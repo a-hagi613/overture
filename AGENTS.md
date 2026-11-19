@@ -154,11 +154,22 @@ Closed. Destinations: Home · Board · Review · Inbox · Profile; Settings from
 
 - Bun, strict TypeScript, Hono, Zod on every input, webhook and env var; SQLite (WAL) via Drizzle; React 19 SPA with
   React Router 7, TanStack Query, Tailwind v4, shadcn/ui. Details: `SPEC.md` §4.
-- No comments; JSDoc on exported port interfaces only. oxlint (all rules), oxfmt, `tsgo --noEmit`.
-- Domain code imports ports only; every port has a production adapter and a fake; e2e uses the fakes.
-- E2E is the standard; six unit files only. Every page reachable in a test, axe clean, 30 visual snapshots.
+- No comments; TSDoc on exported port interfaces only. No hand-written return types on implementations.
+- Lint is every Oxlint rule plus Landmines, anti-slop and the architecture rules; the off-list and its reasons are
+  ADR 0023. Never add an `oxlint-disable` to get green: fix the code, or propose a change to ADR 0023.
+- Domain code imports ports only. Tests run the real adapters: no mocks, stubs or hand-written fakes; third-party
+  HTTP is intercepted by MSW with recorded real responses (ADR 0013). No sleeps, no retries, no raised timeouts.
+- E2E (Playwright) is the standard; six Vitest unit files beside their code. Test files are `*.test.ts`, helpers
+  `*.test-utils.ts`, fixtures `*.fixture.ts`. Every page reachable in a test, axe clean, 30 visual snapshots.
 - Copy strings live in `src/shared/copy`. Tokens through CSS variables; no hard-coded hex in components.
 - Secrets come from `.env` (chmod 600) or Fly secrets. Never print, commit or copy them.
+
+### Linting and formatting
+
+- After making code changes, run `bunx oxlint --fix`, then run `bunx oxfmt`.
+- Before finishing, run `bunx oxlint --deny-warnings --format=agent`; zero warnings is the bar.
+- Claude Code runs both on every edited file through the project hook in `.claude/settings.json` (added with the
+  skeleton ticket, M1-01).
 
 ### Design
 
