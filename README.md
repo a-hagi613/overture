@@ -7,15 +7,17 @@ managed cloud browser.
 
 No code exists yet. The repository holds the specification and the owner's seed data.
 
-| File | What it is |
+| Where | What |
 |---|---|
-| `DESIGN.md` | Visual design system. Authority on appearance |
-| `docs/v2/SPEC.md` | Product and architecture specification. Authority on what exists |
-| `docs/v2/DECISIONS.md` | Why, with the rejected alternative for each decision |
-| `docs/v2/GLOSSARY.md` | The words, used exactly in code and copy |
-| `docs/v2/GRILL-BRIEF.md`, `docs/v2/research/` | The question set behind the spec, and the evidence |
+| GitHub Issues | Specs and tickets: the source of truth for what is being built |
+| `docs/SPEC.md` | Product and architecture reference |
+| `DESIGN.md` | Visual design system, with the canvas boards as the wireframe |
+| `GLOSSARY.md` | The words, used exactly in code, copy, issues and commits |
+| `docs/adr/` | Decisions that are hard to reverse, and why |
+| `docs/SALVAGE.md` | The only v1 logic that may be ported, and where it goes |
+| `docs/research/` | Evidence behind the browser and tagging choices |
+| `docs/agents/` | Configuration for the engineering skills: issue tracker, labels, domain docs |
 | `profile/` | The owner's resume, answer bank and cover-letter template, seed data for the importer |
-| `docs/v2/SALVAGE.md` | The only v1 logic that may be ported, and where it goes |
-| `AGENTS.md`, `CLAUDE.md` | Instructions for coding agents |
+| `AGENTS.md` (`CLAUDE.md` links to it) | The contract for coding agents |
 
 Precedence: the spec beats the code, and `DESIGN.md` beats the code on appearance.

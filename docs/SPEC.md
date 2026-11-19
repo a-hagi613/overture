@@ -1,22 +1,20 @@
 # Overture v2 — specification
 
-Status: **near-final**, written 2026-11-19 from `docs/v2/DECISIONS.md` Session 3 and reconciled with the owner's
-Session 4 rulings (S13) the same day. Nothing is set in stone; a change goes through `DECISIONS.md` first. Where this
-file and an earlier R-row disagree, Sessions 3–4 and this file win. Every section cites the decision it implements as
-`[S1-02]`. A worker implements one slice from §17 at a time and must not need to ask a product question; if a slice
-does need one, the gap is a spec bug: raise it, do not guess.
+Status: **near-final**, 2026-11-19. Nothing is set in stone. The decisions behind this file are ADRs in `docs/adr/`;
+a change to one is a new ADR first, then this file. A worker implements one ticket at a time and must not need to ask
+a product question; if a ticket does need one, the gap is a spec bug: raise it on the issue tracker, do not guess.
 
-Companion files: `docs/v2/DECISIONS.md` (why), `docs/v2/GLOSSARY.md` (words), `docs/v2/SALVAGE.md` (what is ported
-from v1), `docs/v2/research/*.md` (evidence).
+Companion files: `GLOSSARY.md` (words), `DESIGN.md` (appearance), `docs/adr/` (why), `docs/SALVAGE.md` (what is
+ported from v1), `docs/research/*.md` (evidence). Specs and tickets for implementation live as GitHub issues.
 
 **Words.** The banned words (`Hold` as a stage, runner, lease, provider, dispatch, attempt, ledger, credit, CAPTCHA,
 Brain, Hands) never appear in anything a user can read: UI, copy, emails, push, error messages, the landing, the
 admin's user-facing exports. Code uses the glossary's words for product concepts (Application, Review, Stage,
 Posting) and may use precise engineering names for internals (`ledger`, `attempts`, `dispatch/`, `BrowserProvider`),
-because renaming them would hide what they are. [S13-01]
+because renaming them would hide what they are.
 
 Scale: a small side project being made into a SaaS. Prefer the simplest thing that works; no vendor outreach,
-no enterprise process. [S10-01]
+no enterprise process.
 
 ---
 
@@ -24,26 +22,31 @@ no enterprise process. [S10-01]
 
 Overture finds job postings from ATS job feeds, scores them against the user's resume, prepares each application
 from the user's own facts, and submits it through the employer's real ATS form in a managed cloud browser. Users
-never see a browser or a CAPTCHA. [S6-03]
+never see a browser or a CAPTCHA.
 
 Promises, in priority order:
 
 1. **Never lie.** Every factual answer comes from a saved fact. The resume PDF is sent byte-for-byte unchanged.
-   Cover letters and open-text answers only make claims traceable to the resume. [S2-08, R10-03]
+   Cover letters and open-text answers only make claims traceable to the resume.
 2. **Never embarrass.** Never apply to the current employer or a skipped company, never twice to the same role, never
-   in bursts, never below the user's threshold. [S8-01, S8-02, S3-03]
-3. **Never charge for failure.** An application uses one of "Applications left" only when it is actually sent. [S4-05]
+   in bursts, never below the user's threshold.
+3. **Never charge for failure.** An application uses one of "Applications left" only when it is actually sent.
 4. **Fully automatic.** The only thing a user is ever asked mid-pipeline is a factual question Overture cannot answer.
-   [S6-03]
+  
 5. **Auditable.** Every sent application keeps an immutable record of the exact answers, letter, resume file and
-   consent. [S7-03]
+   consent.
+
+Who it is for: one person running a serious job search, ten roles a day, who will not hand-fill forms and will not
+let a tool invent an answer. Primary persona on the boards: a senior backend/platform engineer in Canada searching
+globally. Platform: a web app installable as a PWA, phone-first for triage (answering a Review between meetings),
+desktop for reviewing proof.
 
 Non-goals: native apps, Telegram/SMS, user-facing live browser, real-email mode, Workday/iCIMS/Taleo, teams/workspaces,
-per-user AI keys, resume generation or restyling, annual plans. [S6-04, S6-06, S2-06, R3-03]
+per-user AI keys, resume generation or restyling, annual plans.
 
 ---
 
-## 2. Milestones and exit gates [S1-01]
+## 2. Milestones and exit gates
 
 | Milestone | Who | Scope | Exit gate |
 |---|---|---|---|
@@ -51,13 +54,13 @@ per-user AI keys, resume generation or restyling, annual plans. [S6-04, S6-06, S
 | **M2 — Invite-only beta** | invited users | onboarding wizard, mailboxes for all, two-way Inbox (SES), notifications (PWA push + digest), check-ins, email-driven stage moves, full admin (users, Reveal, audit, support access log), export/delete, legal pages + consent, SmartRecruiters/Recruitee/Workable/Personio after a 20-form probe each. Each accepted invite gets an admin grant of 300 applications over 30 days (no card) | 10 beta users for 14 days; submit rate holds ≥ 85 %; no P1 privacy/security finding |
 | **M3 — Public** | anyone | Stripe Managed Payments, trial/week/month plans, card fingerprints, grants/expiry, payment-failure pause, admin refunds, public landing + pricing (prerendered), public signup | first 20 paying users; Stripe reconciliation matches the ledger for 30 days |
 
-Ledger tables and plan limits exist from M1 so nothing is rewritten in M3. [S1-01]
+Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 
 ---
 
 ## 3. System architecture
 
-### 3.1 Deployment [S1-02, S6-02]
+### 3.1 Deployment
 
 ```
  users (browser/PWA) ──HTTPS──▶ Cloudflare (DNS, WAF, CDN, Turnstile, Access)
@@ -80,17 +83,17 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3. [S1-0
 ```
 
 - One Fly app, one machine, one volume. `fly scale count` stays 1. Machine: `shared-cpu-2x`, 2 GB; volume 10 GB.
-  No runner app: browsers are remote. [S6-02]
+  No runner app: browsers are remote.
 - Same origin for API and SPA. `admin.tryoverture.com` is the same process, routed by host, behind Cloudflare Access.
 - Deploys cause ~10–30 s downtime; on `SIGTERM` the process stops claiming jobs, waits ≤ 25 s for in-flight jobs,
-  then exits; in-flight browser attempts are abandoned and recovered by lease expiry (§9.4). [S8-08]
+  then exits; in-flight browser attempts are abandoned and recovered by lease expiry (§9.4).
 - **Where traffic comes from.** Every request that loads or submits an employer's application form comes from a
   Browser Use browser on a residential IP in the user's country, controlled by `overture-web` over CDP. `overture-web`
   itself calls only the ATSes' public job-feed APIs (discovery §6, the liveness re-check §9.3), which exist for
   programmatic reading. The developer machine never contacts an ATS, a job site or a Browser Use session; it runs
-  code and tests against the local fixture server only. [S13-07]
+  code and tests against the local fixture server only.
 - Litestream replicates continuously to R2 `overture-backups`; a nightly snapshot is kept 30 days; a restore drill
-  runs in CI weekly against a throwaway machine. [R2-08]
+  runs in CI weekly against a throwaway machine.
 
 ### 3.2 External services and environment
 
@@ -113,23 +116,23 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3. [S1-0
 
 All secrets are Fly secrets; local dev reads `.env` (chmod 600, never committed).
 
-### 3.3 Domains and DNS [S9-01..03]
+### 3.3 Domains and DNS
 
-- `tryoverture.com` is registered (Cloudflare Registrar, owner's account). [S13-08]
+- `tryoverture.com` is registered (Cloudflare Registrar, owner's account).
 - `tryoverture.com`: app, marketing, Overture's own mail (`no-reply@`, `hello@` forwarded to the owner via Email
   Routing). SES DKIM (3 CNAMEs), SPF `include:amazonses.com`, DMARC `p=reject; rua=…`, custom MAIL FROM
   `bounce.tryoverture.com`.
-- `mail.tryoverture.com` (subdomain, no second domain bought [S12-01]): job-search addresses. MX on the subdomain →
+- `mail.tryoverture.com` (subdomain, no second domain bought): job-search addresses. MX on the subdomain →
   Cloudflare Email Routing (subdomain added in Email Routing settings), catch-all → Worker `mail-ingest`; confirm at
   setup that the catch-all covers the subdomain, else a Worker route rule for `*@mail.tryoverture.com`. Its own SES
   identity and DKIM, SPF `v=spf1 include:amazonses.com -all`, `_dmarc.mail` `p=reject; adkim=s; aspf=s`, so its
   reputation is tracked apart from the apex. `https://mail.tryoverture.com` serves a one-page explainer: "This is
-  Overture's private job-search email. Each address belongs to one job seeker." [R9-02]
+  Overture's private job-search email. Each address belongs to one job seeker."
 - `admin.tryoverture.com`: Cloudflare Access application (owner identity only).
 
 ---
 
-## 4. Tech stack and repository [S1-07, S1-08, S7-02]
+## 4. Tech stack and repository
 
 | Layer | Choice |
 |---|---|
@@ -169,9 +172,9 @@ tests/e2e/           Playwright specs + fixtures server + fakes
 tests/unit/          ≤ 6 files (§15.2)
 ```
 
-No comments in source (enforced by script; JSDoc on exported port interfaces is the one exception). [R5-04]
+No comments in source (enforced by script; JSDoc on exported port interfaces is the one exception).
 
-### 4.1 Ports (every external dependency) [R2-09, S1-03, S3-04]
+### 4.1 Ports (every external dependency)
 
 ```ts
 interface LlmPort { complete<T>(req: LlmRequest<T>): Promise<LlmResult<T>>; batch<T>(reqs: LlmRequest<T>[]): Promise<BatchHandle> }
@@ -225,13 +228,13 @@ updated_at) · `session` · `account` (provider: google, linkedin, credential) �
 | `company_boards` | id, company_id, ats CHECK IN ('greenhouse','lever','ashby','smartrecruiters','recruitee','workable','personio'), board_token, status CHECK IN ('active','empty','gone','disabled'), source CHECK IN ('v1_seed','discovered','import'), etag, last_modified, content_hash, last_polled_at, next_poll_at, backoff_level, consecutive_errors, created_at; UNIQUE(ats,board_token) |
 | `postings` | id, board_id, company_id, ats, ats_job_id, url, apply_url, apply_url_norm, title, title_norm, department, location_raw, country_code, region, city, workplace CHECK IN ('remote','hybrid','onsite','unknown'), employment_type CHECK IN ('full_time','part_time','contract','internship','temporary','unknown'), language, salary_min_minor, salary_max_minor, salary_currency, salary_period, posted_at, source_updated_at, first_seen_at, last_seen_at, missing_polls, closed_at, description_gz BLOB NULL, description_hash, dedupe_key, tag_source CHECK IN ('rules','model','llm','import'), tagged_at, questions_fetched_at; UNIQUE(board_id, ats_job_id); INDEX(apply_url_norm); INDEX(closed_at); INDEX(dedupe_key) |
 | `posting_tags` | posting_id, dimension CHECK IN ('role','subrole','seniority'), value, source; PK(posting_id,dimension,value) |
-| `postings_fts` | FTS5(title, company, location, department) content=`postings` (short fields only) [R7-02] |
+| `postings_fts` | FTS5(title, company, location, department) content=`postings` (short fields only) |
 | `questions` | id, text_display, text_norm_hash UNIQUE, field_type CHECK IN ('text','textarea','select','multiselect','radio','checkbox','file','date','number','email','phone','url'), options_hash NULL, fact_key NULL, answer_kind CHECK IN ('fact','open_text','consent','skip','unknown'), mapped_by CHECK IN ('rules','llm','owner'), seen_count, created_at |
 | `question_variants` | variant_hash PK, question_id |
 | `posting_questions` | posting_id, question_id, required, position, options JSON; PK(posting_id,question_id) |
 | `tag_imports` | id, source, file_sha256, rows, matched, applied_at |
 
-Descriptions (`description_gz`) are purged 90 days after `closed_at`. [R7-02]
+Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 
 ### 5.4 Pipeline
 
@@ -258,7 +261,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`. [R7-02]
 | `message_attachments` | id, message_id, filename_enc, mime, bytes, object_key |
 | `mail_suppressions` | address_hash PK, reason CHECK IN ('bounce','complaint'), created_at |
 
-### 5.6 Billing [S7-01, S8-05]
+### 5.6 Billing
 
 | Table | Columns |
 |---|---|
@@ -292,15 +295,15 @@ and expired in the same transaction (`release` then `expire`), so it never retur
 | `admin_audit` | id, at, actor_id, action, target_user_id NULL, reason, detail JSON — also shipped to Loki (off-box, append-only) |
 
 Retention: `events` 24 h; `bg_jobs` done 7 days, dead 30 days; `attempts` 180 days; `llm_usage` 400 days;
-`notifications` 90 days; descriptions 90 days after close; messages for account lifetime. [R7-02, S2-03]
+`notifications` 90 days; descriptions 90 days after close; messages for account lifetime.
 
 ---
 
 ## 6. Catalog: discovery and tagging
 
-### 6.1 Sources [S1-09, S2-06]
+### 6.1 Sources
 
-Ported from the v1 feed clients (`docs/v2/SALVAGE.md`); Workable and Personio are new in M2. Each implements
+Ported from the v1 feed clients (`docs/SALVAGE.md`); Workable and Personio are new in M2. Each implements
 `fetchBoard(token, {etag, lastModified}) → {status: 'not_modified'} | {status: 'ok', postings, etag?, lastModified?} | {status: 'gone'}`.
 Discovery runs from `overture-web` directly (no proxy).
 
@@ -312,7 +315,7 @@ Discovery runs from `overture-web` directly (no proxy).
 | SmartRecruiters (M2) | `api.smartrecruiters.com/v1/companies/{id}/postings` + details | content hash | 2 concurrent, 1 req/s |
 | Recruitee (M2) | `{token}.recruitee.com/api/offers/` | content hash | 2 concurrent, 1 req/s |
 
-### 6.2 Backfill and trickle [R10-04]
+### 6.2 Backfill and trickle
 
 1. **Seed**: `scripts/import-v1.ts` loads `company_boards` from the one-time v1 export (§18) — about 22,800 boards.
 2. **Backfill**: one pass over every active board inside per-ATS limits.
@@ -323,7 +326,7 @@ Discovery runs from `overture-web` directly (no proxy).
 5. **Dedupe**: `dedupe_key = company_id + title_norm + country_code + city`; duplicates across boards keep the
    earliest posting; users never see two cards for one role.
 
-### 6.3 Tagging [S6-05, S5-01]
+### 6.3 Tagging
 
 Order of precedence for role/seniority: `import` (hiring.cafe file, if the owner provides one) > `rules` > `model` > `llm`.
 
@@ -345,9 +348,9 @@ Order of precedence for role/seniority: `import` (hiring.cafe file, if the owner
 6. **hiring.cafe import seam**: `POST /admin/api/tag-imports` accepts JSONL rows
    `{apply_url, title, company, role?, subrole?, seniority?, workplace?, employment_type?, salary?}`; rows match a
    posting by `apply_url_norm`; matched rows set `tag_source='import'`. Overture ships no code that fetches
-   hiring.cafe. [S6-05]
+   hiring.cafe.
 
-### 6.4 Taxonomy (starting lists; the census finalises them) [S3-01]
+### 6.4 Taxonomy (starting lists; the census finalises them)
 
 - **Role groups**: Software Engineering, Data & Analytics, Machine Learning & AI, Product Management, Design, DevOps
   & Infrastructure, Security, IT & Support Engineering, QA & Test, Hardware & Embedded, Sales, Customer Success,
@@ -359,16 +362,16 @@ Order of precedence for role/seniority: `import` (hiring.cafe file, if the owner
 - **Workplace**: Remote, Hybrid, On-site. **Employment**: Full-time, Part-time, Contract, Internship, Temporary.
 - Onboarding shows only values with ≥ 1 open posting in the user's locations.
 
-### 6.5 Census [S3-01]
+### 6.5 Census
 
 `scripts/census.ts` runs on `overture-web` against the v2 catalog after the first backfill; prints only aggregates: postings per ATS/country/workplace, top 2,000 title_norm with counts, department
-frequency, share classified by rules at each threshold. Output committed to `docs/v2/research/census.md`.
+frequency, share classified by rules at each threshold. Output committed to `docs/research/census.md`.
 
 ---
 
 ## 7. Profile, facts and resume
 
-### 7.1 Fact catalog (`src/shared/facts.ts`) [S5-03, S8-02, S8-03]
+### 7.1 Fact catalog (`src/shared/facts.ts`)
 
 | Tier | Keys | When |
 |---|---|---|
@@ -378,7 +381,7 @@ frequency, share classified by rules at each threshold. Output committed to `doc
 
 Each fact has `revision`; snapshots record the revision used.
 
-### 7.2 Resume [S8-10, R11-02]
+### 7.2 Resume
 
 - Upload PDF ≤ 10 MB, stored encrypted in R2 `files/{user_id}/resume/{id}.pdf.enc`; sha256 recorded.
 - Parse with `unpdf` (text + column boxes); if text < 200 characters or column detection fails, one Haiku 5.5 PDF
@@ -386,7 +389,7 @@ Each fact has `revision`; snapshots record the revision used.
 - A replacement becomes current for new applications only; snapshots keep the old file.
 - `current_employer` prefilled from the most recent role in `employment_history` → `skip_companies`.
 
-### 7.3 Job-search address [S2-02, S3-06]
+### 7.3 Job-search address
 
 - `local_part = slug(first) + "." + slug(last)`, first name from `preferred_name` when set, else `legal_name`: Unicode NFKD, strip diacritics, transliterate
   non-Latin (ICU-style table), lowercase, keep `a–z 0–9 -`, collapse repeats, max 40 chars.
@@ -394,13 +397,13 @@ Each fact has `revision`; snapshots record the revision used.
 - Shown once in onboarding with "Looks good"; changes only via admin. On account deletion the local part moves to
   `retired_addresses` and is never reused.
 - After cancel, `status='receive_only'`, `receive_until = now + 12 months`; after that `closed` and the Worker
-  rejects mail. [S2-03]
+  rejects mail.
 
 ---
 
 ## 8. Pipeline: matching, preparation, reviews
 
-### 8.1 Candidates (code, free) [S3-02, S8-01..03]
+### 8.1 Candidates (code, free)
 
 A posting is a candidate for a user when all hold: open; tags intersect `targets.roles` (or subroles) and
 `seniorities`; workplace ∈ targets; location matches a target location (a remote posting matches when its country
@@ -412,7 +415,7 @@ ready, sending or confirming, and none sent to it in the last 7 days (failed, sk
 no sent application to the same `dedupe_key` in the last 60 days; crowd limits not reached (§12); not `hidden`; no kill
 switch on its ATS/employer.
 
-**Skip matching** (the current employer and skipped companies) [S13-05]: a posting's company is skipped when any of
+**Skip matching** (the current employer and skipped companies): a posting's company is skipped when any of
 these match a `skip_companies` row: same `company_id`; same registrable domain; same name after normalisation
 (lowercase, diacritics folded, punctuation dropped, legal suffixes `inc`, `ltd`, `llc`, `corp`, `co`, `gmbh`, `sa`,
 `plc`, `limited`, `corporation` removed). A near match (token similarity ≥ 0.85 but not equal) also skips and is
@@ -422,7 +425,7 @@ logged for the owner: when unsure, Overture does not apply.
 10 / country 5 / remote 15, salary known and ≥ floor 10, recency (posted ≤ 3 days 10, ≤ 14 days 5). Candidate rows
 are refreshed by job `match.refresh` when a posting is created/changed or a user's targets change.
 
-### 8.2 Lazy scoring [S3-02, S3-03, S8-06]
+### 8.2 Lazy scoring
 
 Job `match.fill` runs per running user every hour and after any event that frees a slot:
 
@@ -440,7 +443,7 @@ for candidate in candidates ordered by code_rank desc, unscored-or-stale first:
   (`match.score_on_open`). Manual Apply is allowed below threshold (`origin='manual'`).
 - Badge "Strong match" at score ≥ 80.
 
-### 8.3 Preparation [S2-08, R10-03]
+### 8.3 Preparation
 
 Job `application.prepare`:
 
@@ -449,7 +452,7 @@ Job `application.prepare`:
 2. Map each question to the catalog: normalise text (lowercase, strip punctuation/numbers/company names) → hash →
    `question_variants`; unknown → rules (regex set for common facts) → else Haiku mapping call returning
    `{fact_key | 'open_text' | 'consent' | 'skip' | 'unknown'}` from the fixed fact list. Result stored on `questions`.
-   Posting text passes the posting guard (`docs/v2/SALVAGE.md`) first and never decides a factual answer.
+   Posting text passes the posting guard (`docs/SALVAGE.md`) first and never decides a factual answer.
 3. Answer: `fact` → saved fact value (formatted to the field type/options; select options matched by normalised
    text, then synonyms table, else unknown); `open_text` → Haiku from resume text + posting (≤ 120 words unless the
    field states a limit), returned as `[{sentence, resume_line_ids}]` with the same rule as cover letters: a sentence
@@ -458,19 +461,19 @@ Job `application.prepare`:
 4. Cover letter only if the form has a cover-letter field: ≤ 200 words, in the posting's language, generated from
    resume + posting + the user's cover-letter template (its fixed text kept verbatim, its blanks filled) or, without a
    template, the voice sample; every sentence with a factual claim must map to a resume line (the model returns
-   `[{sentence, resume_line_ids}]`); sentences without a mapping are removed. [R10-03]
+   `[{sentence, resume_line_ids}]`); sentences without a mapping are removed.
 5. Unknown **required** factual question → status `needs_review`, create/attach a Review. Unknown **optional** →
-   left blank, never blocking. [S2-08]
+   left blank, never blocking.
 6. All answered → status `ready`, `scheduled_for` assigned by the planner (§9.2).
 
-### 8.4 Reviews [S6-03, R6-04]
+### 8.4 Reviews
 
 - One open Review per (user, question). Each lists the applications it blocks ("unlocks 4 jobs").
 - Answering saves the fact (Tier 3 `q:<id>` or the mapped fact key), re-runs `application.prepare` on every attached
   application, and closes the Review. Dismiss → attached applications `skipped` (`review_dismissed`).
 - A posting that closes while waiting detaches; a Review with no attachments auto-dismisses.
 
-### 8.5 Stages and check-ins [S4-05, S8-07]
+### 8.5 Stages and check-ins
 
 - `stage` is `queued` while status ∈ {preparing, needs_review, ready, sending, confirming}; becomes `applied` on
   `sent`; `NULL` (off-Board) for failed/skipped/withdrawn. A card in `confirming` shows "Checking with the employer".
@@ -481,7 +484,7 @@ Job `application.prepare`:
   (Rejected · Interviewing · Still waiting). After 45 days with neither mail nor answer → `closed`,
   `closed_reason='no_response'`, undoable.
 
-### 8.6 LLM usage [S2-04, S4-09]
+### 8.6 LLM usage
 
 Model `claude-haiku-5-5` in production through `LlmPort`; local dev adapter uses OpenCode Go DeepSeek. All calls:
 structured outputs (`output_config.format`), thinking disabled with `effort: "low"` except cover letters
@@ -500,7 +503,7 @@ structured outputs (`output_config.format`), thinking disabled with `effort: "lo
 Caps (settings): `$0.25` per user per day, `$10` per day global, `$1` per day tagging. A capped call fails closed:
 scoring pauses until the next UTC day, preparation waits, the owner is alerted.
 
-> `email_classify` extends the S2-04 list of LLM uses; it runs only when the rules in §11.3 are not confident.
+> `email_classify` is the one LLM use beyond scoring, answers, letters, PDF fallback and question mapping; it runs only when the rules in §11.3 are not confident.
 
 ---
 
@@ -509,9 +512,9 @@ scoring pauses until the next UTC day, preparation waits, the owner is alerted.
 ### 9.1 Ready queue
 
 Applications in `ready` with `scheduled_for ≤ now`, ordered by user round-robin, then `score_at_queue` desc. Home
-shows queue position and an ETA computed from the planner's slots. [R10-05]
+shows queue position and an ETA computed from the planner's slots.
 
-### 9.2 Planner (pacing) [S8-01]
+### 9.2 Planner (pacing)
 
 Job `planner.day` runs at each user's local midnight and whenever new `ready` applications appear: picks
 `k = min(remaining_today, ready count)` random times in the remaining part of the user's local 08:00–20:00 window,
@@ -530,12 +533,12 @@ that pass every gate below, in order:
 4. Applications left ≥ 1 and today's used + reserved < daily cap (10).
 5. Per-ATS global hourly cap not exceeded; crowd limits (20 Overture applicants per posting, 50 per employer per
    7 days) not exceeded.
-6. **Liveness re-check**: fetch the posting from its ATS API; closed → `skipped/posting_closed`. [R4-13]
+6. **Liveness re-check**: fetch the posting from its ATS API; closed → `skipped/posting_closed`.
 
 Then, in one transaction: ledger `reserve` (idempotency key `reserve:<application_id>:<attempt n>`), status
 `sending`, create `attempts` row with `lease_until = now + 12 min`, enqueue `submit.run`.
 
-### 9.4 Outcomes [S13-04]
+### 9.4 Outcomes
 
 The executor sets `attempts.submit_clicked_at` in the same instant it clicks the final Submit. That timestamp splits
 every failure in two: before it, nothing reached the employer and a retry is safe; after it, the employer may have
@@ -560,7 +563,7 @@ the one-in-flight slot (the partial unique index covers `sending` only) and coun
 **Recovery sweep** (every minute): an attempt whose `lease_until` has passed with no outcome is closed as `unconfirmed`
 if `submit_clicked_at` is set, else as `crash`, and the table above applies.
 
-### 9.5 Automatic kill switches [S6-03, S6-07]
+### 9.5 Automatic kill switches
 
 Evaluated every 10 minutes over the last 50 attempts per scope: ATS success rate < 60 % → ATS switch on; employer
 with ≥ 3 consecutive `blocked`/`captcha_blocked` → employer switch on; provider success < 50 % over 20 attempts →
@@ -571,14 +574,14 @@ switches off.
 
 ## 10. Browser execution
 
-### 10.1 Providers [S6-01, S7-05]
+### 10.1 Providers
 
 - **Browser Use Cloud** (default): `POST /api/v4/browsers` with `profileId` (one per user, created on first use),
   `proxyCountryCode` = user's `current_country` (fallback: nearest supported country from a static map),
   `solveCaptchas: true`; connect with `chromium.connectOverCDP(cdpUrl)`; **always** stop the browser through the
   API in `finally` (closing CDP does not stop billing).
 - **Kernel** (emergency fallback): headful browser, stealth on, ISP proxy, per-user profile. Its acceptable-use
-  policy bans "bulk unsolicited form submission" (S6-01), so it is exercised only against the synthetic lab and
+  policy bans "bulk unsolicited form submission" (ADR 0003), so it is exercised only against the synthetic lab and
   fixtures, never sent real applications by default; the owner switches real traffic to it only if Browser Use's
   provider kill switch trips and the owner chooses to.
 - **Local** (tests/dev): local headed Chrome against the fixture server; no network to ATSes.
@@ -586,13 +589,13 @@ switches off.
 
 ### 10.2 Executor (ported)
 
-Ported from the v1 form-filling engine and per-ATS flows (`docs/v2/SALVAGE.md`), with everything about local Chrome,
+Ported from the v1 form-filling engine and per-ATS flows (`docs/SALVAGE.md`), with everything about local Chrome,
 Xvfb, the laptop, wireproxy, live view, Rehearsal and Shadow removed. The executor reads the page's ARIA tree,
 matches fields to prepared answers by label, fills, uploads, and verifies before submit.
 
 ### 10.3 Attempt steps (`submit.run`)
 
-1. Open provider browser; `page.route` aborts `image`, `font`, `media` and known analytics hosts. [S1-04]
+1. Open provider browser; `page.route` aborts `image`, `font`, `media` and known analytics hosts.
 2. Navigate to `apply_url`; if the page says the job is closed → `posting_closed`.
 3. Compute the form signature; load the cached plan or build one.
 4. Fill answers; upload the resume with `setInputFiles({name, mimeType, buffer})` from the decrypted file.
@@ -610,7 +613,7 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 9. Close the browser; record `browser_ms`, `proxy_bytes`, `cost_micros` from the provider usage report.
 10. Hard timeout 10 min → `timeout` before the click, `unconfirmed` after it.
 
-### 10.4 Synthetic lab and provider report (M1) [S6-01, S13-06]
+### 10.4 Synthetic lab and provider report (M1)
 
 - Synthetic: `https://tryoverture.com/lab/*` pages with reCAPTCHA v3 (score logged server-side), hCaptcha, Turnstile
   and recorded ATS fixture forms; 200 sessions per provider (Browser Use and Kernel); no employer involved.
@@ -626,13 +629,13 @@ Submit. It saves sanitised HTML + assets (names, emails, tokens and employer tra
 `fixtures/{ats}/{form_signature}/`. A developer pulls them into `tests/e2e/fixtures/forms/` with
 `scripts/pull-fixtures.ts` (R2 read only, no ATS traffic); the local fixture server replays them, including fake
 confirmation pages, a fake code prompt and a fake visible challenge. Live smoke checks are the same kind of admin job,
-stopping before Submit. The developer machine never drives a browser against a real form. [S1-05, S13-07]
+stopping before Submit. The developer machine never drives a browser against a real form.
 
 ---
 
 ## 11. Inbox
 
-### 11.1 Inbound [S2-01, S2-03, S3-05]
+### 11.1 Inbound
 
 1. Cloudflare Email Routing catch-all on `mail.tryoverture.com` → Worker `mail-ingest`.
 2. Worker: reject if the local part is unknown or `closed` (lookup via signed `GET /internal/mailboxes/{local}`,
@@ -648,7 +651,7 @@ stopping before Submit. The developer machine never drives a browser against a r
    name or posting title found in subject/body, choosing the most recent sent application to that company.
 6. Automation (codes, stage moves) only when `auth='pass'`.
 
-### 11.2 Outbound (M2) [S2-01, S4-03]
+### 11.2 Outbound (M2)
 
 Reply composer in Inbox; allowed only in threads with `employer_started=1`, ≤ 20 per user per day, attachments
 ≤ 10 MB total; sent via SES `SendRawEmail` from `local_part@mail.tryoverture.com` with correct `In-Reply-To`/`References`;
@@ -667,45 +670,45 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
 
 ## 12. Limits and settings (admin-tunable defaults)
 
-| Key | Default | Source |
+| Key | Default | ADR |
 |---|---|---|
-| `limits.daily_cap` | 10, resetting at the user's local midnight | S8-01 |
-| `limits.send_window` | 08:00–20:00 user local, ≥ 20 min apart | S8-01 |
-| `limits.company_cooldown_days` | 7 | S8-01 |
-| `limits.repost_guard_days` | 60 | S8-01 |
-| `limits.crowd_per_posting` | 20 | S8-01 |
-| `limits.crowd_per_employer_week` | 50 | S8-01 |
-| `limits.ats_hourly.{ats}` | 120 | S8-01 |
-| `limits.max_attempts` | 2 (pre-submit failures only) | R4-13 |
-| `limits.confirm_wait_hours` | 24 | S13-04 |
-| `limits.reply_per_day` | 20 | S2-01 |
-| `limits.timezone_change_days` | 7 | R7-02 |
-| `match.auto_threshold_default` | 60 (user may pick 50) | S3-03 |
-| `match.strong` | 80 | S3-03 |
-| `llm.cap_user_day_usd` / `llm.cap_global_day_usd` / `llm.cap_tagging_day_usd` | 0.25 / 10 / 1 | S2-04, S6-05 |
-| `browser.provider` | `browser_use` | S6-01, S13-06 |
-| `browser.concurrency` | 10 | Browser Use tier |
-| `checkin.after_days` / `checkin.close_after_days` | 21 / 45 | S8-07 |
-| Plans (M3) | trial 3 one-time; week $12 → 70 / 7 days; month $35 → 300 / 30 days; renewals; no rollover | S3-08, S8-05 |
+| `limits.daily_cap` | 10, resetting at the user's local midnight | 0010 |
+| `limits.send_window` | 08:00–20:00 user local, ≥ 20 min apart | 0010 |
+| `limits.company_cooldown_days` | 7 | 0010 |
+| `limits.repost_guard_days` | 60 | 0010 |
+| `limits.crowd_per_posting` | 20 | 0010 |
+| `limits.crowd_per_employer_week` | 50 | 0010 |
+| `limits.ats_hourly.{ats}` | 120 | 0010 |
+| `limits.max_attempts` | 2 (pre-submit failures only) | 0009 |
+| `limits.confirm_wait_hours` | 24 | 0009 |
+| `limits.reply_per_day` | 20 | 0005 |
+| `limits.timezone_change_days` | 7 | — |
+| `match.auto_threshold_default` | 60 (user may pick 50) | 0011 |
+| `match.strong` | 80 | 0011 |
+| `llm.cap_user_day_usd` / `llm.cap_global_day_usd` / `llm.cap_tagging_day_usd` | 0.25 / 10 / 1 | 0011, 0017 |
+| `browser.provider` | `browser_use` | 0003 |
+| `browser.concurrency` | 10 | 0003 |
+| `checkin.after_days` / `checkin.close_after_days` | 21 / 45 | 0012 |
+| Plans (M3) | trial 3 one-time; week $12 → 70 / 7 days; month $35 → 300 / 30 days; renewals; no rollover | 0018 |
 
 ---
 
 ## 13. Security and privacy
 
-### 13.1 Auth [S4-02]
+### 13.1 Auth
 
 - better-auth: Google, LinkedIn (OIDC; name/email/photo only), email + password (scrypt, HaveIBeenPwned plugin,
   min 10 chars), magic link (15 min, single use). Email must be verified before any application runs.
 - Account linking only between methods with the **same verified email**.
 - Turnstile + rate limits (IP and email): signup 5/h, login 10/15 min, magic link 3/15 min, reset 3/h.
 - Cookies httpOnly, Secure, SameSite=Lax; CSRF by Origin check on state-changing routes; sessions 30 days rolling;
-  "Sign out all devices" in Settings. [R11-02]
+  "Sign out all devices" in Settings.
 - M1 allowlist = owner; M2 invites; M3 public.
 
-### 13.2 Encryption and deletion [S4-07]
+### 13.2 Encryption and deletion
 
 - Envelope encryption: per-user 256-bit DEK, wrapped with AES-256-GCM under `MASTER_KEY_v{n}`; ported from v1
-  (`docs/v2/SALVAGE.md`). Ciphertext format `v1:{key_version}:{iv}:{tag}:{data}`; associated data =
+  (`docs/SALVAGE.md`). Ciphertext format `v1:{key_version}:{iv}:{tag}:{data}`; associated data =
   `table:column:row_id`.
 - Encrypted: all `_enc` columns, resume files, mail HTML and attachments, exports.
 - **Delete account** (Settings, re-auth): delete Browser Use/Kernel profiles via API, delete `user_keys` (shred),
@@ -716,7 +719,7 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
 - Logs/traces never contain names, emails, phone numbers, answers, letters or mail content; a redaction processor in
   the OTel pipeline drops attributes outside an allowlist.
 
-### 13.3 Admin [S5-04, R4-08]
+### 13.3 Admin
 
 - Host `admin.tryoverture.com`: Cloudflare Access (owner identity) **and** better-auth session with `role='owner'`
   **and** a passkey assertion within the last 12 h.
@@ -725,15 +728,15 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
 - Never shown per person: EEO answers (aggregate counts only), card data (Stripe), password hashes.
 - Act-as is **read-only** and requires an active Reveal.
 
-### 13.4 Legal minimum before M2 [S7-03]
+### 13.4 Legal minimum before M2
 
 Terms of Service, Privacy Policy (sub-processors: Fly, Cloudflare, Browser Use, Kernel, Anthropic, AWS, Grafana,
 Stripe), per-application consent text versioned in `consent_version`. Vendors' standard published DPAs are accepted
-as-is; no vendor outreach. [S10-01] Drafts for owner review, not legal advice.
+as-is; no vendor outreach. Drafts for owner review, not legal advice.
 
 ---
 
-## 14. API surface [R10-08]
+## 14. API surface
 
 All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes are better-auth's (`/api/auth/*`).
 
@@ -764,34 +767,34 @@ SSE topics: `application.updated`, `board.moved`, `review.created`, `review.reso
 
 Visual design: the canvas artifact `P3aiZsEXkoUKBrknvvBNJJ`, Section A, is the wireframe and the build matches it
 pixel for pixel; `DESIGN.md` is its written contract. Boards that contradict this spec are redrawn before the slice
-that builds them (`DESIGN.md` §13). [D1-01, S13-09] Five destinations: **Home, Board, Review, Inbox, Profile**; Settings from
-the avatar; desktop hover submenus; phone bottom tab bar; sub-sections are list pages on phone. [S4-06]
+that builds them (`DESIGN.md` §13). Five destinations: **Home, Board, Review, Inbox, Profile**; Settings from
+the avatar; desktop hover submenus; phone bottom tab bar; sub-sections are list pages on phone.
 
 | Surface | Content | Key states |
 |---|---|---|
 | Home | Start/Pause switch with pause reason; applications left; today sent / remaining; queue position + ETA; Up next (code-ranked, score on open, Apply/Save/Hide); activity incl. "Couldn't apply" with reason; check-ins; strengthen-profile prompt | paused (each reason has its own copy and fix), nothing matching, waiting for Review, out of applications |
-| Board | Columns Queued, Applied, Screening, Interviewing, Offer, Closed; cards with company, title, score, Strong match badge, "why this match"; card sheet: timeline, proof (answers + source, letter, resume file), linked mail, stage buttons; desktop dnd-kit + keyboard; phone one column per screen, swipe, 250 ms hold to drag, stage buttons in sheet [R10-06] | empty board, auto-move undo toast |
+| Board | Columns Queued, Applied, Screening, Interviewing, Offer, Closed; cards with company, title, score, Strong match badge, "why this match"; card sheet: timeline, proof (answers + source, letter, resume file), linked mail, stage buttons; desktop dnd-kit + keyboard; phone one column per screen, swipe, 250 ms hold to drag, stage buttons in sheet | empty board, auto-move undo toast |
 | Review | Open questions grouped by jobs unlocked; answer input matches field type; dismiss | none open |
 | Inbox | Threads list (linked company/card), message view, attachments, "Couldn't verify sender" label, reply (M2, employer-started threads only) | empty, address explainer |
 | Profile | Resume, facts by tier, targets with live job count, skip list, job-search address, "Strengthen your profile" | missing Tier 1 facts |
 | Settings | Threshold (60/50), digest, notifications, timezone, languages, job-search address (read-only), the fixed limits explained (10 a day, 08:00–20:00, one company per 7 days; not editable), plan & billing (M3), sign out all devices, export, delete, support access log | |
 | Onboarding (M2) | 1 Sign in · 2 Resume · 3 Your facts (Tier 1, prefilled) · 4 What you want (live count) · 5 Your job-search address + consent + trial card (M3) + Start; PWA install + push prompt after step 5 | resume unreadable → manual entry |
-| Admin | Same design system [S5-04]: Overview (success per provider × ATS, cost per completed application, queue, spend), Users, Applications/Attempts (live view/replay embed), Reviews, Kill switches & Settings, Catalog health, Mail health, Provider report, Fixture capture, Grants/Refunds, Audit | |
+| Admin | Same design system: Overview (success per provider × ATS, cost per completed application, queue, spend), Users, Applications/Attempts (live view/replay embed), Reviews, Kill switches & Settings, Catalog health, Mail health, Provider report, Fixture capture, Grants/Refunds, Audit | |
 | Public (M3) | Landing, pricing, privacy, terms, `mail.tryoverture.com` explainer; prerendered static HTML | |
 
-User-facing copy never uses the banned words (see the Words rule at the top). [S13-01]
+User-facing copy never uses the banned words (see the Words rule at the top; ADR 0020).
 
-### 15.1 Notifications [S6-06]
+### 15.1 Notifications
 
 Push: new Review, employer reply, interview/offer detected, card auto-moved (with Undo), paused (with reason),
 "Couldn't apply" summaries (batched hourly). Daily digest email (opt-out) at 08:00 local: yesterday's sends, replies, open
-Reviews, check-ins. [S11-01] In-app notification list mirrors pushes.
+Reviews, check-ins. In-app notification list mirrors pushes.
 
 ---
 
 ## 16. Quality: testing, CI, observability
 
-### 16.1 End-to-end flows (Playwright, every external faked) [R10-09, S7-02]
+### 16.1 End-to-end flows (Playwright, every external faked)
 
 1. Sign up/in with email + password (verify email) · 2. magic link · 3. Google (fake OIDC) · 4. LinkedIn (fake OIDC)
 · 5. account linking refused for unverified email · 6. v1 importer loads resume, answer bank, learned answers ·
@@ -811,20 +814,20 @@ payment-failure pause (M3) · 32. admin fixture capture job writes sanitised for
 Plus: route reachability for every page, axe on every page, 30 visual snapshots (Home, Board, Review, Inbox, Profile
 × 390 / 1280 px × light/dark) in pinned Docker.
 
-### 16.2 Unit tests (≤ 6 files) [R2-12]
+### 16.2 Unit tests (≤ 6 files)
 
 `ledger.test.ts` (balances, idempotency, FIFO expiry), `crypto.test.ts` (wrap/unwrap, AAD, shred), `planner.test.ts`
 (window, spacing, DST), `address.test.ts` (slug, transliteration, collisions), `tag-rules.test.ts`,
 `question-normalize.test.ts`.
 
-### 16.3 CI [R5-04]
+### 16.3 CI
 
 Parallel jobs: oxlint (all categories, type-aware), oxfmt check, comment ban, `tsgo --noEmit`, Vite build, unit,
 Playwright sharded by duration (per-worker server + template SQLite copy, API-seeded auth, no sleeps, zero
 retries), affected-only on PRs. PR < 2 min; `main` < 4 min including `flyctl deploy --remote-only`. Main deploys
 only when every job passes.
 
-### 16.4 Observability [S6-07]
+### 16.4 Observability
 
 OTel traces for every request and job; metrics: `attempt_outcome_total{provider,ats,outcome}`,
 `attempt_cost_micros`, `queue_depth{kind}`, `llm_cost_micros{purpose}`, `mail_inbound_total{auth}`,
@@ -874,16 +877,16 @@ signup · M3-05 cost and margin review with measured numbers; final prices.
 
 ---
 
-## 18. v1 sunset and salvage [R10-10, S13-02, S13-03]
+## 18. v1 sunset and salvage
 
 v2 lives in its own repository; v1 (`a-hagi613/ai-auto-apply`) is read-only reference. What is ported from v1 and
-where it goes: `docs/v2/SALVAGE.md`. Nothing else is taken.
+where it goes: `docs/SALVAGE.md`. Nothing else is taken.
 
 v1 runs on Fly app `ai-auto-apply` (volume `data`, yyz). In order:
 
 1. Snapshot the v1 volume (kept until v1 is destroyed).
 2. Export from the v1 database, read-only: `company_boards`, the owner's answer-bank tables and `learned_answers`
-   (`docs/v2/SALVAGE.md`). The export is encrypted and kept off the repository; boards are not personal data.
+   (`docs/SALVAGE.md`). The export is encrypted and kept off the repository; boards are not personal data.
 3. Stop the v1 machines. Nothing sends from v1 again.
 4. Create `overture-web` with a fresh v2 database; `scripts/import-v1.ts` loads the export. No v1 schema migrates.
 5. Destroy `ai-auto-apply` and its snapshot after a week of the owner using v2.

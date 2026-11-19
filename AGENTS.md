@@ -119,16 +119,17 @@ Orchestration and worker limits for this project are not decided; until they are
 
 ### Read first
 
-1. `docs/v2/SPEC.md` — what exists. Authority on product and architecture.
-2. `DESIGN.md` — how it looks, with the canvas artifact `P3aiZsEXkoUKBrknvvBNJJ` (Section A) as the wireframe the
+1. The GitHub issue you are working on, and its parent spec issue.
+2. `GLOSSARY.md` — the words.
+3. `docs/SPEC.md` — product and architecture reference.
+4. `DESIGN.md` — how it looks, with the canvas artifact `P3aiZsEXkoUKBrknvvBNJJ` (Section A) as the wireframe the
    build matches pixel for pixel. `DESIGN.md` §13 lists boards still to be redrawn.
-3. `docs/v2/DECISIONS.md` — why. Session 4 (S13) holds the latest rulings.
-4. `docs/v2/GLOSSARY.md` — the words.
-5. `docs/v2/SALVAGE.md` — the only v1 logic that may be ported, and where it goes.
+5. `docs/adr/` — the ADRs touching your area.
+6. `docs/SALVAGE.md` — the only v1 logic that may be ported, and where it goes.
 
-Precedence: the spec beats the code; `DESIGN.md` and the canvas beat the code on appearance; where a board and the
-spec disagree on product, the spec wins and the board is redrawn. A gap in the spec is a spec bug: raise it, do not
-guess. Do not re-open a decision without writing the case and asking the owner.
+Precedence: the issue and the spec beat the code; `DESIGN.md` and the canvas beat the code on appearance; where a
+board and the spec disagree on product, the spec wins and the board is redrawn. A gap in the spec is a spec bug: raise
+it on the issue, do not guess. Contradicting an ADR needs a new ADR, agreed with the owner.
 
 ### The five promises
 
@@ -176,5 +177,24 @@ Closed. Destinations: Home · Board · Review · Inbox · Profile; Settings from
 
 ### Work
 
-One slice from `SPEC.md` §17 at a time, behind green CI, naming the e2e flows (§16.1) it satisfies, updating the spec
-if reality diverged. v1 (`a-hagi613/ai-auto-apply`) is read-only reference: port only what `SALVAGE.md` lists.
+GitHub is the source of truth for all work. Every change starts from an issue and lands through a pull request:
+
+- Branch from `main`, one branch per ticket; never commit to `main` directly.
+- The pull request closes its issue (`Closes #<n>`), names the e2e flows it satisfies, and merges only on green CI.
+- Close issues through their pull request; close an issue by hand only with a comment saying why.
+- When reality diverges from the spec or an ADR, update it in the same pull request.
+- v1 (`a-hagi613/ai-auto-apply`) is read-only reference: port only what `docs/SALVAGE.md` lists.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `a-hagi613/overture`, through the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repository root. See `docs/agents/domain.md`.

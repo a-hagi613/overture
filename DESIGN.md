@@ -92,13 +92,13 @@ motion:
 The contract for every screen and every build. Everything below is transcribed from the shipped design
 system boards (Section A, boards 1–3 of the canvas artifact `P3aiZsEXkoUKBrknvvBNJJ`). The canvas is the wireframe:
 **the build matches its boards pixel for pixel.** Where this document and a design-system board disagree on
-appearance, the board wins and this document is corrected. Where a board disagrees with `docs/v2/SPEC.md` on
+appearance, the board wins and this document is corrected. Where a board disagrees with `docs/SPEC.md` on
 product (words, screens, behaviour), the spec wins and the board is redrawn; §13 lists those boards.
 
 Section B of that artifact — the later restatement with neutral paper, Newsreader and Archivo — was an
 experiment that has been **removed**. There is one design, and this is it.
 
-Product vocabulary, screens and behaviour come from `docs/v2/SPEC.md`. This file governs how the
+Product vocabulary, screens and behaviour come from `docs/SPEC.md`. This file governs how the
 product looks. Until §13's redraws land, boards that still say `Hold`, show six nav items or a Live Tab are
 read as `Queued`/`Review` and five destinations; their *visual treatment* is what is fixed here.
 
@@ -493,7 +493,7 @@ Drawn at true pixel size on the Brand assets board.
 ## 13. Boards to redraw
 
 Product changes since the boards were drawn. Each is redrawn on the canvas before the slice that builds that
-screen, then built to match. Visual treatment stays; words, structure and behaviour follow `docs/v2/SPEC.md`.
+screen, then built to match. Visual treatment stays; words, structure and behaviour follow `docs/SPEC.md`.
 
 | Board | Change |
 |---|---|
