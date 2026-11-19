@@ -43,15 +43,17 @@ column.
 
 ## Plans
 
-Trial: 3 applications once, card saved. Week: $12 for 70 applications over 7 days. Month: $35 for 300
-over 30 days. Both renew. Ten applications a day at most, spaced twenty minutes apart, resetting at
-the user's local midnight. Nothing is charged for a send that fails.
+Trial: 3 applications once, card required and verified. Week: $12 for 70 applications over 7 days. Month: $35 for 300
+over 30 days. Both renew. Ten applications a day at most, sent between 08:00 and 20:00 local time,
+at least twenty minutes apart, resetting at the user's local midnight. One company at a time, and not again for 7
+days after a send. These limits are fixed, not settings. Nothing is charged for a send that fails or can't be
+confirmed.
 
 ## Identity and mail
 
 Four sign-in methods: Google, LinkedIn, email + password, magic link. Beta is invitation-only.
-Each user gets a generated job-search address `first.last@mail.tryoverture.com`; employers reply there
-and it lands in the Inbox. The personal mailbox is never connected or read. Replies are allowed only
+Each user gets a generated job-search address `first.last@mail.tryoverture.com`. It is the email on every
+application form, so employers' replies and verification codes land in the Inbox. The personal mailbox is never connected or read. Replies are allowed only
 on threads an employer started, at most 20 a day.
 
 ## Onboarding, five steps
@@ -65,12 +67,13 @@ Each step saves on its own; nothing is skipped.
 Home (start/pause, applications left, queue position and ETA, up next, check-ins, activity including
 `Couldn't apply`), Board (six columns, card sheet with timeline, proof and linked mail), Review (open
 questions grouped by jobs unlocked), Inbox (threads, attachments, sender verification, reply), Profile
-(resume, facts by tier, targets with live count, skip list, job-search address), Settings (daily
-allowance, company limit, notifications, address, plan & billing, sessions, export, delete, support
-access log), Onboarding, and the owner Admin (success by provider × ATS, cost per completed
+(resume, facts by tier, targets with live count, skip list, job-search address), Settings (match
+threshold, notifications and digest, timezone, languages, the fixed limits explained, address, plan & billing,
+sessions, export, delete, support access log), Onboarding, and the owner Admin (success by provider × ATS, cost per completed
 application, queue, kill switches, attempts with live view and replay, audit).
 
 ## Language
 
 Posting, Application, Stage, Status, Queued, Review, Couldn't apply, Applications left, Check-in,
-Job-search address. Never: Hold, runner, lease, provider, dispatch, attempt, ledger, credit, CAPTCHA.
+Job-search address. Never, in anything a user can read: Hold, runner, lease, provider, dispatch, attempt, ledger, credit, CAPTCHA,
+Brain, Hands. Code may use them for internals.

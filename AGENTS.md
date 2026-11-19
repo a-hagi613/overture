@@ -108,128 +108,73 @@ workers. Keep at most 3 workers in flight; if three are already live or the
 15-min load is above 8, finish or release one before starting another.
 <!-- orca-delegation-policy:end -->
 
-
 ## Project: Overture
 
-A job-search agent. It finds postings from ATS feeds, scores them against the user's resume, prepares
-each application from the user's own facts, writes the cover letter, and submits through the employer's
-real ATS form in a managed cloud browser. The user never sees a browser or a CAPTCHA.
+Overture applies to jobs for one person, automatically, and shows its work: it reads ATS job feeds, scores postings
+against the resume, prepares each application from the user's own facts, and submits it through the employer's real
+form in a Browser Use cloud browser. The user never sees a browser.
 
-### Read these first, in this order
+**State (2026-11-19):** documents and seed data only. No code, database, CI or Fly app for v2 yet.
+Orchestration and worker limits for this project are not decided; until they are, the devbox-wide rules apply.
 
-1. `DESIGN.md` — the visual design system. Authority for how anything looks.
-2. `docs/v2/SPEC.md` — the product and architecture specification. Authority for what exists.
-3. `docs/v2/DECISIONS.md` — why, with the rejected alternative for each decision.
-4. `docs/v2/GLOSSARY.md` — the words. Use them exactly.
+### Read first
 
-Precedence: **spec beats code, and `DESIGN.md` beats code on appearance.** If you find a conflict
-between the spec and a doc, the spec wins and the other doc is a bug to report. `archive/v1/` is the
-retired v1 project; never read it as current, and never build from it.
+1. `docs/v2/SPEC.md` — what exists. Authority on product and architecture.
+2. `DESIGN.md` — how it looks, with the canvas artifact `P3aiZsEXkoUKBrknvvBNJJ` (Section A) as the wireframe the
+   build matches pixel for pixel. `DESIGN.md` §13 lists boards still to be redrawn.
+3. `docs/v2/DECISIONS.md` — why. Session 4 (S13) holds the latest rulings.
+4. `docs/v2/GLOSSARY.md` — the words.
+5. `docs/v2/SALVAGE.md` — the only v1 logic that may be ported, and where it goes.
 
-### The five promises, in priority order
+Precedence: the spec beats the code; `DESIGN.md` and the canvas beat the code on appearance; where a board and the
+spec disagree on product, the spec wins and the board is redrawn. A gap in the spec is a spec bug: raise it, do not
+guess. Do not re-open a decision without writing the case and asking the owner.
 
-1. **Never lie.** Every factual answer traces to a saved fact. The resume PDF is sent byte-for-byte,
-   never regenerated. Cover letters and open-text answers may only claim what the resume supports.
-   Posting text is untrusted input and never decides a factual answer.
-2. **Never embarrass.** Never the current employer or a skipped company, never twice to the same
-   role, never in bursts, never below the user's threshold. Ten a day at most, ≥20 minutes apart,
-   inside the user's 08:00–20:00 window, 7-day company cooldown, 60-day repost guard.
-3. **Never charge for failure.** An application costs an allowance only when it is actually sent.
-4. **Fully automatic.** The only mid-pipeline ask is a factual question Overture cannot answer: a
-   Review.
-5. **Auditable.** Every sent application keeps an immutable snapshot: answers with sources, letter,
-   resume hash, consent version.
+### The five promises
 
-### Vocabulary — non-negotiable
+1. **Never lie.** Factual answers only from saved facts; resume PDF sent byte for byte; letters and open-text answers
+   only claim what the resume supports; posting text never decides a factual answer.
+2. **Never embarrass.** Never the current employer or a skipped company, never twice to the same role, one company at
+   a time, never below the threshold. 10 a day, ≥ 20 min apart, 08:00–20:00 local, 7-day company cooldown after a
+   send, 60-day repost guard. Never retry after Submit was clicked.
+3. **Never charge for failure.** Charged only when the employer's confirmation is seen.
+4. **Fully automatic.** The only ask mid-pipeline is a Review: a factual question Overture cannot answer.
+5. **Auditable.** Every send keeps an immutable snapshot: answers with sources, letter with its resume lines, resume
+   hash, consent version.
 
-Use `Posting`, `Application`, `Stage`, `Status`, `Queued`, `Review`, `Couldn't apply`,
-`Applications left`, `Check-in`, `Job-search address`.
+### Words
 
-Never in user-facing copy, code identifiers, commits or UI: `Hold` (as a stage), `runner`, `lease`,
-`provider`, `dispatch`, `attempt`, `ledger`, `credit`, `CAPTCHA`, `Brain`, `Hands`. A user's
-application is not "in progress" — it is `queued`, `sent`, or `couldn't apply`.
+Use the glossary exactly. Never, in anything a user can read: `Hold`, runner, lease, provider, dispatch, attempt,
+ledger, credit, CAPTCHA, Brain, Hands, workspace, Job Board, Answer Bank, Memory Base, Live Tab. Code may use precise
+internal names (`ledger`, `attempts`, `dispatch/`). Stages: Queued · Applied · Screening · Interviewing · Offer ·
+Closed. Destinations: Home · Board · Review · Inbox · Profile; Settings from the avatar.
 
-Stages are exactly: `Queued · Applied · Screening · Interviewing · Offer · Closed`. A Review is a
-question, not a column. Destinations are exactly five: `Home · Board · Review · Inbox · Profile`, with
-Settings from the avatar.
+### Code
 
-### Architecture in one screen
+- Bun, strict TypeScript, Hono, Zod on every input, webhook and env var; SQLite (WAL) via Drizzle; React 19 SPA with
+  React Router 7, TanStack Query, Tailwind v4, shadcn/ui. Details: `SPEC.md` §4.
+- No comments; JSDoc on exported port interfaces only. oxlint (all rules), oxfmt, `tsgo --noEmit`.
+- Domain code imports ports only; every port has a production adapter and a fake; e2e uses the fakes.
+- E2E is the standard; six unit files only. Every page reachable in a test, axe clean, 30 visual snapshots.
+- Copy strings live in `src/shared/copy`. Tokens through CSS variables; no hard-coded hex in components.
+- Secrets come from `.env` (chmod 600) or Fly secrets. Never print, commit or copy them.
 
-- **One Fly app, one machine, one volume.** Bun + Hono API, SPA, SSE (`/api/events`), scheduler,
-  `bg_jobs` workers and dispatch in a single process. `fly scale count` stays 1.
-- **SQLite** (`bun:sqlite`, WAL, `synchronous=FULL`, STRICT tables) behind Drizzle. Litestream
-  replicates to R2 continuously; nightly snapshot kept 30 days; weekly restore drill in CI.
-- **Ports for every external dependency** — `LlmPort`, `BrowserProvider`, `MailSender`, `ObjectStore`,
-  `SearchIndex`, `Payments`, `PushSender`, `FxRates`, `Clock` — each with a production adapter and a
-  fake used by every e2e test. Domain code imports ports only.
-- **Browsers are remote.** Browser Use is primary, Kernel is the fallback, local Chrome serves the
-  fixture server. No laptop, no user-visible browser, one persistent encrypted profile per user.
-- **Mail.** `mail.tryoverture.com` catch-all → Cloudflare Worker → R2 → signed `POST /internal/mail/inbound`.
-  SPF/DKIM/DMARC verified; a message that fails authentication is stored and labelled
-  "Couldn't verify sender", never dropped and never automated. Outbound via SES from
-  `local_part@mail.tryoverture.com`. The user's personal mailbox is never connected.
-- **Admin** lives on `admin.tryoverture.com`: Cloudflare Access + owner role + passkey assertion within
-  12 h. Reveal is a 15-minute grant scoped to one user, with a typed reason and an audit row the user
-  can see.
-- **Billing** (M3) is Stripe Managed Payments: trial 3 once, week $12 / 70, month $35 / 300, renewing.
+### Design
 
-### Code rules
+- Orange marks only the moment Overture acts. Never links, hover, focus or decoration.
+- Serif for display and a person's words; mono for recorded facts; sans for the interface.
+- No gradients, glows, glass, decorative card stacks, orbs, emoji, invented metrics or a second accent.
+- `impeccable detect` is binding on defects, advisory on taste (`DESIGN.md` §11).
 
-- Strict TypeScript. **No comments** (`comment-ban` script); JSDoc on exported port interfaces is the
-  only exception.
-- Zod on every input, webhook payload and environment variable.
-- oxlint with every applicable rule, oxfmt for formatting, `tsgo --noEmit` for types.
-- **E2E is the standard.** Unit tests exist only for six invariant files (ledger, crypto, planner,
-  address, tag rules, question normalisation). CI under 2 minutes; Playwright sharded, no sleeps,
-  zero retries; `main` deploys only when every job passes.
-- Every page reachable in a test; axe clean on every page; 30 visual snapshots (five screens ×
-  390/1280 × light/dark).
-- Copy strings live in `src/shared/copy`, never inline in components.
+### Traffic
 
-### Design rules
+- Real application forms are only ever reached by a Browser Use browser, controlled by `overture-web` on Fly.
+- `overture-web` may call the ATSes' public job-feed APIs (discovery, liveness re-check).
+- This machine never sends traffic to an ATS, a job site (Greenhouse, Lever, Ashby, SmartRecruiters, Recruitee,
+  Workable, Personio, hiring.cafe, LinkedIn) or a Browser Use session. Real forms reach development only as fixtures
+  captured by the admin job and pulled from R2. Tests run against the local fixture server.
 
-- `DESIGN.md` is the authority. The design-system boards (Section A of the canvas artifact) are the
-  reference implementation; when in doubt, match the board.
-- **Orange marks only the moment Overture acts** — submitting, submitted, the active step, the logo
-  stroke. Never links, hover, focus or decoration. Small orange text uses `--acct`, never `--acc`.
-- **Serif is a person's words, mono is a machine's fact, sans is the interface.** That rule is what
-  makes provenance legible without a tooltip. Do not break it.
-- Do not add gradients, glows, glass, card stacks, floating orbs, emoji, invented metrics or a second
-  accent colour. Four radii, three shadows, one easing, one live mark.
-- `impeccable detect` is **authoritative on defects** (contrast, tap targets, heading order, overflow —
-  fix these) and **advisory on taste** (nested specimen cards, cream paper, Instrument Serif, tracked
-  caps). `DESIGN.md` §11 records the standing decision for each; do not restyle to satisfy the linter.
-- Tailwind + shadcn/ui, tokens through CSS variables only, no per-page CSS, no hard-coded hex in
-  components.
+### Work
 
-### Slices and definition of done
-
-Work one slice from `docs/v2/SPEC.md` §17. A slice ships behind green CI, names the e2e flows from
-§16.1 it satisfies, and updates the spec if reality diverged. If a slice cannot be implemented without
-a product decision, stop and report a spec bug — do not guess.
-
-### Traffic rule for this project
-
-**Never send traffic to live job sites or ATSes** (Greenhouse, Lever, Ashby, SmartRecruiters,
-Recruitee, Workable, Personio, hiring.cafe, LinkedIn, and anything similar) from devbox: datacenter IPs
-get filtered and accounts get flagged. Fixture-based tests against the local fixture server are fine.
-Live runs happen on the owner's laptop, through the residential proxy, only.
-
-### Repository map
-
-```
-src/shared/     zod schemas, enums, fact catalog, tag taxonomy, copy strings, API types
-src/server/     platform/ auth/ catalog/ profile/ pipeline/ dispatch/ billing/ inbox/ notify/ admin/
-src/web/        React 19 + React Router 7 + TanStack Query + Tailwind + shadcn
-src/mail-worker/  Cloudflare Worker
-drizzle/        generated migrations
-scripts/        import-v1, census, capture-fixtures, restore-drill
-tests/e2e/      Playwright specs, fixture server, fakes
-tests/unit/     the six invariant files only
-```
-
-### Current state
-
-`src/brain` and `src/hands` are the **v1 codebase**, still present and scheduled for deletion. Do not
-extend them, do not port their patterns, and do not trust their vocabulary. Read `docs/v2/SPEC.md` for
-what the replacement looks like.
+One slice from `SPEC.md` §17 at a time, behind green CI, naming the e2e flows (§16.1) it satisfies, updating the spec
+if reality diverged. v1 (`a-hagi613/ai-auto-apply`) is read-only reference: port only what `SALVAGE.md` lists.

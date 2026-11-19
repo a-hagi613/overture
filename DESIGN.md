@@ -12,8 +12,8 @@ colors:
   signal: "#D2561F"
   signal-text: "#A9431A"
   signal-soft: "rgba(210,86,31,0.10)"
-  hold: "#8E3A2C"
-  hold-soft: "#EFD9D3"
+  need: "#8E3A2C"
+  need-soft: "#EFD9D3"
   ok: "#3F6B52"
   ok-soft: "#DDE7DE"
   border: "rgba(21,19,17,0.14)"
@@ -27,8 +27,8 @@ colors:
   dark-muted-foreground: "#ADA69B"
   dark-signal: "#F0743A"
   dark-signal-text: "#F37D44"
-  dark-hold: "#E58A78"
-  dark-hold-soft: "#40261F"
+  dark-need: "#E58A78"
+  dark-need-soft: "#40261F"
   dark-ok: "#8DBFA2"
   dark-ok-soft: "#25352B"
 typography:
@@ -90,16 +90,17 @@ motion:
 # Overture design system — Ember
 
 The contract for every screen and every build. Everything below is transcribed from the shipped design
-system boards (Section A, boards 1–3 of the canvas artifact), because those boards are the authority:
-**where this document and a board disagree, the board wins and this document is corrected.**
+system boards (Section A, boards 1–3 of the canvas artifact `P3aiZsEXkoUKBrknvvBNJJ`). The canvas is the wireframe:
+**the build matches its boards pixel for pixel.** Where this document and a design-system board disagree on
+appearance, the board wins and this document is corrected. Where a board disagrees with `docs/v2/SPEC.md` on
+product (words, screens, behaviour), the spec wins and the board is redrawn; §13 lists those boards.
 
 Section B of that artifact — the later restatement with neutral paper, Newsreader and Archivo — was an
 experiment that has been **removed**. There is one design, and this is it.
 
 Product vocabulary, screens and behaviour come from `docs/v2/SPEC.md`. This file governs how the
-product looks. Where the boards still use pre-v2 words (they say `Hold` for the stage and six nav
-items), read `Queued`/`Review` and five destinations per the spec — the *visual treatment* is what is
-fixed here.
+product looks. Until §13's redraws land, boards that still say `Hold`, show six nav items or a Live Tab are
+read as `Queued`/`Review` and five destinations; their *visual treatment* is what is fixed here.
 
 ---
 
@@ -143,13 +144,13 @@ ink feel.
 | `--mut` | `--muted-foreground` | `#5E5850` | `#ADA69B` | Secondary text |
 | `--acc` | `--signal` | `#D2561F` | `#F0743A` | Orange: fills, strokes, large text |
 | `--acct` | `--signal-text` | `#A9431A` | `#F37D44` | Orange for small text |
-| `--hold` | `--destructive` | `#8E3A2C` | `#E58A78` | Needs you |
+| `--need` | `--destructive` | `#8E3A2C` | `#E58A78` | Needs you: a Review |
 | `--ok` | — | `#3F6B52` | `#8DBFA2` | Screening, Interviewing, Offer |
 | `--line` | `--border` | `rgba(21,19,17,.14)` | `rgba(242,237,228,.14)` | Hairline, default |
 | `--line2` | `--input` | `rgba(21,19,17,.28)` | `rgba(242,237,228,.26)` | Control outline |
 | `--hl` | — | `rgba(255,255,255,.55)` | `rgba(255,255,255,.04)` | Letterpress highlight under rules |
 | `--accbg` | `--signal-soft` | `rgba(210,86,31,.10)` | `rgba(240,116,58,.16)` | Tinted chip and tray |
-| `--holdbg` | `--hold-soft` | `#EFD9D3` | `#40261F` | Hold pill background |
+| `--needbg` | `--need-soft` | `#EFD9D3` | `#40261F` | "Needs you" pill background |
 | `--okbg` | `--ok-soft` | `#DDE7DE` | `#25352B` | Status pill background |
 | `--scrim` | `--overlay` | `rgba(21,19,17,.16)` | `rgba(0,0,0,.38)` | Behind sheets |
 
@@ -157,9 +158,11 @@ ink feel.
 dot, the Applied tray, the logo stroke. Not links, not hover, not focus, not decoration. Small orange
 text uses `--acct`, never `--acc`, because `--acc` is 3.6:1 on paper.
 
-Statuses differ in lightness as well as hue. A Hold is the only red. Applied and Submitted are the only
-orange states. On the board, stage rules are `hold` / `acc` / `ok` / `mut`. App chrome — selected cards,
-active tabs, meters, KPI numerals — uses ink, never orange.
+Statuses differ in lightness as well as hue. "Needs you" (a Review) is the only red. Applied and Submitted
+are the only orange states. Board column rules: Queued `ink`, Applied `acc`, Screening · Interviewing · Offer
+`ok`, Closed `mut`. Queued is ink because most of it needs nothing from the user; a Queued card waiting on a
+Review carries the red "Needs you" pill instead. App chrome — selected cards, active tabs, meters, KPI
+numerals — uses ink, never orange.
 
 Measured on the shipped hexes (text needs 4.5:1, 3:1 at ≥24px):
 
@@ -173,12 +176,12 @@ Measured on the shipped hexes (text needs 4.5:1, 3:1 at ≥24px):
 | acct on bg (small text) | 5.2:1 | 6.7:1 |
 | acct on card | 5.7:1 | 6.1:1 |
 | acc on bg (large text, strokes) | 3.6:1 | 6.2:1 |
-| hold on card | 7.1:1 | 6.4:1 |
+| need on card | 7.1:1 | 6.4:1 |
 | ok on card | 5.8:1 | 7.9:1 |
 | bg on ink (primary button) | 16.0:1 | 15.3:1 |
 
 Chart colours: `--chart-1` signal, `--chart-2` ink, `--chart-3` ok, `--chart-4` muted-foreground,
-`--chart-5` hold. The primary button is ink with paper text in both modes.
+`--chart-5` need. The primary button is ink with paper text in both modes.
 
 ## 3. Typography
 
@@ -191,7 +194,11 @@ Three families, each with one job. Sizes are px at desktop; the phone column is 
 | IBM Plex Mono | 400 | Timestamps, folio marks, "via Greenhouse" only. A typewriter note, used sparingly, never for paragraphs | ui-monospace |
 
 **The rule that makes provenance legible without a tooltip:** serif is what a person said, mono is what
-the machine recorded, sans is the interface around it. `Yes` in serif beside
+the machine recorded, sans is the interface around it. Serif also sets display type — page and card titles,
+big numerals, the Match score — because those are the editorial voice of the page, not data. Inside a
+provenance context (an answer, a letter, the proof tab, a Review) the rule is strict: serif only for the
+person's words, mono for every recorded fact (timestamps, file names, hashes, counts, "via Greenhouse").
+Inline numbers in tables and metadata are mono and tabular. `Yes` in serif beside
 `Saved answer · Used in 23 applications` in sans/mono *is* the product's promise, rendered.
 
 | Role | Size | At 390 | Line height | Tracking |
@@ -256,7 +263,7 @@ blur or gradient.
 | 2px | Stamp, sheets in a pile, kbd |
 | 5px | Segmented option, small monogram |
 | 6px | Buttons, fields, icon buttons, nav items |
-| 8px | Logo square (of 32) |
+| 7px | Logo square (of 32) |
 | 10px | Cards, panels, job cards, big monogram |
 | 12px | Hero stack cards, bento tiles, connector tiles, phone job cards |
 | 16px top | Phone bottom sheet |
@@ -310,14 +317,14 @@ Slow and paper-like. Elegant, never playful. The orange dot is the only live mar
 
 The four choreographed surfaces, so nobody re-invents them:
 
-1. **Sorting stack** (landing hero) — each card is one job resolving at a timestamp between 11pm and
-   7am. Top card lifts 6px, shadow deepens, evidence rows draw in, receipt strip unfolds (.5s), the
+1. **Sorting stack** (landing hero) — each card is one job resolving at a timestamp inside the user's
+   08:00–20:00 sending window, at least 20 minutes after the last. Top card lifts 6px, shadow deepens, evidence rows draw in, receipt strip unfolds (.5s), the
    Applying stamp presses in (1.04→1 scale, 0→1 opacity, −3°), then the card glides left into the
    Applied count. A non-fit lifts, fades in its one-line reason, glides right, muted. Cards behind sit
-   smaller and dimmer. The tally ticks; at 7am the morning summary settles on top for ~5s. 34 ticks per
+   smaller and dimmer. The tally ticks; at 8 pm the day's summary settles on top for ~5s. 34 ticks per
    loop.
 2. **Travelling dot** (Where it applies) — connectors flow toward the hub (dashed stroke, 1.8s per dash
-   period). The orange dot runs to each tile in turn, the tile border turns orange with a soft glow, a
+   period). The orange dot runs to each tile in turn, the tile border turns orange (no glow), a
    "Submitted" tag shows ~1.5s, the counter ticks. A faint breathing ring (4.6s) marks the active hub.
    On phone the connectors become a vertical spine.
 3. **Reply reading** (every reply) — an 18-tick sequence: email slides in 10px, the label pill appears,
@@ -336,7 +343,7 @@ still changes; nothing moves.
 
 | Product element | shadcn/ui | 21st.dev / Magic UI |
 |---|---|---|
-| Landing hero stack | Card | Card stack with framer-motion (decided by Overture, not a gesture) |
+| Landing hero stack | Card | The one sanctioned card stack (decided by Overture, not a gesture); `motion` library |
 | How it works bento | Card | Bento Grid, paper-styled: solid surfaces, hairlines, no glow |
 | Path and travelling dot | custom | Animated Beam, made elegant: one dot on a dotted path |
 | Where it applies connector | custom | Animated Beam |
@@ -356,7 +363,7 @@ hover, `not-allowed`, drawn for every variant.
 a visible label or an `aria-label`. Select is a field with a chevron opening a popover list on a card
 surface with lift shadow; the current value is bold with a check, the hovered row sits on well.
 
-**Chips, pills, badges.** 999 radius, 600 weight, 11–12px. Status pills tint a surface (`hold-soft`,
+**Chips, pills, badges.** 999 radius, 600 weight, 11–12px. Status pills tint a surface (`need-soft`,
 `ok-soft`, `accbg`); the plain pill is outline on paper. Source tags: solid ink outline = from the
 resume, dashed = from saved answers. The Applying stamp is the only rotated element (−3°, uppercase,
 orange outline).
@@ -380,7 +387,7 @@ Sidebar items: active = card surface, hairline, 3px orange marker on the left ed
 bar). Under 1280 the sidebar becomes a 76px icon rail; under 768 a 64px tab bar.
 
 **Toasts.** Card surface, `line2` border, lift shadow, radius 8, 340 wide, bottom right (top on phone).
-A toast reports something that happened: the orange check only when Overture acted, hold colours when it
+A toast reports something that happened: the orange check only when Overture acted, `need` colours when it
 needs you, neutral otherwise. One ghost action at most. Enters with a 6px rise over .5s, leaves in 4s.
 
 **Hero stack card.** Ink monogram tile; role in serif (clamp 21–31); company; Match as a thin ring (2.5
@@ -405,8 +412,8 @@ Plain section titles — How it works, Where it applies, Pricing, Questions. One
 stop. Concrete verbs: finds, scores, answers, writes, submits, tracks. Name the control: "Anything it
 is unsure about waits for you." Fictional sample data is labelled "Sample data".
 
-No hype, no superlatives, no exclamation points, no emoji, no invented metrics, no internal vocabulary
-(dispatch, provider, lease, attempt, ledger, credit, runner, CAPTCHA). Numbers are mono and tabular. A
+No hype, no superlatives, no exclamation points, no emoji, no invented metrics, none of the banned words
+(`Hold` as a stage, runner, lease, provider, dispatch, attempt, ledger, credit, CAPTCHA, Brain, Hands). Inline numbers are mono and tabular (display numerals follow §3). A
 failure says what happened, what was not sent, and what happens next. Where a policy could be misread,
 state the boundary rather than the marketing line.
 
@@ -414,7 +421,7 @@ state the boundary rather than the marketing line.
 
 - **Contrast.** 4.5:1 minimum for all text, including 11px grey labels; 3:1 from 24px. Small orange
   text always uses `signal-text`.
-- **Not by colour alone.** Statuses differ in lightness, wording or shape: a Hold is a labelled pill,
+- **Not by colour alone.** Statuses differ in lightness, wording or shape: "Needs you" is a labelled pill,
   source tags differ by outline style, the active tab is underlined, the active nav item carries a
   marker.
 - **Target size.** 44px minimum on touch: phone buttons 48, tab bar 60, stage pills 44, icon buttons
@@ -454,7 +461,8 @@ them here removes the qualities that make this look authored rather than assembl
 | `pulsing-dot` | 3 | The one live mark in the system, with a static state under `prefers-reduced-motion` |
 | `hero-eyebrow-chip` | 3 | A tracked-caps kicker above an `h1` is a masthead convention and carries real categorisation |
 
-What we refuse in **both** directions: we do not add gradients, glows, glass, card stacks, floating orbs,
+What we refuse in **both** directions: we do not add gradients, glows, glass, decorative card stacks (the
+landing hero's sorting stack is the one sanctioned stack), floating orbs,
 emoji, invented metrics or a second accent colour to look contemporary; and we do not suppress the
 detector to make a report look clean. If a rule starts catching a **defect**, it is fixed at the source
 and this table is updated.
@@ -481,3 +489,24 @@ Drawn at true pixel size on the Brand assets board.
 | `avatar-400.png` | 400 | Social avatar, mark inside a centred circle for round crops |
 | `logo-horizontal-{paper,ink}.svg` | vector | Mark beside wordmark, min 96px wide |
 | `logo-stacked-{paper,ink}.svg` | vector | Mark over wordmark, min 56px wide |
+
+## 13. Boards to redraw
+
+Product changes since the boards were drawn. Each is redrawn on the canvas before the slice that builds that
+screen, then built to match. Visual treatment stays; words, structure and behaviour follow `docs/v2/SPEC.md`.
+
+| Board | Change |
+|---|---|
+| Every app board | Five destinations (Home, Board, Review, Inbox, Profile), Settings from the avatar; no "Job Board", "Holds", "Answer Bank", "Activity", "Personal workspace"; one "Applications left" figure, no "Match Scores" counter; `--hold` tokens renamed `--need` |
+| Job Board | Queued replaces Hold as the first column, ink rule; red "Needs you" pill on cards waiting on a Review |
+| Holds | Becomes Review: open questions grouped by jobs unlocked |
+| Answer Bank, Resume | Fold into Profile: resume, facts by tier, targets with live count, skip list, job-search address |
+| Settings | No approval mode, no "Overnight window", no user-set company limit or daily caps, no UTC reset; the fixed limits explained (10 a day, 08:00–20:00 local, one company per 7 days, reset at local midnight) |
+| Onboarding 1–4 | Five steps: Sign in · Resume · Your facts · What you want · Your job-search address + consent + trial + Start; no "Connect inbox", no Gmail, no "Memory Base" |
+| Sign In | Google, LinkedIn, email + password, magic link |
+| Product states | No Gmail connect states; add `confirming` ("Checking with the employer"), each pause reason, out of applications |
+| Daily digest | Morning summary of **yesterday** (sends between 08:00 and 20:00); "Needs you", not "Hold" |
+| Landing | Daytime timestamps; card required for the trial (no "No credit card"); Workday removed from Where it applies; plan prices per the spec; no glow on the travelling-dot tiles |
+| Live Tab (3 boards) | Deleted: users never see a browser |
+| Mobile reference | Deleted, already marked to retire |
+| New | Review, check-in on Home, `Couldn't apply` card, Admin (overview, attempts, kill switches, provider report, fixture capture), pricing and billing (M3) |

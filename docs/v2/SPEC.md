@@ -1,11 +1,19 @@
 # Overture v2 — specification
 
-Status: **DRAFT for owner confirmation**, written 2026-11-19 from `docs/v2/DECISIONS.md` Session 3 (rounds S1–S9).
-Where this file and an earlier R-row disagree, Session 3 and this file win. Every section cites the decision it
-implements as `[S1-02]`. A worker implements one slice from §17 at a time and must not need to ask a product question;
-if a slice does need one, the gap is a spec bug: raise it, do not guess.
+Status: **near-final**, written 2026-11-19 from `docs/v2/DECISIONS.md` Session 3 and reconciled with the owner's
+Session 4 rulings (S13) the same day. Nothing is set in stone; a change goes through `DECISIONS.md` first. Where this
+file and an earlier R-row disagree, Sessions 3–4 and this file win. Every section cites the decision it implements as
+`[S1-02]`. A worker implements one slice from §17 at a time and must not need to ask a product question; if a slice
+does need one, the gap is a spec bug: raise it, do not guess.
 
-Companion files: `docs/v2/DECISIONS.md` (why), `docs/v2/GLOSSARY.md` (words), `docs/v2/research/*.md` (evidence).
+Companion files: `docs/v2/DECISIONS.md` (why), `docs/v2/GLOSSARY.md` (words), `docs/v2/SALVAGE.md` (what is ported
+from v1), `docs/v2/research/*.md` (evidence).
+
+**Words.** The banned words (`Hold` as a stage, runner, lease, provider, dispatch, attempt, ledger, credit, CAPTCHA,
+Brain, Hands) never appear in anything a user can read: UI, copy, emails, push, error messages, the landing, the
+admin's user-facing exports. Code uses the glossary's words for product concepts (Application, Review, Stage,
+Posting) and may use precise engineering names for internals (`ledger`, `attempts`, `dispatch/`, `BrowserProvider`),
+because renaming them would hide what they are. [S13-01]
 
 Scale: a small side project being made into a SaaS. Prefer the simplest thing that works; no vendor outreach,
 no enterprise process. [S10-01]
@@ -39,8 +47,8 @@ per-user AI keys, resume generation or restyling, annual plans. [S6-04, S6-06, S
 
 | Milestone | Who | Scope | Exit gate |
 |---|---|---|---|
-| **M1 — Owner applies from the cloud** | owner only (allowlist) | catalog (Greenhouse, Lever, Ashby), tagging, profile via importer, matching, preparation, Reviews, owner's job-search mailbox (inbound), Browser Use + Kernel providers, dispatch, ledger with admin grants, Board, Home, Review, minimal Profile, minimal admin, bake-off harness, observability | ≥ 60 real owner applications per provider; **≥ 85 % of attempted applications reach `sent`** on the winning provider; cost ≤ **$0.03 per completed application**; zero wrong-company or duplicate sends |
-| **M2 — Invite-only beta** | invited users | onboarding wizard, mailboxes for all, two-way Inbox (SES), notifications (PWA push + digest), check-ins, email-driven stage moves, full admin (users, Reveal, audit, support access log), export/delete, legal pages + consent, SmartRecruiters/Recruitee/Workable/Personio after a 20-form probe each | 10 beta users for 14 days; submit rate holds ≥ 85 %; no P1 privacy/security finding |
+| **M1 — Owner applies from the cloud** | owner only (allowlist) | catalog (Greenhouse, Lever, Ashby), tagging, profile via importer, matching, preparation, Reviews, owner's job-search mailbox (inbound), Browser Use provider (Kernel adapter behind the same port, synthetic lab only), dispatch, ledger with admin grants, Board, Home, Review, minimal Profile, minimal admin, synthetic lab, fixture capture job, observability | ≥ 60 real owner applications on Browser Use; **≥ 85 % of attempted applications reach `sent`**; cost ≤ **$0.03 per completed application**; zero wrong-company or duplicate sends |
+| **M2 — Invite-only beta** | invited users | onboarding wizard, mailboxes for all, two-way Inbox (SES), notifications (PWA push + digest), check-ins, email-driven stage moves, full admin (users, Reveal, audit, support access log), export/delete, legal pages + consent, SmartRecruiters/Recruitee/Workable/Personio after a 20-form probe each. Each accepted invite gets an admin grant of 300 applications over 30 days (no card) | 10 beta users for 14 days; submit rate holds ≥ 85 %; no P1 privacy/security finding |
 | **M3 — Public** | anyone | Stripe Managed Payments, trial/week/month plans, card fingerprints, grants/expiry, payment-failure pause, admin refunds, public landing + pricing (prerendered), public signup | first 20 paying users; Stripe reconciliation matches the ledger for 30 days |
 
 Ledger tables and plan limits exist from M1 so nothing is rewritten in M3. [S1-01]
@@ -75,7 +83,12 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3. [S1-0
   No runner app: browsers are remote. [S6-02]
 - Same origin for API and SPA. `admin.tryoverture.com` is the same process, routed by host, behind Cloudflare Access.
 - Deploys cause ~10–30 s downtime; on `SIGTERM` the process stops claiming jobs, waits ≤ 25 s for in-flight jobs,
-  then exits; in-flight browser attempts are abandoned and recovered by lease expiry (§9). [S8-08]
+  then exits; in-flight browser attempts are abandoned and recovered by lease expiry (§9.4). [S8-08]
+- **Where traffic comes from.** Every request that loads or submits an employer's application form comes from a
+  Browser Use browser on a residential IP in the user's country, controlled by `overture-web` over CDP. `overture-web`
+  itself calls only the ATSes' public job-feed APIs (discovery §6, the liveness re-check §9.3), which exist for
+  programmatic reading. The developer machine never contacts an ATS, a job site or a Browser Use session; it runs
+  code and tests against the local fixture server only. [S13-07]
 - Litestream replicates continuously to R2 `overture-backups`; a nightly snapshot is kept 30 days; a restore drill
   runs in CI weekly against a throwaway machine. [R2-08]
 
@@ -102,6 +115,7 @@ All secrets are Fly secrets; local dev reads `.env` (chmod 600, never committed)
 
 ### 3.3 Domains and DNS [S9-01..03]
 
+- `tryoverture.com` is registered (Cloudflare Registrar, owner's account). [S13-08]
 - `tryoverture.com`: app, marketing, Overture's own mail (`no-reply@`, `hello@` forwarded to the owner via Email
   Routing). SES DKIM (3 CNAMEs), SPF `include:amazonses.com`, DMARC `p=reject; rua=…`, custom MAIL FROM
   `bounce.tryoverture.com`.
@@ -150,7 +164,7 @@ src/
   web/               React app (routes/, features/, components/ui = shadcn)
   mail-worker/       Cloudflare Worker (wrangler.toml)
 drizzle/             generated migrations
-scripts/             import-v1.ts, census.ts, capture-fixtures.ts, restore-drill.ts
+scripts/             import-v1.ts, census.ts, pull-fixtures.ts, restore-drill.ts
 tests/e2e/           Playwright specs + fixtures server + fakes
 tests/unit/          ≤ 6 files (§15.2)
 ```
@@ -194,10 +208,10 @@ updated_at) · `session` · `account` (provider: google, linkedin, credential) �
 | Table | Columns |
 |---|---|
 | `user_keys` | user_id PK, wrapped_dek BLOB, master_key_version INTEGER, created_at. **Deleting this row is crypto-shredding.** |
-| `profiles` | user_id PK, running, pause_reason CHECK IN ('user','onboarding','no_resume','plan_ended','payment_failed','suspended','no_mailbox') NULL, timezone, timezone_changed_at, languages TEXT JSON (ISO 639-1), auto_threshold CHECK IN (50,60) DEFAULT 60, onboarding_step, onboarded_at, digest_enabled DEFAULT 1, push_prompted_at, consent_version, consent_at, created_at, updated_at |
+| `profiles` | user_id PK, running, pause_reason CHECK IN ('user','onboarding','no_resume','plan_ended','payment_failed','suspended','no_mailbox') NULL, timezone (IANA, taken from the browser at sign-up, changeable in Settings at most once per 7 days), timezone_changed_at, languages TEXT JSON (ISO 639-1), auto_threshold CHECK IN (50,60) DEFAULT 60, onboarding_step, onboarded_at, digest_enabled DEFAULT 1, push_prompted_at, consent_version, consent_at, created_at, updated_at |
 | `facts` | id, user_id, key, value_enc, source CHECK IN ('resume','user','review','import'), confirmed, revision, updated_at; UNIQUE(user_id,key). Keys from the fact catalog (§7.1) or `q:<question_id>` for learned answers |
 | `targets` | user_id PK, roles JSON, seniorities JSON, workplaces JSON, locations JSON (`{country, region?, city?}`), employment_types JSON, salary_floor_minor NULL, salary_currency NULL, salary_period CHECK IN ('year','month','hour') NULL, version INTEGER |
-| `skip_companies` | id, user_id, company_id NULL, name_norm, reason CHECK IN ('current_employer','user'), created_at; UNIQUE(user_id,name_norm) |
+| `skip_companies` | id, user_id, company_id NULL, name_norm, domain NULL, reason CHECK IN ('current_employer','user'), created_at; UNIQUE(user_id,name_norm). Matching rules in §8.1 |
 | `resumes` | id, user_id, object_key, sha256, bytes, pages, filename_enc, text_enc, parsed_with CHECK IN ('unpdf','llm'), is_current, uploaded_at; partial UNIQUE(user_id) WHERE is_current=1 |
 | `browser_profiles` | user_id, provider, provider_profile_id, country_code, created_at, last_used_at; PK(user_id, provider) |
 | `mailboxes` | id, user_id UNIQUE, local_part UNIQUE, status CHECK IN ('active','receive_only','closed'), receive_until NULL, created_at |
@@ -225,14 +239,15 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`. [R7-02]
 |---|---|
 | `matches` | user_id, posting_id, code_rank REAL, score NULL, reason NULL, resume_id NULL, targets_version NULL, scored_at NULL; PK(user_id,posting_id). A score is valid only while `resume_id` and `targets_version` equal the user's current ones |
 | `posting_user_state` | user_id, posting_id, state CHECK IN ('saved','hidden'), updated_at; PK(user_id,posting_id) |
-| `applications` | id, user_id, posting_id, company_id, origin CHECK IN ('auto','manual'), status CHECK IN ('preparing','needs_review','ready','sending','sent','failed','skipped','withdrawn'), status_reason NULL (§11), stage CHECK IN ('queued','applied','screening','interviewing','offer','closed') NULL, stage_locked INTEGER DEFAULT 0, board_position REAL, score_at_queue, scheduled_for NULL, attempts INTEGER DEFAULT 0, sent_at NULL, closed_reason CHECK IN ('rejected','no_response','withdrawn','offer_declined','offer_accepted','other') NULL, created_at, updated_at; UNIQUE(user_id,posting_id); partial UNIQUE(user_id) WHERE status='sending' |
-| `application_snapshots` | application_id PK, answers_enc (JSON array `{question_id, label, answer, fact_key, fact_revision, kind}`), cover_letter_enc NULL, resume_id, resume_sha256, consent_version, provider, provider_session_id, submitted_at, cost_micros. **Immutable**: `BEFORE UPDATE`/`BEFORE DELETE` triggers raise (deletion only by user cascade) |
+| `applications` | id, user_id, posting_id, company_id, origin CHECK IN ('auto','manual'), status CHECK IN ('preparing','needs_review','ready','sending','confirming','sent','failed','skipped','withdrawn'), status_reason NULL (§11), stage CHECK IN ('queued','applied','screening','interviewing','offer','closed') NULL, stage_locked INTEGER DEFAULT 0, board_position REAL, score_at_queue, scheduled_for NULL, attempts INTEGER DEFAULT 0, sent_at NULL, closed_reason CHECK IN ('rejected','no_response','withdrawn','offer_declined','offer_accepted','other') NULL, created_at, updated_at; UNIQUE(user_id,posting_id); partial UNIQUE(user_id) WHERE status='sending'. `withdrawn` applies only before `sent` (the user stops a queued application); a sent application cannot be un-sent, so the user moves it to Closed with `closed_reason='withdrawn'` |
+| `application_snapshots` | application_id PK, posting_url, posting_title, description_hash, answers_enc (JSON array `{question_id, label, answer, fact_key, fact_revision, kind, resume_line_ids}`), cover_letter_enc NULL (JSON `[{sentence, resume_line_ids}]`), resume_id, resume_sha256, consent_version, provider, provider_session_id, submitted_at, confirmed_by CHECK IN ('page','email'), cost_micros. **Immutable**: a `BEFORE UPDATE` trigger always raises; a `BEFORE DELETE` trigger raises `WHEN EXISTS (SELECT 1 FROM user WHERE id = OLD.user_id)`, so rows go only when the user row is gone (account deletion cascade). Flow 29 proves both |
 | `application_events` | id, application_id, user_id, at, kind CHECK IN ('status','stage','email','checkin','note'), from_value, to_value, source CHECK IN ('system','user','email','checkin','admin'), detail JSON; the card timeline and stage history |
-| `attempts` | id, application_id, user_id, n, provider, provider_session_id, started_at, lease_until, ended_at NULL, outcome CHECK IN ('sent','captcha_blocked','code_timeout','posting_closed','form_changed','blocked','upload_failed','duplicate','needs_review','provider_error','timeout','crash') NULL, browser_ms, proxy_bytes, captcha_seen, code_used, cost_micros, error_code NULL |
+| `attempts` | id, application_id, user_id, n, provider, provider_session_id, started_at, lease_until, ended_at NULL, submit_clicked_at NULL, outcome CHECK IN ('sent','unconfirmed','captcha_blocked','code_timeout','posting_closed','form_changed','blocked','upload_failed','duplicate','needs_review','provider_error','timeout','crash') NULL, browser_ms, proxy_bytes, captcha_seen, code_used, cost_micros, error_code NULL |
 | `reviews` | id, user_id, question_id, fact_key NULL, prompt, field_type, options JSON, status CHECK IN ('open','answered','dismissed'), created_at, resolved_at; UNIQUE(user_id,question_id) WHERE status='open' |
 | `review_applications` | review_id, application_id; PK(review_id,application_id) |
 | `checkins` | id, application_id UNIQUE, user_id, due_at, status CHECK IN ('open','answered','expired'), answer NULL, created_at |
 | `plan_cache` | id, ats, form_signature, plan JSON, hits, failures, updated_at; UNIQUE(ats,form_signature) |
+| `consent_versions` | version PK, text, published_at — the exact consent wording each `consent_version` refers to; rows are never edited |
 
 ### 5.5 Inbox
 
@@ -254,11 +269,13 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`. [R7-02]
 | `stripe_events` | id PK (Stripe event id), type, received_at, processed_at NULL |
 | `card_fingerprints` | hmac PK, trial_used_at — **not** user-linked; survives account deletion |
 
-Accounts: `issued`, `available`, `reserved`, `used`, `expired`. Transfers: grant `issued→available`; reserve
+Accounts: `issued`, `available`, `reserved`, `used`, `expired`. The same no-UPDATE rule and the same user-gone `BEFORE DELETE` condition as snapshots apply. Transfers: grant `issued→available`; reserve
 `available→reserved`; commit `reserved→used`; release `reserved→available`; expire `available→expired`. Balances are
 per `(user_id, grant_id, account)`. Reserve draws from the grant expiring soonest. "Applications left" =
-Σ available over unexpired grants. Daily usage = count of `reserve` rows for the user in the user's current local
-day minus their `release` rows. No separate counters table.
+Σ available over unexpired grants. Daily usage = reservations made in the user's current local day that are still
+reserved or committed (a release counts against the day its reservation was made, never against today). No separate
+counters table. Expiry: `expire` moves only `available`; a reservation held on a grant that expires is released
+and expired in the same transaction (`release` then `expire`), so it never returns to spendable.
 
 ### 5.7 Platform
 
@@ -283,8 +300,7 @@ Retention: `events` 24 h; `bg_jobs` done 7 days, dead 30 days; `attempts` 180 da
 
 ### 6.1 Sources [S1-09, S2-06]
 
-Salvage v1 clients `src/brain/sources/{greenhouse,lever,ashby,smartrecruiters,recruitee}.ts` and
-`html-to-text.ts`; add Workable and Personio in M2. Each implements
+Ported from the v1 feed clients (`docs/v2/SALVAGE.md`); Workable and Personio are new in M2. Each implements
 `fetchBoard(token, {etag, lastModified}) → {status: 'not_modified'} | {status: 'ok', postings, etag?, lastModified?} | {status: 'gone'}`.
 Discovery runs from `overture-web` directly (no proxy).
 
@@ -298,8 +314,7 @@ Discovery runs from `overture-web` directly (no proxy).
 
 ### 6.2 Backfill and trickle [R10-04]
 
-1. **Seed**: `scripts/import-v1.ts` copies `company_boards` from the v1 production database (run on the v1 Fly
-   machine, output is boards only) — about 22,800 boards.
+1. **Seed**: `scripts/import-v1.ts` loads `company_boards` from the one-time v1 export (§18) — about 22,800 boards.
 2. **Backfill**: one pass over every active board inside per-ATS limits.
 3. **Trickle**: each board gets `next_poll_at` from its activity: changed in last 24 h → 30 min; last 7 days → 2 h;
    otherwise → 12 h; errors → exponential backoff (cap 48 h). `404` twice → `gone`.
@@ -320,8 +335,9 @@ Order of precedence for role/seniority: `import` (hiring.cafe file, if the owner
 2. **Rules**: title + department keyword dictionary built from the O\*NET title list (CC BY 4.0, attribution in the
    footer) mapped into §6.4 groups; seniority from title tokens (`intern`, `junior`, `senior`, `staff`, `principal`,
    `lead`, `manager`, `director`, `head of`, `vp`, roman numerals / levels) plus source experience fields.
-3. **Model**: titles the rules leave unclassified go to a local title-similarity model (onet-match or JobBERT-v2,
-   MIT) running in-process; accept when similarity ≥ the threshold set by the census.
+3. **Title similarity (code)**: titles the rules leave unclassified are compared in code (normalised token and
+   trigram similarity) against the O\*NET alternate-title list; accept when similarity ≥ the threshold set by the
+   census. No ML runtime in the process: it must fit the 2 GB machine and stay deterministic. `tag_source='model'`.
 4. **LLM**: what remains goes to Haiku 5.5 via the Batch API (thinking disabled, structured output
    `{role, subrole, seniority}`), title + department + first ~300 words. Daily cap `$1` (setting), backfill budget
    `$20` one-time. Over the cap, postings keep rules-only tags until the next day.
@@ -345,8 +361,7 @@ Order of precedence for role/seniority: `import` (hiring.cafe file, if the owner
 
 ### 6.5 Census [S3-01]
 
-`scripts/census.ts` runs on the v1 Fly machine (`fly ssh console -C "bun scripts/census.ts"`) against the v1
-catalog; prints only aggregates: postings per ATS/country/workplace, top 2,000 title_norm with counts, department
+`scripts/census.ts` runs on `overture-web` against the v2 catalog after the first backfill; prints only aggregates: postings per ATS/country/workplace, top 2,000 title_norm with counts, department
 frequency, share classified by rules at each threshold. Output committed to `docs/v2/research/census.md`.
 
 ---
@@ -357,8 +372,8 @@ frequency, share classified by rules at each threshold. Output committed to `doc
 
 | Tier | Keys | When |
 |---|---|---|
-| 1 (required to Start) | legal_name, email (from auth, read-only), phone, current_city, current_country, linkedin_url, work_auth (per target country), sponsorship_required (per target country), notice_period, earliest_start, salary_expectation, willing_relocate, years_total, degree_highest, employment_history, education_history, current_employer, languages | onboarding step 3; most prefilled from the resume and confirmed |
-| 2 (encouraged) | preferred_name, github_url, website_url, skills, certifications, security_clearance, drivers_license, spoken_languages_levels, voice_sample, eeo_gender, eeo_race_ethnicity, eeo_hispanic_latino, eeo_veteran, eeo_disability (EEO opt-in only) | Profile → "Strengthen your profile", each shows "unlocks N queued jobs" |
+| 1 (required to Start) | legal_name, email (= the job-search address §7.3, read-only; the sign-in email is never put on a form), phone, current_city, current_country, linkedin_url, work_auth (per target country), sponsorship_required (per target country), notice_period, earliest_start, salary_expectation, willing_relocate, years_total, degree_highest, employment_history, education_history, current_employer, languages | onboarding step 3; most prefilled from the resume and confirmed |
+| 2 (encouraged) | preferred_name, github_url, website_url, skills, certifications, security_clearance, drivers_license, spoken_languages_levels, voice_sample, cover_letter_template, eeo_gender, eeo_race_ethnicity, eeo_hispanic_latino, eeo_veteran, eeo_disability (EEO opt-in only) | Profile → "Strengthen your profile", each shows "unlocks N queued jobs" |
 | 3 (learned) | `q:<question_id>` | created by answering a Review; reused for every later application asking that question |
 
 Each fact has `revision`; snapshots record the revision used.
@@ -373,7 +388,7 @@ Each fact has `revision`; snapshots record the revision used.
 
 ### 7.3 Job-search address [S2-02, S3-06]
 
-- `local_part = slug(first) + "." + slug(last)` from `legal_name`: Unicode NFKD, strip diacritics, transliterate
+- `local_part = slug(first) + "." + slug(last)`, first name from `preferred_name` when set, else `legal_name`: Unicode NFKD, strip diacritics, transliterate
   non-Latin (ICU-style table), lowercase, keep `a–z 0–9 -`, collapse repeats, max 40 chars.
 - If taken or in `retired_addresses`, append 2–4 random digits to the last name (`jane.doe4821`), retry up to 10.
 - Shown once in onboarding with "Looks good"; changes only via admin. On account deletion the local part moves to
@@ -388,12 +403,20 @@ Each fact has `revision`; snapshots record the revision used.
 ### 8.1 Candidates (code, free) [S3-02, S8-01..03]
 
 A posting is a candidate for a user when all hold: open; tags intersect `targets.roles` (or subroles) and
-`seniorities`; workplace ∈ targets (remote postings match any location only if the remote country/region is
-compatible); location matches a target location; employment type ∈ targets; posting language ∈ `languages`;
+`seniorities`; workplace ∈ targets; location matches a target location (a remote posting matches when its country
+is a target country, or when it names no country and the user has `work_auth=yes` for the company's country; a
+remote posting restricted to a region, e.g. "Remote, EU", matches only target countries in that region); employment type ∈ targets; posting language ∈ `languages`;
 salary ≥ floor when the posting lists salary (converted with `fx_rates`; postings without salary are never excluded);
-company not in `skip_companies`; no application by this user to this company in the last 7 days; no sent
-application to the same `dedupe_key` in the last 60 days; crowd limits not reached (§12); not `hidden`; no kill
+company not skipped (below); no other application by this user to this company in status preparing, needs_review,
+ready, sending or confirming, and none sent to it in the last 7 days (failed, skipped and withdrawn do not count);
+no sent application to the same `dedupe_key` in the last 60 days; crowd limits not reached (§12); not `hidden`; no kill
 switch on its ATS/employer.
+
+**Skip matching** (the current employer and skipped companies) [S13-05]: a posting's company is skipped when any of
+these match a `skip_companies` row: same `company_id`; same registrable domain; same name after normalisation
+(lowercase, diacritics folded, punctuation dropped, legal suffixes `inc`, `ltd`, `llc`, `corp`, `co`, `gmbh`, `sa`,
+`plc`, `limited`, `corporation` removed). A near match (token similarity ≥ 0.85 but not equal) also skips and is
+logged for the owner: when unsure, Overture does not apply.
 
 `code_rank` = weighted sum: role/subrole match 40, seniority exact 20 / adjacent 10, location exact city 15 / region
 10 / country 5 / remote 15, salary known and ≥ floor 10, recency (posted ≤ 3 days 10, ≤ 14 days 5). Candidate rows
@@ -426,12 +449,15 @@ Job `application.prepare`:
 2. Map each question to the catalog: normalise text (lowercase, strip punctuation/numbers/company names) → hash →
    `question_variants`; unknown → rules (regex set for common facts) → else Haiku mapping call returning
    `{fact_key | 'open_text' | 'consent' | 'skip' | 'unknown'}` from the fixed fact list. Result stored on `questions`.
+   Posting text passes the posting guard (`docs/v2/SALVAGE.md`) first and never decides a factual answer.
 3. Answer: `fact` → saved fact value (formatted to the field type/options; select options matched by normalised
    text, then synonyms table, else unknown); `open_text` → Haiku from resume text + posting (≤ 120 words unless the
-   field states a limit); `consent` → only the Overture-standard consents the user accepted (privacy notice /
+   field states a limit), returned as `[{sentence, resume_line_ids}]` with the same rule as cover letters: a sentence
+   that makes a factual claim without a resume line is removed; `consent` → only the Overture-standard consents the user accepted (privacy notice /
    data processing acknowledgements), never marketing opt-ins; `skip` → blank.
 4. Cover letter only if the form has a cover-letter field: ≤ 200 words, in the posting's language, generated from
-   resume + posting + voice sample; every sentence with a factual claim must map to a resume line (the model returns
+   resume + posting + the user's cover-letter template (its fixed text kept verbatim, its blanks filled) or, without a
+   template, the voice sample; every sentence with a factual claim must map to a resume line (the model returns
    `[{sentence, resume_line_ids}]`); sentences without a mapping are removed. [R10-03]
 5. Unknown **required** factual question → status `needs_review`, create/attach a Review. Unknown **optional** →
    left blank, never blocking. [S2-08]
@@ -446,8 +472,8 @@ Job `application.prepare`:
 
 ### 8.5 Stages and check-ins [S4-05, S8-07]
 
-- `stage` is `queued` while status ∈ {preparing, needs_review, ready, sending}; becomes `applied` on `sent`;
-  `NULL` (off-Board) for failed/skipped/withdrawn.
+- `stage` is `queued` while status ∈ {preparing, needs_review, ready, sending, confirming}; becomes `applied` on
+  `sent`; `NULL` (off-Board) for failed/skipped/withdrawn. A card in `confirming` shows "Checking with the employer".
 - Users drag between Applied…Closed freely; a manual drag sets `stage_locked=1`.
 - Email classification (§11.3) may move a card **forward only** (applied→screening→interviewing→offer, or →closed
   on rejection) when `stage_locked=0`; each auto move creates an event and an "Undo" notification.
@@ -490,7 +516,8 @@ shows queue position and an ETA computed from the planner's slots. [R10-05]
 Job `planner.day` runs at each user's local midnight and whenever new `ready` applications appear: picks
 `k = min(remaining_today, ready count)` random times in the remaining part of the user's local 08:00–20:00 window,
 at least 20 minutes apart, and assigns them in score order. Outside the window nothing is sent; leftovers roll to
-tomorrow's planning.
+tomorrow's planning. A retry's earliest time (§9.4) is a lower bound: the planner gives it the first free slot at or
+after that time inside a window.
 
 ### 9.3 Dispatcher
 
@@ -508,18 +535,30 @@ that pass every gate below, in order:
 Then, in one transaction: ledger `reserve` (idempotency key `reserve:<application_id>:<attempt n>`), status
 `sending`, create `attempts` row with `lease_until = now + 12 min`, enqueue `submit.run`.
 
-### 9.4 Outcomes
+### 9.4 Outcomes [S13-04]
+
+The executor sets `attempts.submit_clicked_at` in the same instant it clicks the final Submit. That timestamp splits
+every failure in two: before it, nothing reached the employer and a retry is safe; after it, the employer may have
+the application, and a retry could send it twice.
 
 | Attempt outcome | Ledger | Application | Retry |
 |---|---|---|---|
-| `sent` | commit | `sent`, stage `applied`, snapshot written | — |
+| `sent` (confirmation page seen) | commit | `sent`, stage `applied`, snapshot written (`confirmed_by='page'`) | — |
+| `unconfirmed` (any failure **after** `submit_clicked_at`: no confirmation signal, timeout, crash, browser lost) | stays reserved | `confirming` | **never** |
 | `needs_review` (unknown required question found on the form) | release | `needs_review` | after Review |
 | `posting_closed`, `duplicate` | release | `skipped` | no |
-| `captcha_blocked`, `code_timeout`, `blocked`, `form_changed`, `upload_failed`, `provider_error`, `timeout`, `crash` | release | back to `ready` with `scheduled_for` ≥ 6 h later if `attempts < 2`, else `failed` | once, fresh browser session |
+| `captcha_blocked`, `code_timeout`, `blocked`, `form_changed`, `upload_failed`, `provider_error`, `timeout`, `crash` (all **before** `submit_clicked_at`) | release | back to `ready`, earliest retry ≥ 6 h later (§9.2), if `attempts < 2`, else `failed` | once, fresh browser session |
 
-A crash or deploy leaves `attempts.lease_until` in the past: the recovery sweep (every minute) marks it `crash`,
-releases the reservation and applies the retry rule. A `sent` outcome must not be retried: before marking `crash`,
-the sweep checks the mailbox for an ATS acknowledgement for that posting since `started_at`; if found → `sent`.
+**Confirming.** An application in `confirming` waits up to `limits.confirm_wait_hours` (24) for an acknowledgement:
+mail to the job-search address with `auth='pass'`, from the company's or the ATS's sender domains, naming the company
+or the posting title, received after `submit_clicked_at`. Found → commit, `sent`, snapshot (`confirmed_by='email'`).
+Not found → release, `failed` with reason `unconfirmed`, never retried, and the posting's `dedupe_key` is treated as
+sent for the 60-day guard so Overture cannot apply to it again. Shown as `Couldn't apply` with the line "Overture
+couldn't confirm this one reached the employer, so it won't send it again. Nothing was charged." `confirming` does not occupy
+the one-in-flight slot (the partial unique index covers `sending` only) and counts toward the company rule (§8.1).
+
+**Recovery sweep** (every minute): an attempt whose `lease_until` has passed with no outcome is closed as `unconfirmed`
+if `submit_clicked_at` is set, else as `crash`, and the table above applies.
 
 ### 9.5 Automatic kill switches [S6-03, S6-07]
 
@@ -538,17 +577,18 @@ switches off.
   `proxyCountryCode` = user's `current_country` (fallback: nearest supported country from a static map),
   `solveCaptchas: true`; connect with `chromium.connectOverCDP(cdpUrl)`; **always** stop the browser through the
   API in `finally` (closing CDP does not stop billing).
-- **Kernel** (fallback): headful browser, stealth on, ISP proxy, per-user profile.
+- **Kernel** (emergency fallback): headful browser, stealth on, ISP proxy, per-user profile. Its acceptable-use
+  policy bans "bulk unsolicited form submission" (S6-01), so it is exercised only against the synthetic lab and
+  fixtures, never sent real applications by default; the owner switches real traffic to it only if Browser Use's
+  provider kill switch trips and the owner chooses to.
 - **Local** (tests/dev): local headed Chrome against the fixture server; no network to ATSes.
-- Provider choice per attempt: admin setting `browser.provider` (`browser_use` | `kernel` | `split`); `split`
-  assigns randomly for the M1 bake-off and records the provider on the attempt.
+- Provider choice per attempt: admin setting `browser.provider` (`browser_use` | `kernel`), recorded on the attempt.
 
-### 10.2 Executor (salvaged)
+### 10.2 Executor (ported)
 
-Salvage `src/hands/agent/executor.ts`, `plan-cache.ts`, `snapshot.ts`, `match.ts` and `src/hands/ats/*`
-(`flow.ts`, `fill-loop.ts`, `check-option.ts`) plus `src/hands/{greenhouse,lever,ashby}`; strip comments and tests;
-drop everything about local Chrome windows, Xvfb, laptop, wireproxy, Rehearsal/Shadow modes. The executor reads the
-page's ARIA tree, matches fields to prepared answers by label, fills, uploads, and verifies before submit.
+Ported from the v1 form-filling engine and per-ATS flows (`docs/v2/SALVAGE.md`), with everything about local Chrome,
+Xvfb, the laptop, wireproxy, live view, Rehearsal and Shadow removed. The executor reads the page's ARIA tree,
+matches fields to prepared answers by label, fills, uploads, and verifies before submit.
 
 ### 10.3 Attempt steps (`submit.run`)
 
@@ -559,28 +599,34 @@ page's ARIA tree, matches fields to prepared answers by label, fills, uploads, a
 5. Any required field the prepared answers do not cover: map it (§8.3 step 2); if it is factual and unknown →
    stop, outcome `needs_review` (nothing submitted).
 6. Submit. If a verification-code prompt appears, poll the user's mailbox (`auth='pass'`, sender domain in the ATS
-   domain list, received after `started_at`) every 5 s for ≤ 5 min, extract the code with the salvaged
-   `src/brain/inbox/codes.ts`, type it, mark `code_consumed_at`. None → `code_timeout`.
+   domain list, received after `started_at`) every 5 s for ≤ 5 min, extract the code (ported code extractor), type
+   it, mark `code_consumed_at`. None → `code_timeout`. A code prompt that appears after the final Submit is handled
+   the same way; a timeout there is `unconfirmed`, not `code_timeout`.
 7. If a CAPTCHA is visible: stop interacting, wait 10 s, re-inspect, up to 3 times (vendor solver works meanwhile).
    Still visible → `captcha_blocked`.
-8. Confirm success by the ATS confirmation signal (URL/heading/text per ATS). No signal within 30 s → `form_changed`.
+8. Set `submit_clicked_at` and click the final Submit. Confirm success by the ATS confirmation signal
+   (URL/heading/text per ATS). No signal within 30 s → `unconfirmed` (§9.4). A missing or changed field found
+   **before** the click → `form_changed`.
 9. Close the browser; record `browser_ms`, `proxy_bytes`, `cost_micros` from the provider usage report.
-10. Hard timeout 10 min → `timeout`.
+10. Hard timeout 10 min → `timeout` before the click, `unconfirmed` after it.
 
-### 10.4 Bake-off harness (M1) [S6-01]
+### 10.4 Synthetic lab and provider report (M1) [S6-01, S13-06]
 
 - Synthetic: `https://tryoverture.com/lab/*` pages with reCAPTCHA v3 (score logged server-side), hCaptcha, Turnstile
-  and recorded ATS fixture forms; 200 sessions per provider; no employer involved.
-- Live: owner's real applications with `browser.provider=split`; ≥ 60 per provider.
-- Admin report: completion rate, code rate, CAPTCHA rate, p50/p95 duration, cost per completed application, per
-  provider × ATS. Decision rule: higher completion rate wins; cost decides only within 5 points and only up to
-  $0.03 per completed application.
+  and recorded ATS fixture forms; 200 sessions per provider (Browser Use and Kernel); no employer involved.
+- Live: the owner's real applications, on Browser Use only; ≥ 60 for the M1 gate.
+- Admin report: completion rate, code rate, challenge rate, p50/p95 duration, cost per completed application, per
+  provider × ATS. Kernel stays the fallback unless the lab shows it clearly ahead and the owner decides otherwise.
 
 ### 10.5 Fixtures
 
-`scripts/capture-fixtures.ts` runs in a Browser Use session (never from devbox) and saves sanitised HTML + assets of
-real forms per ATS into `tests/e2e/fixtures/forms/`; the local fixture server replays them, including fake
-confirmation pages, a fake code prompt and a fake visible CAPTCHA. [S1-05]
+Fixture capture is an admin-started job (`fixtures.capture`, `POST /admin/api/fixtures/capture` `{ats, apply_urls}`)
+that runs on `overture-web` and drives a Browser Use session, the same path as a real application, and never clicks
+Submit. It saves sanitised HTML + assets (names, emails, tokens and employer tracking stripped) to R2
+`fixtures/{ats}/{form_signature}/`. A developer pulls them into `tests/e2e/fixtures/forms/` with
+`scripts/pull-fixtures.ts` (R2 read only, no ATS traffic); the local fixture server replays them, including fake
+confirmation pages, a fake code prompt and a fake visible challenge. Live smoke checks are the same kind of admin job,
+stopping before Submit. The developer machine never drives a browser against a real form. [S1-05, S13-07]
 
 ---
 
@@ -623,20 +669,21 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
 
 | Key | Default | Source |
 |---|---|---|
-| `limits.daily_cap` | 10 | S8-01 |
+| `limits.daily_cap` | 10, resetting at the user's local midnight | S8-01 |
 | `limits.send_window` | 08:00–20:00 user local, ≥ 20 min apart | S8-01 |
 | `limits.company_cooldown_days` | 7 | S8-01 |
 | `limits.repost_guard_days` | 60 | S8-01 |
 | `limits.crowd_per_posting` | 20 | S8-01 |
 | `limits.crowd_per_employer_week` | 50 | S8-01 |
 | `limits.ats_hourly.{ats}` | 120 | S8-01 |
-| `limits.max_attempts` | 2 | R4-13 |
+| `limits.max_attempts` | 2 (pre-submit failures only) | R4-13 |
+| `limits.confirm_wait_hours` | 24 | S13-04 |
 | `limits.reply_per_day` | 20 | S2-01 |
 | `limits.timezone_change_days` | 7 | R7-02 |
 | `match.auto_threshold_default` | 60 (user may pick 50) | S3-03 |
 | `match.strong` | 80 | S3-03 |
 | `llm.cap_user_day_usd` / `llm.cap_global_day_usd` / `llm.cap_tagging_day_usd` | 0.25 / 10 / 1 | S2-04, S6-05 |
-| `browser.provider` | `browser_use` (`split` during the M1 bake-off) | S6-01 |
+| `browser.provider` | `browser_use` | S6-01, S13-06 |
 | `browser.concurrency` | 10 | Browser Use tier |
 | `checkin.after_days` / `checkin.close_after_days` | 21 / 45 | S8-07 |
 | Plans (M3) | trial 3 one-time; week $12 → 70 / 7 days; month $35 → 300 / 30 days; renewals; no rollover | S3-08, S8-05 |
@@ -657,8 +704,8 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
 
 ### 13.2 Encryption and deletion [S4-07]
 
-- Envelope encryption: per-user 256-bit DEK, wrapped with AES-256-GCM under `MASTER_KEY_v{n}`; salvaged from
-  `src/brain/secrets/index.ts`. Ciphertext format `v1:{key_version}:{iv}:{tag}:{data}`; associated data =
+- Envelope encryption: per-user 256-bit DEK, wrapped with AES-256-GCM under `MASTER_KEY_v{n}`; ported from v1
+  (`docs/v2/SALVAGE.md`). Ciphertext format `v1:{key_version}:{iv}:{tag}:{data}`; associated data =
   `table:column:row_id`.
 - Encrypted: all `_enc` columns, resume files, mail HTML and attachments, exports.
 - **Delete account** (Settings, re-auth): delete Browser Use/Kernel profiles via API, delete `user_keys` (shred),
@@ -695,7 +742,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Session | `GET /api/me` |
 | Events | `GET /api/events` (SSE; `Last-Event-ID` replay from `events`; heartbeat 25 s) |
 | Home | `GET /api/home` (status, applications left, today's sent/remaining, queue position + ETA, up next, activity, check-ins) · `POST /api/running` `{running}` |
-| Board | `GET /api/board` · `PATCH /api/applications/:id/stage` `{stage, position}` · `POST /api/applications/:id/undo-stage` · `POST /api/applications/:id/withdraw` |
+| Board | `GET /api/board` · `PATCH /api/applications/:id/stage` `{stage, position}` · `POST /api/applications/:id/undo-stage` · `POST /api/applications/:id/withdraw` (queued only) |
 | Application | `GET /api/applications/:id` (card + timeline + snapshot "proof": answers with sources, letter with mapped lines, resume hash) |
 | Jobs | `GET /api/search?q&filters` (FTS ≤ 50 ms) · `GET /api/postings/:id` (scores on open) · `POST /api/postings/:id/apply` · `PUT /api/postings/:id/state` `{saved|hidden|null}` |
 | Review | `GET /api/reviews` · `POST /api/reviews/:id/answer` · `POST /api/reviews/:id/dismiss` |
@@ -706,7 +753,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Settings | `GET/PUT /api/settings` (threshold, digest, timezone, languages) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `POST /api/account/delete` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/ses/events` · `POST /internal/mail/inbound` · `GET /internal/mailboxes/:local` |
-| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/applications`, `/attempts`, `/attempts/:id/live`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/mail-health`, `/audit`, `/bakeoff` |
+| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/mail-health`, `/audit`, `/provider-report` |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
 `home.updated`, `notification`. TanStack Query invalidates by topic.
@@ -715,8 +762,9 @@ SSE topics: `application.updated`, `board.moved`, `review.created`, `review.reso
 
 ## 15. Surfaces
 
-Visual design follows the canvas design system (v0.2 Ember, World V) via the impeccable skill [D1-01]; the design
-round runs alongside the build [S9-04]. Five destinations: **Home, Board, Review, Inbox, Profile**; Settings from
+Visual design: the canvas artifact `P3aiZsEXkoUKBrknvvBNJJ`, Section A, is the wireframe and the build matches it
+pixel for pixel; `DESIGN.md` is its written contract. Boards that contradict this spec are redrawn before the slice
+that builds them (`DESIGN.md` §13). [D1-01, S13-09] Five destinations: **Home, Board, Review, Inbox, Profile**; Settings from
 the avatar; desktop hover submenus; phone bottom tab bar; sub-sections are list pages on phone. [S4-06]
 
 | Surface | Content | Key states |
@@ -726,12 +774,12 @@ the avatar; desktop hover submenus; phone bottom tab bar; sub-sections are list 
 | Review | Open questions grouped by jobs unlocked; answer input matches field type; dismiss | none open |
 | Inbox | Threads list (linked company/card), message view, attachments, "Couldn't verify sender" label, reply (M2, employer-started threads only) | empty, address explainer |
 | Profile | Resume, facts by tier, targets with live job count, skip list, job-search address, "Strengthen your profile" | missing Tier 1 facts |
-| Settings | Threshold (60/50), digest, notifications, timezone, languages, plan & billing (M3), sign out all devices, export, delete, support access log | |
+| Settings | Threshold (60/50), digest, notifications, timezone, languages, job-search address (read-only), the fixed limits explained (10 a day, 08:00–20:00, one company per 7 days; not editable), plan & billing (M3), sign out all devices, export, delete, support access log | |
 | Onboarding (M2) | 1 Sign in · 2 Resume · 3 Your facts (Tier 1, prefilled) · 4 What you want (live count) · 5 Your job-search address + consent + trial card (M3) + Start; PWA install + push prompt after step 5 | resume unreadable → manual entry |
-| Admin | Same design system [S5-04]: Overview (success per provider × ATS, cost per completed application, queue, spend), Users, Applications/Attempts (live view/replay embed), Reviews, Kill switches & Settings, Catalog health, Mail health, Bake-off, Grants/Refunds, Audit | |
+| Admin | Same design system [S5-04]: Overview (success per provider × ATS, cost per completed application, queue, spend), Users, Applications/Attempts (live view/replay embed), Reviews, Kill switches & Settings, Catalog health, Mail health, Provider report, Fixture capture, Grants/Refunds, Audit | |
 | Public (M3) | Landing, pricing, privacy, terms, `mail.tryoverture.com` explainer; prerendered static HTML | |
 
-User-facing copy never uses internal words (dispatch, provider, lease, attempt, ledger, credit). [CLAUDE.md UI rules]
+User-facing copy never uses the banned words (see the Words rule at the top). [S13-01]
 
 ### 15.1 Notifications [S6-06]
 
@@ -748,16 +796,17 @@ Reviews, check-ins. [S11-01] In-app notification list mirrors pushes.
 1. Sign up/in with email + password (verify email) · 2. magic link · 3. Google (fake OIDC) · 4. LinkedIn (fake OIDC)
 · 5. account linking refused for unverified email · 6. v1 importer loads resume, answer bank, learned answers ·
 7. resume upload + parse + confirm facts · 8. targets with live count · 9. discovery backfill + trickle + close ·
-10. tagging precedence incl. tag import · 11. candidate filters (skip list, cooldown, repost guard, language,
-salary/FX) · 12. lazy scoring stops at need · 13. score on open + manual apply · 14. preparation with factual,
+10. tagging precedence incl. tag import · 11. candidate filters (skip list incl. near-match names and domains, one open
+application per company, cooldown, repost guard, language, remote country rules, salary/FX) · 12. lazy scoring stops at need · 13. score on open + manual apply · 14. preparation with factual,
 open-text, optional blank · 15. Review unlocks N applications · 16. planner window + spacing · 17. dispatcher gates
 (cap, applications left, kill switch, one-in-flight) · 18. submit success on Greenhouse/Lever/Ashby fixtures ·
-19. verification code read from mailbox · 20. CAPTCHA blocked → release + retry once → failed · 21. crash recovery
-does not double-send · 22. Board drag, lock, keyboard DnD, phone hold-drag · 23. email moves card forward + undo ·
+19. verification code read from mailbox · 20. challenge blocked before Submit → release + retry once → failed ·
+21. crash or missing confirmation after Submit → `confirming`, never retried; acknowledgement mail → sent; none in
+24 h → failed, not charged, repost guard set · 22. Board drag, lock, keyboard DnD, phone hold-drag · 23. email moves card forward + undo ·
 24. check-in at 21 days, close at 45 · 25. inbound mail with failed auth stored, not automated · 26. reply limits
 (M2) · 27. onboarding wizard + address generation collision (M2) · 28. push + digest (M2) · 29. export + delete
 crypto-shred (M2) · 30. admin Reveal + audit + support access log (M2) · 31. Stripe checkout, renewal, expiry,
-payment-failure pause (M3).
+payment-failure pause (M3) · 32. admin fixture capture job writes sanitised forms to R2 and never submits.
 
 Plus: route reachability for every page, axe on every page, 30 visual snapshots (Home, Board, Review, Inbox, Profile
 × 390 / 1280 px × light/dark) in pinned Docker.
@@ -794,19 +843,20 @@ slices on the same line can run in parallel.
 
 | # | Slice | Done when | E2E |
 |---|---|---|---|
-| M1-01 | Skeleton: repo layout, Bun + Hono + Vite + RR7 + TanStack Query, Drizzle + migrations, WAL settings, `/api/health`, Fly app + volume, Litestream → R2, CI pipeline incl. comment ban | deploys from `main`; restore drill passes | reachability |
+| M1-00 | v1 sunset, step 1 (§18): snapshot the v1 volume, run `scripts/import-v1.ts` export, stop v1 machines | export file verified, v1 stopped, snapshot listed | — |
+| M1-01 | Skeleton: repo layout, Bun + Hono + Vite + RR7 + TanStack Query, Drizzle + migrations, WAL settings, `/api/health`, Fly app `overture-web` + volume, Litestream → R2, CI pipeline incl. comment ban | deploys from `main`; restore drill passes | reachability |
 | M1-02 | Platform: `bg_jobs` queue (claim, retry, dead-letter, SIGTERM), SSE outbox, OTel, settings, kill switches, envelope crypto, ports + fakes | jobs survive restart; SSE replays | (infra used by all) |
 | M1-03 · M1-04 | Auth (4 methods, Turnstile, limits, linking rule, allowlist, owner role) · Catalog sources GH/Lever/Ashby + v1 board import + backfill/trickle/close + dedupe + FTS search | owner signs in all 4 ways · catalog fills, closes detected | 1–5 · 9 |
 | M1-05 · M1-06 | Tagging (normalisation, rules, title model, Haiku batch + caps, census script, tag import seam) · Profile: facts, resume upload/parse, targets, skip list, v1 importer, owner mailbox | census report committed · owner profile complete from import | 10 · 6–8 |
 | M1-07 | Matching: candidates, code rank, lazy scoring with reason, score on open, saved/hidden | `need` respected; no double scoring | 11–13 |
 | M1-08 | Question catalog + preparation + cover letters + Reviews | Review unlocks applications | 14–15 |
 | M1-09 | Inbound mail: Worker, R2, ingest, auth, threads, linking, code extraction | code from fixture mail reaches attempt | 19, 25 |
-| M1-10 | Browser providers (Browser Use, Kernel, local), executor + ATS flows salvage, resource blocking, fixture capture script | fixture forms submit locally; live smoke on Browser Use by owner | 18 |
-| M1-11 | Billing ledger + admin grants; planner; dispatcher gates; attempts; outcomes; recovery; auto kill switches | no double send; reservations always resolve | 16, 17, 20, 21 |
+| M1-10 | Browser providers (Browser Use, Kernel, local), executor + ATS flows ported, resource blocking, `submit_clicked_at`, fixture capture admin job + pull script | fixture forms submit locally; capture job run by the owner from admin | 18, 32 |
+| M1-11 | Billing ledger + admin grants; planner; dispatcher gates; attempts; outcomes incl. `confirming`; recovery; auto kill switches | no double send; reservations always resolve | 16, 17, 20, 21 |
 | M1-12 · M1-13 | Board + card proof · Home + Review UI | owner runs the pipeline from the phone | 22, 15 |
-| M1-14 | Admin M1: overview, attempts with live view/replay, kill switches, settings, bake-off report, tag import | bake-off decision readable in admin | — |
+| M1-14 | Admin M1: overview, attempts with live view/replay, kill switches, settings, provider report, fixture capture, tag import | provider report readable in admin | — |
 | M1-15 | Observability alerts + dashboards | each alert fires in a drill | — |
-| M1-16 | Bake-off run (owner + builder): synthetic lab, then live split | exit gate in §2 met or provider decision recorded | — |
+| M1-16 | Synthetic lab on both providers, then the owner's live run on Browser Use | exit gate in §2 met | — |
 
 ### M2
 
@@ -824,30 +874,28 @@ signup · M3-05 cost and margin review with measured numbers; final prices.
 
 ---
 
-## 18. Burn and salvage [R10-10, S7-02]
+## 18. v1 sunset and salvage [R10-10, S13-02, S13-03]
 
-On branch `v2`, one burn commit before M1-01:
+v2 lives in its own repository; v1 (`a-hagi613/ai-auto-apply`) is read-only reference. What is ported from v1 and
+where it goes: `docs/v2/SALVAGE.md`. Nothing else is taken.
 
-- **Delete**: `src/brain/web/`, `src/setup/`, `src/hands/hiring-cafe/`, `src/brain/hiring-cafe/`, `src/brain/telegram/`,
-  `src/brain/api-key/`, `src/brain/linkedin/` (v1 scraping, not sign-in), Rehearsal/Shadow code, every `*.test.ts`
-  except the salvaged invariants, root `GLOSSARY.md`, `PRODUCT.md`, `DESIGN.md`, `docs/` except `docs/v2/`,
-  `.impeccable/surfaces/src-brain-web-index-html.md`, `fly.toml` (replaced), `Dockerfile` (replaced).
-- **Salvage then rewrite into the new layout** (strip comments, adopt v2 types): `src/brain/sources/*` (5 clients,
-  html-to-text), `src/brain/directory/{board-urls,seed-boards,loader}.ts`, `src/hands/agent/{executor,plan-cache,
-  snapshot,match}.ts`, `src/hands/ats/*`, `src/hands/{greenhouse,lever,ashby}/`, `src/brain/secrets/index.ts`,
-  `src/brain/matching/posting-guard.ts` (prompt-injection guard on posting text), `src/brain/inbox/codes.ts`,
-  `src/brain/onboarding/memory-base.ts` (as the seed of the fact catalog), `profile/answer-bank.md` (import data).
-- **Rewrite**: `CLAUDE.md` and `AGENTS.md` for v2 (Orca block preserved), `docs/v2/GLOSSARY.md` → root `GLOSSARY.md`.
-- New Fly app `overture-web`; v1 app destroyed after a week of owner use on v2.
+v1 runs on Fly app `ai-auto-apply` (volume `data`, yyz). In order:
 
----
+1. Snapshot the v1 volume (kept until v1 is destroyed).
+2. Export from the v1 database, read-only: `company_boards`, the owner's answer-bank tables and `learned_answers`
+   (`docs/v2/SALVAGE.md`). The export is encrypted and kept off the repository; boards are not personal data.
+3. Stop the v1 machines. Nothing sends from v1 again.
+4. Create `overture-web` with a fresh v2 database; `scripts/import-v1.ts` loads the export. No v1 schema migrates.
+5. Destroy `ai-auto-apply` and its snapshot after a week of the owner using v2.
 
 ## 19. Open risks
 
 | Risk | Resolves it |
 |---|---|
-| Browser Use objects to our use case | handled if they raise it; Kernel fallback already wired behind `BrowserProvider` |
-| Invisible reCAPTCHA scores too low → code/CAPTCHA rate high | M1 bake-off numbers; Anchor sticky-IP or self-hosted as later options |
+| Browser Use objects to our use case | handled if they raise it; Kernel adapter wired behind `BrowserProvider`, but its policy bans bulk form submission, so a second fallback may be needed |
+| ATSes rate-limit or block `overture-web`'s IP on the public feed APIs | per-ATS limits and conditional requests (§6.1); `discovery_poll_total` alert; feeds can move behind Browser Use's proxy if it happens |
+| An acknowledgement email never comes for a sent application | `confirming` resolves as Couldn't apply, not charged, never resent; measured per ATS |
+| Invisible reCAPTCHA scores too low → code/CAPTCHA rate high | M1 lab and live numbers; Anchor sticky-IP or self-hosted as later options |
 | Browser Use profile encryption at rest undocumented | profiles hold cookies/storage only (no resume or facts); deleted via API on account deletion |
 | No city/fixed-IP targeting; uncovered countries | country map fallback; measure per country in M2 |
 | `mail.tryoverture.com` filtered by employers | per-employer monitoring + auto skip; domain reply-rate alert |

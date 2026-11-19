@@ -15,6 +15,7 @@ No code exists yet. The repository holds the specification and the owner's seed 
 | `docs/v2/GLOSSARY.md` | The words, used exactly in code and copy |
 | `docs/v2/GRILL-BRIEF.md`, `docs/v2/research/` | The question set behind the spec, and the evidence |
 | `profile/` | The owner's resume, answer bank and cover-letter template, seed data for the importer |
+| `docs/v2/SALVAGE.md` | The only v1 logic that may be ported, and where it goes |
 | `AGENTS.md`, `CLAUDE.md` | Instructions for coding agents |
 
 Precedence: the spec beats the code, and `DESIGN.md` beats the code on appearance.

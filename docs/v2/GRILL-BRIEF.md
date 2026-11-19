@@ -1,3 +1,7 @@
+> **Historical.** The question set that started the grill on 2026-11-19. Much of it was later reversed (Live Tab,
+> Hold, credits, Gmail, runner machines, tiers). Current truth is `SPEC.md` and `DECISIONS.md`; read this only for
+> context.
+
 # Overture v2 — grill brief and context pack
 
 Hand this file to a senior architecture agent and run a grilling session with it. It is self-contained:

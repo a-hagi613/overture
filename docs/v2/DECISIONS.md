@@ -3,7 +3,8 @@
 Living record of the decisions that define Overture v2. Every answer is recorded here with rationale and
 the alternatives that were rejected, so the spec and tickets cite this file rather than a chat.
 
-Status: **IN PROGRESS** — started 2026-11-19. Answers land here as they are given.
+Status: **near-final** — started 2026-11-19; Session 4 (S13) reconciled the spec with the owner the same day.
+New decisions are appended as rounds. Rows before Session 3 are history.
 
 Inputs:
 - Recovered prior decisions: `/tmp/keep-decisions.md` (Antigravity session `8f9ec262`, 2026-11-18)
@@ -373,3 +374,24 @@ decision supersedes any earlier row it touches. SPEC.md is written only from Ses
 | S12-01 | **One domain only: `tryoverture.com`.** Job-search addresses are `first.last@mail.tryoverture.com` (subdomain with its own SES identity, DKIM, SPF and DMARC). `overturemail.com` is not bought. Supersedes S8-09, S9-02 and the second purchase in S9-03 | owner: side project with no revenue yet, minimise spend. Accepted trade-offs: addresses are tied to the brand domain if it is ever replaced, and the address shows "try". Sender-reputation coupling is low because the subdomain only sends replies (≤ 20/day/user) |
 | S12-02 | **Domain purchase parked**: Cloudflare billing support is resolving the card address error; DNS/Email Routing/SES setup waits for it. Nothing in the design round depends on it | owner |
 | S12-03 | **Repo `CLAUDE.md` gets a v2 banner and v2 UI rules** before the design round, so the impeccable skill does not follow v1 rules (Holds, six destinations, preserved `BoardPage.tsx`); full rewrite stays in the burn commit | builder, to avoid the design pass reading dead rules |
+
+## Session 4 (Claude Opus 5.5, stonefish) — bootstrap of the v2 repository, 2026-11-19
+
+The documents moved to the new repository `a-hagi613/overture`. A full read found contradictions between the spec,
+`DESIGN.md`, the agent files and the canvas; the owner ruled on them, and on the rest asked for the builder's best call.
+
+### Round S13 — answered 2026-11-19
+
+| # | Decision | Rationale / rejected alternative |
+|---|---|---|
+| S13-01 | **Banned words are banned in anything a user can read** (UI, copy, emails, push, errors, landing). Code uses the glossary for product concepts and may keep precise internal names (`ledger`, `attempts`, `dispatch/`, `BrowserProvider`) | renaming every internal to avoid the words rejected: it hides what the code is. The spec already used them as identifiers |
+| S13-02 | **Fresh start, salvage what we can**: v1 logic (ATS feed clients, form-filling engine, per-ATS flows, posting guard, code extractor, crypto) is ported into the v2 layout per `docs/v2/SALVAGE.md`; no v1 structure, vocabulary or tests | copying v1 modules whole rejected: they carry the v1 patterns this repository exists to leave behind |
+| S13-03 | **v1 sunset on Fly**: snapshot the volume, export boards and the owner's answers and learned answers, stop v1, create `overture-web` with a fresh database, destroy v1 a week later. No schema migration | migrating the v1 database rejected: fresh schema (R1-02) |
+| S13-04 | **No retry after Submit is clicked.** `submit_clicked_at` splits failures. After it, the application is `confirming` for up to 24 h, waiting for the employer's acknowledgement mail: found → sent and charged; not found → Couldn't apply, not charged, never resent, repost guard set | retrying a missing confirmation rejected: it can send the same application twice |
+| S13-05 | **One open application per company**; a sent one blocks the company 7 days; failed/skipped/withdrawn do not count. Skip list matches by company, domain or normalised name with legal suffixes removed; a near match also skips | name equality alone rejected: misses "Shopify Inc." for the current employer |
+| S13-06 | **Kernel is an emergency fallback, not a bake-off arm.** Its policy bans bulk form submission; it runs the synthetic lab only. The M1 gate is measured on Browser Use | sending half the owner's real applications through Kernel rejected |
+| S13-07 | **The developer machine never touches a real form or a Browser Use session.** Fixture capture and live smoke checks are admin-started jobs on `overture-web` through Browser Use, never submitting; fixtures are pulled from R2. Forms only ever see Browser Use's residential IPs | developer-driven Browser Use sessions rejected by the owner: production and development share one path to real forms |
+| S13-08 | **`tryoverture.com` is registered.** Job-search addresses on `mail.tryoverture.com` are the email on every form; the sign-in email never goes on a form | supersedes S12-02 (purchase parked); the personal email on forms would send codes and replies outside Overture |
+| S13-09 | **The canvas is the wireframe; the build matches it pixel for pixel.** Boards that contradict the spec are redrawn first (`DESIGN.md` §13). Conflicts are settled for the most solid approach: 08:00–20:00 sending shown in every board; Queued column in ink with a red "Needs you" pill; serif for display and a person's words, mono for recorded facts; logo radius 7; no glows; one sanctioned card stack; `--hold` renamed `--need` | |
+| S13-10 | **Smaller rulings**: open-text answers carry resume-line mapping like letters; snapshots store the letter mapping, posting URL/title and how the send was confirmed; immutability triggers allow deletion only once the user row is gone; withdraw is for queued applications only; daily usage counts against the day a reservation was made; reservations on an expiring grant are released then expired; retries take the next slot inside the window; remote postings match by country or by work authorisation; timezone from the browser; address first name from `preferred_name`; title similarity in code instead of an ML model; census runs on the v2 catalog; invited beta users get 300 applications over 30 days; the cover-letter template is a Tier 2 fact | builder's call where the spec was silent |
+| S13-11 | **Agent files and orchestration are rewritten from scratch.** `AGENTS.md` / `CLAUDE.md` describe this repository only; orchestration and worker limits are deferred (R10-11, R11-01 no longer apply) | v1 agent files described a repository that no longer exists |
