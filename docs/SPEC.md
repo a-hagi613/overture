@@ -97,20 +97,20 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 
 ### 3.2 External services and environment
 
-| Service | Purpose | Env / secret | Fake for tests |
+| Service | Purpose | Env / secret | In tests (ADR 0013) |
 |---|---|---|---|
-| Cloudflare R2 | backups, encrypted files, raw inbound mail | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES`, `R2_BUCKET_MAIL_RAW`, `R2_BUCKET_BACKUPS` | in-memory object store |
-| Cloudflare Turnstile | bot check on auth forms | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | always-pass fake |
-| Cloudflare Access | admin host gate | `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN` | signed test JWT |
-| Cloudflare Email Worker | inbound mail | `MAIL_INGEST_HMAC_KEY` (shared with Worker) | test POSTs |
-| Browser Use Cloud | primary browser | `BROWSER_USE_API_KEY` | local Chrome provider (§10.5) |
-| Kernel | fallback browser | `KERNEL_API_KEY` | same fake |
-| Anthropic | LLM (prod) | `ANTHROPIC_API_KEY` | scripted fake |
+| Cloudflare R2 | backups, encrypted files, raw inbound mail | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES`, `R2_BUCKET_MAIL_RAW`, `R2_BUCKET_BACKUPS` | disk object store adapter (real implementation, also used in local dev) |
+| Cloudflare Turnstile | bot check on auth forms | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | Cloudflare's published always-pass test keys |
+| Cloudflare Access | admin host gate | `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN` | real verification against a test signing key |
+| Cloudflare Email Worker | inbound mail | `MAIL_INGEST_HMAC_KEY` (shared with Worker) | real signed POSTs to the real endpoint |
+| Browser Use Cloud | primary browser | `BROWSER_USE_API_KEY` | `local` provider: real local Chrome filling saved forms from the fixture server (§10.5); control API via MSW |
+| Kernel | fallback browser | `KERNEL_API_KEY` | control API via MSW; lab only |
+| Anthropic | LLM (prod) | `ANTHROPIC_API_KEY` | real adapter; API intercepted by MSW with responses recorded by the daily live check |
 | OpenCode Go | LLM (local dev only) | `OPENCODE_API_KEY` | — |
-| Amazon SES + SNS | outbound mail, bounces | `AWS_REGION=ca-central-1`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `SES_CONFIG_SET` | captured outbox |
-| Stripe (M3) | Managed Payments | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | stripe-mock + signed fixtures |
+| Amazon SES + SNS | outbound mail, bounces | `AWS_REGION=ca-central-1`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `SES_CONFIG_SET` | real adapter; SES API intercepted by MSW, request bodies asserted |
+| Stripe (M3) | Managed Payments | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | stripe-mock (Stripe's own local server) + signed webhook fixtures |
 | Grafana Cloud | logs/metrics/traces | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | local LGTM docker |
-| Web Push | notifications | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | captured pushes |
+| Web Push | notifications | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | real adapter; push endpoints via MSW |
 | Master key | envelope encryption | `MASTER_KEY_V1` (32 bytes base64), `MASTER_KEY_CURRENT=1` | fixed test key |
 | App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=mail.tryoverture.com`, `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite` | |
 
@@ -145,8 +145,8 @@ All secrets are Fly secrets; local dev reads `.env` (chmod 600, never committed)
 | PDF | `unpdf`; Haiku 5.5 PDF fallback |
 | Mail | `mailparser`, `mailauth` (SPF/DKIM/DMARC verification), AWS SDK v3 SES |
 | Telemetry | OpenTelemetry SDK (traces, metrics, logs) → OTLP |
-| Lint/format | oxlint (all categories + type-aware), oxfmt, comment-ban script |
-| Tests | Playwright e2e (sharded), `bun test` for ≤ 6 invariant files |
+| Lint/format | oxlint, every category at error + type-aware (`oxlint-tsgolint`), from Landmines' own configuration, plus `@interfere/landmines`, vendored anti-slop, React / `jsx-a11y` / Vitest plugins and architecture rules (ADR 0023); oxfmt; Oxc's Claude Code lint-and-format hook |
+| Tests | Playwright e2e (sharded), Vitest for the six invariant files, MSW at the network edge, daily live checks on Fly (ADR 0013) |
 
 ```
 src/
@@ -168,11 +168,12 @@ src/
   mail-worker/       Cloudflare Worker (wrangler.toml)
 drizzle/             generated migrations
 scripts/             import-v1.ts, census.ts, pull-fixtures.ts, restore-drill.ts
-tests/e2e/           Playwright specs + fixtures server + fakes
-tests/unit/          ≤ 6 files (§15.2)
+tests/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
+                     (the six unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
+tools/oxlint/        vendored anti-slop plugin
 ```
 
-No comments in source (enforced by script; JSDoc on exported port interfaces is the one exception).
+No comments in source (Landmines `no-comments`; TSDoc on exported port interfaces is the one exception).
 
 ### 4.1 Ports (every external dependency)
 
@@ -189,7 +190,10 @@ interface FxRates { perUsd(currency: string, date: string): number | null }
 interface Clock { now(): number }
 ```
 
-Each port has a production adapter and a fake used by every e2e test. Domain code imports ports only.
+Domain code imports ports only (enforced by `no-restricted-imports`). Each port has its production adapter and, where
+a real local equivalent exists, a local adapter (`local` browser, disk object store) used in development and tests. No
+port has a hand-written fake (ADR 0013). `Clock` reads system time plus an offset that only a test-only route, never
+mounted in production, can move.
 
 ---
 
@@ -794,9 +798,9 @@ Reviews, check-ins. In-app notification list mirrors pushes.
 
 ## 16. Quality: testing, CI, observability
 
-### 16.1 End-to-end flows (Playwright, every external faked)
+### 16.1 End-to-end flows (Playwright, real code, network edge via MSW; ADR 0013)
 
-1. Sign up/in with email + password (verify email) · 2. magic link · 3. Google (fake OIDC) · 4. LinkedIn (fake OIDC)
+1. Sign up/in with email + password (verify email) · 2. magic link · 3. Google (local OIDC server) · 4. LinkedIn (local OIDC server)
 · 5. account linking refused for unverified email · 6. v1 importer loads resume, answer bank, learned answers ·
 7. resume upload + parse + confirm facts · 8. targets with live count · 9. discovery backfill + trickle + close ·
 10. tagging precedence incl. tag import · 11. candidate filters (skip list incl. near-match names and domains, one open
@@ -814,7 +818,7 @@ payment-failure pause (M3) · 32. admin fixture capture job writes sanitised for
 Plus: route reachability for every page, axe on every page, 30 visual snapshots (Home, Board, Review, Inbox, Profile
 × 390 / 1280 px × light/dark) in pinned Docker.
 
-### 16.2 Unit tests (≤ 6 files)
+### 16.2 Unit tests (six files, Vitest, beside their code)
 
 `ledger.test.ts` (balances, idempotency, FIFO expiry), `crypto.test.ts` (wrap/unwrap, AAD, shred), `planner.test.ts`
 (window, spacing, DST), `address.test.ts` (slug, transliteration, collisions), `tag-rules.test.ts`,
@@ -822,12 +826,28 @@ Plus: route reachability for every page, axe on every page, 30 visual snapshots 
 
 ### 16.3 CI
 
-Parallel jobs: oxlint (all categories, type-aware), oxfmt check, comment ban, `tsgo --noEmit`, Vite build, unit,
-Playwright sharded by duration (per-worker server + template SQLite copy, API-seeded auth, no sleeps, zero
-retries), affected-only on PRs. PR < 2 min; `main` < 4 min including `flyctl deploy --remote-only`. Main deploys
+Parallel jobs: oxlint with zero warnings (`--deny-warnings`, ADR 0023, which includes Landmines `no-comments`,
+`no-test-doubles`, `no-fixed-sleep` and `no-flake-masking`), oxfmt check, `tsgo --noEmit`, Vite build, Vitest,
+Playwright sharded by duration (per-worker server + template SQLite copy, API-seeded auth, MSW with unhandled requests
+as errors, no sleeps, zero retries), affected-only on PRs. PR < 2 min; `main` < 4 min including `flyctl deploy --remote-only`. Main deploys
 only when every job passes.
 
-### 16.4 Observability
+### 16.4 Daily live checks (ADR 0013)
+
+Job `live.checks` runs daily on `overture-web` and on demand from admin. Each check alerts the owner on failure and
+none submits an application or touches a user:
+
+| Check | What is real | Also refreshes |
+|---|---|---|
+| Forms | Browser Use opens a sample of live Greenhouse, Lever and Ashby forms per ATS, fills them from a synthetic profile and stops before Submit; a changed form signature is reported | saved forms in R2 `fixtures/` (§10.5) |
+| AI | a fixed set of real Haiku calls per purpose (§8.6), checked against the output schema and the resume-line rule | MSW recordings in R2 `recordings/anthropic/` |
+| Mail | a message via SES to an Overture-owned check address on `mail.tryoverture.com`, through Cloudflare Email Routing and the Worker, ingested with `auth='pass'` and its code extracted | MSW recordings for SES |
+| Storage | an R2 put, get, list and delete | — |
+
+`scripts/pull-fixtures.ts` brings refreshed forms and recordings into `tests/e2e/` through a pull request, so a test
+replays only what a real service actually returned.
+
+### 16.5 Observability
 
 OTel traces for every request and job; metrics: `attempt_outcome_total{provider,ats,outcome}`,
 `attempt_cost_micros`, `queue_depth{kind}`, `llm_cost_micros{purpose}`, `mail_inbound_total{auth}`,
@@ -847,7 +867,7 @@ slices on the same line can run in parallel.
 | # | Slice | Done when | E2E |
 |---|---|---|---|
 | M1-00 | v1 sunset, step 1 (§18): snapshot the v1 volume, run `scripts/import-v1.ts` export, stop v1 machines | export file verified, v1 stopped, snapshot listed | — |
-| M1-01 | Skeleton: repo layout, Bun + Hono + Vite + RR7 + TanStack Query, Drizzle + migrations, WAL settings, `/api/health`, Fly app `overture-web` + volume, Litestream → R2, CI pipeline incl. comment ban | deploys from `main`; restore drill passes | reachability |
+| M1-01 | Skeleton: repo layout, Bun + Hono + Vite + RR7 + TanStack Query, Drizzle + migrations, WAL settings, `/api/health`, Fly app `overture-web` + volume, Litestream → R2, the full lint set (ADR 0023) with the agent hook, MSW harness, CI pipeline | deploys from `main`; restore drill passes | reachability |
 | M1-02 | Platform: `bg_jobs` queue (claim, retry, dead-letter, SIGTERM), SSE outbox, OTel, settings, kill switches, envelope crypto, ports + fakes | jobs survive restart; SSE replays | (infra used by all) |
 | M1-03 · M1-04 | Auth (4 methods, Turnstile, limits, linking rule, allowlist, owner role) · Catalog sources GH/Lever/Ashby + v1 board import + backfill/trickle/close + dedupe + FTS search | owner signs in all 4 ways · catalog fills, closes detected | 1–5 · 9 |
 | M1-05 · M1-06 | Tagging (normalisation, rules, title model, Haiku batch + caps, census script, tag import seam) · Profile: facts, resume upload/parse, targets, skip list, v1 importer, owner mailbox | census report committed · owner profile complete from import | 10 · 6–8 |
@@ -858,7 +878,7 @@ slices on the same line can run in parallel.
 | M1-11 | Billing ledger + admin grants; planner; dispatcher gates; attempts; outcomes incl. `confirming`; recovery; auto kill switches | no double send; reservations always resolve | 16, 17, 20, 21 |
 | M1-12 · M1-13 | Board + card proof · Home + Review UI | owner runs the pipeline from the phone | 22, 15 |
 | M1-14 | Admin M1: overview, attempts with live view/replay, kill switches, settings, provider report, fixture capture, tag import | provider report readable in admin | — |
-| M1-15 | Observability alerts + dashboards | each alert fires in a drill | — |
+| M1-15 | Observability alerts + dashboards; daily live checks (§16.4) | each alert fires in a drill; every live check passes once on production | — |
 | M1-16 | Synthetic lab on both providers, then the owner's live run on Browser Use | exit gate in §2 met | — |
 
 ### M2
