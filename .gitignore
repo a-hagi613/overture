@@ -17,3 +17,20 @@ desktop.ini
 # Logs and scratch
 *.log
 tmp/
+
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+.wrangler/
+
+# Local databases
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+
+# Test output
+test-results/
+playwright-report/
+blob-report/
