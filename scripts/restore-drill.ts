@@ -24,7 +24,12 @@ const machineSchema = z.looseObject({
   id: z.string(),
   name: z.string(),
   state: z.string(),
-  config: z.looseObject({ image: z.string() }).nullish(),
+  config: z
+    .looseObject({
+      image: z.string(),
+      metadata: z.looseObject({ fly_process_group: z.string().optional() }).nullish(),
+    })
+    .nullish(),
 });
 
 function run(command: string[]) {
@@ -184,17 +189,19 @@ function drillFly() {
     name: machine.name,
     state: machine.state,
     image: machine.config?.image,
+    processGroup: machine.config?.metadata?.fly_process_group,
   }));
 
   const production = machines.find(
     (machine) =>
       machine.image !== undefined &&
-      machine.state === "running" &&
+      machine.state === "started" &&
+      machine.processGroup === "app" &&
       !machine.name.startsWith("restore-drill"),
   );
 
   if (production?.image === undefined) {
-    throw new Error(`no running production machine found on ${flyAppName}`);
+    throw new Error(`no started production machine found on ${flyAppName}`);
   }
 
   const drillName = `restore-drill-${new Date(clock.now()).toISOString().replaceAll(/[-:.]/gu, "").toLowerCase()}`;
