@@ -50,8 +50,8 @@ per-user AI keys, resume generation or restyling, annual plans.
 
 | Milestone | Who | Scope | Exit gate |
 |---|---|---|---|
-| **M1 — Owner applies from the cloud** | owner only (allowlist) | catalog (Greenhouse, Lever, Ashby), tagging, profile via importer, matching, preparation, Reviews, owner's job-search mailbox (inbound), Browser Use provider (Kernel adapter behind the same port, synthetic lab only), dispatch, ledger with admin grants, Board, Home, Review, minimal Profile, minimal admin, synthetic lab, fixture capture job, observability | ≥ 60 real owner applications on Browser Use; **≥ 85 % of attempted applications reach `sent`**; cost ≤ **$0.03 per completed application**; zero wrong-company or duplicate sends. *Attempted* and *cost* are defined in ADR 0026 |
-| **M2 — Invite-only beta** | invited users | onboarding wizard, mailboxes for all, two-way Inbox (SES), notifications (PWA push + digest), check-ins, email-driven stage moves, full admin (users, Reveal, audit, support access log), export/delete, legal pages + consent, SmartRecruiters/Recruitee/Workable/Personio after a 20-form probe each. Each accepted invite gets an admin grant of 300 applications over 30 days (no card) | 10 beta users for 14 days; submit rate holds ≥ 85 %; no P1 privacy/security finding |
+| **M1 — Owner applies from the cloud** | owner only (allowlist) | catalog (Greenhouse, Lever, Ashby), tagging, profile via importer, matching, preparation, Reviews, owner's forwarded ATS mail (inbound, ADR 0028), Browser Use provider (Kernel adapter behind the same port, synthetic lab only), dispatch, ledger with admin grants, Board, Home, Review, minimal Profile, minimal admin, synthetic lab, fixture capture job, observability | ≥ 60 real owner applications on Browser Use; **≥ 85 % of attempted applications reach `sent`**; cost ≤ **$0.03 per completed application**; zero wrong-company or duplicate sends. *Attempted* and *cost* are defined in ADR 0026 |
+| **M2 — Invite-only beta** | invited users | onboarding wizard (including the forwarding-filter step, once it is on the canvas), forwarding addresses for all, Inbox of forwarded ATS mail, notifications (PWA push + digest), check-ins, email-driven stage moves, full admin (users, Reveal, audit, support access log), export/delete, legal pages + consent, Workable and Personio after a 20-form probe each; Recruitee and SmartRecruiters only after the checks listed in ADR 0028. Each accepted invite gets an admin grant of 300 applications over 30 days (no card) | 10 beta users for 14 days; submit rate holds ≥ 85 %; no P1 privacy/security finding |
 | **M3 — Public** | anyone | Stripe Managed Payments, trial/week/month plans, card fingerprints, grants/expiry, payment-failure pause, admin refunds, public landing + pricing (prerendered), public signup | first 20 paying users; Stripe reconciliation matches the ledger for 30 days |
 
 Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
@@ -79,7 +79,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
   Browser Use Cloud  Anthropic API    Amazon SES     Grafana Cloud      Cloudflare R2
   (Kernel fallback)  (Haiku 5.5)      (ca-central-1) (LGTM)             backups · files · mail
                                           ▲
-  employers ──mail──▶ SES receiving (mail.tryoverture.com, one rule) ──▶ S3 raw + SNS notice ──▶ overture-web
+  employers ──mail──▶ user's inbox ──ATS-only filter──▶ Email Routing + Worker (tryoverture.com) ──signed raw MIME──▶ overture-web
 ```
 
 - One Fly app, one machine, one volume. `fly scale count` stays 1. Machine: `shared-cpu-2x`, 2 GB; volume 10 GB.
@@ -105,7 +105,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Cloudflare R2 | backups, encrypted files and mail | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES`, `R2_BUCKET_BACKUPS`; `R2_ENDPOINT` overrides the endpoint for tests | disk object store adapter (real implementation, also used in local dev); the R2 adapter runs against a local S3-compatible server (`test/e2e/s3-server.ts`) |
 | Cloudflare Turnstile | bot check on auth forms | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES` (optional, defaults to the `APP_ORIGIN` hostname; production must not list localhost or 127.0.0.1) | Cloudflare's published always-pass test keys; siteverify intercepted with recorded-shape responses (`test/e2e/turnstile-gate.test.ts`) |
 | Cloudflare Access | admin host gate | `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_JWKS_URL` (tests override the certs URL) | real verification against a test signing key |
-| Amazon SES receiving | inbound mail (ADR 0024) | `SES_INBOUND_BUCKET`, `SES_INBOUND_TOPIC_ARN` | real SNS-signed notices (test signing certificate served through MSW) to the real endpoint; raw mail from the disk object store |
+| Cloudflare Email Routing + Email Worker | inbound mail (ADR 0028) | `INBOUND_HMAC_SECRET` (shared by the Worker and `overture-web`) | the Worker's handler run against recorded `.eml` fixtures; signed requests to the real `POST /internal/mail/inbound`; DKIM checked by `mailauth` against recorded keys |
 | Browser Use Cloud | primary browser | `BROWSER_USE_API_KEY` | `local` provider: real local Chrome filling saved forms from the fixture server (§10.5); control API via MSW |
 | Kernel | fallback browser | `KERNEL_API_KEY` | control API via MSW; lab only |
 | Anthropic | LLM (prod) | `ANTHROPIC_API_KEY` | real adapter; API intercepted by MSW with responses recorded by the daily live check |
@@ -117,7 +117,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Master key | envelope encryption | `MASTER_KEY_V1` (32 bytes base64), `MASTER_KEY_CURRENT=1` | fixed test key |
 | Google + LinkedIn (OIDC) | OAuth sign-in providers | `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID` with `LINKEDIN_CLIENT_SECRET`; each pair optional, both or neither (a half-set pair stops boot); an unset pair leaves that provider unregistered and hidden | local OIDC identity server; discovery URLs overridable via `OAUTH_GOOGLE_DISCOVERY_URL`, `OAUTH_LINKEDIN_DISCOVERY_URL` |
 | Auth | better-auth sessions | `BETTER_AUTH_SECRET`, `AUTH_ALLOWED_HOSTS` | local test secret and loopback hosts |
-| App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=mail.tryoverture.com`, `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES` | |
+| App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com` (forwarding addresses), `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES` | |
 
 All secrets are Fly secrets; local dev reads `.env` (chmod 600, never committed).
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
@@ -125,15 +125,11 @@ M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 obj
 ### 3.3 Domains and DNS
 
 - `tryoverture.com` is registered (Cloudflare Registrar, owner's account).
-- `tryoverture.com`: app, marketing, Overture's own mail (`no-reply@`, `hello@` forwarded to the owner via Email
-  Routing). SES DKIM (3 CNAMEs), SPF `include:amazonses.com`, DMARC `p=reject; rua=…`, custom MAIL FROM
-  `bounce.tryoverture.com`.
-- `mail.tryoverture.com` (subdomain, no second domain bought): job-search addresses. MX on the subdomain →
-  `inbound-smtp.ca-central-1.amazonaws.com`; one SES receipt rule with recipient `mail.tryoverture.com` stores to S3
-  and notifies SNS (ADR 0024). Its own SES
-  identity and DKIM, SPF `v=spf1 include:amazonses.com -all`, `_dmarc.mail` `p=reject; adkim=s; aspf=s`, so its
-  reputation is tracked apart from the apex. `https://mail.tryoverture.com` serves a one-page explainer: "This is
-  Overture's private job-search email. Each address belongs to one job seeker."
+- `tryoverture.com`: app, marketing, Overture's own mail (`no-reply@` sent through SES; `hello@` forwarded to the
+  owner by Email Routing), and the forwarding addresses `in-{id}-{mac}@` (ADR 0028). MX → Cloudflare Email Routing,
+  whose catch-all goes to the Email Worker. SES DKIM (3 CNAMEs), SPF `include:amazonses.com` plus Email Routing's
+  include, DMARC `p=reject; rua=…`, custom MAIL FROM `bounce.tryoverture.com`.
+- `mail.tryoverture.com` is not used (it was the ADR 0005 job-search address domain).
 - `admin.tryoverture.com`: Cloudflare Access application (owner identity only).
 
 ---
@@ -161,7 +157,7 @@ src/
     platform/        db, migrations, queue, sse, crypto, telemetry, settings, kill-switches, ports/*
     auth/            better-auth config, invites/allowlist, sessions
     catalog/         sources/*, boards, postings, tagging, questions catalog, search, census
-    profile/         facts, resume, targets, skip list, mailbox address
+    profile/         facts, resume, targets, skip list, forwarding address
     pipeline/        matching, scoring, preparation, reviews, check-ins, applications, stages
     dispatch/        scheduler, limits, browser providers, executor, ats flows, attempts
     billing/         ledger, grants, plans, stripe (M3)
@@ -431,7 +427,7 @@ as top-20 aggregate Posting counts. Output committed to `docs/research/census.md
 
 | Tier | Keys | When |
 |---|---|---|
-| 1 (required to Start) | legal_name, email (= the job-search address §7.3, read-only; the sign-in email is never put on a form), phone, current_city, current_country, linkedin_url, work_auth (per target country), sponsorship_required (per target country), notice_period, earliest_start, salary_expectation, willing_relocate, years_total, degree_highest, employment_history, education_history, current_employer, languages | onboarding step 3; most prefilled from the resume and confirmed |
+| 1 (required to Start) | legal_name, email (the user's real email, prefilled from the resume and confirmed; the forwarding address §7.3 is never put on a form), phone, current_city, current_country, linkedin_url, work_auth (per target country), sponsorship_required (per target country), notice_period, earliest_start, salary_expectation, willing_relocate, years_total, degree_highest, employment_history, education_history, current_employer, languages | onboarding step 3; most prefilled from the resume and confirmed |
 | 2 (encouraged) | preferred_name, github_url, website_url, skills, certifications, security_clearance, drivers_license, spoken_languages_levels, voice_sample, cover_letter_template, eeo_gender, eeo_race_ethnicity, eeo_hispanic_latino, eeo_veteran, eeo_disability (EEO opt-in only) | Profile → "Strengthen your profile", each shows "unlocks N queued jobs" |
 | 3 (learned) | `q:<question_id>` | created by answering a Review; reused for every later application asking that question |
 
@@ -445,19 +441,16 @@ Each fact has `revision`; snapshots record the revision used.
 - A replacement becomes current for new applications only; snapshots keep the old file.
 - `current_employer` prefilled from the most recent role in `employment_history` → `skip_companies`.
 
-### 7.3 Job-search address
+### 7.3 Forwarding address (ADR 0028)
 
-- `local_part = slug(first) + "." + slug(last)`, first name from `preferred_name` when set, else `legal_name`: Unicode NFKD, strip diacritics, transliterate
-  non-Latin (ICU-style table), lowercase, keep `a–z 0–9 -`, collapse repeats, max 40 chars.
-- If taken or in `retired_addresses`, append 2–4 random digits to the last name (`jane.doe4821`), retry up to 10.
-- Shown once in onboarding with "Looks good"; changes only via admin. On account deletion the local part moves to
-  `retired_addresses` and is never reused.
-- After cancel, `status='receive_only'`, `receive_until = now + 12 months`; after that `closed`, and mail to it is
-  discarded at ingest.
-
----
-
-## 8. Pipeline: matching, preparation, reviews
+- Each user gets `in-{id}-{mac}@tryoverture.com`: `id` is the mailbox id, `mac` a truncated HMAC of it under
+  `INBOUND_HMAC_SECRET`, so the Email Worker drops forged or unknown addresses without a lookup.
+- The user adds one filter in their own mailbox forwarding only mail from the ATS sender domains
+  (`src/shared/ats-mail-domains.ts`) to this address. In M1 the owner creates it by hand; the M2 onboarding step
+  follows the canvas. The address is never typed on an application form.
+- On account deletion the local part moves to `retired_addresses` and is never reused. After cancel,
+  `status='receive_only'`, `receive_until = now + 12 months`; after that `closed`, and mail to it is discarded at
+  ingest.
 
 ### 8.1 Candidates (code, free)
 
@@ -467,7 +460,7 @@ is a target country, or when it names no country and the user has `work_auth=yes
 remote posting restricted to a region, e.g. "Remote, EU", matches only target countries in that region); employment type ∈ targets; posting language ∈ `languages`;
 salary ≥ floor when the posting lists salary (converted with `fx_rates`; postings without salary are never excluded);
 company not skipped (below); no other application by this user to this company in status preparing, needs_review,
-ready, sending or confirming, and none sent to it in the last 7 days (failed, skipped and withdrawn do not count);
+ready, sending or confirming, and none sent to it in the last 30 days (failed, skipped and withdrawn do not count);
 no sent application to the same `dedupe_key` in the last 60 days; crowd limits not reached (§12); not `hidden`; no kill
 switch on its ATS/employer.
 
@@ -628,7 +621,7 @@ the employer may have the application, and a retry could send it twice.
 | `captcha_blocked`, `code_timeout`, `blocked`, `form_changed`, `upload_failed`, `provider_error`, `timeout`, `crash` (all **before** `submit_clicked_at`) | release | back to `ready`, earliest retry ≥ 6 h later (§9.2), if `attempts < 2`, else `failed` | once, fresh browser session |
 
 **Confirming.** An application in `confirming` waits up to `limits.confirm_wait_hours` (24) for an acknowledgement:
-mail to the job-search address with `auth='pass'`, from the company's or the ATS's sender domains, naming the company
+forwarded mail to the user's forwarding address with `auth='pass'`, from the company's or the ATS's sender domains, naming the company
 or the posting title, received after `submit_clicked_at`. Found → commit, `sent`, snapshot (`confirmed_by='email'`).
 Not found → release, `failed` with reason `unconfirmed`, never retried, and the posting's `dedupe_key` is treated as
 sent for the 60-day guard so Overture cannot apply to it again. Shown as `Couldn't apply` with the line "Overture
@@ -656,7 +649,7 @@ switches off.
 - **Browser Use Cloud** (default): `POST /api/v4/browsers` with `profileId` (one per user, created on first use),
   `proxyCountryCode` = user's `current_country` (fallback: nearest supported country from a static map),
   `solveCaptchas: true`, `timeout: 15` (minutes; the default is 60) and the attempt id as metadata; connect with `chromium.connectOverCDP(cdpUrl)`; **always** stop the browser through the
-  API in `finally` (closing CDP does not stop billing).
+  API in `finally` (closing CDP does not stop billing). The recovery sweep stops any session left open (§9.4). Browser Use stays the provider for M1 and later; the owner accepts its standard terms (ADR 0028). Every attempt records `browser_ms`, `proxy_bytes` and `cost_micros`, and admin Overview shows proxy MB and cost per completed application against the $0.03 gate.
 - **Kernel** (emergency fallback): headful browser, stealth on, ISP proxy, per-user profile. Its acceptable-use
   policy bans "bulk unsolicited form submission" (ADR 0003), so it is exercised only against the synthetic lab and
   fixtures, never sent real applications by default; the owner switches real traffic to it only if Browser Use's
@@ -715,16 +708,18 @@ stopping before Submit. The developer machine never drives a browser against a r
 
 ### 11.1 Inbound
 
-1. SES receiving in ca-central-1, one receipt rule for `mail.tryoverture.com` (ADR 0024): store the raw MIME in S3
-   `SES_INBOUND_BUCKET`, then publish an SNS notice (message id, recipients, `spfVerdict`, `dkimVerdict`,
-   `dmarcVerdict`, `spamVerdict`, `virusVerdict`) to `POST /internal/ses/inbound`. Messages over 40 MB are refused by
-   SES.
-2. The endpoint verifies the SNS signature and enqueues `mail.ingest`. Server down → SNS retries; sweep
-   `mail.sweep` every 5 min ingests any S3 object not yet processed.
+1. Email Routing on `tryoverture.com` sends the catch-all to the Email Worker (ADR 0028); literal rules such as
+   `hello@` keep forwarding to the owner. The Worker drops an address whose MAC does not verify, forwards Gmail and
+   Outlook forwarding-confirmation messages to the owner's verified destination, drops mail whose original sender is
+   not in the ATS mail domain list, and POSTs the raw MIME with the envelope to `POST /internal/mail/inbound`, signed
+   with HMAC-SHA256 under `INBOUND_HMAC_SECRET` over a timestamp and the body (5-minute replay window). Email
+   Workers accept messages up to 25 MiB.
+2. The endpoint verifies the signature and timestamp, stores the raw message encrypted, and enqueues
+   `mail.ingest`. A non-2xx makes Email Routing retry; nothing else sweeps.
 3. Job `mail.ingest`: unknown or `closed` local part → delete the raw object, store nothing. Otherwise parse
-   (`mailparser`); `auth='pass'` when DMARC passes (or SPF or DKIM passes aligned with the From domain), `fail` on a
-   failing verdict, `none` otherwise; encrypt subject, text, from, to, snippet; HTML and attachments → R2 encrypted;
-   delete the raw object. **Nothing for a live address is dropped**: failed auth is stored and labelled "Couldn't
+   (`mailparser`) and verify with `mailauth`: `auth='pass'` when DKIM passes aligned with the original From domain
+   (forwarding breaks SPF but keeps the DKIM signature), `fail` on a failing signature, `none` when unsigned; encrypt subject, text, from, to, snippet; HTML and attachments → R2 encrypted;
+   delete the stored raw message. **Nothing for a live address is dropped**: failed auth is stored and labelled "Couldn't
    verify sender". Ingest wakes any attempt waiting for a code from that mailbox.
 4. Threading by `In-Reply-To`/`References`, else new thread; `employer_started=1` when the first message is inbound.
 5. Link to an application: sender domain ∈ company domain or ATS mail domains (Greenhouse, Lever, Ashby,
@@ -734,7 +729,8 @@ stopping before Submit. The developer machine never drives a browser against a r
 
 ### 11.2 Outbound (M2)
 
-Reply composer in Inbox; allowed only in threads with `employer_started=1`, ≤ 20 per user per day, attachments
+Reopened by ADR 0028: under real email a reply from Overture would come from an address the employer never saw, so
+nothing here is built until the owner decides. The previous design, kept for reference: reply composer in Inbox; allowed only in threads with `employer_started=1`, ≤ 20 per user per day, attachments
 ≤ 10 MB total; sent via SES `SendRawEmail` from `local_part@mail.tryoverture.com` with correct `In-Reply-To`/`References`;
 SES events (delivery, bounce, complaint) via SNS → `POST /internal/ses/events` (SNS signature verified) → suppression
 list. Overture's own mail (magic links, verification, digest, receipts) from `no-reply@tryoverture.com` via SES.
@@ -755,7 +751,7 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
 |---|---|---|
 | `limits.daily_cap` | 10, resetting at the user's local midnight | 0010 |
 | `limits.send_window` | 08:00–20:00 user local, ≥ 20 min apart | 0010 |
-| `limits.company_cooldown_days` | 7 | 0010 |
+| `limits.company_cooldown_days` | 30 | 0010, 0028 |
 | `limits.repost_guard_days` | 60 | 0010 |
 | `limits.crowd_per_posting` | 20 | 0010 |
 | `limits.crowd_per_employer_week` | 50 | 0010 |
@@ -874,11 +870,11 @@ the avatar; desktop hover submenus; phone bottom tab bar; sub-sections are list 
 | Board | Columns Queued, Applied, Screening, Interviewing, Offer, Closed; cards with company, title, score, Strong match badge, "why this match"; card sheet: timeline, proof (answers + source, letter, resume file), linked mail, stage buttons; desktop dnd-kit + keyboard; phone one column per screen, swipe, 250 ms hold to drag, stage buttons in sheet | empty board, auto-move undo toast |
 | Review | Open questions grouped by jobs unlocked; answer input matches field type; dismiss | none open |
 | Inbox | Threads list (linked company/card), message view, attachments, "Couldn't verify sender" label, reply (M2, employer-started threads only) | empty, address explainer |
-| Profile | Resume, facts by tier, targets with live job count, skip list, job-search address, "Strengthen your profile" | missing Tier 1 facts |
-| Settings | Threshold (60/50), digest, notifications, timezone, languages, job-search address (read-only), the fixed limits explained (10 a day, 08:00–20:00, one company per 7 days; not editable), plan & billing (M3), sign out all devices, export, delete, support access log | |
-| Onboarding (M2) | 1 Sign in · 2 Resume · 3 Your facts (Tier 1, prefilled) · 4 What you want (live count) · 5 Your job-search address + consent + trial card (M3) + Start; PWA install + push prompt after step 5 | resume unreadable → manual entry |
+| Profile | Resume, facts by tier, targets with live job count, skip list, forwarding address, "Strengthen your profile" | missing Tier 1 facts |
+| Settings | Threshold (60/50), digest, notifications, timezone, languages, forwarding address (read-only), the fixed limits explained (10 a day, 08:00–20:00, one company per 30 days; not editable), plan & billing (M3), sign out all devices, export, delete, support access log | |
+| Onboarding (M2) | 1 Sign in · 2 Resume · 3 Your facts (Tier 1, prefilled) · 4 What you want (live count) · 5 Forward ATS mail (the filter step, as drawn on the canvas) + consent + trial card (M3) + Start; PWA install + push prompt after step 5 | resume unreadable → manual entry |
 | Admin | Same design system: Overview (success per provider × ATS, cost per completed application, queue, spend), Users, Applications/Attempts (live view/replay embed), Reviews, Kill switches & Settings, Catalog health, Mail health, Provider report, Fixture capture, Grants/Refunds, Audit | |
-| Public (M3) | Landing, pricing, privacy, terms, `mail.tryoverture.com` explainer; prerendered static HTML | |
+| Public (M3) | Landing, pricing, privacy, terms; prerendered static HTML | |
 
 User-facing copy never uses the banned words (see the Words rule at the top; ADR 0020).
 
@@ -952,7 +948,7 @@ none submits an application or touches a user:
 |---|---|---|
 | Forms | Browser Use opens a sample of live Greenhouse, Lever and Ashby forms per ATS, fills them from a synthetic profile and stops before Submit; a changed form signature is reported | saved forms in R2 `fixtures/` (§10.5) |
 | AI | a fixed set of real Haiku calls per purpose (§8.6), checked against the output schema and the resume-line rule | MSW recordings in R2 `recordings/anthropic/` |
-| Mail | a message via SES to an Overture-owned check address on `mail.tryoverture.com`, through SES receiving and the SNS notice, ingested with `auth='pass'` and its code extracted | MSW recordings for SES |
+| Mail | a DKIM-signed message to an Overture-owned forwarding address on `tryoverture.com`, through Email Routing and the Worker, ingested with `auth='pass'` and its code extracted | recorded `.eml` fixtures |
 | Storage | an R2 put, get, list and delete | — |
 
 `scripts/record-feeds.ts` brings refreshed fixtures and recordings into `test/e2e/` through a pull request, so a test
@@ -981,8 +977,8 @@ truth for their scope and order. Ticket M1-NN is issue #(NN + 7), except M1-05 (
 
 ### M2
 
-M2-01 onboarding wizard + address generation (27) · M2-02 mailboxes for all + `mail.tryoverture.com` explainer ·
-M2-03 outbound replies via SES + suppressions (26) · M2-04 email classification + stage auto-moves + undo (23) ·
+M2-01 onboarding wizard + forwarding step (27) · M2-02 forwarding addresses for all ·
+M2-03 outbound replies, design reopened by ADR 0028 (26) · M2-04 email classification + stage auto-moves + undo (23) ·
 M2-05 check-ins (24) · M2-06 PWA, push, digest (28) · M2-07 admin users, Reveal, audit, support access log (30) ·
 M2-08 export + delete (29) · M2-09 legal pages + consent versioning · M2-10..13 SmartRecruiters, Recruitee, Workable,
 Personio (probe 20 forms each, then enable) · M2-14 invites.
@@ -1014,14 +1010,13 @@ v1 runs on Fly app `ai-auto-apply` (volume `data`, yyz). In order:
 | Risk | Resolves it |
 |---|---|
 | Browser Use objects to our use case | handled if they raise it; Kernel adapter wired behind `BrowserProvider`, but its policy bans bulk form submission, so Browserbase or Anchor would be the real fallback |
-| ATS vendors build against mass applying (Greenhouse Real Talent checks IP, email, phone and location and lets employers blocklist email domains; Ashby flags device and contact signals) | M1 stays at 10 a day, owner only, true answers; one shared `mail.tryoverture.com` can be blocklisted for every user at once in M2–M3, so watch per-employer reply rates and revisit per-user domains before M2 |
+| ATS vendors build against mass applying (Greenhouse Real Talent checks IP, email, phone and location and lets employers blocklist email domains; Ashby flags device and contact signals) | M1 stays at 10 a day, owner only, true answers; applications use each user's real email (ADR 0028), so no shared Overture domain appears on forms |
 | Proxy traffic per form decides the cost gate (each extra MB ≈ $0.005; 5 MB fails it) | measured by the early cloud probe (ADR 0026); resource blocking (§10.3) |
 | ATSes rate-limit or block `overture-web`'s IP on the public feed APIs | per-ATS limits and conditional requests (§6.1); `discovery_poll_total` alert; feeds can move behind Browser Use's proxy if it happens |
 | An acknowledgement email never comes for a sent application | `confirming` resolves as Couldn't apply, not charged, never resent; measured per ATS |
 | Invisible reCAPTCHA scores too low → code/CAPTCHA rate high | M1 lab and live numbers; Anchor sticky-IP or self-hosted as later options |
 | Browser Use profile encryption at rest undocumented | profiles hold cookies/storage only (no resume or facts); deleted via API on account deletion |
 | No city/fixed-IP targeting; uncovered countries | country map fallback; measure per country in M2 |
-| `mail.tryoverture.com` filtered by employers | per-employer monitoring + auto skip; domain reply-rate alert |
 | SES production access denied or slow | apply on day one of the domain; Resend as emergency fallback behind `MailSender` |
 | hiring.cafe import legality and reliability | owner's call; seam only, never a dependency |
 | Trademark conflict on "Overture" | owner's CIPO/USPTO search before brand spend |

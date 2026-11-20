@@ -5,7 +5,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { request as apiRequest } from "@playwright/test";
 import { z } from "zod";
 
-import type { APIRequestContext, Browser, Page } from "@playwright/test";
+import type { APIRequestContext, Browser, Locator, Page } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
 
 import { authTestIdentity } from "./auth.fixture.ts";
@@ -66,6 +66,45 @@ function roundedBox(box: z.infer<typeof boxSchema>) {
     x,
     y,
   };
+}
+
+const layoutGrid = 1 / 64;
+
+function snapToLayoutGrid(value: number) {
+  return Math.round(value / layoutGrid) * layoutGrid;
+}
+
+function subpixelPhase(value: number) {
+  return value - Math.floor(value);
+}
+
+async function placeCardOnBoardPhase({
+  boardY,
+  card,
+  cardY,
+}: {
+  boardY: number;
+  card: Locator;
+  cardY: number;
+}) {
+  const boardTop = snapToLayoutGrid(boardY);
+
+  await card.evaluate(
+    (element, shift) => {
+      element.style.marginTop = `${String(shift)}px`;
+    },
+    subpixelPhase(boardTop) - subpixelPhase(cardY),
+  );
+
+  const placed = await card.boundingBox();
+
+  if (placed === null) {
+    throw new Error("the Time and language card has no box");
+  }
+
+  expect(subpixelPhase(placed.y)).toBeCloseTo(subpixelPhase(boardTop), 4);
+
+  return boardTop;
 }
 
 async function compareCardRegion({
@@ -369,8 +408,6 @@ async function expectCardMatchesBoard(
 
   expect(violations).toEqual([]);
 
-  const actual = await card.screenshot({ animations: "disabled", caret: "hide" });
-
   const expected = readFileSync(
     join(process.cwd(), `design/reference/settings/${String(width)}-${theme}.png`),
   );
@@ -378,26 +415,30 @@ async function expectCardMatchesBoard(
   const boardExact = cardBox(reference);
   const phaseX = cardRect.x - Math.floor(cardRect.x);
 
-  const cropOffsets = [
-    -1.4, -1.3, -1.2, -1.1, -1, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0, 0.1, 0.2,
-  ];
+  const boardTop = await placeCardOnBoardPhase({
+    boardY: boardExact.y,
+    card,
+    cardY: cardRect.y,
+  });
 
-  const ratios = await Promise.all(
-    cropOffsets.map(async (offset) =>
-      page.evaluate(compareCardRegion, {
-        actual: actual.toString("base64"),
-        expected: expected.toString("base64"),
-        region: {
-          height: actual.readUInt32BE(20),
-          width: actual.readUInt32BE(16),
-          x: boardExact.x - phaseX,
-          y: boardExact.y + offset,
-        },
-      }),
-    ),
-  );
+  const actual = await card.screenshot({ animations: "disabled", caret: "hide" });
 
-  expect(Math.min(...ratios)).toBeLessThanOrEqual(0.01);
+  await card.evaluate((element) => {
+    element.style.marginTop = "";
+  });
+
+  const ratio = await page.evaluate(compareCardRegion, {
+    actual: actual.toString("base64"),
+    expected: expected.toString("base64"),
+    region: {
+      height: actual.readUInt32BE(20),
+      width: actual.readUInt32BE(16),
+      x: boardExact.x - phaseX,
+      y: Math.floor(boardTop),
+    },
+  });
+
+  expect(ratio).toBeLessThanOrEqual(0.01);
 
   await context.close();
 }

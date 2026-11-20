@@ -211,6 +211,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run scripts/e2e-ci.ts timings --reports reports
       - run: bun run scripts/e2e-ci.ts map
+      - run: bunx oxfmt test/e2e/timings.json test/e2e/reach-map.json
       - name: Commit the recorded timings and reach map to main
         run: |
           set -euo pipefail

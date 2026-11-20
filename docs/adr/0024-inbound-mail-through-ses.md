@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by ADR 0028
 ---
 
 # Inbound mail arrives through Amazon SES receiving

@@ -276,7 +276,7 @@ test("the skip list also skips near-match names and domains", async ({
   await owner.dispose();
 });
 
-test("one open application per company, and none for seven days after a send", async ({
+test("one open application per company, and none for thirty days after a send", async ({
   isolatedAppServer: { url },
 }) => {
   const { owner, userId } = await ownerContextFor(url);
@@ -287,6 +287,7 @@ test("one open application per company, and none for seven days after a send", a
   const beta = await catalog(owner, "Beta Systems", "beta.example");
   const gamma = await catalog(owner, "Gamma Systems", "gamma.example");
   const delta = await catalog(owner, "Delta Systems", "delta.example");
+  const epsilon = await catalog(owner, "Epsilon Systems", "epsilon.example");
 
   const allowed = await seedPosting(owner, {
     atsJobId: "alpha-1",
@@ -343,6 +344,22 @@ test("one open application per company, and none for seven days after a send", a
     url: "https://delta.example/2",
   });
 
+  const epsilonCandidate = await seedPosting(owner, {
+    atsJobId: "epsilon-1",
+    boardId: epsilon.boardId,
+    companyId: epsilon.companyId,
+    title: "Lead Backend Engineer",
+    url: "https://epsilon.example/1",
+  });
+
+  const epsilonOther = await seedPosting(owner, {
+    atsJobId: "epsilon-2",
+    boardId: epsilon.boardId,
+    companyId: epsilon.companyId,
+    title: "Staff Platform Engineer",
+    url: "https://epsilon.example/2",
+  });
+
   await seedApplication(owner, { postingId: betaOther, status: "preparing", userId });
   await seedApplication(owner, {
     postingId: gammaOther,
@@ -356,15 +373,22 @@ test("one open application per company, and none for seven days after a send", a
     status: "sent",
     userId,
   });
+  await seedApplication(owner, {
+    postingId: epsilonOther,
+    sentAt: now - 40 * 86_400_000,
+    status: "sent",
+    userId,
+  });
 
   await configureMatching(owner);
 
   const ids = idsOf(await homeFor(owner));
 
   expect(ids).toContain(allowed);
-  expect(ids).toContain(deltaCandidate);
+  expect(ids).toContain(epsilonCandidate);
   expect(ids).not.toContain(betaCandidate);
   expect(ids).not.toContain(gammaCandidate);
+  expect(ids).not.toContain(deltaCandidate);
 
   await owner.dispose();
 });

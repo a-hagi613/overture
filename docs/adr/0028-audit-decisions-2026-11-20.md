@@ -1,0 +1,155 @@
+---
+status: accepted
+---
+
+# Decisions from the architecture and feed audit (2026-11-20)
+
+The owner's rulings after an external audit of the catalog, the submission path, inbound mail and the M2 ATS list.
+Each point below is checked against the code or a production probe; the M2 and discovery claims were checked against
+primary sources before building (last section).
+
+## Applications use the user's real email; ATS mail is forwarded to Overture
+
+- The email typed on every application form is the user's real email, the one on their resume. The resume is sent
+  byte-for-byte unchanged, so a different address on the form would not match it, and some ATSes flag or overwrite
+  synthetic addresses.
+- The user adds one narrow filter in their own mailbox that forwards only mail from ATS sender domains
+  (`src/shared/ats-mail-domains.ts`) to their forwarding address `in-{id}-{mac}@tryoverture.com`. `mac` is a
+  truncated HMAC of the id under `INBOUND_HMAC_SECRET`, so forged or unknown addresses are dropped without a lookup.
+  The forwarding address is never typed on a form.
+- Direct replies from recruiters that do not come from an ATS domain stay in the user's own inbox and are not
+  captured. The owner accepts this.
+- No Gmail or Outlook API access: reading a mailbox needs Google's restricted-scope review and a paid annual security
+  assessment. This keeps ADR 0005's rule that the personal mailbox is never connected; the user forwards, Overture
+  never reads it.
+- For M1 the owner creates the filter by hand. The onboarding step that guides it arrives in M2, after the owner adds
+  it to the canvas (ADR 0021); until then no UI is built for it.
+
+This supersedes ADR 0005's generated `first.last@mail.tryoverture.com` job-search address. It also removes the
+risk that one shared `mail.tryoverture.com` domain is blocklisted for every user at once.
+
+## Inbound mail goes through Cloudflare Email Routing and an Email Worker
+
+- Email Routing on the apex `tryoverture.com` sends the catch-all to one Email Worker. Literal rules such as `hello@`
+  keep forwarding to the owner. Catch-all works on the apex, which is where the forwarding addresses live.
+- The Worker checks the address MAC, forwards Gmail and Outlook forwarding-confirmation messages to the owner's
+  verified destination, drops mail whose original sender is not an ATS domain, and POSTs the **raw MIME** with the
+  envelope as an HMAC-SHA256-signed request (timestamped, 5-minute replay window) to `POST /internal/mail/inbound`.
+  No LLM runs in the Worker.
+- `overture-web` verifies DKIM and DMARC itself on the raw message with `mailauth`. That answers ADR 0024's
+  objection that the Worker gets no authentication results: Overture no longer depends on the receiver's verdicts.
+  Forwarding breaks SPF but leaves the original DKIM signature intact, so `auth='pass'` means the original From
+  domain's DKIM passes aligned.
+- Ingest, threading, linking and "automate only on `auth='pass'`" are unchanged (SPEC §11.1, ADR 0006). Codes are
+  read by deterministic patterns. If no code arrives within 10 minutes, the user is asked to paste it.
+- No AWS for inbound: no SES receiving, S3 or SNS, and no `mail.sweep`; Email Routing retries on a non-2xx.
+
+This supersedes ADR 0024.
+
+Open for M2: replying to employers from Overture (SPEC §11.2) assumed the job-search address was the address the
+employer knew. Under real email a reply from Overture would come from an address the employer never saw, so the
+reply composer is not built until the owner decides how it should work.
+
+## Company cooldown default is 30 days
+
+`limits.company_cooldown_days` stays an admin setting; its default moves from 7 to 30 to stay clear of ATS
+repeat-application throttles.
+
+## Browser Use Cloud stays the browser for M1 and later
+
+- The owner has reviewed Browser Use's standard terms, including its use of inputs, and accepts them for M1 and M2+.
+  No provider evaluation or swap is planned. The Kernel adapter stays behind the port as the emergency fallback (ADR
+  0026).
+- Every session is stopped through Browser Use's API in a `finally` path and by the recovery sweep. Closing CDP alone
+  does not stop billing.
+- Every attempt records `browser_ms`, `proxy_bytes` and `cost_micros`. The admin view reports proxy MB and cost per
+  completed application against the $0.03 gate (cost as defined in ADR 0026).
+
+## Catalog
+
+- **Greenhouse fetches content in two modes.** A board's first load, or a poll where more than 5 postings are new
+  or changed, fetches `/v1/boards/{token}/jobs?content=true` once. Otherwise the summary list is fetched, plus
+  `/jobs/{id}?pay_transparency=true` for the 1–5 changed postings. Application questions are fetched only when a
+  posting enters the apply queue, never in a sweep. Measured on production: Stripe's `content=true` list is 779 jobs
+  and 6.1 MB, Cloudflare's 496 jobs and 8.9 MB.
+- **Sweep claims are small.** At most 20 boards per ATS per sweep (`catalog.sweep_max_boards`), so a batch finishes
+  well inside its 15-minute claim. There is no lease heartbeat.
+- **No worker thread for now.** HTTP stays responsive since the chunked writes of #80. The orchestrator watches
+  `/api/health` latency during the faster backfill. A worker thread that writes only catalog rows is revisited only if
+  latency regresses; the main thread keeps its read-write connection because sign-in, settings, the ledger and
+  dispatch write from it.
+- **Feed corrections.** The poll passes each feed's structured workplace to tagging; Ashby uses `workplaceType`,
+  never `isRemote`. Lever gets an EU region (`api.eu.lever.co` is a separate board for the same slug), paginates
+  with `limit=100&skip=N`, keeps slug case and uses `applyUrl`. Greenhouse has no separate EU API (production probe:
+  `boards-api.eu.greenhouse.io` does not resolve, and `boards-api.greenhouse.io` serves `proton`), so only token
+  parsing changes for EU board URLs.
+- **Discovery after M1.** A weekly job off the production machine (a GitHub Action) merges open board lists into one
+  file in Overture's own R2, replacing the runtime dependency on the Stapply bucket. Which lists are used depends on
+  their licenses, checked first (below).
+
+## Operating risks we watch
+
+- **Proxy bytes and zombie sessions.** Proxy traffic is most of Browser Use's bill, and closing Playwright does not
+  stop billing. Every session is stopped through the API (above), and the recovery sweep stops any session left open.
+  The admin view alerts when proxy MB per completed application trends up, so heavy career pages are caught before
+  cost passes $0.03.
+- **One machine, no failover.** A restart mid-apply must never submit twice. Before `submit_clicked_at` an
+  interrupted send is released and retried. After it, the Application goes to Confirming and is never resent
+  (ADR 0025, SPEC §9.4). The e2e suite covers a kill at each side of Submit.
+- **Large payloads.** Greenhouse `content=true` lists run 3–9 MB, and M2's Workable XML feed is one large file. The
+  orchestrator watches `/api/health` latency and process RSS during the backfill. Workable XML is stream-parsed. If
+  either regresses, catalog parsing moves to a Bun Worker that writes only catalog rows.
+- **Anti-bot drift.** Lever's invisible hCaptcha and Greenhouse and Ashby fraud scoring change over time. Each user
+  keeps an isolated Browser Use profile. Selector and pacing changes are driven by measured pass rates per ATS in
+  M1 and M2, not by guesses.
+- **Users who skip the forwarding filter (M2).** The 10-minute paste fallback (a phone notification, then paste the
+  code) has to be quick, so it is designed as a first-class path, not an error screen.
+- **Outbound sign-in mail (#90).** Magic links go through SES from `no-reply@tryoverture.com`, behind
+  `MailSender`. Cloudflare Email Sending was considered, but it is in Beta ("intended for testing purposes only",
+  <https://www.cloudflare.com/terms/>, <https://developers.cloudflare.com/email-service/>, read 2026-11-20), so it is
+  revisited when it becomes generally available.
+
+## Checked before building (M2 and discovery)
+
+Each claim from the audit was checked against primary sources on 2026-11-20 (#114, full quotes in
+`docs/research/m2-ats-verification.md`).
+
+- **Recruitee: confirmed, dropped from M2.** The Careers API needs a per-company token from 2027-02-10
+  (<https://docs.recruitee.com/reference/authentication-1>,
+  <https://support.recruitee.com/en/articles/12087172-upcoming-changes-to-your-custom-api-integrations>). Pinpoint
+  (<https://developers.pinpointhq.com/docs/jobs-json-endpoint>) and then Gem
+  (<https://help.gem.com/databases/gem-help-center/the-job-board-api>) are the deferred replacements; both are
+  per-company reads with no published limits.
+- **SmartRecruiters: confirmed, dropped from M2.** The SAP API Policy forbids AI agents and systematic extraction
+  (<https://developers.smartrecruiters.com/docs/the-smartrecruiters-platform>,
+  <https://help.sap.com/doc/sap-api-policy/latest/en-US/API_Policy_latest.pdf>). It is revisited only with written
+  permission.
+- **Workable: the bulk feed is confirmed, and it is large.** One feed covers every customer on Jobs by Workable,
+  updated hourly, gzip required (<https://help.workable.com/hc/en-us/articles/4420464031767-Utilizing-the-XML-Job-Feed>).
+  It is about 831 MiB uncompressed. It carries a company display name and an apply shortcode, not a board slug, so
+  Workable postings are ingested as a feed keyed by `<referencenumber>`, not as `company_boards`. Ingesting an
+  831 MiB file on the 2 GB machine every hour is not assumed: M2 decides between a streamed daily pass on the
+  machine and an off-box pass that writes only target-relevant postings to R2, measured first. The widget
+  rate-limit figure from the audit is unverifiable and moot.
+- **Personio: confirmed, with one correction.** The public per-company `/xml?language=en|de` feed needs no
+  credentials (<https://developer.personio.de/v1.0/reference/get_xml>). A missing board answers **404**, not a
+  redirect; 3xx and 404 are both treated as gone, with German as the fallback when English is empty.
+- **Workable synthetic-email detection: confirmed**
+  (<https://help.workable.com/hc/en-us/articles/35293126257815-Managing-AI-assisted-and-automated-job-applications>).
+  Real email on forms already avoids it.
+- **Discovery licences.** ats-scrapers (MIT), freehire (MIT), open-jobs (CC0) and ats-directory (**CC0**, not
+  CC-BY) are usable. yc-oss/api (no licence), job-board-aggregator's data (CC BY-NC) and SimplifyJobs (no licence)
+  are excluded.
+
+The M2 scope therefore names Workable (feed) and Personio. Whether M2 still promises four ATSes, with Pinpoint and
+Gem, or restates its scope is the owner's call.
+
+## Considered Options
+
+- **A generated job-search address on every form (ADR 0005).** It gives a full inbox, but the form email does not
+  match the resume, and one shared domain is a single point of blocklisting.
+- **Gmail API access.** One-click setup, but restricted-scope review plus a paid annual assessment, or a per-user
+  fee through a broker.
+- **SES receiving (ADR 0024).** It gives receiver verdicts, but needs AWS credentials, S3, SNS and a sweep. With raw
+  MIME and `mailauth`, the verdicts are no longer needed.
+- **Switching browser providers before M2.** The owner accepts Browser Use's terms, so the switch buys nothing now.

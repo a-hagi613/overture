@@ -532,7 +532,7 @@ screen, then built to match. Visual treatment stays; words, structure and behavi
 | Job Board | **Redrawn as Board.** Queued replaces Hold as the first column, ink rule; red "Needs you" pill on cards waiting on a Review |
 | Holds | **Redrawn as Review (file `w5-holds`).** Becomes Review: open questions grouped by jobs unlocked |
 | Answer Bank, Resume | **Redrawn: folded into Profile.** Fold into Profile: resume, facts by tier, targets with live count, skip list, job-search address |
-| Settings | **Redrawn.** No approval mode, no "Overnight window", no user-set company limit or daily caps, no UTC reset; the fixed limits explained (10 a day, 08:00–20:00 local, one company per 7 days, reset at local midnight) |
+| Settings | **Redrawn.** No approval mode, no "Overnight window", no user-set company limit or daily caps, no UTC reset; the fixed limits explained (10 a day, 08:00–20:00 local, one company per 30 days, reset at local midnight) |
 | Onboarding 1–4 | Five steps: Sign in · Resume · Your facts · What you want · Your job-search address + consent + trial + Start; no "Connect inbox", no Gmail, no "Memory Base" |
 | Sign In | **Redrawn (modes sign-in, sign-up, magic-sent).** Google, LinkedIn, magic link (M1); email + password joins in M2 (ADR 0026). Dark uses the sign-in dark ground (§2, ADR 0027) |
 | Product states | No Gmail connect states; add `confirming` ("Checking with the employer"), each pause reason, out of applications |

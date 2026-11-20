@@ -153,14 +153,8 @@
     },
     "test/e2e/backup-health-cache.test.ts": {
       "full": false,
-      "paths": [
-        "/__test__/clock/offset",
-        "/api/health"
-      ],
-      "modules": [
-        "src/server/testing/turnstile-scenario.ts",
-        "src/shared/turnstile.ts"
-      ]
+      "paths": ["/__test__/clock/offset", "/api/health"],
+      "modules": ["src/server/testing/turnstile-scenario.ts", "src/shared/turnstile.ts"]
     },
     "test/e2e/backup-lag.test.ts": {
       "full": false,
@@ -1331,9 +1325,7 @@
     "test/e2e/inbound-mail-worker.test.ts": {
       "full": false,
       "paths": [],
-      "modules": [
-        "src/shared/inbound-mail.ts"
-      ]
+      "modules": ["src/shared/inbound-mail.ts"]
     },
     "test/e2e/job-survives-restart.test.ts": {
       "full": false,
