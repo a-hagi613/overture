@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { blob, index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -73,3 +73,82 @@ export const probeForms = sqliteTable("probe_forms", {
   sessionId: text("session_id"),
   createdAt: integer("created_at").notNull(),
 });
+export const companies = sqliteTable("companies", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  nameNorm: text("name_norm").notNull(),
+  domain: text("domain"),
+  industry: text("industry"),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const companyBoards = sqliteTable(
+  "company_boards",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    ats: text("ats", { enum: ["greenhouse", "lever", "ashby"] }).notNull(),
+    boardToken: text("board_token").notNull(),
+    status: text("status", { enum: ["active", "empty", "gone"] })
+      .notNull()
+      .default("active"),
+    etag: text("etag"),
+    lastModified: text("last_modified"),
+    lastPolledAt: integer("last_polled_at"),
+    nextPollAt: integer("next_poll_at"),
+    backoffLevel: integer("backoff_level").notNull().default(0),
+    notFoundPolls: integer("not_found_polls").notNull().default(0),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("company_boards_ats_board_token_unique").on(t.ats, t.boardToken)],
+);
+
+export const postings = sqliteTable(
+  "postings",
+  {
+    id: text("id").primaryKey(),
+    boardId: text("board_id")
+      .notNull()
+      .references(() => companyBoards.id, { onDelete: "cascade" }),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    ats: text("ats", { enum: ["greenhouse", "lever", "ashby"] }).notNull(),
+    atsJobId: text("ats_job_id").notNull(),
+    url: text("url").notNull(),
+    applyUrlNorm: text("apply_url_norm").notNull(),
+    title: text("title").notNull(),
+    titleNorm: text("title_norm").notNull(),
+    department: text("department"),
+    locationRaw: text("location_raw"),
+    countryCode: text("country_code"),
+    region: text("region"),
+    city: text("city"),
+    workplace: text("workplace", { enum: ["remote", "hybrid", "onsite", "unknown"] })
+      .notNull()
+      .default("unknown"),
+    employmentType: text("employment_type", {
+      enum: ["full_time", "part_time", "contract", "internship", "temporary", "unknown"],
+    })
+      .notNull()
+      .default("unknown"),
+    language: text("language"),
+    postedAt: integer("posted_at"),
+    sourceUpdatedAt: integer("source_updated_at"),
+    firstSeenAt: integer("first_seen_at").notNull(),
+    lastSeenAt: integer("last_seen_at").notNull(),
+    missingPolls: integer("missing_polls").notNull().default(0),
+    closedAt: integer("closed_at"),
+    dedupeKey: text("dedupe_key").notNull(),
+    descriptionGz: blob("description_gz", { mode: "buffer" }),
+    descriptionHash: text("description_hash"),
+  },
+  (t) => [
+    uniqueIndex("postings_board_ats_job_unique").on(t.boardId, t.atsJobId),
+    index("postings_dedupe_key").on(t.dedupeKey),
+    index("postings_apply_url_norm").on(t.applyUrlNorm),
+    index("postings_closed_at").on(t.closedAt),
+  ],
+);
