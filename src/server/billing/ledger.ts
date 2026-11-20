@@ -195,7 +195,7 @@ function reservationPairsOf(db: BillingDb, userId: string) {
     .select()
     .from(ledger)
     .where(and(eq(ledger.userId, userId), inArray(ledger.kind, ["commit", "release", "reserve"])))
-    .orderBy(asc(ledger.createdAt), asc(ledger.id))
+    .orderBy(asc(ledger.createdAt), sql`rowid`)
     .all();
 
   const open = new Map<string, ReservationsOf>();
