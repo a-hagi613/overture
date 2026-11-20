@@ -1,4 +1,4 @@
-import { rmSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 
 import { z } from "zod";
 
@@ -33,6 +33,24 @@ const tables = tablesSchema.parse(
 );
 
 const failures: string[] = [];
+
+const migrationJournalSchema = z.object({
+  entries: z.array(z.object({ idx: z.number(), tag: z.string(), when: z.number() })),
+});
+
+const migrationJournal = migrationJournalSchema.parse(
+  JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8")),
+);
+
+for (const [position, entry] of migrationJournal.entries.entries()) {
+  const previous = migrationJournal.entries[position - 1];
+
+  if (previous !== undefined && entry.when <= previous.when) {
+    failures.push(
+      `migration ${entry.tag} has when ${String(entry.when)}, not after ${previous.tag} (${String(previous.when)}); an existing database would skip it`,
+    );
+  }
+}
 
 if (journal.journal_mode !== "wal") {
   failures.push(`journal_mode is ${journal.journal_mode}, expected wal`);
