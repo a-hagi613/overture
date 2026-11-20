@@ -30,10 +30,11 @@ jobs:
       - run: bun install --frozen-lockfile
       - id: plan
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            bun run scripts/e2e-ci.ts plan --base "${BASE_SHA}" --out e2e-plan.json --github-output "${GITHUB_OUTPUT}"
+            git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            bun run scripts/e2e-ci.ts plan --base "origin/${BASE_REF}" --out e2e-plan.json --github-output "${GITHUB_OUTPUT}"
           else
             bun run scripts/e2e-ci.ts plan --out e2e-plan.json --github-output "${GITHUB_OUTPUT}"
           fi
