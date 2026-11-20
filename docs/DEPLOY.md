@@ -39,6 +39,9 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` (a Turnstile widget for `tryoverture.com`), and the OAuth
    clients `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`
    (redirect URIs `https://tryoverture.com/api/auth/oauth2/callback/google` and `…/oauth2/callback/linkedin`).
+   Resume and Facts (M1-13) add `MASTER_KEY_V1`, generated with `openssl rand -base64 32`
+   (base64 that decodes to exactly 32 bytes), never rotated without the re-wrap step that
+   re-wraps every user's data key under the new master key.
    The server refuses to boot without any of them, so the **Deploy** workflow checks every name with
    `fly secrets list` first and fails before deploying when one is missing; production keeps its
    current release. Later milestones add their own secrets the same way and to that list; nothing
