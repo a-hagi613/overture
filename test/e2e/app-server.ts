@@ -2,6 +2,8 @@ import { spawn } from "node:child_process";
 
 import type { ChildProcess } from "node:child_process";
 
+import { testAuthEnvironment } from "./auth.fixture.ts";
+
 const listeningPattern = /^overture listening on (?<port>\d+)$/u;
 
 export interface AppServer {
@@ -19,6 +21,18 @@ async function waitForExit(child: ChildProcess) {
   });
 }
 
+function authDefaults(extraEnvironment: Record<string, string>) {
+  const defaults: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(testAuthEnvironment)) {
+    if (process.env[key] === undefined && extraEnvironment[key] === undefined) {
+      defaults[key] = value;
+    }
+  }
+
+  return defaults;
+}
+
 async function spawnServer(databasePath: string, extraEnvironment: Record<string, string>) {
   const child = spawn("bun", ["run", "src/server/main.ts"], {
     env: {
@@ -30,6 +44,7 @@ async function spawnServer(databasePath: string, extraEnvironment: Record<string
       ENABLE_TEST_ROUTES: "true",
       OTEL_SIMPLE_EXPORT: "true",
       KILL_TIMEOUT_MS: "1000",
+      ...authDefaults(extraEnvironment),
       ...extraEnvironment,
     },
     stdio: ["ignore", "pipe", "inherit"],

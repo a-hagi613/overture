@@ -13,6 +13,37 @@ import { accounts, rateLimits, sessions, users, verifications } from "../platfor
 const GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration";
 const LINKEDIN_DISCOVERY_URL = "https://www.linkedin.com/oauth/.well-known/openid-configuration";
 
+const discoveryDefaultsEnabled = env.NODE_ENV !== "test";
+
+const googleProviderConfig = {
+  providerId: "google",
+  name: copy.auth.providers.google,
+  clientId: env.GOOGLE_CLIENT_ID,
+  clientSecret: env.GOOGLE_CLIENT_SECRET,
+  discoveryUrl: env.OAUTH_GOOGLE_DISCOVERY_URL ?? GOOGLE_DISCOVERY_URL,
+  scopes: ["openid", "profile", "email"],
+  requireEmailVerification: true,
+};
+
+const linkedinProviderConfig = {
+  providerId: "linkedin",
+  name: copy.auth.providers.linkedin,
+  clientId: env.LINKEDIN_CLIENT_ID,
+  clientSecret: env.LINKEDIN_CLIENT_SECRET,
+  discoveryUrl: env.OAUTH_LINKEDIN_DISCOVERY_URL ?? LINKEDIN_DISCOVERY_URL,
+  scopes: ["openid", "profile", "email"],
+  requireEmailVerification: true,
+};
+
+const providerConfigs = [
+  ...(env.OAUTH_GOOGLE_DISCOVERY_URL !== undefined || discoveryDefaultsEnabled
+    ? [googleProviderConfig]
+    : []),
+  ...(env.OAUTH_LINKEDIN_DISCOVERY_URL !== undefined || discoveryDefaultsEnabled
+    ? [linkedinProviderConfig]
+    : []),
+];
+
 const ownerEmail = env.OWNER_EMAIL.toLowerCase();
 
 export function isAllowedEmail(email: string) {
@@ -106,26 +137,7 @@ export function createAuth(db: AppDatabase, mailSender: MailSender) {
         endpoints: ["/sign-in/magic-link", "/sign-in/social"],
       }),
       genericOAuth({
-        config: [
-          {
-            providerId: "google",
-            name: copy.auth.providers.google,
-            clientId: env.GOOGLE_CLIENT_ID,
-            clientSecret: env.GOOGLE_CLIENT_SECRET,
-            discoveryUrl: env.OAUTH_GOOGLE_DISCOVERY_URL ?? GOOGLE_DISCOVERY_URL,
-            scopes: ["openid", "profile", "email"],
-            requireEmailVerification: true,
-          },
-          {
-            providerId: "linkedin",
-            name: copy.auth.providers.linkedin,
-            clientId: env.LINKEDIN_CLIENT_ID,
-            clientSecret: env.LINKEDIN_CLIENT_SECRET,
-            discoveryUrl: env.OAUTH_LINKEDIN_DISCOVERY_URL ?? LINKEDIN_DISCOVERY_URL,
-            scopes: ["openid", "profile", "email"],
-            requireEmailVerification: true,
-          },
-        ],
+        config: providerConfigs,
       }),
       magicLink({
         expiresIn: 15 * 60,
