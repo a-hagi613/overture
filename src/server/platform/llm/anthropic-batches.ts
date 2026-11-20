@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 
 import { z } from "zod";
 
-import type { LlmBatchCall, LlmPort, LlmRequest, LlmSingleRequest } from "../ports/llm.ts";
+import type { LlmBatchCall, LlmPort, LlmRequest } from "../ports/llm.ts";
 
 const API_VERSION = "2023-06-01";
 const POLL_INTERVAL_MS = 10_000;

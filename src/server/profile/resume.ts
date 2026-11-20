@@ -13,9 +13,11 @@ import { checkLlmCaps } from "../platform/llm/caps.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
 
 export const MAX_RESUME_BYTES = 10 * 1024 * 1024;
-export const RESUME_PDF_FALLBACK_PURPOSE = "resume_pdf_fallback";
+export const RESUME_PDF_PURPOSE = "resume_pdf";
 const MIN_UNPDF_TEXT_CHARS = 200;
-const RESUME_PDF_PROMPT = "Extract the full text of this resume PDF in reading order. Return only the text.";
+
+const RESUME_PDF_PROMPT =
+  "Extract the full text of this resume PDF in reading order. Return only the text.";
 
 export interface ParsedResume {
   text: string;
@@ -120,7 +122,7 @@ export function createResumeService(deps: {
 
     const caps = checkLlmCaps(db, clock, {
       userId,
-      purpose: RESUME_PDF_FALLBACK_PURPOSE,
+      purpose: RESUME_PDF_PURPOSE,
       estimatedCostMicros: llm.estimateSingleCostMicros(request),
     });
 
@@ -136,7 +138,7 @@ export function createResumeService(deps: {
 
     recordLlmUsage(db, clock, {
       userId,
-      purpose: RESUME_PDF_FALLBACK_PURPOSE,
+      purpose: RESUME_PDF_PURPOSE,
       model: call.model,
       inputTokens: call.inputTokens,
       cachedTokens: call.cachedTokens,

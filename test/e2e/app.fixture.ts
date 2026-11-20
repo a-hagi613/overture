@@ -44,7 +44,10 @@ function authEnv(identityServer: IdentityServer) {
   };
 }
 
-async function startFreshAppServer(identityServer: IdentityServer) {
+async function startFreshAppServer(
+  identityServer: IdentityServer,
+  extraEnvironment: Record<string, string> = {},
+) {
   const directory = mkdtempSync(join(tmpdir(), "overture-e2e-"));
   const databasePath = join(directory, "overture.db");
 
@@ -53,6 +56,7 @@ async function startFreshAppServer(identityServer: IdentityServer) {
   return startAppServer(databasePath, {
     ...authEnv(identityServer),
     OBJECT_STORE_ROOT: join(directory, "objects"),
+    ...extraEnvironment,
   });
 }
 

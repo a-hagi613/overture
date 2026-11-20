@@ -5,7 +5,8 @@ import { request as apiRequest } from "@playwright/test";
 import { z } from "zod";
 
 import { authTestIdentity } from "./auth.fixture.ts";
-import { expect, test } from "./app.fixture.ts";
+import { expect, test, startFreshAppServer } from "./app.fixture.ts";
+import { startAnthropicFixtureServer } from "./anthropic-fixture-server.ts";
 import { latestMailLink, requestMagicLink, verifyAuthState } from "./sign-in.ts";
 
 const uploadSchema = z.object({
@@ -14,6 +15,7 @@ const uploadSchema = z.object({
   bytes: z.number(),
   pages: z.number(),
   parsedWith: z.enum(["unpdf", "llm"]),
+  unreadable: z.boolean(),
   prefilledFacts: z.array(z.string()),
 });
 
@@ -158,42 +160,140 @@ test("tier 1 facts are prefilled from the resume and confirmed on Profile", asyn
   expect(confirmedEmail?.source).toBe("user");
 });
 
-test("a scanned resume falls back to Haiku and the facts are prefilled", async ({
-  isolatedAppServer: { url: appServerUrl },
+test("a scanned resume falls back to the LLM port and a usage row is recorded", async ({
+  identityServer,
 }) => {
-  const owner = await ownerContextFor(appServerUrl);
+  const anthropic = await startAnthropicFixtureServer();
 
-  const pdfBytes = new Uint8Array(readFileSync("test/e2e/fixtures/resume-scanned.pdf"));
-
-  const upload = await owner.post("/api/profile/resume", {
-    multipart: {
-      file: {
-        name: "resume-scanned.pdf",
-        mimeType: "application/pdf",
-        buffer: Buffer.from(pdfBytes),
-      },
-    },
+  const server = await startFreshAppServer(identityServer, {
+    ANTHROPIC_BASE_URL: anthropic.url,
+    ANTHROPIC_API_KEY: "test-anthropic-key",
   });
 
-  const created = uploadSchema.parse(await upload.json());
+  try {
+    const owner = await ownerContextFor(server.url);
+    const pdfBytes = new Uint8Array(readFileSync("test/e2e/fixtures/resume-scanned.pdf"));
 
-  expect(created.parsedWith).toBe("llm");
-  expect(created.prefilledFacts).toEqual([
-    "legal_name",
-    "email",
-    "phone",
-    "current_city",
-    "current_country",
-    "notice_period",
-    "work_auth",
-    "languages",
-  ]);
+    const upload = await owner.post("/api/profile/resume", {
+      multipart: {
+        file: {
+          name: "resume-scanned.pdf",
+          mimeType: "application/pdf",
+          buffer: Buffer.from(pdfBytes),
+        },
+      },
+    });
 
-  const listed = factsSchema.parse(await (await owner.get("/api/profile/facts")).json());
+    const created = uploadSchema.parse(await upload.json());
 
-  const allScanned = listed.facts.filter((fact) => fact.source === "resume");
+    expect(created.parsedWith).toBe("llm");
+    expect(created.unreadable).toBe(false);
+    expect(created.prefilledFacts).toEqual([
+      "legal_name",
+      "email",
+      "phone",
+      "current_city",
+      "current_country",
+      "notice_period",
+      "work_auth",
+      "languages",
+    ]);
 
-  expect(allScanned).toHaveLength(8);
-  expect(allScanned.every((fact) => fact.confirmed)).toBe(false);
-  expect(allScanned.every((fact) => fact.revision)).toBe(true);
+    const listed = factsSchema.parse(await (await owner.get("/api/profile/facts")).json());
+
+    const allScanned = listed.facts.filter((fact) => fact.source === "resume");
+
+    expect(allScanned).toHaveLength(8);
+    expect(allScanned.every((fact) => fact.confirmed)).toBe(false);
+    expect(allScanned.every((fact) => fact.revision)).toBe(true);
+
+    const singles = anthropic.singleMessages();
+
+    expect(singles).toHaveLength(1);
+    expect(singles[0]?.model).toBe("claude-haiku-4-5");
+    expect(singles[0]?.hasDocument).toBe(true);
+    expect(singles[0]?.pdfBytes).toBeGreaterThan(0);
+
+    const sqlite = new DatabaseSync(server.databasePath, { readOnly: true });
+
+    const usageRows = sqlite
+      .prepare("select purpose, model, input_tokens, output_tokens, cost_micros from llm_usage")
+      .all();
+
+    expect(usageRows).toHaveLength(1);
+    expect(usageRows[0]?.purpose).toBe("resume_pdf");
+    expect(usageRows[0]?.input_tokens).toBe(2006);
+    expect(usageRows[0]?.output_tokens).toBe(92);
+    expect(usageRows[0]?.cost_micros).toBeGreaterThan(0);
+
+    sqlite.close();
+  } finally {
+    await server.stop();
+    anthropic.stop();
+  }
+});
+
+test("over the cap the scanned upload still succeeds but the text stays empty", async ({
+  identityServer,
+}) => {
+  const anthropic = await startAnthropicFixtureServer();
+
+  const server = await startFreshAppServer(identityServer, {
+    ANTHROPIC_BASE_URL: anthropic.url,
+    ANTHROPIC_API_KEY: "test-anthropic-key",
+  });
+
+  try {
+    const owner = await ownerContextFor(server.url);
+    const pdfBytes = new Uint8Array(readFileSync("test/e2e/fixtures/resume-scanned.pdf"));
+
+    const capped = await owner.put("/__test__/settings/llm.cap_user_day_usd", {
+      data: { value: "0" },
+    });
+
+    expect(capped.status()).toBe(200);
+
+    const upload = await owner.post("/api/profile/resume", {
+      multipart: {
+        file: {
+          name: "resume-scanned.pdf",
+          mimeType: "application/pdf",
+          buffer: Buffer.from(pdfBytes),
+        },
+      },
+    });
+
+    expect(upload.status()).toBe(201);
+
+    const created = uploadSchema.parse(await upload.json());
+
+    expect(created.bytes).toBe(pdfBytes.byteLength);
+    expect(created.parsedWith).toBe("unpdf");
+    expect(created.unreadable).toBe(true);
+    expect(created.prefilledFacts).toEqual([]);
+
+    const download = await owner.get(`/api/profile/resume/${created.id}/file`);
+    const returned = new Uint8Array(await download.body());
+
+    expect(Buffer.from(returned).equals(pdfBytes)).toBe(true);
+
+    expect(anthropic.singleMessages()).toHaveLength(0);
+
+    const listed = factsSchema.parse(await (await owner.get("/api/profile/facts")).json());
+
+    expect(listed.facts.filter((fact) => fact.source === "resume")).toHaveLength(0);
+
+    const sqlite = new DatabaseSync(server.databasePath, { readOnly: true });
+
+    const usageRows = sqlite
+      .prepare("select purpose from llm_usage where purpose = 'resume_pdf'")
+      .all();
+
+    expect(usageRows).toHaveLength(0);
+
+    sqlite.close();
+  } finally {
+    await server.stop();
+    anthropic.stop();
+  }
 });

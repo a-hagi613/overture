@@ -21,9 +21,14 @@ const singleMessageRequestSchema = z.object({
     .array(
       z.object({
         role: z.literal("user"),
-        content: z.array(
-          z.union([documentContentSchema, z.object({ type: z.literal("text"), text: z.string() })]),
-        ).min(1),
+        content: z
+          .array(
+            z.union([
+              documentContentSchema,
+              z.object({ type: z.literal("text"), text: z.string() }),
+            ]),
+          )
+          .min(1),
       }),
     )
     .min(1),
@@ -193,15 +198,14 @@ export async function startAnthropicFixtureServer() {
   let createdBatches = 0;
   let batchCounter = 0;
 
-  function seenBlocksFor(message: z.infer<typeof singleMessageRequestSchema>["messages"][number]) {
-    const document = message.content.find((block) => block.type === "document");
-    const text = message.content.find((block) => block.type === "text");
+  const server: Server = createServer((request, response) => {
+    void handleRequest(request, response);
+  });
 
-    if (document === undefined || text === undefined) {
-      throw new Error("the single message request carried no document or text block");
-    }
+  function baseUrl() {
+    const address = server.address();
 
-    return { document, text };
+    return `http://127.0.0.1:${String(portFrom(address))}`;
   }
 
   async function createSingleMessage(request: IncomingMessage, response: ServerResponse) {
@@ -453,4 +457,15 @@ function portFrom(address: string | { port: number } | null) {
   }
 
   return parsed.data.port;
+}
+
+function seenBlocksFor(message: z.infer<typeof singleMessageRequestSchema>["messages"][number]) {
+  const document = message.content.find((block) => block.type === "document");
+  const text = message.content.find((block) => block.type === "text");
+
+  if (document === undefined || text === undefined) {
+    throw new Error("the single message request carried no document or text block");
+  }
+
+  return { document, text };
 }
