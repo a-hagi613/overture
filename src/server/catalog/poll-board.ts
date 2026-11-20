@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, notInArray, sql } from "drizzle-orm";
+import { and, count, eq, gte, isNull, notInArray, sql } from "drizzle-orm";
 
 import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -24,6 +24,7 @@ const NOT_FOUND_BACKOFF_MS = 30 * 60_000;
 const MISSING_POLLS_TO_CLOSE = 2;
 const NOT_FOUND_POLLS_TO_GONE = 2;
 const POSTINGS_PER_CHUNK = 50;
+const BULK_DETAIL_THRESHOLD = 5;
 
 export interface PollBoardReport {
   boardId: string;
@@ -64,7 +65,7 @@ function parseMs(iso: string | null) {
 
 type ExistingPosting = Pick<
   typeof postings.$inferSelect,
-  "sourceUpdatedAt" | "closedAt" | "feedContentHash"
+  "atsJobId" | "sourceUpdatedAt" | "closedAt" | "feedContentHash"
 >;
 
 function feedContentHashFor(posting: FeedPosting) {
@@ -101,6 +102,65 @@ function isUnchanged(posting: FeedPosting, existing: ExistingPosting | undefined
   const feedContentHash = feedContentHashFor(posting);
 
   return feedContentHash !== null && existing.feedContentHash === feedContentHash;
+}
+
+function openPostingCount(db: AppDatabase, boardId: string) {
+  const row = db
+    .select({ total: count() })
+    .from(postings)
+    .where(and(eq(postings.boardId, boardId), isNull(postings.closedAt)))
+    .get();
+
+  return row?.total ?? 0;
+}
+
+function changedPostingCount(db: AppDatabase, boardId: string, boardPostings: FeedPosting[]) {
+  const existingRows: ExistingPosting[] = db
+    .select({
+      atsJobId: postings.atsJobId,
+      sourceUpdatedAt: postings.sourceUpdatedAt,
+      closedAt: postings.closedAt,
+      feedContentHash: postings.feedContentHash,
+    })
+    .from(postings)
+    .where(eq(postings.boardId, boardId))
+    .all();
+
+  const existingByJobId = new Map(existingRows.map((row) => [row.atsJobId, row]));
+
+  return boardPostings.filter(
+    (posting) => !isUnchanged(posting, existingByJobId.get(posting.atsJobId)),
+  ).length;
+}
+
+function mergeContentPostings(boardPostings: FeedPosting[], contentPostings: FeedPosting[]) {
+  const contentByJobId = new Map(
+    contentPostings.map((posting) => [posting.atsJobId, posting.content] as const),
+  );
+
+  return boardPostings.map((posting) => {
+    const content = contentByJobId.get(posting.atsJobId);
+
+    if (content === undefined || content === null) {
+      return posting;
+    }
+
+    return { ...posting, descriptionPending: false, content };
+  });
+}
+
+async function fetchBoardContentOrNull(feed: BoardFeed, boardToken: string) {
+  if (feed.fetchBoardContent === undefined) {
+    return null;
+  }
+
+  try {
+    const result = await feed.fetchBoardContent(boardToken);
+
+    return result.status === "ok" ? result.postings : null;
+  } catch {
+    return null;
+  }
 }
 
 function gzip(descriptionText: string) {
@@ -470,6 +530,30 @@ export const pollBoard = async (
 ) => {
   const now = clock.now();
 
+  if (openPostingCount(db, board.id) === 0 && feed.fetchBoardContent !== undefined) {
+    let bulk;
+
+    try {
+      bulk = await feed.fetchBoardContent(board.boardToken);
+    } catch (error) {
+      return markBoardError(db, board, now, error instanceof Error ? error.message : String(error));
+    }
+
+    if (bulk.status === "gone") {
+      return markBoardGone(db, board, board.notFoundPolls + 1, now);
+    }
+
+    if (bulk.status === "not_modified") {
+      return touchWithoutChange(db, clock, board, now);
+    }
+
+    const rows = await syncPostings(db, clock, feed, board, bulk.postings, now);
+
+    markBoardPolled(db, clock, board, bulk);
+
+    return { boardId: board.id, outcome: "polled", ...rows, error: null };
+  }
+
   let result;
 
   try {
@@ -493,9 +577,23 @@ export const pollBoard = async (
     return touchWithoutChange(db, clock, board, now);
   }
 
-  const rows = await syncPostings(db, clock, feed, board, result.postings, now);
+  let feedPostings = result.postings;
 
-  markBoardPolled(db, clock, board, result);
+  if (changedPostingCount(db, board.id, feedPostings) > BULK_DETAIL_THRESHOLD) {
+    const contentPostings = await fetchBoardContentOrNull(feed, board.boardToken);
+
+    if (contentPostings !== null) {
+      feedPostings = mergeContentPostings(feedPostings, contentPostings);
+    }
+  }
+
+  const rows = await syncPostings(db, clock, feed, board, feedPostings, now);
+
+  markBoardPolled(db, clock, board, {
+    etag: result.etag,
+    bodyHash: result.bodyHash,
+    postings: feedPostings,
+  });
 
   return { boardId: board.id, outcome: "polled", ...rows, error: null };
 };

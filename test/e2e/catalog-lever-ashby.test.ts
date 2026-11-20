@@ -310,7 +310,7 @@ test("a mixed backfill respects each ATS's concurrency cap and request pacing", 
     expect(stats.paths.filter((path) => path.startsWith("/posting-api/job-board/")).length).toBe(2);
 
     for (const [ats, expectedRequests] of [
-      ["greenhouse", 15],
+      ["greenhouse", 3],
       ["lever", 2],
       ["ashby", 2],
     ] as const) {

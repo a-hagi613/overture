@@ -32,7 +32,7 @@ const fixtureBoardSchema = z.object({
 });
 
 const SWEEP_CLAIM_MS = 15 * 60_000;
-const BOARD_PASS_BATCH = 120;
+const BOARD_PASS_BATCH = 20;
 const DUE_OFFSET_MS = 12 * 3_600_000 + 5 * 60_000;
 const PARKED_CHAIN_INTERVAL_MS = 86_400_000;
 const ACTIVITY_BANDS_MS = [30 * 60_000, 2 * 3_600_000, 12 * 3_600_000];
@@ -188,10 +188,10 @@ test("a queued sweep waits for the running one, which claims its boards and leav
     const stats = harness.fixture.stats();
 
     for (const token of ["vercel", "stripe"]) {
-      expect(stats.paths.filter((path) => path === listPathFor(token)).length).toBe(2);
+      expect(stats.paths.filter((path) => path === listPathFor(token)).length).toBe(1);
     }
 
-    expect(stats.perAts.greenhouse.requestCount).toBe(13);
+    expect(stats.perAts.greenhouse.requestCount).toBe(5);
 
     const boards = await harness.boards();
 
@@ -231,6 +231,12 @@ test("one sweep's batch is spread across the ATSes in proportion to their limits
 
     expect(await sweepBatches(harness)).toEqual({ greenhouse: 2, lever: 2, ashby: 2 });
 
+    await putSetting(harness, "catalog.sweep_interval_ms", "60000");
+    await putSetting(harness, "catalog.sweep_max_boards", "1");
+
+    expect(await sweepBatches(harness)).toEqual({ greenhouse: 1, lever: 1, ashby: 1 });
+
+    await putSetting(harness, "catalog.sweep_max_boards", "20");
     await putSetting(harness, "catalog.sweep_batch", "6");
 
     expect(await sweepBatches(harness)).toEqual({ greenhouse: 2, lever: 2, ashby: 2 });
@@ -290,6 +296,7 @@ test("a crashed poll's board is held by its claim and polled again once the clai
 
     await moveClock(harness, DUE_OFFSET_MS);
 
+    const inFlightRequestPath = harness.fixture.nextRequest();
     const crashedSweepId = await enqueueSweep(harness);
 
     await readSseEventUntil(`${harness.app.url}/api/events`, null, (event) =>
@@ -297,8 +304,6 @@ test("a crashed poll's board is held by its claim and polled again once the clai
         ? jobDoneSchema.parse(JSON.parse(event.data)).id === crashedSweepId
         : false,
     );
-
-    const inFlightRequestPath = harness.fixture.nextRequest();
 
     const claimedNow = await harness.clockNow();
     const claimedBoard = boardFor(await harness.boards(), "vercel");
@@ -317,7 +322,7 @@ test("a crashed poll's board is held by its claim and polled again once the clai
 
     await harness.runOneJob("catalog.sweep");
 
-    expect(harness.fixture.stats().perAts.greenhouse.requestCount).toBe(6);
+    expect(harness.fixture.stats().perAts.greenhouse.requestCount).toBe(2);
     expect(await harness.postings()).toHaveLength(4);
 
     const heldBoard = boardFor(await harness.boards(), "vercel");
@@ -345,7 +350,7 @@ test("a crashed poll's board is held by its claim and polled again once the clai
 
     await waitForSweepsDone(harness, [...pendingSweeps, finalSweepId]);
 
-    expect(harness.fixture.stats().perAts.greenhouse.requestCount).toBe(7);
+    expect(harness.fixture.stats().perAts.greenhouse.requestCount).toBe(3);
     expect(await harness.postings()).toHaveLength(4);
 
     const recoveredBoard = boardFor(await harness.boards(), "vercel");

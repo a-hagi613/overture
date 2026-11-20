@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import { createServer } from "node:http";
 import { join } from "node:path";
@@ -317,11 +317,20 @@ function loadDirectories(root: string) {
   );
 }
 
+function readGreenhouseBoard(token: string) {
+  const root = "test/e2e/fixtures/greenhouse";
+  const contentPath = join(process.cwd(), root, token, "content.json");
+  const boardPath = join(process.cwd(), root, token, "board.json");
+  const file = existsSync(contentPath) ? contentPath : boardPath;
+
+  return greenhouseBoardSchema.parse(JSON.parse(readFileSync(file, "utf8")));
+}
+
 function loadGreenhouseBoards() {
   const boards = new Map<string, MutableGreenhouseJob[]>();
 
   for (const entry of loadDirectories("test/e2e/fixtures/greenhouse")) {
-    const parsed = readBoardFile("test/e2e/fixtures/greenhouse", entry.name, greenhouseBoardSchema);
+    const parsed = readGreenhouseBoard(entry.name);
 
     boards.set(
       entry.name,
@@ -412,6 +421,32 @@ function loadAshbyBoards() {
   }
 
   return boards;
+}
+
+function serializeGreenhouseJob(job: MutableGreenhouseJob, wantsContent: boolean) {
+  if (wantsContent) {
+    return {
+      id: job.id,
+      title: job.title,
+      absolute_url: job.absoluteUrl,
+      location: { name: job.locationName },
+      updated_at: job.updatedAt,
+      first_published: job.firstPublished,
+      language: job.language,
+      content: job.content,
+      departments: job.departments,
+    };
+  }
+
+  return {
+    id: job.id,
+    title: job.title,
+    absolute_url: job.absoluteUrl,
+    location: { name: job.locationName },
+    updated_at: job.updatedAt,
+    first_published: job.firstPublished,
+    language: job.language,
+  };
 }
 
 function serializeLeverJob(job: MutableLeverJob) {
@@ -640,7 +675,8 @@ export async function startFeedFixtureServer() {
   }
 
   async function handleRequest(request: IncomingMessage, response: ServerResponse) {
-    const { pathname } = new URL(request.url ?? "/", "http://127.0.0.1");
+    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    const { pathname, search } = url;
     const route = routeFor(pathname);
 
     if (route === null) {
@@ -657,7 +693,7 @@ export async function startFeedFixtureServer() {
     state.inFlight += 1;
     state.maxInFlight = Math.max(state.maxInFlight, state.inFlight);
     arrivalTimes.push(now);
-    paths.push(pathname);
+    paths.push(`${pathname}${search}`);
 
     requestWaiters.shift()?.(pathname);
 
@@ -693,18 +729,10 @@ export async function startFeedFixtureServer() {
         (job) => !removedJobIds.has(`greenhouse/${token}/${String(job.id)}`),
       );
 
+      const wantsContent = url.searchParams.get("content") === "true";
+
       const body = JSON.stringify({
-        jobs: jobs.map((job) => ({
-          id: job.id,
-          title: job.title,
-          absolute_url: job.absoluteUrl,
-          location: { name: job.locationName },
-          updated_at: job.updatedAt,
-          first_published: job.firstPublished,
-          language: job.language,
-          content: job.content,
-          departments: job.departments,
-        })),
+        jobs: jobs.map((job) => serializeGreenhouseJob(job, wantsContent)),
       });
 
       const etag = `"${hashBody(body)}"`;

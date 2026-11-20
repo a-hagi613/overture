@@ -30,6 +30,7 @@ const SETTING_DEFAULTS = {
   "checkin.close_after_days": "45",
   "jobs.poll_interval_ms": "15000",
   "jobs.batch_size": "10",
+  "catalog.sweep_max_boards": "20",
   "backups.replica_read_interval_ms": "30000",
 } satisfies Record<string, string>;
 

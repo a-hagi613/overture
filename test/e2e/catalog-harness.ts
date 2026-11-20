@@ -26,6 +26,7 @@ const postingRowSchema = z.object({
   employmentType: z.string(),
   tagSource: z.string().nullable(),
   taggedAt: z.number().nullable(),
+  descriptionHash: z.string().nullable(),
   closedAt: z.number().nullable(),
   missingPolls: z.number(),
   dedupeKey: z.string(),
@@ -91,6 +92,7 @@ export interface PostingRow {
   employmentType: string;
   tagSource: string | null;
   taggedAt: number | null;
+  descriptionHash: string | null;
   closedAt: number | null;
   missingPolls: number;
   dedupeKey: string;
