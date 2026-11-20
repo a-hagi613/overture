@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -55,3 +55,21 @@ export const killSwitches = sqliteTable(
   },
   (t) => [uniqueIndex("kill_switches_scope_key").on(t.scope, t.key)],
 );
+
+export const probeForms = sqliteTable("probe_forms", {
+  id: text("id").primaryKey(),
+  postingUrl: text("posting_url").notNull(),
+  company: text("company").notNull(),
+  title: text("posting_title").notNull(),
+  confirmMode: integer("confirm_mode").notNull(),
+  outcome: text("outcome").notNull(),
+  submitted: integer("submitted").notNull().default(0),
+  confirmationSeen: integer("confirmation_seen").notNull().default(0),
+  codeAsked: integer("code_asked").notNull().default(0),
+  submitResponseStatus: integer("submit_response_status"),
+  proxyMb: real("proxy_mb").notNull().default(0),
+  browserMinutes: real("browser_minutes").notNull().default(0),
+  costUsd: real("cost_usd").notNull().default(0),
+  sessionId: text("session_id"),
+  createdAt: integer("created_at").notNull(),
+});

@@ -99,3 +99,32 @@ runs a Litestream replicator, so the drill cannot overwrite or contend with the 
 - **Third-party Actions are SHA-pinned.** `superfly/flyctl-actions/setup-flyctl` and
   `oven-sh/setup-bun` are pinned to full commit SHAs (with the ref noted in the step name); only
   first-party `actions/*` actions keep their version tags.
+
+## M1-32: the early cloud probe (owner runbook)
+
+[Issue #39](https://github.com/a-hagi613/overture/issues/39) adds a one-off, owner-run probe
+(`scripts/probe.ts`) that validates the Browser Use pipeline against five real Greenhouse forms. It
+runs only on `overture-web` through `fly ssh console` and refuses to run anywhere else; every
+Browser Use session is always stopped through the API in a `finally` path, even on failure or
+timeout. Metrics land in the `probe_forms` table so later milestones never re-apply to these
+postings, and the run prints a summary comparing proxy MB per form and the projected cost per
+completed application against the $0.03 gate.
+
+1. Upload the resume to the volume (the run file references it by path, default `/data/probe/resume.pdf`):
+   `fly sftp shell -a overture-web`, then `put <local resume.pdf> /data/probe/resume.pdf`.
+2. Write the run file to `/data/probe/run.json`. It lives privately at
+   `~/overture-private/probe-run.json` (never in the repo), so upload it with
+   `fly sftp shell -a overture-web`, then `put ~/overture-private/probe-run.json /data/probe/run.json`:
+   the five Greenhouse Posting URLs the owner picked, the owner-approved answer per question
+   (every `approved` must be `true` for `--confirm` to do anything), the two-letter country of
+   the residential exit, and the resume path from step 1.
+3. Dry run — fills and uploads but never submits, prompts nothing (`fly ssh console -a overture-web`):
+   `bun run /app/scripts/probe.ts --run-file /data/probe/run.json`
+4. Real run — same command plus `--confirm`; when the console says Greenhouse emailed a
+   verification code, open the inbox, read the code and type it into the console prompt:
+   `bun run /app/scripts/probe.ts --run-file /data/probe/run.json --confirm`
+5. Delete the resume and the run file from the volume afterwards so no PII sits on the machine:
+   `fly sftp shell -a overture-web`, then `rm /data/probe/resume.pdf /data/probe/run.json`.
+
+`BROWSER_USE_API_KEY` is a Fly secret on `overture-web`; its value is never stored in or printed by
+this repository. The probe needs no other configuration.
