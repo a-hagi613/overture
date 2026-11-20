@@ -26,13 +26,13 @@ export function SignInStory() {
   return (
     <section
       aria-label={copy.signIn.sampleLabel}
-      className="relative hidden min-h-screen flex-col justify-between gap-7 overflow-hidden border-r border-border bg-sidebar px-[max(32px,4.5vw)] pb-9 pt-[34px] min-[961px]:flex"
+      className="relative hidden min-h-screen flex-col justify-between gap-7 overflow-hidden border-r border-border bg-sidebar px-[max(32px,4.5vw)] pb-9 pt-[34px] shadow-[1px_0_0_var(--color-bloom)] min-[961px]:flex"
     >
       <div className="flex items-center gap-2.5">
         <BrandMark size={34} />
         <span className="font-serif text-[29px] leading-none">{copy.app.name}</span>
       </div>
-      <div className="mx-auto flex w-full max-w-[610px] flex-col justify-between gap-7">
+      <div className="relative z-[1] mx-auto flex h-full w-full max-w-[610px] flex-col justify-between gap-7">
         <div className="flex flex-col gap-4">
           <span className="inline-flex items-center gap-2 self-start rounded-full border border-input bg-card px-[11px] py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             <span className="h-[7px] w-[7px] flex-none rounded-full bg-signal" />

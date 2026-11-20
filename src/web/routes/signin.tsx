@@ -12,11 +12,11 @@ export function SignInPage() {
   const { theme, toggleTheme, label } = useTheme();
 
   return (
-    <div className="relative flex min-h-[844px] flex-wrap bg-background text-foreground min-[961px]:min-h-screen">
+    <div className="relative flex min-h-[844px] bg-background text-foreground min-[961px]:grid min-[961px]:min-h-screen min-[961px]:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
       <Backdrop />
       <SignInStory />
       <main className="relative flex min-h-[844px] w-full flex-1 flex-col justify-between px-[clamp(18px,4vw,52px)] pb-7 pt-[18px] min-[961px]:pb-8 min-[961px]:pt-7">
-        <div className="flex w-full items-center justify-between gap-3">
+        <div className="mx-auto flex w-full max-w-[560px] items-center justify-between gap-3">
           <Link
             className="-ml-2.5 inline-flex items-center gap-[7px] rounded-md px-2.5 py-1.5 text-[13px] font-medium hover:bg-muted hover:text-foreground"
             to="/"
@@ -34,7 +34,7 @@ export function SignInPage() {
             <NavGlyph name={theme === "dark" ? "sun" : "moon"} />
           </button>
         </div>
-        <div className="flex w-full flex-col gap-[18px]">
+        <div className="mx-auto flex w-full max-w-[418px] flex-col gap-[18px]">
           <div className="mb-[4px] flex flex-col items-center gap-2 text-center min-[961px]:mb-0 min-[961px]:hidden">
             <Link
               aria-label={copy.brand.homeAria}
