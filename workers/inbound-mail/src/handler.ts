@@ -66,7 +66,7 @@ export async function email(message: ForwardableEmailMessage, env: InboundMailEn
     body: raw,
   });
 
-  const response = await fetch(`${env.OVERTURE_ORIGIN.replace(/\/+$/u, "")}${INBOUND_PATH}`, {
+  const response = await fetch(new URL(INBOUND_PATH, env.OVERTURE_ORIGIN), {
     method: "POST",
     headers: {
       "content-type": "message/rfc822",

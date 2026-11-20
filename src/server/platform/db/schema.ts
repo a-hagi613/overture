@@ -469,6 +469,108 @@ export const resumes = sqliteTable(
   ],
 );
 
+export const mailboxes = sqliteTable("mailboxes", {
+  id: text("id").primaryKey(),
+  userId: cascadeUserId().unique(),
+  localPart: text("local_part").notNull().unique(),
+  status: text("status", { enum: ["active", "receive_only", "closed"] })
+    .notNull()
+    .default("active"),
+  receiveUntil: timestamp("receive_until"),
+  createdAt: timestamp("created_at").notNull(),
+});
+
+export const retiredAddresses = sqliteTable("retired_addresses", {
+  localPart: text("local_part").primaryKey(),
+  retiredAt: timestamp("retired_at").notNull(),
+});
+
+export const mailThreads = sqliteTable(
+  "mail_threads",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    applicationId: text("application_id"),
+    subjectEnc: text("subject_enc").notNull(),
+    employerStarted: integer("employer_started", { mode: "boolean" }).notNull().default(false),
+    lastMessageAt: timestamp("last_message_at").notNull(),
+  },
+  (t) => [index("mail_threads_user_last_message").on(t.userId, t.lastMessageAt)],
+);
+
+export const messages = sqliteTable(
+  "messages",
+  {
+    id: text("id").primaryKey(),
+    threadId: text("thread_id")
+      .notNull()
+      .references(() => mailThreads.id, { onDelete: "cascade" }),
+    userId: cascadeUserId(),
+    mailboxId: text("mailbox_id")
+      .notNull()
+      .references(() => mailboxes.id, { onDelete: "cascade" }),
+    direction: text("direction", { enum: ["in", "out"] }).notNull(),
+    rfcMessageId: text("rfc_message_id").notNull(),
+    inReplyTo: text("in_reply_to"),
+    senderDomain: text("sender_domain").notNull(),
+    auth: text("auth", { enum: ["pass", "fail", "none"] }).notNull(),
+    fromEnc: text("from_enc").notNull(),
+    toEnc: text("to_enc").notNull(),
+    subjectEnc: text("subject_enc").notNull(),
+    textEnc: text("text_enc").notNull(),
+    htmlObjectKey: text("html_object_key"),
+    snippetEnc: text("snippet_enc").notNull(),
+    classification: text("classification", {
+      enum: ["ack", "code", "rejection", "screening", "interview", "offer", "other"],
+    }),
+    codeConsumedAt: timestamp("code_consumed_at"),
+    readAt: timestamp("read_at"),
+    outStatus: text("out_status", { enum: ["queued", "sent", "bounced", "failed"] }),
+    providerMessageId: text("provider_message_id"),
+    createdAt: timestamp("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("messages_mailbox_rfc_message_id_unique").on(t.mailboxId, t.rfcMessageId),
+    index("messages_thread_created").on(t.threadId, t.createdAt),
+  ],
+);
+
+export const messageAttachments = sqliteTable(
+  "message_attachments",
+  {
+    id: text("id").primaryKey(),
+    messageId: text("message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    filenameEnc: text("filename_enc").notNull(),
+    mime: text("mime").notNull(),
+    bytes: integer("bytes").notNull(),
+    objectKey: text("object_key").notNull(),
+  },
+  (t) => [index("message_attachments_message_id").on(t.messageId)],
+);
+
+export const codeWaits = sqliteTable(
+  "code_waits",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    mailboxId: text("mailbox_id")
+      .notNull()
+      .references(() => mailboxes.id, { onDelete: "cascade" }),
+    attemptId: text("attempt_id"),
+    startedAt: timestamp("started_at").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    resolvedAt: timestamp("resolved_at"),
+    resolvedBy: text("resolved_by", { enum: ["mail", "paste"] }),
+    resolvedMessageId: text("resolved_message_id").references(() => messages.id, {
+      onDelete: "set null",
+    }),
+    codeEnc: text("code_enc"),
+  },
+  (t) => [index("code_waits_mailbox_open").on(t.mailboxId, t.resolvedAt, t.startedAt)],
+);
+
 export const grants = sqliteTable(
   "grants",
   {

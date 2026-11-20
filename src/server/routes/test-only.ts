@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { eq, isNull } from "drizzle-orm";
+import { asc, eq, isNull } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -13,12 +13,17 @@ import {
   accounts,
   applications,
   bgJobs,
+  codeWaits,
   companies,
   companyBoards,
   fxRates,
   ledger,
   matches,
   postingQuestions,
+  mailboxes,
+  mailThreads,
+  messageAttachments,
+  messages,
   postingTags,
   postings,
   questionVariants,
@@ -48,6 +53,10 @@ import { DEFAULT_IMPORT_SOURCE, importTags } from "../catalog/tag-import.ts";
 import { readLlmUsage, recordLlmUsage } from "../platform/llm/usage.ts";
 import { QUESTION_FIELD_TYPES } from "../../shared/questions.ts";
 import { questionVariantHash } from "../catalog/question-normalize.ts";
+import { createPersonalCrypto } from "../profile/personal-crypto.ts";
+import { parseMasterKey } from "../platform/crypto.ts";
+import { createCodeWait } from "../inbox/waits.ts";
+import { env } from "../config/env.ts";
 import {
   applicationsLeft,
   commitForApplication,
@@ -354,6 +363,12 @@ export function createTestRoutes(
   preparation: PreparationService | null = null,
 ) {
   const routes = new Hono();
+
+  const personal = createPersonalCrypto(
+    db,
+    parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
+    env.MASTER_KEY_CURRENT,
+  );
 
   routes.get("/clock", (context) => context.json({ now: clock.now(), offsetMs: clock.offset() }));
 
@@ -878,7 +893,7 @@ export function createTestRoutes(
   });
 
   routes.get("/mail", (context) => {
-    const messages = listSinkMail().map((sent) => ({
+    const captured = listSinkMail().map((sent) => ({
       id: sent.id,
       to: sent.to,
       from: sent.from,
@@ -887,7 +902,7 @@ export function createTestRoutes(
       sentAt: sent.sentAt,
     }));
 
-    return context.json({ messages });
+    return context.json({ messages: captured });
   });
 
   routes.post("/mail/clear", (context) => {
@@ -1015,6 +1030,157 @@ export function createTestRoutes(
     }
 
     return context.json({ userId, role });
+  });
+
+  routes.post(
+    "/mail/code-waits",
+    zValidator(
+      "json",
+      z.object({
+        mailboxId: z.string().min(1),
+        attemptId: z.string().min(1).optional(),
+      }),
+    ),
+    (context) => {
+      const { mailboxId, attemptId } = context.req.valid("json");
+      const mailbox = db.select().from(mailboxes).where(eq(mailboxes.id, mailboxId)).get();
+
+      if (mailbox === undefined) {
+        return context.json({ error: "not found" }, 404);
+      }
+
+      const wait = createCodeWait(db, clock, {
+        userId: mailbox.userId,
+        mailboxId,
+        attemptId: attemptId ?? null,
+      });
+
+      if (wait === undefined) {
+        return context.json({ error: "not created" }, 500);
+      }
+
+      return context.json({
+        ...wait,
+        startedAt: wait.startedAt.getTime(),
+        expiresAt: wait.expiresAt.getTime(),
+        resolvedAt: wait.resolvedAt?.getTime() ?? null,
+        code: null,
+      });
+    },
+  );
+
+  routes.get("/mail/code-waits/:id", async (context) => {
+    const wait = db
+      .select()
+      .from(codeWaits)
+      .where(eq(codeWaits.id, context.req.param("id")))
+      .get();
+
+    if (wait === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    const code =
+      wait.codeEnc === null
+        ? null
+        : await personal.openFor(
+            wait.userId,
+            { table: "code_waits", column: "code_enc", rowId: wait.id },
+            wait.codeEnc,
+          );
+
+    return context.json({
+      ...wait,
+      startedAt: wait.startedAt.getTime(),
+      expiresAt: wait.expiresAt.getTime(),
+      resolvedAt: wait.resolvedAt?.getTime() ?? null,
+      code,
+    });
+  });
+
+  routes.get(
+    "/mail/messages",
+    zValidator("query", z.object({ mailboxId: z.string().min(1) })),
+    async (context) => {
+      const { mailboxId } = context.req.valid("query");
+
+      const rows = db
+        .select()
+        .from(messages)
+        .where(eq(messages.mailboxId, mailboxId))
+        .orderBy(asc(messages.createdAt))
+        .all();
+
+      const result = await Promise.all(
+        rows.map(async (row) => {
+          const scope = (column: string) => ({ table: "messages", column, rowId: row.id });
+
+          const attachments = db
+            .select({ id: messageAttachments.id, mime: messageAttachments.mime })
+            .from(messageAttachments)
+            .where(eq(messageAttachments.messageId, row.id))
+            .all();
+
+          return {
+            id: row.id,
+            threadId: row.threadId,
+            direction: row.direction,
+            rfcMessageId: row.rfcMessageId,
+            inReplyTo: row.inReplyTo,
+            senderDomain: row.senderDomain,
+            auth: row.auth,
+            classification: row.classification,
+            subject: await personal.openFor(row.userId, scope("subject_enc"), row.subjectEnc),
+            from: await personal.openFor(row.userId, scope("from_enc"), row.fromEnc),
+            to: await personal.openFor(row.userId, scope("to_enc"), row.toEnc),
+            text: await personal.openFor(row.userId, scope("text_enc"), row.textEnc),
+            snippet: await personal.openFor(row.userId, scope("snippet_enc"), row.snippetEnc),
+            htmlObjectKey: row.htmlObjectKey,
+            attachments,
+            codeConsumedAt: row.codeConsumedAt?.getTime() ?? null,
+            createdAt: row.createdAt.getTime(),
+          };
+        }),
+      );
+
+      return context.json({ messages: result });
+    },
+  );
+
+  routes.get("/mail/threads", async (context) => {
+    const mailboxId = context.req.query("mailboxId");
+
+    const mailbox =
+      mailboxId === undefined
+        ? undefined
+        : db.select().from(mailboxes).where(eq(mailboxes.id, mailboxId)).get();
+
+    if (mailbox === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    const rows = db
+      .select()
+      .from(mailThreads)
+      .where(eq(mailThreads.userId, mailbox.userId))
+      .orderBy(asc(mailThreads.lastMessageAt))
+      .all();
+
+    const threads = await Promise.all(
+      rows.map(async (row) => ({
+        id: row.id,
+        applicationId: row.applicationId,
+        subject: await personal.openFor(
+          row.userId,
+          { table: "mail_threads", column: "subject_enc", rowId: row.id },
+          row.subjectEnc,
+        ),
+        employerStarted: row.employerStarted,
+        lastMessageAt: row.lastMessageAt.getTime(),
+      })),
+    );
+
+    return context.json({ threads });
   });
 
   return routes;

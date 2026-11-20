@@ -22,6 +22,9 @@ import { createTestRoutes } from "./routes/test-only.ts";
 import { env } from "./config/env.ts";
 import { createProfileRoutes } from "./routes/profile.ts";
 import { createMatchingService } from "./matching/score.ts";
+import { createInboundRoutes } from "./routes/inbound.ts";
+import { createMailRoutes } from "./routes/mail.ts";
+import { createMailboxService } from "./inbox/mailboxes.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
 
@@ -82,6 +85,13 @@ export function createApp(deps: AppDependencies) {
 
   const app = new Hono();
 
+  const mailboxes = createMailboxService(
+    deps.db,
+    deps.clock,
+    env.INBOUND_HMAC_SECRET ?? "",
+    env.MAIL_DOMAIN,
+  );
+
   app.all("/api/auth/*", async (context) => deps.auth.handler(context.req.raw));
   app.route("/api", createHealthRoutes(deps.db, deps.backups));
   app.route("/api", createMeRoutes(deps.auth));
@@ -102,6 +112,28 @@ export function createApp(deps: AppDependencies) {
     createReviewRoutes({
       auth: deps.auth,
       reviews: deps.reviews,
+    }),
+  );
+  app.route(
+    "/api",
+    createMailRoutes({
+      db: deps.db,
+      clock: deps.clock,
+      auth: deps.auth,
+      personal,
+      mailboxes,
+      secretSet: env.INBOUND_HMAC_SECRET !== undefined,
+    }),
+  );
+  app.route(
+    "/",
+    createInboundRoutes({
+      db: deps.db,
+      clock: deps.clock,
+      objects: deps.objects,
+      personal,
+      mailboxes,
+      secret: env.INBOUND_HMAC_SECRET,
     }),
   );
 

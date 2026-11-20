@@ -41,6 +41,8 @@ import {
   APPLICATION_PREPARE_JOB_KIND,
   parseApplicationPreparePayload,
 } from "./pipeline/prepare-jobs.ts";
+import { createMailDnsResolver } from "./inbox/dns.ts";
+import { createMailIngest, MAIL_INGEST_JOB_KIND } from "./inbox/ingest.ts";
 
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 
@@ -193,10 +195,36 @@ const objects =
       })
     : createDiskObjectStore(env.OBJECT_STORE_ROOT);
 
+const mailPersonal = createPersonalCrypto(
+  db,
+  parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
+  env.MASTER_KEY_CURRENT,
+);
+
+const mailIngest = createMailIngest({
+  db,
+  clock,
+  objects,
+  personal: mailPersonal,
+  resolver: createMailDnsResolver(env.INBOUND_DNS_SERVER),
+});
+
+const mailJobHandlers: JobHandlers = {
+  [MAIL_INGEST_JOB_KIND]: async (payload) => {
+    await mailIngest.run(payload);
+  },
+};
+
 const worker = startJobWorker(
   db,
   clock,
-  { ...catalogJobHandlers, ...preparationJobHandlers, ...llmJobHandlers, ...testJobHandlers },
+  {
+    ...catalogJobHandlers,
+    ...preparationJobHandlers,
+    ...llmJobHandlers,
+    ...mailJobHandlers,
+    ...testJobHandlers,
+  },
   shutdownController.signal,
   (notify) => {
     registerEnqueueNotify(notify);
@@ -220,6 +248,7 @@ const app = createApp({
     ...catalogJobHandlers,
     ...preparationJobHandlers,
     ...llmJobHandlers,
+    ...mailJobHandlers,
     ...testJobHandlers,
   },
   auth,
