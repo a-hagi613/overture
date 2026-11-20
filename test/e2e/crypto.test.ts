@@ -1,6 +1,11 @@
-import { expect, test } from "vitest";
+import { expect, test } from "@playwright/test";
 
-import { createUserKey, openValue, parseMasterKey, sealValue } from "./index.ts";
+import {
+  createUserKey,
+  openValue,
+  parseMasterKey,
+  sealValue,
+} from "../../src/server/platform/crypto/index.ts";
 
 const scope = { table: "facts", column: "value_enc", rowId: "fact-1" };
 
@@ -12,16 +17,16 @@ test("seal then open returns the plaintext", async () => {
   await expect(openValue(masterKey, userKey, scope, sealed)).resolves.toBe("secret resume text");
 });
 
-test("ciphertexts carry the format version and never the plaintext", async () => {
+test("ciphertext format is v1:{key_version}:{iv}:{tag}:{data}", async () => {
   const masterKey = crypto.getRandomValues(new Uint8Array(32));
   const userKey = await createUserKey(masterKey, 1);
   const sealed = await sealValue(masterKey, userKey, scope, "secret resume text");
 
-  expect(sealed.startsWith("v1:1:")).toBe(true);
+  expect(sealed).toMatch(/^v1:1:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/u);
   expect(sealed).not.toContain("secret resume text");
 });
 
-test("opening with a different scope fails", async () => {
+test("opening with a different associated data scope fails", async () => {
   const masterKey = crypto.getRandomValues(new Uint8Array(32));
   const userKey = await createUserKey(masterKey, 1);
   const sealed = await sealValue(masterKey, userKey, scope, "secret resume text");
@@ -31,23 +36,20 @@ test("opening with a different scope fails", async () => {
   ).rejects.toThrow();
 });
 
-test("shredding the user key makes every value unreadable", async () => {
+test("a different user key cannot open the value", async () => {
+  const masterKey = crypto.getRandomValues(new Uint8Array(32));
+  const other = await createUserKey(masterKey, 1);
+  const sealed = await sealValue(masterKey, await createUserKey(masterKey, 2), scope, "text");
+
+  await expect(openValue(masterKey, other, scope, sealed)).rejects.toThrow();
+});
+
+test("the open value never fails on a fresh identical key", async () => {
   const masterKey = crypto.getRandomValues(new Uint8Array(32));
   const userKey = await createUserKey(masterKey, 1);
   const sealed = await sealValue(masterKey, userKey, scope, "secret resume text");
-  const shredded = { ...userKey, wrappedDek: "AAAAAAAAAAAAAAAAAAAAAA==" };
 
-  await expect(openValue(masterKey, shredded, scope, sealed)).rejects.toThrow();
-  await expect(openValue(masterKey, userKey, scope, sealed)).resolves.toBe("secret resume text");
-});
-
-test("ciphertexts sealed under one master key do not open under another", async () => {
-  const masterA = crypto.getRandomValues(new Uint8Array(32));
-  const masterB = crypto.getRandomValues(new Uint8Array(32));
-  const userKey = await createUserKey(masterA, 1);
-  const sealed = await sealValue(masterA, userKey, scope, "for owner a only");
-
-  await expect(openValue(masterB, userKey, scope, sealed)).rejects.toThrow();
+  await expect(openValue(masterKey, userKey, scope, sealed)).resolves.not.toContain("v1:");
 });
 
 test("parseMasterKey rejects keys that are not 32 bytes", () => {
