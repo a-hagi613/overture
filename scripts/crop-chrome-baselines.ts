@@ -49,23 +49,19 @@ async function screenshotPart(
     `<img id="reference" style="display:block;margin:0;padding:0;position:absolute" />`,
   );
 
-  await page
-    .locator("#reference")
-    .evaluate(async (element: HTMLImageElement, data: string) => {
-      element.src = `data:image/png;base64,${data}`;
+  await page.locator("#reference").evaluate(async (element: HTMLImageElement, data: string) => {
+    element.src = `data:image/png;base64,${data}`;
 
-      await element.decode();
-    }, readFileSync(reference).toString("base64"));
+    await element.decode();
+  }, readFileSync(reference).toString("base64"));
 
-  await page
-    .locator("#reference")
-    .evaluate(
-      (element, position: { left: number; top: number }) => {
-        element.style.left = `-${position.left}px`;
-        element.style.top = `-${position.top}px`;
-      },
-      { left: part.x, top: part.y },
-    );
+  await page.locator("#reference").evaluate(
+    (element, position: { left: number; top: number }) => {
+      element.style.left = `-${position.left}px`;
+      element.style.top = `-${position.top}px`;
+    },
+    { left: part.x, top: part.y },
+  );
 
   const output = join(process.cwd(), outputRoot, `home-${variant}-${theme}-${part.file}.png`);
 
