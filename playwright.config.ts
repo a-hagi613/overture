@@ -6,7 +6,6 @@ export default defineConfig({
   workers: 2,
   reporter: "list",
   globalSetup: "./test/e2e/global-setup.ts",
-  snapshotPathTemplate: "design/reference/profile/{arg}{ext}",
   use: {
     trace: "retain-on-failure",
   },
@@ -22,6 +21,16 @@ export default defineConfig({
         toHaveScreenshot: {
           maxDiffPixelRatio: 0.01,
           pathTemplate: "{testDir}/../../design/reference/signin/{arg}{ext}",
+        },
+      },
+    },
+    {
+      name: "profile-boards",
+      testMatch: /board-match-profile\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/../../design/reference/profile/{arg}{ext}",
         },
       },
     },
