@@ -1,3 +1,5 @@
+import { AxeBuilder } from "@axe-core/playwright";
+
 import { openAdminAsOwner } from "./admin-sign-in.ts";
 import { expect, test } from "./admin.fixture.ts";
 import { authTestIdentity } from "./auth.fixture.ts";
@@ -32,6 +34,10 @@ test("an admin grant reaches Home as Applications left", async ({
   await page.getByRole("button", { name: "Grant the Applications" }).click();
 
   await expect(page.getByText(`${authTestIdentity.ownerEmail} · granted`)).toBeVisible();
+
+  const axe = await new AxeBuilder({ page }).analyze();
+
+  expect(axe.violations).toEqual([]);
 
   const auditResponse = await page.request.get(`${adminIsolatedAppUrl}/admin/api/audit`);
   const audit = auditResponseSchema.parse(await auditResponse.json());
