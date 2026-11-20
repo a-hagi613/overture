@@ -61,6 +61,17 @@ const postingTagsResponseSchema = z.object({
 });
 
 const boardsResponseSchema = z.object({ boards: z.array(boardRowSchema) });
+
+const jobRowSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  status: z.string(),
+  runAt: z.number(),
+  attempts: z.number(),
+  lockedUntil: z.number().nullable(),
+});
+
+const jobsResponseSchema = z.object({ jobs: z.array(jobRowSchema) });
 const clockResponseSchema = z.object({ now: z.number() });
 const companyCreatedSchema = z.object({ id: z.string() });
 const boardCreatedSchema = z.object({ id: z.string() });
@@ -108,6 +119,15 @@ export interface BoardRow {
   consecutiveErrors: number;
 }
 
+export interface JobRow {
+  id: string;
+  kind: string;
+  status: string;
+  runAt: number;
+  attempts: number;
+  lockedUntil: number | null;
+}
+
 const boardSpecSchema = z.union([
   z
     .string()
@@ -140,6 +160,9 @@ export interface CatalogHarness {
   postings: () => Promise<PostingRow[]>;
   postingTags: () => Promise<PostingTagRow[]>;
   boards: () => Promise<BoardRow[]>;
+  jobs: () => Promise<JobRow[]>;
+  putSetting: (key: string, value: string) => Promise<void>;
+  moveClock: (offsetMs: number) => Promise<void>;
   clockNow: () => Promise<number>;
   close: () => Promise<void>;
 }
@@ -391,6 +414,32 @@ export async function startCatalogHarness(
     return boardsResponseSchema.parse(await response.json()).boards;
   }
 
+  async function listJobs() {
+    const response = await fetch(`${app.url}/__test__/jobs`);
+
+    return jobsResponseSchema.parse(await response.json()).jobs;
+  }
+
+  async function putSetting(key: string, value: string) {
+    const response = await fetch(`${app.url}/__test__/settings/${key}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`setting ${key} failed`);
+    }
+  }
+
+  async function moveClock(offsetMs: number) {
+    const response = await postJson(`${app.url}/__test__/clock/offset`, { offsetMs });
+
+    if (!response.ok) {
+      throw new Error("moving the clock failed");
+    }
+  }
+
   return {
     app,
     fixture,
@@ -404,6 +453,9 @@ export async function startCatalogHarness(
     postings,
     postingTags,
     boards,
+    jobs: listJobs,
+    putSetting,
+    moveClock,
     clockNow,
     close: async () => {
       await app.stop();

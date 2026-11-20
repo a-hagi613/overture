@@ -16,9 +16,14 @@ import type { BoardFeeds } from "./board-feed.ts";
 export const SWEEP_JOB_KIND = "catalog.sweep";
 export const BACKFILL_JOB_KIND = "catalog.backfill";
 
+export const SINGLETON_JOB_KINDS = [SWEEP_JOB_KIND];
+
 const DEFAULT_SWEEP_INTERVAL_MS = 60_000;
 const MIN_SWEEP_INTERVAL_MS = 1000;
 const SWEEP_CLAIM_MS = 15 * 60_000;
+const SWEEP_MAX_ATTEMPTS = 1;
+const SWEEP_DEDUPE_KEY = "catalog.sweep";
+const BACKFILL_DEDUPE_KEY = "catalog.backfill";
 
 const SWEEP_LIMITS = {
   greenhouse: GREENHOUSE_LIMITS,
@@ -73,26 +78,34 @@ export function sweepBatchPerAts(db: AppDatabase) {
 }
 
 export function enqueueSweep(deps: CatalogDeps, runAt: number) {
-  return enqueueJob(deps.db, deps.clock, SWEEP_JOB_KIND, "{}", { runAt });
+  return enqueueJob(deps.db, deps.clock, SWEEP_JOB_KIND, "{}", {
+    runAt,
+    dedupeKey: SWEEP_DEDUPE_KEY,
+    maxAttempts: SWEEP_MAX_ATTEMPTS,
+  });
 }
 
 export function enqueueBackfill(deps: CatalogDeps) {
-  return enqueueJob(deps.db, deps.clock, BACKFILL_JOB_KIND, "{}");
+  return enqueueJob(deps.db, deps.clock, BACKFILL_JOB_KIND, "{}", {
+    dedupeKey: BACKFILL_DEDUPE_KEY,
+  });
 }
 
 export function ensureBackfillQueued(db: AppDatabase, clock: Clock) {
-  const existing = db
-    .select({ one: bgJobs.id })
+  const active = db
+    .select({ id: bgJobs.id })
     .from(bgJobs)
     .where(and(eq(bgJobs.kind, BACKFILL_JOB_KIND), inArray(bgJobs.status, ["queued", "running"])))
     .limit(1)
     .get();
 
-  if (existing !== undefined) {
-    return { jobId: existing.one, enqueued: false };
+  if (active !== undefined) {
+    return { jobId: active.id, enqueued: false };
   }
 
-  return { jobId: enqueueJob(db, clock, BACKFILL_JOB_KIND, "{}"), enqueued: true };
+  const job = enqueueJob(db, clock, BACKFILL_JOB_KIND, "{}", { dedupeKey: BACKFILL_DEDUPE_KEY });
+
+  return { jobId: job.id, enqueued: job.inserted };
 }
 
 export async function pollDueBoards(deps: CatalogDeps) {
@@ -137,9 +150,11 @@ export async function runBackfillJob(deps: CatalogDeps) {
 }
 
 export async function runSweepJob(deps: CatalogDeps) {
-  enqueueSweep(deps, deps.clock.now() + readSweepIntervalMs(deps.db));
-
-  await pollDueBoards(deps);
+  try {
+    await pollDueBoards(deps);
+  } finally {
+    enqueueSweep(deps, deps.clock.now() + readSweepIntervalMs(deps.db));
+  }
 }
 
 export function ensureSweepQueued(deps: CatalogDeps) {
@@ -160,7 +175,5 @@ export function ensureSweepQueued(deps: CatalogDeps) {
     return false;
   }
 
-  enqueueSweep(deps, deps.clock.now());
-
-  return true;
+  return enqueueSweep(deps, deps.clock.now()).inserted;
 }

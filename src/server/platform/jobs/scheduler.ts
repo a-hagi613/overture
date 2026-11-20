@@ -2,7 +2,7 @@ import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 import type { ClaimedJob, JobHandlers } from "./queue.ts";
 
-import { claimDueJobs, requeueWithoutConsumingAttempt, runClaimedJob } from "./queue.ts";
+import { claimJobsToRun, requeueWithoutConsumingAttempt, runClaimedJob } from "./queue.ts";
 import { getSetting } from "../settings/index.ts";
 
 const DEFAULT_POLL_INTERVAL_MS = 15_000;
@@ -11,6 +11,7 @@ const MIN_POLL_INTERVAL_MS = 1000;
 
 interface InFlightJob {
   id: string;
+  kind: string;
   claimedAttempts: number;
   promise: Promise<boolean>;
 }
@@ -79,12 +80,15 @@ export function startJobWorker(
   handlers: JobHandlers,
   signal: AbortSignal,
   onEnqueue: (notify: () => void) => void,
+  singletonKinds: readonly string[] = [],
 ) {
   const inFlight = new Set<InFlightJob>();
+  const exclusive = new Set(singletonKinds);
 
   function runTracked(job: ClaimedJob) {
     const entry: InFlightJob = {
       id: job.id,
+      kind: job.kind,
       claimedAttempts: job.attempts,
       promise: Promise.resolve(false),
     };
@@ -102,6 +106,10 @@ export function startJobWorker(
     inFlight.add(entry);
   }
 
+  function busyKinds() {
+    return [...inFlight].flatMap((entry) => (exclusive.has(entry.kind) ? [entry.kind] : []));
+  }
+
   let wakeResolve: (() => void) | null = null;
 
   onEnqueue(() => {
@@ -116,7 +124,7 @@ export function startJobWorker(
       return;
     }
 
-    const claimed = claimDueJobs(db, clock, readBatchSize(db));
+    const claimed = claimJobsToRun(db, clock, readBatchSize(db), singletonKinds, busyKinds());
 
     for (const job of claimed) {
       runTracked(job);

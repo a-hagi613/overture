@@ -25,6 +25,7 @@ export interface AppDependencies {
   auth: Auth;
   objects: ObjectStore;
   llm: LlmPort;
+  singletonJobKinds: readonly string[];
 }
 
 async function staticResponseFrom(root: string, url: string) {
@@ -63,7 +64,10 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createProfileRoutes(deps));
 
   if (deps.testRoutes) {
-    app.route("/__test__", createTestRoutes(deps.db, deps.clock, deps.jobHandlers));
+    app.route(
+      "/__test__",
+      createTestRoutes(deps.db, deps.clock, deps.jobHandlers, deps.singletonJobKinds),
+    );
   }
 
   app.use("*", async (context, next) => {

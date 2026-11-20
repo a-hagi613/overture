@@ -12,6 +12,7 @@ export async function runDueJobs(
   db: AppDatabase,
   clock: Clock,
   handlers: Readonly<Record<string, (payload: string) => Promise<void>>>,
+  singletonKinds: readonly string[] = [],
 ) {
   const controller = new AbortController();
   const raw = getSetting(db, "jobs.batch_size");
@@ -20,5 +21,5 @@ export async function runDueJobs(
   const batchSize =
     Number.isFinite(parsed) && parsed >= 1 ? Math.trunc(parsed) : DEFAULT_BATCH_SIZE;
 
-  return claimAndRunDueJobs(db, clock, handlers, controller.signal, batchSize);
+  return claimAndRunDueJobs(db, clock, handlers, controller.signal, batchSize, singletonKinds);
 }

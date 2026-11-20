@@ -293,7 +293,7 @@ and expired in the same transaction (`release` then `expire`), so it never retur
 
 | Table | Columns |
 |---|---|
-| `bg_jobs` | id, kind, payload JSON, run_at, priority, status CHECK IN ('queued','running','done','failed','dead'), attempts, max_attempts, locked_until NULL, last_error NULL, dedupe_key UNIQUE NULL, created_at, updated_at |
+| `bg_jobs` | id, kind, payload JSON, run_at, priority, status CHECK IN ('queued','running','done','failed','dead'), attempts, max_attempts, locked_until NULL, last_error NULL, dedupe_key UNIQUE among queued rows NULL, created_at, updated_at |
 | `events` | seq INTEGER PK AUTOINCREMENT, user_id NULL, topic, payload JSON, created_at — SSE outbox, purged after 24 h |
 | `notifications` | id, user_id, kind, title, body, url, created_at, read_at, pushed_at, emailed_at |
 | `push_subscriptions` | id, user_id, endpoint UNIQUE, p256dh, auth, created_at, last_ok_at |
@@ -339,16 +339,21 @@ Discovery runs from `overture-web` directly (no proxy).
    feed has one (Greenhouse) and the newest posting's publish time when it does not (Lever, Ashby). `404` twice →
    `gone`. The `catalog.sweep` job claims its batch before polling: in the same statement that selects them, each
    claimed board's `next_poll_at` moves forward to a 15-minute claim, which the finished poll overwrites with its
-   activity band, so two overlapping sweeps never poll the same board and a crashed process's board becomes due
-   again when the claim lapses. Each sweep claims per ATS about `sweep_interval_ms × the ATS's request rate`
-   boards (120 per ATS at the 60 s default and 2 req/s), so no ATS starves another; `catalog.sweep_batch` sets
-   the total per-sweep batch instead (split across ATSes in proportion to their rates) and
-   `catalog.sweep_interval_ms` sets the sweep chain interval.
-4. **Closed**: a posting absent from two consecutive successful polls gets `closed_at`; its queued applications are
+   activity band, so a crashed process's board becomes due again when the claim lapses. Each sweep claims per ATS
+   about `sweep_interval_ms × the ATS's request rate` boards (120 per ATS at the 60 s default and 2 req/s), so no
+   ATS starves another; `catalog.sweep_batch` sets the total per-sweep batch instead (split across ATSes in
+   proportion to their rates) and `catalog.sweep_interval_ms` sets the sweep chain interval.
+4. **One sweep at a time**: the next sweep is enqueued when the current one *finishes*, not when it starts, so a
+   sweep that outlasts the interval delays the next one instead of overlapping it. Its `dedupe_key` is
+   `catalog.sweep` and `bg_jobs` is unique on a dedupe key among queued rows, so at most one is ever queued, and
+   the worker never runs two jobs of a singleton kind (`catalog.sweep`) at once. A sweep killed mid-flight leaves
+   its row running; the claim takes the row over once its lease expires, and only one process polls its boards
+   because the board claim has not lapsed.
+5. **Closed**: a posting absent from two consecutive successful polls gets `closed_at`; its queued applications are
    skipped with `posting_closed`.
-5. **Dedupe**: `dedupe_key = company_id + title_norm + country_code + city`; duplicates across boards keep the
+6. **Dedupe**: `dedupe_key = company_id + title_norm + country_code + city`; duplicates across boards keep the
    earliest posting; users never see two cards for one role.
-6. **Responsiveness**: writing one feed never blocks the process. A board's postings are written in transactions of
+7. **Responsiveness**: writing one feed never blocks the process. A board's postings are written in transactions of
    50 with the event loop yielded between them, the comparison against stored postings reads only `id`,
    `ats_job_id`, `source_updated_at` and `closed_at` rather than whole rows with their descriptions, and the
    twice-missing close is two statements rather than one per posting. A sweep over multi-megabyte feeds therefore
