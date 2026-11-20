@@ -112,6 +112,18 @@ test("discovered boards load from the recorded parquet fixture once, leave v1 ro
       expect(board?.status).toBe("active");
     }
 
+    const euBoard = boardsAfterFirst.find(
+      (board) => board.ats === "lever" && board.boardToken === "aavelabs",
+    );
+
+    expect(euBoard?.region).toBe("eu");
+
+    const usBoard = boardsAfterFirst.find(
+      (board) => board.ats === "lever" && board.boardToken === "32Co",
+    );
+
+    expect(usBoard?.region).toBe("us");
+
     const anagramBoards = boardsAfterFirst.filter(
       (board) =>
         board.boardToken === "anagram" ||

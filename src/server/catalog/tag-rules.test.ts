@@ -33,6 +33,14 @@ describe("workplace", () => {
     expect(tags.workplace).toBe("hybrid");
   });
 
+  test("onsite and on-site spellings both mean onsite", () => {
+    for (const workplaceType of ["OnSite", "onsite", "on-site", "On-Site"]) {
+      const tags = postingOf({ title: "Software Engineer", workplaceType });
+
+      expect(tags.workplace).toBe("onsite");
+    }
+  });
+
   test("isRemote flag", () => {
     const tags = postingOf({ title: "Software Engineer", isRemote: true });
 

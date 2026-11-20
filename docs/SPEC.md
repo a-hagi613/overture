@@ -101,7 +101,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 
 | Service | Purpose | Env / secret | In tests (ADR 0013) |
 |---|---|---|---|
-| ATS job feeds (Greenhouse, Lever, Ashby) | catalog discovery (§6) | `GREENHOUSE_FEED_BASE_URL`, `LEVER_FEED_BASE_URL`, `ASHBY_FEED_BASE_URL` (test-only overrides of the real hosts) | local fixture server replaying recorded real responses captured by `scripts/record-feeds.ts` |
+| ATS job feeds (Greenhouse, Lever, Ashby) | catalog discovery (§6) | `GREENHOUSE_FEED_BASE_URL`, `LEVER_FEED_BASE_URL`, `LEVER_EU_FEED_BASE_URL`, `ASHBY_FEED_BASE_URL` (test-only overrides of the real hosts) | local fixture server replaying recorded real responses captured by `scripts/record-feeds.ts` |
 | Cloudflare R2 | backups, encrypted files and mail | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES`, `R2_BUCKET_BACKUPS`; `R2_ENDPOINT` overrides the endpoint for tests | disk object store adapter (real implementation, also used in local dev); the R2 adapter runs against a local S3-compatible server (`test/e2e/s3-server.ts`) |
 | Cloudflare Turnstile | bot check on auth forms | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES` (optional, defaults to the `APP_ORIGIN` hostname; production must not list localhost or 127.0.0.1) | Cloudflare's published always-pass test keys; siteverify intercepted with recorded-shape responses (`test/e2e/turnstile-gate.test.ts`) |
 | Cloudflare Access | admin host gate | `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_JWKS_URL` (tests override the certs URL) | real verification against a test signing key |
@@ -234,7 +234,7 @@ updated_at) · `session` · `account` (provider: google, linkedin, credential) �
 | Table | Columns |
 |---|---|
 | `companies` | id, name, name_norm, domain NULL, industry NULL, created_at; INDEX(name_norm) |
-| `company_boards` | id, company_id, ats CHECK IN ('greenhouse','lever','ashby','smartrecruiters','recruitee','workable','personio'), board_token, status CHECK IN ('active','empty','gone','disabled'), source CHECK IN ('v1_seed','discovered','import'), etag, last_modified, content_hash, last_polled_at, next_poll_at, backoff_level, consecutive_errors, created_at; UNIQUE(ats,board_token) |
+| `company_boards` | id, company_id, ats CHECK IN ('greenhouse','lever','ashby','smartrecruiters','recruitee','workable','personio'), board_token, region CHECK IN ('us','eu') DEFAULT 'us' (Lever's US and EU instances are separate boards; Greenhouse has one API), status CHECK IN ('active','empty','gone','disabled'), source CHECK IN ('v1_seed','discovered','import'), etag, last_modified, content_hash, last_polled_at, next_poll_at, backoff_level, consecutive_errors, created_at; UNIQUE(ats,region,board_token) |
 | `postings` | id, board_id, company_id, ats, ats_job_id, url, apply_url, apply_url_norm, title, title_norm, department, location_raw, country_code, region, city, workplace CHECK IN ('remote','hybrid','onsite','unknown'), employment_type CHECK IN ('full_time','part_time','contract','internship','temporary','unknown'), language, salary_min_minor, salary_max_minor, salary_currency, salary_period, posted_at, source_updated_at, first_seen_at, last_seen_at, missing_polls, closed_at, description_gz BLOB NULL, description_hash, feed_content_hash NULL (sha256 of the normalized feed posting; set only for ATSs whose list feed carries the description, Lever and Ashby; a poll rewrites a posting only when this hash or `source_updated_at` changes), dedupe_key, tag_source CHECK IN ('rules','model','llm','import'), tagged_at, questions_fetched_at; UNIQUE(board_id, ats_job_id); INDEX(apply_url_norm); INDEX(closed_at); INDEX(dedupe_key) |
 | `posting_tags` | posting_id, dimension CHECK IN ('role','subrole','seniority'), value, source; PK(posting_id,dimension,value) |
 | `postings_fts` | FTS5(title, company, location, department) (short fields only): self-contained, kept in step with `postings` and `companies` by SQLite triggers (insert, update, delete, company rename); closed Postings leave the index |
@@ -313,16 +313,23 @@ Retention: `events` 24 h; `bg_jobs` done 7 days, dead 30 days; `attempts` 180 da
 ### 6.1 Sources
 
 Ported from the v1 feed clients (`docs/SALVAGE.md`); Workable and Personio are new in M2. Each implements
-`fetchBoard(token, {etag, lastModified}) → {status: 'not_modified'} | {status: 'ok', postings, etag?, lastModified?} | {status: 'gone'}`.
-Discovery runs from `overture-web` directly (no proxy).
+`fetchBoard(token, {etag, lastModified}, region) → {status: 'not_modified'} | {status: 'ok', postings, etag?, lastModified?} | {status: 'gone'}`.
+`region` is the board's `company_boards.region`; only Lever uses it (its EU instance is a separate board, and a
+board row's URL decides `eu` at seed time). Discovery runs from `overture-web` directly (no proxy).
 
-| ATS | Feed | Conditional GET | Per-ATS limits (default) |
-|---|---|---|---|
-| Greenhouse | `boards-api.greenhouse.io/v1/boards/{token}/jobs` (light list); the first poll of a board (no open postings yet), and any poll with more than five new or changed postings, fetches `/jobs?content=true` once and takes description, departments and location from it; otherwise one to five changed postings fetch `/jobs/{id}?content=true`; questions via `/jobs/{id}?questions=true` | ETag where returned, else content hash | 4 concurrent, 2 req/s |
-| Lever | `api.lever.co/v0/postings/{token}?mode=json` | content hash | 4 concurrent, 2 req/s |
-| Ashby | `api.ashbyhq.com/posting-api/job-board/{token}?includeCompensation=true` | content hash | 4 concurrent, 2 req/s |
-| SmartRecruiters (M2) | `api.smartrecruiters.com/v1/companies/{id}/postings` + details | content hash | 2 concurrent, 1 req/s |
-| Recruitee (M2) | `{token}.recruitee.com/api/offers/` | content hash | 2 concurrent, 1 req/s |
+| ATS | Region | Feed | Conditional GET | Per-ATS limits (default) |
+|---|---|---|---|---|
+| Greenhouse | one API | `boards-api.greenhouse.io/v1/boards/{token}/jobs` (light list; skips postings whose `internal_job_id` is null); the first poll of a board (no open postings yet), and any poll with more than five new or changed postings, fetches `/jobs?content=true` once and takes description, departments and location from it (that response carries no pay ranges, so salary stays null there until a later per-job detail fetch); otherwise one to five changed postings fetch `/jobs/{id}?content=true&pay_transparency=true`, with salary from `pay_input_ranges`; questions via `/jobs/{id}?questions=true`. `boards-api.eu.greenhouse.io` does not exist: EU tenants are served by the same API | ETag where returned, else content hash | 4 concurrent, 2 req/s |
+| Lever | `us` | `api.lever.co/v0/postings/{token}?mode=json&limit=100&skip=N`, paging until a page returns fewer than 100 | content hash | 4 concurrent, 2 req/s |
+| Lever | `eu` | `api.eu.lever.co/v0/postings/{token}?mode=json&limit=100&skip=N`, same paging; the same slug on each instance is a separate board | content hash | 4 concurrent, 2 req/s |
+| Ashby | one API | `api.ashbyhq.com/posting-api/job-board/{token}` (slug lowercased) `?includeCompensation=true`; skips `isListed === false` | content hash | 4 concurrent, 2 req/s |
+| SmartRecruiters (M2) | one API | `api.smartrecruiters.com/v1/companies/{id}/postings` + details | content hash | 2 concurrent, 1 req/s |
+| Recruitee (M2) | one API | `{token}.recruitee.com/api/offers/` | content hash | 2 concurrent, 1 req/s |
+
+The apply link is the feed's own apply URL (`applyUrl` on Lever and Ashby) when present; the posting URL stays
+`hostedUrl`/`jobUrl`. Greenhouse's `content` arrives double-encoded, so HTML entities are decoded and tags stripped
+before the salary and location rules see the text. Lever and Ashby hand the feed's structured `workplaceType`
+straight to tagging; Ashby's `isRemote` is ignored because Ashby sets it on hybrid roles.
 
 ### 6.2 Backfill and trickle
 
@@ -360,15 +367,22 @@ Discovery runs from `overture-web` directly (no proxy).
    `ats_job_id`, `source_updated_at` and `closed_at` rather than whole rows with their descriptions, and the
    twice-missing close is two statements rather than one per posting. A sweep over multi-megabyte feeds therefore
    leaves `/api/health` answering in milliseconds; the per-ATS limiter and its pacing are untouched.
+8. **One-time re-tag**: `scripts/retag-feed-workplace.ts --db <overture.db>` clears the board and posting
+   `content_hash`/`feed_content_hash` for Lever and Ashby once, so the next sweep rewrites every open posting from
+   its feed and tags the feed's structured workplace. It is idempotent (a second run only schedules the same
+   rewrite) and is run once on production after the deploy that adds the structured workplace.
 
 ### 6.3 Tagging
 
 Order of precedence for role/seniority: `import` (hiring.cafe file, if the owner provides one) > `rules` > `model` > `llm`.
 
-1. **Structured normalisation (code)**: workplace from `workplaceType`/`isRemote`/`remote`/`hybrid` flags or a
-   `remote` token in location text; employment type from source enums or keyword map; location via an offline
-   GeoNames cities15000 + admin1 table → `country_code/region/city`; language from source field, else a trigram
-   detector on the title + first 500 characters; salary from structured fields, else the pay-range regex set on the
+1. **Structured normalisation (code)**: workplace from the feed's `workplaceType` when it has one (Lever
+   `onsite`/`on-site`/`hybrid`/`remote`, Ashby `OnSite`/`Hybrid`/`Remote`; Ashby's `isRemote` is ignored because it is
+   also set on hybrid roles), else the `isRemote` flag where a feed has one, else `remote`/`hybrid` tokens in the
+   location or title, else the description; employment type from source enums or keyword map; location via an
+   offline GeoNames cities15000 + admin1 table → `country_code/region/city`; language from source field, else a
+   trigram detector on the title + first 500 characters; salary from structured fields (Greenhouse
+   `pay_input_ranges` `min_cents`/`max_cents`, already minor units), else the pay-range regex set on the
    description (`$120,000 – $150,000`, `120k-150k`, `€50.000`, per hour/year).
 2. **Rules**: title + department keyword dictionary built from the O\*NET title list (CC BY 4.0, attribution in the
    footer) mapped into §6.4 groups; seniority from title tokens (`intern`, `junior`, `senior`, `staff`, `principal`,

@@ -410,17 +410,16 @@ const targetNames: string[] = [];
 const targetSlugs = new Map<string, string[]>();
 
 for (const argument of process.argv.slice(2)) {
-  const [name, list] = argument.toLowerCase().split(":");
+  const [name, slugs] = argument.split(":");
+  const target = (name ?? "").toLowerCase();
 
-  if (name !== undefined) {
-    targetNames.push(name);
+  targetNames.push(target);
 
-    if (list !== undefined) {
-      targetSlugs.set(
-        name,
-        list.split(",").filter((slug) => slug !== ""),
-      );
-    }
+  if (slugs !== undefined) {
+    targetSlugs.set(
+      target,
+      slugs.split(",").filter((slug) => slug !== ""),
+    );
   }
 }
 

@@ -157,6 +157,27 @@ test("a Lever onsite posting is tagged onsite and keeps hostedUrl and applyUrl a
   }
 });
 
+test("an Ashby board slug is requested in lowercase", async () => {
+  const harness = await startCatalogHarness([{ ats: "ashby", token: "Ramp" }]);
+
+  try {
+    const fixtureJobs = readBoardFixture("ashby", ASHBY_BOARD);
+
+    await harness.runBackfillCycle();
+
+    const { urls } = harness.fixture.stats();
+
+    expect(urls).toContain("/posting-api/job-board/ramp?includeCompensation=true");
+    expect(urls.some((url) => url.includes("/posting-api/job-board/Ramp"))).toBe(false);
+
+    const postings = postingsOnBoard(await harness.postings(), harness.boardIds.Ramp);
+
+    expect(postings).toHaveLength(fixtureJobs.length);
+  } finally {
+    await harness.close();
+  }
+});
+
 test("a Lever board over one hundred postings is read page by page", async () => {
   const harness = await startCatalogHarness([{ ats: "lever", token: PAGINATED_LEVER_BOARD }]);
 
