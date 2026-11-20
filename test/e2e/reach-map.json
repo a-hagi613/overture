@@ -46,8 +46,6 @@
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
-        "src/server/catalog/content-hash.ts",
-        "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/catalog/tag-import.ts",
         "src/server/catalog/tag-store.ts",
@@ -155,8 +153,14 @@
     },
     "test/e2e/backup-health-cache.test.ts": {
       "full": false,
-      "paths": ["/__test__/clock/offset", "/api/health"],
-      "modules": ["src/server/testing/turnstile-scenario.ts", "src/shared/turnstile.ts"]
+      "paths": [
+        "/__test__/clock/offset",
+        "/api/health"
+      ],
+      "modules": [
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/turnstile.ts"
+      ]
     },
     "test/e2e/backup-lag.test.ts": {
       "full": false,
@@ -252,8 +256,6 @@
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
-        "src/server/catalog/content-hash.ts",
-        "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/geo.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
@@ -520,6 +522,69 @@
         "/__test__/jobs",
         "/__test__/jobs/enqueue",
         "/__test__/settings",
+        "/api/events"
+      ],
+      "modules": [
+        "src/server/billing/ledger.ts",
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/companies-parquet.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-import.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/matching/applications.ts",
+        "src/server/matching/candidates.ts",
+        "src/server/matching/fx.ts",
+        "src/server/matching/regions.ts",
+        "src/server/matching/score.ts",
+        "src/server/matching/skip-match.ts",
+        "src/server/pipeline/prepare-jobs.ts",
+        "src/server/profile/facts.ts",
+        "src/server/profile/languages.ts",
+        "src/server/profile/personal-crypto.ts",
+        "src/server/profile/skip-companies.ts",
+        "src/server/profile/targets.ts",
+        "src/server/profile/time-zone.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/facts.ts",
+        "src/shared/questions.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/targets.ts",
+        "src/shared/turnstile.ts"
+      ]
+    },
+    "test/e2e/catalog-feed-correctness.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/discovered-boards",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/catalog/retag-open-postings",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs",
+        "/__test__/jobs/enqueue",
+        "/__test__/settings",
+        "/__test__/tag-imports",
         "/api/events"
       ],
       "modules": [
@@ -1266,7 +1331,9 @@
     "test/e2e/inbound-mail-worker.test.ts": {
       "full": false,
       "paths": [],
-      "modules": ["src/shared/inbound-mail.ts"]
+      "modules": [
+        "src/shared/inbound-mail.ts"
+      ]
     },
     "test/e2e/job-survives-restart.test.ts": {
       "full": false,
@@ -1718,8 +1785,6 @@
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
-        "src/server/catalog/content-hash.ts",
-        "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/geo.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
@@ -1764,8 +1829,6 @@
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
-        "src/server/catalog/content-hash.ts",
-        "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/geo.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
