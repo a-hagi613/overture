@@ -4,7 +4,12 @@ import { authClient } from "../lib/auth-client.ts";
 import { PageHeader } from "../components/page-header.tsx";
 
 function dateLine() {
-  return new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  const now = new Date();
+
+  const weekday = now.toLocaleDateString(copy.home.dateLocale, { weekday: "long" });
+  const month = now.toLocaleDateString(copy.home.dateLocale, { month: "long" });
+
+  return `${weekday}, ${String(now.getDate())} ${month}`;
 }
 
 function greetingWord() {

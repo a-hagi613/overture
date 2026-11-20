@@ -125,6 +125,7 @@ export const copy = {
   },
   home: {
     title: "Home",
+    dateLocale: "en-US",
     greetingMorning: "Good morning,",
     greetingAfternoon: "Good afternoon,",
     greetingEvening: "Good evening,",

@@ -42,7 +42,7 @@ export function PageHeader({ lead, titleNode }: { lead: string; titleNode: React
             placeholder={copy.shell.searchPlaceholder}
             type="search"
           />
-          <kbd className="hidden rounded border border-input bg-background px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground min-[768px]:inline">
+          <kbd className="hidden rounded-[2px] border border-input bg-background px-[7px] py-[2px] text-[11px] font-medium leading-[1.2] text-muted-foreground min-[768px]:inline">
             {copy.shell.searchShortcut}
           </kbd>
         </label>
