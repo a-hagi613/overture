@@ -168,7 +168,10 @@
     },
     "test/e2e/backup-health-cache.test.ts": {
       "full": false,
-      "paths": ["/__test__/clock/offset", "/api/health"],
+      "paths": [
+        "/__test__/clock/offset",
+        "/api/health"
+      ],
       "modules": [
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
@@ -269,6 +272,7 @@
         "src/server/profile/resume.ts",
         "src/server/profile/skip-companies.ts",
         "src/server/profile/targets.ts",
+        "src/server/profile/time-zone.ts",
         "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
         "src/shared/facts.ts",
@@ -1063,6 +1067,7 @@
         "src/server/profile/resume.ts",
         "src/server/profile/skip-companies.ts",
         "src/server/profile/targets.ts",
+        "src/server/profile/time-zone.ts",
         "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
         "src/shared/facts.ts",
@@ -1106,6 +1111,7 @@
         "src/server/profile/resume.ts",
         "src/server/profile/skip-companies.ts",
         "src/server/profile/targets.ts",
+        "src/server/profile/time-zone.ts",
         "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
         "src/shared/facts.ts",
@@ -1150,6 +1156,7 @@
         "src/server/profile/resume.ts",
         "src/server/profile/skip-companies.ts",
         "src/server/profile/targets.ts",
+        "src/server/profile/time-zone.ts",
         "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
         "src/shared/facts.ts",
@@ -1237,6 +1244,7 @@
         "src/server/config/env.ts",
         "src/server/profile/languages.ts",
         "src/server/profile/skip-companies.ts",
+        "src/server/profile/time-zone.ts",
         "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
         "src/shared/tag-taxonomy.ts",
@@ -1453,6 +1461,38 @@
         "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
         "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
+      ]
+    },
+    "test/e2e/time-zone-pending.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/ledger/sample",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/turnstile",
+        "/__test__/user/name",
+        "/api",
+        "/api/profile/settings"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/server/profile/languages.ts",
+        "src/server/profile/skip-companies.ts",
+        "src/server/profile/time-zone.ts",
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/targets.ts",
         "src/shared/turnstile.ts"
       ]
     },
