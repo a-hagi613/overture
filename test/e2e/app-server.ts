@@ -9,9 +9,14 @@ export interface AppServer {
   databasePath: string;
   stop: () => Promise<void>;
   restart: () => Promise<void>;
+  crash: () => Promise<void>;
 }
 
 async function waitForExit(child: ChildProcess) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return;
+  }
+
   await new Promise<void>((resolve) => {
     child.once("exit", () => {
       resolve();
@@ -86,6 +91,10 @@ export async function startAppServer(
 
       child = nextChild;
       url = nextUrl;
+    },
+    crash: async () => {
+      child.kill("SIGKILL");
+      await waitForExit(child);
     },
   };
 
