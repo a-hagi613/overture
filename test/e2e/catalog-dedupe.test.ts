@@ -14,6 +14,7 @@ const fixtureBoardSchema = z.object({
     z.object({
       id: z.union([z.number(), z.string()]).transform(String),
       title: z.string().default(""),
+      location: z.object({ name: z.string().nullish() }).nullish(),
     }),
   ),
 });
@@ -51,6 +52,7 @@ test("duplicate roles across one company's boards share a dedupe key and show on
 
     harness.fixture.mutateBoard(DUPLICATE_BOARD, {
       titleUpdates: { [duplicateJob.id]: mainJob.title },
+      locationUpdates: { [duplicateJob.id]: mainJob.location?.name ?? "" },
     });
 
     await harness.runBackfillCycle();

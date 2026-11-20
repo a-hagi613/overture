@@ -7,6 +7,8 @@ import { htmlToText } from "./html-to-text.ts";
 import { normalizeApplyUrl, normalizeTitle } from "./normalize.ts";
 import { contentHash } from "./content-hash.ts";
 import { dedupeKeyFor } from "./dedupe-key.ts";
+import { storePostingTags, salaryPeriodForColumn } from "./tag-store.ts";
+import { tagPosting } from "./tag-rules.ts";
 
 import type { GreenhouseFeed, GreenhouseFeedJob, GreenhouseJobDetail } from "./greenhouse-feed.ts";
 
@@ -173,12 +175,25 @@ async function syncPostings(
     const detail = detailsByJobId.get(job.id) ?? null;
     const descriptionText = htmlToText(detail?.contentHtml ?? null);
     const titleNorm = normalizeTitle(job.title);
+    const locationRaw = detail?.locationName ?? job.locationName;
+
+    const tags = tagPosting({
+      title: job.title,
+      department: detail?.department ?? null,
+      locationRaw,
+      workplaceType: null,
+      isRemote: null,
+      employmentType: null,
+      language: job.language,
+      salary: null,
+      descriptionText: descriptionText === null ? null : descriptionText.slice(0, 20_000),
+    });
 
     const dedupeKey = dedupeKeyFor({
       companyId: board.companyId,
       titleNorm,
-      countryCode: null,
-      city: null,
+      countryCode: tags.countryCode,
+      city: tags.city,
     });
 
     const values = {
@@ -188,8 +203,17 @@ async function syncPostings(
       title: job.title,
       titleNorm,
       department: detail?.department ?? null,
-      locationRaw: detail?.locationName ?? job.locationName,
-      language: job.language,
+      locationRaw,
+      countryCode: tags.countryCode,
+      region: tags.region,
+      city: tags.city,
+      language: tags.language,
+      workplace: tags.workplace,
+      employmentType: tags.employmentType,
+      salaryMinMinor: tags.salaryMinMinor,
+      salaryMaxMinor: tags.salaryMaxMinor,
+      salaryCurrency: tags.salaryCurrency,
+      salaryPeriod: salaryPeriodForColumn(tags.salaryPeriod),
       postedAt: parseMs(job.firstPublished),
       sourceUpdatedAt: parseMs(job.updatedAt),
       lastSeenAt: now,
@@ -198,6 +222,8 @@ async function syncPostings(
       dedupeKey,
       descriptionGz: descriptionText === null ? null : gzip(descriptionText),
       descriptionHash: descriptionText === null ? null : contentHash(descriptionText),
+      tagSource: "rules" as const,
+      taggedAt: now,
     };
 
     if (existing === undefined) {
@@ -218,6 +244,8 @@ async function syncPostings(
         .at(0);
 
       if (inserted !== undefined) {
+        storePostingTags(db, inserted.id, tags);
+
         report.added += 1;
       }
 
@@ -225,6 +253,8 @@ async function syncPostings(
     }
 
     db.update(postings).set(values).where(eq(postings.id, existing.id)).run();
+
+    storePostingTags(db, existing.id, tags);
 
     report.updated += 1;
   }

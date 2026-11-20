@@ -8,20 +8,40 @@ import type { Clock } from "../platform/ports/clock.ts";
 import { createSseStream } from "../platform/sse/stream.ts";
 import { getAllKillSwitches, getAllSettings, getSetting } from "../platform/settings/index.ts";
 import { searchPostings } from "../platform/search/search.ts";
+import { EMPLOYMENT_TYPES, SENIORITIES, WORKPLACES } from "../../shared/tag-taxonomy.ts";
 
 const searchQuerySchema = z.object({
   q: z.string().min(1).max(200),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+  role: z.string().min(1).max(60).optional(),
+  seniority: z.enum(SENIORITIES).optional(),
+  workplace: z.enum(WORKPLACES).optional(),
+  location: z.string().min(1).max(120).optional(),
+  employmentType: z.enum(EMPLOYMENT_TYPES).optional(),
 });
 
 export function createApiRoutes(db: AppDatabase, clock: Clock) {
   const routes = new Hono();
 
   routes.get("/search", zValidator("query", searchQuerySchema), (context) => {
-    const { q, limit } = context.req.valid("query");
+    const { q, limit, role, seniority, workplace, location, employmentType } =
+      context.req.valid("query");
 
     const startedAt = performance.now();
-    const hits = searchPostings(db, { text: q, openOnly: true, limit });
+
+    const hits = searchPostings(db, {
+      text: q,
+      openOnly: true,
+      limit,
+      filters: {
+        role: role ?? null,
+        seniority: seniority ?? null,
+        workplace: workplace ?? null,
+        location: location ?? null,
+        employmentType: employmentType ?? null,
+      },
+    });
+
     const durationMs = performance.now() - startedAt;
 
     return context.json({

@@ -8,7 +8,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { JobHandlers } from "../platform/jobs/run-due.ts";
 import type { AdjustableClock } from "../platform/ports/clock.ts";
 
-import { bgJobs, companies, companyBoards, postings } from "../platform/db/schema.ts";
+import { bgJobs, companies, companyBoards, postingTags, postings } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
@@ -222,6 +222,12 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
       return context.json(report);
     },
   );
+
+  routes.get("/catalog/posting-tags", (context) => {
+    const rows = db.select().from(postingTags).all();
+
+    return context.json({ postingTags: rows });
+  });
 
   return routes;
 }

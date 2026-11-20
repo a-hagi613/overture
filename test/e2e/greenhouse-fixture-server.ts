@@ -38,6 +38,7 @@ export interface FixtureStats {
 
 export interface BoardMutation {
   titleUpdates?: Record<string, string>;
+  locationUpdates?: Record<string, string>;
   updatedAtUpdates?: Record<string, string>;
   removeJobIds?: string[];
   addJobs?: {
@@ -263,6 +264,12 @@ export async function startGreenhouseFixtureServer() {
 
         if (title !== undefined) {
           job.title = title;
+        }
+
+        const locationName = mutation.locationUpdates?.[job.id];
+
+        if (locationName !== undefined) {
+          job.locationName = locationName;
         }
 
         const updatedAt = mutation.updatedAtUpdates?.[job.id];
