@@ -19,12 +19,14 @@ echo "[chain $(date +%H:%M:%S)] refreshing cookies from the Orca browser"
 $PY scrape/hiringcafe.py cookies >/dev/null 2>&1 \
   || echo "[chain] WARNING: cookie refresh failed (browser tab unavailable) — using data/cookies.txt as-is"
 
+sleep 1200   # CF cool-down: a 403 means the IP budget is exhausted; silence refills it
+
 echo "[chain $(date +%H:%M:%S)] week enumeration (2026-11-13 .. 2026-11-20)"
 $PY -u scrape/hiringcafe.py enumerate --from 2026-11-13 --to 2026-11-20 \
-    --rps 0.8 --window 80 --window-s 600 >> data/enumerate.log 2>&1
+    --rps 0.2 --window 20 --window-s 600 >> data/enumerate.log 2>&1
 
 echo "[chain $(date +%H:%M:%S)] description mop-up: no-sign-in ATS sources, this week only"
-$PY -u scrape/mcp_desc.py --all --rps 1.5 --workers 4 --since 2026-11-13 --sources \
+$PY -u scrape/mcp_desc.py --all --rps 0.7 --workers 4 --since 2026-11-13 --sources \
 	grnhse,lever,eu_lever,ashby,bamboohr,smartrecruiters,workable,recruitee,jazzhr,rippling,teamtailor,breezy,jobvite,pinpoint \
 	>> data/mcp_desc.log 2>&1
 
