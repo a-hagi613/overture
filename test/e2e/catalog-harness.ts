@@ -59,7 +59,7 @@ export interface CatalogHarness {
 }
 
 export async function startCatalogHarness(boardTokens: string[]): Promise<CatalogHarness> {
-  const fixture = startGreenhouseFixtureServer();
+  const fixture = await startGreenhouseFixtureServer();
   const directory = mkdtempSync(join(tmpdir(), "overture-catalog-"));
   const databasePath = join(directory, "overture.db");
 
@@ -98,7 +98,10 @@ export async function startCatalogHarness(boardTokens: string[]): Promise<Catalo
 }
 
 export async function postBackfillAndRun(harness: CatalogHarness): Promise<void> {
-  await postJson(`${harness.app.url}/__test__/jobs/enqueue-backfill`, {});
+  await postJson(`${harness.app.url}/__test__/jobs/enqueue`, {
+    kind: "catalog.backfill",
+    payload: "{}",
+  });
   await postJson(`${harness.app.url}/__test__/jobs/run-due`, {});
 }
 

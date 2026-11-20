@@ -69,15 +69,14 @@ function hashBody(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-const arrivalTimes: number[] = [];
-const paths: string[] = [];
-
-export function startGreenhouseFixtureServer(): GreenhouseFixtureServer {
+export async function startGreenhouseFixtureServer(): Promise<GreenhouseFixtureServer> {
   const boards = new Map<string, MutableJob[]>();
   const removedJobIds = new Set<string>();
   const notFoundTokens = new Set<string>();
-  const detailCounts: Record<string, number> = {};
   const state = { requestCount: 0, maxInFlight: 0, inFlight: 0, delayMs: 0 };
+  const detailCounts: Record<string, number> = {};
+  const arrivalTimes: number[] = [];
+  const paths: string[] = [];
 
   for (const entry of readdirSync(join(process.cwd(), "test/e2e/fixtures/greenhouse"), {
     withFileTypes: true,
@@ -153,20 +152,14 @@ export function startGreenhouseFixtureServer(): GreenhouseFixtureServer {
     const jobMatch = /^\/v1\/boards\/(?<token>[A-Za-z0-9_-]+)\/jobs\/(?<jobId>[A-Za-z0-9_-]+)$/u.exec(pathname);
 
     if (jobMatch?.groups === undefined) {
-      finish(404, JSON.stringify({ error: "not found" }));
+      finish(404, JSON.stringify({ error: "unknown path" }));
 
       return;
     }
 
+    const token = jobMatch.groups.token ?? "";
     const jobId = jobMatch.groups.jobId ?? "";
-
-    if (notFoundTokens.has(jobId)) {
-      finish(404, JSON.stringify({ error: "not found" }));
-
-      return;
-    }
-
-    const jobs = boards.get(jobMatch.groups.token ?? "") ?? [];
+    const jobs = boards.get(token) ?? [];
     const job = jobs.find((candidate) => candidate.id === jobId);
 
     if (job === undefined) {
@@ -179,10 +172,14 @@ export function startGreenhouseFixtureServer(): GreenhouseFixtureServer {
     finish(200, JSON.stringify(job));
   });
 
-  void server.listen(0, "127.0.0.1");
+  await new Promise<void>((resolveListen) => {
+    server.listen(0, "127.0.0.1", resolveListen);
+  });
+  const address = server.address();
+  const port = typeof address === "object" && address !== null ? address.port : 0;
 
   return {
-    url: "",
+    url: `http://127.0.0.1:${String(port)}`,
     stop: () => {
       server.close();
     },
