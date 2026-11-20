@@ -676,18 +676,27 @@ function isKnownModule(map: z.infer<typeof reachMapSchema>, file: string) {
   return Object.values(map.tests).some((test) => test.modules.includes(file));
 }
 
-function forcedFull(map: z.infer<typeof reachMapSchema>, changed: readonly string[]) {
-  return changed.some(
+function forcedFull(map: z.infer<typeof reachMapSchema>, touched: readonly string[]) {
+  return touched.some(
     (file) =>
-      !isIgnored(file) &&
-      (isAlwaysFull(file) ||
-        (!file.endsWith(".test.ts") && map.tests[file] === undefined && !isKnownModule(map, file))),
+      isAlwaysFull(file) ||
+      (!file.endsWith(".test.ts") && map.tests[file] === undefined && !isKnownModule(map, file)),
   );
 }
 
-function selectionReason(isMain: boolean, forced: boolean, selected: number, total: number) {
+function selectionReason(
+  isMain: boolean,
+  forced: boolean,
+  touched: number,
+  selected: number,
+  total: number,
+) {
   if (isMain) {
     return "a push to main runs the full suite";
+  }
+
+  if (touched === 0) {
+    return "the diff touches only documentation, so no e2e file runs";
   }
 
   if (forced) {
@@ -713,27 +722,34 @@ function plan() {
     ...new Set([...knownTests, ...Object.keys(map.tests), ...changedTests]),
   ].toSorted((left, right) => left.localeCompare(right));
 
+  const touched = changed.filter((file) => !isIgnored(file));
   const isMain = base === null;
-  const forced = Object.keys(map.tests).length === 0 || forcedFull(map, changed);
+  const forced = Object.keys(map.tests).length === 0 || forcedFull(map, touched);
   const full = isMain || forced;
 
-  const selected = full
-    ? allTests
-    : allTests.filter(
-        (test) =>
-          changedTests.includes(test) ||
-          map.tests[test]?.full === true ||
-          (map.tests[test]?.modules ?? []).some((module) => changed.includes(module)),
-      );
+  let selected = allTests.filter(
+    (test) =>
+      changedTests.includes(test) ||
+      map.tests[test]?.full === true ||
+      (map.tests[test]?.modules ?? []).some((module) => touched.includes(module)),
+  );
+
+  if (full) {
+    selected = allTests;
+  }
+
+  if (touched.length === 0 && !isMain) {
+    selected = [];
+  }
 
   const container =
-    isMain || changed.some((file) => containerPatterns.some((pattern) => pattern.test(file)));
+    isMain || touched.some((file) => containerPatterns.some((pattern) => pattern.test(file)));
 
   const planBody = planSchema.parse({
     version: 1,
     full,
     container,
-    reason: selectionReason(isMain, forced, selected.length, allTests.length),
+    reason: selectionReason(isMain, forced, touched.length, selected.length, allTests.length),
     selected,
     shards: assignShards(selected, readTimings().seconds, shardCount),
   });
