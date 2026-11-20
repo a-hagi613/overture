@@ -8,6 +8,7 @@ dockerfile = "Dockerfile"
 
 [env]
 NODE_ENV = "production"
+APP_ORIGIN = "https://tryoverture.com"
 PORT = "3000"
 DATABASE_PATH = "/data/app.sqlite"
 OBJECT_STORE_ROOT = "/data/objects"
