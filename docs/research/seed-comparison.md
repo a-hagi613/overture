@@ -255,3 +255,15 @@ so its listing is empty — not an error).
 
 No new drizzle migration: the loader writes data into #14's existing `company_boards` schema,
 and `db:verify` passes unchanged (9 STRICT tables, migration 0003 at `when` 1795230000002).
+
+## 10. M1-09 update: one-transaction load, pinned fetch, one-command backfill
+
+For #16 the loader was made production-ready without changing its contract: the whole load now runs in one
+transaction (a fresh full-dataset load of 13,911 boards lands in 11.8 s wall, an idempotent second run in 2.3 s,
+both measured 2026-11-20 on the dev box), the pin checks live once in
+`src/server/catalog/companies-parquet.ts` and are shared by `scripts/fetch-seed.ts` (which downloads the pinned
+manifest and parquet for the orchestrator) and the loader. The backfill over all boards is started with
+`scripts/enqueue-backfill.ts`, which also prints the per-ATS request counts and the duration estimate at
+2 req/s per ATS. The measured numbers, the production commands and the timing write-down (a board pass of about
+an hour, a first full pass of about a day greenhouse-bound on per-job details) are in
+`docs/research/m1-09-runbook.md`; the census contract and its recorded-fixture e2e are in #16's PR.

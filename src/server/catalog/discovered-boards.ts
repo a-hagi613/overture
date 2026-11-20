@@ -112,54 +112,58 @@ export function loadDiscoveredBoards(db: AppDatabase, clock: Clock, rows: Discov
     reusedCompanies: 0,
   };
 
-  for (const board of boards) {
-    const existing = db
-      .select()
-      .from(companyBoards)
-      .where(and(eq(companyBoards.ats, board.ats), eq(companyBoards.boardToken, board.boardToken)))
-      .get();
+  db.transaction((tx) => {
+    for (const board of boards) {
+      const existing = tx
+        .select()
+        .from(companyBoards)
+        .where(
+          and(eq(companyBoards.ats, board.ats), eq(companyBoards.boardToken, board.boardToken)),
+        )
+        .get();
 
-    if (existing !== undefined) {
-      report.existingBoards += 1;
+      if (existing !== undefined) {
+        report.existingBoards += 1;
 
-      continue;
-    }
+        continue;
+      }
 
-    const nameNorm = board.companyName.toLowerCase();
-    const company = db.select().from(companies).where(eq(companies.nameNorm, nameNorm)).get();
-    const companyId = company?.id ?? crypto.randomUUID();
+      const nameNorm = board.companyName.toLowerCase();
+      const company = tx.select().from(companies).where(eq(companies.nameNorm, nameNorm)).get();
+      const companyId = company?.id ?? crypto.randomUUID();
 
-    if (company === undefined) {
-      db.insert(companies)
+      if (company === undefined) {
+        tx.insert(companies)
+          .values({
+            id: companyId,
+            name: board.companyName,
+            nameNorm,
+            createdAt: clock.now(),
+          })
+          .run();
+
+        report.createdCompanies += 1;
+      } else {
+        report.reusedCompanies += 1;
+      }
+
+      tx.insert(companyBoards)
         .values({
-          id: companyId,
-          name: board.companyName,
-          nameNorm,
+          id: crypto.randomUUID(),
+          companyId,
+          ats: board.ats,
+          boardToken: board.boardToken,
+          status: "active",
+          source: "discovered",
+          notFoundPolls: 0,
           createdAt: clock.now(),
         })
+        .onConflictDoNothing()
         .run();
 
-      report.createdCompanies += 1;
-    } else {
-      report.reusedCompanies += 1;
+      report.createdBoards += 1;
     }
-
-    db.insert(companyBoards)
-      .values({
-        id: crypto.randomUUID(),
-        companyId,
-        ats: board.ats,
-        boardToken: board.boardToken,
-        status: "active",
-        source: "discovered",
-        notFoundPolls: 0,
-        createdAt: clock.now(),
-      })
-      .onConflictDoNothing()
-      .run();
-
-    report.createdBoards += 1;
-  }
+  });
 
   return report;
 }

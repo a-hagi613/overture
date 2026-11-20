@@ -169,7 +169,7 @@ src/
     main.ts          process entry: http + workers + scheduler, graceful shutdown
   web/               React app (routes/, features/, components/ui = shadcn)
 drizzle/             generated migrations
-scripts/             import-v1.ts, census.ts, record-feeds.ts, restore-drill.ts
+scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, restore-drill.ts
 test/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
                      (the six unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
@@ -323,8 +323,14 @@ Discovery runs from `overture-web` directly (no proxy).
 
 ### 6.2 Backfill and trickle
 
-1. **Seed**: `scripts/import-v1.ts` loads `company_boards` from the one-time v1 export (§18) — about 22,800 boards.
-2. **Backfill**: one pass over every active board inside per-ATS limits.
+1. **Seed**: `scripts/fetch-seed.ts --dir <seed-dir>` downloads the pinned ats-scrapers manifest and
+   `companies.parquet` (both sha256-pinned in `src/server/catalog/companies-parquet.ts`), then
+   `scripts/load-discovered-boards.ts` loads the dataset's greenhouse, lever and ashby rows as
+   `source='discovered'` — 13,911 boards, in one transaction, idempotent. v1 boards are not imported (the
+   measured comparison is `docs/research/seed-comparison.md`; the runbook is `docs/research/m1-09-runbook.md`).
+2. **Backfill**: one pass over every active board inside per-ATS limits; on production it is started with
+   `bun run scripts/enqueue-backfill.ts --db /data/app.sqlite`, which enqueues the `catalog.backfill` job and
+   prints the per-ATS request counts and the duration estimate at the 2 req/s per-ATS pace.
 3. **Trickle**: each board gets `next_poll_at` from its activity: changed in last 24 h → 30 min; last 7 days → 2 h;
    otherwise → 12 h; errors → exponential backoff (cap 48 h). "Changed" is the feed's job `updated_at` when the
    feed has one (Greenhouse) and the newest posting's publish time when it does not (Lever, Ashby). `404` twice →
@@ -372,8 +378,11 @@ Order of precedence for role/seniority: `import` (hiring.cafe file, if the owner
 
 ### 6.5 Census
 
-`scripts/census.ts` runs on `overture-web` against the v2 catalog after the first backfill; prints only aggregates: postings per ATS/country/workplace, top 2,000 title_norm with counts, department
-frequency, share classified by rules at each threshold. Output committed to `docs/research/census.md`.
+`scripts/census.ts --db <path> --out docs/research/census.md` runs on `overture-web` against the v2 catalog after the
+first backfill; prints only aggregates: board counts by ATS and status, Postings per ATS/country/workplace, the top
+50 normalized titles with counts, department frequency, and the share classified by rules per tag dimension. It
+contains no personal data: no apply URLs, no person names, no emails, no descriptions; company names appear only
+as top-20 aggregate Posting counts. Output committed to `docs/research/census.md`.
 
 ---
 
@@ -914,7 +923,7 @@ v1 runs on Fly app `ai-auto-apply` (volume `data`, yyz). In order:
 2. Export from the v1 database, read-only: `company_boards`, the owner's answer-bank tables and `learned_answers`
    (`docs/SALVAGE.md`). The export is encrypted and kept off the repository; boards are not personal data.
 3. Stop the v1 machines. Nothing sends from v1 again.
-4. Create `overture-web` with a fresh v2 database; `scripts/import-v1.ts` loads the export. No v1 schema migrates.
+4. Create `overture-web` with a fresh v2 database seeded from the ats-scrapers dataset (§6.2); the owner's exported answer-bank and learned answers import with the Facts work (#26). No v1 schema migrates.
 5. Destroy `ai-auto-apply` and its snapshot after a week of the owner using v2.
 
 ## 19. Open risks
