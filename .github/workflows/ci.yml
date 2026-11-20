@@ -105,6 +105,7 @@ jobs:
             -e LINKEDIN_CLIENT_SECRET=e2e-linkedin-client-secret \
             -e OWNER_EMAIL=maya.okafor@example.com \
             -e TURNSTILE_SECRET=1x0000000000000000000000000000000AA \
+            -e TURNSTILE_HOSTNAMES=tryoverture.com \
             -e TURNSTILE_SITE_KEY=1x00000000000000000000AA \
             -p 127.0.0.1:3100:3000 \
             overture:ci

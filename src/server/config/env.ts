@@ -90,7 +90,9 @@ const envSchema = z
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV === "production") {
-      const hostnames = value.TURNSTILE_HOSTNAMES ?? turnstileDefaultHostnames(value.APP_ORIGIN);
+      const hostnames =
+        value.TURNSTILE_HOSTNAMES ??
+        (value.APP_ORIGIN === undefined ? [] : turnstileDefaultHostnames(value.APP_ORIGIN));
 
       for (const local of localHostnames) {
         if (hostnames.includes(local)) {
