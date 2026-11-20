@@ -217,7 +217,7 @@ updated_at) · `session` · `account` (provider: google, linkedin, credential) �
 |---|---|
 | `user_keys` | user_id PK, wrapped_dek BLOB, master_key_version INTEGER, created_at. **Deleting this row is crypto-shredding.** |
 | `profiles` | user_id PK, running, pause_reason CHECK IN ('user','onboarding','no_resume','plan_ended','payment_failed','suspended','no_mailbox') NULL, timezone (IANA, taken from the browser at sign-up; the first zone saved applies at once; a later change is stored in pending_timezone with pending_timezone_at = now + `limits.timezone_change_days` (7) and the current zone stays in force until then; every read of the zone applies a due pending change first, through one function), pending_timezone, pending_timezone_at, languages TEXT JSON (ISO 639-1), auto_threshold CHECK IN (50,60) DEFAULT 60, onboarding_step, onboarded_at, digest_enabled DEFAULT 1, push_prompted_at, consent_version, consent_at, created_at, updated_at. M1-14 creates the row with `languages`, `timezone` and the timestamps; the remaining columns arrive with the slices that read them |
-| `facts` | id, user_id, key, value_enc, source CHECK IN ('resume','user','review','import'), confirmed, revision, updated_at; UNIQUE(user_id,key). Keys from the fact catalog (§7.1) or `q:<question_id>` for learned answers |
+| `facts` | id, user_id, key, scope ('' or an ISO 3166-1 alpha-2 country), value_enc, source CHECK IN ('resume','user','review','import'), confirmed, revision, updated_at; UNIQUE(user_id,key,scope). Keys from the fact catalog (§7.1) or `q:<question_id>` for learned answers. `work_auth` and `sponsorship_required` are country-scoped; every other key has `scope=''` |
 | `targets` | user_id PK, roles JSON (strings as typed), seniorities JSON, workplaces JSON, locations JSON (strings as typed), employment_types JSON, salary_floor_minor NULL, salary_currency NULL, salary_period CHECK IN ('year','month','hour') NULL, version INTEGER, updated_at |
 | `skip_companies` | id, user_id, company_id NULL, name, name_norm, domain NULL, reason CHECK IN ('current_employer','user'), created_at; UNIQUE(user_id,name_norm). Matching rules in §8.1 |
 | `resumes` | id, user_id, object_key, sha256, bytes, pages, filename_enc, text_enc, parsed_with CHECK IN ('unpdf','llm'), is_current, uploaded_at; partial UNIQUE(user_id) WHERE is_current=1 |
@@ -251,7 +251,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `application_snapshots` | application_id PK, user_id, posting_url, posting_title, description_hash, answers_enc (JSON array `{question_id, label, answer, fact_key, fact_revision, kind, resume_line_ids}`), cover_letter_enc NULL (JSON `[{sentence, resume_line_ids}]`), resume_id, resume_sha256, consent_version, provider, provider_session_id, submitted_at, confirmed_by CHECK IN ('page','email'), cost_micros. **Immutable**: a `BEFORE UPDATE` trigger always raises; a `BEFORE DELETE` trigger raises `WHEN EXISTS (SELECT 1 FROM user WHERE id = OLD.user_id)`, so rows go only when the user row is gone (account deletion cascade). Flow 29 proves both |
 | `application_events` | id, application_id, user_id, at, kind CHECK IN ('status','stage','email','checkin','note'), from_value, to_value, source CHECK IN ('system','user','email','checkin','admin'), detail JSON; the card timeline and stage history |
 | `attempts` | id, application_id, user_id, n, provider, provider_session_id, started_at, lease_until, ended_at NULL, submit_clicked_at NULL, submit_response_status INTEGER NULL, outcome CHECK IN ('sent','unconfirmed','captcha_blocked','code_timeout','posting_closed','form_changed','blocked','upload_failed','duplicate','needs_review','provider_error','timeout','crash','interrupted') NULL, browser_ms, proxy_bytes, captcha_seen, code_used, cost_micros, error_code NULL |
-| `reviews` | id, user_id, question_id, fact_key NULL, prompt, field_type, options JSON, status CHECK IN ('open','answered','dismissed'), created_at, resolved_at; UNIQUE(user_id,question_id) WHERE status='open' |
+| `reviews` | id, user_id, question_id, fact_key NULL, scope ('' or an ISO 3166-1 alpha-2 country), prompt, field_type, options JSON, status CHECK IN ('open','answered','dismissed'), created_at, resolved_at; UNIQUE(user_id,question_id,scope) WHERE status='open' |
 | `review_applications` | review_id, application_id; PK(review_id,application_id) |
 | `checkins` | id, application_id UNIQUE, user_id, due_at, status CHECK IN ('open','answered','expired'), answer NULL, created_at |
 | `plan_cache` | id, ats, form_signature, plan JSON, hits, failures, updated_at; UNIQUE(ats,form_signature) |
@@ -432,7 +432,11 @@ as top-20 aggregate Posting counts. Output committed to `docs/research/census.md
 | 2 (encouraged) | preferred_name, github_url, website_url, skills, certifications, security_clearance, drivers_license, spoken_languages_levels, voice_sample, cover_letter_template, eeo_gender, eeo_race_ethnicity, eeo_hispanic_latino, eeo_veteran, eeo_disability (EEO opt-in only) | Profile → "Strengthen your profile", each shows "unlocks N queued jobs" |
 | 3 (learned) | `q:<question_id>` | created by answering a Review; reused for every later application asking that question |
 
-Each fact has `revision`; snapshots record the revision used.
+Each fact has `revision`; snapshots record the revision used. `work_auth` and `sponsorship_required` are stored per
+country, with `scope` set to the ISO country code. A question that names a country is answered only from that
+country's Fact; with none it opens a Review for that country. A question that names no country is answered from the
+unscoped Fact; with none, from the country-scoped Facts only when they all agree, otherwise it opens a Review that
+picks none. A question naming several countries is answered only from the unscoped Fact.
 
 ### 7.2 Resume
 
@@ -457,7 +461,8 @@ Each fact has `revision`; snapshots record the revision used.
 
 A posting is a candidate for a user when all hold: open; tags intersect `targets.roles` (or subroles) and
 `seniorities`; workplace ∈ targets; location matches a target location (a remote posting matches when its country
-is a target country, or when it names no country and the user has `work_auth=yes` for the company's country; a
+is a target country, or when it names no country and the user has an unscoped `work_auth=yes` (a country-scoped
+answer is never used for a posting that names no country); a
 remote posting restricted to a region, e.g. "Remote, EU", matches only target countries in that region); employment type ∈ targets; posting language ∈ `languages`;
 salary ≥ floor when the posting lists salary (converted with `fx_rates`; postings without salary are never excluded);
 company not skipped (below); no other application by this user to this company in status preparing, needs_review,
@@ -511,9 +516,11 @@ Job `application.prepare`:
    `{fact_key | 'open_text' | 'consent' | 'skip' | 'unknown'}` from the fixed fact list. Result stored on `questions`.
    Posting text passes the posting guard (`docs/SALVAGE.md`) first and never decides a factual answer.
 3. Answer: `fact` → saved fact value (formatted to the field type/options; select options matched by normalised
-   text, then synonyms table, else unknown); `open_text` → Haiku from resume text + posting (≤ 120 words unless the
-   field states a limit), returned as `[{sentence, resume_line_ids}]` with the same rule as cover letters: a sentence
-   that makes a factual claim without a resume line is removed; `consent` → only the Overture-standard consents the user accepted (privacy notice /
+   text, then synonyms table, else unknown). A `work_auth` or `sponsorship_required` answer is country-scoped
+   (§7.1): the question's country decides which Fact may answer it, and another country's Fact never does.
+   `open_text` → Haiku from resume text + posting (≤ 120 words unless the field states a limit), returned as
+   `[{sentence, resume_line_ids}]` with the same rule as cover letters: a sentence that makes a factual claim
+   without a resume line is removed; `consent` → only the Overture-standard consents the user accepted (privacy notice /
    data processing acknowledgements), never marketing opt-ins; `skip` → blank.
 4. Cover letter only if the form has a cover-letter field: ≤ 200 words, in the posting's language, generated from
    resume + posting + the user's cover-letter template (its fixed text kept verbatim, its blanks filled) or, without a
@@ -531,9 +538,10 @@ Job `application.prepare`:
 
 ### 8.4 Reviews
 
-- One open Review per (user, question). Each lists the applications it blocks ("unlocks 4 jobs"), grouped by that
-  count and filterable by the question's topic (availability, experience, work authorisation, links, languages,
-  identity, EEO, other).
+- One open Review per (user, question, country scope). A country-scoped Review saves its answer to that country's
+  Fact, so answering "authorised to work in Canada" never answers a question about the UK. Each lists the
+  applications it blocks ("unlocks 4 jobs"), grouped by that count and filterable by the question's topic
+  (availability, experience, work authorisation, links, languages, identity, EEO, other).
 - Answering saves the fact (Tier 3 `q:<id>` or the mapped fact key), re-runs `application.prepare` on every attached
   application, and closes the Review. Dismiss → attached applications `skipped` (`review_dismissed`).
 - A posting that closes while waiting detaches; a Review with no attachments auto-dismisses.

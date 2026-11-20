@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 
 import type { QuestionFieldType } from "../../shared/questions.ts";
 
+import { countryCodesNamedIn } from "./geo.ts";
+
 const AFFIRMATIVE = new Set([
   "1",
   "agree",
@@ -71,6 +73,17 @@ export function normalizeQuestionText(text: string, companyNames: readonly strin
 
 export function questionVariantHash(text: string, companyNames: readonly string[] = []) {
   return createHash("sha256").update(normalizeQuestionText(text, companyNames)).digest("hex");
+}
+
+const USER_COUNTRY_REFERENCE =
+  /\b(?:country|countries|location|locations|place|places)\s*(?:\(s\)|s)?\s+(?:where|in which)\s+you\s+(?:currently\s+)?(?:live|reside|are based)\b|\b(?:location|locations)\s*\(s\)\s+you\s+(?:selected|chose)\b|\b(?:country|countries|location|locations)\s+you\s+(?:selected|chose)\b|\bcountry of residence\b|\bwhich country (?:do\s+)?you\s+(?:currently\s+)?(?:live|reside)\b/u;
+
+export function countriesNamedIn(questionText: string) {
+  return countryCodesNamedIn(questionText);
+}
+
+export function referencesUserCountry(questionText: string) {
+  return USER_COUNTRY_REFERENCE.test(questionText.toLowerCase());
 }
 
 export function normalizeOptionText(text: string) {

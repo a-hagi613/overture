@@ -13,6 +13,7 @@ export interface OpenReviewInput {
   prompt: string;
   fieldType: QuestionFieldType;
   options: string[];
+  scope: string;
 }
 
 export function ensureOpenReview(db: AppDatabase, clock: Clock, input: OpenReviewInput) {
@@ -23,6 +24,7 @@ export function ensureOpenReview(db: AppDatabase, clock: Clock, input: OpenRevie
       and(
         eq(reviews.userId, input.userId),
         eq(reviews.questionId, input.questionId),
+        eq(reviews.scope, input.scope),
         eq(reviews.status, "open"),
       ),
     )
@@ -40,6 +42,7 @@ export function ensureOpenReview(db: AppDatabase, clock: Clock, input: OpenRevie
       userId: input.userId,
       questionId: input.questionId,
       factKey: input.factKey,
+      scope: input.scope,
       prompt: input.prompt,
       fieldType: input.fieldType,
       options: JSON.stringify(input.options),
@@ -65,6 +68,7 @@ export function openReviewsForApplication(db: AppDatabase, userId: string, appli
       fieldType: reviews.fieldType,
       options: reviews.options,
       factKey: reviews.factKey,
+      scope: reviews.scope,
     })
     .from(reviews)
     .innerJoin(reviewApplications, eq(reviewApplications.reviewId, reviews.id))

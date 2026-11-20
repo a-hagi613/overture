@@ -78,6 +78,10 @@ _Avoid_: Answer Bank, Memory Base, saved answer (as a place)
 **Tier**:
 How a Fact is gathered: Tier 1 in onboarding, Tier 2 under "Strengthen your profile", Tier 3 learned from a Review.
 
+**Country scope**:
+The country a country-scoped Fact applies to, as an ISO country code. Work authorisation and sponsorship are
+country-scoped: a Fact for one country never answers a question about another.
+
 **Question catalog**:
 Every application question Overture has seen, shared across users without their answers, each linked to the Fact that answers it.
 

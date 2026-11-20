@@ -43,6 +43,14 @@ export type Tier1FactKey = (typeof TIER_1_FACT_KEYS)[number];
 
 export type FactKey = (typeof FACT_KEYS)[number];
 
+export const COUNTRY_SCOPED_FACT_KEYS = ["work_auth", "sponsorship_required"] as const;
+
+export type CountryScopedFactKey = (typeof COUNTRY_SCOPED_FACT_KEYS)[number];
+
+export function isCountryScopedFactKey(key: string): key is CountryScopedFactKey {
+  return COUNTRY_SCOPED_FACT_KEYS.some((candidate) => candidate === key);
+}
+
 export const factLabels: Record<FactKey, string> = {
   legal_name: "Legal name",
   email: "Job-search email",

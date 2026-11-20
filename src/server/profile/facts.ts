@@ -6,12 +6,14 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { PersonalCrypto } from "./personal-crypto.ts";
 
 import { facts } from "../platform/db/schema.ts";
-import { FACT_KEYS } from "../../shared/facts.ts";
+import { isCountryCode } from "../catalog/geo.ts";
+import { FACT_KEYS, isCountryScopedFactKey } from "../../shared/facts.ts";
 
 const factKeySchema = z.union([z.enum(FACT_KEYS), z.string().regex(/^q:[A-Za-z0-9-]+$/u)]);
 
 export interface FactRecord {
   key: string;
+  scope: string;
   value: string;
   source: "resume" | "user" | "review" | "import";
   confirmed: boolean;
@@ -20,14 +22,33 @@ export interface FactRecord {
 
 export interface FactService {
   list: (userId: string) => Promise<FactRecord[]>;
-  save: (userId: string, key: string, value: string) => Promise<FactRecord>;
-  saveFromReview: (userId: string, key: string, value: string) => Promise<FactRecord>;
+  save: (userId: string, key: string, value: string, scope?: string) => Promise<FactRecord>;
+  saveFromReview: (
+    userId: string,
+    key: string,
+    value: string,
+    scope?: string,
+  ) => Promise<FactRecord>;
   prefillFromResume: (userId: string, text: string) => Promise<FactRecord[]>;
 }
 
 function assertFactKey(key: string) {
   if (!factKeySchema.safeParse(key).success) {
     throw new Error(`unknown fact key: ${key}`);
+  }
+}
+
+function assertScope(key: string, scope: string) {
+  if (scope === "") {
+    return;
+  }
+
+  if (!isCountryCode(scope)) {
+    throw new Error(`unknown country scope: ${scope}`);
+  }
+
+  if (!isCountryScopedFactKey(key)) {
+    throw new Error(`fact key ${key} is not scoped by country`);
   }
 }
 
@@ -41,6 +62,7 @@ export function createFactService(deps: {
   async function upsert(
     userId: string,
     key: string,
+    scope: string,
     value: string,
     source: FactRecord["source"],
     confirmed: boolean,
@@ -48,7 +70,7 @@ export function createFactService(deps: {
     const rows = await db
       .select()
       .from(facts)
-      .where(and(eq(facts.userId, userId), eq(facts.key, key)))
+      .where(and(eq(facts.userId, userId), eq(facts.key, key), eq(facts.scope, scope)))
       .limit(1);
 
     const row = rows.at(0);
@@ -64,6 +86,7 @@ export function createFactService(deps: {
     const values = {
       userId,
       key,
+      scope,
       valueEnc,
       source,
       confirmed,
@@ -80,7 +103,7 @@ export function createFactService(deps: {
       await db.update(facts).set(values).where(eq(facts.id, row.id));
     }
 
-    return { key, value, source, confirmed, revision };
+    return { key, scope, value, source, confirmed, revision };
   }
 
   return {
@@ -97,6 +120,7 @@ export function createFactService(deps: {
 
           return {
             key: row.key,
+            scope: row.scope,
             value,
             source: row.source,
             confirmed: row.confirmed,
@@ -105,23 +129,27 @@ export function createFactService(deps: {
         }),
       );
 
-      return records.toSorted((left, right) => left.key.localeCompare(right.key));
+      return records.toSorted(
+        (left, right) => left.key.localeCompare(right.key) || left.scope.localeCompare(right.scope),
+      );
     },
-    save: async (userId: string, key: string, value: string) => {
+    save: async (userId: string, key: string, value: string, scope = "") => {
       assertFactKey(key);
+      assertScope(key, scope);
 
-      return upsert(userId, key, value, "user", true);
+      return upsert(userId, key, scope, value, "user", true);
     },
-    saveFromReview: async (userId: string, key: string, value: string) => {
+    saveFromReview: async (userId: string, key: string, value: string, scope = "") => {
       assertFactKey(key);
+      assertScope(key, scope);
 
-      return upsert(userId, key, value, "review", true);
+      return upsert(userId, key, scope, value, "review", true);
     },
     prefillFromResume: async (userId: string, text: string) => {
       const parsed = parseResumeFacts(text);
 
       const prefilled = await Promise.all(
-        parsed.map(async (fact) => upsert(userId, fact.key, fact.value, "resume", false)),
+        parsed.map(async (fact) => upsert(userId, fact.key, "", fact.value, "resume", false)),
       );
 
       return prefilled;

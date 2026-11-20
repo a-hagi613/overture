@@ -397,13 +397,14 @@ export const facts = sqliteTable(
     id: text("id").primaryKey(),
     userId: cascadeUserId(),
     key: text("key").notNull(),
+    scope: text("scope").notNull().default(""),
     valueEnc: text("value_enc").notNull(),
     source: text("source", { enum: ["resume", "user", "review", "import"] }).notNull(),
     confirmed: integer("confirmed", { mode: "boolean" }).notNull().default(false),
     revision: integer("revision").notNull().default(1),
     updatedAt: timestamp("updated_at").notNull(),
   },
-  (t) => [uniqueIndex("facts_user_key_unique").on(t.userId, t.key)],
+  (t) => [uniqueIndex("facts_user_key_scope_unique").on(t.userId, t.key, t.scope)],
 );
 
 export const profiles = sqliteTable("profiles", {
@@ -679,6 +680,7 @@ export const reviews = sqliteTable(
       .notNull()
       .references(() => questions.id, { onDelete: "cascade" }),
     factKey: text("fact_key"),
+    scope: text("scope").notNull().default(""),
     prompt: text("prompt").notNull(),
     fieldType: text("field_type", {
       enum: [
@@ -702,8 +704,8 @@ export const reviews = sqliteTable(
     resolvedAt: integer("resolved_at"),
   },
   (t) => [
-    uniqueIndex("reviews_user_question_open_unique")
-      .on(t.userId, t.questionId)
+    uniqueIndex("reviews_user_question_scope_open_unique")
+      .on(t.userId, t.questionId, t.scope)
       .where(sql`status = 'open'`),
     index("reviews_user_status").on(t.userId, t.status),
   ],

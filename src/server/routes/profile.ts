@@ -31,7 +31,18 @@ const uploadSchema = z.object({
 });
 
 const factsSchema = z.object({
-  facts: z.array(z.object({ key: z.string().min(1), value: z.string().max(2000) })).max(64),
+  facts: z
+    .array(
+      z.object({
+        key: z.string().min(1),
+        value: z.string().max(2000),
+        scope: z
+          .string()
+          .regex(/^(?:|[A-Z]{2})$/u)
+          .default(""),
+      }),
+    )
+    .max(64),
 });
 
 export function createProfileRoutes(deps: {
@@ -143,7 +154,9 @@ export function createProfileRoutes(deps: {
 
     const saved = (
       await Promise.all(
-        body.facts.map(async (fact) => factsService.save(account.id, fact.key, fact.value)),
+        body.facts.map(async (fact) =>
+          factsService.save(account.id, fact.key, fact.value, fact.scope),
+        ),
       )
     ).toSorted((left, right) => left.key.localeCompare(right.key));
 

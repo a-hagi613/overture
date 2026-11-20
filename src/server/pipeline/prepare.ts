@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
+import type { FactRecord } from "../profile/facts.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { AnswerKind, QuestionFieldType } from "../../shared/questions.ts";
 import type { QuestionSource } from "../catalog/greenhouse-questions.ts";
@@ -18,13 +19,17 @@ import {
 import { createFactService } from "../profile/facts.ts";
 import { mapQuestionsWithLlm } from "../catalog/question-mapping.ts";
 import { createQuestionCatalog, questionInputsFromAts } from "../catalog/questions.ts";
+import { resolveLocation } from "../catalog/geo.ts";
 import {
   AFFIRMATIVE_OPTION,
   NEGATIVE_OPTION,
   affirmativeOption,
+  countriesNamedIn,
   matchOption,
   normalizeQuestionText,
+  referencesUserCountry,
 } from "../catalog/question-normalize.ts";
+import { isCountryScopedFactKey } from "../../shared/facts.ts";
 import {
   attachApplication,
   detachApplication,
@@ -67,6 +72,17 @@ const NEGATIVE_FACT_VALUES = new Set([
   "none",
 ]);
 
+interface ScopedFactEntry {
+  scope: string;
+  value: string;
+}
+
+interface FactIndex {
+  unscoped: ReadonlyMap<string, string>;
+  scoped: ReadonlyMap<string, ReadonlyMap<string, string>>;
+  all: ReadonlyMap<string, readonly ScopedFactEntry[]>;
+}
+
 interface ResolveInput {
   questionText: string;
   required: boolean;
@@ -74,8 +90,94 @@ interface ResolveInput {
   options: readonly string[];
   answerKind: AnswerKind;
   factKey: string | null;
-  facts: ReadonlyMap<string, string>;
+  facts: FactIndex;
   hasResume: boolean;
+}
+
+function indexFacts(records: readonly FactRecord[]) {
+  const unscoped = new Map<string, string>();
+  const scoped = new Map<string, Map<string, string>>();
+  const all = new Map<string, ScopedFactEntry[]>();
+
+  for (const record of records) {
+    if (record.scope === "") {
+      unscoped.set(record.key, record.value);
+    } else {
+      const byScope = scoped.get(record.key) ?? new Map<string, string>();
+
+      byScope.set(record.scope, record.value);
+      scoped.set(record.key, byScope);
+    }
+
+    const entries = all.get(record.key) ?? [];
+
+    entries.push({ scope: record.scope, value: record.value });
+    all.set(record.key, entries);
+  }
+
+  return { unscoped, scoped, all } satisfies FactIndex;
+}
+
+type QuestionScope = { kind: "country"; code: string } | { kind: "multiple" } | { kind: "generic" };
+
+type ScopedLookup =
+  | { kind: "answer"; value: string; scope: string }
+  | { kind: "review"; scope: string };
+
+function questionScope(questionText: string, facts: FactIndex) {
+  const named = countriesNamedIn(questionText);
+
+  if (named.length > 1) {
+    return { kind: "multiple" } satisfies QuestionScope;
+  }
+
+  const [code] = named;
+
+  if (code !== undefined) {
+    return { kind: "country", code } satisfies QuestionScope;
+  }
+
+  if (referencesUserCountry(questionText)) {
+    const resident = facts.unscoped.get("current_country");
+    const countryCode = resident === undefined ? null : resolveLocation(resident).countryCode;
+
+    if (countryCode !== null) {
+      return { kind: "country", code: countryCode } satisfies QuestionScope;
+    }
+  }
+
+  return { kind: "generic" } satisfies QuestionScope;
+}
+
+function lookupScopedFact(key: string, questionText: string, facts: FactIndex) {
+  const scope = questionScope(questionText, facts);
+
+  if (scope.kind === "country") {
+    const value = facts.scoped.get(key)?.get(scope.code);
+
+    return value === undefined
+      ? ({ kind: "review", scope: scope.code } satisfies ScopedLookup)
+      : ({ kind: "answer", value, scope: scope.code } satisfies ScopedLookup);
+  }
+
+  const unscoped = facts.unscoped.get(key);
+
+  if (unscoped !== undefined) {
+    return { kind: "answer", value: unscoped, scope: "" } satisfies ScopedLookup;
+  }
+
+  if (scope.kind === "multiple") {
+    return { kind: "review", scope: "" } satisfies ScopedLookup;
+  }
+
+  const values = new Set((facts.all.get(key) ?? []).map((entry) => entry.value));
+  const [only] = [...values];
+
+  if (values.size === 1 && only !== undefined) {
+    return { kind: "answer", value: only, scope: "" } satisfies ScopedLookup;
+  }
+
+  return { kind: "review", scope: "" } satisfies ScopedLookup;
 }
 
 function splitName(value: string) {
@@ -202,6 +304,7 @@ type ResolutionKind = "ready" | "needs_review" | "skip";
 interface Resolution {
   kind: ResolutionKind;
   answer: string | null;
+  scope: string;
 }
 
 function consentAnswer(questionText: string, options: readonly string[]) {
@@ -220,12 +323,14 @@ function consentAnswer(questionText: string, options: readonly string[]) {
   return affirmativeOption(options) ?? (options.length === 0 ? AFFIRMATIVE_OPTION : null);
 }
 
-const READY_REVIEW: Resolution = { kind: "needs_review", answer: null };
+const SKIPPED_FORM: Resolution = { kind: "skip", answer: null, scope: "" };
 
-const SKIPPED_FORM: Resolution = { kind: "skip", answer: null };
+function reviewFor(scope: string) {
+  return { kind: "needs_review", answer: null, scope } satisfies Resolution;
+}
 
-function ready(answer: string | null) {
-  return { kind: "ready", answer } satisfies Resolution;
+function ready(answer: string | null, scope = "") {
+  return { kind: "ready", answer, scope } satisfies Resolution;
 }
 
 function resolveQuestionValue(input: ResolveInput) {
@@ -254,10 +359,31 @@ function resolveQuestionValue(input: ResolveInput) {
   }
 
   if (input.answerKind !== "fact" || input.factKey === null) {
-    return required ? READY_REVIEW : ready(null);
+    return required ? reviewFor("") : ready(null);
   }
 
-  const value = input.facts.get(input.factKey);
+  if (isCountryScopedFactKey(input.factKey)) {
+    const lookup = lookupScopedFact(input.factKey, input.questionText, input.facts);
+
+    if (lookup.kind === "review") {
+      return required ? reviewFor(lookup.scope) : ready(null);
+    }
+
+    const scopedAnswer = formatFactValue({
+      questionText: input.questionText,
+      fieldType: input.fieldType,
+      options: input.options,
+      value: lookup.value,
+    });
+
+    if (scopedAnswer !== null) {
+      return ready(scopedAnswer, lookup.scope);
+    }
+
+    return required ? reviewFor(lookup.scope) : ready(null);
+  }
+
+  const value = input.facts.unscoped.get(input.factKey);
 
   const answer =
     value === undefined
@@ -273,7 +399,7 @@ function resolveQuestionValue(input: ResolveInput) {
     return ready(answer);
   }
 
-  return required ? READY_REVIEW : ready(null);
+  return required ? reviewFor("") : ready(null);
 }
 
 export function createPreparationService(deps: {
@@ -364,12 +490,15 @@ export function createPreparationService(deps: {
       prompt: string;
       fieldType: QuestionFieldType;
       options: string[];
+      scope: string;
     }[];
   }) {
-    const blockedIds = new Set(input.blocked.map((entry) => entry.questionId));
+    const blockedKeys = new Set(
+      input.blocked.map((entry) => `${entry.questionId}\u0000${entry.scope}`),
+    );
 
     for (const review of openReviewsForApplication(db, input.userId, input.applicationId)) {
-      if (!blockedIds.has(review.questionId)) {
+      if (!blockedKeys.has(`${review.questionId}\u0000${review.scope}`)) {
         detachApplication(db, review.id, input.applicationId);
         dismissEmptyReview(db, clock, review.id);
       }
@@ -383,6 +512,7 @@ export function createPreparationService(deps: {
         prompt: entry.prompt,
         fieldType: entry.fieldType,
         options: entry.options,
+        scope: entry.scope,
       });
 
       attachApplication(db, reviewId, input.applicationId);
@@ -422,7 +552,7 @@ export function createPreparationService(deps: {
     await loadQuestions(row);
 
     const factRows = await factsService.list(row.userId);
-    const factValues = new Map(factRows.map((fact) => [fact.key, fact.value]));
+    const factValues = indexFacts(factRows);
     const questionRows = catalog.forPosting(row.postingId);
 
     const blocked: {
@@ -431,6 +561,7 @@ export function createPreparationService(deps: {
       prompt: string;
       fieldType: QuestionFieldType;
       options: string[];
+      scope: string;
     }[] = [];
 
     let unsupported = false;
@@ -460,6 +591,7 @@ export function createPreparationService(deps: {
           prompt: question.textDisplay,
           fieldType: question.fieldType,
           options,
+          scope: resolution.scope,
         });
       }
     }
@@ -516,7 +648,7 @@ export function createPreparationService(deps: {
     }
 
     const factRows = await factsService.list(row.userId);
-    const factValues = new Map(factRows.map((fact) => [fact.key, fact.value]));
+    const factValues = indexFacts(factRows);
 
     const resume = db
       .select({ id: resumes.id })
@@ -547,6 +679,7 @@ export function createPreparationService(deps: {
         required: question.required,
         resolved: resolution.kind === "ready",
         answer: resolution.answer,
+        scope: resolution.scope,
       };
     });
   }

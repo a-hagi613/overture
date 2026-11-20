@@ -54,6 +54,7 @@ const reviewRowSchema = z.object({
   id: z.string(),
   questionId: z.string(),
   prompt: z.string(),
+  scope: z.string(),
   status: z.string(),
 });
 
@@ -67,6 +68,8 @@ const reviewViewSchema = z.object({
     z.object({
       id: z.string(),
       prompt: z.string(),
+      scope: z.string(),
+      factLabel: z.string().nullable(),
       unlocked: z.number(),
     }),
   ),
@@ -75,6 +78,7 @@ const reviewViewSchema = z.object({
 
 const factRowSchema = z.object({
   key: z.string(),
+  scope: z.string(),
   value: z.string(),
   source: z.string(),
 });
@@ -85,6 +89,8 @@ const answersSchema = z.object({
   answers: z.array(
     z.object({
       text: z.string(),
+      factKey: z.string().nullable(),
+      scope: z.string(),
       answerKind: z.string(),
       resolved: z.boolean(),
       answer: z.string().nullable(),
@@ -230,6 +236,15 @@ async function factsFor(owner: APIRequestContext) {
   return factsSchema.parse(await (await owner.get("/api/profile/facts")).json()).facts;
 }
 
+async function saveFacts(
+  owner: APIRequestContext,
+  facts: { key: string; value: string; scope?: string }[],
+) {
+  const response = await owner.put("/api/profile/facts", { data: { facts } });
+
+  expect(response.ok()).toBe(true);
+}
+
 test("an Application whose Facts answer every required question reaches ready", async ({
   preparation,
 }) => {
@@ -241,7 +256,7 @@ test("an Application whose Facts answer every required question reaches ready", 
         { key: "legal_name", value: "Maya Okafor" },
         { key: "email", value: "maya.okafor@mail.overture.test" },
         { key: "phone", value: "+1 416 555 0199" },
-        { key: "work_auth", value: "Yes" },
+        { key: "work_auth", scope: "CA", value: "Yes" },
       ],
     },
   });
@@ -870,4 +885,218 @@ test("Haiku maps a question that no rule covers", async ({ preparation }) => {
       .requests()
       .some((request) => request.title.includes("country or countries you anticipate working in")),
   ).toBe(true);
+});
+
+test("a country's work authorisation never answers another country's question", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await saveFacts(owner, [
+    { key: "legal_name", value: "Maya Okafor" },
+    { key: "email", value: "maya.okafor@mail.overture.test" },
+    { key: "phone", value: "+1 416 555 0199" },
+    { key: "current_country", value: "Canada" },
+    { key: "work_auth", scope: "CA", value: "Yes" },
+    { key: "sponsorship_required", scope: "CA", value: "No" },
+  ]);
+
+  const postingId = await seedRecordedPosting(owner, {
+    atsJobId: "5999792004",
+    boardToken: "vercel",
+    companyName: "Vercel",
+    domain: "vercel.example",
+    title: "Account Executive, Majors",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const question = "Are you authorized to work in the UK?";
+
+  const before = (await answersFor(owner, applicationId)).find((answer) =>
+    answer.text.startsWith(question),
+  );
+
+  expect(before).toMatchObject({ answer: null, factKey: "work_auth", resolved: false });
+
+  const open = await reviewsFor(owner, userId);
+  const review = open.reviews.find((candidate) => candidate.prompt.startsWith(question));
+
+  if (review === undefined) {
+    throw new Error("no Review was opened for the UK question");
+  }
+
+  expect(review.scope).toBe("GB");
+
+  const views = reviewViewSchema.parse(await (await owner.get("/api/reviews")).json());
+  const view = views.reviews.find((candidate) => candidate.id === review.id);
+
+  expect(view).toMatchObject({
+    factLabel: "Work authorisation (United Kingdom)",
+    scope: "GB",
+  });
+
+  const authorised = "I am authorized to work in the country due to my nationality";
+
+  const answered = await owner.post(`/api/reviews/${review.id}/answer`, {
+    data: { value: authorised },
+  });
+
+  expect(answered.ok()).toBe(true);
+
+  const facts = await factsFor(owner);
+
+  const after = (await answersFor(owner, applicationId)).find((answer) =>
+    answer.text.startsWith(question),
+  );
+
+  expect(after).toMatchObject({ answer: authorised, resolved: true, scope: "GB" });
+
+  expect(facts.find((fact) => fact.key === "work_auth" && fact.scope === "GB")).toMatchObject({
+    source: "review",
+    value: authorised,
+  });
+  expect(facts.find((fact) => fact.key === "work_auth" && fact.scope === "CA")).toMatchObject({
+    source: "user",
+    value: "Yes",
+  });
+});
+
+test("an unscoped work authorisation does not answer a question naming a country", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await saveFacts(owner, [
+    { key: "legal_name", value: "Maya Okafor" },
+    { key: "email", value: "maya.okafor@mail.overture.test" },
+    { key: "current_country", value: "Canada" },
+    { key: "work_auth", value: "Yes" },
+  ]);
+
+  const postingId = await seedRecordedPosting(owner, {
+    atsJobId: "5999792004",
+    boardToken: "vercel",
+    companyName: "Vercel",
+    domain: "vercel.example",
+    title: "Account Executive, Majors",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const question = "Are you authorized to work in the UK?";
+
+  const answer = (await answersFor(owner, applicationId)).find((candidate) =>
+    candidate.text.startsWith(question),
+  );
+
+  expect(answer).toMatchObject({ answer: null, resolved: false });
+
+  const review = (await reviewsFor(owner, userId)).reviews.find((candidate) =>
+    candidate.prompt.startsWith(question),
+  );
+
+  expect(review?.scope).toBe("GB");
+});
+
+test("a question about the country where the user lives uses that country's Fact", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await saveFacts(owner, [
+    { key: "legal_name", value: "Maya Okafor" },
+    { key: "email", value: "maya.okafor@mail.overture.test" },
+    { key: "current_country", value: "Canada" },
+    { key: "work_auth", scope: "CA", value: "Yes" },
+    { key: "work_auth", scope: "GB", value: "No" },
+    { key: "sponsorship_required", scope: "CA", value: "No" },
+    { key: "sponsorship_required", scope: "GB", value: "Yes" },
+  ]);
+
+  const postingId = await seedRecordedPosting(owner, {
+    atsJobId: "8332467",
+    boardToken: "stripe",
+    companyName: "Stripe",
+    domain: "stripe.example",
+    title: "Account Executive, AI Sales",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const answers = await answersFor(owner, applicationId);
+
+  const workAuth = answers.find((answer) =>
+    answer.text.startsWith("Are you authorized to work in the location(s)"),
+  );
+
+  expect(workAuth).toMatchObject({ answer: "Yes", resolved: true, scope: "CA" });
+
+  const sponsorship = answers.find((answer) =>
+    answer.text.startsWith("Will you require Stripe to sponsor you"),
+  );
+
+  expect(sponsorship).toMatchObject({ answer: "No", resolved: true, scope: "CA" });
+});
+
+test("a question naming no country opens a Review when scoped Facts disagree", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await saveFacts(owner, [
+    { key: "legal_name", value: "Maya Okafor" },
+    { key: "email", value: "maya.okafor@mail.overture.test" },
+    { key: "current_country", value: "Canada" },
+    { key: "sponsorship_required", scope: "CA", value: "No" },
+    { key: "sponsorship_required", scope: "GB", value: "Yes" },
+  ]);
+
+  const postingId = await seedRecordedPosting(owner, {
+    atsJobId: "5999792004",
+    boardToken: "vercel",
+    companyName: "Vercel",
+    domain: "vercel.example",
+    title: "Account Executive, Majors",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const question = "Will you require Visa Sponsorship now, or in the future?";
+
+  const answer = (await answersFor(owner, applicationId)).find((candidate) =>
+    candidate.text.startsWith(question),
+  );
+
+  expect(answer).toMatchObject({ answer: null, resolved: false, scope: "" });
+
+  const review = (await reviewsFor(owner, userId)).reviews.find((candidate) =>
+    candidate.prompt.startsWith(question),
+  );
+
+  expect(review?.scope).toBe("");
 });

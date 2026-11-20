@@ -38,6 +38,8 @@ const countryAliases = new Map([
   ["usa", "US"],
   ["united states of america", "US"],
   ["united states", "US"],
+  ["america", "US"],
+  ["uae", "AE"],
   ["uk", "GB"],
   ["britain", "GB"],
   ["great britain", "GB"],
@@ -55,6 +57,22 @@ const remoteKeywords = new Set([
   "distributed",
   "worldwide",
 ]);
+
+const countryNameLookup = new Map<string, string>();
+
+for (const [code, name] of Object.entries(dataset.countries)) {
+  for (const candidate of [name, name.replace(/^the /iu, "")]) {
+    const normalized = normalizePlaceName(candidate);
+
+    if (normalized.length >= 3) {
+      countryNameLookup.set(normalized, code);
+    }
+  }
+}
+
+for (const [alias, code] of countryAliases) {
+  countryNameLookup.set(alias, code);
+}
 
 const regionNames = new Map<string, string>();
 const regionNameLookup = new Map<string, string>();
@@ -207,4 +225,36 @@ function findCity(segments: string[], countryCode: string | null) {
   }
 
   return null;
+}
+
+const US_ABBREVIATION = /\bU\.?S\.?(?![A-Za-z])/u;
+const UK_ABBREVIATION = /\bU\.?K\.?(?![A-Za-z])/u;
+
+export function countryCodesNamedIn(text: string) {
+  const normalized = ` ${normalizePlaceName(text)} `;
+  const codes = new Set<string>();
+
+  if (US_ABBREVIATION.test(text)) {
+    codes.add("US");
+  }
+
+  if (UK_ABBREVIATION.test(text)) {
+    codes.add("GB");
+  }
+
+  for (const [name, code] of countryNameLookup) {
+    if (normalized.includes(` ${name} `)) {
+      codes.add(code);
+    }
+  }
+
+  return [...codes].toSorted();
+}
+
+export function countryNameFor(code: string) {
+  return dataset.countries[code] ?? null;
+}
+
+export function isCountryCode(code: string) {
+  return Object.hasOwn(dataset.countries, code);
 }
