@@ -28,7 +28,7 @@ export function ResumeSection() {
               {resume.chip}
             </span>
             <div className="min-w-0">
-              <p className="break-words font-mono text-sm">{resume.fileName}</p>
+              <p className="break-words font-mono text-[14px] leading-[1.5]">{resume.fileName}</p>
               <p className="mt-0.5 text-[12.5px] text-muted-foreground tabular-nums">
                 {resume.meta}
               </p>
@@ -68,7 +68,7 @@ export function ResumeSection() {
           </dl>
           <div className="mt-3.5 flex flex-wrap items-center gap-3">
             <button
-              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-input bg-card px-4 text-[13.5px] leading-[normal] font-semibold hover:bg-muted"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-input bg-card px-4 text-[13.5px] leading-[normal] font-semibold hover:bg-muted max-[767px]:min-h-12 max-[767px]:flex-[1_1_100%]"
               type="button"
             >
               <svg
@@ -87,7 +87,7 @@ export function ResumeSection() {
               {resume.replace}
             </button>
             <a
-              className="inline-flex min-h-11 items-center gap-2 rounded-md px-3.5 text-[13.5px] leading-[normal] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3.5 text-[13.5px] leading-[normal] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground max-[767px]:min-h-12 max-[767px]:flex-[1_1_100%]"
               href="#profile-resume"
             >
               <svg

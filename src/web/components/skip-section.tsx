@@ -36,7 +36,7 @@ export function SkipSection() {
         ))}
       </div>
       <div className="mt-[18px] flex flex-wrap items-center gap-2.5">
-        <label className="flex h-10 min-w-0 max-w-[380px] flex-1 items-center rounded-md border border-input bg-card px-3 max-[767px]:h-11">
+        <label className="flex h-10 min-w-0 max-w-[380px] flex-[1_1_260px] items-center rounded-md border border-input bg-card px-3 max-[767px]:h-11 max-[767px]:max-w-full">
           <input
             aria-label={list.addLabel}
             className="h-full min-w-0 flex-1 bg-transparent text-[13.5px] font-medium text-foreground outline-0 placeholder:text-muted-foreground leading-[normal]"

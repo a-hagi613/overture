@@ -36,7 +36,7 @@ export function FactsSection() {
       />
       <div
         aria-label={facts.tiersLabel}
-        className="mt-[18px] flex flex-wrap gap-2 max-[767px]:mx-[-16px] max-[767px]:overflow-x-auto max-[767px]:p-2 max-[767px]:px-4"
+        className="mt-[18px] flex flex-wrap gap-2 max-[767px]:mx-[-16px] max-[767px]:overflow-x-auto max-[767px]:py-[2px] max-[767px]:px-4"
       >
         <FilterChip count={facts.tier1.count} on>
           {facts.tier1.label}

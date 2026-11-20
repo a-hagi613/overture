@@ -9,7 +9,7 @@ const roleKeys = ["role", "role2", "role3", "role4", "role5"] as const;
 const locationKeys = ["location1", "location2", "location3"] as const;
 
 function saveButtonLook() {
-  return "inline-flex min-h-11 items-center gap-2 rounded-md border border-foreground bg-foreground px-[18px] text-[13.5px] leading-[normal] font-semibold text-btn-ink shadow-[inset_0_1px_0_rgba(255,255,255,.14)] hover:bg-btn-hover max-[767px]:min-h-12";
+  return "inline-flex min-h-11 items-center gap-2 rounded-md border border-foreground bg-foreground px-[18px] text-[13.5px] leading-[normal] font-semibold text-btn-ink shadow-[inset_0_1px_0_rgba(255,255,255,.14)] hover:bg-btn-hover max-[767px]:min-h-12 max-[767px]:flex-[1_1_100%]";
 }
 
 export function TargetsSection() {
@@ -96,7 +96,7 @@ export function TargetsSection() {
           <div className="flex max-w-[380px] items-center gap-2.5">
             <select
               aria-label={targets.currencyLabel}
-              className="h-10 w-24 flex-none appearance-none rounded-md border border-input bg-card px-3 pr-9 text-[13.5px] font-medium"
+              className="h-10 w-24 flex-none appearance-none rounded-md border border-input bg-card px-3 pr-9 text-[13.5px] font-medium max-[767px]:h-11"
               defaultValue="CAD"
               name="currency"
             >
@@ -104,7 +104,7 @@ export function TargetsSection() {
               <option value="USD">{targets.currencyUsd}</option>
             </select>
             <input
-              className="min-w-0 flex-1 rounded-md border border-input bg-card px-3 py-0 text-[13.5px] leading-[normal] font-medium tabular-nums h-10"
+              className="min-w-0 flex-1 rounded-md border border-input bg-card px-3 py-0 text-[13.5px] leading-[normal] font-medium tabular-nums h-10 max-[767px]:h-11"
               id="ovt-salary"
               inputMode="numeric"
               readOnly
@@ -121,7 +121,9 @@ export function TargetsSection() {
         <button className={saveButtonLook()} type="button">
           {targets.submit}
         </button>
-        <p className="text-[12.5px] text-muted-foreground">{targets.submitNote}</p>
+        <p className="text-[12.5px] text-muted-foreground max-[767px]:min-h-12 max-[767px]:flex-[1_1_100%]">
+          {targets.submitNote}
+        </p>
       </div>
     </Section>
   );

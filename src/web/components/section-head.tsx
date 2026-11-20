@@ -14,7 +14,9 @@ export function SectionHead(props: {
         </h2>
         <p className="mt-[3px] max-w-[62ch] text-[13.5px] text-muted-foreground">{props.intro}</p>
       </div>
-      <span className="font-serif text-sm italic text-muted-foreground">{props.folio}</span>
+      <span className="font-serif text-[14px] leading-[1.5] italic text-muted-foreground">
+        {props.folio}
+      </span>
     </div>
   );
 }

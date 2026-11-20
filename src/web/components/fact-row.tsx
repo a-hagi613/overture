@@ -16,7 +16,7 @@ export function FactRow(props: {
   const actionAria = copy.profile.facts.aria(props.label, actionText);
 
   return (
-    <div className="flex flex-wrap items-center gap-x-5 border-t border-border py-4">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border py-4">
       <div className="min-w-0 flex-[1_1_340px]">
         <p className="text-sm font-semibold leading-[1.4]">{props.label}</p>
         <p

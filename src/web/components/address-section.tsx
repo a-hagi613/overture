@@ -21,7 +21,7 @@ export function AddressSection() {
         }
       />
       <div className="mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 rounded-lg border border-border bg-muted p-[18px] px-5">
-        <p className="break-words font-mono text-[17px]">{address.alias}</p>
+        <p className="font-mono text-[17px] [overflow-wrap:anywhere]">{address.alias}</p>
         <SourceChip variant="dashed">{address.chip}</SourceChip>
       </div>
       <dl className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(min(240px,100%),1fr))] gap-x-5">

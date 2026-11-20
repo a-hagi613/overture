@@ -6,6 +6,7 @@ export default defineConfig({
   workers: 2,
   reporter: "list",
   globalSetup: "./test/e2e/global-setup.ts",
+  snapshotPathTemplate: "design/reference/profile/{arg}{ext}",
   use: {
     trace: "retain-on-failure",
   },
