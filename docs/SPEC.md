@@ -220,10 +220,10 @@ updated_at) · `session` · `account` (provider: google, linkedin, credential) �
 | Table | Columns |
 |---|---|
 | `user_keys` | user_id PK, wrapped_dek BLOB, master_key_version INTEGER, created_at. **Deleting this row is crypto-shredding.** |
-| `profiles` | user_id PK, running, pause_reason CHECK IN ('user','onboarding','no_resume','plan_ended','payment_failed','suspended','no_mailbox') NULL, timezone (IANA, taken from the browser at sign-up, changeable in Settings at most once per 7 days), timezone_changed_at, languages TEXT JSON (ISO 639-1), auto_threshold CHECK IN (50,60) DEFAULT 60, onboarding_step, onboarded_at, digest_enabled DEFAULT 1, push_prompted_at, consent_version, consent_at, created_at, updated_at |
+| `profiles` | user_id PK, running, pause_reason CHECK IN ('user','onboarding','no_resume','plan_ended','payment_failed','suspended','no_mailbox') NULL, timezone (IANA, taken from the browser at sign-up, changeable in Settings at most once per 7 days), timezone_changed_at, languages TEXT JSON (ISO 639-1), auto_threshold CHECK IN (50,60) DEFAULT 60, onboarding_step, onboarded_at, digest_enabled DEFAULT 1, push_prompted_at, consent_version, consent_at, created_at, updated_at. M1-14 creates the row with `languages` and the timestamps; the remaining columns arrive with the slices that read them |
 | `facts` | id, user_id, key, value_enc, source CHECK IN ('resume','user','review','import'), confirmed, revision, updated_at; UNIQUE(user_id,key). Keys from the fact catalog (§7.1) or `q:<question_id>` for learned answers |
-| `targets` | user_id PK, roles JSON, seniorities JSON, workplaces JSON, locations JSON (`{country, region?, city?}`), employment_types JSON, salary_floor_minor NULL, salary_currency NULL, salary_period CHECK IN ('year','month','hour') NULL, version INTEGER |
-| `skip_companies` | id, user_id, company_id NULL, name_norm, domain NULL, reason CHECK IN ('current_employer','user'), created_at; UNIQUE(user_id,name_norm). Matching rules in §8.1 |
+| `targets` | user_id PK, roles JSON (strings as typed), seniorities JSON, workplaces JSON, locations JSON (strings as typed), employment_types JSON, salary_floor_minor NULL, salary_currency NULL, salary_period CHECK IN ('year','month','hour') NULL, version INTEGER, updated_at |
+| `skip_companies` | id, user_id, company_id NULL, name, name_norm, domain NULL, reason CHECK IN ('current_employer','user'), created_at; UNIQUE(user_id,name_norm). Matching rules in §8.1 |
 | `resumes` | id, user_id, object_key, sha256, bytes, pages, filename_enc, text_enc, parsed_with CHECK IN ('unpdf','llm'), is_current, uploaded_at; partial UNIQUE(user_id) WHERE is_current=1 |
 | `browser_profiles` | user_id, provider, provider_profile_id, country_code, created_at, last_used_at; PK(user_id, provider) |
 | `mailboxes` | id, user_id UNIQUE, local_part UNIQUE, status CHECK IN ('active','receive_only','closed'), receive_until NULL, created_at |
@@ -449,6 +449,13 @@ company not skipped (below); no other application by this user to this company i
 ready, sending or confirming, and none sent to it in the last 7 days (failed, skipped and withdrawn do not count);
 no sent application to the same `dedupe_key` in the last 60 days; crowd limits not reached (§12); not `hidden`; no kill
 switch on its ATS/employer.
+
+**Live Targets count.** `POST /api/profile/targets/match-count` counts open Postings that pass the candidate
+filters above that depend on the catalog: role and subrole tags, seniority tags, workplace, employment type,
+location and the profile's posting languages. A role target matches when its words intersect the words of a role
+or subrole tag (`Backend` matches `Senior Backend Engineer`); a location target is resolved with the geo dataset
+(§6.1) and matched on country with city or region. The salary floor is applied only when the posting's currency
+equals the floor's; a posting without a salary always counts. FX conversion arrives with matching (M1-16).
 
 **Skip matching** (the current employer and skipped companies): a posting's company is skipped when any of
 these match a `skip_companies` row: same `company_id`; same registrable domain; same name after normalisation
@@ -816,7 +823,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Review | `GET /api/reviews` · `POST /api/reviews/:id/answer` · `POST /api/reviews/:id/dismiss` |
 | Check-ins | `POST /api/checkins/:id` `{answer}` |
 | Inbox | `GET /api/threads` · `GET /api/threads/:id` · `POST /api/threads/:id/reply` (M2) · `GET /api/attachments/:id` · `POST /api/messages/:id/read` |
-| Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `GET/PUT /api/profile/skip-companies` · `GET /api/profile/strengthen` |
+| Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET /api/profile/strengthen` |
 | Onboarding (M2) | `GET /api/onboarding` · `POST /api/onboarding/:step` · `POST /api/onboarding/address/accept` |
 | Settings | `GET/PUT /api/settings` (threshold, digest, timezone, languages) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `POST /api/account/delete` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |

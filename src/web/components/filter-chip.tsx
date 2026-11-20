@@ -3,6 +3,7 @@ export function FilterChip(props: {
   children: string;
   count?: string;
   on: boolean;
+  onClick?: () => void;
 }) {
   return (
     <button
@@ -13,6 +14,7 @@ export function FilterChip(props: {
           ? "border-foreground bg-foreground text-background"
           : "border-input bg-card text-foreground hover:bg-muted"
       }`}
+      onClick={props.onClick}
       type="button"
     >
       {props.children}

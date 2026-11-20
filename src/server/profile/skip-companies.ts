@@ -65,11 +65,11 @@ export function createSkipCompanyService(deps: { db: AppDatabase; clock: Clock }
     return rows
       .map((row) => storedSchema.parse(row))
       .toSorted((left, right) => {
-        if (left.reason !== right.reason) {
-          return left.reason === "current_employer" ? -1 : 1;
+        if (left.reason === right.reason) {
+          return 0;
         }
 
-        return left.name.localeCompare(right.name);
+        return left.reason === "current_employer" ? -1 : 1;
       });
   }
 

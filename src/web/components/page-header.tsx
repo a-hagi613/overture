@@ -66,12 +66,14 @@ export function PageHeader({ lead, titleNode }: { lead: string; titleNode: React
           </span>
         </button>
         <Link
-          aria-label={copy.shell.settings}
+          aria-label={
+            name === null ? copy.shell.settings : `${initialsOf(name)}, ${copy.shell.settings}`
+          }
           aria-current={pathname === "/settings" ? "page" : undefined}
           className="hidden h-10 w-10 items-center justify-center rounded-full border border-input bg-muted font-serif text-[17px] italic max-[767px]:flex max-[767px]:h-11 max-[767px]:w-11"
           to="/settings"
         >
-          {name === null ? "" : initialsOf(name)}
+          <span aria-hidden="true">{name === null ? "" : initialsOf(name)}</span>
         </Link>
         <div className="flex h-10 items-center gap-3 rounded-md border border-input bg-card pl-3.5 pr-1.5">
           <span className="flex items-center gap-2 text-[13px] font-medium">
