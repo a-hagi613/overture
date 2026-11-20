@@ -3,13 +3,15 @@ import { join, resolve } from "node:path";
 
 import type { AppDatabase } from "./platform/db/client.ts";
 import type { Auth } from "./auth/index.ts";
-import type { JobHandlers } from "./platform/jobs/run-due.ts";
 import type { AdjustableClock } from "./platform/ports/clock.ts";
+import type { JobHandlers } from "./platform/jobs/run-due.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
 import { createMeRoutes } from "./routes/me.ts";
 import { createApiRoutes } from "./routes/api.ts";
+import { createAdminApi, isAdminHost } from "./routes/admin.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
+import { env } from "./config/env.ts";
 
 export interface AppDependencies {
   db: AppDatabase;
@@ -20,7 +22,33 @@ export interface AppDependencies {
   auth: Auth;
 }
 
+async function staticResponseFrom(root: string, url: string) {
+  const { pathname } = new URL(url);
+  const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/u, "");
+  const resolvedRoot = resolve(root);
+  const requested = resolve(resolvedRoot, relativePath);
+  const file = Bun.file(requested);
+
+  if (requested.startsWith(`${resolvedRoot}/`) && (await file.exists())) {
+    return new Response(file);
+  }
+
+  const fallback = Bun.file(join(resolvedRoot, "index.html"));
+
+  if (await fallback.exists()) {
+    return new Response(fallback, { headers: { "content-type": "text/html; charset=utf-8" } });
+  }
+
+  return null;
+}
+
 export function createApp(deps: AppDependencies) {
+  const adminApi = createAdminApi(deps.db, deps.clock, deps.auth);
+  const adminHost = new Hono();
+
+  adminHost.route("/admin/api", adminApi);
+  adminHost.all("/api/auth/*", async (context) => deps.auth.handler(context.req.raw));
+
   const app = new Hono();
 
   app.all("/api/auth/*", async (context) => deps.auth.handler(context.req.raw));
@@ -32,24 +60,27 @@ export function createApp(deps: AppDependencies) {
     app.route("/__test__", createTestRoutes(deps.db, deps.clock, deps.jobHandlers));
   }
 
+  app.use("*", async (context, next) => {
+    const hostHeader = context.req.header("host") ?? "";
+    const { hostname } = new URL(`http://${hostHeader}`);
+
+    if (isAdminHost(hostname, env.ADMIN_ORIGIN)) {
+      return adminHost.fetch(context.req.raw);
+    }
+
+    return next();
+  });
+
   app.get("*", async (context) => {
-    const root = resolve(deps.staticRoot);
-    const { pathname } = new URL(context.req.url);
-    const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/u, "");
-    const requested = resolve(root, relativePath);
-    const file = Bun.file(requested);
+    const page = await staticResponseFrom(deps.staticRoot, context.req.url);
 
-    if (requested.startsWith(`${root}/`) && (await file.exists())) {
-      return new Response(file);
-    }
+    return page ?? context.notFound();
+  });
 
-    const fallback = Bun.file(join(root, "index.html"));
+  adminHost.get("*", async (context) => {
+    const page = await staticResponseFrom(deps.staticRoot, context.req.url);
 
-    if (await fallback.exists()) {
-      return new Response(fallback, { headers: { "content-type": "text/html; charset=utf-8" } });
-    }
-
-    return context.notFound();
+    return page ?? context.notFound();
   });
 
   return app;

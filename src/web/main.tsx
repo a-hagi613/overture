@@ -15,6 +15,10 @@ import { SearchPage } from "./routes/search.tsx";
 import { SettingsPage } from "./routes/settings.tsx";
 import { SignInPage } from "./routes/signin.tsx";
 import { ThemeProvider } from "./lib/theme.tsx";
+import { AdminShell } from "./routes/admin/shell.tsx";
+import { AdminSettingsPage } from "./routes/admin/settings.tsx";
+import { CatalogPage } from "./routes/admin/catalog.tsx";
+import { OverviewPage } from "./routes/admin/overview.tsx";
 
 const router = createBrowserRouter([
   {
@@ -28,6 +32,14 @@ const router = createBrowserRouter([
       { path: "/search", element: <SearchPage /> },
       { path: "/settings", element: <SettingsPage /> },
       { path: "*", element: <NotFoundPage /> },
+    ],
+  },
+  {
+    element: <AdminShell />,
+    children: [
+      { path: "/admin", element: <OverviewPage /> },
+      { path: "/admin/settings", element: <AdminSettingsPage /> },
+      { path: "/admin/catalog", element: <CatalogPage /> },
     ],
   },
   { path: "/signin", element: <SignInPage /> },

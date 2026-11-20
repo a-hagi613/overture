@@ -2,13 +2,24 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError } from "better-auth/api";
 import { captcha, genericOAuth, magicLink } from "better-auth/plugins";
+import { passkey } from "@better-auth/passkey";
+import { eq } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
+import type { Clock } from "../platform/ports/clock.ts";
 import type { MailSender } from "../platform/mail/port.ts";
 
 import { copy } from "../../shared/copy.ts";
 import { env } from "../config/env.ts";
-import { accounts, rateLimits, sessions, users, verifications } from "../platform/db/schema.ts";
+import {
+  accounts,
+  passkeys,
+  rateLimits,
+  sessions,
+  users,
+  verifications,
+} from "../platform/db/schema.ts";
+import { recordPasskeyAssertion } from "../platform/passkey/index.ts";
 
 const GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration";
 const LINKEDIN_DISCOVERY_URL = "https://www.linkedin.com/oauth/.well-known/openid-configuration";
@@ -50,16 +61,18 @@ export function isAllowedEmail(email: string) {
   return email.trim().toLowerCase() === ownerEmail;
 }
 
-const trustedOrigins = [
-  ...(env.APP_ORIGIN === undefined ? [] : [env.APP_ORIGIN]),
-  ...(env.AUTH_ALLOWED_HOSTS === undefined
-    ? []
-    : env.AUTH_ALLOWED_HOSTS.map((host) => `http://${host}:*`)),
-];
-
 export type Auth = ReturnType<typeof createAuth>;
 
-export function createAuth(db: AppDatabase, mailSender: MailSender) {
+export function createAuth(db: AppDatabase, clock: Clock, mailSender: MailSender) {
+  const adminOrigin = new URL(env.ADMIN_ORIGIN);
+
+  const trustedOrigins = [
+    ...(env.APP_ORIGIN === undefined ? [] : [env.APP_ORIGIN]),
+    ...(env.AUTH_ALLOWED_HOSTS === undefined
+      ? []
+      : env.AUTH_ALLOWED_HOSTS.map((host) => `http://${host}:*`)),
+  ];
+
   return betterAuth({
     appName: copy.app.name,
     baseURL: env.APP_ORIGIN ?? {
@@ -78,6 +91,7 @@ export function createAuth(db: AppDatabase, mailSender: MailSender) {
         account: accounts,
         verification: verifications,
         rateLimit: rateLimits,
+        passkey: passkeys,
       },
     }),
     user: {
@@ -154,6 +168,28 @@ export function createAuth(db: AppDatabase, mailSender: MailSender) {
           }
 
           await mailSender.sendMagicLink({ to: email, url: data.url });
+        },
+      }),
+      passkey({
+        rpID: adminOrigin.hostname,
+        rpName: copy.app.name,
+        origin: [env.ADMIN_ORIGIN],
+        authentication: {
+          afterVerification: ({ verification }) => {
+            const credentialId = verification.authenticationInfo.credentialID;
+
+            const row = db
+              .select()
+              .from(passkeys)
+              .where(eq(passkeys.credentialID, credentialId))
+              .get();
+
+            const userId = row?.userId;
+
+            if (userId !== undefined) {
+              recordPasskeyAssertion(db, clock, userId);
+            }
+          },
         },
       }),
     ],

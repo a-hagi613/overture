@@ -55,7 +55,7 @@ if (env.ENABLE_TEST_ROUTES) {
 const clock = createClock();
 const shutdownController = new AbortController();
 const mailSender = createMailSender(clock);
-const auth = createAuth(db, mailSender);
+const auth = createAuth(db, clock, mailSender);
 
 recoverStaleLocks(db, clock);
 

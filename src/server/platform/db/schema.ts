@@ -120,6 +120,35 @@ export const settings = sqliteTable("settings", {
   updatedBy: text("updated_by").notNull(),
 });
 
+export const passkeys = sqliteTable("passkey", {
+  id: text("id").primaryKey(),
+  name: text("name"),
+  publicKey: text("public_key").notNull(),
+  userId: cascadeUserId(),
+  credentialID: text("credential_id").notNull(),
+  counter: integer("counter").notNull(),
+  deviceType: text("device_type").notNull(),
+  backedUp: integer("backed_up", { mode: "boolean" }).notNull(),
+  transports: text("transports"),
+  createdAt: timestamp("created_at"),
+  aaguid: text("aaguid"),
+});
+
+export const passkeyAssertions = sqliteTable("passkey_assertions", {
+  userId: cascadeUserId().primaryKey(),
+  assertedAt: integer("asserted_at").notNull(),
+});
+
+export const adminAudit = sqliteTable("admin_audit", {
+  id: text("id").primaryKey(),
+  at: integer("at").notNull(),
+  actorId: text("actor_id").notNull(),
+  action: text("action").notNull(),
+  targetUserId: text("target_user_id"),
+  reason: text("reason").notNull(),
+  detail: text("detail").notNull(),
+});
+
 export const killSwitches = sqliteTable(
   "kill_switches",
   {

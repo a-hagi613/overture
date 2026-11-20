@@ -104,7 +104,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | ATS job feeds (Greenhouse, Lever, Ashby) | catalog discovery (§6) | `GREENHOUSE_FEED_BASE_URL`, `LEVER_FEED_BASE_URL`, `ASHBY_FEED_BASE_URL` (test-only overrides of the real hosts) | local fixture server replaying recorded real responses captured by `scripts/record-feeds.ts` |
 | Cloudflare R2 | backups, encrypted files and mail | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES`, `R2_BUCKET_BACKUPS` | disk object store adapter (real implementation, also used in local dev) |
 | Cloudflare Turnstile | bot check on auth forms | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | Cloudflare's published always-pass test keys |
-| Cloudflare Access | admin host gate | `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN` | real verification against a test signing key |
+| Cloudflare Access | admin host gate | `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_JWKS_URL` (tests override the certs URL) | real verification against a test signing key |
 | Amazon SES receiving | inbound mail (ADR 0024) | `SES_INBOUND_BUCKET`, `SES_INBOUND_TOPIC_ARN` | real SNS-signed notices (test signing certificate served through MSW) to the real endpoint; raw mail from the disk object store |
 | Browser Use Cloud | primary browser | `BROWSER_USE_API_KEY` | `local` provider: real local Chrome filling saved forms from the fixture server (§10.5); control API via MSW |
 | Kernel | fallback browser | `KERNEL_API_KEY` | control API via MSW; lab only |
@@ -371,9 +371,10 @@ Order of precedence for role/seniority: `import` (hiring.cafe file, if the owner
    `{apply_url, title, company, role?, subrole?, seniority?, workplace?, employment_type?, salary?}`; rows match a
    posting by `apply_url_norm`; matched rows set `tag_source='import'` and imported tags win over rules, model and
    llm tags for the dimensions they set. The import is recorded in `tag_imports` (who uploaded, when, row count,
-   matched count). Until the admin area lands (M1-12), the import runs through the `importTags` module exposed by the
-   owner-run script `scripts/import-tags.ts --db <overture.db> --file <tags.jsonl>` and by a test-only route; the
-   HTTP route mounts behind the admin owner gate in M1-12. Overture ships no code that fetches hiring.cafe.
+   matched count). The route mounts behind the admin owner gate (§12) and its action is recorded on `admin_audit`;
+   the same `importTags` module runs from the owner-run script `scripts/import-tags.ts --db <overture.db>
+   --file <tags.jsonl>` and from a test-only route. `GET /admin/api/llm-usage` returns the recorded LLM usage
+   (§6.3.4, `llm_usage`) behind the same gate, filterable by `purpose`. Overture ships no code that fetches hiring.cafe.
 
 ### 6.4 Taxonomy (starting lists; the census finalises them)
 
@@ -765,8 +766,23 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
 
 - Host `admin.tryoverture.com`: Cloudflare Access (owner identity) **and** better-auth session with `role='owner'`
   **and** a passkey assertion within the last 12 h.
+- `admin.tryoverture.com` is served by the same process; the Host header picks the admin surface. A request to the
+  admin API (`/admin/api/*`) that fails a gate is refused with a stable code: `access_required` (no Access JWT in
+  `Cf-Access-Jwt-Assertion` or the `CF_Authorization` cookie, or one that fails verification against the team JWKS
+  with audience `CF_ACCESS_AUD`), `sign_in_required` (no session), `owner_required` (the session's role is not
+  `owner`) or `passkey_required` (no passkey assertion within 12 h, recorded in `passkey_assertions` when the
+  better-auth passkey plugin verifies one).
 - **Reveal**: passkey re-assertion + typed reason → 15-minute grant scoped to one user; every reveal and admin
   action writes `admin_audit` and ships to Loki. Users see their entries in Settings → "Support access".
+- Every admin action on `admin_audit`: `at`, `actor_id`, `action`, `target_user_id` (null), `reason`, `detail`
+  JSON; an OTel span carries the action.
+- `/admin/api/catalog` returns `{ discoveredAt, ats }`, where `ats` holds one entry per source
+  (`greenhouse`, `lever`, `ashby`) with `hourlyLimit` (from `limits.ats_hourly.<ats>`) and `killSwitchEnabled`
+  (null until a kill switch for that ATS is set). Before discovery exists, `discoveredAt` is null. Later slices
+  (M1-07) add optional per-ATS fields (`boardCount`, `lastPollAt`, `errorRate`) without changing this contract.
+- `POST /admin/api/tag-imports` mounts the hiring.cafe import seam (§6.3.6) behind the same gate;
+  `PUT /admin/api/settings/:key` and `PUT /admin/api/kill-switches/:scope/:key` are the admin's other write
+  surfaces. `GET /admin/api/llm-usage` returns the recorded LLM usage and cost, filterable by `purpose`.
 - Never shown per person: EEO answers (aggregate counts only), card data (Stripe), password hashes.
 - Act-as is **read-only** and requires an active Reveal.
 
@@ -798,7 +814,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Settings | `GET/PUT /api/settings` (threshold, digest, timezone, languages) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `POST /api/account/delete` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/ses/events` · `POST /internal/mail/inbound` · `GET /internal/mailboxes/:local` |
-| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/mail-health`, `/audit`, `/provider-report` |
+| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/mail-health`, `/audit`, `/provider-report` |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
 `home.updated`, `notification`. TanStack Query invalidates by topic.
