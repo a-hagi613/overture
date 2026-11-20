@@ -890,6 +890,7 @@ export function createPreparationService(deps: {
             resolved: saved !== null,
             answer: saved === null ? null : saved.map((sentence) => sentence.sentence).join(" "),
             sentences: saved ?? [],
+            scope: "",
           };
         }
 

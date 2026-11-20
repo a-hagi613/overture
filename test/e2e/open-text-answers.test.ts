@@ -72,7 +72,10 @@ async function uploadResume(owner: APIRequestContext) {
   expect(response.ok()).toBe(true);
 }
 
-async function saveFacts(owner: APIRequestContext, facts: { key: string; value: string }[]) {
+async function saveFacts(
+  owner: APIRequestContext,
+  facts: { key: string; value: string; scope?: string }[],
+) {
   const response = await owner.put("/api/profile/facts", { data: { facts } });
 
   expect(response.ok()).toBe(true);
@@ -348,7 +351,7 @@ test("a prompt-injection posting does not change a factual answer", async ({ ans
   await uploadResume(owner);
   await saveFacts(owner, [
     { key: "email", value: "maya.okafor@mail.overture.test" },
-    { key: "work_auth", value: "Yes" },
+    { key: "work_auth", scope: "CA", value: "Yes" },
   ]);
 
   const postingId = await seedQuestions(owner, {
