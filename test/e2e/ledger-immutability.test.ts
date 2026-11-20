@@ -17,7 +17,7 @@ test("a direct ledger row change is refused by the database", async ({
   isolatedAppServer,
   request,
 }) => {
-  const url = isolatedAppServer.url;
+  const { url } = isolatedAppServer;
 
   await requestMagicLink(url, request, authTestIdentity.ownerEmail);
 
@@ -28,6 +28,7 @@ test("a direct ledger row change is refused by the database", async ({
   const sampleResponse = await request.post(`${url}/__test__/ledger/sample`, {
     data: { email: authTestIdentity.ownerEmail },
   });
+
   const sample = sampleResponseSchema.parse(await sampleResponse.json());
 
   expect(sample.applicationsLeft).toBe(63);
@@ -74,7 +75,7 @@ test("a direct ledger row change is refused by the database", async ({
 });
 
 test("ledger rows go only when their user goes", async ({ isolatedAppServer, request }) => {
-  const url = isolatedAppServer.url;
+  const { url } = isolatedAppServer;
 
   await requestMagicLink(url, request, authTestIdentity.ownerEmail);
 

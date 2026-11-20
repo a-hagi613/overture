@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 
 import { openDatabase } from "../platform/db/client.ts";
 import { migrateDatabase } from "../platform/db/migrate.ts";

@@ -10,7 +10,6 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
-import { sql } from "drizzle-orm";
 
 const timestamp = (name: string) => integer(name, { mode: "timestamp" });
 
