@@ -2,14 +2,13 @@ import { and, desc, eq, gte, isNull, notInArray, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
-import { indexPosting } from "../platform/search/search.ts";
 import { companies, companyBoards, postings } from "../platform/db/schema.ts";
 import { htmlToText } from "./html-to-text.ts";
 import { normalizeApplyUrl, normalizeTitle } from "./normalize.ts";
 import { contentHash } from "./content-hash.ts";
 import { dedupeKeyFor } from "./dedupe-key.ts";
 
-import type { GreenhouseFeed, GreenhouseFeedJob } from "./greenhouse-feed.ts";
+import type { GreenhouseFeed, GreenhouseFeedJob, GreenhouseJobDetail } from "./greenhouse-feed.ts";
 
 export type BoardRow = typeof companyBoards.$inferSelect;
 
@@ -85,10 +84,6 @@ async function fetchDetailOrNull(feed: GreenhouseFeed, boardToken: string, jobId
   }
 }
 
-async function fetchChangedDetails(feed: GreenhouseFeed, boardToken: string, jobIds: string[]) {
-  return Promise.all(jobIds.map(async (jobId) => fetchDetailOrNull(feed, boardToken, jobId)));
-}
-
 function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow, now: number) {
   const latestChangeMs = latestSourceUpdatedAtForBoard(db, board.id);
 
@@ -96,21 +91,14 @@ function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow, now:
     .update(postings)
     .set({ missingPolls: sql`${postings.missingPolls} + 1` })
     .where(
-      and(
-        eq(postings.boardId, board.id),
-        isNull(postings.closedAt),
-        gte(postings.missingPolls, 1),
-      ),
+      and(eq(postings.boardId, board.id), isNull(postings.closedAt), gte(postings.missingPolls, 1)),
     )
     .returning({ id: postings.id, missingPolls: postings.missingPolls })
     .all();
 
   for (const row of missingRows) {
     if (row.missingPolls >= MISSING_POLLS_TO_CLOSE) {
-      db.update(postings)
-        .set({ closedAt: clock.now() })
-        .where(eq(postings.id, row.id))
-        .run();
+      db.update(postings).set({ closedAt: clock.now() }).where(eq(postings.id, row.id)).run();
     }
   }
 
@@ -143,35 +131,16 @@ async function syncPostings(
   feed: GreenhouseFeed,
   board: BoardRow,
   jobs: GreenhouseFeedJob[],
-  companyName: string,
   now: number,
 ) {
   const report = { added: 0, updated: 0, closed: 0 };
-  const seenJobIds = new Set<string>();
-  const changedJobIds: string[] = [];
+  const seenJobIds = new Set<string>(jobs.map((job) => job.id));
 
-  const existingByJobId = new Map<
-    string,
-    { id: string; closedAt: number | null; sourceUpdatedAt: number | null }
-  >();
+  const existingRows = db.select().from(postings).where(eq(postings.boardId, board.id)).all();
+  const existingByJobId = new Map(existingRows.map((row) => [row.atsJobId, row]));
 
-  for (const job of jobs) {
-    seenJobIds.add(job.id);
-
-    const existing = db
-      .select()
-      .from(postings)
-      .where(and(eq(postings.boardId, board.id), eq(postings.atsJobId, job.id)))
-      .get();
-
-    if (existing !== undefined) {
-      existingByJobId.set(job.id, {
-        id: existing.id,
-        closedAt: existing.closedAt,
-        sourceUpdatedAt: existing.sourceUpdatedAt,
-      });
-    }
-
+  const changedJobs = jobs.filter((job) => {
+    const existing = existingByJobId.get(job.id);
     const jobUpdatedAtMs = parseMs(job.updatedAt);
 
     const unchanged =
@@ -179,31 +148,29 @@ async function syncPostings(
       existing.sourceUpdatedAt !== null &&
       existing.sourceUpdatedAt === jobUpdatedAtMs;
 
-    if (!unchanged) {
-      changedJobIds.push(job.id);
-    }
-  }
+    return !unchanged;
+  });
 
-  const details = await fetchChangedDetails(feed, board.boardToken, changedJobIds);
+  const detailsList = await Promise.all(
+    changedJobs.map(async (job) => {
+      const detail = await fetchDetailOrNull(feed, board.boardToken, job.id);
 
-  for (const [index, job] of jobs.entries()) {
-    if (!changedJobIds.includes(job.id)) {
-      const unchangedId = existingByJobId.get(job.id);
+      return [job.id, detail] as const;
+    }),
+  );
 
-      if (unchangedId !== undefined) {
-        touchUnchangedPosting(db, unchangedId.id, now);
-      }
+  const detailsByJobId = new Map<string, GreenhouseJobDetail | null>(detailsList);
+
+  for (const job of jobs) {
+    const existing = existingByJobId.get(job.id);
+
+    if (existing !== undefined && !detailsByJobId.has(job.id)) {
+      touchUnchangedPosting(db, existing.id, now);
 
       continue;
     }
 
-    if (existingByJobId.get(job.id) === undefined) {
-      report.added += 1;
-    } else {
-      report.updated += 1;
-    }
-
-    const detail = details[index] ?? null;
+    const detail = detailsByJobId.get(job.id) ?? null;
     const descriptionText = htmlToText(detail?.contentHtml ?? null);
     const titleNorm = normalizeTitle(job.title);
 
@@ -216,6 +183,7 @@ async function syncPostings(
 
     const values = {
       url: job.absoluteUrl ?? "",
+      applyUrl: null,
       applyUrlNorm: normalizeApplyUrl(job.absoluteUrl ?? ""),
       title: job.title,
       titleNorm,
@@ -232,38 +200,33 @@ async function syncPostings(
       descriptionHash: descriptionText === null ? null : contentHash(descriptionText),
     };
 
-    const existingId = existingByJobId.get(job.id);
+    if (existing === undefined) {
+      const inserted = db
+        .insert(postings)
+        .values({
+          id: crypto.randomUUID(),
+          boardId: board.id,
+          companyId: board.companyId,
+          ats: board.ats,
+          atsJobId: job.id,
+          firstSeenAt: now,
+          ...values,
+        })
+        .onConflictDoNothing()
+        .returning({ id: postings.id })
+        .all()
+        .at(0);
 
-    const postingId =
-      existingId === undefined
-        ? ((
-            db
-              .insert(postings)
-              .values({
-                id: crypto.randomUUID(),
-                boardId: board.id,
-                companyId: board.companyId,
-                ats: board.ats,
-                atsJobId: job.id,
-                firstSeenAt: now,
-                ...values,
-              })
-              .onConflictDoNothing()
-              .returning({ id: postings.id })
-              .all()
-              .at(0) ?? null
-          )?.id ?? null)
-        : existingId.id;
+      if (inserted !== undefined) {
+        report.added += 1;
+      }
 
-    if (postingId !== null) {
-      indexPosting(db, {
-        id: postingId,
-        title: titleNorm,
-        company: companyName,
-        location: values.locationRaw ?? "",
-        department: values.department,
-      });
+      continue;
     }
+
+    db.update(postings).set(values).where(eq(postings.id, existing.id)).run();
+
+    report.updated += 1;
   }
 
   const missingFilter =
@@ -410,9 +373,7 @@ export const pollBoard = async (
     return touchWithoutChange(db, clock, board, now);
   }
 
-  const company = db.select().from(companies).where(eq(companies.id, board.companyId)).get();
-
-  const rows = await syncPostings(db, clock, feed, board, result.jobs, company?.name ?? "", now);
+  const rows = await syncPostings(db, clock, feed, board, result.jobs, now);
 
   markBoardPolled(db, clock, board, result);
 

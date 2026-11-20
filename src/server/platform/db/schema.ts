@@ -1,4 +1,12 @@
-import { blob, index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  blob,
+  index,
+  integer,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -73,6 +81,7 @@ export const probeForms = sqliteTable("probe_forms", {
   sessionId: text("session_id"),
   createdAt: integer("created_at").notNull(),
 });
+
 export const companies = sqliteTable("companies", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -94,6 +103,7 @@ export const companyBoards = sqliteTable(
     status: text("status", { enum: ["active", "empty", "gone", "disabled"] })
       .notNull()
       .default("active"),
+    source: text("source", { enum: ["v1_seed", "discovered", "import"] }).notNull(),
     etag: text("etag"),
     lastModified: text("last_modified"),
     contentHash: text("content_hash"),
@@ -120,6 +130,7 @@ export const postings = sqliteTable(
     ats: text("ats", { enum: ["greenhouse", "lever", "ashby"] }).notNull(),
     atsJobId: text("ats_job_id").notNull(),
     url: text("url").notNull(),
+    applyUrl: text("apply_url"),
     applyUrlNorm: text("apply_url_norm").notNull(),
     title: text("title").notNull(),
     titleNorm: text("title_norm").notNull(),

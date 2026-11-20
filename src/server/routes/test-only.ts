@@ -50,6 +50,7 @@ const createBoardBody = z.object({
   ats: z.enum(["greenhouse", "lever", "ashby"]),
   boardToken: z.string().min(1),
   status: z.enum(["active", "empty", "gone", "disabled"]).default("active"),
+  source: z.enum(["v1_seed", "discovered", "import"]).default("discovered"),
 });
 
 export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handlers: JobHandlers) {
@@ -168,11 +169,20 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
   });
 
   routes.post("/catalog/boards", zValidator("json", createBoardBody), (context) => {
-    const { companyId, ats, boardToken, status } = context.req.valid("json");
+    const { companyId, ats, boardToken, status, source } = context.req.valid("json");
     const id = crypto.randomUUID();
 
     db.insert(companyBoards)
-      .values({ id, companyId, ats, boardToken, status, notFoundPolls: 0, createdAt: clock.now() })
+      .values({
+        id,
+        companyId,
+        ats,
+        boardToken,
+        status,
+        source,
+        notFoundPolls: 0,
+        createdAt: clock.now(),
+      })
       .onConflictDoNothing()
       .run();
 

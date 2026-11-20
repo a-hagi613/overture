@@ -2,7 +2,6 @@ import { mkdirSync, rmSync } from "node:fs";
 
 import { openDatabase } from "../src/server/platform/db/client.ts";
 import { migrateDatabase } from "../src/server/platform/db/migrate.ts";
-import { indexPosting } from "../src/server/platform/search/search.ts";
 import { companies, companyBoards, postings } from "../src/server/platform/db/schema.ts";
 
 const COMPANY_NAMES = [
@@ -62,14 +61,7 @@ const LOCATIONS = [
   "Berlin, Germany",
 ];
 
-const DEPARTMENTS = [
-  "Engineering",
-  "Data",
-  "Product",
-  "Security",
-  "Infrastructure",
-  "Support",
-];
+const DEPARTMENTS = ["Engineering", "Data", "Product", "Security", "Infrastructure", "Support"];
 
 function slugFor(value: string) {
   return value.toLowerCase().replaceAll(/[^a-z0-9]+/gu, "-");
@@ -102,6 +94,7 @@ export function seedTemplateCatalog(db: ReturnType<typeof openDatabase>["db"]) {
         ats: "greenhouse",
         boardToken: `${slugFor(name)}-seed`,
         status: "disabled",
+        source: "discovered",
         etag: null,
         lastModified: null,
         lastPolledAt: null,
@@ -129,6 +122,7 @@ export function seedTemplateCatalog(db: ReturnType<typeof openDatabase>["db"]) {
           ats: "greenhouse",
           atsJobId: String(900_000 + companyIndex * 100 + jobIndex),
           url: `https://jobs.example/${String(companyIndex)}/${String(jobIndex)}`,
+          applyUrl: null,
           applyUrlNorm: `https://jobs.example/${String(companyIndex)}/${String(jobIndex)}`,
           title,
           titleNorm,
@@ -156,14 +150,6 @@ export function seedTemplateCatalog(db: ReturnType<typeof openDatabase>["db"]) {
         })
         .onConflictDoNothing()
         .run();
-
-      indexPosting(db, {
-        id: postingId,
-        title: titleNorm,
-        company: name,
-        location,
-        department,
-      });
     }
   }
 }
