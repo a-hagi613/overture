@@ -168,10 +168,7 @@
     },
     "test/e2e/backup-health-cache.test.ts": {
       "full": false,
-      "paths": [
-        "/__test__/clock/offset",
-        "/api/health"
-      ],
+      "paths": ["/__test__/clock/offset", "/api/health"],
       "modules": [
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",

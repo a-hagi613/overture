@@ -12,6 +12,7 @@ import { recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.
 import { startJobWorker } from "./platform/jobs/scheduler.ts";
 import { startTelemetry, trace } from "./platform/telemetry/otel.ts";
 import { createDiskObjectStore } from "./platform/ports/object-store.ts";
+import { createR2ObjectStore } from "./platform/ports/r2-object-store.ts";
 import { createGreenhouseFeed } from "./catalog/greenhouse-feed.ts";
 import { createLeverFeed } from "./catalog/lever-feed.ts";
 import { createAshbyFeed } from "./catalog/ashby-feed.ts";
@@ -136,7 +137,18 @@ const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
     }
   : {};
 
-const objects = createDiskObjectStore(env.OBJECT_STORE_ROOT);
+const objects =
+  env.R2_ACCOUNT_ID !== undefined &&
+  env.R2_ACCESS_KEY_ID !== undefined &&
+  env.R2_SECRET_ACCESS_KEY !== undefined &&
+  env.R2_BUCKET_FILES !== undefined
+    ? createR2ObjectStore({
+        endpoint: env.R2_ENDPOINT ?? `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        bucket: env.R2_BUCKET_FILES,
+        accessKeyId: env.R2_ACCESS_KEY_ID,
+        secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+      })
+    : createDiskObjectStore(env.OBJECT_STORE_ROOT);
 
 const worker = startJobWorker(
   db,

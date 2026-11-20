@@ -72,6 +72,11 @@ const envSchema = z
       }),
     MASTER_KEY_CURRENT: z.coerce.number().int().min(1).default(1),
     OBJECT_STORE_ROOT: z.string().min(1).default("data/objects"),
+    R2_ACCOUNT_ID: z.string().min(1).optional(),
+    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    R2_BUCKET_FILES: z.string().min(1).optional(),
+    R2_ENDPOINT: z.url().optional(),
     MAIL_FROM: z.email().default("no-reply@tryoverture.com"),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
     OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
@@ -123,6 +128,34 @@ const envSchema = z
           path: [value[idName] === undefined ? idName : secretName],
         });
       }
+    }
+
+    const r2Credentials = [value.R2_ACCOUNT_ID, value.R2_ACCESS_KEY_ID, value.R2_SECRET_ACCESS_KEY];
+    const r2CredentialsPresent = r2Credentials.filter((entry) => entry !== undefined).length;
+
+    if (r2CredentialsPresent > 0 && r2CredentialsPresent < r2Credentials.length) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "R2_ACCOUNT_ID, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY are set together or not at all.",
+        path: ["R2_ACCOUNT_ID"],
+      });
+    }
+
+    if (value.R2_BUCKET_FILES !== undefined && r2CredentialsPresent < r2Credentials.length) {
+      context.addIssue({
+        code: "custom",
+        message: "R2_BUCKET_FILES needs R2_ACCOUNT_ID, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY.",
+        path: ["R2_BUCKET_FILES"],
+      });
+    }
+
+    if (value.R2_ENDPOINT !== undefined && value.R2_BUCKET_FILES === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "R2_ENDPOINT overrides the R2 files endpoint and needs R2_BUCKET_FILES.",
+        path: ["R2_ENDPOINT"],
+      });
     }
   });
 
