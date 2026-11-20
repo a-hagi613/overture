@@ -1,0 +1,207 @@
+{
+  "jobs": [
+    {
+      "absolute_url": "https://boards.greenhouse.io/cloudflare/jobs/7695702?gh_jid=7695702",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 3383201,
+      "location": {
+        "name": "Hybrid"
+      },
+      "metadata": [
+        {
+          "id": 825338,
+          "name": "Cost Center",
+          "value": "5150 - Field Sales",
+          "value_type": "single_select"
+        },
+        {
+          "id": 8654220,
+          "name": "Job Posting Location",
+          "value": [
+            "Washington DC, US"
+          ],
+          "value_type": "multi_select"
+        },
+        {
+          "id": 46546702,
+          "name": "Career Site Department",
+          "value": [
+            "Sales"
+          ],
+          "value_type": "multi_select"
+        }
+      ],
+      "id": 7695702,
+      "updated_at": "2026-11-09T19:03:42-05:00",
+      "requisition_id": "GTM_AMER US PUBSEC FED NSPS#22974",
+      "title": "Account Executive, FedCiv",
+      "company_name": "Cloudflare",
+      "first_published": "2026-03-09T16:05:19-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;h3&gt;About Us&lt;/h3&gt;\n&lt;p&gt;At Cloudflare, we are on a mission to help build a better Internet. Today the company runs one of the world’s largest networks that powers millions of websites and other Internet properties for customers ranging from individual bloggers to SMBs to Fortune 500 companies. Cloudflare protects and accelerates any Internet application online without adding hardware, installing software, or changing a line of code. Internet properties powered by Cloudflare all have web traffic routed through its intelligent global network, which gets smarter with every request. As a result, they see significant improvement in performance and a decrease in spam and other attacks. Cloudflare was named to Entrepreneur Magazine’s Top Company Cultures list and ranked among the World’s Most Innovative Companies by Fast Company.&lt;/p&gt;\n&lt;p&gt;At Cloudflare, we’re not looking for people who wait for a polished roadmap; we’re looking for the builders who see the cracks in the Internet that everyone else has simply learned to live with. We value candidates who have the instinct to spot a &quot;normalized&quot; problem and the AI-native curiosity to create a solution using the latest tools. Our culture is built on iteration, leveraging AI to ship faster today to make it better tomorrow, while ensuring that every improvement, no matter how small, is shared across the team to lift everyone up. If you’re the type of person who values curiosity over bureaucracy, and that AI is a partner in solving tough problems to keep the Internet moving forward, you’ll fit right in.&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;Available Locations&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;Washington DC, US&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h2&gt;About the Role&lt;/h2&gt;\n&lt;p&gt;Account Executives, Channel Account Managers, Business Development Representatives, Solution Engineers, Customer Success, and Sales Operations - all working together help our customers adopt Cloudflare and create great Internet-enabled experiences. The sales team at Cloudflare helps customers solve real, technical problems while creating the revenue streams that help the company provide free service to millions in our community.&lt;/p&gt;\n&lt;h2&gt;Responsibilities&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;We are looking for a seasoned sales professional to help cover the Federal market for US. The ideal candidate will possess both a sales and technical background that enables them to drive engagement at all levels with technical and non-technical buyers.&lt;/li&gt;\n&lt;li&gt;As an Account Executive, you&#39;ll be responsible for developing and executing against a comprehensive account/territory plan as well as driving sales in a defined territory and/or account list to achieve revenue targets. The person in this role will also assist in creating and articulating compelling value propositions for Cloudflare services.&lt;/li&gt;\n&lt;li&gt;Manage contract negotiations&lt;/li&gt;\n&lt;li&gt;Maintain a robust sales pipeline&lt;/li&gt;\n&lt;li&gt;Develop long-term strategic relationships with key accounts.&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h2&gt;Desirable Skills, Knowledge, and Experience&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;Minimum 3 years of experience selling technical solutions or products to the Public Sector (Federal Government) ; &lt;strong&gt;all&lt;/strong&gt; FedCiv agency experience open to consideration&lt;/li&gt;\n&lt;li&gt;Experience managing longer, complex sales cycles`&lt;/li&gt;\n&lt;li&gt;Basic understanding of computer networking and “how the internet works”&lt;/li&gt;\n&lt;li&gt;Aptitude for learning technical concepts/terms (Technical background in engineering, computer science, or MIS a plus)&lt;/li&gt;\n&lt;li&gt;Strong interpersonal communication and organizational skills.&lt;/li&gt;\n&lt;li&gt;Self-motivated; entrepreneurial spirit&lt;/li&gt;\n&lt;li&gt;Comfortable working in a fast paced dynamic environment&lt;/li&gt;\n&lt;li&gt;Experience selling to the Fe"
+    },
+    {
+      "absolute_url": "https://boards.greenhouse.io/cloudflare/jobs/8392878?gh_jid=8392878",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 3622460,
+      "location": {
+        "name": "Hybrid"
+      },
+      "metadata": [
+        {
+          "id": 825338,
+          "name": "Cost Center",
+          "value": "5100 - Mid Market",
+          "value_type": "single_select"
+        },
+        {
+          "id": 8654220,
+          "name": "Job Posting Location",
+          "value": [
+            "Munich, Germany"
+          ],
+          "value_type": "multi_select"
+        },
+        {
+          "id": 46546702,
+          "name": "Career Site Department",
+          "value": [
+            "Sales"
+          ],
+          "value_type": "multi_select"
+        }
+      ],
+      "id": 8392878,
+      "updated_at": "2026-11-19T11:10:40-05:00",
+      "requisition_id": null,
+      "title": "Account Executive, Start Ups",
+      "company_name": "Cloudflare",
+      "first_published": "2026-11-19T07:12:47-05:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;h3&gt;About Us&lt;/h3&gt;\n&lt;p&gt;At Cloudflare, we are on a mission to help build a better Internet. Today the company runs one of the world’s largest networks that powers millions of websites and other Internet properties for customers ranging from individual bloggers to SMBs to Fortune 500 companies. Cloudflare protects and accelerates any Internet application online without adding hardware, installing software, or changing a line of code. Internet properties powered by Cloudflare all have web traffic routed through its intelligent global network, which gets smarter with every request. As a result, they see significant improvement in performance and a decrease in spam and other attacks. Cloudflare was named to Entrepreneur Magazine’s Top Company Cultures list and ranked among the World’s Most Innovative Companies by Fast Company.&lt;/p&gt;\n&lt;p&gt;At Cloudflare, we’re not looking for people who wait for a polished roadmap; we’re looking for the builders who see the cracks in the Internet that everyone else has simply learned to live with. We value candidates who have the instinct to spot a &quot;normalized&quot; problem and the AI-native curiosity to create a solution using the latest tools. Our culture is built on iteration, leveraging AI to ship faster today to make it better tomorrow, while ensuring that every improvement, no matter how small, is shared across the team to lift everyone up. If you’re the type of person who values curiosity over bureaucracy, and that AI is a partner in solving tough problems to keep the Internet moving forward, you’ll fit right in.&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;&lt;span style=&quot;color: rgb(230, 126, 35);&quot;&gt;&lt;strong&gt;Available Locations&lt;/strong&gt;&lt;/span&gt;&lt;/h2&gt;\n&lt;hr&gt;\n&lt;p&gt;Munich, Berlin or Frankfurt&lt;/p&gt;\n&lt;h2&gt;&lt;span style=&quot;color: rgb(230, 126, 35);&quot;&gt;&lt;strong&gt;About the Role&lt;/strong&gt;&lt;/span&gt;&lt;/h2&gt;\n&lt;hr&gt;\n&lt;p&gt;Cloudflare is looking for a Startup Account Executive to join our Digital Natives team in Germany and Austria. You&#39;ll build your own customer base from the ground up, mostly through your own prospecting or by working closely with your BDR. Your job is to find promising startups across the region, win them early and help them build on Cloudflare as they grow.&lt;/p&gt;\n&lt;p&gt;You&#39;ll work with AI startups, developer tool companies and other young tech businesses, often in the first years after their funding. Their teams are small, and founders make most of the decisions. Often an engineer has been using Cloudflare long before anyone talks to sales. You know this world, and you&#39;re comfortable talking about technology with a founder or CTO. You don&#39;t need to know every spec, but you understand what they&#39;re building and what Cloudflare can change for them.&lt;/p&gt;\n&lt;p&gt;The pace is high. You&#39;ll spend a good part of your week reaching out to founders and engineers, following up and booking first meetings. You&#39;ll also build your network in the startup scene. VC firms, accelerators and founder communities are often the fastest way to the right companies, and you&#39;ll become a familiar face there. If you enjoy the hunt and like seeing your own work turn into new customers, you&#39;ll like this job.&amp;nbsp;&lt;/p&gt;\n&lt;p&gt;Above all, we are looking for true team players. We win together, not as lone wolves with sharp elbows. You share what works, ask for help when you need it, and celebrate your colleagues&#39; wins as much as your own. You see your BDR, Solutions Engineers and specialists as real partners, not as support functions, and you bring the same care to working with your colleagues as you do to working with your customers. If you believe the best results come from people who make each other better, you&#39;ll feel right at home on our team.&amp;nbsp;&lt;/p&gt;\n&lt;p&gt;AI tools are a big part of how we sell."
+    },
+    {
+      "absolute_url": "https://boards.greenhouse.io/cloudflare/jobs/8394342?gh_jid=8394342",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 3623060,
+      "location": {
+        "name": "In-Office"
+      },
+      "metadata": [
+        {
+          "id": 825338,
+          "name": "Cost Center",
+          "value": "5991 - S&M Interns",
+          "value_type": "single_select"
+        },
+        {
+          "id": 8654220,
+          "name": "Job Posting Location",
+          "value": [
+            "Austin, TX",
+            "San Francisco, CA"
+          ],
+          "value_type": "multi_select"
+        },
+        {
+          "id": 46546702,
+          "name": "Career Site Department",
+          "value": [
+            "Early Talent"
+          ],
+          "value_type": "multi_select"
+        }
+      ],
+      "id": 8394342,
+      "updated_at": "2026-11-17T15:02:04-05:00",
+      "requisition_id": null,
+      "title": "AI & Automation Intern, Communications (Winter 2027)",
+      "company_name": "Cloudflare",
+      "first_published": "2026-11-17T15:02:04-05:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;h3&gt;About Us&lt;/h3&gt;\n&lt;p&gt;At Cloudflare, we are on a mission to help build a better Internet. Today the company runs one of the world’s largest networks that powers millions of websites and other Internet properties for customers ranging from individual bloggers to SMBs to Fortune 500 companies. Cloudflare protects and accelerates any Internet application online without adding hardware, installing software, or changing a line of code. Internet properties powered by Cloudflare all have web traffic routed through its intelligent global network, which gets smarter with every request. As a result, they see significant improvement in performance and a decrease in spam and other attacks. Cloudflare was named to Entrepreneur Magazine’s Top Company Cultures list and ranked among the World’s Most Innovative Companies by Fast Company.&lt;/p&gt;\n&lt;p&gt;At Cloudflare, we’re not looking for people who wait for a polished roadmap; we’re looking for the builders who see the cracks in the Internet that everyone else has simply learned to live with. We value candidates who have the instinct to spot a &quot;normalized&quot; problem and the AI-native curiosity to create a solution using the latest tools. Our culture is built on iteration, leveraging AI to ship faster today to make it better tomorrow, while ensuring that every improvement, no matter how small, is shared across the team to lift everyone up. If you’re the type of person who values curiosity over bureaucracy, and that AI is a partner in solving tough problems to keep the Internet moving forward, you’ll fit right in.&lt;/p&gt;&lt;/div&gt;&lt;p&gt;&lt;strong&gt;Available Locations:&amp;nbsp;&lt;/strong&gt;&lt;/p&gt;\n&lt;ul&gt;\n&lt;li&gt;Austin, TX&lt;/li&gt;\n&lt;li&gt;San Francisco, CA&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;&lt;strong&gt;Available Term&lt;/strong&gt;&lt;/p&gt;\n&lt;ul&gt;\n&lt;li&gt;Winter (January - April 2027)&amp;nbsp;&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;&lt;strong&gt;About the role&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;Cloudflare’s mission is to help build a better Internet—and our Communications team is responsible for telling that story to the world and to our own employees. Across Public Relations, Social, Internal, Visual, and Executive Communications, we support major company announcements, Innovation Weeks, internal employee platforms and news, our public social channels and executive communications.&lt;/p&gt;\n&lt;p&gt;Cloudflare moves fast, and so does our work. We&#39;re looking for a builder who is just as curious about how organizations communicate as about the technology behind it. You might be studying information science, data science, HCI, digital media, journalism, cognitive science, business or information systems, or communications with a strong technical streak, or coming from a coding bootcamp or self-taught path. You&#39;ll work at the intersection of AI, automation, and employee and corporate communications, identifying opportunities to eliminate manual work, connect disconnected systems, and build tools that make our team smarter and more effective.&lt;/p&gt;\n&lt;p&gt;By the end of the internship, you’ve built new tools or processes for how we can better communicate or collaborate.&amp;nbsp;&lt;/p&gt;\n&lt;h4&gt;&lt;strong&gt;Responsibilities&lt;/strong&gt;&lt;/h4&gt;\n&lt;ul&gt;\n&lt;li&gt;&lt;strong&gt;Automate the everyday:&lt;/strong&gt; Build workflows that can save the team time—like creating a dynamic, shared visual calendar that pulls milestones automatically from multiple team trackers, auto-populating our weekly internal newsletter with top press coverage, or keeping our internal wiki (Company Hub) continuously updated with the latest stats or coverage highlights.&lt;/li&gt;\n&lt;li&gt;&lt;strong&gt;Own a flagship AI project:&lt;/strong&gt; Sit down with teammates across PR, Social, Design, and Internal Comms to uncover an opportunity to use AI to reimagine a time-consuming or fragmented process."
+    },
+    {
+      "absolute_url": "https://boards.greenhouse.io/cloudflare/jobs/8097321?gh_jid=8097321",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 3507882,
+      "location": {
+        "name": "Hybrid"
+      },
+      "metadata": [
+        {
+          "id": 825338,
+          "name": "Cost Center",
+          "value": "4700 - Security",
+          "value_type": "single_select"
+        },
+        {
+          "id": 8654220,
+          "name": "Job Posting Location",
+          "value": [
+            "Austin, US",
+            "New York, US"
+          ],
+          "value_type": "multi_select"
+        },
+        {
+          "id": 46546702,
+          "name": "Career Site Department",
+          "value": [
+            "Engineering",
+            "Security"
+          ],
+          "value_type": "multi_select"
+        }
+      ],
+      "id": 8097321,
+      "updated_at": "2026-11-09T19:03:42-05:00",
+      "requisition_id": null,
+      "title": "AI Security Research & Red Team Engineer",
+      "company_name": "Cloudflare",
+      "first_published": "2026-08-10T11:02:09-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;h3&gt;About Us&lt;/h3&gt;\n&lt;p&gt;At Cloudflare, we are on a mission to help build a better Internet. Today the company runs one of the world’s largest networks that powers millions of websites and other Internet properties for customers ranging from individual bloggers to SMBs to Fortune 500 companies. Cloudflare protects and accelerates any Internet application online without adding hardware, installing software, or changing a line of code. Internet properties powered by Cloudflare all have web traffic routed through its intelligent global network, which gets smarter with every request. As a result, they see significant improvement in performance and a decrease in spam and other attacks. Cloudflare was named to Entrepreneur Magazine’s Top Company Cultures list and ranked among the World’s Most Innovative Companies by Fast Company.&lt;/p&gt;\n&lt;p&gt;At Cloudflare, we’re not looking for people who wait for a polished roadmap; we’re looking for the builders who see the cracks in the Internet that everyone else has simply learned to live with. We value candidates who have the instinct to spot a &quot;normalized&quot; problem and the AI-native curiosity to create a solution using the latest tools. Our culture is built on iteration, leveraging AI to ship faster today to make it better tomorrow, while ensuring that every improvement, no matter how small, is shared across the team to lift everyone up. If you’re the type of person who values curiosity over bureaucracy, and that AI is a partner in solving tough problems to keep the Internet moving forward, you’ll fit right in.&lt;/p&gt;&lt;/div&gt;&lt;p&gt;&lt;strong&gt;The Role:&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;We are seeking a highly skilled AI Security Research &amp;amp; Red team engineer&lt;strong&gt; &lt;/strong&gt;&amp;nbsp;to join our Red Team within the Security Threat Detection, Response and Emulation organization. This is a critical role that will be at the forefront of protecting our company and customers from malicious threats. You will be responsible for driving security research, exercises, and activities that emulate real world attackers and attacks to drive improvements in Cloudflare’s security posture focusing on AI, Agents, harnesses and LLM’s.&amp;nbsp;&lt;/p&gt;\n&lt;p&gt;&lt;strong&gt;Key Responsibilities:&lt;/strong&gt;&lt;/p&gt;\n&lt;ul&gt;\n&lt;li&gt;&lt;strong&gt;AI Security and Vulnerability Research: &lt;/strong&gt;Stay current with emerging threats and perform deep-dive research to identify AI-specific vulnerabilities and risks in addition to general vulnerabilities across Cloudflare’s products and services.&lt;/li&gt;\n&lt;li&gt;&lt;strong&gt;Agentic testing and adoption: &lt;/strong&gt;As a core function, identifying AI-related attack surfaces through rigorous testing of agentic implementations and LLM usage which will help&amp;nbsp; define requirements and implementation guidance while proactively.&amp;nbsp;&lt;/li&gt;\n&lt;li&gt;&lt;strong&gt;Adversary Simulation:&lt;/strong&gt; Execution of full-chain red team operations targeting Cloudflare’s global infrastructure, corporate networks, and product ecosystems.&lt;/li&gt;\n&lt;li&gt;&lt;strong&gt;Efficacy Testing:&lt;/strong&gt; Establish a rigorous framework for testing &quot;Security Efficacy&quot;—measuring exactly how well our WAF, EDR, and SIEM detections perform against known TTPs (Tactics, Techniques, and Procedures).&lt;/li&gt;\n&lt;li&gt;&lt;strong&gt;Purple Teaming:&lt;/strong&gt; Foster a highly collaborative relationship with the Blue Team (Detection &amp;amp; Response) to ensure findings are translated into immediate defensive improvements.&lt;/li&gt;\n&lt;li&gt;&lt;strong&gt;Mentorship &amp;amp; Growth:&lt;/strong&gt; Be a technical leader, providing technical expertise while fostering a culture of curiosity, ethical hacking and partnering to improve Cloudflare’s security posture.&amp;nbsp;&lt;/li&gt;\n&lt;li&gt;&lt;strong&gt;Executive Reporting:&lt;"
+    }
+  ]
+}
