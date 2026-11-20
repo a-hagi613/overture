@@ -28,7 +28,7 @@ export function SignInStory() {
   return (
     <section
       aria-label={copy.signIn.sampleLabel}
-      className="relative hidden overflow-hidden border-r border-border bg-sidebar px-[clamp(32px,4.5vw,64px)] pb-9 pt-[34px] shadow-[1px_0_0_var(--color-bloom)] min-[961px]:flex min-[961px]:flex-col"
+      className="relative hidden overflow-hidden border-r border-border bg-sidebar px-[clamp(32px,4.5vw,64px)] pb-9 pt-[34px] shadow-[1px_0_0_var(--color-hl)] min-[961px]:flex min-[961px]:flex-col"
     >
       <div className="relative z-[1] mx-auto flex h-full w-full max-w-[610px] flex-col justify-between gap-7">
         <div className="flex items-center gap-4">
@@ -56,7 +56,7 @@ export function SignInStory() {
           </p>
           <SampleStage />
         </div>
-        <div className="grid grid-cols-3 gap-4 border-t border-border pt-5 shadow-[0_-1px_0_var(--color-bloom)]">
+        <div className="grid grid-cols-3 gap-4 border-t border-border pt-5 shadow-[0_-1px_0_var(--color-hl)]">
           {pillars.map((pillar) => (
             <div key={pillar.n} className="flex flex-col gap-[3px]">
               <span className="font-mono text-[11px] text-signal-text [line-height:normal]">

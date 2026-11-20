@@ -38,11 +38,6 @@ for (const width of widths) {
       boardTest(
         `the ${String(width)} ${theme} sign-in screen matches the board in ${mode} mode`,
         async ({ boardServer, browser }) => {
-          boardTest.fixme(
-            theme === "dark",
-            "the redrawn w5-signin board ships its own dark tokens (#12110F page ground) that deviate from the Ember design system (DESIGN.md and ds-2/ds-3 put the dark page at #191714); the build follows the design system, so the dark diff will not get under maxDiffPixelRatio 0.01 until the board is redrawn - ratios reported in the PR",
-          );
-
           const context = await browser.newContext({
             deviceScaleFactor: 1,
             viewport: { width, height: 900 },
