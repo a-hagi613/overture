@@ -85,7 +85,7 @@ test("a backfill fills the catalog and later reads add, change and close Posting
 
     const recentIso = new Date((await clockNow(harness)) - 60_000).toISOString();
 
-    harness.fixture.mutateBoard(FIXTURE_BOARD, {
+    harness.fixture.mutateBoard("greenhouse", FIXTURE_BOARD, {
       titleUpdates: { [changedJob.id]: "Principal Platform Engineer" },
       updatedAtUpdates: { [changedJob.id]: recentIso },
       removeJobIds: [removedJob.id],
@@ -179,7 +179,7 @@ test("search reflects a Posting title change and a close once the poll lands", a
 
     const recentIso = new Date((await clockNow(harness)) - 60_000).toISOString();
 
-    harness.fixture.mutateBoard(FIXTURE_BOARD, {
+    harness.fixture.mutateBoard("greenhouse", FIXTURE_BOARD, {
       titleUpdates: { [changedJob.id]: "Principal Platform Engineer" },
       updatedAtUpdates: { [changedJob.id]: recentIso },
       removeJobIds: [removedJob.id],
@@ -210,7 +210,7 @@ test("activity-based scheduling puts a freshly changed board on the 30 minute ba
     const jobsOnBoard = readFixtureBoard(FIXTURE_BOARD);
     const changedJob = jobsOnBoard[0] ?? { id: "", title: "" };
 
-    harness.fixture.mutateBoard(FIXTURE_BOARD, {
+    harness.fixture.mutateBoard("greenhouse", FIXTURE_BOARD, {
       updatedAtUpdates: {
         [changedJob.id]: new Date((await clockNow(harness)) - 60_000).toISOString(),
       },
@@ -231,7 +231,7 @@ test("activity-based scheduling puts a freshly changed board on the 30 minute ba
 
     const freshIso = new Date((await clockNow(harness)) - 60_000).toISOString();
 
-    harness.fixture.mutateBoard(FIXTURE_BOARD, {
+    harness.fixture.mutateBoard("greenhouse", FIXTURE_BOARD, {
       titleUpdates: { [changedJob.id]: "Distinguished Platform Engineer" },
       updatedAtUpdates: { [changedJob.id]: freshIso },
     });
@@ -261,7 +261,7 @@ test("a board that 404s twice is marked gone and stops being polled", async () =
   const harness = await startCatalogHarness([MISSING_BOARD]);
 
   try {
-    harness.fixture.setNotFound([MISSING_BOARD]);
+    harness.fixture.setNotFound("greenhouse", [MISSING_BOARD]);
 
     await harness.runBackfillCycle();
 
