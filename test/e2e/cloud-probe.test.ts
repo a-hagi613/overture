@@ -115,27 +115,70 @@ function storedForms(harness: ProbeHarness) {
   return readProbeForms(database.db);
 }
 
-test("a dry run without --confirm fills every question on the five recorded real forms and stops before submit", async () => {
-  await withHarness(async (harness) => {
-    const results = await runProbe(command(harness, false, {}));
+for (const record of runFileTemplate.postings) {
+  test(`a dry run without --confirm fills the recorded ${record.board} ${record.jobId} form and stops before submit`, async () => {
+    await withHarness(async (harness) => {
+      const results = await runProbe(
+        command(harness, false, { runFile: singlePostingRunFile(harness, record) }),
+      );
 
-    expect(results.map((result) => result.outcome)).toEqual([
-      "dry_run_filled",
-      "dry_run_filled",
-      "dry_run_filled",
-      "dry_run_filled",
-      "dry_run_filled",
-    ]);
+      expect(results.length).toBe(1);
 
-    for (const result of results) {
+      const [result] = results;
+
+      if (result === undefined) {
+        throw new Error(`no result for ${record.board} ${record.jobId}`);
+      }
+
+      expect(result.outcome).toBe("dry_run_filled");
       expect(result.submitted).toBe(false);
       expect(result.codeAsked).toBe(false);
       expect(result.confirmationSeen).toBe(false);
+
+      expect(harness.fixture.state.submissions).toBe(0);
+      expect(harness.browserUse.sessionCount).toBe(1);
+      expect(harness.browserUse.stoppedSessionIds.length).toBe(1);
+    });
+  });
+}
+
+test("a dry run over the five recorded postings prints one run summary line per posting and stops every session", async () => {
+  await withHarness(async (harness) => {
+    const output = outputProperties(harness.output);
+
+    const unreachable = runFileTemplate.postings.map((record) => ({
+      ...record,
+      url: `http://127.0.0.1:9/${record.board}/jobs/${record.jobId}`,
+    }));
+
+    const results = await runProbe(
+      command(harness, false, {
+        runFile: { ...runFileTemplate, resumePath: harness.resumePath, postings: unreachable },
+      }),
+    );
+
+    expect(results.length).toBe(runFileTemplate.postings.length);
+
+    for (const result of results) {
+      expect(result.submitted).toBe(false);
     }
 
     expect(harness.fixture.state.submissions).toBe(0);
     expect(harness.browserUse.sessionCount).toBe(5);
     expect(harness.browserUse.stoppedSessionIds.length).toBe(5);
+    expect(storedForms(harness).length).toBe(5);
+
+    const summary = output.text();
+
+    expect(summary).toContain("early cloud probe summary");
+
+    for (const record of runFileTemplate.postings) {
+      expect(summary).toContain(`${record.company} — ${record.title}:`);
+    }
+
+    expect(summary).toContain(
+      "dry run: every form was filled and the run stopped before submit; nothing was sent",
+    );
   });
 });
 
