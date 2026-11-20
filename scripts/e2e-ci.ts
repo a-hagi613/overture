@@ -481,12 +481,15 @@ function testReach(testFile: string, graph: Map<string, string[]>, files: Set<st
   }
 
   const routeRoots = new Set<string>();
+  const matchedPaths = new Set<string>();
 
   for (const path of paths) {
     const requested = segmentsOf(path);
 
     for (const entry of routeEntries) {
       if (routeMatches(requested, segmentsOf(entry.path))) {
+        matchedPaths.add(path);
+
         for (const module of entry.modules) {
           routeRoots.add(module);
         }
@@ -511,7 +514,7 @@ function testReach(testFile: string, graph: Map<string, string[]>, files: Set<st
 
   return {
     full: usesBrowser || (routeRoots.size === 0 && directModules.length === 0),
-    paths,
+    paths: [...matchedPaths].toSorted((left, right) => left.localeCompare(right)),
     modules: [...modules].toSorted((left, right) => left.localeCompare(right)),
   };
 }

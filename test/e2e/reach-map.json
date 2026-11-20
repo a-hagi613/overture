@@ -1,0 +1,984 @@
+{
+  "version": 1,
+  "tests": {
+    "test/e2e/admin-actions.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api",
+        "/api/kill-switches",
+        "/api/settings/limits.daily_cap"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/admin-catalog.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/llm/usage",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/tag-imports",
+        "/__test__/user/name",
+        "/api"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/tag-import.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/admin-gates.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/auth/role",
+        "/__test__/auth/state",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api",
+        "/overview"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/tag-import.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/admin-passkey.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/clock/offset",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/admin-visual.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/backup-lag.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/clock",
+        "/__test__/jobs/enqueue",
+        "/api/health"
+      ],
+      "modules": [
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/board-match-profile.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/board-match-shell.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/board-match-signin.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/catalog-backfill.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs/enqueue",
+        "/api/events",
+        "/api/search"
+      ],
+      "modules": [
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/catalog-dedupe.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs/enqueue",
+        "/api/events",
+        "/api/search"
+      ],
+      "modules": [
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/catalog-discovered-seed.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/discovered-boards",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs/enqueue",
+        "/api/events"
+      ],
+      "modules": [
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/companies-parquet.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-import.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/catalog-lever-ashby.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs/enqueue",
+        "/api/events",
+        "/api/search"
+      ],
+      "modules": [
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/catalog-rate-limit.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs/enqueue",
+        "/api/events"
+      ],
+      "modules": [
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/catalog-search-filters.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs/enqueue",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api",
+        "/api/events",
+        "/api/search"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/catalog-search.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api",
+        "/api/search"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/catalog-sweep-claim.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/catalog/sweep-batches",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs",
+        "/__test__/jobs/enqueue",
+        "/__test__/settings",
+        "/api/events"
+      ],
+      "modules": [
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/catalog-sweep-starve.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs/enqueue",
+        "/api/events",
+        "/api/health"
+      ],
+      "modules": [
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/census.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs/enqueue",
+        "/api/events"
+      ],
+      "modules": [
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/clock-and-run-due.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs",
+        "/__test__/jobs/enqueue",
+        "/__test__/jobs/run-due",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/cloud-probe.test.ts": {
+      "full": false,
+      "paths": [],
+      "modules": [
+        "src/server/config/env.ts",
+        "src/server/dispatch/browser/browser-use.ts",
+        "src/server/probe/console.ts",
+        "src/server/probe/greenhouse.ts",
+        "src/server/probe/run-file.ts",
+        "src/server/probe/run-probe.ts",
+        "src/server/probe/store.ts"
+      ]
+    },
+    "test/e2e/graceful-stop-requeue.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/jobs",
+        "/__test__/jobs/enqueue",
+        "/__test__/jobs/release",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/settings/jobs.poll_interval_ms",
+        "/__test__/user/name",
+        "/api",
+        "/api/events"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/job-survives-restart.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs",
+        "/__test__/jobs/enqueue",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/settings/jobs.poll_interval_ms",
+        "/__test__/user/name",
+        "/api",
+        "/api/events"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/msw-canary.test.ts": {
+      "full": true,
+      "paths": [],
+      "modules": []
+    },
+    "test/e2e/oauth-optional.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/profile-resume.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/settings/llm.cap_user_day_usd",
+        "/__test__/user/name",
+        "/api",
+        "/api/profile/facts",
+        "/api/profile/resume"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/server/profile/facts.ts",
+        "src/server/profile/personal-crypto.ts",
+        "src/server/profile/resume.ts",
+        "src/shared/copy.ts",
+        "src/shared/facts.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/reachability.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api",
+        "/api/health"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/settings-and-kill-switches.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/kill-switches/global/all",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/settings/limits.daily_cap",
+        "/__test__/user/name",
+        "/api",
+        "/api/kill-switches",
+        "/api/settings",
+        "/api/settings/limits.daily_cap"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/shell.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api",
+        "/settings",
+        "/settings/u"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/signin.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api",
+        "/settings"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/sse-live-and-replay.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/events/publish",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/user/name",
+        "/api",
+        "/api/events"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/tag-import.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs/enqueue",
+        "/__test__/tag-imports",
+        "/api/events"
+      ],
+      "modules": [
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-import.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/tag-llm-fallback.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs",
+        "/__test__/jobs/enqueue",
+        "/__test__/jobs/run-due",
+        "/__test__/llm/usage",
+        "/__test__/settings",
+        "/api/events"
+      ],
+      "modules": [
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    },
+    "test/e2e/telemetry-redaction.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/jobs/enqueue",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/telemetry/reset",
+        "/__test__/telemetry/spans",
+        "/__test__/user/name",
+        "/api",
+        "/api/events",
+        "/api/health"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts"
+      ]
+    }
+  }
+}
