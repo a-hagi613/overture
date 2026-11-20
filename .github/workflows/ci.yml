@@ -105,7 +105,7 @@ jobs:
     if: needs.plan.outputs.e2e == 'true'
     container:
       image: mcr.microsoft.com/playwright:v1.65.1-noble
-      options: --user root
+      options: --user 1001
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
@@ -125,8 +125,10 @@ jobs:
         run: |
           curl -fsSLo /tmp/bun.zip https://github.com/oven-sh/bun/releases/download/bun-v1.4.5/bun-linux-x64.zip
           python3 -m zipfile -e /tmp/bun.zip /tmp/bun
-          install -m 0755 /tmp/bun/bun-linux-x64/bun /usr/local/bin/bun
-          bun --version
+          mkdir -p "$HOME/.bun/bin"
+          install -m 0755 /tmp/bun/bun-linux-x64/bun "$HOME/.bun/bin/bun"
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+          "$HOME/.bun/bin/bun" --version
       - run: bun install --frozen-lockfile
       - name: Install Litestream
         run: |

@@ -889,11 +889,25 @@ Plus: route reachability for every page, axe on every page, 30 visual snapshots 
 
 Parallel jobs: `bun lint` with zero warnings (ADR 0023, which includes Landmines `no-comments`, `no-test-doubles`,
 `no-fixed-sleep` and `no-flake-masking`), `bun fmt --check`, `bun check`, Vite build, `bun test`; the same checks run
-locally by `bun run verify`; Playwright sharded by duration (per-worker server + template SQLite copy, API-seeded auth,
-MSW with unhandled requests
-as errors, MSW pinned to 2.x with a check that an unmocked host fails, a test-only route that runs due jobs, no
-sleeps, zero retries), affected-only on PRs. PR < 2 min; `main` < 4 min including `flyctl deploy --remote-only`. Main deploys
-only when every job passes.
+locally by `bun run verify`. E2E runs inside the pinned `mcr.microsoft.com/playwright` image that matches
+`@playwright/test`, so CI downloads no browser and installs no system package. The app is built once per run and the
+`dist` artifact is handed to six shards balanced by recorded per-file time (`test/e2e/timings.json`, refreshed from
+main runs); every shard starts one server per Playwright worker (template SQLite copy, API-seeded auth, MSW with
+unhandled requests as errors, MSW pinned to 2.x with a check that an unmocked host fails, a test-only route that runs
+due jobs, no sleeps, zero retries).
+
+A pull request runs only the e2e files its diff can reach. `test/e2e/reach-map.json`, regenerated on main, maps each
+test file to the source modules it exercises, derived from the test's import graph and the routes it calls. A changed
+test file always runs, and every test whose reach intersects the diff runs. Anything the map cannot classify runs
+everything: dependencies, workflows, the Playwright config, test fixtures, `src/server/{app,main,routes,auth,config,platform,testing}`,
+`src/web`, `src/shared`, migrations, and any path the map does not know. Tests that drive the SPA through the browser
+without a known API path always run. A push to main always runs the full suite.
+
+The container job runs on main and on pull requests that touch the Dockerfile, the entrypoint, `litestream.yml`,
+`fly.toml`, `package.json` or `bun.lock`, with GitHub Actions layer caching. `ci-ok` is the one aggregator job: it needs
+every other job and fails when one failed or was cancelled, while a deliberately skipped job counts as success, so
+branch protection needs to require only `ci-ok`. PR < 2 min; `main` < 4 min including `flyctl deploy --remote-only`.
+Main deploys only when every job passes.
 
 ### 16.4 Daily live checks (ADR 0013)
 
