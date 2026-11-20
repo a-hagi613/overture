@@ -91,6 +91,20 @@ _Avoid_: blocklist, never-apply list
 The address Overture gives each user on `mail.tryoverture.com`; it is the email on every application form, and employers' replies to it appear in the Inbox.
 _Avoid_: alias, inbox address, real-email mode
 
+## The admin
+
+**Kill switch**:
+A scope-scoped switch (global, one ATS, one employer or one browser provider) that stops Overture's work there until it is switched on again. The owner sets one from the admin; the change is audited.
+_Avoid_: toggle, off switch, feature flag
+
+**Passkey assertion**:
+The owner proving themselves with a passkey before the admin opens. The last assertion must be within 12 hours.
+_Avoid_: reauth, 2FA, step-up
+
+**Admin audit**:
+The append-only record in `admin_audit` of every action taken in the admin: who, what, when, why.
+_Avoid_: log entry, change history
+
 ## Never in anything a user can read
 
 `Hold`, runner, lease, provider, dispatch, attempt, ledger, credit, CAPTCHA, Brain, Hands, workspace, Job Board (say Board), Answer Bank, Memory Base, Live Tab.

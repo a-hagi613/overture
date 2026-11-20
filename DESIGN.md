@@ -509,4 +509,4 @@ screen, then built to match. Visual treatment stays; words, structure and behavi
 | Landing | Daytime timestamps; card required for the trial (no "No credit card"); Workday removed from Where it applies; plan prices per the spec; no glow on the travelling-dot tiles |
 | Live Tab (3 boards) | Deleted: users never see a browser |
 | Mobile reference | Deleted, already marked to retire |
-| New | Review, check-in on Home, `Couldn't apply` card, Admin (overview, attempts, kill switches, provider report, fixture capture), pricing and billing (M3) |
+| New | Review, check-in on Home, `Couldn't apply` card, **Admin — still to draw.** The M1 admin (overview, kill switches & settings, catalog health; M1-12) is built from the Settings board's components and this document's tokens, with no pixel check of its own until a board exists; pricing and billing (M3) |

@@ -85,6 +85,7 @@ const llmUsageQuery = z.object({
 const userNameBody = z.object({ email: z.email(), name: z.string().min(1) });
 
 const lowercased = (value: string) => value.trim().toLowerCase();
+const roleBody = z.object({ userId: z.string().min(1), role: z.enum(["user", "owner"]) });
 
 export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handlers: JobHandlers) {
   const routes = new Hono();
@@ -343,6 +344,23 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
         expiresAt: session.expiresAt,
       })),
     });
+  });
+
+  routes.post("/auth/role", zValidator("json", roleBody), (context) => {
+    const { userId, role } = context.req.valid("json");
+
+    const updated = db
+      .update(users)
+      .set({ role, updatedAt: new Date(clock.now()) })
+      .where(eq(users.id, userId))
+      .returning()
+      .all();
+
+    if (updated.length === 0) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    return context.json({ userId, role });
   });
 
   return routes;
