@@ -23,6 +23,10 @@ export const QUESTION_MAPPERS = ["rules", "llm", "owner"] as const;
 
 export type QuestionMapper = (typeof QUESTION_MAPPERS)[number];
 
+export const REVIEW_REASONS = ["unknown_required", "option_missing"] as const;
+
+export type ReviewReason = (typeof REVIEW_REASONS)[number];
+
 export const REVIEW_CATEGORIES = [
   "availability",
   "experience",

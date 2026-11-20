@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, test } from "bun:test";
+import { z } from "zod";
 
 import {
   affirmativeOption,
@@ -12,6 +15,34 @@ import {
   referencesUserCountry,
   reviewCategory,
 } from "./question-normalize.ts";
+
+const recordedFixtureSchema = z.object({
+  questions: z.array(
+    z.object({
+      label: z.string(),
+      fields: z.array(
+        z.object({
+          values: z.array(z.object({ label: z.string() })).default([]),
+        }),
+      ),
+    }),
+  ),
+});
+
+function recordedOptions(file: string, labelStartsWith: string) {
+  const path = new URL(`../../../test/e2e/fixtures/greenhouse/${file}`, import.meta.url);
+  const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+
+  const question = recordedFixtureSchema
+    .parse(parsed)
+    .questions.find((candidate) => candidate.label.startsWith(labelStartsWith));
+
+  if (question === undefined) {
+    throw new Error(`the recording has no question starting with ${labelStartsWith}`);
+  }
+
+  return question.fields.flatMap((field) => field.values.map((value) => value.label));
+}
 
 describe("normalizeQuestionText", () => {
   test("folds case, punctuation, numbers and spacing", () => {
@@ -95,21 +126,142 @@ describe("normalizeFieldType", () => {
 
 describe("matchOption", () => {
   test("matches ignoring case and punctuation", () => {
-    expect(matchOption("yes", ["No", "Yes"])).toBe("Yes");
+    expect(matchOption("yes", ["No", "Yes"])).toEqual({ matched: true, option: "Yes" });
   });
 
   test("maps a stored affirmative to a yes option", () => {
-    expect(matchOption("Canadian citizen", ["No", "Yes"])).toBe("Yes");
-    expect(matchOption("I will require sponsorship", ["No", "Yes"])).toBe("No");
+    expect(matchOption("Canadian citizen", ["No", "Yes"])).toEqual({
+      matched: true,
+      option: "Yes",
+    });
+    expect(matchOption("I will require sponsorship", ["No", "Yes"])).toEqual({
+      matched: true,
+      option: "No",
+    });
   });
 
-  test("returns nothing when the value is not an option", () => {
-    expect(matchOption("Toronto", ["Vancouver", "Montreal"])).toBeNull();
+  test("returns a typed option_missing reason when no option matches", () => {
+    expect(matchOption("Toronto", ["Vancouver", "Montreal"])).toEqual({
+      matched: false,
+      reason: "option_missing",
+    });
   });
 
   test("finds the affirmative option", () => {
     expect(affirmativeOption(["Disagree", "I agree"])).toBe("I agree");
     expect(affirmativeOption(["No", "Yes"])).toBe("Yes");
+  });
+
+  test("maps a work-authorisation type onto the recorded five-option select", () => {
+    const options = recordedOptions(
+      "vercel/jobs/5999792004.questions.json",
+      "Are you authorized to work in the UK?",
+    );
+
+    expect(matchOption("Citizen", options)).toEqual({
+      matched: true,
+      option: "I am authorized to work in the country due to my nationality",
+    });
+    expect(matchOption("Work permit with no company sponsorship", options)).toEqual({
+      matched: true,
+      option:
+        "I am authorized to work in the country based on a valid work permit and do not need a company to sponsor my visa",
+    });
+    expect(matchOption("Work permit that needs company sponsorship", options)).toEqual({
+      matched: true,
+      option:
+        "I am authorized to work in the country based on a valid work permit which needs to be sponsored by the company I work for",
+    });
+    expect(matchOption("Not authorized to work and need visa support", options)).toEqual({
+      matched: true,
+      option: "I am not authorized to work in the country and need visa support",
+    });
+    expect(matchOption("Permanent resident", options)).toEqual({
+      matched: false,
+      reason: "option_missing",
+    });
+    expect(matchOption("Yes", options)).toEqual({ matched: false, reason: "option_missing" });
+  });
+
+  test("maps country names onto the recorded country selects", () => {
+    const stripe = recordedOptions(
+      "stripe/jobs/8138044.questions.json",
+      "Please select the country where you currently reside.",
+    );
+
+    expect(matchOption("United States", stripe)).toEqual({ matched: true, option: "US" });
+    expect(matchOption("USA", stripe)).toEqual({ matched: true, option: "US" });
+    expect(matchOption("U.S.", stripe)).toEqual({ matched: true, option: "US" });
+    expect(matchOption("United Kingdom", stripe)).toEqual({ matched: true, option: "UK" });
+    expect(matchOption("Britain", stripe)).toEqual({ matched: true, option: "UK" });
+    expect(matchOption("Netherlands", stripe)).toEqual({
+      matched: true,
+      option: "The Netherlands",
+    });
+    expect(matchOption("United Arab Emirates", stripe)).toEqual({ matched: true, option: "UAE" });
+    expect(matchOption("Atlantis", stripe)).toEqual({
+      matched: false,
+      reason: "option_missing",
+    });
+
+    const vercel = recordedOptions(
+      "vercel/jobs/5999792004.questions.json",
+      "Are you currently based in any of these countries?",
+    );
+
+    expect(matchOption("USA", vercel)).toEqual({
+      matched: true,
+      option: "United States",
+    });
+    expect(matchOption("UK", vercel)).toEqual({ matched: true, option: "United Kingdom" });
+    expect(matchOption("Netherlands", vercel)).toEqual({
+      matched: false,
+      reason: "option_missing",
+    });
+  });
+
+  test("maps degrees, notice periods and salary periods from their tables", () => {
+    const degrees = [
+      "High School Diploma",
+      "Associate's Degree",
+      "Bachelor's Degree",
+      "Master's Degree",
+      "PhD",
+      "Other",
+    ];
+
+    expect(matchOption("BSc", degrees)).toEqual({ matched: true, option: "Bachelor's Degree" });
+    expect(matchOption("Master of Science", degrees)).toEqual({
+      matched: true,
+      option: "Master's Degree",
+    });
+    expect(matchOption("Doctor of Philosophy", degrees)).toEqual({ matched: true, option: "PhD" });
+    expect(matchOption("Some college", degrees)).toEqual({
+      matched: false,
+      reason: "option_missing",
+    });
+
+    const notice = ["Immediately", "2 weeks", "4 weeks", "More than 3 months"];
+
+    expect(matchOption("Four weeks", notice)).toEqual({ matched: true, option: "4 weeks" });
+    expect(matchOption("3 days", notice)).toEqual({ matched: false, reason: "option_missing" });
+    expect(matchOption("one month", notice)).toEqual({
+      matched: false,
+      reason: "option_missing",
+    });
+
+    const periods = ["Monthly", "Annual", "Hourly"];
+
+    expect(matchOption("per year", periods)).toEqual({ matched: true, option: "Annual" });
+    expect(matchOption("$150,000 per annum", periods)).toEqual({
+      matched: true,
+      option: "Annual",
+    });
+    expect(matchOption("yearly", periods)).toEqual({ matched: true, option: "Annual" });
+    expect(matchOption("per week", periods)).toEqual({
+      matched: false,
+      reason: "option_missing",
+    });
   });
 });
 
