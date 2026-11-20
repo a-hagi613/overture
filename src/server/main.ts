@@ -8,6 +8,14 @@ import { createClock } from "./platform/ports/clock.ts";
 import { recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
 import { startJobWorker } from "./platform/jobs/scheduler.ts";
 import { startTelemetry, trace } from "./platform/telemetry/otel.ts";
+import { createGreenhouseFeed } from "./catalog/greenhouse-feed.ts";
+import {
+  BACKFILL_JOB_KIND,
+  SWEEP_JOB_KIND,
+  ensureSweepQueued,
+  runBackfillJob,
+  runSweepJob,
+} from "./catalog/discovery.ts";
 
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 
@@ -42,6 +50,20 @@ const tracer = trace.getTracer("overture");
 
 const otelPayloadSchema = z.record(z.string(), z.string());
 
+const greenhouseFeed = createGreenhouseFeed(env.GREENHOUSE_FEED_BASE_URL);
+const catalogDeps = { db, clock, greenhouse: greenhouseFeed };
+
+const catalogJobHandlers: JobHandlers = {
+  [BACKFILL_JOB_KIND]: async (payload) => {
+    runBackfillJob(catalogDeps);
+
+    await Promise.resolve(payload);
+  },
+  [SWEEP_JOB_KIND]: async () => {
+    await runSweepJob(catalogDeps);
+  },
+};
+
 const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
   ? {
       "test.ping": async (payload) => {
@@ -70,16 +92,24 @@ const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
     }
   : {};
 
-const worker = startJobWorker(db, clock, testJobHandlers, shutdownController.signal, (notify) => {
-  registerEnqueueNotify(notify);
-});
+const worker = startJobWorker(
+  db,
+  clock,
+  { ...catalogJobHandlers, ...testJobHandlers },
+  shutdownController.signal,
+  (notify) => {
+    registerEnqueueNotify(notify);
+  },
+);
+
+ensureSweepQueued(catalogDeps);
 
 const app = createApp({
   db,
   clock,
   staticRoot: env.STATIC_ROOT,
   testRoutes: env.ENABLE_TEST_ROUTES,
-  jobHandlers: testJobHandlers,
+  jobHandlers: { ...catalogJobHandlers, ...testJobHandlers },
 });
 
 const server = Bun.serve({ port: env.PORT, fetch: app.fetch });

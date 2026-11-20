@@ -91,14 +91,16 @@ export const companyBoards = sqliteTable(
       .references(() => companies.id, { onDelete: "cascade" }),
     ats: text("ats", { enum: ["greenhouse", "lever", "ashby"] }).notNull(),
     boardToken: text("board_token").notNull(),
-    status: text("status", { enum: ["active", "empty", "gone"] })
+    status: text("status", { enum: ["active", "empty", "gone", "disabled"] })
       .notNull()
       .default("active"),
     etag: text("etag"),
     lastModified: text("last_modified"),
+    contentHash: text("content_hash"),
     lastPolledAt: integer("last_polled_at"),
     nextPollAt: integer("next_poll_at"),
     backoffLevel: integer("backoff_level").notNull().default(0),
+    consecutiveErrors: integer("consecutive_errors").notNull().default(0),
     notFoundPolls: integer("not_found_polls").notNull().default(0),
     createdAt: integer("created_at").notNull(),
   },
@@ -126,6 +128,7 @@ export const postings = sqliteTable(
     countryCode: text("country_code"),
     region: text("region"),
     city: text("city"),
+    language: text("language"),
     workplace: text("workplace", { enum: ["remote", "hybrid", "onsite", "unknown"] })
       .notNull()
       .default("unknown"),
@@ -134,8 +137,11 @@ export const postings = sqliteTable(
     })
       .notNull()
       .default("unknown"),
-    language: text("language"),
     postedAt: integer("posted_at"),
+    salaryMinMinor: integer("salary_min_minor"),
+    salaryMaxMinor: integer("salary_max_minor"),
+    salaryCurrency: text("salary_currency"),
+    salaryPeriod: text("salary_period", { enum: ["year", "month", "hour"] }),
     sourceUpdatedAt: integer("source_updated_at"),
     firstSeenAt: integer("first_seen_at").notNull(),
     lastSeenAt: integer("last_seen_at").notNull(),
@@ -144,6 +150,9 @@ export const postings = sqliteTable(
     dedupeKey: text("dedupe_key").notNull(),
     descriptionGz: blob("description_gz", { mode: "buffer" }),
     descriptionHash: text("description_hash"),
+    tagSource: text("tag_source", { enum: ["rules", "model", "llm", "import"] }),
+    taggedAt: integer("tagged_at"),
+    questionsFetchedAt: integer("questions_fetched_at"),
   },
   (t) => [
     uniqueIndex("postings_board_ats_job_unique").on(t.boardId, t.atsJobId),
