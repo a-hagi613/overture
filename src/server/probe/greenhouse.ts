@@ -1,4 +1,4 @@
-import type { Locator, Page } from "playwright-core";
+import type { Locator, Page, Response } from "playwright-core";
 
 import type { ProbeConsole } from "./console.ts";
 import type { RunFilePosting } from "./run-file.ts";
@@ -39,6 +39,7 @@ const messages = {
 };
 
 const CONFIRMATION_URL_PATH = "/confirmation";
+const APPLICATION_URL_PATH = "/application";
 
 const acceptedStatus = (status: number | null) => status !== null && status >= 200 && status < 300;
 
@@ -293,8 +294,12 @@ async function uploadResume(page: Page, fieldId: string, resumePath: string) {
   return true;
 }
 
+const isApplicationResponse = (candidate: Response) =>
+  candidate.request().method() === "POST" &&
+  new URL(candidate.url()).pathname.endsWith(APPLICATION_URL_PATH);
+
 async function waitForApplicationResponse(page: Page) {
-  const response = page.waitForResponse((candidate) => candidate.request().method() === "POST");
+  const response = page.waitForResponse(isApplicationResponse);
 
   const settled = await Promise.allSettled([submitButton(page).click(), response]);
 

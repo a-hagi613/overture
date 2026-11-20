@@ -244,12 +244,19 @@ const attachResumeEcho = (form: HTMLFormElement) => {
   });
 };
 
+const prepareNativeSubmit = (form: HTMLFormElement) => {
+  form.setAttribute("action", `${form.getAttribute("action")}/application`);
+  form.setAttribute("method", "post");
+};
+
 const attachSubmitBehaviour = (form: HTMLFormElement, meta: FixtureMeta) => {
   attachResumeEcho(form);
 
   const search = new URLSearchParams(globalThis.location.search);
 
   if (search.get("native") === "1") {
+    prepareNativeSubmit(form);
+
     return;
   }
 
