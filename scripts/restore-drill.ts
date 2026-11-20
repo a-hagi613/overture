@@ -184,7 +184,7 @@ function listMachines() {
     );
 }
 
-function drillFly() {
+async function drillFly() {
   const machines = listMachines().map((machine) => ({
     name: machine.name,
     state: machine.state,
@@ -251,7 +251,7 @@ function drillFly() {
       "10m",
     ]);
 
-    const check = runOrThrow([
+    const check = [
       "flyctl",
       "ssh",
       "console",
@@ -261,9 +261,33 @@ function drillFly() {
       drill.id,
       "--command",
       "bun run scripts/check-restored-db.ts /data/app.sqlite http://127.0.0.1:3000/api/health",
-    ]);
+    ];
 
-    process.stdout.write(check.output);
+    const deadline = clock.now() + 180_000;
+
+    const attemptCheck = async () => {
+      const attempt = run(check);
+
+      if (attempt.exitCode === 0) {
+        process.stdout.write(attempt.output);
+
+        return;
+      }
+
+      if (clock.now() >= deadline) {
+        throw new Error(
+          `the restored database check did not pass within 3 minutes:\n${attempt.output}`,
+        );
+      }
+
+      process.stdout.write(
+        "the drill app is not serving yet, retrying the restored database check\n",
+      );
+      await Bun.sleep(5000);
+      await attemptCheck();
+    };
+
+    await attemptCheck();
   } finally {
     if (drillId !== undefined) {
       run(["flyctl", "machines", "destroy", drillId, "-a", flyAppName, "--force"]);
@@ -276,5 +300,5 @@ function drillFly() {
 if (drillTarget === "local") {
   await drillLocal();
 } else {
-  drillFly();
+  await drillFly();
 }
