@@ -8,6 +8,9 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1).default("data/overture.db"),
   STATIC_ROOT: z.string().min(1).default("dist"),
   ENABLE_TEST_ROUTES: booleanFromString.default(false),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
+  OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
+  OTEL_DEBUG: booleanFromString.default(false),
 });
 
 export const env = envSchema.parse(process.env);
