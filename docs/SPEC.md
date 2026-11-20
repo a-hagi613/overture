@@ -343,17 +343,17 @@ Discovery runs from `overture-web` directly (no proxy).
    about `sweep_interval_ms × the ATS's request rate` boards (120 per ATS at the 60 s default and 2 req/s), so no
    ATS starves another; `catalog.sweep_batch` sets the total per-sweep batch instead (split across ATSes in
    proportion to their rates) and `catalog.sweep_interval_ms` sets the sweep chain interval.
-6. **One sweep at a time**: the next sweep is enqueued when the current one *finishes*, not when it starts, so a
+4. **One sweep at a time**: the next sweep is enqueued when the current one *finishes*, not when it starts, so a
    sweep that outlasts the interval delays the next one instead of overlapping it. Its `dedupe_key` is
    `catalog.sweep` and `bg_jobs` is unique on a dedupe key among queued rows, so at most one is ever queued, and
    the worker never runs two jobs of a singleton kind (`catalog.sweep`) at once. A sweep killed mid-flight leaves
    its row running; the claim takes the row over once its lease expires, and only one process polls its boards
    because the board claim has not lapsed.
-7. **Closed**: a posting absent from two consecutive successful polls gets `closed_at`; its queued applications are
+5. **Closed**: a posting absent from two consecutive successful polls gets `closed_at`; its queued applications are
    skipped with `posting_closed`.
-8. **Dedupe**: `dedupe_key = company_id + title_norm + country_code + city`; duplicates across boards keep the
+6. **Dedupe**: `dedupe_key = company_id + title_norm + country_code + city`; duplicates across boards keep the
    earliest posting; users never see two cards for one role.
-9. **Responsiveness**: writing one feed never blocks the process. A board's postings are written in transactions of
+7. **Responsiveness**: writing one feed never blocks the process. A board's postings are written in transactions of
    50 with the event loop yielded between them, the comparison against stored postings reads only `id`,
    `ats_job_id`, `source_updated_at` and `closed_at` rather than whole rows with their descriptions, and the
    twice-missing close is two statements rather than one per posting. A sweep over multi-megabyte feeds therefore
