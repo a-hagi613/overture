@@ -69,8 +69,8 @@ export function PdfPreview() {
           );
         })}
       </div>
-      <div className="mt-3">
-        <span className="text-[12px] leading-[1.5] text-muted-foreground tabular-nums">
+      <div className="mt-3 text-[14px] leading-[21px]">
+        <span className="text-[12px] leading-[18px] text-muted-foreground tabular-nums">
           {copy.profile.resume.pageOf}
         </span>
       </div>
