@@ -1,0 +1,446 @@
+{
+  "country": "ca",
+  "resumePath": "/data/probe/resume.pdf",
+  "postings": [
+    {
+      "board": "curaleaf",
+      "company": "Curaleaf",
+      "jobId": "8936939002",
+      "title": "Cultivation Associate",
+      "resumeFieldId": "resume",
+      "questions": [
+        {
+          "id": "first_name",
+          "value": "Jane",
+          "approved": true
+        },
+        {
+          "id": "last_name",
+          "value": "Doe",
+          "approved": true
+        },
+        {
+          "id": "email",
+          "value": "jane.doe@example.com",
+          "approved": true
+        },
+        {
+          "id": "phone",
+          "value": "+1 555 0100",
+          "approved": true
+        },
+        {
+          "id": "country",
+          "value": "Canada",
+          "approved": true
+        },
+        {
+          "id": "candidate-location",
+          "value": "Hammonton - NJ",
+          "approved": true
+        },
+        {
+          "id": "question_39195807002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39195808002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39195809002",
+          "value": "New to the Company",
+          "approved": true
+        },
+        {
+          "id": "question_39195810002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39195811002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39195812002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39195813002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39195814002",
+          "value": "No",
+          "approved": true
+        },
+        {
+          "id": "question_39195815002",
+          "value": "100 Example Street, Ottawa, ON K1A 0B1, Canada",
+          "approved": true
+        },
+        {
+          "id": "gender",
+          "value": "Decline To Self Identify",
+          "approved": true
+        },
+        {
+          "id": "veteran_status",
+          "value": "I don't wish to answer",
+          "approved": true
+        }
+      ]
+    },
+    {
+      "board": "curaleaf",
+      "company": "Curaleaf",
+      "jobId": "8925575002",
+      "title": "Community Outreach Representative",
+      "resumeFieldId": "resume",
+      "questions": [
+        {
+          "id": "first_name",
+          "value": "Jane",
+          "approved": true
+        },
+        {
+          "id": "last_name",
+          "value": "Doe",
+          "approved": true
+        },
+        {
+          "id": "email",
+          "value": "jane.doe@example.com",
+          "approved": true
+        },
+        {
+          "id": "phone",
+          "value": "+1 555 0100",
+          "approved": true
+        },
+        {
+          "id": "country",
+          "value": "Canada",
+          "approved": true
+        },
+        {
+          "id": "question_39089479002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39089480002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39089481002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39089482002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39089483002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39089484002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39089485002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39089486002",
+          "value": "No",
+          "approved": true
+        },
+        {
+          "id": "question_39089487002",
+          "value": "100 Example Street, Ottawa, ON K1A 0B1, Canada",
+          "approved": true
+        },
+        {
+          "id": "question_39089488002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39089489002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_39089490002",
+          "value": "New to the Company",
+          "approved": true
+        },
+        {
+          "id": "gender",
+          "value": "Decline To Self Identify",
+          "approved": true
+        },
+        {
+          "id": "veteran_status",
+          "value": "I don't wish to answer",
+          "approved": true
+        }
+      ]
+    },
+    {
+      "board": "sunnyside",
+      "company": "Sunnyside",
+      "jobId": "8891671002",
+      "title": "Lead Retail Sales Associate",
+      "resumeFieldId": "resume",
+      "questions": [
+        {
+          "id": "first_name",
+          "value": "Jane",
+          "approved": true
+        },
+        {
+          "id": "last_name",
+          "value": "Doe",
+          "approved": true
+        },
+        {
+          "id": "email",
+          "value": "jane.doe@example.com",
+          "approved": true
+        },
+        {
+          "id": "phone",
+          "value": "+1 555 0100",
+          "approved": true
+        },
+        {
+          "id": "country",
+          "value": "Canada",
+          "approved": true
+        },
+        {
+          "id": "candidate-location",
+          "value": "1546 W Church St, Newark, OH 43055",
+          "approved": true
+        },
+        {
+          "id": "question_38816876002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_38816877002",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_38816878002",
+          "value": "No",
+          "approved": true
+        },
+        {
+          "id": "question_38816879002",
+          "value": "https://www.https://www.linkedin.com/in/example",
+          "approved": true
+        },
+        {
+          "id": "question_38816880002",
+          "value": "Other Job Board (Indeed, Glassdoor, etc.)",
+          "approved": true
+        },
+        {
+          "id": "question_38816881002",
+          "value": "None of the above",
+          "approved": true
+        },
+        {
+          "id": "question_38816882002",
+          "value": "100,000 USD per year",
+          "approved": true
+        },
+        {
+          "id": "question_38816883002",
+          "value": "No",
+          "approved": true
+        },
+        {
+          "id": "question_38816884002",
+          "value": "No",
+          "approved": true
+        },
+        {
+          "id": "question_38816885002",
+          "value": "No preference.",
+          "approved": true
+        },
+        {
+          "id": "gender",
+          "value": "Decline To Self Identify",
+          "approved": true
+        },
+        {
+          "id": "veteran_status",
+          "value": "I don't wish to answer",
+          "approved": true
+        }
+      ]
+    },
+    {
+      "board": "blankstreet",
+      "company": "Blank Street",
+      "jobId": "8004209003",
+      "title": "Assistant General Manager",
+      "resumeFieldId": "resume",
+      "questions": [
+        {
+          "id": "first_name",
+          "value": "Jane",
+          "approved": true
+        },
+        {
+          "id": "last_name",
+          "value": "Doe",
+          "approved": true
+        },
+        {
+          "id": "email",
+          "value": "jane.doe@example.com",
+          "approved": true
+        },
+        {
+          "id": "phone",
+          "value": "+1 555 0100",
+          "approved": true
+        },
+        {
+          "id": "country",
+          "value": "United Kingdom",
+          "approved": true
+        },
+        {
+          "id": "question_32895467003",
+          "value": "https://www.https://www.linkedin.com/in/example",
+          "approved": true
+        },
+        {
+          "id": "question_32895468003",
+          "value": "https://example.com",
+          "approved": true
+        }
+      ]
+    },
+    {
+      "board": "mejuri",
+      "company": "Mejuri",
+      "jobId": "4700872006",
+      "title": "Assistant Store Manager",
+      "resumeFieldId": "resume",
+      "questions": [
+        {
+          "id": "first_name",
+          "value": "Jane",
+          "approved": true
+        },
+        {
+          "id": "last_name",
+          "value": "Doe",
+          "approved": true
+        },
+        {
+          "id": "preferred_name",
+          "value": "Jane",
+          "approved": true
+        },
+        {
+          "id": "email",
+          "value": "jane.doe@example.com",
+          "approved": true
+        },
+        {
+          "id": "phone",
+          "value": "+1 555 0100",
+          "approved": true
+        },
+        {
+          "id": "country",
+          "value": "Canada",
+          "approved": true
+        },
+        {
+          "id": "question_8592880006",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_8592881006",
+          "value": "Ottawa, ON",
+          "approved": true
+        },
+        {
+          "id": "question_8592882006",
+          "value": "Yes, Seattle, WA; anywhere in Canada or the US",
+          "approved": true
+        },
+        {
+          "id": "question_8592883006",
+          "value": "https://www.https://www.linkedin.com/in/example",
+          "approved": true
+        },
+        {
+          "id": "question_8592884006",
+          "value": "0",
+          "approved": true
+        },
+        {
+          "id": "question_8592885006",
+          "value": "I am looking for frontline retail leadership work in Seattle while I continue my platform engineering career search.",
+          "approved": true
+        },
+        {
+          "id": "question_8592886006",
+          "value": "100,000 USD per year",
+          "approved": true
+        },
+        {
+          "id": "question_8592887006",
+          "value": "2 weeks",
+          "approved": true
+        },
+        {
+          "id": "question_8592888006",
+          "value": "No",
+          "approved": true
+        },
+        {
+          "id": "question_8592889006",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_8592890006",
+          "value": "Yes",
+          "approved": true
+        },
+        {
+          "id": "question_8592891006",
+          "value": "he/him",
+          "approved": true
+        }
+      ]
+    }
+  ]
+}
