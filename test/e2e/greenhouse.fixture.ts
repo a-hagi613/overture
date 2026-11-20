@@ -1,11 +1,15 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { z } from "zod";
 
 const FIXTURE_FORMS_DIR = join(process.cwd(), "test/e2e/fixtures/forms/greenhouse");
 const RUNTIME_SOURCE = join(process.cwd(), "test/e2e/fixtures/forms/fixture-runtime.ts");
 
 export interface GreenhouseFixturesState {
   submissions: number;
+  applicationRequests: number;
+  formLoads: number;
+  confirmationLoads: number;
   code: string;
   codeAsked: boolean;
   lastForm: Record<string, string>;
@@ -24,17 +28,45 @@ export const NO_FORM_PAGE =
 
 const CODE_DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7"];
 
+const valuesSchema = z.record(z.string(), z.string());
+
+const holdSchema = z.object({ form: z.boolean().optional(), confirmation: z.boolean().optional() });
+
 export function startGreenhouseFixture() {
   const transpiler = new Bun.Transpiler({ loader: "ts" });
   const runtime = transpiler.transformSync(readFileSync(RUNTIME_SOURCE, "utf8"));
 
   const state: GreenhouseFixturesState = {
     submissions: 0,
+    applicationRequests: 0,
+    formLoads: 0,
+    confirmationLoads: 0,
     code: "48211357",
     codeAsked: false,
     lastForm: {},
     lastChoices: {},
     lastResumeBytes: null,
+  };
+
+  let holdForm = false;
+  let holdConfirmation = false;
+  let waiters: (() => void)[] = [];
+
+  const waitForRelease = async () =>
+    new Promise<void>((resolve) => {
+      waiters.push(resolve);
+    });
+
+  const release = () => {
+    holdForm = false;
+    holdConfirmation = false;
+    const pending = waiters;
+
+    waiters = [];
+
+    for (const resolve of pending) {
+      resolve();
+    }
   };
 
   const typedCode = () =>
@@ -65,6 +97,26 @@ export function startGreenhouseFixture() {
         return Response.json({ stored: upload instanceof File });
       }
 
+      if (path === "/__fixture__/confirmation-shown" && request.method === "POST") {
+        state.confirmationLoads += 1;
+
+        if (holdConfirmation) {
+          await waitForRelease();
+        }
+
+        return Response.json({ recorded: true });
+      }
+
+      if (path === "/__fixture__/values") {
+        const values = valuesSchema.parse(await request.json());
+
+        for (const [key, value] of Object.entries(values)) {
+          state.lastForm[key] = value;
+        }
+
+        return Response.json({ recorded: true });
+      }
+
       if (path === "/__fixture__/choice") {
         const fieldId = url.searchParams.get("fieldId");
         const value = url.searchParams.get("value");
@@ -77,7 +129,30 @@ export function startGreenhouseFixture() {
       }
 
       if (path === "/__fixture__/state") {
-        return Response.json({ submissions: state.submissions, codeAsked: state.codeAsked });
+        return Response.json({
+          submissions: state.submissions,
+          applicationRequests: state.applicationRequests,
+          formLoads: state.formLoads,
+          confirmationLoads: state.confirmationLoads,
+          codeAsked: state.codeAsked,
+          holdForm,
+          holdConfirmation,
+        });
+      }
+
+      if (path === "/__fixture__/hold") {
+        const body = holdSchema.parse(await request.json());
+
+        holdForm = body.form === true;
+        holdConfirmation = body.confirmation === true;
+
+        return Response.json({ holdForm, holdConfirmation });
+      }
+
+      if (path === "/__fixture__/release") {
+        release();
+
+        return Response.json({ released: true });
       }
 
       const match =
@@ -90,6 +165,12 @@ export function startGreenhouseFixture() {
       const { board, job, confirmation } = match.groups;
 
       if (confirmation !== undefined && request.method !== "POST") {
+        state.confirmationLoads += 1;
+
+        if (holdConfirmation) {
+          await waitForRelease();
+        }
+
         let page = Buffer.from(NO_FORM_PAGE);
 
         try {
@@ -107,6 +188,12 @@ export function startGreenhouseFixture() {
       const pagePath = join(FIXTURE_FORMS_DIR, `${board}-${job}.fixture.html`);
 
       if (request.method !== "POST") {
+        state.formLoads += 1;
+
+        if (holdForm) {
+          await waitForRelease();
+        }
+
         let page = Buffer.from(NO_FORM_PAGE);
 
         try {
@@ -122,6 +209,7 @@ export function startGreenhouseFixture() {
       }
 
       state.submissions += 1;
+      state.applicationRequests += 1;
 
       const wantsCode = url.searchParams.get("verify") === "1";
 

@@ -37,6 +37,14 @@ import { MATCH_FILL_JOB_KIND, ensureMatchFillQueued, runMatchFillJob } from "./m
 import { createGreenhouseQuestionSource } from "./catalog/greenhouse-questions.ts";
 import { createPreparationService } from "./pipeline/prepare.ts";
 import { createReviewService } from "./pipeline/reviews.ts";
+import { createResumeService } from "./profile/resume.ts";
+import { createBrowserProvider } from "./dispatch/browser/index.ts";
+import {
+  APPLICATION_SEND_JOB_KIND,
+  DISPATCH_RECOVER_JOB_KIND,
+  createDispatcher,
+} from "./dispatch/executor.ts";
+import type { Dispatcher } from "./dispatch/executor.ts";
 import {
   APPLICATION_PREPARE_JOB_KIND,
   parseApplicationPreparePayload,
@@ -125,12 +133,17 @@ const matchDeps = {
   personal,
 };
 
+let dispatcher: Dispatcher | null = null;
+
 const preparation = createPreparationService({
   db,
   clock,
   llm: anthropicLlmPort,
   personal,
   source: createGreenhouseQuestionSource(env.GREENHOUSE_FEED_BASE_URL),
+  onReady: (applicationId) => {
+    dispatcher?.enqueueSend(applicationId);
+  },
 });
 
 const reviews = createReviewService({ db, clock, personal, preparation });
@@ -215,22 +228,66 @@ const mailJobHandlers: JobHandlers = {
   },
 };
 
+const browserProvider = createBrowserProvider(env, clock);
+
+const resumes = createResumeService({ db, clock, llm: anthropicLlmPort, objects, personal });
+
+dispatcher =
+  browserProvider === null
+    ? null
+    : createDispatcher({
+        db,
+        clock,
+        personal,
+        preparation,
+        provider: browserProvider,
+        proxyCountry: env.BROWSER_PROXY_COUNTRY,
+        resumes,
+      });
+
+const activeDispatcher = dispatcher;
+
+const dispatchJobHandlers: JobHandlers =
+  activeDispatcher === null
+    ? {}
+    : {
+        [APPLICATION_SEND_JOB_KIND]: async (payload) => {
+          const { applicationId } = z
+            .object({ applicationId: z.string().min(1) })
+            .parse(JSON.parse(payload));
+
+          await activeDispatcher.sendNow(applicationId);
+        },
+        [DISPATCH_RECOVER_JOB_KIND]: async () => {
+          await activeDispatcher.recover();
+          activeDispatcher.ensureRecoveryQueued();
+        },
+      };
+
+const allJobHandlers: JobHandlers = {
+  ...catalogJobHandlers,
+  ...preparationJobHandlers,
+  ...llmJobHandlers,
+  ...mailJobHandlers,
+  ...dispatchJobHandlers,
+  ...testJobHandlers,
+};
+
 const worker = startJobWorker(
   db,
   clock,
-  {
-    ...catalogJobHandlers,
-    ...preparationJobHandlers,
-    ...llmJobHandlers,
-    ...mailJobHandlers,
-    ...testJobHandlers,
-  },
+  allJobHandlers,
   shutdownController.signal,
   (notify) => {
     registerEnqueueNotify(notify);
   },
   SINGLETON_JOB_KINDS,
 );
+
+if (dispatcher !== null) {
+  await dispatcher.recover();
+  dispatcher.ensureRecoveryQueued();
+}
 
 ensureSweepQueued(catalogDeps);
 
@@ -244,13 +301,7 @@ const app = createApp({
   clock,
   staticRoot: env.STATIC_ROOT,
   testRoutes: env.ENABLE_TEST_ROUTES,
-  jobHandlers: {
-    ...catalogJobHandlers,
-    ...preparationJobHandlers,
-    ...llmJobHandlers,
-    ...mailJobHandlers,
-    ...testJobHandlers,
-  },
+  jobHandlers: allJobHandlers,
   auth,
   objects,
   llm: anthropicLlmPort,

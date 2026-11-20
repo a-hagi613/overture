@@ -128,6 +128,7 @@ export async function seedPosting(
     tags?: { dimension: "role" | "subrole" | "seniority"; value: string }[];
     questions?: {
       text: string;
+      fieldName?: string | null;
       fieldType:
         | "text"
         | "textarea"

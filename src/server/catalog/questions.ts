@@ -167,6 +167,7 @@ export function createQuestionCatalog(deps: { db: AppDatabase; clock: Clock }) {
       required: boolean;
       position: number;
       options: string[];
+      fieldName: string | null;
     }[],
   ) {
     db.delete(postingQuestions).where(eq(postingQuestions.postingId, postingId)).run();
@@ -179,6 +180,7 @@ export function createQuestionCatalog(deps: { db: AppDatabase; clock: Clock }) {
           required: entry.required,
           position: entry.position,
           options: JSON.stringify(entry.options),
+          fieldName: entry.fieldName,
         })
         .onConflictDoNothing()
         .run();
@@ -192,6 +194,7 @@ export function createQuestionCatalog(deps: { db: AppDatabase; clock: Clock }) {
         required: postingQuestions.required,
         position: postingQuestions.position,
         options: postingQuestions.options,
+        fieldName: postingQuestions.fieldName,
         textDisplay: questions.textDisplay,
         fieldType: questions.fieldType,
         factKey: questions.factKey,
@@ -229,6 +232,7 @@ export function questionInputsFromAts(
         fieldType,
         options,
         required: question.required,
+        fieldName: field.name === "" ? null : field.name,
         textNormalized: normalizeQuestionText(question.label, [...companyNames]),
       },
     ];

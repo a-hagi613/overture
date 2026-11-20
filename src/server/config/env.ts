@@ -96,6 +96,13 @@ const envSchema = z
     LITESTREAM_BINARY: z.string().min(1).default("litestream"),
     BROWSER_USE_API_KEY: z.string().min(1).optional(),
     BROWSER_USE_API_BASE_URL: z.url().default("https://api.browser-use.com"),
+    BROWSER_PROVIDER: z.enum(["local", "browser_use", "kernel"]).optional(),
+    BROWSER_SESSION_DIR: z.string().min(1).optional(),
+    BROWSER_PROXY_COUNTRY: z
+      .string()
+      .length(2)
+      .transform((value) => value.toLowerCase())
+      .default("ca"),
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     ANTHROPIC_BASE_URL: z.url().default("https://api.anthropic.com"),
     ANTHROPIC_MODEL: z.string().min(1).default("claude-haiku-4-5"),
