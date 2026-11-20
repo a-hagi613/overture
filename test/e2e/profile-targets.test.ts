@@ -37,6 +37,11 @@ const skipCompaniesSchema = z.object({ companies: z.array(skipCompanySchema) });
 
 const languagesSchema = z.object({ languages: z.array(z.string()) });
 
+const profileSettingsSchema = z.object({
+  languages: z.array(z.string()),
+  timezone: z.string().nullable(),
+});
+
 const factsSchema = z.object({
   facts: z.array(
     z.object({
@@ -383,6 +388,29 @@ test("languages and the cover-letter template are saved", async ({
   const readBack = languagesSchema.parse(await (await owner.get("/api/profile/languages")).json());
 
   expect(readBack.languages).toEqual(["en", "fr", "de"]);
+
+  const settings = profileSettingsSchema.parse(
+    await (
+      await owner.put("/api/profile/settings", {
+        data: { languages: ["en", "fr", "de"], timezone: "America/Toronto" },
+      })
+    ).json(),
+  );
+
+  expect(settings.timezone).toBe("America/Toronto");
+
+  const readSettings = profileSettingsSchema.parse(
+    await (await owner.get("/api/profile/settings")).json(),
+  );
+
+  expect(readSettings.timezone).toBe("America/Toronto");
+  expect(readSettings.languages).toEqual(["en", "fr", "de"]);
+
+  const badZone = await owner.put("/api/profile/settings", {
+    data: { languages: ["en"], timezone: "Eastern Time (Toronto)" },
+  });
+
+  expect(badZone.status()).toBe(400);
 
   const template =
     "Dear {{company}},\n\nI am applying for {{role}} because {{reason}}.\n\nSincerely,\nMaya";

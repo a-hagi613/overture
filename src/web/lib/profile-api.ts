@@ -23,6 +23,11 @@ const skipCompaniesSchema = z.object({ companies: z.array(skipCompanySchema) });
 
 const languagesSchema = z.object({ languages: z.array(z.string()) });
 
+const profileSettingsSchema = z.object({
+  languages: z.array(z.string()),
+  timezone: z.string().nullable(),
+});
+
 async function jsonFrom(response: Response) {
   if (!response.ok) {
     throw new Error(`profile request failed: ${String(response.status)}`);
@@ -88,6 +93,22 @@ export async function saveLanguages(languages: string[]) {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ languages }),
+      }),
+    ),
+  );
+}
+
+export async function fetchProfileSettings() {
+  return profileSettingsSchema.parse(await jsonFrom(await fetch("/api/profile/settings")));
+}
+
+export async function saveProfileSettings(settings: { languages: string[]; timezone: string }) {
+  return profileSettingsSchema.parse(
+    await jsonFrom(
+      await fetch("/api/profile/settings", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(settings),
       }),
     ),
   );

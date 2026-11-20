@@ -58,16 +58,28 @@ export const targetsInputSchema = z
 
 export type TargetsInput = z.infer<typeof targetsInputSchema>;
 
-export const languagesInputSchema = z.object({
-  languages: z
-    .array(
-      z
-        .string()
-        .trim()
-        .toLowerCase()
-        .regex(/^[a-z]{2}$/u),
-    )
-    .max(20),
+const languagesSchema = z
+  .array(
+    z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(/^[a-z]{2}$/u),
+  )
+  .max(20);
+
+export const languagesInputSchema = z.object({ languages: languagesSchema });
+
+export const timezoneSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_+\-/]+$/u);
+
+export const profileSettingsInputSchema = z.object({
+  languages: languagesSchema,
+  timezone: timezoneSchema,
 });
 
 export const skipCompaniesInputSchema = z.object({

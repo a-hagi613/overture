@@ -18,6 +18,7 @@ import { createSkipCompanyService } from "../profile/skip-companies.ts";
 import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
 import {
   languagesInputSchema,
+  profileSettingsInputSchema,
   skipCompaniesInputSchema,
   targetsInputSchema,
 } from "../../shared/targets.ts";
@@ -156,7 +157,7 @@ export function createProfileRoutes(deps: {
       return context.json({ error: "unauthorised" }, 401);
     }
 
-    return context.json({ languages: await languagesService.read(account.id) });
+    return context.json({ languages: (await languagesService.read(account.id)).languages });
   });
 
   routes.put("/profile/languages", zValidator("json", languagesInputSchema), async (context) => {
@@ -167,9 +168,33 @@ export function createProfileRoutes(deps: {
     }
 
     return context.json({
-      languages: await languagesService.save(account.id, context.req.valid("json")),
+      languages: await languagesService.saveLanguages(account.id, context.req.valid("json")),
     });
   });
+
+  routes.get("/profile/settings", async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
+
+    if (account === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    return context.json(await languagesService.read(account.id));
+  });
+
+  routes.put(
+    "/profile/settings",
+    zValidator("json", profileSettingsInputSchema),
+    async (context) => {
+      const account = await sessionUser(auth, context.req.raw);
+
+      if (account === null) {
+        return context.json({ error: "unauthorised" }, 401);
+      }
+
+      return context.json(await languagesService.save(account.id, context.req.valid("json")));
+    },
+  );
 
   routes.get("/profile/targets", async (context) => {
     const account = await sessionUser(auth, context.req.raw);
@@ -179,7 +204,7 @@ export function createProfileRoutes(deps: {
     }
 
     const saved = await targetsService.read(account.id);
-    const languages = await languagesService.read(account.id);
+    const { languages } = await languagesService.read(account.id);
 
     return context.json({
       ...saved,
@@ -195,7 +220,7 @@ export function createProfileRoutes(deps: {
     }
 
     const saved = await targetsService.save(account.id, context.req.valid("json"));
-    const languages = await languagesService.read(account.id);
+    const { languages } = await languagesService.read(account.id);
 
     return context.json({
       ...saved,
@@ -213,7 +238,7 @@ export function createProfileRoutes(deps: {
         return context.json({ error: "unauthorised" }, 401);
       }
 
-      const languages = await languagesService.read(account.id);
+      const { languages } = await languagesService.read(account.id);
 
       return context.json({
         matchedCount: countMatchingPostings(db, context.req.valid("json"), languages),

@@ -12,6 +12,11 @@ const createdSchema = z.object({ id: z.string() });
 const countSchema = z.object({ matchedCount: z.number() });
 const languagesSchema = z.object({ languages: z.array(z.string()) });
 
+const profileSettingsSchema = z.object({
+  languages: z.array(z.string()),
+  timezone: z.string().nullable(),
+});
+
 const baseTargets = {
   roles: ["Backend"],
   seniorities: ["senior"],
@@ -191,19 +196,26 @@ test("the skip list is prefilled from the resume, and companies add and remove",
   await request.dispose();
 });
 
-test("posting languages save from Settings", async ({
+test("posting languages and the time zone save from Settings", async ({
   isolatedAppServer: { url: appServerUrl },
   browser,
 }) => {
   const { request, storageState } = await ownerStorage(appServerUrl);
 
-  const context = await browser.newContext({ baseURL: appServerUrl, storageState });
+  const context = await browser.newContext({
+    baseURL: appServerUrl,
+    storageState,
+    timezoneId: "America/Vancouver",
+  });
+
   const page = await context.newPage();
 
   await page.goto("/settings");
 
   const french = page.getByRole("button", { name: "French" });
+  const timezone = page.getByLabel("Time zone");
 
+  await expect(timezone).toHaveValue("America/Vancouver");
   await expect(french).toHaveAttribute("aria-pressed", "false");
   await french.click();
   await expect(french).toHaveAttribute("aria-pressed", "true");
@@ -212,15 +224,27 @@ test("posting languages save from Settings", async ({
 
   expect(results.violations).toEqual([]);
 
+  const firstSave = profileSettingsSchema.parse(
+    await (await request.get("/api/profile/settings")).json(),
+  );
+
+  expect(firstSave.languages).toEqual(["fr"]);
+  expect(firstSave.timezone).toBe("America/Vancouver");
+
   await page.reload();
   await expect(page.getByRole("button", { name: "French" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
 
-  const saved = languagesSchema.parse(await (await request.get("/api/profile/languages")).json());
+  await timezone.selectOption("America/Toronto");
+  await expect(timezone).toHaveValue("America/Toronto");
 
-  expect(saved.languages).toEqual(["fr"]);
+  const withZone = profileSettingsSchema.parse(
+    await (await request.get("/api/profile/settings")).json(),
+  );
+
+  expect(withZone.timezone).toBe("America/Toronto");
 
   await page.getByRole("button", { name: "English" }).click();
   await expect(page.getByRole("button", { name: "English" })).toHaveAttribute(
@@ -231,6 +255,9 @@ test("posting languages save from Settings", async ({
   const both = languagesSchema.parse(await (await request.get("/api/profile/languages")).json());
 
   expect(both.languages.toSorted()).toEqual(["en", "fr"]);
+
+  await page.reload();
+  await expect(page.getByLabel("Time zone")).toHaveValue("America/Toronto");
 
   await context.close();
   await request.dispose();

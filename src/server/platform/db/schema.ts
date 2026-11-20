@@ -337,6 +337,7 @@ export const facts = sqliteTable(
 export const profiles = sqliteTable("profiles", {
   userId: cascadeUserId().primaryKey(),
   languages: text("languages").notNull().default("[]"),
+  timezone: text("timezone"),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
 });
