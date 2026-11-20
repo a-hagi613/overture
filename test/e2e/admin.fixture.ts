@@ -48,14 +48,6 @@ function adminEnv(jwksUrl: string, port: number, identityServer: IdentityServer)
   return {
     PORT: String(port),
     ADMIN_ORIGIN: `http://localhost:${String(port)}`,
-    BETTER_AUTH_SECRET: authTestIdentity.secret,
-    OWNER_EMAIL: authTestIdentity.ownerEmail,
-    TURNSTILE_SITE_KEY: authTestIdentity.turnstileSiteKey,
-    TURNSTILE_SECRET: "1x0000000000000000000000000000000AA",
-    GOOGLE_CLIENT_ID: "e2e-google-client-id",
-    GOOGLE_CLIENT_SECRET: "e2e-google-client-secret",
-    LINKEDIN_CLIENT_ID: "e2e-linkedin-client-id",
-    LINKEDIN_CLIENT_SECRET: "e2e-linkedin-client-secret",
     OAUTH_GOOGLE_DISCOVERY_URL: `${identityServer.url}/.well-known/openid-configuration`,
     OAUTH_LINKEDIN_DISCOVERY_URL: `${identityServer.url}/.well-known/openid-configuration`,
     AUTH_ALLOWED_HOSTS: "127.0.0.1,localhost",
@@ -75,9 +67,10 @@ async function startFreshAdminServer(
 
   copyFileSync(join(process.cwd(), "test/e2e/.tmp/template.db"), databasePath);
 
-  return startAppServer(databasePath, {
-    extraEnv: adminEnv(accessServer.url, adminPort(offset), identityServer),
-  });
+  return startAppServer(
+    databasePath,
+    adminEnv(accessServer.url, adminPort(offset), identityServer),
+  );
 }
 
 function adminUrlOf(server: AppServer) {
