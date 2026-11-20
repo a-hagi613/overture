@@ -102,7 +102,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Service | Purpose | Env / secret | In tests (ADR 0013) |
 |---|---|---|---|
 | ATS job feeds (Greenhouse, Lever, Ashby) | catalog discovery (§6) | `GREENHOUSE_FEED_BASE_URL`, `LEVER_FEED_BASE_URL`, `ASHBY_FEED_BASE_URL` (test-only overrides of the real hosts) | local fixture server replaying recorded real responses captured by `scripts/record-feeds.ts` |
-| Cloudflare R2 | backups, encrypted files and mail | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES`, `R2_BUCKET_BACKUPS` | disk object store adapter (real implementation, also used in local dev) |
+| Cloudflare R2 | backups, encrypted files and mail | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES`, `R2_BUCKET_BACKUPS`; `R2_ENDPOINT` overrides the endpoint for tests | disk object store adapter (real implementation, also used in local dev); the R2 adapter runs against a local S3-compatible server (`test/e2e/s3-server.ts`) |
 | Cloudflare Turnstile | bot check on auth forms | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES` (optional, defaults to the `APP_ORIGIN` hostname; production must not list localhost or 127.0.0.1) | Cloudflare's published always-pass test keys; siteverify intercepted with recorded-shape responses (`test/e2e/turnstile-gate.test.ts`) |
 | Cloudflare Access | admin host gate | `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_JWKS_URL` (tests override the certs URL) | real verification against a test signing key |
 | Amazon SES receiving | inbound mail (ADR 0024) | `SES_INBOUND_BUCKET`, `SES_INBOUND_TOPIC_ARN` | real SNS-signed notices (test signing certificate served through MSW) to the real endpoint; raw mail from the disk object store |
@@ -120,7 +120,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=mail.tryoverture.com`, `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES` | |
 
 All secrets are Fly secrets; local dev reads `.env` (chmod 600, never committed).
-M1 keeps encrypted files on the Fly volume at `/data/objects` (`OBJECT_STORE_ROOT`) through the disk object store adapter; they are sealed per user but not in the Litestream backup, which covers SQLite only. Moving them to `R2_BUCKET_FILES` is #81.
+M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
 
 ### 3.3 Domains and DNS
 
