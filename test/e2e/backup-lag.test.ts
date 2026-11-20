@@ -10,6 +10,7 @@ import { z } from "zod";
 
 import { expect, test } from "@playwright/test";
 
+import { testAuthEnvironment } from "./auth.fixture.ts";
 import { startAppServer } from "./app-server.ts";
 
 const replicasCaughtUpSchema = z.object({
@@ -47,7 +48,10 @@ test.beforeAll(async () => {
   );
 
   replicator = spawn("litestream", ["replicate", "-config", configPath], { stdio: "ignore" });
-  server = await startAppServer(databasePath, { LITESTREAM_CONFIG_PATH: configPath });
+  server = await startAppServer(databasePath, {
+    ...testAuthEnvironment,
+    LITESTREAM_CONFIG_PATH: configPath,
+  });
 });
 
 test.afterAll(async () => {

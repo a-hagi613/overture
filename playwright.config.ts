@@ -9,4 +9,30 @@ export default defineConfig({
   use: {
     trace: "retain-on-failure",
   },
+  projects: [
+    {
+      name: "chromium",
+      testIgnore: "**/board-match-*.test.ts",
+    },
+    {
+      name: "signin-boards",
+      testMatch: /board-match-signin\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/../../design/reference/signin/{arg}{ext}",
+        },
+      },
+    },
+    {
+      name: "shell-boards",
+      testMatch: /board-match-shell\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/chrome-baselines/{arg}{ext}",
+        },
+      },
+    },
+  ],
 });

@@ -9,10 +9,80 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+const timestamp = (name: string) => integer(name, { mode: "timestamp" });
+
+const cascadeUserId = () =>
+  text("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull();
+
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
+  name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  createdAt: integer("created_at").notNull(),
+  emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
+  image: text("image"),
+  role: text("role", { enum: ["user", "owner"] })
+    .notNull()
+    .default("user"),
+  suspendedAt: timestamp("suspended_at"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+});
+
+export const sessions = sqliteTable("session", {
+  id: text("id").primaryKey(),
+  userId: cascadeUserId(),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+});
+
+export const accounts = sqliteTable(
+  "account",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at"),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: timestamp("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull(),
+  },
+  (t) => [uniqueIndex("account_provider_account_id").on(t.providerId, t.accountId)],
+);
+
+export const verifications = sqliteTable("verification", {
+  id: text("id").primaryKey(),
+  identifier: text("identifier").notNull(),
+  value: text("value").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+});
+
+export const rateLimits = sqliteTable("rate_limit", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: integer("last_request").notNull(),
+});
+
+export const invites = sqliteTable("invites", {
+  id: text("id").primaryKey(),
+  emailHash: text("email_hash").notNull().unique(),
+  invitedBy: text("invited_by"),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").notNull(),
 });
 
 export const bgJobs = sqliteTable("bg_jobs", {
