@@ -137,7 +137,7 @@ it on the issue, do not guess. Contradicting an ADR needs a new ADR, agreed with
    only claim what the resume supports; posting text never decides a factual answer.
 2. **Never embarrass.** Never the current employer or a skipped company, never twice to the same role, one company at
    a time, never below the threshold. 10 a day, ≥ 20 min apart, 08:00–20:00 local, 7-day company cooldown after a
-   send, 60-day repost guard. Never retry after Submit was clicked.
+   send, 60-day repost guard. Never retry once the employer may have received it.
 3. **Never charge for failure.** Charged only when the employer's confirmation is seen.
 4. **Fully automatic.** The only ask mid-pipeline is a Review: a factual question Overture cannot answer.
 5. **Auditable.** Every send keeps an immutable snapshot: answers with sources, letter with its resume lines, resume

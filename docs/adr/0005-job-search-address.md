@@ -1,10 +1,10 @@
 ---
-status: accepted
+status: accepted (inbound path replaced by ADR 0024)
 ---
 
 # A generated job-search address per user; the personal mailbox is never connected
 
-Each user gets `first.last@mail.tryoverture.com`, a subdomain of the one brand domain with its own SES identity, SPF, DKIM and DMARC at reject. It is the email typed on every application form, so codes and replies reach Overture. Inbound runs through Cloudflare Email Routing to a Worker, R2 and a signed POST; outbound replies go through Amazon SES, only in threads the employer started, at most 20 a day. Every message is kept, encrypted. Addresses are never reused.
+Each user gets `first.last@mail.tryoverture.com`, a subdomain of the one brand domain with its own SES identity, SPF, DKIM and DMARC at reject. It is the email typed on every application form, so codes and replies reach Overture. Inbound is received by Amazon SES (ADR 0024); outbound replies go through Amazon SES, only in threads the employer started, at most 20 a day. Every message is kept, encrypted. Addresses are never reused.
 
 ## Considered Options
 

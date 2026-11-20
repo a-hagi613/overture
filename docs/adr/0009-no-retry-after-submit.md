@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted (refined by ADR 0025: Submit counts when the server may have accepted it)
 ---
 
 # Never retry after Submit was pressed

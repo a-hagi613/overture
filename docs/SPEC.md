@@ -50,7 +50,7 @@ per-user AI keys, resume generation or restyling, annual plans.
 
 | Milestone | Who | Scope | Exit gate |
 |---|---|---|---|
-| **M1 — Owner applies from the cloud** | owner only (allowlist) | catalog (Greenhouse, Lever, Ashby), tagging, profile via importer, matching, preparation, Reviews, owner's job-search mailbox (inbound), Browser Use provider (Kernel adapter behind the same port, synthetic lab only), dispatch, ledger with admin grants, Board, Home, Review, minimal Profile, minimal admin, synthetic lab, fixture capture job, observability | ≥ 60 real owner applications on Browser Use; **≥ 85 % of attempted applications reach `sent`**; cost ≤ **$0.03 per completed application**; zero wrong-company or duplicate sends |
+| **M1 — Owner applies from the cloud** | owner only (allowlist) | catalog (Greenhouse, Lever, Ashby), tagging, profile via importer, matching, preparation, Reviews, owner's job-search mailbox (inbound), Browser Use provider (Kernel adapter behind the same port, synthetic lab only), dispatch, ledger with admin grants, Board, Home, Review, minimal Profile, minimal admin, synthetic lab, fixture capture job, observability | ≥ 60 real owner applications on Browser Use; **≥ 85 % of attempted applications reach `sent`**; cost ≤ **$0.03 per completed application**; zero wrong-company or duplicate sends. *Attempted* and *cost* are defined in ADR 0026 |
 | **M2 — Invite-only beta** | invited users | onboarding wizard, mailboxes for all, two-way Inbox (SES), notifications (PWA push + digest), check-ins, email-driven stage moves, full admin (users, Reveal, audit, support access log), export/delete, legal pages + consent, SmartRecruiters/Recruitee/Workable/Personio after a 20-form probe each. Each accepted invite gets an admin grant of 300 applications over 30 days (no card) | 10 beta users for 14 days; submit rate holds ≥ 85 %; no P1 privacy/security finding |
 | **M3 — Public** | anyone | Stripe Managed Payments, trial/week/month plans, card fingerprints, grants/expiry, payment-failure pause, admin refunds, public landing + pricing (prerendered), public signup | first 20 paying users; Stripe reconciliation matches the ledger for 30 days |
 
@@ -77,16 +77,18 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
         │CDP/WSS        │HTTPS            │HTTPS          │OTLP           │S3 API
         ▼               ▼                 ▼               ▼               ▼
   Browser Use Cloud  Anthropic API    Amazon SES     Grafana Cloud      Cloudflare R2
-  (Kernel fallback)  (Haiku 5.5)      (ca-central-1) (LGTM)             backups · files · raw mail
+  (Kernel fallback)  (Haiku 5.5)      (ca-central-1) (LGTM)             backups · files · mail
                                           ▲
-  employers ──mail──▶ Cloudflare Email Routing (mail.tryoverture.com catch-all) ──▶ Worker `mail-ingest` ──▶ R2 + signed POST
+  employers ──mail──▶ SES receiving (mail.tryoverture.com, one rule) ──▶ S3 raw + SNS notice ──▶ overture-web
 ```
 
 - One Fly app, one machine, one volume. `fly scale count` stays 1. Machine: `shared-cpu-2x`, 2 GB; volume 10 GB.
   No runner app: browsers are remote.
 - Same origin for API and SPA. `admin.tryoverture.com` is the same process, routed by host, behind Cloudflare Access.
-- Deploys cause ~10–30 s downtime; on `SIGTERM` the process stops claiming jobs, waits ≤ 25 s for in-flight jobs,
-  then exits; in-flight browser attempts are abandoned and recovered by lease expiry (§9.4).
+- Deploys cause ~10–30 s downtime; `kill_timeout = 300` (Fly's maximum). On `SIGTERM` the process stops claiming
+  jobs and waits for in-flight jobs. A send that has not reached `submit_clicked_at` stops, releases and is
+  rescheduled as `interrupted`, which does not use one of its two tries; a send past it waits for its confirmation
+  signal. Anything still open at exit is recovered by lease expiry (§9.4).
 - **Where traffic comes from.** Every request that loads or submits an employer's application form comes from a
   Browser Use browser on a residential IP in the user's country, controlled by `overture-web` over CDP. `overture-web`
   itself calls only the ATSes' public job-feed APIs (discovery §6, the liveness re-check §9.3), which exist for
@@ -99,10 +101,10 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 
 | Service | Purpose | Env / secret | In tests (ADR 0013) |
 |---|---|---|---|
-| Cloudflare R2 | backups, encrypted files, raw inbound mail | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES`, `R2_BUCKET_MAIL_RAW`, `R2_BUCKET_BACKUPS` | disk object store adapter (real implementation, also used in local dev) |
+| Cloudflare R2 | backups, encrypted files and mail | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES`, `R2_BUCKET_BACKUPS` | disk object store adapter (real implementation, also used in local dev) |
 | Cloudflare Turnstile | bot check on auth forms | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | Cloudflare's published always-pass test keys |
 | Cloudflare Access | admin host gate | `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN` | real verification against a test signing key |
-| Cloudflare Email Worker | inbound mail | `MAIL_INGEST_HMAC_KEY` (shared with Worker) | real signed POSTs to the real endpoint |
+| Amazon SES receiving | inbound mail (ADR 0024) | `SES_INBOUND_BUCKET`, `SES_INBOUND_TOPIC_ARN` | real SNS-signed notices (test signing certificate served through MSW) to the real endpoint; raw mail from the disk object store |
 | Browser Use Cloud | primary browser | `BROWSER_USE_API_KEY` | `local` provider: real local Chrome filling saved forms from the fixture server (§10.5); control API via MSW |
 | Kernel | fallback browser | `KERNEL_API_KEY` | control API via MSW; lab only |
 | Anthropic | LLM (prod) | `ANTHROPIC_API_KEY` | real adapter; API intercepted by MSW with responses recorded by the daily live check |
@@ -123,8 +125,8 @@ All secrets are Fly secrets; local dev reads `.env` (chmod 600, never committed)
   Routing). SES DKIM (3 CNAMEs), SPF `include:amazonses.com`, DMARC `p=reject; rua=…`, custom MAIL FROM
   `bounce.tryoverture.com`.
 - `mail.tryoverture.com` (subdomain, no second domain bought): job-search addresses. MX on the subdomain →
-  Cloudflare Email Routing (subdomain added in Email Routing settings), catch-all → Worker `mail-ingest`; confirm at
-  setup that the catch-all covers the subdomain, else a Worker route rule for `*@mail.tryoverture.com`. Its own SES
+  `inbound-smtp.ca-central-1.amazonaws.com`; one SES receipt rule with recipient `mail.tryoverture.com` stores to S3
+  and notifies SNS (ADR 0024). Its own SES
   identity and DKIM, SPF `v=spf1 include:amazonses.com -all`, `_dmarc.mail` `p=reject; adkim=s; aspf=s`, so its
   reputation is tracked apart from the apex. `https://mail.tryoverture.com` serves a one-page explainer: "This is
   Overture's private job-search email. Each address belongs to one job seeker."
@@ -139,7 +141,7 @@ All secrets are Fly secrets; local dev reads `.env` (chmod 600, never committed)
 | Runtime | Bun (latest stable), strict TypeScript (`tsgo` for typecheck) |
 | HTTP | Hono + `@hono/zod-validator`; Zod on every input, webhook and env var |
 | DB | `bun:sqlite`, WAL, `synchronous=FULL`, `foreign_keys=ON`, STRICT tables; Drizzle ORM + drizzle-kit migrations; no SQLite-only SQL outside `server/platform/search` |
-| Auth | better-auth (Google, LinkedIn OIDC, email+password, magic link, passkey for admin) with Drizzle adapter |
+| Auth | better-auth (M1: Google, LinkedIn OIDC, magic link; M2 adds email + password; passkey for admin) with Drizzle adapter |
 | Web | Vite 8, React 19, React Router 7 (library mode, Zod-typed search params), TanStack Query, Hono RPC client, Tailwind v4, shadcn/ui, 21st.dev, dnd-kit, lucide |
 | Browser control | `playwright-core` `chromium.connectOverCDP` |
 | PDF | `unpdf`; Haiku 5.5 PDF fallback |
@@ -165,7 +167,6 @@ src/
     app.ts           Hono app composition (host routing: app vs admin)
     main.ts          process entry: http + workers + scheduler, graceful shutdown
   web/               React app (routes/, features/, components/ui = shadcn)
-  mail-worker/       Cloudflare Worker (wrangler.toml)
 drizzle/             generated migrations
 scripts/             import-v1.ts, census.ts, pull-fixtures.ts, restore-drill.ts
 tests/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
@@ -179,7 +180,7 @@ No comments in source (Landmines `no-comments`; TSDoc on exported port interface
 
 ```ts
 interface LlmPort { complete<T>(req: LlmRequest<T>): Promise<LlmResult<T>>; batch<T>(reqs: LlmRequest<T>[]): Promise<BatchHandle> }
-interface BrowserProvider { id: "browser_use" | "kernel" | "local"; open(o: { profileId: string | null; country: string }): Promise<RemoteBrowser>; ensureProfile(userId: string): Promise<string>; deleteProfile(profileId: string): Promise<void> }
+interface BrowserProvider { id: "browser_use" | "kernel" | "local"; open(o: { profileId: string | null; country: string; timeoutMinutes: number; attemptId: string }): Promise<RemoteBrowser>; listOpen(): Promise<{ sessionId: string; attemptId: string | null }[]>; stop(sessionId: string): Promise<void>; ensureProfile(userId: string): Promise<string>; deleteProfile(profileId: string): Promise<void> }
 interface RemoteBrowser { cdpUrl: string; sessionId: string; liveViewUrl: string | null; close(): Promise<UsageReport> }
 interface MailSender { sendRaw(m: OutboundMime): Promise<{ providerMessageId: string }> }
 interface ObjectStore { put(k: string, b: Uint8Array, meta?): Promise<void>; get(k: string): Promise<Uint8Array | null>; delete(k: string): Promise<void>; list(prefix: string): AsyncIterable<string> }
@@ -193,7 +194,7 @@ interface Clock { now(): number }
 Domain code imports ports only (enforced by `no-restricted-imports`). Each port has its production adapter and, where
 a real local equivalent exists, a local adapter (`local` browser, disk object store) used in development and tests. No
 port has a hand-written fake (ADR 0013). `Clock` reads system time plus an offset that only a test-only route, never
-mounted in production, can move.
+mounted in production, can move; a second test-only route runs every job that is due.
 
 ---
 
@@ -247,9 +248,9 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `matches` | user_id, posting_id, code_rank REAL, score NULL, reason NULL, resume_id NULL, targets_version NULL, scored_at NULL; PK(user_id,posting_id). A score is valid only while `resume_id` and `targets_version` equal the user's current ones |
 | `posting_user_state` | user_id, posting_id, state CHECK IN ('saved','hidden'), updated_at; PK(user_id,posting_id) |
 | `applications` | id, user_id, posting_id, company_id, origin CHECK IN ('auto','manual'), status CHECK IN ('preparing','needs_review','ready','sending','confirming','sent','failed','skipped','withdrawn'), status_reason NULL (§11), stage CHECK IN ('queued','applied','screening','interviewing','offer','closed') NULL, stage_locked INTEGER DEFAULT 0, board_position REAL, score_at_queue, scheduled_for NULL, attempts INTEGER DEFAULT 0, sent_at NULL, closed_reason CHECK IN ('rejected','no_response','withdrawn','offer_declined','offer_accepted','other') NULL, created_at, updated_at; UNIQUE(user_id,posting_id); partial UNIQUE(user_id) WHERE status='sending'. `withdrawn` applies only before `sent` (the user stops a queued application); a sent application cannot be un-sent, so the user moves it to Closed with `closed_reason='withdrawn'` |
-| `application_snapshots` | application_id PK, posting_url, posting_title, description_hash, answers_enc (JSON array `{question_id, label, answer, fact_key, fact_revision, kind, resume_line_ids}`), cover_letter_enc NULL (JSON `[{sentence, resume_line_ids}]`), resume_id, resume_sha256, consent_version, provider, provider_session_id, submitted_at, confirmed_by CHECK IN ('page','email'), cost_micros. **Immutable**: a `BEFORE UPDATE` trigger always raises; a `BEFORE DELETE` trigger raises `WHEN EXISTS (SELECT 1 FROM user WHERE id = OLD.user_id)`, so rows go only when the user row is gone (account deletion cascade). Flow 29 proves both |
+| `application_snapshots` | application_id PK, user_id, posting_url, posting_title, description_hash, answers_enc (JSON array `{question_id, label, answer, fact_key, fact_revision, kind, resume_line_ids}`), cover_letter_enc NULL (JSON `[{sentence, resume_line_ids}]`), resume_id, resume_sha256, consent_version, provider, provider_session_id, submitted_at, confirmed_by CHECK IN ('page','email'), cost_micros. **Immutable**: a `BEFORE UPDATE` trigger always raises; a `BEFORE DELETE` trigger raises `WHEN EXISTS (SELECT 1 FROM user WHERE id = OLD.user_id)`, so rows go only when the user row is gone (account deletion cascade). Flow 29 proves both |
 | `application_events` | id, application_id, user_id, at, kind CHECK IN ('status','stage','email','checkin','note'), from_value, to_value, source CHECK IN ('system','user','email','checkin','admin'), detail JSON; the card timeline and stage history |
-| `attempts` | id, application_id, user_id, n, provider, provider_session_id, started_at, lease_until, ended_at NULL, submit_clicked_at NULL, outcome CHECK IN ('sent','unconfirmed','captcha_blocked','code_timeout','posting_closed','form_changed','blocked','upload_failed','duplicate','needs_review','provider_error','timeout','crash') NULL, browser_ms, proxy_bytes, captcha_seen, code_used, cost_micros, error_code NULL |
+| `attempts` | id, application_id, user_id, n, provider, provider_session_id, started_at, lease_until, ended_at NULL, submit_clicked_at NULL, submit_response_status INTEGER NULL, outcome CHECK IN ('sent','unconfirmed','captcha_blocked','code_timeout','posting_closed','form_changed','blocked','upload_failed','duplicate','needs_review','provider_error','timeout','crash','interrupted') NULL, browser_ms, proxy_bytes, captcha_seen, code_used, cost_micros, error_code NULL |
 | `reviews` | id, user_id, question_id, fact_key NULL, prompt, field_type, options JSON, status CHECK IN ('open','answered','dismissed'), created_at, resolved_at; UNIQUE(user_id,question_id) WHERE status='open' |
 | `review_applications` | review_id, application_id; PK(review_id,application_id) |
 | `checkins` | id, application_id UNIQUE, user_id, due_at, status CHECK IN ('open','answered','expired'), answer NULL, created_at |
@@ -313,7 +314,7 @@ Discovery runs from `overture-web` directly (no proxy).
 
 | ATS | Feed | Conditional GET | Per-ATS limits (default) |
 |---|---|---|---|
-| Greenhouse | `boards-api.greenhouse.io/v1/boards/{token}/jobs?content=true`; questions via `/jobs/{id}?questions=true` | ETag where returned, else content hash | 4 concurrent, 2 req/s |
+| Greenhouse | `boards-api.greenhouse.io/v1/boards/{token}/jobs` (light list); `/jobs/{id}` with content only when a job's `updated_at` changed; questions via `/jobs/{id}?questions=true` | ETag where returned, else content hash | 4 concurrent, 2 req/s |
 | Lever | `api.lever.co/v0/postings/{token}?mode=json` | content hash | 4 concurrent, 2 req/s |
 | Ashby | `api.ashbyhq.com/posting-api/job-board/{token}?includeCompensation=true` | content hash | 4 concurrent, 2 req/s |
 | SmartRecruiters (M2) | `api.smartrecruiters.com/v1/companies/{id}/postings` + details | content hash | 2 concurrent, 1 req/s |
@@ -400,8 +401,8 @@ Each fact has `revision`; snapshots record the revision used.
 - If taken or in `retired_addresses`, append 2–4 random digits to the last name (`jane.doe4821`), retry up to 10.
 - Shown once in onboarding with "Looks good"; changes only via admin. On account deletion the local part moves to
   `retired_addresses` and is never reused.
-- After cancel, `status='receive_only'`, `receive_until = now + 12 months`; after that `closed` and the Worker
-  rejects mail.
+- After cancel, `status='receive_only'`, `receive_until = now + 12 months`; after that `closed`, and mail to it is
+  discarded at ingest.
 
 ---
 
@@ -466,6 +467,9 @@ Job `application.prepare`:
    resume + posting + the user's cover-letter template (its fixed text kept verbatim, its blanks filled) or, without a
    template, the voice sample; every sentence with a factual claim must map to a resume line (the model returns
    `[{sentence, resume_line_ids}]`); sentences without a mapping are removed.
+   **Grounding check in code**, for open text and letters: every number, date, employer and technology named in a
+   sentence must appear in the resume lines it cites, else the sentence is removed. (Anthropic Citations cannot be
+   combined with structured outputs, so the check is ours.)
 5. Unknown **required** factual question → status `needs_review`, create/attach a Review. Unknown **optional** →
    left blank, never blocking.
 6. All answered → status `ready`, `scheduled_for` assigned by the planner (§9.2).
@@ -544,9 +548,12 @@ Then, in one transaction: ledger `reserve` (idempotency key `reserve:<applicatio
 
 ### 9.4 Outcomes
 
-The executor sets `attempts.submit_clicked_at` in the same instant it clicks the final Submit. That timestamp splits
-every failure in two: before it, nothing reached the employer and a retry is safe; after it, the employer may have
-the application, and a retry could send it twice.
+Each ATS flow names its application request. The executor clicks the final Submit and watches that request
+(ADR 0025): a 4xx answer (Greenhouse's 428 `captcha-failed` asking for an emailed code and a second Submit) means
+nothing was submitted; a 2xx, a 5xx, a timeout or a lost connection sets `attempts.submit_clicked_at`, and the status
+is kept in `submit_response_status`. A flow that cannot observe its request sets `submit_clicked_at` at the click.
+That timestamp splits every failure in two: before it, nothing reached the employer and a retry is safe; after it,
+the employer may have the application, and a retry could send it twice.
 
 | Attempt outcome | Ledger | Application | Retry |
 |---|---|---|---|
@@ -554,6 +561,7 @@ the application, and a retry could send it twice.
 | `unconfirmed` (any failure **after** `submit_clicked_at`: no confirmation signal, timeout, crash, browser lost) | stays reserved | `confirming` | **never** |
 | `needs_review` (unknown required question found on the form) | release | `needs_review` | after Review |
 | `posting_closed`, `duplicate` | release | `skipped` | no |
+| `interrupted` (deploy or shutdown **before** `submit_clicked_at`) | release | back to `ready`, next free slot; does not count toward `limits.max_attempts` | yes |
 | `captcha_blocked`, `code_timeout`, `blocked`, `form_changed`, `upload_failed`, `provider_error`, `timeout`, `crash` (all **before** `submit_clicked_at`) | release | back to `ready`, earliest retry ≥ 6 h later (§9.2), if `attempts < 2`, else `failed` | once, fresh browser session |
 
 **Confirming.** An application in `confirming` waits up to `limits.confirm_wait_hours` (24) for an acknowledgement:
@@ -564,8 +572,10 @@ sent for the 60-day guard so Overture cannot apply to it again. Shown as `Couldn
 couldn't confirm this one reached the employer, so it won't send it again. Nothing was charged." `confirming` does not occupy
 the one-in-flight slot (the partial unique index covers `sending` only) and counts toward the company rule (§8.1).
 
-**Recovery sweep** (every minute): an attempt whose `lease_until` has passed with no outcome is closed as `unconfirmed`
-if `submit_clicked_at` is set, else as `crash`, and the table above applies.
+**Recovery sweep** (every minute, and once on boot): an attempt whose `lease_until` has passed with no outcome is
+closed as `unconfirmed` if `submit_clicked_at` is set, else as `crash`, and the table above applies. The same sweep
+lists the provider's open sessions and stops any whose attempt is closed or unknown (a crashed process never runs
+`finally`).
 
 ### 9.5 Automatic kill switches
 
@@ -582,7 +592,7 @@ switches off.
 
 - **Browser Use Cloud** (default): `POST /api/v4/browsers` with `profileId` (one per user, created on first use),
   `proxyCountryCode` = user's `current_country` (fallback: nearest supported country from a static map),
-  `solveCaptchas: true`; connect with `chromium.connectOverCDP(cdpUrl)`; **always** stop the browser through the
+  `solveCaptchas: true`, `timeout: 15` (minutes; the default is 60) and the attempt id as metadata; connect with `chromium.connectOverCDP(cdpUrl)`; **always** stop the browser through the
   API in `finally` (closing CDP does not stop billing).
 - **Kernel** (emergency fallback): headful browser, stealth on, ISP proxy, per-user profile. Its acceptable-use
   policy bans "bulk unsolicited form submission" (ADR 0003), so it is exercised only against the synthetic lab and
@@ -599,19 +609,20 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 
 ### 10.3 Attempt steps (`submit.run`)
 
-1. Open provider browser; `page.route` aborts `image`, `font`, `media` and known analytics hosts.
+1. Open provider browser (15-minute vendor timeout, attempt id as metadata); `page.route` aborts `image`, `font`, `media` and known analytics hosts.
 2. Navigate to `apply_url`; if the page says the job is closed → `posting_closed`.
 3. Compute the form signature; load the cached plan or build one.
 4. Fill answers; upload the resume with `setInputFiles({name, mimeType, buffer})` from the decrypted file.
 5. Any required field the prepared answers do not cover: map it (§8.3 step 2); if it is factual and unknown →
    stop, outcome `needs_review` (nothing submitted).
-6. Submit. If a verification-code prompt appears, poll the user's mailbox (`auth='pass'`, sender domain in the ATS
-   domain list, received after `started_at`) every 5 s for ≤ 5 min, extract the code (ported code extractor), type
-   it, mark `code_consumed_at`. None → `code_timeout`. A code prompt that appears after the final Submit is handled
-   the same way; a timeout there is `unconfirmed`, not `code_timeout`.
+6. Submit. If a verification-code prompt appears (on Greenhouse, after a 428 answer to the application request, an
+   8-character code), wait for the user's mailbox (`auth='pass'`, sender domain in the ATS domain list, received
+   after `started_at`; woken by ingest, checked every 5 s as a backstop) for ≤ 5 min, extract the code (ported code extractor), type
+   it, mark `code_consumed_at`, and Submit again. None → `code_timeout`. Whether a timeout is `code_timeout` or
+   `unconfirmed` depends only on whether `submit_clicked_at` was set (§9.4), never on where the prompt appeared.
 7. If a CAPTCHA is visible: stop interacting, wait 10 s, re-inspect, up to 3 times (vendor solver works meanwhile).
    Still visible → `captcha_blocked`.
-8. Set `submit_clicked_at` and click the final Submit. Confirm success by the ATS confirmation signal
+8. Click the final Submit; set `submit_clicked_at` per §9.4 from the application request's answer. Confirm success by the ATS confirmation signal
    (URL/heading/text per ATS). No signal within 30 s → `unconfirmed` (§9.4). A missing or changed field found
    **before** the click → `form_changed`.
 9. Close the browser; record `browser_ms`, `proxy_bytes`, `cost_micros` from the provider usage report.
@@ -641,14 +652,17 @@ stopping before Submit. The developer machine never drives a browser against a r
 
 ### 11.1 Inbound
 
-1. Cloudflare Email Routing catch-all on `mail.tryoverture.com` → Worker `mail-ingest`.
-2. Worker: reject if the local part is unknown or `closed` (lookup via signed `GET /internal/mailboxes/{local}`,
-   cached 5 min); otherwise write raw MIME to R2 `mail-raw/{ulid}.eml` and `POST /internal/mail/inbound`
-   `{key, to, from, size}` signed with HMAC-SHA256 (`MAIL_INGEST_HMAC_KEY`, timestamp ±5 min). Server down → the
-   object stays; sweep `mail.sweep` every 5 min ingests unprocessed keys.
-3. Job `mail.ingest`: parse (`mailparser`), verify SPF/DKIM/DMARC (`mailauth`) → `auth`; encrypt subject, text,
-   from, to, snippet; HTML and attachments → R2 encrypted; delete the raw object. **Nothing is dropped** — failed auth
-   is stored and labelled "Couldn't verify sender".
+1. SES receiving in ca-central-1, one receipt rule for `mail.tryoverture.com` (ADR 0024): store the raw MIME in S3
+   `SES_INBOUND_BUCKET`, then publish an SNS notice (message id, recipients, `spfVerdict`, `dkimVerdict`,
+   `dmarcVerdict`, `spamVerdict`, `virusVerdict`) to `POST /internal/ses/inbound`. Messages over 40 MB are refused by
+   SES.
+2. The endpoint verifies the SNS signature and enqueues `mail.ingest`. Server down → SNS retries; sweep
+   `mail.sweep` every 5 min ingests any S3 object not yet processed.
+3. Job `mail.ingest`: unknown or `closed` local part → delete the raw object, store nothing. Otherwise parse
+   (`mailparser`); `auth='pass'` when DMARC passes (or SPF or DKIM passes aligned with the From domain), `fail` on a
+   failing verdict, `none` otherwise; encrypt subject, text, from, to, snippet; HTML and attachments → R2 encrypted;
+   delete the raw object. **Nothing for a live address is dropped**: failed auth is stored and labelled "Couldn't
+   verify sender". Ingest wakes any attempt waiting for a code from that mailbox.
 4. Threading by `In-Reply-To`/`References`, else new thread; `employer_started=1` when the first message is inbound.
 5. Link to an application: sender domain ∈ company domain or ATS mail domains (Greenhouse, Lever, Ashby,
    SmartRecruiters, Recruitee, Workable, Personio sender lists in `src/shared/ats-mail-domains.ts`) **and** company
@@ -701,8 +715,9 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
 
 ### 13.1 Auth
 
-- better-auth: Google, LinkedIn (OIDC; name/email/photo only), email + password (scrypt, HaveIBeenPwned plugin,
-  min 10 chars), magic link (15 min, single use). Email must be verified before any application runs.
+- better-auth: Google, LinkedIn (OIDC; name/email/photo only), magic link (15 min, single use). Email + password
+  (scrypt, HaveIBeenPwned plugin, min 10 chars) is added in M2 (ADR 0026). Email must be verified before any
+  application runs.
 - Account linking only between methods with the **same verified email**.
 - Turnstile + rate limits (IP and email): signup 5/h, login 10/15 min, magic link 3/15 min, reset 3/h.
 - Cookies httpOnly, Secure, SameSite=Lax; CSRF by Origin check on state-changing routes; sessions 30 days rolling;
@@ -800,7 +815,7 @@ Reviews, check-ins. In-app notification list mirrors pushes.
 
 ### 16.1 End-to-end flows (Playwright, real code, network edge via MSW; ADR 0013)
 
-1. Sign up/in with email + password (verify email) · 2. magic link · 3. Google (local OIDC server) · 4. LinkedIn (local OIDC server)
+1. Sign up/in with email + password (verify email) (M2) · 2. magic link · 3. Google (local OIDC server) · 4. LinkedIn (local OIDC server)
 · 5. account linking refused for unverified email · 6. v1 importer loads resume, answer bank, learned answers ·
 7. resume upload + parse + confirm facts · 8. targets with live count · 9. discovery backfill + trickle + close ·
 10. tagging precedence incl. tag import · 11. candidate filters (skip list incl. near-match names and domains, one open
@@ -829,7 +844,8 @@ Plus: route reachability for every page, axe on every page, 30 visual snapshots 
 Parallel jobs: oxlint with zero warnings (`--deny-warnings`, ADR 0023, which includes Landmines `no-comments`,
 `no-test-doubles`, `no-fixed-sleep` and `no-flake-masking`), oxfmt check, `tsgo --noEmit`, Vite build, Vitest,
 Playwright sharded by duration (per-worker server + template SQLite copy, API-seeded auth, MSW with unhandled requests
-as errors, no sleeps, zero retries), affected-only on PRs. PR < 2 min; `main` < 4 min including `flyctl deploy --remote-only`. Main deploys
+as errors, MSW pinned to 2.x with a check that an unmocked host fails, a test-only route that runs due jobs, no
+sleeps, zero retries), affected-only on PRs. PR < 2 min; `main` < 4 min including `flyctl deploy --remote-only`. Main deploys
 only when every job passes.
 
 ### 16.4 Daily live checks (ADR 0013)
@@ -841,7 +857,7 @@ none submits an application or touches a user:
 |---|---|---|
 | Forms | Browser Use opens a sample of live Greenhouse, Lever and Ashby forms per ATS, fills them from a synthetic profile and stops before Submit; a changed form signature is reported | saved forms in R2 `fixtures/` (§10.5) |
 | AI | a fixed set of real Haiku calls per purpose (§8.6), checked against the output schema and the resume-line rule | MSW recordings in R2 `recordings/anthropic/` |
-| Mail | a message via SES to an Overture-owned check address on `mail.tryoverture.com`, through Cloudflare Email Routing and the Worker, ingested with `auth='pass'` and its code extracted | MSW recordings for SES |
+| Mail | a message via SES to an Overture-owned check address on `mail.tryoverture.com`, through SES receiving and the SNS notice, ingested with `auth='pass'` and its code extracted | MSW recordings for SES |
 | Storage | an R2 put, get, list and delete | — |
 
 `scripts/pull-fixtures.ts` brings refreshed forms and recordings into `tests/e2e/` through a pull request, so a test
@@ -864,22 +880,9 @@ slices on the same line can run in parallel.
 
 ### M1
 
-| # | Slice | Done when | E2E |
-|---|---|---|---|
-| M1-00 | v1 sunset, step 1 (§18): snapshot the v1 volume, run `scripts/import-v1.ts` export, stop v1 machines | export file verified, v1 stopped, snapshot listed | — |
-| M1-01 | Skeleton: repo layout, Bun + Hono + Vite + RR7 + TanStack Query, Drizzle + migrations, WAL settings, `/api/health`, Fly app `overture-web` + volume, Litestream → R2, the full lint set (ADR 0023) with the agent hook, MSW harness, CI pipeline | deploys from `main`; restore drill passes | reachability |
-| M1-02 | Platform: `bg_jobs` queue (claim, retry, dead-letter, SIGTERM), SSE outbox, OTel, settings, kill switches, envelope crypto, ports + fakes | jobs survive restart; SSE replays | (infra used by all) |
-| M1-03 · M1-04 | Auth (4 methods, Turnstile, limits, linking rule, allowlist, owner role) · Catalog sources GH/Lever/Ashby + v1 board import + backfill/trickle/close + dedupe + FTS search | owner signs in all 4 ways · catalog fills, closes detected | 1–5 · 9 |
-| M1-05 · M1-06 | Tagging (normalisation, rules, title model, Haiku batch + caps, census script, tag import seam) · Profile: facts, resume upload/parse, targets, skip list, v1 importer, owner mailbox | census report committed · owner profile complete from import | 10 · 6–8 |
-| M1-07 | Matching: candidates, code rank, lazy scoring with reason, score on open, saved/hidden | `need` respected; no double scoring | 11–13 |
-| M1-08 | Question catalog + preparation + cover letters + Reviews | Review unlocks applications | 14–15 |
-| M1-09 | Inbound mail: Worker, R2, ingest, auth, threads, linking, code extraction | code from fixture mail reaches attempt | 19, 25 |
-| M1-10 | Browser providers (Browser Use, Kernel, local), executor + ATS flows ported, resource blocking, `submit_clicked_at`, fixture capture admin job + pull script | fixture forms submit locally; capture job run by the owner from admin | 18, 32 |
-| M1-11 | Billing ledger + admin grants; planner; dispatcher gates; attempts; outcomes incl. `confirming`; recovery; auto kill switches | no double send; reservations always resolve | 16, 17, 20, 21 |
-| M1-12 · M1-13 | Board + card proof · Home + Review UI | owner runs the pipeline from the phone | 22, 15 |
-| M1-14 | Admin M1: overview, attempts with live view/replay, kill switches, settings, provider report, fixture capture, tag import | provider report readable in admin | — |
-| M1-15 | Observability alerts + dashboards; daily live checks (§16.4) | each alert fires in a drill; every live check passes once on production | — |
-| M1-16 | Synthetic lab on both providers, then the owner's live run on Browser Use | exit gate in §2 met | — |
+The M1 tickets are sub-issues of the M1 spec (#5) on GitHub, with native blocked-by edges; GitHub is the source of
+truth for their scope and order. Ticket M1-NN is issue #(NN + 7), except M1-05 (#13), M1-06 (#12) and M1-32
+(#39, the early cloud probe, ADR 0026).
 
 ### M2
 
@@ -915,7 +918,9 @@ v1 runs on Fly app `ai-auto-apply` (volume `data`, yyz). In order:
 
 | Risk | Resolves it |
 |---|---|
-| Browser Use objects to our use case | handled if they raise it; Kernel adapter wired behind `BrowserProvider`, but its policy bans bulk form submission, so a second fallback may be needed |
+| Browser Use objects to our use case | handled if they raise it; Kernel adapter wired behind `BrowserProvider`, but its policy bans bulk form submission, so Browserbase or Anchor would be the real fallback |
+| ATS vendors build against mass applying (Greenhouse Real Talent checks IP, email, phone and location and lets employers blocklist email domains; Ashby flags device and contact signals) | M1 stays at 10 a day, owner only, true answers; one shared `mail.tryoverture.com` can be blocklisted for every user at once in M2–M3, so watch per-employer reply rates and revisit per-user domains before M2 |
+| Proxy traffic per form decides the cost gate (each extra MB ≈ $0.005; 5 MB fails it) | measured by the early cloud probe (ADR 0026); resource blocking (§10.3) |
 | ATSes rate-limit or block `overture-web`'s IP on the public feed APIs | per-ATS limits and conditional requests (§6.1); `discovery_poll_total` alert; feeds can move behind Browser Use's proxy if it happens |
 | An acknowledgement email never comes for a sent application | `confirming` resolves as Couldn't apply, not charged, never resent; measured per ATS |
 | Invisible reCAPTCHA scores too low → code/CAPTCHA rate high | M1 lab and live numbers; Anchor sticky-IP or self-hosted as later options |
