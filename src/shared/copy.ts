@@ -30,4 +30,14 @@ export const copy = {
     title: "Not found",
     body: "This page does not exist yet.",
   },
+  search: {
+    title: "Search",
+    eyebrow: "Find a role",
+    placeholder: "Search by title, company, location or department",
+    submit: "Search",
+    resultsHeading: "Postings",
+    empty: "No postings match that search.",
+    pending: "Searching…",
+    via: "via",
+  },
 } as const;

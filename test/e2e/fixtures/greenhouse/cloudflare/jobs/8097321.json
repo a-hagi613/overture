@@ -1,0 +1,73 @@
+{
+  "absolute_url": "https://boards.greenhouse.io/cloudflare/jobs/8097321?gh_jid=8097321",
+  "data_compliance": [
+    {
+      "type": "gdpr",
+      "requires_consent": false,
+      "requires_processing_consent": false,
+      "requires_retention_consent": false,
+      "retention_period": null,
+      "demographic_data_consent_applies": false
+    }
+  ],
+  "internal_job_id": 3507882,
+  "location": {
+    "name": "Hybrid"
+  },
+  "metadata": [
+    {
+      "id": 825338,
+      "name": "Cost Center",
+      "value": "4700 - Security",
+      "value_type": "single_select"
+    },
+    {
+      "id": 8654220,
+      "name": "Job Posting Location",
+      "value": ["Austin, US", "New York, US"],
+      "value_type": "multi_select"
+    },
+    {
+      "id": 46546702,
+      "name": "Career Site Department",
+      "value": ["Engineering", "Security"],
+      "value_type": "multi_select"
+    }
+  ],
+  "id": 8097321,
+  "updated_at": "2026-11-09T19:03:42-05:00",
+  "requisition_id": null,
+  "title": "AI Security Research & Red Team Engineer",
+  "company_name": "Cloudflare",
+  "first_published": "2026-08-10T11:02:09-04:00",
+  "language": "en",
+  "application_deadline": null,
+  "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;h3&gt;About Us&lt;/h3&gt;\n&lt;p&gt;At Cloudflare, we are on a mission to help build a better Internet. Today the company runs one of the world\u2019s largest networks that powers millions of websites and other Internet properties for customers ranging from individual bloggers to SMBs to Fortune 500 companies. Cloudflare protects and accelerates any Internet application online without adding hardware, installing software, or changing a line of code. Internet properties powered by Cloudflare all have web traffic routed through its intelligent global network, which gets smarter with every request. As a result, they see significant improvement in performance and a decrease in spam and other attacks. Cloudflare was named to Entrepreneur Magazine\u2019s Top Company Cultures list and ranked among the World\u2019s Most Innovative Companies by Fast Company.&lt;/p&gt;\n&lt;p&gt;At Cloudflare, we\u2019re not looking for people who wait for a polished roadmap; we\u2019re looking for the builders who see the cracks in the Internet that everyone else has simply learned to live with. We value candidates who have the instinct to spot a &quot;normalized&quot; problem and the AI-native curiosity to create a solution using the latest tools. Our culture is built on iteration, leveraging AI to ship faster today to make it better tomorrow, while ensuring that every improvement, no matter how small, is shared across the team to lift everyone up. If you\u2019re the type of person who values curiosity over bureaucracy, and that AI is a partner in solving tough problems to keep the Internet moving forward, you\u2019ll fit right in.&lt;/p&gt;&lt;/div&gt;&lt;p&gt;&lt;strong&gt;The Role:&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;We are seeking a highly skilled AI Security Research &amp;amp; Red team engineer&lt;strong&gt; &lt;/strong&gt;&amp;nbsp;to join our Red Team within the Security Threat Detection, Response and Emulation organization. This is a critical role that will be at the forefront of protecting our company and customers from malicious threats. You will be responsible for driving security research, exercises, and activities that emulate real world attackers and attacks to drive improvements in Cloudflare\u2019s security posture focusing on AI, Agents, harnesses and LLM\u2019s.&amp;nbsp;&lt;/p&gt;\n&lt;p&gt;&lt;strong&gt;Key Responsibilities:&lt;/strong&gt;&lt;/p&gt;\n&lt;ul&gt;\n&lt;li&gt;&lt;strong&gt;AI Security and Vulnerability Research: &lt;/strong&gt;Stay current with emerging threats and perform deep-dive research to identify AI-specific vulnerabilities and risks in addition to general vulnerabilities across Cloudflare\u2019s products and services.&lt;/li&gt;\n&lt;li&gt;&lt;strong&gt;Agentic testing and adoption: &lt;/strong&gt;As a core function, identifying AI-related attack surfaces through rigorous testing of agentic implementations and LLM usage which will help&amp;nbsp; define requirements and implementation guidance while proactively.&amp;nbsp;&lt;/li&gt;\n&lt;li&gt;&lt;strong&gt;Adversary Simulation:&lt;/strong&gt; Execution of full-chain red team operations targeting Cloudflare\u2019s global infrastructure, corporate networks, and product ecosystems.&lt;/li&gt;\n&lt;li&gt;&lt;strong&gt;Efficacy Testing:&lt;/strong&gt; Establish a rigorous framework for testing &quot;Security Efficacy&quot;\u2014measuring exactly how well our WAF, EDR, and SIEM detections perform against known TTPs (Tactics, Techniques, and Procedures).&lt;/li&gt;\n&lt;li&gt;&lt;strong&gt;Purple Teaming:&lt;/strong&gt; Foster a highly collaborative relationship with the Blue Team (Detection &amp;amp; Response) to ensure findings are translated into immediate defensive improvements.&lt;/li&gt;\n&lt;li&gt;&lt;strong&gt;Mentorship &amp;amp; Growth:&lt;/strong&gt; Be a technical leader, providing technical expertise while fostering a culture of curiosity, ethical hacking and partnering to improve Cloudflare\u2019s security posture.&amp;nbsp;&lt;/li&gt;\n&lt;li&gt;&lt;strong&gt;Executive Reporting:&lt;",
+  "departments": [
+    {
+      "id": 54562,
+      "name": "Security",
+      "child_ids": [],
+      "parent_id": null
+    }
+  ],
+  "offices": [
+    {
+      "id": 19983,
+      "name": "Austin, TX",
+      "location": "Austin, TX, United States",
+      "child_ids": [],
+      "parent_id": 48752
+    },
+    {
+      "id": 19990,
+      "name": "New York, NY",
+      "location": "New York, New York, United States",
+      "child_ids": [],
+      "parent_id": 48752
+    }
+  ],
+  "ai_disclaimer": null,
+  "include_ai_disclaimer": null,
+  "ai_opt_out_request_url": null
+}

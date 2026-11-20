@@ -1,0 +1,54 @@
+{
+  "absolute_url": "https://job-boards.greenhouse.io/vercel/jobs/6100103004",
+  "data_compliance": [
+    {
+      "type": "gdpr",
+      "requires_consent": false,
+      "requires_processing_consent": false,
+      "requires_retention_consent": false,
+      "retention_period": null,
+      "demographic_data_consent_applies": false
+    }
+  ],
+  "internal_job_id": 5178079004,
+  "location": {
+    "name": "Hybrid - Sydney"
+  },
+  "metadata": [
+    {
+      "id": 18783104004,
+      "name": "Career Site Categories",
+      "value": "Sales",
+      "value_type": "single_select"
+    }
+  ],
+  "id": 6100103004,
+  "updated_at": "2026-11-16T10:29:38-05:00",
+  "requisition_id": "1263",
+  "title": "Account Executive, Majors- Install Base (APAC)",
+  "company_name": "Vercel",
+  "first_published": "2026-06-25T12:45:34-04:00",
+  "language": "en",
+  "application_deadline": null,
+  "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;h2&gt;About Vercel:&lt;/h2&gt;\n&lt;p&gt;&lt;span data-sheets-root=&quot;1&quot;&gt;Vercel is the agentic infrastructure company, freeing people and agents to ship what&#39;s next. For more than a decade we&#39;ve helped builders move from idea to production with speed, security, and exceptional developer experience.&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span data-sheets-root=&quot;1&quot;&gt;Now we&#39;re scaling our products for both agents and people to ship and run software, built in the open and trusted by OpenAI, PayPal, Ramp, Supreme, and millions of developers worldwide.&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;About the role&lt;/h2&gt;\n&lt;p&gt;As an Enterprise Account Executive on the install base team, you\u2019ll own a book of named enterprise accounts in Australia and New Zealand. You\u2019ll be the primary driver of net revenue retention and expansion: finding whitespace, bringing Vercel\u2019s newest products into each account, and embedding Vercel in your customers\u2019 roadmaps for web and AI. Success looks like growing platform adoption and account value across your portfolio, with hyperscaler, systems integrator, and agency partners involved in every account plan. This is a hybrid role with 3 in-office days per week in Sydney.&lt;/p&gt;\n&lt;h2&gt;What you\u2019ll do&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;Own a book of named enterprise accounts, driving renewals, upsells, and cross-sells to grow net revenue retention&lt;/li&gt;\n&lt;li&gt;Map whitespace across your accounts and expand into new teams and use cases, including Vercel\u2019s newest products (platform API, AI SDK, observability)&lt;/li&gt;\n&lt;li&gt;Build and run strategic account plans tied to each customer\u2019s business goals, working with Solutions Engineering, Customer Success, and Product&lt;/li&gt;\n&lt;li&gt;Build relationships across engineering, product, procurement, and the C-suite, and frame Vercel\u2019s value around developer velocity, infrastructure consolidation, and AI transformation&lt;/li&gt;\n&lt;li&gt;Negotiate renewals, enterprise license agreement (ELA) amendments, and consumption-based expansions&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h2&gt;What you need&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;5+ years of enterprise SaaS experience in install base, account management, or named account roles&lt;/li&gt;\n&lt;li&gt;Drove upsell and cross-sell in complex accounts with multiple buying centers&lt;/li&gt;\n&lt;li&gt;Closed deals through a co-sell or partner-influenced motion with a hyperscaler or systems integrator&lt;/li&gt;\n&lt;li&gt;Held technical conversations with senior engineering and product leaders, and total cost of ownership conversations with CFOs, without relying on a solutions engineer to carry them&lt;/li&gt;\n&lt;li&gt;Built and executed multi-year account plans for named accounts&lt;/li&gt;\n&lt;li&gt;Used MEDDPICC to run deals and kept forecasts and CRM records current&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h2&gt;Bonus if you&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;Have hands-on experience in web development, developer tooling, web infrastructure, cloud platforms, or AI/ML&lt;/li&gt;\n&lt;li&gt;Have existing relationships at AWS, GCP, or Azure, or at systems integrators and agencies active in Australia and New Zealand&lt;/li&gt;\n&lt;li&gt;Have sold into media, retail, financial services, or digital-native companies&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h2&gt;Benefits &amp;amp; Compensation:&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;Competitive compensation package, including equity&lt;/li&gt;\n&lt;li&gt;Inclusive Healthcare Package&lt;/li&gt;\n&lt;li&gt;Learn and Grow \u2014 we provide mentorship and send you to events that help you build your network and skills&lt;/li&gt;\n&lt;li&gt;Flexible Time Off&lt;/li&gt;\n&lt;li&gt;We will provide you the gear you need to do your role, and a WFH budget for you to outfit your space as needed&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p class=&quot;text-copy-16 text-gray-900 [&amp;amp;_b]:text-gray-1000 my-6 [&amp;amp;_b]:font-semibold [&amp;amp;_i]:not-italic&quo",
+  "departments": [
+    {
+      "id": 4085775004,
+      "name": "Account Executive",
+      "child_ids": [],
+      "parent_id": null
+    }
+  ],
+  "offices": [
+    {
+      "id": 4035433004,
+      "name": "Remote - Australia ",
+      "location": "Canberra, Australian Capital Territory, Australia",
+      "child_ids": [],
+      "parent_id": 4014160004
+    }
+  ],
+  "ai_disclaimer": null,
+  "include_ai_disclaimer": null,
+  "ai_opt_out_request_url": "http://app4.greenhouse.io/ai_opt_out_request/job_post/6100103004/ai_opt_out"
+}
