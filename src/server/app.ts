@@ -6,6 +6,7 @@ import type { JobHandlers } from "./platform/jobs/run-due.ts";
 import type { AdjustableClock } from "./platform/ports/clock.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
+import { createApiRoutes } from "./routes/api.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
 
 export interface AppDependencies {
@@ -20,6 +21,7 @@ export function createApp(deps: AppDependencies) {
   const app = new Hono();
 
   app.route("/api", createHealthRoutes(deps.db));
+  app.route("/api", createApiRoutes(deps.db, deps.clock));
 
   if (deps.testRoutes) {
     app.route("/__test__", createTestRoutes(deps.db, deps.clock, deps.jobHandlers));

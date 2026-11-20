@@ -1,0 +1,55 @@
+import { Hono } from "hono";
+
+import type { AppDatabase } from "../platform/db/client.ts";
+import type { Clock } from "../platform/ports/clock.ts";
+
+import { createSseStream } from "../platform/sse/stream.ts";
+import { getAllKillSwitches, getAllSettings, getSetting } from "../platform/settings/index.ts";
+
+export function createApiRoutes(db: AppDatabase, clock: Clock) {
+  const routes = new Hono();
+
+  routes.get("/events", (context) => {
+    const lastEventId = context.req.header("Last-Event-ID") ?? null;
+    const abortController = new AbortController();
+
+    context.req.raw.signal.addEventListener("abort", () => {
+      abortController.abort();
+    });
+
+    const stream = createSseStream(db, clock, lastEventId, null, abortController.signal);
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  });
+
+  routes.get("/settings", (context) => {
+    const all = getAllSettings(db);
+
+    return context.json(all);
+  });
+
+  routes.get("/settings/:key", (context) => {
+    const { key } = context.req.param();
+    const value = getSetting(db, key);
+
+    if (value === null) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    return context.json({ key, value });
+  });
+
+  routes.get("/kill-switches", (context) => {
+    const all = getAllKillSwitches(db);
+
+    return context.json(all);
+  });
+
+  return routes;
+}

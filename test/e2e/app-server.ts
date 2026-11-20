@@ -6,7 +6,9 @@ const listeningPattern = /^overture listening on (?<port>\d+)$/u;
 
 export interface AppServer {
   url: string;
+  databasePath: string;
   stop: () => Promise<void>;
+  restart: () => Promise<void>;
 }
 
 async function waitForExit(child: ChildProcess) {
@@ -17,7 +19,7 @@ async function waitForExit(child: ChildProcess) {
   });
 }
 
-export async function startAppServer(databasePath: string) {
+async function spawnServer(databasePath: string) {
   const child = spawn("bun", ["run", "src/server/main.ts"], {
     env: {
       ...process.env,
@@ -26,11 +28,13 @@ export async function startAppServer(databasePath: string) {
       DATABASE_URL: databasePath,
       STATIC_ROOT: "dist",
       ENABLE_TEST_ROUTES: "true",
+      OTEL_SIMPLE_EXPORT: "true",
+      KILL_TIMEOUT_MS: "1000",
     },
     stdio: ["ignore", "pipe", "inherit"],
   });
 
-  return await new Promise<AppServer>((resolve, reject) => {
+  return new Promise<{ child: ChildProcess; url: string }>((resolve, reject) => {
     let buffer = "";
 
     child.once("error", reject);
@@ -52,15 +56,34 @@ export async function startAppServer(databasePath: string) {
         newlineIndex = buffer.indexOf("\n");
 
         if (port !== undefined) {
-          resolve({
-            url: `http://127.0.0.1:${port}`,
-            stop: async () => {
-              child.kill("SIGTERM");
-              await waitForExit(child);
-            },
-          });
+          resolve({ child, url: `http://127.0.0.1:${port}` });
         }
       }
     });
   });
+}
+
+export async function startAppServer(databasePath: string) {
+  let { child, url } = await spawnServer(databasePath);
+
+  const server: AppServer = {
+    get url() {
+      return url;
+    },
+    databasePath,
+    stop: async () => {
+      child.kill("SIGTERM");
+      await waitForExit(child);
+    },
+    restart: async () => {
+      child.kill("SIGTERM");
+      await waitForExit(child);
+      const { child: nextChild, url: nextUrl } = await spawnServer(databasePath);
+
+      child = nextChild;
+      url = nextUrl;
+    },
+  };
+
+  return server;
 }

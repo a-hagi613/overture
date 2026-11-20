@@ -10,14 +10,15 @@ import { startAppServer } from "./app-server.ts";
 
 interface TestFixtures {
   appServerUrl: string;
-}
-
-interface WorkerFixtures {
   appServer: AppServer;
 }
 
+interface WorkerFixtures {
+  _appServerWorker: AppServer;
+}
+
 export const test = base.extend<TestFixtures, WorkerFixtures>({
-  appServer: [
+  _appServerWorker: [
     async ({ browserName: _browserName }, provide) => {
       const directory = mkdtempSync(join(tmpdir(), "overture-e2e-"));
       const databasePath = join(directory, "overture.db");
@@ -31,8 +32,11 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     },
     { scope: "worker" },
   ],
-  appServerUrl: async ({ appServer }, provide) => {
-    await provide(appServer.url);
+  appServer: async ({ _appServerWorker }, provide) => {
+    await provide(_appServerWorker);
+  },
+  appServerUrl: async ({ _appServerWorker }, provide) => {
+    await provide(_appServerWorker.url);
   },
 });
 
