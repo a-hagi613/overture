@@ -8,7 +8,14 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { JobHandlers } from "../platform/jobs/run-due.ts";
 import type { AdjustableClock } from "../platform/ports/clock.ts";
 
-import { bgJobs, companies, companyBoards, postingTags, postings } from "../platform/db/schema.ts";
+import {
+  bgJobs,
+  companies,
+  companyBoards,
+  postingTags,
+  postings,
+  tagImports,
+} from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
@@ -17,6 +24,8 @@ import { getTestSpans, resetTestSpans } from "../platform/telemetry/otel.ts";
 import { releaseBlockingJobs } from "../testing/blocking-job.ts";
 import { readCompaniesParquet } from "../catalog/companies-parquet.ts";
 import { loadDiscoveredBoards } from "../catalog/discovered-boards.ts";
+import { DEFAULT_IMPORT_SOURCE, importTags } from "../catalog/tag-import.ts";
+import { readLlmUsage } from "../platform/llm/usage.ts";
 
 const offsetBody = z.object({ offsetMs: z.number().int() });
 
@@ -57,6 +66,16 @@ const createBoardBody = z.object({
 });
 
 const discoveredBoardsBody = z.object({ path: z.string().min(1) });
+
+const tagImportBody = z.object({
+  content: z.string().min(1),
+  source: z.string().min(1).default(DEFAULT_IMPORT_SOURCE),
+});
+
+const llmUsageQuery = z.object({
+  purpose: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(1000).default(100),
+});
 
 export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handlers: JobHandlers) {
   const routes = new Hono();
@@ -227,6 +246,32 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
     const rows = db.select().from(postingTags).all();
 
     return context.json({ postingTags: rows });
+  });
+
+  routes.post("/tag-imports", zValidator("json", tagImportBody), (context) => {
+    const { content, source } = context.req.valid("json");
+
+    const report = importTags(db, clock, { content, source, uploadedBy: "owner" });
+
+    return context.json(report);
+  });
+
+  routes.get("/tag-imports", (context) => {
+    const rows = db.select().from(tagImports).all();
+
+    return context.json({ tagImports: rows });
+  });
+
+  routes.get("/llm/usage", zValidator("query", llmUsageQuery), (context) => {
+    const { purpose, limit } = context.req.valid("query");
+
+    const summary = readLlmUsage(db, {
+      purpose: purpose ?? null,
+      sinceMs: null,
+      limit,
+    });
+
+    return context.json(summary);
   });
 
   return routes;

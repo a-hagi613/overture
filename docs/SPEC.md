@@ -238,7 +238,7 @@ updated_at) · `session` · `account` (provider: google, linkedin, credential) �
 | `questions` | id, text_display, text_norm_hash UNIQUE, field_type CHECK IN ('text','textarea','select','multiselect','radio','checkbox','file','date','number','email','phone','url'), options_hash NULL, fact_key NULL, answer_kind CHECK IN ('fact','open_text','consent','skip','unknown'), mapped_by CHECK IN ('rules','llm','owner'), seen_count, created_at |
 | `question_variants` | variant_hash PK, question_id |
 | `posting_questions` | posting_id, question_id, required, position, options JSON; PK(posting_id,question_id) |
-| `tag_imports` | id, source, file_sha256, rows, matched, applied_at |
+| `tag_imports` | id, source, file_sha256, rows, matched, uploaded_by, applied_at |
 
 Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 
@@ -355,8 +355,11 @@ Order of precedence for role/seniority: `import` (hiring.cafe file, if the owner
 5. **Industry**: once per company (Haiku, batch) from company name + domain + one description; ~$3 total.
 6. **hiring.cafe import seam**: `POST /admin/api/tag-imports` accepts JSONL rows
    `{apply_url, title, company, role?, subrole?, seniority?, workplace?, employment_type?, salary?}`; rows match a
-   posting by `apply_url_norm`; matched rows set `tag_source='import'`. Overture ships no code that fetches
-   hiring.cafe.
+   posting by `apply_url_norm`; matched rows set `tag_source='import'` and imported tags win over rules, model and
+   llm tags for the dimensions they set. The import is recorded in `tag_imports` (who uploaded, when, row count,
+   matched count). Until the admin area lands (M1-12), the import runs through the `importTags` module exposed by the
+   owner-run script `scripts/import-tags.ts --db <overture.db> --file <tags.jsonl>` and by a test-only route; the
+   HTTP route mounts behind the admin owner gate in M1-12. Overture ships no code that fetches hiring.cafe.
 
 ### 6.4 Taxonomy (starting lists; the census finalises them)
 
