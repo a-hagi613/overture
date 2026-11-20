@@ -15,6 +15,17 @@ clock and random ports, `process.env` is read only in the Zod config module, and
 from the copy module). oxfmt formats; `tsgo --noEmit` type-checks. Coding agents run lint and format on every edit
 (Oxc's Claude Code hook) and finish only at zero warnings. Landmines wins every conflict.
 
+## Rules that close the gaps
+
+Landmines alone leaves three ways around these rules, so the architecture rules close them:
+
+- **No disable directives.** Any `oxlint-disable`, `eslint-disable` or `@ts-ignore` comment is an error. `no-comments`
+  runs with an empty `allow` list, so `// WARNING:` notes are errors too.
+- **Six unit test files only.** A Vitest file is allowed only beside the six invariants in ADR 0013 (ledger, crypto,
+  planner, address, tag rules, question normalisation), by an explicit path allowlist. Any other unit test file is an
+  error. Every other test is a Playwright end-to-end test.
+- **The off-list is checked.** CI fails if the rules turned off in the configuration differ from the table below.
+
 ## Rules turned off, and why
 
 | Rule | Reason |
