@@ -378,7 +378,9 @@ export async function startFeedFixtureServer() {
   const paths: string[] = [];
 
   function mutateGreenhouse(token: string, mutation: BoardMutation) {
-    const jobs = greenhouseBoards.get(token) ?? [];
+    const existingGreenhouseJobs = greenhouseBoards.get(token);
+    const jobs = existingGreenhouseJobs ?? [];
+    greenhouseBoards.set(token, jobs);
 
     for (const job of jobs) {
       const title = mutation.titleUpdates?.[String(job.id)];
@@ -420,7 +422,9 @@ export async function startFeedFixtureServer() {
   }
 
   function mutateLever(token: string, mutation: BoardMutation) {
-    const jobs = leverBoards.get(token) ?? [];
+    const existingLeverJobs = leverBoards.get(token);
+    const jobs = existingLeverJobs ?? [];
+    leverBoards.set(token, jobs);
 
     for (const job of jobs) {
       const title = mutation.titleUpdates?.[job.id];
@@ -464,7 +468,9 @@ export async function startFeedFixtureServer() {
   }
 
   function mutateAshby(token: string, mutation: BoardMutation) {
-    const jobs = ashbyBoards.get(token) ?? [];
+    const existingAshbyJobs = ashbyBoards.get(token);
+    const jobs = existingAshbyJobs ?? [];
+    ashbyBoards.set(token, jobs);
 
     for (const job of jobs) {
       const title = mutation.titleUpdates?.[job.id];

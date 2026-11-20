@@ -111,6 +111,12 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
     return context.json({ id });
   });
 
+  routes.get("/jobs", (context) => {
+    const rows = db.select().from(bgJobs).all();
+
+    return context.json({ jobs: rows });
+  });
+
   routes.get("/jobs/:id", (context) => {
     const { id } = context.req.param();
     const job = db.select().from(bgJobs).where(eq(bgJobs.id, id)).get();

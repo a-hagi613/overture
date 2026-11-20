@@ -106,9 +106,7 @@
       "indexes": {
         "bg_jobs_dedupe_key_unique": {
           "name": "bg_jobs_dedupe_key_unique",
-          "columns": [
-            "dedupe_key"
-          ],
+          "columns": ["dedupe_key"],
           "isUnique": true
         }
       },
@@ -285,10 +283,7 @@
       "indexes": {
         "company_boards_ats_board_token_unique": {
           "name": "company_boards_ats_board_token_unique",
-          "columns": [
-            "ats",
-            "board_token"
-          ],
+          "columns": ["ats", "board_token"],
           "isUnique": true
         }
       },
@@ -297,12 +292,8 @@
           "name": "company_boards_company_id_companies_id_fk",
           "tableFrom": "company_boards",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -408,10 +399,7 @@
       "indexes": {
         "kill_switches_scope_key": {
           "name": "kill_switches_scope_key",
-          "columns": [
-            "scope",
-            "key"
-          ],
+          "columns": ["scope", "key"],
           "isUnique": true
         }
       },
@@ -528,10 +516,7 @@
       "indexes": {
         "posting_tags_dimension_value": {
           "name": "posting_tags_dimension_value",
-          "columns": [
-            "dimension",
-            "value"
-          ],
+          "columns": ["dimension", "value"],
           "isUnique": false
         }
       },
@@ -540,23 +525,15 @@
           "name": "posting_tags_posting_id_postings_id_fk",
           "tableFrom": "posting_tags",
           "tableTo": "postings",
-          "columnsFrom": [
-            "posting_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["posting_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "posting_tags_posting_id_dimension_value_pk": {
-          "columns": [
-            "posting_id",
-            "dimension",
-            "value"
-          ],
+          "columns": ["posting_id", "dimension", "value"],
           "name": "posting_tags_posting_id_dimension_value_pk"
         }
       },
@@ -811,31 +788,22 @@
       "indexes": {
         "postings_board_ats_job_unique": {
           "name": "postings_board_ats_job_unique",
-          "columns": [
-            "board_id",
-            "ats_job_id"
-          ],
+          "columns": ["board_id", "ats_job_id"],
           "isUnique": true
         },
         "postings_dedupe_key": {
           "name": "postings_dedupe_key",
-          "columns": [
-            "dedupe_key"
-          ],
+          "columns": ["dedupe_key"],
           "isUnique": false
         },
         "postings_apply_url_norm": {
           "name": "postings_apply_url_norm",
-          "columns": [
-            "apply_url_norm"
-          ],
+          "columns": ["apply_url_norm"],
           "isUnique": false
         },
         "postings_closed_at": {
           "name": "postings_closed_at",
-          "columns": [
-            "closed_at"
-          ],
+          "columns": ["closed_at"],
           "isUnique": false
         }
       },
@@ -844,12 +812,8 @@
           "name": "postings_board_id_company_boards_id_fk",
           "tableFrom": "postings",
           "tableTo": "company_boards",
-          "columnsFrom": [
-            "board_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["board_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -857,12 +821,8 @@
           "name": "postings_company_id_companies_id_fk",
           "tableFrom": "postings",
           "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["company_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1117,9 +1077,7 @@
       "indexes": {
         "users_email_unique": {
           "name": "users_email_unique",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         }
       },
