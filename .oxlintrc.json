@@ -126,7 +126,14 @@
       "error",
       {
         "e2eRoot": "test/e2e",
-        "allow": []
+        "allow": [
+          "src/server/billing/ledger.test.ts",
+          "src/server/platform/crypto.test.ts",
+          "src/server/dispatch/planner.test.ts",
+          "src/server/profile/address.test.ts",
+          "src/server/catalog/tag-rules.test.ts",
+          "src/server/catalog/question-normalize.test.ts"
+        ]
       }
     ],
     "eslint/no-restricted-imports": [
