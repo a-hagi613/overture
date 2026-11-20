@@ -671,6 +671,31 @@ export const applications = sqliteTable(
   ],
 );
 
+export const applicationAnswers = sqliteTable(
+  "application_answers",
+  {
+    id: text("id").primaryKey(),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    questionId: text("question_id")
+      .notNull()
+      .references(() => questions.id, { onDelete: "cascade" }),
+    userId: cascadeUserId(),
+    kind: text("kind", { enum: ["open_text", "cover_letter"] }).notNull(),
+    sentencesEnc: text("sentences_enc").notNull(),
+    wordCount: integer("word_count").notNull(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("application_answers_application_question_unique").on(
+      t.applicationId,
+      t.questionId,
+    ),
+  ],
+);
+
 export const reviews = sqliteTable(
   "reviews",
   {

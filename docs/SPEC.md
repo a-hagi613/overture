@@ -249,6 +249,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `posting_user_state` | user_id, posting_id, state CHECK IN ('saved','hidden'), updated_at; PK(user_id,posting_id) |
 | `applications` | id, user_id, posting_id, company_id, origin CHECK IN ('auto','manual'), status CHECK IN ('preparing','needs_review','ready','sending','confirming','sent','failed','skipped','withdrawn'), status_reason NULL (§11), stage CHECK IN ('queued','applied','screening','interviewing','offer','closed') NULL, stage_locked INTEGER DEFAULT 0, board_position REAL, score_at_queue, scheduled_for NULL, attempts INTEGER DEFAULT 0, sent_at NULL, closed_reason CHECK IN ('rejected','no_response','withdrawn','offer_declined','offer_accepted','other') NULL, created_at, updated_at; UNIQUE(user_id,posting_id); partial UNIQUE(user_id) WHERE status='sending'. `withdrawn` applies only before `sent` (the user stops a queued application); a sent application cannot be un-sent, so the user moves it to Closed with `closed_reason='withdrawn'` |
 | `application_snapshots` | application_id PK, user_id, posting_url, posting_title, description_hash, answers_enc (JSON array `{question_id, label, answer, fact_key, fact_revision, kind, resume_line_ids}`), cover_letter_enc NULL (JSON `[{sentence, resume_line_ids}]`), resume_id, resume_sha256, consent_version, provider, provider_session_id, submitted_at, confirmed_by CHECK IN ('page','email'), cost_micros. **Immutable**: a `BEFORE UPDATE` trigger always raises; a `BEFORE DELETE` trigger raises `WHEN EXISTS (SELECT 1 FROM user WHERE id = OLD.user_id)`, so rows go only when the user row is gone (account deletion cascade). Flow 29 proves both |
+| `application_answers` | id, application_id, question_id, user_id, kind CHECK IN ('open_text','cover_letter'), sentences_enc (JSON `[{sentence, resumeLineIds}]`, sealed), word_count, created_at, updated_at; UNIQUE(application_id,question_id). The generated, grounded open text and letter kept from preparation until the Snapshot takes them |
 | `application_events` | id, application_id, user_id, at, kind CHECK IN ('status','stage','email','checkin','note'), from_value, to_value, source CHECK IN ('system','user','email','checkin','admin'), detail JSON; the card timeline and stage history |
 | `attempts` | id, application_id, user_id, n, provider, provider_session_id, started_at, lease_until, ended_at NULL, submit_clicked_at NULL, submit_response_status INTEGER NULL, outcome CHECK IN ('sent','unconfirmed','captcha_blocked','code_timeout','posting_closed','form_changed','blocked','upload_failed','duplicate','needs_review','provider_error','timeout','crash','interrupted') NULL, browser_ms, proxy_bytes, captcha_seen, code_used, cost_micros, error_code NULL |
 | `reviews` | id, user_id, question_id, fact_key NULL, scope ('' or an ISO 3166-1 alpha-2 country), prompt, field_type, options JSON, status CHECK IN ('open','answered','dismissed'), created_at, resolved_at; UNIQUE(user_id,question_id,scope) WHERE status='open' |
@@ -518,21 +519,28 @@ Job `application.prepare`:
 3. Answer: `fact` → saved fact value (formatted to the field type/options; select options matched by normalised
    text, then synonyms table, else unknown). A `work_auth` or `sponsorship_required` answer is country-scoped
    (§7.1): the question's country decides which Fact may answer it, and another country's Fact never does.
-   `open_text` → Haiku from resume text + posting (≤ 120 words unless the field states a limit), returned as
+   `open_text` → Haiku from resume text + guarded posting (≤ 120 words unless the field states a limit), returned as
    `[{sentence, resume_line_ids}]` with the same rule as cover letters: a sentence that makes a factual claim
-   without a resume line is removed; `consent` → only the Overture-standard consents the user accepted (privacy notice /
-   data processing acknowledgements), never marketing opt-ins; `skip` → blank.
+   without a resume line is removed; a choice field (`select`, `radio`, multi-select, checkbox) never takes generated
+   prose, so an open-text mapping there stays factual and becomes a Review when unknown; `consent` → only the
+   Overture-standard consents the user accepted (privacy notice / data processing acknowledgements), never marketing
+   opt-ins; `skip` → blank.
 4. Cover letter only if the form has a cover-letter field: ≤ 200 words, in the posting's language, generated from
    resume + posting + the user's cover-letter template (its fixed text kept verbatim, its blanks filled) or, without a
    template, the voice sample; every sentence with a factual claim must map to a resume line (the model returns
-   `[{sentence, resume_line_ids}]`); sentences without a mapping are removed.
+   `[{sentence, resume_line_ids}]`); sentences without a mapping are removed. A sentence with no factual claim (a
+   greeting or sign-off) may stand without a line.
    **Grounding check in code**, for open text and letters: every number, date, employer and technology named in a
-   sentence must appear in the resume lines it cites, else the sentence is removed. (Anthropic Citations cannot be
+   sentence must appear in the resume lines it cites, and so must every seniority claim (led, owned, managed,
+   architected, mentored, expert, senior, staff, principal) or inflated title, else the sentence is removed. A claim
+   is checked against the cited lines only; a cited line is not proof of entailment. (Anthropic Citations cannot be
    combined with structured outputs, so the check is ours.)
 5. Unknown **required** factual question → status `needs_review`, create/attach a Review. Unknown **optional** →
-   left blank, never blocking. A required consent resolves only when it is a standard privacy or data-processing
-   acknowledgement with an option to select; a required marketing opt-in, a required `skip`, or a required file
-   field other than the resume slot never becomes a Review: the Application is `skipped` with
+   left blank, never blocking. A required open-text answer or cover letter whose surviving sentences are empty (no
+   resume, or nothing the resume grounds) is never a Review: the Application is `skipped` with
+   `status_reason='open_text_ungrounded'`. A required consent resolves only when it is a standard privacy or
+   data-processing acknowledgement with an option to select; a required marketing opt-in, a required `skip`, or a
+   required file field other than the resume slot never becomes a Review: the Application is `skipped` with
    `status_reason='form_unsupported'`. A required resume slot resolves only when a current resume exists.
 6. All answered → status `ready`, `scheduled_for` assigned by the planner (§9.2).
 

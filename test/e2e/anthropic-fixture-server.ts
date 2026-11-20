@@ -77,6 +77,7 @@ const batchCreateRequestSchema = z.object({
 
 const titleFromPrompt = /(?:^|\n)title: (?<title>.+)$/mu;
 const questionFromPrompt = /(?:^|\n)question: (?<question>.+)$/mu;
+const kindFromPrompt = /(?:^|\n)kind: (?<kind>[a-z_]+)$/mu;
 
 const CREATED_AT = "2026-11-20T12:00:00.000Z";
 const ENDED_AT = "2026-11-20T12:01:00.000Z";
@@ -85,6 +86,7 @@ const EXPIRES_AT = "2026-11-21T12:00:00.000Z";
 export interface RecordedBatchRequest {
   customId: string;
   title: string;
+  kind: string | null;
   model: string;
   cacheControl: string | null;
   outputFormatType: string;
@@ -175,6 +177,31 @@ export function loadScoreRecordingsSync() {
   return byTitle;
 }
 
+function loadTextRecordingsSync(file: string) {
+  const path = join(process.cwd(), file);
+  const byQuestion = new Map<string, Recording>();
+
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    if (line.trim() === "") {
+      continue;
+    }
+
+    const parsed = recordingSchema.parse(JSON.parse(line));
+
+    byQuestion.set(parsed.title, parsed);
+  }
+
+  return byQuestion;
+}
+
+export function loadOpenTextRecordingsSync() {
+  return loadTextRecordingsSync("test/e2e/fixtures/anthropic/open-text-recording.jsonl");
+}
+
+export function loadCoverLetterRecordingsSync() {
+  return loadTextRecordingsSync("test/e2e/fixtures/anthropic/cover-letter-recording.jsonl");
+}
+
 function finishJson(response: ServerResponse, status: number, body: string) {
   response.writeHead(status, { "content-type": "application/json" });
   response.end(body);
@@ -228,6 +255,8 @@ export async function startAnthropicFixtureServer() {
   const recordings = loadTagFallbackRecordingsSync();
   const scoreRecordings = loadScoreRecordingsSync();
   const questionRecordings = loadQuestionMappingRecordingsSync();
+  const openTextRecordings = loadOpenTextRecordingsSync();
+  const coverLetterRecordings = loadCoverLetterRecordingsSync();
   const resumeFallback = loadResumePdfFallbackRecordingSync();
   const batches = new Map<string, TrackedBatch>();
   const seenRequests: RecordedBatchRequest[] = [];
@@ -244,6 +273,22 @@ export async function startAnthropicFixtureServer() {
     const address = server.address();
 
     return `http://127.0.0.1:${String(portFrom(address))}`;
+  }
+
+  function textRecordingFor(kind: string | null, question: string | null) {
+    if (question === null) {
+      return null;
+    }
+
+    if (kind === "cover_letter") {
+      return coverLetterRecordings.get(question) ?? null;
+    }
+
+    if (kind === "open_text") {
+      return openTextRecordings.get(question) ?? null;
+    }
+
+    return null;
   }
 
   async function createSingleMessage(request: IncomingMessage, response: ServerResponse) {
@@ -299,6 +344,7 @@ export async function startAnthropicFixtureServer() {
       const userContent = batchRequest.params.messages.at(0)?.content ?? "";
       const title = titleFromPrompt.exec(userContent)?.groups?.title ?? null;
       const question = questionFromPrompt.exec(userContent)?.groups?.question ?? null;
+      const kind = kindFromPrompt.exec(userContent)?.groups?.kind ?? null;
 
       if (title === null && question === null) {
         finishJson(
@@ -313,7 +359,10 @@ export async function startAnthropicFixtureServer() {
         return;
       }
 
+      const textRecording = textRecordingFor(kind, question);
+
       const recording =
+        textRecording ??
         (question === null ? undefined : questionRecordings.get(question)) ??
         (title === null ? undefined : (recordings.get(title) ?? scoreRecordings.get(title)));
 
@@ -336,6 +385,7 @@ export async function startAnthropicFixtureServer() {
       seenRequests.push({
         customId: batchRequest.custom_id,
         title: question ?? title ?? "",
+        kind,
         model: batchRequest.params.model,
         cacheControl: batchRequest.params.system.at(0)?.cache_control?.type ?? null,
         outputFormatType: batchRequest.params.output_config.format.type,
