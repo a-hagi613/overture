@@ -1,0 +1,18 @@
+From: Greenhouse <no-reply@us.greenhouse-mail.io>
+To: Overture <in-forward@tryoverture.com>
+Subject: Your application to Acme needs a security code
+Date: Thu, 19 Nov 2026 15:01:00 +0000
+Message-ID: <code.__MESSAGE_ID__@us.greenhouse-mail.io>
+In-Reply-To: <ack.__ACK_ID__@us.greenhouse-mail.io>
+References: <ack.__ACK_ID__@us.greenhouse-mail.io>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Hi there,
+
+Your application to Acme needs one more step. Enter this security code on your application: A1B2C3D4
+
+The code expires in 10 minutes.
+
+Greenhouse

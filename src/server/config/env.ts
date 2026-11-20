@@ -79,6 +79,13 @@ const envSchema = z
     R2_BUCKET_FILES: z.string().min(1).optional(),
     R2_ENDPOINT: z.url().optional(),
     MAIL_FROM: z.email().default("no-reply@tryoverture.com"),
+    MAIL_DOMAIN: z
+      .string()
+      .min(1)
+      .regex(/^[a-z0-9.-]+$/u)
+      .default("tryoverture.com"),
+    INBOUND_HMAC_SECRET: z.string().min(16).optional(),
+    INBOUND_DNS_SERVER: z.string().min(1).optional(),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
     OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
     OTEL_DEBUG: booleanFromString.default(false),

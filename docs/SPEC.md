@@ -222,7 +222,7 @@ updated_at) · `session` · `account` (provider: google, linkedin, credential) �
 | `skip_companies` | id, user_id, company_id NULL, name, name_norm, domain NULL, reason CHECK IN ('current_employer','user'), created_at; UNIQUE(user_id,name_norm). Matching rules in §8.1 |
 | `resumes` | id, user_id, object_key, sha256, bytes, pages, filename_enc, text_enc, parsed_with CHECK IN ('unpdf','llm'), is_current, uploaded_at; partial UNIQUE(user_id) WHERE is_current=1 |
 | `browser_profiles` | user_id, provider, provider_profile_id, country_code, created_at, last_used_at; PK(user_id, provider) |
-| `mailboxes` | id, user_id UNIQUE, local_part UNIQUE, status CHECK IN ('active','receive_only','closed'), receive_until NULL, created_at |
+| `mailboxes` | id (the forwarding id, `[a-z0-9]{8,32}`), user_id UNIQUE, local_part UNIQUE (the `in-{id}-{mac}` local part), status CHECK IN ('active','receive_only','closed'), receive_until NULL, created_at |
 | `retired_addresses` | local_part PK, retired_at — **a local part is never reassigned** |
 
 ### 5.3 Catalog
@@ -264,6 +264,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `mail_threads` | id, user_id, application_id NULL, subject_enc, employer_started, last_message_at |
 | `messages` | id, thread_id, user_id, mailbox_id, direction CHECK IN ('in','out'), rfc_message_id, in_reply_to NULL, sender_domain, auth CHECK IN ('pass','fail','none'), from_enc, to_enc, subject_enc, text_enc, html_object_key NULL, snippet_enc, classification CHECK IN ('ack','code','rejection','screening','interview','offer','other') NULL, code_consumed_at NULL, read_at NULL, out_status CHECK IN ('queued','sent','bounced','failed') NULL, provider_message_id NULL, created_at; UNIQUE(mailbox_id, rfc_message_id) |
 | `message_attachments` | id, message_id, filename_enc, mime, bytes, object_key |
+| `code_waits` | id, user_id, mailbox_id, attempt_id NULL (no foreign key until the attempts slice links it), started_at, expires_at, resolved_at NULL, resolved_by CHECK IN ('mail','paste') NULL, resolved_message_id NULL, code_enc NULL |
 | `mail_suppressions` | address_hash PK, reason CHECK IN ('bounce','complaint'), created_at |
 
 ### 5.6 Billing
@@ -726,6 +727,13 @@ stopping before Submit. The developer machine never drives a browser against a r
    SmartRecruiters, Recruitee, Workable, Personio sender lists in `src/shared/ats-mail-domains.ts`) **and** company
    name or posting title found in subject/body, choosing the most recent sent application to that company.
 6. Automation (codes, stage moves) only when `auth='pass'`.
+7. Code waits: while a verification prompt is open, an attempt records a `code_waits` row with `started_at` and
+   `expires_at = started_at + 10 min`. Ingest resolves the oldest open, unexpired wait for that mailbox when an
+   `auth='pass'` message classified as a code arrives from an ATS domain at or after its start, storing the code
+   encrypted and publishing `code.wait_resolved`. The owner may instead paste the code through
+   `POST /api/mail/code-waits/:id` while the wait is unexpired; an expired or already-resolved wait is refused.
+   `GET /internal/mail/code-waits` lists the open waits for a forwarding address, authenticated with the same
+   HMAC-SHA256 headers as inbound mail.
 
 ### 11.2 Outbound (M2)
 
