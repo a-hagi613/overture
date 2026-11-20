@@ -26,8 +26,10 @@ test("settings and kill switches read their defaults and can be changed", async 
   expect(allSettings["limits.daily_cap"]).toBe("10");
   expect(allSettings["browser.provider"]).toBe("browser_use");
   expect(allSettings["match.strong"]).toBe("80");
+  expect(allSettings["jobs.poll_interval_ms"]).toBe("15000");
+  expect(allSettings["jobs.batch_size"]).toBe("10");
 
-  const putResponse = await fetch(`${appServerUrl}/api/settings/limits.daily_cap`, {
+  const putResponse = await fetch(`${appServerUrl}/__test__/settings/limits.daily_cap`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ value: "5" }),
@@ -55,7 +57,7 @@ test("settings and kill switches read their defaults and can be changed", async 
 
   expect(Array.isArray(switchesBefore)).toBe(true);
 
-  const putSwitchResponse = await fetch(`${appServerUrl}/api/kill-switches/global/all`, {
+  const putSwitchResponse = await fetch(`${appServerUrl}/__test__/kill-switches/global/all`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ enabled: true, reason: "test", setBy: "owner" }),

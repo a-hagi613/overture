@@ -45,11 +45,29 @@ async function runJob(
   }
 }
 
+function requeueWithoutConsumingAttempt(
+  db: AppDatabase,
+  clock: Clock,
+  jobId: string,
+  originalAttempts: number,
+) {
+  db.update(bgJobs)
+    .set({
+      status: "queued",
+      attempts: originalAttempts,
+      lockedUntil: null,
+      updatedAt: clock.now(),
+    })
+    .where(eq(bgJobs.id, jobId))
+    .run();
+}
+
 export async function claimAndRunDueJobs(
   db: AppDatabase,
   clock: Clock,
   handlers: JobHandlers,
   signal: AbortSignal,
+  batchSize: number,
 ) {
   const now = clock.now();
 
@@ -66,6 +84,14 @@ export async function claimAndRunDueJobs(
         eq(bgJobs.status, "queued"),
         lte(bgJobs.runAt, now),
         or(isNull(bgJobs.lockedUntil), lt(bgJobs.lockedUntil, now)),
+        sql`${bgJobs.id} IN (
+          SELECT id FROM bg_jobs
+          WHERE status = 'queued'
+            AND run_at <= ${now}
+            AND (locked_until IS NULL OR locked_until < ${now})
+          ORDER BY priority DESC, run_at ASC
+          LIMIT ${batchSize}
+        )`,
       ),
     )
     .returning()
@@ -73,10 +99,7 @@ export async function claimAndRunDueJobs(
 
   const tasks = claimed.map(async (job) => {
     if (signal.aborted) {
-      db.update(bgJobs)
-        .set({ status: "queued", lockedUntil: null, updatedAt: clock.now() })
-        .where(eq(bgJobs.id, job.id))
-        .run();
+      requeueWithoutConsumingAttempt(db, clock, job.id, job.attempts - 1);
 
       return false;
     }
@@ -113,6 +136,12 @@ export function recoverStaleLocks(db: AppDatabase, clock: Clock) {
     .run();
 }
 
+let enqueueNotify: (() => void) | null = null;
+
+export function registerEnqueueNotify(notify: () => void) {
+  enqueueNotify = notify;
+}
+
 export function enqueueJob(
   db: AppDatabase,
   clock: Clock,
@@ -142,6 +171,10 @@ export function enqueueJob(
     })
     .onConflictDoNothing()
     .run();
+
+  if (enqueueNotify !== null) {
+    enqueueNotify();
+  }
 
   return id;
 }

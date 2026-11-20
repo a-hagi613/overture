@@ -28,6 +28,8 @@ const SETTING_DEFAULTS = {
   "browser.concurrency": "10",
   "checkin.after_days": "21",
   "checkin.close_after_days": "45",
+  "jobs.poll_interval_ms": "15000",
+  "jobs.batch_size": "10",
 } satisfies Record<string, string>;
 
 export { SETTING_DEFAULTS };

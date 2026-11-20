@@ -78,7 +78,7 @@ async function readOneSseEvent(url: string, lastEventId: string | null) {
 test("a page receives an event live and replays missed events after reconnecting", async ({
   appServerUrl,
 }) => {
-  const publishFirst = await fetch(`${appServerUrl}/api/events/publish`, {
+  const publishFirst = await fetch(`${appServerUrl}/__test__/events/publish`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ topic: "home.updated", payload: { kind: "test" } }),
@@ -94,7 +94,7 @@ test("a page receives an event live and replays missed events after reconnecting
 
   const firstId = firstEvent?.id ?? "0";
 
-  const publishSecond = await fetch(`${appServerUrl}/api/events/publish`, {
+  const publishSecond = await fetch(`${appServerUrl}/__test__/events/publish`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ topic: "application.updated", payload: { kind: "replay" } }),

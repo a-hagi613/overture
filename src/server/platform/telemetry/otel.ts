@@ -1,6 +1,6 @@
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-proto";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-proto";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import {
   CompositePropagator,
   W3CBaggagePropagator,
@@ -10,8 +10,24 @@ import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
+import type { LogRecordExporter, ReadableLogRecord } from "@opentelemetry/sdk-logs";
 import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
+import type { Context } from "@opentelemetry/api";
+import type {
+  ReadableSpan,
+  Span,
+  SpanExporter,
+  SpanProcessor,
+} from "@opentelemetry/sdk-trace-base";
+import {
+  BatchSpanProcessor,
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+} from "@opentelemetry/sdk-trace-base";
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
+import type { ExportResult } from "@opentelemetry/core";
+
+export { trace } from "@opentelemetry/api";
 
 export const OTEL_ATTRIBUTE_ALLOWLIST = new Set([
   "service.name",
@@ -48,6 +64,64 @@ export function redactAttributes(attributes: Record<string, string | number | bo
   return redacted;
 }
 
+class RedactingSpanProcessor implements SpanProcessor {
+  private readonly inner: SpanProcessor;
+
+  constructor(inner: SpanProcessor) {
+    this.inner = inner;
+  }
+
+  onStart(span: Span, parentContext: Context) {
+    this.inner.onStart(span, parentContext);
+  }
+
+  onEnd(span: ReadableSpan) {
+    for (const key of Object.keys(span.attributes)) {
+      if (!OTEL_ATTRIBUTE_ALLOWLIST.has(key)) {
+        span.attributes[key] = "[redacted]";
+      }
+    }
+
+    this.inner.onEnd(span);
+  }
+
+  async shutdown() {
+    return this.inner.shutdown();
+  }
+
+  async forceFlush() {
+    return this.inner.forceFlush();
+  }
+}
+
+class RedactingLogExporter implements LogRecordExporter {
+  private readonly inner: LogRecordExporter;
+
+  constructor(inner: LogRecordExporter) {
+    this.inner = inner;
+  }
+
+  export(logRecords: ReadableLogRecord[], resultCallback: (result: ExportResult) => void) {
+    for (const record of logRecords) {
+      for (const key of Object.keys(record.attributes)) {
+        if (!OTEL_ATTRIBUTE_ALLOWLIST.has(key)) {
+          record.attributes[key] = "[redacted]";
+        }
+      }
+    }
+
+    this.inner.export(logRecords, resultCallback);
+  }
+
+  async shutdown() {
+    return this.inner.shutdown();
+  }
+
+  async forceFlush() {
+    return this.inner.forceFlush();
+  }
+}
+
 function parseHeaders(raw?: string) {
   if (!raw) {
     return {};
@@ -72,11 +146,22 @@ function makeExporterConfig(endpoint: string | undefined, rawHeaders?: string) {
   return endpoint === undefined ? { headers } : { url: endpoint, headers };
 }
 
+let testSpanExporter: InMemorySpanExporter | null = null;
+
+export function getTestSpans() {
+  return testSpanExporter === null ? [] : testSpanExporter.getFinishedSpans();
+}
+
+export function resetTestSpans() {
+  testSpanExporter?.reset();
+}
+
 export function startTelemetry(options: {
   serviceName: string;
   otlpEndpoint?: string;
   otlpHeaders?: string;
   debug?: boolean;
+  simpleExport?: boolean;
 }) {
   if (options.debug === true) {
     diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
@@ -96,19 +181,31 @@ export function startTelemetry(options: {
   const logEndpoint =
     options.otlpEndpoint === undefined ? undefined : `${options.otlpEndpoint}/v1/logs`;
 
-  const traceExporter = new OTLPTraceExporter(
-    makeExporterConfig(traceEndpoint, options.otlpHeaders),
-  );
+  let traceExporter: SpanExporter;
+
+  if (options.simpleExport === true) {
+    testSpanExporter = new InMemorySpanExporter();
+    traceExporter = testSpanExporter;
+  } else {
+    traceExporter = new OTLPTraceExporter(makeExporterConfig(traceEndpoint, options.otlpHeaders));
+  }
 
   const metricExporter = new OTLPMetricExporter(
     makeExporterConfig(metricEndpoint, options.otlpHeaders),
   );
 
-  const logExporter = new OTLPLogExporter(makeExporterConfig(logEndpoint, options.otlpHeaders));
+  const logExporter = new RedactingLogExporter(
+    new OTLPLogExporter(makeExporterConfig(logEndpoint, options.otlpHeaders)),
+  );
+
+  const innerSpanProcessor =
+    options.simpleExport === true
+      ? new SimpleSpanProcessor(traceExporter)
+      : new BatchSpanProcessor(traceExporter);
 
   const sdk = new NodeSDK({
     resource,
-    traceExporter,
+    spanProcessors: [new RedactingSpanProcessor(innerSpanProcessor)],
     metricReaders: [
       new PeriodicExportingMetricReader({
         exporter: metricExporter,

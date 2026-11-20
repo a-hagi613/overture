@@ -10,7 +10,9 @@ import type { AdjustableClock } from "../platform/ports/clock.ts";
 import { bgJobs } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
-import { OTEL_ATTRIBUTE_ALLOWLIST } from "../platform/telemetry/otel.ts";
+import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
+import { getTestSpans, resetTestSpans } from "../platform/telemetry/otel.ts";
 
 const offsetBody = z.object({ offsetMs: z.number().int() });
 
@@ -23,8 +25,18 @@ const enqueueBody = z.object({
   dedupeKey: z.string().optional(),
 });
 
-const attributesBody = z.object({
-  attributes: z.record(z.string(), z.string().or(z.number()).or(z.boolean()).or(z.null())),
+const settingBody = z.object({ value: z.string().min(1) });
+
+const killSwitchBody = z.object({
+  enabled: z.boolean(),
+  reason: z.string().default(""),
+  setBy: z.enum(["auto", "owner"]).default("owner"),
+});
+
+const publishBody = z.object({
+  topic: z.string().min(1),
+  payload: z.record(z.string(), z.string().or(z.number()).or(z.boolean()).or(z.null())),
+  userId: z.string().optional(),
 });
 
 export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handlers: JobHandlers) {
@@ -72,15 +84,51 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
     return context.json(job);
   });
 
-  routes.post("/telemetry/redact", zValidator("json", attributesBody), (context) => {
-    const { attributes } = context.req.valid("json");
-    const redacted: Record<string, string | number | boolean | null> = {};
+  routes.put("/settings/:key", zValidator("json", settingBody), (context) => {
+    const { key } = context.req.param();
+    const { value } = context.req.valid("json");
 
-    for (const [key, value] of Object.entries(attributes)) {
-      redacted[key] = OTEL_ATTRIBUTE_ALLOWLIST.has(key) ? value : "[redacted]";
+    setSetting(db, clock, key, value, "owner");
+
+    return context.json({ key, value });
+  });
+
+  routes.put("/kill-switches/:scope/:key", zValidator("json", killSwitchBody), (context) => {
+    const { scope, key } = context.req.param();
+    const { enabled, reason, setBy } = context.req.valid("json");
+
+    const validScope = z.enum(["global", "ats", "employer", "provider"]).safeParse(scope);
+
+    if (!validScope.success) {
+      return context.json({ error: "invalid scope" }, 400);
     }
 
-    return context.json({ redacted, allowlist: [...OTEL_ATTRIBUTE_ALLOWLIST] });
+    setKillSwitch(db, clock, validScope.data, key, enabled, reason, setBy);
+
+    return context.json({ scope, key, enabled, reason, setBy });
+  });
+
+  routes.post("/events/publish", zValidator("json", publishBody), (context) => {
+    const { topic, payload, userId } = context.req.valid("json");
+
+    publishEvent(db, clock, topic, JSON.stringify(payload), userId);
+
+    return context.json({ ok: true });
+  });
+
+  routes.get("/telemetry/spans", (context) => {
+    const spans = getTestSpans().map((span) => ({
+      name: span.name,
+      attributes: span.attributes,
+    }));
+
+    return context.json({ spans });
+  });
+
+  routes.post("/telemetry/reset", (context) => {
+    resetTestSpans();
+
+    return context.json({ ok: true });
   });
 
   return routes;

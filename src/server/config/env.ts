@@ -11,6 +11,7 @@ const envSchema = z.object({
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
   OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
   OTEL_DEBUG: booleanFromString.default(false),
+  OTEL_SIMPLE_EXPORT: booleanFromString.default(false),
 });
 
 export const env = envSchema.parse(process.env);

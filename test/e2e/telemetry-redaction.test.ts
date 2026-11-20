@@ -2,50 +2,56 @@ import { z } from "zod";
 
 import { expect, test } from "./app.fixture.ts";
 
-const redactResponseSchema = z.object({
-  redacted: z.record(z.string(), z.unknown()),
-  allowlist: z.array(z.string()),
+const spansResponseSchema = z.object({
+  spans: z.array(
+    z.object({
+      name: z.string(),
+      attributes: z.record(z.string(), z.unknown()),
+    }),
+  ),
 });
 
+const enqueueResponseSchema = z.object({ id: z.string() });
+const runDueResponseSchema = z.object({ ran: z.number() });
+
 test("telemetry attributes outside the allowlist are dropped", async ({ appServerUrl }) => {
-  const allowedKeys = ["http.method", "http.route", "http.status_code", "job.kind", "job.id"];
-  const redactedKeys = ["user.email", "user.name", "answer.text", "letter.content"];
+  await fetch(`${appServerUrl}/__test__/telemetry/reset`, { method: "POST" });
 
-  const mixedAttributes = {
-    "http.method": "GET",
-    "http.route": "/api/health",
-    "http.status_code": 200,
-    "job.kind": "test.ping",
-    "job.id": "abc-123",
-    "user.email": "user@example.com",
-    "user.name": "Alice",
-    "answer.text": "my private answer",
-    "letter.content": "cover letter here",
-  };
-
-  const attributeLookup = new Map(Object.entries(mixedAttributes));
-
-  const response = await fetch(`${appServerUrl}/__test__/telemetry/redact`, {
+  const enqueueResponse = await fetch(`${appServerUrl}/__test__/jobs/enqueue`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ attributes: mixedAttributes }),
+    body: JSON.stringify({
+      kind: "test.otel",
+      payload: JSON.stringify({
+        "http.route": "/api/health",
+        "user.email": "user@example.com",
+        "job.kind": "test.otel",
+      }),
+    }),
   });
 
-  expect(response.ok).toBe(true);
+  expect(enqueueResponse.ok).toBe(true);
+  enqueueResponseSchema.parse(await enqueueResponse.json());
 
-  const { redacted, allowlist } = redactResponseSchema.parse(await response.json());
+  const runResponse = await fetch(`${appServerUrl}/__test__/jobs/run-due`, { method: "POST" });
 
-  for (const key of allowedKeys) {
-    expect(allowlist.includes(key)).toBe(true);
-    expect(redacted[key]).toBe(attributeLookup.get(key));
-  }
+  expect(runResponse.ok).toBe(true);
 
-  for (const key of redactedKeys) {
-    expect(allowlist.includes(key)).toBe(false);
-    expect(redacted[key]).toBe("[redacted]");
-  }
+  const { ran } = runDueResponseSchema.parse(await runResponse.json());
 
-  const healthResponse = await fetch(`${appServerUrl}/api/health`);
+  expect(ran).toBe(1);
 
-  expect(healthResponse.ok).toBe(true);
+  const spansResponse = await fetch(`${appServerUrl}/__test__/telemetry/spans`);
+
+  expect(spansResponse.ok).toBe(true);
+
+  const { spans } = spansResponseSchema.parse(await spansResponse.json());
+
+  const otelSpan = spans.find((s) => s.name === "test.otel.run");
+
+  expect(otelSpan).toBeDefined();
+
+  expect(otelSpan?.attributes["http.route"]).toBe("/api/health");
+  expect(otelSpan?.attributes["job.kind"]).toBe("test.otel");
+  expect(otelSpan?.attributes["user.email"]).toBe("[redacted]");
 });
