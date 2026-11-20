@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { request as apiRequest, test as base } from "@playwright/test";
 
-import type { BrowserContext } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
 
 import type { AppServer } from "./app-server.ts";
 import type { IdentityServer } from "./identity-server-test.fixture.ts";
@@ -22,6 +22,7 @@ interface TestFixtures {
   chromeOwnerStorage: StorageState;
   identityServer: IdentityServer;
   isolatedAppServer: AppServer;
+  ownerPage: Page;
   ownerStorageState: StorageState;
 }
 
@@ -111,6 +112,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   },
   ownerStorageState: async ({ _ownerStorageStateWorker }, provide) => {
     await provide(_ownerStorageStateWorker);
+  },
+  ownerPage: async ({ browser, ownerStorageState }, provide) => {
+    const context = await browser.newContext({ storageState: ownerStorageState });
+    const page = await context.newPage();
+
+    await provide(page);
+    await context.close();
   },
   _ownerStorageStateWorker: [
     async ({ _appServerWorker }, provide) => {

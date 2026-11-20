@@ -72,12 +72,12 @@ test("search by title, company, location and department stays under 50 ms on the
   ).toBe(true);
 });
 
-test("the search page lists postings for a query", async ({ page, appServerUrl }) => {
-  await page.goto(`${appServerUrl}/search?q=${encodeURIComponent(QUERIES.title)}`);
+test("the search page lists postings for a query", async ({ ownerPage, appServerUrl }) => {
+  await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent(QUERIES.title)}`);
 
-  await expect(page.getByRole("heading", { level: 1, name: "Search" })).toBeVisible();
+  await expect(ownerPage.getByRole("heading", { level: 1, name: "Search" })).toBeVisible();
 
-  await expect(page.getByText(QUERIES.title).first()).toBeVisible();
+  await expect(ownerPage.getByText(QUERIES.title).first()).toBeVisible();
 
-  await expect(page.getByText("Northwind Systems").first()).toBeVisible();
+  await expect(ownerPage.getByText("Northwind Systems").first()).toBeVisible();
 });

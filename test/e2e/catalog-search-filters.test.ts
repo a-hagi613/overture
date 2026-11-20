@@ -27,12 +27,12 @@ const searchResponseSchema = z.object({
   durationMs: z.number(),
 });
 
-function results(page: Page) {
-  return page.getByRole("region", { name: "Postings" }).getByRole("listitem");
+function results(ownerPage: Page) {
+  return ownerPage.getByRole("region", { name: "Postings" }).getByRole("listitem");
 }
 
-function resultLinks(page: Page) {
-  return results(page).getByRole("link");
+function resultLinks(ownerPage: Page) {
+  return results(ownerPage).getByRole("link");
 }
 
 async function searchHits(url: string) {
@@ -46,74 +46,80 @@ async function searchHits(url: string) {
 }
 
 test("the role filter narrows search results to the tagged role", async ({
-  page,
+  ownerPage,
   appServerUrl,
 }) => {
-  await page.goto(`${appServerUrl}/search?q=${encodeURIComponent("Manager")}`);
+  await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent("Manager")}`);
 
-  await expect(resultLinks(page).filter({ hasText: "Engineering Manager" })).toHaveCount(20);
-  await expect(resultLinks(page).filter({ hasText: "Product Manager" })).toHaveCount(20);
+  await expect(resultLinks(ownerPage).filter({ hasText: "Engineering Manager" })).toHaveCount(20);
+  await expect(resultLinks(ownerPage).filter({ hasText: "Product Manager" })).toHaveCount(20);
 
-  await page.getByLabel("Role").selectOption("Product Management");
+  await ownerPage.getByLabel("Role").selectOption("Product Management");
 
-  await expect(resultLinks(page).filter({ hasText: "Engineering Manager" })).toHaveCount(0);
-  await expect(resultLinks(page).filter({ hasText: "Product Manager" })).toHaveCount(20);
+  await expect(resultLinks(ownerPage).filter({ hasText: "Engineering Manager" })).toHaveCount(0);
+  await expect(resultLinks(ownerPage).filter({ hasText: "Product Manager" })).toHaveCount(20);
 });
 
 test("the seniority filter narrows search results to the tagged seniority", async ({
-  page,
+  ownerPage,
   appServerUrl,
 }) => {
-  await page.goto(`${appServerUrl}/search?q=${encodeURIComponent("Backend")}`);
+  await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent("Backend")}`);
 
-  await expect(resultLinks(page).filter({ hasText: /^Senior Backend Engineer$/u })).toHaveCount(20);
-  await expect(resultLinks(page).filter({ hasText: /^Backend Engineer$/u })).toHaveCount(20);
+  await expect(
+    resultLinks(ownerPage).filter({ hasText: /^Senior Backend Engineer$/u }),
+  ).toHaveCount(20);
+  await expect(resultLinks(ownerPage).filter({ hasText: /^Backend Engineer$/u })).toHaveCount(20);
 
-  await page.getByLabel("Seniority").selectOption("senior");
+  await ownerPage.getByLabel("Seniority").selectOption("senior");
 
-  await expect(resultLinks(page).filter({ hasText: /^Backend Engineer$/u })).toHaveCount(0);
-  await expect(resultLinks(page).filter({ hasText: /^Senior Backend Engineer$/u })).toHaveCount(20);
+  await expect(resultLinks(ownerPage).filter({ hasText: /^Backend Engineer$/u })).toHaveCount(0);
+  await expect(
+    resultLinks(ownerPage).filter({ hasText: /^Senior Backend Engineer$/u }),
+  ).toHaveCount(20);
 });
 
 test("the workplace filter narrows search results to the tagged workplace", async ({
-  page,
+  ownerPage,
   appServerUrl,
 }) => {
-  await page.goto(`${appServerUrl}/search?q=${encodeURIComponent("Engineer")}`);
+  await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent("Engineer")}`);
 
-  await page.getByLabel("Workplace").selectOption("remote");
+  await ownerPage.getByLabel("Workplace").selectOption("remote");
 
-  await expect(results(page).filter({ hasText: "Remote" })).toHaveCount(50);
+  await expect(results(ownerPage).filter({ hasText: "Remote" })).toHaveCount(50);
 
-  await page.getByLabel("Workplace").selectOption("hybrid");
+  await ownerPage.getByLabel("Workplace").selectOption("hybrid");
 
-  await expect(results(page).first()).toBeVisible();
-  await expect(results(page).filter({ hasText: "Remote" })).toHaveCount(0);
+  await expect(results(ownerPage).first()).toBeVisible();
+  await expect(results(ownerPage).filter({ hasText: "Remote" })).toHaveCount(0);
 });
 
 test("the city filter narrows search results to postings resolved to that city", async ({
-  page,
+  ownerPage,
   appServerUrl,
 }) => {
-  await page.goto(`${appServerUrl}/search?q=${encodeURIComponent("Engineer")}`);
+  await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent("Engineer")}`);
 
-  await page.getByLabel("City").fill("Toronto");
-  await page.getByLabel("City").press("Enter");
+  await ownerPage.getByLabel("City").fill("Toronto");
+  await ownerPage.getByLabel("City").press("Enter");
 
-  await expect(results(page).filter({ hasText: "Toronto" }).first()).toBeVisible();
-  await expect(results(page).filter({ hasNotText: "Toronto" })).toHaveCount(0);
+  await expect(results(ownerPage).filter({ hasText: "Toronto" }).first()).toBeVisible();
+  await expect(results(ownerPage).filter({ hasNotText: "Toronto" })).toHaveCount(0);
 });
 
 test("the employment type filter narrows search results to the tagged type", async ({
-  page,
+  ownerPage,
   appServerUrl,
 }) => {
-  await page.goto(`${appServerUrl}/search?q=${encodeURIComponent("Engineer")}`);
+  await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent("Engineer")}`);
 
-  await page.getByLabel("Employment type").selectOption("contract");
+  await ownerPage.getByLabel("Employment type").selectOption("contract");
 
-  await expect(resultLinks(page).filter({ hasText: "Senior Backend Engineer" })).toHaveCount(0);
-  await expect(results(page).filter({ hasText: "Frontend Engineer" }).first()).toBeVisible();
+  await expect(resultLinks(ownerPage).filter({ hasText: "Senior Backend Engineer" })).toHaveCount(
+    0,
+  );
+  await expect(results(ownerPage).filter({ hasText: "Frontend Engineer" }).first()).toBeVisible();
 
   const contractTitles = new Set([
     "Frontend Engineer",
@@ -122,14 +128,14 @@ test("the employment type filter narrows search results to the tagged type", asy
     "DevOps Engineer",
   ]);
 
-  const titles = await resultLinks(page).allTextContents();
+  const titles = await resultLinks(ownerPage).allTextContents();
 
   expect(titles.every((title) => contractTitles.has(title))).toBe(true);
 
-  await page.getByLabel("Employment type").selectOption("internship");
+  await ownerPage.getByLabel("Employment type").selectOption("internship");
 
-  await expect(results(page)).toHaveCount(0);
-  await expect(page.getByText("No postings match that search.")).toBeVisible();
+  await expect(results(ownerPage)).toHaveCount(0);
+  await expect(ownerPage.getByText("No postings match that search.")).toBeVisible();
 });
 
 test("postings poll records tags from the rules and the filters search them", async () => {

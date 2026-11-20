@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 export interface TurnstileRenderOptions {
   sitekey: string;
   appearance?: "always" | "execute" | "interaction-only";
   callback?: (token: string) => void;
-  "error-callback"?: () => void;
+  "error-callback"?: (error: string) => void;
 }
 
 interface TurnstileApi {
@@ -23,10 +23,34 @@ declare global {
 
 const readyEvent = "overture:turnstile-ready";
 
+interface TokenWaiter {
+  resolve: (token: string | null) => void;
+}
+
 export function useTurnstile(siteKey: string | null) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const tokenRef = useRef<string | null>(null);
-  const [hasToken, setHasToken] = useState(false);
+  const waitersRef = useRef<TokenWaiter[]>([]);
+
+  const settle = useCallback((token: string | null) => {
+    const waiters = waitersRef.current;
+
+    waitersRef.current = [];
+
+    if (waiters.length === 0) {
+      tokenRef.current = token;
+
+      return;
+    }
+
+    if (globalThis.turnstile !== undefined) {
+      globalThis.turnstile.reset();
+    }
+
+    for (const waiter of waiters) {
+      waiter.resolve(token);
+    }
+  }, []);
 
   useEffect(() => {
     let widgetId: string | null = null;
@@ -41,6 +65,8 @@ export function useTurnstile(siteKey: string | null) {
     };
 
     if (siteKey === null || containerRef.current === null) {
+      settle(null);
+
       return clear;
     }
 
@@ -53,8 +79,10 @@ export function useTurnstile(siteKey: string | null) {
         sitekey: siteKey,
         appearance: "interaction-only",
         callback: (token) => {
-          tokenRef.current = token;
-          setHasToken(true);
+          settle(token);
+        },
+        "error-callback": () => {
+          settle(null);
         },
       });
     };
@@ -74,22 +102,29 @@ export function useTurnstile(siteKey: string | null) {
     }
 
     return clear;
-  }, [siteKey]);
+  }, [settle, siteKey]);
 
-  return {
-    containerRef,
-    hasToken,
-    consume: () => {
-      const token = tokenRef.current;
+  const obtainToken = async () => {
+    const token = tokenRef.current;
 
+    if (token !== null) {
       tokenRef.current = null;
-      setHasToken(false);
 
       if (globalThis.turnstile !== undefined) {
         globalThis.turnstile.reset();
       }
 
       return token;
-    },
+    }
+
+    if (siteKey === null) {
+      return null;
+    }
+
+    return new Promise<string | null>((resolve) => {
+      waitersRef.current.push({ resolve });
+    });
   };
+
+  return { containerRef, obtainToken };
 }

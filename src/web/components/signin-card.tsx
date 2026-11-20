@@ -49,7 +49,7 @@ export function SignInCard() {
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [siteKey, setSiteKey] = useState<string | null>(null);
-  const { containerRef, consume: consumeTurnstile } = useTurnstile(siteKey);
+  const { containerRef, obtainToken } = useTurnstile(siteKey);
 
   useEffect(() => {
     const load = async () => {
@@ -81,8 +81,8 @@ export function SignInCard() {
     void check();
   }, [navigate, sentTo, siteKeyFromCallback]);
 
-  const confirmToken = () => {
-    const token = consumeTurnstile();
+  const confirmToken = async () => {
+    const token = await obtainToken();
 
     if (token === null) {
       setActionError(copy.signIn.captchaMissing);
@@ -94,7 +94,7 @@ export function SignInCard() {
   };
 
   const onSocial = async (provider: "google" | "linkedin") => {
-    const token = confirmToken();
+    const token = await confirmToken();
 
     if (token === null) {
       return;
@@ -115,7 +115,7 @@ export function SignInCard() {
   };
 
   const onMagic = async () => {
-    const token = confirmToken();
+    const token = await confirmToken();
 
     if (token === null) {
       return;
