@@ -12,7 +12,7 @@ interface AdminGateCheck {
 
 const widths = [390, 1280];
 const themes = ["light", "dark"];
-const adminPaths = ["/admin", "/admin/settings", "/admin/catalog"];
+const adminPaths = ["/admin", "/admin/settings", "/admin/catalog", "/admin/grants"];
 
 function combinations() {
   return widths.flatMap((width) =>
@@ -40,6 +40,7 @@ async function checkPage(
       .getByRole("heading", { name: "Background jobs" })
       .or(page.getByRole("heading", { name: "Kill switches" }))
       .or(page.getByRole("heading", { name: "Job board sources" }))
+      .or(page.getByRole("heading", { name: "Recent grants" }))
       .first(),
   ).toBeVisible();
 

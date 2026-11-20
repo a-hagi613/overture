@@ -1,6 +1,7 @@
 import { copy } from "../../shared/copy.ts";
 import { firstNameOf } from "../lib/identity.ts";
 import { authClient } from "../lib/auth-client.ts";
+import { useHomeData } from "../lib/home-api.ts";
 import { PageHeader } from "../components/page-header.tsx";
 
 function dateLine() {
@@ -26,6 +27,7 @@ export function HomePage() {
   const { data: session } = authClient.useSession();
   const name = session === null ? "" : session.user.name;
   const firstName = name === "" ? "" : firstNameOf(name);
+  const { data: home } = useHomeData();
 
   return (
     <div className="mx-auto max-w-[1200px]">
@@ -53,13 +55,17 @@ export function HomePage() {
             <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               {copy.home.applicationsLeft}
             </dt>
-            <dd className="font-serif text-3xl tabular-nums">{copy.home.applicationsLeftValue}</dd>
+            <dd className="font-serif text-3xl tabular-nums">
+              {copy.home.usageCount(home?.applicationsLeft ?? 0)}
+            </dd>
           </div>
           <div>
             <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               {copy.home.sentToday}
             </dt>
-            <dd className="font-serif text-3xl tabular-nums">{copy.home.sentTodayValue}</dd>
+            <dd className="font-serif text-3xl tabular-nums">
+              {copy.home.usageCount(home?.sentToday ?? 0)}
+            </dd>
           </div>
           <div>
             <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">

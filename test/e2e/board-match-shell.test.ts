@@ -88,6 +88,7 @@ for (const width of [390, 1280] as const) {
 
       await page.goto(`${appServerUrl}/`);
       await expect(page.getByRole("heading", { name: "Overture is ready" })).toBeVisible();
+      await expect(page.locator("dd").filter({ hasText: "63" })).toBeVisible();
       await page.evaluate(async () => {
         await document.fonts.ready;
       });

@@ -44,5 +44,15 @@ export default defineConfig({
         },
       },
     },
+    {
+      name: "home-boards",
+      testMatch: /board-match-home-usage\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/../../design/reference/home/{arg}{ext}",
+        },
+      },
+    },
   ],
 });

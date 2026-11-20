@@ -19,6 +19,7 @@ import { AdminShell } from "./routes/admin/shell.tsx";
 import { AdminSettingsPage } from "./routes/admin/settings.tsx";
 import { CatalogPage } from "./routes/admin/catalog.tsx";
 import { OverviewPage } from "./routes/admin/overview.tsx";
+import { GrantsPage } from "./routes/admin/grants.tsx";
 
 const router = createBrowserRouter([
   {
@@ -40,6 +41,7 @@ const router = createBrowserRouter([
       { path: "/admin", element: <OverviewPage /> },
       { path: "/admin/settings", element: <AdminSettingsPage /> },
       { path: "/admin/catalog", element: <CatalogPage /> },
+      { path: "/admin/grants", element: <GrantsPage /> },
     ],
   },
   { path: "/signin", element: <SignInPage /> },

@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { count, sql } from "drizzle-orm";
+import { count, desc, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -7,13 +7,14 @@ import type { Auth } from "../auth/index.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
-import { bgJobs, killSwitches, sessions, users } from "../platform/db/schema.ts";
+import { bgJobs, grants, killSwitches, sessions, users } from "../platform/db/schema.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags, readTagImports } from "../catalog/tag-import.ts";
 import { createAccessVerifier } from "../platform/access/index.ts";
 import { env } from "../config/env.ts";
 import { hasRecentPasskeyAssertion } from "../platform/passkey/index.ts";
 import { listAdminAudit, recordAdminAudit } from "../platform/audit/index.ts";
 import { readLlmUsage } from "../platform/llm/usage.ts";
+import { applicationsLeft, grantApplications } from "../billing/ledger.ts";
 import {
   getAllKillSwitches,
   getAllSettings,
@@ -27,6 +28,13 @@ const settingBody = z.object({ value: z.string().min(1) });
 const killSwitchBody = z.object({
   enabled: z.boolean(),
   reason: z.string().default(""),
+});
+
+const grantBody = z.object({
+  email: z.email(),
+  expiresInDays: z.number().int().min(0).max(365).nullable(),
+  idempotencyKey: z.string().min(1),
+  quantity: z.number().int().min(1).max(100_000),
 });
 
 const tagImportBody = z.object({
@@ -268,6 +276,68 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth) {
   });
 
   routes.get("/tag-imports", (context) => context.json({ tagImports: readTagImports(db) }));
+
+  routes.get("/grants", (context) => {
+    const rows = db
+      .select({ grant: grants, email: users.email })
+      .from(grants)
+      .innerJoin(users, eq(grants.userId, users.id))
+      .orderBy(desc(grants.createdAt))
+      .limit(50)
+      .all();
+
+    return context.json({
+      grants: rows.map((row) => ({
+        createdAt: row.grant.createdAt,
+        email: row.email,
+        expiresAt: row.grant.expiresAt,
+        id: row.grant.id,
+        quantity: row.grant.quantity,
+        source: row.grant.source,
+        startsAt: row.grant.startsAt,
+      })),
+    });
+  });
+
+  routes.post("/grants", zValidator("json", grantBody), (context) => {
+    const { email, expiresInDays, idempotencyKey, quantity } = context.req.valid("json");
+    const owner = context.get("owner");
+    const user = db.select().from(users).where(eq(users.email, email.trim().toLowerCase())).get();
+
+    if (user === undefined) {
+      return context.json({ error: "user_not_found" }, 404);
+    }
+
+    const at = clock.now();
+    const expiresAt = expiresInDays === null ? null : at + expiresInDays * 24 * 60 * 60 * 1000;
+
+    const placed = grantApplications(db, clock, {
+      expiresAt,
+      idempotencyKey,
+      quantity,
+      source: "admin",
+      userId: user.id,
+    });
+
+    if (placed.created) {
+      recordAdminAudit(db, clock, {
+        actorId: owner.userId,
+        action: "grants.create",
+        detail: {
+          email: user.email,
+          grantId: placed.grantId,
+          quantity,
+        },
+        reason: `Granted ${String(quantity)} Applications to ${user.email} from the admin grants page`,
+        targetUserId: user.id,
+      });
+    }
+
+    return context.json({
+      applicationsLeft: applicationsLeft(db, user.id, at),
+      grantId: placed.grantId,
+    });
+  });
 
   routes.get("/llm-usage", zValidator("query", llmUsageQuery), (context) => {
     const { purpose, limit } = context.req.valid("query");
