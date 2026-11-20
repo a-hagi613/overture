@@ -30,15 +30,35 @@ function normalizeRule(name: string) {
     .replace(/^react-perf\//u, "react_perf/")
     .replace(/^jsx-a11y\//u, "jsx_a11y/");
 
-  return withDashes.startsWith("eslint/") ? withDashes.slice("eslint/".length) : withDashes;
+  return withDashes.replace(/^eslint\//u, "");
 }
 
 function severityOf(value: string | unknown[]) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function tableRules(markdown: string, heading: string) {
-  const rules: string[] = [];
+function optionsOf(value: string | unknown[]) {
+  return Array.isArray(value) ? value.slice(1).map((option) => JSON.stringify(option)) : [];
+}
+
+function lowersRule(value: string | unknown[], base: string | unknown[] | undefined) {
+  if (base === undefined) {
+    return true;
+  }
+
+  if (severityOf(base) === "allow") {
+    return false;
+  }
+
+  if (severityOf(value) === "allow" || severityOf(value) === "off") {
+    return true;
+  }
+
+  return optionsOf(value).join(",") !== optionsOf(base).join(",");
+}
+
+function tableRows(markdown: string, heading: string) {
+  const rows: string[][] = [];
   let inSection = false;
 
   for (const line of markdown.split("\n")) {
@@ -60,14 +80,42 @@ function tableRules(markdown: string, heading: string) {
       continue;
     }
 
-    for (const match of (cells[0] ?? "").matchAll(/`(?<rule>[^`]+)`/gu)) {
-      if (match[1] !== undefined) {
-        rules.push(normalizeRule(match[1]));
+    rows.push(cells);
+  }
+
+  return rows;
+}
+
+function tokensIn(cell: string | undefined) {
+  return [...(cell ?? "").matchAll(/`(?<token>[^`]+)`/gu)].flatMap((match) =>
+    match.groups?.token === undefined ? [] : [match.groups.token],
+  );
+}
+
+function tableRules(markdown: string, heading: string) {
+  return tableRows(markdown, heading).flatMap((cells) =>
+    tokensIn(cells[0]).map((token) => normalizeRule(token)),
+  );
+}
+
+function tableScopedRules(markdown: string, heading: string) {
+  const scoped = new Map<string, Set<string>>();
+
+  for (const cells of tableRows(markdown, heading)) {
+    const globs = tokensIn(cells[1]);
+
+    for (const rule of tokensIn(cells[0]).map((token) => normalizeRule(token))) {
+      const existing = scoped.get(rule) ?? new Set<string>();
+
+      for (const glob of globs) {
+        existing.add(glob);
       }
+
+      scoped.set(rule, existing);
     }
   }
 
-  return rules;
+  return scoped;
 }
 
 function expandWildcards(rules: string[], available: Set<string>) {
@@ -106,6 +154,41 @@ function formatDifference(label: string, expected: Set<string>, actual: Set<stri
   ];
 }
 
+function formatScopedDifference(
+  label: string,
+  expected: Map<string, Set<string>>,
+  actual: Map<string, Set<string>>,
+) {
+  const failures: string[] = [];
+
+  for (const [rule, globs] of actual) {
+    const documented = expected.get(rule);
+
+    if (documented === undefined) {
+      failures.push(
+        `${label}: ${rule} is turned down in an override the ADR does not list (${[...globs].join(", ")})`,
+      );
+      continue;
+    }
+
+    if (documented.size !== globs.size || [...globs].some((glob) => !documented.has(glob))) {
+      failures.push(
+        `${label}: ${rule} is overridden for ${[...globs].join(", ")}, the ADR lists ${[...documented].join(", ")}`,
+      );
+    }
+  }
+
+  for (const [rule, globs] of expected) {
+    if (!actual.has(rule)) {
+      failures.push(
+        `${label}: the ADR lists ${rule} as scoped off but no override turns it down (${[...globs].join(", ")})`,
+      );
+    }
+  }
+
+  return failures;
+}
+
 const printed = spawnSync("bunx", ["oxlint", "--print-config"], { encoding: "utf8" });
 
 if (printed.status !== 0) {
@@ -116,6 +199,10 @@ const printedLines = printedConfigSchema.parse(JSON.parse(printed.stdout));
 const project = projectConfigSchema.parse(JSON.parse(readFileSync(".oxlintrc.json", "utf8")));
 const adr = readFileSync("docs/adr/0023-lint-rule-set.md", "utf8");
 const available = new Set(Object.keys(printedLines.rules));
+
+const baseRules = new Map(
+  Object.entries(printedLines.rules).map(([rule, value]) => [normalizeRule(rule), value]),
+);
 
 const documentedOff = expandWildcards(
   globalSections.flatMap((heading) => tableRules(adr, heading)),
@@ -130,24 +217,36 @@ const documentedSet = new Set(documentedOff);
 const configuredSet = new Set(configuredOff);
 const failures = formatDifference("the off-list", documentedSet, configuredSet);
 
-const scoped = expandWildcards(tableRules(adr, scopedSection), available);
+const configuredScoped = new Map<string, Set<string>>();
 
-for (const rule of scoped) {
-  if (configuredSet.has(rule)) {
-    failures.push(`${rule} is off globally but ADR 0023 only turns it off in one folder`);
-    continue;
-  }
+for (const override of project.overrides) {
+  for (const [rule, value] of Object.entries(override.rules)) {
+    const name = normalizeRule(rule);
 
-  const turnedOffSomewhere = project.overrides.some(
-    (override) => severityOf(override.rules[rule] ?? "deny") === "off",
-  );
+    if (!lowersRule(value, baseRules.get(name))) {
+      continue;
+    }
 
-  if (!turnedOffSomewhere) {
-    failures.push(
-      `${rule} is not turned off in any override, but ADR 0023 says it is off in one folder`,
-    );
+    if (configuredSet.has(name)) {
+      failures.push(
+        `${name} is off globally, so an override for ${override.files.join(", ")} changes nothing`,
+      );
+      continue;
+    }
+
+    const globs = configuredScoped.get(name) ?? new Set<string>();
+
+    for (const glob of override.files) {
+      globs.add(glob);
+    }
+
+    configuredScoped.set(name, globs);
   }
 }
+
+const documentedScoped = tableScopedRules(adr, scopedSection);
+
+failures.push(...formatScopedDifference("scoped overrides", documentedScoped, configuredScoped));
 
 const notAtError = Object.entries(printedLines.rules)
   .filter(
@@ -169,5 +268,5 @@ const enabled = Object.values(printedLines.rules).filter(
 ).length;
 
 process.stdout.write(
-  `lint configuration verified: ${String(enabled)} rules at error, ${String(configuredSet.size)} off, all off rules match ADR 0023\n`,
+  `lint configuration verified: ${String(enabled)} rules at error, ${String(configuredSet.size)} off, ${String(configuredScoped.size)} documented scoped overrides\n`,
 );

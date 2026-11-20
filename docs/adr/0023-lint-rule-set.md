@@ -32,7 +32,9 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
 - **Six unit test files only.** A Vitest file is allowed only beside the six invariants in ADR 0013 (ledger, crypto,
   planner, address, tag rules, question normalisation), by an explicit path allowlist. Any other unit test file is an
   error. Every other test is a Playwright end-to-end test.
-- **The off-list is checked.** CI fails if the rules turned off in the configuration differ from the table below.
+- **The off-list and every scoped override are checked.** CI fails if the rules turned off in the configuration
+  differ from the table below, if an override turns a rule down or changes its options without appearing in the
+  "Rules off in one folder only" table, or if that table lists an override that does not exist.
 
 ## Rules turned off, and why
 
@@ -59,13 +61,17 @@ below so that CI can check the configuration against this file.
 
 ## Rules off in one folder only
 
+Every override that turns a rule down or changes its options is listed here, with the exact files it covers; CI
+compares this table with `.oxlintrc.json`.
+
 | Rule | Where | Reason |
 |---|---|---|
-| `react/jsx-props-no-spreading`, `react/no-multi-comp` | `src/web/components/ui/**` | shadcn/ui components pass props through and ship several components in one file |
+| `import/no-default-export` | `**/*.config.{ts,mts,mjs,js}`, `test/e2e/global-setup.ts`, `tools/oxlint/architecture/index.ts` | Vite, Vitest, Playwright and Drizzle config files, Playwright's global setup hook and the Oxc plugin registration all require a default export |
+| `node/no-process-env` | `src/server/config/env.ts`, `drizzle.config.ts`, `test/e2e/**` | `src/server/config/env.ts` is the one module that reads the process environment inside the app; the Drizzle CLI config and the e2e harness read it from outside the app |
 
 Two React options are set rather than turned off: `react/jsx-filename-extension` allows `.tsx`, and
 `react/jsx-max-depth` allows six levels, because a real screen nests deeper than the default of two. Both stay at
-error.
+error and both live in the global rules, so the scoped table does not cover them.
 
 ## Inherited off-list
 

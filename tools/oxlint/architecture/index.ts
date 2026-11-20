@@ -10,16 +10,18 @@ const disableDirectivePatterns = [
   /^@ts-nocheck(?:\s|$)/u,
 ];
 
-function isDisableDirective(comment: { value: string }): boolean {
+function isDisableDirective(comment: { value: string }) {
   const value = comment.value
     .replace(/^!/u, "")
     .replaceAll(/^\s*\*\s?/gmu, "")
     .trim();
+
   return disableDirectivePatterns.some((pattern) => pattern.test(value));
 }
 
-function matchesAnyPath(filename: string, paths: string[]): boolean {
+function matchesAnyPath(filename: string, paths: string[]) {
   const normalized = filename.replaceAll("\\", "/");
+
   return paths.some((path) => normalized.endsWith(`/${path}`));
 }
 
@@ -30,6 +32,13 @@ const allowPathsSchema = z
     }),
   ])
   .or(z.tuple([]));
+
+const unlistedUnitTestSchema = z.tuple([
+  z.object({
+    e2eRoot: z.string().min(1),
+    allow: z.array(z.string().min(1)).optional(),
+  }),
+]);
 
 const noDisableDirectives = defineRule({
   meta: {
@@ -46,6 +55,7 @@ const noDisableDirectives = defineRule({
   },
   create(context) {
     const source = context.sourceCode;
+
     return {
       "Program:exit"() {
         for (const comment of source.getAllComments()) {
@@ -81,7 +91,11 @@ const noDateNow = defineRule({
     const [options] = allowPathsSchema.parse(context.options);
     const allow = options?.allow ?? [];
     const filename = context.physicalFilename.replaceAll("\\", "/");
-    if (matchesAnyPath(filename, allow)) return {};
+
+    if (matchesAnyPath(filename, allow)) {
+      return {};
+    }
+
     return {
       MemberExpression(node) {
         if (
@@ -121,7 +135,11 @@ const noMathRandom = defineRule({
     const [options] = allowPathsSchema.parse(context.options);
     const allow = options?.allow ?? [];
     const filename = context.physicalFilename.replaceAll("\\", "/");
-    if (matchesAnyPath(filename, allow)) return {};
+
+    if (matchesAnyPath(filename, allow)) {
+      return {};
+    }
+
     return {
       MemberExpression(node) {
         if (
@@ -161,13 +179,22 @@ const noUnlistedUnitTest = defineRule({
     },
   },
   create(context) {
-    const [options] = context.options;
-    const e2eRoot = options?.e2eRoot ?? "tests/e2e";
-    const allow = options?.allow ?? [];
+    const [options] = unlistedUnitTestSchema.parse(context.options);
+    const allow = options.allow ?? [];
     const filename = context.physicalFilename.replaceAll("\\", "/");
-    if (!/\.test\.(?:ts|tsx)$/u.test(filename)) return {};
-    if (filename.includes(`/${e2eRoot}/`)) return {};
-    if (matchesAnyPath(filename, allow)) return {};
+
+    if (!/\.test\.(?:ts|tsx)$/u.test(filename)) {
+      return {};
+    }
+
+    if (filename.includes(`/${options.e2eRoot}/`)) {
+      return {};
+    }
+
+    if (matchesAnyPath(filename, allow)) {
+      return {};
+    }
+
     return {
       Program(node) {
         context.report({ node, messageId: "forbidden" });

@@ -15,8 +15,7 @@
     ".pi/**",
     ".roo/**",
     ".windsurf/**",
-    "tools/oxlint/anti-slop/**",
-    "tools/oxlint/architecture/**"
+    "tools/oxlint/anti-slop/**"
   ],
   "plugins": [
     "eslint",
@@ -491,103 +490,23 @@
   },
   "overrides": [
     {
-      "files": ["**/*.{ts,tsx,mts,cts}"],
-      "rules": {
-        "eslint/no-useless-return": "off"
-      }
-    },
-    {
-      "files": ["**/*.config.{ts,mts,mjs,js}"],
+      "files": [
+        "**/*.config.{ts,mts,mjs,js}",
+        "test/e2e/global-setup.ts",
+        "tools/oxlint/architecture/index.ts"
+      ],
       "rules": {
         "import/no-default-export": "off"
       }
     },
     {
-      "files": ["**/*.d.ts"],
-      "rules": {
-        "import/unambiguous": "off"
-      }
-    },
-    {
-      "files": [
-        "**/keys.ts",
-        "**/env.ts",
-        "**/config/env.ts",
-        "**/*.config.{ts,mts,mjs,js}",
-        "**/*.test.*",
-        "**/*.fixture.*",
-        "**/*.test-utils.*",
-        "**/test/**"
-      ],
+      "files": ["src/server/config/env.ts", "drizzle.config.ts", "test/e2e/**"],
       "rules": {
         "node/no-process-env": "off"
       }
-    },
-    {
-      "files": ["src/web/components/ui/**"],
-      "rules": {
-        "react/jsx-props-no-spreading": "off",
-        "react/no-multi-comp": "off"
-      }
-    },
-    {
-      "files": ["src/server/platform/ports/**"],
-      "rules": {
-        "eslint/no-restricted-imports": "off"
-      }
-    },
-    {
-      "files": ["**/*.test.ts", "**/*.test.tsx"],
-      "rules": {
-        "vitest/require-hook": "error"
-      }
-    },
-    {
-      "files": [
-        "**/*.test.ts",
-        "**/*.test.tsx",
-        "**/*.e2e.ts",
-        "**/*.fixture.ts",
-        "**/*.fixture.tsx",
-        "**/*.test-utils.ts",
-        "**/*.test-utils.tsx"
-      ],
-      "rules": {
-        "typescript/no-unsafe-type-assertion": "off"
-      }
-    },
-    {
-      "files": [
-        "**/*.test.ts",
-        "**/*.test.tsx",
-        "**/*.e2e.ts",
-        "**/*.fixture.ts",
-        "**/*.fixture.tsx",
-        "**/*.test-utils.ts",
-        "**/*.test-utils.tsx",
-        "**/test/**"
-      ],
-      "rules": {
-        "unicorn/consistent-function-scoping": [
-          "error",
-          {
-            "checkArrowFunctions": false
-          }
-        ]
-      }
-    },
-    {
-      "files": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
-      "rules": {
-        "eslint/no-undef": "off",
-        "typescript/consistent-return": "off"
-      }
-    },
-    {
-      "files": ["test/e2e/global-setup.ts"],
-      "rules": {
-        "import/no-default-export": "off"
-      }
     }
-  ]
+  ],
+  "globals": {
+    "Bun": "readonly"
+  }
 }
