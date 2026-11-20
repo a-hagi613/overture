@@ -251,7 +251,7 @@ function drillFly() {
       "10m",
     ]);
 
-    runOrThrow([
+    const check = runOrThrow([
       "flyctl",
       "ssh",
       "console",
@@ -262,6 +262,8 @@ function drillFly() {
       "--command",
       "bun run scripts/check-restored-db.ts /data/app.sqlite http://127.0.0.1:3000/api/health",
     ]);
+
+    process.stdout.write(check.output);
   } finally {
     if (drillId !== undefined) {
       run(["flyctl", "machines", "destroy", drillId, "-a", flyAppName, "--force"]);
