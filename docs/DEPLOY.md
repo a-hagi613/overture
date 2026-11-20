@@ -35,7 +35,14 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    Object Read & Write scoped to that bucket. Note the account ID, access key ID and secret access key.
 5. Set only the backup and app secrets on the app (values come from the previous step, never the repo):
    `fly secrets set R2_ACCOUNT_ID=… R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… R2_BUCKET_BACKUPS=overture-backups -a overture-web`
-   Later milestones add their own secrets the same way; nothing else exists in `fly.toml`.
+   Sign-in (M1-06) adds `BETTER_AUTH_SECRET` (at least 16 random characters), `OWNER_EMAIL`,
+   `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` (a Turnstile widget for `tryoverture.com`), and the OAuth
+   clients `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`
+   (redirect URIs `https://tryoverture.com/api/auth/oauth2/callback/google` and `…/oauth2/callback/linkedin`).
+   The server refuses to boot without any of them, so the **Deploy** workflow checks every name with
+   `fly secrets list` first and fails before deploying when one is missing; production keeps its
+   current release. Later milestones add their own secrets the same way and to that list; nothing
+   else exists in `fly.toml`.
 6. Create a deploy token (Full permissions on the app) and store it as a repository secret:
    `gh secret set FLY_API_TOKEN -b <token-in-your-terminal> -R a-hagi613/overture`
 7. Point DNS at the app in Cloudflare: `tryoverture.com` (proxied) → `overture-web.fly.dev`, then
