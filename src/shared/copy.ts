@@ -81,6 +81,9 @@ export const copy = {
     sampleLabel: "Sample data",
     story: {
       pill: "Personal job-search agent",
+      backdropMonogram: "L",
+      backdropRole: "Halden Systems · Senior Backend Engineer",
+      backdropQueue: "Queued · sends about 14:10",
       heading: "The job hunt,",
       headingItalic: "handled.",
       deck: "Finds fresh roles from employers' job feeds, answers forms from the facts you saved, and asks you only when it cannot answer for itself.",

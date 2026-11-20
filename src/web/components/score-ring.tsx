@@ -25,7 +25,7 @@ export function ScoreRing() {
         />
         <circle cx="24" cy="4" r="2.6" fill="var(--color-signal)" />
       </svg>
-      <span className="relative font-serif text-xl italic tabular-nums">
+      <span className="relative font-serif text-xl leading-none tabular-nums">
         {copy.signIn.story.score}
       </span>
     </div>

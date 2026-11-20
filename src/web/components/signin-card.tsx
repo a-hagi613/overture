@@ -183,7 +183,7 @@ export function SignInCard() {
             </div>
           </div>
           <button
-            className="inline-flex min-h-[46px] w-full items-center justify-center rounded-[7px] border border-input bg-card px-[18px] text-[13.5px] font-semibold shadow-[0_1px_0_rgba(21,19,17,0.04)] [line-height:normal] hover:bg-muted"
+            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-[7px] border border-input bg-card px-[18px] text-[13.5px] font-semibold shadow-[0_1px_0_rgba(21,19,17,0.04)] [line-height:normal] max-[960px]:min-h-[46px] hover:bg-muted"
             onClick={() => {
               void onMagic();
             }}
@@ -220,7 +220,7 @@ export function SignInCard() {
             {copy.signIn.google}
           </button>
           <button
-            className="mt-2.5 inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-[7px] border border-input bg-card px-[18px] text-[13.5px] font-semibold shadow-[0_1px_0_rgba(21,19,17,0.04)] [line-height:normal] hover:bg-muted"
+            className="mt-2.5 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[7px] border border-input bg-card px-[18px] text-[13.5px] font-semibold shadow-[0_1px_0_rgba(21,19,17,0.04)] [line-height:normal] max-[960px]:min-h-[46px] hover:bg-muted"
             onClick={() => {
               void onSocial("linkedin");
             }}
@@ -266,7 +266,7 @@ export function SignInCard() {
               />
             </div>
             <button
-              className="inline-flex min-h-[46px] w-full items-center justify-center rounded-[7px] border border-input bg-card px-[18px] text-[13.5px] font-semibold shadow-[0_1px_0_rgba(21,19,17,0.04)] [line-height:normal] hover:bg-muted"
+              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-[7px] border border-input bg-card px-[18px] text-[13.5px] font-semibold shadow-[0_1px_0_rgba(21,19,17,0.04)] [line-height:normal] max-[960px]:min-h-[46px] hover:bg-muted"
               type="submit"
             >
               {copy.signIn.magicSubmit}
