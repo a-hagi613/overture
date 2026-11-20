@@ -31,10 +31,6 @@ export function createProfileRoutes(deps: {
   objects: ObjectStore;
   llm: LlmPort;
 }) {
-  if (env.MASTER_KEY_V1 === undefined) {
-    throw new Error("MASTER_KEY_V1 is not set.");
-  }
-
   const { db, clock, auth, objects, llm } = deps;
 
   const personal = createPersonalCrypto(
