@@ -177,7 +177,56 @@ test("a dry run over the five recorded postings prints one run summary line per 
     }
 
     expect(summary).toContain(
-      "dry run: every form was filled and the run stopped before submit; nothing was sent",
+      "dry run: 0 of 5 forms were filled and the run stopped before submit; nothing was sent",
+    );
+
+    for (const record of runFileTemplate.postings) {
+      expect(summary).toContain(
+        `not filled: ${record.company} — ${record.title} (board ${record.board}, job ${record.jobId}): error:`,
+      );
+    }
+  });
+});
+
+test("a dry run where one posting is unreachable prints the filled count, the total and that posting's board and job id", async () => {
+  await withHarness(async (harness) => {
+    const output = outputProperties(harness.output);
+
+    const unreachable = {
+      ...posting("curaleaf", "8936939002"),
+      url: "http://127.0.0.1:9/curaleaf/jobs/8936939002",
+    };
+
+    const results = await runProbe(
+      command(harness, false, {
+        runFile: {
+          country: runFileTemplate.country,
+          resumePath: harness.resumePath,
+          postings: [posting("blankstreet", "8004209003"), unreachable],
+        },
+      }),
+    );
+
+    const [filled, failed] = results;
+
+    if (filled === undefined || failed === undefined) {
+      throw new Error("the probe produced no result for either posting");
+    }
+
+    expect(filled.outcome).toBe("dry_run_filled");
+    expect(failed.outcome.startsWith("error:")).toBe(true);
+
+    expect(harness.browserUse.sessionCount).toBe(2);
+    expect(harness.browserUse.stoppedSessionIds).toHaveLength(2);
+    expect(harness.fixture.state.submissions).toBe(0);
+
+    const summary = output.text();
+
+    expect(summary).toContain(
+      "dry run: 1 of 2 forms were filled and the run stopped before submit; nothing was sent",
+    );
+    expect(summary).toContain(
+      "not filled: Curaleaf — Cultivation Associate (board curaleaf, job 8936939002): error:",
     );
   });
 });
