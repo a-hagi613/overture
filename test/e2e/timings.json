@@ -1,20 +1,20 @@
 {
   "version": 1,
   "seconds": {
-    "test/e2e/admin-visual.test.ts": 22.8,
+    "test/e2e/admin-visual.test.ts": 10.5,
     "test/e2e/catalog-dedupe.test.ts": 8.4,
     "test/e2e/catalog-sweep-claim.test.ts": 12.8,
     "test/e2e/job-survives-restart.test.ts": 1.8,
     "test/e2e/shell.test.ts": 5.5,
     "test/e2e/admin-passkey.test.ts": 3.3,
-    "test/e2e/catalog-backfill.test.ts": 18.8,
+    "test/e2e/catalog-backfill.test.ts": 15.7,
     "test/e2e/catalog-search.test.ts": 0.3,
-    "test/e2e/graceful-stop-requeue.test.ts": 3.5,
+    "test/e2e/graceful-stop-requeue.test.ts": 3.7,
     "test/e2e/settings-and-kill-switches.test.ts": 0.1,
-    "test/e2e/admin-gates.test.ts": 1.6,
-    "test/e2e/catalog-search-filters.test.ts": 13.9,
+    "test/e2e/admin-gates.test.ts": 1.9,
+    "test/e2e/catalog-search-filters.test.ts": 4.3,
     "test/e2e/cloud-probe.test.ts": 84.7,
-    "test/e2e/reachability.test.ts": 2.9,
+    "test/e2e/reachability.test.ts": 0.9,
     "test/e2e/tag-llm-fallback.test.ts": 9.2,
     "test/e2e/board-match-signin.test.ts": 45.4,
     "test/e2e/admin-catalog.test.ts": 9.2,
@@ -28,7 +28,7 @@
     "test/e2e/census.test.ts": 2.5,
     "test/e2e/oauth-optional.test.ts": 5.6,
     "test/e2e/sse-live-and-replay.test.ts": 0.2,
-    "test/e2e/board-match-profile.test.ts": 11.5,
+    "test/e2e/board-match-profile.test.ts": 13.8,
     "test/e2e/backup-lag.test.ts": 32.8,
     "test/e2e/catalog-discovered-seed.test.ts": 2.4,
     "test/e2e/catalog-sweep-starve.test.ts": 7.2,
@@ -46,6 +46,9 @@
     "test/e2e/move-objects-to-r2.test.ts": 0.1,
     "test/e2e/catalog-feed-correctness.test.ts": 24.3,
     "test/e2e/matching-candidates.test.ts": 7.6,
-    "test/e2e/question-preparation.test.ts": 13.3
+    "test/e2e/question-preparation.test.ts": 13.3,
+    "test/e2e/ledger-immutability.test.ts": 1.4,
+    "test/e2e/settings-time-language-board.test.ts": 7.9,
+    "test/e2e/board-match-review.test.ts": 9.9
   }
 }
