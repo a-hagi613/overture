@@ -159,7 +159,7 @@ test("tier 1 facts are prefilled from the resume and confirmed on Profile", asyn
 });
 
 test("a scanned resume falls back to Haiku and the facts are prefilled", async ({
-  appServerUrl,
+  isolatedAppServer: { url: appServerUrl },
 }) => {
   const owner = await ownerContextFor(appServerUrl);
 

@@ -36,11 +36,11 @@ interface WorkerFixtures {
 function authEnv(identityServer: IdentityServer) {
   return {
     ...testAuthEnvironment,
-    OAUTH_GOOGLE_DISCOVERY_URL: `${identityServer.url}/.well-known/openid-configuration`,
-    OAUTH_LINKEDIN_DISCOVERY_URL: `${identityServer.url}/.well-known/openid-configuration`,
     AUTH_ALLOWED_HOSTS: "127.0.0.1,localhost",
     MASTER_KEY_V1: authTestIdentity.masterKey,
     MASTER_KEY_CURRENT: "1",
+    OAUTH_GOOGLE_DISCOVERY_URL: `${identityServer.url}/.well-known/openid-configuration`,
+    OAUTH_LINKEDIN_DISCOVERY_URL: `${identityServer.url}/.well-known/openid-configuration`,
   };
 }
 

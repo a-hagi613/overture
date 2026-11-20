@@ -16,7 +16,12 @@ export const authTestIdentity = {
   ownerName: "Maya Okafor",
   secret: "e2e-auth-secret-0123456789abcdef",
   turnstileSiteKey: "1x00000000000000000000AA",
+  turnstileSecret: "1x0000000000000000000000000000000AA",
   turnstilePassToken: "XXXX.DUMMY.TOKEN.XXXX",
+  googleClientId: "e2e-google-client-id",
+  googleClientSecret: "e2e-google-client-secret",
+  linkedInClientId: "e2e-linkedin-client-id",
+  linkedInClientSecret: "e2e-linkedin-client-secret",
   masterKey: Buffer.from("overture e2e master key v1".padEnd(32, "1"), "binary").toString("base64"),
 };
 
