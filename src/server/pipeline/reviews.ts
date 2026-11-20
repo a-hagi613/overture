@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
-import type { QuestionFieldType, ReviewCategory } from "../../shared/questions.ts";
+import type { QuestionFieldType, ReviewCategory, ReviewReason } from "../../shared/questions.ts";
 import type { PreparationService } from "./prepare.ts";
 
 import {
@@ -43,6 +43,7 @@ export interface ReviewView {
   factKey: string | null;
   scope: string;
   factLabel: string | null;
+  reason: ReviewReason;
   category: ReviewCategory;
   unlocked: number;
   companies: number;
@@ -60,6 +61,7 @@ function openReviewRows(db: AppDatabase, userId: string) {
       prompt: reviews.prompt,
       fieldType: reviews.fieldType,
       options: reviews.options,
+      reason: reviews.reason,
       createdAt: reviews.createdAt,
     })
     .from(reviews)
@@ -153,6 +155,7 @@ export function createReviewService(deps: {
         factKey: review.factKey,
         scope: review.scope,
         factLabel,
+        reason: review.reason,
         category: reviewCategory(review.prompt, review.factKey),
         unlocked: attachments.length,
         companies: companiesUnlocked.size,

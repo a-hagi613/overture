@@ -1,0 +1,1 @@
+ALTER TABLE `reviews` ADD `reason` text DEFAULT 'unknown_required' NOT NULL;

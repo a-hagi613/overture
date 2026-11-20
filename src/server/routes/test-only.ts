@@ -54,7 +54,7 @@ import { resetFeedContentHashes } from "../catalog/feed-retag.ts";
 import { normalizeApplyUrl, normalizeTitle } from "../catalog/normalize.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags } from "../catalog/tag-import.ts";
 import { readLlmUsage, recordLlmUsage } from "../platform/llm/usage.ts";
-import { QUESTION_FIELD_TYPES } from "../../shared/questions.ts";
+import { QUESTION_FIELD_TYPES, REVIEW_REASONS } from "../../shared/questions.ts";
 import { questionVariantHash } from "../catalog/question-normalize.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
@@ -256,6 +256,7 @@ const seedReviewBody = z.object({
     .regex(/^(?:|[A-Z]{2})$/u)
     .default(""),
   answerKind: z.enum(["fact", "open_text", "consent", "skip", "unknown"]).default("unknown"),
+  reason: z.enum(REVIEW_REASONS).default("unknown_required"),
   applicationIds: z.array(z.string().min(1)).min(1).max(50),
 });
 
@@ -811,6 +812,7 @@ export function createTestRoutes(
         prompt: body.prompt,
         fieldType: body.fieldType,
         options: JSON.stringify(body.options),
+        reason: body.reason,
         status: "open",
         createdAt: now,
         resolvedAt: null,

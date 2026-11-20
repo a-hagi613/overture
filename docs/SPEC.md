@@ -252,7 +252,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `application_answers` | id, application_id, question_id, user_id, kind CHECK IN ('open_text','cover_letter'), sentences_enc (JSON `[{sentence, resumeLineIds}]`, sealed), word_count, created_at, updated_at; UNIQUE(application_id,question_id). The generated, grounded open text and letter kept from preparation until the Snapshot takes them |
 | `application_events` | id, application_id, user_id, at, kind CHECK IN ('status','stage','email','checkin','note'), from_value, to_value, source CHECK IN ('system','user','email','checkin','admin'), detail JSON; the card timeline and stage history |
 | `attempts` | id, application_id, user_id, n, provider, provider_session_id, started_at, lease_until, ended_at NULL, submit_clicked_at NULL, submit_response_status INTEGER NULL, outcome CHECK IN ('sent','unconfirmed','captcha_blocked','code_timeout','posting_closed','form_changed','blocked','upload_failed','duplicate','needs_review','provider_error','timeout','crash','interrupted') NULL, browser_ms, proxy_bytes, captcha_seen, code_used, cost_micros, error_code NULL |
-| `reviews` | id, user_id, question_id, fact_key NULL, scope ('' or an ISO 3166-1 alpha-2 country), prompt, field_type, options JSON, status CHECK IN ('open','answered','dismissed'), created_at, resolved_at; UNIQUE(user_id,question_id,scope) WHERE status='open' |
+| `reviews` | id, user_id, question_id, fact_key NULL, scope ('' or an ISO 3166-1 alpha-2 country), prompt, field_type, options JSON, reason CHECK IN ('unknown_required','option_missing'), status CHECK IN ('open','answered','dismissed'), created_at, resolved_at; UNIQUE(user_id,question_id,scope) WHERE status='open' |
 | `review_applications` | review_id, application_id; PK(review_id,application_id) |
 | `checkins` | id, application_id UNIQUE, user_id, due_at, status CHECK IN ('open','answered','expired'), answer NULL, created_at |
 | `plan_cache` | id, ats, form_signature, plan JSON, hits, failures, updated_at; UNIQUE(ats,form_signature) |
@@ -517,7 +517,9 @@ Job `application.prepare`:
    `{fact_key | 'open_text' | 'consent' | 'skip' | 'unknown'}` from the fixed fact list. Result stored on `questions`.
    Posting text passes the posting guard (`docs/SALVAGE.md`) first and never decides a factual answer.
 3. Answer: `fact` → saved fact value (formatted to the field type/options; select options matched by normalised
-   text, then synonyms table, else unknown). A `work_auth` or `sponsorship_required` answer is country-scoped
+   text, then the explicit synonym tables for work-authorisation types, countries, degrees, notice periods and
+   salary periods, else an `option_missing` Review; never a fuzzy or model pick). A `work_auth` or
+   `sponsorship_required` answer is country-scoped
    (§7.1): the question's country decides which Fact may answer it, and another country's Fact never does.
    `open_text` → Haiku from resume text + guarded posting (≤ 120 words unless the field states a limit), returned as
    `[{sentence, resume_line_ids}]` with the same rule as cover letters: a sentence that makes a factual claim
@@ -549,7 +551,9 @@ Job `application.prepare`:
 - One open Review per (user, question, country scope). A country-scoped Review saves its answer to that country's
   Fact, so answering "authorised to work in Canada" never answers a question about the UK. Each lists the
   applications it blocks ("unlocks 4 jobs"), grouped by that count and filterable by the question's topic
-  (availability, experience, work authorisation, links, languages, identity, EEO, other).
+  (availability, experience, work authorisation, links, languages, identity, EEO, other). It records why it opened:
+  `unknown_required` when the Fact is missing and `option_missing` when a Fact value has no exact or tabulated
+  option in the field's list.
 - Answering saves the fact (Tier 3 `q:<id>` or the mapped fact key), re-runs `application.prepare` on every attached
   application, and closes the Review. Dismiss → attached applications `skipped` (`review_dismissed`).
 - A posting that closes while waiting detaches; a Review with no attachments auto-dismisses.

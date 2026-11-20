@@ -8,7 +8,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { FactRecord } from "../profile/facts.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
-import type { AnswerKind, QuestionFieldType } from "../../shared/questions.ts";
+import type { AnswerKind, QuestionFieldType, ReviewReason } from "../../shared/questions.ts";
 import type { QuestionSource } from "../catalog/greenhouse-questions.ts";
 import type { GroundedAnswer } from "./open-text.ts";
 
@@ -233,22 +233,36 @@ function splitName(value: string) {
   return { first: parts.at(0) ?? "", last: parts.at(-1) ?? "" };
 }
 
+interface FormattedValue {
+  value: string | null;
+  reason: ReviewReason | null;
+}
+
+const formatted: (value: string | null) => FormattedValue = (value) => ({
+  value,
+  reason: null,
+});
+
+const OPTION_MISSING_VALUE: FormattedValue = { value: null, reason: "option_missing" };
+
 function formatSelectValue(value: string, options: readonly string[]) {
   if (options.length === 0) {
     const folded = value.trim().toLowerCase();
 
     if (AFFIRMATIVE_FACT_VALUES.has(folded)) {
-      return AFFIRMATIVE_OPTION;
+      return formatted(AFFIRMATIVE_OPTION);
     }
 
     if (NEGATIVE_FACT_VALUES.has(folded)) {
-      return NEGATIVE_OPTION;
+      return formatted(NEGATIVE_OPTION);
     }
 
-    return null;
+    return formatted(null);
   }
 
-  return matchOption(value, options);
+  const match = matchOption(value, options);
+
+  return match.matched ? formatted(match.option) : OPTION_MISSING_VALUE;
 }
 
 function formatMultiselectValue(value: string, options: readonly string[]) {
@@ -257,9 +271,14 @@ function formatMultiselectValue(value: string, options: readonly string[]) {
     .map((part) => part.trim())
     .filter((part) => part !== "");
 
-  const matched = parts.map((part) => matchOption(part, options));
+  const matches = parts.map((part) => matchOption(part, options));
+  const matched = matches.filter((match) => match.matched);
 
-  return matched.every((option) => option !== null) ? matched.join(", ") : null;
+  if (matched.length !== matches.length) {
+    return OPTION_MISSING_VALUE;
+  }
+
+  return formatted(matched.map((match) => match.option).join(", "));
 }
 
 function formatFactValue(input: {
@@ -271,7 +290,7 @@ function formatFactValue(input: {
   const value = input.value.trim();
 
   if (value === "") {
-    return null;
+    return formatted(null);
   }
 
   const normalizedQuestion = normalizeQuestionText(input.questionText);
@@ -289,35 +308,35 @@ function formatFactValue(input: {
   }
 
   if (input.fieldType === "email") {
-    return value.includes("@") ? value : null;
+    return formatted(value.includes("@") ? value : null);
   }
 
   if (input.fieldType === "phone") {
     const digits = value.replaceAll(/[^0-9]/gu, "");
 
-    return digits.length >= 7 ? value : null;
+    return formatted(digits.length >= 7 ? value : null);
   }
 
   if (input.fieldType === "url") {
-    return URL.canParse(value) || /^[a-z][a-z0-9+.-]*:/iu.test(value) ? value : null;
+    return formatted(URL.canParse(value) || /^[a-z][a-z0-9+.-]*:/iu.test(value) ? value : null);
   }
 
   if (input.fieldType === "number") {
     const number = /[0-9]+(?:\.[0-9]+)?/u.exec(value);
 
-    return number?.[0] ?? null;
+    return formatted(number?.[0] ?? null);
   }
 
   if (input.fieldType === "date") {
     const parsed = new Date(value);
 
-    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+    return formatted(Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10));
   }
 
   if (normalizedQuestion === "first name" || normalizedQuestion === "given name") {
     const name = splitName(value).first;
 
-    return name === "" ? null : name;
+    return formatted(name === "" ? null : name);
   }
 
   if (
@@ -327,10 +346,10 @@ function formatFactValue(input: {
   ) {
     const name = splitName(value).last;
 
-    return name === "" ? null : name;
+    return formatted(name === "" ? null : name);
   }
 
-  return value;
+  return formatted(value);
 }
 
 const resolveQuestion: (input: ResolveInput) => Resolution = resolveQuestionValue;
@@ -349,6 +368,7 @@ interface Resolution {
   kind: ResolutionKind;
   answer: string | null;
   scope: string;
+  reason: ReviewReason | null;
 }
 
 function consentAnswer(questionText: string, options: readonly string[]) {
@@ -367,14 +387,14 @@ function consentAnswer(questionText: string, options: readonly string[]) {
   return affirmativeOption(options) ?? (options.length === 0 ? AFFIRMATIVE_OPTION : null);
 }
 
-const SKIPPED_FORM: Resolution = { kind: "skip", answer: null, scope: "" };
+const SKIPPED_FORM: Resolution = { kind: "skip", answer: null, scope: "", reason: null };
 
-function reviewFor(scope: string) {
-  return { kind: "needs_review", answer: null, scope } satisfies Resolution;
+function reviewFor(scope: string, reason: ReviewReason = "unknown_required") {
+  return { kind: "needs_review", answer: null, scope, reason } satisfies Resolution;
 }
 
 function ready(answer: string | null, scope = "") {
-  return { kind: "ready", answer, scope } satisfies Resolution;
+  return { kind: "ready", answer, scope, reason: null } satisfies Resolution;
 }
 
 function resolveQuestionValue(input: ResolveInput) {
@@ -420,18 +440,20 @@ function resolveQuestionValue(input: ResolveInput) {
       value: lookup.value,
     });
 
-    if (scopedAnswer !== null) {
-      return ready(scopedAnswer, lookup.scope);
+    if (scopedAnswer.value !== null) {
+      return ready(scopedAnswer.value, lookup.scope);
     }
 
-    return required ? reviewFor(lookup.scope) : ready(null);
+    return required
+      ? reviewFor(lookup.scope, scopedAnswer.reason ?? "unknown_required")
+      : ready(null);
   }
 
   const value = input.facts.unscoped.get(input.factKey);
 
   const answer =
     value === undefined
-      ? null
+      ? formatted(null)
       : formatFactValue({
           questionText: input.questionText,
           fieldType: input.fieldType,
@@ -439,11 +461,15 @@ function resolveQuestionValue(input: ResolveInput) {
           value,
         });
 
-  if (answer !== null) {
-    return ready(answer);
+  if (answer.value !== null) {
+    return ready(answer.value);
   }
 
-  return required ? reviewFor("") : ready(null);
+  if (!required) {
+    return ready(null);
+  }
+
+  return reviewFor("", answer.reason ?? "unknown_required");
 }
 
 export function createPreparationService(deps: {
@@ -630,6 +656,7 @@ export function createPreparationService(deps: {
       fieldType: QuestionFieldType;
       options: string[];
       scope: string;
+      reason: ReviewReason;
     }[];
   }) {
     const blockedKeys = new Set(
@@ -652,6 +679,7 @@ export function createPreparationService(deps: {
         fieldType: entry.fieldType,
         options: entry.options,
         scope: entry.scope,
+        reason: entry.reason,
       });
 
       attachApplication(db, reviewId, input.applicationId);
@@ -713,6 +741,7 @@ export function createPreparationService(deps: {
       fieldType: QuestionFieldType;
       options: string[];
       scope: string;
+      reason: ReviewReason;
     }[] = [];
 
     const openTextQuestions: {
@@ -763,6 +792,7 @@ export function createPreparationService(deps: {
           fieldType: question.fieldType,
           options,
           scope: resolution.scope,
+          reason: resolution.reason ?? "unknown_required",
         });
       }
     }
@@ -1031,6 +1061,7 @@ export function createPreparationService(deps: {
             required: question.required,
             resolved: saved !== null,
             answer: saved === null ? null : saved.map((sentence) => sentence.sentence).join(" "),
+            reason: null,
             sentences: saved ?? [],
             scope: "",
           };
@@ -1057,6 +1088,7 @@ export function createPreparationService(deps: {
           required: question.required,
           resolved: resolution.kind === "ready",
           answer: resolution.answer,
+          reason: resolution.reason,
           sentences: [],
           scope: resolution.scope,
         };

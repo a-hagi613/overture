@@ -55,6 +55,7 @@ const reviewRowSchema = z.object({
   questionId: z.string(),
   prompt: z.string(),
   scope: z.string(),
+  reason: z.string(),
   status: z.string(),
 });
 
@@ -1099,4 +1100,88 @@ test("a question naming no country opens a Review when scoped Facts disagree", a
   );
 
   expect(review?.scope).toBe("");
+});
+
+test("a recorded five-option work-authorisation select resolves from the scoped Fact", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await saveFacts(owner, [
+    { key: "legal_name", value: "Maya Okafor" },
+    { key: "email", value: "maya.okafor@mail.overture.test" },
+    { key: "phone", value: "+1 416 555 0199" },
+    { key: "current_country", value: "UK" },
+    { key: "work_auth", scope: "GB", value: "Citizen" },
+    { key: "sponsorship_required", scope: "GB", value: "No" },
+  ]);
+
+  const postingId = await seedRecordedPosting(owner, {
+    atsJobId: "5999792004",
+    boardToken: "vercel",
+    companyName: "Vercel",
+    domain: "vercel.example",
+    title: "Senior Frontend Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const answers = await answersFor(owner, applicationId);
+
+  expect(
+    answers.find((answer) => answer.text === "Are you authorized to work in the UK?"),
+  ).toMatchObject({
+    resolved: true,
+    answer: "I am authorized to work in the country due to my nationality",
+    scope: "GB",
+  });
+
+  expect(
+    answers.find((answer) =>
+      answer.text.startsWith("Are you currently based in any of these countries"),
+    ),
+  ).toMatchObject({ resolved: true, answer: "United Kingdom" });
+});
+
+test("a scoped Fact with no matching option opens a Review with the option_missing reason", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await saveFacts(owner, [
+    { key: "legal_name", value: "Maya Okafor" },
+    { key: "email", value: "maya.okafor@mail.overture.test" },
+    { key: "phone", value: "+1 416 555 0199" },
+    { key: "current_country", value: "UK" },
+    { key: "work_auth", scope: "GB", value: "Permanent resident" },
+    { key: "sponsorship_required", scope: "GB", value: "No" },
+  ]);
+
+  const postingId = await seedRecordedPosting(owner, {
+    atsJobId: "5999792004",
+    boardToken: "vercel",
+    companyName: "Vercel",
+    domain: "vercel.example",
+    title: "Senior Frontend Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const review = (await reviewsFor(owner, userId)).reviews.find((candidate) =>
+    candidate.prompt.startsWith("Are you authorized to work in the UK?"),
+  );
+
+  expect(review).toMatchObject({ status: "open", reason: "option_missing", scope: "GB" });
 });

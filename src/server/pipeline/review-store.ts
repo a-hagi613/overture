@@ -2,7 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
-import type { QuestionFieldType } from "../../shared/questions.ts";
+import type { QuestionFieldType, ReviewReason } from "../../shared/questions.ts";
 
 import { reviewApplications, reviews } from "../platform/db/schema.ts";
 
@@ -14,11 +14,12 @@ export interface OpenReviewInput {
   fieldType: QuestionFieldType;
   options: string[];
   scope: string;
+  reason: ReviewReason;
 }
 
 export function ensureOpenReview(db: AppDatabase, clock: Clock, input: OpenReviewInput) {
   const existing = db
-    .select({ id: reviews.id })
+    .select({ id: reviews.id, reason: reviews.reason })
     .from(reviews)
     .where(
       and(
@@ -31,6 +32,10 @@ export function ensureOpenReview(db: AppDatabase, clock: Clock, input: OpenRevie
     .get();
 
   if (existing !== undefined) {
+    if (existing.reason !== input.reason) {
+      db.update(reviews).set({ reason: input.reason }).where(eq(reviews.id, existing.id)).run();
+    }
+
     return existing.id;
   }
 
@@ -46,6 +51,7 @@ export function ensureOpenReview(db: AppDatabase, clock: Clock, input: OpenRevie
       prompt: input.prompt,
       fieldType: input.fieldType,
       options: JSON.stringify(input.options),
+      reason: input.reason,
       status: "open",
       createdAt: clock.now(),
       resolvedAt: null,
