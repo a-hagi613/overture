@@ -4,9 +4,12 @@ import { Link, Outlet, useNavigate } from "react-router";
 import { copy } from "../shared/copy.ts";
 import { NavGlyph } from "./components/nav-glyph.tsx";
 import { AvatarLink } from "./components/avatar-link.tsx";
+import { Backdrop } from "./components/backdrop.tsx";
 import { BrandMark } from "./components/brand-mark.tsx";
 import { SideNav } from "./components/side-nav.tsx";
 import { TabBar } from "./components/tab-bar.tsx";
+import { UsageCard } from "./components/usage.tsx";
+import { UsageMini } from "./components/usage-mini.tsx";
 import { authClient } from "./lib/auth-client.ts";
 
 const collapsedStorageKey = "overture.rail";
@@ -46,9 +49,10 @@ export function AppShell() {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-wrap bg-background text-foreground">
+    <div className="relative flex min-h-screen flex-col bg-background text-foreground md:flex-row">
+      <Backdrop />
       <aside
-        className={`hidden border-r border-border bg-sidebar px-4 pb-[18px] pt-[22px] md:flex md:flex-col md:gap-[18px] ${columnWidths}`}
+        className={`hidden border-r border-border bg-sidebar px-4 pb-[18px] pt-[22px] md:flex md:flex-col md:items-center md:gap-[18px] lg:items-stretch ${columnWidths}`}
       >
         <div className={`flex items-center justify-between px-1.5 ${wide ? "" : "justify-center"}`}>
           <Link aria-label={copy.brand.homeAria} className="flex items-center gap-2.5" to="/">
@@ -72,7 +76,8 @@ export function AppShell() {
         </div>
         <hr className="m-0 border-border shadow-[0_1px_0_var(--color-bloom)]" />
         <SideNav showLabels={wide} />
-        <div className="mt-auto">
+        <div className="mt-auto flex flex-col gap-3.5">
+          {wide ? <UsageCard /> : <UsageMini />}
           <AvatarLink name={name} wide={wide} />
         </div>
       </aside>

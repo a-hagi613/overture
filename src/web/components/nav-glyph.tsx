@@ -1,5 +1,6 @@
 type GlyphName =
   | "back"
+  | "bell"
   | "board"
   | "home"
   | "inbox"
@@ -18,6 +19,10 @@ interface GlyphPaths {
 
 const glyphs: Record<GlyphName, GlyphPaths> = {
   back: { paths: ["M19 12H5", "M11 6l-6 6 6 6"], strokeWidth: 1.8 },
+  bell: {
+    paths: ["M6 16v-5a6 6 0 0112 0v5l1.5 2h-15z", "M10 20a2 2 0 004 0"],
+    strokeWidth: 1.6,
+  },
   home: { paths: ["M4 11l8-7 8 7", "M6 10v10h12V10"], strokeWidth: 1.6 },
   board: {
     paths: [

@@ -19,6 +19,7 @@ type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
 interface TestFixtures {
   appServerUrl: string;
   appServer: AppServer;
+  chromeOwnerStorage: StorageState;
   identityServer: IdentityServer;
   isolatedAppServer: AppServer;
   ownerStorageState: StorageState;
@@ -28,6 +29,7 @@ interface WorkerFixtures {
   _appServerWorker: AppServer;
   _identityServerWorker: IdentityServer;
   _ownerStorageStateWorker: StorageState;
+  _chromeOwnerStorageWorker: StorageState;
 }
 
 function authEnv(identityServer: IdentityServer) {
@@ -55,7 +57,29 @@ async function startFreshAppServer(identityServer: IdentityServer) {
   return startAppServer(databasePath, authEnv(identityServer));
 }
 
+export { startFreshAppServer };
+
 export const test = base.extend<TestFixtures, WorkerFixtures>({
+  _chromeOwnerStorageWorker: [
+    async ({ _appServerWorker }, provide) => {
+      const request = await apiRequest.newContext();
+
+      await requestMagicLink(_appServerWorker.url, request, authTestIdentity.ownerEmail);
+
+      const link = await latestMailLink(_appServerWorker.url, request, authTestIdentity.ownerEmail);
+
+      await request.get(link);
+      await request.post(`${_appServerWorker.url}/__test__/user/name`, {
+        data: { email: authTestIdentity.ownerEmail, name: authTestIdentity.ownerName },
+      });
+
+      const storage = await request.storageState();
+
+      await request.dispose();
+      await provide(storage);
+    },
+    { scope: "worker" },
+  ],
   _identityServerWorker: [
     async ({ browser: _browser }, provide) => {
       const server = await startIdentityServer();
@@ -79,6 +103,9 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   },
   appServerUrl: async ({ _appServerWorker }, provide) => {
     await provide(_appServerWorker.url);
+  },
+  chromeOwnerStorage: async ({ _chromeOwnerStorageWorker }, provide) => {
+    await provide(_chromeOwnerStorageWorker);
   },
   identityServer: async ({ _identityServerWorker }, provide) => {
     await provide(_identityServerWorker);

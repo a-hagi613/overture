@@ -1,4 +1,4 @@
-const ownerEmail = "owner@example.com";
+const ownerEmail = "maya.okafor@example.com";
 
 export const authTestIdentity = {
   ownerEmail,

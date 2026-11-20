@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
+import { Backdrop } from "../components/backdrop.tsx";
 import { BrandMark } from "../components/brand-mark.tsx";
 import { NavGlyph } from "../components/nav-glyph.tsx";
 import { SignInCard } from "../components/signin-card.tsx";
@@ -12,6 +13,7 @@ export function SignInPage() {
 
   return (
     <div className="relative flex min-h-screen flex-wrap bg-background text-foreground">
+      <Backdrop />
       <SignInStory />
       <main className="relative flex min-h-[844px] w-full flex-1 flex-col justify-between gap-5 px-[max(18px,4vw)] pb-7 pt-[18px] min-[961px]:py-7">
         <div className="mx-auto flex w-full max-w-[560px] items-center justify-between gap-3">

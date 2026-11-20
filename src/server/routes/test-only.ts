@@ -80,6 +80,9 @@ const llmUsageQuery = z.object({
   purpose: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(1000).default(100),
 });
+const userNameBody = z.object({ email: z.email(), name: z.string().min(1) });
+
+const lowercased = (value: string) => value.trim().toLowerCase();
 
 export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handlers: JobHandlers) {
   const routes = new Hono();
@@ -299,6 +302,17 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
 
   routes.post("/mail/clear", (context) => {
     clearSinkMail();
+
+    return context.json({ ok: true });
+  });
+
+  routes.post("/user/name", zValidator("json", userNameBody), (context) => {
+    const { email, name } = context.req.valid("json");
+
+    db.update(users)
+      .set({ name })
+      .where(eq(users.email, lowercased(email)))
+      .run();
 
     return context.json({ ok: true });
   });

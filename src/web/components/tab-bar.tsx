@@ -6,8 +6,20 @@ import { NavGlyph } from "./nav-glyph.tsx";
 const destinations = [
   { glyph: "home", to: "/" },
   { glyph: "board", to: "/board" },
-  { glyph: "review", to: "/review" },
-  { glyph: "inbox", to: "/inbox" },
+  {
+    aria: copy.sample.reviewTabAria,
+    badge: copy.sample.reviewWaiting,
+    badgeTone: "need",
+    glyph: "review",
+    to: "/review",
+  },
+  {
+    aria: copy.sample.inboxTabAria,
+    badge: copy.sample.inboxUnread,
+    badgeTone: "well",
+    glyph: "inbox",
+    to: "/inbox",
+  },
   { glyph: "profile", to: "/profile" },
 ] as const;
 
@@ -19,6 +31,7 @@ export function TabBar() {
     >
       {destinations.map((destination) => (
         <NavLink
+          aria-label={"aria" in destination ? destination.aria : undefined}
           key={destination.to}
           to={destination.to}
           end={destination.to === "/"}
@@ -35,6 +48,17 @@ export function TabBar() {
               ) : null}
               <NavGlyph name={destination.glyph} size={21} />
               {copy.nav[destination.glyph]}
+              {"badge" in destination ? (
+                <span
+                  className={`absolute left-[calc(50%+6px)] top-[5px] flex h-4 min-w-4 items-center justify-center rounded-lg px-1 text-[10px] font-bold tabular-nums ${
+                    destination.badgeTone === "need"
+                      ? "bg-need-soft text-need"
+                      : "bg-muted text-foreground"
+                  }`}
+                >
+                  {destination.badge}
+                </span>
+              ) : null}
             </>
           )}
         </NavLink>
