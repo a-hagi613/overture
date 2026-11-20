@@ -6,9 +6,9 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { PersonalCrypto } from "./personal-crypto.ts";
 
 import { facts } from "../platform/db/schema.ts";
-import { TIER_1_FACT_KEYS } from "../../shared/facts.ts";
+import { FACT_KEYS } from "../../shared/facts.ts";
 
-const factKeySchema = z.enum(TIER_1_FACT_KEYS);
+const factKeySchema = z.enum(FACT_KEYS);
 
 export interface FactRecord {
   key: string;

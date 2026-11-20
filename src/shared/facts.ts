@@ -19,9 +19,31 @@ export const TIER_1_FACT_KEYS = [
   "languages",
 ] as const;
 
+export const TIER_2_FACT_KEYS = [
+  "preferred_name",
+  "github_url",
+  "website_url",
+  "skills",
+  "certifications",
+  "security_clearance",
+  "drivers_license",
+  "spoken_languages_levels",
+  "voice_sample",
+  "cover_letter_template",
+  "eeo_gender",
+  "eeo_race_ethnicity",
+  "eeo_hispanic_latino",
+  "eeo_veteran",
+  "eeo_disability",
+] as const;
+
+export const FACT_KEYS = [...TIER_1_FACT_KEYS, ...TIER_2_FACT_KEYS] as const;
+
 export type Tier1FactKey = (typeof TIER_1_FACT_KEYS)[number];
 
-export const factLabels: Record<Tier1FactKey, string> = {
+export type FactKey = (typeof FACT_KEYS)[number];
+
+export const factLabels: Record<FactKey, string> = {
   legal_name: "Legal name",
   email: "Job-search email",
   phone: "Phone",
@@ -40,6 +62,21 @@ export const factLabels: Record<Tier1FactKey, string> = {
   education_history: "Education",
   current_employer: "Current employer",
   languages: "Languages",
+  preferred_name: "Preferred name",
+  github_url: "GitHub",
+  website_url: "Website",
+  skills: "Skills",
+  certifications: "Certifications",
+  security_clearance: "Security clearance",
+  drivers_license: "Driver's licence",
+  spoken_languages_levels: "Spoken languages and levels",
+  voice_sample: "Voice sample",
+  cover_letter_template: "Cover-letter template",
+  eeo_gender: "Gender",
+  eeo_race_ethnicity: "Race and ethnicity",
+  eeo_hispanic_latino: "Hispanic or Latino",
+  eeo_veteran: "Veteran status",
+  eeo_disability: "Disability",
 };
 
 export const factSources = {

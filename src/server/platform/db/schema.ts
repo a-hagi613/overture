@@ -334,6 +334,45 @@ export const facts = sqliteTable(
   (t) => [uniqueIndex("facts_user_key_unique").on(t.userId, t.key)],
 );
 
+export const profiles = sqliteTable("profiles", {
+  userId: cascadeUserId().primaryKey(),
+  languages: text("languages").notNull().default("[]"),
+  timezone: text("timezone"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+});
+
+export const targets = sqliteTable("targets", {
+  userId: cascadeUserId().primaryKey(),
+  roles: text("roles").notNull(),
+  seniorities: text("seniorities").notNull(),
+  workplaces: text("workplaces").notNull(),
+  locations: text("locations").notNull(),
+  employmentTypes: text("employment_types").notNull(),
+  salaryFloorMinor: integer("salary_floor_minor"),
+  salaryCurrency: text("salary_currency"),
+  salaryPeriod: text("salary_period", { enum: ["year", "month", "hour"] })
+    .notNull()
+    .default("year"),
+  version: integer("version").notNull().default(1),
+  updatedAt: timestamp("updated_at").notNull(),
+});
+
+export const skipCompanies = sqliteTable(
+  "skip_companies",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    nameNorm: text("name_norm").notNull(),
+    domain: text("domain"),
+    reason: text("reason", { enum: ["current_employer", "user"] }).notNull(),
+    createdAt: timestamp("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("skip_companies_user_name_unique").on(t.userId, t.nameNorm)],
+);
+
 export const resumes = sqliteTable(
   "resumes",
   {
