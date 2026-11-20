@@ -1,4 +1,4 @@
-import type { Locator, Page } from "playwright-core";
+import type { Locator, Page, Response } from "playwright-core";
 
 import type { ProbeConsole } from "./console.ts";
 import type { RunFilePosting } from "./run-file.ts";
@@ -37,6 +37,11 @@ export interface GreenhouseAttempt {
 const messages = {
   uploadRefused: (id: string) => `the resume input ${id} refused the upload`,
 };
+
+const CONFIRMATION_URL_PATH = "/confirmation";
+const APPLICATION_URL_PATH = "/application";
+
+const acceptedStatus = (status: number | null) => status !== null && status >= 200 && status < 300;
 
 const cssValue = (raw: string) => raw.replaceAll(/["\\]/gu, String.raw`\$&`);
 
@@ -289,15 +294,18 @@ async function uploadResume(page: Page, fieldId: string, resumePath: string) {
   return true;
 }
 
+const isApplicationResponse = (candidate: Response) =>
+  candidate.request().method() === "POST" &&
+  new URL(candidate.url()).pathname.endsWith(APPLICATION_URL_PATH);
+
 async function waitForApplicationResponse(page: Page) {
-  const settled = await Promise.allSettled([
-    submitButton(page).click(),
-    page.waitForResponse((response) => response.request().method() === "POST"),
-  ]);
+  const response = page.waitForResponse(isApplicationResponse);
 
-  const [, response] = settled;
+  const settled = await Promise.allSettled([submitButton(page).click(), response]);
 
-  return response.status === "fulfilled" ? response.value : null;
+  const [, captured] = settled;
+
+  return captured.status === "fulfilled" ? captured.value : null;
 }
 
 async function typeCode(page: Page, code: string) {
@@ -322,10 +330,11 @@ async function typeCode(page: Page, code: string) {
 async function readConfirmation(page: Page) {
   try {
     await page.waitForFunction(
-      (sources) =>
-        document.querySelector("form#application-form") === null &&
-        sources.some((source) => new RegExp(source, "iu").test(document.body.textContent)),
-      CONFIRMATION_SOURCES,
+      ({ sources, confirmationPath }) =>
+        globalThis.location.pathname.endsWith(confirmationPath) ||
+        (document.querySelector("form#application-form") === null &&
+          sources.some((source) => new RegExp(source, "iu").test(document.body.textContent))),
+      { sources: CONFIRMATION_SOURCES, confirmationPath: CONFIRMATION_URL_PATH },
       { timeout: 10_000 },
     );
   } catch {
@@ -424,10 +433,11 @@ export async function probeGreenhouse(
   const codeResponseStatus = firstStatus === 428 ? 428 : null;
 
   if (!(await codeStepVisible(page))) {
-    const confirmed = firstStatus !== null && firstStatus < 400 && (await readConfirmation(page));
+    const confirmed = await readConfirmation(page);
+    const sent = confirmed || acceptedStatus(firstStatus);
 
     return {
-      ...attemptStructure.empty(confirmed ? "sent" : "unconfirmed", filledIds),
+      ...attemptStructure.empty(sent ? "sent" : "unconfirmed", filledIds),
       resumeUploaded,
       codeResponseStatus,
       submitResponseStatus: firstStatus,
@@ -442,12 +452,11 @@ export async function probeGreenhouse(
 
   const typed = await io.readLine();
 
-  io.writeLine(`DEBUG count=${String(await codeInputs(page).count())} typed=[${typed}]`);
   await typeCode(page, typed);
 
   const secondResponse = await waitForApplicationResponse(page);
   const secondStatus = secondResponse === null ? null : secondResponse.status();
-  const confirmed = secondStatus !== null && secondStatus < 400 && (await readConfirmation(page));
+  const confirmed = await readConfirmation(page);
 
   if (secondStatus !== null && secondStatus >= 400) {
     return {
@@ -460,7 +469,10 @@ export async function probeGreenhouse(
   }
 
   return {
-    ...attemptStructure.empty(confirmed ? "sent" : "unconfirmed", filledIds),
+    ...attemptStructure.empty(
+      confirmed || acceptedStatus(secondStatus) ? "sent" : "unconfirmed",
+      filledIds,
+    ),
     resumeUploaded,
     codeAsked: true,
     codeResponseStatus,

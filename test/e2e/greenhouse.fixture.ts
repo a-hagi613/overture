@@ -80,13 +80,30 @@ export function startGreenhouseFixture() {
         return Response.json({ submissions: state.submissions, codeAsked: state.codeAsked });
       }
 
-      const match = /\/(?<board>[a-z]+)\/jobs\/(?<job>[0-9]+)/u.exec(path);
+      const match =
+        /\/(?<board>[a-z]+)\/jobs\/(?<job>[0-9]+)(?<confirmation>\/confirmation)?/u.exec(path);
 
       if (match?.groups === undefined) {
         return new Response(NO_FORM_PAGE, { status: 404 });
       }
 
-      const { board, job } = match.groups;
+      const { board, job, confirmation } = match.groups;
+
+      if (confirmation !== undefined && request.method !== "POST") {
+        let page = Buffer.from(NO_FORM_PAGE);
+
+        try {
+          page = readFileSync(join(FIXTURE_FORMS_DIR, `${board}-${job}-confirmation.fixture.html`));
+        } catch {
+          return new Response(new Uint8Array(page), {
+            status: 404,
+            headers: { "content-type": "text/html" },
+          });
+        }
+
+        return new Response(new Uint8Array(page), { headers: { "content-type": "text/html" } });
+      }
+
       const pagePath = join(FIXTURE_FORMS_DIR, `${board}-${job}.fixture.html`);
 
       if (request.method !== "POST") {
@@ -140,7 +157,7 @@ export function startGreenhouseFixture() {
         return new Response("That code was not accepted.", { status: 422 });
       }
 
-      return Response.json({ ok: true });
+      return Response.json({ ok: true }, { status: 201 });
     },
   });
 

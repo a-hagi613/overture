@@ -302,7 +302,7 @@ async function runPosting(
 function printSummary(deps: ProbeDeps, results: ProbeFormResult[]) {
   const io = deps.console;
   const spend = results.reduce((total, result) => total + result.costUsd, 0);
-  const completed = results.filter((result) => result.submitted && result.confirmationSeen).length;
+  const completed = results.filter((result) => result.outcome === "sent").length;
   const projected = completed > 0 ? spend / completed : spend;
 
   io.writeLine("");

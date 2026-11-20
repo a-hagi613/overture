@@ -13,6 +13,7 @@ interface FixtureMeta {
   autocompletes?: string[];
   jobLocation: string;
   confirmationMessage: string;
+  confirmationPath?: string;
 }
 
 declare global {
@@ -243,8 +244,21 @@ const attachResumeEcho = (form: HTMLFormElement) => {
   });
 };
 
+const prepareNativeSubmit = (form: HTMLFormElement) => {
+  form.setAttribute("action", `${form.getAttribute("action")}/application`);
+  form.setAttribute("method", "post");
+};
+
 const attachSubmitBehaviour = (form: HTMLFormElement, meta: FixtureMeta) => {
   attachResumeEcho(form);
+
+  const search = new URLSearchParams(globalThis.location.search);
+
+  if (search.get("native") === "1") {
+    prepareNativeSubmit(form);
+
+    return;
+  }
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -269,6 +283,16 @@ const attachSubmitBehaviour = (form: HTMLFormElement, meta: FixtureMeta) => {
           const message = (await response.text()).trim();
 
           showErrors(form, [message === "" ? "The application was refused." : message]);
+
+          return;
+        }
+
+        if (search.get("confirmation") === "none") {
+          return;
+        }
+
+        if (meta.confirmationPath !== undefined) {
+          globalThis.location.assign(meta.confirmationPath);
 
           return;
         }

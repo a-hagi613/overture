@@ -66,6 +66,22 @@ const singlePostingRunFile = (harness: ProbeHarness, record: RunFilePosting) => 
   postings: [record],
 });
 
+const examplePosting = (url: string) =>
+  ({
+    board: "exampleco",
+    company: "Example Company",
+    jobId: "7006005001",
+    title: "Sample Feature Analyst",
+    resumeFieldId: "resume",
+    url,
+    questions: [
+      { id: "first_name", value: "Jane", approved: true },
+      { id: "last_name", value: "Doe", approved: true },
+      { id: "email", value: "jane.doe@example.com", approved: true },
+      { id: "phone", value: "+1 555 0100", approved: true },
+    ],
+  }) satisfies RunFilePosting;
+
 function outputProperties(stream: PassThrough) {
   let received = "";
 
@@ -99,27 +115,70 @@ function storedForms(harness: ProbeHarness) {
   return readProbeForms(database.db);
 }
 
-test("a dry run without --confirm fills every question on the five recorded real forms and stops before submit", async () => {
-  await withHarness(async (harness) => {
-    const results = await runProbe(command(harness, false, {}));
+for (const record of runFileTemplate.postings) {
+  test(`a dry run without --confirm fills the recorded ${record.board} ${record.jobId} form and stops before submit`, async () => {
+    await withHarness(async (harness) => {
+      const results = await runProbe(
+        command(harness, false, { runFile: singlePostingRunFile(harness, record) }),
+      );
 
-    expect(results.map((result) => result.outcome)).toEqual([
-      "dry_run_filled",
-      "dry_run_filled",
-      "dry_run_filled",
-      "dry_run_filled",
-      "dry_run_filled",
-    ]);
+      expect(results.length).toBe(1);
 
-    for (const result of results) {
+      const [result] = results;
+
+      if (result === undefined) {
+        throw new Error(`no result for ${record.board} ${record.jobId}`);
+      }
+
+      expect(result.outcome).toBe("dry_run_filled");
       expect(result.submitted).toBe(false);
       expect(result.codeAsked).toBe(false);
       expect(result.confirmationSeen).toBe(false);
+
+      expect(harness.fixture.state.submissions).toBe(0);
+      expect(harness.browserUse.sessionCount).toBe(1);
+      expect(harness.browserUse.stoppedSessionIds.length).toBe(1);
+    });
+  });
+}
+
+test("a dry run over the five recorded postings prints one run summary line per posting and stops every session", async () => {
+  await withHarness(async (harness) => {
+    const output = outputProperties(harness.output);
+
+    const unreachable = runFileTemplate.postings.map((record) => ({
+      ...record,
+      url: `http://127.0.0.1:9/${record.board}/jobs/${record.jobId}`,
+    }));
+
+    const results = await runProbe(
+      command(harness, false, {
+        runFile: { ...runFileTemplate, resumePath: harness.resumePath, postings: unreachable },
+      }),
+    );
+
+    expect(results.length).toBe(runFileTemplate.postings.length);
+
+    for (const result of results) {
+      expect(result.submitted).toBe(false);
     }
 
     expect(harness.fixture.state.submissions).toBe(0);
     expect(harness.browserUse.sessionCount).toBe(5);
     expect(harness.browserUse.stoppedSessionIds.length).toBe(5);
+    expect(storedForms(harness).length).toBe(5);
+
+    const summary = output.text();
+
+    expect(summary).toContain("early cloud probe summary");
+
+    for (const record of runFileTemplate.postings) {
+      expect(summary).toContain(`${record.company} — ${record.title}:`);
+    }
+
+    expect(summary).toContain(
+      "dry run: every form was filled and the run stopped before submit; nothing was sent",
+    );
   });
 });
 
@@ -299,6 +358,7 @@ test("the code path prompts on the console, records the 428 and the confirmation
     const summary = output.text();
 
     expect(summary).toContain("projected cost per completed application");
+    expect(summary).toContain("(1 completed of 1 submitted)");
     expect(summary).toContain("$0.03");
   });
 });
@@ -399,5 +459,114 @@ test("a posting the run file cannot fill is recorded as fill_failed and the run 
     expect(harness.browserUse.sessionCount).toBe(2);
     expect(harness.browserUse.stoppedSessionIds).toHaveLength(2);
     expect(harness.fixture.state.submissions).toBe(0);
+  });
+});
+
+test("a 201 whose page navigates to the hosted confirmation URL records sent with the confirmation seen", async () => {
+  await withHarness(async (harness) => {
+    const results = await runProbe(
+      command(harness, true, {
+        runFile: {
+          country: runFileTemplate.country,
+          resumePath: harness.resumePath,
+          postings: [examplePosting(`${harness.fixture.url}/exampleco/jobs/7006005001`)],
+        },
+      }),
+    );
+
+    const [result] = results;
+
+    if (result === undefined) {
+      throw new Error("no result for the hosted confirmation posting");
+    }
+
+    expect(result.outcome).toBe("sent");
+    expect(result.submitted).toBe(true);
+    expect(result.confirmationSeen).toBe(true);
+    expect(harness.fixture.state.submissions).toBe(1);
+
+    const [form] = storedForms(harness);
+
+    if (form === undefined) {
+      throw new Error("no stored form");
+    }
+
+    expect(form.submitResponseStatus).toBe(201);
+    expect(form.submitted).toBe(1);
+    expect(form.confirmationSeen).toBe(1);
+  });
+});
+
+test("a 201 whose page shows no confirmation records sent with no confirmation seen and still counts as completed", async () => {
+  await withHarness(async (harness) => {
+    const output = outputProperties(harness.output);
+
+    const results = await runProbe(
+      command(harness, true, {
+        runFile: {
+          country: runFileTemplate.country,
+          resumePath: harness.resumePath,
+          postings: [
+            examplePosting(`${harness.fixture.url}/exampleco/jobs/7006005001?confirmation=none`),
+          ],
+        },
+      }),
+    );
+
+    const [result] = results;
+
+    if (result === undefined) {
+      throw new Error("no result for the silent 201 posting");
+    }
+
+    expect(result.outcome).toBe("sent");
+    expect(result.submitted).toBe(true);
+    expect(result.confirmationSeen).toBe(false);
+
+    const [form] = storedForms(harness);
+
+    if (form === undefined) {
+      throw new Error("no stored form");
+    }
+
+    expect(form.submitResponseStatus).toBe(201);
+    expect(form.confirmationSeen).toBe(0);
+
+    const summary = output.text();
+
+    expect(summary).toContain("projected cost per completed application");
+    expect(summary).toContain("(1 completed of 1 submitted)");
+  });
+});
+
+test("a submit whose POST is answered instantly and navigates away still captures the 201", async () => {
+  await withHarness(async (harness) => {
+    const results = await runProbe(
+      command(harness, true, {
+        runFile: {
+          country: runFileTemplate.country,
+          resumePath: harness.resumePath,
+          postings: [examplePosting(`${harness.fixture.url}/exampleco/jobs/7006005001?native=1`)],
+        },
+      }),
+    );
+
+    const [result] = results;
+
+    if (result === undefined) {
+      throw new Error("no result for the native submit posting");
+    }
+
+    expect(result.outcome).toBe("sent");
+    expect(result.confirmationSeen).toBe(false);
+
+    const [form] = storedForms(harness);
+
+    if (form === undefined) {
+      throw new Error("no stored form");
+    }
+
+    expect(form.submitResponseStatus).toBe(201);
+    expect(harness.fixture.state.submissions).toBe(1);
   });
 });

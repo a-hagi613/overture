@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Job Application for Sample Feature Analyst at Example Company</title>
+  </head>
+  <body>
+    <div id="react-portal-mount-point"></div>
+    <main class="main font-secondary job-post">
+      <div class="job-post-container">
+        <div>
+          <a class="link" target="_top" href="/exampleco">Back to jobs</a>
+          <div class="job__tags"></div>
+          <div class="job__header">
+            <div class="job__title">
+              <h1 class="section-header section-header--large font-primary">
+                Sample Feature Analyst
+              </h1>
+              <div class="job__location">
+                <div>Toronto, Ontario, Canada</div>
+              </div>
+            </div>
+          </div>
+          <form
+            method="get"
+            action="/exampleco/jobs/7006005001"
+            id="application-form"
+            class="application--form"
+          >
+            <div class="application--questions">
+              <div class="field-wrapper">
+                <div class="text-input-wrapper">
+                  <div class="input-wrapper">
+                    <label id="first_name-label" for="first_name" class="label label"
+                      >First Name<span aria-hidden="true">*</span></label
+                    ><input
+                      id="first_name"
+                      class="input input__single-line"
+                      aria-label="First Name"
+                      aria-required="true"
+                      type="text"
+                      maxlength="255"
+                      autocomplete="given-name"
+                      value=""
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="field-wrapper">
+                <div class="text-input-wrapper">
+                  <div class="input-wrapper">
+                    <label id="last_name-label" for="last_name" class="label label"
+                      >Last Name<span aria-hidden="true">*</span></label
+                    ><input
+                      id="last_name"
+                      class="input input__single-line"
+                      aria-label="Last Name"
+                      aria-required="true"
+                      type="text"
+                      maxlength="255"
+                      autocomplete="family-name"
+                      value=""
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="field-wrapper">
+                <div class="text-input-wrapper">
+                  <div class="input-wrapper">
+                    <label id="email-label" for="email" class="label label"
+                      >Email<span aria-hidden="true">*</span></label
+                    ><input
+                      id="email"
+                      class="input input__single-line"
+                      aria-label="Email"
+                      aria-required="true"
+                      type="text"
+                      maxlength="255"
+                      autocomplete="email"
+                      value=""
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="field-wrapper">
+                <div class="text-input-wrapper">
+                  <div class="input-wrapper">
+                    <label id="phone-label" for="phone" class="label label">Phone</label>
+                    <input
+                      id="phone"
+                      class="input input__single-line"
+                      aria-label="Phone"
+                      type="tel"
+                      maxlength="255"
+                      value=""
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="field-wrapper">
+                <div
+                  role="group"
+                  aria-labelledby="upload-label-resume"
+                  aria-required="true"
+                  class="file-upload"
+                >
+                  <div id="upload-label-resume" class="label upload-label">
+                    Resume/CV<span class="required">*</span>
+                  </div>
+                  <input
+                    id="resume"
+                    class="visually-hidden"
+                    type="file"
+                    accept=".pdf,.doc,.docx,.txt,.rtf"
+                  />
+                </div>
+              </div>
+            </div>
+            <div class="application--submit">
+              <button type="submit" class="btn btn--rectangle" aria-disabled="false">
+                Submit application
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </main>
+    <script>
+      globalThis.fixtureMeta = {
+        options: {},
+        jobLocation: "Toronto, Ontario, Canada",
+        confirmationMessage: "",
+        confirmationPath: "/exampleco/jobs/7006005001/confirmation",
+      };
+    </script>
+    <script type="module" src="/__fixture__/runtime.js"></script>
+  </body>
+</html>
