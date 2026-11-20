@@ -99,16 +99,20 @@ export function createResumeService(deps: {
     upload: async (userId: string, file: { name: string; bytes: Uint8Array<ArrayBuffer> }) => {
       const id = crypto.randomUUID();
 
-      const parsed = await extractResumeText(file.bytes, llm);
+      const bytes = new Uint8Array(file.bytes);
+      const byteCount = bytes.byteLength;
 
-      const digest = await sha256(file.bytes);
+      const digest = await sha256(bytes);
+
       const objectKey = `files/${userId}/resume/${id}.pdf.enc`;
 
       const sealedFile = await personal.sealFor(
         userId,
         resumeScope(id, "bytes"),
-        Buffer.from(file.bytes).toString("base64"),
+        Buffer.from(bytes).toString("base64"),
       );
+
+      const parsed = await extractResumeText(bytes, llm);
 
       const filenameEnc = await personal.sealFor(
         userId,
@@ -127,7 +131,7 @@ export function createResumeService(deps: {
         userId,
         objectKey,
         sha256: digest,
-        bytes: file.bytes.byteLength,
+        bytes: byteCount,
         pages: parsed.pages,
         filenameEnc,
         textEnc,
@@ -191,7 +195,9 @@ export function createResumeService(deps: {
 }
 
 async function extractResumeText(pdf: Uint8Array<ArrayBuffer>, llm: ResumeTextPort) {
-  const document = await getDocumentProxy(pdf);
+  const bytes = new Uint8Array(pdf);
+
+  const document = await getDocumentProxy(bytes);
 
   const extracted = await extractText(document, { mergePages: true });
 

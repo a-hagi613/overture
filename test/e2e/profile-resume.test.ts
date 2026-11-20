@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { Database } from "bun:sqlite";
+import { DatabaseSync } from "node:sqlite";
 import { request as apiRequest } from "@playwright/test";
 import { z } from "zod";
 
@@ -17,7 +17,7 @@ const uploadSchema = z.object({
   prefilledFacts: z.array(z.string()),
 });
 
-const wrappedKeySchema = z.object({ wrapped_dek: z.instanceof(Buffer) });
+const wrappedKeySchema = z.object({ wrapped_dek: z.instanceof(Uint8Array) });
 
 const factsSchema = z.object({
   facts: z.array(
@@ -59,8 +59,7 @@ async function ownerContextFor(appServerUrl: string) {
 }
 
 test("an uploaded resume is stored encrypted and retrievable byte for byte", async ({
-  appServerUrl,
-  appServer,
+  isolatedAppServer: { url: appServerUrl, databasePath: appDatabasePath },
 }) => {
   const owner = await ownerContextFor(appServerUrl);
   const pdfBytes = new Uint8Array(readFileSync("test/e2e/fixtures/resume-text.pdf"));
@@ -85,17 +84,17 @@ test("an uploaded resume is stored encrypted and retrievable byte for byte", asy
 
   expect(Buffer.from(returned).equals(pdfBytes)).toBe(true);
 
-  const sqlite = new Database(appServer.databasePath, { readonly: true });
+  const sqlite = new DatabaseSync(appDatabasePath, { readOnly: true });
 
   const row = resumeRowSchema.parse(
-    sqlite.query("select sha256, bytes, is_current from resumes limit 1").get(),
+    sqlite.prepare("select sha256, bytes, is_current from resumes limit 1").get(),
   );
 
   expect(row.sha256).toBe(created.sha256);
   expect(row.bytes).toBe(pdfBytes.byteLength);
 
   const wrapped = wrappedKeySchema.parse(
-    sqlite.query("select wrapped_dek from user_keys limit 1").get(),
+    sqlite.prepare("select wrapped_dek from user_keys limit 1").get(),
   );
 
   expect(Buffer.from(wrapped.wrapped_dek).length).toBeGreaterThan(32);
@@ -104,7 +103,7 @@ test("an uploaded resume is stored encrypted and retrievable byte for byte", asy
 });
 
 test("tier 1 facts are prefilled from the resume and confirmed on Profile", async ({
-  appServerUrl,
+  isolatedAppServer: { url: appServerUrl },
 }) => {
   const owner = await ownerContextFor(appServerUrl);
 
@@ -123,12 +122,18 @@ test("tier 1 facts are prefilled from the resume and confirmed on Profile", asyn
   const resumeFacts = listed.facts.filter((fact) => fact.source === "resume");
 
   expect(resumeFacts.map((fact) => fact.key)).toEqual([
-    "legal_name",
-    "email",
-    "phone",
     "current_city",
     "current_country",
+    "current_employer",
+    "degree_highest",
+    "email",
     "languages",
+    "legal_name",
+    "notice_period",
+    "phone",
+    "salary_expectation",
+    "willing_relocate",
+    "work_auth",
   ]);
 
   const email = listed.facts.find((fact) => fact.key === "email");
@@ -151,4 +156,44 @@ test("tier 1 facts are prefilled from the resume and confirmed on Profile", asyn
   expect(confirmedEmail?.confirmed).toBe(true);
   expect(confirmedEmail?.revision).toBe(2);
   expect(confirmedEmail?.source).toBe("user");
+});
+
+test("a scanned resume falls back to Haiku and the facts are prefilled", async ({
+  appServerUrl,
+}) => {
+  const owner = await ownerContextFor(appServerUrl);
+
+  const pdfBytes = new Uint8Array(readFileSync("test/e2e/fixtures/resume-scanned.pdf"));
+
+  const upload = await owner.post("/api/profile/resume", {
+    multipart: {
+      file: {
+        name: "resume-scanned.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from(pdfBytes),
+      },
+    },
+  });
+
+  const created = uploadSchema.parse(await upload.json());
+
+  expect(created.parsedWith).toBe("llm");
+  expect(created.prefilledFacts).toEqual([
+    "legal_name",
+    "email",
+    "phone",
+    "current_city",
+    "current_country",
+    "notice_period",
+    "work_auth",
+    "languages",
+  ]);
+
+  const listed = factsSchema.parse(await (await owner.get("/api/profile/facts")).json());
+
+  const allScanned = listed.facts.filter((fact) => fact.source === "resume");
+
+  expect(allScanned).toHaveLength(8);
+  expect(allScanned.every((fact) => fact.confirmed)).toBe(false);
+  expect(allScanned.every((fact) => fact.revision)).toBe(true);
 });

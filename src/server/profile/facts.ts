@@ -46,10 +46,11 @@ export function createFactService(deps: {
 
     const row = rows.at(0);
     const revision = (row?.revision ?? 0) + 1;
+    const rowId = row?.id ?? crypto.randomUUID();
 
     const valueEnc = await personal.sealFor(
       userId,
-      { table: "facts", column: "value_enc", rowId: row?.id ?? key },
+      { table: "facts", column: "value_enc", rowId },
       value,
     );
 
@@ -65,7 +66,7 @@ export function createFactService(deps: {
 
     if (row === undefined) {
       await db.insert(facts).values({
-        id: crypto.randomUUID(),
+        id: rowId,
         ...values,
       });
     } else {

@@ -56,7 +56,9 @@ export function createProfileRoutes(deps: {
       return context.json({ error: "unauthorised" }, 401);
     }
 
-    const form = uploadSchema.parse(await context.req.formData());
+    const form = uploadSchema.parse({
+      file: (await context.req.formData()).get("file"),
+    });
 
     const upload = await resumesService.upload(account.id, {
       name: form.file.name === "" ? "resume.pdf" : form.file.name,
