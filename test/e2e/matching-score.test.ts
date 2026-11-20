@@ -200,7 +200,7 @@ test("opening a posting scores it once, and manual apply works below the thresho
 
   expect(strongPosting.score).toBe(87);
   expect(strongPosting.reason).toContain("pipelines");
-  expect(strongPosting.applicationId).not.toBeNull();
+  expect(strongPosting.applicationId).toBeNull();
   expect(matching.anthropic.requests()).toHaveLength(1);
 
   const weakFirst = postingSchema.parse(await (await owner.get(`/api/postings/${weak}`)).json());

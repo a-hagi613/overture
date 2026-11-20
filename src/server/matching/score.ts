@@ -361,36 +361,6 @@ export function createMatchingService(deps: MatchDeps) {
     return { score: output.score, reason: truncateReason(output.reason) };
   }
 
-  async function ensureAutoApplication(userId: string, postingId: string, score: number) {
-    const context = await contextFor(userId);
-
-    if (score < context.threshold) {
-      return null;
-    }
-
-    const posting = db
-      .select({ companyId: postings.companyId })
-      .from(postings)
-      .where(eq(postings.id, postingId))
-      .get();
-
-    if (posting === undefined) {
-      return null;
-    }
-
-    if (activeApplicationCompanies(db, userId).has(posting.companyId)) {
-      return null;
-    }
-
-    return createApplication(db, clock.now(), {
-      companyId: posting.companyId,
-      origin: "auto",
-      postingId,
-      score,
-      userId,
-    });
-  }
-
   async function scoreOnOpen(userId: string, postingId: string) {
     const scored = await scorePosting(userId, postingId);
 
@@ -400,13 +370,7 @@ export function createMatchingService(deps: MatchDeps) {
 
     const existing = applicationFor(db, userId, postingId);
 
-    if (existing !== undefined) {
-      return { ...scored, applicationId: existing.id };
-    }
-
-    const applicationId = await ensureAutoApplication(userId, postingId, scored.score);
-
-    return { ...scored, applicationId };
+    return { ...scored, applicationId: existing?.id ?? null };
   }
 
   async function applyManually(userId: string, postingId: string) {

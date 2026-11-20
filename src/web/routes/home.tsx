@@ -3,6 +3,7 @@ import { firstNameOf } from "../lib/identity.ts";
 import { authClient } from "../lib/auth-client.ts";
 import { useHomeData } from "../lib/home-api.ts";
 import { PageHeader } from "../components/page-header.tsx";
+import { UpNextSection } from "../components/up-next-section.tsx";
 
 function dateLine() {
   const now = new Date();
@@ -76,6 +77,7 @@ export function HomePage() {
         </dl>
         <p className="mt-6 font-mono text-xs text-muted-foreground">{copy.home.nothingYet}</p>
       </section>
+      <UpNextSection />
     </div>
   );
 }
