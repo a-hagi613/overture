@@ -497,13 +497,13 @@ screen, then built to match. Visual treatment stays; words, structure and behavi
 
 | Board | Change |
 |---|---|
-| Every app board | Five destinations (Home, Board, Review, Inbox, Profile), Settings from the avatar; no "Job Board", "Holds", "Answer Bank", "Activity", "Personal workspace"; one "Applications left" figure, no "Match Scores" counter; `--hold` tokens renamed `--need` |
-| Job Board | Queued replaces Hold as the first column, ink rule; red "Needs you" pill on cards waiting on a Review |
-| Holds | Becomes Review: open questions grouped by jobs unlocked |
-| Answer Bank, Resume | Fold into Profile: resume, facts by tier, targets with live count, skip list, job-search address |
-| Settings | No approval mode, no "Overnight window", no user-set company limit or daily caps, no UTC reset; the fixed limits explained (10 a day, 08:00–20:00 local, one company per 7 days, reset at local midnight) |
+| Every app board | **Redrawn on Home, Board, Review, Profile and Settings; the other app boards (Inbox, card detail, notifications) are still to do.** Five destinations (Home, Board, Review, Inbox, Profile), Settings from the avatar; no "Job Board", "Holds", "Answer Bank", "Activity", "Personal workspace"; one "Applications left" figure, no "Match Scores" counter; `--hold` tokens renamed `--need` |
+| Job Board | **Redrawn as Board.** Queued replaces Hold as the first column, ink rule; red "Needs you" pill on cards waiting on a Review |
+| Holds | **Redrawn as Review (file `w5-holds`).** Becomes Review: open questions grouped by jobs unlocked |
+| Answer Bank, Resume | **Redrawn: folded into Profile.** Fold into Profile: resume, facts by tier, targets with live count, skip list, job-search address |
+| Settings | **Redrawn.** No approval mode, no "Overnight window", no user-set company limit or daily caps, no UTC reset; the fixed limits explained (10 a day, 08:00–20:00 local, one company per 7 days, reset at local midnight) |
 | Onboarding 1–4 | Five steps: Sign in · Resume · Your facts · What you want · Your job-search address + consent + trial + Start; no "Connect inbox", no Gmail, no "Memory Base" |
-| Sign In | Google, LinkedIn, magic link (M1); email + password joins in M2 (ADR 0026) |
+| Sign In | **Redrawn (modes sign-in, sign-up, magic-sent).** Google, LinkedIn, magic link (M1); email + password joins in M2 (ADR 0026) |
 | Product states | No Gmail connect states; add `confirming` ("Checking with the employer"), each pause reason, out of applications |
 | Daily digest | Morning summary of **yesterday** (sends between 08:00 and 20:00); "Needs you", not "Hold" |
 | Landing | Daytime timestamps; card required for the trial (no "No credit card"); Workday removed from Where it applies; plan prices per the spec; no glow on the travelling-dot tiles |
