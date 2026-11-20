@@ -10,11 +10,14 @@ import { useTurnstile } from "../lib/turnstile.ts";
 
 type Mode = "sign-in" | "sign-up";
 
+type SocialProvider = "google" | "linkedin";
+
 const CALLBACK_URL = "/signin";
 
 const meSchema = z.object({
   user: z.unknown().nullable(),
   turnstileSiteKey: z.string().optional(),
+  socialProviders: z.array(z.enum(["google", "linkedin"])).default([]),
 });
 
 const callbackCopy = new Map<string, string>([
@@ -49,6 +52,7 @@ export function SignInCard() {
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [siteKey, setSiteKey] = useState<string | null>(null);
+  const [socialProviders, setSocialProviders] = useState<SocialProvider[]>([]);
   const { containerRef, obtainToken } = useTurnstile(siteKey);
 
   useEffect(() => {
@@ -59,6 +63,7 @@ export function SignInCard() {
         const parsed = meSchema.parse(await response.json());
 
         setSiteKey(parsed.turnstileSiteKey ?? null);
+        setSocialProviders(parsed.socialProviders);
       }
     };
 
@@ -93,7 +98,7 @@ export function SignInCard() {
     return token;
   };
 
-  const onSocial = async (provider: "google" | "linkedin") => {
+  const onSocial = async (provider: SocialProvider) => {
     const token = await confirmToken();
 
     if (token === null) {
@@ -207,38 +212,44 @@ export function SignInCard() {
         </div>
       ) : (
         <div>
-          <button
-            className="inline-flex min-h-[46px] w-full items-center justify-center gap-2.5 rounded-[7px] bg-foreground px-5 text-sm font-semibold text-card shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_1px_2px_rgba(0,0,0,0.08)] [line-height:normal] hover:bg-btn-hover"
-            onClick={() => {
-              void onSocial("google");
-            }}
-            type="button"
-          >
-            <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full bg-white">
-              <GoogleMark />
-            </span>
-            {copy.signIn.google}
-          </button>
-          <button
-            className="mt-2.5 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[7px] border border-input bg-card px-[18px] text-[13.5px] font-semibold shadow-[0_1px_0_rgba(21,19,17,0.04)] [line-height:normal] max-[960px]:min-h-[46px] hover:bg-muted"
-            onClick={() => {
-              void onSocial("linkedin");
-            }}
-            type="button"
-          >
-            <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded border border-input bg-muted text-[11px] font-bold">
-              {copy.signIn.linkedinBadge}
-            </span>
-            {copy.signIn.linkedin}
-          </button>
-          <div
-            aria-hidden="true"
-            className="my-[18px] flex items-center gap-3 text-xs text-muted-foreground leading-[18px]"
-          >
-            <hr className="flex-1 border-border" />
-            <span>{copy.signIn.magicLegend}</span>
-            <hr className="flex-1 border-border" />
-          </div>
+          {socialProviders.includes("google") ? (
+            <button
+              className="inline-flex min-h-[46px] w-full items-center justify-center gap-2.5 rounded-[7px] bg-foreground px-5 text-sm font-semibold text-card shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_1px_2px_rgba(0,0,0,0.08)] [line-height:normal] hover:bg-btn-hover"
+              onClick={() => {
+                void onSocial("google");
+              }}
+              type="button"
+            >
+              <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full bg-white">
+                <GoogleMark />
+              </span>
+              {copy.signIn.google}
+            </button>
+          ) : null}
+          {socialProviders.includes("linkedin") ? (
+            <button
+              className="mt-2.5 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[7px] border border-input bg-card px-[18px] text-[13.5px] font-semibold shadow-[0_1px_0_rgba(21,19,17,0.04)] [line-height:normal] max-[960px]:min-h-[46px] hover:bg-muted"
+              onClick={() => {
+                void onSocial("linkedin");
+              }}
+              type="button"
+            >
+              <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded border border-input bg-muted text-[11px] font-bold">
+                {copy.signIn.linkedinBadge}
+              </span>
+              {copy.signIn.linkedin}
+            </button>
+          ) : null}
+          {socialProviders.length === 0 ? null : (
+            <div
+              aria-hidden="true"
+              className="my-[18px] flex items-center gap-3 text-xs text-muted-foreground leading-[18px]"
+            >
+              <hr className="flex-1 border-border" />
+              <span>{copy.signIn.magicLegend}</span>
+              <hr className="flex-1 border-border" />
+            </div>
+          )}
           <form
             className="flex flex-col gap-3"
             onSubmit={(event) => {

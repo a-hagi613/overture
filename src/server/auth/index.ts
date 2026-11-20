@@ -26,34 +26,48 @@ const LINKEDIN_DISCOVERY_URL = "https://www.linkedin.com/oauth/.well-known/openi
 
 const discoveryDefaultsEnabled = env.NODE_ENV !== "test";
 
-const googleProviderConfig = {
-  providerId: "google",
-  name: copy.auth.providers.google,
-  clientId: env.GOOGLE_CLIENT_ID,
-  clientSecret: env.GOOGLE_CLIENT_SECRET,
-  discoveryUrl: env.OAUTH_GOOGLE_DISCOVERY_URL ?? GOOGLE_DISCOVERY_URL,
-  scopes: ["openid", "profile", "email"],
-  requireEmailVerification: true,
-};
+const googleDiscoveryUrl =
+  env.OAUTH_GOOGLE_DISCOVERY_URL ?? (discoveryDefaultsEnabled ? GOOGLE_DISCOVERY_URL : undefined);
 
-const linkedinProviderConfig = {
-  providerId: "linkedin",
-  name: copy.auth.providers.linkedin,
-  clientId: env.LINKEDIN_CLIENT_ID,
-  clientSecret: env.LINKEDIN_CLIENT_SECRET,
-  discoveryUrl: env.OAUTH_LINKEDIN_DISCOVERY_URL ?? LINKEDIN_DISCOVERY_URL,
-  scopes: ["openid", "profile", "email"],
-  requireEmailVerification: true,
-};
+const linkedinDiscoveryUrl =
+  env.OAUTH_LINKEDIN_DISCOVERY_URL ??
+  (discoveryDefaultsEnabled ? LINKEDIN_DISCOVERY_URL : undefined);
 
-const providerConfigs = [
-  ...(env.OAUTH_GOOGLE_DISCOVERY_URL !== undefined || discoveryDefaultsEnabled
-    ? [googleProviderConfig]
-    : []),
-  ...(env.OAUTH_LINKEDIN_DISCOVERY_URL !== undefined || discoveryDefaultsEnabled
-    ? [linkedinProviderConfig]
-    : []),
-];
+const googleProviderConfig =
+  env.GOOGLE_CLIENT_ID === undefined ||
+  env.GOOGLE_CLIENT_SECRET === undefined ||
+  googleDiscoveryUrl === undefined
+    ? null
+    : {
+        providerId: "google",
+        name: copy.auth.providers.google,
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
+        discoveryUrl: googleDiscoveryUrl,
+        scopes: ["openid", "profile", "email"],
+        requireEmailVerification: true,
+      };
+
+const linkedinProviderConfig =
+  env.LINKEDIN_CLIENT_ID === undefined ||
+  env.LINKEDIN_CLIENT_SECRET === undefined ||
+  linkedinDiscoveryUrl === undefined
+    ? null
+    : {
+        providerId: "linkedin",
+        name: copy.auth.providers.linkedin,
+        clientId: env.LINKEDIN_CLIENT_ID,
+        clientSecret: env.LINKEDIN_CLIENT_SECRET,
+        discoveryUrl: linkedinDiscoveryUrl,
+        scopes: ["openid", "profile", "email"],
+        requireEmailVerification: true,
+      };
+
+const providerConfigs = [googleProviderConfig, linkedinProviderConfig].filter(
+  (config) => config !== null,
+);
+
+export const enabledSocialProviders = providerConfigs.map((config) => config.providerId);
 
 const ownerEmail = env.OWNER_EMAIL.toLowerCase();
 
