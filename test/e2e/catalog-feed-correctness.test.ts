@@ -24,6 +24,8 @@ const fixtureJobSchema = z.object({
   jobUrl: z.string().default(""),
   hostedUrl: z.string().default(""),
   applyUrl: z.string().nullish(),
+  descriptionPlain: z.string().nullish(),
+  description: z.string().nullish(),
   pay_input_ranges: z
     .array(
       z.object({
@@ -47,6 +49,11 @@ const importReportSchema = z.object({
 const retagReportSchema = z.object({
   boardsReset: z.number(),
   postingsReset: z.number(),
+});
+
+const discoveredReportSchema = z.object({
+  createdBoards: z.number(),
+  existingBoards: z.number(),
 });
 
 function readBoardFixture(ats: Ats, token: string, region: "us" | "eu" = "us") {
@@ -311,6 +318,20 @@ test("a Lever board over one hundred postings is read page by page", async () =>
     expect(pageUrls[0]).toContain("limit=100&skip=0");
     expect(pageUrls[1]).toContain("limit=100&skip=100");
     expect(pageUrls.some((url) => url.includes("skip=200"))).toBe(false);
+
+    const htmlOnlyJob = fixtureJobs.find(
+      (job) => (job.descriptionPlain ?? "").trim() === "" && (job.description ?? "") !== "",
+    );
+
+    if (htmlOnlyJob === undefined) {
+      throw new Error("the Lever fixture has no HTML-only description");
+    }
+
+    const htmlOnlyPosting = postings.find((row) => row.atsJobId === htmlOnlyJob.id);
+
+    expect((htmlOnlyPosting?.descriptionText ?? "").length).toBeGreaterThan(100);
+    expect(htmlOnlyPosting?.descriptionText ?? "").not.toMatch(/<(?:p|div|li|ul|strong)\b/u);
+    expect(htmlOnlyPosting?.descriptionText ?? "").not.toMatch(/&(?:amp|lt|gt|quot|nbsp);/u);
   } finally {
     await harness.close();
   }
@@ -488,6 +509,62 @@ test("the one-time re-tag rewrites open Lever and Ashby postings with the feed w
     );
     expect(postingsOnBoard(afterSecondRetag, harness.boardIds[ASHBY_BOARD])).toHaveLength(
       ashbyJobs.length,
+    );
+  } finally {
+    await harness.close();
+  }
+});
+
+test("a Greenhouse seed row yields its token from every URL shape the dataset uses", async () => {
+  const harness = await startCatalogHarness([]);
+
+  try {
+    const rows = [
+      {
+        ats: "greenhouse",
+        name: "Boards Co",
+        slug: "",
+        url: "https://boards.greenhouse.io/boardsco",
+      },
+      {
+        ats: "greenhouse",
+        name: "Job Boards Co",
+        slug: "",
+        url: "https://job-boards.greenhouse.io/jobboardsco",
+      },
+      {
+        ats: "greenhouse",
+        name: "EU Co",
+        slug: "",
+        url: "https://job-boards.eu.greenhouse.io/euboardsco",
+      },
+      {
+        ats: "greenhouse",
+        name: "Job Path Co",
+        slug: "",
+        url: "https://job-boards.greenhouse.io/jobpathco/jobs/1234567",
+      },
+      {
+        ats: "greenhouse",
+        name: "Embed Co",
+        slug: "",
+        url: "https://boards.greenhouse.io/embed/job_board?for=embedco",
+      },
+    ];
+
+    const response = await postJson(
+      `${harness.app.url}/__test__/catalog/discovered-boards`,
+      JSON.stringify({ rows }),
+    );
+
+    const report = discoveredReportSchema.parse(await response.json());
+
+    expect(report.createdBoards).toBe(rows.length);
+
+    const tokens = (await harness.boards()).map((board) => board.boardToken);
+
+    expect(new Set(tokens)).toEqual(
+      new Set(["boardsco", "jobboardsco", "euboardsco", "jobpathco", "embedco"]),
     );
   } finally {
     await harness.close();

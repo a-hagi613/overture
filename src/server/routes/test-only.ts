@@ -96,7 +96,17 @@ const createBoardBody = z.object({
   source: z.enum(["v1_seed", "discovered", "import"]).default("discovered"),
 });
 
-const discoveredBoardsBody = z.object({ path: z.string().min(1) });
+const discoveredScraperRowSchema = z.object({
+  ats: z.string().min(1),
+  name: z.string().min(1),
+  slug: z.string(),
+  url: z.string(),
+});
+
+const discoveredBoardsBody = z.union([
+  z.object({ path: z.string().min(1) }),
+  z.object({ rows: z.array(discoveredScraperRowSchema).min(1) }),
+]);
 
 const tagImportBody = z.object({
   content: z.string().min(1),
@@ -578,8 +588,13 @@ export function createTestRoutes(
     "/catalog/discovered-boards",
     zValidator("json", discoveredBoardsBody),
     async (context) => {
-      const { path } = context.req.valid("json");
-      const bytes = readFileSync(path);
+      const body = context.req.valid("json");
+
+      if ("rows" in body) {
+        return context.json(loadDiscoveredBoards(db, clock, body.rows));
+      }
+
+      const bytes = readFileSync(body.path);
       const file = new ArrayBuffer(bytes.byteLength);
 
       new Uint8Array(file).set(bytes);
