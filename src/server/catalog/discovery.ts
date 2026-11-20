@@ -46,21 +46,7 @@ export function enqueueBackfill(deps: CatalogDeps) {
   return enqueueJob(deps.db, deps.clock, BACKFILL_JOB_KIND, "{}");
 }
 
-export function runBackfillJob(deps: CatalogDeps) {
-  const now = deps.clock.now();
-
-  deps.db
-    .update(companyBoards)
-    .set({ nextPollAt: now })
-    .where(inArray(companyBoards.status, ["active", "empty"]))
-    .run();
-
-  enqueueSweep(deps, now);
-}
-
-export async function runSweepJob(deps: CatalogDeps) {
-  enqueueSweep(deps, deps.clock.now() + readSweepIntervalMs(deps.db));
-
+export async function pollDueBoards(deps: CatalogDeps) {
   const now = deps.clock.now();
 
   const due = deps.db
@@ -75,6 +61,26 @@ export async function runSweepJob(deps: CatalogDeps) {
   await Promise.all(
     due.map(async (board) => pollBoard(deps.db, deps.clock, deps.greenhouse, board)),
   );
+}
+
+export async function runBackfillJob(deps: CatalogDeps) {
+  const now = deps.clock.now();
+
+  deps.db
+    .update(companyBoards)
+    .set({ nextPollAt: now })
+    .where(inArray(companyBoards.status, ["active", "empty"]))
+    .run();
+
+  await pollDueBoards(deps);
+
+  enqueueSweep(deps, now + readSweepIntervalMs(deps.db));
+}
+
+export async function runSweepJob(deps: CatalogDeps) {
+  enqueueSweep(deps, deps.clock.now() + readSweepIntervalMs(deps.db));
+
+  await pollDueBoards(deps);
 }
 
 export function ensureSweepQueued(deps: CatalogDeps) {

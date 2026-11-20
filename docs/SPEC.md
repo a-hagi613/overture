@@ -101,6 +101,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 
 | Service | Purpose | Env / secret | In tests (ADR 0013) |
 |---|---|---|---|
+| ATS job feeds (Greenhouse, later Lever/Ashby) | catalog discovery (§6) | `GREENHOUSE_FEED_BASE_URL` (test-only override of the real host) | local fixture server replaying recorded real responses captured by `scripts/record-feeds.ts` |
 | Cloudflare R2 | backups, encrypted files and mail | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES`, `R2_BUCKET_BACKUPS` | disk object store adapter (real implementation, also used in local dev) |
 | Cloudflare Turnstile | bot check on auth forms | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | Cloudflare's published always-pass test keys |
 | Cloudflare Access | admin host gate | `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN` | real verification against a test signing key |
@@ -168,7 +169,7 @@ src/
     main.ts          process entry: http + workers + scheduler, graceful shutdown
   web/               React app (routes/, features/, components/ui = shadcn)
 drizzle/             generated migrations
-scripts/             import-v1.ts, census.ts, pull-fixtures.ts, restore-drill.ts
+scripts/             import-v1.ts, census.ts, record-feeds.ts, restore-drill.ts
 test/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
                      (the six unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
@@ -233,7 +234,7 @@ updated_at) · `session` · `account` (provider: google, linkedin, credential) �
 | `company_boards` | id, company_id, ats CHECK IN ('greenhouse','lever','ashby','smartrecruiters','recruitee','workable','personio'), board_token, status CHECK IN ('active','empty','gone','disabled'), source CHECK IN ('v1_seed','discovered','import'), etag, last_modified, content_hash, last_polled_at, next_poll_at, backoff_level, consecutive_errors, created_at; UNIQUE(ats,board_token) |
 | `postings` | id, board_id, company_id, ats, ats_job_id, url, apply_url, apply_url_norm, title, title_norm, department, location_raw, country_code, region, city, workplace CHECK IN ('remote','hybrid','onsite','unknown'), employment_type CHECK IN ('full_time','part_time','contract','internship','temporary','unknown'), language, salary_min_minor, salary_max_minor, salary_currency, salary_period, posted_at, source_updated_at, first_seen_at, last_seen_at, missing_polls, closed_at, description_gz BLOB NULL, description_hash, dedupe_key, tag_source CHECK IN ('rules','model','llm','import'), tagged_at, questions_fetched_at; UNIQUE(board_id, ats_job_id); INDEX(apply_url_norm); INDEX(closed_at); INDEX(dedupe_key) |
 | `posting_tags` | posting_id, dimension CHECK IN ('role','subrole','seniority'), value, source; PK(posting_id,dimension,value) |
-| `postings_fts` | FTS5(title, company, location, department) content=`postings` (short fields only) |
+| `postings_fts` | FTS5(title, company, location, department) (short fields only): self-contained, kept in step with `postings` and `companies` by SQLite triggers (insert, update, delete, company rename); closed Postings leave the index |
 | `questions` | id, text_display, text_norm_hash UNIQUE, field_type CHECK IN ('text','textarea','select','multiselect','radio','checkbox','file','date','number','email','phone','url'), options_hash NULL, fact_key NULL, answer_kind CHECK IN ('fact','open_text','consent','skip','unknown'), mapped_by CHECK IN ('rules','llm','owner'), seen_count, created_at |
 | `question_variants` | variant_hash PK, question_id |
 | `posting_questions` | posting_id, question_id, required, position, options JSON; PK(posting_id,question_id) |
@@ -642,7 +643,7 @@ Fixture capture is an admin-started job (`fixtures.capture`, `POST /admin/api/fi
 that runs on `overture-web` and drives a Browser Use session, the same path as a real application, and never clicks
 Submit. It saves sanitised HTML + assets (names, emails, tokens and employer tracking stripped) to R2
 `fixtures/{ats}/{form_signature}/`. A developer pulls them into `test/e2e/fixtures/forms/` with
-`scripts/pull-fixtures.ts` (R2 read only, no ATS traffic); the local fixture server replays them, including fake
+`scripts/record-feeds.ts` (R2 read only, no ATS traffic); the local fixture server replays them, including fake
 confirmation pages, a fake code prompt and a fake visible challenge. Live smoke checks are the same kind of admin job,
 stopping before Submit. The developer machine never drives a browser against a real form.
 
@@ -860,7 +861,7 @@ none submits an application or touches a user:
 | Mail | a message via SES to an Overture-owned check address on `mail.tryoverture.com`, through SES receiving and the SNS notice, ingested with `auth='pass'` and its code extracted | MSW recordings for SES |
 | Storage | an R2 put, get, list and delete | — |
 
-`scripts/pull-fixtures.ts` brings refreshed forms and recordings into `test/e2e/` through a pull request, so a test
+`scripts/record-feeds.ts` brings refreshed fixtures and recordings into `test/e2e/` through a pull request, so a test
 replays only what a real service actually returned.
 
 ### 16.5 Observability

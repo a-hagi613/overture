@@ -1,153 +1,292 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { z } from "zod";
 import { expect, test } from "@playwright/test";
 
-import { catalogBoards, catalogPostings, postBackfillAndRun, startCatalogHarness } from "./catalog-harness.ts";
+import { startCatalogHarness } from "./catalog-harness.ts";
+
+import type { CatalogHarness } from "./catalog-harness.ts";
 
 const FIXTURE_BOARD = "vercel";
-const TOKEN_WITH_404 = "stripe";
+const MISSING_BOARD = "stripe";
 
-function fixtureJobIds(token: string) {
-  const boardPath = join(process.cwd(), "test/e2e/fixtures/greenhouse", token, "board.json");
-  const board = JSON.parse(readFileSync(boardPath, "utf8")) as { jobs: { id: number }[] };
+const fixtureBoardSchema = z.object({
+  jobs: z.array(
+    z.object({
+      id: z.union([z.number(), z.string()]).transform(String),
+      title: z.string().default(""),
+    }),
+  ),
+});
 
-  return board.jobs.map((job) => String(job.id));
+const searchResponseSchema = z.object({
+  hits: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      company: z.string(),
+      location: z.string().nullable(),
+      department: z.string().nullable(),
+      ats: z.string(),
+    }),
+  ),
+  durationMs: z.number(),
+});
+
+function readFixtureBoard(token: string) {
+  const boardFile = join(process.cwd(), "test/e2e/fixtures/greenhouse", token, "board.json");
+  const board = fixtureBoardSchema.parse(JSON.parse(readFileSync(boardFile, "utf8")));
+
+  return board.jobs.map((job) => ({ id: job.id, title: job.title }));
+}
+
+async function clockNow(harness: CatalogHarness) {
+  const response = await fetch(`${harness.app.url}/__test__/clock`);
+  const clockResponse = z.object({ now: z.number() }).parse(await response.json());
+
+  return clockResponse.now;
+}
+
+async function search(harness: CatalogHarness, query: string) {
+  const response = await fetch(
+    `${harness.app.url}/api/search?q=${encodeURIComponent(query)}&limit=50`,
+  );
+
+  return searchResponseSchema.parse(await response.json());
 }
 
 test("a backfill fills the catalog and later reads add, change and close Postings", async () => {
   const harness = await startCatalogHarness([FIXTURE_BOARD]);
 
   try {
-    await postBackfillAndRun(harness);
+    const jobsOnBoard = readFixtureBoard(FIXTURE_BOARD);
 
-    const afterBackfill = await catalogPostings(harness.app.url);
-    const boardPostings = afterBackfill.filter((posting) => posting.boardId === harness.boardIds[FIXTURE_BOARD]);
+    expect(jobsOnBoard.length).toBe(4);
 
-    expect(boardPostings.length).toBe(4);
-    expect(boardPostings.every((posting) => posting.closedAt === null)).toBe(true);
+    const changedJob = jobsOnBoard[0] ?? { id: "", title: "" };
+    const removedJob = jobsOnBoard[1] ?? { id: "", title: "" };
+    const untouchedJob = jobsOnBoard[2] ?? { id: "", title: "" };
 
-    const detailCountsAfterBackfill = (await harness.fixture.stats()).detailCounts;
-    const detailCountEntries = Object.values(detailCountsAfterBackfill);
+    await harness.runBackfillCycle();
 
-    expect(detailCountEntries.length).toBe(4);
-    expect(detailCountEntries.every((count) => count === 1)).toBe(true);
+    const afterBackfill = await harness.postings();
 
-    const jobsOnBoard = fixtureJobIds(FIXTURE_BOARD);
-    const changedJobId = jobsOnBoard[0] ?? "";
-    const removedJobId = jobsOnBoard[1] ?? "";
-    const untouchedJobId = jobsOnBoard[2] ?? "";
+    expect(postingsOnBoard(afterBackfill, harness.boardIds[FIXTURE_BOARD] ?? "").length).toBe(4);
+    expect(
+      postingsOnBoard(afterBackfill, harness.boardIds[FIXTURE_BOARD] ?? "").every(
+        (posting) => posting.closedAt === null,
+      ),
+    ).toBe(true);
 
-    await harness.fixture.mutateBoard(FIXTURE_BOARD, {
-      titleUpdates: { [changedJobId]: "Principal Platform Engineer" },
-      updatedAtUpdates: { [changedJobId]: "2026-11-19T18:30:00Z" },
-      removeJobIds: [removedJobId],
+    const detailsAfterBackfill = harness.fixture.stats().detailCounts;
+
+    expect(Object.values(detailsAfterBackfill).reduce((total, count) => total + count, 0)).toBe(4);
+
+    const recentIso = new Date((await clockNow(harness)) - 60_000).toISOString();
+
+    harness.fixture.mutateBoard(FIXTURE_BOARD, {
+      titleUpdates: { [changedJob.id]: "Principal Platform Engineer" },
+      updatedAtUpdates: { [changedJob.id]: recentIso },
+      removeJobIds: [removedJob.id],
       addJobs: [
         {
           id: "9999001",
           title: "Senior Backend Engineer",
-          updatedAt: "2026-11-19T19:00:00Z",
-          firstPublished: "2026-11-19T09:00:00Z",
+          updatedAt: recentIso,
+          firstPublished: recentIso,
           absoluteUrl: "https://job-boards.greenhouse.io/vercel/jobs/9999001",
           locationName: "Remote — Canada",
         },
       ],
     });
 
-    await postBackfillAndRun(harness);
+    await harness.runBackfillCycle();
 
-    const afterSecondRead = await catalogPostings(harness.app.url);
+    const afterSecondRead = await harness.postings();
+    const secondReadBoard = postingsOnBoard(afterSecondRead, harness.boardIds[FIXTURE_BOARD] ?? "");
 
-    const boardAfterSecondRead = afterSecondRead.filter(
-      (posting) => posting.boardId === harness.boardIds[FIXTURE_BOARD],
-    );
+    expect(secondReadBoard.length).toBe(5);
 
-    expect(boardAfterSecondRead.length).toBe(5);
-
-    const removed = boardAfterSecondRead.find((posting) => posting.atsJobId === removedJobId);
+    const removed = findJob(secondReadBoard, removedJob.id);
 
     expect(removed?.closedAt).toBeNull();
     expect(removed?.missingPolls).toBe(1);
 
-    const changed = boardAfterSecondRead.find((posting) => posting.atsJobId === changedJobId);
+    const changed = findJob(secondReadBoard, changedJob.id);
 
     expect(changed?.title).toBe("Principal Platform Engineer");
 
-    const added = boardAfterSecondRead.find((posting) => posting.atsJobId === "9999001");
+    const added = findJob(secondReadBoard, "9999001");
 
     expect(added?.closedAt).toBeNull();
 
-    const detailCountsAfterSecondRead = (await harness.fixture.stats()).detailCounts;
-    const detailsForChanged = detailCountsAfterSecondRead[`${FIXTURE_BOARD}/${changedJobId}`] ?? 0;
-    const detailsForUntouched = detailCountsAfterSecondRead[`${FIXTURE_BOARD}/${untouchedJobId}`] ?? 0;
+    const detailsAfterSecondRead = harness.fixture.stats().detailCounts;
 
-    expect(detailsForChanged).toBe(2);
-    expect(detailsForUntouched).toBe(1);
-
-    await postBackfillAndRun(harness);
-
-    const afterThirdRead = await catalogPostings(harness.app.url);
-
-    const boardAfterThirdRead = afterThirdRead.filter(
-      (posting) => posting.boardId === harness.boardIds[FIXTURE_BOARD],
+    expect(detailsAfterSecondRead[`${FIXTURE_BOARD}/${changedJob.id}`] ?? 0).toBe(2);
+    expect(detailsAfterSecondRead[`vercel/9999001`] ?? 0).toBe(1);
+    expect(detailsAfterSecondRead[`${FIXTURE_BOARD}/${untouchedJob.id}`] ?? 0).toBe(1);
+    expect(Object.values(detailsAfterSecondRead).reduce((total, count) => total + count, 0)).toBe(
+      6,
     );
 
-    const closedAfterThirdRead = boardAfterThirdRead.find((posting) => posting.atsJobId === removedJobId);
+    await harness.runBackfillCycle();
 
-    expect(closedAfterThirdRead?.closedAt).not.toBeNull();
+    const afterThirdRead = await harness.postings();
+    const thirdReadBoard = postingsOnBoard(afterThirdRead, harness.boardIds[FIXTURE_BOARD] ?? "");
 
-    const detailCountsAfterThirdRead = (await harness.fixture.stats()).detailCounts;
+    const closed = findJob(thirdReadBoard, removedJob.id);
 
-    expect(detailCountsAfterThirdRead).toEqual(detailCountsAfterSecondRead);
+    expect(closed?.closedAt).not.toBeNull();
+
+    expect(harness.fixture.stats().detailCounts).toEqual(detailsAfterSecondRead);
   } finally {
     await harness.close();
   }
 });
 
-test("activity-based scheduling gives a changed board a next plan inside the quiet band", async () => {
+function boardFor(boards: Awaited<ReturnType<CatalogHarness["boards"]>>, boardToken: string) {
+  const board = boards.find((candidate) => candidate.boardToken === boardToken);
+
+  if (board === undefined) {
+    throw new Error(`the ${boardToken} board is missing from the catalog`);
+  }
+
+  return board;
+}
+
+function postingsOnBoard<T extends { boardId: string }>(rows: T[], boardId: string) {
+  return rows.filter((row) => row.boardId === boardId);
+}
+
+function findJob<T extends { atsJobId: string }>(rows: T[], atsJobId: string) {
+  return rows.find((row) => row.atsJobId === atsJobId);
+}
+
+test("search reflects a Posting title change and a close once the poll lands", async () => {
   const harness = await startCatalogHarness([FIXTURE_BOARD]);
 
   try {
-    await postBackfillAndRun(harness);
+    const jobsOnBoard = readFixtureBoard(FIXTURE_BOARD);
+    const changedJob = jobsOnBoard[0] ?? { id: "", title: "" };
+    const removedJob = jobsOnBoard[1] ?? { id: "", title: "" };
 
-    const boards = await catalogBoards(harness.app.url);
-    const board = boards.find((candidate) => candidate.boardToken === FIXTURE_BOARD);
+    await harness.runBackfillCycle();
 
-    expect(board?.status).toBe("active");
-    expect(board?.etag).not.toBeNull();
-    expect(board?.lastPolledAt).not.toBeNull();
-    expect(board?.nextPollAt).not.toBeNull();
+    const before = await search(harness, "Principal Platform Engineer");
 
-    const intervalMs = (board?.nextPollAt ?? 0) - (board?.lastPolledAt ?? 0);
+    expect(before.hits.length).toBe(0);
 
-    expect(intervalMs).toBeGreaterThanOrEqual(30 * 60_000);
-    expect(intervalMs).toBeLessThanOrEqual(12 * 3_600_000 + 60_000);
+    const recentIso = new Date((await clockNow(harness)) - 60_000).toISOString();
+
+    harness.fixture.mutateBoard(FIXTURE_BOARD, {
+      titleUpdates: { [changedJob.id]: "Principal Platform Engineer" },
+      updatedAtUpdates: { [changedJob.id]: recentIso },
+      removeJobIds: [removedJob.id],
+    });
+
+    await harness.runBackfillCycle();
+    await harness.runBackfillCycle();
+
+    const after = await search(harness, "Principal Platform Engineer");
+
+    expect(after.hits.length).toBe(1);
+    expect(after.hits[0]?.title).toBe("Principal Platform Engineer");
+
+    const removedSearch = await search(harness, removedJob.title);
+
+    expect(
+      removedSearch.hits.some((hit) => hit.title === removedJob.title && hit.ats === "greenhouse"),
+    ).toBe(false);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("activity-based scheduling puts a freshly changed board on the 30 minute band and the trickle reads the change", async () => {
+  const harness = await startCatalogHarness([FIXTURE_BOARD]);
+
+  try {
+    const jobsOnBoard = readFixtureBoard(FIXTURE_BOARD);
+    const changedJob = jobsOnBoard[0] ?? { id: "", title: "" };
+
+    harness.fixture.mutateBoard(FIXTURE_BOARD, {
+      updatedAtUpdates: {
+        [changedJob.id]: new Date((await clockNow(harness)) - 60_000).toISOString(),
+      },
+    });
+
+    await harness.runBackfillCycle();
+
+    const boards = await harness.boards();
+    const board = boardFor(boards, FIXTURE_BOARD);
+
+    expect(board.status).toBe("active");
+    expect(board.etag).not.toBeNull();
+    expect(board.nextPollAt).not.toBeNull();
+
+    const intervalMs = (board.nextPollAt ?? 0) - (board.lastPolledAt ?? 0);
+
+    expect(intervalMs).toBe(30 * 60_000);
+
+    const freshIso = new Date((await clockNow(harness)) - 60_000).toISOString();
+
+    harness.fixture.mutateBoard(FIXTURE_BOARD, {
+      titleUpdates: { [changedJob.id]: "Distinguished Platform Engineer" },
+      updatedAtUpdates: { [changedJob.id]: freshIso },
+    });
+
+    await harness.pollThroughScheduledSweep(31 * 60_000);
+
+    const boardsAfterTrickle = await harness.boards();
+    const boardAfterTrickle = boardFor(boardsAfterTrickle, FIXTURE_BOARD);
+
+    expect(boardAfterTrickle.lastPolledAt ?? 0).toBeGreaterThan(board.lastPolledAt ?? 0);
+
+    const intervalAfterTrickle =
+      (boardAfterTrickle.nextPollAt ?? 0) - (boardAfterTrickle.lastPolledAt ?? 0);
+
+    expect(intervalAfterTrickle).toBe(30 * 60_000);
+
+    const postings = await harness.postings();
+    const changed = findJob(postings, changedJob.id);
+
+    expect(changed?.title).toBe("Distinguished Platform Engineer");
   } finally {
     await harness.close();
   }
 });
 
 test("a board that 404s twice is marked gone and stops being polled", async () => {
-  const harness = await startCatalogHarness([TOKEN_WITH_404]);
+  const harness = await startCatalogHarness([MISSING_BOARD]);
 
   try {
-    await harness.fixture.setNotFound([TOKEN_WITH_404]);
+    harness.fixture.setNotFound([MISSING_BOARD]);
 
-    await postBackfillAndRun(harness);
+    await harness.runBackfillCycle();
 
-    const boardsAfterFirst = await catalogBoards(harness.app.url);
-    const boardAfterFirst = boardsAfterFirst.find((candidate) => candidate.boardToken === TOKEN_WITH_404);
+    const boardsAfterFirst = await harness.boards();
+
+    const boardAfterFirst = boardsAfterFirst.find(
+      (candidate) => candidate.boardToken === MISSING_BOARD,
+    );
 
     expect(boardAfterFirst?.status).toBe("active");
     expect(boardAfterFirst?.notFoundPolls).toBe(1);
 
-    await postBackfillAndRun(harness);
+    await harness.runBackfillCycle();
 
-    const boardsAfterSecond = await catalogBoards(harness.app.url);
-    const boardAfterSecond = boardsAfterSecond.find((candidate) => candidate.boardToken === TOKEN_WITH_404);
+    const boardsAfterSecond = await harness.boards();
+
+    const boardAfterSecond = boardsAfterSecond.find(
+      (candidate) => candidate.boardToken === MISSING_BOARD,
+    );
 
     expect(boardAfterSecond?.status).toBe("gone");
     expect(boardAfterSecond?.nextPollAt).toBeNull();
+    const postings = await harness.postings();
+
+    expect(postings).toHaveLength(0);
   } finally {
     await harness.close();
   }

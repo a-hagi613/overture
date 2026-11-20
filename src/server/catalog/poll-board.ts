@@ -2,7 +2,7 @@ import { and, desc, eq, gte, isNull, notInArray, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
-import { companies, companyBoards, postings } from "../platform/db/schema.ts";
+import { companyBoards, postings } from "../platform/db/schema.ts";
 import { htmlToText } from "./html-to-text.ts";
 import { normalizeApplyUrl, normalizeTitle } from "./normalize.ts";
 import { contentHash } from "./content-hash.ts";

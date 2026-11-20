@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
-import { createServer, type Server } from "node:http";
-import { join } from "node:path";
 import { readdirSync, readFileSync } from "node:fs";
+import type { IncomingMessage, Server, ServerResponse } from "node:http";
+import { createServer } from "node:http";
+import { join } from "node:path";
+
 import { z } from "zod";
 
 const fixtureJobSchema = z.object({
-  id: z.union([z.number(), z.string()]).transform(String),
+  id: z.union([z.number(), z.string()]),
   title: z.string().default(""),
   absolute_url: z.string().default(""),
   location: z.object({ name: z.string().default("") }).nullish(),
@@ -21,10 +23,15 @@ const fixtureJobSchema = z.object({
 
 const fixtureBoardSchema = z.object({ jobs: z.array(fixtureJobSchema).default([]) });
 
+const ifNoneMatchSchema = z
+  .union([z.string(), z.array(z.string())])
+  .nullish()
+  .transform((value) => (Array.isArray(value) ? (value[0] ?? null) : (value ?? null)));
+
 export interface FixtureStats {
   requestCount: number;
   maxInFlight: number;
-  arrivalTimes: number[];
+  arrivalGapsMs: number[];
   paths: string[];
   detailCounts: Record<string, number>;
 }
@@ -48,11 +55,14 @@ export interface GreenhouseFixtureServer {
   stop: () => void;
   stats: () => FixtureStats;
   setNotFound: (tokens: string[]) => void;
+  setDelayMs: (delayMs: number) => void;
   mutateBoard: (token: string, mutation: BoardMutation) => void;
 }
 
+export type FixtureServer = GreenhouseFixtureServer;
+
 interface MutableJob {
-  id: string;
+  id: number | string;
   title: string;
   absoluteUrl: string;
   locationName: string;
@@ -63,13 +73,21 @@ interface MutableJob {
   departments: { name: string | null }[];
 }
 
-export type FixtureServer = GreenhouseFixtureServer;
+function ifNoneMatchFrom(header: string | string[] | undefined) {
+  return ifNoneMatchSchema.parse(header);
+}
 
 function hashBody(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-export async function startGreenhouseFixtureServer(): Promise<GreenhouseFixtureServer> {
+async function responseDelayMs(delayMs: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
+}
+
+export async function startGreenhouseFixtureServer() {
   const boards = new Map<string, MutableJob[]>();
   const removedJobIds = new Set<string>();
   const notFoundTokens = new Set<string>();
@@ -85,9 +103,15 @@ export async function startGreenhouseFixtureServer(): Promise<GreenhouseFixtureS
       continue;
     }
 
-    const parsed = fixtureBoardSchema.parse(
-      JSON.parse(readFileSync(join(process.cwd(), "test/e2e/fixtures/greenhouse", entry.name, "board.json"), "utf8")),
+    const raw: unknown = JSON.parse(
+      readFileSync(
+        join(process.cwd(), "test/e2e/fixtures/greenhouse", entry.name, "board.json"),
+        "utf8",
+      ),
     );
+
+    const parsed = fixtureBoardSchema.parse(raw);
+
     const jobs = parsed.jobs.map((job) => ({
       id: job.id,
       title: job.title,
@@ -97,31 +121,44 @@ export async function startGreenhouseFixtureServer(): Promise<GreenhouseFixtureS
       firstPublished: job.first_published,
       language: job.language,
       content: job.content ?? null,
-      departments: (job.departments ?? []).map((department) => ({ name: department?.name ?? null })),
+      departments: (job.departments ?? []).map((department) => ({ name: department.name ?? null })),
     }));
 
     boards.set(entry.name, jobs);
   }
 
-  const server: Server = createServer((request, response) => {
+  async function handleRequest(request: IncomingMessage, response: ServerResponse) {
+    state.requestCount += 1;
+    state.inFlight += 1;
+    state.maxInFlight = Math.max(state.maxInFlight, state.inFlight);
+    arrivalTimes.push(performance.now());
+
     const { pathname } = new URL(request.url ?? "/", "http://127.0.0.1");
+    paths.push(pathname);
+
     const finish = (status: number, body: string, headers: Record<string, string> = {}) => {
       response.writeHead(status, { "content-type": "application/json", ...headers });
       response.end(body);
       state.inFlight -= 1;
     };
 
-    state.requestCount += 1;
-    state.inFlight += 1;
-    state.maxInFlight = Math.max(state.maxInFlight, state.inFlight);
-    arrivalTimes.push(performance.now());
-    paths.push(pathname);
+    await responseDelayMs(state.delayMs);
 
     const boardMatch = /^\/v1\/boards\/(?<token>[A-Za-z0-9_-]+)\/jobs$/u.exec(pathname);
 
     if (boardMatch?.groups !== undefined) {
       const { token = "" } = boardMatch.groups;
-      const jobs = (boards.get(token) ?? []).filter((job) => !removedJobIds.has(`${token}/${job.id}`));
+
+      if (notFoundTokens.has(token)) {
+        finish(404, JSON.stringify({ error: "board not found" }));
+
+        return;
+      }
+
+      const jobs = (boards.get(token) ?? []).filter(
+        (job) => !removedJobIds.has(`${token}/${job.id}`),
+      );
+
       const body = JSON.stringify({
         jobs: jobs.map((job) => ({
           id: job.id,
@@ -135,10 +172,12 @@ export async function startGreenhouseFixtureServer(): Promise<GreenhouseFixtureS
           departments: job.departments,
         })),
       });
-      const etag = `"${hashBody(body)}"`;
-      const ifNoneMatch = request.headers["if-none-match"];
 
-      if (typeof ifNoneMatch === "string" && ifNoneMatch === etag) {
+      const etag = `"${hashBody(body)}"`;
+
+      const ifNoneMatch = ifNoneMatchFrom(request.headers["if-none-match"]);
+
+      if (ifNoneMatch === etag) {
         finish(304, "");
 
         return;
@@ -149,7 +188,8 @@ export async function startGreenhouseFixtureServer(): Promise<GreenhouseFixtureS
       return;
     }
 
-    const jobMatch = /^\/v1\/boards\/(?<token>[A-Za-z0-9_-]+)\/jobs\/(?<jobId>[A-Za-z0-9_-]+)$/u.exec(pathname);
+    const jobMatch =
+      /^\/v1\/boards\/(?<token>[A-Za-z0-9_-]+)\/jobs\/(?<jobId>[A-Za-z0-9_-]+)$/u.exec(pathname);
 
     if (jobMatch?.groups === undefined) {
       finish(404, JSON.stringify({ error: "unknown path" }));
@@ -159,34 +199,51 @@ export async function startGreenhouseFixtureServer(): Promise<GreenhouseFixtureS
 
     const token = jobMatch.groups.token ?? "";
     const jobId = jobMatch.groups.jobId ?? "";
-    const jobs = boards.get(token) ?? [];
-    const job = jobs.find((candidate) => candidate.id === jobId);
 
-    if (job === undefined) {
-      finish(404, JSON.stringify({ error: "not found" }));
+    if (notFoundTokens.has(token)) {
+      finish(404, JSON.stringify({ error: "board not found" }));
 
       return;
     }
 
-    detailCounts[jobId] = (detailCounts[jobId] ?? 0) + 1;
+    const job = (boards.get(token) ?? []).find((candidate) => String(candidate.id) === jobId);
+
+    if (job === undefined) {
+      finish(404, JSON.stringify({ error: "job not found" }));
+
+      return;
+    }
+
+    detailCounts[`${token}/${jobId}`] = (detailCounts[`${token}/${jobId}`] ?? 0) + 1;
     finish(200, JSON.stringify(job));
+  }
+
+  const server: Server = createServer((request, response) => {
+    void handleRequest(request, response);
   });
 
-  await new Promise<void>((resolveListen) => {
-    server.listen(0, "127.0.0.1", resolveListen);
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
   });
+
   const address = server.address();
-  const port = typeof address === "object" && address !== null ? address.port : 0;
+  const port = z.object({ port: z.number() }).safeParse(address);
+
+  if (!port.success) {
+    server.close();
+
+    throw new Error("the fixture server did not bind to a port");
+  }
 
   return {
-    url: `http://127.0.0.1:${String(port)}`,
+    url: `http://127.0.0.1:${String(port.data.port)}`,
     stop: () => {
       server.close();
     },
-    stats: (): FixtureStats => ({
+    stats: () => ({
       requestCount: state.requestCount,
       maxInFlight: state.maxInFlight,
-      arrivalTimes: [...arrivalTimes],
+      arrivalGapsMs: arrivalTimes.slice(1).map((time, index) => time - (arrivalTimes[index] ?? 0)),
       paths: [...paths],
       detailCounts: { ...detailCounts },
     }),
@@ -194,6 +251,9 @@ export async function startGreenhouseFixtureServer(): Promise<GreenhouseFixtureS
       for (const token of tokens) {
         notFoundTokens.add(token);
       }
+    },
+    setDelayMs: (delayMs) => {
+      state.delayMs = delayMs;
     },
     mutateBoard: (token, mutation) => {
       const jobs = boards.get(token) ?? [];

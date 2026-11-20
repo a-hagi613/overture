@@ -57,7 +57,7 @@ export interface GreenhouseFeed {
 }
 
 const jobSchema = z.object({
-  id: z.number(),
+  id: z.union([z.number(), z.string()]).transform(String),
   title: z.string(),
   absolute_url: z.string().nullish(),
   location: z.object({ name: z.string().nullish() }).nullish(),
@@ -92,6 +92,10 @@ const GREENHOUSE_FETCHER: FeedFetcher = async (url, request) => {
 
   if (response.status === 304) {
     return { status: 304, etag, json: null };
+  }
+
+  if (response.status === 404) {
+    return { status: 404, etag, json: null };
   }
 
   if (!response.ok) {
@@ -134,7 +138,7 @@ export function createGreenhouseFeed(
     const parsed = listResponseSchema.parse(response.json);
 
     const jobs: GreenhouseFeedJob[] = parsed.jobs.map((job) => ({
-      id: String(job.id),
+      id: job.id,
       title: job.title,
       absoluteUrl: job.absolute_url ?? null,
       locationName: job.location?.name ?? null,

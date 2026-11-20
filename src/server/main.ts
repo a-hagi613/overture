@@ -54,10 +54,8 @@ const greenhouseFeed = createGreenhouseFeed(env.GREENHOUSE_FEED_BASE_URL);
 const catalogDeps = { db, clock, greenhouse: greenhouseFeed };
 
 const catalogJobHandlers: JobHandlers = {
-  [BACKFILL_JOB_KIND]: async (payload) => {
-    runBackfillJob(catalogDeps);
-
-    await Promise.resolve(payload);
+  [BACKFILL_JOB_KIND]: async () => {
+    await runBackfillJob(catalogDeps);
   },
   [SWEEP_JOB_KIND]: async () => {
     await runSweepJob(catalogDeps);

@@ -8,7 +8,7 @@ const sseEventSchema = z.object({
 
 export type SseEvent = z.infer<typeof sseEventSchema>;
 
-function extractSseEvents(buffer: string) {
+export function extractSseEvents(buffer: string) {
   const lastBoundary = buffer.lastIndexOf("\n\n");
   const complete = buffer.slice(0, lastBoundary + 2);
   const events: SseEvent[] = [];
