@@ -185,7 +185,7 @@ direct columns but at jobs level hc has them; Item of note: hc has *enrichment*;
   2026-11-20 → observed age ≈ 1.5 days at fetch). "Daily snapshot diffs" therefore means, today,
   *we* keep yesterday's slice and diff against today's, per ATS; no served delta exists. The
   manifest schema anticipates `by_date` deltas, so this may arrive later.
-- **Ours (SPEC §6.2/§6.3)**: polls are per-board with ETag/content-hash conditional GETs — deltas
+- **Our own (SPEC §6.2/§6.3)**: polls are per-board with ETag/content-hash conditional GETs — deltas
   come from the ATS itself, not reconstructed.
 
 ### 4.2 Design (hosted-snapshot ingestion, for comparison in §7)
