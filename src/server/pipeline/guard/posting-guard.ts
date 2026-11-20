@@ -28,7 +28,7 @@ const HIDDEN_STYLE =
   /display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0(?:\.0+)?(?:[;}"']|$)|font-size\s*:\s*0(?:\.0+)?(?:px|pt|em|rem|%)?(?:[;}"']|$)|color\s*:\s*transparent|clip\s*:\s*rect\(\s*0|clip-path\s*:\s*inset\(\s*100%|(?:left|top|text-indent)\s*:\s*-\d{4,}px/iu;
 
 const PRESTRIP = /<!DOCTYPE[^>]*>|<\?[^>]*\?>/giu;
-const COMMENT = /<!--[\s\S]*?(?:-->|$)/gu;
+const COMMENT = /<!--[\s\S]*?(?:--!?>|$)/gu;
 
 const DROP_BLOCKS =
   /<(?<tag>script|style|noscript|svg|template)\b[^>]*>[\s\S]*?(?:<\/\k<tag>\s*>|$)/giu;
