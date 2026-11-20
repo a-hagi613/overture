@@ -3,46 +3,72 @@ import { chromium } from "@playwright/test";
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import { z } from "zod";
+
 const referenceRoot = "design/reference/home";
 const outputRoot = "test/e2e/chrome-baselines";
 
-interface Part {
-  file: string;
+const boxSchema = z.object({ h: z.number(), w: z.number(), x: z.number(), y: z.number() });
+
+const elementSchema = z.object({ box: boxSchema, path: z.string() });
+
+const referenceSchema = z.object({ elements: z.array(elementSchema) });
+
+interface Rect {
   height: number;
   width: number;
   x: number;
   y: number;
 }
 
-const boards: { parts: Part[]; variant: string }[] = [
-  {
-    parts: [
-      { file: "header", height: 262, width: 390, x: 0, y: 0 },
-      { file: "tabbar", height: 64, width: 390, x: 0, y: 1975 },
-    ],
-    variant: "390",
-  },
-  {
-    parts: [
-      { file: "sidebar", height: 1197, width: 268, x: 0, y: 0 },
-      { file: "header", height: 140, width: 1012, x: 268, y: 0 },
-    ],
-    variant: "1280",
-  },
-];
+function rectOfBox(box: z.infer<typeof boxSchema>) {
+  const x = Math.round(box.x);
+  const y = Math.round(box.y);
+
+  return {
+    height: Math.round(box.y + box.h) - y,
+    width: Math.round(box.x + box.w) - x,
+    x,
+    y,
+  };
+}
+
+const parts = {
+  1280: [
+    { name: "header", suffix: ">main>header" },
+    { name: "sidebar", suffix: "aside" },
+  ],
+  390: [
+    { name: "header", suffix: ">main>header" },
+    { name: "tabbar", suffix: ">div>nav" },
+  ],
+} as const;
 
 const themes = ["light", "dark"];
 
-async function screenshotPart(
+function referenceRect(variant: string, suffix: string) {
+  const reference = referenceSchema.parse(
+    JSON.parse(readFileSync(join(process.cwd(), referenceRoot, `${variant}.json`), "utf8")),
+  );
+
+  const element = reference.elements.find((candidate) => candidate.path.endsWith(suffix));
+
+  if (element === undefined) {
+    throw new Error(`no element ends with ${suffix} in ${variant}`);
+  }
+
+  return rectOfBox(element.box);
+}
+
+async function crop(
   browser: Awaited<ReturnType<typeof chromium.launch>>,
   reference: string,
-  part: Part,
-  variant: string,
-  theme: string,
+  rect: Rect,
+  output: string,
 ) {
   const page = await browser.newPage({
     deviceScaleFactor: 1,
-    viewport: { height: part.height, width: part.width },
+    viewport: { height: rect.height, width: rect.width },
   });
 
   await page.setContent(
@@ -57,13 +83,11 @@ async function screenshotPart(
 
   await page.locator("#reference").evaluate(
     (element, position: { left: number; top: number }) => {
-      element.style.left = `-${position.left}px`;
-      element.style.top = `-${position.top}px`;
+      element.style.left = `-${String(position.left)}px`;
+      element.style.top = `-${String(position.top)}px`;
     },
-    { left: part.x, top: part.y },
+    { left: rect.x, top: rect.y },
   );
-
-  const output = join(process.cwd(), outputRoot, `home-${variant}-${theme}-${part.file}.png`);
 
   mkdirSync(dirname(output), { recursive: true });
 
@@ -75,22 +99,25 @@ async function screenshotPart(
 async function main() {
   const browser = await chromium.launch();
 
-  const combinations = boards.flatMap((board) =>
-    themes.map((theme) => ({ theme, variant: board.variant, parts: board.parts })),
+  const combinations = Object.entries(parts).flatMap(([width, namedParts]) =>
+    themes.map((theme) => ({
+      namedParts,
+      reference: join(process.cwd(), referenceRoot, `${width}-${theme}.png`),
+      variant: `${width}-${theme}`,
+    })),
   );
 
   await Promise.all(
     combinations.map(async (combination) => {
-      const reference = join(
-        process.cwd(),
-        referenceRoot,
-        `${combination.variant}-${combination.theme}.png`,
-      );
-
       await Promise.all(
-        combination.parts.map(async (part) =>
-          screenshotPart(browser, reference, part, combination.variant, combination.theme),
-        ),
+        combination.namedParts.map(async (namedPart) => {
+          await crop(
+            browser,
+            combination.reference,
+            referenceRect(combination.variant, namedPart.suffix),
+            join(process.cwd(), outputRoot, `home-${combination.variant}-${namedPart.name}.png`),
+          );
+        }),
       );
     }),
   );

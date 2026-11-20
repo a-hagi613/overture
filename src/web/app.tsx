@@ -49,42 +49,46 @@ export function AppShell() {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-background text-foreground md:flex-row">
+    <div className="relative overflow-hidden bg-background text-foreground">
       <Backdrop />
-      <aside
-        className={`hidden border-r border-border bg-sidebar px-4 pb-[18px] pt-[22px] md:flex md:flex-col md:items-center md:gap-[18px] lg:items-stretch ${columnWidths}`}
-      >
-        <div className={`flex items-center justify-between px-1.5 ${wide ? "" : "justify-center"}`}>
-          <Link aria-label={copy.brand.homeAria} className="flex items-center gap-2.5" to="/">
-            <BrandMark size={30} />
+      <div className="relative z-[1] flex min-h-screen flex-col md:flex-row">
+        <aside
+          className={`hidden border-r border-border bg-sidebar px-4 pb-[18px] pt-[22px] md:flex md:flex-col md:items-center md:gap-[18px] lg:items-stretch ${columnWidths}`}
+        >
+          <div
+            className={`flex items-center justify-between px-1.5 ${wide ? "" : "justify-center"}`}
+          >
+            <Link aria-label={copy.brand.homeAria} className="flex items-center gap-2.5" to="/">
+              <BrandMark size={30} />
+              {wide ? (
+                <span className="font-serif text-[27px] leading-none tracking-tight">
+                  {copy.app.name}
+                </span>
+              ) : null}
+            </Link>
             {wide ? (
-              <span className="font-serif text-[27px] leading-none tracking-tight">
-                {copy.app.name}
-              </span>
+              <button
+                aria-label={copy.shell.collapseSidebar}
+                className="flex h-[34px] w-[34px] items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={toggleRail}
+                type="button"
+              >
+                <NavGlyph name="rail" size={18} />
+              </button>
             ) : null}
-          </Link>
-          {wide ? (
-            <button
-              aria-label={copy.shell.collapseSidebar}
-              className="flex h-[34px] w-[34px] items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-              onClick={toggleRail}
-              type="button"
-            >
-              <NavGlyph name="rail" size={18} />
-            </button>
-          ) : null}
-        </div>
-        <hr className="m-0 border-border shadow-[0_1px_0_var(--color-bloom)]" />
-        <SideNav showLabels={wide} />
-        <div className="mt-auto flex flex-col gap-3.5">
-          {wide ? <UsageCard /> : <UsageMini />}
-          <AvatarLink name={name} wide={wide} />
-        </div>
-      </aside>
-      <main className="min-w-0 flex-1 px-4 pb-7 pt-[18px] md:px-9 md:pb-10 md:pt-[26px]">
-        <Outlet />
-      </main>
-      <TabBar />
+          </div>
+          <hr className="m-0 border-border shadow-[0_1px_0_var(--color-bloom)]" />
+          <SideNav showLabels={wide} />
+          <div className="mt-auto flex flex-col gap-3.5">
+            {wide ? <UsageCard /> : <UsageMini />}
+            <AvatarLink name={name} wide={wide} />
+          </div>
+        </aside>
+        <main className="min-w-0 flex-1 px-4 pb-7 pt-[18px] md:px-9 md:pb-10 md:pt-[26px]">
+          <Outlet />
+        </main>
+        <TabBar />
+      </div>
     </div>
   );
 }

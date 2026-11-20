@@ -21,7 +21,7 @@ export function PageHeader({ lead, titleNode }: { lead: string; titleNode: React
         <h1 className="mt-0.5 font-serif text-[32px] leading-[1.05] md:text-[42px]">{titleNode}</h1>
       </div>
       <div className="flex min-w-0 flex-[1_1_420px] flex-wrap items-center justify-end gap-3">
-        <label className="flex h-10 min-w-[200px] max-w-[380px] flex-[1_1_260px] items-center gap-2.5 rounded-md border border-input bg-card px-3 max-[767px]:max-w-full">
+        <label className="flex h-10 min-w-[200px] max-w-[380px] flex-[1_1_260px] items-center gap-2.5 rounded-md border border-input bg-card px-3 max-[767px]:h-11 max-[767px]:max-w-full">
           <svg
             aria-hidden="true"
             fill="none"

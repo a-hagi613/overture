@@ -63,7 +63,7 @@ for (const width of widths) {
             await expect(page.getByText("Link sent to")).toBeVisible();
           }
 
-          await expect(page).toHaveScreenshot(`${String(width)}-${theme}-${mode}`, {
+          await expect(page).toHaveScreenshot(`${String(width)}-${theme}-${mode}.png`, {
             animations: "disabled",
             caret: "hide",
             maxDiffPixelRatio: 0.01,
