@@ -100,7 +100,7 @@ export function grantApplications(db: BillingDb, clock: Clock, input: GrantInput
     const existing = entryOf(tx, input.idempotencyKey);
 
     if (existing !== undefined) {
-      return { entry: existing, grantId: existing.grantId };
+      return { created: false, entry: existing, grantId: existing.grantId };
     }
 
     const at = clock.now();
@@ -128,7 +128,7 @@ export function grantApplications(db: BillingDb, clock: Clock, input: GrantInput
       idempotencyKey: input.idempotencyKey,
     });
 
-    return { entry, grantId };
+    return { created: true, entry, grantId };
   });
 }
 

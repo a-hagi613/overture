@@ -83,6 +83,10 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
         data: { email: authTestIdentity.ownerEmail, name: authTestIdentity.ownerName },
       });
 
+      await request.post(`${_appServerWorker.url}/__test__/ledger/sample`, {
+        data: { email: authTestIdentity.ownerEmail },
+      });
+
       const storage = await request.storageState();
 
       await request.dispose();

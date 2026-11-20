@@ -12,6 +12,7 @@ import type { ObjectStore } from "./platform/ports/object-store.ts";
 import { createHealthRoutes } from "./routes/health.ts";
 import { createMeRoutes } from "./routes/me.ts";
 import { createApiRoutes } from "./routes/api.ts";
+import { createHomeRoutes } from "./routes/home.ts";
 import { createAdminApi, isAdminHost } from "./routes/admin.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
 import { env } from "./config/env.ts";
@@ -64,6 +65,7 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createMeRoutes(deps.auth));
   app.route("/api", createApiRoutes(deps.db, deps.clock));
   app.route("/api", createProfileRoutes(deps));
+  app.route("/api", createHomeRoutes(deps.db, deps.clock, deps.auth));
 
   if (deps.testRoutes) {
     app.route(

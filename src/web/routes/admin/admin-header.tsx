@@ -36,6 +36,12 @@ export function AdminHeader() {
         >
           {copy.admin.navCatalog}
         </Link>
+        <Link
+          className="rounded-md border border-input bg-card px-3.5 py-2 text-[13.5px] font-semibold hover:bg-muted"
+          to="/admin/grants"
+        >
+          {copy.admin.navGrants}
+        </Link>
         <button
           aria-label={label}
           aria-pressed={theme === "dark"}

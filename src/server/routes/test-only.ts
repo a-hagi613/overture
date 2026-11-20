@@ -13,6 +13,7 @@ import {
   bgJobs,
   companies,
   companyBoards,
+  ledger,
   postingTags,
   postings,
   sessions,
@@ -35,6 +36,12 @@ import { dedupeKeyFor } from "../catalog/dedupe-key.ts";
 import { normalizeApplyUrl, normalizeTitle } from "../catalog/normalize.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags } from "../catalog/tag-import.ts";
 import { readLlmUsage, recordLlmUsage } from "../platform/llm/usage.ts";
+import {
+  applicationsLeft,
+  commitForApplication,
+  grantApplications,
+  reserveForApplication,
+} from "../billing/ledger.ts";
 
 const offsetBody = z.object({ offsetMs: z.number().int() });
 
@@ -95,6 +102,12 @@ const postingTagBody = z.object({
   dimension: z.enum(["role", "subrole", "seniority"]),
   value: z.string().min(1),
 });
+
+const sampleLedgerBody = z.object({ email: z.email() });
+
+const tamperLedgerBody = z.object({ action: z.enum(["delete", "update"]) });
+
+const SAMPLE_GRANT_QUANTITY = 70;
 
 const createPostingBody = z.object({
   boardId: z.string().min(1),
@@ -470,6 +483,71 @@ export function createTestRoutes(
       .run();
 
     return context.json({ ok: true });
+  });
+
+  routes.post("/ledger/sample", zValidator("json", sampleLedgerBody), (context) => {
+    const { email } = context.req.valid("json");
+
+    const user = db
+      .select()
+      .from(users)
+      .where(eq(users.email, lowercased(email)))
+      .get();
+
+    if (user === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    grantApplications(db, clock, {
+      idempotencyKey: `sample-grant:${user.id}`,
+      quantity: SAMPLE_GRANT_QUANTITY,
+      source: "admin",
+      userId: user.id,
+    });
+
+    for (let index = 1; index <= 7; index += 1) {
+      const applicationId = `sample-${String(index)}`;
+
+      reserveForApplication(db, clock, {
+        applicationId,
+        idempotencyKey: `sample-reserve:${user.id}:${applicationId}`,
+        userId: user.id,
+      });
+
+      commitForApplication(db, clock, {
+        applicationId,
+        idempotencyKey: `sample-commit:${user.id}:${applicationId}`,
+        userId: user.id,
+      });
+    }
+
+    return context.json({ applicationsLeft: applicationsLeft(db, user.id, clock.now()) });
+  });
+
+  routes.post("/ledger/tamper", zValidator("json", tamperLedgerBody), (context) => {
+    const { action } = context.req.valid("json");
+    const row = db.select().from(ledger).limit(1).get();
+
+    if (row === undefined) {
+      return context.json({ error: "no ledger rows" }, 404);
+    }
+
+    try {
+      if (action === "update") {
+        db.update(ledger)
+          .set({ amount: row.amount + 1 })
+          .where(eq(ledger.id, row.id))
+          .run();
+      } else {
+        db.delete(ledger).where(eq(ledger.id, row.id)).run();
+      }
+
+      return context.json({ ledger: row.id, refused: false });
+    } catch (error) {
+      const refusal = error instanceof Error ? error.message : String(error);
+
+      return context.json({ ledger: row.id, refused: true, refusal });
+    }
   });
 
   routes.get("/auth/state", (context) => {

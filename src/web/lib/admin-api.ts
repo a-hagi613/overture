@@ -55,6 +55,23 @@ export const killSwitchResponseSchema = z.object({
   reason: z.string(),
 });
 
+export const grantRowSchema = z.object({
+  createdAt: z.number(),
+  email: z.string(),
+  expiresAt: z.number().nullable(),
+  id: z.string(),
+  quantity: z.number(),
+  source: z.string(),
+  startsAt: z.number(),
+});
+
+export const grantsResponseSchema = z.object({ grants: z.array(grantRowSchema) });
+
+export const grantCreateResponseSchema = z.object({
+  applicationsLeft: z.number(),
+  grantId: z.string(),
+});
+
 export const catalogResponseSchema = z.object({
   discoveredAt: z.number().nullable(),
   ats: z.array(
@@ -73,6 +90,8 @@ export type Overview = z.infer<typeof overviewSchema>;
 export type AuditRow = z.infer<typeof auditRowSchema>;
 
 export type KillSwitchRow = z.infer<typeof killSwitchRowSchema>;
+
+export type GrantRow = z.infer<typeof grantRowSchema>;
 
 export type AdminResult<T> = { ok: true; data: T } | { ok: false; refusal: AdminRefusalCode };
 
@@ -103,13 +122,29 @@ async function adminGet<T>(path: string, schema: z.ZodType<T>) {
   return adminRequest(await fetch(path), schema);
 }
 
-type AdminPutBody = { value: string } | { enabled: boolean; reason: string };
+type AdminWriteBody =
+  | {
+      enabled: boolean;
+      reason: string;
+    }
+  | {
+      email: string;
+      expiresInDays: number | null;
+      idempotencyKey: string;
+      quantity: number;
+    }
+  | { value: string };
 
-async function adminPut<T>(path: string, body: AdminPutBody, schema: z.ZodType<T>) {
+async function adminWrite<T>(
+  method: "POST" | "PUT",
+  path: string,
+  body: AdminWriteBody,
+  schema: z.ZodType<T>,
+) {
   const response = await fetch(path, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
+    headers: { "content-type": "application/json" },
+    method,
   });
 
   const result = await adminRequest(response, schema);
@@ -119,6 +154,14 @@ async function adminPut<T>(path: string, body: AdminPutBody, schema: z.ZodType<T
   }
 
   return result.data;
+}
+
+async function adminPost<T>(path: string, body: AdminWriteBody, schema: z.ZodType<T>) {
+  return adminWrite("POST", path, body, schema);
+}
+
+async function adminPut<T>(path: string, body: AdminWriteBody, schema: z.ZodType<T>) {
+  return adminWrite("PUT", path, body, schema);
 }
 
 export const loadOverview = async () => adminGet("/admin/api/overview", overviewSchema);
@@ -138,4 +181,18 @@ export const setKillSwitch = async (scope: string, key: string, enabled: boolean
     `/admin/api/kill-switches/${scope}/${key}`,
     { enabled, reason },
     killSwitchResponseSchema,
+  );
+
+export const loadGrants = async () => adminGet("/admin/api/grants", grantsResponseSchema);
+
+export const createGrant = async (
+  email: string,
+  quantity: number,
+  expiresInDays: number | null,
+  idempotencyKey: string,
+) =>
+  adminPost(
+    "/admin/api/grants",
+    { email, expiresInDays, idempotencyKey, quantity },
+    grantCreateResponseSchema,
   );
