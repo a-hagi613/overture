@@ -83,8 +83,10 @@ function seedLiveDatabase(livePath: string) {
     .prepare("insert into users (id, email, created_at) values (?, ?, ?)")
     .run("drill-user-2", "drill-2@example.com", timestamp);
   sqlite
-    .prepare("insert into jobs (id, kind, payload, due_at) values (?, ?, ?, ?)")
-    .run("drill-job-1", "drill", "{}", timestamp);
+    .prepare(
+      "insert into bg_jobs (id, kind, payload, run_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?)",
+    )
+    .run("drill-job-1", "drill", "{}", timestamp, timestamp, timestamp);
 
   const counts = rowCounts(sqlite);
 
