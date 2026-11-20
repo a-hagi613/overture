@@ -29,6 +29,7 @@ async function spawnServer(databasePath: string) {
       STATIC_ROOT: "dist",
       ENABLE_TEST_ROUTES: "true",
       OTEL_SIMPLE_EXPORT: "true",
+      KILL_TIMEOUT_MS: "1000",
     },
     stdio: ["ignore", "pipe", "inherit"],
   });

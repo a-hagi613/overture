@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { expect, test } from "./app.fixture.ts";
+import { readSseEventUntil } from "./sse.ts";
 
 const spansResponseSchema = z.object({
   spans: z.array(
@@ -12,7 +13,7 @@ const spansResponseSchema = z.object({
 });
 
 const enqueueResponseSchema = z.object({ id: z.string() });
-const runDueResponseSchema = z.object({ ran: z.number() });
+const jobDoneSchema = z.object({ id: z.string() });
 
 test("telemetry attributes outside the allowlist are dropped", async ({ appServerUrl }) => {
   await fetch(`${appServerUrl}/__test__/telemetry/reset`, { method: "POST" });
@@ -31,15 +32,16 @@ test("telemetry attributes outside the allowlist are dropped", async ({ appServe
   });
 
   expect(enqueueResponse.ok).toBe(true);
-  enqueueResponseSchema.parse(await enqueueResponse.json());
 
-  const runResponse = await fetch(`${appServerUrl}/__test__/jobs/run-due`, { method: "POST" });
+  const { id } = enqueueResponseSchema.parse(await enqueueResponse.json());
 
-  expect(runResponse.ok).toBe(true);
+  const done = await readSseEventUntil(
+    `${appServerUrl}/api/events`,
+    null,
+    (event) => event.event === "job.done" && jobDoneSchema.parse(JSON.parse(event.data)).id === id,
+  );
 
-  const { ran } = runDueResponseSchema.parse(await runResponse.json());
-
-  expect(ran).toBe(1);
+  expect(done).not.toBeNull();
 
   const spansResponse = await fetch(`${appServerUrl}/__test__/telemetry/spans`);
 

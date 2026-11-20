@@ -13,6 +13,7 @@ import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { getTestSpans, resetTestSpans } from "../platform/telemetry/otel.ts";
+import { releaseBlockingJobs } from "../testing/blocking-job.ts";
 
 const offsetBody = z.object({ offsetMs: z.number().int() });
 
@@ -82,6 +83,12 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
     }
 
     return context.json(job);
+  });
+
+  routes.post("/jobs/release", (context) => {
+    releaseBlockingJobs();
+
+    return context.json({ ok: true });
   });
 
   routes.put("/settings/:key", zValidator("json", settingBody), (context) => {

@@ -5,6 +5,7 @@ const booleanFromString = z.enum(["true", "false"]).transform((value) => value =
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().min(0).max(65_535).default(3000),
+  KILL_TIMEOUT_MS: z.coerce.number().int().min(1).default(270_000),
   DATABASE_URL: z.string().min(1).default("data/overture.db"),
   STATIC_ROOT: z.string().min(1).default("dist"),
   ENABLE_TEST_ROUTES: booleanFromString.default(false),

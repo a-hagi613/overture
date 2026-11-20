@@ -11,8 +11,6 @@ import { startTelemetry, trace } from "./platform/telemetry/otel.ts";
 
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 
-const KILL_TIMEOUT_MS = 270_000;
-
 const sdk = startTelemetry({
   serviceName: "overture",
   ...(env.OTEL_EXPORTER_OTLP_ENDPOINT !== undefined && {
@@ -64,14 +62,17 @@ const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
           span.end();
         }
       },
+      "test.blocking": async (payload) => {
+        const { waitForBlockingRelease } = await import("./testing/blocking-job.ts");
+
+        await waitForBlockingRelease(payload);
+      },
     }
   : {};
 
-if (!env.ENABLE_TEST_ROUTES) {
-  startJobWorker(db, clock, testJobHandlers, shutdownController.signal, (notify) => {
-    registerEnqueueNotify(notify);
-  });
-}
+const worker = startJobWorker(db, clock, testJobHandlers, shutdownController.signal, (notify) => {
+  registerEnqueueNotify(notify);
+});
 
 const app = createApp({
   db,
@@ -91,12 +92,13 @@ function handleShutdown() {
   const killTimer = setTimeout(() => {
     void server.stop(true);
     void sdk.shutdown();
-  }, KILL_TIMEOUT_MS);
+  }, env.KILL_TIMEOUT_MS);
 
   killTimer.unref();
 
   void (async () => {
     await server.stop(false);
+    await worker.drain(env.KILL_TIMEOUT_MS);
 
     clearTimeout(killTimer);
     await sdk.shutdown();

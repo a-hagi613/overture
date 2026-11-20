@@ -1,13 +1,23 @@
 import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
-import type { JobHandlers } from "./queue.ts";
+import type { ClaimedJob, JobHandlers } from "./queue.ts";
 
-import { claimAndRunDueJobs } from "./queue.ts";
+import { claimDueJobs, requeueWithoutConsumingAttempt, runClaimedJob } from "./queue.ts";
 import { getSetting } from "../settings/index.ts";
 
 const DEFAULT_POLL_INTERVAL_MS = 15_000;
 const DEFAULT_BATCH_SIZE = 10;
 const MIN_POLL_INTERVAL_MS = 1000;
+
+interface InFlightJob {
+  id: string;
+  claimedAttempts: number;
+  promise: Promise<boolean>;
+}
+
+export interface JobWorker {
+  drain: (timeoutMs: number) => Promise<void>;
+}
 
 function readPollIntervalMs(db: AppDatabase) {
   const raw = getSetting(db, "jobs.poll_interval_ms");
@@ -29,8 +39,6 @@ async function sleep(ms: number, signal: AbortSignal, onResolve: (resolve: () =>
   return new Promise<void>((resolve) => {
     const timer = setTimeout(resolve, ms);
 
-    onResolve(resolve);
-
     signal.addEventListener(
       "abort",
       () => {
@@ -39,17 +47,30 @@ async function sleep(ms: number, signal: AbortSignal, onResolve: (resolve: () =>
       },
       { once: true },
     );
+
+    onResolve(resolve);
   });
 }
 
-async function runOnce(db: AppDatabase, clock: Clock, handlers: JobHandlers, signal: AbortSignal) {
-  if (signal.aborted) {
-    return;
-  }
+interface TimeoutHandle {
+  timer: ReturnType<typeof setTimeout> | null;
+}
 
-  const batchSize = readBatchSize(db);
+function expiring(ms: number) {
+  const holder: TimeoutHandle = { timer: null };
 
-  await claimAndRunDueJobs(db, clock, handlers, signal, batchSize);
+  const promise = new Promise<void>((resolve) => {
+    holder.timer = setTimeout(resolve, ms);
+  });
+
+  const cancel = () => {
+    if (holder.timer !== null) {
+      clearTimeout(holder.timer);
+      holder.timer = null;
+    }
+  };
+
+  return { promise, cancel };
 }
 
 export function startJobWorker(
@@ -59,6 +80,28 @@ export function startJobWorker(
   signal: AbortSignal,
   onEnqueue: (notify: () => void) => void,
 ) {
+  const inFlight = new Set<InFlightJob>();
+
+  function runTracked(job: ClaimedJob) {
+    const entry: InFlightJob = {
+      id: job.id,
+      claimedAttempts: job.attempts,
+      promise: Promise.resolve(false),
+    };
+
+    const tracked = async () => {
+      try {
+        return await runClaimedJob(db, clock, job, handlers, signal);
+      } finally {
+        inFlight.delete(entry);
+      }
+    };
+
+    entry.promise = tracked();
+
+    inFlight.add(entry);
+  }
+
   let wakeResolve: (() => void) | null = null;
 
   onEnqueue(() => {
@@ -68,9 +111,19 @@ export function startJobWorker(
     }
   });
 
-  async function step() {
-    await runOnce(db, clock, handlers, signal);
+  function runOnce() {
+    if (signal.aborted) {
+      return;
+    }
 
+    const claimed = claimDueJobs(db, clock, readBatchSize(db));
+
+    for (const job of claimed) {
+      runTracked(job);
+    }
+  }
+
+  async function step() {
     if (signal.aborted) {
       return;
     }
@@ -83,8 +136,25 @@ export function startJobWorker(
 
     wakeResolve = null;
 
+    runOnce();
+
     return step();
   }
 
   void step();
+
+  async function drain(timeoutMs: number) {
+    const waiting = Promise.allSettled([...inFlight].map(async (entry) => entry.promise));
+    const deadline = expiring(timeoutMs);
+
+    await Promise.race([waiting, deadline.promise]);
+
+    deadline.cancel();
+
+    for (const entry of inFlight) {
+      requeueWithoutConsumingAttempt(db, clock, entry.id, entry.claimedAttempts - 1);
+    }
+  }
+
+  return { drain } satisfies JobWorker;
 }

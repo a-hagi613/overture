@@ -4,15 +4,18 @@ import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 
 import { bgJobs } from "../db/schema.ts";
+import { publishEvent } from "../sse/stream.ts";
 
 export type JobHandlers = Readonly<Record<string, (payload: string) => Promise<void>>>;
 
 const LOCK_DURATION_MS = 5 * 60_000;
 
+export type ClaimedJob = typeof bgJobs.$inferSelect;
+
 async function runJob(
   db: AppDatabase,
   clock: Clock,
-  job: typeof bgJobs.$inferSelect,
+  job: ClaimedJob,
   handler: (payload: string) => Promise<void>,
 ) {
   try {
@@ -22,6 +25,8 @@ async function runJob(
       .set({ status: "done", lockedUntil: null, updatedAt: clock.now() })
       .where(eq(bgJobs.id, job.id))
       .run();
+
+    publishEvent(db, clock, "job.done", JSON.stringify({ id: job.id }));
 
     return true;
   } catch (error) {
@@ -45,7 +50,7 @@ async function runJob(
   }
 }
 
-function requeueWithoutConsumingAttempt(
+export function requeueWithoutConsumingAttempt(
   db: AppDatabase,
   clock: Clock,
   jobId: string,
@@ -62,16 +67,10 @@ function requeueWithoutConsumingAttempt(
     .run();
 }
 
-export async function claimAndRunDueJobs(
-  db: AppDatabase,
-  clock: Clock,
-  handlers: JobHandlers,
-  signal: AbortSignal,
-  batchSize: number,
-) {
+export function claimDueJobs(db: AppDatabase, clock: Clock, batchSize: number) {
   const now = clock.now();
 
-  const claimed = db
+  return db
     .update(bgJobs)
     .set({
       status: "running",
@@ -96,31 +95,49 @@ export async function claimAndRunDueJobs(
     )
     .returning()
     .all();
+}
 
-  const tasks = claimed.map(async (job) => {
-    if (signal.aborted) {
-      requeueWithoutConsumingAttempt(db, clock, job.id, job.attempts - 1);
+export async function runClaimedJob(
+  db: AppDatabase,
+  clock: Clock,
+  job: ClaimedJob,
+  handlers: JobHandlers,
+  signal: AbortSignal,
+) {
+  if (signal.aborted) {
+    requeueWithoutConsumingAttempt(db, clock, job.id, job.attempts - 1);
 
-      return false;
-    }
+    return false;
+  }
 
-    const handler = handlers[job.kind];
+  const handler = handlers[job.kind];
 
-    if (handler === undefined) {
-      db.update(bgJobs)
-        .set({
-          status: "dead",
-          lastError: `no handler for kind: ${job.kind}`,
-          updatedAt: clock.now(),
-        })
-        .where(eq(bgJobs.id, job.id))
-        .run();
+  if (handler === undefined) {
+    db.update(bgJobs)
+      .set({
+        status: "dead",
+        lastError: `no handler for kind: ${job.kind}`,
+        updatedAt: clock.now(),
+      })
+      .where(eq(bgJobs.id, job.id))
+      .run();
 
-      return false;
-    }
+    return false;
+  }
 
-    return runJob(db, clock, job, handler);
-  });
+  return runJob(db, clock, job, handler);
+}
+
+export async function claimAndRunDueJobs(
+  db: AppDatabase,
+  clock: Clock,
+  handlers: JobHandlers,
+  signal: AbortSignal,
+  batchSize: number,
+) {
+  const claimed = claimDueJobs(db, clock, batchSize);
+
+  const tasks = claimed.map(async (job) => runClaimedJob(db, clock, job, handlers, signal));
 
   const results = await Promise.all(tasks);
 
