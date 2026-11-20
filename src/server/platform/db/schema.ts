@@ -2,6 +2,7 @@ import {
   blob,
   index,
   integer,
+  primaryKey,
   real,
   sqliteTable,
   text,
@@ -170,5 +171,21 @@ export const postings = sqliteTable(
     index("postings_dedupe_key").on(t.dedupeKey),
     index("postings_apply_url_norm").on(t.applyUrlNorm),
     index("postings_closed_at").on(t.closedAt),
+  ],
+);
+
+export const postingTags = sqliteTable(
+  "posting_tags",
+  {
+    postingId: text("posting_id")
+      .notNull()
+      .references(() => postings.id, { onDelete: "cascade" }),
+    dimension: text("dimension", { enum: ["role", "subrole", "seniority"] }).notNull(),
+    value: text("value").notNull(),
+    source: text("source", { enum: ["rules", "model", "llm", "import"] }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.postingId, t.dimension, t.value] }),
+    index("posting_tags_dimension_value").on(t.dimension, t.value),
   ],
 );

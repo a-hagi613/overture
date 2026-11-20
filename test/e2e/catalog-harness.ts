@@ -21,6 +21,10 @@ const postingRowSchema = z.object({
   titleNorm: z.string(),
   department: z.string().nullable(),
   locationRaw: z.string().nullable(),
+  workplace: z.string(),
+  employmentType: z.string(),
+  tagSource: z.string().nullable(),
+  taggedAt: z.number().nullable(),
   closedAt: z.number().nullable(),
   missingPolls: z.number(),
   dedupeKey: z.string(),
@@ -58,6 +62,10 @@ export interface PostingRow {
   titleNorm: string;
   department: string | null;
   locationRaw: string | null;
+  workplace: string;
+  employmentType: string;
+  tagSource: string | null;
+  taggedAt: number | null;
   closedAt: number | null;
   missingPolls: number;
   dedupeKey: string;

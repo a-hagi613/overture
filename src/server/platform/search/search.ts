@@ -1,11 +1,23 @@
 import { sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 
 import type { AppDatabase } from "../db/client.ts";
+
+import type { EmploymentType, Seniority, Workplace } from "../../../shared/tag-taxonomy.ts";
+
+export interface SearchFilters {
+  role: string | null;
+  seniority: Seniority | null;
+  workplace: Workplace | null;
+  location: string | null;
+  employmentType: EmploymentType | null;
+}
 
 export interface SearchQuery {
   text: string;
   openOnly: boolean;
   limit: number;
+  filters: SearchFilters;
 }
 
 export interface SearchHitRow {
@@ -33,6 +45,39 @@ function ftsMatchExpression(text: string) {
   return match.length === 0 ? null : match;
 }
 
+function tagMatches(dimension: "role" | "seniority", value: string) {
+  return sql` and exists (
+    select 1 from posting_tags pt
+    where pt.posting_id = p.id and pt.dimension = ${dimension} and pt.value = ${value}
+  )`;
+}
+
+function filtersExpression(filters: SearchFilters) {
+  const parts: SQL[] = [];
+
+  if (filters.role !== null) {
+    parts.push(tagMatches("role", filters.role));
+  }
+
+  if (filters.seniority !== null) {
+    parts.push(tagMatches("seniority", filters.seniority));
+  }
+
+  if (filters.workplace !== null) {
+    parts.push(sql` and p.workplace = ${filters.workplace}`);
+  }
+
+  if (filters.location !== null) {
+    parts.push(sql` and lower(p.city) = lower(${filters.location})`);
+  }
+
+  if (filters.employmentType !== null) {
+    parts.push(sql` and p.employment_type = ${filters.employmentType}`);
+  }
+
+  return parts.length === 0 ? sql`` : sql.join(parts, sql``);
+}
+
 export function searchPostings(db: AppDatabase, query: SearchQuery) {
   const match = ftsMatchExpression(query.text);
 
@@ -41,6 +86,7 @@ export function searchPostings(db: AppDatabase, query: SearchQuery) {
   }
 
   const openFilter = query.openOnly ? sql`and p.closed_at is null` : sql``;
+  const filtersFilter = filtersExpression(query.filters);
 
   return db.all<SearchHitRow>(sql`
     select id, title, company, location, department, url, applyUrl, ats, closedAt, postedAt, rank
@@ -56,7 +102,7 @@ export function searchPostings(db: AppDatabase, query: SearchQuery) {
       from postings p
       join companies c on c.id = p.company_id
       join postings_fts f on f.rowid = p.rowid
-      where postings_fts match ${match} ${openFilter}
+      where postings_fts match ${match} ${openFilter} ${filtersFilter}
     )
     where rn = 1
     order by rank, id
