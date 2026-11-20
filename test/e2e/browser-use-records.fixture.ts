@@ -17,6 +17,8 @@ export interface BrowserUseApiState {
   createdSessions: RecordedBrowserSession[];
   stoppedSessionIds: string[];
   cdpUrlBySession: Record<string, string>;
+  readsBySession: Record<string, number>;
+  readsBeforeFinalUsage: number;
 }
 
 export const recordedProxyUsedMb = "2.71";
@@ -65,6 +67,8 @@ export function recordedBrowserUseHandlers(cdpUrl: string) {
     createdSessions: [],
     stoppedSessionIds: [],
     cdpUrlBySession: {},
+    readsBySession: {},
+    readsBeforeFinalUsage: 0,
   };
 
   const handlers = [
@@ -99,11 +103,16 @@ export function recordedBrowserUseHandlers(cdpUrl: string) {
         return new HttpResponse(null, { status: 404 });
       }
 
-      const current = state.stoppedSessionIds.includes(id)
-        ? { ...session, stopped: true }
-        : session;
+      const reads = (state.readsBySession[id] ?? 0) + 1;
 
-      return HttpResponse.json(browserUseSessionView(current, storedUrl));
+      state.readsBySession[id] = reads;
+
+      const stopped = state.stoppedSessionIds.includes(id);
+      const current = stopped ? { ...session, stopped: true } : session;
+      const meteringSettled = !stopped || reads > state.readsBeforeFinalUsage;
+      const metered = meteringSettled ? current : { ...current, proxyUsedMb: "0", proxyCost: "0" };
+
+      return HttpResponse.json(browserUseSessionView(metered, storedUrl));
     }),
     http.patch(`${apiOrigin}/api/v4/browsers/:id`, async ({ request, params }) => {
       const { id } = sessionIdSchema.parse(params);

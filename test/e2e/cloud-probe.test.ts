@@ -210,6 +210,35 @@ test("per-form metrics land in probe_forms after the session is stopped", async 
   });
 });
 
+test("proxy usage that settles only on a later read after the stop is still recorded in full", async () => {
+  await withHarness(async (harness) => {
+    harness.browserUse.readsBeforeFinalUsage = 2;
+
+    const results = await runProbe(
+      command(harness, false, {
+        runFile: singlePostingRunFile(harness, posting("blankstreet", "8004209003")),
+      }),
+    );
+
+    const [result] = results;
+
+    if (result === undefined) {
+      throw new Error("no result for the late usage posting");
+    }
+
+    const [form] = storedForms(harness);
+
+    if (form === undefined) {
+      throw new Error("no stored form");
+    }
+
+    expect(form.proxyMb).toBeCloseTo(2.71, 3);
+    expect(form.costUsd).toBeCloseTo(0.0288, 4);
+    expect(form.browserMinutes).toBeCloseTo(556 / 60, 2);
+    expect(result.proxyMb).toBeCloseTo(2.71, 3);
+  });
+});
+
 test("the probe refuses to run off Fly", async () => {
   await withHarness(async (harness) => {
     let refusal = null;
@@ -291,6 +320,35 @@ test("a combobox that lists nothing until typed takes the region that matches th
     expect(result.outcome).toBe("dry_run_filled");
     expect(result.submitted).toBe(false);
     expect(harness.fixture.state.lastChoices["candidate-location"]).toBe("Ottawa, ON, Canada");
+
+    const [form] = storedForms(harness);
+
+    if (form === undefined) {
+      throw new Error("no stored form");
+    }
+
+    expect(form.outcome).toBe("dry_run_filled");
+    expect(harness.browserUse.stoppedSessionIds).toHaveLength(1);
+  });
+});
+
+test("a country combobox takes the option that extends the typed query when no city matches", async () => {
+  await withHarness(async (harness) => {
+    const results = await runProbe(
+      command(harness, false, {
+        runFile: singlePostingRunFile(harness, posting("sunnyside", "8891671002")),
+      }),
+    );
+
+    const [result] = results;
+
+    if (result === undefined) {
+      throw new Error("no result for the phone country posting");
+    }
+
+    expect(result.outcome).toBe("dry_run_filled");
+    expect(result.submitted).toBe(false);
+    expect(harness.fixture.state.lastChoices["country"]).toBe("Canada +1");
 
     const [form] = storedForms(harness);
 
