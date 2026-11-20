@@ -83,7 +83,7 @@ const otelPayloadSchema = z.record(z.string(), z.string());
 
 const feeds: BoardFeeds = {
   greenhouse: createGreenhouseFeed(env.GREENHOUSE_FEED_BASE_URL),
-  lever: createLeverFeed(env.LEVER_FEED_BASE_URL),
+  lever: createLeverFeed(env.LEVER_FEED_BASE_URL, undefined, env.LEVER_EU_FEED_BASE_URL),
   ashby: createAshbyFeed(env.ASHBY_FEED_BASE_URL),
 };
 

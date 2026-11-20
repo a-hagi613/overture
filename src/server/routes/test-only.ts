@@ -42,6 +42,7 @@ import { contentHash } from "../catalog/content-hash.ts";
 import { loadDiscoveredBoards } from "../catalog/discovered-boards.ts";
 import { sweepBatchPerAts } from "../catalog/discovery.ts";
 import { dedupeKeyFor } from "../catalog/dedupe-key.ts";
+import { resetFeedContentHashes } from "../catalog/feed-retag.ts";
 import { normalizeApplyUrl, normalizeTitle } from "../catalog/normalize.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags } from "../catalog/tag-import.ts";
 import { readLlmUsage, recordLlmUsage } from "../platform/llm/usage.ts";
@@ -90,11 +91,22 @@ const createBoardBody = z.object({
   companyId: z.string().min(1),
   ats: z.enum(["greenhouse", "lever", "ashby"]),
   boardToken: z.string().min(1),
+  region: z.enum(["us", "eu"]).default("us"),
   status: z.enum(["active", "empty", "gone", "disabled"]).default("active"),
   source: z.enum(["v1_seed", "discovered", "import"]).default("discovered"),
 });
 
-const discoveredBoardsBody = z.object({ path: z.string().min(1) });
+const discoveredScraperRowSchema = z.object({
+  ats: z.string().min(1),
+  name: z.string().min(1),
+  slug: z.string(),
+  url: z.string(),
+});
+
+const discoveredBoardsBody = z.union([
+  z.object({ path: z.string().min(1) }),
+  z.object({ rows: z.array(discoveredScraperRowSchema).min(1) }),
+]);
 
 const tagImportBody = z.object({
   content: z.string().min(1),
@@ -481,7 +493,7 @@ export function createTestRoutes(
   });
 
   routes.post("/catalog/boards", zValidator("json", createBoardBody), (context) => {
-    const { companyId, ats, boardToken, status, source } = context.req.valid("json");
+    const { companyId, ats, boardToken, region, status, source } = context.req.valid("json");
     const id = crypto.randomUUID();
 
     db.insert(companyBoards)
@@ -490,6 +502,7 @@ export function createTestRoutes(
         companyId,
         ats,
         boardToken,
+        region,
         status,
         source,
         notFoundPolls: 0,
@@ -507,14 +520,30 @@ export function createTestRoutes(
     return context.json({ boards: rows });
   });
 
+  routes.post("/catalog/retag-open-postings", (context) => {
+    const report = resetFeedContentHashes(db);
+
+    return context.json(report);
+  });
+
   routes.get("/catalog/sweep-batches", (context) =>
     context.json({ batches: sweepBatchPerAts(db) }),
   );
 
   routes.get("/catalog/postings", (context) => {
     const rows = db.select().from(postings).all();
+    const postingRows: ((typeof rows)[number] & { descriptionText: string | null })[] = [];
 
-    return context.json({ postings: rows });
+    for (const row of rows) {
+      const descriptionText =
+        row.descriptionGz === null
+          ? null
+          : new TextDecoder().decode(Bun.gunzipSync(new Uint8Array(row.descriptionGz)));
+
+      postingRows.push({ ...row, descriptionText });
+    }
+
+    return context.json({ postings: postingRows });
   });
 
   routes.post("/catalog/postings", zValidator("json", createPostingBody), (context) => {
@@ -559,8 +588,13 @@ export function createTestRoutes(
     "/catalog/discovered-boards",
     zValidator("json", discoveredBoardsBody),
     async (context) => {
-      const { path } = context.req.valid("json");
-      const bytes = readFileSync(path);
+      const body = context.req.valid("json");
+
+      if ("rows" in body) {
+        return context.json(loadDiscoveredBoards(db, clock, body.rows));
+      }
+
+      const bytes = readFileSync(body.path);
       const file = new ArrayBuffer(bytes.byteLength);
 
       new Uint8Array(file).set(bytes);

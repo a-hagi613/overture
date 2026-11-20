@@ -24,6 +24,14 @@ const postingRowSchema = z.object({
   countryCode: z.string().nullable(),
   workplace: z.string(),
   employmentType: z.string(),
+  url: z.string(),
+  applyUrl: z.string().nullable(),
+  applyUrlNorm: z.string(),
+  salaryMinMinor: z.number().nullable(),
+  salaryMaxMinor: z.number().nullable(),
+  salaryCurrency: z.string().nullable(),
+  salaryPeriod: z.string().nullable(),
+  descriptionText: z.string().nullable(),
   tagSource: z.string().nullable(),
   taggedAt: z.number().nullable(),
   descriptionHash: z.string().nullable(),
@@ -38,6 +46,7 @@ const boardRowSchema = z.object({
   companyId: z.string(),
   ats: z.string(),
   boardToken: z.string(),
+  region: z.string(),
   status: z.string(),
   source: z.string(),
   etag: z.string().nullable(),
@@ -90,6 +99,14 @@ export interface PostingRow {
   countryCode: string | null;
   workplace: string;
   employmentType: string;
+  url: string;
+  applyUrl: string | null;
+  applyUrlNorm: string;
+  salaryMinMinor: number | null;
+  salaryMaxMinor: number | null;
+  salaryCurrency: string | null;
+  salaryPeriod: string | null;
+  descriptionText: string | null;
   tagSource: string | null;
   taggedAt: number | null;
   descriptionHash: string | null;
@@ -111,6 +128,7 @@ export interface BoardRow {
   companyId: string;
   ats: string;
   boardToken: string;
+  region: string;
   status: string;
   source: string;
   etag: string | null;
@@ -134,10 +152,16 @@ const boardSpecSchema = z.union([
   z
     .string()
     .min(1)
-    .transform((token) => ({ ats: "greenhouse" as const, token, bulk: undefined })),
+    .transform((token) => ({
+      ats: "greenhouse" as const,
+      token,
+      region: "us" as const,
+      bulk: undefined,
+    })),
   z.object({
     ats: z.enum(["greenhouse", "lever", "ashby"]),
     token: z.string().min(1),
+    region: z.enum(["us", "eu"]).default("us"),
     bulk: z
       .union([
         z.object({
@@ -285,6 +309,7 @@ export async function startCatalogHarness(
   const app = await startAppServer(databasePath, {
     GREENHOUSE_FEED_BASE_URL: fixture.url,
     LEVER_FEED_BASE_URL: fixture.url,
+    LEVER_EU_FEED_BASE_URL: `${fixture.url}/eu`,
     ASHBY_FEED_BASE_URL: fixture.url,
     ...extraEnvironment,
   });
@@ -310,6 +335,7 @@ export async function startCatalogHarness(
         companyId: company.id,
         ats: spec.ats,
         boardToken: spec.token,
+        region: spec.region,
       });
 
       const board = boardCreatedSchema.parse(await boardResponse.json());

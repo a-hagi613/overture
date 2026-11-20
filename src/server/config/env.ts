@@ -24,6 +24,7 @@ const envSchema = z
     ENABLE_TEST_ROUTES: booleanFromString.default(false),
     GREENHOUSE_FEED_BASE_URL: z.string().min(1).optional(),
     LEVER_FEED_BASE_URL: z.string().min(1).optional(),
+    LEVER_EU_FEED_BASE_URL: z.string().min(1).optional(),
     ASHBY_FEED_BASE_URL: z.string().min(1).optional(),
     APP_ORIGIN: z.url().optional(),
     ADMIN_ORIGIN: z.url().default("https://admin.tryoverture.com"),

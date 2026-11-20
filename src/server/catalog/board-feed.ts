@@ -1,4 +1,10 @@
+import type { SalaryRange } from "../../shared/tag-taxonomy.ts";
+
 export type Ats = "greenhouse" | "lever" | "ashby";
+
+export const BOARD_REGIONS = ["us", "eu"] as const;
+
+export type BoardRegion = (typeof BOARD_REGIONS)[number];
 
 export interface BoardCondition {
   etag: string | null;
@@ -9,13 +15,16 @@ export interface FeedContent {
   descriptionText: string | null;
   department: string | null;
   locationRaw: string | null;
+  salary: SalaryRange | null;
 }
 
 export interface FeedPosting {
   atsJobId: string;
   title: string;
   url: string;
+  applyUrl: string | null;
   locationRaw: string | null;
+  workplaceType: string | null;
   language: string | null;
   postedAt: string | null;
   sourceUpdatedAt: string | null;
@@ -29,8 +38,12 @@ export type BoardFetchResult =
   | { status: "ok"; postings: FeedPosting[]; etag: string | null; bodyHash: string };
 
 export interface BoardFeed {
-  fetchBoard: (boardToken: string, condition: BoardCondition) => Promise<BoardFetchResult>;
-  fetchBoardContent?: (boardToken: string) => Promise<BoardFetchResult>;
+  fetchBoard: (
+    boardToken: string,
+    condition: BoardCondition,
+    region: BoardRegion,
+  ) => Promise<BoardFetchResult>;
+  fetchBoardContent?: (boardToken: string, region: BoardRegion) => Promise<BoardFetchResult>;
   fetchPostingDetail?: (boardToken: string, atsJobId: string) => Promise<FeedContent>;
 }
 
