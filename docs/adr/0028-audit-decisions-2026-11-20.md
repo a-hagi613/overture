@@ -87,6 +87,27 @@ repeat-application throttles.
   file in Overture's own R2, replacing the runtime dependency on the Stapply bucket. Which lists are used depends on
   their licenses, checked first (below).
 
+## Operating risks we watch
+
+- **Proxy bytes and zombie sessions.** Proxy traffic is most of Browser Use's bill, and closing Playwright does not
+  stop billing. Every session is stopped through the API (above), and the recovery sweep stops any session left open.
+  The admin view alerts when proxy MB per completed application trends up, so heavy career pages are caught before
+  cost passes $0.03.
+- **One machine, no failover.** A restart mid-apply must never submit twice. Before `submit_clicked_at` an
+  interrupted send is released and retried. After it, the Application goes to Confirming and is never resent
+  (ADR 0025, SPEC §9.4). The e2e suite covers a kill at each side of Submit.
+- **Large payloads.** Greenhouse `content=true` lists run 3–9 MB, and M2's Workable XML feed is one large file. The
+  orchestrator watches `/api/health` latency and process RSS during the backfill. Workable XML is stream-parsed. If
+  either regresses, catalog parsing moves to a Bun Worker that writes only catalog rows.
+- **Anti-bot drift.** Lever's invisible hCaptcha and Greenhouse and Ashby fraud scoring change over time. Each user
+  keeps an isolated Browser Use profile. Selector and pacing changes are driven by measured pass rates per ATS in
+  M1 and M2, not by guesses.
+- **Users who skip the forwarding filter (M2).** The 10-minute paste fallback (a phone notification, then paste the
+  code) has to be quick, so it is designed as a first-class path, not an error screen.
+- **Outbound sign-in mail (#90).** Magic links need a sender. Cloudflare Email Sending is preferred if its
+  availability and price check out (#114), because it keeps mail in one vendor and removes AWS from the project.
+  Otherwise use SES from `no-reply@tryoverture.com`. Either way it sits behind `MailSender`.
+
 ## Verify before building (M2 and discovery)
 
 These came from the audit and have **not** been checked against primary sources yet. Each is checked, with its
