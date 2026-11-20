@@ -422,6 +422,103 @@ export const grants = sqliteTable(
   (t) => [uniqueIndex("grants_stripe_invoice_id_unique").on(t.stripeInvoiceId)],
 );
 
+export const matches = sqliteTable(
+  "matches",
+  {
+    userId: cascadeUserId(),
+    postingId: text("posting_id")
+      .notNull()
+      .references(() => postings.id, { onDelete: "cascade" }),
+    codeRank: real("code_rank").notNull(),
+    score: integer("score"),
+    reason: text("reason"),
+    resumeId: text("resume_id").references(() => resumes.id, { onDelete: "set null" }),
+    targetsVersion: integer("targets_version"),
+    scoredAt: integer("scored_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.postingId] }),
+    index("matches_user_code_rank").on(t.userId, t.codeRank),
+  ],
+);
+
+export const postingUserState = sqliteTable(
+  "posting_user_state",
+  {
+    userId: cascadeUserId(),
+    postingId: text("posting_id")
+      .notNull()
+      .references(() => postings.id, { onDelete: "cascade" }),
+    state: text("state", { enum: ["saved", "hidden"] }).notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.postingId] })],
+);
+
+export const applications = sqliteTable(
+  "applications",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    postingId: text("posting_id")
+      .notNull()
+      .references(() => postings.id, { onDelete: "cascade" }),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    origin: text("origin", { enum: ["auto", "manual"] }).notNull(),
+    status: text("status", {
+      enum: [
+        "preparing",
+        "needs_review",
+        "ready",
+        "sending",
+        "confirming",
+        "sent",
+        "failed",
+        "skipped",
+        "withdrawn",
+      ],
+    }).notNull(),
+    statusReason: text("status_reason"),
+    stage: text("stage", {
+      enum: ["queued", "applied", "screening", "interviewing", "offer", "closed"],
+    }),
+    stageLocked: integer("stage_locked", { mode: "boolean" }).notNull().default(false),
+    boardPosition: real("board_position"),
+    scoreAtQueue: integer("score_at_queue"),
+    scheduledFor: integer("scheduled_for"),
+    attempts: integer("attempts").notNull().default(0),
+    sentAt: integer("sent_at"),
+    closedReason: text("closed_reason", {
+      enum: ["rejected", "no_response", "withdrawn", "offer_declined", "offer_accepted", "other"],
+    }),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("applications_user_posting_unique").on(t.userId, t.postingId),
+    uniqueIndex("applications_user_sending_unique")
+      .on(t.userId)
+      .where(sql`status = 'sending'`),
+    index("applications_user_company").on(t.userId, t.companyId),
+    index("applications_user_sent_at").on(t.userId, t.sentAt),
+  ],
+);
+
+export const fxRates = sqliteTable(
+  "fx_rates",
+  {
+    date: text("date").notNull(),
+    currency: text("currency").notNull(),
+    perUsd: real("per_usd").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.date, t.currency] }),
+    check("fx_rates_per_usd_positive", sql`${t.perUsd} > 0`),
+  ],
+);
+
 export const ledger = sqliteTable(
   "ledger",
   {

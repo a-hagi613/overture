@@ -3,9 +3,12 @@ import { Hono } from "hono";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
+import type { MatchingService } from "../matching/score.ts";
 
 import { applicationsLeft, committedSince, planApplications } from "../billing/ledger.ts";
 import { getSetting } from "../platform/settings/index.ts";
+
+const UP_NEXT_LIMIT = 6;
 
 function dayStartOf(at: number) {
   const day = new Date(at);
@@ -22,7 +25,12 @@ function dailyCapOf(db: AppDatabase) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
 }
 
-export function createHomeRoutes(db: AppDatabase, clock: Clock, auth: Auth) {
+export function createHomeRoutes(
+  db: AppDatabase,
+  clock: Clock,
+  auth: Auth,
+  matching: MatchingService,
+) {
   const routes = new Hono();
 
   routes.get("/home", async (context) => {
@@ -39,11 +47,17 @@ export function createHomeRoutes(db: AppDatabase, clock: Clock, auth: Auth) {
     const at = clock.now();
     const userId = session.user.id;
 
+    const sentToday = committedSince(db, userId, dayStartOf(at));
+    const dailyCap = dailyCapOf(db);
+    const left = applicationsLeft(db, userId, at);
+
     return context.json({
-      applicationsLeft: applicationsLeft(db, userId, at),
+      applicationsLeft: left,
       planApplications: planApplications(db, userId, at),
-      sentToday: committedSince(db, userId, dayStartOf(at)),
-      dailyCap: dailyCapOf(db),
+      sentToday,
+      dailyCap,
+      remainingToday: Math.max(0, Math.min(dailyCap, left) - sentToday),
+      upNext: await matching.upNext(userId, UP_NEXT_LIMIT),
     });
   });
 

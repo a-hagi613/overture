@@ -38,7 +38,7 @@ function wordsOf(value: string) {
     .filter((word) => word.length > 0 && !STOP_WORDS.has(word));
 }
 
-function roleTargetMatches(target: string, tagValues: readonly string[]) {
+export function roleTargetMatches(target: string, tagValues: readonly string[]) {
   const targetWords = new Set(wordsOf(target));
 
   return tagValues.some((tag) => wordsOf(tag).some((word) => targetWords.has(word)));
@@ -81,7 +81,7 @@ function salaryCondition(floorMinor: number | null, currency: string | null) {
   );
 }
 
-function matchedRoleTags(db: AppDatabase, roles: readonly string[]) {
+export function matchedRoleTags(db: AppDatabase, roles: readonly string[]) {
   const tagRows = db
     .selectDistinct({ value: postingTags.value })
     .from(postingTags)

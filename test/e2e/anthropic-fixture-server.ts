@@ -87,6 +87,7 @@ export interface RecordedBatchRequest {
   model: string;
   cacheControl: string | null;
   outputFormatType: string;
+  user: string;
 }
 
 export interface RecordedSingleMessage {
@@ -124,6 +125,23 @@ export function loadResumePdfFallbackRecordingSync() {
 
 export function loadTagFallbackRecordingsSync() {
   const path = join(process.cwd(), "test/e2e/fixtures/anthropic/tag-fallback-recording.jsonl");
+  const byTitle = new Map<string, Recording>();
+
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    if (line.trim() === "") {
+      continue;
+    }
+
+    const parsed = recordingSchema.parse(JSON.parse(line));
+
+    byTitle.set(parsed.title, parsed);
+  }
+
+  return byTitle;
+}
+
+export function loadScoreRecordingsSync() {
+  const path = join(process.cwd(), "test/e2e/fixtures/anthropic/score-recording.jsonl");
   const byTitle = new Map<string, Recording>();
 
   for (const line of readFileSync(path, "utf8").split("\n")) {
@@ -190,6 +208,7 @@ function serveResults(batch: TrackedBatch) {
 
 export async function startAnthropicFixtureServer() {
   const recordings = loadTagFallbackRecordingsSync();
+  const scoreRecordings = loadScoreRecordingsSync();
   const resumeFallback = loadResumePdfFallbackRecordingSync();
   const batches = new Map<string, TrackedBatch>();
   const seenRequests: RecordedBatchRequest[] = [];
@@ -274,7 +293,7 @@ export async function startAnthropicFixtureServer() {
         return;
       }
 
-      const recording = recordings.get(title);
+      const recording = recordings.get(title) ?? scoreRecordings.get(title);
 
       if (recording === undefined) {
         finishJson(
@@ -295,6 +314,7 @@ export async function startAnthropicFixtureServer() {
         model: batchRequest.params.model,
         cacheControl: batchRequest.params.system.at(0)?.cache_control?.type ?? null,
         outputFormatType: batchRequest.params.output_config.format.type,
+        user: userContent,
       });
 
       items.push({ customId: batchRequest.custom_id, recording });
