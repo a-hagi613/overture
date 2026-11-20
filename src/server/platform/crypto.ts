@@ -12,6 +12,8 @@ export interface SealScope {
   rowId: string;
 }
 
+export const IV_BYTES = 12;
+
 export function parseMasterKey(value: string | undefined, version: number) {
   if (value === undefined) {
     throw new Error(`MASTER_KEY_V${version} is not set.`);
@@ -47,6 +49,7 @@ async function importAesKey(raw: Uint8Array<ArrayBuffer>, usages: KeyUsage[]) {
 
 async function unwrapDek(masterKey: Uint8Array<ArrayBuffer>, userKey: StoredUserKey) {
   const aesKey = await importAesKey(masterKey, ["decrypt"]);
+
   const dek = new Uint8Array(
     await crypto.subtle.decrypt(
       { name: "AES-GCM", iv: new Uint8Array(Buffer.from(userKey.dekIv, "base64")) },
@@ -62,6 +65,7 @@ export async function createUserKey(masterKey: Uint8Array<ArrayBuffer>, keyVersi
   const dek = crypto.getRandomValues(new Uint8Array(32));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const aesKey = await importAesKey(masterKey, ["encrypt"]);
+
   const wrappedDek = new Uint8Array(
     await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, dek),
   );
@@ -81,6 +85,7 @@ export async function sealValue(
 ) {
   const dek = await unwrapDek(masterKey, userKey);
   const iv = crypto.getRandomValues(new Uint8Array(12));
+
   const sealed = new Uint8Array(
     await crypto.subtle.encrypt(
       { name: "AES-GCM", iv, additionalData: new TextEncoder().encode(associatedData(scope)) },
@@ -89,8 +94,8 @@ export async function sealValue(
     ),
   );
 
-  const data = sealed.subarray(0, sealed.length - 16);
-  const tag = sealed.subarray(sealed.length - 16);
+  const data = sealed.subarray(0, -16);
+  const tag = sealed.subarray(-16);
 
   return ["v1", userKey.keyVersion, b64of(iv), b64of(tag), b64of(data)].join(":");
 }
@@ -120,10 +125,12 @@ export async function openValue(
   }
 
   const dek = await unwrapDek(masterKey, userKey);
+
   const joined = joinDataAndTag(
     new Uint8Array(Buffer.from(data, "base64")),
     new Uint8Array(Buffer.from(tag, "base64")),
   );
+
   const plaintext = await crypto.subtle.decrypt(
     {
       name: "AES-GCM",

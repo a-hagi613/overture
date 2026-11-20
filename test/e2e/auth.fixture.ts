@@ -17,6 +17,7 @@ export const authTestIdentity = {
   secret: "e2e-auth-secret-0123456789abcdef",
   turnstileSiteKey: "1x00000000000000000000AA",
   turnstilePassToken: "XXXX.DUMMY.TOKEN.XXXX",
+  masterKey: Buffer.from("overture e2e master key v1".padEnd(32, "1"), "binary").toString("base64"),
 };
 
 export const personas = {

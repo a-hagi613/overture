@@ -39,6 +39,8 @@ function authEnv(identityServer: IdentityServer) {
     OAUTH_GOOGLE_DISCOVERY_URL: `${identityServer.url}/.well-known/openid-configuration`,
     OAUTH_LINKEDIN_DISCOVERY_URL: `${identityServer.url}/.well-known/openid-configuration`,
     AUTH_ALLOWED_HOSTS: "127.0.0.1,localhost",
+    MASTER_KEY_V1: authTestIdentity.masterKey,
+    MASTER_KEY_CURRENT: "1",
   };
 }
 
@@ -48,7 +50,10 @@ async function startFreshAppServer(identityServer: IdentityServer) {
 
   copyFileSync(join(process.cwd(), "test/e2e/.tmp/template.db"), databasePath);
 
-  return startAppServer(databasePath, authEnv(identityServer));
+  return startAppServer(databasePath, {
+    ...authEnv(identityServer),
+    OBJECT_STORE_ROOT: join(directory, "objects"),
+  });
 }
 
 export { startFreshAppServer };

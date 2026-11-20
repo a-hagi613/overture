@@ -28,7 +28,7 @@ test("opening with a different associated data scope fails", async () => {
 
   await expect(
     openValue(masterKey, userKey, { table: "facts", column: "value_enc", rowId: "fact-2" }, sealed),
-  ).rejects.toThrow();
+  ).rejects.toThrow("operation failed for an operation-specific reason");
 });
 
 test("shredding the user key makes every value unreadable", async () => {
@@ -38,7 +38,9 @@ test("shredding the user key makes every value unreadable", async () => {
   const shredded = { ...userKey, wrappedDek: "AAAAAAAAAAAAAAAAAAAAAA==" };
 
   await expect(openValue(masterKey, userKey, scope, sealed)).resolves.toBe("secret resume text");
-  await expect(openValue(masterKey, shredded, scope, sealed)).rejects.toThrow();
+  await expect(openValue(masterKey, shredded, scope, sealed)).rejects.toThrow(
+    "operation failed for an operation-specific reason",
+  );
 });
 
 test("ciphertexts record their key version and reject mismatched keys", async () => {
@@ -52,7 +54,7 @@ test("ciphertexts record their key version and reject mismatched keys", async ()
 });
 
 test("parseMasterKey rejects keys that are not 32 bytes", () => {
-  expect(() => parseMasterKey("", 1)).toThrow();
-  expect(() => parseMasterKey(undefined, 1)).toThrow();
+  expect(() => parseMasterKey("", 1)).toThrow("must decode to 32 bytes");
+  expect(() => parseMasterKey(undefined, 1)).toThrow("not set");
   expect(parseMasterKey("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", 1)).toHaveLength(32);
 });

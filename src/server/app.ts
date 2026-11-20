@@ -5,6 +5,8 @@ import type { AppDatabase } from "./platform/db/client.ts";
 import type { Auth } from "./auth/index.ts";
 import type { AdjustableClock } from "./platform/ports/clock.ts";
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
+import type { ResumeTextPort } from "./platform/ports/resume-text.ts";
+import type { ObjectStore } from "./platform/ports/object-store.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
 import { createMeRoutes } from "./routes/me.ts";
@@ -12,6 +14,7 @@ import { createApiRoutes } from "./routes/api.ts";
 import { createAdminApi, isAdminHost } from "./routes/admin.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
 import { env } from "./config/env.ts";
+import { createProfileRoutes } from "./routes/profile.ts";
 
 export interface AppDependencies {
   db: AppDatabase;
@@ -20,6 +23,8 @@ export interface AppDependencies {
   testRoutes: boolean;
   jobHandlers: JobHandlers;
   auth: Auth;
+  objects: ObjectStore;
+  llm: ResumeTextPort;
 }
 
 async function staticResponseFrom(root: string, url: string) {
@@ -55,6 +60,7 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createHealthRoutes(deps.db, deps.clock));
   app.route("/api", createMeRoutes(deps.auth));
   app.route("/api", createApiRoutes(deps.db, deps.clock));
+  app.route("/api", createProfileRoutes(deps));
 
   if (deps.testRoutes) {
     app.route("/__test__", createTestRoutes(deps.db, deps.clock, deps.jobHandlers));
