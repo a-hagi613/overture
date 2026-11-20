@@ -183,6 +183,37 @@ Measured on the shipped hexes (text needs 4.5:1, 3:1 at ≥24px):
 Chart colours: `--chart-1` signal, `--chart-2` ink, `--chart-3` ok, `--chart-4` muted-foreground,
 `--chart-5` need. The primary button is ink with paper text in both modes.
 
+### Sign-in dark ground
+
+The sign-in surfaces (`/signin`: sign-in, sign-up, magic-sent) in dark mode use the ground of the redrawn
+sign-in boards (`design/reference/source/w5-signin.dc.html`, the `.ov.dark` block), not the Ember dark above
+(ADR 0027). They are a scoped token set, `.dark .signin-surface` in `src/web/styles.css`; every other screen keeps
+the dark column of the table. Light mode is unchanged.
+
+| CSS variable | Sign-in dark (canvas) | Ember dark (other screens) |
+|---|---|---|
+| `--bg` | `#12110F` | `#191714` |
+| `--bg2` | `#181614` | `#1E1C19` |
+| `--card` | `#1B1916` | `#221F1C` |
+| `--well` | `#24211D` | `#2A2723` |
+| `--ink` | `#F2EDE4` | `#F2EDE4` |
+| `--mut` | `#A39C92` | `#ADA69B` |
+| `--line` | `rgba(242,237,228,.12)` | `rgba(242,237,228,.14)` |
+| `--line2` | `rgba(242,237,228,.24)` | `rgba(242,237,228,.26)` |
+| `--hl` | `rgba(255,255,255,.035)` | `rgba(255,255,255,.04)` |
+| `--bloom` | `rgba(255,255,255,.04)` | `rgba(255,255,255,.04)` |
+| `--acc`, `--acct` | `#F0743A` | `#F0743A`, `#F37D44` |
+| `--need`, `--needbg` | `#E58A78`, `#3A211C` | `#E58A78`, `#40261F` |
+| `--ok`, `--okbg` | `#8DBFA2`, `#1F2E26` | `#8DBFA2`, `#25352B` |
+| primary button text | `#12110F` | `#221F1C` (card) |
+| `--btnh` (primary hover) | `#FFFBF2` | `#FFFBF2` |
+| `--sh` | `0 1px 0 rgba(0,0,0,.45), 0 12px 26px -20px rgba(0,0,0,.9)` | `0 1px 0 rgba(0,0,0,.4), 0 12px 26px -20px rgba(0,0,0,.8)` |
+| `--lift` | `0 1px 0 rgba(0,0,0,.5), 0 30px 60px -26px rgba(0,0,0,.92)` | `0 1px 0 rgba(0,0,0,.5), 0 30px 60px -26px rgba(0,0,0,.92)` |
+
+The canvas's `--btnink`, `--btnh`, `--sh` and `--lift` map to the scoped `--color-primary-ink`,
+`--color-btn-hover`, `--shadow-sh` and `--shadow-lift`. Tokens the sign-in surface does not draw (`--accbg`,
+`--okbg` as a chip, `--scrim`, `--gridln`, `--focus`) are left out.
+
 ## 3. Typography
 
 Three families, each with one job. Sizes are px at desktop; the phone column is what changes.
@@ -503,7 +534,7 @@ screen, then built to match. Visual treatment stays; words, structure and behavi
 | Answer Bank, Resume | **Redrawn: folded into Profile.** Fold into Profile: resume, facts by tier, targets with live count, skip list, job-search address |
 | Settings | **Redrawn.** No approval mode, no "Overnight window", no user-set company limit or daily caps, no UTC reset; the fixed limits explained (10 a day, 08:00–20:00 local, one company per 7 days, reset at local midnight) |
 | Onboarding 1–4 | Five steps: Sign in · Resume · Your facts · What you want · Your job-search address + consent + trial + Start; no "Connect inbox", no Gmail, no "Memory Base" |
-| Sign In | **Redrawn (modes sign-in, sign-up, magic-sent).** Google, LinkedIn, magic link (M1); email + password joins in M2 (ADR 0026) |
+| Sign In | **Redrawn (modes sign-in, sign-up, magic-sent).** Google, LinkedIn, magic link (M1); email + password joins in M2 (ADR 0026). Dark uses the sign-in dark ground (§2, ADR 0027) |
 | Product states | No Gmail connect states; add `confirming` ("Checking with the employer"), each pause reason, out of applications |
 | Daily digest | Morning summary of **yesterday** (sends between 08:00 and 20:00); "Needs you", not "Hold" |
 | Landing | Daytime timestamps; card required for the trial (no "No credit card"); Workday removed from Where it applies; plan prices per the spec; no glow on the travelling-dot tiles |
