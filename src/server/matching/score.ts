@@ -22,7 +22,7 @@ import { checkLlmCaps } from "../platform/llm/caps.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
-import { getSetting } from "../platform/settings/index.ts";
+import { SETTING_DEFAULTS, getSetting } from "../platform/settings/index.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createTargetsService } from "../profile/targets.ts";
 import { activeApplicationCompanies, applicationFor, createApplication } from "./applications.ts";
@@ -74,9 +74,10 @@ interface ScoreContext {
   threshold: number;
 }
 
-function settingNumber(db: AppDatabase, key: string, fallback: number) {
+function settingNumber(db: AppDatabase, key: keyof typeof SETTING_DEFAULTS) {
   const raw = getSetting(db, key);
   const parsed = raw === null ? Number.NaN : Number(raw);
+  const fallback = Number(SETTING_DEFAULTS[key]);
 
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
@@ -176,7 +177,7 @@ export function createMatchingService(deps: MatchDeps) {
       resumeDigest,
       resumeId: resume?.id ?? null,
       targetsVersion: targets.version,
-      threshold: settingNumber(db, "match.auto_threshold_default", 60),
+      threshold: settingNumber(db, "match.auto_threshold_default"),
     };
   }
 
@@ -437,7 +438,7 @@ export function createMatchingService(deps: MatchDeps) {
       .get();
 
     const dayStart = localDayStart(at, profile?.timezone ?? "UTC");
-    const dailyCap = settingNumber(db, "limits.daily_cap", 10);
+    const dailyCap = settingNumber(db, "limits.daily_cap");
     const usedToday = committedSince(db, userId, dayStart);
     const remaining = Math.max(0, Math.min(dailyCap, applicationsLeft(db, userId, at)) - usedToday);
     const buffer = Math.max(2, Math.ceil(remaining * 0.5));
@@ -622,7 +623,7 @@ export function createMatchingService(deps: MatchDeps) {
         codeRank: candidate.codeRank,
         score: matched?.score ?? null,
         reason: matched?.reason ?? null,
-        strong: (matched?.score ?? 0) >= settingNumber(db, "match.strong", 80),
+        strong: (matched?.score ?? 0) >= settingNumber(db, "match.strong"),
         saved: states.get(candidate.id) === "saved",
       };
     });

@@ -13,7 +13,7 @@ import {
   postingUserState,
   skipCompanies,
 } from "../platform/db/schema.ts";
-import { getSetting, getAllKillSwitches } from "../platform/settings/index.ts";
+import { SETTING_DEFAULTS, getSetting, getAllKillSwitches } from "../platform/settings/index.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { createFactService } from "../profile/facts.ts";
 import { matchedRoleTags } from "../profile/targets.ts";
@@ -211,9 +211,10 @@ function recencyScore(postedAt: number | null, at: number) {
   return 0;
 }
 
-function settingNumber(db: AppDatabase, key: string, fallback: number) {
+function settingNumber(db: AppDatabase, key: keyof typeof SETTING_DEFAULTS) {
   const raw = getSetting(db, key);
   const parsed = raw === null ? Number.NaN : Number(raw);
+  const fallback = Number(SETTING_DEFAULTS[key]);
 
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
@@ -377,10 +378,10 @@ export function createCandidateService(deps: CandidateDeps) {
       .from(applications)
       .all();
 
-    const cooldownDays = settingNumber(db, "limits.company_cooldown_days", 7);
-    const repostDays = settingNumber(db, "limits.repost_guard_days", 60);
-    const crowdPosting = settingNumber(db, "limits.crowd_per_posting", 20);
-    const crowdEmployer = settingNumber(db, "limits.crowd_per_employer_week", 50);
+    const cooldownDays = settingNumber(db, "limits.company_cooldown_days");
+    const repostDays = settingNumber(db, "limits.repost_guard_days");
+    const crowdPosting = settingNumber(db, "limits.crowd_per_posting");
+    const crowdEmployer = settingNumber(db, "limits.crowd_per_employer_week");
 
     const activeCompanies = new Set<string>();
     const recentCompanies = new Set<string>();
