@@ -91,10 +91,13 @@ const manifestSchema = z.object({
 
 const clock = createClock();
 
-const boardListingSchema = z.object({
-  jobs: z.array(z.unknown()).optional(),
-  postings: z.array(z.unknown()).optional(),
-});
+const boardListingSchema = z.union([
+  z.object({
+    jobs: z.array(z.unknown()).optional(),
+    postings: z.array(z.unknown()).optional(),
+  }),
+  z.array(z.unknown()),
+]);
 
 const parquetRowSchema = z.tuple([z.string(), z.string(), z.string(), z.string()]);
 
@@ -503,7 +506,10 @@ const pacedFetch = async (index: number, ats: string, token: string) => {
 
     try {
       const parsed = boardListingSchema.parse(JSON.parse(await response.text()));
-      const postings = (parsed.jobs?.length ?? 0) + (parsed.postings?.length ?? 0);
+
+      const postings = Array.isArray(parsed)
+        ? parsed.length
+        : (parsed.jobs?.length ?? 0) + (parsed.postings?.length ?? 0);
 
       return postings > 0 ? probe("live", postings) : probe("empty", 0);
     } catch {
