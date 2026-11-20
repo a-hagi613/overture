@@ -23,7 +23,7 @@ jobs:
           bun-version: 1.4.5
       - run: bun install --frozen-lockfile
       - run: bun run lint:config
-      - run: bunx oxlint --deny-warnings --format=agent
+      - run: bun run lint
   format:
     runs-on: ubuntu-latest
     steps:
@@ -64,7 +64,7 @@ jobs:
         with:
           bun-version: 1.4.5
       - run: bun install --frozen-lockfile
-      - run: bun run test:unit
+      - run: bun test src
   e2e:
     runs-on: ubuntu-latest
     steps:
