@@ -6,15 +6,15 @@
     "test/e2e/catalog-sweep-claim.test.ts": 29.1,
     "test/e2e/job-survives-restart.test.ts": 2.2,
     "test/e2e/shell.test.ts": 11.8,
-    "test/e2e/admin-passkey.test.ts": 5.9,
-    "test/e2e/catalog-backfill.test.ts": 18.5,
+    "test/e2e/admin-passkey.test.ts": 8.1,
+    "test/e2e/catalog-backfill.test.ts": 18.8,
     "test/e2e/catalog-search.test.ts": 0.4,
     "test/e2e/graceful-stop-requeue.test.ts": 4.3,
     "test/e2e/settings-and-kill-switches.test.ts": 0.1,
     "test/e2e/admin-gates.test.ts": 3.4,
     "test/e2e/catalog-search-filters.test.ts": 13.9,
     "test/e2e/cloud-probe.test.ts": 134.2,
-    "test/e2e/reachability.test.ts": 3.1,
+    "test/e2e/reachability.test.ts": 2.9,
     "test/e2e/tag-llm-fallback.test.ts": 11.2,
     "test/e2e/board-match-signin.test.ts": 45.4,
     "test/e2e/admin-catalog.test.ts": 14.5,
@@ -30,8 +30,11 @@
     "test/e2e/sse-live-and-replay.test.ts": 0.2,
     "test/e2e/board-match-profile.test.ts": 18.5,
     "test/e2e/backup-lag.test.ts": 4.1,
-    "test/e2e/catalog-discovered-seed.test.ts": 8.1,
+    "test/e2e/catalog-discovered-seed.test.ts": 8.2,
     "test/e2e/catalog-sweep-starve.test.ts": 7.2,
-    "test/e2e/signin.test.ts": 27.8
+    "test/e2e/signin.test.ts": 38.6,
+    "test/e2e/admin-grants.test.ts": 10.3,
+    "test/e2e/catalog-unchanged-postings.test.ts": 18.4,
+    "test/e2e/profile-targets.test.ts": 5.6
   }
 }

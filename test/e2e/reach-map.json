@@ -5,6 +5,7 @@
       "full": true,
       "paths": [
         "/__test__/auth/state",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -16,6 +17,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -34,6 +36,7 @@
         "/__test__/catalog/companies",
         "/__test__/catalog/posting-tags",
         "/__test__/catalog/postings",
+        "/__test__/ledger/sample",
         "/__test__/llm/usage",
         "/__test__/mail",
         "/__test__/mail/clear",
@@ -45,6 +48,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -62,6 +66,7 @@
       "paths": [
         "/__test__/auth/role",
         "/__test__/auth/state",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -72,6 +77,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -84,11 +90,11 @@
         "src/shared/turnstile.ts"
       ]
     },
-    "test/e2e/admin-passkey.test.ts": {
+    "test/e2e/admin-grants.test.ts": {
       "full": true,
       "paths": [
         "/__test__/auth/state",
-        "/__test__/clock/offset",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -98,6 +104,33 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
+      ]
+    },
+    "test/e2e/admin-passkey.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/clock/offset",
+        "/__test__/ledger/sample",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/turnstile",
+        "/__test__/user/name",
+        "/api"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -112,6 +145,7 @@
       "full": true,
       "paths": [
         "/__test__/auth/state",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -121,6 +155,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -179,6 +214,31 @@
         "src/shared/turnstile.ts"
       ]
     },
+    "test/e2e/board-match-home-usage.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/ledger/sample",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/turnstile",
+        "/__test__/user/name",
+        "/api"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
+      ]
+    },
     "test/e2e/board-match-profile.test.ts": {
       "full": true,
       "paths": [
@@ -186,6 +246,7 @@
         "/__test__/catalog/boards",
         "/__test__/catalog/companies",
         "/__test__/catalog/postings/bulk",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -199,6 +260,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/geo.ts",
@@ -222,6 +284,7 @@
       "full": true,
       "paths": [
         "/__test__/auth/state",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -231,6 +294,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -245,6 +309,7 @@
       "full": true,
       "paths": [
         "/__test__/auth/state",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -254,6 +319,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -488,6 +554,7 @@
         "/__test__/clock/offset",
         "/__test__/jobs",
         "/__test__/jobs/enqueue",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/settings",
@@ -500,6 +567,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
         "src/server/catalog/board-feed.ts",
         "src/server/catalog/content-hash.ts",
@@ -530,6 +598,7 @@
       "full": true,
       "paths": [
         "/__test__/auth/state",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -540,6 +609,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -767,6 +837,7 @@
         "/__test__/jobs",
         "/__test__/jobs/enqueue",
         "/__test__/jobs/run-due",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -776,6 +847,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
         "src/server/catalog/board-feed.ts",
         "src/server/catalog/content-hash.ts",
@@ -822,6 +894,7 @@
         "/__test__/jobs",
         "/__test__/jobs/enqueue",
         "/__test__/jobs/release",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/settings/jobs.poll_interval_ms",
@@ -833,6 +906,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
         "src/server/catalog/board-feed.ts",
         "src/server/catalog/content-hash.ts",
@@ -867,6 +941,7 @@
         "/__test__/clock/offset",
         "/__test__/jobs",
         "/__test__/jobs/enqueue",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/settings/jobs.poll_interval_ms",
@@ -878,6 +953,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
         "src/server/catalog/board-feed.ts",
         "src/server/catalog/content-hash.ts",
@@ -904,15 +980,13 @@
         "src/shared/turnstile.ts"
       ]
     },
-    "test/e2e/msw-canary.test.ts": {
-      "full": true,
-      "paths": [],
-      "modules": []
-    },
-    "test/e2e/oauth-optional.test.ts": {
-      "full": true,
+    "test/e2e/ledger-immutability.test.ts": {
+      "full": false,
       "paths": [
         "/__test__/auth/state",
+        "/__test__/ledger/rows",
+        "/__test__/ledger/sample",
+        "/__test__/ledger/tamper",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -922,6 +996,37 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
+      ]
+    },
+    "test/e2e/msw-canary.test.ts": {
+      "full": true,
+      "paths": [],
+      "modules": []
+    },
+    "test/e2e/oauth-optional.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/ledger/sample",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/turnstile",
+        "/__test__/user/name",
+        "/api"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -936,6 +1041,7 @@
       "full": false,
       "paths": [
         "/__test__/auth/state",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/settings/llm.cap_user_day_usd",
@@ -948,6 +1054,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/geo.ts",
@@ -974,6 +1081,7 @@
         "/__test__/catalog/boards",
         "/__test__/catalog/companies",
         "/__test__/catalog/postings/bulk",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -989,6 +1097,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/geo.ts",
@@ -1015,6 +1124,7 @@
         "/__test__/catalog/boards",
         "/__test__/catalog/companies",
         "/__test__/catalog/postings/bulk",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -1031,6 +1141,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/geo.ts",
@@ -1054,6 +1165,7 @@
       "full": true,
       "paths": [
         "/__test__/auth/state",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -1064,6 +1176,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -1079,6 +1192,7 @@
       "paths": [
         "/__test__/auth/state",
         "/__test__/kill-switches/global/all",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/settings/limits.daily_cap",
@@ -1092,6 +1206,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -1106,6 +1221,7 @@
       "full": true,
       "paths": [
         "/__test__/auth/state",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -1117,6 +1233,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -1134,6 +1251,7 @@
       "full": true,
       "paths": [
         "/__test__/auth/state",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -1145,6 +1263,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -1159,6 +1278,7 @@
       "full": true,
       "paths": [
         "/__test__/auth/state",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -1169,6 +1289,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -1184,6 +1305,7 @@
       "paths": [
         "/__test__/auth/state",
         "/__test__/events/publish",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -1194,6 +1316,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
@@ -1295,6 +1418,7 @@
       "paths": [
         "/__test__/auth/state",
         "/__test__/jobs/enqueue",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/telemetry/reset",
@@ -1308,6 +1432,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
         "src/server/catalog/board-feed.ts",
         "src/server/catalog/content-hash.ts",
@@ -1338,6 +1463,7 @@
       "full": false,
       "paths": [
         "/__test__/auth/state",
+        "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/turnstile",
@@ -1347,6 +1473,7 @@
       "modules": [
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
