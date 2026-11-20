@@ -69,6 +69,9 @@ export function startInterception() {
     http.get(`${env.LEVER_FEED_BASE_URL ?? "https://api.lever.co"}/v0/postings/:token`, () =>
       passthrough(),
     ),
+    http.get(`${env.LEVER_EU_FEED_BASE_URL ?? "https://api.eu.lever.co"}/v0/postings/:token`, () =>
+      passthrough(),
+    ),
     http.get(
       `${env.ASHBY_FEED_BASE_URL ?? "https://api.ashbyhq.com"}/posting-api/job-board/:token`,
       () => passthrough(),

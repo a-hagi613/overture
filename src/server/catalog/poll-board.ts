@@ -9,7 +9,7 @@ import { dedupeKeyFor } from "./dedupe-key.ts";
 import { storePostingTags, salaryPeriodForColumn } from "./tag-store.ts";
 import { tagPosting } from "./tag-rules.ts";
 
-import type { BoardFeed, FeedContent, FeedPosting } from "./board-feed.ts";
+import type { BoardFeed, BoardRegion, FeedContent, FeedPosting } from "./board-feed.ts";
 
 export type BoardRow = typeof companyBoards.$inferSelect;
 
@@ -78,7 +78,9 @@ function feedContentHashFor(posting: FeedPosting) {
       posting.atsJobId,
       posting.title,
       posting.url,
+      posting.applyUrl,
       posting.locationRaw,
+      posting.workplaceType,
       posting.language,
       posting.postedAt,
       posting.sourceUpdatedAt,
@@ -149,13 +151,13 @@ function mergeContentPostings(boardPostings: FeedPosting[], contentPostings: Fee
   });
 }
 
-async function fetchBoardContentOrNull(feed: BoardFeed, boardToken: string) {
+async function fetchBoardContentOrNull(feed: BoardFeed, boardToken: string, region: BoardRegion) {
   if (feed.fetchBoardContent === undefined) {
     return null;
   }
 
   try {
-    const result = await feed.fetchBoardContent(boardToken);
+    const result = await feed.fetchBoardContent(boardToken, region);
 
     return result.status === "ok" ? result.postings : null;
   } catch {
@@ -264,11 +266,11 @@ function postingValues(
     title: posting.title,
     department: detail?.department ?? null,
     locationRaw,
-    workplaceType: null,
+    workplaceType: posting.workplaceType,
     isRemote: null,
     employmentType: null,
     language: posting.language,
-    salary: null,
+    salary: detail?.salary ?? null,
     descriptionText: descriptionText === null ? null : descriptionText.slice(0, 20_000),
   });
 
@@ -281,8 +283,8 @@ function postingValues(
 
   const values = {
     url: posting.url,
-    applyUrl: null,
-    applyUrlNorm: normalizeApplyUrl(posting.url),
+    applyUrl: posting.applyUrl,
+    applyUrlNorm: normalizeApplyUrl(posting.applyUrl ?? posting.url),
     title: posting.title,
     titleNorm,
     department: detail?.department ?? null,
@@ -534,7 +536,7 @@ export const pollBoard = async (
     let bulk;
 
     try {
-      bulk = await feed.fetchBoardContent(board.boardToken);
+      bulk = await feed.fetchBoardContent(board.boardToken, board.region);
     } catch (error) {
       return markBoardError(db, board, now, error instanceof Error ? error.message : String(error));
     }
@@ -557,10 +559,14 @@ export const pollBoard = async (
   let result;
 
   try {
-    result = await feed.fetchBoard(board.boardToken, {
-      etag: board.etag,
-      bodyHash: board.contentHash,
-    });
+    result = await feed.fetchBoard(
+      board.boardToken,
+      {
+        etag: board.etag,
+        bodyHash: board.contentHash,
+      },
+      board.region,
+    );
   } catch (error) {
     return markBoardError(db, board, now, error instanceof Error ? error.message : String(error));
   }
@@ -580,7 +586,7 @@ export const pollBoard = async (
   let feedPostings = result.postings;
 
   if (changedPostingCount(db, board.id, feedPostings) > BULK_DETAIL_THRESHOLD) {
-    const contentPostings = await fetchBoardContentOrNull(feed, board.boardToken);
+    const contentPostings = await fetchBoardContentOrNull(feed, board.boardToken, board.region);
 
     if (contentPostings !== null) {
       feedPostings = mergeContentPostings(feedPostings, contentPostings);

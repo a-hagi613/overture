@@ -210,6 +210,9 @@ export const companyBoards = sqliteTable(
       .references(() => companies.id, { onDelete: "cascade" }),
     ats: text("ats", { enum: ["greenhouse", "lever", "ashby"] }).notNull(),
     boardToken: text("board_token").notNull(),
+    region: text("region", { enum: ["us", "eu"] })
+      .notNull()
+      .default("us"),
     status: text("status", { enum: ["active", "empty", "gone", "disabled"] })
       .notNull()
       .default("active"),
@@ -224,7 +227,9 @@ export const companyBoards = sqliteTable(
     notFoundPolls: integer("not_found_polls").notNull().default(0),
     createdAt: integer("created_at").notNull(),
   },
-  (t) => [uniqueIndex("company_boards_ats_board_token_unique").on(t.ats, t.boardToken)],
+  (t) => [
+    uniqueIndex("company_boards_ats_region_board_token_unique").on(t.ats, t.region, t.boardToken),
+  ],
 );
 
 export const postings = sqliteTable(

@@ -3,6 +3,9 @@ import { and, eq } from "drizzle-orm";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import { companies, companyBoards } from "../platform/db/schema.ts";
+import { greenhouseBoardTokenFromUrl } from "./greenhouse-feed.ts";
+
+import type { BoardRegion } from "./board-feed.ts";
 
 export const M1_ATS_NAMES = ["greenhouse", "lever", "ashby"] as const;
 
@@ -18,6 +21,7 @@ export interface DiscoveredScraperRow {
 export interface DiscoveredBoard {
   ats: M1AtsName;
   boardToken: string;
+  region: BoardRegion;
   companyName: string;
 }
 
@@ -50,7 +54,33 @@ function lastPathSegment(value: string) {
   }
 }
 
+const LEVER_EU_HOSTS: ReadonlySet<string> = new Set(["jobs.eu.lever.co", "api.eu.lever.co"]);
+
+function hostOf(value: string) {
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+export function boardRegionFromScraperRow(row: DiscoveredScraperRow) {
+  const host = hostOf(row.url);
+
+  return row.ats === "lever" && host !== null && LEVER_EU_HOSTS.has(host)
+    ? ("eu" satisfies BoardRegion)
+    : ("us" satisfies BoardRegion);
+}
+
 export function boardTokenFromScraperRow(row: DiscoveredScraperRow) {
+  if (row.ats === "greenhouse") {
+    const parsed = greenhouseBoardTokenFromUrl(row.url);
+
+    if (parsed !== null) {
+      return parsed;
+    }
+  }
+
   const segment = row.url === "" ? null : lastPathSegment(row.url);
 
   if (segment === null) {
@@ -86,7 +116,8 @@ export function normalizeDiscoveredBoards(rows: DiscoveredScraperRow[]) {
       continue;
     }
 
-    const key = `${row.ats}:${boardToken}`;
+    const region = boardRegionFromScraperRow(row);
+    const key = `${row.ats}:${region}:${boardToken}`;
 
     if (seen.has(key)) {
       stats.duplicateBoardToken += 1;
@@ -95,7 +126,7 @@ export function normalizeDiscoveredBoards(rows: DiscoveredScraperRow[]) {
     }
 
     seen.add(key);
-    boards.push({ ats: row.ats, boardToken, companyName: row.name });
+    boards.push({ ats: row.ats, boardToken, region, companyName: row.name });
   }
 
   return { boards, stats };
@@ -118,11 +149,37 @@ export function loadDiscoveredBoards(db: AppDatabase, clock: Clock, rows: Discov
         .select()
         .from(companyBoards)
         .where(
-          and(eq(companyBoards.ats, board.ats), eq(companyBoards.boardToken, board.boardToken)),
+          and(
+            eq(companyBoards.ats, board.ats),
+            eq(companyBoards.region, board.region),
+            eq(companyBoards.boardToken, board.boardToken),
+          ),
         )
         .get();
 
       if (existing !== undefined) {
+        report.existingBoards += 1;
+
+        continue;
+      }
+
+      const sameToken = tx
+        .select()
+        .from(companyBoards)
+        .where(
+          and(eq(companyBoards.ats, board.ats), eq(companyBoards.boardToken, board.boardToken)),
+        )
+        .all();
+
+      const misplaced =
+        sameToken.length === 1 && sameToken[0]?.source === "discovered" ? sameToken[0] : undefined;
+
+      if (misplaced !== undefined) {
+        tx.update(companyBoards)
+          .set({ region: board.region })
+          .where(eq(companyBoards.id, misplaced.id))
+          .run();
+
         report.existingBoards += 1;
 
         continue;
@@ -153,6 +210,7 @@ export function loadDiscoveredBoards(db: AppDatabase, clock: Clock, rows: Discov
           companyId,
           ats: board.ats,
           boardToken: board.boardToken,
+          region: board.region,
           status: "active",
           source: "discovered",
           notFoundPolls: 0,

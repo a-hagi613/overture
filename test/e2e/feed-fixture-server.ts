@@ -16,6 +16,18 @@ const greenhouseJobSchema = z.object({
   updated_at: z.string().default("2026-01-01T00:00:00Z"),
   first_published: z.string().default("2026-01-01T00:00:00Z"),
   language: z.string().default("en"),
+  internal_job_id: z.number().nullish(),
+  requisition_id: z.string().nullish(),
+  pay_input_ranges: z
+    .array(
+      z.object({
+        min_cents: z.number().nullish(),
+        max_cents: z.number().nullish(),
+        currency_type: z.string().nullish(),
+        interval: z.string().nullish(),
+      }),
+    )
+    .nullish(),
   content: z.string().nullish(),
   departments: z
     .array(z.object({ name: z.string().nullish() }))
@@ -29,6 +41,7 @@ const leverJobSchema = z.object({
   id: z.string(),
   text: z.string().default(""),
   hostedUrl: z.string().default(""),
+  applyUrl: z.string().nullish(),
   createdAt: z.number().default(0),
   workplaceType: z.string().nullish(),
   categories: z
@@ -60,6 +73,7 @@ const ashbyJobSchema = z.object({
     .nullish()
     .default([]),
   jobUrl: z.string().default(""),
+  applyUrl: z.string().nullish(),
   publishedAt: z.union([z.number(), z.string()]).nullish(),
   isListed: z.boolean().nullish(),
   isRemote: z.boolean().nullish(),
@@ -136,6 +150,14 @@ interface MutableGreenhouseJob {
   updatedAt: string;
   firstPublished: string;
   language: string;
+  internalJobId: number | null;
+  requisitionId: string | null;
+  payInputRanges: {
+    min_cents: number | null;
+    max_cents: number | null;
+    currency_type: string | null;
+    interval: string | null;
+  }[];
   content: string | null;
   departments: { name: string | null }[];
 }
@@ -144,6 +166,7 @@ interface MutableLeverJob {
   id: string;
   text: string;
   hostedUrl: string;
+  applyUrl: string | null;
   createdAt: number;
   workplaceType: string | null;
   categories: {
@@ -165,6 +188,7 @@ interface MutableAshbyJob {
   location: string | null;
   secondaryLocations: { location: string | null }[];
   jobUrl: string;
+  applyUrl: string | null;
   publishedAt: number | string | null;
   isListed: boolean | null;
   isRemote: boolean | null;
@@ -245,6 +269,9 @@ function bulkGreenhouseJobs(token: string, spec: SyntheticBoardSpec) {
     updatedAt: BULK_UPDATED_AT,
     firstPublished: BULK_FIRST_PUBLISHED,
     language: "en",
+    internalJobId: 5_000_000_000 + index,
+    requisitionId: null,
+    payInputRanges: [],
     content: bulkHtml(spec.descriptionKb, index),
     departments: [{ name: "Engineering" }],
   }));
@@ -270,6 +297,9 @@ function replayedGreenhouseJobs(
       updatedAt: template.updatedAt,
       firstPublished: template.firstPublished,
       language: template.language,
+      internalJobId: template.internalJobId,
+      requisitionId: template.requisitionId,
+      payInputRanges: template.payInputRanges,
       content: template.content,
       departments: template.departments,
     };
@@ -284,6 +314,7 @@ function bulkLeverJobs(token: string, spec: SyntheticBoardSpec) {
       id: `lv-${token}-${String(index)}`,
       text: pick(BULK_TITLES, index),
       hostedUrl: `https://jobs.example.com/${token}/lv-${String(index)}`,
+      applyUrl: `https://jobs.example.com/${token}/lv-${String(index)}/apply`,
       createdAt: Date.parse(BULK_FIRST_PUBLISHED),
       workplaceType: "onsite",
       categories: {
@@ -308,6 +339,7 @@ function bulkAshbyJobs(token: string, spec: SyntheticBoardSpec) {
     location: pick(BULK_LOCATIONS, index),
     secondaryLocations: [],
     jobUrl: `https://jobs.ashbyhq.com/${token}/ash-${String(index)}`,
+    applyUrl: `https://jobs.ashbyhq.com/${token}/ash-${String(index)}/application`,
     publishedAt: Date.parse(BULK_FIRST_PUBLISHED),
     isListed: true,
     isRemote: false,
@@ -355,6 +387,8 @@ function loadDirectories(root: string) {
     entry.isDirectory(),
   );
 }
+
+const LEVER_EU_FIXTURE_ROOT = "test/e2e/fixtures/lever-eu";
 
 function readGreenhouseBoard(token: string) {
   const root = "test/e2e/fixtures/greenhouse";
@@ -407,6 +441,14 @@ function loadGreenhouseBoards() {
         updatedAt: job.updated_at,
         firstPublished: job.first_published,
         language: job.language,
+        internalJobId: job.internal_job_id ?? null,
+        requisitionId: job.requisition_id ?? null,
+        payInputRanges: (job.pay_input_ranges ?? []).map((range) => ({
+          min_cents: range.min_cents ?? null,
+          max_cents: range.max_cents ?? null,
+          currency_type: range.currency_type ?? null,
+          interval: range.interval ?? null,
+        })),
         content: job.content ?? null,
         departments: (job.departments ?? []).map((department) => ({
           name: department.name ?? null,
@@ -418,11 +460,11 @@ function loadGreenhouseBoards() {
   return boards;
 }
 
-function loadLeverBoards() {
+function loadLeverBoards(root: string) {
   const boards = new Map<string, MutableLeverJob[]>();
 
-  for (const entry of loadDirectories("test/e2e/fixtures/lever")) {
-    const parsed = readBoardFile("test/e2e/fixtures/lever", entry.name, leverBoardSchema);
+  for (const entry of loadDirectories(root)) {
+    const parsed = readBoardFile(root, entry.name, leverBoardSchema);
 
     boards.set(
       entry.name,
@@ -430,6 +472,7 @@ function loadLeverBoards() {
         id: job.id,
         text: job.text,
         hostedUrl: job.hostedUrl,
+        applyUrl: job.applyUrl ?? null,
         createdAt: job.createdAt,
         workplaceType: job.workplaceType ?? null,
         categories: {
@@ -471,6 +514,7 @@ function loadAshbyBoards() {
           location: secondary.location ?? null,
         })),
         jobUrl: job.jobUrl,
+        applyUrl: job.applyUrl ?? null,
         publishedAt: job.publishedAt ?? null,
         isListed: job.isListed ?? null,
         isRemote: job.isRemote ?? null,
@@ -489,21 +533,7 @@ function loadAshbyBoards() {
 }
 
 function serializeGreenhouseJob(job: MutableGreenhouseJob, wantsContent: boolean) {
-  if (wantsContent) {
-    return {
-      id: job.id,
-      title: job.title,
-      absolute_url: job.absoluteUrl,
-      location: { name: job.locationName },
-      updated_at: job.updatedAt,
-      first_published: job.firstPublished,
-      language: job.language,
-      content: job.content,
-      departments: job.departments,
-    };
-  }
-
-  return {
+  const base = {
     id: job.id,
     title: job.title,
     absolute_url: job.absoluteUrl,
@@ -511,7 +541,15 @@ function serializeGreenhouseJob(job: MutableGreenhouseJob, wantsContent: boolean
     updated_at: job.updatedAt,
     first_published: job.firstPublished,
     language: job.language,
+    internal_job_id: job.internalJobId,
+    requisition_id: job.requisitionId,
   };
+
+  if (wantsContent) {
+    return { ...base, content: job.content, departments: job.departments };
+  }
+
+  return base;
 }
 
 function serializeLeverJob(job: MutableLeverJob) {
@@ -519,6 +557,7 @@ function serializeLeverJob(job: MutableLeverJob) {
     id: job.id,
     text: job.text,
     hostedUrl: job.hostedUrl,
+    applyUrl: job.applyUrl,
     createdAt: job.createdAt,
     workplaceType: job.workplaceType,
     categories: {
@@ -542,6 +581,7 @@ function serializeAshbyJob(job: MutableAshbyJob) {
     location: job.location,
     secondaryLocations: job.secondaryLocations,
     jobUrl: job.jobUrl,
+    applyUrl: job.applyUrl,
     publishedAt: job.publishedAt,
     isListed: job.isListed,
     isRemote: job.isRemote,
@@ -571,7 +611,8 @@ function snapshotAts(stats: {
 export async function startFeedFixtureServer() {
   const greenhouseBoards = loadGreenhouseBoards();
   const greenhouseQuestions = loadGreenhouseQuestions();
-  const leverBoards = loadLeverBoards();
+  const leverBoards = loadLeverBoards("test/e2e/fixtures/lever");
+  const leverEuBoards = loadLeverBoards(LEVER_EU_FIXTURE_ROOT);
   const ashbyBoards = loadAshbyBoards();
   const removedJobIds = new Set<string>();
 
@@ -633,6 +674,9 @@ export async function startFeedFixtureServer() {
         updatedAt: added.updatedAt,
         firstPublished: added.firstPublished,
         language: "en",
+        internalJobId: 9_000_000 + jobs.length,
+        requisitionId: null,
+        payInputRanges: [],
         content: null,
         departments: [],
       });
@@ -674,6 +718,7 @@ export async function startFeedFixtureServer() {
         id: added.id,
         text: added.title,
         hostedUrl: added.absoluteUrl,
+        applyUrl: null,
         createdAt: Date.parse(added.firstPublished),
         workplaceType: "onsite",
         categories: {
@@ -727,6 +772,7 @@ export async function startFeedFixtureServer() {
         location: added.locationName,
         secondaryLocations: [],
         jobUrl: added.absoluteUrl,
+        applyUrl: null,
         publishedAt: added.firstPublished,
         isListed: true,
         isRemote: false,
@@ -848,7 +894,18 @@ export async function startFeedFixtureServer() {
       }
 
       detailCounts[`${token}/${jobId}`] = (detailCounts[`${token}/${jobId}`] ?? 0) + 1;
-      finish(200, JSON.stringify(job));
+      finish(
+        200,
+        JSON.stringify({
+          ...job,
+          internal_job_id: job.internalJobId,
+          requisition_id: job.requisitionId,
+          pay_input_ranges: job.payInputRanges,
+          content: job.content,
+          departments: job.departments,
+          location: { name: job.locationName },
+        }),
+      );
 
       return;
     }
@@ -862,11 +919,17 @@ export async function startFeedFixtureServer() {
         return;
       }
 
-      const jobs = (leverBoards.get(token) ?? []).filter(
-        (job) => !removedJobIds.has(`lever/${token}/${job.id}`),
-      );
+      const allJobs =
+        (route.region === "eu" ? leverEuBoards.get(token) : leverBoards.get(token)) ?? [];
 
-      finish(200, JSON.stringify(jobs.map((job) => serializeLeverJob(job))));
+      const jobs = allJobs.filter((job) => !removedJobIds.has(`lever/${token}/${job.id}`));
+      const { searchParams } = new URL(request.url ?? "/", "http://127.0.0.1");
+      const { limit: limitParam, skip: skipParam } = Object.fromEntries(searchParams);
+      const limit = Number(limitParam ?? jobs.length);
+      const skip = Number(skipParam ?? 0);
+      const page = jobs.slice(skip, skip + limit);
+
+      finish(200, JSON.stringify(page.map((job) => serializeLeverJob(job))));
 
       return;
     }
@@ -1006,7 +1069,9 @@ const GREENHOUSE_JOB_RE =
 const LEVER_BOARD_RE = /^\/v0\/postings\/(?<token>[A-Za-z0-9_-]+)$/u;
 const ASHBY_BOARD_RE = /^\/posting-api\/job-board\/(?<token>[A-Za-z0-9_-]+)$/u;
 
-function routeFor(pathname: string) {
+function routeFor(rawPathname: string) {
+  const region = rawPathname.startsWith("/eu/") ? "eu" : "us";
+  const pathname = region === "eu" ? rawPathname.slice(3) : rawPathname;
   const boardMatch = GREENHOUSE_BOARD_RE.exec(pathname);
 
   if (boardMatch?.groups !== undefined) {
@@ -1031,7 +1096,12 @@ function routeFor(pathname: string) {
   const leverMatch = LEVER_BOARD_RE.exec(pathname);
 
   if (leverMatch?.groups !== undefined) {
-    return { name: "lever-list", ats: "lever", token: leverMatch.groups.token ?? "" } as const;
+    return {
+      name: "lever-list",
+      ats: "lever",
+      region,
+      token: leverMatch.groups.token ?? "",
+    } as const;
   }
 
   const ashbyMatch = ASHBY_BOARD_RE.exec(pathname);

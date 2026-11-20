@@ -12,6 +12,7 @@ import { limiterFor } from "./rate-limiter.ts";
 import type {
   BoardCondition,
   BoardFeed,
+  BoardRegion,
   FeedContent,
   FeedPosting,
   UnconditionalFetcher,
@@ -34,8 +35,10 @@ const jobSchema = z.object({
   location: z.string().nullish(),
   secondaryLocations: z.array(z.object({ location: z.string().nullish() })).nullish(),
   jobUrl: stringField,
+  applyUrl: stringField,
   publishedAt: z.union([z.number(), z.string()]).nullish(),
   isListed: z.boolean().nullish(),
+  workplaceType: z.string().nullish(),
   department: z.string().nullish(),
   team: z.string().nullish(),
   descriptionPlain: z.string().nullish(),
@@ -56,11 +59,12 @@ export function createAshbyFeed(
     }
   };
 
-  const fetchBoard = async (boardToken: string, condition: BoardCondition) => {
+  const fetchBoard = async (boardToken: string, condition: BoardCondition, region: BoardRegion) => {
     assertToken(boardToken);
     void condition;
+    void region;
 
-    const url = `${baseUrl}/posting-api/job-board/${boardToken}?includeCompensation=true`;
+    const url = `${baseUrl}/posting-api/job-board/${boardToken.toLowerCase()}?includeCompensation=true`;
     const response = await limiter.run(async () => fetcher(url));
 
     if (response.status === 404) {
@@ -76,16 +80,19 @@ export function createAshbyFeed(
           descriptionText: job.descriptionPlain?.trim() || null,
           department: job.department?.trim() || null,
           locationRaw: null,
+          salary: null,
         };
 
         return {
           atsJobId: job.id,
           title: job.title,
           url: job.jobUrl,
+          applyUrl: job.applyUrl === "" ? null : job.applyUrl,
           locationRaw: joinDistinctLocations([
             job.location ?? null,
             ...(job.secondaryLocations ?? []).map((secondary) => secondary.location),
           ]),
+          workplaceType: job.workplaceType ?? null,
           language: null,
           postedAt: isoFromTimestamp(job.publishedAt),
           sourceUpdatedAt: null,
