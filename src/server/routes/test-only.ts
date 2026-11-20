@@ -231,6 +231,10 @@ const seedReviewBody = z.object({
   fieldType: z.enum(QUESTION_FIELD_TYPES),
   options: z.array(z.string().min(1)).max(200).default([]),
   factKey: z.string().min(1).nullish(),
+  scope: z
+    .string()
+    .regex(/^(?:|[A-Z]{2})$/u)
+    .default(""),
   answerKind: z.enum(["fact", "open_text", "consent", "skip", "unknown"]).default("unknown"),
   applicationIds: z.array(z.string().min(1)).min(1).max(50),
 });
@@ -782,6 +786,7 @@ export function createTestRoutes(
         userId: body.userId,
         questionId,
         factKey: body.factKey ?? null,
+        scope: body.scope,
         prompt: body.prompt,
         fieldType: body.fieldType,
         options: JSON.stringify(body.options),

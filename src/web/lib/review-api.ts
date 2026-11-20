@@ -16,6 +16,8 @@ const reviewSchema = z.object({
   fieldType: z.enum(QUESTION_FIELD_TYPES),
   options: z.array(z.string()),
   factKey: z.string().nullable(),
+  scope: z.string(),
+  factLabel: z.string().nullable(),
   category: z.enum(REVIEW_CATEGORIES),
   unlocked: z.number(),
   companies: z.number(),

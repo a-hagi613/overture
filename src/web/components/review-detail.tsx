@@ -4,7 +4,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { Review } from "../lib/review-api";
 
 import { copy } from "../../shared/copy.ts";
-import { factLabelFor } from "../../shared/facts.ts";
 import { answerReview, dismissReview } from "../lib/review-api.ts";
 import { ReviewAnswer } from "./review-answer.tsx";
 
@@ -65,7 +64,7 @@ export function ReviewDetail({
     setPending(false);
   }
 
-  const factLabel = review.factKey === null ? null : factLabelFor(review.factKey);
+  const { factLabel } = review;
 
   return (
     <section

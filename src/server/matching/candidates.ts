@@ -223,8 +223,10 @@ function settingNumber(db: AppDatabase, key: keyof typeof SETTING_DEFAULTS) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-function workAuthorisation(records: { key: string; value: string }[]) {
-  const record = records.find((candidate) => candidate.key === "work_auth");
+function workAuthorisation(records: { key: string; scope: string; value: string }[]) {
+  const record = records.find(
+    (candidate) => candidate.key === "work_auth" && candidate.scope === "",
+  );
 
   return record?.value.trim().toLowerCase() === "yes";
 }

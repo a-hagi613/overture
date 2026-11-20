@@ -2,12 +2,14 @@ import { describe, expect, test } from "bun:test";
 
 import {
   affirmativeOption,
+  countriesNamedIn,
   matchOption,
   normalizeFieldType,
   normalizeOptionText,
   normalizeQuestionText,
   questionOptionsHash,
   questionVariantHash,
+  referencesUserCountry,
   reviewCategory,
 } from "./question-normalize.ts";
 
@@ -108,6 +110,47 @@ describe("matchOption", () => {
   test("finds the affirmative option", () => {
     expect(affirmativeOption(["Disagree", "I agree"])).toBe("I agree");
     expect(affirmativeOption(["No", "Yes"])).toBe("Yes");
+  });
+});
+
+describe("countriesNamedIn", () => {
+  test("names the country a question asks about", () => {
+    expect(countriesNamedIn("Are you authorized to work in the UK?")).toEqual(["GB"]);
+    expect(countriesNamedIn("Are you authorized to work in Canada?")).toEqual(["CA"]);
+    expect(countriesNamedIn("Can you work in the United States or Canada?")).toEqual(["CA", "US"]);
+  });
+
+  test("reads an uppercase two-letter country abbreviation", () => {
+    expect(countriesNamedIn("Are you authorized to work in the US?")).toEqual(["US"]);
+    expect(countriesNamedIn("Do you need a visa for the U.S.?")).toEqual(["US"]);
+    expect(countriesNamedIn("Are you authorized to work in the U.K.?")).toEqual(["GB"]);
+  });
+
+  test("does not read a country out of an ordinary word", () => {
+    expect(countriesNamedIn("Will you require us to sponsor a visa?")).toEqual([]);
+    expect(countriesNamedIn("Do you need sponsorship now, or in the future?")).toEqual([]);
+  });
+
+  test("folds country aliases", () => {
+    expect(countriesNamedIn("Are you based in England?")).toEqual(["GB"]);
+    expect(countriesNamedIn("Do you live in the Netherlands?")).toEqual(["NL"]);
+  });
+});
+
+describe("referencesUserCountry", () => {
+  test("recognises questions about the country where the user lives", () => {
+    expect(referencesUserCountry("Your authorization to work in the country where you live.")).toBe(
+      true,
+    );
+    expect(
+      referencesUserCountry(
+        "Are you authorized to work in the location(s) you selected in your previous response?",
+      ),
+    ).toBe(true);
+  });
+
+  test("leaves a question about a named country alone", () => {
+    expect(referencesUserCountry("Are you authorized to work in the UK?")).toBe(false);
   });
 });
 

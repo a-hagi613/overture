@@ -15,8 +15,10 @@ import {
   reviews,
 } from "../platform/db/schema.ts";
 import { createQuestionCatalog } from "../catalog/questions.ts";
+import { countryNameFor } from "../catalog/geo.ts";
 import { reviewCategory } from "../catalog/question-normalize.ts";
 import { createFactService } from "../profile/facts.ts";
+import { factLabelFor } from "../../shared/facts.ts";
 import {
   applicationIdsForReview,
   dismissEmptyReview,
@@ -39,6 +41,8 @@ export interface ReviewView {
   fieldType: QuestionFieldType;
   options: string[];
   factKey: string | null;
+  scope: string;
+  factLabel: string | null;
   category: ReviewCategory;
   unlocked: number;
   companies: number;
@@ -52,6 +56,7 @@ function openReviewRows(db: AppDatabase, userId: string) {
       id: reviews.id,
       questionId: reviews.questionId,
       factKey: reviews.factKey,
+      scope: reviews.scope,
       prompt: reviews.prompt,
       fieldType: reviews.fieldType,
       options: reviews.options,
@@ -131,6 +136,14 @@ export function createReviewService(deps: {
     const views: ReviewView[] = openReviewRows(db, userId).map((review) => {
       const attachments = attachmentsFor(db, review.id);
       const companiesUnlocked = new Set(attachments.map((attachment) => attachment.company));
+      const label = review.factKey === null ? null : factLabelFor(review.factKey);
+      const country = review.scope === "" ? null : countryNameFor(review.scope);
+
+      let factLabel = label;
+
+      if (label !== null && country !== null) {
+        factLabel = `${label} (${country})`;
+      }
 
       return {
         id: review.id,
@@ -138,6 +151,8 @@ export function createReviewService(deps: {
         fieldType: review.fieldType,
         options: optionsSchema.parse(JSON.parse(review.options)),
         factKey: review.factKey,
+        scope: review.scope,
+        factLabel,
         category: reviewCategory(review.prompt, review.factKey),
         unlocked: attachments.length,
         companies: companiesUnlocked.size,
@@ -164,7 +179,7 @@ export function createReviewService(deps: {
 
     const factKey = review.factKey ?? `q:${review.questionId}`;
 
-    await factsService.saveFromReview(userId, factKey, value);
+    await factsService.saveFromReview(userId, factKey, value, review.scope);
     catalog.setMapping(review.questionId, { answerKind: "fact", factKey, mappedBy: "owner" });
 
     const applicationIds = applicationIdsForReview(db, reviewId);
@@ -176,7 +191,7 @@ export function createReviewService(deps: {
 
     await preparation.prepareMany(applicationIds);
 
-    return { reviewId, factKey, applicationIds };
+    return { reviewId, factKey, scope: review.scope, applicationIds };
   }
 
   function dismiss(userId: string, reviewId: string) {
