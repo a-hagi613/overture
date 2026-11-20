@@ -1,16 +1,15 @@
-import { and, desc, eq, gte, isNull, notInArray, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, notInArray, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import { companyBoards, postings } from "../platform/db/schema.ts";
-import { htmlToText } from "./html-to-text.ts";
 import { normalizeApplyUrl, normalizeTitle } from "./normalize.ts";
 import { contentHash } from "./content-hash.ts";
 import { dedupeKeyFor } from "./dedupe-key.ts";
 import { storePostingTags, salaryPeriodForColumn } from "./tag-store.ts";
 import { tagPosting } from "./tag-rules.ts";
 
-import type { GreenhouseFeed, GreenhouseFeedJob, GreenhouseJobDetail } from "./greenhouse-feed.ts";
+import type { BoardFeed, FeedContent, FeedPosting } from "./board-feed.ts";
 
 export type BoardRow = typeof companyBoards.$inferSelect;
 
@@ -66,28 +65,37 @@ function gzip(descriptionText: string) {
   return Buffer.from(Bun.gzipSync(descriptionText));
 }
 
-function latestSourceUpdatedAtForBoard(db: AppDatabase, boardId: string) {
+function latestChangeMsForBoard(db: AppDatabase, boardId: string) {
   const row = db
-    .select({ latest: postings.sourceUpdatedAt })
+    .select({
+      latestSource: sql<number | null>`max(${postings.sourceUpdatedAt})`,
+      latestPosted: sql<number | null>`max(${postings.postedAt})`,
+    })
     .from(postings)
     .where(and(eq(postings.boardId, boardId), isNull(postings.closedAt)))
-    .orderBy(desc(postings.sourceUpdatedAt))
-    .limit(1)
     .get();
 
-  return row?.latest ?? null;
+  const candidates = [row?.latestSource ?? null, row?.latestPosted ?? null].filter(
+    (value): value is number => value !== null,
+  );
+
+  return candidates.length === 0 ? null : Math.max(...candidates);
 }
 
-async function fetchDetailOrNull(feed: GreenhouseFeed, boardToken: string, jobId: string) {
+async function fetchDetailOrNull(feed: BoardFeed, boardToken: string, atsJobId: string) {
+  if (feed.fetchPostingDetail === undefined) {
+    return null;
+  }
+
   try {
-    return await feed.fetchJobDetail(boardToken, jobId);
+    return await feed.fetchPostingDetail(boardToken, atsJobId);
   } catch {
     return null;
   }
 }
 
 function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow, now: number) {
-  const latestChangeMs = latestSourceUpdatedAtForBoard(db, board.id);
+  const latestChangeMs = latestChangeMsForBoard(db, board.id);
 
   const missingRows = db
     .update(postings)
@@ -130,61 +138,64 @@ function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow, now:
 async function syncPostings(
   db: AppDatabase,
   clock: Clock,
-  feed: GreenhouseFeed,
+  feed: BoardFeed,
   board: BoardRow,
-  jobs: GreenhouseFeedJob[],
+  boardPostings: FeedPosting[],
   now: number,
 ) {
   const report = { added: 0, updated: 0, closed: 0 };
-  const seenJobIds = new Set<string>(jobs.map((job) => job.id));
+  const seenJobIds = new Set<string>(boardPostings.map((posting) => posting.atsJobId));
 
   const existingRows = db.select().from(postings).where(eq(postings.boardId, board.id)).all();
   const existingByJobId = new Map(existingRows.map((row) => [row.atsJobId, row]));
 
-  const changedJobs = jobs.filter((job) => {
-    const existing = existingByJobId.get(job.id);
-    const jobUpdatedAtMs = parseMs(job.updatedAt);
+  const changedPostings = boardPostings.filter((posting) => {
+    const existing = existingByJobId.get(posting.atsJobId);
+    const sourceUpdatedAtMs = parseMs(posting.sourceUpdatedAt);
 
     const unchanged =
       existing?.closedAt === null &&
       existing.sourceUpdatedAt !== null &&
-      existing.sourceUpdatedAt === jobUpdatedAtMs;
+      existing.sourceUpdatedAt === sourceUpdatedAtMs;
 
     return !unchanged;
   });
 
-  const detailsList = await Promise.all(
-    changedJobs.map(async (job) => {
-      const detail = await fetchDetailOrNull(feed, board.boardToken, job.id);
+  const detailPairs = await Promise.all(
+    changedPostings.map(async (posting) => {
+      const content = posting.descriptionPending
+        ? await fetchDetailOrNull(feed, board.boardToken, posting.atsJobId)
+        : posting.content;
 
-      return [job.id, detail] as const;
+      return [posting.atsJobId, content] as const;
     }),
   );
 
-  const detailsByJobId = new Map<string, GreenhouseJobDetail | null>(detailsList);
+  const contentByJobId = new Map<string, FeedContent | null>(detailPairs);
 
-  for (const job of jobs) {
-    const existing = existingByJobId.get(job.id);
+  for (const posting of boardPostings) {
+    const existing = existingByJobId.get(posting.atsJobId);
+    const content = contentByJobId.get(posting.atsJobId) ?? null;
 
-    if (existing !== undefined && !detailsByJobId.has(job.id)) {
+    if (existing !== undefined && !contentByJobId.has(posting.atsJobId)) {
       touchUnchangedPosting(db, existing.id, now);
 
       continue;
     }
 
-    const detail = detailsByJobId.get(job.id) ?? null;
-    const descriptionText = htmlToText(detail?.contentHtml ?? null);
-    const titleNorm = normalizeTitle(job.title);
-    const locationRaw = detail?.locationName ?? job.locationName;
+    const detail = posting.descriptionPending ? content : posting.content;
+    const descriptionText = detail?.descriptionText ?? null;
+    const titleNorm = normalizeTitle(posting.title);
+    const locationRaw = detail?.locationRaw ?? posting.locationRaw;
 
     const tags = tagPosting({
-      title: job.title,
+      title: posting.title,
       department: detail?.department ?? null,
       locationRaw,
       workplaceType: null,
       isRemote: null,
       employmentType: null,
-      language: job.language,
+      language: posting.language,
       salary: null,
       descriptionText: descriptionText === null ? null : descriptionText.slice(0, 20_000),
     });
@@ -197,10 +208,10 @@ async function syncPostings(
     });
 
     const values = {
-      url: job.absoluteUrl ?? "",
+      url: posting.url,
       applyUrl: null,
-      applyUrlNorm: normalizeApplyUrl(job.absoluteUrl ?? ""),
-      title: job.title,
+      applyUrlNorm: normalizeApplyUrl(posting.url),
+      title: posting.title,
       titleNorm,
       department: detail?.department ?? null,
       locationRaw,
@@ -214,8 +225,8 @@ async function syncPostings(
       salaryMaxMinor: tags.salaryMaxMinor,
       salaryCurrency: tags.salaryCurrency,
       salaryPeriod: salaryPeriodForColumn(tags.salaryPeriod),
-      postedAt: parseMs(job.firstPublished),
-      sourceUpdatedAt: parseMs(job.updatedAt),
+      postedAt: parseMs(posting.postedAt),
+      sourceUpdatedAt: parseMs(posting.sourceUpdatedAt),
       lastSeenAt: now,
       missingPolls: 0,
       closedAt: null,
@@ -234,7 +245,7 @@ async function syncPostings(
           boardId: board.id,
           companyId: board.companyId,
           ats: board.ats,
-          atsJobId: job.id,
+          atsJobId: posting.atsJobId,
           firstSeenAt: now,
           ...values,
         })
@@ -301,10 +312,10 @@ function markBoardPolled(
   db: AppDatabase,
   clock: Clock,
   board: BoardRow,
-  result: { etag: string | null; bodyHash: string; jobs: GreenhouseFeedJob[] },
+  result: { etag: string | null; bodyHash: string; postings: FeedPosting[] },
 ) {
   const now = clock.now();
-  const latestChangeMs = latestSourceUpdatedAtForBoard(db, board.id);
+  const latestChangeMs = latestChangeMsForBoard(db, board.id);
 
   db.update(companyBoards)
     .set({
@@ -315,7 +326,7 @@ function markBoardPolled(
       backoffLevel: 0,
       consecutiveErrors: 0,
       notFoundPolls: 0,
-      status: result.jobs.length === 0 ? "empty" : "active",
+      status: result.postings.length === 0 ? "empty" : "active",
     })
     .where(eq(companyBoards.id, board.id))
     .run();
@@ -371,7 +382,7 @@ function markBoardError(db: AppDatabase, board: BoardRow, now: number, message: 
 export const pollBoard = async (
   db: AppDatabase,
   clock: Clock,
-  feed: GreenhouseFeed,
+  feed: BoardFeed,
   board: BoardRow,
 ) => {
   if (board.status === "gone" || board.nextPollAt === null || board.nextPollAt > clock.now()) {
@@ -383,7 +394,7 @@ export const pollBoard = async (
   let result;
 
   try {
-    result = await feed.fetchBoardList(board.boardToken, {
+    result = await feed.fetchBoard(board.boardToken, {
       etag: board.etag,
       bodyHash: board.contentHash,
     });
@@ -403,7 +414,7 @@ export const pollBoard = async (
     return touchWithoutChange(db, clock, board, now);
   }
 
-  const rows = await syncPostings(db, clock, feed, board, result.jobs, now);
+  const rows = await syncPostings(db, clock, feed, board, result.postings, now);
 
   markBoardPolled(db, clock, board, result);
 

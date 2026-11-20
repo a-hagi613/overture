@@ -5,13 +5,13 @@ import { join } from "node:path";
 import { z } from "zod";
 
 import { startAppServer } from "./app-server.ts";
-import { startGreenhouseFixtureServer } from "./greenhouse-fixture-server.ts";
+import { startFeedFixtureServer } from "./feed-fixture-server.ts";
 import { extractSseEvents } from "./sse.ts";
 
 import type { SseEvent } from "./sse.ts";
 
 import type { AppServer } from "./app-server.ts";
-import type { GreenhouseFixtureServer } from "./greenhouse-fixture-server.ts";
+import type { FeedFixtureServer } from "./feed-fixture-server.ts";
 
 const postingRowSchema = z.object({
   id: z.string(),
@@ -87,15 +87,29 @@ export interface BoardRow {
   consecutiveErrors: number;
 }
 
+const boardSpecSchema = z.union([
+  z
+    .string()
+    .min(1)
+    .transform((token) => ({ ats: "greenhouse" as const, token })),
+  z.object({
+    ats: z.enum(["greenhouse", "lever", "ashby"]),
+    token: z.string().min(1),
+  }),
+]);
+
+export type BoardSpec = z.input<typeof boardSpecSchema>;
+
 export interface CatalogHarness {
   app: AppServer;
-  fixture: GreenhouseFixtureServer;
+  fixture: FeedFixtureServer;
   companyId: string;
   boardIds: Record<string, string>;
   runBackfillCycle: () => Promise<void>;
   pollThroughScheduledSweep: (clockOffsetMs: number) => Promise<void>;
   postings: () => Promise<PostingRow[]>;
   boards: () => Promise<BoardRow[]>;
+  clockNow: () => Promise<number>;
   close: () => Promise<void>;
 }
 
@@ -194,13 +208,15 @@ async function waitForJobDone(
   return readUntilSettled();
 }
 
-export async function startCatalogHarness(boardTokens: string[]) {
-  const fixture = await startGreenhouseFixtureServer();
+export async function startCatalogHarness(boardSpecs: BoardSpec[]) {
+  const fixture = await startFeedFixtureServer();
   const directory = mkdtempSync(join(tmpdir(), "overture-catalog-"));
   const databasePath = join(directory, "overture.db");
 
   const app = await startAppServer(databasePath, {
     GREENHOUSE_FEED_BASE_URL: fixture.url,
+    LEVER_FEED_BASE_URL: fixture.url,
+    ASHBY_FEED_BASE_URL: fixture.url,
   });
 
   const companyResponse = await postJson(`${app.url}/__test__/catalog/companies`, {
@@ -210,23 +226,25 @@ export async function startCatalogHarness(boardTokens: string[]) {
 
   const company = companyCreatedSchema.parse(await companyResponse.json());
 
-  const boardIdPairs = await Promise.all(
-    boardTokens.map(async (token) => {
+  const specs = boardSpecs.map((spec) => boardSpecSchema.parse(spec));
+
+  const createdBoards = await Promise.all(
+    specs.map(async (spec) => {
       const boardResponse = await postJson(`${app.url}/__test__/catalog/boards`, {
         companyId: company.id,
-        ats: "greenhouse",
-        boardToken: token,
+        ats: spec.ats,
+        boardToken: spec.token,
       });
 
       const board = boardCreatedSchema.parse(await boardResponse.json());
 
-      return [token, board.id] as const;
+      return [spec.token, board.id] as const;
     }),
   );
 
   const boardIds: Record<string, string> = {};
 
-  for (const [token, id] of boardIdPairs) {
+  for (const [token, id] of createdBoards) {
     boardIds[token] = id;
   }
 
@@ -291,6 +309,7 @@ export async function startCatalogHarness(boardTokens: string[]) {
     pollThroughScheduledSweep,
     postings,
     boards,
+    clockNow,
     close: async () => {
       await app.stop();
       fixture.stop();

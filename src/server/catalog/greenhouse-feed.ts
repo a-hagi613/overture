@@ -1,60 +1,17 @@
 import { z } from "zod";
 
 import { contentHash } from "./content-hash.ts";
+import { FeedError } from "./board-feed.ts";
+import { htmlToText } from "./html-to-text.ts";
 import { limiterFor } from "./rate-limiter.ts";
+
+import type { BoardCondition, BoardFeed, FeedResponse, FeedPosting } from "./board-feed.ts";
 
 export const GREENHOUSE_DEFAULT_BASE_URL = "https://boards-api.greenhouse.io";
 
 export const GREENHOUSE_LIMITS = { maxConcurrent: 4, minIntervalMs: 500 } as const;
 
 const BOARD_TOKEN_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/u;
-
-export interface FeedResponse {
-  status: number;
-  etag: string | null;
-  json: unknown;
-}
-
-export class FeedError extends Error {
-  readonly status: number;
-
-  constructor(status: number, url: string) {
-    super(`GET ${url} failed: ${String(status)}`);
-    this.name = "FeedError";
-    this.status = status;
-  }
-}
-
-export interface BoardCondition {
-  etag: string | null;
-  bodyHash: string | null;
-}
-
-export interface GreenhouseFeedJob {
-  id: string;
-  title: string;
-  absoluteUrl: string | null;
-  locationName: string | null;
-  updatedAt: string | null;
-  firstPublished: string | null;
-  language: string | null;
-}
-
-export interface GreenhouseJobDetail {
-  contentHtml: string | null;
-  department: string | null;
-  locationName: string | null;
-}
-
-export type BoardListResult =
-  | { status: "ok"; jobs: GreenhouseFeedJob[]; etag: string | null; bodyHash: string }
-  | { status: "not_modified" }
-  | { status: "gone" };
-
-export interface GreenhouseFeed {
-  fetchBoardList: (boardToken: string, condition: BoardCondition) => Promise<BoardListResult>;
-  fetchJobDetail: (boardToken: string, jobId: string) => Promise<GreenhouseJobDetail>;
-}
 
 const jobSchema = z.object({
   id: z.union([z.number(), z.string()]).transform(String),
@@ -121,7 +78,7 @@ export function createGreenhouseFeed(
     }
   };
 
-  const fetchBoardList = async (boardToken: string, condition: BoardCondition) => {
+  const fetchBoard = async (boardToken: string, condition: BoardCondition) => {
     assertToken(boardToken);
 
     const url = `${baseUrl}/v1/boards/${boardToken}/jobs`;
@@ -137,51 +94,61 @@ export function createGreenhouseFeed(
 
     const parsed = listResponseSchema.parse(response.json);
 
-    const jobs: GreenhouseFeedJob[] = parsed.jobs.map((job) => ({
-      id: job.id,
+    const postings: FeedPosting[] = parsed.jobs.map((job) => ({
+      atsJobId: job.id,
       title: job.title,
-      absoluteUrl: job.absolute_url ?? null,
-      locationName: job.location?.name ?? null,
-      updatedAt: job.updated_at ?? null,
-      firstPublished: job.first_published ?? null,
+      url: job.absolute_url ?? "",
+      locationRaw: job.location?.name ?? null,
       language: job.language ?? null,
+      postedAt: job.first_published ?? null,
+      sourceUpdatedAt: job.updated_at ?? null,
+      descriptionPending: true,
+      content: null,
     }));
 
     return {
       status: "ok",
-      jobs,
+      postings,
       etag: response.etag,
       bodyHash: contentHash(JSON.stringify(response.json)),
     } as const;
   };
 
-  const fetchJobDetail = async (boardToken: string, jobId: string) => {
+  const fetchPostingDetail = async (boardToken: string, atsJobId: string) => {
     assertToken(boardToken);
 
-    const url = `${baseUrl}/v1/boards/${boardToken}/jobs/${jobId}?content=true`;
+    const url = `${baseUrl}/v1/boards/${boardToken}/jobs/${atsJobId}?content=true`;
 
     try {
       const response = await limiter.run(async () => fetcher(url, { ifNoneMatch: null }));
 
       if (response.status === 404) {
-        return { contentHtml: null, department: null, locationName: null };
+        return {
+          descriptionText: null,
+          department: null,
+          locationRaw: null,
+        };
       }
 
       const parsed = detailResponseSchema.parse(response.json);
 
       return {
-        contentHtml: parsed.content ?? null,
+        descriptionText: htmlToText(parsed.content ?? null),
         department: parsed.departments?.[0]?.name ?? null,
-        locationName: parsed.location?.name ?? null,
+        locationRaw: parsed.location?.name ?? null,
       };
     } catch (error) {
       if (error instanceof FeedError && error.status === 404) {
-        return { contentHtml: null, department: null, locationName: null };
+        return {
+          descriptionText: null,
+          department: null,
+          locationRaw: null,
+        };
       }
 
       throw error;
     }
   };
 
-  return { fetchBoardList, fetchJobDetail } satisfies GreenhouseFeed;
+  return { fetchBoard, fetchPostingDetail } satisfies BoardFeed;
 }

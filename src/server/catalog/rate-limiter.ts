@@ -43,11 +43,12 @@ export function createRateLimiter(clock: Clock, options: RateLimiterOptions) {
   };
 
   const run = async <T>(task: () => Promise<T>) => {
-    const earliest = Math.max(nextStartAt, clock.now());
+    const nowStart = clock.now();
+    const earliest = Math.max(nextStartAt, nowStart);
 
     nextStartAt = earliest + minIntervalMs;
 
-    const waitMs = earliest - clock.now();
+    const waitMs = earliest - nowStart;
 
     if (waitMs > 0) {
       await new Promise<void>((resolve) => {

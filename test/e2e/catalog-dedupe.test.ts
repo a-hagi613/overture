@@ -50,7 +50,7 @@ test("duplicate roles across one company's boards share a dedupe key and show on
     const mainJob = readFirstJob(MAIN_BOARD);
     const duplicateJob = readFirstJob(DUPLICATE_BOARD);
 
-    harness.fixture.mutateBoard(DUPLICATE_BOARD, {
+    harness.fixture.mutateBoard("greenhouse", DUPLICATE_BOARD, {
       titleUpdates: { [duplicateJob.id]: mainJob.title },
       locationUpdates: { [duplicateJob.id]: mainJob.location?.name ?? "" },
     });
