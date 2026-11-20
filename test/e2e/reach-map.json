@@ -113,11 +113,7 @@
     },
     "test/e2e/backup-lag.test.ts": {
       "full": false,
-      "paths": [
-        "/__test__/clock",
-        "/__test__/jobs/enqueue",
-        "/api/health"
-      ],
+      "paths": ["/__test__/clock", "/__test__/jobs/enqueue", "/api/health"],
       "modules": [
         "src/server/catalog/ashby-feed.ts",
         "src/server/catalog/board-feed.ts",
