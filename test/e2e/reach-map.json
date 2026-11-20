@@ -1266,9 +1266,7 @@
     "test/e2e/inbound-mail-worker.test.ts": {
       "full": false,
       "paths": [],
-      "modules": [
-        "src/shared/inbound-mail.ts"
-      ]
+      "modules": ["src/shared/inbound-mail.ts"]
     },
     "test/e2e/job-survives-restart.test.ts": {
       "full": false,
