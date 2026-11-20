@@ -47,6 +47,7 @@ const greenhouseFixtureSchema = z.object({
     z.object({
       id: z.union([z.number(), z.string()]).transform(String),
       title: z.string().default(""),
+      location: z.object({ name: z.string().nullish() }).nullish(),
     }),
   ),
 });
@@ -77,6 +78,7 @@ function readFixture(ats: Ats, token: string) {
         id: job.id,
         title: job.text,
         department: job.categories?.department ?? null,
+        location: null,
       })),
     };
   }
@@ -89,13 +91,21 @@ function readFixture(ats: Ats, token: string) {
         id: job.id,
         title: job.title,
         department: job.department ?? null,
+        location: null,
       })),
     };
   }
 
   const parsed = greenhouseFixtureSchema.parse(raw);
 
-  return { jobs: parsed.jobs.map((job) => ({ id: job.id, title: job.title, department: null })) };
+  return {
+    jobs: parsed.jobs.map((job) => ({
+      id: job.id,
+      title: job.title,
+      department: null,
+      location: job.location?.name ?? null,
+    })),
+  };
 }
 
 async function search(harness: CatalogHarness, query: string) {
@@ -248,6 +258,7 @@ test("duplicate roles across ATS boards share a dedupe key and show once", async
 
     harness.fixture.mutateBoard("ashby", ASHBY_BOARD, {
       titleUpdates: { [ashbyJob.id]: greenhouseJob.title },
+      locationUpdates: { [ashbyJob.id]: greenhouseJob.location ?? "" },
     });
 
     await harness.runBackfillCycle();
