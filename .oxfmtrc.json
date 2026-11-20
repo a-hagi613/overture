@@ -1,0 +1,9 @@
+{
+  "ignorePatterns": [
+    "docs/**",
+    "profile/**",
+    "README.md",
+    "DESIGN.md",
+    "tools/oxlint/anti-slop/vendor/**"
+  ]
+}

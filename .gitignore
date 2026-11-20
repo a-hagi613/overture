@@ -34,3 +34,6 @@ coverage/
 test-results/
 playwright-report/
 blob-report/
+
+data/
+test/e2e/.tmp/

@@ -169,7 +169,7 @@ src/
   web/               React app (routes/, features/, components/ui = shadcn)
 drizzle/             generated migrations
 scripts/             import-v1.ts, census.ts, pull-fixtures.ts, restore-drill.ts
-tests/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
+test/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
                      (the six unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
 ```
@@ -641,7 +641,7 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 Fixture capture is an admin-started job (`fixtures.capture`, `POST /admin/api/fixtures/capture` `{ats, apply_urls}`)
 that runs on `overture-web` and drives a Browser Use session, the same path as a real application, and never clicks
 Submit. It saves sanitised HTML + assets (names, emails, tokens and employer tracking stripped) to R2
-`fixtures/{ats}/{form_signature}/`. A developer pulls them into `tests/e2e/fixtures/forms/` with
+`fixtures/{ats}/{form_signature}/`. A developer pulls them into `test/e2e/fixtures/forms/` with
 `scripts/pull-fixtures.ts` (R2 read only, no ATS traffic); the local fixture server replays them, including fake
 confirmation pages, a fake code prompt and a fake visible challenge. Live smoke checks are the same kind of admin job,
 stopping before Submit. The developer machine never drives a browser against a real form.
@@ -860,7 +860,7 @@ none submits an application or touches a user:
 | Mail | a message via SES to an Overture-owned check address on `mail.tryoverture.com`, through SES receiving and the SNS notice, ingested with `auth='pass'` and its code extracted | MSW recordings for SES |
 | Storage | an R2 put, get, list and delete | — |
 
-`scripts/pull-fixtures.ts` brings refreshed forms and recordings into `tests/e2e/` through a pull request, so a test
+`scripts/pull-fixtures.ts` brings refreshed forms and recordings into `test/e2e/` through a pull request, so a test
 replays only what a real service actually returned.
 
 ### 16.5 Observability
