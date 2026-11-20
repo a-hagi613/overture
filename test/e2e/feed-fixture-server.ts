@@ -74,6 +74,11 @@ const ashbyJobSchema = z.object({
 
 const ashbyBoardSchema = z.object({ jobs: z.array(ashbyJobSchema).default([]) });
 
+const recordedQuestionsSchema = z.object({
+  id: z.union([z.string(), z.number()]),
+  questions: z.array(z.record(z.string(), z.unknown())).default([]),
+});
+
 const ifNoneMatchSchema = z
   .union([z.string(), z.array(z.string())])
   .nullish()
@@ -91,6 +96,7 @@ export interface FixtureStats {
   arrivalGapsMs: number[];
   paths: string[];
   detailCounts: Record<string, number>;
+  questionsRequests: number;
   perAts: Record<Ats, AtsStats>;
 }
 
@@ -359,6 +365,32 @@ function readGreenhouseBoard(token: string) {
   return greenhouseBoardSchema.parse(JSON.parse(readFileSync(file, "utf8")));
 }
 
+function loadGreenhouseQuestions() {
+  const byPosting = new Map<string, unknown>();
+
+  for (const entry of loadDirectories("test/e2e/fixtures/greenhouse")) {
+    const jobsDirectory = join("test/e2e/fixtures/greenhouse", entry.name, "jobs");
+
+    if (!existsSync(jobsDirectory)) {
+      continue;
+    }
+
+    for (const file of readdirSync(jobsDirectory)) {
+      if (!file.endsWith(".questions.json")) {
+        continue;
+      }
+
+      const parsed = recordedQuestionsSchema.parse(
+        JSON.parse(readFileSync(join(jobsDirectory, file), "utf8")),
+      );
+
+      byPosting.set(`${entry.name}/${String(parsed.id)}`, parsed);
+    }
+  }
+
+  return byPosting;
+}
+
 function loadGreenhouseBoards() {
   const boards = new Map<string, MutableGreenhouseJob[]>();
 
@@ -538,6 +570,7 @@ function snapshotAts(stats: {
 
 export async function startFeedFixtureServer() {
   const greenhouseBoards = loadGreenhouseBoards();
+  const greenhouseQuestions = loadGreenhouseQuestions();
   const leverBoards = loadLeverBoards();
   const ashbyBoards = loadAshbyBoards();
   const removedJobIds = new Set<string>();
@@ -560,6 +593,7 @@ export async function startFeedFixtureServer() {
   };
 
   const paths: string[] = [];
+  let questionsRequests = 0;
 
   function mutateGreenhouse(token: string, mutation: BoardMutation) {
     const existingGreenhouseJobs = greenhouseBoards.get(token);
@@ -710,6 +744,7 @@ export async function startFeedFixtureServer() {
   async function handleRequest(request: IncomingMessage, response: ServerResponse) {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     const { pathname, search } = url;
+    const wantsQuestions = url.searchParams.get("questions") === "true";
     const route = routeFor(pathname);
 
     if (route === null) {
@@ -785,6 +820,16 @@ export async function startFeedFixtureServer() {
 
     if (route.name === "greenhouse-job") {
       const { token, jobId } = route;
+
+      if (wantsQuestions) {
+        questionsRequests += 1;
+
+        const recorded = greenhouseQuestions.get(`${token}/${jobId}`);
+
+        finish(200, JSON.stringify(recorded ?? { id: jobId, questions: [] }));
+
+        return;
+      }
 
       if (notFoundTokens.get("greenhouse")?.has(token)) {
         finish(404, JSON.stringify({ error: "board not found" }));
@@ -869,6 +914,7 @@ export async function startFeedFixtureServer() {
       arrivalGapsMs: arrivalTimes.slice(1).map((time, index) => time - (arrivalTimes[index] ?? 0)),
       paths: [...paths],
       detailCounts: { ...detailCounts },
+      questionsRequests,
       perAts: {
         greenhouse: snapshotAts(perAts.greenhouse),
         lever: snapshotAts(perAts.lever),

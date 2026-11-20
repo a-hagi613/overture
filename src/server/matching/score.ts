@@ -24,6 +24,7 @@ import { checkLlmCaps } from "../platform/llm/caps.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
+import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
 import { SETTING_DEFAULTS, getSetting } from "../platform/settings/index.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createTargetsService } from "../profile/targets.ts";
@@ -438,6 +439,10 @@ export function createMatchingService(deps: MatchDeps) {
       userId,
     });
 
+    if (applicationId !== null) {
+      enqueueApplicationPrepare(db, clock, applicationId);
+    }
+
     return { applicationId, created: true };
   }
 
@@ -508,6 +513,7 @@ export function createMatchingService(deps: MatchDeps) {
       });
 
       if (created !== null) {
+        enqueueApplicationPrepare(db, clock, created);
         companiesUsed.add(candidate.companyId);
         applicationsCreated += 1;
         need -= 1;

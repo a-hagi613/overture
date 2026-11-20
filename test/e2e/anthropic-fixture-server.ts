@@ -76,6 +76,7 @@ const batchCreateRequestSchema = z.object({
 });
 
 const titleFromPrompt = /(?:^|\n)title: (?<title>.+)$/mu;
+const questionFromPrompt = /(?:^|\n)question: (?<question>.+)$/mu;
 
 const CREATED_AT = "2026-11-20T12:00:00.000Z";
 const ENDED_AT = "2026-11-20T12:01:00.000Z";
@@ -138,6 +139,23 @@ export function loadTagFallbackRecordingsSync() {
   }
 
   return byTitle;
+}
+
+export function loadQuestionMappingRecordingsSync() {
+  const path = join(process.cwd(), "test/e2e/fixtures/anthropic/question-mapping-recording.jsonl");
+  const byQuestion = new Map<string, Recording>();
+
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    if (line.trim() === "") {
+      continue;
+    }
+
+    const parsed = recordingSchema.parse(JSON.parse(line));
+
+    byQuestion.set(parsed.title, parsed);
+  }
+
+  return byQuestion;
 }
 
 export function loadScoreRecordingsSync() {
@@ -209,6 +227,7 @@ function serveResults(batch: TrackedBatch) {
 export async function startAnthropicFixtureServer() {
   const recordings = loadTagFallbackRecordingsSync();
   const scoreRecordings = loadScoreRecordingsSync();
+  const questionRecordings = loadQuestionMappingRecordingsSync();
   const resumeFallback = loadResumePdfFallbackRecordingSync();
   const batches = new Map<string, TrackedBatch>();
   const seenRequests: RecordedBatchRequest[] = [];
@@ -279,8 +298,9 @@ export async function startAnthropicFixtureServer() {
     for (const batchRequest of createBody.requests) {
       const userContent = batchRequest.params.messages.at(0)?.content ?? "";
       const title = titleFromPrompt.exec(userContent)?.groups?.title ?? null;
+      const question = questionFromPrompt.exec(userContent)?.groups?.question ?? null;
 
-      if (title === null) {
+      if (title === null && question === null) {
         finishJson(
           response,
           500,
@@ -293,7 +313,9 @@ export async function startAnthropicFixtureServer() {
         return;
       }
 
-      const recording = recordings.get(title) ?? scoreRecordings.get(title);
+      const recording =
+        (question === null ? undefined : questionRecordings.get(question)) ??
+        (title === null ? undefined : (recordings.get(title) ?? scoreRecordings.get(title)));
 
       if (recording === undefined) {
         finishJson(
@@ -301,7 +323,10 @@ export async function startAnthropicFixtureServer() {
           500,
           JSON.stringify({
             type: "error",
-            error: { type: "invalid_request_error", message: `no recording for title ${title}` },
+            error: {
+              type: "invalid_request_error",
+              message: `no recording for ${question ?? title ?? "the request"}`,
+            },
           }),
         );
 
@@ -310,7 +335,7 @@ export async function startAnthropicFixtureServer() {
 
       seenRequests.push({
         customId: batchRequest.custom_id,
-        title,
+        title: question ?? title ?? "",
         model: batchRequest.params.model,
         cacheControl: batchRequest.params.system.at(0)?.cache_control?.type ?? null,
         outputFormatType: batchRequest.params.output_config.format.type,

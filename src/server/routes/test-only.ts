@@ -17,8 +17,13 @@ import {
   fxRates,
   ledger,
   matches,
+  postingQuestions,
   postingTags,
   postings,
+  questionVariants,
+  questions,
+  reviewApplications,
+  reviews,
   sessions,
   tagImports,
   users,
@@ -39,6 +44,8 @@ import { dedupeKeyFor } from "../catalog/dedupe-key.ts";
 import { normalizeApplyUrl, normalizeTitle } from "../catalog/normalize.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags } from "../catalog/tag-import.ts";
 import { readLlmUsage, recordLlmUsage } from "../platform/llm/usage.ts";
+import { QUESTION_FIELD_TYPES } from "../../shared/questions.ts";
+import { questionVariantHash } from "../catalog/question-normalize.ts";
 import {
   applicationsLeft,
   commitForApplication,
@@ -180,6 +187,16 @@ const fxRateBody = z.object({
   date: z.string().min(10).max(10),
   currency: z.string().length(3),
   perUsd: z.number().positive(),
+});
+
+const seedReviewBody = z.object({
+  userId: z.string().min(1),
+  prompt: z.string().min(1).max(2000),
+  fieldType: z.enum(QUESTION_FIELD_TYPES),
+  options: z.array(z.string().min(1)).max(200).default([]),
+  factKey: z.string().min(1).nullish(),
+  answerKind: z.enum(["fact", "open_text", "consent", "skip", "unknown"]).default("unknown"),
+  applicationIds: z.array(z.string().min(1)).min(1).max(50),
 });
 
 const userQuery = z.object({ userId: z.string().min(1) });
@@ -585,6 +602,110 @@ export function createTestRoutes(
       .run();
 
     return context.json({ id });
+  });
+
+  routes.post("/reviews/seed", zValidator("json", seedReviewBody), (context) => {
+    const body = context.req.valid("json");
+    const now = clock.now();
+
+    const textNormHash = questionVariantHash(body.prompt);
+
+    const existing = db
+      .select({ id: questions.id })
+      .from(questions)
+      .where(eq(questions.textNormHash, textNormHash))
+      .get();
+
+    const questionId = existing?.id ?? crypto.randomUUID();
+
+    if (existing === undefined) {
+      db.insert(questions)
+        .values({
+          id: questionId,
+          textDisplay: body.prompt,
+          textNormHash,
+          fieldType: body.fieldType,
+          optionsHash: null,
+          factKey: body.factKey ?? null,
+          answerKind: body.answerKind,
+          mappedBy: null,
+          seenCount: 1,
+          createdAt: now,
+        })
+        .run();
+
+      db.insert(questionVariants)
+        .values({ variantHash: textNormHash, questionId })
+        .onConflictDoNothing()
+        .run();
+    }
+
+    const reviewId = crypto.randomUUID();
+
+    db.insert(reviews)
+      .values({
+        id: reviewId,
+        userId: body.userId,
+        questionId,
+        factKey: body.factKey ?? null,
+        prompt: body.prompt,
+        fieldType: body.fieldType,
+        options: JSON.stringify(body.options),
+        status: "open",
+        createdAt: now,
+        resolvedAt: null,
+      })
+      .run();
+
+    for (const applicationId of body.applicationIds) {
+      db.insert(reviewApplications).values({ reviewId, applicationId }).onConflictDoNothing().run();
+    }
+
+    return context.json({ reviewId, questionId });
+  });
+
+  routes.get("/reviews", zValidator("query", userQuery), (context) => {
+    const { userId } = context.req.valid("query");
+
+    return context.json({
+      reviews: db.select().from(reviews).where(eq(reviews.userId, userId)).all(),
+      applications: db.select().from(reviewApplications).all(),
+    });
+  });
+
+  routes.get("/questions", zValidator("query", userQuery), (context) => {
+    const { userId } = context.req.valid("query");
+
+    const application = db
+      .select({ postingId: applications.postingId })
+      .from(applications)
+      .where(eq(applications.userId, userId))
+      .limit(1)
+      .get();
+
+    if (application === undefined) {
+      return context.json({ questions: [] });
+    }
+
+    return context.json({
+      questions: db
+        .select({
+          questionId: postingQuestions.questionId,
+          required: postingQuestions.required,
+          position: postingQuestions.position,
+          options: postingQuestions.options,
+          text: questions.textDisplay,
+          fieldType: questions.fieldType,
+          factKey: questions.factKey,
+          answerKind: questions.answerKind,
+          mappedBy: questions.mappedBy,
+        })
+        .from(postingQuestions)
+        .innerJoin(questions, eq(questions.id, postingQuestions.questionId))
+        .where(eq(postingQuestions.postingId, application.postingId))
+        .orderBy(postingQuestions.position)
+        .all(),
+    });
   });
 
   routes.get("/applications", zValidator("query", userQuery), (context) => {

@@ -8,7 +8,7 @@ import type { PersonalCrypto } from "./personal-crypto.ts";
 import { facts } from "../platform/db/schema.ts";
 import { FACT_KEYS } from "../../shared/facts.ts";
 
-const factKeySchema = z.enum(FACT_KEYS);
+const factKeySchema = z.union([z.enum(FACT_KEYS), z.string().regex(/^q:[A-Za-z0-9-]+$/u)]);
 
 export interface FactRecord {
   key: string;
@@ -21,7 +21,14 @@ export interface FactRecord {
 export interface FactService {
   list: (userId: string) => Promise<FactRecord[]>;
   save: (userId: string, key: string, value: string) => Promise<FactRecord>;
+  saveFromReview: (userId: string, key: string, value: string) => Promise<FactRecord>;
   prefillFromResume: (userId: string, text: string) => Promise<FactRecord[]>;
+}
+
+function assertFactKey(key: string) {
+  if (!factKeySchema.safeParse(key).success) {
+    throw new Error(`unknown fact key: ${key}`);
+  }
 }
 
 export function createFactService(deps: {
@@ -101,13 +108,14 @@ export function createFactService(deps: {
       return records.toSorted((left, right) => left.key.localeCompare(right.key));
     },
     save: async (userId: string, key: string, value: string) => {
-      const parsedKey = factKeySchema.safeParse(key);
-
-      if (!parsedKey.success) {
-        throw new Error(`unknown fact key: ${key}`);
-      }
+      assertFactKey(key);
 
       return upsert(userId, key, value, "user", true);
+    },
+    saveFromReview: async (userId: string, key: string, value: string) => {
+      assertFactKey(key);
+
+      return upsert(userId, key, value, "review", true);
     },
     prefillFromResume: async (userId: string, text: string) => {
       const parsed = parseResumeFacts(text);

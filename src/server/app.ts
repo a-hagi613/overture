@@ -8,12 +8,15 @@ import type { AdjustableClock } from "./platform/ports/clock.ts";
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 import type { LlmPort } from "./platform/ports/llm.ts";
 import type { ObjectStore } from "./platform/ports/object-store.ts";
+import type { PreparationService } from "./pipeline/prepare.ts";
+import type { ReviewService } from "./pipeline/reviews.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
 import { createMeRoutes } from "./routes/me.ts";
 import { createApiRoutes } from "./routes/api.ts";
 import { createHomeRoutes } from "./routes/home.ts";
 import { createMatchingRoutes } from "./routes/matching.ts";
+import { createReviewRoutes } from "./routes/reviews.ts";
 import { createAdminApi, isAdminHost } from "./routes/admin.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
 import { env } from "./config/env.ts";
@@ -32,6 +35,8 @@ export interface AppDependencies {
   auth: Auth;
   objects: ObjectStore;
   llm: LlmPort;
+  preparation: PreparationService;
+  reviews: ReviewService;
   singletonJobKinds: readonly string[];
 }
 
@@ -90,6 +95,13 @@ export function createApp(deps: AppDependencies) {
       clock: deps.clock,
       db: deps.db,
       matching,
+    }),
+  );
+  app.route(
+    "/api",
+    createReviewRoutes({
+      auth: deps.auth,
+      reviews: deps.reviews,
     }),
   );
 

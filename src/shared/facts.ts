@@ -79,6 +79,12 @@ export const factLabels: Record<FactKey, string> = {
   eeo_disability: "Disability",
 };
 
+const factLabelByKey = new Map<string, string>(FACT_KEYS.map((key) => [key, factLabels[key]]));
+
+export function factLabelFor(key: string) {
+  return factLabelByKey.get(key) ?? null;
+}
+
 export const factSources = {
   resume: "from your resume",
   user: "you entered",

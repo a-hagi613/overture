@@ -284,6 +284,63 @@ export const postings = sqliteTable(
   ],
 );
 
+export const questions = sqliteTable(
+  "questions",
+  {
+    id: text("id").primaryKey(),
+    textDisplay: text("text_display").notNull(),
+    textNormHash: text("text_norm_hash").notNull(),
+    fieldType: text("field_type", {
+      enum: [
+        "text",
+        "textarea",
+        "select",
+        "multiselect",
+        "radio",
+        "checkbox",
+        "file",
+        "date",
+        "number",
+        "email",
+        "phone",
+        "url",
+      ],
+    }).notNull(),
+    optionsHash: text("options_hash"),
+    factKey: text("fact_key"),
+    answerKind: text("answer_kind", {
+      enum: ["fact", "open_text", "consent", "skip", "unknown"],
+    }).notNull(),
+    mappedBy: text("mapped_by", { enum: ["rules", "llm", "owner"] }),
+    seenCount: integer("seen_count").notNull().default(1),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("questions_text_norm_hash_unique").on(t.textNormHash)],
+);
+
+export const questionVariants = sqliteTable("question_variants", {
+  variantHash: text("variant_hash").primaryKey(),
+  questionId: text("question_id")
+    .notNull()
+    .references(() => questions.id, { onDelete: "cascade" }),
+});
+
+export const postingQuestions = sqliteTable(
+  "posting_questions",
+  {
+    postingId: text("posting_id")
+      .notNull()
+      .references(() => postings.id, { onDelete: "cascade" }),
+    questionId: text("question_id")
+      .notNull()
+      .references(() => questions.id, { onDelete: "cascade" }),
+    required: integer("required", { mode: "boolean" }).notNull().default(false),
+    position: integer("position").notNull(),
+    options: text("options").notNull().default("[]"),
+  },
+  (t) => [primaryKey({ columns: [t.postingId, t.questionId] })],
+);
+
 export const postingTags = sqliteTable(
   "posting_tags",
   {
@@ -504,6 +561,58 @@ export const applications = sqliteTable(
     index("applications_user_company").on(t.userId, t.companyId),
     index("applications_user_sent_at").on(t.userId, t.sentAt),
   ],
+);
+
+export const reviews = sqliteTable(
+  "reviews",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    questionId: text("question_id")
+      .notNull()
+      .references(() => questions.id, { onDelete: "cascade" }),
+    factKey: text("fact_key"),
+    prompt: text("prompt").notNull(),
+    fieldType: text("field_type", {
+      enum: [
+        "text",
+        "textarea",
+        "select",
+        "multiselect",
+        "radio",
+        "checkbox",
+        "file",
+        "date",
+        "number",
+        "email",
+        "phone",
+        "url",
+      ],
+    }).notNull(),
+    options: text("options").notNull().default("[]"),
+    status: text("status", { enum: ["open", "answered", "dismissed"] }).notNull(),
+    createdAt: integer("created_at").notNull(),
+    resolvedAt: integer("resolved_at"),
+  },
+  (t) => [
+    uniqueIndex("reviews_user_question_open_unique")
+      .on(t.userId, t.questionId)
+      .where(sql`status = 'open'`),
+    index("reviews_user_status").on(t.userId, t.status),
+  ],
+);
+
+export const reviewApplications = sqliteTable(
+  "review_applications",
+  {
+    reviewId: text("review_id")
+      .notNull()
+      .references(() => reviews.id, { onDelete: "cascade" }),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.reviewId, t.applicationId] })],
 );
 
 export const fxRates = sqliteTable(
