@@ -7,7 +7,7 @@ import { getSetting } from "../platform/settings/index.ts";
 import { bgJobs, companyBoards } from "../platform/db/schema.ts";
 import { pollBoard } from "./poll-board.ts";
 
-import type { GreenhouseFeed } from "./greenhouse-feed.ts";
+import type { BoardFeeds } from "./board-feed.ts";
 
 export const SWEEP_JOB_KIND = "catalog.sweep";
 export const BACKFILL_JOB_KIND = "catalog.backfill";
@@ -19,7 +19,7 @@ const DEFAULT_SWEEP_BATCH = 50;
 export interface CatalogDeps {
   db: AppDatabase;
   clock: Clock;
-  greenhouse: GreenhouseFeed;
+  feeds: BoardFeeds;
 }
 
 export function readSweepIntervalMs(db: AppDatabase) {
@@ -59,7 +59,7 @@ export async function pollDueBoards(deps: CatalogDeps) {
     .all();
 
   await Promise.all(
-    due.map(async (board) => pollBoard(deps.db, deps.clock, deps.greenhouse, board)),
+    due.map(async (board) => pollBoard(deps.db, deps.clock, deps.feeds[board.ats], board)),
   );
 }
 

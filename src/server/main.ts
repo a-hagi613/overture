@@ -9,6 +9,9 @@ import { recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.
 import { startJobWorker } from "./platform/jobs/scheduler.ts";
 import { startTelemetry, trace } from "./platform/telemetry/otel.ts";
 import { createGreenhouseFeed } from "./catalog/greenhouse-feed.ts";
+import { createLeverFeed } from "./catalog/lever-feed.ts";
+import { createAshbyFeed } from "./catalog/ashby-feed.ts";
+import type { BoardFeeds } from "./catalog/board-feed.ts";
 import {
   BACKFILL_JOB_KIND,
   SWEEP_JOB_KIND,
@@ -50,8 +53,13 @@ const tracer = trace.getTracer("overture");
 
 const otelPayloadSchema = z.record(z.string(), z.string());
 
-const greenhouseFeed = createGreenhouseFeed(env.GREENHOUSE_FEED_BASE_URL);
-const catalogDeps = { db, clock, greenhouse: greenhouseFeed };
+const feeds: BoardFeeds = {
+  greenhouse: createGreenhouseFeed(env.GREENHOUSE_FEED_BASE_URL),
+  lever: createLeverFeed(env.LEVER_FEED_BASE_URL),
+  ashby: createAshbyFeed(env.ASHBY_FEED_BASE_URL),
+};
+
+const catalogDeps = { db, clock, feeds };
 
 const catalogJobHandlers: JobHandlers = {
   [BACKFILL_JOB_KIND]: async () => {
