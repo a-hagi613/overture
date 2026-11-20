@@ -1759,6 +1759,7 @@
         "src/server/auth/index.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
+        "src/server/catalog/geo.ts",
         "src/server/config/env.ts",
         "src/server/profile/facts.ts",
         "src/server/profile/personal-crypto.ts",
