@@ -11,6 +11,7 @@ import type { CatalogHarness, PostingRow } from "./catalog-harness.ts";
 
 const ASHBY_BOARD = "ramp";
 const LEVER_BOARD = "swile";
+const LEVER_EU_BOARD = "aavelabs";
 const PAGINATED_LEVER_BOARD = "pigment";
 const GREENHOUSE_BOARD = "anthropic";
 
@@ -48,9 +49,12 @@ const retagReportSchema = z.object({
   postingsReset: z.number(),
 });
 
-function readBoardFixture(ats: Ats, token: string) {
+function readBoardFixture(ats: Ats, token: string, region: "us" | "eu" = "us") {
+  const root =
+    ats === "lever" && region === "eu" ? "test/e2e/fixtures/lever-eu" : `test/e2e/fixtures/${ats}`;
+
   const raw: unknown = JSON.parse(
-    readFileSync(join(process.cwd(), `test/e2e/fixtures/${ats}`, token, "board.json"), "utf8"),
+    readFileSync(join(process.cwd(), root, token, "board.json"), "utf8"),
   );
 
   const parsed = boardFixtureSchema.parse(raw);
@@ -178,6 +182,110 @@ test("an Ashby board slug is requested in lowercase", async () => {
   }
 });
 
+test("a Lever EU board is polled on the EU instance and a US board stays on the US one", async () => {
+  const harness = await startCatalogHarness([
+    { ats: "lever", token: LEVER_EU_BOARD, region: "eu" },
+    { ats: "lever", token: LEVER_BOARD, region: "us" },
+  ]);
+
+  try {
+    const euFixtureJobs = readBoardFixture("lever", LEVER_EU_BOARD, "eu");
+    const usFixtureJobs = readBoardFixture("lever", LEVER_BOARD);
+
+    await harness.runBackfillCycle();
+
+    const boards = await harness.boards();
+
+    const euBoard = boards.find(
+      (board) =>
+        board.ats === "lever" && board.boardToken === LEVER_EU_BOARD && board.region === "eu",
+    );
+
+    const usBoard = boards.find(
+      (board) => board.ats === "lever" && board.boardToken === LEVER_BOARD && board.region === "us",
+    );
+
+    expect(euBoard?.region).toBe("eu");
+    expect(usBoard?.region).toBe("us");
+
+    const { urls } = harness.fixture.stats();
+
+    expect(urls.filter((url) => url.startsWith(`/eu/v0/postings/${LEVER_EU_BOARD}?`))).toHaveLength(
+      1,
+    );
+    expect(urls.filter((url) => url.startsWith(`/v0/postings/${LEVER_EU_BOARD}?`))).toHaveLength(0);
+    expect(urls.some((url) => url.startsWith(`/v0/postings/${LEVER_BOARD}?`))).toBe(true);
+    expect(urls.some((url) => url.startsWith(`/eu/v0/postings/${LEVER_BOARD}?`))).toBe(false);
+
+    const postings = await harness.postings();
+
+    expect(postings.filter((row) => row.boardId === euBoard?.id)).toHaveLength(
+      euFixtureJobs.length,
+    );
+    expect(postings.filter((row) => row.boardId === usBoard?.id)).toHaveLength(
+      usFixtureJobs.length,
+    );
+  } finally {
+    await harness.close();
+  }
+});
+
+test("the same Lever slug on two regions makes two board rows and polls each separately", async () => {
+  const harness = await startCatalogHarness([
+    { ats: "lever", token: LEVER_EU_BOARD, region: "eu" },
+    { ats: "lever", token: LEVER_EU_BOARD, region: "us" },
+  ]);
+
+  try {
+    const euFixtureJobs = readBoardFixture("lever", LEVER_EU_BOARD, "eu");
+    const boards = await harness.boards();
+
+    const sameSlug = boards.filter(
+      (board) => board.ats === "lever" && board.boardToken === LEVER_EU_BOARD,
+    );
+
+    expect(sameSlug).toHaveLength(2);
+    expect(new Set(sameSlug.map((board) => board.region))).toEqual(new Set(["eu", "us"]));
+
+    await harness.runBackfillCycle();
+
+    const euBoard = sameSlug.find((board) => board.region === "eu");
+    const usBoard = sameSlug.find((board) => board.region === "us");
+    const postings = await harness.postings();
+
+    expect(postings.filter((row) => row.boardId === euBoard?.id)).toHaveLength(
+      euFixtureJobs.length,
+    );
+    expect(postings.filter((row) => row.boardId === usBoard?.id)).toHaveLength(0);
+
+    const { urls } = harness.fixture.stats();
+
+    expect(urls.some((url) => url.startsWith(`/eu/v0/postings/${LEVER_EU_BOARD}?`))).toBe(true);
+    expect(urls.some((url) => url.startsWith(`/v0/postings/${LEVER_EU_BOARD}?`))).toBe(true);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("a Lever slug keeps its exact case in the request", async () => {
+  const harness = await startCatalogHarness([{ ats: "lever", token: "Swile" }]);
+
+  try {
+    await harness.runBackfillCycle();
+
+    const { urls } = harness.fixture.stats();
+
+    expect(urls.some((url) => url.startsWith("/v0/postings/Swile?"))).toBe(true);
+    expect(urls.some((url) => url.startsWith("/v0/postings/swile?"))).toBe(false);
+
+    const board = (await harness.boards()).find((row) => row.boardToken === "Swile");
+
+    expect(board?.status).toBe("empty");
+  } finally {
+    await harness.close();
+  }
+});
+
 test("a Lever board over one hundred postings is read page by page", async () => {
   const harness = await startCatalogHarness([{ ats: "lever", token: PAGINATED_LEVER_BOARD }]);
 
@@ -267,75 +375,120 @@ test("a double-encoded Greenhouse posting is decoded before its description reac
   }
 });
 
-test("the one-time re-tag rewrites open Lever postings with the feed workplace and is idempotent", async () => {
-  const harness = await startCatalogHarness([{ ats: "lever", token: LEVER_BOARD }]);
+test("the one-time re-tag rewrites open Lever and Ashby postings with the feed workplace and is idempotent", async () => {
+  const harness = await startCatalogHarness([
+    { ats: "lever", token: LEVER_BOARD },
+    { ats: "ashby", token: ASHBY_BOARD },
+  ]);
 
   try {
-    const fixtureJobs = readBoardFixture("lever", LEVER_BOARD);
-    const onsiteJob = fixtureJobs.find((job) => job.workplaceType === "onsite");
+    const leverJobs = readBoardFixture("lever", LEVER_BOARD);
+    const ashbyJobs = readBoardFixture("ashby", ASHBY_BOARD);
+    const onsiteJob = leverJobs.find((job) => job.workplaceType === "onsite");
+    const hybridJob = ashbyJobs.find((job) => job.workplaceType === "Hybrid");
 
-    if (onsiteJob === undefined) {
-      throw new Error("the Lever fixture has no onsite posting");
+    if (onsiteJob === undefined || hybridJob === undefined) {
+      throw new Error("the fixtures have no Lever onsite or Ashby hybrid posting");
     }
 
     await harness.runBackfillCycle();
 
-    const beforeImport = postingsOnBoard(
+    const leverBeforeImport = postingsOnBoard(
       await harness.postings(),
       harness.boardIds[LEVER_BOARD],
     ).find((row) => row.atsJobId === onsiteJob.id);
 
-    expect(beforeImport?.workplace).toBe("onsite");
+    const ashbyBeforeImport = postingsOnBoard(
+      await harness.postings(),
+      harness.boardIds[ASHBY_BOARD],
+    ).find((row) => row.atsJobId === hybridJob.id);
+
+    expect(leverBeforeImport?.workplace).toBe("onsite");
+    expect(ashbyBeforeImport?.workplace).toBe("hybrid");
 
     const imported = await importWorkplace(
       harness,
-      JSON.stringify({
-        apply_url: beforeImport?.applyUrl ?? onsiteJob.hostedUrl,
-        title: onsiteJob.title,
-        workplace: "unknown",
-      }),
+      [
+        JSON.stringify({
+          apply_url: leverBeforeImport?.applyUrl ?? onsiteJob.hostedUrl,
+          title: onsiteJob.title,
+          workplace: "unknown",
+        }),
+        JSON.stringify({
+          apply_url: ashbyBeforeImport?.applyUrl ?? hybridJob.jobUrl,
+          title: hybridJob.title,
+          workplace: "unknown",
+        }),
+      ].join("\n"),
     );
 
-    expect(imported.matched).toBe(1);
+    expect(imported.matched).toBe(2);
 
-    const afterImport = postingsOnBoard(
-      await harness.postings(),
-      harness.boardIds[LEVER_BOARD],
-    ).find((row) => row.atsJobId === onsiteJob.id);
+    const afterImport = await harness.postings();
 
-    expect(afterImport?.workplace).toBe("unknown");
+    expect(
+      postingsOnBoard(afterImport, harness.boardIds[LEVER_BOARD]).find(
+        (row) => row.atsJobId === onsiteJob.id,
+      )?.workplace,
+    ).toBe("unknown");
+    expect(
+      postingsOnBoard(afterImport, harness.boardIds[ASHBY_BOARD]).find(
+        (row) => row.atsJobId === hybridJob.id,
+      )?.workplace,
+    ).toBe("unknown");
 
     await harness.runBackfillCycle();
 
-    const afterPlainPoll = postingsOnBoard(
-      await harness.postings(),
-      harness.boardIds[LEVER_BOARD],
-    ).find((row) => row.atsJobId === onsiteJob.id);
+    const afterPlainPoll = await harness.postings();
 
-    expect(afterPlainPoll?.workplace).toBe("unknown");
+    expect(
+      postingsOnBoard(afterPlainPoll, harness.boardIds[LEVER_BOARD]).find(
+        (row) => row.atsJobId === onsiteJob.id,
+      )?.workplace,
+    ).toBe("unknown");
+    expect(
+      postingsOnBoard(afterPlainPoll, harness.boardIds[ASHBY_BOARD]).find(
+        (row) => row.atsJobId === hybridJob.id,
+      )?.workplace,
+    ).toBe("unknown");
 
     const firstReset = await resetFeedHashes(harness);
 
-    expect(firstReset.boardsReset).toBe(1);
-    expect(firstReset.postingsReset).toBe(fixtureJobs.length);
+    expect(firstReset.boardsReset).toBe(2);
+    expect(firstReset.postingsReset).toBe(leverJobs.length + ashbyJobs.length);
 
     await harness.runBackfillCycle();
 
-    const afterRetag = postingsOnBoard(await harness.postings(), harness.boardIds[LEVER_BOARD]);
+    const afterRetag = await harness.postings();
+    const leverAfterRetag = postingsOnBoard(afterRetag, harness.boardIds[LEVER_BOARD]);
+    const ashbyAfterRetag = postingsOnBoard(afterRetag, harness.boardIds[ASHBY_BOARD]);
 
-    expect(afterRetag.find((row) => row.atsJobId === onsiteJob.id)?.workplace).toBe("onsite");
-    expect(afterRetag).toHaveLength(fixtureJobs.length);
+    expect(leverAfterRetag.find((row) => row.atsJobId === onsiteJob.id)?.workplace).toBe("onsite");
+    expect(ashbyAfterRetag.find((row) => row.atsJobId === hybridJob.id)?.workplace).toBe("hybrid");
+    expect(leverAfterRetag).toHaveLength(leverJobs.length);
+    expect(ashbyAfterRetag).toHaveLength(ashbyJobs.length);
 
     await resetFeedHashes(harness);
     await harness.runBackfillCycle();
 
-    const afterSecondRetag = postingsOnBoard(
-      await harness.postings(),
-      harness.boardIds[LEVER_BOARD],
-    );
+    const afterSecondRetag = await harness.postings();
 
-    expect(afterSecondRetag.find((row) => row.atsJobId === onsiteJob.id)?.workplace).toBe("onsite");
-    expect(afterSecondRetag).toHaveLength(fixtureJobs.length);
+    expect(
+      postingsOnBoard(afterSecondRetag, harness.boardIds[LEVER_BOARD]).find(
+        (row) => row.atsJobId === onsiteJob.id,
+      )?.workplace,
+    ).toBe("onsite");
+    expect(
+      postingsOnBoard(afterSecondRetag, harness.boardIds[ASHBY_BOARD]).find(
+        (row) => row.atsJobId === hybridJob.id,
+      )?.workplace,
+    ).toBe("hybrid");
+    expect(postingsOnBoard(afterSecondRetag, harness.boardIds[LEVER_BOARD])).toHaveLength(
+      leverJobs.length,
+    );
+    expect(postingsOnBoard(afterSecondRetag, harness.boardIds[ASHBY_BOARD])).toHaveLength(
+      ashbyJobs.length,
+    );
   } finally {
     await harness.close();
   }
