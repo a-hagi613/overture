@@ -108,7 +108,13 @@ export function createApp(deps: AppDependencies) {
   if (deps.testRoutes) {
     app.route(
       "/__test__",
-      createTestRoutes(deps.db, deps.clock, deps.jobHandlers, deps.singletonJobKinds),
+      createTestRoutes(
+        deps.db,
+        deps.clock,
+        deps.jobHandlers,
+        deps.singletonJobKinds,
+        deps.preparation,
+      ),
     );
   }
 

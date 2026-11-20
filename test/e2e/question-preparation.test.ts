@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
@@ -78,6 +80,17 @@ const factRowSchema = z.object({
 });
 
 const factsSchema = z.object({ facts: z.array(factRowSchema) });
+
+const answersSchema = z.object({
+  answers: z.array(
+    z.object({
+      text: z.string(),
+      answerKind: z.string(),
+      resolved: z.boolean(),
+      answer: z.string().nullable(),
+    }),
+  ),
+});
 
 const questionsSchema = z.object({
   questions: z.array(
@@ -189,6 +202,28 @@ async function questionsFor(owner: APIRequestContext, userId: string, postingId:
   );
 
   return questionsSchema.parse(await response.json()).questions;
+}
+
+async function answersFor(owner: APIRequestContext, applicationId: string) {
+  const response = await owner.get(
+    `/__test__/prepared-answers?applicationId=${encodeURIComponent(applicationId)}`,
+  );
+
+  return answersSchema.parse(await response.json()).answers;
+}
+
+async function uploadResume(owner: APIRequestContext) {
+  const response = await owner.post("/api/profile/resume", {
+    multipart: {
+      file: {
+        buffer: Buffer.from(readFileSync("test/e2e/fixtures/resume-text.pdf")),
+        mimeType: "application/pdf",
+        name: "resume.pdf",
+      },
+    },
+  });
+
+  expect(response.ok()).toBe(true);
 }
 
 async function factsFor(owner: APIRequestContext) {
@@ -457,6 +492,291 @@ test("an unknown optional question stays blank and never blocks", async ({ prepa
   expect(
     (await reviewsFor(owner, userId)).reviews.filter((candidate) => candidate.status === "open"),
   ).toEqual([]);
+});
+
+test("a required standard consent resolves with a built answer", async ({ preparation }) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await owner.put("/api/profile/facts", {
+    data: { facts: [{ key: "email", value: "maya.okafor@mail.overture.test" }] },
+  });
+
+  const postingId = await seedQuestions(owner, {
+    atsJobId: "consent-ok-1",
+    boardToken: "consent-ok",
+    companyName: "Consent Co",
+    domain: "consent.example",
+    questions: [
+      { answerKind: "fact", factKey: "email", fieldType: "email", required: true, text: "Email" },
+      {
+        answerKind: "consent",
+        fieldType: "select",
+        options: ["Acknowledge/Confirm"],
+        required: true,
+        text: "Please review and acknowledge our privacy notice.",
+      },
+    ],
+    title: "Backend Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const application = (await applicationsFor(owner, userId)).find(
+    (row) => row.id === applicationId,
+  );
+
+  expect(application?.status).toBe("ready");
+
+  const consent = (await answersFor(owner, applicationId)).find((answer) =>
+    answer.text.startsWith("Please review and acknowledge"),
+  );
+
+  expect(consent).toMatchObject({ answer: "Acknowledge/Confirm", resolved: true });
+});
+
+test("a required non-standard consent skips the Application with a reason", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  const postingId = await seedQuestions(owner, {
+    atsJobId: "consent-bad-1",
+    boardToken: "consent-bad",
+    companyName: "Consent Bad Co",
+    domain: "consent-bad.example",
+    questions: [
+      {
+        answerKind: "consent",
+        fieldType: "select",
+        options: ["Yes", "No"],
+        required: true,
+        text: "Do you consent to a background check?",
+      },
+    ],
+    title: "Backend Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const application = (await applicationsFor(owner, userId)).find(
+    (row) => row.id === applicationId,
+  );
+
+  expect(application?.status).toBe("skipped");
+  expect(application?.statusReason).toBe("form_unsupported");
+  expect((await reviewsFor(owner, userId)).reviews).toEqual([]);
+});
+
+test("a required skip-mapped field skips the Application", async ({ preparation }) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  const postingId = await seedQuestions(owner, {
+    atsJobId: "skip-required-1",
+    boardToken: "skip-required",
+    companyName: "Skip Required Co",
+    domain: "skip-required.example",
+    questions: [
+      {
+        answerKind: "skip",
+        fieldType: "select",
+        options: ["Yes", "No"],
+        required: true,
+        text: "Would you like to opt in to our newsletter?",
+      },
+    ],
+    title: "Backend Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const application = (await applicationsFor(owner, userId)).find(
+    (row) => row.id === applicationId,
+  );
+
+  expect(application?.status).toBe("skipped");
+  expect(application?.statusReason).toBe("form_unsupported");
+});
+
+test("a required non-resume file field skips the Application even with a resume", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await uploadResume(owner);
+  await owner.put("/api/profile/facts", {
+    data: { facts: [{ key: "email", value: "maya.okafor@mail.overture.test" }] },
+  });
+
+  const postingId = await seedQuestions(owner, {
+    atsJobId: "file-required-1",
+    boardToken: "file-required",
+    companyName: "File Required Co",
+    domain: "file-required.example",
+    questions: [
+      { answerKind: "fact", factKey: "email", fieldType: "email", required: true, text: "Email" },
+      {
+        answerKind: "unknown",
+        fieldType: "file",
+        required: true,
+        text: "Portfolio PDF",
+      },
+    ],
+    title: "Backend Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const application = (await applicationsFor(owner, userId)).find(
+    (row) => row.id === applicationId,
+  );
+
+  expect(application?.status).toBe("skipped");
+  expect(application?.statusReason).toBe("form_unsupported");
+});
+
+test("a required resume file resolves once a resume is uploaded", async ({ preparation }) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  const withoutResume = await seedQuestions(owner, {
+    atsJobId: "resume-required-1",
+    boardToken: "resume-required",
+    companyName: "Resume Required Co",
+    domain: "resume-required.example",
+    questions: [{ answerKind: "unknown", fieldType: "file", required: true, text: "Resume/CV" }],
+    title: "Backend Engineer",
+  });
+
+  const missing = await seedApplication(owner, {
+    postingId: withoutResume,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, missing);
+
+  expect((await applicationsFor(owner, userId)).find((row) => row.id === missing)?.status).toBe(
+    "skipped",
+  );
+
+  await uploadResume(owner);
+
+  const withResume = await seedQuestions(owner, {
+    atsJobId: "resume-required-2",
+    boardToken: "resume-uploaded",
+    companyName: "Resume Uploaded Co",
+    domain: "resume-uploaded.example",
+    questions: [{ answerKind: "unknown", fieldType: "file", required: true, text: "Resume/CV" }],
+    title: "Backend Engineer",
+  });
+
+  const readyApplication = await seedApplication(owner, {
+    postingId: withResume,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, readyApplication);
+
+  expect(
+    (await applicationsFor(owner, userId)).find((row) => row.id === readyApplication)?.status,
+  ).toBe("ready");
+});
+
+test("a recorded form with a required file field does not reach ready without a resume", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  const postingId = await seedRecordedPosting(owner, {
+    atsJobId: "8392878",
+    boardToken: "cloudflare",
+    companyName: "Cloudflare",
+    domain: "cloudflare.example",
+    title: "Backend Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const application = (await applicationsFor(owner, userId)).find(
+    (row) => row.id === applicationId,
+  );
+
+  expect(application?.status).not.toBe("ready");
+
+  const resume = (await answersFor(owner, applicationId)).find((answer) =>
+    answer.text.startsWith("Resume/CV"),
+  );
+
+  expect(resume).toMatchObject({ answer: null, resolved: false });
+});
+
+test("a recorded form's standard consent carries a built value but the form is not ready", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await uploadResume(owner);
+
+  const postingId = await seedRecordedPosting(owner, {
+    atsJobId: "8392878",
+    boardToken: "cloudflare",
+    companyName: "Cloudflare",
+    domain: "cloudflare.example",
+    title: "Backend Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const application = (await applicationsFor(owner, userId)).find(
+    (row) => row.id === applicationId,
+  );
+
+  expect(application?.status).not.toBe("ready");
+
+  const answers = await answersFor(owner, applicationId);
+  const consent = answers.find((answer) => answer.text.startsWith("Please review and acknowledge"));
+
+  expect(consent).toMatchObject({
+    answerKind: "consent",
+    resolved: true,
+  });
+  expect(consent?.answer).not.toBeNull();
 });
 
 test("Greenhouse questions are read only when an Application is prepared", async ({

@@ -36,7 +36,7 @@ export function ReviewRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold leading-[1.35]">{review.prompt}</span>
-        <span className="mt-px block text-[12.5px] text-muted-foreground">
+        <span className="mt-px block text-[12.5px] leading-4 text-muted-foreground">
           {copy.review.categories[review.category]}
           {" · "}
           {companyLine(review)}

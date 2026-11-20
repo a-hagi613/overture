@@ -36,7 +36,9 @@ export function ReviewPage() {
       />
       <div className="mt-7 flex flex-wrap items-center justify-between gap-x-5 gap-y-3">
         <ReviewFilters active={filter} onChange={setFilter} reviews={reviews} />
-        <p className="font-serif text-sm italic text-muted-foreground">{copy.review.groupedBy}</p>
+        <p className="font-serif text-sm italic leading-[21px] text-muted-foreground">
+          {copy.review.groupedBy}
+        </p>
       </div>
       {selected === null ? (
         <section className="mt-4 rounded-lg border border-border bg-card p-6 shadow-sh">

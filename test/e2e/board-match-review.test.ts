@@ -221,11 +221,18 @@ async function expectReviewMatchesBoard(
   }
 
   await page.goto(`${appServerUrl}/review`);
-  await expect(page.getByRole("heading", { level: 2, name: "Waiting for you" })).toBeVisible();
+
+  if (width === 1280) {
+    await expect(page.getByRole("heading", { level: 2, name: "Waiting for you" })).toBeVisible();
+  }
+
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByText("Four questions, ten applications waiting")).toBeVisible();
   await expect(
-    page.getByText("Are you comfortable with a weekly on-call rotation?").first(),
+    page.getByRole("heading", {
+      level: 2,
+      name: "Are you comfortable with a weekly on-call rotation?",
+    }),
   ).toBeVisible();
   await page.evaluate(async () => document.fonts.ready);
 

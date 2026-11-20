@@ -45,14 +45,17 @@ export function ReviewAnswer({
     const chosen = multiple ? value.split(", ").filter((part) => part !== "") : [value];
 
     return (
-      <fieldset aria-labelledby="rev-lbl" className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0">
+      <fieldset
+        aria-labelledby="rev-lbl"
+        className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0 max-md:-mx-4 max-md:px-4 max-md:py-0.5"
+      >
         {review.options.map((option) => {
           const selected = chosen.includes(option);
 
           return (
             <button
               aria-pressed={selected}
-              className={`inline-flex min-h-9 items-center whitespace-nowrap rounded-full border px-[14px] text-[13px] font-semibold ${
+              className={`inline-flex min-h-9 items-center whitespace-nowrap rounded-full border px-[14px] text-[13px] font-semibold max-md:min-h-11 ${
                 selected
                   ? "border-foreground bg-foreground text-background"
                   : "border-input bg-card text-foreground hover:bg-muted"

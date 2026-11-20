@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { JobHandlers } from "../platform/jobs/run-due.ts";
 import type { AdjustableClock } from "../platform/ports/clock.ts";
+import type { PreparationService } from "../pipeline/prepare.ts";
 
 import {
   accounts,
@@ -222,6 +223,8 @@ const questionsQuery = z.object({
   postingId: z.string().min(1).optional(),
 });
 
+const applicationQuery = z.object({ applicationId: z.string().min(1) });
+
 const createUserBody = z.object({ email: z.email(), name: z.string().min(1) });
 
 type PostingWriter = AppDatabase | Parameters<Parameters<AppDatabase["transaction"]>[0]>[0];
@@ -336,6 +339,7 @@ export function createTestRoutes(
   clock: AdjustableClock,
   handlers: JobHandlers,
   singletonJobKinds: readonly string[],
+  preparation: PreparationService | null = null,
 ) {
   const routes = new Hono();
 
@@ -790,6 +794,16 @@ export function createTestRoutes(
         .orderBy(postingQuestions.position)
         .all(),
     });
+  });
+
+  routes.get("/prepared-answers", zValidator("query", applicationQuery), async (context) => {
+    const { applicationId } = context.req.valid("query");
+
+    if (preparation === null) {
+      return context.json({ answers: [] });
+    }
+
+    return context.json({ answers: await preparation.answersFor(applicationId) });
   });
 
   routes.get("/applications", zValidator("query", userQuery), (context) => {

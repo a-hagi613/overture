@@ -73,7 +73,7 @@ export function ReviewDetail({
       className="min-w-0 flex-[999_1_500px] rounded-lg border border-border bg-card p-[20px_16px_18px] shadow-sh md:p-[26px_28px_24px]"
     >
       <button
-        className="-ml-2.5 mb-2 inline-flex min-h-11 items-center gap-2 rounded-md px-2.5 text-[13.5px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
+        className="-ml-2.5 -mt-2 mb-2 inline-flex min-h-11 items-center gap-2 rounded-md px-2.5 text-[13.5px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
         onClick={onResolved}
         type="button"
       >
@@ -180,7 +180,7 @@ export function ReviewDetail({
           {copy.review.answerNote}
         </p>
       </div>
-      <div className="mt-[22px] flex flex-wrap items-center gap-3 border-t border-border pt-5">
+      <div className="mt-[22px] flex flex-wrap items-center gap-3 border-t border-border pt-5 max-md:mt-[21px]">
         <button
           className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-foreground bg-foreground px-[22px] text-[13.5px] font-semibold text-primary-ink hover:bg-btn-hover disabled:opacity-[.45] max-md:min-h-12 max-md:flex-[1_1_100%]"
           disabled={pending}
@@ -214,7 +214,7 @@ export function ReviewDetail({
         >
           {copy.review.dismiss}
         </button>
-        <p className="flex-[1_1_220px] text-[12.5px] leading-[1.5] text-muted-foreground">
+        <p className="flex-[1_1_220px] text-[12.5px] leading-[1.5] text-muted-foreground max-md:min-h-12">
           {copy.review.dismissNote(review.unlocked)}
         </p>
       </div>
