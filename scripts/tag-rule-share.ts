@@ -55,13 +55,16 @@ const salaryFromPatterns = rows.filter(
 ).length;
 
 const salaryNone = rows.filter((row) => row.tags.salaryMinMinor === null).length;
+
 const languageFromSource = rows.filter((row) => row.languageFromSource).length;
 
 const languageDetected = rows.filter(
   (row) => !row.languageFromSource && row.tags.language !== null && row.tags.language !== "en",
 ).length;
 
-const languageDefaulted = rows.filter((row) => row.tags.language === "en").length;
+const languageDefaulted = rows.filter(
+  (row) => !row.languageFromSource && row.tags.language === "en",
+).length;
 
 const roleCounts = new Map<string, number>();
 
@@ -88,9 +91,12 @@ const report = [
   shareLine("role by keyword rules", byRules, total),
   shareLine("role by O*NET title similarity", byModel, total, "threshold 0.85"),
   shareLine("role unclassified", unclassified, total, "goes to the LLM batch in the full pipeline"),
-  shareLine("seniority", seniority, total),
-  shareLine("workplace (non-unknown)", workplaceKnown, total),
-  shareLine("employment type (non-unknown)", employmentKnown, total),
+  shareLine("seniority tagged", seniority, total),
+  shareLine("seniority not in the title", total - seniority, total),
+  shareLine("workplace from field, flag or text", workplaceKnown, total),
+  shareLine("workplace unclassified", total - workplaceKnown, total),
+  shareLine("employment type", employmentKnown, total),
+  shareLine("employment type not stated", total - employmentKnown, total),
   shareLine(
     "location to city",
     located,
@@ -106,12 +112,16 @@ const report = [
   "",
   "Per ATS:",
   "",
+  "| Source | Postings | Share | Notes |",
+  "|---|---|---|---|",
   ...[...perAts.entries()]
     .toSorted((a, b) => (a[0] < b[0] ? -1 : 1))
     .map(([ats, count]) => shareLine(ats, count, total)),
   "",
   "Top roles:",
   "",
+  "| Role | Postings | Share | Notes |",
+  "|---|---|---|---|",
   ...topRoles.map(([role, count]) => shareLine(role, count, total)),
   "",
 ].join("\n");

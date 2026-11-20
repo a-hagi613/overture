@@ -1,4 +1,4 @@
-import citiesDataJson from "./data/geonames-cities.json";
+import citiesDataJson from "./tag-data/geonames-cities.json";
 
 const dataset: {
   cities: string[][];

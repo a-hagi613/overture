@@ -218,6 +218,7 @@ async function pullGreenhouse() {
 const leverPostingSchema = z.looseObject({
   text: z.string(),
   hostedUrl: z.string(),
+  workplaceType: z.string().nullish(),
   categories: z
     .looseObject({
       team: z.string().nullish(),
@@ -259,7 +260,8 @@ async function pullLever() {
         title: posting.text,
         department: optionalString(categories.department) ?? optionalString(categories.team),
         locationRaw: optionalString(categories.location),
-        workplaceType: optionalString(categories.workplaceType),
+        workplaceType:
+          optionalString(posting.workplaceType) ?? optionalString(categories.workplaceType),
         isRemote: null,
         employmentType: optionalString(categories.commitment),
         language: null,

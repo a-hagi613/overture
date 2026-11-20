@@ -346,7 +346,7 @@ async function buildCities() {
   const dataset = { cities, regions, countries: countryNames };
 
   await mkdir("src/server/catalog/data", { recursive: true });
-  await writeFile("src/server/catalog/data/geonames-cities.json", `${JSON.stringify(dataset)}\n`);
+  await writeFile("src/server/catalog/tag-data/geonames-cities.json", `${JSON.stringify(dataset)}\n`);
   process.stdout.write(
     `geonames-cities.json: ${String(cities.length)} cities, ${String(Object.keys(regions).length)} regions\n`,
   );
@@ -409,7 +409,7 @@ async function buildOnet() {
   const alternateCount = occupations.reduce((sum, row) => sum + row.alternates.length, 0);
 
   await mkdir("src/server/catalog/data", { recursive: true });
-  await writeFile("src/server/catalog/data/onet-titles.json", `${JSON.stringify(occupations)}\n`);
+  await writeFile("src/server/catalog/tag-data/onet-titles.json", `${JSON.stringify(occupations)}\n`);
   process.stdout.write(
     `onet-titles.json: ${String(occupations.length)} occupations, ${String(alternateCount)} alternate titles\n`,
   );

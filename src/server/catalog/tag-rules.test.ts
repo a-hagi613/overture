@@ -57,6 +57,28 @@ describe("workplace", () => {
 
     expect(tags.workplace).toBe("unknown");
   });
+
+  test("hybrid working phrase in the description", () => {
+    const tags = postingOf({
+      title: "Account Executive",
+      locationRaw: "London",
+      descriptionText: "This is a full time hybrid role based in our London hub.",
+    });
+
+    expect(tags.workplace).toBe("hybrid");
+  });
+
+  test("fully remote phrase in the description", () => {
+    const tags = postingOf({
+      title: "Support Engineer",
+      locationRaw: "United States",
+      descriptionText:
+        "An overview of this role This position is 100% remote and will be based in the US.",
+    });
+
+    expect(tags.workplace).toBe("remote");
+    expect(tags.city).toBeNull();
+  });
 });
 
 describe("employment type", () => {
@@ -281,6 +303,12 @@ describe("role, subrole and seniority rules", () => {
     expect(classifyTitle("Engineering Manager", null).seniority).toBe("manager");
     expect(classifyTitle("Head of Design", null).seniority).toBe("director");
     expect(classifyTitle("VP Engineering", null).seniority).toBe("director");
+  });
+
+  test("a level token on a manager title is kept", () => {
+    expect(classifyTitle("Senior Event Marketing Manager", "Marketing").seniority).toBe("senior");
+    expect(classifyTitle("Lead Program Manager", null).seniority).toBe("staff");
+    expect(classifyTitle("Product Manager", null).seniority).toBeNull();
   });
 
   test("a manager title outside engineering is not a manager seniority", () => {

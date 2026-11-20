@@ -4,31 +4,38 @@ Recorded from real Greenhouse, Lever and Ashby boards by `scripts/pull-tagging-s
 
 | Dimension | Classified | Share | Notes |
 |---|---|---|---|
-| role by keyword rules | 557 | 78.6 % |  |
+| role by keyword rules | 576 | 81.2 % |  |
 | role by O*NET title similarity | 2 | 0.3 % | threshold 0.85 |
-| role unclassified | 150 | 21.2 % | goes to the LLM batch in the full pipeline |
-| seniority | 204 | 28.8 % |  |
-| workplace (non-unknown) | 294 | 41.5 % |  |
-| employment type (non-unknown) | 263 | 37.1 % |  |
-| location to city | 300 | 42.3 % | 301 resolved to country only |
+| role unclassified | 131 | 18.5 % | goes to the LLM batch in the full pipeline |
+| seniority tagged | 257 | 36.2 % |  |
+| seniority not in the title | 452 | 63.8 % |  |
+| workplace from field, flag or text | 396 | 55.9 % |  |
+| workplace unclassified | 313 | 44.1 % |  |
+| employment type | 312 | 44.0 % |  |
+| employment type not stated | 397 | 56.0 % |  |
+| location to city | 294 | 41.5 % | 307 resolved to country only |
 | salary from structured fields | 9 | 1.3 % |  |
 | salary from pay-range patterns | 182 | 25.7 % |  |
 | salary not found | 518 | 73.1 % |  |
 | language from the source field | 469 | 66.1 % |  |
 | language detected by trigrams | 0 | 0.0 % | non-English postings |
-| language defaulted to English | 703 | 99.2 % |  |
+| language defaulted to English | 240 | 33.9 % |  |
 
 Per ATS:
 
+| Source | Postings | Share | Notes |
+|---|---|---|---|
 | ashby | 152 | 21.4 % |  |
 | greenhouse | 469 | 66.1 % |  |
 | lever | 88 | 12.4 % |  |
 
 Top roles:
 
+| Role | Postings | Share | Notes |
+|---|---|---|---|
 | Sales | 174 | 24.5 % |  |
-| unclassified | 150 | 21.2 % |  |
-| Software Engineering | 72 | 10.2 % |  |
+| unclassified | 131 | 18.5 % |  |
+| Software Engineering | 91 | 12.8 % |  |
 | Business Development & Partnerships | 40 | 5.6 % |  |
 | Legal | 36 | 5.1 % |  |
 | Machine Learning & AI | 34 | 4.8 % |  |

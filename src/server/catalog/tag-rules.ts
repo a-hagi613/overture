@@ -1,4 +1,4 @@
-import onetTitlesJson from "./data/onet-titles.json";
+import onetTitlesJson from "./tag-data/onet-titles.json";
 import { isRemoteLocationText, normalizePlaceName, resolveLocation } from "./geo.ts";
 import { detectLanguage } from "./language.ts";
 import { parsePayRange } from "./salary.ts";
@@ -138,7 +138,7 @@ const roleRules: readonly { role: string; pattern: RegExp }[] = [
   {
     role: "Software Engineering",
     pattern:
-      /\b(?:software|developer|development|programmer|\bswe\b|engineer|front[- ]?end|back[- ]?end|full[- ]?stack)\b/u,
+      /\b(?:software|developer|development|engineering|programmer|\bswe\b|engineer|front[- ]?end|back[- ]?end|full[- ]?stack)\b/u,
   },
 ];
 
@@ -171,7 +171,7 @@ const seniorityRules: readonly { seniority: Seniority; pattern: RegExp }[] = [
   },
   { seniority: "manager", pattern: /\b(?:manager|mgr)\b/u },
   { seniority: "principal", pattern: /\b(?:principal|architect)\b/u },
-  { seniority: "staff", pattern: /\bstaff\b/u },
+  { seniority: "staff", pattern: /\b(?:staff|technical lead|\blead\b)\b/u },
   { seniority: "senior", pattern: /\b(?:senior|\bsr\b|iii)\b/u },
   { seniority: "mid", pattern: /\b(?:\bii\b|mid[- ]level|intermediate)\b/u },
   {
@@ -338,18 +338,16 @@ export function classifyTitle(title: string, department: string | null | undefin
     }
   }
 
-  let seniority: Seniority | null = null;
+  const seniorityMatches = seniorityRules.flatMap((rule) =>
+    rule.pattern.test(text) ? [rule.seniority] : [],
+  );
 
-  for (const rule of seniorityRules) {
-    if (rule.pattern.test(text)) {
-      ({ seniority } = rule);
-      break;
-    }
-  }
+  const managerRole = role !== null && managerTitles.has(role);
+  const nonManagerMatch = seniorityMatches.find((match) => match !== "manager");
 
-  if (seniority === "manager" && role !== null && managerTitles.has(role)) {
-    seniority = null;
-  }
+  const seniority: Seniority | null = managerRole
+    ? (nonManagerMatch ?? null)
+    : (seniorityMatches[0] ?? null);
 
   if (role !== null) {
     return { role, subrole, seniority, roleSource: "rules" as const };
@@ -369,6 +367,7 @@ function normalizeWorkplace(
   isRemote: boolean | null | undefined,
   title: string,
   locationRaw: string | null | undefined,
+  descriptionText: string | null | undefined,
 ) {
   if (workplaceType !== null && workplaceType !== undefined) {
     const mapped = workplaceEnums.get(workplaceType.toLowerCase().trim());
@@ -394,6 +393,27 @@ function normalizeWorkplace(
     return "remote";
   }
 
+  const head =
+    descriptionText === null || descriptionText === undefined ? "" : descriptionText.slice(0, 2000);
+
+  if (
+    /\bhybrid (?:working|environment|role|model|schedule|workplace|position|culture)\b/iu.test(
+      head,
+    ) ||
+    /\bthis (?:position|role) is hybrid\b/iu.test(head)
+  ) {
+    return "hybrid";
+  }
+
+  if (
+    /\b(?:100%[- ]remote|fully[- ]remote|remote[- ]first|this (?:position|role) is (?:100%[- ]|a )?remote)\b/iu.test(
+      head,
+    ) ||
+    /#LI-Remote\b/iu.test(head)
+  ) {
+    return "remote";
+  }
+
   return "unknown";
 }
 
@@ -416,7 +436,7 @@ function normalizeEmploymentType(
   }
 
   const head =
-    `${title} ${descriptionText === null || descriptionText === undefined ? "" : descriptionText.slice(0, 500)}`.toLowerCase();
+    `${title} ${descriptionText === null || descriptionText === undefined ? "" : descriptionText.slice(0, 2000)}`.toLowerCase();
 
   for (const keyword of employmentTypeKeywords) {
     if (keyword.pattern.test(head)) {
@@ -433,6 +453,7 @@ export function tagPosting(input: PostingTagInput) {
     input.isRemote,
     input.title,
     input.locationRaw,
+    input.descriptionText,
   );
 
   const resolved = resolveLocation(input.locationRaw);
