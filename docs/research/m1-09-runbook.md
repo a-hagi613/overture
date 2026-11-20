@@ -78,10 +78,16 @@ greenhouse 7,363 listings → **61.4 min**; lever 2,377 → 19.8 min; ashby 4,17
   Postings (`docs/research/seed-comparison.md` §5), that is ~174,000 × 0.5 s ≈ **24 h** more, so the first full
   backfill is a ~1-day, greenhouse-bound run. Later passes are conditional (ETag / content hash) and only
   re-fetch what changed.
-- **Sweep pacing.** The pass runs as a chain of sweeps; at the defaults (`catalog.sweep_batch` 50 boards,
-  `catalog.sweep_interval_ms` 60 s) the board pass alone has a 13,911 / 50 × 60 s ≈ 4.7 h pacing floor. Both keys
-  are admin-tunable settings and can be raised (the per-ATS limiter is the only pacing that protects the feeds),
-  e.g. `catalog.sweep_batch` 500 during the backfill to run near the limits.
+- **Sweep pacing.** The pass runs as a chain of sweeps, and each sweep claims its batch before polling: a board is
+  claimed by moving `next_poll_at` forward to a 15-minute claim in the same statement that selects it, so
+  overlapping sweeps never poll the same board and a crashed process's board returns when the claim lapses. At the
+  defaults (`catalog.sweep_interval_ms` 60 s) one sweep claims 120 boards per ATS (the interval times the ATS's
+  2 req/s rate), 360 in total — the same pace the §6.1 limits allow — so the board pass is bounded by Greenhouse:
+  7,363 boards / 120 per sweep × 60 s ≈ **61.4 min**, the same ~1 hour as the request-count estimate above. A slower
+  ATS cannot starve the others. `catalog.sweep_batch` overrides the per-sweep total (split across ATSes in
+  proportion to their rates — e.g. 500 claims ~167 per ATS per sweep) and `catalog.sweep_interval_ms` overrides the
+  chain interval (and with it the computed per-ATS batch); the per-ATS limiter is the only pacing that protects the
+  feeds.
 
 ## 4. Run the census
 
