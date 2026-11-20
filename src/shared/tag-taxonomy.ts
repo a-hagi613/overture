@@ -80,7 +80,6 @@ export const TAG_SOURCES = ["rules", "model", "llm", "import"] as const;
 
 export type TagSource = (typeof TAG_SOURCES)[number];
 
-/** Order of precedence for a tag: the higher the number, the stronger the source. */
 export const TAG_SOURCE_PRECEDENCE: Record<TagSource, number> = {
   llm: 1,
   model: 2,
