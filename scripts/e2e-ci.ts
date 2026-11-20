@@ -554,12 +554,22 @@ function readTimings() {
   return timingsSchema.parse(JSON.parse(readFileSync(path, "utf8")));
 }
 
-function mergeReport(file: string, seconds: Map<string, number>) {
+function reportFilePath(named: string, testFiles: readonly string[]) {
+  const withoutRoot = named.replace(`${root}/`, "");
+
+  if (testFiles.includes(withoutRoot)) {
+    return withoutRoot;
+  }
+
+  return testFiles.find((file) => file.endsWith(`/${withoutRoot}`)) ?? withoutRoot;
+}
+
+function mergeReport(file: string, seconds: Map<string, number>, testFiles: readonly string[]) {
   const report = reportSchema.parse(JSON.parse(readFileSync(file, "utf8")));
 
   function visit(suite: ReportSuite, inherited: string | undefined) {
     const named = suite.file ?? inherited;
-    const fileOfSuite = named === undefined ? undefined : named.replace(`${root}/`, "");
+    const fileOfSuite = named === undefined ? undefined : reportFilePath(named, testFiles);
 
     for (const spec of suite.specs) {
       for (const test of spec.tests) {
@@ -587,9 +597,10 @@ function writeTimings() {
   const directory = localPath(flagValue("--reports") ?? "test-results");
   const output = localPath(flagValue("--out") ?? "test/e2e/timings.json");
   const measured = new Map<string, number>();
+  const testFiles = [...new Glob("test/e2e/**/*.test.ts").scanSync({ cwd: root })];
 
   for (const file of new Glob("**/*.json").scanSync({ cwd: directory })) {
-    mergeReport(join(directory, file), measured);
+    mergeReport(join(directory, file), measured, testFiles);
   }
 
   const entries: [string, number][] = Object.entries(readTimings().seconds);
@@ -598,7 +609,9 @@ function writeTimings() {
     entries.push([file, Math.round(value * 10) / 10]);
   }
 
-  const seconds = Object.fromEntries(entries.filter(([, value]) => value > 0));
+  const seconds = Object.fromEntries(
+    entries.filter(([file, value]) => value > 0 && existsSync(localPath(file))),
+  );
 
   mkdirSync(dirname(output), { recursive: true });
   writeFileSync(output, `${JSON.stringify({ version: 1, seconds }, undefined, 2)}\n`);
@@ -730,12 +743,15 @@ function plan() {
   const forced = Object.keys(map.tests).length === 0 || forcedFull(map, touched);
   const full = isMain || forced;
 
-  let selected = allTests.filter(
-    (test) =>
-      changedTests.includes(test) ||
-      map.tests[test]?.full === true ||
-      (map.tests[test]?.modules ?? []).some((module) => touched.includes(module)),
-  );
+  let selected = allTests.filter((test) => {
+    const reach = map.tests[test];
+
+    if (changedTests.includes(test) || reach === undefined) {
+      return true;
+    }
+
+    return reach.full || reach.modules.some((module) => touched.includes(module));
+  });
 
   if (full) {
     selected = allTests;
