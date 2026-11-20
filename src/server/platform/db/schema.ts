@@ -348,6 +348,8 @@ export const profiles = sqliteTable("profiles", {
   userId: cascadeUserId().primaryKey(),
   languages: text("languages").notNull().default("[]"),
   timezone: text("timezone"),
+  pendingTimezone: text("pending_timezone"),
+  pendingTimezoneAt: timestamp("pending_timezone_at"),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
 });

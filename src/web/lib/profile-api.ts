@@ -26,6 +26,8 @@ const languagesSchema = z.object({ languages: z.array(z.string()) });
 const profileSettingsSchema = z.object({
   languages: z.array(z.string()),
   timezone: z.string().nullable(),
+  pendingTimezone: z.string().nullable(),
+  pendingTimezoneAt: z.string().nullable(),
 });
 
 async function jsonFrom(response: Response) {

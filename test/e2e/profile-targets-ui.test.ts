@@ -15,6 +15,8 @@ const languagesSchema = z.object({ languages: z.array(z.string()) });
 const profileSettingsSchema = z.object({
   languages: z.array(z.string()),
   timezone: z.string().nullable(),
+  pendingTimezone: z.string().nullable(),
+  pendingTimezoneAt: z.string().nullable(),
 });
 
 const baseTargets = {
@@ -238,13 +240,20 @@ test("posting languages and the time zone save from Settings", async ({
   );
 
   await timezone.selectOption("America/Toronto");
-  await expect(timezone).toHaveValue("America/Toronto");
+
+  await expect
+    .poll(
+      async () =>
+        profileSettingsSchema.parse(await (await request.get("/api/profile/settings")).json())
+          .pendingTimezone,
+    )
+    .toBe("America/Toronto");
 
   const withZone = profileSettingsSchema.parse(
     await (await request.get("/api/profile/settings")).json(),
   );
 
-  expect(withZone.timezone).toBe("America/Toronto");
+  expect(withZone.timezone).toBe("America/Vancouver");
 
   await page.getByRole("button", { name: "English" }).click();
   await expect(page.getByRole("button", { name: "English" })).toHaveAttribute(
@@ -257,7 +266,7 @@ test("posting languages and the time zone save from Settings", async ({
   expect(both.languages.toSorted()).toEqual(["en", "fr"]);
 
   await page.reload();
-  await expect(page.getByLabel("Time zone")).toHaveValue("America/Toronto");
+  await expect(page.getByLabel("Time zone")).toHaveValue("America/Vancouver");
 
   await context.close();
   await request.dispose();
