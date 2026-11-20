@@ -1,0 +1,70 @@
+{
+  "absolute_url": "https://boards.greenhouse.io/cloudflare/jobs/8392878?gh_jid=8392878",
+  "data_compliance": [
+    {
+      "type": "gdpr",
+      "requires_consent": false,
+      "requires_processing_consent": false,
+      "requires_retention_consent": false,
+      "retention_period": null,
+      "demographic_data_consent_applies": false
+    }
+  ],
+  "internal_job_id": 3622460,
+  "location": {
+    "name": "Hybrid"
+  },
+  "metadata": [
+    {
+      "id": 825338,
+      "name": "Cost Center",
+      "value": "5100 - Mid Market",
+      "value_type": "single_select"
+    },
+    {
+      "id": 8654220,
+      "name": "Job Posting Location",
+      "value": [
+        "Munich, Germany"
+      ],
+      "value_type": "multi_select"
+    },
+    {
+      "id": 46546702,
+      "name": "Career Site Department",
+      "value": [
+        "Sales"
+      ],
+      "value_type": "multi_select"
+    }
+  ],
+  "id": 8392878,
+  "updated_at": "2026-11-19T11:10:40-05:00",
+  "requisition_id": null,
+  "title": "Account Executive, Start Ups",
+  "company_name": "Cloudflare",
+  "first_published": "2026-11-19T07:12:47-05:00",
+  "language": "en",
+  "application_deadline": null,
+  "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;h3&gt;About Us&lt;/h3&gt;\n&lt;p&gt;At Cloudflare, we are on a mission to help build a better Internet. Today the company runs one of the world’s largest networks that powers millions of websites and other Internet properties for customers ranging from individual bloggers to SMBs to Fortune 500 companies. Cloudflare protects and accelerates any Internet application online without adding hardware, installing software, or changing a line of code. Internet properties powered by Cloudflare all have web traffic routed through its intelligent global network, which gets smarter with every request. As a result, they see significant improvement in performance and a decrease in spam and other attacks. Cloudflare was named to Entrepreneur Magazine’s Top Company Cultures list and ranked among the World’s Most Innovative Companies by Fast Company.&lt;/p&gt;\n&lt;p&gt;At Cloudflare, we’re not looking for people who wait for a polished roadmap; we’re looking for the builders who see the cracks in the Internet that everyone else has simply learned to live with. We value candidates who have the instinct to spot a &quot;normalized&quot; problem and the AI-native curiosity to create a solution using the latest tools. Our culture is built on iteration, leveraging AI to ship faster today to make it better tomorrow, while ensuring that every improvement, no matter how small, is shared across the team to lift everyone up. If you’re the type of person who values curiosity over bureaucracy, and that AI is a partner in solving tough problems to keep the Internet moving forward, you’ll fit right in.&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;&lt;span style=&quot;color: rgb(230, 126, 35);&quot;&gt;&lt;strong&gt;Available Locations&lt;/strong&gt;&lt;/span&gt;&lt;/h2&gt;\n&lt;hr&gt;\n&lt;p&gt;Munich, Berlin or Frankfurt&lt;/p&gt;\n&lt;h2&gt;&lt;span style=&quot;color: rgb(230, 126, 35);&quot;&gt;&lt;strong&gt;About the Role&lt;/strong&gt;&lt;/span&gt;&lt;/h2&gt;\n&lt;hr&gt;\n&lt;p&gt;Cloudflare is looking for a Startup Account Executive to join our Digital Natives team in Germany and Austria. You&#39;ll build your own customer base from the ground up, mostly through your own prospecting or by working closely with your BDR. Your job is to find promising startups across the region, win them early and help them build on Cloudflare as they grow.&lt;/p&gt;\n&lt;p&gt;You&#39;ll work with AI startups, developer tool companies and other young tech businesses, often in the first years after their funding. Their teams are small, and founders make most of the decisions. Often an engineer has been using Cloudflare long before anyone talks to sales. You know this world, and you&#39;re comfortable talking about technology with a founder or CTO. You don&#39;t need to know every spec, but you understand what they&#39;re building and what Cloudflare can change for them.&lt;/p&gt;\n&lt;p&gt;The pace is high. You&#39;ll spend a good part of your week reaching out to founders and engineers, following up and booking first meetings. You&#39;ll also build your network in the startup scene. VC firms, accelerators and founder communities are often the fastest way to the right companies, and you&#39;ll become a familiar face there. If you enjoy the hunt and like seeing your own work turn into new customers, you&#39;ll like this job.&amp;nbsp;&lt;/p&gt;\n&lt;p&gt;Above all, we are looking for true team players. We win together, not as lone wolves with sharp elbows. You share what works, ask for help when you need it, and celebrate your colleagues&#39; wins as much as your own. You see your BDR, Solutions Engineers and specialists as real partners, not as support functions, and you bring the same care to working with your colleagues as you do to working with your customers. If you believe the best results come from people who make each other better, you&#39;ll feel right at home on our team.&amp;nbsp;&lt;/p&gt;\n&lt;p&gt;AI tools are a big part of how we sell.",
+  "departments": [
+    {
+      "id": 70660,
+      "name": "Field Sales",
+      "child_ids": [],
+      "parent_id": 29066
+    }
+  ],
+  "offices": [
+    {
+      "id": 48350,
+      "name": "Munich, Germany",
+      "location": "München, Bayern, Germany",
+      "child_ids": [],
+      "parent_id": 74843
+    }
+  ],
+  "ai_disclaimer": null,
+  "include_ai_disclaimer": null,
+  "ai_opt_out_request_url": null
+}

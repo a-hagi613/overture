@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, notInArray } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, notInArray, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -92,6 +92,30 @@ async function fetchChangedDetails(feed: GreenhouseFeed, boardToken: string, job
 function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow, now: number) {
   const latestChangeMs = latestSourceUpdatedAtForBoard(db, board.id);
 
+  const missingRows = db
+    .update(postings)
+    .set({ missingPolls: sql`${postings.missingPolls} + 1` })
+    .where(
+      and(
+        eq(postings.boardId, board.id),
+        isNull(postings.closedAt),
+        gte(postings.missingPolls, 1),
+      ),
+    )
+    .returning({ id: postings.id, missingPolls: postings.missingPolls })
+    .all();
+
+  for (const row of missingRows) {
+    if (row.missingPolls >= MISSING_POLLS_TO_CLOSE) {
+      db.update(postings)
+        .set({ closedAt: clock.now() })
+        .where(eq(postings.id, row.id))
+        .run();
+    }
+  }
+
+  const closed = missingRows.filter((row) => row.missingPolls >= MISSING_POLLS_TO_CLOSE).length;
+
   db.update(companyBoards)
     .set({
       lastPolledAt: now,
@@ -108,7 +132,7 @@ function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow, now:
     outcome: "not_modified" as const,
     added: 0,
     updated: 0,
-    closed: 0,
+    closed,
     error: null,
   } satisfies PollBoardReport;
 }
@@ -253,7 +277,7 @@ async function syncPostings(
 
   const missingRows = db
     .update(postings)
-    .set({ missingPolls: 1 })
+    .set({ missingPolls: sql`${postings.missingPolls} + 1` })
     .where(missingFilter)
     .returning({ id: postings.id, missingPolls: postings.missingPolls })
     .all();
