@@ -15,6 +15,14 @@ clock and random ports, `process.env` is read only in the Zod config module, and
 from the copy module). oxfmt formats; `tsgo --noEmit` type-checks. Coding agents run lint and format on every edit
 (Oxc's Claude Code hook) and finish only at zero warnings. Landmines wins every conflict.
 
+## Plugins
+
+Oxlint 1.94 ships 872 rules. Every plugin is on except the two for frameworks we do not use: `eslint`, `typescript`,
+`unicorn`, `import`, `oxc`, `promise`, `node`, `jsdoc`, `react`, `react_perf` (then off, below), `jsx_a11y` and
+`vitest` are on; `vue` and `nextjs` are off; `jest` is replaced by `vitest`. That leaves about 700 rules at error. The
+pull request that adds or upgrades Oxlint prints the enabled count from `oxlint --print-config`, and CI fails if a rule
+outside the off-list below is not at error.
+
 ## Rules that close the gaps
 
 Landmines alone leaves three ways around these rules, so the architecture rules close them:
