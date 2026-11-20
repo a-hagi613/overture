@@ -26,7 +26,7 @@ const NOT_FOUND_POLLS_TO_GONE = 2;
 
 export interface PollBoardReport {
   boardId: string;
-  outcome: "polled" | "not_modified" | "gone" | "error" | "skipped";
+  outcome: "polled" | "not_modified" | "gone" | "error";
   added: number;
   updated: number;
   closed: number;
@@ -385,10 +385,6 @@ export const pollBoard = async (
   feed: BoardFeed,
   board: BoardRow,
 ) => {
-  if (board.status === "gone" || board.nextPollAt === null || board.nextPollAt > clock.now()) {
-    return { boardId: board.id, outcome: "skipped", added: 0, updated: 0, closed: 0, error: null };
-  }
-
   const now = clock.now();
 
   let result;

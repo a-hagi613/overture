@@ -115,6 +115,7 @@ export interface FeedFixtureServer {
   stats: () => FixtureStats;
   setNotFound: (ats: Ats, tokens: string[]) => void;
   setDelayMs: (delayMs: number) => void;
+  nextRequest: () => Promise<string>;
   mutateBoard: (ats: Ats, token: string, mutation: BoardMutation) => void;
 }
 
@@ -368,6 +369,7 @@ export async function startFeedFixtureServer() {
   const state = { requestCount: 0, maxInFlight: 0, inFlight: 0, delayMs: 0 };
   const detailCounts: Record<string, number> = {};
   const arrivalTimes: number[] = [];
+  const requestWaiters: ((path: string) => void)[] = [];
 
   const perAts = {
     greenhouse: newAtsTracker(),
@@ -531,6 +533,8 @@ export async function startFeedFixtureServer() {
     arrivalTimes.push(now);
     paths.push(pathname);
 
+    requestWaiters.shift()?.(pathname);
+
     const atsStats = perAts[ats];
     atsStats.requestCount += 1;
 
@@ -692,6 +696,10 @@ export async function startFeedFixtureServer() {
     setDelayMs: (delayMs) => {
       state.delayMs = delayMs;
     },
+    nextRequest: async () =>
+      new Promise((resolve) => {
+        requestWaiters.push(resolve);
+      }),
     mutateBoard: (ats, token, mutation) => {
       if (ats === "greenhouse") {
         mutateGreenhouse(token, mutation);

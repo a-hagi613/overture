@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -6,6 +6,10 @@ import { enqueueJob } from "../platform/jobs/queue.ts";
 import { getSetting } from "../platform/settings/index.ts";
 import { bgJobs, companyBoards } from "../platform/db/schema.ts";
 import { pollBoard } from "./poll-board.ts";
+import { ASHBY_LIMITS } from "./ashby-feed.ts";
+import { GREENHOUSE_LIMITS } from "./greenhouse-feed.ts";
+import { LEVER_LIMITS } from "./lever-feed.ts";
+import { M1_ATS_NAMES } from "./discovered-boards.ts";
 
 import type { BoardFeeds } from "./board-feed.ts";
 
@@ -14,7 +18,13 @@ export const BACKFILL_JOB_KIND = "catalog.backfill";
 
 const DEFAULT_SWEEP_INTERVAL_MS = 60_000;
 const MIN_SWEEP_INTERVAL_MS = 1000;
-const DEFAULT_SWEEP_BATCH = 50;
+const SWEEP_CLAIM_MS = 15 * 60_000;
+
+const SWEEP_LIMITS = {
+  greenhouse: GREENHOUSE_LIMITS,
+  lever: LEVER_LIMITS,
+  ashby: ASHBY_LIMITS,
+} as const;
 
 export interface CatalogDeps {
   db: AppDatabase;
@@ -31,11 +41,35 @@ export function readSweepIntervalMs(db: AppDatabase) {
     : DEFAULT_SWEEP_INTERVAL_MS;
 }
 
-function readSweepBatch(db: AppDatabase) {
+function readSweepBatchOverride(db: AppDatabase) {
   const raw = getSetting(db, "catalog.sweep_batch");
   const parsed = raw === null ? Number.NaN : Number(raw);
 
-  return Number.isFinite(parsed) && parsed >= 1 ? Math.trunc(parsed) : DEFAULT_SWEEP_BATCH;
+  return Number.isFinite(parsed) && parsed >= 1 ? Math.trunc(parsed) : null;
+}
+
+function requestRatePerSecond(ats: (typeof M1_ATS_NAMES)[number]) {
+  return 1000 / SWEEP_LIMITS[ats].minIntervalMs;
+}
+
+export function sweepBatchPerAts(db: AppDatabase) {
+  const intervalMs = readSweepIntervalMs(db);
+  const overrideTotal = readSweepBatchOverride(db);
+  const totalRate = M1_ATS_NAMES.reduce((sum, ats) => sum + requestRatePerSecond(ats), 0);
+
+  const batchFor = (ats: (typeof M1_ATS_NAMES)[number]) => {
+    if (overrideTotal === null) {
+      return Math.max(1, Math.trunc(intervalMs / SWEEP_LIMITS[ats].minIntervalMs));
+    }
+
+    return Math.max(1, Math.trunc((overrideTotal * requestRatePerSecond(ats)) / totalRate));
+  };
+
+  return {
+    greenhouse: batchFor("greenhouse"),
+    lever: batchFor("lever"),
+    ashby: batchFor("ashby"),
+  } satisfies Record<(typeof M1_ATS_NAMES)[number], number>;
 }
 
 export function enqueueSweep(deps: CatalogDeps, runAt: number) {
@@ -63,18 +97,28 @@ export function ensureBackfillQueued(db: AppDatabase, clock: Clock) {
 
 export async function pollDueBoards(deps: CatalogDeps) {
   const now = deps.clock.now();
+  const batches = sweepBatchPerAts(deps.db);
 
-  const due = deps.db
-    .select()
-    .from(companyBoards)
-    .where(
-      and(inArray(companyBoards.status, ["active", "empty"]), lte(companyBoards.nextPollAt, now)),
-    )
-    .limit(readSweepBatch(deps.db))
-    .all();
+  const claimed = M1_ATS_NAMES.flatMap((ats) =>
+    deps.db
+      .update(companyBoards)
+      .set({ nextPollAt: now + SWEEP_CLAIM_MS })
+      .where(
+        sql`${companyBoards.id} IN (
+          SELECT id FROM company_boards
+          WHERE ats = ${ats}
+            AND status IN ('active', 'empty')
+            AND next_poll_at <= ${now}
+          ORDER BY next_poll_at
+          LIMIT ${batches[ats]}
+        )`,
+      )
+      .returning()
+      .all(),
+  );
 
   await Promise.all(
-    due.map(async (board) => pollBoard(deps.db, deps.clock, deps.feeds[board.ats], board)),
+    claimed.map(async (board) => pollBoard(deps.db, deps.clock, deps.feeds[board.ats], board)),
   );
 }
 

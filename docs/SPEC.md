@@ -334,7 +334,13 @@ Discovery runs from `overture-web` directly (no proxy).
 3. **Trickle**: each board gets `next_poll_at` from its activity: changed in last 24 h → 30 min; last 7 days → 2 h;
    otherwise → 12 h; errors → exponential backoff (cap 48 h). "Changed" is the feed's job `updated_at` when the
    feed has one (Greenhouse) and the newest posting's publish time when it does not (Lever, Ashby). `404` twice →
-   `gone`.
+   `gone`. The `catalog.sweep` job claims its batch before polling: in the same statement that selects them, each
+   claimed board's `next_poll_at` moves forward to a 15-minute claim, which the finished poll overwrites with its
+   activity band, so two overlapping sweeps never poll the same board and a crashed process's board becomes due
+   again when the claim lapses. Each sweep claims per ATS about `sweep_interval_ms × the ATS's request rate`
+   boards (120 per ATS at the 60 s default and 2 req/s), so no ATS starves another; `catalog.sweep_batch` sets
+   the total per-sweep batch instead (split across ATSes in proportion to their rates) and
+   `catalog.sweep_interval_ms` sets the sweep chain interval.
 4. **Closed**: a posting absent from two consecutive successful polls gets `closed_at`; its queued applications are
    skipped with `posting_closed`.
 5. **Dedupe**: `dedupe_key = company_id + title_norm + country_code + city`; duplicates across boards keep the
@@ -832,7 +838,8 @@ Reviews, check-ins. In-app notification list mirrors pushes.
 
 1. Sign up/in with email + password (verify email) (M2) · 2. magic link · 3. Google (local OIDC server) · 4. LinkedIn (local OIDC server)
 · 5. account linking refused for unverified email · 6. v1 importer loads resume, answer bank, learned answers ·
-7. resume upload + parse + confirm facts · 8. targets with live count · 9. discovery backfill + trickle + close ·
+7. resume upload + parse + confirm facts · 8. targets with live count · 9. discovery backfill + trickle + close + the sweep's board claim (per-ATS batch,
+crash recovery) ·
 10. tagging precedence incl. tag import · 11. candidate filters (skip list incl. near-match names and domains, one open
 application per company, cooldown, repost guard, language, remote country rules, salary/FX) · 12. lazy scoring stops at need · 13. score on open + manual apply · 14. preparation with factual,
 open-text, optional blank · 15. Review unlocks N applications · 16. planner window + spacing · 17. dispatcher gates

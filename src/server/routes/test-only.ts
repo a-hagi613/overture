@@ -24,6 +24,7 @@ import { getTestSpans, resetTestSpans } from "../platform/telemetry/otel.ts";
 import { releaseBlockingJobs } from "../testing/blocking-job.ts";
 import { readCompaniesParquet } from "../catalog/companies-parquet.ts";
 import { loadDiscoveredBoards } from "../catalog/discovered-boards.ts";
+import { sweepBatchPerAts } from "../catalog/discovery.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags } from "../catalog/tag-import.ts";
 import { readLlmUsage } from "../platform/llm/usage.ts";
 
@@ -224,6 +225,10 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
 
     return context.json({ boards: rows });
   });
+
+  routes.get("/catalog/sweep-batches", (context) =>
+    context.json({ batches: sweepBatchPerAts(db) }),
+  );
 
   routes.get("/catalog/postings", (context) => {
     const rows = db.select().from(postings).all();
