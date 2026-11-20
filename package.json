@@ -9,7 +9,7 @@
     "build": "vite build",
     "start": "bun run src/server/main.ts",
     "typecheck": "bun check",
-    "lint": "oxlint",
+    "lint": "oxlint --deny-warnings",
     "lint:fix": "oxlint --fix",
     "lint:config": "bun run scripts/check-lint-config.ts",
     "format": "bun fmt",
@@ -19,7 +19,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/server/platform/db/migrate.ts",
     "db:template": "bun run scripts/create-template-db.ts test/e2e/.tmp/template.db",
-    "db:verify": "bun run scripts/verify-db.ts"
+    "db:verify": "bun run scripts/verify-db.ts",
+    "lint:parity": "bun run scripts/lint-parity.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "1.7.26",
