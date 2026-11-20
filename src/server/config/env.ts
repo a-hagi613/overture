@@ -22,6 +22,9 @@ const envSchema = z.object({
   LITESTREAM_CONFIG_PATH: z.string().min(1).optional(),
   BROWSER_USE_API_KEY: z.string().min(1).optional(),
   BROWSER_USE_API_BASE_URL: z.url().default("https://api.browser-use.com"),
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  ANTHROPIC_BASE_URL: z.url().default("https://api.anthropic.com"),
+  ANTHROPIC_MODEL: z.string().min(1).default("claude-haiku-4-5"),
   FLY_APP_NAME: z.string().min(1).optional(),
   FLY_MACHINE_ID: z.string().min(1).optional(),
 });
