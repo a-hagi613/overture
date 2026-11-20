@@ -27,7 +27,7 @@ const foreignKeys = foreignKeysSchema.parse(sqlite.query("PRAGMA foreign_keys").
 const tables = tablesSchema.parse(
   sqlite
     .query(
-      "select name, sql as structure from sqlite_master where type = 'table' and name not like 'sqlite_%' and name not like '__drizzle_%'",
+      "select name, sql as structure from sqlite_master where type = 'table' and name not like 'sqlite_%' and name not like '__drizzle_%' and sql not like 'CREATE VIRTUAL TABLE%' and name not like 'postings_fts_%'",
     )
     .all(),
 );
