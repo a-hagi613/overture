@@ -109,6 +109,7 @@ export interface CatalogHarness {
   pollThroughScheduledSweep: (clockOffsetMs: number) => Promise<void>;
   postings: () => Promise<PostingRow[]>;
   boards: () => Promise<BoardRow[]>;
+  clockNow: () => Promise<number>;
   close: () => Promise<void>;
 }
 
@@ -308,6 +309,7 @@ export async function startCatalogHarness(boardSpecs: BoardSpec[]) {
     pollThroughScheduledSweep,
     postings,
     boards,
+    clockNow,
     close: async () => {
       await app.stop();
       fixture.stop();
