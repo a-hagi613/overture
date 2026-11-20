@@ -522,8 +522,18 @@ export function createTestRoutes(
 
   routes.get("/catalog/postings", (context) => {
     const rows = db.select().from(postings).all();
+    const postingRows: ((typeof rows)[number] & { descriptionText: string | null })[] = [];
 
-    return context.json({ postings: rows });
+    for (const row of rows) {
+      const descriptionText =
+        row.descriptionGz === null
+          ? null
+          : new TextDecoder().decode(Bun.gunzipSync(new Uint8Array(row.descriptionGz)));
+
+      postingRows.push({ ...row, descriptionText });
+    }
+
+    return context.json({ postings: postingRows });
   });
 
   routes.post("/catalog/postings", zValidator("json", createPostingBody), (context) => {

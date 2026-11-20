@@ -1,0 +1,27 @@
+{
+  "id": 8403432,
+  "title": "Applied Scientist II - Advertiser Optimization",
+  "absolute_url": "https://instacart.careers/job/?gh_jid=8403432",
+  "location": {
+    "name": "Canada - Remote (ON, AB, BC, or NS Only)"
+  },
+  "updated_at": "2026-11-19T15:24:42-05:00",
+  "first_published": "2026-11-19T15:24:42-05:00",
+  "language": "en",
+  "internal_job_id": 3626351,
+  "requisition_id": "PR00179",
+  "pay_input_ranges": [
+    {
+      "min_cents": 15400000,
+      "max_cents": 16250000,
+      "currency_type": "CAD",
+      "interval": null
+    }
+  ],
+  "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;&lt;strong&gt;We&#39;re transforming the grocery industry&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;&lt;span class=&quot;im&quot;&gt;At Instacart, we invite the world to share love through food because we believe everyone should have access to the food they love and more time to enjoy it together. Where others see a simple need for grocery delivery, we see exciting complexity and endless opportunity to serve the varied needs of our community. We work to deliver an essential service that customers rely on to get their groceries and household goods, while also offering safe and flexible earnings opportunities to Instacart Personal Shoppers.&lt;/span&gt;&lt;/p&gt;\n&lt;p&gt;Instacart has become a lifeline for millions of people, and we’re building the team to help push our shopping cart forward. If you’re ready to do the best work of your life, come join our table.&lt;/p&gt;\n&lt;p&gt;&lt;strong&gt;Instacart is a Flex First team &lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;There’s no one-size fits all approach to how we do our best work. Our employees have the flexibility to choose where they do their best work—whether it’s from home, an office, or your favorite coffee shop—while staying connected and building community through regular in-person events. &lt;a href=&quot;https://www.instacart.careers/flex-first&quot; target=&quot;_blank&quot; data-saferedirecturl=&quot;https://www.google.com/url?q=https://instacart.careers/remote/&amp;amp;source=gmail&amp;amp;ust=1651869232122000&amp;amp;usg=AOvVaw37OlxP8hAKN7nq4YwHQH7e&quot;&gt;Learn more about our flexible approach to where we work.&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;&lt;strong&gt;Overview&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;The Advertiser Optimization team is the decision-making engine of Instacart&#39;s $1B+ ads business. We own the systems responsible for Bidding, Pacing, Budgeting, Targeting and advertiser-facing recommendations - converting stated advertiser goals into real-time auction actions. Our mission is to maximize realized Advertiser Value by deciding when to participate, how much to bid, and how fast to spend, all while carefully balancing User Experience and Platform Revenue.&lt;/p&gt;\n&lt;p&gt;&amp;nbsp;&lt;/p&gt;\n&lt;p&gt;We are looking for an Applied Research Scientist II with a strong quantitative background to join our team. In this role, you will apply your expertise in operational research, mathematics, statistics, economics, or a related field to help build and refine the algorithmic systems that power how Instacart&#39;s advertising marketplace operates. You&#39;ll work alongside a talented team of scientists and engineers, contributing to production systems that have real, measurable impact on a scaled ads platform. If you&#39;re excited by the intersection of rigorous quantitative thinking and large-scale engineering, this is the role for you.&lt;/p&gt;\n&lt;p&gt;&amp;nbsp;&lt;/p&gt;\n&lt;h2&gt;&lt;strong&gt;About the Job&lt;/strong&gt;&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;Develop and evaluate models and algorithms for ads bidding, pacing, and budgeting, applying your training in operational research, mathematics, statistics, economics, or a related quantitative discipline to solve complex marketplace problems at scale.&lt;/li&gt;\n&lt;li&gt;Collaborate closely with senior scientists, engineers and product managers to translate well-defined marketplace questions into mathematical formulations, implement analyses and prototypes, design experiments, and interpret results using large-scale data.&lt;/li&gt;\n&lt;li&gt;Contribute to production systems through algorithm implementation, validation, and monitoring, progressively taking ownership of well-scoped projects from initial hypothesis through measurable impact.&lt;/li&gt;\n&lt;li&gt;Operate in a fast-paced, constantly evolving environment where the ads marketplace shifts quickly — you&#39;ll need to balance rigor with speed, and thrive when priorities change and new challenges",
+  "departments": [
+    {
+      "name": "Machine Learning"
+    }
+  ]
+}

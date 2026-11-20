@@ -24,6 +24,14 @@ const postingRowSchema = z.object({
   countryCode: z.string().nullable(),
   workplace: z.string(),
   employmentType: z.string(),
+  url: z.string(),
+  applyUrl: z.string().nullable(),
+  applyUrlNorm: z.string(),
+  salaryMinMinor: z.number().nullable(),
+  salaryMaxMinor: z.number().nullable(),
+  salaryCurrency: z.string().nullable(),
+  salaryPeriod: z.string().nullable(),
+  descriptionText: z.string().nullable(),
   tagSource: z.string().nullable(),
   taggedAt: z.number().nullable(),
   descriptionHash: z.string().nullable(),
@@ -91,6 +99,14 @@ export interface PostingRow {
   countryCode: string | null;
   workplace: string;
   employmentType: string;
+  url: string;
+  applyUrl: string | null;
+  applyUrlNorm: string;
+  salaryMinMinor: number | null;
+  salaryMaxMinor: number | null;
+  salaryCurrency: string | null;
+  salaryPeriod: string | null;
+  descriptionText: string | null;
   tagSource: string | null;
   taggedAt: number | null;
   descriptionHash: string | null;

@@ -1,0 +1,39 @@
+{
+  "id": 8259642,
+  "title": "AML Investigator",
+  "absolute_url": "https://boards.greenhouse.io/robinhood/jobs/8259642?t=gh_src=&gh_jid=8259642",
+  "location": {
+    "name": "Denver, CO; New York, NY; Westlake, TX"
+  },
+  "updated_at": "2026-11-13T15:22:37-05:00",
+  "first_published": "2026-11-12T15:14:34-05:00",
+  "language": "en",
+  "internal_job_id": 3573936,
+  "requisition_id": "JR109504",
+  "pay_input_ranges": [
+    {
+      "min_cents": 9400000,
+      "max_cents": 11000000,
+      "currency_type": "USD",
+      "interval": null
+    },
+    {
+      "min_cents": 8200000,
+      "max_cents": 9700000,
+      "currency_type": "USD",
+      "interval": null
+    },
+    {
+      "min_cents": 7300000,
+      "max_cents": 8600000,
+      "currency_type": "USD",
+      "interval": null
+    }
+  ],
+  "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;h2&gt;Join us in building the future of finance.&lt;/h2&gt;\n&lt;p&gt;Our mission is to democratize finance for all. &lt;a href=&quot;https://www.cerulli.com/press-releases/cerulli-anticipates-124-trillion-in-wealth-will-transfer-through-2048&quot; target=&quot;_blank&quot;&gt;An estimated $124 trillion of assets&lt;/a&gt; will be inherited by younger generations in the next two decades. The largest transfer of wealth in human history. If you’re ready to be at the epicenter of this historic cultural and financial shift, keep reading.&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;&lt;strong&gt;About the team + role&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;We are building an elite team, applying frontier technologies to the world’s biggest financial problems. We’re looking for bold thinkers. Sharp problem-solvers. Builders who are wired to make an impact. Robinhood isn’t a place for complacency, it’s where ambitious people do the best work of their careers. We’re a high-performing, fast-moving team with ethics at the center of everything we do. Expectations are high, and so are the rewards.&amp;nbsp;&lt;/p&gt;\n&lt;p&gt;The Financial Crimes Investigations team protects Robinhood and its customers by detecting, investigating, and reporting potentially suspicious activity across our brokerage and crypto products. The team partners closely with Compliance, Legal, Product, Risk, and Engineering to strengthen controls and meet regulatory obligations. We focus on thorough investigations, clear documentation, and continuous process improvement to reduce financial crime risk. Our work directly supports regulatory compliance and customer trust.&lt;/p&gt;\n&lt;p&gt;As an AML Investigator, you will conduct complex investigations involving cryptocurrency transactions, brokerage accounts, and cash movement. You will analyze blockchain activity using industry-standard analytics tools, evaluate customer behavior across Robinhood entities, and prepare Suspicious Activity Reports (SARs) that meet regulatory requirements. You will manage investigations from initial alert through final decision and documentation, while identifying trends and control enhancements that strengthen our monitoring program. Your analysis will contribute directly to meeting Bank Secrecy Act (BSA) and anti-money laundering (AML) obligations.&lt;/p&gt;\n&lt;p&gt;&lt;strong&gt;This role is based in our New York, NY; Denver, CO; or Westlake, TX office(s)office(s), with in-person attendance expected at least [3/4/5] days per week.&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;At Robinhood, we believe in the power of in-person work to accelerate progress, spark innovation, and strengthen community. Our office experience is intentional, energizing, and designed to fully support high-performing teams.&amp;nbsp;&lt;/p&gt;\n&lt;h2&gt;&lt;strong&gt;What you’ll do&lt;/strong&gt;&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;Conduct investigations into potentially suspicious activity across cryptocurrency products, brokerage accounts, and fiat transactions generated from transaction monitoring systems, referrals, or external inquiries.&lt;/li&gt;\n&lt;li&gt;Analyze blockchain transactions using tools such as Chainalysis, TRM, or similar platforms to trace fund flows and identify indicators of money laundering or other financial crimes.&lt;/li&gt;\n&lt;li&gt;Review customer activity across Robinhood Financial, Robinhood Securities, Robinhood Crypto, and Robinhood Money to assess risk and determine appropriate case outcomes.&lt;/li&gt;\n&lt;li&gt;Draft clear, well-supported Suspicious Activity Reports (SARs) that meet regulatory standards and internal quality benchmarks.&lt;/li&gt;\n&lt;li&gt;Manage the full lifecycle of investigations, including alert review, evidence gathering, decisioning, documentation, and case closure.&lt;/li&gt;\n&lt;li&gt;Contribute to process improvements by identifying trends, control gaps, or tooling enhancements that improve investigative quality and efficiency.&lt;/",
+  "departments": [
+    {
+      "name": "Financial Crimes"
+    }
+  ]
+}

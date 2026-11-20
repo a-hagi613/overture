@@ -1,0 +1,39 @@
+{
+  "id": 7350823,
+  "title": "Android Engineer, Money Experience",
+  "absolute_url": "https://boards.greenhouse.io/robinhood/jobs/7350823?t=gh_src=&gh_jid=7350823",
+  "location": {
+    "name": "Menlo Park, CA"
+  },
+  "updated_at": "2026-10-02T18:49:27-04:00",
+  "first_published": "2025-10-22T16:55:56-04:00",
+  "language": "en",
+  "internal_job_id": 3085172,
+  "requisition_id": "1683",
+  "pay_input_ranges": [
+    {
+      "min_cents": 16600000,
+      "max_cents": 19500000,
+      "currency_type": "USD",
+      "interval": null
+    },
+    {
+      "min_cents": 14700000,
+      "max_cents": 17200000,
+      "currency_type": "USD",
+      "interval": null
+    },
+    {
+      "min_cents": 13000000,
+      "max_cents": 15200000,
+      "currency_type": "USD",
+      "interval": null
+    }
+  ],
+  "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;h2&gt;Join us in building the future of finance.&lt;/h2&gt;\n&lt;p&gt;Our mission is to democratize finance for all. &lt;a href=&quot;https://www.cerulli.com/press-releases/cerulli-anticipates-124-trillion-in-wealth-will-transfer-through-2048&quot; target=&quot;_blank&quot;&gt;An estimated $124 trillion of assets&lt;/a&gt; will be inherited by younger generations in the next two decades. The largest transfer of wealth in human history. If you’re ready to be at the epicenter of this historic cultural and financial shift, keep reading.&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;&lt;strong&gt;About the team + role &lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;Our group is building an elite team, applying frontier technologies to the world’s biggest financial problems. We’re looking for bold thinkers &amp;amp; sharp problem-solvers. Individuals who are wired to make an impact. Robinhood is where ambitious people do the best work of their careers. We’re a high-performing, fast-moving team with ethics at the center of everything we do. Expectations are high, and so are the rewards.&lt;/p&gt;\n&lt;p class=&quot;wnfdntt _1ibi0s3f5 _1ibi0s3ce _1ibi0s3ea&quot; data-pm-slice=&quot;1 1 []&quot;&gt;Robinhood’s &lt;strong&gt;Money Experience team&lt;/strong&gt; builds the customer-facing money movement experience in the app. The team owns core transfer flows and works across experiences like deposits, withdrawals, recurring deposits, transfer history, post-transfer pages, incoming wires, and guided transfer flows, including launches such as the net worth tracker.&lt;/p&gt;\n&lt;p class=&quot;wnfdntt _1ibi0s3f5 _1ibi0s3ce _1ibi0s3ea&quot;&gt;As a &lt;strong&gt;Android Engineer &lt;/strong&gt;on the Money Experience team, you would build and improve Android experiences that help customers move money into, out of, and between Robinhood accounts. You would contribute to features like account selection, transfer validation, deposit and withdrawal flows, post-transfer experiences, and the migration to newer guided transfer flows, working as part of a mobile team that includes multiple Android and iOS engineers.&lt;/p&gt;\n&lt;p&gt;These teams are based in our &lt;strong&gt;Menlo Park, CA&lt;/strong&gt; office, with in-person attendance expected at least &lt;strong&gt;3 days per week&lt;/strong&gt;.&lt;/p&gt;\n&lt;p&gt;At Robinhood, we believe in the power of in-person work to accelerate progress, spark innovation, and strengthen community. Our office experience is intentional, energizing, and designed to fully support high-performing teams.&lt;/p&gt;\n&lt;h2&gt;What you&#39;ll do&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;Work with a fast-growing team to revolutionize finance at speed and scale&lt;/li&gt;\n&lt;li&gt;Build smooth, stable, and elegant products with Kotlin and the newest Android APIs&lt;/li&gt;\n&lt;li&gt;Own features from inception to design, implementation, and launch&lt;/li&gt;\n&lt;li&gt;Work cross-functionally with Product Designers, Product Managers, Backend Developers, and Data team&lt;/li&gt;\n&lt;li&gt;Work with Kotlin, Android SDK &amp;amp; Jetpack Compose, MVVM, Coroutines &amp;amp; Flow (preferred) OR RxJava, and Retrofit &amp;amp; Room&lt;/li&gt;\n&lt;/ul&gt;\n&lt;h2&gt;What you bring&lt;/h2&gt;\n&lt;ul&gt;\n&lt;li&gt;3+ years of professional Android development experience building consumer Android applications at scale, preferably in Kotlin and Compose&lt;/li&gt;\n&lt;li&gt;Attention to detail, passion for writing clean, readable and maintainable code&lt;/li&gt;\n&lt;li&gt;Proficiency in Kotlin or Java, and Jetpack&lt;/li&gt;\n&lt;li&gt;Desire to improve Robinhood&#39;s app and codebase to ensure outstanding quality for our all users&lt;/li&gt;\n&lt;li&gt;Strong product sense and ability to collaborate with Product Managers and Designers&lt;/li&gt;\n&lt;li&gt;Excellent communication skills and passion for solving technical challenges&lt;/li&gt;\n&lt;li&gt;Bachelor’s degree in Computer Science or a related field preferred; eq",
+  "departments": [
+    {
+      "name": "ENG Infrastructure"
+    }
+  ]
+}

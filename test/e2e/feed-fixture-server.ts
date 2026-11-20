@@ -109,6 +109,7 @@ export interface FixtureStats {
   maxInFlight: number;
   arrivalGapsMs: number[];
   paths: string[];
+  urls: string[];
   detailCounts: Record<string, number>;
   questionsRequests: number;
   perAts: Record<Ats, AtsStats>;
@@ -635,6 +636,7 @@ export async function startFeedFixtureServer() {
 
   const paths: string[] = [];
   let questionsRequests = 0;
+  const urls: string[] = [];
 
   function mutateGreenhouse(token: string, mutation: BoardMutation) {
     const existingGreenhouseJobs = greenhouseBoards.get(token);
@@ -808,6 +810,7 @@ export async function startFeedFixtureServer() {
     state.maxInFlight = Math.max(state.maxInFlight, state.inFlight);
     arrivalTimes.push(now);
     paths.push(`${pathname}${search}`);
+    urls.push(request.url ?? pathname);
 
     requestWaiters.shift()?.(pathname);
 
@@ -976,6 +979,7 @@ export async function startFeedFixtureServer() {
       maxInFlight: state.maxInFlight,
       arrivalGapsMs: arrivalTimes.slice(1).map((time, index) => time - (arrivalTimes[index] ?? 0)),
       paths: [...paths],
+      urls: [...urls],
       detailCounts: { ...detailCounts },
       questionsRequests,
       perAts: {

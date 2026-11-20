@@ -406,8 +406,26 @@ async function writeBoard(
   );
 }
 
-const targets = process.argv.slice(2).map((arg) => arg.toLowerCase());
-const wants = (ats: string) => targets.length === 0 || targets.includes(ats);
+const targetNames: string[] = [];
+const targetSlugs = new Map<string, string[]>();
+
+for (const argument of process.argv.slice(2)) {
+  const [name, list] = argument.toLowerCase().split(":");
+
+  if (name !== undefined) {
+    targetNames.push(name);
+
+    if (list !== undefined) {
+      targetSlugs.set(
+        name,
+        list.split(",").filter((slug) => slug !== ""),
+      );
+    }
+  }
+}
+
+const wants = (ats: string) => targetNames.length === 0 || targetNames.includes(ats);
+const candidatesFor = (target: string, fallback: string[]) => targetSlugs.get(target) ?? fallback;
 
 const greenhouseRecorded = (
   await Promise.all(
@@ -562,7 +580,11 @@ async function scanGreenhouse(boardToken: string) {
 
 if (wants("greenhouse-extra")) {
   const scans = (
-    await Promise.all(GREENHOUSE_CANDIDATES.map(async (boardToken) => scanGreenhouse(boardToken)))
+    await Promise.all(
+      candidatesFor("greenhouse-extra", GREENHOUSE_CANDIDATES).map(async (boardToken) =>
+        scanGreenhouse(boardToken),
+      ),
+    )
   ).flatMap((scan) => (scan === null ? [] : [scan]));
 
   process.stdout.write(`greenhouse scan\n${JSON.stringify(scans, null, 2)}\n`);
@@ -623,7 +645,9 @@ async function writeLeverRegion(region: "us" | "eu", boardToken: string) {
 if (wants("lever-all")) {
   const scans = (
     await Promise.all(
-      LEVER_CANDIDATES.map(async (boardToken) => writeLeverRegion("us", boardToken)),
+      candidatesFor("lever-all", LEVER_CANDIDATES).map(async (boardToken) =>
+        writeLeverRegion("us", boardToken),
+      ),
     )
   ).flatMap((scan) => (scan === null ? [] : [scan]));
 
@@ -633,7 +657,7 @@ if (wants("lever-all")) {
 if (wants("lever-eu")) {
   const pairs = (
     await Promise.all(
-      LEVER_EU_CANDIDATES.map(async (boardToken) => {
+      candidatesFor("lever-eu", LEVER_EU_CANDIDATES).map(async (boardToken) => {
         const eu = await writeLeverRegion("eu", boardToken);
 
         if (eu === null) {
@@ -664,7 +688,7 @@ interface AshbyScan {
 if (wants("ashby-extra")) {
   const scans = (
     await Promise.all(
-      ASHBY_CANDIDATES.map(async (boardToken) => {
+      candidatesFor("ashby-extra", ASHBY_CANDIDATES).map(async (boardToken) => {
         const board = await ashbyLimiter.run(async () =>
           tryFetchJson(
             `${ASHBY_DEFAULT_BASE_URL}/posting-api/job-board/${boardToken}?includeCompensation=true`,
