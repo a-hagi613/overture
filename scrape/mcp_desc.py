@@ -127,7 +127,7 @@ def md_to_text(md: str) -> str:
 
 
 def queue(con: sqlite3.Connection, priority: str, limit: int | None,
-          sources: str | None = None) -> list[tuple[str, str]]:
+          sources: str | None = None, since: str | None = None) -> list[tuple[str, str]]:
     # Sources whose apply forms work without a sign-in: Overture can auto-apply
     # only to these, so their descriptions/copy are what the app consumes first.
     where = "d.status='pending' AND j.requisition_id IS NOT NULL"
@@ -136,6 +136,9 @@ def queue(con: sqlite3.Connection, priority: str, limit: int | None,
         vals = [s.strip() for s in sources.split(",") if s.strip()]
         where += f" AND j.source IN ({','.join('?' * len(vals))})"
         args.extend(vals)
+    if since:
+        where += " AND date(j.published_at) >= date(?)"
+        args.append(since)
     if priority == "se":
         like = " OR ".join("lower(j.title) LIKE ?" for _ in SE_TITLE)
         depts = ",".join("?" * len(SE_DEPTS))
@@ -165,6 +168,8 @@ def main() -> None:
     ap.add_argument("--sources", default=None,
                     help="comma-separated ATS sources to restrict to "
                          "(e.g. grnhse,lever,ashby); default: all sources")
+    ap.add_argument("--since", default=None,
+                    help="only jobs published on/after this date (YYYY-MM-DD)")
     a = ap.parse_args()
 
     global RATE
@@ -177,7 +182,7 @@ def main() -> None:
         con.execute("ALTER TABLE descriptions ADD COLUMN markdown TEXT")
         con.commit()
 
-    rows = queue(con, a.priority, None if a.all else a.limit, a.sources)
+    rows = queue(con, a.priority, None if a.all else a.limit, a.sources, a.since)
     log(f"{len(rows):,} descriptions queued (priority={a.priority}, workers={a.workers})")
     if not rows:
         return

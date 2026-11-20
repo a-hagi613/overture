@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Overnight seed crawl, phase 1.
+# Overnight seed crawl — one-week scope (owner decision: Nov 13 → Nov 20, 2026).
 #
 # Chain:
-#   1. wait for the running 10k description backfill (mcp_desc.py) to exit
-#   2. enumerate the full month (auto-bisect date → workplace×role) at the safe rate
-#   3. backfill descriptions for everything the enumeration added
+#   1. wait for the running week description backfill (mcp_desc.py) to exit
+#   2. enumerate 2026-11-13..2026-11-20 (auto-bisect date → workplace×role) at the safe rate
+#   3. backfill descriptions for the week's jobs from no-sign-in ATS sources
 #   4. install + enable the hourly systemd sync timer so the pipeline self-runs
 #
 # Everything resumes on rerun: shards/pages track progress, jobs dedupe on object_id.
@@ -19,12 +19,12 @@ echo "[chain $(date +%H:%M:%S)] refreshing cookies from the Orca browser"
 $PY scrape/hiringcafe.py cookies >/dev/null 2>&1 \
   || echo "[chain] WARNING: cookie refresh failed (browser tab unavailable) — using data/cookies.txt as-is"
 
-echo "[chain $(date +%H:%M:%S)] full-month enumeration"
-$PY -u scrape/hiringcafe.py enumerate --from 2026-10-20 --to 2026-11-20 \
+echo "[chain $(date +%H:%M:%S)] week enumeration (2026-11-13 .. 2026-11-20)"
+$PY -u scrape/hiringcafe.py enumerate --from 2026-11-13 --to 2026-11-20 \
     --rps 0.8 --window 80 --window-s 600 >> data/enumerate.log 2>&1
 
-echo "[chain $(date +%H:%M:%S)] description mop-up (no-sign-in ATS sources only)"
-$PY -u scrape/mcp_desc.py --all --rps 1.5 --workers 4 --sources \
+echo "[chain $(date +%H:%M:%S)] description mop-up: no-sign-in ATS sources, this week only"
+$PY -u scrape/mcp_desc.py --all --rps 1.5 --workers 4 --since 2026-11-13 --sources \
 	grnhse,lever,eu_lever,ashby,bamboohr,smartrecruiters,workable,recruitee,jazzhr,rippling,teamtailor,breezy,jobvite,pinpoint \
 	>> data/mcp_desc.log 2>&1
 
