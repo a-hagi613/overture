@@ -210,6 +210,35 @@ test("per-form metrics land in probe_forms after the session is stopped", async 
   });
 });
 
+test("proxy usage that settles only on a later read after the stop is still recorded in full", async () => {
+  await withHarness(async (harness) => {
+    harness.browserUse.readsBeforeFinalUsage = 2;
+
+    const results = await runProbe(
+      command(harness, false, {
+        runFile: singlePostingRunFile(harness, posting("blankstreet", "8004209003")),
+      }),
+    );
+
+    const [result] = results;
+
+    if (result === undefined) {
+      throw new Error("no result for the late usage posting");
+    }
+
+    const [form] = storedForms(harness);
+
+    if (form === undefined) {
+      throw new Error("no stored form");
+    }
+
+    expect(form.proxyMb).toBeCloseTo(2.71, 3);
+    expect(form.costUsd).toBeCloseTo(0.0288, 4);
+    expect(form.browserMinutes).toBeCloseTo(556 / 60, 2);
+    expect(result.proxyMb).toBeCloseTo(2.71, 3);
+  });
+});
+
 test("the probe refuses to run off Fly", async () => {
   await withHarness(async (harness) => {
     let refusal = null;

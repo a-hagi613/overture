@@ -18,6 +18,9 @@ export const COST_GATE_USD = 0.03;
 export const SESSION_TIMEOUT_MINUTES = 15;
 export const PROBE_METADATA_PURPOSE = "early_cloud_probe";
 
+const USAGE_SETTLE_INTERVAL_MS = 1000;
+const USAGE_SETTLE_DEADLINE_MS = 120_000;
+
 export class ProbeRefusedError extends Error {
   constructor(message: string) {
     super(message);
@@ -106,6 +109,39 @@ const attemptOutcome = (attempt: GreenhouseAttempt | null, fallback: string) => 
   return attempt.outcome === "fill_failed"
     ? `fill_failed: ${attempt.failedIds.join(", ")}`
     : attempt.outcome;
+};
+
+const settledUsage = (view: BrowserSession) =>
+  toPositiveNumber(view.proxyUsedMb) > 0 && toPositiveNumber(view.proxyCost) > 0;
+
+const readSession = async (client: ReturnType<typeof BrowserUseClient>, sessionId: string) => {
+  try {
+    return await client.getSession(sessionId);
+  } catch {
+    return null;
+  }
+};
+
+const finalSessionView = async (
+  client: ReturnType<typeof BrowserUseClient>,
+  sessionId: string,
+  clock: Clock,
+) => {
+  const deadline = clock.now() + USAGE_SETTLE_DEADLINE_MS;
+
+  const readUntilSettled = async (view: BrowserSession | null) => {
+    if ((view !== null && settledUsage(view)) || clock.now() >= deadline) {
+      return view;
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, USAGE_SETTLE_INTERVAL_MS);
+    });
+
+    return readUntilSettled(await readSession(client, sessionId));
+  };
+
+  return readUntilSettled(await readSession(client, sessionId));
 };
 
 export async function runProbe(deps: ProbeDeps) {
@@ -220,11 +256,7 @@ async function runPosting(
   let view: BrowserSession | null = null;
 
   if (session !== null) {
-    try {
-      view = await client.getSession(session.id);
-    } catch {
-      view = null;
-    }
+    view = await finalSessionView(client, session.id, deps.clock);
   }
 
   const proxyMb = toPositiveNumber(view === null ? null : view.proxyUsedMb);
