@@ -69,6 +69,14 @@ for (const width of widths) {
             await expect(page.getByText("Link sent to")).toBeVisible();
           }
 
+          await page.evaluate(() => {
+            const active = document.activeElement;
+
+            if (active instanceof HTMLElement) {
+              active.blur();
+            }
+          });
+
           await expect(page).toHaveScreenshot(`${String(width)}-${theme}-${mode}.png`, {
             animations: "disabled",
             caret: "hide",

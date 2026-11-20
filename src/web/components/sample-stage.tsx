@@ -11,13 +11,15 @@ export function SampleStage() {
         aria-hidden="true"
         className="absolute inset-x-4 top-0 flex h-[86px] -rotate-[1.2deg] items-start justify-between gap-3 rounded-[11px] border border-border bg-muted p-3 px-4 opacity-[0.92]"
       >
-        <div className="flex items-center gap-3">
-          <span className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-md bg-foreground font-serif text-lg italic text-background">
+        <div className="flex items-center gap-[9px]">
+          <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[4px] bg-foreground font-serif text-[13px] italic text-background">
             {v.backdropMonogram}
           </span>
-          <span className="text-[13px] font-semibold [line-height:normal]">{v.backdropRole}</span>
+          <span className="text-[12.5px] font-semibold text-muted-foreground">
+            {v.backdropRole}
+          </span>
         </div>
-        <span className="font-mono text-[12.5px] text-muted-foreground [line-height:normal]">
+        <span className="font-mono text-[11px] text-muted-foreground [line-height:normal]">
           {v.backdropQueue}
         </span>
       </div>
@@ -40,7 +42,7 @@ export function SampleStage() {
             <ReceiptRow ask={ask} fact={v.facts[index] ?? ""} key={ask} />
           ))}
         </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-[13px]">
           <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
             {v.receiptStamp}
           </span>

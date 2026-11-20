@@ -62,7 +62,7 @@ export function SignInStory() {
               <span className="font-mono text-[11px] text-signal-text [line-height:normal]">
                 {pillar.n}
               </span>
-              <span className="text-[13px] font-semibold [line-height:normal]">{pillar.title}</span>
+              <span className="text-[13px] font-semibold">{pillar.title}</span>
               <span className="text-xs leading-[1.45] text-muted-foreground">{pillar.detail}</span>
             </div>
           ))}
