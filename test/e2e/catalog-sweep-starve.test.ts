@@ -8,7 +8,7 @@ const HEALTH_BUDGET_MS = 1000;
 const MIN_SAMPLES = 40;
 const GREENHOUSE_JOBS = 900;
 const ASHBY_JOBS = 900;
-const HEAVY_GREENHOUSE_JOBS = 400;
+const HEAVY_GREENHOUSE_JOBS = 900;
 
 const GREENHOUSE_BOARDS = [
   "bulk-greenhouse-one",
@@ -30,7 +30,7 @@ const BOARDS: BoardSpec[] = [
   {
     ats: "greenhouse" as const,
     token: HEAVY_GREENHOUSE_BOARD,
-    bulk: { jobCount: HEAVY_GREENHOUSE_JOBS, descriptionKb: 8 },
+    bulk: { jobCount: HEAVY_GREENHOUSE_JOBS, sourceToken: "stripe" },
   },
   ...ASHBY_BOARDS.map((token) => ({
     ats: "ashby" as const,

@@ -139,10 +139,16 @@ const boardSpecSchema = z.union([
     ats: z.enum(["greenhouse", "lever", "ashby"]),
     token: z.string().min(1),
     bulk: z
-      .object({
-        jobCount: z.number().int().min(1).max(2000),
-        descriptionKb: z.number().int().min(1).max(64),
-      })
+      .union([
+        z.object({
+          jobCount: z.number().int().min(1).max(2000),
+          descriptionKb: z.number().int().min(1).max(64),
+        }),
+        z.object({
+          jobCount: z.number().int().min(1).max(2000),
+          sourceToken: z.string().min(1),
+        }),
+      ])
       .optional(),
   }),
 ]);

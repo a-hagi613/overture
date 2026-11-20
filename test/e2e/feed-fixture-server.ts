@@ -171,10 +171,17 @@ interface MutableAshbyJob {
   compensation: unknown;
 }
 
-export interface BulkBoardSpec {
+export interface SyntheticBoardSpec {
   jobCount: number;
   descriptionKb: number;
 }
+
+export interface ReplayedBoardSpec {
+  jobCount: number;
+  sourceToken: string;
+}
+
+export type BulkBoardSpec = SyntheticBoardSpec | ReplayedBoardSpec;
 
 export interface FixtureJob {
   atsJobId: string;
@@ -223,7 +230,7 @@ function bulkPlain(kb: number, seed: number) {
   return paragraph.repeat(Math.ceil((kb * 1024) / paragraph.length));
 }
 
-function bulkGreenhouseJobs(token: string, spec: BulkBoardSpec) {
+function bulkGreenhouseJobs(token: string, spec: SyntheticBoardSpec) {
   return Array.from({ length: spec.jobCount }, (_unused, index) => ({
     id: `gh-${token}-${String(index)}`,
     title: pick(BULK_TITLES, index),
@@ -237,7 +244,33 @@ function bulkGreenhouseJobs(token: string, spec: BulkBoardSpec) {
   }));
 }
 
-function bulkLeverJobs(token: string, spec: BulkBoardSpec) {
+function replayedGreenhouseJobs(
+  token: string,
+  source: MutableGreenhouseJob[],
+  spec: ReplayedBoardSpec,
+) {
+  return Array.from({ length: spec.jobCount }, (_unused, index) => {
+    const template = source[index % source.length];
+
+    if (template === undefined) {
+      throw new Error(`the ${spec.sourceToken} fixture has no recorded jobs`);
+    }
+
+    return {
+      id: `gh-${token}-${String(index)}`,
+      title: template.title,
+      absoluteUrl: `https://boards.example.com/${token}/jobs/${String(index)}`,
+      locationName: template.locationName,
+      updatedAt: template.updatedAt,
+      firstPublished: template.firstPublished,
+      language: template.language,
+      content: template.content,
+      departments: template.departments,
+    };
+  });
+}
+
+function bulkLeverJobs(token: string, spec: SyntheticBoardSpec) {
   return Array.from({ length: spec.jobCount }, (_unused, index) => {
     const location = pick(BULK_LOCATIONS, index);
 
@@ -262,7 +295,7 @@ function bulkLeverJobs(token: string, spec: BulkBoardSpec) {
   });
 }
 
-function bulkAshbyJobs(token: string, spec: BulkBoardSpec) {
+function bulkAshbyJobs(token: string, spec: SyntheticBoardSpec) {
   return Array.from({ length: spec.jobCount }, (_unused, index) => ({
     id: `ash-${token}-${String(index)}`,
     title: pick(BULK_TITLES, index),
@@ -869,14 +902,21 @@ export async function startFeedFixtureServer() {
     },
     seedBoard: (ats, token, spec) => {
       if (ats === "greenhouse") {
-        greenhouseBoards.set(token, bulkGreenhouseJobs(token, spec));
+        if ("sourceToken" in spec) {
+          greenhouseBoards.set(
+            token,
+            replayedGreenhouseJobs(token, greenhouseBoards.get(spec.sourceToken) ?? [], spec),
+          );
+        } else {
+          greenhouseBoards.set(token, bulkGreenhouseJobs(token, spec));
+        }
       }
 
-      if (ats === "lever") {
+      if (ats === "lever" && !("sourceToken" in spec)) {
         leverBoards.set(token, bulkLeverJobs(token, spec));
       }
 
-      if (ats === "ashby") {
+      if (ats === "ashby" && !("sourceToken" in spec)) {
         ashbyBoards.set(token, bulkAshbyJobs(token, spec));
       }
     },
