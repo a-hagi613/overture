@@ -13,7 +13,7 @@
     "test/e2e/settings-and-kill-switches.test.ts": 0.1,
     "test/e2e/admin-gates.test.ts": 3.4,
     "test/e2e/catalog-search-filters.test.ts": 13.9,
-    "test/e2e/cloud-probe.test.ts": 121.2,
+    "test/e2e/cloud-probe.test.ts": 134.2,
     "test/e2e/reachability.test.ts": 3.1,
     "test/e2e/tag-llm-fallback.test.ts": 11.2,
     "test/e2e/board-match-signin.test.ts": 45.4,

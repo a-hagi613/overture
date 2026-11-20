@@ -7,6 +7,7 @@
         "/__test__/auth/state",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api",
         "/api/kill-switches",
@@ -14,12 +15,15 @@
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/admin-catalog.test.ts": {
@@ -34,19 +38,23 @@
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/tag-imports",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api"
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/catalog/tag-import.ts",
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/admin-gates.test.ts": {
@@ -56,20 +64,24 @@
         "/__test__/auth/state",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api",
         "/overview"
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/catalog/tag-import.ts",
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/admin-passkey.test.ts": {
@@ -79,17 +91,21 @@
         "/__test__/clock/offset",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api"
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/admin-visual.test.ts": {
@@ -98,22 +114,45 @@
         "/__test__/auth/state",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api"
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
+      ]
+    },
+    "test/e2e/backup-health-cache.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/clock/offset",
+        "/api/health"
+      ],
+      "modules": [
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/backup-lag.test.ts": {
       "full": false,
-      "paths": ["/__test__/clock", "/__test__/jobs/enqueue", "/api/health"],
+      "paths": [
+        "/__test__/clock",
+        "/__test__/jobs/enqueue",
+        "/__test__/settings/backups.replica_read_interval_ms",
+        "/api/health"
+      ],
       "modules": [
         "src/server/catalog/ashby-feed.ts",
         "src/server/catalog/board-feed.ts",
@@ -135,26 +174,48 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/board-match-profile.test.ts": {
       "full": true,
       "paths": [
         "/__test__/auth/state",
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/postings/bulk",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/turnstile",
         "/__test__/user/name",
-        "/api"
+        "/api",
+        "/api/profile/languages",
+        "/api/profile/resume",
+        "/api/profile/skip-companies",
+        "/api/profile/targets"
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/geo.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
+        "src/server/profile/facts.ts",
+        "src/server/profile/languages.ts",
+        "src/server/profile/personal-crypto.ts",
+        "src/server/profile/resume.ts",
+        "src/server/profile/skip-companies.ts",
+        "src/server/profile/targets.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/facts.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/targets.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/board-match-shell.test.ts": {
@@ -163,17 +224,21 @@
         "/__test__/auth/state",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api"
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/board-match-signin.test.ts": {
@@ -182,17 +247,21 @@
         "/__test__/auth/state",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api"
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/catalog-backfill.test.ts": {
@@ -205,7 +274,9 @@
         "/__test__/catalog/postings/bulk",
         "/__test__/clock",
         "/__test__/clock/offset",
+        "/__test__/jobs",
         "/__test__/jobs/enqueue",
+        "/__test__/settings",
         "/api/events",
         "/api/search"
       ],
@@ -230,7 +301,9 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/catalog-dedupe.test.ts": {
@@ -243,7 +316,9 @@
         "/__test__/catalog/postings/bulk",
         "/__test__/clock",
         "/__test__/clock/offset",
+        "/__test__/jobs",
         "/__test__/jobs/enqueue",
+        "/__test__/settings",
         "/api/events",
         "/api/search"
       ],
@@ -268,7 +343,9 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/catalog-discovered-seed.test.ts": {
@@ -282,7 +359,9 @@
         "/__test__/catalog/postings/bulk",
         "/__test__/clock",
         "/__test__/clock/offset",
+        "/__test__/jobs",
         "/__test__/jobs/enqueue",
+        "/__test__/settings",
         "/api/events"
       ],
       "modules": [
@@ -308,7 +387,9 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/catalog-lever-ashby.test.ts": {
@@ -321,7 +402,9 @@
         "/__test__/catalog/postings/bulk",
         "/__test__/clock",
         "/__test__/clock/offset",
+        "/__test__/jobs",
         "/__test__/jobs/enqueue",
+        "/__test__/settings",
         "/api/events",
         "/api/search"
       ],
@@ -346,7 +429,9 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/catalog-rate-limit.test.ts": {
@@ -359,7 +444,9 @@
         "/__test__/catalog/postings/bulk",
         "/__test__/clock",
         "/__test__/clock/offset",
+        "/__test__/jobs",
         "/__test__/jobs/enqueue",
+        "/__test__/settings",
         "/api/events"
       ],
       "modules": [
@@ -383,7 +470,9 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/catalog-search-filters.test.ts": {
@@ -397,9 +486,12 @@
         "/__test__/catalog/postings/bulk",
         "/__test__/clock",
         "/__test__/clock/offset",
+        "/__test__/jobs",
         "/__test__/jobs/enqueue",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/settings",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api",
         "/api/events",
@@ -407,6 +499,7 @@
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/ashby-feed.ts",
         "src/server/catalog/board-feed.ts",
         "src/server/catalog/content-hash.ts",
@@ -427,8 +520,10 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/catalog-search.test.ts": {
@@ -437,18 +532,22 @@
         "/__test__/auth/state",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api",
         "/api/search"
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/catalog-sweep-claim.test.ts": {
@@ -488,10 +587,12 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
-    "test/e2e/catalog-sweep-starve.test.ts": {
+    "test/e2e/catalog-sweep-single.test.ts": {
       "full": false,
       "paths": [
         "/__test__/catalog/boards",
@@ -501,7 +602,9 @@
         "/__test__/catalog/postings/bulk",
         "/__test__/clock",
         "/__test__/clock/offset",
+        "/__test__/jobs",
         "/__test__/jobs/enqueue",
+        "/__test__/settings",
         "/api/events",
         "/api/health"
       ],
@@ -526,10 +629,12 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
-    "test/e2e/census.test.ts": {
+    "test/e2e/catalog-sweep-starve.test.ts": {
       "full": false,
       "paths": [
         "/__test__/catalog/boards",
@@ -539,7 +644,51 @@
         "/__test__/catalog/postings/bulk",
         "/__test__/clock",
         "/__test__/clock/offset",
+        "/__test__/jobs",
         "/__test__/jobs/enqueue",
+        "/__test__/settings",
+        "/api/events",
+        "/api/health"
+      ],
+      "modules": [
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
+      ]
+    },
+    "test/e2e/catalog-unchanged-postings.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs",
+        "/__test__/jobs/enqueue",
+        "/__test__/settings",
         "/api/events"
       ],
       "modules": [
@@ -563,25 +712,27 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
-    "test/e2e/clock-and-run-due.test.ts": {
+    "test/e2e/census.test.ts": {
       "full": false,
       "paths": [
-        "/__test__/auth/state",
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/posting-tags",
+        "/__test__/catalog/postings",
+        "/__test__/catalog/postings/bulk",
         "/__test__/clock",
         "/__test__/clock/offset",
         "/__test__/jobs",
         "/__test__/jobs/enqueue",
-        "/__test__/jobs/run-due",
-        "/__test__/mail",
-        "/__test__/mail/clear",
-        "/__test__/user/name",
-        "/api"
+        "/__test__/settings",
+        "/api/events"
       ],
       "modules": [
-        "src/server/auth/index.ts",
         "src/server/catalog/ashby-feed.ts",
         "src/server/catalog/board-feed.ts",
         "src/server/catalog/content-hash.ts",
@@ -602,8 +753,53 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
+      ]
+    },
+    "test/e2e/clock-and-run-due.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs",
+        "/__test__/jobs/enqueue",
+        "/__test__/jobs/run-due",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/turnstile",
+        "/__test__/user/name",
+        "/api"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/discovery.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/language.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/llm-tagging.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/poll-board.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/salary.ts",
+        "src/server/catalog/tag-rules.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/cloud-probe.test.ts": {
@@ -629,12 +825,14 @@
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/settings/jobs.poll_interval_ms",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api",
         "/api/events"
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/ashby-feed.ts",
         "src/server/catalog/board-feed.ts",
         "src/server/catalog/content-hash.ts",
@@ -655,8 +853,10 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/job-survives-restart.test.ts": {
@@ -670,12 +870,14 @@
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/settings/jobs.poll_interval_ms",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api",
         "/api/events"
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/ashby-feed.ts",
         "src/server/catalog/board-feed.ts",
         "src/server/catalog/content-hash.ts",
@@ -696,8 +898,10 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/msw-canary.test.ts": {
@@ -711,17 +915,21 @@
         "/__test__/auth/state",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api"
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/profile-resume.test.ts": {
@@ -731,6 +939,7 @@
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/settings/llm.cap_user_day_usd",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api",
         "/api/profile/facts",
@@ -738,16 +947,107 @@
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/geo.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
         "src/server/profile/facts.ts",
+        "src/server/profile/languages.ts",
         "src/server/profile/personal-crypto.ts",
         "src/server/profile/resume.ts",
+        "src/server/profile/skip-companies.ts",
+        "src/server/profile/targets.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
         "src/shared/facts.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/targets.ts",
+        "src/shared/turnstile.ts"
+      ]
+    },
+    "test/e2e/profile-targets-ui.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/turnstile",
+        "/__test__/user/name",
+        "/api",
+        "/api/profile/languages",
+        "/api/profile/resume",
+        "/api/profile/settings",
+        "/api/profile/targets",
+        "/api/profile/targets/match-count",
+        "/settings"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/server/profile/facts.ts",
+        "src/server/profile/languages.ts",
+        "src/server/profile/personal-crypto.ts",
+        "src/server/profile/resume.ts",
+        "src/server/profile/skip-companies.ts",
+        "src/server/profile/targets.ts",
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/copy.ts",
+        "src/shared/facts.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/targets.ts",
+        "src/shared/turnstile.ts"
+      ]
+    },
+    "test/e2e/profile-targets.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/postings/bulk",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/turnstile",
+        "/__test__/user/name",
+        "/api",
+        "/api/profile/facts",
+        "/api/profile/languages",
+        "/api/profile/resume",
+        "/api/profile/settings",
+        "/api/profile/skip-companies",
+        "/api/profile/targets",
+        "/api/profile/targets/match-count"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/server/profile/facts.ts",
+        "src/server/profile/languages.ts",
+        "src/server/profile/personal-crypto.ts",
+        "src/server/profile/resume.ts",
+        "src/server/profile/skip-companies.ts",
+        "src/server/profile/targets.ts",
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/copy.ts",
+        "src/shared/facts.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/targets.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/reachability.test.ts": {
@@ -756,18 +1056,22 @@
         "/__test__/auth/state",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api",
         "/api/health"
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/settings-and-kill-switches.test.ts": {
@@ -778,6 +1082,7 @@
         "/__test__/mail",
         "/__test__/mail/clear",
         "/__test__/settings/limits.daily_cap",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api",
         "/api/kill-switches",
@@ -786,12 +1091,43 @@
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
+      ]
+    },
+    "test/e2e/settings-time-language-board.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/turnstile",
+        "/__test__/user/name",
+        "/api",
+        "/api/profile/settings",
+        "/settings"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/server/profile/languages.ts",
+        "src/server/profile/skip-companies.ts",
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/targets.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/shell.test.ts": {
@@ -800,6 +1136,7 @@
         "/__test__/auth/state",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api",
         "/settings",
@@ -807,12 +1144,15 @@
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/signin.test.ts": {
@@ -821,18 +1161,22 @@
         "/__test__/auth/state",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api",
         "/settings"
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/sse-live-and-replay.test.ts": {
@@ -842,18 +1186,22 @@
         "/__test__/events/publish",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api",
         "/api/events"
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/content-hash.ts",
         "src/server/catalog/dedupe-key.ts",
         "src/server/catalog/normalize.ts",
         "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/tag-import.test.ts": {
@@ -866,7 +1214,9 @@
         "/__test__/catalog/postings/bulk",
         "/__test__/clock",
         "/__test__/clock/offset",
+        "/__test__/jobs",
         "/__test__/jobs/enqueue",
+        "/__test__/settings",
         "/__test__/tag-imports",
         "/api/events"
       ],
@@ -892,7 +1242,9 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/tag-llm-fallback.test.ts": {
@@ -933,7 +1285,9 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     },
     "test/e2e/telemetry-redaction.test.ts": {
@@ -945,6 +1299,7 @@
         "/__test__/mail/clear",
         "/__test__/telemetry/reset",
         "/__test__/telemetry/spans",
+        "/__test__/turnstile",
         "/__test__/user/name",
         "/api",
         "/api/events",
@@ -952,6 +1307,7 @@
       ],
       "modules": [
         "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
         "src/server/catalog/ashby-feed.ts",
         "src/server/catalog/board-feed.ts",
         "src/server/catalog/content-hash.ts",
@@ -972,8 +1328,33 @@
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
         "src/server/testing/blocking-job.ts",
+        "src/server/testing/turnstile-scenario.ts",
         "src/shared/copy.ts",
-        "src/shared/tag-taxonomy.ts"
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
+      ]
+    },
+    "test/e2e/turnstile-gate.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/turnstile",
+        "/__test__/user/name",
+        "/api"
+      ],
+      "modules": [
+        "src/server/auth/index.ts",
+        "src/server/auth/turnstile-gate.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/config/env.ts",
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/copy.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/turnstile.ts"
       ]
     }
   }
