@@ -57,9 +57,13 @@ drill and every merge-to-`main` deploy therefore stay green while the one-time s
   `curl -fsS https://overture-web.fly.dev/api/health` → `{"status":"ok","database":"ok",...}`.
 - **Litestream lag is visible and a restore drill has passed once**
   Lag: `curl -fsS https://overture-web.fly.dev/api/health | jq .backups` →
-  `{"replication":"ok","lagSeconds":<n>,"replicaTxid":"…"}`. The health route reads the newest
-  replicated transaction from the replica (`litestream ltx -level 0`) on every call; `lagSeconds`
-  above ~300 s means R2 replication is falling behind. Drill: run the **Restore drill** workflow once
+  `{"replication":"ok","lagSeconds":<n>,"replicaTxid":"…"}`. `lagSeconds` measures how far the replica
+  (`replicaTxid`) is behind the local database: the health route reads the local database's latest
+  transaction id and the newest replicated one (`litestream ltx -level all` on the
+  replica) on every call, and reports `0` when they match — an idle, fully replicated database reads
+  `0` forever instead of growing without bound. When the local database has transactions the replica
+  does not hold yet, `lagSeconds` is the age in seconds of the oldest such write; above ~300 s means
+  R2 replication is falling behind. Drill: run the **Restore drill** workflow once
   (`gh workflow run "Restore drill" -R a-hagi613/overture`); it is scheduled weekly thereafter. A run
   proves a restore into a throwaway machine passed `integrity_check`, has applied migrations and
   answers `/api/health`, and the machine was destroyed.
