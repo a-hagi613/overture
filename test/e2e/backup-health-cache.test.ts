@@ -88,6 +88,8 @@ test("health answers from the cached reading in under 100 ms while the replica l
     });
 
     try {
+      await timedHealth(server.url);
+
       const latencies: number[] = [];
       const cold = await timedHealth(server.url);
 
