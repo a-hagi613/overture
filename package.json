@@ -14,7 +14,7 @@
     "lint:config": "bun run scripts/check-lint-config.ts",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "test:unit": "vitest run",
+    "test:unit": "bun test src",
     "test:e2e": "bun node_modules/playwright/cli.js test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/server/platform/db/migrate.ts",
@@ -67,7 +67,6 @@
     "oxlint": "^1.94.0",
     "oxlint-tsgolint": "^7.0.2007",
     "tailwindcss": "^4.3.5",
-    "vite": "^8.3.8",
-    "vitest": "^5.1.1"
+    "vite": "^8.3.8"
   }
 }

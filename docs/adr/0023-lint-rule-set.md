@@ -29,7 +29,7 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
 
 - **No disable directives.** Any `oxlint-disable`, `eslint-disable` or `@ts-ignore` comment is an error. `no-comments`
   runs with an empty `allow` list, so `// WARNING:` notes are errors too.
-- **Six unit test files only.** A Vitest file is allowed only beside the six invariants in ADR 0013 (ledger, crypto,
+- **Six unit test files only.** A unit test file is allowed only beside the six invariants in ADR 0013 (ledger, crypto,
   planner, address, tag rules, question normalisation), by an explicit path allowlist. Any other unit test file is an
   error. Every other test is a Playwright end-to-end test.
 - **The off-list and every scoped override are checked.** CI fails if the rules turned off in the configuration
@@ -54,7 +54,7 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
 | `react_perf/*` | The React Compiler memoises; hand-written `useCallback`/`useMemo` is noise |
 | `jsdoc/require-param-type`, `jsdoc/require-returns-type` | TypeScript carries the types; JSDoc only on port interfaces |
 | `typescript/prefer-readonly-parameter-types` | Fails on most library types (React props, `Request`) |
-| `jest/*` that require Jest globals, hooks bans or assertion counts | The six unit files use Vitest; the Vitest rules apply instead |
+| `jest/*` that require Jest globals, hooks bans or assertion counts | The six unit files use `bun:test`; the Vitest rules apply instead |
 
 Everything else in Landmines' configuration's off-list is inherited unchanged; the inherited rules are written out
 below so that CI can check the configuration against this file.
