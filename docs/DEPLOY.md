@@ -16,8 +16,8 @@ No secret value ever appears in this repository: secrets are set with `fly secre
 | `litestream.yml` | Continuous replication (1 s sync) to R2 `overture-backups`, nightly snapshot (`interval: 24h`) kept 30 days (`retention: 720h`) |
 | `fly.toml` | App `overture-web`, region `yyz`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health` |
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`) and a `restore-drill` job (Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations) |
-| `.github/workflows/deploy.yml` | After CI succeeds on `main`: `flyctl deploy --remote-only` with `FLY_API_TOKEN`, then polls the production health route |
-| `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): restores from R2 into a throwaway Fly machine, checks it, destroys the machine |
+| `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: `flyctl deploy --remote-only` with `FLY_API_TOKEN`, then polls the production health route |
+| `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks it, destroys the machine |
 | `scripts/check-restored-db.ts` | Restored-database checks: PRAGMA `integrity_check`, applied-migration count, per-table row counts, optional health-route probe |
 | `scripts/restore-drill.ts` | `DRILL_TARGET=local` (CI round-trip) or `DRILL_TARGET=fly` (throwaway machine drill) |
 
@@ -42,6 +42,11 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    `fly certs add tryoverture.com -a overture-web`. `tryoverture.com` is already registered.
 
 Merge to `main` and watch the first run of the **Deploy** workflow.
+
+Until step 6 is done, the **Deploy** and **Restore drill** workflows do not go red: their first step
+maps the `FLY_API_TOKEN` repository secret to an environment variable and skips the remaining steps
+successfully, with a `::notice::` annotation and a job summary pointing at this document. The weekly
+drill and every merge-to-`main` deploy therefore stay green while the one-time steps are pending.
 
 ## Verifying the acceptance criteria
 
@@ -71,3 +76,22 @@ Merge to `main` and watch the first run of the **Deploy** workflow.
 The throwaway machine runs the same image with `LITESTREAM_RESTORE_ONLY=true`: it restores from R2 and
 serves the app from an empty ephemeral filesystem. It never mounts the production volume and never
 runs a Litestream replicator, so the drill cannot overwrite or contend with the live backup.
+
+## Runtime security
+
+- **The container runs unprivileged.** The runtime image creates a dedicated system user `app`
+  (uid/gid `10001`, nologin shell). The entrypoint itself starts as root for exactly one purpose —
+  Fly mounts volumes as root, so it fixes the ownership of the data directory — and then re-execs
+  itself as `app` via `gosu` without ever returning to root. The only long-running processes are
+  therefore `litestream replicate` and the Bun server, both as uid `10001`. Verified locally with
+  `docker top` after an image run.
+- **No secret is baked into the image or printed in logs.** Neither Dockerfile stage copies anything
+  beyond built artifacts (`dist/`, `src/`, `drizzle/`, `scripts/`, `litestream.yml`) — there is no
+  `.env` or credential file in the runtime layers. R2 credentials reach Litestream only at start as
+  environment variables set by `fly secrets set` (deploy step 5 above): `litestream.yml` references
+  them as `${R2_ACCOUNT_ID}`, `${R2_ACCESS_KEY_ID}` and `${R2_SECRET_ACCESS_KEY}`, and the
+  entrypoint passes the config they live in to `litestream replicate`. The workflows never echo
+  `FLY_API_TOKEN`; the guard step maps the secret to an environment variable and only tests emptiness.
+- **Third-party Actions are SHA-pinned.** `superfly/flyctl-actions/setup-flyctl` and
+  `oven-sh/setup-bun` are pinned to full commit SHAs (with the ref noted in the step name); only
+  first-party `actions/*` actions keep their version tags.

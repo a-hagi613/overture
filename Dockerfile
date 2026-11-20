@@ -14,8 +14,9 @@ FROM oven/bun:1.4.5-slim AS runtime
 ARG LITESTREAM_VERSION=0.5.18
 ARG LITESTREAM_ASSET=litestream-${LITESTREAM_VERSION}-linux-x86_64.tar.gz
 
+# gosu drops privileges in the entrypoint; there is no way back to root after that.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates curl \
+  && apt-get install -y --no-install-recommends ca-certificates curl gosu \
   && rm -rf /var/lib/apt/lists/* \
   && curl -fsSLo "/tmp/${LITESTREAM_ASSET}" "https://github.com/benbjohnson/litestream/releases/download/v${LITESTREAM_VERSION}/${LITESTREAM_ASSET}" \
   && curl -fsSLo /tmp/checksums.txt "https://github.com/benbjohnson/litestream/releases/download/v${LITESTREAM_VERSION}/checksums.txt" \
@@ -35,7 +36,18 @@ COPY --from=build /app/drizzle ./drizzle
 COPY --from=build /app/scripts ./scripts
 COPY litestream.yml /etc/litestream.yml
 
-RUN chmod 0755 /app/scripts/docker-entrypoint.sh
+RUN chmod 0755 /app/scripts/docker-entrypoint.sh \
+  && groupadd --system --gid 10001 app \
+  && useradd --system --uid 10001 --gid app --home-dir /home/app --shell /usr/sbin/nologin app \
+  && chown -R app:app /app /etc/litestream.yml
+
+# The entrypoint starts as root for exactly one purpose: Fly mounts volumes as
+# root, so it fixes the ownership of the data directory before anything else,
+# then re-execs itself as the unprivileged `app` user (see
+# scripts/docker-entrypoint.sh). No secret is baked into the image or any
+# build stage; runtime credentials arrive only via Fly secrets as environment
+# variables at start.
+USER root
 
 ENV NODE_ENV=production \
   DATABASE_PATH=/data/app.sqlite \

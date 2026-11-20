@@ -18,14 +18,38 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
+      - name: Skip unless FLY_API_TOKEN is set (docs/DEPLOY.md, one-time step 6)
+        id: guard
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::notice::FLY_API_TOKEN is not set yet (docs/DEPLOY.md one-time step 6); skipping deploy."
+            {
+              echo "### Deploy skipped"
+              echo ""
+              echo "The \`FLY_API_TOKEN\` repository secret is not set yet (see docs/DEPLOY.md, one-time step 6)."
+              echo "Nothing was deployed. Once \`gh secret set FLY_API_TOKEN\` is done, the next"
+              echo "successful CI run on \`main\` deploys as usual."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
+        if: steps.guard.outputs.skip != 'true'
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: flyctl deploy --remote-only
+      - name: Set up flyctl (superfly/flyctl-actions/setup-flyctl @ master @ 98172f7)
+        if: steps.guard.outputs.skip != 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
+      - name: Deploy to Fly
+        if: steps.guard.outputs.skip != 'true'
+        run: flyctl deploy --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       - name: Check the health route in production
+        if: steps.guard.outputs.skip != 'true'
         run: |
           for attempt in $(seq 1 24); do
             if curl -fsS https://overture-web.fly.dev/api/health | tee /tmp/health.json; then
