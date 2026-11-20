@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { DatabaseWriter } from "../platform/db/client.ts";
 import { postings, postingTags } from "../platform/db/schema.ts";
 
 import type { PostingTags, SalaryPeriod, TagSource } from "../../shared/tag-taxonomy.ts";
@@ -25,7 +25,7 @@ export function salaryPeriodForColumn(period: SalaryPeriod | null) {
 }
 
 export function writePostingTags(
-  db: AppDatabase,
+  db: DatabaseWriter,
   postingId: string,
   writes: readonly TagWrite[],
   now: number,
@@ -91,7 +91,7 @@ export function rowsForTags(tags: PostingTags) {
 }
 
 export function storePostingTags(
-  db: AppDatabase,
+  db: DatabaseWriter,
   postingId: string,
   tags: PostingTags,
   now: number,
