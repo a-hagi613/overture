@@ -1,42 +1,44 @@
+import type { ReactNode } from "react";
+
 import { copy } from "../../shared/copy.ts";
 
-interface FactRowProps {
+export function FactRow(props: {
+  action: "edit" | "read-only";
+  chip: ReactNode;
+  kind?: "mono" | "serif";
   label: string;
+  note: string;
   value: string;
-  chip: string;
-  chipNote?: string;
-  detail?: string;
-  usedIn?: number;
-}
+}) {
+  const actionText =
+    props.action === "read-only" ? copy.profile.facts.readOnly : copy.profile.facts.edit;
 
-export function FactRow(props: FactRowProps) {
+  const actionAria = copy.profile.facts.aria(props.label, actionText);
+
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-border py-5 last:border-b-0">
-      <div className="min-w-0">
-        <p className="text-sm font-semibold">{props.label}</p>
-        <p className="mt-1.5 font-serif text-[22px] leading-[1.1]">{props.value}</p>
-        <div className="mt-2.5 flex flex-wrap items-baseline gap-3">
-          <span className="rounded-full bg-card px-3 py-1 text-[11px] font-semibold">
-            {props.chip}
-          </span>
-          {props.chipNote !== undefined && (
-            <span className="text-sm font-semibold">{props.chipNote}</span>
-          )}
-          {props.usedIn !== undefined && (
-            <span className="text-[12.5px] text-muted-foreground">
-              {copy.profile.facts.usedIn(props.usedIn)}
-            </span>
-          )}
+    <div className="flex flex-wrap items-center gap-x-5 border-t border-border py-4">
+      <div className="min-w-0 flex-[1_1_340px]">
+        <p className="text-sm font-semibold leading-[1.4]">{props.label}</p>
+        <p
+          className={
+            props.kind === "mono"
+              ? "break-words font-mono text-sm leading-[1.5]"
+              : "font-serif text-[22px] leading-[1.2]"
+          }
+        >
+          {props.value}
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          {props.chip}
+          <span className="text-[12.5px] text-muted-foreground tabular-nums">{props.note}</span>
         </div>
-        {props.detail !== undefined && (
-          <p className="mt-1 text-[11px] font-semibold text-muted-foreground">{props.detail}</p>
-        )}
       </div>
       <button
-        className="h-10 flex-none rounded-md text-[13.5px] font-semibold hover:bg-muted"
+        aria-label={actionAria}
+        className="min-h-10 flex-none px-3.5 text-[13.5px] leading-[normal] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground max-[767px]:min-h-11"
         type="button"
       >
-        {copy.profile.edit}
+        {actionText}
       </button>
     </div>
   );
