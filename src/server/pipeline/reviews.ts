@@ -91,6 +91,7 @@ function attachmentsFor(db: AppDatabase, reviewId: string) {
     .innerJoin(postings, eq(postings.id, applications.postingId))
     .innerJoin(companies, eq(companies.id, postings.companyId))
     .where(eq(reviewApplications.reviewId, reviewId))
+    .orderBy(applications.createdAt, applications.id)
     .all();
 }
 

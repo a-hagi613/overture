@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -150,7 +150,13 @@ export function createQuestionCatalog(deps: { db: AppDatabase; clock: Clock }) {
         fieldType: questions.fieldType,
       })
       .from(questions)
-      .where(and(inArray(questions.id, [...questionIds]), eq(questions.answerKind, "unknown")))
+      .where(
+        and(
+          inArray(questions.id, [...questionIds]),
+          eq(questions.answerKind, "unknown"),
+          isNull(questions.mappedBy),
+        ),
+      )
       .all();
   }
 

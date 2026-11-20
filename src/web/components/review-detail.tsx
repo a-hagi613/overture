@@ -97,7 +97,7 @@ export function ReviewDetail({
           <span className="inline-flex items-center rounded-full bg-need-soft px-2.5 py-0.5 text-[11.5px] font-semibold text-need">
             {copy.review.needsYou}
           </span>
-          <span className="text-[11px] font-semibold uppercase tracking-[.15em] text-muted-foreground">
+          <span className="text-[11px] font-semibold uppercase leading-[13px] tracking-[.15em] text-muted-foreground">
             {copy.review.categories[review.category]}
           </span>
         </div>
@@ -111,12 +111,12 @@ export function ReviewDetail({
       >
         {review.prompt}
       </h2>
-      <p className="mt-2.5 max-w-[62ch] text-sm leading-[1.55] text-muted-foreground">
+      <p className="mt-2.5 max-w-[62ch] text-sm leading-[1.5] text-muted-foreground">
         {copy.review.detailNote(review.unlocked)}
       </p>
       <div className="mt-[22px] grid grid-cols-2 border-y border-border">
         <div className="py-3.5 pr-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[.15em] text-muted-foreground">
+          <p className="text-[11px] font-semibold uppercase leading-[13px] tracking-[.15em] text-muted-foreground">
             {copy.review.unlocks}
           </p>
           <p className="mt-1 flex flex-wrap items-baseline gap-2">
@@ -127,7 +127,7 @@ export function ReviewDetail({
           </p>
         </div>
         <div className="border-l border-border py-3.5 pl-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[.15em] text-muted-foreground">
+          <p className="text-[11px] font-semibold uppercase leading-[13px] tracking-[.15em] text-muted-foreground">
             {copy.review.askedBy}
           </p>
           <p className="mt-1 flex flex-wrap items-baseline gap-2">
@@ -138,7 +138,7 @@ export function ReviewDetail({
           </p>
         </div>
       </div>
-      <h3 className="mt-6 text-[11px] font-semibold uppercase tracking-[.15em] text-muted-foreground">
+      <h3 className="mt-6 text-[11px] font-semibold uppercase leading-[13px] tracking-[.15em] text-muted-foreground">
         {copy.review.queued}
       </h3>
       <div className="mt-2.5 flex flex-wrap gap-2">
@@ -162,17 +162,17 @@ export function ReviewDetail({
         ))}
       </div>
       <div className="mt-[26px] rounded-lg border border-border bg-background px-[18px] py-4">
-        <h3 className="text-[11px] font-semibold uppercase tracking-[.15em] text-muted-foreground">
+        <h3 className="text-[11px] font-semibold uppercase leading-[13px] tracking-[.15em] text-muted-foreground">
           {copy.review.closestFact}
         </h3>
-        <p className="mt-2 max-w-[56ch] text-sm leading-[1.55] text-muted-foreground">
+        <p className="mt-2 max-w-[56ch] text-sm leading-[1.5] text-muted-foreground">
           {factLabel === null
             ? copy.review.closestFactNote
             : copy.review.closestFactKnown(factLabel)}
         </p>
       </div>
       <div className="mt-[22px]">
-        <p className="mb-1.5 block text-[12.5px] font-semibold" id="rev-lbl">
+        <p className="block text-[12.5px] font-semibold leading-[16px]" id="rev-lbl">
           {copy.review.yourAnswer}
         </p>
         <ReviewAnswer onChange={setValue} review={review} value={value} />

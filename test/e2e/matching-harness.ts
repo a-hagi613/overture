@@ -126,12 +126,34 @@ export async function seedPosting(
     postedAt?: number | null;
     descriptionText?: string | null;
     tags?: { dimension: "role" | "subrole" | "seniority"; value: string }[];
+    questions?: {
+      text: string;
+      fieldType:
+        | "text"
+        | "textarea"
+        | "select"
+        | "multiselect"
+        | "radio"
+        | "checkbox"
+        | "file"
+        | "date"
+        | "number"
+        | "email"
+        | "phone"
+        | "url";
+      options?: string[];
+      required?: boolean;
+      factKey?: string | null;
+      answerKind?: "fact" | "open_text" | "consent" | "skip" | "unknown";
+      mappedBy?: "rules" | "llm" | "owner" | null;
+    }[];
   },
 ) {
   const data = {
     ...basePosting,
     ...input,
     tags: input.tags ?? basePosting.tags,
+    questions: input.questions ?? [],
   };
 
   const response = await request.post("/__test__/catalog/postings", { data });
@@ -190,10 +212,12 @@ export async function seedApplication(
     postingId: string;
     status: "preparing" | "needs_review" | "ready" | "sending" | "confirming" | "sent";
     sentAt?: number | null;
+    createdAt?: number | null;
   },
 ) {
   const response = await request.post("/__test__/applications/seed", {
     data: {
+      createdAt: input.createdAt ?? null,
       origin: "auto",
       sentAt: input.sentAt ?? null,
       status: input.status,

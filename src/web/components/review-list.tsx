@@ -31,7 +31,7 @@ export function ReviewList({
       <div className="mt-3 flex flex-col gap-1">
         {many.length > 0 ? (
           <>
-            <p className="px-3.5 pb-1.5 pt-2.5 text-[11px] font-semibold uppercase tracking-[.15em] text-muted-foreground">
+            <p className="px-3.5 pb-1.5 pt-2.5 text-[11px] font-semibold uppercase leading-[13px] tracking-[.15em] text-muted-foreground">
               {copy.review.groupMany}
             </p>
             {many.map((review) => (
@@ -50,7 +50,7 @@ export function ReviewList({
         {few.length > 0 ? (
           <>
             {many.length > 0 ? (
-              <p className="px-3.5 pb-1.5 pt-2.5 text-[11px] font-semibold uppercase tracking-[.15em] text-muted-foreground">
+              <p className="px-3.5 pb-1.5 pt-2.5 text-[11px] font-semibold uppercase leading-[13px] tracking-[.15em] text-muted-foreground">
                 {copy.review.groupFew}
               </p>
             ) : null}

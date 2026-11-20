@@ -21,6 +21,7 @@ import { createQuestionCatalog, questionInputsFromAts } from "../catalog/questio
 import {
   AFFIRMATIVE_OPTION,
   NEGATIVE_OPTION,
+  affirmativeOption,
   matchOption,
   normalizeQuestionText,
 } from "../catalog/question-normalize.ts";
@@ -68,6 +69,7 @@ const NEGATIVE_FACT_VALUES = new Set([
 
 interface ResolveInput {
   questionText: string;
+  required: boolean;
   fieldType: QuestionFieldType;
   options: readonly string[];
   answerKind: AnswerKind;
@@ -185,33 +187,93 @@ function formatFactValue(input: {
   return value;
 }
 
-function isResolved(input: ResolveInput) {
-  if (input.answerKind === "skip" || input.answerKind === "consent") {
-    return true;
+const resolveQuestion: (input: ResolveInput) => Resolution = resolveQuestionValue;
+
+const STANDARD_CONSENT =
+  /\b(?:privacy|data processing|terms|acknowledg|accuracy|double check|double-check)\b/u;
+
+const MARKETING_CONSENT =
+  /\b(?:marketing|newsletter|promotion|job alerts|talent pool|whatsapp|sms|text messages)\b/u;
+
+const RESUME_QUESTION = /\b(?:resume|cv|curriculum vitae)\b/u;
+
+type ResolutionKind = "ready" | "needs_review" | "skip";
+
+interface Resolution {
+  kind: ResolutionKind;
+  answer: string | null;
+}
+
+function consentAnswer(questionText: string, options: readonly string[]) {
+  const normalized = normalizeQuestionText(questionText);
+
+  if (!STANDARD_CONSENT.test(normalized) || MARKETING_CONSENT.test(normalized)) {
+    return null;
   }
 
+  const [single] = options;
+
+  if (options.length === 1 && single !== undefined) {
+    return single;
+  }
+
+  return affirmativeOption(options) ?? (options.length === 0 ? AFFIRMATIVE_OPTION : null);
+}
+
+const READY_REVIEW: Resolution = { kind: "needs_review", answer: null };
+
+const SKIPPED_FORM: Resolution = { kind: "skip", answer: null };
+
+function ready(answer: string | null) {
+  return { kind: "ready", answer } satisfies Resolution;
+}
+
+function resolveQuestionValue(input: ResolveInput) {
+  const { required } = input;
+
   if (input.fieldType === "file") {
-    return input.hasResume;
+    if (RESUME_QUESTION.test(normalizeQuestionText(input.questionText))) {
+      return input.hasResume || !required ? ready(null) : SKIPPED_FORM;
+    }
+
+    return required ? SKIPPED_FORM : ready(null);
+  }
+
+  if (input.answerKind === "consent") {
+    const answer = consentAnswer(input.questionText, input.options);
+
+    if (answer !== null) {
+      return ready(answer);
+    }
+
+    return required ? SKIPPED_FORM : ready(null);
+  }
+
+  if (input.answerKind === "skip") {
+    return required ? SKIPPED_FORM : ready(null);
   }
 
   if (input.answerKind !== "fact" || input.factKey === null) {
-    return false;
+    return required ? READY_REVIEW : ready(null);
   }
 
   const value = input.facts.get(input.factKey);
 
-  if (value === undefined) {
-    return false;
+  const answer =
+    value === undefined
+      ? null
+      : formatFactValue({
+          questionText: input.questionText,
+          fieldType: input.fieldType,
+          options: input.options,
+          value,
+        });
+
+  if (answer !== null) {
+    return ready(answer);
   }
 
-  return (
-    formatFactValue({
-      questionText: input.questionText,
-      fieldType: input.fieldType,
-      options: input.options,
-      value,
-    }) !== null
-  );
+  return required ? READY_REVIEW : ready(null);
 }
 
 export function createPreparationService(deps: {
@@ -227,7 +289,7 @@ export function createPreparationService(deps: {
   const factsService = createFactService({ db, clock, personal });
 
   async function loadQuestions(posting: {
-    id: string;
+    postingId: string;
     ats: "greenhouse" | "lever" | "ashby";
     atsJobId: string;
     boardToken: string;
@@ -257,7 +319,9 @@ export function createPreparationService(deps: {
       position,
     }));
 
-    const unresolved = catalog.unmapped(entries.map((entry) => entry.question.id));
+    const unresolved = catalog
+      .unmapped(entries.map((entry) => entry.question.id))
+      .filter((question) => question.fieldType !== "file");
 
     await mapQuestionsWithLlm(
       { db, clock, llm },
@@ -276,7 +340,7 @@ export function createPreparationService(deps: {
     );
 
     catalog.savePostingQuestions(
-      posting.id,
+      posting.postingId,
       entries.map((entry) => ({
         questionId: entry.question.id,
         required: entry.required,
@@ -287,7 +351,7 @@ export function createPreparationService(deps: {
 
     db.update(postings)
       .set({ questionsFetchedAt: clock.now() })
-      .where(eq(postings.id, posting.id))
+      .where(eq(postings.id, posting.postingId))
       .run();
   }
 
@@ -355,10 +419,6 @@ export function createPreparationService(deps: {
       .where(and(eq(resumes.userId, row.userId), eq(resumes.isCurrent, true)))
       .get();
 
-    if (resume === undefined) {
-      return { status: row.status, blocked: 0 };
-    }
-
     await loadQuestions(row);
 
     const factRows = await factsService.list(row.userId);
@@ -373,20 +433,27 @@ export function createPreparationService(deps: {
       options: string[];
     }[] = [];
 
+    let unsupported = false;
+
     for (const question of questionRows) {
       const options = optionsSchema.parse(JSON.parse(question.options));
 
-      const resolved = isResolved({
+      const resolution = resolveQuestion({
         questionText: question.textDisplay,
+        required: question.required,
         fieldType: question.fieldType,
         options,
         answerKind: question.answerKind,
         factKey: question.factKey,
         facts: factValues,
-        hasResume: true,
+        hasResume: resume !== undefined,
       });
 
-      if (!resolved && question.required) {
+      if (resolution.kind === "skip") {
+        unsupported = true;
+      }
+
+      if (resolution.kind === "needs_review") {
         blocked.push({
           questionId: question.questionId,
           factKey: question.factKey,
@@ -400,8 +467,22 @@ export function createPreparationService(deps: {
     syncReviews({
       userId: row.userId,
       applicationId,
-      blocked,
+      blocked: unsupported ? [] : blocked,
     });
+
+    if (unsupported) {
+      db.update(applications)
+        .set({
+          status: "skipped",
+          statusReason: "form_unsupported",
+          stage: null,
+          updatedAt: clock.now(),
+        })
+        .where(eq(applications.id, applicationId))
+        .run();
+
+      return { status: "skipped" as const, blocked: 0 };
+    }
 
     const status = blocked.length === 0 ? "ready" : "needs_review";
 
@@ -446,10 +527,16 @@ export function createPreparationService(deps: {
     return catalog.forPosting(row.postingId).map((question) => {
       const options = optionsSchema.parse(JSON.parse(question.options));
 
-      const value =
-        question.answerKind === "fact" && question.factKey !== null
-          ? (factValues.get(question.factKey) ?? null)
-          : null;
+      const resolution = resolveQuestion({
+        questionText: question.textDisplay,
+        required: question.required,
+        fieldType: question.fieldType,
+        options,
+        answerKind: question.answerKind,
+        factKey: question.factKey,
+        facts: factValues,
+        hasResume: resume !== undefined,
+      });
 
       return {
         questionId: question.questionId,
@@ -458,24 +545,8 @@ export function createPreparationService(deps: {
         answerKind: question.answerKind,
         factKey: question.factKey,
         required: question.required,
-        resolved: isResolved({
-          questionText: question.textDisplay,
-          fieldType: question.fieldType,
-          options,
-          answerKind: question.answerKind,
-          factKey: question.factKey,
-          facts: factValues,
-          hasResume: resume !== undefined,
-        }),
-        answer:
-          value === null
-            ? null
-            : formatFactValue({
-                questionText: question.textDisplay,
-                fieldType: question.fieldType,
-                options,
-                value,
-              }),
+        resolved: resolution.kind === "ready",
+        answer: resolution.answer,
       };
     });
   }

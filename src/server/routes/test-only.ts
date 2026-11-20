@@ -66,6 +66,8 @@ const enqueueBody = z.object({
 
 const settingBody = z.object({ value: z.string().min(1) });
 
+const runNowBody = z.object({ kind: z.string().min(1), payload: z.string() });
+
 const killSwitchBody = z.object({
   enabled: z.boolean(),
   reason: z.string().default(""),
@@ -113,6 +115,16 @@ const postingTagBody = z.object({
   value: z.string().min(1),
 });
 
+const seedPostingQuestionBody = z.object({
+  text: z.string().min(1).max(2000),
+  fieldType: z.enum(QUESTION_FIELD_TYPES),
+  options: z.array(z.string().min(1)).max(200).default([]),
+  required: z.boolean().default(false),
+  factKey: z.string().min(1).nullish(),
+  answerKind: z.enum(["fact", "open_text", "consent", "skip", "unknown"]).default("unknown"),
+  mappedBy: z.enum(["rules", "llm", "owner"]).nullish(),
+});
+
 const sampleLedgerBody = z.object({ email: z.email() });
 
 const tamperLedgerBody = z.object({
@@ -144,6 +156,7 @@ const createPostingBody = z.object({
   salaryPeriod: z.enum(["year", "month", "hour"]).nullish(),
   postedAt: z.number().int().nullish(),
   tags: z.array(postingTagBody).max(20).default([]),
+  questions: z.array(seedPostingQuestionBody).max(40).default([]),
 });
 
 const bulkPostingsBody = z.object({
@@ -174,6 +187,7 @@ const seedApplicationBody = z.object({
     "withdrawn",
   ]),
   sentAt: z.number().int().nullable().default(null),
+  createdAt: z.number().int().nullable().default(null),
   origin: z.enum(["auto", "manual"]).default("auto"),
 });
 
@@ -202,6 +216,11 @@ const seedReviewBody = z.object({
 const userQuery = z.object({ userId: z.string().min(1) });
 
 const closePostingBody = z.object({ id: z.string().min(1) });
+
+const questionsQuery = z.object({
+  userId: z.string().min(1),
+  postingId: z.string().min(1).optional(),
+});
 
 const createUserBody = z.object({ email: z.email(), name: z.string().min(1) });
 
@@ -249,6 +268,7 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
       descriptionHash: descriptionText === null ? null : contentHash(descriptionText),
       tagSource: null,
       closedAt: null,
+      questionsFetchedAt: row.questions.length > 0 ? now : null,
     })
     .run();
 
@@ -256,6 +276,54 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
     writer
       .insert(postingTags)
       .values({ postingId: id, dimension: tag.dimension, value: tag.value, source: "import" })
+      .onConflictDoNothing()
+      .run();
+  }
+
+  for (const [position, question] of row.questions.entries()) {
+    const textNormHash = questionVariantHash(question.text);
+
+    const existing = writer
+      .select({ id: questions.id })
+      .from(questions)
+      .where(eq(questions.textNormHash, textNormHash))
+      .get();
+
+    const questionId = existing?.id ?? crypto.randomUUID();
+
+    if (existing === undefined) {
+      writer
+        .insert(questions)
+        .values({
+          id: questionId,
+          textDisplay: question.text,
+          textNormHash,
+          fieldType: question.fieldType,
+          optionsHash: null,
+          factKey: question.factKey ?? null,
+          answerKind: question.answerKind,
+          mappedBy: question.mappedBy ?? null,
+          seenCount: 1,
+          createdAt: now,
+        })
+        .run();
+
+      writer
+        .insert(questionVariants)
+        .values({ variantHash: textNormHash, questionId })
+        .onConflictDoNothing()
+        .run();
+    }
+
+    writer
+      .insert(postingQuestions)
+      .values({
+        postingId: id,
+        questionId,
+        required: question.required,
+        position,
+        options: JSON.stringify(question.options),
+      })
       .onConflictDoNothing()
       .run();
   }
@@ -291,6 +359,19 @@ export function createTestRoutes(
     const ran = await runDueJobs(db, clock, handlers, singletonJobKinds);
 
     return context.json({ ran });
+  });
+
+  routes.post("/jobs/run-now", zValidator("json", runNowBody), async (context) => {
+    const { kind, payload } = context.req.valid("json");
+    const handler = handlers[kind];
+
+    if (handler === undefined) {
+      return context.json({ error: "unknown job kind" }, 404);
+    }
+
+    await handler(payload);
+
+    return context.json({ ok: true });
   });
 
   routes.post("/jobs/enqueue", zValidator("json", enqueueBody), (context) => {
@@ -571,7 +652,7 @@ export function createTestRoutes(
   });
 
   routes.post("/applications/seed", zValidator("json", seedApplicationBody), (context) => {
-    const { userId, postingId, status, sentAt, origin } = context.req.valid("json");
+    const { userId, postingId, status, sentAt, createdAt, origin } = context.req.valid("json");
 
     const posting = db
       .select({ companyId: postings.companyId })
@@ -584,7 +665,7 @@ export function createTestRoutes(
     }
 
     const id = crypto.randomUUID();
-    const now = clock.now();
+    const now = createdAt ?? clock.now();
 
     db.insert(applications)
       .values({
@@ -673,15 +754,18 @@ export function createTestRoutes(
     });
   });
 
-  routes.get("/questions", zValidator("query", userQuery), (context) => {
-    const { userId } = context.req.valid("query");
+  routes.get("/questions", zValidator("query", questionsQuery), (context) => {
+    const { userId, postingId } = context.req.valid("query");
 
-    const application = db
-      .select({ postingId: applications.postingId })
-      .from(applications)
-      .where(eq(applications.userId, userId))
-      .limit(1)
-      .get();
+    const application =
+      postingId === undefined
+        ? db
+            .select({ postingId: applications.postingId })
+            .from(applications)
+            .where(eq(applications.userId, userId))
+            .limit(1)
+            .get()
+        : { postingId };
 
     if (application === undefined) {
       return context.json({ questions: [] });
