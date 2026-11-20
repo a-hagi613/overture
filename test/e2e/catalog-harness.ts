@@ -112,10 +112,16 @@ const boardSpecSchema = z.union([
   z
     .string()
     .min(1)
-    .transform((token) => ({ ats: "greenhouse" as const, token })),
+    .transform((token) => ({ ats: "greenhouse" as const, token, bulk: undefined })),
   z.object({
     ats: z.enum(["greenhouse", "lever", "ashby"]),
     token: z.string().min(1),
+    bulk: z
+      .object({
+        jobCount: z.number().int().min(1).max(2000),
+        descriptionKb: z.number().int().min(1).max(64),
+      })
+      .optional(),
   }),
 ]);
 
@@ -130,6 +136,7 @@ export interface CatalogHarness {
   runBackfillCycle: () => Promise<void>;
   runOneJob: (kind: string) => Promise<string>;
   pollThroughScheduledSweep: (clockOffsetMs: number) => Promise<void>;
+  seedPostings: (tokens: string[]) => Promise<void>;
   postings: () => Promise<PostingRow[]>;
   postingTags: () => Promise<PostingTagRow[]>;
   boards: () => Promise<BoardRow[]>;
@@ -137,7 +144,11 @@ export interface CatalogHarness {
   close: () => Promise<void>;
 }
 
-type JsonBody = Record<string, string | number>;
+type JsonValue = string | number | boolean | null | undefined | readonly JsonValue[] | JsonBody;
+
+interface JsonBody {
+  readonly [key: string]: JsonValue;
+}
 
 async function postJson(url: string, body: JsonBody) {
   const response = await fetch(url, {
@@ -256,6 +267,12 @@ export async function startCatalogHarness(
 
   const specs = boardSpecs.map((spec) => boardSpecSchema.parse(spec));
 
+  for (const spec of specs) {
+    if (spec.bulk !== undefined) {
+      fixture.seedBoard(spec.ats, spec.token, spec.bulk);
+    }
+  }
+
   const createdBoards = await Promise.all(
     specs.map(async (spec) => {
       const boardResponse = await postJson(`${app.url}/__test__/catalog/boards`, {
@@ -335,6 +352,33 @@ export async function startCatalogHarness(
     return postingsResponseSchema.parse(await response.json()).postings;
   }
 
+  async function seedPostings(tokens: string[]) {
+    await Promise.all(
+      tokens.map(async (token) => {
+        const spec = specs.find((candidate) => candidate.token === token);
+
+        if (spec === undefined) {
+          throw new Error(`no board spec for ${token}`);
+        }
+
+        const jobs = fixture.jobs(spec.ats, token);
+
+        await postJson(`${app.url}/__test__/catalog/postings/bulk`, {
+          postings: jobs.map((job) => ({
+            boardId: boardIds[token] ?? "",
+            companyId: company.id,
+            ats: spec.ats,
+            atsJobId: job.atsJobId,
+            url: job.url,
+            title: job.title,
+            sourceUpdatedAt: job.sourceUpdatedAt === null ? null : Date.parse(job.sourceUpdatedAt),
+            descriptionText: job.descriptionText,
+          })),
+        });
+      }),
+    );
+  }
+
   async function postingTags() {
     const response = await fetch(`${app.url}/__test__/catalog/posting-tags`);
 
@@ -356,6 +400,7 @@ export async function startCatalogHarness(
     runBackfillCycle,
     runOneJob,
     pollThroughScheduledSweep,
+    seedPostings,
     postings,
     postingTags,
     boards,

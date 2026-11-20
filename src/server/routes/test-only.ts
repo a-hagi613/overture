@@ -27,6 +27,7 @@ import { clearSinkMail, listSinkMail } from "../platform/mail/sink.ts";
 import { getTestSpans, resetTestSpans } from "../platform/telemetry/otel.ts";
 import { releaseBlockingJobs } from "../testing/blocking-job.ts";
 import { readCompaniesParquet } from "../catalog/companies-parquet.ts";
+import { contentHash } from "../catalog/content-hash.ts";
 import { loadDiscoveredBoards } from "../catalog/discovered-boards.ts";
 import { sweepBatchPerAts } from "../catalog/discovery.ts";
 import { dedupeKeyFor } from "../catalog/dedupe-key.ts";
@@ -96,6 +97,12 @@ const createPostingBody = z.object({
   atsJobId: z.string().min(1),
   url: z.string().min(1),
   title: z.string().min(1),
+  sourceUpdatedAt: z.number().int().nullish(),
+  descriptionText: z.string().nullish(),
+});
+
+const bulkPostingsBody = z.object({
+  postings: z.array(createPostingBody).min(1).max(2000),
 });
 
 const recordLlmUsageBody = z.object({
@@ -106,6 +113,45 @@ const recordLlmUsageBody = z.object({
   outputTokens: z.number().int().min(0),
   costMicros: z.number().int().min(0),
 });
+
+type PostingWriter = AppDatabase | Parameters<Parameters<AppDatabase["transaction"]>[0]>[0];
+
+function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBody>, now: number) {
+  const id = crypto.randomUUID();
+  const titleNorm = normalizeTitle(row.title);
+  const descriptionText = row.descriptionText ?? null;
+
+  writer
+    .insert(postings)
+    .values({
+      id,
+      boardId: row.boardId,
+      companyId: row.companyId,
+      ats: row.ats,
+      atsJobId: row.atsJobId,
+      url: row.url,
+      applyUrl: null,
+      applyUrlNorm: normalizeApplyUrl(row.url),
+      title: row.title,
+      titleNorm,
+      dedupeKey: dedupeKeyFor({
+        companyId: row.companyId,
+        titleNorm,
+        countryCode: null,
+        city: null,
+      }),
+      firstSeenAt: now,
+      lastSeenAt: now,
+      sourceUpdatedAt: row.sourceUpdatedAt ?? null,
+      descriptionGz: descriptionText === null ? null : Buffer.from(Bun.gzipSync(descriptionText)),
+      descriptionHash: descriptionText === null ? null : contentHash(descriptionText),
+      tagSource: null,
+      closedAt: null,
+    })
+    .run();
+
+  return id;
+}
 
 export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handlers: JobHandlers) {
   const routes = new Hono();
@@ -266,32 +312,22 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
   });
 
   routes.post("/catalog/postings", zValidator("json", createPostingBody), (context) => {
-    const { boardId, companyId, ats, atsJobId, url, title } = context.req.valid("json");
-    const id = crypto.randomUUID();
-    const now = clock.now();
-    const titleNorm = normalizeTitle(title);
-
-    db.insert(postings)
-      .values({
-        id,
-        boardId,
-        companyId,
-        ats,
-        atsJobId,
-        url,
-        applyUrl: null,
-        applyUrlNorm: normalizeApplyUrl(url),
-        title,
-        titleNorm,
-        dedupeKey: dedupeKeyFor({ companyId, titleNorm, countryCode: null, city: null }),
-        firstSeenAt: now,
-        lastSeenAt: now,
-        tagSource: null,
-        closedAt: null,
-      })
-      .run();
+    const id = seedPosting(db, context.req.valid("json"), clock.now());
 
     return context.json({ id });
+  });
+
+  routes.post("/catalog/postings/bulk", zValidator("json", bulkPostingsBody), (context) => {
+    const { postings: rows } = context.req.valid("json");
+    const now = clock.now();
+
+    db.transaction((tx) => {
+      for (const row of rows) {
+        seedPosting(tx, row, now);
+      }
+    });
+
+    return context.json({ created: rows.length });
   });
 
   routes.post(
