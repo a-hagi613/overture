@@ -51,6 +51,7 @@ USER root
 
 ENV NODE_ENV=production \
   DATABASE_PATH=/data/app.sqlite \
+  OBJECT_STORE_ROOT=/data/objects \
   LITESTREAM_CONFIG_PATH=/etc/litestream.yml
 
 EXPOSE 3000

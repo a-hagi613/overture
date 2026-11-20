@@ -120,6 +120,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=mail.tryoverture.com`, `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | |
 
 All secrets are Fly secrets; local dev reads `.env` (chmod 600, never committed).
+M1 keeps encrypted files on the Fly volume at `/data/objects` (`OBJECT_STORE_ROOT`) through the disk object store adapter; they are sealed per user but not in the Litestream backup, which covers SQLite only. Moving them to `R2_BUCKET_FILES` is #81.
 
 ### 3.3 Domains and DNS
 

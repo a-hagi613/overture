@@ -3,17 +3,18 @@ set -eu
 
 DATABASE="${DATABASE_PATH:-/data/app.sqlite}"
 DATA_DIR="$(dirname "$DATABASE")"
+OBJECTS="${OBJECT_STORE_ROOT:-${DATA_DIR}/objects}"
 
 # Run as root only for this: the Fly volume mount is root-owned, so fix its
 # ownership for the unprivileged `app` user, then drop privileges and never
 # return to root.
 if [ "$(id -u)" = "0" ]; then
-  mkdir -p "$DATA_DIR"
+  mkdir -p "$DATA_DIR" "$OBJECTS"
   chown -R app:app "$DATA_DIR"
   exec gosu app:app "$0" "$@"
 fi
 
-mkdir -p "$DATA_DIR"
+mkdir -p "$DATA_DIR" "$OBJECTS"
 
 if [ "${LITESTREAM_ENABLED:-true}" != "true" ]; then
   exec bun run /app/src/server/main.ts

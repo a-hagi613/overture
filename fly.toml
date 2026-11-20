@@ -10,6 +10,7 @@ dockerfile = "Dockerfile"
 NODE_ENV = "production"
 PORT = "3000"
 DATABASE_PATH = "/data/app.sqlite"
+OBJECT_STORE_ROOT = "/data/objects"
 LITESTREAM_CONFIG_PATH = "/etc/litestream.yml"
 
 [http_service]
