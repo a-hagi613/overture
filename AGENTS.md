@@ -6,8 +6,12 @@ Overture applies to jobs for one person, automatically, and shows its work.
 
 Lint, format, typecheck and tests define what is allowed. ADR 0023 lists the rules and ADR 0013 the testing rules.
 
-- After every change: `bunx oxlint --fix`, then `bunx oxfmt`.
-- Done means `bunx oxlint --deny-warnings --format=agent` reports zero, and format, typecheck, build and tests pass.
+- After every change: `bun lint --fix`, then `bun fmt`.
+- Done means `bun run verify` passes locally, and you paste its summary in your report; e2e and the container build run
+  in CI.
+- The commands are `bun lint`, `bun fmt --check`, `bun check`, `bun test src`, `bun run build`, `bun run lint:config`
+  and `bun run db:verify`; `bun run verify` runs them all in parallel. `bun run lint:parity` compares lint findings with
+  a canary Bun.
 - Never disable, weaken or work around a rule. If a rule is wrong, say so on the issue; changing it needs an ADR.
 
 ## Read first

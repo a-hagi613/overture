@@ -142,7 +142,7 @@ M1 keeps encrypted files on the Fly volume at `/data/objects` (`OBJECT_STORE_ROO
 
 | Layer | Choice |
 |---|---|
-| Runtime | Bun (latest stable), strict TypeScript (`tsgo` for typecheck) |
+| Runtime | Bun 1.4.5 (pinned in `package.json`, CI and the Dockerfile), strict TypeScript (`bun check` for typecheck) |
 | HTTP | Hono + `@hono/zod-validator`; Zod on every input, webhook and env var |
 | DB | `bun:sqlite`, WAL, `synchronous=FULL`, `foreign_keys=ON`, STRICT tables; Drizzle ORM + drizzle-kit migrations; no SQLite-only SQL outside `server/platform/search` |
 | Auth | better-auth (M1: Google, LinkedIn OIDC, magic link; M2 adds email + password; passkey for admin) with Drizzle adapter |
@@ -151,8 +151,8 @@ M1 keeps encrypted files on the Fly volume at `/data/objects` (`OBJECT_STORE_ROO
 | PDF | `unpdf`; Haiku 5.5 PDF fallback |
 | Mail | `mailparser`, `mailauth` (SPF/DKIM/DMARC verification), AWS SDK v3 SES |
 | Telemetry | OpenTelemetry SDK (traces, metrics, logs) → OTLP |
-| Lint/format | oxlint, every category at error + type-aware (`oxlint-tsgolint`), from Landmines' own configuration, plus `@interfere/landmines`, vendored anti-slop, React / `jsx-a11y` / Vitest plugins and architecture rules (ADR 0023); oxfmt; Oxc's Claude Code lint-and-format hook |
-| Tests | Playwright e2e (sharded), Vitest for the six invariant files, MSW at the network edge, daily live checks on Fly (ADR 0013) |
+| Lint/format | oxlint, every category at error + type-aware (`oxlint-tsgolint`), from Landmines' own configuration, plus `@interfere/landmines`, vendored anti-slop, React / `jsx-a11y` / Vitest plugins and architecture rules (ADR 0023), with the Cloudflare preset rules; `bun lint` runs Oxlint with `--deny-warnings`; `bun fmt` formats |
+| Tests | Playwright e2e (sharded), `bun test` for the six invariant files, MSW at the network edge, daily live checks on Fly (ADR 0013) |
 
 ```
 src/
@@ -882,9 +882,10 @@ Plus: route reachability for every page, axe on every page, 30 visual snapshots 
 
 ### 16.3 CI
 
-Parallel jobs: oxlint with zero warnings (`--deny-warnings`, ADR 0023, which includes Landmines `no-comments`,
-`no-test-doubles`, `no-fixed-sleep` and `no-flake-masking`), oxfmt check, `tsgo --noEmit`, Vite build, Vitest,
-Playwright sharded by duration (per-worker server + template SQLite copy, API-seeded auth, MSW with unhandled requests
+Parallel jobs: `bun lint` with zero warnings (ADR 0023, which includes Landmines `no-comments`, `no-test-doubles`,
+`no-fixed-sleep` and `no-flake-masking`), `bun fmt --check`, `bun check`, Vite build, `bun test`; the same checks run
+locally by `bun run verify`; Playwright sharded by duration (per-worker server + template SQLite copy, API-seeded auth,
+MSW with unhandled requests
 as errors, MSW pinned to 2.x with a check that an unmocked host fails, a test-only route that runs due jobs, no
 sleeps, zero retries), affected-only on PRs. PR < 2 min; `main` < 4 min including `flyctl deploy --remote-only`. Main deploys
 only when every job passes.

@@ -163,6 +163,7 @@
     "eslint/no-useless-assignment": "error",
     "import/export": "error",
     "import/named": "error",
+    "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
     "promise/no-return-in-finally": "error",
     "unicorn/no-useless-iterator-to-array": "error",
     "typescript/no-unnecessary-condition": [
@@ -321,12 +322,7 @@
     "promise/prefer-await-to-callbacks": "off",
     "promise/prefer-await-to-then": "error",
     "typescript/consistent-type-definitions": "error",
-    "typescript/consistent-type-imports": [
-      "error",
-      {
-        "disallowTypeAnnotations": false
-      }
-    ],
+    "typescript/consistent-type-imports": "error",
     "typescript/dot-notation": [
       "error",
       {
@@ -395,7 +391,7 @@
     "vitest/require-hook": "off",
     "vitest/require-top-level-describe": "off",
     "oxc/no-accumulating-spread": "error",
-    "typescript/no-unnecessary-type-assertion": "off",
+    "typescript/no-unnecessary-type-assertion": "error",
     "oxc/no-async-endpoint-handlers": "off",
     "eslint/no-underscore-dangle": "error",
     "eslint/no-unused-vars": [
@@ -471,6 +467,7 @@
     "typescript/switch-exhaustiveness-check": [
       "error",
       {
+        "allowDefaultCaseForExhaustiveSwitch": true,
         "considerDefaultExhaustiveForUnions": true
       }
     ],

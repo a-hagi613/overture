@@ -8,18 +8,21 @@
     "dev:web": "vite",
     "build": "vite build",
     "start": "bun run src/server/main.ts",
-    "typecheck": "tsgo --noEmit",
-    "lint": "oxlint",
+    "typecheck": "bun check",
+    "lint": "oxlint --deny-warnings",
     "lint:fix": "oxlint --fix",
     "lint:config": "bun run scripts/check-lint-config.ts",
-    "format": "oxfmt",
-    "format:check": "oxfmt --check",
-    "test:unit": "vitest run",
+    "format": "bun fmt",
+    "format:check": "bun fmt --check",
+    "test:unit": "bun test src",
     "test:e2e": "bun node_modules/playwright/cli.js test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/server/platform/db/migrate.ts",
     "db:template": "bun run scripts/create-template-db.ts test/e2e/.tmp/template.db",
-    "db:verify": "bun run scripts/verify-db.ts"
+    "db:verify": "bun run scripts/verify-db.ts",
+    "lint:parity": "bun run scripts/lint-parity.ts",
+    "verify": "bun run scripts/verify.ts",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@better-auth/passkey": "1.7.26",
@@ -59,15 +62,15 @@
     "@types/bun": "^1.4.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vitejs/plugin-react": "^6.3.0",
     "drizzle-kit": "^0.31.11",
     "msw": "^2.15.0",
-    "oxfmt": "^0.79.0",
     "oxlint": "^1.94.0",
     "oxlint-tsgolint": "^7.0.2007",
     "tailwindcss": "^4.3.5",
-    "vite": "^8.3.8",
-    "vitest": "^5.1.1"
+    "vite": "^8.3.8"
+  },
+  "engines": {
+    "bun": "1.4.5"
   }
 }

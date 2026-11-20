@@ -12,8 +12,9 @@ On top: the Landmines plugins (testing, style, structure, types), Dmitry Mulroy'
 checked against Landmines before it is enabled), every rule of the React, `jsx-a11y` and test plugins, and rules that
 enforce this architecture: domain code may not import vendor SDKs, `Date.now` and `Math.random` are banned outside the
 clock and random ports, `process.env` is read only in the Zod config module, and JSX holds no literal text (copy comes
-from the copy module). oxfmt formats; `tsgo --noEmit` type-checks. Coding agents run lint and format on every edit
-(Oxc's Claude Code hook) and finish only at zero warnings. Landmines wins every conflict.
+from the copy module). `bun fmt` formats, reading `.oxfmtrc.json`; `bun check` type-checks with the same errors as
+TypeScript 7. Coding agents run lint and format on every edit (Oxc's Claude Code hook) and finish only at zero
+warnings. Landmines wins every conflict.
 
 ## Plugins
 
@@ -23,13 +24,48 @@ Oxlint 1.94 ships 872 rules. Every plugin is on except the two for frameworks we
 pull request that adds or upgrades Oxlint prints the enabled count from `oxlint --print-config`, and CI fails if a rule
 outside the off-list below is not at error.
 
+## Cloudflare preset rules
+
+The rules that `@cloudflare/oxlint-config` adds on top of its inherited base are enabled here with the preset's
+options. Every one was already at error through the categories unless the table says otherwise; nothing was loosened
+to match it.
+
+| Rule | State | Options |
+|---|---|---|
+| `eqeqeq` | already on | default |
+| `import/no-self-import` | already on | default |
+| `no-eval` | already on | default |
+| `typescript/unbound-method` | already on | default |
+| `import/consistent-type-specifier-style` | added options | `prefer-top-level` |
+| `typescript/consistent-type-imports` | already on, options tightened | default (`disallowTypeAnnotations: true`) |
+| `typescript/no-confusing-non-null-assertion` | already on | default |
+| `typescript/no-non-null-assertion` | already on | default |
+| `typescript/no-unnecessary-type-assertion` | added, previously inherited off | default |
+| `typescript/no-unsafe-argument` | already on | default |
+| `typescript/no-unsafe-assignment` | already on | default |
+| `typescript/no-unsafe-call` | already on | default |
+| `typescript/no-unsafe-member-access` | already on | default |
+| `typescript/no-unsafe-return` | already on | default |
+| `typescript/no-unsafe-type-assertion` | already on | default |
+| `typescript/switch-exhaustiveness-check` | already on, one option added | `allowDefaultCaseForExhaustiveSwitch: true`, `considerDefaultExhaustiveForUnions: true` |
+| `typescript/no-misused-promises` | already on | default |
+| `no-promise-executor-return` | already on | default |
+| `typescript/no-floating-promises` | already on | default |
+| `typescript/use-unknown-in-catch-callback-variable` | already on | default |
+| `unicorn/prefer-set-has` | already on | default |
+
+`bun lint` runs Oxlint with this configuration and `--deny-warnings`, so the full rule set is the developer command.
+`bun run lint:parity` compares Oxlint's findings with a native `bun lint --no-script` from a canary Bun; on Bun
+1.4.6-canary the findings are identical apart from two extra `vitest/prefer-each` findings, and native lint does not
+run the `jsdoc` plugin. The parity script is not a CI gate.
+
 ## Rules that close the gaps
 
 Landmines alone leaves three ways around these rules, so the architecture rules close them:
 
 - **No disable directives.** Any `oxlint-disable`, `eslint-disable` or `@ts-ignore` comment is an error. `no-comments`
   runs with an empty `allow` list, so `// WARNING:` notes are errors too.
-- **Six unit test files only.** A Vitest file is allowed only beside the six invariants in ADR 0013 (ledger, crypto,
+- **Six unit test files only.** A unit test file is allowed only beside the six invariants in ADR 0013 (ledger, crypto,
   planner, address, tag rules, question normalisation), by an explicit path allowlist. Any other unit test file is an
   error. Every other test is a Playwright end-to-end test.
 - **The off-list and every scoped override are checked.** CI fails if the rules turned off in the configuration
@@ -54,7 +90,7 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
 | `react_perf/*` | The React Compiler memoises; hand-written `useCallback`/`useMemo` is noise |
 | `jsdoc/require-param-type`, `jsdoc/require-returns-type` | TypeScript carries the types; JSDoc only on port interfaces |
 | `typescript/prefer-readonly-parameter-types` | Fails on most library types (React props, `Request`) |
-| `jest/*` that require Jest globals, hooks bans or assertion counts | The six unit files use Vitest; the Vitest rules apply instead |
+| `jest/*` that require Jest globals, hooks bans or assertion counts | The six unit files use `bun:test`; the Vitest rules apply instead |
 
 Everything else in Landmines' configuration's off-list is inherited unchanged; the inherited rules are written out
 below so that CI can check the configuration against this file.
@@ -100,7 +136,6 @@ gives.
 | `oxc/no-async-endpoint-handlers` | Hono handlers are async. |
 | `promise/avoid-new` | MSW and child_process APIs are callback-shaped. |
 | `promise/prefer-await-to-callbacks` | Landmines' baseline; the same callback adapters. |
-| `typescript/no-unnecessary-type-assertion` | Landmines' baseline; the anti-slop assertion rules cover the risk. |
 | `typescript/non-nullable-type-assertion-style` | Landmines' baseline. |
 | `typescript/strict-void-return` | Landmines' baseline; `no-confusing-void-expression` covers the risk. |
 | `unicorn/max-nested-calls` | Landmines' baseline. |

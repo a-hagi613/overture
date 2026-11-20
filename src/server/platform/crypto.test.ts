@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "bun:test";
 
 import { createUserKey, openValue, parseMasterKey, sealValue } from "./crypto.ts";
 
@@ -9,7 +9,7 @@ test("seal then open returns the plaintext", async () => {
   const userKey = await createUserKey(masterKey, 1);
   const sealed = await sealValue(masterKey, userKey, scope, "secret resume text");
 
-  await expect(openValue(masterKey, userKey, scope, sealed)).resolves.toBe("secret resume text");
+  expect(openValue(masterKey, userKey, scope, sealed)).resolves.toBe("secret resume text");
 });
 
 test("ciphertexts carry the format version and never the plaintext", async () => {
@@ -26,7 +26,7 @@ test("opening with a different associated data scope fails", async () => {
   const userKey = await createUserKey(masterKey, 1);
   const sealed = await sealValue(masterKey, userKey, scope, "secret resume text");
 
-  await expect(
+  expect(
     openValue(masterKey, userKey, { table: "facts", column: "value_enc", rowId: "fact-2" }, sealed),
   ).rejects.toThrow("operation failed for an operation-specific reason");
 });
@@ -37,8 +37,8 @@ test("shredding the user key makes every value unreadable", async () => {
   const sealed = await sealValue(masterKey, userKey, scope, "secret resume text");
   const shredded = { ...userKey, wrappedDek: "AAAAAAAAAAAAAAAAAAAAAA==" };
 
-  await expect(openValue(masterKey, userKey, scope, sealed)).resolves.toBe("secret resume text");
-  await expect(openValue(masterKey, shredded, scope, sealed)).rejects.toThrow(
+  expect(openValue(masterKey, userKey, scope, sealed)).resolves.toBe("secret resume text");
+  expect(openValue(masterKey, shredded, scope, sealed)).rejects.toThrow(
     "operation failed for an operation-specific reason",
   );
 });
@@ -48,7 +48,7 @@ test("ciphertexts record their key version and reject mismatched keys", async ()
   const userKey = await createUserKey(masterKey, 1);
   const sealed = await sealValue(masterKey, userKey, scope, "secret resume text");
 
-  await expect(openValue(masterKey, { ...userKey, keyVersion: 2 }, scope, sealed)).rejects.toThrow(
+  expect(openValue(masterKey, { ...userKey, keyVersion: 2 }, scope, sealed)).rejects.toThrow(
     "key version 1",
   );
 });
