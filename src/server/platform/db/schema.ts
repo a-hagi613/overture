@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   blob,
+  check,
   index,
   integer,
   primaryKey,
@@ -9,6 +10,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
 const timestamp = (name: string) => integer(name, { mode: "timestamp" });
 
@@ -401,5 +403,49 @@ export const resumes = sqliteTable(
     uniqueIndex("resumes_user_current_unique")
       .on(t.userId)
       .where(sql`is_current = 1`),
+  ],
+);
+
+export const grants = sqliteTable(
+  "grants",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    source: text("source", { enum: ["trial", "period", "admin"] }).notNull(),
+    quantity: integer("quantity").notNull(),
+    startsAt: integer("starts_at").notNull(),
+    expiresAt: integer("expires_at"),
+    stripeInvoiceId: text("stripe_invoice_id"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("grants_stripe_invoice_id_unique").on(t.stripeInvoiceId)],
+);
+
+export const ledger = sqliteTable(
+  "ledger",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    kind: text("kind", {
+      enum: ["grant", "reserve", "commit", "release", "expire", "refund", "adjust"],
+    }).notNull(),
+    debitAccount: text("debit_account", {
+      enum: ["issued", "available", "reserved", "used", "expired"],
+    }).notNull(),
+    creditAccount: text("credit_account", {
+      enum: ["issued", "available", "reserved", "used", "expired"],
+    }).notNull(),
+    amount: integer("amount").notNull(),
+    grantId: text("grant_id")
+      .notNull()
+      .references(() => grants.id),
+    applicationId: text("application_id"),
+    idempotencyKey: text("idempotency_key").notNull().unique(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [
+    check("ledger_amount_positive", sql`${t.amount} > 0`),
+    index("ledger_user_created_at").on(t.userId, t.createdAt),
+    index("ledger_user_grant_kind").on(t.userId, t.grantId, t.kind),
   ],
 );
