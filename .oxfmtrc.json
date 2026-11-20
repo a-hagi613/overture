@@ -1,6 +1,7 @@
 {
   "ignorePatterns": [
     "docs/**",
+    "design/reference/**",
     "profile/**",
     "README.md",
     "DESIGN.md",
