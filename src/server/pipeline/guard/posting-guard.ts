@@ -322,7 +322,7 @@ function cleanHtml(raw: string) {
 
   const collect = (whole: string) => {
     hiddenParts.push(
-      decodeEntities(whole.replaceAll(/<!--|-->/gu, " ").replaceAll(/<[^>]+>/gu, " ")),
+      decodeEntities(whole.replaceAll(/<!--|--!?>/gu, " ").replaceAll(/<[^>]+>/gu, " ")),
     );
     hiddenBlocks += 1;
 
