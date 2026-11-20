@@ -136,6 +136,20 @@ async function pullGreenhouse(boardToken: string) {
   return { boardToken, jobs: trimmed };
 }
 
+async function pullGreenhouseContent(boardToken: string) {
+  const list = await greenhouseLimiter.run(async () =>
+    fetchJson(
+      `${GREENHOUSE_DEFAULT_BASE_URL}/v1/boards/${boardToken}/jobs?content=true`,
+      greenhouseListSchema,
+    ),
+  );
+
+  return {
+    boardToken,
+    jobs: list.jobs.slice(0, JOBS_PER_BOARD).map((job) => trimGreenhouse(job)),
+  };
+}
+
 function trimLever(job: z.infer<typeof leverJobSchema>) {
   return {
     id: job.id,
@@ -243,6 +257,27 @@ await Promise.all(
 
     process.stdout.write(
       `recorded ${String(board.jobs.length)} jobs for greenhouse board ${board.boardToken}\n`,
+    );
+  }),
+);
+
+const greenhouseContentRecorded = (
+  await Promise.all(
+    GREENHOUSE_BOARDS.map(async (boardToken) =>
+      wants("greenhouse") ? await pullGreenhouseContent(boardToken) : null,
+    ),
+  )
+).filter((board): board is Awaited<ReturnType<typeof pullGreenhouseContent>> => board !== null);
+
+await Promise.all(
+  greenhouseContentRecorded.map(async (board) => {
+    const directory = join(GREENHOUSE_FIXTURE_ROOT, board.boardToken);
+
+    mkdirSync(directory, { recursive: true });
+    await Bun.write(join(directory, "content.json"), JSON.stringify({ jobs: board.jobs }, null, 2));
+
+    process.stdout.write(
+      `recorded ${String(board.jobs.length)} content jobs for greenhouse board ${board.boardToken}\n`,
     );
   }),
 );

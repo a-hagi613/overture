@@ -26,6 +26,7 @@ const postingRowSchema = z.object({
   employmentType: z.string(),
   tagSource: z.string().nullable(),
   taggedAt: z.number().nullable(),
+  descriptionHash: z.string().nullable(),
   closedAt: z.number().nullable(),
   missingPolls: z.number(),
   dedupeKey: z.string(),
@@ -91,6 +92,7 @@ export interface PostingRow {
   employmentType: string;
   tagSource: string | null;
   taggedAt: number | null;
+  descriptionHash: string | null;
   closedAt: number | null;
   missingPolls: number;
   dedupeKey: string;
@@ -137,10 +139,16 @@ const boardSpecSchema = z.union([
     ats: z.enum(["greenhouse", "lever", "ashby"]),
     token: z.string().min(1),
     bulk: z
-      .object({
-        jobCount: z.number().int().min(1).max(2000),
-        descriptionKb: z.number().int().min(1).max(64),
-      })
+      .union([
+        z.object({
+          jobCount: z.number().int().min(1).max(2000),
+          descriptionKb: z.number().int().min(1).max(64),
+        }),
+        z.object({
+          jobCount: z.number().int().min(1).max(2000),
+          sourceToken: z.string().min(1),
+        }),
+      ])
       .optional(),
   }),
 ]);

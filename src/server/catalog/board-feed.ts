@@ -30,6 +30,7 @@ export type BoardFetchResult =
 
 export interface BoardFeed {
   fetchBoard: (boardToken: string, condition: BoardCondition) => Promise<BoardFetchResult>;
+  fetchBoardContent?: (boardToken: string) => Promise<BoardFetchResult>;
   fetchPostingDetail?: (boardToken: string, atsJobId: string) => Promise<FeedContent>;
 }
 

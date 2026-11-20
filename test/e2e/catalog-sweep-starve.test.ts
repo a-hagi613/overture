@@ -8,6 +8,7 @@ const HEALTH_BUDGET_MS = 1000;
 const MIN_SAMPLES = 40;
 const GREENHOUSE_JOBS = 900;
 const ASHBY_JOBS = 900;
+const HEAVY_GREENHOUSE_JOBS = 900;
 
 const GREENHOUSE_BOARDS = [
   "bulk-greenhouse-one",
@@ -15,6 +16,8 @@ const GREENHOUSE_BOARDS = [
   "bulk-greenhouse-three",
   "bulk-greenhouse-four",
 ];
+
+const HEAVY_GREENHOUSE_BOARD = "bulk-greenhouse-heavy";
 
 const ASHBY_BOARDS = ["bulk-ashby-one", "bulk-ashby-two", "bulk-ashby-three"];
 
@@ -24,6 +27,11 @@ const BOARDS: BoardSpec[] = [
     token,
     bulk: { jobCount: GREENHOUSE_JOBS, descriptionKb: 6 },
   })),
+  {
+    ats: "greenhouse" as const,
+    token: HEAVY_GREENHOUSE_BOARD,
+    bulk: { jobCount: HEAVY_GREENHOUSE_JOBS, sourceToken: "stripe" },
+  },
   ...ASHBY_BOARDS.map((token) => ({
     ats: "ashby" as const,
     token,
@@ -95,9 +103,13 @@ test("the health route keeps answering while the sweep reads multi-megabyte feed
     const after = await harness.postings();
     const ashbyBoardIds = new Set(ASHBY_BOARDS.map((token) => harness.boardIds[token] ?? ""));
     const ashbyPostings = after.filter((posting) => ashbyBoardIds.has(posting.boardId));
+    const heavyBoardId = harness.boardIds[HEAVY_GREENHOUSE_BOARD] ?? "";
+    const heavyPostings = after.filter((posting) => posting.boardId === heavyBoardId);
 
-    expect(after.length).toBe(seeded.length);
+    expect(after.length).toBe(seeded.length + HEAVY_GREENHOUSE_JOBS);
     expect(after.filter((posting) => posting.closedAt !== null).length).toBe(0);
+    expect(heavyPostings.length).toBe(HEAVY_GREENHOUSE_JOBS);
+    expect(heavyPostings.every((posting) => posting.descriptionHash !== null)).toBe(true);
     expect(ashbyPostings.length).toBe(ASHBY_JOBS * ASHBY_BOARDS.length);
     expect(ashbyPostings.every((posting) => posting.tagSource === "rules")).toBe(true);
   } finally {

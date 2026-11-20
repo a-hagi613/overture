@@ -81,7 +81,11 @@ test("a backfill fills the catalog and later reads add, change and close Posting
 
     const detailsAfterBackfill = harness.fixture.stats().detailCounts;
 
-    expect(Object.values(detailsAfterBackfill).reduce((total, count) => total + count, 0)).toBe(4);
+    expect(Object.values(detailsAfterBackfill).reduce((total, count) => total + count, 0)).toBe(0);
+    expect(harness.fixture.stats().perAts.greenhouse.requestCount).toBe(1);
+    expect(harness.fixture.stats().paths).toEqual([
+      `/v1/boards/${FIXTURE_BOARD}/jobs?content=true`,
+    ]);
 
     const recentIso = new Date((await clockNow(harness)) - 60_000).toISOString();
 
@@ -123,11 +127,11 @@ test("a backfill fills the catalog and later reads add, change and close Posting
 
     const detailsAfterSecondRead = harness.fixture.stats().detailCounts;
 
-    expect(detailsAfterSecondRead[`${FIXTURE_BOARD}/${changedJob.id}`] ?? 0).toBe(2);
+    expect(detailsAfterSecondRead[`${FIXTURE_BOARD}/${changedJob.id}`] ?? 0).toBe(1);
     expect(detailsAfterSecondRead[`vercel/9999001`] ?? 0).toBe(1);
-    expect(detailsAfterSecondRead[`${FIXTURE_BOARD}/${untouchedJob.id}`] ?? 0).toBe(1);
+    expect(detailsAfterSecondRead[`${FIXTURE_BOARD}/${untouchedJob.id}`] ?? 0).toBe(0);
     expect(Object.values(detailsAfterSecondRead).reduce((total, count) => total + count, 0)).toBe(
-      6,
+      2,
     );
 
     await harness.runBackfillCycle();
@@ -222,7 +226,7 @@ test("activity-based scheduling puts a freshly changed board on the 30 minute ba
     const board = boardFor(boards, FIXTURE_BOARD);
 
     expect(board.status).toBe("active");
-    expect(board.etag).not.toBeNull();
+    expect(board.contentHash).not.toBeNull();
     expect(board.nextPollAt).not.toBeNull();
 
     const intervalMs = (board.nextPollAt ?? 0) - (board.lastPolledAt ?? 0);

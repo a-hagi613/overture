@@ -20,6 +20,7 @@ export const SINGLETON_JOB_KINDS = [SWEEP_JOB_KIND];
 
 const DEFAULT_SWEEP_INTERVAL_MS = 60_000;
 const MIN_SWEEP_INTERVAL_MS = 1000;
+const DEFAULT_SWEEP_MAX_BOARDS = 20;
 const SWEEP_CLAIM_MS = 15 * 60_000;
 const SWEEP_MAX_ATTEMPTS = 1;
 const SWEEP_DEDUPE_KEY = "catalog.sweep";
@@ -53,6 +54,13 @@ function readSweepBatchOverride(db: AppDatabase) {
   return Number.isFinite(parsed) && parsed >= 1 ? Math.trunc(parsed) : null;
 }
 
+function readSweepMaxBoards(db: AppDatabase) {
+  const raw = getSetting(db, "catalog.sweep_max_boards");
+  const parsed = raw === null ? Number.NaN : Number(raw);
+
+  return Number.isFinite(parsed) && parsed >= 1 ? Math.trunc(parsed) : DEFAULT_SWEEP_MAX_BOARDS;
+}
+
 function requestRatePerSecond(ats: (typeof M1_ATS_NAMES)[number]) {
   return 1000 / SWEEP_LIMITS[ats].minIntervalMs;
 }
@@ -60,14 +68,16 @@ function requestRatePerSecond(ats: (typeof M1_ATS_NAMES)[number]) {
 export function sweepBatchPerAts(db: AppDatabase) {
   const intervalMs = readSweepIntervalMs(db);
   const overrideTotal = readSweepBatchOverride(db);
+  const maxBoards = readSweepMaxBoards(db);
   const totalRate = M1_ATS_NAMES.reduce((sum, ats) => sum + requestRatePerSecond(ats), 0);
 
   const batchFor = (ats: (typeof M1_ATS_NAMES)[number]) => {
-    if (overrideTotal === null) {
-      return Math.max(1, Math.trunc(intervalMs / SWEEP_LIMITS[ats].minIntervalMs));
-    }
+    const planned =
+      overrideTotal === null
+        ? Math.trunc(intervalMs / SWEEP_LIMITS[ats].minIntervalMs)
+        : Math.trunc((overrideTotal * requestRatePerSecond(ats)) / totalRate);
 
-    return Math.max(1, Math.trunc((overrideTotal * requestRatePerSecond(ats)) / totalRate));
+    return Math.max(1, Math.min(planned, maxBoards));
   };
 
   return {

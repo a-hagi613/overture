@@ -318,7 +318,7 @@ Discovery runs from `overture-web` directly (no proxy).
 
 | ATS | Feed | Conditional GET | Per-ATS limits (default) |
 |---|---|---|---|
-| Greenhouse | `boards-api.greenhouse.io/v1/boards/{token}/jobs` (light list); `/jobs/{id}` with content only when a job's `updated_at` changed; questions via `/jobs/{id}?questions=true` | ETag where returned, else content hash | 4 concurrent, 2 req/s |
+| Greenhouse | `boards-api.greenhouse.io/v1/boards/{token}/jobs` (light list); the first poll of a board (no open postings yet), and any poll with more than five new or changed postings, fetches `/jobs?content=true` once and takes description, departments and location from it; otherwise one to five changed postings fetch `/jobs/{id}?content=true`; questions via `/jobs/{id}?questions=true` | ETag where returned, else content hash | 4 concurrent, 2 req/s |
 | Lever | `api.lever.co/v0/postings/{token}?mode=json` | content hash | 4 concurrent, 2 req/s |
 | Ashby | `api.ashbyhq.com/posting-api/job-board/{token}?includeCompensation=true` | content hash | 4 concurrent, 2 req/s |
 | SmartRecruiters (M2) | `api.smartrecruiters.com/v1/companies/{id}/postings` + details | content hash | 2 concurrent, 1 req/s |
@@ -340,9 +340,11 @@ Discovery runs from `overture-web` directly (no proxy).
    `gone`. The `catalog.sweep` job claims its batch before polling: in the same statement that selects them, each
    claimed board's `next_poll_at` moves forward to a 15-minute claim, which the finished poll overwrites with its
    activity band, so a crashed process's board becomes due again when the claim lapses. Each sweep claims per ATS
-   about `sweep_interval_ms × the ATS's request rate` boards (120 per ATS at the 60 s default and 2 req/s), so no
-   ATS starves another; `catalog.sweep_batch` sets the total per-sweep batch instead (split across ATSes in
-   proportion to their rates) and `catalog.sweep_interval_ms` sets the sweep chain interval.
+   `sweep_interval_ms × the ATS's request rate` boards (120 per ATS at the 60 s default and 2 req/s), capped at
+   `catalog.sweep_max_boards` (default 20) so a claimed batch finishes well inside the 15-minute claim; no ATS
+   starves another. `catalog.sweep_batch` sets the total per-sweep batch instead (split across ATSes in proportion
+   to their rates, and still capped per ATS by `catalog.sweep_max_boards`) and `catalog.sweep_interval_ms` sets the
+   sweep chain interval.
 4. **One sweep at a time**: the next sweep is enqueued when the current one *finishes*, not when it starts, so a
    sweep that outlasts the interval delays the next one instead of overlapping it. Its `dedupe_key` is
    `catalog.sweep` and `bg_jobs` is unique on a dedupe key among queued rows, so at most one is ever queued, and

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import { createServer } from "node:http";
 import { join } from "node:path";
@@ -171,10 +171,17 @@ interface MutableAshbyJob {
   compensation: unknown;
 }
 
-export interface BulkBoardSpec {
+export interface SyntheticBoardSpec {
   jobCount: number;
   descriptionKb: number;
 }
+
+export interface ReplayedBoardSpec {
+  jobCount: number;
+  sourceToken: string;
+}
+
+export type BulkBoardSpec = SyntheticBoardSpec | ReplayedBoardSpec;
 
 export interface FixtureJob {
   atsJobId: string;
@@ -223,7 +230,7 @@ function bulkPlain(kb: number, seed: number) {
   return paragraph.repeat(Math.ceil((kb * 1024) / paragraph.length));
 }
 
-function bulkGreenhouseJobs(token: string, spec: BulkBoardSpec) {
+function bulkGreenhouseJobs(token: string, spec: SyntheticBoardSpec) {
   return Array.from({ length: spec.jobCount }, (_unused, index) => ({
     id: `gh-${token}-${String(index)}`,
     title: pick(BULK_TITLES, index),
@@ -237,7 +244,33 @@ function bulkGreenhouseJobs(token: string, spec: BulkBoardSpec) {
   }));
 }
 
-function bulkLeverJobs(token: string, spec: BulkBoardSpec) {
+function replayedGreenhouseJobs(
+  token: string,
+  source: MutableGreenhouseJob[],
+  spec: ReplayedBoardSpec,
+) {
+  return Array.from({ length: spec.jobCount }, (_unused, index) => {
+    const template = source[index % source.length];
+
+    if (template === undefined) {
+      throw new Error(`the ${spec.sourceToken} fixture has no recorded jobs`);
+    }
+
+    return {
+      id: `gh-${token}-${String(index)}`,
+      title: template.title,
+      absoluteUrl: `https://boards.example.com/${token}/jobs/${String(index)}`,
+      locationName: template.locationName,
+      updatedAt: template.updatedAt,
+      firstPublished: template.firstPublished,
+      language: template.language,
+      content: template.content,
+      departments: template.departments,
+    };
+  });
+}
+
+function bulkLeverJobs(token: string, spec: SyntheticBoardSpec) {
   return Array.from({ length: spec.jobCount }, (_unused, index) => {
     const location = pick(BULK_LOCATIONS, index);
 
@@ -262,7 +295,7 @@ function bulkLeverJobs(token: string, spec: BulkBoardSpec) {
   });
 }
 
-function bulkAshbyJobs(token: string, spec: BulkBoardSpec) {
+function bulkAshbyJobs(token: string, spec: SyntheticBoardSpec) {
   return Array.from({ length: spec.jobCount }, (_unused, index) => ({
     id: `ash-${token}-${String(index)}`,
     title: pick(BULK_TITLES, index),
@@ -317,11 +350,20 @@ function loadDirectories(root: string) {
   );
 }
 
+function readGreenhouseBoard(token: string) {
+  const root = "test/e2e/fixtures/greenhouse";
+  const contentPath = join(process.cwd(), root, token, "content.json");
+  const boardPath = join(process.cwd(), root, token, "board.json");
+  const file = existsSync(contentPath) ? contentPath : boardPath;
+
+  return greenhouseBoardSchema.parse(JSON.parse(readFileSync(file, "utf8")));
+}
+
 function loadGreenhouseBoards() {
   const boards = new Map<string, MutableGreenhouseJob[]>();
 
   for (const entry of loadDirectories("test/e2e/fixtures/greenhouse")) {
-    const parsed = readBoardFile("test/e2e/fixtures/greenhouse", entry.name, greenhouseBoardSchema);
+    const parsed = readGreenhouseBoard(entry.name);
 
     boards.set(
       entry.name,
@@ -412,6 +454,32 @@ function loadAshbyBoards() {
   }
 
   return boards;
+}
+
+function serializeGreenhouseJob(job: MutableGreenhouseJob, wantsContent: boolean) {
+  if (wantsContent) {
+    return {
+      id: job.id,
+      title: job.title,
+      absolute_url: job.absoluteUrl,
+      location: { name: job.locationName },
+      updated_at: job.updatedAt,
+      first_published: job.firstPublished,
+      language: job.language,
+      content: job.content,
+      departments: job.departments,
+    };
+  }
+
+  return {
+    id: job.id,
+    title: job.title,
+    absolute_url: job.absoluteUrl,
+    location: { name: job.locationName },
+    updated_at: job.updatedAt,
+    first_published: job.firstPublished,
+    language: job.language,
+  };
 }
 
 function serializeLeverJob(job: MutableLeverJob) {
@@ -640,7 +708,8 @@ export async function startFeedFixtureServer() {
   }
 
   async function handleRequest(request: IncomingMessage, response: ServerResponse) {
-    const { pathname } = new URL(request.url ?? "/", "http://127.0.0.1");
+    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    const { pathname, search } = url;
     const route = routeFor(pathname);
 
     if (route === null) {
@@ -657,7 +726,7 @@ export async function startFeedFixtureServer() {
     state.inFlight += 1;
     state.maxInFlight = Math.max(state.maxInFlight, state.inFlight);
     arrivalTimes.push(now);
-    paths.push(pathname);
+    paths.push(`${pathname}${search}`);
 
     requestWaiters.shift()?.(pathname);
 
@@ -693,18 +762,10 @@ export async function startFeedFixtureServer() {
         (job) => !removedJobIds.has(`greenhouse/${token}/${String(job.id)}`),
       );
 
+      const wantsContent = url.searchParams.get("content") === "true";
+
       const body = JSON.stringify({
-        jobs: jobs.map((job) => ({
-          id: job.id,
-          title: job.title,
-          absolute_url: job.absoluteUrl,
-          location: { name: job.locationName },
-          updated_at: job.updatedAt,
-          first_published: job.firstPublished,
-          language: job.language,
-          content: job.content,
-          departments: job.departments,
-        })),
+        jobs: jobs.map((job) => serializeGreenhouseJob(job, wantsContent)),
       });
 
       const etag = `"${hashBody(body)}"`;
@@ -841,14 +902,21 @@ export async function startFeedFixtureServer() {
     },
     seedBoard: (ats, token, spec) => {
       if (ats === "greenhouse") {
-        greenhouseBoards.set(token, bulkGreenhouseJobs(token, spec));
+        if ("sourceToken" in spec) {
+          greenhouseBoards.set(
+            token,
+            replayedGreenhouseJobs(token, greenhouseBoards.get(spec.sourceToken) ?? [], spec),
+          );
+        } else {
+          greenhouseBoards.set(token, bulkGreenhouseJobs(token, spec));
+        }
       }
 
-      if (ats === "lever") {
+      if (ats === "lever" && !("sourceToken" in spec)) {
         leverBoards.set(token, bulkLeverJobs(token, spec));
       }
 
-      if (ats === "ashby") {
+      if (ats === "ashby" && !("sourceToken" in spec)) {
         ashbyBoards.set(token, bulkAshbyJobs(token, spec));
       }
     },

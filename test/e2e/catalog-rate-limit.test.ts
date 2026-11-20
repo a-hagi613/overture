@@ -16,7 +16,7 @@ test("a backfill across boards respects the Greenhouse concurrency cap and reque
 
     const stats = harness.fixture.stats();
 
-    expect(stats.requestCount).toBe(BOARDS.length + 4 * BOARDS.length);
+    expect(stats.requestCount).toBe(BOARDS.length);
 
     const overlappingRequests = stats.maxInFlight;
 

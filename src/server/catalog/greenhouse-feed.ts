@@ -26,6 +26,13 @@ const jobSchema = z.object({
 
 const listResponseSchema = z.object({ jobs: z.array(jobSchema) });
 
+const contentJobSchema = jobSchema.extend({
+  content: z.string().nullish(),
+  departments: z.array(z.object({ name: z.string().nullish() })).nullish(),
+});
+
+const contentResponseSchema = z.object({ jobs: z.array(contentJobSchema) });
+
 const detailResponseSchema = z.object({
   content: z.string().nullish(),
   departments: z.array(z.object({ name: z.string().nullish() })).nullish(),
@@ -114,6 +121,46 @@ export function createGreenhouseFeed(
     } as const;
   };
 
+  const fetchBoardContent = async (boardToken: string) => {
+    assertToken(boardToken);
+
+    const url = `${baseUrl}/v1/boards/${boardToken}/jobs?content=true`;
+    const response = await limiter.run(async () => fetcher(url, { ifNoneMatch: null }));
+
+    if (response.status === 304) {
+      return { status: "not_modified" } as const;
+    }
+
+    if (response.status === 404) {
+      return { status: "gone" } as const;
+    }
+
+    const parsed = contentResponseSchema.parse(response.json);
+
+    const postings: FeedPosting[] = parsed.jobs.map((job) => ({
+      atsJobId: job.id,
+      title: job.title,
+      url: job.absolute_url ?? "",
+      locationRaw: job.location?.name ?? null,
+      language: job.language ?? null,
+      postedAt: job.first_published ?? null,
+      sourceUpdatedAt: job.updated_at ?? null,
+      descriptionPending: false,
+      content: {
+        descriptionText: htmlToText(job.content ?? null),
+        department: job.departments?.[0]?.name ?? null,
+        locationRaw: job.location?.name ?? null,
+      },
+    }));
+
+    return {
+      status: "ok",
+      postings,
+      etag: null,
+      bodyHash: contentHash(JSON.stringify(response.json)),
+    } as const;
+  };
+
   const fetchPostingDetail = async (boardToken: string, atsJobId: string) => {
     assertToken(boardToken);
 
@@ -150,5 +197,5 @@ export function createGreenhouseFeed(
     }
   };
 
-  return { fetchBoard, fetchPostingDetail } satisfies BoardFeed;
+  return { fetchBoard, fetchBoardContent, fetchPostingDetail } satisfies BoardFeed;
 }
