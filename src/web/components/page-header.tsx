@@ -38,7 +38,7 @@ export function PageHeader({ lead, titleNode }: { lead: string; titleNode: React
           </svg>
           <input
             aria-label={copy.shell.searchLabel}
-            className="h-full min-w-0 flex-1 bg-transparent text-[13.5px] font-medium outline-0 placeholder:text-muted-foreground"
+            className="min-w-0 flex-1 bg-transparent px-[2px] py-[1px] text-[13.5px] font-medium leading-[17px] outline-0 placeholder:text-muted-foreground"
             placeholder={copy.shell.searchPlaceholder}
             type="search"
           />

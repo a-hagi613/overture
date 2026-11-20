@@ -28,10 +28,10 @@ export function SideNav({ showLabels }: { showLabels: boolean }) {
         <NavLink key={destination.to} to={destination.to} end={destination.to === "/"}>
           {({ isActive }) => (
             <span
-              className={`relative flex min-h-10 items-center gap-3 rounded-md border px-3 text-sm font-medium ${
+              className={`relative flex min-h-10 items-center gap-3 rounded-md border px-3 text-sm font-medium leading-[21px] ${
                 isActive
                   ? "border-border bg-card text-foreground shadow-sh"
-                  : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+                  : "border-transparent text-foreground hover:bg-muted"
               } ${showLabels ? "" : "justify-center"}`}
             >
               {isActive ? (

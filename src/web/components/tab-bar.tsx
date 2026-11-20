@@ -32,11 +32,7 @@ export function TabBar() {
           key={destination.to}
           to={destination.to}
           end={destination.to === "/"}
-          className={({ isActive }) =>
-            `relative flex min-w-0 flex-1 flex-col items-center justify-center gap-[3px] text-[10.5px] font-semibold ${
-              isActive ? "text-foreground" : "text-muted-foreground"
-            }`
-          }
+          className="relative flex min-w-0 flex-1 flex-col items-center justify-center gap-[3px] text-[10.5px] font-semibold text-foreground"
         >
           {({ isActive }) => (
             <>

@@ -2,8 +2,8 @@ import { copy } from "../../shared/copy.ts";
 
 export function UsageCard() {
   return (
-    <div className="rounded-lg border border-border bg-card px-3.5 pb-[15px] pt-3.5">
-      <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+    <div className="rounded-lg border border-border bg-card px-3.5 pb-[15px] pt-[15px]">
+      <p className="mb-2.5 text-[11px] font-semibold leading-[13px] uppercase tracking-[0.15em] text-muted-foreground">
         {copy.home.applicationsLeft}
       </p>
       <div className="flex items-baseline gap-2">
@@ -15,7 +15,7 @@ export function UsageCard() {
       <div className="mt-2.5 h-[5px] rounded-[3px] bg-border">
         <div className="h-full w-[10%] rounded-[3px] bg-foreground" />
       </div>
-      <p className="mt-[11px] text-xs tabular-nums text-muted-foreground">
+      <p className="mt-[11px] text-xs leading-[18px] tabular-nums text-muted-foreground">
         {copy.sample.sentToday}
       </p>
     </div>
