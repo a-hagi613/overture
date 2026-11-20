@@ -639,6 +639,55 @@ SPLIT_AXES = [{"workplaceTypes": [w], "roleTypes": [r]}
               for w in ("Remote", "Hybrid", "Onsite")
               for r in ("Individual Contributor", "People Manager")]
 
+# Even a workplace×role day-slice can exceed the page cap (Onsite×IC runs ~4.4k/day).
+# Third axis: `locations` (verified filter key). Country names for the ISO codes the
+# site's job records use; if a country slice is still over the cap, fall back to that
+# country's states (from job_locations), else accept partial coverage and say so.
+SPLIT_COUNTRIES = ("Canada", "United States", "United Kingdom", "Germany", "Mexico",
+                   "Brazil", "Spain", "Ireland", "Australia", "Netherlands",
+                   "Italy", "India")
+COUNTRY_CODE = {"Canada": "CA", "United States": "US", "United Kingdom": "GB",
+                "Germany": "DE", "Mexico": "MX", "Brazil": "BR", "Spain": "ES",
+                "Ireland": "IE", "Australia": "AU", "Netherlands": "NL",
+                "Italy": "IT", "India": "IN"}
+
+
+def _location_filter(name: str, types: list[str]) -> dict:
+    return {"locations": [{"formatted_address": name, "types": types}]}
+
+
+def _split_locations(con, dfrom: str, dto: str, sid: int, filters: str, total: int) -> None:
+    """Split an over-cap filtered day-shard by country (then state)."""
+    cur = json.loads(filters) if filters else {}
+    locs = (cur.get("locations") or [])
+    inserts: list[tuple[str, str]] = []
+    if not locs:                                    # level 1: by country
+        for name in SPLIT_COUNTRIES:
+            nxt = dict(cur, **{"locations": [{"formatted_address": name, "types": ["country"]}]})
+            inserts.append((dfrom, json.dumps(nxt, separators=(",", ":"))))
+    else:
+        addr = locs[0]
+        code = COUNTRY_CODE.get(addr.get("formatted_address"))
+        if addr.get("types") == ["country"] and code:
+            states = [r[0] for r in con.execute(
+                "SELECT value FROM job_locations WHERE level='state' AND country_code=? "
+                "GROUP BY value ORDER BY COUNT(*) DESC LIMIT 40", (code,))]
+            for st in states:
+                nxt = dict(cur, **{"locations": [{
+                    "formatted_address": st,
+                    "types": ["administrative_area_level_1"]}]})
+                inserts.append((dfrom, json.dumps(nxt, separators=(",", ":"))))
+        else:
+            log(f"WARNING {dfrom} {filters or ''}: {total} hits over cap and no finer "
+                f"location split available — coverage partial")
+            return
+    con.execute("UPDATE shards SET status='split' WHERE id=?", (sid,))
+    for d, f in inserts:
+        con.execute("INSERT INTO shards(dfrom, dto, filters) VALUES (?,?,?)", (d, d, f))
+    con.commit()
+    log(f"shard {dfrom} {filters or ''}: {total} hits > {RETRIEVE_CAP} → "
+        f"{len(inserts)} location shards")
+
 
 def enumerate_all(client: Client, start: str, end: str) -> None:
     con = connect()
@@ -691,9 +740,10 @@ def enumerate_all(client: Client, start: str, end: str) -> None:
                 f"{len(SPLIT_AXES)} workplace×role shards")
             continue
 
-        if total > RETRIEVE_CAP:
-            log(f"WARNING {dfrom} {filters or ''}: {total} hits over the ~1,680 retrieval "
-                f"cap even after splitting — coverage will be partial")
+        if total > RETRIEVE_CAP and filters:
+            # single day + workplace/role split still over cap → split by location
+            _split_locations(con, dfrom, dto, sid, filters, total)
+            continue
 
         label = f"{dfrom}..{dto}" + (f" {filters}" if filters else "")
         log(f"shard {label}: {total} hits")
