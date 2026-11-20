@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError } from "better-auth/api";
-import { captcha, genericOAuth, magicLink } from "better-auth/plugins";
+import { genericOAuth, magicLink } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { eq } from "drizzle-orm";
 
@@ -20,6 +20,7 @@ import {
   verifications,
 } from "../platform/db/schema.ts";
 import { recordPasskeyAssertion } from "../platform/passkey/index.ts";
+import { verifyTurnstile } from "./turnstile-gate.ts";
 
 const GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration";
 const LINKEDIN_DISCOVERY_URL = "https://www.linkedin.com/oauth/.well-known/openid-configuration";
@@ -159,11 +160,14 @@ export function createAuth(db: AppDatabase, clock: Clock, mailSender: MailSender
     },
     socialProviders: {},
     plugins: [
-      captcha({
-        provider: "cloudflare-turnstile",
-        secretKey: env.TURNSTILE_SECRET,
-        endpoints: ["/sign-in/magic-link", "/sign-in/social"],
-      }),
+      {
+        id: "turnstile-gate",
+        onRequest: async (request: Request) => {
+          const refusal = await verifyTurnstile(request);
+
+          return refusal === null ? undefined : { response: refusal };
+        },
+      },
       genericOAuth({
         config: providerConfigs,
       }),

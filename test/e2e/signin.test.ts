@@ -4,6 +4,7 @@ import {
   clearSinkMail,
   latestMailLink,
   requestMagicLink,
+  setTurnstileScenario,
   signInByMagicLink,
   sinkMailCount,
   verifyAuthState,
@@ -35,9 +36,13 @@ test("the owner signs in from the sign-in screen with an emailed link", async ({
 
 test("the owner signs in with Google through the local identity server", async ({
   page,
-  appServerUrl,
+  request,
+  isolatedAppServer,
   identityServer,
 }) => {
+  const appServerUrl = isolatedAppServer.url;
+
+  await setTurnstileScenario(request, appServerUrl, { action: "signin" });
   await identityServer.setPersona(personas.owner("google-owner"));
   await page.goto(`${appServerUrl}/signin`);
   const googleButton = page.getByRole("button", { name: "Continue with Google" });
@@ -55,9 +60,13 @@ test("the owner signs in with Google through the local identity server", async (
 
 test("the owner signs in with LinkedIn through the local identity server", async ({
   page,
-  appServerUrl,
+  request,
+  isolatedAppServer,
   identityServer,
 }) => {
+  const appServerUrl = isolatedAppServer.url;
+
+  await setTurnstileScenario(request, appServerUrl, { action: "signin" });
   await identityServer.setPersona(personas.owner("linkedin-owner"));
   await page.goto(`${appServerUrl}/signin`);
   const linkedinButton = page.getByRole("button", { name: "Continue with LinkedIn" });
@@ -79,6 +88,7 @@ test("an unverified provider email is refused and no session is issued", async (
 }) => {
   const appServerUrl = isolatedAppServer.url;
 
+  await setTurnstileScenario(request, appServerUrl, { action: "signin" });
   await identityServer.setPersona(personas.unverified("unverified-owner"));
   await page.goto(`${appServerUrl}/signin`);
   const googleButton = page.getByRole("button", { name: "Continue with Google" });
@@ -103,6 +113,7 @@ test("an email outside the allowlist is refused at the sign-in screen", async ({
 }) => {
   const appServerUrl = isolatedAppServer.url;
 
+  await setTurnstileScenario(request, appServerUrl, { action: "signin" });
   await identityServer.setPersona(personas.outsider("outsider-google"));
   await clearSinkMail(appServerUrl, request);
 
@@ -123,6 +134,8 @@ test("an email outside the allowlist is refused at the sign-in screen", async ({
   });
 
   const outsider = personas.outsider("outsider-magic");
+
+  await setTurnstileScenario(request, appServerUrl, { action: "magiclink" });
   const magic = await requestMagicLink(appServerUrl, request, outsider.email);
 
   expect(magic.status()).toBe(403);
@@ -224,6 +237,7 @@ test("a second sign-in method on the same verified email joins the one account",
   const secondContext = await browser.newContext();
   const secondPage = await secondContext.newPage();
 
+  await setTurnstileScenario(request, appServerUrl, { action: "signin" });
   await secondPage.goto(`${appServerUrl}/signin`);
   await secondPage.getByRole("button", { name: "Continue with Google" }).click();
   await expect(secondPage.getByRole("heading", { name: "Overture is ready" })).toBeVisible();

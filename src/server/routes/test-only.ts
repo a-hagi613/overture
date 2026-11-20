@@ -26,6 +26,7 @@ import { publishEvent } from "../platform/sse/stream.ts";
 import { clearSinkMail, listSinkMail } from "../platform/mail/sink.ts";
 import { getTestSpans, resetTestSpans } from "../platform/telemetry/otel.ts";
 import { releaseBlockingJobs } from "../testing/blocking-job.ts";
+import { setTurnstileScenario, turnstileScenarioBody } from "../testing/turnstile-scenario.ts";
 import { readCompaniesParquet } from "../catalog/companies-parquet.ts";
 import { contentHash } from "../catalog/content-hash.ts";
 import { loadDiscoveredBoards } from "../catalog/discovered-boards.ts";
@@ -164,6 +165,12 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
     clock.setOffset(offsetMs);
 
     return context.json({ now: clock.now(), offsetMs: clock.offset() });
+  });
+
+  routes.post("/turnstile", zValidator("json", turnstileScenarioBody), (context) => {
+    setTurnstileScenario(context.req.valid("json"));
+
+    return context.json({ ok: true });
   });
 
   routes.post("/jobs/run-due", async (context) => {

@@ -248,7 +248,10 @@ for (const width of widths) {
           if (mode === "magic-sent") {
             await expect
               .poll(
-                async () => await page.locator('input[name="cf-turnstile-response"]').inputValue(),
+                async () =>
+                  await page
+                    .locator('[data-turnstile="magic"] input[name="cf-turnstile-response"]')
+                    .inputValue(),
               )
               .not.toBe("");
             await page.getByRole("button", { name: "Email me a sign-in link" }).click();

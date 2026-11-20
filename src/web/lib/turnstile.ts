@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef } from "react";
 
+import type { TurnstileAction } from "../../shared/turnstile.ts";
+
 export interface TurnstileRenderOptions {
   sitekey: string;
+  action?: TurnstileAction;
   appearance?: "always" | "execute" | "interaction-only";
   callback?: (token: string) => void;
   "error-callback"?: (error: string) => void;
@@ -23,45 +26,38 @@ declare global {
 
 const readyEvent = "overture:turnstile-ready";
 
-interface TokenWaiter {
-  resolve: (token: string | null) => void;
-}
-
-export function useTurnstile(siteKey: string | null) {
+export function useTurnstile(siteKey: string | null, action: TurnstileAction) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const widgetIdRef = useRef<string | null>(null);
   const tokenRef = useRef<string | null>(null);
-  const waitersRef = useRef<TokenWaiter[]>([]);
+  const waiterRef = useRef<((token: string | null) => void) | null>(null);
 
   const settle = useCallback((token: string | null) => {
-    const waiters = waitersRef.current;
+    const waiter = waiterRef.current;
 
-    waitersRef.current = [];
+    waiterRef.current = null;
 
-    if (waiters.length === 0) {
+    if (waiter === null) {
       tokenRef.current = token;
 
       return;
     }
 
-    if (globalThis.turnstile !== undefined) {
-      globalThis.turnstile.reset();
-    }
-
-    for (const waiter of waiters) {
-      waiter.resolve(token);
-    }
+    waiter(token);
   }, []);
 
   useEffect(() => {
-    let widgetId: string | null = null;
     let cancelled = false;
 
     const clear = () => {
       cancelled = true;
 
-      if (widgetId !== null && globalThis.turnstile !== undefined) {
-        globalThis.turnstile.remove(widgetId);
+      if (widgetIdRef.current !== null && globalThis.turnstile !== undefined) {
+        globalThis.turnstile.remove(widgetIdRef.current);
       }
+
+      widgetIdRef.current = null;
+      tokenRef.current = null;
     };
 
     if (siteKey === null || containerRef.current === null) {
@@ -75,8 +71,9 @@ export function useTurnstile(siteKey: string | null) {
         return;
       }
 
-      widgetId = turnstile.render(containerRef.current, {
+      widgetIdRef.current = turnstile.render(containerRef.current, {
         sitekey: siteKey,
+        action,
         appearance: "interaction-only",
         callback: (token) => {
           settle(token);
@@ -102,29 +99,27 @@ export function useTurnstile(siteKey: string | null) {
     }
 
     return clear;
-  }, [settle, siteKey]);
+  }, [action, settle, siteKey]);
 
-  const obtainToken = async () => {
-    const token = tokenRef.current;
-
-    if (token !== null) {
-      tokenRef.current = null;
-
-      if (globalThis.turnstile !== undefined) {
-        globalThis.turnstile.reset();
-      }
-
-      return token;
-    }
-
+  const obtainToken = useCallback(async () => {
     if (siteKey === null) {
       return null;
     }
 
-    return new Promise<string | null>((resolve) => {
-      waitersRef.current.push({ resolve });
-    });
-  };
+    const token =
+      tokenRef.current ??
+      (await new Promise<string | null>((resolve) => {
+        waiterRef.current = resolve;
+      }));
+
+    tokenRef.current = null;
+
+    if (widgetIdRef.current !== null && globalThis.turnstile !== undefined) {
+      globalThis.turnstile.reset(widgetIdRef.current);
+    }
+
+    return token;
+  }, [siteKey]);
 
   return { containerRef, obtainToken };
 }
