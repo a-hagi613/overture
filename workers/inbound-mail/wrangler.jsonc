@@ -1,0 +1,11 @@
+{
+  "name": "overture-inbound-mail",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "observability": {
+    "enabled": true,
+  },
+  "vars": {
+    "OVERTURE_ORIGIN": "https://tryoverture.com",
+  },
+}
