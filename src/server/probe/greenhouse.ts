@@ -15,10 +15,18 @@ const FILLABLE_INPUT_TYPES = new Set(["text", "email", "tel", "number", "date", 
 
 const FORM_APPEAR_MS = 15_000;
 const COMBOBOX_MENU_MS = 5000;
+const COMBOBOX_KEY_DELAY_MS = 50;
 
 export interface GreenhouseAttempt {
-  outcome: "dry_run_filled" | "sent" | "unconfirmed" | "code_refused" | "form_missing";
+  outcome:
+    | "dry_run_filled"
+    | "fill_failed"
+    | "sent"
+    | "unconfirmed"
+    | "code_refused"
+    | "form_missing";
   filledIds: string[];
+  failedIds: string[];
   resumeUploaded: boolean;
   codeAsked: boolean;
   codeResponseStatus: number | null;
@@ -27,7 +35,6 @@ export interface GreenhouseAttempt {
 }
 
 const messages = {
-  unfilled: (ids: string) => `questions the run file does not fill: ${ids}`,
   uploadRefused: (id: string) => `the resume input ${id} refused the upload`,
 };
 
@@ -51,6 +58,17 @@ const fillTextbox = async (field: Locator, value: string) => {
   return true;
 };
 
+const firstSegmentOf = (wanted: string) => (wanted.split(",")[0] ?? "").trim();
+
+const cityOf = (text: string) => (text.split(",")[0] ?? "").trim();
+
+const tokensOf = (text: string) => text.split(/[\s,]+/u).filter((token) => token !== "");
+
+const samePlaceToken = (wanted: string, offered: string) =>
+  wanted === offered ||
+  (wanted.length >= 2 && offered.startsWith(wanted)) ||
+  (offered.length >= 2 && wanted.startsWith(offered));
+
 function matchedIndex(texts: string[], target: string) {
   const exact = texts.indexOf(target);
 
@@ -67,6 +85,45 @@ function matchedIndex(texts: string[], target: string) {
   return -1;
 }
 
+function autocompleteIndex(texts: string[], wanted: string) {
+  const target = norm(wanted);
+  const exact = texts.indexOf(target);
+
+  if (exact !== -1) {
+    return exact;
+  }
+
+  const city = cityOf(target);
+
+  if (city === "") {
+    return -1;
+  }
+
+  const regionTokens = tokensOf(target.slice(city.length));
+
+  const candidates = texts.flatMap((text, index) =>
+    cityOf(text) === city ? [{ text, index }] : [],
+  );
+
+  const withRegion = candidates.find((entry) =>
+    tokensOf(entry.text.slice(cityOf(entry.text).length)).some((token) =>
+      regionTokens.some((region) => samePlaceToken(region, token)),
+    ),
+  );
+
+  return withRegion === undefined ? (candidates[0]?.index ?? -1) : withRegion.index;
+}
+
+async function optionTexts(list: Locator) {
+  try {
+    await list.first().waitFor({ state: "visible", timeout: COMBOBOX_MENU_MS });
+  } catch {
+    return [];
+  }
+
+  return (await list.allInnerTexts()).map((text) => norm(text));
+}
+
 async function chooseFromCombobox(page: Page, field: Locator, wanted: string) {
   await field.click();
 
@@ -77,15 +134,37 @@ async function chooseFromCombobox(page: Page, field: Locator, wanted: string) {
       ? page.getByRole("option")
       : page.locator(`[id="${cssValue(listboxId)}"] [role='option']`);
 
-  try {
-    await list.first().waitFor({ state: "visible", timeout: COMBOBOX_MENU_MS });
-  } catch {
+  const opened = await optionTexts(list);
+
+  if (opened.length > 0) {
+    const index = matchedIndex(opened, norm(wanted));
+
+    if (index >= 0) {
+      await list.nth(index).click();
+
+      return true;
+    }
+  }
+
+  const query = firstSegmentOf(wanted);
+
+  if (norm(query) === "") {
+    if (opened.length > 0) {
+      await field.press("Escape");
+    }
+
     return false;
   }
 
-  const texts = (await list.allInnerTexts()).map((text) => norm(text));
-  const target = norm(wanted);
-  const index = matchedIndex(texts, target);
+  await field.pressSequentially(query, { delay: COMBOBOX_KEY_DELAY_MS });
+
+  const searched = await optionTexts(list);
+
+  if (searched.length === 0) {
+    return false;
+  }
+
+  const index = autocompleteIndex(searched, wanted);
 
   if (index < 0) {
     await field.press("Escape");
@@ -254,6 +333,7 @@ const attemptStructure = {
   empty: (outcome: GreenhouseAttempt["outcome"], filledIds: string[]) => ({
     outcome,
     filledIds,
+    failedIds: [],
     resumeUploaded: false,
     codeAsked: false,
     codeResponseStatus: null,
@@ -310,7 +390,7 @@ export async function probeGreenhouse(
   const { filledIds, failedIds } = await fillQuestionsInOrder(page, posting.questions);
 
   if (failedIds.length > 0) {
-    throw new Error(messages.unfilled(failedIds.join(", ")));
+    return { ...attemptStructure.empty("fill_failed", filledIds), failedIds };
   }
 
   const resumeUploaded = await uploadResume(page, posting.resumeFieldId, resumePath);
@@ -331,10 +411,8 @@ export async function probeGreenhouse(
     const confirmed = firstStatus !== null && firstStatus < 400 && (await readConfirmation(page));
 
     return {
-      outcome: confirmed ? "sent" : "unconfirmed",
-      filledIds,
+      ...attemptStructure.empty(confirmed ? "sent" : "unconfirmed", filledIds),
       resumeUploaded,
-      codeAsked: false,
       codeResponseStatus,
       submitResponseStatus: firstStatus,
       confirmationSeen: confirmed,
@@ -357,19 +435,16 @@ export async function probeGreenhouse(
 
   if (secondStatus !== null && secondStatus >= 400) {
     return {
-      outcome: "code_refused",
-      filledIds,
+      ...attemptStructure.empty("code_refused", filledIds),
       resumeUploaded,
       codeAsked: true,
       codeResponseStatus,
       submitResponseStatus: secondStatus,
-      confirmationSeen: false,
     };
   }
 
   return {
-    outcome: confirmed ? "sent" : "unconfirmed",
-    filledIds,
+    ...attemptStructure.empty(confirmed ? "sent" : "unconfirmed", filledIds),
     resumeUploaded,
     codeAsked: true,
     codeResponseStatus,

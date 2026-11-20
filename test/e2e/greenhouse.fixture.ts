@@ -9,6 +9,7 @@ export interface GreenhouseFixturesState {
   code: string;
   codeAsked: boolean;
   lastForm: Record<string, string>;
+  lastChoices: Record<string, string>;
   lastResumeBytes: Uint8Array | null;
 }
 
@@ -32,6 +33,7 @@ export function startGreenhouseFixture() {
     code: "48211357",
     codeAsked: false,
     lastForm: {},
+    lastChoices: {},
     lastResumeBytes: null,
   };
 
@@ -61,6 +63,17 @@ export function startGreenhouseFixture() {
         }
 
         return Response.json({ stored: upload instanceof File });
+      }
+
+      if (path === "/__fixture__/choice") {
+        const fieldId = url.searchParams.get("fieldId");
+        const value = url.searchParams.get("value");
+
+        if (fieldId !== null && value !== null) {
+          state.lastChoices[fieldId] = value;
+        }
+
+        return new Response(null, { status: 204 });
       }
 
       if (path === "/__fixture__/state") {

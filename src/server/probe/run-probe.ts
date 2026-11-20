@@ -8,6 +8,7 @@ import { BrowserUseClient } from "../dispatch/browser/browser-use.ts";
 import type { BrowserSession } from "../dispatch/browser/browser-use.ts";
 import type { ProbeConsole } from "./console.ts";
 import { probeGreenhouse } from "./greenhouse.ts";
+import type { GreenhouseAttempt } from "./greenhouse.ts";
 import { GREENHOUSE_BOARD_ORIGIN, postingUrl } from "./run-file.ts";
 import type { RunFile, RunFilePosting } from "./run-file.ts";
 import { openProbeDatabase, recordProbeForm } from "./store.ts";
@@ -95,6 +96,16 @@ const routeHandler = async (route: Route) => {
   }
 
   await route.fallback();
+};
+
+const attemptOutcome = (attempt: GreenhouseAttempt | null, fallback: string) => {
+  if (attempt === null) {
+    return fallback;
+  }
+
+  return attempt.outcome === "fill_failed"
+    ? `fill_failed: ${attempt.failedIds.join(", ")}`
+    : attempt.outcome;
 };
 
 export async function runProbe(deps: ProbeDeps) {
@@ -231,7 +242,7 @@ async function runPosting(
     company: posting.company,
     title: posting.title,
     confirmMode: deps.confirm,
-    outcome: attempt === null ? outcome : attempt.outcome,
+    outcome: attemptOutcome(attempt, outcome),
     submitted: sent,
     confirmationSeen: attempt?.confirmationSeen === true,
     codeAsked: attempt?.codeAsked === true,

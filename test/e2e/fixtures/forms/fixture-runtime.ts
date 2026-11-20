@@ -10,6 +10,7 @@ interface RecordedOption {
 
 interface FixtureMeta {
   options: Record<string, RecordedOption[]>;
+  autocompletes?: string[];
   jobLocation: string;
   confirmationMessage: string;
 }
@@ -48,8 +49,9 @@ const chooseOption = (
   option: HTMLElement,
 ) => {
   const label = option.textContent;
+  const value = option.dataset.value ?? "";
 
-  hiddenInput.setAttribute("value", option.dataset.value ?? "");
+  hiddenInput.setAttribute("value", value);
   closeListbox(field, listbox);
 
   const container = field.closest(".select__container");
@@ -72,19 +74,25 @@ const chooseOption = (
   }
 
   chosen.textContent = label;
+
+  const choice = new URLSearchParams({ fieldId: field.id, value });
+
+  void fetch(`/__fixture__/choice?${choice.toString()}`);
 };
 
-const setupCombobox = (
+const openListbox = (field: HTMLInputElement, listbox: HTMLElement) => {
+  listbox.hidden = false;
+  field.setAttribute("aria-expanded", "true");
+};
+
+const renderOptions = (
   field: HTMLInputElement,
+  listbox: HTMLElement,
+  listboxId: string,
   hiddenInput: HTMLInputElement,
   options: RecordedOption[],
 ) => {
-  const listbox = document.createElement("ul");
-  const listboxId = `react-select-${field.id}-listbox`;
-
-  listbox.id = listboxId;
-  listbox.setAttribute("role", "listbox");
-  listbox.hidden = true;
+  listbox.replaceChildren();
 
   for (const [optionIndex, option] of options.entries()) {
     const item = document.createElement("li");
@@ -101,6 +109,22 @@ const setupCombobox = (
 
     listbox.append(item);
   }
+};
+
+const setupCombobox = (
+  field: HTMLInputElement,
+  hiddenInput: HTMLInputElement,
+  options: RecordedOption[],
+  autocomplete: boolean,
+) => {
+  const listbox = document.createElement("ul");
+  const listboxId = `react-select-${field.id}-listbox`;
+
+  listbox.id = listboxId;
+  listbox.setAttribute("role", "listbox");
+  listbox.hidden = true;
+
+  renderOptions(field, listbox, listboxId, hiddenInput, options);
 
   field.setAttribute("aria-controls", listboxId);
 
@@ -108,10 +132,30 @@ const setupCombobox = (
 
   shell?.append(listbox);
 
-  field.addEventListener("click", () => {
-    listbox.hidden = false;
-    field.setAttribute("aria-expanded", "true");
-  });
+  if (autocomplete) {
+    field.addEventListener("input", () => {
+      const query = field.value.trim().toLowerCase();
+
+      const matched =
+        query === ""
+          ? []
+          : options.filter((option) => option.label.toLowerCase().startsWith(query));
+
+      renderOptions(field, listbox, listboxId, hiddenInput, matched);
+
+      if (matched.length === 0) {
+        closeListbox(field, listbox);
+
+        return;
+      }
+
+      openListbox(field, listbox);
+    });
+  } else {
+    field.addEventListener("click", () => {
+      openListbox(field, listbox);
+    });
+  }
 
   field.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -173,7 +217,7 @@ const attachComboboxes = (form: HTMLFormElement, meta: FixtureMeta) => {
     hidden.type = "hidden";
     hidden.name = field.id;
     form.append(hidden);
-    setupCombobox(field, hidden, options);
+    setupCombobox(field, hidden, options, meta.autocompletes?.includes(field.id) ?? false);
   }
 };
 
