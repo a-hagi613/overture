@@ -1,0 +1,686 @@
+import { and, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
+
+import type { AppDatabase } from "../platform/db/client.ts";
+import type { Clock } from "../platform/ports/clock.ts";
+import type { LlmOutputSchema, LlmPort, LlmRequest } from "../platform/ports/llm.ts";
+import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import type { RankedCandidate } from "./candidates.ts";
+
+import {
+  applications,
+  companies,
+  matches,
+  postings,
+  postingUserState,
+  profiles,
+  resumes,
+  users,
+} from "../platform/db/schema.ts";
+import { applicationsLeft, committedSince } from "../billing/ledger.ts";
+import { checkLlmCaps } from "../platform/llm/caps.ts";
+import { recordLlmUsage } from "../platform/llm/usage.ts";
+import { raiseAlert } from "../platform/alerts.ts";
+import { enqueueJob } from "../platform/jobs/queue.ts";
+import { getSetting } from "../platform/settings/index.ts";
+import { createLanguagesService } from "../profile/languages.ts";
+import { createTargetsService } from "../profile/targets.ts";
+import { activeApplicationCompanies, applicationFor, createApplication } from "./applications.ts";
+import { createCandidateService } from "./candidates.ts";
+
+export const MATCH_FILL_JOB_KIND = "match.fill";
+export const SCORE_PURPOSE = "score";
+
+const CHUNK_SIZE = 5;
+const RESUME_DIGEST_CHARS = 1500;
+const SUMMARY_WORDS = 200;
+
+const OUTPUT_SCHEMA: LlmOutputSchema = {
+  type: "object",
+  properties: {
+    score: { type: "number", description: "Fit from 0 to 100." },
+    reason: { type: "string", description: "One line, 140 characters or fewer." },
+  },
+  required: ["score", "reason"],
+  additionalProperties: false,
+};
+
+const scoreOutputSchema = z.object({
+  score: z.number().int().min(0).max(100),
+  reason: z.string().min(1),
+});
+
+const SYSTEM_PROMPT = [
+  "You score how well a job posting fits one candidate's resume and targets.",
+  "Give 0-100 for overall fit. Be strict: 80 or above only for a strong fit on role, seniority, place and pay.",
+  "Write one line of at most 140 characters saying why, naming the strongest match or the gap.",
+  "Use only the facts given. Never invent experience.",
+  "Return the JSON the tool requests, with no other text.",
+].join(" ");
+
+type ScoreOutput = z.infer<typeof scoreOutputSchema>;
+
+interface MatchDeps {
+  db: AppDatabase;
+  clock: Clock;
+  llm: LlmPort;
+  personal: PersonalCrypto;
+}
+
+interface ScoreContext {
+  resumeId: string | null;
+  resumeDigest: string;
+  targetsVersion: number;
+  threshold: number;
+}
+
+function settingNumber(db: AppDatabase, key: string, fallback: number) {
+  const raw = getSetting(db, key);
+  const parsed = raw === null ? Number.NaN : Number(raw);
+
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function localDayStart(at: number, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+    minute: "2-digit",
+    month: "2-digit",
+    second: "2-digit",
+    timeZone,
+    year: "numeric",
+  }).formatToParts(new Date(at));
+
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+
+  const year = Number(values.get("year"));
+  const month = Number(values.get("month"));
+  const day = Number(values.get("day"));
+  const hour = Number(values.get("hour"));
+  const minute = Number(values.get("minute"));
+  const second = Number(values.get("second"));
+
+  const asUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  const offset = asUtc - Math.floor(at / 1000) * 1000;
+
+  return Date.UTC(year, month - 1, day) - offset;
+}
+
+function truncateReason(reason: string) {
+  return reason.trim().slice(0, 140);
+}
+
+function scoreRequest(input: {
+  customId: string;
+  title: string;
+  company: string;
+  location: string;
+  workplace: string;
+  employmentType: string;
+  salary: string;
+  tags: string;
+  summary: string;
+  resumeDigest: string;
+}) {
+  const user = [
+    `title: ${input.title}`,
+    `company: ${input.company}`,
+    `location: ${input.location}`,
+    `workplace: ${input.workplace}`,
+    `employment: ${input.employmentType}`,
+    `salary: ${input.salary}`,
+    `tags: ${input.tags}`,
+    `summary: ${input.summary}`,
+    `resume: ${input.resumeDigest}`,
+  ].join("\n");
+
+  return {
+    customId: input.customId,
+    purpose: SCORE_PURPOSE,
+    schema: OUTPUT_SCHEMA,
+    system: SYSTEM_PROMPT,
+    user,
+  } satisfies LlmRequest;
+}
+
+export function createMatchingService(deps: MatchDeps) {
+  const { db, clock, llm, personal } = deps;
+
+  const candidates = createCandidateService({ db, clock, personal });
+  const languagesService = createLanguagesService({ db, clock });
+  const targetsService = createTargetsService({ db, clock });
+
+  async function contextFor(userId: string) {
+    const resume = db
+      .select()
+      .from(resumes)
+      .where(and(eq(resumes.userId, userId), eq(resumes.isCurrent, true)))
+      .get();
+
+    const resumeDigest =
+      resume === undefined
+        ? ""
+        : (
+            await personal.openFor(
+              userId,
+              { table: "resumes", column: "text_enc", rowId: resume.id },
+              resume.textEnc,
+            )
+          ).slice(0, RESUME_DIGEST_CHARS);
+
+    const targets = await targetsService.read(userId);
+
+    return {
+      resumeDigest,
+      resumeId: resume?.id ?? null,
+      targetsVersion: targets.version,
+      threshold: settingNumber(db, "match.auto_threshold_default", 60),
+    };
+  }
+
+  function cachedMatch(userId: string, postingId: string, context: ScoreContext) {
+    const row = db
+      .select()
+      .from(matches)
+      .where(and(eq(matches.userId, userId), eq(matches.postingId, postingId)))
+      .get();
+
+    if (
+      row?.score === undefined ||
+      row.score === null ||
+      row.resumeId !== context.resumeId ||
+      row.targetsVersion !== context.targetsVersion
+    ) {
+      return null;
+    }
+
+    return { score: row.score, reason: row.reason ?? "" };
+  }
+
+  function writeMatch(
+    userId: string,
+    postingId: string,
+    codeRank: number,
+    output: ScoreOutput | null,
+    context: ScoreContext,
+  ) {
+    const at = clock.now();
+
+    if (output === null) {
+      db.insert(matches)
+        .values({ userId, postingId, codeRank })
+        .onConflictDoUpdate({
+          target: [matches.userId, matches.postingId],
+          set: { codeRank },
+        })
+        .run();
+
+      return;
+    }
+
+    db.insert(matches)
+      .values({
+        userId,
+        postingId,
+        codeRank,
+        score: output.score,
+        reason: truncateReason(output.reason),
+        resumeId: context.resumeId,
+        targetsVersion: context.targetsVersion,
+        scoredAt: at,
+      })
+      .onConflictDoUpdate({
+        target: [matches.userId, matches.postingId],
+        set: {
+          codeRank,
+          score: output.score,
+          reason: truncateReason(output.reason),
+          resumeId: context.resumeId,
+          targetsVersion: context.targetsVersion,
+          scoredAt: at,
+        },
+      })
+      .run();
+  }
+
+  async function runScoreRequests(userId: string, requests: LlmRequest[]) {
+    const scores = new Map<string, ScoreOutput>();
+
+    if (requests.length === 0) {
+      return scores;
+    }
+
+    const estimated = llm.estimateBatchCostMicros(requests);
+
+    const caps = checkLlmCaps(db, clock, {
+      userId,
+      purpose: SCORE_PURPOSE,
+      estimatedCostMicros: estimated,
+    });
+
+    if (!caps.withinCaps) {
+      raiseAlert(db, clock, "llm.cap", {
+        cap: caps.exceeded,
+        purpose: SCORE_PURPOSE,
+        spentMicros: caps.spentMicros,
+        estimatedMicros: estimated,
+        capMicros: caps.capMicros,
+        postingsWaiting: requests.length,
+      });
+
+      return scores;
+    }
+
+    const calls = await llm.runBatch(requests);
+
+    for (const call of calls) {
+      recordLlmUsage(db, clock, {
+        userId,
+        purpose: SCORE_PURPOSE,
+        model: call.model,
+        inputTokens: call.inputTokens,
+        cachedTokens: call.cachedTokens,
+        outputTokens: call.outputTokens,
+        costMicros: call.costMicros,
+      });
+
+      const parsed = scoreOutputSchema.safeParse(call.result.ok ? call.result.value : null);
+
+      if (parsed.success) {
+        scores.set(call.customId, parsed.data);
+      }
+    }
+
+    return scores;
+  }
+
+  async function scorePosting(userId: string, postingId: string) {
+    const row = db
+      .select({
+        id: postings.id,
+        companyId: postings.companyId,
+        companyName: companies.name,
+        title: postings.title,
+        locationRaw: postings.locationRaw,
+        workplace: postings.workplace,
+        employmentType: postings.employmentType,
+        salaryMinMinor: postings.salaryMinMinor,
+        salaryCurrency: postings.salaryCurrency,
+        salaryPeriod: postings.salaryPeriod,
+        descriptionGz: postings.descriptionGz,
+      })
+      .from(postings)
+      .innerJoin(companies, eq(postings.companyId, companies.id))
+      .where(eq(postings.id, postingId))
+      .get();
+
+    if (row === undefined) {
+      return null;
+    }
+
+    const context = await contextFor(userId);
+    const cached = cachedMatch(userId, postingId, context);
+
+    if (cached !== null) {
+      return cached;
+    }
+
+    const summary = row.descriptionGz === null ? "" : row.descriptionGz.toString("utf8");
+
+    const salary =
+      row.salaryMinMinor === null || row.salaryCurrency === null
+        ? "none listed"
+        : `${row.salaryCurrency} ${String(Math.round(row.salaryMinMinor / 100))} per ${row.salaryPeriod ?? "year"}`;
+
+    const requests = [
+      scoreRequest({
+        customId: "score-open",
+        title: row.title,
+        company: row.companyName,
+        location: row.locationRaw ?? "unknown",
+        workplace: row.workplace,
+        employmentType: row.employmentType,
+        salary,
+        tags: "",
+        summary: summary.split(/\s+/u).slice(0, SUMMARY_WORDS).join(" "),
+        resumeDigest: context.resumeDigest,
+      }),
+    ];
+
+    const scores = await runScoreRequests(userId, requests);
+    const output = scores.get("score-open");
+
+    if (output === undefined) {
+      return null;
+    }
+
+    writeMatch(userId, postingId, 0, output, context);
+
+    return { score: output.score, reason: truncateReason(output.reason) };
+  }
+
+  async function ensureAutoApplication(userId: string, postingId: string, score: number) {
+    const context = await contextFor(userId);
+
+    if (score < context.threshold) {
+      return null;
+    }
+
+    const posting = db
+      .select({ companyId: postings.companyId })
+      .from(postings)
+      .where(eq(postings.id, postingId))
+      .get();
+
+    if (posting === undefined) {
+      return null;
+    }
+
+    if (activeApplicationCompanies(db, userId).has(posting.companyId)) {
+      return null;
+    }
+
+    return createApplication(db, clock.now(), {
+      companyId: posting.companyId,
+      origin: "auto",
+      postingId,
+      score,
+      userId,
+    });
+  }
+
+  async function scoreOnOpen(userId: string, postingId: string) {
+    const scored = await scorePosting(userId, postingId);
+
+    if (scored === null) {
+      return null;
+    }
+
+    const existing = applicationFor(db, userId, postingId);
+
+    if (existing !== undefined) {
+      return { ...scored, applicationId: existing.id };
+    }
+
+    const applicationId = await ensureAutoApplication(userId, postingId, scored.score);
+
+    return { ...scored, applicationId };
+  }
+
+  async function applyManually(userId: string, postingId: string) {
+    const existing = applicationFor(db, userId, postingId);
+
+    if (existing !== undefined) {
+      return { applicationId: existing.id, created: false };
+    }
+
+    const scored = await scorePosting(userId, postingId);
+
+    if (scored === null) {
+      return null;
+    }
+
+    const posting = db
+      .select({ companyId: postings.companyId })
+      .from(postings)
+      .where(eq(postings.id, postingId))
+      .get();
+
+    if (posting === undefined) {
+      return null;
+    }
+
+    const applicationId = createApplication(db, clock.now(), {
+      companyId: posting.companyId,
+      origin: "manual",
+      postingId,
+      score: scored.score,
+      userId,
+    });
+
+    return { applicationId, created: true };
+  }
+
+  async function fill(userId: string) {
+    const settings = await targetsService.read(userId);
+    const { languages } = await languagesService.read(userId);
+    const at = clock.now();
+
+    const list = await candidates.ranked(userId, settings.targets, languages);
+
+    for (const candidate of list) {
+      db.insert(matches)
+        .values({ userId, postingId: candidate.id, codeRank: candidate.codeRank })
+        .onConflictDoUpdate({
+          target: [matches.userId, matches.postingId],
+          set: { codeRank: candidate.codeRank },
+        })
+        .run();
+    }
+
+    const context = await contextFor(userId);
+
+    if (list.length === 0) {
+      return { applicationsCreated: 0, blocked: false, candidates: 0, scored: 0 };
+    }
+
+    const profile = db
+      .select({ timezone: profiles.timezone })
+      .from(profiles)
+      .where(eq(profiles.userId, userId))
+      .get();
+
+    const dayStart = localDayStart(at, profile?.timezone ?? "UTC");
+    const dailyCap = settingNumber(db, "limits.daily_cap", 10);
+    const usedToday = committedSince(db, userId, dayStart);
+    const remaining = Math.max(0, Math.min(dailyCap, applicationsLeft(db, userId, at)) - usedToday);
+    const buffer = Math.max(2, Math.ceil(remaining * 0.5));
+
+    const activeRows = db
+      .select({ status: applications.status })
+      .from(applications)
+      .where(
+        and(eq(applications.userId, userId), inArray(applications.status, ["preparing", "ready"])),
+      )
+      .all();
+
+    let need = Math.max(0, remaining + buffer - activeRows.length);
+
+    if (need === 0) {
+      return { applicationsCreated: 0, blocked: false, candidates: list.length, scored: 0 };
+    }
+
+    const companiesUsed = activeApplicationCompanies(db, userId);
+    let scored = 0;
+    let applicationsCreated = 0;
+
+    function offerApplication(candidate: RankedCandidate, score: number) {
+      if (need <= 0 || score < context.threshold || companiesUsed.has(candidate.companyId)) {
+        return;
+      }
+
+      const created = createApplication(db, clock.now(), {
+        companyId: candidate.companyId,
+        origin: "auto",
+        postingId: candidate.id,
+        score,
+        userId,
+      });
+
+      if (created !== null) {
+        companiesUsed.add(candidate.companyId);
+        applicationsCreated += 1;
+        need -= 1;
+      }
+    }
+
+    for (const candidate of list) {
+      if (need <= 0) {
+        break;
+      }
+
+      const cached = cachedMatch(userId, candidate.id, context);
+
+      if (cached !== null) {
+        offerApplication(candidate, cached.score);
+      }
+    }
+
+    const unscored: RankedCandidate[] = [];
+    let blocked = false;
+
+    for (const candidate of list) {
+      if (need <= 0) {
+        break;
+      }
+
+      if (cachedMatch(userId, candidate.id, context) === null) {
+        unscored.push(candidate);
+      }
+    }
+
+    async function scoreNextChunk(start: number) {
+      if (start >= unscored.length || need <= 0) {
+        return;
+      }
+
+      const chunk = unscored.slice(start, start + Math.min(CHUNK_SIZE, need));
+
+      const requests = chunk.map((candidate, index) =>
+        scoreRequest({
+          customId: `score-${String(index)}`,
+          title: candidate.title,
+          company: candidate.companyName,
+          location: candidate.locationRaw ?? "unknown",
+          workplace: candidate.workplace,
+          employmentType: candidate.employmentType,
+          salary:
+            candidate.salaryMinMinor === null || candidate.salaryCurrency === null
+              ? "none listed"
+              : `${candidate.salaryCurrency} ${String(Math.round(candidate.salaryMinMinor / 100))} per ${candidate.salaryPeriod ?? "year"}`,
+          tags: candidate.tags.map((tag) => `${tag.dimension}:${tag.value}`).join(" "),
+          summary: "",
+          resumeDigest: context.resumeDigest,
+        }),
+      );
+
+      const results = await runScoreRequests(userId, requests);
+
+      if (results.size === 0) {
+        blocked = true;
+
+        return;
+      }
+
+      let scoredThisChunk = 0;
+
+      for (const [index, candidate] of chunk.entries()) {
+        const output = results.get(`score-${String(index)}`);
+
+        if (output === undefined) {
+          continue;
+        }
+
+        scoredThisChunk += 1;
+        scored += 1;
+        writeMatch(userId, candidate.id, candidate.codeRank, output, context);
+        offerApplication(candidate, output.score);
+      }
+
+      if (scoredThisChunk === 0) {
+        return;
+      }
+
+      await scoreNextChunk(start + chunk.length);
+    }
+
+    await scoreNextChunk(0);
+
+    return {
+      applicationsCreated,
+      blocked,
+      candidates: list.length,
+      scored,
+    };
+  }
+
+  async function fillAllUsers() {
+    const allUsers = db.select({ id: users.id }).from(users).all();
+
+    return Promise.all(
+      allUsers.map(async (user) => ({ report: await fill(user.id), userId: user.id })),
+    );
+  }
+
+  async function upNext(userId: string, limit: number) {
+    const settings = await targetsService.read(userId);
+    const { languages } = await languagesService.read(userId);
+    const list = await candidates.ranked(userId, settings.targets, languages);
+    const chosen = list.slice(0, limit);
+
+    if (chosen.length === 0) {
+      return [];
+    }
+
+    const ids = chosen.map((candidate) => candidate.id);
+
+    const matchRows = db
+      .select({ postingId: matches.postingId, score: matches.score, reason: matches.reason })
+      .from(matches)
+      .where(and(eq(matches.userId, userId), inArray(matches.postingId, ids)))
+      .all();
+
+    const scores = new Map(matchRows.map((row) => [row.postingId, row]));
+
+    const stateRows = db
+      .select({ postingId: postingUserState.postingId, state: postingUserState.state })
+      .from(postingUserState)
+      .where(and(eq(postingUserState.userId, userId), inArray(postingUserState.postingId, ids)))
+      .all();
+
+    const states = new Map(stateRows.map((row) => [row.postingId, row.state]));
+
+    return chosen.map((candidate) => {
+      const matched = scores.get(candidate.id);
+
+      return {
+        id: candidate.id,
+        title: candidate.title,
+        company: candidate.companyName,
+        location: candidate.locationRaw,
+        workplace: candidate.workplace,
+        employmentType: candidate.employmentType,
+        salaryMinMinor: candidate.salaryMinMinor,
+        salaryCurrency: candidate.salaryCurrency,
+        salaryPeriod: candidate.salaryPeriod,
+        codeRank: candidate.codeRank,
+        score: matched?.score ?? null,
+        reason: matched?.reason ?? null,
+        strong: (matched?.score ?? 0) >= settingNumber(db, "match.strong", 80),
+        saved: states.get(candidate.id) === "saved",
+      };
+    });
+  }
+
+  return { applyManually, fill, fillAllUsers, scoreOnOpen, upNext };
+}
+
+export type MatchingService = ReturnType<typeof createMatchingService>;
+
+export async function runMatchFillJob(deps: MatchDeps) {
+  const service = createMatchingService(deps);
+
+  return service.fillAllUsers();
+}
+
+export function ensureMatchFillQueued(db: AppDatabase, clock: Clock) {
+  const job = enqueueJob(db, clock, MATCH_FILL_JOB_KIND, "{}", {
+    dedupeKey: MATCH_FILL_JOB_KIND,
+    maxAttempts: 1,
+    runAt: clock.now() + 3_600_000,
+  });
+
+  return job.id;
+}

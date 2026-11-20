@@ -13,10 +13,14 @@ import { createHealthRoutes } from "./routes/health.ts";
 import { createMeRoutes } from "./routes/me.ts";
 import { createApiRoutes } from "./routes/api.ts";
 import { createHomeRoutes } from "./routes/home.ts";
+import { createMatchingRoutes } from "./routes/matching.ts";
 import { createAdminApi, isAdminHost } from "./routes/admin.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
 import { env } from "./config/env.ts";
 import { createProfileRoutes } from "./routes/profile.ts";
+import { createMatchingService } from "./matching/score.ts";
+import { createPersonalCrypto } from "./profile/personal-crypto.ts";
+import { parseMasterKey } from "./platform/crypto.ts";
 
 export interface AppDependencies {
   db: AppDatabase;
@@ -55,6 +59,19 @@ export function createApp(deps: AppDependencies) {
   const adminApi = createAdminApi(deps.db, deps.clock, deps.auth);
   const adminHost = new Hono();
 
+  const personal = createPersonalCrypto(
+    deps.db,
+    parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
+    env.MASTER_KEY_CURRENT,
+  );
+
+  const matching = createMatchingService({
+    db: deps.db,
+    clock: deps.clock,
+    llm: deps.llm,
+    personal,
+  });
+
   adminHost.route("/admin/api", adminApi);
   adminHost.all("/api/auth/*", async (context) => deps.auth.handler(context.req.raw));
 
@@ -65,7 +82,16 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createMeRoutes(deps.auth));
   app.route("/api", createApiRoutes(deps.db, deps.clock));
   app.route("/api", createProfileRoutes(deps));
-  app.route("/api", createHomeRoutes(deps.db, deps.clock, deps.auth));
+  app.route("/api", createHomeRoutes(deps.db, deps.clock, deps.auth, matching));
+  app.route(
+    "/api",
+    createMatchingRoutes({
+      auth: deps.auth,
+      clock: deps.clock,
+      db: deps.db,
+      matching,
+    }),
+  );
 
   if (deps.testRoutes) {
     app.route(

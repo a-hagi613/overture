@@ -81,7 +81,7 @@ function salaryCondition(floorMinor: number | null, currency: string | null) {
   );
 }
 
-function matchedRoleTags(db: AppDatabase, roles: readonly string[]) {
+export function matchedRoleTags(db: AppDatabase, roles: readonly string[]) {
   const tagRows = db
     .selectDistinct({ value: postingTags.value })
     .from(postingTags)

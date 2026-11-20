@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -10,10 +10,13 @@ import type { AdjustableClock } from "../platform/ports/clock.ts";
 
 import {
   accounts,
+  applications,
   bgJobs,
   companies,
   companyBoards,
+  fxRates,
   ledger,
+  matches,
   postingTags,
   postings,
   sessions,
@@ -131,6 +134,8 @@ const createPostingBody = z.object({
   city: z.string().nullish(),
   salaryMinMinor: z.number().int().nonnegative().nullish(),
   salaryCurrency: z.string().length(3).nullish(),
+  salaryPeriod: z.enum(["year", "month", "hour"]).nullish(),
+  postedAt: z.number().int().nullish(),
   tags: z.array(postingTagBody).max(20).default([]),
 });
 
@@ -146,6 +151,40 @@ const recordLlmUsageBody = z.object({
   outputTokens: z.number().int().min(0),
   costMicros: z.number().int().min(0),
 });
+
+const seedApplicationBody = z.object({
+  userId: z.string().min(1),
+  postingId: z.string().min(1),
+  status: z.enum([
+    "preparing",
+    "needs_review",
+    "ready",
+    "sending",
+    "confirming",
+    "sent",
+    "failed",
+    "skipped",
+    "withdrawn",
+  ]),
+  sentAt: z.number().int().nullable().default(null),
+  origin: z.enum(["auto", "manual"]).default("auto"),
+});
+
+const seedGrantBody = z.object({
+  email: z.email(),
+  quantity: z.number().int().min(1).max(10_000),
+  idempotencyKey: z.string().min(1),
+});
+
+const fxRateBody = z.object({
+  date: z.string().min(10).max(10),
+  currency: z.string().length(3),
+  perUsd: z.number().positive(),
+});
+
+const userQuery = z.object({ userId: z.string().min(1) });
+
+const createUserBody = z.object({ email: z.email(), name: z.string().min(1) });
 
 type PostingWriter = AppDatabase | Parameters<Parameters<AppDatabase["transaction"]>[0]>[0];
 
@@ -176,6 +215,8 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
       employmentType: row.employmentType,
       salaryMinMinor: row.salaryMinMinor ?? null,
       salaryCurrency: row.salaryCurrency ?? null,
+      salaryPeriod: row.salaryPeriod ?? null,
+      postedAt: row.postedAt ?? null,
       dedupeKey: dedupeKeyFor({
         companyId: row.companyId,
         titleNorm,
@@ -391,6 +432,17 @@ export function createTestRoutes(
     return context.json({ created: rows.length });
   });
 
+  routes.post("/catalog/postings/close-all", (context) => {
+    const closed = db
+      .update(postings)
+      .set({ closedAt: clock.now() })
+      .where(isNull(postings.closedAt))
+      .returning({ id: postings.id })
+      .all();
+
+    return context.json({ closed: closed.length });
+  });
+
   routes.post(
     "/catalog/discovered-boards",
     zValidator("json", discoveredBoardsBody),
@@ -455,6 +507,111 @@ export function createTestRoutes(
     });
 
     return context.json({ ok: true });
+  });
+
+  routes.post("/fx-rates", zValidator("json", fxRateBody), (context) => {
+    const { date, currency, perUsd } = context.req.valid("json");
+
+    db.insert(fxRates)
+      .values({ date, currency: currency.toUpperCase(), perUsd })
+      .onConflictDoUpdate({
+        target: [fxRates.date, fxRates.currency],
+        set: { perUsd },
+      })
+      .run();
+
+    return context.json({ ok: true });
+  });
+
+  routes.post("/users", zValidator("json", createUserBody), (context) => {
+    const { email, name } = context.req.valid("json");
+    const id = crypto.randomUUID();
+    const now = new Date(clock.now());
+
+    db.insert(users)
+      .values({
+        id,
+        name,
+        email: lowercased(email),
+        emailVerified: true,
+        role: "user",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+
+    return context.json({ id });
+  });
+
+  routes.post("/applications/seed", zValidator("json", seedApplicationBody), (context) => {
+    const { userId, postingId, status, sentAt, origin } = context.req.valid("json");
+
+    const posting = db
+      .select({ companyId: postings.companyId })
+      .from(postings)
+      .where(eq(postings.id, postingId))
+      .get();
+
+    if (posting === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    const id = crypto.randomUUID();
+    const now = clock.now();
+
+    db.insert(applications)
+      .values({
+        id,
+        userId,
+        postingId,
+        companyId: posting.companyId,
+        origin,
+        status,
+        stage: status === "sent" ? "applied" : "queued",
+        sentAt,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+
+    return context.json({ id });
+  });
+
+  routes.get("/applications", zValidator("query", userQuery), (context) => {
+    const { userId } = context.req.valid("query");
+    const rows = db.select().from(applications).where(eq(applications.userId, userId)).all();
+
+    return context.json({ applications: rows });
+  });
+
+  routes.get("/matches", zValidator("query", userQuery), (context) => {
+    const { userId } = context.req.valid("query");
+    const rows = db.select().from(matches).where(eq(matches.userId, userId)).all();
+
+    return context.json({ matches: rows });
+  });
+
+  routes.post("/ledger/grant", zValidator("json", seedGrantBody), (context) => {
+    const { email, quantity, idempotencyKey } = context.req.valid("json");
+
+    const user = db
+      .select()
+      .from(users)
+      .where(eq(users.email, lowercased(email)))
+      .get();
+
+    if (user === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    grantApplications(db, clock, {
+      idempotencyKey,
+      quantity,
+      source: "admin",
+      userId: user.id,
+    });
+
+    return context.json({ applicationsLeft: applicationsLeft(db, user.id, clock.now()) });
   });
 
   routes.get("/mail", (context) => {

@@ -31,6 +31,9 @@ import {
   runTagFallbackJob,
 } from "./catalog/llm-tagging.ts";
 import { createAnthropicLlmPort } from "./platform/llm/anthropic-batches.ts";
+import { createPersonalCrypto } from "./profile/personal-crypto.ts";
+import { parseMasterKey } from "./platform/crypto.ts";
+import { MATCH_FILL_JOB_KIND, ensureMatchFillQueued, runMatchFillJob } from "./matching/score.ts";
 
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 
@@ -100,12 +103,29 @@ const tagDeps = {
   llm: anthropicLlmPort,
 };
 
+const personal = createPersonalCrypto(
+  db,
+  parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
+  env.MASTER_KEY_CURRENT,
+);
+
+const matchDeps = {
+  db,
+  clock,
+  llm: anthropicLlmPort,
+  personal,
+};
+
 const llmJobHandlers: JobHandlers =
   env.ANTHROPIC_API_KEY === undefined
     ? {}
     : {
         [TAG_FALLBACK_JOB_KIND]: async () => {
           await runTagFallbackJob(tagDeps);
+        },
+        [MATCH_FILL_JOB_KIND]: async () => {
+          await runMatchFillJob(matchDeps);
+          ensureMatchFillQueued(db, clock);
         },
       };
 
@@ -165,6 +185,7 @@ ensureSweepQueued(catalogDeps);
 
 if (env.ANTHROPIC_API_KEY !== undefined) {
   ensureTagFallbackQueued(db, clock);
+  ensureMatchFillQueued(db, clock);
 }
 
 const app = createApp({
