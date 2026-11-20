@@ -19,7 +19,7 @@ async function waitForExit(child: ChildProcess) {
   });
 }
 
-async function spawnServer(databasePath: string) {
+async function spawnServer(databasePath: string, extraEnvironment: Record<string, string>) {
   const child = spawn("bun", ["run", "src/server/main.ts"], {
     env: {
       ...process.env,
@@ -30,6 +30,7 @@ async function spawnServer(databasePath: string) {
       ENABLE_TEST_ROUTES: "true",
       OTEL_SIMPLE_EXPORT: "true",
       KILL_TIMEOUT_MS: "1000",
+      ...extraEnvironment,
     },
     stdio: ["ignore", "pipe", "inherit"],
   });
@@ -63,8 +64,11 @@ async function spawnServer(databasePath: string) {
   });
 }
 
-export async function startAppServer(databasePath: string) {
-  let { child, url } = await spawnServer(databasePath);
+export async function startAppServer(
+  databasePath: string,
+  extraEnvironment: Record<string, string> = {},
+) {
+  let { child, url } = await spawnServer(databasePath, extraEnvironment);
 
   const server: AppServer = {
     get url() {
@@ -78,7 +82,7 @@ export async function startAppServer(databasePath: string) {
     restart: async () => {
       child.kill("SIGTERM");
       await waitForExit(child);
-      const { child: nextChild, url: nextUrl } = await spawnServer(databasePath);
+      const { child: nextChild, url: nextUrl } = await spawnServer(databasePath, extraEnvironment);
 
       child = nextChild;
       url = nextUrl;

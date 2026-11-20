@@ -1,3 +1,6 @@
+import { basename, dirname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+
 import { z } from "zod";
 
 import { databasePath, env } from "../../config/env.ts";
@@ -16,67 +19,88 @@ export type BackupStatus =
   | { replication: "unavailable" }
   | { replication: "ok"; lagSeconds: number; replicaTxid: string };
 
+function compareTransactions(left: ReplicaTransaction, right: ReplicaTransaction) {
+  if (left.max_txid < right.max_txid) {
+    return -1;
+  }
+
+  return left.max_txid > right.max_txid ? 1 : 0;
+}
+
+function newestTransaction(transactions: ReplicaTransaction[]) {
+  const ordered = transactions.toSorted(compareTransactions);
+
+  return ordered.at(-1);
+}
+
+function oldestUnreplicatedTransaction(local: ReplicaTransaction[], replica: ReplicaTransaction) {
+  const ordered = local.toSorted(compareTransactions);
+
+  return ordered.find((transaction) => transaction.max_txid > replica.max_txid);
+}
+
 export async function readBackupStatus(now: number) {
   if (env.LITESTREAM_CONFIG_PATH === undefined) {
     return { replication: "unconfigured" } as const;
   }
 
-  const ltxListing = await listReplicaTransactions();
+  const configPath = env.LITESTREAM_CONFIG_PATH;
+  const absoluteDatabasePath = resolve(databasePath);
 
-  if (ltxListing.length === 0) {
+  const shadowDirectory = pathToFileURL(
+    join(dirname(absoluteDatabasePath), `.${basename(absoluteDatabasePath)}-litestream`),
+  ).href;
+
+  const [replicaListing, localListing] = await Promise.all([
+    listTransactions(["-config", configPath, databasePath]),
+    listTransactions([shadowDirectory]),
+  ]);
+
+  if (replicaListing === null || localListing === null) {
     return { replication: "unavailable" } as const;
   }
 
-  let newest: ReplicaTransaction | undefined;
+  const newestReplica = newestTransaction(replicaListing);
 
-  for (const file of ltxListing) {
-    newest =
-      newest === undefined || Date.parse(file.timestamp) > Date.parse(newest.timestamp)
-        ? file
-        : newest;
-  }
-
-  if (newest === undefined) {
+  if (newestReplica === undefined) {
     return { replication: "unavailable" } as const;
   }
 
-  const newestTimestamp = Date.parse(newest.timestamp);
+  const oldestUnreplicated = oldestUnreplicatedTransaction(localListing, newestReplica);
+
+  if (oldestUnreplicated === undefined) {
+    return {
+      replication: "ok",
+      lagSeconds: 0,
+      replicaTxid: newestReplica.max_txid,
+    } as const satisfies BackupStatus;
+  }
+
+  const oldestUnreplicatedAt = Date.parse(oldestUnreplicated.timestamp);
 
   return {
     replication: "ok",
-    lagSeconds: Math.max(0, Math.round((now - newestTimestamp) / 1000)),
-    replicaTxid: newest.max_txid,
+    lagSeconds: Math.max(0, Math.round((now - oldestUnreplicatedAt) / 1000)),
+    replicaTxid: newestReplica.max_txid,
   } as const satisfies BackupStatus;
 }
 
-async function listReplicaTransactions() {
-  if (env.LITESTREAM_CONFIG_PATH === undefined) {
-    return [];
-  }
-
+async function listTransactions(ltxArguments: string[]) {
   try {
-    const child = Bun.spawn(
-      [
-        "litestream",
-        "ltx",
-        "-json",
-        "-level",
-        "0",
-        "-config",
-        env.LITESTREAM_CONFIG_PATH,
-        databasePath,
-      ],
-      { stdout: "pipe", stderr: "ignore", signal: AbortSignal.timeout(5000) },
-    );
+    const child = Bun.spawn(["litestream", "ltx", "-json", "-level", "all", ...ltxArguments], {
+      stdout: "pipe",
+      stderr: "ignore",
+      signal: AbortSignal.timeout(5000),
+    });
 
     const output = await new Response(child.stdout).text();
 
     if ((await child.exited) !== 0) {
-      return [];
+      return null;
     }
 
     return ltxListingSchema.parse(JSON.parse(output));
   } catch {
-    return [];
+    return null;
   }
 }
