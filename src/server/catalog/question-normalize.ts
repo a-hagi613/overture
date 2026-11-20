@@ -531,6 +531,28 @@ export function affirmativeOption(options: readonly string[]) {
   return match.matched ? match.option : null;
 }
 
+export function factPolarity(value: string) {
+  const folded = normalizeOptionText(value);
+
+  if (NEGATIVE.has(folded)) {
+    return "negative" as const;
+  }
+
+  if (AFFIRMATIVE.has(folded)) {
+    return "affirmative" as const;
+  }
+
+  if (/\b(?:no|not|never|do not|don t)\b/u.test(folded)) {
+    return "negative" as const;
+  }
+
+  if (/\b(?:yes|willing|open to|happy to)\b/u.test(folded)) {
+    return "affirmative" as const;
+  }
+
+  return null;
+}
+
 const AVAILABILITY_PATTERN =
   /\b(?:on call|oncall|weekend|evening|night shift|shift|overtime|holiday|notice period|start date|start within|earliest start|relocat|travel|available|availability|open to)\b/u;
 

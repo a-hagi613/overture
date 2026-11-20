@@ -92,6 +92,7 @@ for (const [code, name] of Object.entries(dataset.regions)) {
 }
 
 const citiesByName = new Map<string, CityRow>();
+const citiesByUsState = new Map<string, CityRow>();
 
 for (const row of dataset.cities) {
   const [name, country, admin1, ...aliases] = row;
@@ -102,6 +103,14 @@ for (const row of dataset.cities) {
 
   const city: CityRow = { name, country, admin1 };
 
+  if (country === "US" && /^[A-Z]{2}$/u.test(admin1)) {
+    const stateKey = `${normalizePlaceName(name)}|${admin1}`;
+
+    if (!citiesByUsState.has(stateKey)) {
+      citiesByUsState.set(stateKey, city);
+    }
+  }
+
   for (const candidate of [name, ...aliases]) {
     const normalized = normalizePlaceName(candidate);
 
@@ -111,6 +120,25 @@ for (const row of dataset.cities) {
 
     citiesByName.set(normalized, city);
   }
+}
+
+function findUsCityWithState(segments: readonly string[]) {
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    const city = normalizePlaceName(segments[index] ?? "");
+    const state = (segments[index + 1] ?? "").trim().toUpperCase();
+
+    if (city === "" || !/^[A-Z]{2}$/u.test(state)) {
+      continue;
+    }
+
+    const row = citiesByUsState.get(`${city}|${state}`);
+
+    if (row !== undefined) {
+      return row;
+    }
+  }
+
+  return null;
 }
 
 export function normalizePlaceName(value: string) {
@@ -151,12 +179,15 @@ export function resolveLocation(locationRaw: string | null | undefined) {
       );
     });
 
-  const countryCode = findCountry(segments);
+  const usCity = findUsCityWithState(segments);
+  const countryCode = usCity?.country ?? findCountry(segments);
 
   const regionCode =
-    findRegion(segments, countryCode) ?? findCity(segments, countryCode)?.admin1 ?? null;
+    usCity === null
+      ? (findRegion(segments, countryCode) ?? findCity(segments, countryCode)?.admin1 ?? null)
+      : `${usCity.country}.${usCity.admin1}`;
 
-  const city = findCity(segments, countryCode);
+  const city = usCity ?? findCity(segments, countryCode);
 
   return {
     countryCode:
@@ -253,6 +284,28 @@ export function countryCodesNamedIn(text: string) {
 
 export function countryNameFor(code: string) {
   return dataset.countries[code] ?? null;
+}
+
+export function regionNameFor(countryCode: string | null, region: string | null) {
+  if (region === null || region === "") {
+    return null;
+  }
+
+  if (regionNames.has(region)) {
+    return regionNames.get(region) ?? null;
+  }
+
+  if (countryCode === null) {
+    return region;
+  }
+
+  return regionNames.get(`${countryCode}.${region}`) ?? region;
+}
+
+export function usStateNames() {
+  return Object.entries(dataset.regions)
+    .filter(([code]) => code.startsWith("US."))
+    .map(([, name]) => normalizePlaceName(name));
 }
 
 export function isCountryCode(code: string) {

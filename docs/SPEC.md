@@ -234,7 +234,7 @@ updated_at) · `session` · `account` (provider: google, linkedin, credential) �
 | `postings` | id, board_id, company_id, ats, ats_job_id, url, apply_url, apply_url_norm, title, title_norm, department, location_raw, country_code, region, city, workplace CHECK IN ('remote','hybrid','onsite','unknown'), employment_type CHECK IN ('full_time','part_time','contract','internship','temporary','unknown'), language, salary_min_minor, salary_max_minor, salary_currency, salary_period, posted_at, source_updated_at, first_seen_at, last_seen_at, missing_polls, closed_at, description_gz BLOB NULL, description_hash, feed_content_hash NULL (sha256 of the normalized feed posting; set only for ATSs whose list feed carries the description, Lever and Ashby; a poll rewrites a posting only when this hash or `source_updated_at` changes), dedupe_key, tag_source CHECK IN ('rules','model','llm','import'), tagged_at, questions_fetched_at; UNIQUE(board_id, ats_job_id); INDEX(apply_url_norm); INDEX(closed_at); INDEX(dedupe_key) |
 | `posting_tags` | posting_id, dimension CHECK IN ('role','subrole','seniority'), value, source; PK(posting_id,dimension,value) |
 | `postings_fts` | FTS5(title, company, location, department) (short fields only): self-contained, kept in step with `postings` and `companies` by SQLite triggers (insert, update, delete, company rename); closed Postings leave the index |
-| `questions` | id, text_display, text_norm_hash UNIQUE, field_type CHECK IN ('text','textarea','select','multiselect','radio','checkbox','file','date','number','email','phone','url'), options_hash NULL, fact_key NULL, answer_kind CHECK IN ('fact','open_text','consent','skip','unknown'), mapped_by CHECK IN ('rules','llm','owner'), seen_count, created_at |
+| `questions` | id, text_display, text_norm_hash UNIQUE, field_type CHECK IN ('text','textarea','select','multiselect','radio','checkbox','file','date','number','email','phone','url'), options_hash NULL, fact_key NULL (a fact key, or a derivation key for `target`/`derived`), answer_kind CHECK IN ('fact','target','derived','open_text','consent','skip','unknown'), mapped_by CHECK IN ('rules','llm','owner'), seen_count, created_at |
 | `question_variants` | variant_hash PK, question_id |
 | `posting_questions` | posting_id, question_id, required, position, options JSON, field_name (the form input's name or id, taken from the ATS question fields and used to fill the live form); PK(posting_id,question_id) |
 | `tag_imports` | id, source, file_sha256, rows, matched, uploaded_by, applied_at |
@@ -439,6 +439,16 @@ country's Fact; with none it opens a Review for that country. A question that na
 unscoped Fact; with none, from the country-scoped Facts only when they all agree, otherwise it opens a Review that
 picks none. A question naming several countries is answered only from the unscoped Fact.
 
+**Derived answers.** Some answers are deterministic code over a saved Fact or a Target, not a model output: the
+country or countries a question asks about (`target_countries`, the Posting's country when it is a target, else the
+target countries the form offers), remote/hybrid/onsite willingness (`target_workplace`), relocation
+(`target_relocation`, from `current_city` and `willing_relocate`), "have you ever been employed by X?"
+(`employed_by_company`, from `current_employer` and a confirmed `employment_history`), a US-state list
+(`us_state_residence`, from `current_city`/`current_country` and the states named in the question), and a combined
+city/region or city/region/country answer (`city_region`, `city_region_country`). A derivation that cannot be made
+from the user's values is a Review for a required question and blank for an optional one; it never guesses. The
+answers snapshot records the derivation key next to the value.
+
 ### 7.2 Resume
 
 - Upload PDF ≤ 10 MB, stored encrypted in R2 `files/{user_id}/resume/{id}.pdf.enc`; sha256 recorded.
@@ -514,13 +524,17 @@ Job `application.prepare`:
    signature is known; otherwise questions are read during the first attempt (§10.3 step 5).
 2. Map each question to the catalog: normalise text (lowercase, strip punctuation/numbers/company names) → hash →
    `question_variants`; unknown → rules (regex set for common facts) → else Haiku mapping call returning
-   `{fact_key | 'open_text' | 'consent' | 'skip' | 'unknown'}` from the fixed fact list. Result stored on `questions`.
-   Posting text passes the posting guard (`docs/SALVAGE.md`) first and never decides a factual answer.
+   `{fact_key | 'open_text' | 'consent' | 'skip' | 'unknown'}` from the fixed fact list. Rules alone may also map a
+   question to `target` or `derived` with a derivation key; the model never returns either. Result stored on
+   `questions`. Posting text passes the posting guard (`docs/SALVAGE.md`) first and never decides a factual answer.
 3. Answer: `fact` → saved fact value (formatted to the field type/options; select options matched by normalised
    text, then the explicit synonym tables for work-authorisation types, countries, degrees, notice periods and
    salary periods, else an `option_missing` Review; never a fuzzy or model pick). A `work_auth` or
    `sponsorship_required` answer is country-scoped
    (§7.1): the question's country decides which Fact may answer it, and another country's Fact never does.
+   `target` and `derived` → the deterministic derivation in §7.1, from Targets and the Posting for the former and
+   from saved Facts for the latter; a value that cannot be derived never becomes a model guess (required → Review,
+   optional → blank). The question's stored `fact_key` is the derivation key.
    `open_text` → Haiku from resume text + guarded posting (≤ 120 words unless the field states a limit), returned as
    `[{sentence, resume_line_ids}]` with the same rule as cover letters: a sentence that makes a factual claim
    without a resume line is removed; a choice field (`select`, `radio`, multi-select, checkbox) never takes generated
@@ -537,13 +551,14 @@ Job `application.prepare`:
    architected, mentored, expert, senior, staff, principal) or inflated title, else the sentence is removed. A claim
    is checked against the cited lines only; a cited line is not proof of entailment. (Anthropic Citations cannot be
    combined with structured outputs, so the check is ours.)
-5. Unknown **required** factual question → status `needs_review`, create/attach a Review. Unknown **optional** →
-   left blank, never blocking. A required open-text answer or cover letter whose surviving sentences are empty (no
-   resume, or nothing the resume grounds) is never a Review: the Application is `skipped` with
-   `status_reason='open_text_ungrounded'`. A required consent resolves only when it is a standard privacy or
-   data-processing acknowledgement with an option to select; a required marketing opt-in, a required `skip`, or a
-   required file field other than the resume slot never becomes a Review: the Application is `skipped` with
-   `status_reason='form_unsupported'`. A required resume slot resolves only when a current resume exists.
+5. Unknown **required** factual question, or a required derivation the user's values cannot answer → status
+   `needs_review`, create/attach a Review. Unknown **optional** → left blank, never blocking. A required open-text
+   answer or cover letter whose surviving sentences are empty (no resume, or nothing the resume grounds) is never a
+   Review: the Application is `skipped` with `status_reason='open_text_ungrounded'`. A required consent resolves only
+   when it is a standard privacy or data-processing acknowledgement with an option to select; a required marketing
+   opt-in, a required `skip`, or a required file field other than the resume slot never becomes a Review: the
+   Application is `skipped` with `status_reason='form_unsupported'`. A required resume slot resolves only when a
+   current resume exists.
 6. All answered → status `ready`, `scheduled_for` assigned by the planner (§9.2).
 
 ### 8.4 Reviews

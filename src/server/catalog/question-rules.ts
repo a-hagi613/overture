@@ -21,6 +21,43 @@ const CONSENT_PATTERN =
 
 const RULES: readonly { pattern: RegExp; mapping: RuleMapping }[] = [
   {
+    pattern: /\bcountry or countries you anticipate (?:working|to work)\b/u,
+    mapping: { answerKind: "target", factKey: "target_countries" },
+  },
+  {
+    pattern: /\b(?:option to work from a remote location|plan to work remotely|work remotely)\b/u,
+    mapping: { answerKind: "target", factKey: "target_workplace" },
+  },
+  {
+    pattern:
+      /\bopen to working from\b.*\boffice\b|\bwork out of\b.*\boffice\b|\bhybrid schedule\b/u,
+    mapping: { answerKind: "target", factKey: "target_workplace" },
+  },
+  {
+    pattern: /\bwilling to relocate\b|\bcurrently located in one of\b.*\bhub/u,
+    mapping: { answerKind: "target", factKey: "target_relocation" },
+  },
+  {
+    pattern: /\bever been employed by\b|\bever worked (?:at|for|by)\b/u,
+    mapping: { answerKind: "derived", factKey: "employed_by_company" },
+  },
+  {
+    pattern: /\blive in one of the following states\b|\breside in one of\b.*\bstates\b/u,
+    mapping: { answerKind: "derived", factKey: "us_state_residence" },
+  },
+  {
+    pattern: /\bcity state and country\b/u,
+    mapping: { answerKind: "derived", factKey: "city_region_country" },
+  },
+  {
+    pattern: /\b(?:city and state|city state)\b/u,
+    mapping: { answerKind: "derived", factKey: "city_region" },
+  },
+  {
+    pattern: /\blegal name\b/u,
+    mapping: { answerKind: "fact", factKey: "legal_name" },
+  },
+  {
     pattern:
       /\b(?:will you|do you) (?:now or in the future )?require (?:visa|immigration|work)? ?sponsor/u,
     mapping: { answerKind: "fact", factKey: "sponsorship_required" },

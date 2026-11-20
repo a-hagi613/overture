@@ -9,8 +9,10 @@ import type { LlmPort } from "../platform/ports/llm.ts";
 import type { FactRecord } from "../profile/facts.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { AnswerKind, QuestionFieldType, ReviewReason } from "../../shared/questions.ts";
+import type { Targets } from "../../shared/targets.ts";
 import type { QuestionSource } from "../catalog/greenhouse-questions.ts";
 import type { GroundedAnswer } from "./open-text.ts";
+import type { DerivationFact, PostingPlace } from "../catalog/answer-derivations.ts";
 
 import {
   applicationAnswers,
@@ -25,9 +27,15 @@ import type { SendPlan, SendPlanField } from "./send-plan.ts";
 import { createFactService } from "../profile/facts.ts";
 import { guardPosting } from "./guard/posting-guard.ts";
 import { createOpenTextService, isCoverLetterQuestion } from "./open-text.ts";
+import { createTargetsService } from "../profile/targets.ts";
 import { mapQuestionsWithLlm } from "../catalog/question-mapping.ts";
 import { createQuestionCatalog, questionInputsFromAts } from "../catalog/questions.ts";
 import { resolveLocation } from "../catalog/geo.ts";
+import {
+  deriveAnswer,
+  isDerivationKey,
+  isTargetDerivationKey,
+} from "../catalog/answer-derivations.ts";
 import {
   AFFIRMATIVE_OPTION,
   NEGATIVE_OPTION,
@@ -125,6 +133,7 @@ interface FactIndex {
   unscoped: ReadonlyMap<string, string>;
   scoped: ReadonlyMap<string, ReadonlyMap<string, string>>;
   all: ReadonlyMap<string, readonly ScopedFactEntry[]>;
+  details: ReadonlyMap<string, DerivationFact>;
 }
 
 interface ResolveInput {
@@ -135,6 +144,8 @@ interface ResolveInput {
   answerKind: AnswerKind;
   factKey: string | null;
   facts: FactIndex;
+  targets: Targets;
+  posting: PostingPlace;
   hasResume: boolean;
 }
 
@@ -142,10 +153,12 @@ function indexFacts(records: readonly FactRecord[]) {
   const unscoped = new Map<string, string>();
   const scoped = new Map<string, Map<string, string>>();
   const all = new Map<string, ScopedFactEntry[]>();
+  const details = new Map<string, DerivationFact>();
 
   for (const record of records) {
     if (record.scope === "") {
       unscoped.set(record.key, record.value);
+      details.set(record.key, { value: record.value, confirmed: record.confirmed });
     } else {
       const byScope = scoped.get(record.key) ?? new Map<string, string>();
 
@@ -159,7 +172,7 @@ function indexFacts(records: readonly FactRecord[]) {
     all.set(record.key, entries);
   }
 
-  return { unscoped, scoped, all } satisfies FactIndex;
+  return { unscoped, scoped, all, details } satisfies FactIndex;
 }
 
 type QuestionScope = { kind: "country"; code: string } | { kind: "multiple" } | { kind: "generic" };
@@ -422,6 +435,33 @@ function resolveQuestionValue(input: ResolveInput) {
     return required ? SKIPPED_FORM : ready(null);
   }
 
+  if (input.answerKind === "target" || input.answerKind === "derived") {
+    const key = input.factKey;
+
+    if (
+      key === null ||
+      !isDerivationKey(key) ||
+      (input.answerKind === "target") !== isTargetDerivationKey(key)
+    ) {
+      return required ? reviewFor("") : ready(null);
+    }
+
+    const derived = deriveAnswer(key, {
+      questionText: input.questionText,
+      fieldType: input.fieldType,
+      options: input.options,
+      targets: input.targets,
+      posting: input.posting,
+      facts: input.facts.details,
+    });
+
+    if (derived !== null) {
+      return ready(derived);
+    }
+
+    return required ? reviewFor("") : ready(null);
+  }
+
   if (input.answerKind !== "fact" || input.factKey === null) {
     return required ? reviewFor("") : ready(null);
   }
@@ -577,6 +617,8 @@ export function createPreparationService(deps: {
       .run();
   }
 
+  const targetsService = createTargetsService({ db, clock });
+
   async function loadQuestions(posting: {
     postingId: string;
     ats: "greenhouse" | "lever" | "ashby";
@@ -697,6 +739,10 @@ export function createPreparationService(deps: {
         atsJobId: postings.atsJobId,
         boardToken: companyBoards.boardToken,
         companyName: companies.name,
+        countryCode: postings.countryCode,
+        city: postings.city,
+        region: postings.region,
+        locationRaw: postings.locationRaw,
         language: postings.language,
         title: postings.title,
         descriptionGz: postings.descriptionGz,
@@ -732,7 +778,16 @@ export function createPreparationService(deps: {
 
     const factRows = await factsService.list(row.userId);
     const factValues = indexFacts(factRows);
+    const settings = await targetsService.read(row.userId);
     const questionRows = catalog.forPosting(row.postingId);
+
+    const posting: PostingPlace = {
+      companyName: row.companyName,
+      countryCode: row.countryCode,
+      city: row.city,
+      region: row.region,
+      locationRaw: row.locationRaw,
+    };
 
     const blocked: {
       questionId: string;
@@ -777,6 +832,8 @@ export function createPreparationService(deps: {
         answerKind: question.answerKind,
         factKey: question.factKey,
         facts: factValues,
+        targets: settings.targets,
+        posting,
         hasResume: resume !== undefined,
       });
 
@@ -787,7 +844,7 @@ export function createPreparationService(deps: {
       if (resolution.kind === "needs_review") {
         blocked.push({
           questionId: question.questionId,
-          factKey: question.factKey,
+          factKey: question.answerKind === "fact" ? question.factKey : null,
           prompt: question.textDisplay,
           fieldType: question.fieldType,
           options,
@@ -906,6 +963,10 @@ export function createPreparationService(deps: {
         companyName: companies.name,
         boardToken: companyBoards.boardToken,
         atsJobId: postings.atsJobId,
+        countryCode: postings.countryCode,
+        city: postings.city,
+        region: postings.region,
+        locationRaw: postings.locationRaw,
       })
       .from(applications)
       .innerJoin(postings, eq(postings.id, applications.postingId))
@@ -920,6 +981,15 @@ export function createPreparationService(deps: {
 
     const factRows = await factsService.list(row.userId);
     const factIndex = indexFacts(factRows);
+    const settings = await targetsService.read(row.userId);
+
+    const posting: PostingPlace = {
+      companyName: row.companyName,
+      countryCode: row.countryCode,
+      city: row.city,
+      region: row.region,
+      locationRaw: row.locationRaw,
+    };
 
     const factRevisions = new Map(
       factRows.map((fact) => [`${fact.key}\u0000${fact.scope}`, fact.revision]),
@@ -964,6 +1034,8 @@ export function createPreparationService(deps: {
           answerKind: question.answerKind,
           factKey: question.factKey,
           facts: factIndex,
+          targets: settings.targets,
+          posting,
           hasResume: resume !== undefined,
         });
 
@@ -1031,8 +1103,18 @@ export function createPreparationService(deps: {
 
   async function answersFor(applicationId: string) {
     const row = db
-      .select({ userId: applications.userId, postingId: applications.postingId })
+      .select({
+        userId: applications.userId,
+        postingId: applications.postingId,
+        companyName: companies.name,
+        countryCode: postings.countryCode,
+        city: postings.city,
+        region: postings.region,
+        locationRaw: postings.locationRaw,
+      })
       .from(applications)
+      .innerJoin(postings, eq(postings.id, applications.postingId))
+      .innerJoin(companies, eq(companies.id, postings.companyId))
       .where(eq(applications.id, applicationId))
       .get();
 
@@ -1042,6 +1124,15 @@ export function createPreparationService(deps: {
 
     const factRows = await factsService.list(row.userId);
     const factValues = indexFacts(factRows);
+    const settings = await targetsService.read(row.userId);
+
+    const posting: PostingPlace = {
+      companyName: row.companyName,
+      countryCode: row.countryCode,
+      city: row.city,
+      region: row.region,
+      locationRaw: row.locationRaw,
+    };
 
     const resume = db
       .select({ id: resumes.id })
@@ -1080,6 +1171,8 @@ export function createPreparationService(deps: {
           answerKind: question.answerKind,
           factKey: question.factKey,
           facts: factValues,
+          targets: settings.targets,
+          posting,
           hasResume: resume !== undefined,
         });
 

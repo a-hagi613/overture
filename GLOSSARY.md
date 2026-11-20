@@ -75,6 +75,12 @@ _Avoid_: action required, blocked
 Something true about the user that answers application questions, such as work authorisation or notice period.
 _Avoid_: Answer Bank, Memory Base, saved answer (as a place)
 
+**Derived answer**:
+An answer that code builds from a saved Fact or a Target the user set: a city, region and country combined, a US-state
+check, or a country, workplace or relocation choice from Targets. It is recorded with its basis and never adds a Fact
+the user did not give.
+_Avoid_: inferred answer, computed answer
+
 **Tier**:
 How a Fact is gathered: Tier 1 in onboarding, Tier 2 under "Strengthen your profile", Tier 3 learned from a Review.
 

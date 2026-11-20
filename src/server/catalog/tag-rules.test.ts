@@ -128,6 +128,14 @@ describe("location", () => {
     expect(tags.city).toBe("San Francisco");
   });
 
+  test("city and state without the country name", () => {
+    const tags = postingOf({ title: "Software Engineer", locationRaw: "San Francisco, CA" });
+
+    expect(tags.countryCode).toBe("US");
+    expect(tags.region).toBe("California");
+    expect(tags.city).toBe("San Francisco");
+  });
+
   test("city and country by name", () => {
     const tags = postingOf({ title: "Software Engineer", locationRaw: "Warsaw, Poland" });
 

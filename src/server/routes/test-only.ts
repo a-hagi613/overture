@@ -54,8 +54,9 @@ import { resetFeedContentHashes } from "../catalog/feed-retag.ts";
 import { normalizeApplyUrl, normalizeTitle } from "../catalog/normalize.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags } from "../catalog/tag-import.ts";
 import { readLlmUsage, recordLlmUsage } from "../platform/llm/usage.ts";
-import { QUESTION_FIELD_TYPES, REVIEW_REASONS } from "../../shared/questions.ts";
-import { questionVariantHash } from "../catalog/question-normalize.ts";
+import { ANSWER_KINDS, QUESTION_FIELD_TYPES, REVIEW_REASONS } from "../../shared/questions.ts";
+import { normalizeFieldType, questionVariantHash } from "../catalog/question-normalize.ts";
+import { mapQuestionByRules } from "../catalog/question-rules.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
 import { createCodeWait } from "../inbox/waits.ts";
@@ -142,12 +143,13 @@ const postingTagBody = z.object({
 
 const seedPostingQuestionBody = z.object({
   text: z.string().min(1).max(2000),
-  fieldType: z.enum(QUESTION_FIELD_TYPES),
+  fieldType: z.enum(QUESTION_FIELD_TYPES).nullish(),
   fieldName: z.string().min(1).max(200).nullish(),
+  atsFieldType: z.string().min(1).nullish(),
   options: z.array(z.string().min(1)).max(200).default([]),
   required: z.boolean().default(false),
   factKey: z.string().min(1).nullish(),
-  answerKind: z.enum(["fact", "open_text", "consent", "skip", "unknown"]).default("unknown"),
+  answerKind: z.enum(ANSWER_KINDS).nullish(),
   mappedBy: z.enum(["rules", "llm", "owner"]).nullish(),
 });
 
@@ -341,17 +343,31 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
     const questionId = existing?.id ?? crypto.randomUUID();
 
     if (existing === undefined) {
+      const mapped =
+        question.answerKind === null || question.answerKind === undefined
+          ? mapQuestionByRules(question.text)
+          : null;
+
+      const answerKind = question.answerKind ?? mapped?.answerKind ?? "unknown";
+
+      const mappedBy =
+        question.mappedBy ?? (mapped === null || mapped.answerKind === "unknown" ? null : "rules");
+
+      const fieldType =
+        question.fieldType ??
+        normalizeFieldType(question.atsFieldType ?? "", question.fieldName ?? "");
+
       writer
         .insert(questions)
         .values({
           id: questionId,
           textDisplay: question.text,
           textNormHash,
-          fieldType: question.fieldType,
+          fieldType,
           optionsHash: null,
-          factKey: question.factKey ?? null,
-          answerKind: question.answerKind,
-          mappedBy: question.mappedBy ?? null,
+          factKey: question.factKey ?? mapped?.factKey ?? null,
+          answerKind,
+          mappedBy,
           seenCount: 1,
           createdAt: now,
         })
