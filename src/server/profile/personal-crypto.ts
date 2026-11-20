@@ -23,16 +23,30 @@ export function createPersonalCrypto(
 
     if (row === undefined) {
       const created = await createUserKey(masterKey, keyVersion);
-      const now = new Date();
 
-      await db.insert(userKeys).values({
-        userId,
-        wrappedDek: dekBlob(created),
-        masterKeyVersion: keyVersion,
-        createdAt: now,
-      });
+      db.insert(userKeys)
+        .values({
+          userId,
+          wrappedDek: dekBlob(created),
+          masterKeyVersion: keyVersion,
+          createdAt: new Date(),
+        })
+        .onConflictDoNothing()
+        .run();
 
-      return created;
+      const stored = await db.select().from(userKeys).where(eq(userKeys.userId, userId)).limit(1);
+
+      const winner = stored.at(0);
+
+      if (winner === undefined) {
+        throw new Error("the user key could not be created");
+      }
+
+      return {
+        keyVersion: winner.masterKeyVersion,
+        dekIv: winner.wrappedDek.subarray(0, IV_BYTES).toString("base64"),
+        wrappedDek: winner.wrappedDek.subarray(IV_BYTES).toString("base64"),
+      };
     }
 
     return {

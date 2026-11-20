@@ -515,12 +515,17 @@ Job `application.prepare`:
    sentence must appear in the resume lines it cites, else the sentence is removed. (Anthropic Citations cannot be
    combined with structured outputs, so the check is ours.)
 5. Unknown **required** factual question → status `needs_review`, create/attach a Review. Unknown **optional** →
-   left blank, never blocking.
+   left blank, never blocking. A required consent resolves only when it is a standard privacy or data-processing
+   acknowledgement with an option to select; a required marketing opt-in, a required `skip`, or a required file
+   field other than the resume slot never becomes a Review: the Application is `skipped` with
+   `status_reason='form_unsupported'`. A required resume slot resolves only when a current resume exists.
 6. All answered → status `ready`, `scheduled_for` assigned by the planner (§9.2).
 
 ### 8.4 Reviews
 
-- One open Review per (user, question). Each lists the applications it blocks ("unlocks 4 jobs").
+- One open Review per (user, question). Each lists the applications it blocks ("unlocks 4 jobs"), grouped by that
+  count and filterable by the question's topic (availability, experience, work authorisation, links, languages,
+  identity, EEO, other).
 - Answering saves the fact (Tier 3 `q:<id>` or the mapped fact key), re-runs `application.prepare` on every attached
   application, and closes the Review. Dismiss → attached applications `skipped` (`review_dismissed`).
 - A posting that closes while waiting detaches; a Review with no attachments auto-dismisses.

@@ -25,6 +25,31 @@ const greenhouseJobSchema = z.object({
 
 const greenhouseListSchema = z.object({ jobs: z.array(greenhouseJobSchema) });
 
+const greenhouseQuestionFieldSchema = z.object({
+  name: z.string().nullish().default(""),
+  type: z.string().nullish().default(""),
+  values: z
+    .array(
+      z.object({
+        label: z.string().nullish().default(""),
+        value: z.union([z.string(), z.number(), z.boolean()]).nullish(),
+      }),
+    )
+    .nullish()
+    .default([]),
+});
+
+const greenhouseQuestionSchema = z.object({
+  label: z.string().nullish().default(""),
+  required: z.boolean().nullish().default(false),
+  fields: z.array(greenhouseQuestionFieldSchema).nullish().default([]),
+});
+
+const greenhouseQuestionsSchema = z.object({
+  id: z.union([z.number(), z.string()]),
+  questions: z.array(greenhouseQuestionSchema).nullish().default([]),
+});
+
 const leverJobSchema = z.object({
   id: z.string(),
   text: z.string().nullish().default(""),
@@ -118,7 +143,7 @@ async function pullGreenhouse(boardToken: string) {
 
   const jobs = list.jobs.slice(0, JOBS_PER_BOARD);
 
-  const trimmed = await Promise.all(
+  const recorded = await Promise.all(
     jobs.map(async (job) => {
       const detail = await greenhouseLimiter.run(async () =>
         fetchJson(
@@ -129,11 +154,24 @@ async function pullGreenhouse(boardToken: string) {
         ),
       );
 
-      return trimGreenhouse(detail);
+      const questions = await greenhouseLimiter.run(async () =>
+        fetchJson(
+          `${GREENHOUSE_DEFAULT_BASE_URL}/v1/boards/${boardToken}/jobs/${String(
+            job.id,
+          )}?questions=true`,
+          greenhouseQuestionsSchema,
+        ),
+      );
+
+      return { job: trimGreenhouse(detail), questions };
     }),
   );
 
-  return { boardToken, jobs: trimmed };
+  return {
+    boardToken,
+    jobs: recorded.map((entry) => entry.job),
+    questions: recorded.map((entry) => entry.questions),
+  };
 }
 
 async function pullGreenhouseContent(boardToken: string) {
@@ -254,6 +292,20 @@ const greenhouseRecorded = (
 await Promise.all(
   greenhouseRecorded.map(async (board) => {
     await writeBoard(GREENHOUSE_FIXTURE_ROOT, board, true);
+
+    await Promise.all(
+      board.questions.map(async (recorded) => {
+        await Bun.write(
+          join(
+            GREENHOUSE_FIXTURE_ROOT,
+            board.boardToken,
+            "jobs",
+            `${String(recorded.id)}.questions.json`,
+          ),
+          JSON.stringify(recorded, null, 2),
+        );
+      }),
+    );
 
     process.stdout.write(
       `recorded ${String(board.jobs.length)} jobs for greenhouse board ${board.boardToken}\n`,

@@ -1,3 +1,35 @@
+const COUNT_WORDS = [
+  "zero",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+  "eleven",
+  "twelve",
+  "thirteen",
+  "fourteen",
+  "fifteen",
+  "sixteen",
+  "seventeen",
+  "eighteen",
+  "nineteen",
+  "twenty",
+] as const;
+
+function countWord(count: number) {
+  return COUNT_WORDS[count] ?? String(count);
+}
+
+function capitalize(word: string) {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
 export const copy = {
   app: {
     name: "Overture",
@@ -429,6 +461,60 @@ export const copy = {
       repliesTo: "Replies go to",
       repliesToValue: "Your Inbox",
       changeNote: "The address can only be changed through support.",
+    },
+  },
+  review: {
+    lead: (questions: number, applications: number) =>
+      `${capitalize(countWord(questions))} questions, ${countWord(applications)} applications waiting`,
+    title: "Your",
+    titleAccent: "Review",
+    filters: "Filter questions",
+    all: "All",
+    groupMany: "Unlocks 3 or more jobs",
+    groupFew: "Unlocks 1 or 2 jobs",
+    listTitle: "Waiting for you",
+    listNote: "Answer once, and every application waiting on it moves forward",
+    figList: "fig. 1",
+    figDetail: "fig. 2",
+    groupedBy: "Grouped by jobs unlocked",
+    unlocked: (count: number) => (count === 1 ? "job unlocked" : "jobs unlocked"),
+    needsYou: "Needs you",
+    questionOf: (position: number, total: number) =>
+      `Question ${String(position)} of ${String(total)} · fig. 2`,
+    detailNote: (count: number) =>
+      `${capitalize(countWord(count))} postings ask this. Nothing on your resume or in your saved facts says either way, so Overture will not guess.`,
+    unlocks: "Unlocks",
+    jobs: "jobs",
+    askedBy: "Asked by",
+    companies: "companies",
+    queued: "Queued, waiting on this answer",
+    closestFact: "Closest fact on file",
+    closestFactNote:
+      "Nothing in your resume or your saved facts answers this question. Answer it once and Overture reuses it for every application that asks.",
+    closestFactKnown: (label: string) =>
+      `${label} is on file. Confirming it here updates the fact for every form that asks.`,
+    answerPlaceholder: "Type your answer",
+    checkboxYes: "Yes",
+    yourAnswer: "Your answer",
+    answerNote:
+      "Saved as a fact and reused whenever a form asks this. Posting text never answers it for you.",
+    save: (count: number) =>
+      `Save answer · unlocks ${String(count)} ${count === 1 ? "job" : "jobs"}`,
+    dismiss: "Dismiss",
+    dismissNote: (count: number) =>
+      `Dismissing skips these ${String(count)} applications. They leave the Board.`,
+    back: "All questions",
+    emptyTitle: "Nothing is waiting for you",
+    emptyBody: "When a form asks something your Facts cannot answer, it waits here.",
+    categories: {
+      availability: "Availability",
+      experience: "Experience",
+      work_authorization: "Work authorization",
+      links: "Links",
+      languages: "Languages",
+      identity: "Identity",
+      eeo: "EEO",
+      other: "Other",
     },
   },
   placeholder: {

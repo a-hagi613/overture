@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { JobHandlers } from "../platform/jobs/run-due.ts";
 import type { AdjustableClock } from "../platform/ports/clock.ts";
+import type { PreparationService } from "../pipeline/prepare.ts";
 
 import {
   accounts,
@@ -17,8 +18,13 @@ import {
   fxRates,
   ledger,
   matches,
+  postingQuestions,
   postingTags,
   postings,
+  questionVariants,
+  questions,
+  reviewApplications,
+  reviews,
   sessions,
   tagImports,
   users,
@@ -39,6 +45,8 @@ import { dedupeKeyFor } from "../catalog/dedupe-key.ts";
 import { normalizeApplyUrl, normalizeTitle } from "../catalog/normalize.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags } from "../catalog/tag-import.ts";
 import { readLlmUsage, recordLlmUsage } from "../platform/llm/usage.ts";
+import { QUESTION_FIELD_TYPES } from "../../shared/questions.ts";
+import { questionVariantHash } from "../catalog/question-normalize.ts";
 import {
   applicationsLeft,
   commitForApplication,
@@ -58,6 +66,8 @@ const enqueueBody = z.object({
 });
 
 const settingBody = z.object({ value: z.string().min(1) });
+
+const runNowBody = z.object({ kind: z.string().min(1), payload: z.string() });
 
 const killSwitchBody = z.object({
   enabled: z.boolean(),
@@ -106,6 +116,16 @@ const postingTagBody = z.object({
   value: z.string().min(1),
 });
 
+const seedPostingQuestionBody = z.object({
+  text: z.string().min(1).max(2000),
+  fieldType: z.enum(QUESTION_FIELD_TYPES),
+  options: z.array(z.string().min(1)).max(200).default([]),
+  required: z.boolean().default(false),
+  factKey: z.string().min(1).nullish(),
+  answerKind: z.enum(["fact", "open_text", "consent", "skip", "unknown"]).default("unknown"),
+  mappedBy: z.enum(["rules", "llm", "owner"]).nullish(),
+});
+
 const sampleLedgerBody = z.object({ email: z.email() });
 
 const tamperLedgerBody = z.object({
@@ -137,6 +157,7 @@ const createPostingBody = z.object({
   salaryPeriod: z.enum(["year", "month", "hour"]).nullish(),
   postedAt: z.number().int().nullish(),
   tags: z.array(postingTagBody).max(20).default([]),
+  questions: z.array(seedPostingQuestionBody).max(40).default([]),
 });
 
 const bulkPostingsBody = z.object({
@@ -167,6 +188,7 @@ const seedApplicationBody = z.object({
     "withdrawn",
   ]),
   sentAt: z.number().int().nullable().default(null),
+  createdAt: z.number().int().nullable().default(null),
   origin: z.enum(["auto", "manual"]).default("auto"),
 });
 
@@ -182,9 +204,26 @@ const fxRateBody = z.object({
   perUsd: z.number().positive(),
 });
 
+const seedReviewBody = z.object({
+  userId: z.string().min(1),
+  prompt: z.string().min(1).max(2000),
+  fieldType: z.enum(QUESTION_FIELD_TYPES),
+  options: z.array(z.string().min(1)).max(200).default([]),
+  factKey: z.string().min(1).nullish(),
+  answerKind: z.enum(["fact", "open_text", "consent", "skip", "unknown"]).default("unknown"),
+  applicationIds: z.array(z.string().min(1)).min(1).max(50),
+});
+
 const userQuery = z.object({ userId: z.string().min(1) });
 
 const closePostingBody = z.object({ id: z.string().min(1) });
+
+const questionsQuery = z.object({
+  userId: z.string().min(1),
+  postingId: z.string().min(1).optional(),
+});
+
+const applicationQuery = z.object({ applicationId: z.string().min(1) });
 
 const createUserBody = z.object({ email: z.email(), name: z.string().min(1) });
 
@@ -232,6 +271,7 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
       descriptionHash: descriptionText === null ? null : contentHash(descriptionText),
       tagSource: null,
       closedAt: null,
+      questionsFetchedAt: row.questions.length > 0 ? now : null,
     })
     .run();
 
@@ -239,6 +279,54 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
     writer
       .insert(postingTags)
       .values({ postingId: id, dimension: tag.dimension, value: tag.value, source: "import" })
+      .onConflictDoNothing()
+      .run();
+  }
+
+  for (const [position, question] of row.questions.entries()) {
+    const textNormHash = questionVariantHash(question.text);
+
+    const existing = writer
+      .select({ id: questions.id })
+      .from(questions)
+      .where(eq(questions.textNormHash, textNormHash))
+      .get();
+
+    const questionId = existing?.id ?? crypto.randomUUID();
+
+    if (existing === undefined) {
+      writer
+        .insert(questions)
+        .values({
+          id: questionId,
+          textDisplay: question.text,
+          textNormHash,
+          fieldType: question.fieldType,
+          optionsHash: null,
+          factKey: question.factKey ?? null,
+          answerKind: question.answerKind,
+          mappedBy: question.mappedBy ?? null,
+          seenCount: 1,
+          createdAt: now,
+        })
+        .run();
+
+      writer
+        .insert(questionVariants)
+        .values({ variantHash: textNormHash, questionId })
+        .onConflictDoNothing()
+        .run();
+    }
+
+    writer
+      .insert(postingQuestions)
+      .values({
+        postingId: id,
+        questionId,
+        required: question.required,
+        position,
+        options: JSON.stringify(question.options),
+      })
       .onConflictDoNothing()
       .run();
   }
@@ -251,6 +339,7 @@ export function createTestRoutes(
   clock: AdjustableClock,
   handlers: JobHandlers,
   singletonJobKinds: readonly string[],
+  preparation: PreparationService | null = null,
 ) {
   const routes = new Hono();
 
@@ -274,6 +363,19 @@ export function createTestRoutes(
     const ran = await runDueJobs(db, clock, handlers, singletonJobKinds);
 
     return context.json({ ran });
+  });
+
+  routes.post("/jobs/run-now", zValidator("json", runNowBody), async (context) => {
+    const { kind, payload } = context.req.valid("json");
+    const handler = handlers[kind];
+
+    if (handler === undefined) {
+      return context.json({ error: "unknown job kind" }, 404);
+    }
+
+    await handler(payload);
+
+    return context.json({ ok: true });
   });
 
   routes.post("/jobs/enqueue", zValidator("json", enqueueBody), (context) => {
@@ -554,7 +656,7 @@ export function createTestRoutes(
   });
 
   routes.post("/applications/seed", zValidator("json", seedApplicationBody), (context) => {
-    const { userId, postingId, status, sentAt, origin } = context.req.valid("json");
+    const { userId, postingId, status, sentAt, createdAt, origin } = context.req.valid("json");
 
     const posting = db
       .select({ companyId: postings.companyId })
@@ -567,7 +669,7 @@ export function createTestRoutes(
     }
 
     const id = crypto.randomUUID();
-    const now = clock.now();
+    const now = createdAt ?? clock.now();
 
     db.insert(applications)
       .values({
@@ -585,6 +687,123 @@ export function createTestRoutes(
       .run();
 
     return context.json({ id });
+  });
+
+  routes.post("/reviews/seed", zValidator("json", seedReviewBody), (context) => {
+    const body = context.req.valid("json");
+    const now = clock.now();
+
+    const textNormHash = questionVariantHash(body.prompt);
+
+    const existing = db
+      .select({ id: questions.id })
+      .from(questions)
+      .where(eq(questions.textNormHash, textNormHash))
+      .get();
+
+    const questionId = existing?.id ?? crypto.randomUUID();
+
+    if (existing === undefined) {
+      db.insert(questions)
+        .values({
+          id: questionId,
+          textDisplay: body.prompt,
+          textNormHash,
+          fieldType: body.fieldType,
+          optionsHash: null,
+          factKey: body.factKey ?? null,
+          answerKind: body.answerKind,
+          mappedBy: null,
+          seenCount: 1,
+          createdAt: now,
+        })
+        .run();
+
+      db.insert(questionVariants)
+        .values({ variantHash: textNormHash, questionId })
+        .onConflictDoNothing()
+        .run();
+    }
+
+    const reviewId = crypto.randomUUID();
+
+    db.insert(reviews)
+      .values({
+        id: reviewId,
+        userId: body.userId,
+        questionId,
+        factKey: body.factKey ?? null,
+        prompt: body.prompt,
+        fieldType: body.fieldType,
+        options: JSON.stringify(body.options),
+        status: "open",
+        createdAt: now,
+        resolvedAt: null,
+      })
+      .run();
+
+    for (const applicationId of body.applicationIds) {
+      db.insert(reviewApplications).values({ reviewId, applicationId }).onConflictDoNothing().run();
+    }
+
+    return context.json({ reviewId, questionId });
+  });
+
+  routes.get("/reviews", zValidator("query", userQuery), (context) => {
+    const { userId } = context.req.valid("query");
+
+    return context.json({
+      reviews: db.select().from(reviews).where(eq(reviews.userId, userId)).all(),
+      applications: db.select().from(reviewApplications).all(),
+    });
+  });
+
+  routes.get("/questions", zValidator("query", questionsQuery), (context) => {
+    const { userId, postingId } = context.req.valid("query");
+
+    const application =
+      postingId === undefined
+        ? db
+            .select({ postingId: applications.postingId })
+            .from(applications)
+            .where(eq(applications.userId, userId))
+            .limit(1)
+            .get()
+        : { postingId };
+
+    if (application === undefined) {
+      return context.json({ questions: [] });
+    }
+
+    return context.json({
+      questions: db
+        .select({
+          questionId: postingQuestions.questionId,
+          required: postingQuestions.required,
+          position: postingQuestions.position,
+          options: postingQuestions.options,
+          text: questions.textDisplay,
+          fieldType: questions.fieldType,
+          factKey: questions.factKey,
+          answerKind: questions.answerKind,
+          mappedBy: questions.mappedBy,
+        })
+        .from(postingQuestions)
+        .innerJoin(questions, eq(questions.id, postingQuestions.questionId))
+        .where(eq(postingQuestions.postingId, application.postingId))
+        .orderBy(postingQuestions.position)
+        .all(),
+    });
+  });
+
+  routes.get("/prepared-answers", zValidator("query", applicationQuery), async (context) => {
+    const { applicationId } = context.req.valid("query");
+
+    if (preparation === null) {
+      return context.json({ answers: [] });
+    }
+
+    return context.json({ answers: await preparation.answersFor(applicationId) });
   });
 
   routes.get("/applications", zValidator("query", userQuery), (context) => {

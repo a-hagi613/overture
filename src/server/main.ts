@@ -34,6 +34,13 @@ import { createAnthropicLlmPort } from "./platform/llm/anthropic-batches.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
 import { MATCH_FILL_JOB_KIND, ensureMatchFillQueued, runMatchFillJob } from "./matching/score.ts";
+import { createGreenhouseQuestionSource } from "./catalog/greenhouse-questions.ts";
+import { createPreparationService } from "./pipeline/prepare.ts";
+import { createReviewService } from "./pipeline/reviews.ts";
+import {
+  APPLICATION_PREPARE_JOB_KIND,
+  parseApplicationPreparePayload,
+} from "./pipeline/prepare-jobs.ts";
 
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 
@@ -116,6 +123,22 @@ const matchDeps = {
   personal,
 };
 
+const preparation = createPreparationService({
+  db,
+  clock,
+  llm: anthropicLlmPort,
+  personal,
+  source: createGreenhouseQuestionSource(env.GREENHOUSE_FEED_BASE_URL),
+});
+
+const reviews = createReviewService({ db, clock, personal, preparation });
+
+const preparationJobHandlers: JobHandlers = {
+  [APPLICATION_PREPARE_JOB_KIND]: async (payload) => {
+    await preparation.prepare(parseApplicationPreparePayload(payload).applicationId);
+  },
+};
+
 const llmJobHandlers: JobHandlers =
   env.ANTHROPIC_API_KEY === undefined
     ? {}
@@ -173,7 +196,7 @@ const objects =
 const worker = startJobWorker(
   db,
   clock,
-  { ...catalogJobHandlers, ...llmJobHandlers, ...testJobHandlers },
+  { ...catalogJobHandlers, ...preparationJobHandlers, ...llmJobHandlers, ...testJobHandlers },
   shutdownController.signal,
   (notify) => {
     registerEnqueueNotify(notify);
@@ -195,12 +218,15 @@ const app = createApp({
   testRoutes: env.ENABLE_TEST_ROUTES,
   jobHandlers: {
     ...catalogJobHandlers,
+    ...preparationJobHandlers,
     ...llmJobHandlers,
     ...testJobHandlers,
   },
   auth,
   objects,
   llm: anthropicLlmPort,
+  preparation,
+  reviews,
   singletonJobKinds: SINGLETON_JOB_KINDS,
   backups,
 });

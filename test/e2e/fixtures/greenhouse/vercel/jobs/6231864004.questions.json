@@ -1,0 +1,345 @@
+{
+  "id": 6231864004,
+  "questions": [
+    {
+      "label": "First Name",
+      "required": true,
+      "fields": [
+        {
+          "name": "first_name",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "label": "Last Name",
+      "required": true,
+      "fields": [
+        {
+          "name": "last_name",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "label": "Email",
+      "required": true,
+      "fields": [
+        {
+          "name": "email",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "label": "Phone",
+      "required": true,
+      "fields": [
+        {
+          "name": "phone",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "label": "Resume/CV",
+      "required": false,
+      "fields": [
+        {
+          "name": "resume",
+          "type": "input_file",
+          "values": []
+        },
+        {
+          "name": "resume_text",
+          "type": "textarea",
+          "values": []
+        }
+      ]
+    },
+    {
+      "label": "Cover Letter",
+      "required": false,
+      "fields": [
+        {
+          "name": "cover_letter",
+          "type": "input_file",
+          "values": []
+        },
+        {
+          "name": "cover_letter_text",
+          "type": "textarea",
+          "values": []
+        }
+      ]
+    },
+    {
+      "label": "Are you currently based in any of these countries? Please note these are the only countries where we are accepting applications",
+      "required": true,
+      "fields": [
+        {
+          "name": "question_20361583004",
+          "type": "multi_value_single_select",
+          "values": [
+            {
+              "label": "United States",
+              "value": 163962070004
+            },
+            {
+              "label": "Germany",
+              "value": 163962071004
+            },
+            {
+              "label": "United Kingdom",
+              "value": 163962072004
+            },
+            {
+              "label": "Argentina",
+              "value": 163962073004
+            },
+            {
+              "label": "Australia",
+              "value": 163962074004
+            },
+            {
+              "label": "Canada",
+              "value": 163962075004
+            },
+            {
+              "label": "India",
+              "value": 163962076004
+            },
+            {
+              "label": "Japan",
+              "value": 163962077004
+            },
+            {
+              "label": "Other",
+              "value": 163962078004
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Will you require Visa Sponsorship now, or in the future?",
+      "required": true,
+      "fields": [
+        {
+          "name": "question_20361584004",
+          "type": "multi_value_single_select",
+          "values": [
+            {
+              "label": "Yes",
+              "value": 1
+            },
+            {
+              "label": "No",
+              "value": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Your authorization to work in the country where you live. Please choose the option that describes your work authorization.\n",
+      "required": true,
+      "fields": [
+        {
+          "name": "question_20361585004",
+          "type": "multi_value_single_select",
+          "values": [
+            {
+              "label": "I am authorized to work in the country due to my nationality",
+              "value": 163962079004
+            },
+            {
+              "label": "I am authorized to work in the country based on a valid work permit and do not need a company to sponsor my visa",
+              "value": 163962080004
+            },
+            {
+              "label": "I am authorized to work in the country based on a valid work permit which needs to be sponsored by the company I work for",
+              "value": 163962081004
+            },
+            {
+              "label": "I am not authorized to work in the country and need visa support",
+              "value": 163962082004
+            },
+            {
+              "label": "Other",
+              "value": 163962083004
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Do you live in one of the following states?\nAlabama, Alaska, Delaware, Kansas, Maine, Mississippi, Montana, Nebraska, New Mexico, North Dakota, South Dakota, West Virginia, or Wyoming.",
+      "required": true,
+      "fields": [
+        {
+          "name": "question_20361586004",
+          "type": "multi_value_single_select",
+          "values": [
+            {
+              "label": "Yes",
+              "value": 1
+            },
+            {
+              "label": "No",
+              "value": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "LinkedIn Profile",
+      "required": false,
+      "fields": [
+        {
+          "name": "question_20361587004",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "label": "Twitter",
+      "required": false,
+      "fields": [
+        {
+          "name": "question_20361588004",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "label": "Github",
+      "required": false,
+      "fields": [
+        {
+          "name": "question_20361589004",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "label": "Website",
+      "required": false,
+      "fields": [
+        {
+          "name": "question_20361590004",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "label": "Where did you first hear about this role?",
+      "required": true,
+      "fields": [
+        {
+          "name": "question_20361591004",
+          "type": "multi_value_single_select",
+          "values": [
+            {
+              "label": "Events",
+              "value": 163962084004
+            },
+            {
+              "label": "Built In",
+              "value": 163962085004
+            },
+            {
+              "label": "LinkedIn",
+              "value": 163962086004
+            },
+            {
+              "label": "Google Search",
+              "value": 163962087004
+            },
+            {
+              "label": "Advertisements",
+              "value": 163962088004
+            },
+            {
+              "label": "Other job boards",
+              "value": 163962089004
+            },
+            {
+              "label": "LLMs (ChatGPT, etc.)",
+              "value": 163962090004
+            },
+            {
+              "label": "I'm a Vercel customer",
+              "value": 163962091004
+            },
+            {
+              "label": "Referral from a Vercel customer",
+              "value": 163962092004
+            },
+            {
+              "label": "Referral from a Vercel team member",
+              "value": 163962093004
+            },
+            {
+              "label": "Social media (X, Instagram, YouTube, etc.)",
+              "value": 163962094004
+            },
+            {
+              "label": "Other Content (news articles, podcasts, blogs)",
+              "value": 163962095004
+            },
+            {
+              "label": "Developer communities (GitHub, Hacker News, Reddit, etc.)",
+              "value": 163962096004
+            },
+            {
+              "label": "Other",
+              "value": 163962097004
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "By submitting my application, I acknowledge that I have read and understand Vercel’s Job Applicant Privacy Notice - https://vercel.com/legal/job-applicant-privacy-notice ",
+      "required": true,
+      "fields": [
+        {
+          "name": "question_20361592004",
+          "type": "multi_value_single_select",
+          "values": [
+            {
+              "label": "Acknowledge/Confirm",
+              "value": 163962098004
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Please double-check all the information provided above. Ensuring accuracy is crucial, as any errors or omissions may impact the review of your application.",
+      "required": true,
+      "fields": [
+        {
+          "name": "question_20361593004",
+          "type": "multi_value_single_select",
+          "values": [
+            {
+              "label": "I have reviewed and confirmed that all the information provided is accurate and complete.",
+              "value": 163962099004
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
