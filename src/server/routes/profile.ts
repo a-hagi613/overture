@@ -12,6 +12,14 @@ import { parseMasterKey } from "../platform/crypto.ts";
 import { createFactService } from "../profile/facts.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { createResumeService, MAX_RESUME_BYTES } from "../profile/resume.ts";
+import { createLanguagesService } from "../profile/languages.ts";
+import { createSkipCompanyService } from "../profile/skip-companies.ts";
+import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
+import {
+  languagesInputSchema,
+  skipCompaniesInputSchema,
+  targetsInputSchema,
+} from "../../shared/targets.ts";
 
 const uploadSchema = z.object({
   file: z
@@ -43,6 +51,12 @@ export function createProfileRoutes(deps: {
 
   const factsService = createFactService({ db, clock, personal });
 
+  const targetsService = createTargetsService({ db, clock });
+
+  const languagesService = createLanguagesService({ db, clock });
+
+  const skipCompanyService = createSkipCompanyService({ db, clock });
+
   const routes = new Hono();
 
   routes.post("/profile/resume", async (context) => {
@@ -62,6 +76,12 @@ export function createProfileRoutes(deps: {
     });
 
     const prefilled = await factsService.prefillFromResume(account.id, upload.text);
+
+    const employer = prefilled.find((fact) => fact.key === "current_employer");
+
+    if (employer !== undefined) {
+      await skipCompanyService.setCurrentEmployer(account.id, employer.value);
+    }
 
     return context.json(
       { ...upload.resume, prefilledFacts: prefilled.map((fact) => fact.key) },
@@ -126,6 +146,98 @@ export function createProfileRoutes(deps: {
     ).toSorted((left, right) => left.key.localeCompare(right.key));
 
     return context.json({ facts: saved });
+  });
+
+  routes.get("/profile/languages", async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
+
+    if (account === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    return context.json({ languages: await languagesService.read(account.id) });
+  });
+
+  routes.put("/profile/languages", async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
+
+    if (account === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    const body = languagesInputSchema.parse(await context.req.json());
+
+    return context.json({ languages: await languagesService.save(account.id, body) });
+  });
+
+  routes.get("/profile/targets", async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
+
+    if (account === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    const saved = await targetsService.read(account.id);
+    const languages = await languagesService.read(account.id);
+
+    return context.json({
+      ...saved,
+      matchedCount: countMatchingPostings(db, saved.targets, languages),
+    });
+  });
+
+  routes.put("/profile/targets", async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
+
+    if (account === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    const body = targetsInputSchema.parse(await context.req.json());
+    const saved = await targetsService.save(account.id, body);
+    const languages = await languagesService.read(account.id);
+
+    return context.json({
+      ...saved,
+      matchedCount: countMatchingPostings(db, saved.targets, languages),
+    });
+  });
+
+  routes.post("/profile/targets/match-count", async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
+
+    if (account === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    const body = targetsInputSchema.parse(await context.req.json());
+    const languages = await languagesService.read(account.id);
+
+    return context.json({ matchedCount: countMatchingPostings(db, body, languages) });
+  });
+
+  routes.get("/profile/skip-companies", async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
+
+    if (account === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    return context.json({ companies: await skipCompanyService.list(account.id) });
+  });
+
+  routes.put("/profile/skip-companies", async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
+
+    if (account === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    const body = skipCompaniesInputSchema.parse(await context.req.json());
+
+    return context.json({
+      companies: await skipCompanyService.replaceUserCompanies(account.id, body),
+    });
   });
 
   return routes;
