@@ -13,6 +13,36 @@ permissions:
   contents: read
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      e2e: ${{ steps.plan.outputs.e2e }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      container: ${{ steps.plan.outputs.container }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.5
+      - run: bun install --frozen-lockfile
+      - id: plan
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            bun run scripts/e2e-ci.ts plan --base "origin/${BASE_REF}" --out e2e-plan.json --github-output "${GITHUB_OUTPUT}"
+          else
+            bun run scripts/e2e-ci.ts plan --out e2e-plan.json --github-output "${GITHUB_OUTPUT}"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e2e-plan
+          path: e2e-plan.json
+          retention-days: 1
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -55,6 +85,11 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
       - run: bun run db:verify
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 1
   unit:
     runs-on: ubuntu-latest
     steps:
@@ -67,12 +102,34 @@ jobs:
       - run: bun test src
   e2e:
     runs-on: ubuntu-latest
+    needs: [plan, build]
+    if: needs.plan.outputs.e2e == 'true'
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
+      options: --user 1001
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+      - name: Take the built app from the build job
+        uses: actions/download-artifact@v4
         with:
-          bun-version: 1.4.5
+          name: dist
+          path: dist
+      - name: Take the shard plan from the plan job
+        uses: actions/download-artifact@v4
+        with:
+          name: e2e-plan
+          path: .
+      - name: Install Bun (the Playwright image has no unzip for setup-bun)
+        run: |
+          curl -fsSLo /tmp/bun.zip https://github.com/oven-sh/bun/releases/download/bun-v1.4.5/bun-linux-x64.zip
+          python3 -m zipfile -e /tmp/bun.zip /tmp/bun
+          mkdir -p "$HOME/.bun/bin"
+          install -m 0755 /tmp/bun/bun-linux-x64/bun "$HOME/.bun/bin/bun"
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+          "$HOME/.bun/bin/bun" --version
       - run: bun install --frozen-lockfile
       - name: Install Litestream
         run: |
@@ -80,16 +137,71 @@ jobs:
           curl -fsSLo "/tmp/$litestream_asset" "https://github.com/benbjohnson/litestream/releases/download/v0.5.18/$litestream_asset"
           curl -fsSLo /tmp/checksums.txt https://github.com/benbjohnson/litestream/releases/download/v0.5.18/checksums.txt
           grep " $litestream_asset\$" /tmp/checksums.txt | (cd /tmp && sha256sum -c -)
-          tar -xzf "/tmp/$litestream_asset" -C /usr/local/bin litestream
-          litestream version
-      - run: bunx playwright install --with-deps chromium
-      - run: bun run build
-      - run: bun run test:e2e
-  container:
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf "/tmp/$litestream_asset" -C "$HOME/.local/bin" litestream
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/litestream" version
+      - name: Run this shard
+        run: |
+          files=$(bun run scripts/e2e-ci.ts shard --plan e2e-plan.json --shard "${{ matrix.shard }}")
+          bun node_modules/playwright/cli.js test $files
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-report-${{ matrix.shard }}
+          path: test-results/e2e.json
+          if-no-files-found: ignore
+          retention-days: 1
+  record:
     runs-on: ubuntu-latest
+    needs: [e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-      - run: docker build --pull -t overture:ci .
+        with:
+          ref: main
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: e2e-report-*
+          path: reports
+          merge-multiple: true
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.5
+      - run: bun install --frozen-lockfile
+      - run: bun run scripts/e2e-ci.ts timings --reports reports
+      - run: bun run scripts/e2e-ci.ts map
+      - name: Commit the recorded timings and reach map to main
+        run: |
+          set -euo pipefail
+          git config user.name "overture-ci"
+          git config user.email "ci@overture.invalid"
+          git add test/e2e/timings.json test/e2e/reach-map.json
+          if git diff --cached --quiet; then
+            echo "nothing new to record"
+            exit 0
+          fi
+          git commit -m "Record e2e timings and the reach map from the main run"
+          git push || { git pull --rebase origin main && git push; }
+  container:
+    runs-on: ubuntu-latest
+    needs: [plan]
+    if: needs.plan.outputs.container == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx (docker/setup-buildx-action v3 @ 8d2750c)
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+      - name: Build the container image (docker/build-push-action v6 @ 10e90e3)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: .
+          load: true
+          tags: overture:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       - name: Start the container and check the health route
         run: |
           set -euo pipefail
@@ -160,3 +272,21 @@ jobs:
           tar -xzf "/tmp/$litestream_asset" -C /usr/local/bin litestream
           litestream version
       - run: bun run scripts/restore-drill.ts local
+
+  ci-ok:
+    if: always()
+    needs: [lint, format, typecheck, build, unit, e2e, container, restore-drill, record]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every needed job succeeded, or was deliberately skipped
+        run: |
+          set -euo pipefail
+          for result in ${{ join(needs.*.result, ' ') }}; do
+            case "$result" in
+              success|skipped) ;;
+              *)
+                echo "a needed job finished as ${result}"
+                exit 1
+                ;;
+            esac
+          done

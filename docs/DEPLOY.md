@@ -109,9 +109,10 @@ runs a Litestream replicator, so the drill cannot overwrite or contend with the 
   them as `${R2_ACCOUNT_ID}`, `${R2_ACCESS_KEY_ID}` and `${R2_SECRET_ACCESS_KEY}`, and the
   entrypoint passes the config they live in to `litestream replicate`. The workflows never echo
   `FLY_API_TOKEN`; the guard step maps the secret to an environment variable and only tests emptiness.
-- **Third-party Actions are SHA-pinned.** `superfly/flyctl-actions/setup-flyctl` and
-  `oven-sh/setup-bun` are pinned to full commit SHAs (with the ref noted in the step name); only
-  first-party `actions/*` actions keep their version tags.
+- **Third-party Actions are SHA-pinned.** `superfly/flyctl-actions/setup-flyctl`,
+  `oven-sh/setup-bun`, `docker/setup-buildx-action` and `docker/build-push-action` are pinned to full
+  commit SHAs (with the ref noted in the step name); only first-party `actions/*` actions keep their
+  version tags, and the e2e container image is pinned to its digest.
 
 ## M1-32: the early cloud probe (owner runbook)
 

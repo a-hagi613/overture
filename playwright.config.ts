@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: "test/e2e",
   fullyParallel: true,
   workers: 2,
-  reporter: "list",
+  reporter: [["list"], ["json", { outputFile: "test-results/e2e.json" }]],
   globalSetup: "./test/e2e/global-setup.ts",
   use: {
     trace: "retain-on-failure",
