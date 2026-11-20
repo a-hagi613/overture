@@ -92,15 +92,29 @@ jobs:
       - run: docker build --pull -t overture:ci .
       - name: Start the container and check the health route
         run: |
+          set -euo pipefail
           docker run -d --name overture-ci \
             -e LITESTREAM_ENABLED=false \
             -e ENABLE_TEST_ROUTES=false \
+            -e BETTER_AUTH_SECRET=e2e-auth-secret-0123456789abcdef \
+            -e GOOGLE_CLIENT_ID=e2e-google-client-id \
+            -e GOOGLE_CLIENT_SECRET=e2e-google-client-secret \
+            -e LINKEDIN_CLIENT_ID=e2e-linkedin-client-id \
+            -e LINKEDIN_CLIENT_SECRET=e2e-linkedin-client-secret \
+            -e OWNER_EMAIL=maya.okafor@example.com \
+            -e TURNSTILE_SECRET=1x0000000000000000000000000000000AA \
+            -e TURNSTILE_SITE_KEY=1x00000000000000000000AA \
             -p 127.0.0.1:3100:3000 \
             overture:ci
-          for attempt in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3100/api/health | tee /tmp/health.json; then
+          deadline=$(date -u +%s)
+          deadline=$((deadline + 60))
+          while [ "$(date -u +%s)" -lt "$deadline" ]; do
+            status=$(curl -s -o /tmp/health.json -w '%{http_code}' http://127.0.0.1:3100/api/health || true)
+            if [ "$status" = "200" ]; then
+              cat /tmp/health.json
               exit 0
-            elif ! docker inspect -f '{{.State.Running}}' overture-ci | grep -q true; then
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' overture-ci)" != "true" ]; then
               docker logs overture-ci
               exit 1
             fi
