@@ -9,6 +9,17 @@ const enqueueResponseSchema = z.object({ id: z.string() });
 const jobStatusSchema = z.object({ status: z.string(), attempts: z.number() });
 const jobDoneSchema = z.object({ id: z.string() });
 const okSchema = z.object({ ok: z.boolean() });
+const jobStartedSchema = z.object({ id: z.string() });
+
+function isStartedForJob(id: string) {
+  return (event: SseEvent) => {
+    if (event.event !== "job.started") {
+      return false;
+    }
+
+    return jobStartedSchema.parse(JSON.parse(event.data)).id === id;
+  };
+}
 
 function isDoneForJob(id: string) {
   return (event: SseEvent) => {
@@ -43,6 +54,14 @@ test("SIGTERM requeues an in-flight job without consuming an attempt, and it com
     expect(enqueueResponse.ok).toBe(true);
 
     const { id } = enqueueResponseSchema.parse(await enqueueResponse.json());
+
+    const started = await readSseEventUntil(
+      `${appServer.url}/api/events`,
+      null,
+      isStartedForJob(id),
+    );
+
+    expect(started).not.toBeNull();
 
     const runningResponse = await fetch(`${appServer.url}/__test__/jobs/${id}`);
 

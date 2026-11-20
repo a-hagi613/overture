@@ -18,6 +18,8 @@ async function runJob(
   job: ClaimedJob,
   handler: (payload: string) => Promise<void>,
 ) {
+  publishEvent(db, clock, "job.started", JSON.stringify({ id: job.id }));
+
   try {
     await handler(job.payload);
 
