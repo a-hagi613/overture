@@ -303,6 +303,35 @@ test("a combobox that lists nothing until typed takes the region that matches th
   });
 });
 
+test("a country combobox takes the option that extends the typed query when no city matches", async () => {
+  await withHarness(async (harness) => {
+    const results = await runProbe(
+      command(harness, false, {
+        runFile: singlePostingRunFile(harness, posting("sunnyside", "8891671002")),
+      }),
+    );
+
+    const [result] = results;
+
+    if (result === undefined) {
+      throw new Error("no result for the phone country posting");
+    }
+
+    expect(result.outcome).toBe("dry_run_filled");
+    expect(result.submitted).toBe(false);
+    expect(harness.fixture.state.lastChoices["country"]).toBe("Canada +1");
+
+    const [form] = storedForms(harness);
+
+    if (form === undefined) {
+      throw new Error("no stored form");
+    }
+
+    expect(form.outcome).toBe("dry_run_filled");
+    expect(harness.browserUse.stoppedSessionIds).toHaveLength(1);
+  });
+});
+
 test("a posting the run file cannot fill is recorded as fill_failed and the run keeps going", async () => {
   await withHarness(async (harness) => {
     const failing = structuredClone(posting("blankstreet", "8004209003"));

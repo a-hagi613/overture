@@ -134,7 +134,9 @@ async function chooseFromCombobox(page: Page, field: Locator, wanted: string) {
       ? page.getByRole("option")
       : page.locator(`[id="${cssValue(listboxId)}"] [role='option']`);
 
-  const opened = await optionTexts(list);
+  const expanded = await field.getAttribute("aria-expanded");
+
+  const opened = expanded === "false" ? [] : await optionTexts(list);
 
   if (opened.length > 0) {
     const index = matchedIndex(opened, norm(wanted));
@@ -166,15 +168,29 @@ async function chooseFromCombobox(page: Page, field: Locator, wanted: string) {
 
   const index = autocompleteIndex(searched, wanted);
 
-  if (index < 0) {
-    await field.press("Escape");
+  if (index >= 0) {
+    await list.nth(index).click();
 
-    return false;
+    return true;
   }
 
-  await list.nth(index).click();
+  const typed = norm(query);
+  const singleSegment = norm(wanted) === typed;
+  const cityOffered = searched.some((text) => cityOf(text) === typed);
 
-  return true;
+  if (singleSegment && !cityOffered) {
+    const fallback = matchedIndex(searched, typed);
+
+    if (fallback >= 0) {
+      await list.nth(fallback).click();
+
+      return true;
+    }
+  }
+
+  await field.press("Escape");
+
+  return false;
 }
 
 async function selectMatchingOption(field: Locator, wanted: string) {
