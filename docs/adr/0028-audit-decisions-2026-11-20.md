@@ -5,8 +5,8 @@ status: accepted
 # Decisions from the architecture and feed audit (2026-11-20)
 
 The owner's rulings after an external audit of the catalog, the submission path, inbound mail and the M2 ATS list.
-Each point below is checked against the code or a production probe; anything not yet checked is listed at the end as
-"verify before building".
+Each point below is checked against the code or a production probe; the M2 and discovery claims were checked against
+primary sources before building (last section).
 
 ## Applications use the user's real email; ATS mail is forwarded to Overture
 
@@ -104,26 +104,45 @@ repeat-application throttles.
   M1 and M2, not by guesses.
 - **Users who skip the forwarding filter (M2).** The 10-minute paste fallback (a phone notification, then paste the
   code) has to be quick, so it is designed as a first-class path, not an error screen.
-- **Outbound sign-in mail (#90).** Magic links need a sender. Cloudflare Email Sending is preferred if its
-  availability and price check out (#114), because it keeps mail in one vendor and removes AWS from the project.
-  Otherwise use SES from `no-reply@tryoverture.com`. Either way it sits behind `MailSender`.
+- **Outbound sign-in mail (#90).** Magic links go through SES from `no-reply@tryoverture.com`, behind
+  `MailSender`. Cloudflare Email Sending was considered, but it is in Beta ("intended for testing purposes only",
+  <https://www.cloudflare.com/terms/>, <https://developers.cloudflare.com/email-service/>, read 2026-11-20), so it is
+  revisited when it becomes generally available.
 
-## Verify before building (M2 and discovery)
+## Checked before building (M2 and discovery)
 
-These came from the audit and have **not** been checked against primary sources yet. Each is checked, with its
-source URL recorded in the M2 spec, before work that depends on it starts.
+Each claim from the audit was checked against primary sources on 2026-11-20 (#114, full quotes in
+`docs/research/m2-ats-verification.md`).
 
-- Recruitee: the public `/api/offers/` endpoint is said to require a per-company token from 2027-02-10.
-  If true, Recruitee is dropped from M2 and Gem or Pinpoint is evaluated instead.
-- SmartRecruiters: said to fall under an SAP API policy restricting large-scale extraction and AI agents. Deferred
-  until the policy text is read.
-- Workable: said to publish one bulk feed, `https://www.workable.com/boards/workable.xml`, hourly, covering companies
-  listed on Jobs by Workable, and to rate-limit per-company widget calls hard. If true, it replaces slug guessing.
-- Personio: `https://{company}.jobs.personio.de/xml?language=en`. A missing board is said to redirect to the
-  marketing site, so redirects count as gone, with a German fallback when English descriptions are empty.
-- Workable is said to detect synthetic applicant emails, which this ADR already avoids.
-- Board-list licenses for discovery: ats-scrapers (MIT), freehire (MIT), open-jobs (CC0), ats-directory (CC-BY,
-  attribution), yc-oss; job-board-aggregator (CC BY-NC) and SimplifyJobs (no license) are excluded.
+- **Recruitee: confirmed, dropped from M2.** The Careers API needs a per-company token from 2027-02-10
+  (<https://docs.recruitee.com/reference/authentication-1>,
+  <https://support.recruitee.com/en/articles/12087172-upcoming-changes-to-your-custom-api-integrations>). Pinpoint
+  (<https://developers.pinpointhq.com/docs/jobs-json-endpoint>) and then Gem
+  (<https://help.gem.com/databases/gem-help-center/the-job-board-api>) are the deferred replacements; both are
+  per-company reads with no published limits.
+- **SmartRecruiters: confirmed, dropped from M2.** The SAP API Policy forbids AI agents and systematic extraction
+  (<https://developers.smartrecruiters.com/docs/the-smartrecruiters-platform>,
+  <https://help.sap.com/doc/sap-api-policy/latest/en-US/API_Policy_latest.pdf>). It is revisited only with written
+  permission.
+- **Workable: the bulk feed is confirmed, and it is large.** One feed covers every customer on Jobs by Workable,
+  updated hourly, gzip required (<https://help.workable.com/hc/en-us/articles/4420464031767-Utilizing-the-XML-Job-Feed>).
+  It is about 831 MiB uncompressed. It carries a company display name and an apply shortcode, not a board slug, so
+  Workable postings are ingested as a feed keyed by `<referencenumber>`, not as `company_boards`. Ingesting an
+  831 MiB file on the 2 GB machine every hour is not assumed: M2 decides between a streamed daily pass on the
+  machine and an off-box pass that writes only target-relevant postings to R2, measured first. The widget
+  rate-limit figure from the audit is unverifiable and moot.
+- **Personio: confirmed, with one correction.** The public per-company `/xml?language=en|de` feed needs no
+  credentials (<https://developer.personio.de/v1.0/reference/get_xml>). A missing board answers **404**, not a
+  redirect; 3xx and 404 are both treated as gone, with German as the fallback when English is empty.
+- **Workable synthetic-email detection: confirmed**
+  (<https://help.workable.com/hc/en-us/articles/35293126257815-Managing-AI-assisted-and-automated-job-applications>).
+  Real email on forms already avoids it.
+- **Discovery licences.** ats-scrapers (MIT), freehire (MIT), open-jobs (CC0) and ats-directory (**CC0**, not
+  CC-BY) are usable. yc-oss/api (no licence), job-board-aggregator's data (CC BY-NC) and SimplifyJobs (no licence)
+  are excluded.
+
+The M2 scope therefore names Workable (feed) and Personio. Whether M2 still promises four ATSes, with Pinpoint and
+Gem, or restates its scope is the owner's call.
 
 ## Considered Options
 
