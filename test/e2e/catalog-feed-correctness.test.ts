@@ -337,36 +337,51 @@ test("a Lever board over one hundred postings is read page by page", async () =>
   }
 });
 
-test("a Greenhouse detail fetch asks for pay transparency and stores the pay range", async () => {
+test("a changed Greenhouse posting fetches its detail with pay transparency and stores the pay range", async () => {
   const harness = await startCatalogHarness([GREENHOUSE_BOARD]);
 
   try {
     const fixtureJobs = readBoardFixture("greenhouse", GREENHOUSE_BOARD);
-    const paidJobs = fixtureJobs.filter((job) => (job.pay_input_ranges ?? []).length > 0);
+    const paidJob = fixtureJobs.find((job) => (job.pay_input_ranges ?? []).length > 0);
 
-    expect(paidJobs.length).toBeGreaterThan(0);
+    if (paidJob === undefined) {
+      throw new Error("the Greenhouse fixture has no paid posting");
+    }
+
+    const [range] = paidJob.pay_input_ranges ?? [];
 
     await harness.runBackfillCycle();
 
-    const postings = postingsOnBoard(await harness.postings(), harness.boardIds[GREENHOUSE_BOARD]);
+    const afterBulk = postingsOnBoard(await harness.postings(), harness.boardIds[GREENHOUSE_BOARD]);
 
-    expect(postings).toHaveLength(fixtureJobs.length);
+    expect(afterBulk).toHaveLength(fixtureJobs.length);
+    expect(afterBulk.every((posting) => posting.salaryMinMinor === null)).toBe(true);
 
-    for (const fixtureJob of paidJobs) {
-      const [range] = fixtureJob.pay_input_ranges ?? [];
-      const posting = postings.find((row) => row.atsJobId === fixtureJob.id);
+    const freshIso = new Date((await harness.clockNow()) - 60_000).toISOString();
 
-      expect(posting?.salaryMinMinor).toBe(range?.min_cents);
-      expect(posting?.salaryMaxMinor).toBe(range?.max_cents);
-      expect(posting?.salaryCurrency).toBe(range?.currency_type ?? null);
-      expect(posting?.salaryPeriod).toBe(range?.interval ?? null);
-    }
+    harness.fixture.mutateBoard("greenhouse", GREENHOUSE_BOARD, {
+      updatedAtUpdates: { [paidJob.id]: freshIso },
+    });
+
+    await harness.runBackfillCycle();
+
+    const afterDetail = postingsOnBoard(
+      await harness.postings(),
+      harness.boardIds[GREENHOUSE_BOARD],
+    );
+
+    const paidPosting = afterDetail.find((row) => row.atsJobId === paidJob.id);
+
+    expect(paidPosting?.salaryMinMinor).toBe(range?.min_cents);
+    expect(paidPosting?.salaryMaxMinor).toBe(range?.max_cents);
+    expect(paidPosting?.salaryCurrency).toBe(range?.currency_type ?? null);
+    expect(paidPosting?.salaryPeriod).toBe(range?.interval ?? null);
 
     const detailUrls = harness.fixture
       .stats()
       .urls.filter((url) => url.includes(`/v1/boards/${GREENHOUSE_BOARD}/jobs/`));
 
-    expect(detailUrls.length).toBe(fixtureJobs.length);
+    expect(detailUrls.some((url) => url.includes(`/jobs/${paidJob.id}?`))).toBe(true);
     expect(detailUrls.every((url) => url.includes("pay_transparency=true"))).toBe(true);
   } finally {
     await harness.close();
@@ -566,6 +581,37 @@ test("a Greenhouse seed row yields its token from every URL shape the dataset us
     expect(new Set(tokens)).toEqual(
       new Set(["boardsco", "jobboardsco", "euboardsco", "jobpathco", "embedco"]),
     );
+  } finally {
+    await harness.close();
+  }
+});
+
+test("a Greenhouse job without internal_job_id parses and is kept while an explicit null is dropped", async () => {
+  const harness = await startCatalogHarness(["vercel", GREENHOUSE_BOARD]);
+
+  try {
+    const vercelJobs = readBoardFixture("greenhouse", "vercel");
+    const anthropicJobs = readBoardFixture("greenhouse", GREENHOUSE_BOARD);
+    const [talentPoolJob] = anthropicJobs;
+
+    if (talentPoolJob === undefined) {
+      throw new Error("the Greenhouse fixture has no jobs");
+    }
+
+    harness.fixture.mutateBoard("greenhouse", GREENHOUSE_BOARD, {
+      internalJobIdUpdates: { [talentPoolJob.id]: null },
+    });
+
+    await harness.runBackfillCycle();
+
+    const postings = await harness.postings();
+    const vercelPostings = postingsOnBoard(postings, harness.boardIds.vercel);
+    const anthropicPostings = postingsOnBoard(postings, harness.boardIds[GREENHOUSE_BOARD]);
+
+    expect(vercelPostings).toHaveLength(vercelJobs.length);
+    expect(vercelPostings.every((posting) => posting.title !== "")).toBe(true);
+    expect(anthropicPostings).toHaveLength(anthropicJobs.length - 1);
+    expect(anthropicPostings.some((posting) => posting.atsJobId === talentPoolJob.id)).toBe(false);
   } finally {
     await harness.close();
   }

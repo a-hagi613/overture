@@ -43,10 +43,7 @@ export interface BoardFeed {
     condition: BoardCondition,
     region: BoardRegion,
   ) => Promise<BoardFetchResult>;
-  fetchBoardContent?: (
-    boardToken: string,
-    region: BoardRegion,
-  ) => Promise<BoardFetchResult>;
+  fetchBoardContent?: (boardToken: string, region: BoardRegion) => Promise<BoardFetchResult>;
   fetchPostingDetail?: (boardToken: string, atsJobId: string) => Promise<FeedContent>;
 }
 

@@ -191,7 +191,7 @@ export function createGreenhouseFeed(
     const parsed = listResponseSchema.parse(response.json);
 
     const postings: FeedPosting[] = parsed.jobs
-      .filter((job) => isPresent(job.internal_job_id))
+      .filter((job) => job.internal_job_id !== null)
       .map((job) => ({
         atsJobId: job.id,
         title: job.title,
@@ -232,7 +232,7 @@ export function createGreenhouseFeed(
     const parsed = contentResponseSchema.parse(response.json);
 
     const postings: FeedPosting[] = parsed.jobs
-      .filter((job) => isPresent(job.internal_job_id))
+      .filter((job) => job.internal_job_id !== null)
       .map((job) => ({
         atsJobId: job.id,
         title: job.title,

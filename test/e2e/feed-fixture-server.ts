@@ -117,6 +117,8 @@ export interface FixtureStats {
 
 export interface BoardMutation {
   titleUpdates?: Record<string, string>;
+  internalJobIdUpdates?: Record<string, number | null>;
+  omitInternalJobIds?: string[];
   locationUpdates?: Record<string, string>;
   descriptionUpdates?: Record<string, string>;
   updatedAtUpdates?: Record<string, string>;
@@ -151,7 +153,7 @@ interface MutableGreenhouseJob {
   updatedAt: string;
   firstPublished: string;
   language: string;
-  internalJobId: number | null;
+  internalJobId: number | null | undefined;
   requisitionId: string | null;
   payInputRanges: {
     min_cents: number | null;
@@ -442,7 +444,7 @@ function loadGreenhouseBoards() {
         updatedAt: job.updated_at,
         firstPublished: job.first_published,
         language: job.language,
-        internalJobId: job.internal_job_id ?? null,
+        internalJobId: job.internal_job_id,
         requisitionId: job.requisition_id ?? null,
         payInputRanges: (job.pay_input_ranges ?? []).map((range) => ({
           min_cents: range.min_cents ?? null,
@@ -660,6 +662,16 @@ export async function startFeedFixtureServer() {
 
       if (updatedAt !== undefined) {
         job.updatedAt = updatedAt;
+      }
+
+      const internalJobId = mutation.internalJobIdUpdates?.[String(job.id)];
+
+      if (internalJobId !== undefined) {
+        job.internalJobId = internalJobId;
+      }
+
+      if ((mutation.omitInternalJobIds ?? []).includes(String(job.id))) {
+        job.internalJobId = undefined;
       }
     }
 
