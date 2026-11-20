@@ -106,7 +106,7 @@ export function createResumeService(deps: {
   }
 
   async function extractResumeText(userId: string, pdf: Uint8Array<ArrayBuffer>) {
-    const document = await getDocumentProxy(pdf);
+    const document = await getDocumentProxy(new Uint8Array(pdf));
 
     const extracted = await extractText(document, { mergePages: true });
 
