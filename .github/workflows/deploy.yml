@@ -43,6 +43,32 @@ jobs:
       - name: Set up flyctl (superfly/flyctl-actions/setup-flyctl @ master @ 98172f7)
         if: steps.guard.outputs.skip != 'true'
         uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
+      - name: Refuse to deploy while a required Fly secret is missing (docs/DEPLOY.md, step 5)
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          required="R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET_BACKUPS BETTER_AUTH_SECRET OWNER_EMAIL TURNSTILE_SITE_KEY TURNSTILE_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET LINKEDIN_CLIENT_ID LINKEDIN_CLIENT_SECRET"
+          present="$(flyctl secrets list -a overture-web --json | jq -r '.[].name')"
+          missing=""
+          for name in $required; do
+            if ! grep -qx "$name" <<<"$present"; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Fly secrets missing on overture-web:$missing. The app refuses to boot without them; production stays on its current release."
+            {
+              echo "### Deploy refused"
+              echo ""
+              echo "These Fly secrets are not set on \`overture-web\`:$missing"
+              echo ""
+              echo "The server's env schema requires them, so a deploy would crash-loop. Set them with"
+              echo "\`fly secrets set\` (docs/DEPLOY.md, step 5); the next successful CI run on \`main\` deploys."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
       - name: Deploy to Fly
         if: steps.guard.outputs.skip != 'true'
         run: flyctl deploy --remote-only
