@@ -45,7 +45,6 @@ const envSchema = z.object({
   MASTER_KEY_V1: z.string().min(1).optional(),
   MASTER_KEY_CURRENT: z.coerce.number().int().min(1).default(1),
   OBJECT_STORE_ROOT: z.string().min(1).default("data/objects"),
-  ANTHROPIC_API_KEY: z.string().min(1).optional(),
   MAIL_FROM: z.email().default("no-reply@tryoverture.com"),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
   OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
