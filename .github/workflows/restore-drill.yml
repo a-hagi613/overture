@@ -1,0 +1,53 @@
+name: Restore drill
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: restore-drill
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip unless FLY_API_TOKEN is set (docs/DEPLOY.md, one-time step 6)
+        id: guard
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::notice::FLY_API_TOKEN is not set yet (docs/DEPLOY.md one-time step 6); skipping restore drill."
+            {
+              echo "### Restore drill skipped"
+              echo ""
+              echo "The \`FLY_API_TOKEN\` repository secret is not set yet (see docs/DEPLOY.md, one-time step 6)."
+              echo "The drill needs it to reach the Fly app and the R2 replica. Once it is set,"
+              echo "the next weekly run (or a manual run) drills the restore for real."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.guard.outputs.skip != 'true'
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        if: steps.guard.outputs.skip != 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+        if: steps.guard.outputs.skip != 'true'
+      - name: Set up flyctl (superfly/flyctl-actions/setup-flyctl @ master @ 98172f7)
+        if: steps.guard.outputs.skip != 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
+      - name: Run the restore drill against a throwaway Fly machine
+        if: steps.guard.outputs.skip != 'true'
+        run: bun run scripts/restore-drill.ts fly
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

@@ -20,7 +20,7 @@ export interface AppDependencies {
 export function createApp(deps: AppDependencies) {
   const app = new Hono();
 
-  app.route("/api", createHealthRoutes(deps.db));
+  app.route("/api", createHealthRoutes(deps.db, deps.clock));
   app.route("/api", createApiRoutes(deps.db, deps.clock));
 
   if (deps.testRoutes) {

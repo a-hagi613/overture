@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { createApp } from "./app.ts";
-import { env } from "./config/env.ts";
+import { databasePath, env } from "./config/env.ts";
 import { openDatabase } from "./platform/db/client.ts";
 import { migrateDatabase } from "./platform/db/migrate.ts";
 import { createClock } from "./platform/ports/clock.ts";
@@ -23,7 +23,7 @@ const sdk = startTelemetry({
   simpleExport: env.OTEL_SIMPLE_EXPORT,
 });
 
-const { db } = openDatabase(env.DATABASE_URL);
+const { db } = openDatabase(databasePath);
 
 migrateDatabase(db, "drizzle");
 

@@ -17,7 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
@@ -27,7 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
@@ -36,7 +38,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
@@ -45,7 +48,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
@@ -55,7 +59,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
@@ -64,10 +69,57 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
       - run: bunx playwright install --with-deps chromium
       - run: bun run build
       - run: bun run test:e2e
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --pull -t overture:ci .
+      - name: Start the container and check the health route
+        run: |
+          docker run -d --name overture-ci \
+            -e LITESTREAM_ENABLED=false \
+            -e ENABLE_TEST_ROUTES=false \
+            -p 127.0.0.1:3100:3000 \
+            overture:ci
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3100/api/health | tee /tmp/health.json; then
+              exit 0
+            elif ! docker inspect -f '{{.State.Running}}' overture-ci | grep -q true; then
+              docker logs overture-ci
+              exit 1
+            fi
+            sleep 2
+          done
+          docker logs overture-ci
+          exit 1
+      - run: docker logs overture-ci
+        if: always()
+      - run: docker rm -f overture-ci
+        if: always()
+
+  restore-drill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Install Litestream
+        run: |
+          litestream_asset=litestream-0.5.18-linux-x86_64.tar.gz
+          curl -fsSLo "/tmp/$litestream_asset" "https://github.com/benbjohnson/litestream/releases/download/v0.5.18/$litestream_asset"
+          curl -fsSLo /tmp/checksums.txt https://github.com/benbjohnson/litestream/releases/download/v0.5.18/checksums.txt
+          grep " $litestream_asset\$" /tmp/checksums.txt | (cd /tmp && sha256sum -c -)
+          tar -xzf "/tmp/$litestream_asset" -C /usr/local/bin litestream
+          litestream version
+      - run: bun run scripts/restore-drill.ts local
