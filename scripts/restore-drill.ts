@@ -257,7 +257,7 @@ function drillFly() {
       "console",
       "-a",
       flyAppName,
-      "-m",
+      "--machine",
       drill.id,
       "--command",
       "bun run scripts/check-restored-db.ts /data/app.sqlite http://127.0.0.1:3000/api/health",
