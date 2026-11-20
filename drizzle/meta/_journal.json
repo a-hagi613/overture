@@ -57,6 +57,13 @@
       "when": 1795230000006,
       "tag": "0007_admin_audit_passkeys",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1795230000007,
+      "tag": "0008_wild_plazm",
+      "breakpoints": true
     }
   ]
 }

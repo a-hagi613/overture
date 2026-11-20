@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   blob,
   index,
@@ -310,3 +311,47 @@ export const tagImports = sqliteTable("tag_imports", {
   uploadedBy: text("uploaded_by").notNull(),
   appliedAt: integer("applied_at").notNull(),
 });
+
+export const userKeys = sqliteTable("user_keys", {
+  userId: cascadeUserId().primaryKey(),
+  wrappedDek: blob("wrapped_dek", { mode: "buffer" }).notNull(),
+  masterKeyVersion: integer("master_key_version").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+});
+
+export const facts = sqliteTable(
+  "facts",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    key: text("key").notNull(),
+    valueEnc: text("value_enc").notNull(),
+    source: text("source", { enum: ["resume", "user", "review", "import"] }).notNull(),
+    confirmed: integer("confirmed", { mode: "boolean" }).notNull().default(false),
+    revision: integer("revision").notNull().default(1),
+    updatedAt: timestamp("updated_at").notNull(),
+  },
+  (t) => [uniqueIndex("facts_user_key_unique").on(t.userId, t.key)],
+);
+
+export const resumes = sqliteTable(
+  "resumes",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    objectKey: text("object_key").notNull(),
+    sha256: text("sha256").notNull(),
+    bytes: integer("bytes").notNull(),
+    pages: integer("pages").notNull(),
+    filenameEnc: text("filename_enc").notNull(),
+    textEnc: text("text_enc").notNull(),
+    parsedWith: text("parsed_with", { enum: ["unpdf", "llm"] }).notNull(),
+    isCurrent: integer("is_current", { mode: "boolean" }).notNull().default(true),
+    uploadedAt: timestamp("uploaded_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("resumes_user_current_unique")
+      .on(t.userId)
+      .where(sql`is_current = 1`),
+  ],
+);

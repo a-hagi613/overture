@@ -1,0 +1,20 @@
+{
+  "id": "msg_recorded_resume_pdf_fallback",
+  "type": "result",
+  "role": "assistant",
+  "model": "claude-haiku-5-5",
+  "content": [
+    {
+      "type": "text",
+      "text": "Name: Maya Okafor\nEmail: maya.okafor@example.com\nPhone: +1 416 555 0199\nCity: Toronto\nCountry: Canada\nNotice period: two weeks\nWork authorisation: Canadian citizen\nLanguages: English, French"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 2006,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 92
+  }
+}

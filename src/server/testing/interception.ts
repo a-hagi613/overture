@@ -7,7 +7,7 @@ import { env } from "../config/env.ts";
 import { z } from "zod";
 
 const turnstileVerifier = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
-const recordingPath = "test/e2e/recordings/turnstile/siteverify-pass.json";
+const turnstileRecordingPath = "test/e2e/recordings/turnstile/siteverify-pass.json";
 
 const recordedVerificationSchema = z.object({
   success: z.boolean(),
@@ -26,7 +26,7 @@ export function startInterception() {
   const anthropicRoot = env.ANTHROPIC_BASE_URL.replace(/\/+$/u, "");
 
   const recorded = recordedVerificationSchema.parse(
-    JSON.parse(readFileSync(recordingPath, "utf8")),
+    JSON.parse(readFileSync(turnstileRecordingPath, "utf8")),
   );
 
   const server = setupServer(

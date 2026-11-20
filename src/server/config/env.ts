@@ -42,6 +42,14 @@ const envSchema = z.object({
   LINKEDIN_CLIENT_SECRET: z.string().min(1),
   OAUTH_GOOGLE_DISCOVERY_URL: z.url().optional(),
   OAUTH_LINKEDIN_DISCOVERY_URL: z.url().optional(),
+  MASTER_KEY_V1: z
+    .string()
+    .trim()
+    .refine((value) => Buffer.from(value, "base64").byteLength === 32, {
+      message: "MASTER_KEY_V1 must decode to 32 bytes",
+    }),
+  MASTER_KEY_CURRENT: z.coerce.number().int().min(1).default(1),
+  OBJECT_STORE_ROOT: z.string().min(1).default("data/objects"),
   MAIL_FROM: z.email().default("no-reply@tryoverture.com"),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
   OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),

@@ -5,6 +5,47 @@ import { join } from "node:path";
 
 import { z } from "zod";
 
+const documentContentSchema = z.object({
+  type: z.literal("document"),
+  source: z.object({
+    type: z.literal("base64"),
+    media_type: z.literal("application/pdf"),
+    data: z.string().min(1),
+  }),
+});
+
+const singleMessageRequestSchema = z.object({
+  model: z.string().min(1),
+  max_tokens: z.number().int().positive(),
+  messages: z
+    .array(
+      z.object({
+        role: z.literal("user"),
+        content: z
+          .array(
+            z.union([
+              documentContentSchema,
+              z.object({ type: z.literal("text"), text: z.string() }),
+            ]),
+          )
+          .min(1),
+      }),
+    )
+    .min(1),
+});
+
+const recordedMessageSchema = z.object({
+  id: z.string().min(1),
+  model: z.string().min(1),
+  content: z.array(z.object({ type: z.string(), text: z.string().nullish() })),
+  usage: z.object({
+    input_tokens: z.number().int().nonnegative(),
+    cache_creation_input_tokens: z.number().int().nonnegative(),
+    cache_read_input_tokens: z.number().int().nonnegative(),
+    output_tokens: z.number().int().nonnegative(),
+  }),
+});
+
 const recordingSchema = z.object({
   title: z.string().min(1),
   messageId: z.string().min(1),
@@ -48,11 +89,19 @@ export interface RecordedBatchRequest {
   outputFormatType: string;
 }
 
+export interface RecordedSingleMessage {
+  model: string;
+  hasDocument: boolean;
+  pdfBytes: number;
+  userText: string;
+}
+
 export interface AnthropicFixtureServer {
   url: string;
   stop: () => void;
   batchesCreated: () => number;
   requests: () => RecordedBatchRequest[];
+  singleMessages: () => RecordedSingleMessage[];
 }
 
 interface BatchItem {
@@ -66,6 +115,12 @@ interface TrackedBatch {
 }
 
 type Recording = z.infer<typeof recordingSchema>;
+
+export function loadResumePdfFallbackRecordingSync() {
+  const path = join(process.cwd(), "test/e2e/recordings/anthropic/resume-pdf-fallback.json");
+
+  return recordedMessageSchema.parse(JSON.parse(readFileSync(path, "utf8")));
+}
 
 export function loadTagFallbackRecordingsSync() {
   const path = join(process.cwd(), "test/e2e/fixtures/anthropic/tag-fallback-recording.jsonl");
@@ -135,8 +190,10 @@ function serveResults(batch: TrackedBatch) {
 
 export async function startAnthropicFixtureServer() {
   const recordings = loadTagFallbackRecordingsSync();
+  const resumeFallback = loadResumePdfFallbackRecordingSync();
   const batches = new Map<string, TrackedBatch>();
   const seenRequests: RecordedBatchRequest[] = [];
+  const seenSingleMessages: RecordedSingleMessage[] = [];
 
   let createdBatches = 0;
   let batchCounter = 0;
@@ -149,6 +206,44 @@ export async function startAnthropicFixtureServer() {
     const address = server.address();
 
     return `http://127.0.0.1:${String(portFrom(address))}`;
+  }
+
+  async function createSingleMessage(request: IncomingMessage, response: ServerResponse) {
+    const parsed = singleMessageRequestSchema.parse(JSON.parse(await readBody(request)));
+    const message = parsed.messages.at(0);
+
+    if (message === undefined) {
+      throw new Error("the single message request carried no message");
+    }
+
+    const { document, text } = seenBlocksFor(message);
+
+    seenSingleMessages.push({
+      model: parsed.model,
+      hasDocument: true,
+      pdfBytes: Buffer.from(document.source.data, "base64").byteLength,
+      userText: text.text,
+    });
+
+    finishJson(
+      response,
+      200,
+      JSON.stringify({
+        id: resumeFallback.id,
+        type: "message",
+        role: "assistant",
+        model: resumeFallback.model,
+        content: resumeFallback.content,
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: {
+          input_tokens: resumeFallback.usage.input_tokens,
+          cache_creation_input_tokens: resumeFallback.usage.cache_creation_input_tokens,
+          cache_read_input_tokens: resumeFallback.usage.cache_read_input_tokens,
+          output_tokens: resumeFallback.usage.output_tokens,
+        },
+      }),
+    );
   }
 
   async function createBatch(request: IncomingMessage, response: ServerResponse) {
@@ -287,6 +382,13 @@ export async function startAnthropicFixtureServer() {
 
   async function handleRequest(request: IncomingMessage, response: ServerResponse) {
     const { pathname } = new URL(request.url ?? "/", "http://127.0.0.1");
+
+    if (request.method === "POST" && pathname === "/v1/messages") {
+      await createSingleMessage(request, response);
+
+      return;
+    }
+
     const path = batchPathMatch(pathname);
 
     if (request.method === "POST" && path?.batchId === null) {
@@ -325,6 +427,7 @@ export async function startAnthropicFixtureServer() {
     },
     batchesCreated: () => createdBatches,
     requests: () => [...seenRequests],
+    singleMessages: () => [...seenSingleMessages],
   } satisfies AnthropicFixtureServer;
 }
 
@@ -354,4 +457,15 @@ function portFrom(address: string | { port: number } | null) {
   }
 
   return parsed.data.port;
+}
+
+function seenBlocksFor(message: z.infer<typeof singleMessageRequestSchema>["messages"][number]) {
+  const document = message.content.find((block) => block.type === "document");
+  const text = message.content.find((block) => block.type === "text");
+
+  if (document === undefined || text === undefined) {
+    throw new Error("the single message request carried no document or text block");
+  }
+
+  return { document, text };
 }

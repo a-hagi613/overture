@@ -25,6 +25,16 @@ export default defineConfig({
       },
     },
     {
+      name: "profile-boards",
+      testMatch: /board-match-profile\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/../../design/reference/profile/{arg}{ext}",
+        },
+      },
+    },
+    {
       name: "shell-boards",
       testMatch: /board-match-shell\.test\.ts/u,
       expect: {

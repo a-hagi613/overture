@@ -2,6 +2,7 @@ type GlyphName =
   | "back"
   | "bell"
   | "board"
+  | "check"
   | "home"
   | "inbox"
   | "lock"
@@ -32,6 +33,7 @@ const glyphs: Record<GlyphName, GlyphPaths> = {
     ],
     strokeWidth: 1.6,
   },
+  check: { paths: ["M5 12.5l4.5 4.5L19 7.5"], strokeWidth: 2 },
   review: {
     paths: [
       "M12 3a9 9 0 100 18 9 9 0 000-18z",
