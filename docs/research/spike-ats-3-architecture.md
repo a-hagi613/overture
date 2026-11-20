@@ -3,15 +3,15 @@
 **Worker 3 of epic #5 (research spike).** Deliverable: this report. Live evidence only — every
 number below cites the command that produced it. Shared data in `spike-ats-out/data/` (never in git).
 
-Status: **in progress** (M1 of 5 done).
+Status: **complete** (2026-11-20).
 
 | Milestone | Content | Status |
 |---|---|---|
 | M1 | Live env + hosted manifest + source read of the `Job` schema | done |
-| M2 | Schema mapping (ats-scrapers `Job` → Overture SPEC tables, → hc.sqlite) | pending |
-| M3 | Delta & expiry design + test on real snapshots | pending |
-| M4 | Coverage: hc.sqlite top companies vs companies.parquet directory | pending |
-| M5 | Fallback (/api/mcp) + build-vs-adopt verdict | pending |
+| M2 | Schema mapping (ats-scrapers `Job` → Overture SPEC tables, → hc.sqlite) | done |
+| M3 | Delta & expiry design + test on real snapshots | done |
+| M4 | Coverage: hc.sqlite top companies vs companies.parquet directory | done |
+| M5 | Fallback (/api/mcp) + build-vs-adopt verdict | done |
 
 ---
 
@@ -251,3 +251,227 @@ every one of the 16,213 unique URLs reappears in the Nov 13–20 week crawl (ove
 hiring.cafe did not visibly expire anything over a month, so a missing-from-two-reads rule against
 a Hiring Cafe catalog would almost never fire. The same caution applies to Stapply: absence
 reflects the *generator's* retention, which is unpublished (risk, §8).
+
+## 5. M4 — Coverage: hc.sqlite vs the hosted companies directory
+
+Sources of truth: `hc.sqlite` (read-only; 25,269 jobs, 9,205 companies — see postmortem §2), the
+downloaded `companies.parquet` (173,344 rows: `ats, name, slug, url`), and `find_company()`
+(a **local substring match** over that artifact — no network call; verified live on 'shopify',
+'maple leaf', 'ao globe', 'cobs', 'kittyspout').
+
+Commands (sketch; full transcripts in `spike-ats-out/notes/`):
+
+```
+sqlite3 -readonly …/hc.sqlite "SELECT COUNT(*) FROM jobs"                → 25,269
+sqlite3 -readonly …/hc.sqlite "SELECT COUNT(*) FROM companies"           → 9,205
+.venv/bin/python … top-500 companies by job count → data/top500-companies.parquet
+slug sets per ATS from companies.parquet; hc board_token (normalised)
+matched against them; per-ATS job and company rates printed
+```
+
+### 5.1 Where hc.sqlite's jobs sit (what matters first)
+
+hc.sqlite's own source distribution (one week, Canada-skewed; top 10 of 100 distinct sources):
+`workday 2,820 · dayforce 2,352 · adp 2,021 · ultipro 1,825 · successfactors 1,677 · bamboohr 1,218 ·
+adhoc 1,208 · icims2 1,163 · grnhse 896 · oraclecloud 891` jobs.
+
+**Only 3,093 of 25,269 hc jobs (12.2 %) sit on the seven ATS Overture supports**
+(896+847+544+413+319+73+1 = 3,093; `sqlite3 … "SELECT 896+847+544+413+318+1+73+1"`), i.e. the Hiring
+Cafe sample skews heavily to the enterprise ATSes Overture explicitly excludes (SPEC non-goals:
+Workday/iCIMS/Taleo). Conversely, for Overture's target segment (Greenhouse/Lever/Ashby startups),
+hc's week-long sample is thin.
+
+### 5.2 Coverage of hc.sqlite companies by the hosted directory
+
+Per-SPEC-supported-ATS, matching hc `board_token` (normalised: lowercase, `[-_ ]` stripped) against
+the directory's `slug` per ATS — the precise test (name-based match gives lower numbers, ~74 %,
+because hc company names differ from ATS tenant names):
+
+| ATS | hc boards tested | in directory | % (boards) | % (jobs behind them) |
+|---|---|---|---|---|
+| greenhouse | 463 | 424 | 91.6 % | 92.7 % |
+| smartrecruiters | 167 | 158 | 94.6 % | 98.1 % |
+| lever | 138 | 121 | 87.7 % | 87.1 % |
+| ashby | 285 | 240 | 84.2 % | 83.5 % |
+| recruitee | 37 | 30 | 81.1 % | 86.3 % |
+| workable | 213 | 28 | **13.1 %** | 12.6 % |
+| personio | 1 | 1 | 100 % (n=1) | — |
+| **all supported** | **1,304** | **1,002** | **76.8 %** | |
+
+Workable is the outlier: its two slug conventions (hc: `durham_community_health_centre`;
+directory: `1000heads`, `10xbanking`) still disagree after normalisation for ~59 % of boards —
+either the directory stores a different identifier for Workable tenants or hc's tokens are URLs.
+The hosted Workable "marketplace" source exists as an option (`workable_marketplace`), which never
+needs slugs at all.
+
+### 5.3 The verdict measurement (top-500)
+
+- Top-500 hc companies by job count (9–135 jobs each; `data/top500-companies.parquet`).
+- Only **44/500 (8.8 %)** of them have ≥ 1 job on a SPEC-supported ATS — Hiring Cafe's top companies
+  are enterprise-ATS shops (Alberta Health Services/Taleo, Walmart Canada/TalentBrew, BMO/Phenom…).
+- **Of those 44: 39 present in the hosted directory on a supported ATS = 88.6 %.**
+
+### 5.4 Gaps found
+
+- **Missing major supported-ATS companies** (in hc top-500, on supported ATS, absent from
+  directory): Maple Leaf Foods (SmartRecruiters; ~22 jobs), AO Globe Life (Lever), KittySpout
+  (Workable), **Shopify (Ashby — 12 jobs; and `find_company('shopify')` returns a *wrong* company,
+  shopify.teamtailor.com, a stale 2020-era board)**, COBS Bread (Workable). Live-verified with
+  `find_company()`; before inferring permanent absence, note the snapshot's age (§1).
+- **Region skew**: the hosted directory has no geography column at all, so regional coverage is
+  unmeasurable from it by design; hc.sqlite is 99.2 % Canada by country-level locations
+  (CA 25,031 / US 1,079 / GB 123 of 25,075) — a *sample* bias, not a directory fact. US-major
+  employers appear (Walmart CAD, FedEx, L3Harris), so the directory isn't Canada-poor, but nothing
+  in the artifact lets us prove US coverage either way.
+- **Missing ATS types** (hc sources with no hosted slice at all, after slug aliasing
+  icims2→icims, ultipro→ukg, oraclecloud/oraclepeoplesoft→oracle, phenompeople→phenom,
+  taleo_*→taleo, zohorecruit→zoho_recruit, join→join_com, isolvedhire→isolved_hire): **adhoc**
+  (bespoke big-tech careers — 1,208 hc jobs), **paradox** (411), **njoyn** (277, Canadian),
+  **workstream (92, Canadian retail/hospitality)**, ttcportals, hrsmart, csod, brassring,
+  careerplug, betterteam, dover, hibob… ≈ 3,500–4,300 of 25,269 hc jobs (13–17 %) come from ATSes
+  with no hosted slice. None of these are on Overture's SPEC ATS list, so for Overture's scope the
+  loss is small; but note the directory also lists tenants for sources it cannot scrape
+  (`careerplug 5,455`, `hiringthing 4,569`, `isolved_hire 3,988` rows in companies.parquet with no
+  matching `by_ats` job slice).
+- **The directory is bigger than Overture's scope**: 173,344 tenants total; the seven SPEC ATSs'
+  slices hold ≈ 39,075 (greenhouse 7,363 + smartrecruiters 11,876 + bamboohr 11,857 + workday
+  5,359 + workable 4,752 + ashby 4,171 + personio 5,564 + lever 2,377 + recruitee 2,972 across the
+  top ones) — the adoptable universe is ~39k boards on day one, before any of our own discovery.
+
+### 5.5 Verdict measurement
+
+Coverage (pass = ≥ 80 % of the top-500 hc companies *on supported ATS* present in the hosted
+directory): **88.6 % (39/44) → PASS** (a looser name-based match gives 82.2 %, still PASS).
+The number is on a small base (44 of 500 companies), and the hosted snapshot was 1.5 days stale at
+fetch; both caveats argue the PASS is robust but the *base* disqualifies hc.sqlite as Overture's
+universe, not the directory.
+
+## 6. M5a — Should hiring.cafe's `/api/mcp` stay as a light secondary discovery source?
+
+**No — drop it.** The post-mortem's own measurements already settle this:
+
+1. **Not a discovery source.** `search_jobs` on the MCP endpoint is capped at 25 results/call with no
+   source filter (postmortem §4.2; §6.2 "can't power a broad seed"), while the SSR search route —
+   the one that actually enumerates — is the route robots.txt disallows and Cloudflare kills within
+   ~90 min (interactive Turnstile in the user's own browser session). MCP only exposes
+   `get_job_details` (descriptions) usefully.
+2. **Rate budget is hostile and unowned.** Measured: sustained 3.6 rps → 429s after a few hundred
+   calls; then even 1 rps 429s; ~45 min silence to heal; clean sustained profile 1.5 rps ≈ 2,400
+   calls/25 min (postmortem §4.2). Backfill of one week of descriptions took hours at 2 req/min.
+   Same per-IP budget as the blocked HTML routes.
+3. **Legal posture**: robots.txt disallows `/api/*`-adjacent shapes; ToS page unreadable (403).
+   SPEC's own risk table says "Overture ships no code that fetches hiring.cafe"; the postmortem's
+   outcome was "we cannot use it" (owner decision 2026-11-20).
+4. **What it would buy** — third-party descriptions and tags for postings we already have from the
+   ATS feed itself — is redundant: our feed clients get the description straight from Greenhouse/
+   Lever/Ashby, and tagging is ours (SPEC §6.3, #17).
+
+Keep only the *data* as a one-time tag-import seam input (SPEC §6.3.6 `tag-imports` accepts JSONL
+by `apply_url_norm`); that needs no runtime dependency on hiring.cafe at all.
+
+## 7. M5b — Build vs adopt
+
+### 7.1 The three options
+
+**(A) ats-scrapers hosted Parquet as the primary ingestion layer.**
+Feed `company_boards` from its 39k supported-ATS tenants, then let a nightly job download each
+tracked ATS slice, diff on global_id (§4.2), and write `postings`.
+
+- **Fits**: 7.66M jobs / 146k companies / 90 sources, one 68 MB parquet per ATS instead of polling
+  ~22,800 boards. (Polling is feasible too — 22,800 boards once at 2 req/s per ATS ≈ one pass per
+  ~1.5–2 h — but discovery at 39k+ tenants and zero-latency breadth are things only the dataset has.)
+- **Doesn't fit**: freshness (slice age ≈ 12–36 h at fetch, unpublished SLA; postings arrive
+  L+1…L+2 days after publication vs minutes-hours for direct feeds); field coverage (country_iso
+  blank on 80 % of Ashby rows, workplace_type dropped from slices, no source_updated_at, no
+  etag/conditional GET — 68 MB per Ashby slice per day whether 5 jobs changed or 0); the
+  `raw`-JSON string recovery work (per ATS); tags (SPEC pipeline re-tagging anyway).
+- **Stack**: Bun cannot efficiently read this pipeline's 3.5 GB parquet / per-ATS parquet. Concretely
+  Bun/TS would either (i) run a DuckDB subprocess (`duckdb` npm uses WASM/native via Node — works
+  under Node, flaky under Bun), (ii) port the 700-line model + manifest + normalize to TS
+  (manifest is trivial; `_normalize_dataset` is the only fiddly part), or (iii)—most realistic—pull
+  slices with curl and convert to a SQLite sidecar once daily in Python, keeping Bun ingestion
+  unchanged. Option (iii) means a second runtime on the single Fly machine (ADR 0002: one machine,
+  one Bun process) — a real architecture delta.
+- **Data ownership/compliance**: none — the data is Stapply's harvesting (their scraper code
+  fetches public ATS endpoints the way our own clients do; MIT licensed). But *provenance is
+  unverifiable*: we'd surface employer data whose collection we don't control, can't audit, can't
+  answer per-ATS questions about (rate limits they hit, ToS stances). SPEC deliberately touches only
+  "ATS public job-feed APIs which exist for programmatic reading" (§3). Adopting (A) breaks that
+  posture for the whole catalog.
+- **Dependency**: single volunteer repo, 208 stars, 52 forks, 62 open issues, created 2025-10,
+  releases every 1–2 months (v0.4.0 2026-11-19, v0.3.0 2026-09-02, v0.2.0 2026-07-22); hosted layer
+  is one person's R2 bucket. A break in the bucket = total catalog outage. No contractual SLA.
+
+**(B) Discovery/seed source feeding our own feed clients** — the hybrid.
+Use `companies.parquet` (7.9 MB, ~39k supported-ATS tenants) to seed/extend `company_boards`
+(source='discovered'), then let OUR clients (#14) poll those boards exactly as SPEC plans.
+- Fits: replaces/validates the lost v1 22,800-board seed with a fresh, larger one (39k + resolve
+  URL→(ats,slug) coverage). No new runtime, no per-day egress, no freshness problem (our clients
+  poll), no provenance risk beyond the *seed* (which is exactly what v1 did with its own curated
+  list). Licensing: MIT.
+- Gaps: seed quality — name/URL matching into `companies` rows must be built (normalisation + human
+  review; find_company's substring match returns junk agents as seen above → needs exact-slug only
+  plus our own host-based resolver port); the Workable slug convention mismatch (§5.2) means
+  Workable seeds need verification; ver 173k directory includes 4k+ unscrapeable tenants — filter by
+  our ATS list.
+- **(B) is the recommendation.** Keep `find_company`/resolver as offline tooling; do not ship the
+  Python library into production but derive a seed pipeline from the companies artifact (one-time +
+  monthly refresh), and optionally run `models.py` semantics as the contract for a future optional
+  hosted-delta ingestion *if* Stapply publishes `by_date`.
+
+**(C) Not used.** Loses the only available replacement for the v1 22,800-board seed at scale, at zero
+favourable price. The 39k-tenant seed is worth more than its risks.
+
+### 7.2 Decision drivers summary
+
+| Driver | (A) primary | (B) seed | (C) build-only |
+|---|---|---|---|
+| Coverage of target universe (SPEC ATSs) | 39k tenants, but workable slug gap + snapshot staleness | 39k seed + our own live verification | today: the encrypted v1 export (~22.8k) only |
+| Freshness | 1–2 days + backup lag; no SLA | ours (minutes, per activity) | ours |
+| Compliance posture | contradicts SPEC §3 | consistent (seed is a list, not the jobs) | consistent |
+| Ownership/audit | none (third-party harvest) | seed only, clients ours | full |
+| Runtime cost | 68 MB–3.5 GB/day + Python under Bun OR DuckDB-TS | 7.9 MB/month + once | none |
+| Maintenance | vendor's (volatile) + our recovery work for `raw` | ours, small | ours, large (7 ATS clients + discovery) |
+| Licence | MIT | MIT | — |
+| Failure mode | whole catalog outage | worst case: stale seed | nothing shared |
+
+## 8. Verdict
+
+**Coverage PASS** — 39/44 = **88.6 %** of the top-500 hc.sqlite companies that are on a
+SPEC-supported ATS are present in ats-scrapers' hosted company directory (pass threshold 80 %).
+Measured by normalised `board_token`↔`slug` match; name-based fallback gives 82.2 % (also PASS).
+
+- **Build vs adopt: option (B).** Use ats-scrapers' companies artifact as a discovery/seed source for
+  `company_boards` (~39k tenants on Greenhouse/Lever/Ashby/SmartRecruiters/Recruitee/Workable/
+  Personio + the resolve.py URL patterns ported to TS), keep #14's direct per-ATS clients as the
+  only ingestion path. Do not adopt the hosted Parquet as primary (A): freshness, provenance,
+  compliance posture and single-vendor hosting are all wrong for a product whose promises are
+  "never lie, never embarrass" — the pre-send liveness re-check would be carrying the whole
+  catalog's correctness. Do not drop it entirely (C): the v1 seed is replaced and extended at ~8 MB
+  of inputs.
+- **/api/mcp: drop as a runtime source entirely** (rate-capped, robots-hostile, redundant with our
+  feed data); keep only the existing one-time tag-import seam.
+
+### Risks
+
+1. **Stapply single-vendor hosting is uncontracted.** A moved/rotated/dead bucket silently empties
+   the seed-refresh path. Mitigation: pin manifest URL + sha256 pins, monthly refresh, alert on
+   manifest schema drift; the catalog must tolerate a frozen seed (all our active boards keep
+   working independently).
+2. **Coverage measured against a biased universe.** hc.sqlite is one week, 99.2 % Canada, 88 %
+   non-supported ATSes; "top-500" here is a small-n proxy for real demand. A PASS on it does not
+   prove, e.g., US mid-market Greenhouse coverage (unmeasurable without another independent list).
+3. **Snapshot staleness interacts with SPEC's closure rule** (§4.2): adoption as the *only*
+   closure signal would mark postings closed ~L+2 days late; with the pre-send liveness re-check
+   (SPEC §9.3) the harm is bounded but the catalog can briefly show closed roles (~3 days at the
+   measured ≈2-day lag).
+4. **Data quality traps confirmed in slices**: `country_iso=''` on 80 % of Ashby rows; `raw` is a
+   JSON *string* (per-ATS recovery parsing); workable slug conventions disagree (13–42 % match);
+   even `find_company` returns stale/wrong boards (shopify.teamtailor.com). Any seed pipeline needs
+   exact-slug matching, human review on misses, and verification of the tenant URL before insert.
+5. **Python library is not shippable directly** under the stack (Bun/TS, ADR 0002 one process):
+   treat `models.py` as a contract to port, not a dependency to run.
+
+*(Full command transcripts: `/home/ubuntu/orca/workspaces/overture/spike-ats-out/notes/`; artifacts:
+`data/manifest.json`, `data/companies.parquet`, `data/ashby-jobs.parquet`,
+`data/top500-companies.parquet`.)*
