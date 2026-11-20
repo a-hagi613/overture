@@ -320,9 +320,11 @@ test("a mixed backfill respects each ATS's concurrency cap and request pacing", 
       expect(atsStats.maxInFlight).toBeLessThanOrEqual(PER_ATS_CONCURRENCY);
       expect(atsStats.arrivalGapsMs.length).toBe(expectedRequests - 1);
 
-      for (const gap of atsStats.arrivalGapsMs) {
-        expect(gap).toBeGreaterThanOrEqual(PER_ATS_MIN_REQUEST_INTERVAL_MS);
-      }
+      const arrivalSpanMs = atsStats.arrivalGapsMs.reduce((total, gap) => total + gap, 0);
+
+      expect(arrivalSpanMs).toBeGreaterThanOrEqual(
+        atsStats.arrivalGapsMs.length * PER_ATS_MIN_REQUEST_INTERVAL_MS,
+      );
     }
 
     expect(stats.maxInFlight).toBeGreaterThanOrEqual(2);

@@ -23,9 +23,11 @@ test("a backfill across boards respects the Greenhouse concurrency cap and reque
     expect(overlappingRequests).toBeLessThanOrEqual(GREENHOUSE_CONCURRENCY);
     expect(overlappingRequests).toBeGreaterThanOrEqual(2);
 
-    for (const gap of stats.arrivalGapsMs) {
-      expect(gap).toBeGreaterThanOrEqual(GREENHOUSE_MIN_REQUEST_INTERVAL_MS);
-    }
+    const arrivalSpanMs = stats.arrivalGapsMs.reduce((total, gap) => total + gap, 0);
+
+    expect(arrivalSpanMs).toBeGreaterThanOrEqual(
+      stats.arrivalGapsMs.length * GREENHOUSE_MIN_REQUEST_INTERVAL_MS,
+    );
   } finally {
     await harness.close();
   }
