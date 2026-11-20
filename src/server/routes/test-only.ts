@@ -188,7 +188,12 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
   return id;
 }
 
-export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handlers: JobHandlers) {
+export function createTestRoutes(
+  db: AppDatabase,
+  clock: AdjustableClock,
+  handlers: JobHandlers,
+  singletonJobKinds: readonly string[],
+) {
   const routes = new Hono();
 
   routes.get("/clock", (context) => context.json({ now: clock.now(), offsetMs: clock.offset() }));
@@ -208,7 +213,7 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
   });
 
   routes.post("/jobs/run-due", async (context) => {
-    const ran = await runDueJobs(db, clock, handlers);
+    const ran = await runDueJobs(db, clock, handlers, singletonJobKinds);
 
     return context.json({ ran });
   });
@@ -223,9 +228,9 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
       ...(dedupeKey !== undefined && { dedupeKey }),
     };
 
-    const id = enqueueJob(db, clock, kind, payload, opts);
+    const job = enqueueJob(db, clock, kind, payload, opts);
 
-    return context.json({ id });
+    return context.json({ id: job.id });
   });
 
   routes.get("/jobs", (context) => {

@@ -95,6 +95,16 @@ function doneFor(event: SseEvent) {
   return event.event === "job.done" ? jobDoneSchema.parse(JSON.parse(event.data)).id : null;
 }
 
+function sweepEventLabel(event: SseEvent, sweepIds: string[]) {
+  if (event.event !== "job.started" && event.event !== "job.done") {
+    return null;
+  }
+
+  const { id } = jobDoneSchema.parse(JSON.parse(event.data));
+
+  return sweepIds.includes(id) ? `${event.event}:${id}` : null;
+}
+
 async function waitForSweepsDone(harness: CatalogHarness, sweepIds: string[]) {
   const settled = new Set<string>();
 
@@ -109,20 +119,20 @@ async function waitForSweepsDone(harness: CatalogHarness, sweepIds: string[]) {
   });
 }
 
-async function sweepDoneOrder(harness: CatalogHarness, sweepIds: string[]) {
-  const order: string[] = [];
+async function sweepTimeline(harness: CatalogHarness, sweepIds: string[]) {
+  const timeline: string[] = [];
 
-  await readSseEventUntil(`${harness.app.url}/api/events`, null, (event) => {
-    const id = doneFor(event);
+  await readSseEventUntil(`${harness.app.url}/api/events`, "", (event) => {
+    const label = sweepEventLabel(event, sweepIds);
 
-    if (id !== null && sweepIds.includes(id) && !order.includes(id)) {
-      order.push(id);
+    if (label !== null && !timeline.includes(label)) {
+      timeline.push(label);
     }
 
-    return sweepIds.every((sweepId) => order.includes(sweepId));
+    return timeline.length === sweepIds.length * 2;
   });
 
-  return order;
+  return timeline;
 }
 
 function boardFor(rows: Awaited<ReturnType<CatalogHarness["boards"]>>, boardToken: string) {
@@ -139,11 +149,12 @@ function polledCount(rows: Awaited<ReturnType<CatalogHarness["boards"]>>, ats: s
   return rows.filter((row) => row.ats === ats && row.lastPolledAt !== null).length;
 }
 
-test("overlapping sweeps never poll the same board, and the finished poll replaces the claim", async () => {
+test("a queued sweep waits for the running one, which claims its boards and leaves the finished poll's band", async () => {
   const harness = await startCatalogHarness(["vercel", "stripe"]);
 
   try {
     await putSetting(harness, "catalog.sweep_interval_ms", String(PARKED_CHAIN_INTERVAL_MS));
+    await putSetting(harness, "jobs.poll_interval_ms", "1000");
 
     await harness.runBackfillCycle();
 
@@ -165,6 +176,15 @@ test("overlapping sweeps never poll the same board, and the finished poll replac
 
     await waitForSweepsDone(harness, [firstSweepId, secondSweepId]);
 
+    const timeline = await sweepTimeline(harness, [firstSweepId, secondSweepId]);
+
+    expect(timeline).toEqual([
+      `job.started:${firstSweepId}`,
+      `job.done:${firstSweepId}`,
+      `job.started:${secondSweepId}`,
+      `job.done:${secondSweepId}`,
+    ]);
+
     const stats = harness.fixture.stats();
 
     for (const token of ["vercel", "stripe"]) {
@@ -172,11 +192,6 @@ test("overlapping sweeps never poll the same board, and the finished poll replac
     }
 
     expect(stats.perAts.greenhouse.requestCount).toBe(13);
-    expect(stats.maxInFlight).toBeGreaterThanOrEqual(2);
-
-    const doneOrder = await sweepDoneOrder(harness, [firstSweepId, secondSweepId]);
-
-    expect(doneOrder).toEqual([secondSweepId, firstSweepId]);
 
     const boards = await harness.boards();
 
@@ -264,6 +279,7 @@ test("a crashed poll's board is held by its claim and polled again once the clai
 
   try {
     await putSetting(harness, "catalog.sweep_interval_ms", String(PARKED_CHAIN_INTERVAL_MS));
+    await putSetting(harness, "jobs.poll_interval_ms", "1000");
 
     await harness.runBackfillCycle();
 

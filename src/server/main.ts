@@ -17,6 +17,7 @@ import { createAshbyFeed } from "./catalog/ashby-feed.ts";
 import type { BoardFeeds } from "./catalog/board-feed.ts";
 import {
   BACKFILL_JOB_KIND,
+  SINGLETON_JOB_KINDS,
   SWEEP_JOB_KIND,
   ensureSweepQueued,
   runBackfillJob,
@@ -58,7 +59,7 @@ const shutdownController = new AbortController();
 const mailSender = createMailSender(clock);
 const auth = createAuth(db, clock, mailSender);
 
-recoverStaleLocks(db, clock);
+recoverStaleLocks(db, clock, SINGLETON_JOB_KINDS);
 
 const tracer = trace.getTracer("overture");
 
@@ -140,6 +141,7 @@ const worker = startJobWorker(
   (notify) => {
     registerEnqueueNotify(notify);
   },
+  SINGLETON_JOB_KINDS,
 );
 
 ensureSweepQueued(catalogDeps);
@@ -161,6 +163,7 @@ const app = createApp({
   auth,
   objects,
   llm: anthropicLlmPort,
+  singletonJobKinds: SINGLETON_JOB_KINDS,
 });
 
 const server = Bun.serve({ port: env.PORT, fetch: app.fetch });

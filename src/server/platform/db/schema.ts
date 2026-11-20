@@ -86,25 +86,33 @@ export const invites = sqliteTable("invites", {
   createdAt: timestamp("created_at").notNull(),
 });
 
-export const bgJobs = sqliteTable("bg_jobs", {
-  id: text("id").primaryKey(),
-  kind: text("kind").notNull(),
-  payload: text("payload").notNull(),
-  runAt: integer("run_at").notNull(),
-  priority: integer("priority").notNull().default(0),
-  status: text("status", {
-    enum: ["queued", "running", "done", "failed", "dead"],
-  })
-    .notNull()
-    .default("queued"),
-  attempts: integer("attempts").notNull().default(0),
-  maxAttempts: integer("max_attempts").notNull().default(2),
-  lockedUntil: integer("locked_until"),
-  lastError: text("last_error"),
-  dedupeKey: text("dedupe_key").unique(),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull(),
-});
+export const bgJobs = sqliteTable(
+  "bg_jobs",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind").notNull(),
+    payload: text("payload").notNull(),
+    runAt: integer("run_at").notNull(),
+    priority: integer("priority").notNull().default(0),
+    status: text("status", {
+      enum: ["queued", "running", "done", "failed", "dead"],
+    })
+      .notNull()
+      .default("queued"),
+    attempts: integer("attempts").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(2),
+    lockedUntil: integer("locked_until"),
+    lastError: text("last_error"),
+    dedupeKey: text("dedupe_key"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("bg_jobs_dedupe_key_queued")
+      .on(t.dedupeKey)
+      .where(sql`status = 'queued'`),
+  ],
+);
 
 export const events = sqliteTable("events", {
   seq: integer("seq").primaryKey({ autoIncrement: true }),

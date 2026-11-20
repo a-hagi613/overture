@@ -1,4 +1,4 @@
-import { and, eq, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, eq, isNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
@@ -69,8 +69,32 @@ export function requeueWithoutConsumingAttempt(
     .run();
 }
 
-export function claimDueJobs(db: AppDatabase, clock: Clock, batchSize: number) {
+export function claimDueJobs(
+  db: AppDatabase,
+  clock: Clock,
+  batchSize: number,
+  singletonKinds: readonly string[] = [],
+  busyKinds: readonly string[] = [],
+) {
   const now = clock.now();
+
+  const reclaimable = singletonKinds.flatMap((kind) =>
+    busyKinds.includes(kind) ? [] : [sql`${kind}`],
+  );
+
+  const claimable =
+    reclaimable.length === 0
+      ? sql`${bgJobs.status} = 'queued'`
+      : sql`(${bgJobs.status} = 'queued'
+          OR (${bgJobs.status} = 'running'
+            AND (${bgJobs.lockedUntil} IS NULL OR ${bgJobs.lockedUntil} < ${now})
+            AND ${bgJobs.kind} IN (${sql.join(reclaimable, sql`, `)})))`;
+
+  const claimableNow = and(
+    claimable,
+    lte(bgJobs.runAt, now),
+    or(isNull(bgJobs.lockedUntil), lt(bgJobs.lockedUntil, now)),
+  );
 
   return db
     .update(bgJobs)
@@ -82,12 +106,10 @@ export function claimDueJobs(db: AppDatabase, clock: Clock, batchSize: number) {
     })
     .where(
       and(
-        eq(bgJobs.status, "queued"),
-        lte(bgJobs.runAt, now),
-        or(isNull(bgJobs.lockedUntil), lt(bgJobs.lockedUntil, now)),
+        claimableNow,
         sql`${bgJobs.id} IN (
           SELECT id FROM bg_jobs
-          WHERE status = 'queued'
+          WHERE ${claimable}
             AND run_at <= ${now}
             AND (locked_until IS NULL OR locked_until < ${now})
           ORDER BY priority DESC, run_at ASC
@@ -136,8 +158,9 @@ export async function claimAndRunDueJobs(
   handlers: JobHandlers,
   signal: AbortSignal,
   batchSize: number,
+  singletonKinds: readonly string[] = [],
 ) {
-  const claimed = claimDueJobs(db, clock, batchSize);
+  const claimed = claimJobsToRun(db, clock, batchSize, singletonKinds, []);
 
   const tasks = claimed.map(async (job) => runClaimedJob(db, clock, job, handlers, signal));
 
@@ -146,12 +169,52 @@ export async function claimAndRunDueJobs(
   return results.filter(Boolean).length;
 }
 
-export function recoverStaleLocks(db: AppDatabase, clock: Clock) {
+export function claimJobsToRun(
+  db: AppDatabase,
+  clock: Clock,
+  batchSize: number,
+  singletonKinds: readonly string[],
+  busyKinds: readonly string[],
+) {
+  const exclusive = new Set(singletonKinds);
+  const busy = new Set(busyKinds);
+  const startable: ClaimedJob[] = [];
+
+  for (const job of claimDueJobs(db, clock, batchSize, singletonKinds, busyKinds)) {
+    if (!exclusive.has(job.kind)) {
+      startable.push(job);
+
+      continue;
+    }
+
+    if (busy.has(job.kind)) {
+      requeueWithoutConsumingAttempt(db, clock, job.id, job.attempts - 1);
+
+      continue;
+    }
+
+    busy.add(job.kind);
+    startable.push(job);
+  }
+
+  return startable;
+}
+
+export function recoverStaleLocks(
+  db: AppDatabase,
+  clock: Clock,
+  singletonKinds: readonly string[] = [],
+) {
   const now = clock.now();
+  const conditions = [eq(bgJobs.status, "running"), lt(bgJobs.lockedUntil, now)];
+
+  if (singletonKinds.length > 0) {
+    conditions.push(notInArray(bgJobs.kind, [...singletonKinds]));
+  }
 
   db.update(bgJobs)
     .set({ status: "queued", lockedUntil: null, updatedAt: now })
-    .where(and(eq(bgJobs.status, "running"), lt(bgJobs.lockedUntil, now)))
+    .where(and(...conditions))
     .run();
 }
 
@@ -175,8 +238,10 @@ export function enqueueJob(
 ) {
   const now = clock.now();
   const id = crypto.randomUUID();
+  const dedupeKey = options?.dedupeKey;
 
-  db.insert(bgJobs)
+  const [created] = db
+    .insert(bgJobs)
     .values({
       id,
       kind,
@@ -184,16 +249,31 @@ export function enqueueJob(
       runAt: options?.runAt ?? now,
       priority: options?.priority ?? 0,
       maxAttempts: options?.maxAttempts ?? 2,
-      dedupeKey: options?.dedupeKey,
+      dedupeKey,
       createdAt: now,
       updatedAt: now,
     })
     .onConflictDoNothing()
-    .run();
+    .returning({ id: bgJobs.id })
+    .all();
 
   if (enqueueNotify !== null) {
     enqueueNotify();
   }
 
-  return id;
+  if (created !== undefined) {
+    return { id: created.id, inserted: true };
+  }
+
+  const existing =
+    dedupeKey === undefined
+      ? undefined
+      : db
+          .select({ id: bgJobs.id })
+          .from(bgJobs)
+          .where(and(eq(bgJobs.dedupeKey, dedupeKey), eq(bgJobs.status, "queued")))
+          .limit(1)
+          .get();
+
+  return { id: existing?.id ?? id, inserted: false };
 }
