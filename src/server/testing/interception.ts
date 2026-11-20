@@ -8,8 +8,6 @@ import { z } from "zod";
 
 const turnstileVerifier = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const turnstileRecordingPath = "test/e2e/recordings/turnstile/siteverify-pass.json";
-const anthropicMessages = "https://api.anthropic.com/v1/messages";
-const resumeFallbackRecordingPath = "test/e2e/recordings/anthropic/resume-pdf-fallback.json";
 
 const recordedVerificationSchema = z.object({
   success: z.boolean(),
@@ -17,15 +15,6 @@ const recordedVerificationSchema = z.object({
   hostname: z.string().optional(),
   "error-codes": z.array(z.string()).optional(),
   messages: z.array(z.string()).optional(),
-});
-
-const recordedMessageSchema = z.object({
-  content: z.array(
-    z.object({
-      type: z.string(),
-      text: z.string().optional(),
-    }),
-  ),
 });
 
 const loopbackPassthrough = [
@@ -38,10 +27,6 @@ export function startInterception() {
 
   const recorded = recordedVerificationSchema.parse(
     JSON.parse(readFileSync(turnstileRecordingPath, "utf8")),
-  );
-
-  const resumeFallback = recordedMessageSchema.parse(
-    JSON.parse(readFileSync(resumeFallbackRecordingPath, "utf8")),
   );
 
   const server = setupServer(
@@ -65,7 +50,6 @@ export function startInterception() {
     http.get(`${anthropicRoot}/v1/messages/batches/:batchId`, () => passthrough()),
     http.get(`${anthropicRoot}/v1/messages/batches/:batchId/results`, () => passthrough()),
     http.post(turnstileVerifier, () => HttpResponse.json(recorded)),
-    http.post(anthropicMessages, () => HttpResponse.json(resumeFallback)),
   );
 
   server.listen({ onUnhandledRequest: "error" });

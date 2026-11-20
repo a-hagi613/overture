@@ -5,7 +5,7 @@ import type { AppDatabase } from "./platform/db/client.ts";
 import type { Auth } from "./auth/index.ts";
 import type { AdjustableClock } from "./platform/ports/clock.ts";
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
-import type { ResumeTextPort } from "./platform/ports/resume-text.ts";
+import type { LlmPort } from "./platform/ports/llm.ts";
 import type { ObjectStore } from "./platform/ports/object-store.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
@@ -24,7 +24,7 @@ export interface AppDependencies {
   jobHandlers: JobHandlers;
   auth: Auth;
   objects: ObjectStore;
-  llm: ResumeTextPort;
+  llm: LlmPort;
 }
 
 async function staticResponseFrom(root: string, url: string) {

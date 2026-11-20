@@ -10,7 +10,6 @@ import { createClock } from "./platform/ports/clock.ts";
 import { recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
 import { startJobWorker } from "./platform/jobs/scheduler.ts";
 import { startTelemetry, trace } from "./platform/telemetry/otel.ts";
-import { createAnthropicLlm } from "./platform/llm/anthropic.ts";
 import { createDiskObjectStore } from "./platform/ports/object-store.ts";
 import { createGreenhouseFeed } from "./catalog/greenhouse-feed.ts";
 import { createLeverFeed } from "./catalog/lever-feed.ts";
@@ -82,14 +81,16 @@ const catalogJobHandlers: JobHandlers = {
   },
 };
 
+const anthropicLlmPort = createAnthropicLlmPort({
+  baseUrl: env.ANTHROPIC_BASE_URL,
+  apiKey: env.ANTHROPIC_API_KEY,
+  model: env.ANTHROPIC_MODEL,
+});
+
 const tagDeps = {
   db,
   clock,
-  llm: createAnthropicLlmPort({
-    baseUrl: env.ANTHROPIC_BASE_URL,
-    apiKey: env.ANTHROPIC_API_KEY,
-    model: env.ANTHROPIC_MODEL,
-  }),
+  llm: anthropicLlmPort,
 };
 
 const llmJobHandlers: JobHandlers =
@@ -131,11 +132,6 @@ const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
 
 const objects = createDiskObjectStore(env.OBJECT_STORE_ROOT);
 
-const llm =
-  env.ANTHROPIC_API_KEY === undefined
-    ? createAnthropicLlm("")
-    : createAnthropicLlm(env.ANTHROPIC_API_KEY);
-
 const worker = startJobWorker(
   db,
   clock,
@@ -164,7 +160,7 @@ const app = createApp({
   },
   auth,
   objects,
-  llm,
+  llm: anthropicLlmPort,
 });
 
 const server = Bun.serve({ port: env.PORT, fetch: app.fetch });

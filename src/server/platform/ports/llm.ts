@@ -33,7 +33,24 @@ export interface LlmBatchCall {
   costMicros: number;
 }
 
+export interface LlmSingleRequest {
+  user: string;
+  pdf: Uint8Array<ArrayBuffer>;
+}
+
+export interface LlmSingleCall {
+  model: string;
+  text: string | null;
+  inputTokens: number;
+  cachedTokens: number;
+  cacheWriteTokens: number;
+  outputTokens: number;
+  costMicros: number;
+}
+
 export interface LlmPort {
   estimateBatchCostMicros: (requests: readonly LlmRequest[]) => number;
   runBatch: (requests: readonly LlmRequest[]) => Promise<LlmBatchCall[]>;
+  estimateSingleCostMicros: (request: LlmSingleRequest) => number;
+  runSingle: (request: LlmSingleRequest) => Promise<LlmSingleCall>;
 }

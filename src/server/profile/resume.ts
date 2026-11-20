@@ -4,14 +4,18 @@ import { and, desc, eq } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
-import type { ResumeTextPort } from "../platform/ports/resume-text.ts";
+import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PersonalCrypto } from "./personal-crypto.ts";
 
 import { resumes } from "../platform/db/schema.ts";
+import { checkLlmCaps } from "../platform/llm/caps.ts";
+import { recordLlmUsage } from "../platform/llm/usage.ts";
 
 export const MAX_RESUME_BYTES = 10 * 1024 * 1024;
+export const RESUME_PDF_FALLBACK_PURPOSE = "resume_pdf_fallback";
 const MIN_UNPDF_TEXT_CHARS = 200;
+const RESUME_PDF_PROMPT = "Extract the full text of this resume PDF in reading order. Return only the text.";
 
 export interface ParsedResume {
   text: string;
@@ -26,6 +30,7 @@ export interface ResumeRecord {
   bytes: number;
   pages: number;
   parsedWith: "unpdf" | "llm";
+  unreadable: boolean;
   isCurrent: boolean;
   uploadedAt: Date;
 }
@@ -61,7 +66,7 @@ export function createResumeService(deps: {
   clock: Clock;
   objects: ObjectStore;
   personal: PersonalCrypto;
-  llm: ResumeTextPort;
+  llm: LlmPort;
 }) {
   const { db, clock, objects, personal, llm } = deps;
 
@@ -83,6 +88,8 @@ export function createResumeService(deps: {
       row.filenameEnc,
     );
 
+    const text = await personal.openFor(userId, resumeScope(row.id, "text_enc"), row.textEnc);
+
     return {
       id: row.id,
       filename,
@@ -90,9 +97,64 @@ export function createResumeService(deps: {
       bytes: row.bytes,
       pages: row.pages,
       parsedWith: row.parsedWith,
+      unreadable: text.trim().length === 0,
       isCurrent: row.isCurrent,
       uploadedAt: row.uploadedAt,
     };
+  }
+
+  async function extractResumeText(userId: string, pdf: Uint8Array<ArrayBuffer>) {
+    const document = await getDocumentProxy(pdf);
+
+    const extracted = await extractText(document, { mergePages: true });
+
+    if (extracted.text.trim().length >= MIN_UNPDF_TEXT_CHARS) {
+      return {
+        text: extracted.text,
+        parsedWith: "unpdf" as const,
+        pages: extracted.totalPages,
+      } satisfies ParsedResume;
+    }
+
+    const request = { user: RESUME_PDF_PROMPT, pdf };
+
+    const caps = checkLlmCaps(db, clock, {
+      userId,
+      purpose: RESUME_PDF_FALLBACK_PURPOSE,
+      estimatedCostMicros: llm.estimateSingleCostMicros(request),
+    });
+
+    if (!caps.withinCaps) {
+      return {
+        text: "",
+        parsedWith: "unpdf" as const,
+        pages: extracted.totalPages,
+      } satisfies ParsedResume;
+    }
+
+    const call = await llm.runSingle(request);
+
+    recordLlmUsage(db, clock, {
+      userId,
+      purpose: RESUME_PDF_FALLBACK_PURPOSE,
+      model: call.model,
+      inputTokens: call.inputTokens,
+      cachedTokens: call.cachedTokens,
+      outputTokens: call.outputTokens,
+      costMicros: call.costMicros,
+    });
+
+    const text = (call.text ?? "").trim();
+
+    if (text.length === 0) {
+      return {
+        text: "",
+        parsedWith: "unpdf" as const,
+        pages: extracted.totalPages,
+      } satisfies ParsedResume;
+    }
+
+    return { text, parsedWith: "llm" as const, pages: extracted.totalPages } satisfies ParsedResume;
   }
 
   return {
@@ -112,7 +174,7 @@ export function createResumeService(deps: {
         Buffer.from(bytes).toString("base64"),
       );
 
-      const parsed = await extractResumeText(bytes, llm);
+      const parsed = await extractResumeText(userId, bytes);
 
       const filenameEnc = await personal.sealFor(
         userId,
@@ -192,26 +254,6 @@ export function createResumeService(deps: {
       return { bytes: bytesFromBase64(base64), filename };
     },
   } satisfies ResumeService;
-}
-
-async function extractResumeText(pdf: Uint8Array<ArrayBuffer>, llm: ResumeTextPort) {
-  const bytes = new Uint8Array(pdf);
-
-  const document = await getDocumentProxy(bytes);
-
-  const extracted = await extractText(document, { mergePages: true });
-
-  if (extracted.text.trim().length >= MIN_UNPDF_TEXT_CHARS) {
-    return {
-      text: extracted.text,
-      parsedWith: "unpdf",
-      pages: extracted.totalPages,
-    } satisfies ParsedResume;
-  }
-
-  const text = await llm.resumePdfFallback(pdf);
-
-  return { text, parsedWith: "llm", pages: extracted.totalPages } satisfies ParsedResume;
 }
 
 function encodeUtf8(value: string) {

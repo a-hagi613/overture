@@ -1,6 +1,8 @@
+import { Buffer } from "node:buffer";
+
 import { z } from "zod";
 
-import type { LlmBatchCall, LlmPort, LlmRequest } from "../ports/llm.ts";
+import type { LlmBatchCall, LlmPort, LlmRequest, LlmSingleRequest } from "../ports/llm.ts";
 
 const API_VERSION = "2023-06-01";
 const POLL_INTERVAL_MS = 10_000;
@@ -8,6 +10,8 @@ const MAX_POLL_ATTEMPTS = 360;
 const MAX_TOKENS = 1024;
 const ESTIMATED_OUTPUT_TOKENS = 200;
 const CHARS_PER_TOKEN = 4;
+const SINGLE_MAX_TOKENS = 4096;
+const PDF_BYTES_PER_TOKEN = 3;
 
 const requestCountsSchema = z.object({
   processing: z.number().int().nonnegative(),
@@ -319,6 +323,64 @@ export function createAnthropicLlmPort(config: AnthropicLlmConfig) {
       const lines = await fetchResultLines(ended.results_url);
 
       return lines.map((line) => callFor(line));
+    },
+    estimateSingleCostMicros: (request) =>
+      costMicrosFor(config.model, {
+        input:
+          Math.ceil(request.user.length / CHARS_PER_TOKEN) +
+          Math.ceil(request.pdf.byteLength / PDF_BYTES_PER_TOKEN),
+        cacheRead: 0,
+        cacheWrite: 0,
+        output: ESTIMATED_OUTPUT_TOKENS,
+      }),
+    runSingle: async (request) => {
+      if (config.apiKey === undefined) {
+        throw new Error("the Anthropic adapter has no api key configured");
+      }
+
+      const response = await call("/v1/messages", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          model: config.model,
+          max_tokens: SINGLE_MAX_TOKENS,
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "document",
+                  source: {
+                    type: "base64",
+                    media_type: "application/pdf",
+                    data: Buffer.from(request.pdf).toString("base64"),
+                  },
+                },
+                { type: "text", text: request.user },
+              ],
+            },
+          ],
+        }),
+      });
+
+      const body: unknown = await response.json();
+
+      const message = messageSchema.parse(body);
+
+      return {
+        model: message.model,
+        text: message.text,
+        inputTokens: message.usage.input_tokens,
+        cachedTokens: message.usage.cache_read_input_tokens,
+        cacheWriteTokens: message.usage.cache_creation_input_tokens,
+        outputTokens: message.usage.output_tokens,
+        costMicros: costMicrosFor(message.model, {
+          input: message.usage.input_tokens,
+          cacheRead: message.usage.cache_read_input_tokens,
+          cacheWrite: message.usage.cache_creation_input_tokens,
+          output: message.usage.output_tokens,
+        }),
+      };
     },
   };
 

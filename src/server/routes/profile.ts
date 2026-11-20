@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
-import type { ResumeTextPort } from "../platform/ports/resume-text.ts";
+import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 
 import { env } from "../config/env.ts";
@@ -29,7 +29,7 @@ export function createProfileRoutes(deps: {
   clock: Clock;
   auth: Auth;
   objects: ObjectStore;
-  llm: ResumeTextPort;
+  llm: LlmPort;
 }) {
   if (env.MASTER_KEY_V1 === undefined) {
     throw new Error("MASTER_KEY_V1 is not set.");
