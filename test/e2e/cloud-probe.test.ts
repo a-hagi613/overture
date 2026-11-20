@@ -273,3 +273,73 @@ test("the code path prompts on the console, records the 428 and the confirmation
     expect(summary).toContain("$0.03");
   });
 });
+
+test("a combobox that lists nothing until typed takes the region that matches the wanted value", async () => {
+  await withHarness(async (harness) => {
+    const results = await runProbe(
+      command(harness, false, {
+        runFile: singlePostingRunFile(harness, posting("curaleaf", "8936939002")),
+      }),
+    );
+
+    const [result] = results;
+
+    if (result === undefined) {
+      throw new Error("no result for the autocomplete posting");
+    }
+
+    expect(result.outcome).toBe("dry_run_filled");
+    expect(result.submitted).toBe(false);
+    expect(harness.fixture.state.lastChoices["candidate-location"]).toBe("Ottawa, ON, Canada");
+
+    const [form] = storedForms(harness);
+
+    if (form === undefined) {
+      throw new Error("no stored form");
+    }
+
+    expect(form.outcome).toBe("dry_run_filled");
+    expect(harness.browserUse.stoppedSessionIds).toHaveLength(1);
+  });
+});
+
+test("a posting the run file cannot fill is recorded as fill_failed and the run keeps going", async () => {
+  await withHarness(async (harness) => {
+    const failing = structuredClone(posting("blankstreet", "8004209003"));
+    const countryQuestion = failing.questions.find((question) => question.id === "country");
+
+    if (countryQuestion === undefined) {
+      throw new Error("the template posting has no country question");
+    }
+
+    countryQuestion.value = "Atlantis";
+
+    const results = await runProbe(
+      command(harness, false, {
+        runFile: {
+          country: runFileTemplate.country,
+          resumePath: harness.resumePath,
+          postings: [failing, structuredClone(posting("blankstreet", "8004209003"))],
+        },
+      }),
+    );
+
+    expect(results.map((result) => result.outcome)).toEqual([
+      "fill_failed: country",
+      "dry_run_filled",
+    ]);
+
+    const [failed, filled] = storedForms(harness);
+
+    if (failed === undefined || filled === undefined) {
+      throw new Error("not every posting landed in probe_forms");
+    }
+
+    expect(failed.outcome).toBe("fill_failed: country");
+    expect(failed.submitted).toBe(0);
+    expect(filled.outcome).toBe("dry_run_filled");
+    expect(harness.browserUse.sessionCount).toBe(2);
+    expect(harness.browserUse.stoppedSessionIds).toHaveLength(2);
+    expect(harness.fixture.state.submissions).toBe(0);
+  });
+});
