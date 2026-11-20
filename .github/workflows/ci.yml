@@ -71,3 +71,47 @@ jobs:
       - run: bunx playwright install --with-deps chromium
       - run: bun run build
       - run: bun run test:e2e
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --pull -t overture:ci .
+      - name: Start the container and check the health route
+        run: |
+          docker run -d --name overture-ci \
+            -e LITESTREAM_ENABLED=false \
+            -e ENABLE_TEST_ROUTES=false \
+            -p 127.0.0.1:3100:3000 \
+            overture:ci
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3100/api/health | tee /tmp/health.json; then
+              exit 0
+            elif ! docker inspect -f '{{.State.Running}}' overture-ci | grep -q true; then
+              docker logs overture-ci
+              exit 1
+            fi
+            sleep 2
+          done
+          docker logs overture-ci
+          exit 1
+      - run: docker logs overture-ci
+        if: always()
+      - run: docker rm -f overture-ci
+        if: always()
+
+  restore-drill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Install Litestream
+        run: |
+          curl -fsSLo /tmp/litestream.tar.gz https://github.com/benbjohnson/litestream/releases/download/v0.5.18/litestream-0.5.18-linux-x86_64.tar.gz
+          curl -fsSLo /tmp/checksums.txt https://github.com/benbjohnson/litestream/releases/download/v0.5.18/checksums.txt
+          grep " litestream-0.5.18-linux-x86_64.tar.gz$" /tmp/checksums.txt | (cd /tmp && sha256sum -c -)
+          tar -xzf /tmp/litestream.tar.gz -C /usr/local/bin litestream
+          litestream version
+      - run: bun run scripts/restore-drill.ts local

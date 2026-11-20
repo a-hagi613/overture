@@ -1,0 +1,46 @@
+FROM oven/bun:1.4.5-slim AS build
+
+WORKDIR /app
+
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+
+COPY . .
+RUN bun run build
+RUN bun install --frozen-lockfile --production
+
+FROM oven/bun:1.4.5-slim AS runtime
+
+ARG LITESTREAM_VERSION=0.5.18
+ARG LITESTREAM_ASSET=litestream-${LITESTREAM_VERSION}-linux-x86_64.tar.gz
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl \
+  && rm -rf /var/lib/apt/lists/* \
+  && curl -fsSLo "/tmp/${LITESTREAM_ASSET}" "https://github.com/benbjohnson/litestream/releases/download/v${LITESTREAM_VERSION}/${LITESTREAM_ASSET}" \
+  && curl -fsSLo /tmp/checksums.txt "https://github.com/benbjohnson/litestream/releases/download/v${LITESTREAM_VERSION}/checksums.txt" \
+  && (cd /tmp && grep " ${LITESTREAM_ASSET}\$" checksums.txt | sha256sum -c -) \
+  && tar -xzf "/tmp/${LITESTREAM_ASSET}" -C /usr/local/bin litestream \
+  && chmod 0755 /usr/local/bin/litestream \
+  && rm -rf "/tmp/${LITESTREAM_ASSET}" /tmp/checksums.txt \
+  && litestream version
+
+WORKDIR /app
+
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/src ./src
+COPY --from=build /app/drizzle ./drizzle
+COPY --from=build /app/scripts ./scripts
+COPY litestream.yml /etc/litestream.yml
+
+RUN chmod 0755 /app/scripts/docker-entrypoint.sh
+
+ENV NODE_ENV=production \
+  DATABASE_PATH=/data/app.sqlite \
+  LITESTREAM_CONFIG_PATH=/etc/litestream.yml
+
+EXPOSE 3000
+
+ENTRYPOINT ["/app/scripts/docker-entrypoint.sh"]
