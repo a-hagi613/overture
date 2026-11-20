@@ -97,6 +97,7 @@ export interface FixtureStats {
 export interface BoardMutation {
   titleUpdates?: Record<string, string>;
   locationUpdates?: Record<string, string>;
+  descriptionUpdates?: Record<string, string>;
   updatedAtUpdates?: Record<string, string>;
   removeJobIds?: string[];
   addJobs?: {
@@ -554,6 +555,12 @@ export async function startFeedFixtureServer() {
         job.categories.location = location;
         job.categories.allLocations = [];
       }
+
+      const description = mutation.descriptionUpdates?.[job.id];
+
+      if (description !== undefined) {
+        job.descriptionPlain = description;
+      }
     }
 
     for (const jobId of mutation.removeJobIds ?? []) {
@@ -598,6 +605,12 @@ export async function startFeedFixtureServer() {
 
       if (location !== undefined) {
         job.location = location;
+      }
+
+      const description = mutation.descriptionUpdates?.[job.id];
+
+      if (description !== undefined) {
+        job.descriptionPlain = description;
       }
     }
 

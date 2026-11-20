@@ -270,6 +270,7 @@ export const postings = sqliteTable(
     dedupeKey: text("dedupe_key").notNull(),
     descriptionGz: blob("description_gz", { mode: "buffer" }),
     descriptionHash: text("description_hash"),
+    feedContentHash: text("feed_content_hash"),
     tagSource: text("tag_source", { enum: ["rules", "model", "llm", "import"] }),
     taggedAt: integer("tagged_at"),
     questionsFetchedAt: integer("questions_fetched_at"),

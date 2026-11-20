@@ -62,6 +62,47 @@ function parseMs(iso: string | null) {
   return Number.isFinite(ms) ? ms : null;
 }
 
+type ExistingPosting = Pick<
+  typeof postings.$inferSelect,
+  "sourceUpdatedAt" | "closedAt" | "feedContentHash"
+>;
+
+function feedContentHashFor(posting: FeedPosting) {
+  if (posting.descriptionPending) {
+    return null;
+  }
+
+  return contentHash(
+    JSON.stringify([
+      posting.atsJobId,
+      posting.title,
+      posting.url,
+      posting.locationRaw,
+      posting.language,
+      posting.postedAt,
+      posting.sourceUpdatedAt,
+      posting.content,
+    ]),
+  );
+}
+
+function isUnchanged(posting: FeedPosting, existing: ExistingPosting | undefined) {
+  if (existing === undefined || existing.closedAt !== null) {
+    return false;
+  }
+
+  if (
+    existing.sourceUpdatedAt !== null &&
+    existing.sourceUpdatedAt === parseMs(posting.sourceUpdatedAt)
+  ) {
+    return true;
+  }
+
+  const feedContentHash = feedContentHashFor(posting);
+
+  return feedContentHash !== null && existing.feedContentHash === feedContentHash;
+}
+
 function gzip(descriptionText: string) {
   return Buffer.from(Bun.gzipSync(descriptionText));
 }
@@ -204,6 +245,7 @@ function postingValues(
     dedupeKey,
     descriptionGz: descriptionText === null ? null : gzip(descriptionText),
     descriptionHash: descriptionText === null ? null : contentHash(descriptionText),
+    feedContentHash: feedContentHashFor(posting),
     tagSource: "rules" as const,
     taggedAt: now,
   };
@@ -228,6 +270,7 @@ async function syncPostings(
       atsJobId: postings.atsJobId,
       sourceUpdatedAt: postings.sourceUpdatedAt,
       closedAt: postings.closedAt,
+      feedContentHash: postings.feedContentHash,
     })
     .from(postings)
     .where(eq(postings.boardId, board.id))
@@ -235,17 +278,13 @@ async function syncPostings(
 
   const existingByJobId = new Map(existingRows.map((row) => [row.atsJobId, row]));
 
-  const changedPostings = boardPostings.filter((posting) => {
-    const existing = existingByJobId.get(posting.atsJobId);
-    const sourceUpdatedAtMs = parseMs(posting.sourceUpdatedAt);
+  const unchangedJobIds = new Set(
+    boardPostings.flatMap((posting) =>
+      isUnchanged(posting, existingByJobId.get(posting.atsJobId)) ? [posting.atsJobId] : [],
+    ),
+  );
 
-    const unchanged =
-      existing?.closedAt === null &&
-      existing.sourceUpdatedAt !== null &&
-      existing.sourceUpdatedAt === sourceUpdatedAtMs;
-
-    return !unchanged;
-  });
+  const changedPostings = boardPostings.filter((posting) => !unchangedJobIds.has(posting.atsJobId));
 
   const detailPairs = await Promise.all(
     changedPostings.map(async (posting) => {
@@ -266,7 +305,7 @@ async function syncPostings(
       for (const posting of chunk) {
         const existing = existingByJobId.get(posting.atsJobId);
 
-        if (existing !== undefined && !contentByJobId.has(posting.atsJobId)) {
+        if (existing !== undefined && unchangedJobIds.has(posting.atsJobId)) {
           touchUnchangedPosting(tx, existing.id, now);
 
           continue;

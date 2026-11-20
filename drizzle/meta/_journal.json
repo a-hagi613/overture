@@ -85,6 +85,13 @@
       "when": 1795230000010,
       "tag": "0011_bg_jobs_dedupe_key_queued",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1795230000011,
+      "tag": "0012_feed_content_hash",
+      "breakpoints": true
     }
   ]
 }
