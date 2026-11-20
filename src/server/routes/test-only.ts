@@ -80,6 +80,7 @@ const llmUsageQuery = z.object({
   purpose: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(1000).default(100),
 });
+
 const userNameBody = z.object({ email: z.email(), name: z.string().min(1) });
 
 const lowercased = (value: string) => value.trim().toLowerCase();
