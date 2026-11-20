@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { join, resolve } from "node:path";
 
 import type { AppDatabase } from "./platform/db/client.ts";
+import type { BackupMonitor } from "./platform/ports/backup.ts";
 import type { Auth } from "./auth/index.ts";
 import type { AdjustableClock } from "./platform/ports/clock.ts";
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
@@ -19,6 +20,7 @@ import { createProfileRoutes } from "./routes/profile.ts";
 export interface AppDependencies {
   db: AppDatabase;
   clock: AdjustableClock;
+  backups: BackupMonitor;
   staticRoot: string;
   testRoutes: boolean;
   jobHandlers: JobHandlers;
@@ -58,7 +60,7 @@ export function createApp(deps: AppDependencies) {
   const app = new Hono();
 
   app.all("/api/auth/*", async (context) => deps.auth.handler(context.req.raw));
-  app.route("/api", createHealthRoutes(deps.db, deps.clock));
+  app.route("/api", createHealthRoutes(deps.db, deps.backups));
   app.route("/api", createMeRoutes(deps.auth));
   app.route("/api", createApiRoutes(deps.db, deps.clock));
   app.route("/api", createProfileRoutes(deps));

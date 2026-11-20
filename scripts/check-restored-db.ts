@@ -6,8 +6,13 @@ const healthSchema = z.object({
   status: z.string(),
   database: z.string(),
   backups: z.union([
-    z.object({ replication: z.literal("ok"), lagSeconds: z.number(), replicaTxid: z.string() }),
-    z.object({ replication: z.enum(["unconfigured", "unavailable"]) }),
+    z.object({
+      replication: z.literal("ok"),
+      lagSeconds: z.number(),
+      replicaTxid: z.string(),
+      readAgeSeconds: z.number(),
+    }),
+    z.object({ replication: z.enum(["unconfigured", "unknown", "unavailable"]) }),
   ]),
 });
 

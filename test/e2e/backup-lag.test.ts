@@ -12,6 +12,7 @@ import { expect, test } from "@playwright/test";
 
 import { testAuthEnvironment } from "./auth.fixture.ts";
 import { startAppServer } from "./app-server.ts";
+import { waitForReplicaTransactions } from "./replication.fixture.ts";
 
 const replicasCaughtUpSchema = z.object({
   replication: z.literal("ok"),
@@ -48,9 +49,16 @@ test.beforeAll(async () => {
   );
 
   replicator = spawn("litestream", ["replicate", "-config", configPath], { stdio: "ignore" });
+  await waitForReplicaTransactions(directory);
   server = await startAppServer(databasePath, {
     ...testAuthEnvironment,
     LITESTREAM_CONFIG_PATH: configPath,
+  });
+
+  await fetch(`${server.url}/__test__/settings/backups.replica_read_interval_ms`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ value: "1000" }),
   });
 });
 

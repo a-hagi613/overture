@@ -1,25 +1,23 @@
 import { Hono } from "hono";
 
 import type { AppDatabase } from "../platform/db/client.ts";
-import type { AdjustableClock } from "../platform/ports/clock.ts";
+import type { BackupMonitor } from "../platform/ports/backup.ts";
 
 import { sql } from "drizzle-orm";
 
-import { readBackupStatus } from "../platform/ports/backup.ts";
-
-export function createHealthRoutes(db: AppDatabase, clock: AdjustableClock) {
+export function createHealthRoutes(db: AppDatabase, backups: BackupMonitor) {
   const routes = new Hono();
 
-  routes.get("/health", async (context) => {
+  routes.get("/health", (context) => {
     db.run(sql`select 1`);
 
-    const backups = await readBackupStatus(clock.now());
+    const status = backups.status();
 
-    if (backups.replication === "unconfigured") {
+    if (status.replication === "unconfigured") {
       return context.json({ status: "ok", database: "ok" });
     }
 
-    return context.json({ status: "ok", database: "ok", backups });
+    return context.json({ status: "ok", database: "ok", backups: status });
   });
 
   return routes;

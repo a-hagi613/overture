@@ -80,6 +80,7 @@ const envSchema = z
     LITESTREAM_ENABLED: booleanFromString.default(true),
     LITESTREAM_RESTORE_ONLY: booleanFromString.default(false),
     LITESTREAM_CONFIG_PATH: z.string().min(1).optional(),
+    LITESTREAM_BINARY: z.string().min(1).default("litestream"),
     BROWSER_USE_API_KEY: z.string().min(1).optional(),
     BROWSER_USE_API_BASE_URL: z.url().default("https://api.browser-use.com"),
     ANTHROPIC_API_KEY: z.string().min(1).optional(),

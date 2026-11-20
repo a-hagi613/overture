@@ -70,13 +70,19 @@ drill and every merge-to-`main` deploy therefore stay green while the one-time s
   `curl -fsS https://overture-web.fly.dev/api/health` → `{"status":"ok","database":"ok",...}`.
 - **Litestream lag is visible and a restore drill has passed once**
   Lag: `curl -fsS https://overture-web.fly.dev/api/health | jq .backups` →
-  `{"replication":"ok","lagSeconds":<n>,"replicaTxid":"…"}`. `lagSeconds` measures how far the replica
-  (`replicaTxid`) is behind the local database: the health route reads the local database's latest
-  transaction id and the newest replicated one (`litestream ltx -level all` on the
-  replica) on every call, and reports `0` when they match — an idle, fully replicated database reads
-  `0` forever instead of growing without bound. When the local database has transactions the replica
-  does not hold yet, `lagSeconds` is the age in seconds of the oldest such write; above ~300 s means
-  R2 replication is falling behind. Drill: run the **Restore drill** workflow once
+  `{"replication":"ok","lagSeconds":<n>,"replicaTxid":"…","readAgeSeconds":<n>}`. `lagSeconds` measures how
+  far the replica (`replicaTxid`) is behind the local database. The server reads the replica's newest
+  transaction id and the local database's transactions (`litestream ltx -level all`) in the background every
+  `backups.replica_read_interval_ms` (default `30000`, changed in Settings). `/api/health` only serves that
+  cached reading and never runs litestream, so it answers in milliseconds even when the R2 listing is slow.
+  `readAgeSeconds` is how old that reading is. `lagSeconds` is `0` when the replica holds every local
+  transaction, so an idle, fully replicated database reads `0` forever instead of growing without bound.
+  When the local database has transactions the replica does not hold yet, `lagSeconds` is the age in
+  seconds of the oldest such write; above ~300 s means R2 replication is falling behind. A write shows up
+  within one read interval. If the last reading is older than three intervals (the reader has stopped),
+  `replication` is `"unknown"`, not `"ok"`, and `readAgeSeconds` says how old it is. `"unavailable"` means the
+  last reading could not list the replica or the local transactions. Right after a cold start with no replica
+  yet, the first reading can be `"unknown"` or `"unavailable"` for up to one read interval. Drill: run the **Restore drill** workflow once
   (`gh workflow run "Restore drill" -R a-hagi613/overture`); it is scheduled weekly thereafter. A run
   proves a restore into a throwaway machine passed `integrity_check`, has applied migrations and
   answers `/api/health`, and the machine was destroyed.
