@@ -17,3 +17,7 @@ desktop.ini
 # Logs and scratch
 *.log
 tmp/
+
+# scraped data (large, regenerable)
+data/
+.venv/

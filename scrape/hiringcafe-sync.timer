@@ -1,0 +1,10 @@
+[Unit]
+Description=Run HiringCafe sync every hour
+
+[Timer]
+OnCalendar=hourly
+AccuracySec=2min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

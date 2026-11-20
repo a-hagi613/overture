@@ -1,0 +1,14 @@
+[Unit]
+Description=HiringCafe hourly sync (metadata delta + description backfill)
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/orca/workspaces/overture/porgy
+ExecStart=%h/orca/workspaces/overture/porgy/.venv/bin/python scrape/hiringcafe.py sync --days 2 --limit 400 --rps 0.5 --window 60 --window-s 600
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+StandardOutput=append:%h/orca/workspaces/overture/porgy/data/sync.log
+StandardError=append:%h/orca/workspaces/overture/porgy/data/sync.log
+TimeoutStartSec=3600
