@@ -49,10 +49,65 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
 | `import/exports-last`, `import/group-exports` | Fight exporting a declaration where it is written |
 | `react/react-in-jsx-scope` | Obsolete with React 19's automatic runtime |
 | `react/forbid-component-props` | shadcn/ui is built on `className` props |
-| `react/jsx-props-no-spreading`, `react/no-multi-comp` | Off only in the shadcn/ui component folder |
 | `react_perf/*` | The React Compiler memoises; hand-written `useCallback`/`useMemo` is noise |
 | `jsdoc/require-param-type`, `jsdoc/require-returns-type` | TypeScript carries the types; JSDoc only on port interfaces |
 | `typescript/prefer-readonly-parameter-types` | Fails on most library types (React props, `Request`) |
 | `jest/*` that require Jest globals, hooks bans or assertion counts | The six unit files use Vitest; the Vitest rules apply instead |
 
-Everything else in Landmines' configuration's off-list is inherited unchanged, with its reasons in that file.
+Everything else in Landmines' configuration's off-list is inherited unchanged; the inherited rules are written out
+below so that CI can check the configuration against this file.
+
+## Rules off in one folder only
+
+| Rule | Where | Reason |
+|---|---|---|
+| `react/jsx-props-no-spreading`, `react/no-multi-comp` | `src/web/components/ui/**` | shadcn/ui components pass props through and ship several components in one file |
+
+Two React options are set rather than turned off: `react/jsx-filename-extension` allows `.tsx`, and
+`react/jsx-max-depth` allows six levels, because a real screen nests deeper than the default of two. Both stay at
+error.
+
+## Inherited off-list
+
+These rules are off in Landmines' own configuration. They stay off here unchanged, with the reasons that configuration
+gives.
+
+| Rule | Reason |
+|---|---|
+| `eslint/complexity` | Size and complexity caps that a dense Hono and React codebase cannot meet; Landmines' baseline. |
+| `eslint/id-length` | Landmines' baseline; short names are idiomatic in callbacks and SQL mapping. |
+| `eslint/init-declarations` | Landmines' baseline; declarations are initialised where they are written. |
+| `eslint/max-classes-per-file` | Landmines' baseline. |
+| `eslint/max-depth` | Landmines' baseline; Hono route composition nests. |
+| `eslint/max-lines` | Landmines' baseline. |
+| `eslint/max-lines-per-function` | Landmines' baseline. |
+| `eslint/max-nested-callbacks` | Landmines' baseline; Playwright and MSW callbacks nest. |
+| `eslint/max-params` | Landmines' baseline; ports and adapters take explicit positional arguments. |
+| `eslint/max-statements` | Landmines' baseline. |
+| `eslint/no-continue` | Landmines' baseline; queue and migration loops use it. |
+| `eslint/no-magic-numbers` | Landmines' baseline; SQL, tokens and test fixtures carry literals. |
+| `eslint/require-await` | Landmines' baseline; an adapter keeps an async signature even when it has nothing to await. |
+| `import/max-dependencies` | Landmines' baseline. |
+| `import/no-nodejs-modules` | Bun serves node: builtins and the server needs node:path and node:fs. |
+| `import/no-relative-parent-imports` | The app is one package; relative imports across src are normal. |
+| `node/no-sync` | Bun's SQLite and file APIs are synchronous by design. |
+| `oxc/no-async-endpoint-handlers` | Hono handlers are async. |
+| `promise/avoid-new` | MSW and child_process APIs are callback-shaped. |
+| `promise/prefer-await-to-callbacks` | Landmines' baseline; the same callback adapters. |
+| `typescript/no-unnecessary-type-assertion` | Landmines' baseline; the anti-slop assertion rules cover the risk. |
+| `typescript/non-nullable-type-assertion-style` | Landmines' baseline. |
+| `typescript/strict-void-return` | Landmines' baseline; `no-confusing-void-expression` covers the risk. |
+| `unicorn/max-nested-calls` | Landmines' baseline. |
+| `unicorn/no-await-expression-member` | Landmines' baseline. |
+| `unicorn/number-literal-case` | Landmines' baseline. |
+| `unicorn/prefer-reflect-apply` | Landmines' baseline. |
+| `vitest/max-expects` | Landmines' baseline for its colocated tests. |
+| `vitest/no-conditional-in-test` | Landmines' baseline. |
+| `vitest/no-hooks` | Landmines' baseline. |
+| `vitest/no-importing-vitest-globals` | Landmines' baseline. |
+| `vitest/prefer-called-once` | Landmines' baseline. |
+| `vitest/prefer-to-be-falsy` | Landmines' baseline; strict boolean matchers are kept instead. |
+| `vitest/prefer-to-be-truthy` | Landmines' baseline; strict boolean matchers are kept instead. |
+| `vitest/require-hook` | Landmines' baseline. |
+| `vitest/require-test-timeout` | Landmines' baseline. |
+| `vitest/require-top-level-describe` | Landmines' baseline. |
