@@ -1,5 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";
+import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -14,6 +15,8 @@ import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { getTestSpans, resetTestSpans } from "../platform/telemetry/otel.ts";
 import { releaseBlockingJobs } from "../testing/blocking-job.ts";
+import { readCompaniesParquet } from "../catalog/companies-parquet.ts";
+import { loadDiscoveredBoards } from "../catalog/discovered-boards.ts";
 
 const offsetBody = z.object({ offsetMs: z.number().int() });
 
@@ -52,6 +55,8 @@ const createBoardBody = z.object({
   status: z.enum(["active", "empty", "gone", "disabled"]).default("active"),
   source: z.enum(["v1_seed", "discovered", "import"]).default("discovered"),
 });
+
+const discoveredBoardsBody = z.object({ path: z.string().min(1) });
 
 export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handlers: JobHandlers) {
   const routes = new Hono();
@@ -200,6 +205,23 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
 
     return context.json({ postings: rows });
   });
+
+  routes.post(
+    "/catalog/discovered-boards",
+    zValidator("json", discoveredBoardsBody),
+    async (context) => {
+      const { path } = context.req.valid("json");
+      const bytes = readFileSync(path);
+      const file = new ArrayBuffer(bytes.byteLength);
+
+      new Uint8Array(file).set(bytes);
+
+      const { rows } = await readCompaniesParquet(file);
+      const report = loadDiscoveredBoards(db, clock, rows);
+
+      return context.json(report);
+    },
+  );
 
   return routes;
 }

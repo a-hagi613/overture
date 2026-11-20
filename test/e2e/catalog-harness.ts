@@ -29,8 +29,11 @@ const postingRowSchema = z.object({
 
 const boardRowSchema = z.object({
   id: z.string(),
+  companyId: z.string(),
+  ats: z.string(),
   boardToken: z.string(),
   status: z.string(),
+  source: z.string(),
   etag: z.string().nullable(),
   contentHash: z.string().nullable(),
   lastPolledAt: z.number().nullable(),
@@ -63,8 +66,11 @@ export interface PostingRow {
 
 export interface BoardRow {
   id: string;
+  companyId: string;
+  ats: string;
   boardToken: string;
   status: string;
+  source: string;
   etag: string | null;
   contentHash: string | null;
   lastPolledAt: number | null;

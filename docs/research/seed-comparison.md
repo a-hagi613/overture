@@ -1,8 +1,10 @@
 # M1-09b — Seed comparison: the v1 board seed vs the ats-scrapers directory
 
-**Date of measurement:** 2026-11-20, 01:12–01:32 UTC-05:00 (06:12–06:32 UTC). **Deliverable for
-epic #5 (issue #56):** decide, on measured numbers, whether #16 should seed `company_boards`
-from the v1 export, from ats-scrapers' hosted `companies.parquet`, or from the union of both.
+**Date of measurement:** 2026-11-20, 01:12–01:32 UTC-05:00 (06:12–06:32 UTC); Phase 2 loader run
+against the full dataset: 2026-11-20, 02:10 UTC-05:00. **Deliverable for epic #5 (issue #56):**
+decide, on measured numbers, whether #16 should seed `company_boards` from the v1 export, from
+ats-scrapers' hosted `companies.parquet`, or from the union of both, and load the discovered
+boards once #14's `company_boards` is on main.
 
 Rules followed: every number below comes from `scripts/seed-comparison.ts` and cites the command
 that produced it; scratch data (the v1 CSV, the manifest and the parquet) stays in
@@ -205,3 +207,51 @@ interval per stratum is in the run log alongside the report.
 - Postings are from the light listing only (no questions, no per-job content), and a board that
   is hiring but blocks our probe would be misheard as non-live — the log shows no such failure
   (0 fetch errors, 0 parse errors after the lever fix).
+
+## 9. Phase 2 — the discovered-boards load (post-#14)
+
+Once #14's `company_boards` landed (migration 0003), `scripts/load-discovered-boards.ts` loads
+the pinned dataset's M1 ATS rows with `source='discovered'`:
+
+```sh
+bun run scripts/load-discovered-boards.ts \
+  --db <overture.db> \
+  --manifest /home/ubuntu/orca/workspaces/overture/spike-ats-out/m1-09b/manifest.json \
+  --companies /home/ubuntu/orca/workspaces/overture/spike-ats-out/m1-09b/companies.parquet
+```
+
+Semantics (`src/server/catalog/discovered-boards.ts`):
+
+- Only greenhouse, lever and ashby rows are considered; workday and other ATSes are counted and
+  skipped (`unsupportedAts`).
+- The board token is the URL's last path segment, with the row's `slug` as fallback — the same
+  normalisation as the comparison (§2); `Aave Labs` (url `https://jobs.eu.lever.co/aavelabs`,
+  slug a full URL string) proves the URL wins, and `32Co` keeps its case.
+- A board already present at `(ats, board_token)` — including a v1-seeded one — is left exactly
+  as it is; the loader never overwrites `source`, `status` or scheduling fields.
+- A board's company is matched by exact `name_norm` round-trip (`name.toLowerCase()`); a miss
+  creates the `companies` row. Rows sharing a name (the real `Anagram` has three boards: ashby
+  `anagram`, ashby `goanagram`, lever `anagramsecurity`) share one company row.
+
+Full-dataset run against a fresh database (2026-11-20, the pinned parquet): considered 173,344
+rows, unsupported ATS 159,433, created **13,911 boards** (greenhouse 7,363 + lever 2,377 +
+ashby 4,171 — identical to §3's scrapers column), created 13,586 companies, reused 325 with
+multiple boards. Second run on the same database: created boards 0, existing 13,911, created
+companies 0 — the load is idempotent, and table counts (13,911 / 13,586) are unchanged after
+both runs. A tampered manifest fails loudly on the sha256 pin before anything is written
+(`manifest sha256 pin mismatch: pinned cc62…, actual 3c48…`).
+
+The Playwright e2e (`test/e2e/catalog-discovered-seed.test.ts`) proves the same contract against
+a small recorded parquet fixture, `test/e2e/fixtures/ats-scrapers/companies.parquet` — 11
+verbatim rows of the pinned dataset chosen to exercise every branch: the three recorded
+Greenhouse fixture boards (`vercel`, `stripe`, `cloudflare`), the URL-vs-slug lever row, a
+case-preserving lever token, the three-board `Anagram` company, and one workday + one teamtailor
+row that must be skipped as non-M1. The test pre-seeds a v1 board (`stripe`) and a company
+(`Anagram`), loads the fixture, asserts the 8 discovered boards with `source='discovered'`
+against the untouched v1 row, loads it a second time (0 created, 9 existing), and runs a
+backfill cycle that polls the discovered `vercel` board to 4 live Postings and marks the
+fixture-less `32Co` lever board `empty` (the Greenhouse fixture server serves no such board,
+so its listing is empty — not an error).
+
+No new drizzle migration: the loader writes data into #14's existing `company_boards` schema,
+and `db:verify` passes unchanged (9 STRICT tables, migration 0003 at `when` 1795230000002).

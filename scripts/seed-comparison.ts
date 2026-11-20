@@ -6,9 +6,13 @@ import { parquetMetadata, parquetRead } from "hyparquet";
 import { z } from "zod";
 
 import { createClock } from "../src/server/platform/ports/clock.ts";
+import {
+  PINNED_COMPANIES_PARQUET_SHA256,
+  PINNED_MANIFEST_SHA256,
+} from "../src/server/catalog/companies-parquet.ts";
 
-const MANIFEST_SHA256 = "cc6bc21396e64f6e93be77ffcdc37dba9b3a70892fcc53f8277559482f502b9b";
-const COMPANIES_PARQUET_SHA256 = "dabf803a8849e4f07c9ddf38b027d7bdd7b68875d43121825415da08cedf736c";
+const MANIFEST_SHA256 = PINNED_MANIFEST_SHA256;
+const COMPANIES_PARQUET_SHA256 = PINNED_COMPANIES_PARQUET_SHA256;
 const USER_AGENT = "overture-catalog-seed/0.1 (comparison for a-hagi613/overture#56)";
 const MILLISECONDS_PER_REQUEST = 550;
 const GREENHOUSE = "greenhouse";
