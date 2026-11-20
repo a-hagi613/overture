@@ -105,7 +105,9 @@ const postingTagBody = z.object({
 
 const sampleLedgerBody = z.object({ email: z.email() });
 
-const tamperLedgerBody = z.object({ action: z.enum(["delete", "update"]) });
+const tamperLedgerBody = z.object({
+  action: z.enum(["delete", "delete-owner", "update"]),
+});
 
 const SAMPLE_GRANT_QUANTITY = 70;
 
@@ -538,17 +540,23 @@ export function createTestRoutes(
           .set({ amount: row.amount + 1 })
           .where(eq(ledger.id, row.id))
           .run();
-      } else {
+      } else if (action === "delete") {
         db.delete(ledger).where(eq(ledger.id, row.id)).run();
+      } else {
+        db.delete(users).where(eq(users.id, row.userId)).run();
       }
 
-      return context.json({ ledger: row.id, refused: false });
+      return context.json({ refused: false, refusal: null });
     } catch (error) {
       const refusal = error instanceof Error ? error.message : String(error);
 
-      return context.json({ ledger: row.id, refused: true, refusal });
+      return context.json({ refused: true, refusal });
     }
   });
+
+  routes.get("/ledger/rows", (context) =>
+    context.json({ rows: db.select().from(ledger).all().length }),
+  );
 
   routes.get("/auth/state", (context) => {
     const allUsers = db.select().from(users).all();
