@@ -7,6 +7,7 @@ import { createMailSender } from "./platform/mail/index.ts";
 import { openDatabase } from "./platform/db/client.ts";
 import { migrateDatabase } from "./platform/db/migrate.ts";
 import { createClock } from "./platform/ports/clock.ts";
+import { createBackupMonitor } from "./platform/ports/backup.ts";
 import { recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
 import { startJobWorker } from "./platform/jobs/scheduler.ts";
 import { startTelemetry, trace } from "./platform/telemetry/otel.ts";
@@ -56,6 +57,10 @@ if (env.ENABLE_TEST_ROUTES) {
 
 const clock = createClock();
 const shutdownController = new AbortController();
+const backups = createBackupMonitor(db, clock);
+
+void backups.run(shutdownController.signal);
+
 const mailSender = createMailSender(clock);
 const auth = createAuth(db, clock, mailSender);
 
@@ -164,6 +169,7 @@ const app = createApp({
   objects,
   llm: anthropicLlmPort,
   singletonJobKinds: SINGLETON_JOB_KINDS,
+  backups,
 });
 
 const server = Bun.serve({ port: env.PORT, fetch: app.fetch });
