@@ -318,9 +318,31 @@ function printSummary(deps: ProbeDeps, results: ProbeFormResult[]) {
   io.writeLine("");
 
   if (!deps.confirm) {
+    const filled = results.filter((result) => result.outcome === "dry_run_filled").length;
+
+    if (filled === results.length) {
+      io.writeLine(
+        "dry run: every form was filled and the run stopped before submit; nothing was sent",
+      );
+
+      return;
+    }
+
     io.writeLine(
-      "dry run: every form was filled and the run stopped before submit; nothing was sent",
+      `dry run: ${String(filled)} of ${String(results.length)} forms were filled and the run stopped before submit; nothing was sent`,
     );
+
+    for (const [index, result] of results.entries()) {
+      const posting = deps.runFile.postings[index];
+
+      if (posting === undefined || result.outcome === "dry_run_filled") {
+        continue;
+      }
+
+      io.writeLine(
+        `not filled: ${result.company} — ${result.title} (board ${posting.board}, job ${posting.jobId}): ${result.outcome}`,
+      );
+    }
 
     return;
   }
