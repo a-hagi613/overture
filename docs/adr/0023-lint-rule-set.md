@@ -102,7 +102,7 @@ compares this table with `.oxlintrc.json`.
 
 | Rule | Where | Reason |
 |---|---|---|
-| `import/no-default-export` | `**/*.config.{ts,mts,mjs,js}`, `test/e2e/global-setup.ts`, `tools/oxlint/architecture/index.ts` | Vite, Vitest, Playwright and Drizzle config files, Playwright's global setup hook and the Oxc plugin registration all require a default export |
+| `import/no-default-export` | `**/*.config.{ts,mts,mjs,js}`, `test/e2e/global-setup.ts`, `tools/oxlint/architecture/index.ts`, `workers/inbound-mail/src/index.ts` | Vite, Vitest, Playwright and Drizzle config files, Playwright's global setup hook, the Oxc plugin registration and the Cloudflare Email Worker entry all require a default export |
 | `node/no-process-env` | `src/server/config/env.ts`, `drizzle.config.ts`, `test/e2e/**` | `src/server/config/env.ts` is the one module that reads the process environment inside the app; the Drizzle CLI config and the e2e harness read it from outside the app |
 
 Two React options are set rather than turned off: `react/jsx-filename-extension` allows `.tsx`, and

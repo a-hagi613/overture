@@ -2,6 +2,9 @@
   "name": "overture",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "workers/*"
+  ],
   "type": "module",
   "scripts": {
     "dev": "bun run src/server/main.ts",
