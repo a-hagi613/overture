@@ -5,6 +5,8 @@ import { dirname } from "node:path";
 
 export type AppDatabase = ReturnType<typeof openDatabase>["db"];
 
+export type DatabaseWriter = Pick<AppDatabase, "select" | "insert" | "update" | "delete">;
+
 export function openDatabase(path: string) {
   if (path !== ":memory:") {
     mkdirSync(dirname(path), { recursive: true });

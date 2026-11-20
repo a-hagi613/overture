@@ -348,6 +348,11 @@ Discovery runs from `overture-web` directly (no proxy).
    skipped with `posting_closed`.
 5. **Dedupe**: `dedupe_key = company_id + title_norm + country_code + city`; duplicates across boards keep the
    earliest posting; users never see two cards for one role.
+6. **Responsiveness**: writing one feed never blocks the process. A board's postings are written in transactions of
+   50 with the event loop yielded between them, the comparison against stored postings reads only `id`,
+   `ats_job_id`, `source_updated_at` and `closed_at` rather than whole rows with their descriptions, and the
+   twice-missing close is two statements rather than one per posting. A sweep over multi-megabyte feeds therefore
+   leaves `/api/health` answering in milliseconds; the per-ATS limiter and its pacing are untouched.
 
 ### 6.3 Tagging
 

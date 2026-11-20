@@ -117,6 +117,8 @@ export interface FeedFixtureServer {
   setDelayMs: (delayMs: number) => void;
   nextRequest: () => Promise<string>;
   mutateBoard: (ats: Ats, token: string, mutation: BoardMutation) => void;
+  seedBoard: (ats: Ats, token: string, spec: BulkBoardSpec) => void;
+  jobs: (ats: Ats, token: string) => FixtureJob[];
 }
 
 interface MutableGreenhouseJob {
@@ -166,6 +168,117 @@ interface MutableAshbyJob {
   descriptionPlain: string | null;
   descriptionHtml: string | null;
   compensation: unknown;
+}
+
+export interface BulkBoardSpec {
+  jobCount: number;
+  descriptionKb: number;
+}
+
+export interface FixtureJob {
+  atsJobId: string;
+  title: string;
+  url: string;
+  sourceUpdatedAt: string | null;
+  descriptionText: string;
+}
+
+const BULK_TITLES = [
+  "Senior Backend Engineer",
+  "Staff Data Engineer",
+  "Principal Product Designer",
+  "Engineering Manager, Platform",
+  "Machine Learning Engineer",
+  "Security Engineer",
+  "Site Reliability Engineer",
+  "Technical Program Manager",
+  "Senior Frontend Engineer",
+  "Customer Success Manager",
+] as const;
+
+const BULK_LOCATIONS = [
+  "Berlin, Germany",
+  "Remote - Germany",
+  "London, United Kingdom",
+  "Toronto, Canada",
+] as const;
+
+const BULK_UPDATED_AT = "2026-11-01T09:00:00Z";
+const BULK_FIRST_PUBLISHED = "2026-10-01T09:00:00Z";
+
+function pick<T>(values: readonly [T, ...T[]], index: number) {
+  return values[index % values.length] ?? values[0];
+}
+
+function bulkHtml(kb: number, seed: number) {
+  const paragraph = `<p>Role ${String(seed)}: we are building thoughtful software with care, and we would like you to help us ship it to real users who depend on it daily, with rigor and kindness.</p><ul><li>Ship &amp; own services</li><li>Mentor &amp; review code</li><li>Work with product &amp; design</li></ul>`;
+
+  return paragraph.repeat(Math.ceil((kb * 1024) / paragraph.length));
+}
+
+function bulkPlain(kb: number, seed: number) {
+  const paragraph = `Role ${String(seed)}: we are building thoughtful software with care, and we would like you to help us ship it to real users who depend on it daily, with rigor and kindness. The salary range is $120,000 - $150,000 per year depending on experience.`;
+
+  return paragraph.repeat(Math.ceil((kb * 1024) / paragraph.length));
+}
+
+function bulkGreenhouseJobs(token: string, spec: BulkBoardSpec) {
+  return Array.from({ length: spec.jobCount }, (_unused, index) => ({
+    id: `gh-${token}-${String(index)}`,
+    title: pick(BULK_TITLES, index),
+    absoluteUrl: `https://boards.example.com/${token}/jobs/${String(index)}`,
+    locationName: pick(BULK_LOCATIONS, index),
+    updatedAt: BULK_UPDATED_AT,
+    firstPublished: BULK_FIRST_PUBLISHED,
+    language: "en",
+    content: bulkHtml(spec.descriptionKb, index),
+    departments: [{ name: "Engineering" }],
+  }));
+}
+
+function bulkLeverJobs(token: string, spec: BulkBoardSpec) {
+  return Array.from({ length: spec.jobCount }, (_unused, index) => {
+    const location = pick(BULK_LOCATIONS, index);
+
+    return {
+      id: `lv-${token}-${String(index)}`,
+      text: pick(BULK_TITLES, index),
+      hostedUrl: `https://jobs.example.com/${token}/lv-${String(index)}`,
+      createdAt: Date.parse(BULK_FIRST_PUBLISHED),
+      workplaceType: "onsite",
+      categories: {
+        location,
+        allLocations: [location],
+        department: "Engineering",
+        team: null,
+        commitment: "Full-time",
+      },
+      description: null,
+      descriptionPlain: bulkPlain(spec.descriptionKb, index),
+      lists: [],
+      additionalPlain: null,
+    };
+  });
+}
+
+function bulkAshbyJobs(token: string, spec: BulkBoardSpec) {
+  return Array.from({ length: spec.jobCount }, (_unused, index) => ({
+    id: `ash-${token}-${String(index)}`,
+    title: pick(BULK_TITLES, index),
+    location: pick(BULK_LOCATIONS, index),
+    secondaryLocations: [],
+    jobUrl: `https://jobs.ashbyhq.com/${token}/ash-${String(index)}`,
+    publishedAt: Date.parse(BULK_FIRST_PUBLISHED),
+    isListed: true,
+    isRemote: false,
+    workplaceType: "onsite",
+    employmentType: "FullTime",
+    department: "Engineering",
+    team: null,
+    descriptionPlain: bulkPlain(spec.descriptionKb, index),
+    descriptionHtml: null,
+    compensation: null,
+  }));
 }
 
 function ifNoneMatchFrom(header: string | string[] | undefined) {
@@ -712,6 +825,48 @@ export async function startFeedFixtureServer() {
       if (ats === "ashby") {
         mutateAshby(token, mutation);
       }
+    },
+    seedBoard: (ats, token, spec) => {
+      if (ats === "greenhouse") {
+        greenhouseBoards.set(token, bulkGreenhouseJobs(token, spec));
+      }
+
+      if (ats === "lever") {
+        leverBoards.set(token, bulkLeverJobs(token, spec));
+      }
+
+      if (ats === "ashby") {
+        ashbyBoards.set(token, bulkAshbyJobs(token, spec));
+      }
+    },
+    jobs: (ats, token) => {
+      if (ats === "greenhouse") {
+        return (greenhouseBoards.get(token) ?? []).map((job) => ({
+          atsJobId: String(job.id),
+          title: job.title,
+          url: job.absoluteUrl,
+          sourceUpdatedAt: job.updatedAt,
+          descriptionText: job.content ?? "",
+        }));
+      }
+
+      if (ats === "lever") {
+        return (leverBoards.get(token) ?? []).map((job) => ({
+          atsJobId: job.id,
+          title: job.text,
+          url: job.hostedUrl,
+          sourceUpdatedAt: null,
+          descriptionText: job.descriptionPlain ?? "",
+        }));
+      }
+
+      return (ashbyBoards.get(token) ?? []).map((job) => ({
+        atsJobId: job.id,
+        title: job.title,
+        url: job.jobUrl,
+        sourceUpdatedAt: null,
+        descriptionText: job.descriptionPlain ?? "",
+      }));
     },
   } satisfies FeedFixtureServer;
 }

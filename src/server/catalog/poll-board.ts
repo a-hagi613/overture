@@ -1,6 +1,6 @@
 import { and, eq, gte, isNull, notInArray, sql } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import { companyBoards, postings } from "../platform/db/schema.ts";
 import { normalizeApplyUrl, normalizeTitle } from "./normalize.ts";
@@ -23,6 +23,7 @@ const ERROR_BACKOFF_CAP_MS = 48 * 3_600_000;
 const NOT_FOUND_BACKOFF_MS = 30 * 60_000;
 const MISSING_POLLS_TO_CLOSE = 2;
 const NOT_FOUND_POLLS_TO_GONE = 2;
+const POSTINGS_PER_CHUNK = 50;
 
 export interface PollBoardReport {
   boardId: string;
@@ -65,6 +66,10 @@ function gzip(descriptionText: string) {
   return Buffer.from(Bun.gzipSync(descriptionText));
 }
 
+async function yieldToEventLoop() {
+  await Bun.sleep(0);
+}
+
 function latestChangeMsForBoard(db: AppDatabase, boardId: string) {
   const row = db
     .select({
@@ -97,22 +102,14 @@ async function fetchDetailOrNull(feed: BoardFeed, boardToken: string, atsJobId: 
 function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow, now: number) {
   const latestChangeMs = latestChangeMsForBoard(db, board.id);
 
-  const missingRows = db
-    .update(postings)
+  db.update(postings)
     .set({ missingPolls: sql`${postings.missingPolls} + 1` })
     .where(
       and(eq(postings.boardId, board.id), isNull(postings.closedAt), gte(postings.missingPolls, 1)),
     )
-    .returning({ id: postings.id, missingPolls: postings.missingPolls })
-    .all();
+    .run();
 
-  for (const row of missingRows) {
-    if (row.missingPolls >= MISSING_POLLS_TO_CLOSE) {
-      db.update(postings).set({ closedAt: clock.now() }).where(eq(postings.id, row.id)).run();
-    }
-  }
-
-  const closed = missingRows.filter((row) => row.missingPolls >= MISSING_POLLS_TO_CLOSE).length;
+  const closed = closeMissingPostings(db, clock, board.id);
 
   db.update(companyBoards)
     .set({
@@ -135,6 +132,85 @@ function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow, now:
   } satisfies PollBoardReport;
 }
 
+function closeMissingPostings(db: AppDatabase, clock: Clock, boardId: string) {
+  const closed = db
+    .update(postings)
+    .set({ closedAt: clock.now() })
+    .where(
+      and(
+        eq(postings.boardId, boardId),
+        isNull(postings.closedAt),
+        gte(postings.missingPolls, MISSING_POLLS_TO_CLOSE),
+      ),
+    )
+    .returning({ id: postings.id })
+    .all();
+
+  return closed.length;
+}
+
+function postingValues(
+  board: BoardRow,
+  posting: FeedPosting,
+  detail: FeedContent | null,
+  now: number,
+) {
+  const descriptionText = detail?.descriptionText ?? null;
+  const titleNorm = normalizeTitle(posting.title);
+  const locationRaw = detail?.locationRaw ?? posting.locationRaw;
+
+  const tags = tagPosting({
+    title: posting.title,
+    department: detail?.department ?? null,
+    locationRaw,
+    workplaceType: null,
+    isRemote: null,
+    employmentType: null,
+    language: posting.language,
+    salary: null,
+    descriptionText: descriptionText === null ? null : descriptionText.slice(0, 20_000),
+  });
+
+  const dedupeKey = dedupeKeyFor({
+    companyId: board.companyId,
+    titleNorm,
+    countryCode: tags.countryCode,
+    city: tags.city,
+  });
+
+  const values = {
+    url: posting.url,
+    applyUrl: null,
+    applyUrlNorm: normalizeApplyUrl(posting.url),
+    title: posting.title,
+    titleNorm,
+    department: detail?.department ?? null,
+    locationRaw,
+    countryCode: tags.countryCode,
+    region: tags.region,
+    city: tags.city,
+    language: tags.language,
+    workplace: tags.workplace,
+    employmentType: tags.employmentType,
+    salaryMinMinor: tags.salaryMinMinor,
+    salaryMaxMinor: tags.salaryMaxMinor,
+    salaryCurrency: tags.salaryCurrency,
+    salaryPeriod: salaryPeriodForColumn(tags.salaryPeriod),
+    postedAt: parseMs(posting.postedAt),
+    sourceUpdatedAt: parseMs(posting.sourceUpdatedAt),
+    lastSeenAt: now,
+    missingPolls: 0,
+    closedAt: null,
+    dedupeKey,
+    descriptionGz: descriptionText === null ? null : gzip(descriptionText),
+    descriptionHash: descriptionText === null ? null : contentHash(descriptionText),
+    tagSource: "rules" as const,
+    taggedAt: now,
+  };
+
+  return { values, tags };
+}
+
 async function syncPostings(
   db: AppDatabase,
   clock: Clock,
@@ -146,7 +222,17 @@ async function syncPostings(
   const report = { added: 0, updated: 0, closed: 0 };
   const seenJobIds = new Set<string>(boardPostings.map((posting) => posting.atsJobId));
 
-  const existingRows = db.select().from(postings).where(eq(postings.boardId, board.id)).all();
+  const existingRows = db
+    .select({
+      id: postings.id,
+      atsJobId: postings.atsJobId,
+      sourceUpdatedAt: postings.sourceUpdatedAt,
+      closedAt: postings.closedAt,
+    })
+    .from(postings)
+    .where(eq(postings.boardId, board.id))
+    .all();
+
   const existingByJobId = new Map(existingRows.map((row) => [row.atsJobId, row]));
 
   const changedPostings = boardPostings.filter((posting) => {
@@ -173,102 +259,68 @@ async function syncPostings(
 
   const contentByJobId = new Map<string, FeedContent | null>(detailPairs);
 
-  for (const posting of boardPostings) {
-    const existing = existingByJobId.get(posting.atsJobId);
-    const content = contentByJobId.get(posting.atsJobId) ?? null;
+  async function writeChunk(offset: number) {
+    const chunk = boardPostings.slice(offset, offset + POSTINGS_PER_CHUNK);
 
-    if (existing !== undefined && !contentByJobId.has(posting.atsJobId)) {
-      touchUnchangedPosting(db, existing.id, now);
+    db.transaction((tx) => {
+      for (const posting of chunk) {
+        const existing = existingByJobId.get(posting.atsJobId);
 
-      continue;
-    }
+        if (existing !== undefined && !contentByJobId.has(posting.atsJobId)) {
+          touchUnchangedPosting(tx, existing.id, now);
 
-    const detail = posting.descriptionPending ? content : posting.content;
-    const descriptionText = detail?.descriptionText ?? null;
-    const titleNorm = normalizeTitle(posting.title);
-    const locationRaw = detail?.locationRaw ?? posting.locationRaw;
+          continue;
+        }
 
-    const tags = tagPosting({
-      title: posting.title,
-      department: detail?.department ?? null,
-      locationRaw,
-      workplaceType: null,
-      isRemote: null,
-      employmentType: null,
-      language: posting.language,
-      salary: null,
-      descriptionText: descriptionText === null ? null : descriptionText.slice(0, 20_000),
-    });
+        const detail = posting.descriptionPending
+          ? (contentByJobId.get(posting.atsJobId) ?? null)
+          : posting.content;
 
-    const dedupeKey = dedupeKeyFor({
-      companyId: board.companyId,
-      titleNorm,
-      countryCode: tags.countryCode,
-      city: tags.city,
-    });
+        const { values, tags } = postingValues(board, posting, detail, now);
 
-    const values = {
-      url: posting.url,
-      applyUrl: null,
-      applyUrlNorm: normalizeApplyUrl(posting.url),
-      title: posting.title,
-      titleNorm,
-      department: detail?.department ?? null,
-      locationRaw,
-      countryCode: tags.countryCode,
-      region: tags.region,
-      city: tags.city,
-      language: tags.language,
-      workplace: tags.workplace,
-      employmentType: tags.employmentType,
-      salaryMinMinor: tags.salaryMinMinor,
-      salaryMaxMinor: tags.salaryMaxMinor,
-      salaryCurrency: tags.salaryCurrency,
-      salaryPeriod: salaryPeriodForColumn(tags.salaryPeriod),
-      postedAt: parseMs(posting.postedAt),
-      sourceUpdatedAt: parseMs(posting.sourceUpdatedAt),
-      lastSeenAt: now,
-      missingPolls: 0,
-      closedAt: null,
-      dedupeKey,
-      descriptionGz: descriptionText === null ? null : gzip(descriptionText),
-      descriptionHash: descriptionText === null ? null : contentHash(descriptionText),
-      tagSource: "rules" as const,
-      taggedAt: now,
-    };
+        if (existing === undefined) {
+          const inserted = tx
+            .insert(postings)
+            .values({
+              id: crypto.randomUUID(),
+              boardId: board.id,
+              companyId: board.companyId,
+              ats: board.ats,
+              atsJobId: posting.atsJobId,
+              firstSeenAt: now,
+              ...values,
+            })
+            .onConflictDoNothing()
+            .returning({ id: postings.id })
+            .all()
+            .at(0);
 
-    if (existing === undefined) {
-      const inserted = db
-        .insert(postings)
-        .values({
-          id: crypto.randomUUID(),
-          boardId: board.id,
-          companyId: board.companyId,
-          ats: board.ats,
-          atsJobId: posting.atsJobId,
-          firstSeenAt: now,
-          ...values,
-        })
-        .onConflictDoNothing()
-        .returning({ id: postings.id })
-        .all()
-        .at(0);
+          if (inserted !== undefined) {
+            storePostingTags(tx, inserted.id, tags, now);
 
-      if (inserted !== undefined) {
-        storePostingTags(db, inserted.id, tags, now);
+            report.added += 1;
+          }
 
-        report.added += 1;
+          continue;
+        }
+
+        tx.update(postings).set(values).where(eq(postings.id, existing.id)).run();
+
+        storePostingTags(tx, existing.id, tags, now);
+
+        report.updated += 1;
       }
+    });
 
-      continue;
+    const next = offset + chunk.length;
+
+    if (next < boardPostings.length) {
+      await yieldToEventLoop();
+      await writeChunk(next);
     }
-
-    db.update(postings).set(values).where(eq(postings.id, existing.id)).run();
-
-    storePostingTags(db, existing.id, tags, now);
-
-    report.updated += 1;
   }
+
+  await writeChunk(0);
 
   const missingFilter =
     seenJobIds.size === 0
@@ -279,25 +331,17 @@ async function syncPostings(
           notInArray(postings.atsJobId, [...seenJobIds]),
         );
 
-  const missingRows = db
-    .update(postings)
+  db.update(postings)
     .set({ missingPolls: sql`${postings.missingPolls} + 1` })
     .where(missingFilter)
-    .returning({ id: postings.id, missingPolls: postings.missingPolls })
-    .all();
+    .run();
 
-  for (const row of missingRows) {
-    if (row.missingPolls >= MISSING_POLLS_TO_CLOSE) {
-      db.update(postings).set({ closedAt: clock.now() }).where(eq(postings.id, row.id)).run();
-
-      report.closed += 1;
-    }
-  }
+  report.closed += closeMissingPostings(db, clock, board.id);
 
   return report;
 }
 
-function touchUnchangedPosting(db: AppDatabase, postingId: string, now: number) {
+function touchUnchangedPosting(db: DatabaseWriter, postingId: string, now: number) {
   db.update(postings)
     .set({ lastSeenAt: now, missingPolls: 0 })
     .where(eq(postings.id, postingId))
