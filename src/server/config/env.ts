@@ -7,6 +7,12 @@ const oauthPairs = [
   ["LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"],
 ] as const;
 
+const localHostnames = ["localhost", "127.0.0.1"];
+
+function turnstileDefaultHostnames(appOrigin: string | undefined) {
+  return appOrigin === undefined ? localHostnames : [new URL(appOrigin).hostname];
+}
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -42,6 +48,16 @@ const envSchema = z
     OWNER_EMAIL: z.email(),
     TURNSTILE_SITE_KEY: z.string().min(1),
     TURNSTILE_SECRET: z.string().min(1),
+    TURNSTILE_HOSTNAMES: z
+      .string()
+      .min(1)
+      .transform((value) =>
+        value
+          .split(",")
+          .map((host) => host.trim().toLowerCase())
+          .filter((host) => host.length > 0),
+      )
+      .optional(),
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
     LINKEDIN_CLIENT_ID: z.string().min(1).optional(),
@@ -73,6 +89,31 @@ const envSchema = z
     FLY_MACHINE_ID: z.string().min(1).optional(),
   })
   .superRefine((value, context) => {
+    if (value.NODE_ENV === "production") {
+      const hostnames =
+        value.TURNSTILE_HOSTNAMES ??
+        (value.APP_ORIGIN === undefined ? [] : turnstileDefaultHostnames(value.APP_ORIGIN));
+
+      for (const local of localHostnames) {
+        if (hostnames.includes(local)) {
+          context.addIssue({
+            code: "custom",
+            message: `TURNSTILE_HOSTNAMES must not include ${local} in production.`,
+            path: ["TURNSTILE_HOSTNAMES"],
+          });
+        }
+      }
+
+      if (value.TURNSTILE_HOSTNAMES === undefined && value.APP_ORIGIN === undefined) {
+        context.addIssue({
+          code: "custom",
+          message:
+            "Production needs APP_ORIGIN or TURNSTILE_HOSTNAMES to name the Turnstile hostnames.",
+          path: ["TURNSTILE_HOSTNAMES"],
+        });
+      }
+    }
+
     for (const [idName, secretName] of oauthPairs) {
       if ((value[idName] === undefined) !== (value[secretName] === undefined)) {
         context.addIssue({
@@ -87,5 +128,8 @@ const envSchema = z
 export const env = envSchema.parse(process.env);
 
 export const databasePath = env.DATABASE_PATH ?? env.DATABASE_URL;
+
+export const turnstileHostnames =
+  env.TURNSTILE_HOSTNAMES ?? turnstileDefaultHostnames(env.APP_ORIGIN);
 
 export type Env = z.infer<typeof envSchema>;

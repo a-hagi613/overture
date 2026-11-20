@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { z } from "zod";
 
 import { copy } from "../../shared/copy.ts";
+import { turnstileActionHeader, turnstileTokenHeader } from "../../shared/turnstile.ts";
 import { GoogleMark } from "./google-mark.tsx";
 import { NavGlyph } from "./nav-glyph.tsx";
 import { authClient } from "../lib/auth-client.ts";
@@ -31,9 +32,9 @@ const headlineByMode = {
   "sign-up": { title: copy.signIn.signUpTitle, description: copy.signIn.signUpDescription },
 };
 
-function presentError(status: number) {
+function presentError(status: number, code: string | undefined) {
   if (status === 403) {
-    return copy.signIn.refusedEmail;
+    return code === "captcha_failed" ? copy.signIn.captchaFailed : copy.signIn.refusedEmail;
   }
 
   if (status === 429) {
@@ -53,7 +54,17 @@ export function SignInCard() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [siteKey, setSiteKey] = useState<string | null>(null);
   const [socialProviders, setSocialProviders] = useState<SocialProvider[]>([]);
-  const { containerRef, obtainToken } = useTurnstile(siteKey);
+  const socialAction = mode === "sign-up" ? "signup" : "signin";
+
+  const { containerRef: socialContainer, obtainToken: obtainSocialToken } = useTurnstile(
+    socialProviders.length > 0 ? siteKey : null,
+    socialAction,
+  );
+
+  const { containerRef: magicContainer, obtainToken: obtainMagicToken } = useTurnstile(
+    siteKey,
+    "magiclink",
+  );
 
   useEffect(() => {
     const load = async () => {
@@ -86,7 +97,7 @@ export function SignInCard() {
     void check();
   }, [navigate, sentTo, siteKeyFromCallback]);
 
-  const confirmToken = async () => {
+  const confirmToken = async (obtainToken: () => Promise<string | null>) => {
     const token = await obtainToken();
 
     if (token === null) {
@@ -99,7 +110,7 @@ export function SignInCard() {
   };
 
   const onSocial = async (provider: SocialProvider) => {
-    const token = await confirmToken();
+    const token = await confirmToken(obtainSocialToken);
 
     if (token === null) {
       return;
@@ -110,17 +121,19 @@ export function SignInCard() {
         provider,
         callbackURL: CALLBACK_URL,
         errorCallbackURL: CALLBACK_URL,
-        fetchOptions: { headers: { "x-captcha-response": token } },
+        fetchOptions: {
+          headers: { [turnstileTokenHeader]: token, [turnstileActionHeader]: socialAction },
+        },
       })
       .catch(() => null);
 
     if (result !== null && result.error !== null) {
-      setActionError(presentError(result.error.status));
+      setActionError(presentError(result.error.status, result.error.code));
     }
   };
 
   const onMagic = async () => {
-    const token = await confirmToken();
+    const token = await confirmToken(obtainMagicToken);
 
     if (token === null) {
       return;
@@ -130,7 +143,9 @@ export function SignInCard() {
       .magicLink({
         email,
         callbackURL: CALLBACK_URL,
-        fetchOptions: { headers: { "x-captcha-response": token } },
+        fetchOptions: {
+          headers: { [turnstileTokenHeader]: token, [turnstileActionHeader]: "magiclink" },
+        },
       })
       .catch(() => null);
 
@@ -147,7 +162,7 @@ export function SignInCard() {
       return;
     }
 
-    setActionError(presentError(result.error.status));
+    setActionError(presentError(result.error.status, result.error.code));
   };
 
   const isSent = sentTo !== null;
@@ -283,7 +298,6 @@ export function SignInCard() {
               {copy.signIn.magicSubmit}
             </button>
           </form>
-          <div ref={containerRef} />
           <p className="flex items-start gap-[9px] text-pretty text-[12.5px] leading-[1.52] text-muted-foreground">
             <span className="mt-0.5 flex-none">
               <NavGlyph name="lock" size={14} />
@@ -308,6 +322,8 @@ export function SignInCard() {
           </p>
         </div>
       )}
+      <div data-turnstile="social" ref={socialContainer} />
+      <div data-turnstile="magic" ref={magicContainer} />
       {presentedError === null ? null : (
         <p className="mt-2 text-[13px] font-semibold text-need" role="alert">
           {presentedError}

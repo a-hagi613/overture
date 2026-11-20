@@ -95,6 +95,7 @@ export const copy = {
     genericError: "Sign-in did not go through. Try again.",
     rateLimited: "Too many tries. Wait a few minutes and ask again.",
     captchaMissing: "Finish the bot check before continuing.",
+    captchaFailed: "The bot check did not pass. Finish it again and retry.",
     sampleLabel: "Sample data",
     story: {
       pill: "Personal job-search agent",

@@ -94,7 +94,20 @@ jobs:
         run: |
           set -euo pipefail
           master_key_v1=$(printf '%s' "overture ci container master key v1" | openssl dgst -sha256 -binary | base64)
+          fly_env="$RUNNER_TEMP/fly-production.env"
+          python3 - "$fly_env" <<'PY'
+          import sys
+          import tomllib
+
+          with open("fly.toml", "rb") as source:
+              values = tomllib.load(source)["env"]
+
+          with open(sys.argv[1], "w", encoding="utf-8") as target:
+              for name, value in values.items():
+                  target.write(f"{name}={value}\n")
+          PY
           docker run -d --name overture-ci \
+            --env-file "$fly_env" \
             -e LITESTREAM_ENABLED=false \
             -e ENABLE_TEST_ROUTES=false \
             -e MASTER_KEY_V1="$master_key_v1" \

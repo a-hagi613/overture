@@ -31,7 +31,12 @@ emailOnlyTest(
   async ({ page, request, emailOnlyServer }) => {
     await page.goto(`${emailOnlyServer.url}/signin`);
     await expect
-      .poll(async () => await page.locator('input[name="cf-turnstile-response"]').inputValue())
+      .poll(
+        async () =>
+          await page
+            .locator('[data-turnstile="magic"] input[name="cf-turnstile-response"]')
+            .inputValue(),
+      )
       .not.toBe("");
 
     await expect(page.getByRole("button", { name: "Continue with Google" })).toHaveCount(0);

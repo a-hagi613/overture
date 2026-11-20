@@ -36,7 +36,7 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
 5. Set only the backup and app secrets on the app (values come from the previous step, never the repo):
    `fly secrets set R2_ACCOUNT_ID=… R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… R2_BUCKET_BACKUPS=overture-backups -a overture-web`
    Sign-in (M1-06) adds `BETTER_AUTH_SECRET` (at least 16 random characters), `OWNER_EMAIL`,
-   `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` (a Turnstile widget for `tryoverture.com`).
+   `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` (a Turnstile widget for `tryoverture.com`), and optionally `TURNSTILE_HOSTNAMES` (defaults to the `APP_ORIGIN` hostname; never localhost or 127.0.0.1 in production).
    The OAuth clients are optional until they exist, one pair at a time: `GOOGLE_CLIENT_ID` with
    `GOOGLE_CLIENT_SECRET`, and `LINKEDIN_CLIENT_ID` with `LINKEDIN_CLIENT_SECRET` (redirect URIs
    `https://tryoverture.com/api/auth/oauth2/callback/google` and `…/oauth2/callback/linkedin`).

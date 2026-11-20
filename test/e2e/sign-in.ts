@@ -41,9 +41,28 @@ export async function requestMagicLink(
     data: { email, callbackURL: "/signin" },
     headers: {
       "x-captcha-response": authTestIdentity.turnstilePassToken,
+      "x-turnstile-action": "magiclink",
       origin: appServerUrl,
     },
   });
+}
+
+export interface TurnstileScenario {
+  action: "signin" | "signup" | "magiclink";
+  hostname?: string;
+  outcome?: "pass" | "replay" | "error";
+}
+
+export async function setTurnstileScenario(
+  request: APIRequestContext,
+  appServerUrl: string,
+  scenario: TurnstileScenario,
+) {
+  const response = await request.post(`${appServerUrl}/__test__/turnstile`, { data: scenario });
+
+  if (!response.ok()) {
+    throw new Error(`Setting the Turnstile scenario failed with ${String(response.status())}.`);
+  }
 }
 
 export async function latestMailLink(appServerUrl: string, request: APIRequestContext, to: string) {
