@@ -101,7 +101,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 
 | Service | Purpose | Env / secret | In tests (ADR 0013) |
 |---|---|---|---|
-| ATS job feeds (Greenhouse, later Lever/Ashby) | catalog discovery (§6) | `GREENHOUSE_FEED_BASE_URL` (test-only override of the real host) | local fixture server replaying recorded real responses captured by `scripts/record-feeds.ts` |
+| ATS job feeds (Greenhouse, Lever, Ashby) | catalog discovery (§6) | `GREENHOUSE_FEED_BASE_URL`, `LEVER_FEED_BASE_URL`, `ASHBY_FEED_BASE_URL` (test-only overrides of the real hosts) | local fixture server replaying recorded real responses captured by `scripts/record-feeds.ts` |
 | Cloudflare R2 | backups, encrypted files and mail | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES`, `R2_BUCKET_BACKUPS` | disk object store adapter (real implementation, also used in local dev) |
 | Cloudflare Turnstile | bot check on auth forms | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | Cloudflare's published always-pass test keys |
 | Cloudflare Access | admin host gate | `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN` | real verification against a test signing key |
@@ -326,7 +326,9 @@ Discovery runs from `overture-web` directly (no proxy).
 1. **Seed**: `scripts/import-v1.ts` loads `company_boards` from the one-time v1 export (§18) — about 22,800 boards.
 2. **Backfill**: one pass over every active board inside per-ATS limits.
 3. **Trickle**: each board gets `next_poll_at` from its activity: changed in last 24 h → 30 min; last 7 days → 2 h;
-   otherwise → 12 h; errors → exponential backoff (cap 48 h). `404` twice → `gone`.
+   otherwise → 12 h; errors → exponential backoff (cap 48 h). "Changed" is the feed's job `updated_at` when the
+   feed has one (Greenhouse) and the newest posting's publish time when it does not (Lever, Ashby). `404` twice →
+   `gone`.
 4. **Closed**: a posting absent from two consecutive successful polls gets `closed_at`; its queued applications are
    skipped with `posting_closed`.
 5. **Dedupe**: `dedupe_key = company_id + title_norm + country_code + city`; duplicates across boards keep the
