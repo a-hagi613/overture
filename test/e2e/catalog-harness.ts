@@ -21,6 +21,7 @@ const postingRowSchema = z.object({
   titleNorm: z.string(),
   department: z.string().nullable(),
   locationRaw: z.string().nullable(),
+  countryCode: z.string().nullable(),
   workplace: z.string(),
   employmentType: z.string(),
   tagSource: z.string().nullable(),
@@ -47,6 +48,18 @@ const boardRowSchema = z.object({
 });
 
 const postingsResponseSchema = z.object({ postings: z.array(postingRowSchema) });
+
+const postingTagsResponseSchema = z.object({
+  postingTags: z.array(
+    z.object({
+      postingId: z.string(),
+      dimension: z.string(),
+      value: z.string(),
+      source: z.string(),
+    }),
+  ),
+});
+
 const boardsResponseSchema = z.object({ boards: z.array(boardRowSchema) });
 const clockResponseSchema = z.object({ now: z.number() });
 const companyCreatedSchema = z.object({ id: z.string() });
@@ -62,6 +75,7 @@ export interface PostingRow {
   titleNorm: string;
   department: string | null;
   locationRaw: string | null;
+  countryCode: string | null;
   workplace: string;
   employmentType: string;
   tagSource: string | null;
@@ -70,6 +84,13 @@ export interface PostingRow {
   missingPolls: number;
   dedupeKey: string;
   lastSeenAt: number;
+}
+
+export interface PostingTagRow {
+  postingId: string;
+  dimension: string;
+  value: string;
+  source: string;
 }
 
 export interface BoardRow {
@@ -103,12 +124,14 @@ export type BoardSpec = z.input<typeof boardSpecSchema>;
 export interface CatalogHarness {
   app: AppServer;
   fixture: FeedFixtureServer;
+  databasePath: string;
   companyId: string;
   boardIds: Record<string, string>;
   runBackfillCycle: () => Promise<void>;
   runOneJob: (kind: string) => Promise<string>;
   pollThroughScheduledSweep: (clockOffsetMs: number) => Promise<void>;
   postings: () => Promise<PostingRow[]>;
+  postingTags: () => Promise<PostingTagRow[]>;
   boards: () => Promise<BoardRow[]>;
   clockNow: () => Promise<number>;
   close: () => Promise<void>;
@@ -312,6 +335,12 @@ export async function startCatalogHarness(
     return postingsResponseSchema.parse(await response.json()).postings;
   }
 
+  async function postingTags() {
+    const response = await fetch(`${app.url}/__test__/catalog/posting-tags`);
+
+    return postingTagsResponseSchema.parse(await response.json()).postingTags;
+  }
+
   async function boards() {
     const response = await fetch(`${app.url}/__test__/catalog/boards`);
 
@@ -321,12 +350,14 @@ export async function startCatalogHarness(
   return {
     app,
     fixture,
+    databasePath,
     companyId: company.id,
     boardIds,
     runBackfillCycle,
     runOneJob,
     pollThroughScheduledSweep,
     postings,
+    postingTags,
     boards,
     clockNow,
     close: async () => {
