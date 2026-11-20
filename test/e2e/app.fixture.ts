@@ -1,31 +1,73 @@
-import { mkdtempSync, copyFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { test as base } from "@playwright/test";
+import { request as apiRequest, test as base } from "@playwright/test";
+
+import type { BrowserContext } from "@playwright/test";
 
 import type { AppServer } from "./app-server.ts";
+import type { IdentityServer } from "./identity-server-test.fixture.ts";
 
+import { authTestIdentity } from "./auth.fixture.ts";
 import { startAppServer } from "./app-server.ts";
+import { latestMailLink, requestMagicLink } from "./sign-in.ts";
+import { startIdentityServer } from "./identity-server-test.fixture.ts";
+
+type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
 
 interface TestFixtures {
   appServerUrl: string;
   appServer: AppServer;
+  identityServer: IdentityServer;
+  isolatedAppServer: AppServer;
+  ownerStorageState: StorageState;
 }
 
 interface WorkerFixtures {
   _appServerWorker: AppServer;
+  _identityServerWorker: IdentityServer;
+  _ownerStorageStateWorker: StorageState;
+}
+
+function authEnv(identityServer: IdentityServer) {
+  return {
+    BETTER_AUTH_SECRET: authTestIdentity.secret,
+    OWNER_EMAIL: authTestIdentity.ownerEmail,
+    TURNSTILE_SITE_KEY: authTestIdentity.turnstileSiteKey,
+    TURNSTILE_SECRET: "1x0000000000000000000000000000000AA",
+    GOOGLE_CLIENT_ID: "e2e-google-client-id",
+    GOOGLE_CLIENT_SECRET: "e2e-google-client-secret",
+    LINKEDIN_CLIENT_ID: "e2e-linkedin-client-id",
+    LINKEDIN_CLIENT_SECRET: "e2e-linkedin-client-secret",
+    OAUTH_GOOGLE_DISCOVERY_URL: `${identityServer.url}/.well-known/openid-configuration`,
+    OAUTH_LINKEDIN_DISCOVERY_URL: `${identityServer.url}/.well-known/openid-configuration`,
+    AUTH_ALLOWED_HOSTS: "127.0.0.1,localhost",
+  };
+}
+
+async function startFreshAppServer(identityServer: IdentityServer) {
+  const directory = mkdtempSync(join(tmpdir(), "overture-e2e-"));
+  const databasePath = join(directory, "overture.db");
+
+  copyFileSync(join(process.cwd(), "test/e2e/.tmp/template.db"), databasePath);
+
+  return startAppServer(databasePath, authEnv(identityServer));
 }
 
 export const test = base.extend<TestFixtures, WorkerFixtures>({
+  _identityServerWorker: [
+    async ({ browser: _browser }, provide) => {
+      const server = await startIdentityServer();
+
+      await provide(server);
+      await server.stop();
+    },
+    { scope: "worker" },
+  ],
   _appServerWorker: [
-    async ({ browserName: _browserName }, provide) => {
-      const directory = mkdtempSync(join(tmpdir(), "overture-e2e-"));
-      const databasePath = join(directory, "overture.db");
-
-      copyFileSync(join(process.cwd(), "test/e2e/.tmp/template.db"), databasePath);
-
-      const server = await startAppServer(databasePath);
+    async ({ _identityServerWorker }, provide) => {
+      const server = await startFreshAppServer(_identityServerWorker);
 
       await provide(server);
       await server.stop();
@@ -38,6 +80,35 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   appServerUrl: async ({ _appServerWorker }, provide) => {
     await provide(_appServerWorker.url);
   },
+  identityServer: async ({ _identityServerWorker }, provide) => {
+    await provide(_identityServerWorker);
+  },
+  isolatedAppServer: async ({ _identityServerWorker }, provide) => {
+    const server = await startFreshAppServer(_identityServerWorker);
+
+    await provide(server);
+    await server.stop();
+  },
+  ownerStorageState: async ({ _ownerStorageStateWorker }, provide) => {
+    await provide(_ownerStorageStateWorker);
+  },
+  _ownerStorageStateWorker: [
+    async ({ _appServerWorker }, provide) => {
+      const context = await apiRequest.newContext();
+
+      await requestMagicLink(_appServerWorker.url, context, authTestIdentity.ownerEmail);
+
+      const link = await latestMailLink(_appServerWorker.url, context, authTestIdentity.ownerEmail);
+
+      await context.get(link);
+
+      const storage = await context.storageState();
+
+      await context.dispose();
+      await provide(storage);
+    },
+    { scope: "worker" },
+  ],
 });
 
 export { expect } from "@playwright/test";

@@ -9,17 +9,21 @@ import type { JobHandlers } from "../platform/jobs/run-due.ts";
 import type { AdjustableClock } from "../platform/ports/clock.ts";
 
 import {
+  accounts,
   bgJobs,
   companies,
   companyBoards,
   postingTags,
   postings,
+  sessions,
   tagImports,
+  users,
 } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
+import { clearSinkMail, listSinkMail } from "../platform/mail/sink.ts";
 import { getTestSpans, resetTestSpans } from "../platform/telemetry/otel.ts";
 import { releaseBlockingJobs } from "../testing/blocking-job.ts";
 import { readCompaniesParquet } from "../catalog/companies-parquet.ts";
@@ -278,6 +282,47 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
     });
 
     return context.json(summary);
+  });
+
+  routes.get("/mail", (context) => {
+    const messages = listSinkMail().map((sent) => ({
+      id: sent.id,
+      to: sent.to,
+      from: sent.from,
+      subject: sent.subject,
+      body: sent.body,
+      sentAt: sent.sentAt,
+    }));
+
+    return context.json({ messages });
+  });
+
+  routes.post("/mail/clear", (context) => {
+    clearSinkMail();
+
+    return context.json({ ok: true });
+  });
+
+  routes.get("/auth/state", (context) => {
+    const allUsers = db.select().from(users).all();
+    const allAccounts = db.select().from(accounts).all();
+    const allSessions = db.select().from(sessions).all();
+
+    return context.json({
+      users: allUsers,
+      accounts: allAccounts.map((account) => ({
+        id: account.id,
+        userId: account.userId,
+        providerId: account.providerId,
+        accountId: account.accountId,
+      })),
+      sessions: allSessions.map((session) => ({
+        id: session.id,
+        userId: session.userId,
+        token: session.token,
+        expiresAt: session.expiresAt,
+      })),
+    });
   });
 
   return routes;

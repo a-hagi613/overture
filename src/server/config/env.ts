@@ -13,6 +13,28 @@ const envSchema = z.object({
   GREENHOUSE_FEED_BASE_URL: z.string().min(1).optional(),
   LEVER_FEED_BASE_URL: z.string().min(1).optional(),
   ASHBY_FEED_BASE_URL: z.string().min(1).optional(),
+  APP_ORIGIN: z.url().optional(),
+  AUTH_ALLOWED_HOSTS: z
+    .string()
+    .min(1)
+    .transform((value) =>
+      value
+        .split(",")
+        .map((host) => host.trim())
+        .filter((host) => host.length > 0),
+    )
+    .optional(),
+  BETTER_AUTH_SECRET: z.string().min(16),
+  OWNER_EMAIL: z.email(),
+  TURNSTILE_SITE_KEY: z.string().min(1),
+  TURNSTILE_SECRET: z.string().min(1),
+  GOOGLE_CLIENT_ID: z.string().min(1),
+  GOOGLE_CLIENT_SECRET: z.string().min(1),
+  LINKEDIN_CLIENT_ID: z.string().min(1),
+  LINKEDIN_CLIENT_SECRET: z.string().min(1),
+  OAUTH_GOOGLE_DISCOVERY_URL: z.url().optional(),
+  OAUTH_LINKEDIN_DISCOVERY_URL: z.url().optional(),
+  MAIL_FROM: z.email().default("no-reply@tryoverture.com"),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
   OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
   OTEL_DEBUG: booleanFromString.default(false),

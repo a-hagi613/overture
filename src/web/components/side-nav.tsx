@@ -1,0 +1,40 @@
+import { NavLink } from "react-router";
+
+import { copy } from "../../shared/copy.ts";
+import { NavGlyph } from "./nav-glyph.tsx";
+
+const destinations = [
+  { glyph: "home", to: "/" },
+  { glyph: "board", to: "/board" },
+  { glyph: "review", to: "/review" },
+  { glyph: "inbox", to: "/inbox" },
+  { glyph: "profile", to: "/profile" },
+] as const;
+
+export function SideNav({ showLabels }: { showLabels: boolean }) {
+  return (
+    <nav aria-label={copy.nav.label} className="flex w-full flex-col gap-[3px]">
+      {destinations.map((destination) => (
+        <NavLink key={destination.to} to={destination.to} end={destination.to === "/"}>
+          {({ isActive }) => (
+            <span
+              className={`relative flex min-h-10 items-center gap-3 rounded-md border px-3 text-sm font-medium ${
+                isActive
+                  ? "border-border bg-card text-foreground shadow-sh"
+                  : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+              } ${showLabels ? "" : "justify-center"}`}
+            >
+              {isActive ? (
+                <span className="absolute -left-px bottom-[9px] top-[9px] w-[3px] rounded-[2px] bg-signal" />
+              ) : null}
+              <NavGlyph name={destination.glyph} />
+              {showLabels ? (
+                <span className="whitespace-nowrap">{copy.nav[destination.glyph]}</span>
+              ) : null}
+            </span>
+          )}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}

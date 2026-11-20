@@ -5,19 +5,32 @@ import { createBrowserRouter, RouterProvider } from "react-router";
 
 import { copy } from "../shared/copy.ts";
 import { AppShell } from "./app.tsx";
+import { BoardPage } from "./routes/board.tsx";
 import { HomePage } from "./routes/home.tsx";
+import { InboxPage } from "./routes/inbox.tsx";
 import { NotFoundPage } from "./routes/not-found.tsx";
+import { ProfilePage } from "./routes/profile.tsx";
+import { ReviewPage } from "./routes/review.tsx";
 import { SearchPage } from "./routes/search.tsx";
+import { SettingsPage } from "./routes/settings.tsx";
+import { SignInPage } from "./routes/signin.tsx";
+import { ThemeProvider } from "./lib/theme.tsx";
 
 const router = createBrowserRouter([
   {
     element: <AppShell />,
     children: [
       { path: "/", element: <HomePage /> },
+      { path: "/board", element: <BoardPage /> },
+      { path: "/review", element: <ReviewPage /> },
+      { path: "/inbox", element: <InboxPage /> },
+      { path: "/profile", element: <ProfilePage /> },
       { path: "/search", element: <SearchPage /> },
+      { path: "/settings", element: <SettingsPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },
+  { path: "/signin", element: <SignInPage /> },
 ]);
 
 const queryClient = new QueryClient();
@@ -30,7 +43,9 @@ if (rootElement === null) {
 createRoot(rootElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <ThemeProvider>
+        <RouterProvider router={router} />
+      </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

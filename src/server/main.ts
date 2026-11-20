@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 import { createApp } from "./app.ts";
+import { createAuth } from "./auth/index.ts";
 import { databasePath, env } from "./config/env.ts";
+import { createMailSender } from "./platform/mail/index.ts";
 import { openDatabase } from "./platform/db/client.ts";
 import { migrateDatabase } from "./platform/db/migrate.ts";
 import { createClock } from "./platform/ports/clock.ts";
@@ -52,6 +54,8 @@ if (env.ENABLE_TEST_ROUTES) {
 
 const clock = createClock();
 const shutdownController = new AbortController();
+const mailSender = createMailSender(clock);
+const auth = createAuth(db, mailSender);
 
 recoverStaleLocks(db, clock);
 
@@ -149,6 +153,7 @@ const app = createApp({
     ...llmJobHandlers,
     ...testJobHandlers,
   },
+  auth,
 });
 
 const server = Bun.serve({ port: env.PORT, fetch: app.fetch });
