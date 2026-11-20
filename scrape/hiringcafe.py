@@ -798,6 +798,15 @@ def stats() -> None:
                          GROUP BY department ORDER BY n DESC LIMIT 8""").fetchall()
     if dep:
         print("top departments " + ", ".join(f"{r[0]} ({r[1]})" for r in dep))
+    print("by ATS source   (total / described / pending)")
+    for src, tot, dsc, pen in con.execute("""
+            SELECT COALESCE(j.source,'?'),
+                   COUNT(*),
+                   SUM(d.status='done'),
+                   SUM(d.status='pending')
+            FROM jobs j JOIN descriptions d ON d.job_id=j.object_id
+            GROUP BY j.source ORDER BY COUNT(*) DESC"""):
+        print(f"  {src:18s} {tot:6,d}  {dsc or 0:6,d}  {pen or 0:6,d}")
 
 
 # --------------------------------------------------------------------- export

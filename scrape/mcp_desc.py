@@ -126,8 +126,16 @@ def md_to_text(md: str) -> str:
     return t.strip()
 
 
-def queue(con: sqlite3.Connection, priority: str, limit: int | None) -> list[tuple[str, str]]:
+def queue(con: sqlite3.Connection, priority: str, limit: int | None,
+          sources: str | None = None) -> list[tuple[str, str]]:
+    # Sources whose apply forms work without a sign-in: Overture can auto-apply
+    # only to these, so their descriptions/copy are what the app consumes first.
     where = "d.status='pending' AND j.requisition_id IS NOT NULL"
+    args: list = []
+    if sources:
+        vals = [s.strip() for s in sources.split(",") if s.strip()]
+        where += f" AND j.source IN ({','.join('?' * len(vals))})"
+        args.extend(vals)
     if priority == "se":
         like = " OR ".join("lower(j.title) LIKE ?" for _ in SE_TITLE)
         depts = ",".join("?" * len(SE_DEPTS))
@@ -135,12 +143,11 @@ def queue(con: sqlite3.Connection, priority: str, limit: int | None) -> list[tup
                    JOIN jobs j ON j.object_id=d.job_id
                    WHERE {where} AND (j.department IN ({depts}) OR {like})
                    ORDER BY j.published_at DESC""")
-        args: list = [*SE_DEPTS, *[f"%{w}%" for w in SE_TITLE]]
+        args.extend([*SE_DEPTS, *[f"%{w}%" for w in SE_TITLE]])
     else:
         sql = (f"""SELECT d.job_id, j.requisition_id FROM descriptions d
                    JOIN jobs j ON j.object_id=d.job_id
                    WHERE {where} ORDER BY j.published_at DESC""")
-        args = []
     if limit:
         sql += f" LIMIT {int(limit)}"
     return con.execute(sql, args).fetchall()
@@ -155,6 +162,9 @@ def main() -> None:
                     help="global request rate cap (default 1.5/s)")
     ap.add_argument("--priority", choices=["se", "recent"], default="recent")
     ap.add_argument("--all", action="store_true", help="every pending description")
+    ap.add_argument("--sources", default=None,
+                    help="comma-separated ATS sources to restrict to "
+                         "(e.g. grnhse,lever,ashby); default: all sources")
     a = ap.parse_args()
 
     global RATE
@@ -167,7 +177,7 @@ def main() -> None:
         con.execute("ALTER TABLE descriptions ADD COLUMN markdown TEXT")
         con.commit()
 
-    rows = queue(con, a.priority, None if a.all else a.limit)
+    rows = queue(con, a.priority, None if a.all else a.limit, a.sources)
     log(f"{len(rows):,} descriptions queued (priority={a.priority}, workers={a.workers})")
     if not rows:
         return

@@ -23,8 +23,10 @@ echo "[chain $(date +%H:%M:%S)] full-month enumeration"
 $PY -u scrape/hiringcafe.py enumerate --from 2026-10-20 --to 2026-11-20 \
     --rps 0.8 --window 80 --window-s 600 >> data/enumerate.log 2>&1
 
-echo "[chain $(date +%H:%M:%S)] description mop-up (newly enumerated jobs)"
-$PY -u scrape/mcp_desc.py --all --rps 1.5 --workers 4 >> data/mcp_desc.log 2>&1
+echo "[chain $(date +%H:%M:%S)] description mop-up (no-sign-in ATS sources only)"
+$PY -u scrape/mcp_desc.py --all --rps 1.5 --workers 4 --sources \
+	grnhse,lever,eu_lever,ashby,bamboohr,smartrecruiters,workable,recruitee,jazzhr,rippling,teamtailor,breezy,jobvite,pinpoint \
+	>> data/mcp_desc.log 2>&1
 
 echo "[chain $(date +%H:%M:%S)] installing hourly sync timer"
 mkdir -p ~/.config/systemd/user
