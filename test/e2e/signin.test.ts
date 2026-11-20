@@ -178,14 +178,14 @@ test("the bot check is required on the auth endpoints", async ({ request, isolat
     headers: { origin: appServerUrl },
   });
 
-  expect(magicLink.status()).toBe(400);
+  expect(magicLink.status()).toBe(403);
 
   const social = await request.post(`${appServerUrl}/api/auth/sign-in/social`, {
     data: { provider: "google", callbackURL: "/signin" },
     headers: { origin: appServerUrl },
   });
 
-  expect(social.status()).toBe(400);
+  expect(social.status()).toBe(403);
 
   expect(await sinkMailCount(appServerUrl, request)).toBe(0);
   expect((await verifyAuthState(appServerUrl, request)).users).toEqual([]);

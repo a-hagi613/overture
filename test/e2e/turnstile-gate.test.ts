@@ -1,5 +1,11 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawn } from "node:child_process";
+
 import { authTestIdentity } from "./auth.fixture.ts";
-import { expect, test } from "./app.fixture.ts";
+import { expect, test, test as appTest } from "./app.fixture.ts";
+import { serverEnvironment } from "./app-server.ts";
 import { requestMagicLink, setTurnstileScenario, sinkMailCount } from "./sign-in.ts";
 
 test("a token issued for another action is refused before any mail is sent", async ({
@@ -112,4 +118,35 @@ test("a valid token for the surface's action still sends the sign-in link", asyn
 
   expect(response.status()).toBe(200);
   expect(await sinkMailCount(isolatedAppServer.url, request)).toBe(1);
+});
+
+appTest("production refuses to boot when the Turnstile allowlist names localhost", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "overture-e2e-turnstile-"));
+
+  const child = spawn("bun", ["run", "src/server/main.ts"], {
+    env: {
+      ...serverEnvironment({
+        NODE_ENV: "production",
+        APP_ORIGIN: "https://tryoverture.com",
+        TURNSTILE_HOSTNAMES: "tryoverture.com,localhost",
+      }),
+      DATABASE_URL: join(directory, "overture.db"),
+    },
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+
+  const outcome = await new Promise<{ code: number | null; stderr: string }>((resolve) => {
+    let stderr = "";
+
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    child.once("exit", (code) => {
+      resolve({ code, stderr });
+    });
+  });
+
+  expect(outcome.code).not.toBe(0);
+  expect(outcome.stderr).toContain("TURNSTILE_HOSTNAMES must not include localhost in production.");
 });
