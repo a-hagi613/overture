@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
@@ -13,6 +15,7 @@ import {
   grantApplications,
   ownerContextFor,
   runMatchFill,
+  seedApplication,
   seedBoard,
   seedCompany,
   seedPosting,
@@ -179,6 +182,7 @@ test("opening a posting scores it once, and manual apply works below the thresho
     atsJobId: "strong",
     boardId: strongBoard,
     companyId: strongCompany,
+    descriptionText: "We build distributed systems on Kubernetes and Postgres for payments teams.",
     title: "Data Backend Engineer",
     url: "https://strong.example/1",
   });
@@ -202,6 +206,9 @@ test("opening a posting scores it once, and manual apply works below the thresho
   expect(strongPosting.reason).toContain("pipelines");
   expect(strongPosting.applicationId).toBeNull();
   expect(matching.anthropic.requests()).toHaveLength(1);
+  expect(matching.anthropic.requests().at(0)?.user).toContain(
+    "distributed systems on Kubernetes and Postgres",
+  );
 
   const weakFirst = postingSchema.parse(await (await owner.get(`/api/postings/${weak}`)).json());
 
@@ -228,9 +235,9 @@ test("opening a posting scores it once, and manual apply works below the thresho
   await owner.put("/api/profile/targets", {
     data: {
       roles: ["Backend"],
-      seniorities: ["staff"],
+      seniorities: ["senior"],
       workplaces: ["remote"],
-      locations: ["Toronto, ON"],
+      locations: ["Toronto, ON", "Vancouver, BC"],
       employmentTypes: ["full_time"],
       salaryFloorMinor: 10_000_000,
       salaryCurrency: "CAD",
@@ -284,6 +291,143 @@ test("an application is created only for a score at or above the threshold", asy
   expect(matches.filter((row) => row.score !== null)).toHaveLength(3);
   expect(applications).toHaveLength(1);
   expect(applications.at(0)?.postingId).toBe(seeded.at(0)?.id);
+
+  await owner.dispose();
+});
+
+test("manual Apply refuses every hard filter and scores only what it may apply to", async ({
+  matching,
+}) => {
+  const { owner, userId } = await ownerContextFor(matching.server.url);
+
+  await clearCatalog(owner);
+  await grantApplications(owner, 70);
+  await configureMatching(owner);
+
+  const upload = await owner.post("/api/profile/resume", {
+    multipart: {
+      file: {
+        buffer: Buffer.from(readFileSync("test/e2e/fixtures/resume-text.pdf")),
+        mimeType: "application/pdf",
+        name: "resume.pdf",
+      },
+    },
+  });
+
+  expect(upload.status()).toBe(201);
+
+  await owner.put("/api/profile/skip-companies", {
+    data: { companies: [{ domain: "fenwick.example", name: "Fenwick & Marsh" }] },
+  });
+
+  const now = await clockNow(owner);
+
+  async function companyWithPostings(company: string, titles: string[]) {
+    const companyId = await seedCompany(
+      owner,
+      company,
+      `${company.toLowerCase().replaceAll(" ", "-").replaceAll("&", "and")}.example`,
+    );
+
+    const boardId = await seedBoard(
+      owner,
+      companyId,
+      "greenhouse",
+      company.toLowerCase().replaceAll(" ", "-").replaceAll("&", "and"),
+    );
+
+    return Promise.all(
+      titles.map(async (title, index) =>
+        seedPosting(owner, {
+          atsJobId: `${company}-${String(index)}`,
+          boardId,
+          companyId,
+          title,
+          url: `https://example.test/${company}/${String(index)}`,
+        }),
+      ),
+    );
+  }
+
+  const skipped = await companyWithPostings("Fenwick & Marsh", ["Senior Backend Engineer"]);
+  const employer = await companyWithPostings("Brightwave Analytics", ["Senior Backend Engineer"]);
+  const closed = await companyWithPostings("Closed Co", ["Senior Backend Engineer"]);
+
+  const repost = await companyWithPostings("Repost Co", [
+    "Repost Backend Engineer",
+    "Repost Backend Engineer",
+  ]);
+
+  const openCompany = await companyWithPostings("Open Co", [
+    "Backend Engineer",
+    "Platform Backend Engineer",
+  ]);
+
+  const cooldown = await companyWithPostings("Cooldown Co", [
+    "Staff Backend Engineer",
+    "Data Backend Engineer",
+  ]);
+
+  const allowed = await companyWithPostings("Allowed Co", ["Junior Backend Engineer"]);
+
+  await owner.post("/__test__/catalog/postings/close", { data: { id: closed[0] } });
+
+  await seedApplication(owner, {
+    postingId: repost[0] ?? "",
+    sentAt: now - 20 * 86_400_000,
+    status: "sent",
+    userId,
+  });
+  await seedApplication(owner, { postingId: openCompany[1] ?? "", status: "preparing", userId });
+  await seedApplication(owner, {
+    postingId: cooldown[1] ?? "",
+    sentAt: now - 3 * 86_400_000,
+    status: "sent",
+    userId,
+  });
+
+  const refusals: { id: string; reason: string }[] = [
+    { id: skipped[0] ?? "", reason: "skip_list" },
+    { id: employer[0] ?? "", reason: "current_employer" },
+    { id: closed[0] ?? "", reason: "closed" },
+    { id: repost[1] ?? "", reason: "repost_guard" },
+    { id: openCompany[0] ?? "", reason: "open_application_company" },
+    { id: cooldown[0] ?? "", reason: "company_cooldown" },
+  ];
+
+  await Promise.all(
+    refusals.map(async (refusal) => {
+      const response = await owner.post(`/api/postings/${refusal.id}/apply`, { data: {} });
+
+      expect(response.status()).toBe(409);
+      expect(
+        z.object({ error: z.literal("filtered"), reason: z.string() }).parse(await response.json())
+          .reason,
+      ).toBe(refusal.reason);
+    }),
+  );
+
+  expect(matching.anthropic.requests()).toHaveLength(0);
+
+  const skippedPosting = postingSchema.parse(
+    await (await owner.get(`/api/postings/${skipped[0] ?? ""}`)).json(),
+  );
+
+  expect(skippedPosting.score).toBeNull();
+  expect(skippedPosting.reason).toBeNull();
+  expect(matching.anthropic.requests()).toHaveLength(0);
+
+  const allowedResponse = await owner.post(`/api/postings/${allowed[0] ?? ""}/apply`, { data: {} });
+
+  expect(allowedResponse.status()).toBe(200);
+  expect(appliedSchema.parse(await allowedResponse.json()).created).toBe(true);
+  expect(matching.anthropic.requests()).toHaveLength(1);
+
+  const applications = await applicationsFor(owner, userId);
+  const refusedIds = new Set(refusals.map((refusal) => refusal.id));
+
+  expect(applications.some((row) => refusedIds.has(row.postingId))).toBe(false);
+  expect(applications.find((row) => row.postingId === allowed[0])?.origin).toBe("manual");
 
   await owner.dispose();
 });

@@ -38,7 +38,7 @@ function wordsOf(value: string) {
     .filter((word) => word.length > 0 && !STOP_WORDS.has(word));
 }
 
-function roleTargetMatches(target: string, tagValues: readonly string[]) {
+export function roleTargetMatches(target: string, tagValues: readonly string[]) {
   const targetWords = new Set(wordsOf(target));
 
   return tagValues.some((tag) => wordsOf(tag).some((word) => targetWords.has(word)));

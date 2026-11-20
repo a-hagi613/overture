@@ -87,6 +87,7 @@ export interface RecordedBatchRequest {
   model: string;
   cacheControl: string | null;
   outputFormatType: string;
+  user: string;
 }
 
 export interface RecordedSingleMessage {
@@ -313,6 +314,7 @@ export async function startAnthropicFixtureServer() {
         model: batchRequest.params.model,
         cacheControl: batchRequest.params.system.at(0)?.cache_control?.type ?? null,
         outputFormatType: batchRequest.params.output_config.format.type,
+        user: userContent,
       });
 
       items.push({ customId: batchRequest.custom_id, recording });

@@ -184,6 +184,8 @@ const fxRateBody = z.object({
 
 const userQuery = z.object({ userId: z.string().min(1) });
 
+const closePostingBody = z.object({ id: z.string().min(1) });
+
 const createUserBody = z.object({ email: z.email(), name: z.string().min(1) });
 
 type PostingWriter = AppDatabase | Parameters<Parameters<AppDatabase["transaction"]>[0]>[0];
@@ -430,6 +432,14 @@ export function createTestRoutes(
     });
 
     return context.json({ created: rows.length });
+  });
+
+  routes.post("/catalog/postings/close", zValidator("json", closePostingBody), (context) => {
+    const { id } = context.req.valid("json");
+
+    db.update(postings).set({ closedAt: clock.now() }).where(eq(postings.id, id)).run();
+
+    return context.json({ id, closed: true });
   });
 
   routes.post("/catalog/postings/close-all", (context) => {

@@ -79,6 +79,10 @@ export function createMatchingRoutes(deps: {
       return context.json({ error: "not found" }, 404);
     }
 
+    if ("refused" in applied) {
+      return context.json({ error: "filtered", reason: applied.refused }, 409);
+    }
+
     return context.json(applied);
   });
 

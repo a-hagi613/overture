@@ -124,6 +124,7 @@ export async function seedPosting(
     salaryCurrency?: string | null;
     salaryPeriod?: "year" | "month" | "hour" | null;
     postedAt?: number | null;
+    descriptionText?: string | null;
     tags?: { dimension: "role" | "subrole" | "seniority"; value: string }[];
   },
 ) {

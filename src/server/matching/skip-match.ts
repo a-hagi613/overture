@@ -6,6 +6,7 @@ export interface SkipTarget {
   companyId: string | null;
   nameNorm: string;
   domain: string | null;
+  reason: "current_employer" | "user";
 }
 
 export interface CompanyIdentity {
@@ -76,6 +77,7 @@ export function bigramSimilarity(left: string, right: string) {
 export interface SkipMatch {
   matched: boolean;
   near: boolean;
+  reason: "current_employer" | "user" | null;
 }
 
 export function skipMatches(company: CompanyIdentity, skips: readonly SkipTarget[]) {
@@ -83,12 +85,14 @@ export function skipMatches(company: CompanyIdentity, skips: readonly SkipTarget
   const companyDomain = registrableDomain(company.domain);
 
   for (const skip of skips) {
+    const matched = { matched: true, near: false, reason: skip.reason } satisfies SkipMatch;
+
     if (skip.companyId !== null && skip.companyId === company.id) {
-      return { matched: true, near: false };
+      return matched;
     }
 
     if (skip.nameNorm === companyNorm) {
-      return { matched: true, near: false };
+      return matched;
     }
 
     if (
@@ -96,7 +100,7 @@ export function skipMatches(company: CompanyIdentity, skips: readonly SkipTarget
       companyNorm !== "" &&
       bigramSimilarity(skip.nameNorm, companyNorm) >= NEAR_MATCH_THRESHOLD
     ) {
-      return { matched: true, near: true };
+      return { ...matched, near: true };
     }
 
     const skipDomain = registrableDomain(skip.domain);
@@ -107,14 +111,14 @@ export function skipMatches(company: CompanyIdentity, skips: readonly SkipTarget
         companyDomain.endsWith(`.${skipDomain}`) ||
         skipDomain.endsWith(`.${companyDomain}`)
       ) {
-        return { matched: true, near: false };
+        return matched;
       }
 
       if (bigramSimilarity(skipDomain, companyDomain) >= NEAR_MATCH_THRESHOLD) {
-        return { matched: true, near: true };
+        return { ...matched, near: true };
       }
     }
   }
 
-  return { matched: false, near: false };
+  return { matched: false, near: false, reason: null };
 }

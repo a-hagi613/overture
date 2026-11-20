@@ -1,3 +1,5 @@
+import { gunzipSync } from "node:zlib";
+
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
@@ -34,6 +36,7 @@ export const SCORE_PURPOSE = "score";
 const CHUNK_SIZE = 5;
 const RESUME_DIGEST_CHARS = 1500;
 const SUMMARY_WORDS = 200;
+const SUMMARY_CHARS = 2000;
 
 const OUTPUT_SCHEMA: LlmOutputSchema = {
   type: "object",
@@ -111,6 +114,18 @@ function localDayStart(at: number, timeZone: string) {
 
 function truncateReason(reason: string) {
   return reason.trim().slice(0, 140);
+}
+
+function descriptionText(descriptionGz: Buffer | null) {
+  if (descriptionGz === null) {
+    return "";
+  }
+
+  try {
+    return gunzipSync(descriptionGz).toString("utf8");
+  } catch {
+    return "";
+  }
 }
 
 function scoreRequest(input: {
@@ -328,7 +343,11 @@ export function createMatchingService(deps: MatchDeps) {
       return cached;
     }
 
-    const summary = row.descriptionGz === null ? "" : row.descriptionGz.toString("utf8");
+    const summary = descriptionText(row.descriptionGz)
+      .split(/\s+/u)
+      .slice(0, SUMMARY_WORDS)
+      .join(" ")
+      .slice(0, SUMMARY_CHARS);
 
     const salary =
       row.salaryMinMinor === null || row.salaryCurrency === null
@@ -345,7 +364,7 @@ export function createMatchingService(deps: MatchDeps) {
         employmentType: row.employmentType,
         salary,
         tags: "",
-        summary: summary.split(/\s+/u).slice(0, SUMMARY_WORDS).join(" "),
+        summary,
         resumeDigest: context.resumeDigest,
       }),
     ];
@@ -363,6 +382,14 @@ export function createMatchingService(deps: MatchDeps) {
   }
 
   async function scoreOnOpen(userId: string, postingId: string) {
+    const refused = await candidates.check(userId, postingId);
+
+    if (refused !== null) {
+      const existing = applicationFor(db, userId, postingId);
+
+      return { applicationId: existing?.id ?? null, reason: null, score: null };
+    }
+
     const scored = await scorePosting(userId, postingId);
 
     if (scored === null) {
@@ -379,6 +406,12 @@ export function createMatchingService(deps: MatchDeps) {
 
     if (existing !== undefined) {
       return { applicationId: existing.id, created: false };
+    }
+
+    const refused = await candidates.check(userId, postingId);
+
+    if (refused !== null) {
+      return { refused };
     }
 
     const scored = await scorePosting(userId, postingId);
