@@ -136,8 +136,10 @@ jobs:
           curl -fsSLo "/tmp/$litestream_asset" "https://github.com/benbjohnson/litestream/releases/download/v0.5.18/$litestream_asset"
           curl -fsSLo /tmp/checksums.txt https://github.com/benbjohnson/litestream/releases/download/v0.5.18/checksums.txt
           grep " $litestream_asset\$" /tmp/checksums.txt | (cd /tmp && sha256sum -c -)
-          tar -xzf "/tmp/$litestream_asset" -C /usr/local/bin litestream
-          litestream version
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf "/tmp/$litestream_asset" -C "$HOME/.local/bin" litestream
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/litestream" version
       - name: Run this shard
         run: |
           files=$(bun run scripts/e2e-ci.ts shard --plan e2e-plan.json --shard "${{ matrix.shard }}")
