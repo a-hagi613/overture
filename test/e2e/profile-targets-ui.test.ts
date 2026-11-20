@@ -240,6 +240,7 @@ test("posting languages and the time zone save from Settings", async ({
   );
 
   await timezone.selectOption("America/Toronto");
+  await expect(timezone).toHaveValue("America/Toronto");
 
   await expect
     .poll(
@@ -266,7 +267,7 @@ test("posting languages and the time zone save from Settings", async ({
   expect(both.languages.toSorted()).toEqual(["en", "fr"]);
 
   await page.reload();
-  await expect(page.getByLabel("Time zone")).toHaveValue("America/Vancouver");
+  await expect(page.getByLabel("Time zone")).toHaveValue("America/Toronto");
 
   await context.close();
   await request.dispose();
