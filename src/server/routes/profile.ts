@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -158,16 +159,16 @@ export function createProfileRoutes(deps: {
     return context.json({ languages: await languagesService.read(account.id) });
   });
 
-  routes.put("/profile/languages", async (context) => {
+  routes.put("/profile/languages", zValidator("json", languagesInputSchema), async (context) => {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
       return context.json({ error: "unauthorised" }, 401);
     }
 
-    const body = languagesInputSchema.parse(await context.req.json());
-
-    return context.json({ languages: await languagesService.save(account.id, body) });
+    return context.json({
+      languages: await languagesService.save(account.id, context.req.valid("json")),
+    });
   });
 
   routes.get("/profile/targets", async (context) => {
@@ -186,15 +187,14 @@ export function createProfileRoutes(deps: {
     });
   });
 
-  routes.put("/profile/targets", async (context) => {
+  routes.put("/profile/targets", zValidator("json", targetsInputSchema), async (context) => {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
       return context.json({ error: "unauthorised" }, 401);
     }
 
-    const body = targetsInputSchema.parse(await context.req.json());
-    const saved = await targetsService.save(account.id, body);
+    const saved = await targetsService.save(account.id, context.req.valid("json"));
     const languages = await languagesService.read(account.id);
 
     return context.json({
@@ -203,18 +203,23 @@ export function createProfileRoutes(deps: {
     });
   });
 
-  routes.post("/profile/targets/match-count", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+  routes.post(
+    "/profile/targets/match-count",
+    zValidator("json", targetsInputSchema),
+    async (context) => {
+      const account = await sessionUser(auth, context.req.raw);
 
-    if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
-    }
+      if (account === null) {
+        return context.json({ error: "unauthorised" }, 401);
+      }
 
-    const body = targetsInputSchema.parse(await context.req.json());
-    const languages = await languagesService.read(account.id);
+      const languages = await languagesService.read(account.id);
 
-    return context.json({ matchedCount: countMatchingPostings(db, body, languages) });
-  });
+      return context.json({
+        matchedCount: countMatchingPostings(db, context.req.valid("json"), languages),
+      });
+    },
+  );
 
   routes.get("/profile/skip-companies", async (context) => {
     const account = await sessionUser(auth, context.req.raw);
@@ -226,19 +231,24 @@ export function createProfileRoutes(deps: {
     return context.json({ companies: await skipCompanyService.list(account.id) });
   });
 
-  routes.put("/profile/skip-companies", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+  routes.put(
+    "/profile/skip-companies",
+    zValidator("json", skipCompaniesInputSchema),
+    async (context) => {
+      const account = await sessionUser(auth, context.req.raw);
 
-    if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
-    }
+      if (account === null) {
+        return context.json({ error: "unauthorised" }, 401);
+      }
 
-    const body = skipCompaniesInputSchema.parse(await context.req.json());
-
-    return context.json({
-      companies: await skipCompanyService.replaceUserCompanies(account.id, body),
-    });
-  });
+      return context.json({
+        companies: await skipCompanyService.replaceUserCompanies(
+          account.id,
+          context.req.valid("json"),
+        ),
+      });
+    },
+  );
 
   return routes;
 }

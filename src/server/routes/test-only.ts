@@ -91,6 +91,11 @@ const userNameBody = z.object({ email: z.email(), name: z.string().min(1) });
 const lowercased = (value: string) => value.trim().toLowerCase();
 const roleBody = z.object({ userId: z.string().min(1), role: z.enum(["user", "owner"]) });
 
+const postingTagBody = z.object({
+  dimension: z.enum(["role", "subrole", "seniority"]),
+  value: z.string().min(1),
+});
+
 const createPostingBody = z.object({
   boardId: z.string().min(1),
   companyId: z.string().min(1),
@@ -100,6 +105,18 @@ const createPostingBody = z.object({
   title: z.string().min(1),
   sourceUpdatedAt: z.number().int().nullish(),
   descriptionText: z.string().nullish(),
+  workplace: z.enum(["remote", "hybrid", "onsite", "unknown"]).default("unknown"),
+  employmentType: z
+    .enum(["full_time", "part_time", "contract", "internship", "temporary", "unknown"])
+    .default("unknown"),
+  language: z.string().min(2).max(5).nullish(),
+  locationRaw: z.string().nullish(),
+  countryCode: z.string().length(2).nullish(),
+  region: z.string().nullish(),
+  city: z.string().nullish(),
+  salaryMinMinor: z.number().int().nonnegative().nullish(),
+  salaryCurrency: z.string().length(3).nullish(),
+  tags: z.array(postingTagBody).max(20).default([]),
 });
 
 const bulkPostingsBody = z.object({
@@ -135,11 +152,20 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
       applyUrlNorm: normalizeApplyUrl(row.url),
       title: row.title,
       titleNorm,
+      locationRaw: row.locationRaw ?? null,
+      countryCode: row.countryCode ?? null,
+      region: row.region ?? null,
+      city: row.city ?? null,
+      language: row.language ?? null,
+      workplace: row.workplace,
+      employmentType: row.employmentType,
+      salaryMinMinor: row.salaryMinMinor ?? null,
+      salaryCurrency: row.salaryCurrency ?? null,
       dedupeKey: dedupeKeyFor({
         companyId: row.companyId,
         titleNorm,
-        countryCode: null,
-        city: null,
+        countryCode: row.countryCode ?? null,
+        city: row.city ?? null,
       }),
       firstSeenAt: now,
       lastSeenAt: now,
@@ -150,6 +176,14 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
       closedAt: null,
     })
     .run();
+
+  for (const tag of row.tags) {
+    writer
+      .insert(postingTags)
+      .values({ postingId: id, dimension: tag.dimension, value: tag.value, source: "import" })
+      .onConflictDoNothing()
+      .run();
+  }
 
   return id;
 }
