@@ -33,13 +33,11 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    `fly volumes create data -a overture-web -r yyz -s 10`
 4. In Cloudflare, create an R2 bucket for backups named `overture-backups`, plus an R2 API token with
    Object Read & Write scoped to that bucket. Note the account ID, access key ID and secret access key.
-   The encrypted files bucket is a second R2 bucket named `overture-files`; it does not exist yet, so
-   `R2_BUCKET_FILES` is **required once set**: create the bucket and set it before the follow-up that adds
-   it to the Deploy secret check. Until then the app keeps using the disk object store on the volume.
+   The encrypted files bucket is a second R2 bucket named `overture-files`; `R2_BUCKET_FILES` is required
+   alongside the other R2 names. The bucket exists and the secret is set on `overture-web`.
 5. Set only the backup and app secrets on the app (values come from the previous step, never the repo):
-   `fly secrets set R2_ACCOUNT_ID=… R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… R2_BUCKET_BACKUPS=overture-backups -a overture-web`
-   Once the `overture-files` bucket exists, add `R2_BUCKET_FILES=overture-files` to that same command;
-   with it set the app stores encrypted resumes and mail in R2, and a half-set R2 files config (the
+   `fly secrets set R2_ACCOUNT_ID=… R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… R2_BUCKET_BACKUPS=overture-backups R2_BUCKET_FILES=overture-files -a overture-web`
+   With `R2_BUCKET_FILES` set the app stores encrypted resumes and mail in R2, and a half-set R2 files config (the
    bucket without the three credentials, or the credentials partly set) stops the server at boot.
    Sign-in (M1-06) adds `BETTER_AUTH_SECRET` (at least 16 random characters), `OWNER_EMAIL`,
    `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` (a Turnstile widget for `tryoverture.com`), and optionally `TURNSTILE_HOSTNAMES` (defaults to the `APP_ORIGIN` hostname; never localhost or 127.0.0.1 in production).
