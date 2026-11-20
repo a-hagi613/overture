@@ -52,13 +52,17 @@ for (const width of widths) {
 
           await openSignIn(page, theme, boardServer.url);
 
+          await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
+
           if (mode === "sign-up") {
             await page.getByRole("button", { name: "Create an account" }).click();
             await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
           }
 
           if (mode === "magic-sent") {
-            await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
+            await expect
+              .poll(() => page.locator('input[name="cf-turnstile-response"]').inputValue())
+              .not.toBe("");
             await page.getByRole("button", { name: "Email me a sign-in link" }).click();
             await expect(page.getByText("Link sent to")).toBeVisible();
           }

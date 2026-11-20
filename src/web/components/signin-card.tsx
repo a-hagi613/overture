@@ -81,15 +81,31 @@ export function SignInCard() {
     void check();
   }, [navigate, sentTo, siteKeyFromCallback]);
 
-  const consumedToken = () => consumeTurnstile() ?? "";
+  const confirmToken = () => {
+    const token = consumeTurnstile();
+
+    if (token === null) {
+      setActionError(copy.signIn.captchaMissing);
+
+      return null;
+    }
+
+    return token;
+  };
 
   const onSocial = async (provider: "google" | "linkedin") => {
+    const token = confirmToken();
+
+    if (token === null) {
+      return;
+    }
+
     const result = await authClient.signIn
       .social({
         provider,
         callbackURL: CALLBACK_URL,
         errorCallbackURL: CALLBACK_URL,
-        fetchOptions: { headers: { "x-captcha-response": consumedToken() } },
+        fetchOptions: { headers: { "x-captcha-response": token } },
       })
       .catch(() => null);
 
@@ -99,11 +115,17 @@ export function SignInCard() {
   };
 
   const onMagic = async () => {
+    const token = confirmToken();
+
+    if (token === null) {
+      return;
+    }
+
     const result = await authClient.signIn
       .magicLink({
         email,
         callbackURL: CALLBACK_URL,
-        fetchOptions: { headers: { "x-captcha-response": consumedToken() } },
+        fetchOptions: { headers: { "x-captcha-response": token } },
       })
       .catch(() => null);
 
@@ -138,7 +160,7 @@ export function SignInCard() {
     >
       <div className="mb-[22px] flex flex-col gap-1.5">
         <h1
-          className="font-serif text-[30px] leading-[1.05] tracking-[-0.012em] min-[961px]:text-[34px]"
+          className="font-serif font-serif-tight text-[30px] leading-[1.05] min-[961px]:text-[34px]"
           id="signin-heading"
         >
           {headline.title}
@@ -161,7 +183,7 @@ export function SignInCard() {
             </div>
           </div>
           <button
-            className="inline-flex min-h-[46px] w-full items-center justify-center rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold hover:bg-muted"
+            className="inline-flex min-h-[46px] w-full items-center justify-center rounded-[7px] border border-input bg-card px-[18px] text-[13.5px] font-semibold shadow-[0_1px_0_rgba(21,19,17,0.04)] [line-height:normal] hover:bg-muted"
             onClick={() => {
               void onMagic();
             }}
@@ -186,7 +208,7 @@ export function SignInCard() {
       ) : (
         <div>
           <button
-            className="inline-flex min-h-[46px] w-full items-center justify-center gap-2.5 rounded-md bg-foreground px-5 text-sm font-semibold text-card shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] hover:bg-btn-hover"
+            className="inline-flex min-h-[46px] w-full items-center justify-center gap-2.5 rounded-[7px] bg-foreground px-5 text-sm font-semibold text-card shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_1px_2px_rgba(0,0,0,0.08)] [line-height:normal] hover:bg-btn-hover"
             onClick={() => {
               void onSocial("google");
             }}
@@ -198,7 +220,7 @@ export function SignInCard() {
             {copy.signIn.google}
           </button>
           <button
-            className="mt-2.5 inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold hover:bg-muted"
+            className="mt-2.5 inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-[7px] border border-input bg-card px-[18px] text-[13.5px] font-semibold shadow-[0_1px_0_rgba(21,19,17,0.04)] [line-height:normal] hover:bg-muted"
             onClick={() => {
               void onSocial("linkedin");
             }}
@@ -226,14 +248,14 @@ export function SignInCard() {
           >
             <div>
               <label
-                className="mb-1 block text-[12.5px] leading-[18px] font-semibold"
+                className="mb-[6px] block text-[12.5px] font-semibold [line-height:normal]"
                 htmlFor="signin-email"
               >
                 {copy.signIn.emailLabel}
               </label>
               <input
                 autoComplete="email"
-                className="h-[46px] w-full rounded-md border border-input bg-card px-3.5 text-sm font-medium placeholder:text-muted-foreground"
+                className="h-[46px] w-full rounded-[7px] border border-input bg-card px-3.5 text-sm font-medium placeholder:text-muted-foreground"
                 id="signin-email"
                 onInput={(event) => {
                   setEmail(event.currentTarget.value);
@@ -244,14 +266,14 @@ export function SignInCard() {
               />
             </div>
             <button
-              className="inline-flex min-h-[46px] w-full items-center justify-center rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold hover:bg-muted"
+              className="inline-flex min-h-[46px] w-full items-center justify-center rounded-[7px] border border-input bg-card px-[18px] text-[13.5px] font-semibold shadow-[0_1px_0_rgba(21,19,17,0.04)] [line-height:normal] hover:bg-muted"
               type="submit"
             >
               {copy.signIn.magicSubmit}
             </button>
           </form>
           <div ref={containerRef} />
-          <p className="flex items-start gap-2 text-[12.5px] leading-[1.52] text-muted-foreground">
+          <p className="flex items-start gap-[9px] text-pretty text-[12.5px] leading-[1.52] text-muted-foreground">
             <span className="mt-0.5 flex-none">
               <NavGlyph name="lock" size={14} />
             </span>

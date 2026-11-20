@@ -18,7 +18,7 @@ export function SignInPage() {
       <main className="relative flex min-h-[844px] w-full flex-1 flex-col justify-between px-[clamp(18px,4vw,52px)] pb-7 pt-[18px] min-[961px]:pb-8 min-[961px]:pt-7">
         <div className="flex w-full items-center justify-between gap-3">
           <Link
-            className="-ml-2.5 inline-flex items-center gap-[7px] rounded-md px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="-ml-2.5 inline-flex items-center gap-[7px] rounded-md px-2.5 py-1.5 text-[13px] font-medium hover:bg-muted hover:text-foreground"
             to="/"
           >
             <NavGlyph name="back" size={15} />
@@ -38,11 +38,11 @@ export function SignInPage() {
           <div className="mb-[4px] flex flex-col items-center gap-2 text-center min-[961px]:mb-0 min-[961px]:hidden">
             <Link
               aria-label={copy.brand.homeAria}
-              className="inline-flex items-center gap-[11px]"
+              className="inline-flex items-center gap-[10px]"
               to="/"
             >
               <BrandMark size={34} />
-              <span className="font-serif text-[29px] leading-none">{copy.app.name}</span>
+              <span className="font-serif text-[30px] leading-none">{copy.app.name}</span>
             </Link>
             <p className="font-serif text-[17px] leading-[1.5] italic text-muted-foreground">
               {copy.signIn.brandTagline}
@@ -50,11 +50,21 @@ export function SignInPage() {
           </div>
           <SignInCard />
           <footer className="flex flex-col items-center gap-1.5 text-center text-xs leading-[1.55] text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5 font-mono text-[11px] leading-[28px] whitespace-nowrap">
+            <span className="inline-flex items-center gap-1.5 font-mono text-[11px] [line-height:normal]">
               <NavGlyph name="lock" size={12} />
               <span>{copy.signIn.trust}</span>
             </span>
-            <p>{copy.signIn.legal}</p>
+            <p>
+              {copy.signIn.legalIntro}{" "}
+              <a className="decoration-input underline underline-offset-[3px]" href="/terms">
+                {copy.signIn.legalTerms}
+              </a>{" "}
+              {copy.signIn.legalJoin}{" "}
+              <a className="decoration-input underline underline-offset-[3px]" href="/privacy">
+                {copy.signIn.legalPrivacy}
+              </a>
+              {copy.signIn.legalEnd}
+            </p>
           </footer>
         </div>
         <div aria-hidden="true" className="h-2" />

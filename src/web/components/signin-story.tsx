@@ -30,7 +30,7 @@ export function SignInStory() {
     >
       <div className="flex items-center gap-2.5">
         <BrandMark size={34} />
-        <span className="font-serif text-[29px] leading-none tracking-tight">{copy.app.name}</span>
+        <span className="font-serif text-[29px] leading-none">{copy.app.name}</span>
       </div>
       <div className="mx-auto flex w-full max-w-[610px] flex-col justify-between gap-7">
         <div className="flex flex-col gap-4">
@@ -38,7 +38,7 @@ export function SignInStory() {
             <span className="h-[7px] w-[7px] flex-none rounded-full bg-signal" />
             {v.pill}
           </span>
-          <h1 className="font-serif text-[clamp(52px,5vw,76px)] leading-[0.96] tracking-[-0.022em]">
+          <h1 className="font-serif font-serif-display text-[clamp(52px,5vw,76px)] leading-[0.96]">
             {v.heading}
             <br />
             <span className="italic">{v.headingItalic}</span>

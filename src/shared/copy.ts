@@ -64,7 +64,11 @@ export const copy = {
     switchToSignIn: "Sign in",
     sentHeading: "Link sent to",
     sentDetail: "Open it on this device. It works once and expires in 15 minutes.",
-    legal: "By continuing, you agree to Overture's Terms and Privacy Policy.",
+    legalIntro: "By continuing, you agree to Overture's",
+    legalTerms: "Terms",
+    legalJoin: "and",
+    legalPrivacy: "Privacy Policy",
+    legalEnd: ".",
     trust: "No password to keep · Google, LinkedIn or an emailed link",
     refusedEmail:
       "That email is not allowed in yet. Only the owner can sign in during this milestone.",
