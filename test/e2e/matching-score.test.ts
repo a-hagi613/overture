@@ -374,7 +374,7 @@ test("manual Apply refuses every hard filter and scores only what it may apply t
 
   await seedApplication(owner, {
     postingId: repost[0] ?? "",
-    sentAt: now - 20 * 86_400_000,
+    sentAt: now - 40 * 86_400_000,
     status: "sent",
     userId,
   });

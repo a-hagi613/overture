@@ -446,7 +446,7 @@ is a target country, or when it names no country and the user has `work_auth=yes
 remote posting restricted to a region, e.g. "Remote, EU", matches only target countries in that region); employment type ∈ targets; posting language ∈ `languages`;
 salary ≥ floor when the posting lists salary (converted with `fx_rates`; postings without salary are never excluded);
 company not skipped (below); no other application by this user to this company in status preparing, needs_review,
-ready, sending or confirming, and none sent to it in the last 7 days (failed, skipped and withdrawn do not count);
+ready, sending or confirming, and none sent to it in the last 30 days (failed, skipped and withdrawn do not count);
 no sent application to the same `dedupe_key` in the last 60 days; crowd limits not reached (§12); not `hidden`; no kill
 switch on its ATS/employer.
 
