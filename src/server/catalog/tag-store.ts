@@ -1,13 +1,19 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
-import { postingTags } from "../platform/db/schema.ts";
+import { postings, postingTags } from "../platform/db/schema.ts";
 
-import type { PostingTags, SalaryPeriod } from "../../shared/tag-taxonomy.ts";
+import type { PostingTags, SalaryPeriod, TagSource } from "../../shared/tag-taxonomy.ts";
+
+import { TAG_SOURCE_PRECEDENCE } from "../../shared/tag-taxonomy.ts";
 
 interface StoredTagRow {
   dimension: "role" | "subrole" | "seniority";
   value: string;
+}
+
+interface TagWrite extends StoredTagRow {
+  source: TagSource;
 }
 
 export function salaryPeriodForColumn(period: SalaryPeriod | null) {
@@ -16,6 +22,54 @@ export function salaryPeriodForColumn(period: SalaryPeriod | null) {
   }
 
   return period;
+}
+
+export function writePostingTags(
+  db: AppDatabase,
+  postingId: string,
+  writes: readonly TagWrite[],
+  now: number,
+) {
+  for (const write of writes) {
+    const existing = db
+      .select()
+      .from(postingTags)
+      .where(and(eq(postingTags.postingId, postingId), eq(postingTags.dimension, write.dimension)))
+      .all();
+
+    const strongerExists = existing.some(
+      (row) => TAG_SOURCE_PRECEDENCE[row.source] > TAG_SOURCE_PRECEDENCE[write.source],
+    );
+
+    if (strongerExists) {
+      continue;
+    }
+
+    db.delete(postingTags)
+      .where(and(eq(postingTags.postingId, postingId), eq(postingTags.dimension, write.dimension)))
+      .run();
+
+    db.insert(postingTags)
+      .values({ postingId, dimension: write.dimension, value: write.value, source: write.source })
+      .onConflictDoNothing()
+      .run();
+  }
+
+  const rows = db.select().from(postingTags).where(eq(postingTags.postingId, postingId)).all();
+
+  if (rows.length === 0) {
+    return;
+  }
+
+  let tagSource: TagSource = "llm";
+
+  for (const row of rows) {
+    if (TAG_SOURCE_PRECEDENCE[row.source] > TAG_SOURCE_PRECEDENCE[tagSource]) {
+      tagSource = row.source;
+    }
+  }
+
+  db.update(postings).set({ tagSource, taggedAt: now }).where(eq(postings.id, postingId)).run();
 }
 
 export function rowsForTags(tags: PostingTags) {
@@ -36,19 +90,19 @@ export function rowsForTags(tags: PostingTags) {
   return rows;
 }
 
-export function storePostingTags(db: AppDatabase, postingId: string, tags: PostingTags) {
-  db.delete(postingTags).where(eq(postingTags.postingId, postingId)).run();
+export function storePostingTags(
+  db: AppDatabase,
+  postingId: string,
+  tags: PostingTags,
+  now: number,
+) {
+  const source: TagSource = tags.roleSource === "model" ? "model" : "rules";
 
-  const rows = rowsForTags(tags);
+  const writes: TagWrite[] = [];
 
-  if (rows.length === 0) {
-    return;
+  for (const row of rowsForTags(tags)) {
+    writes.push({ dimension: row.dimension, value: row.value, source });
   }
 
-  const source = tags.roleSource === "model" ? ("model" as const) : ("rules" as const);
-
-  db.insert(postingTags)
-    .values(rows.map((row) => ({ postingId, dimension: row.dimension, value: row.value, source })))
-    .onConflictDoNothing()
-    .run();
+  writePostingTags(db, postingId, writes, now);
 }

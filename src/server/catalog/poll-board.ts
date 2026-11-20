@@ -255,7 +255,7 @@ async function syncPostings(
         .at(0);
 
       if (inserted !== undefined) {
-        storePostingTags(db, inserted.id, tags);
+        storePostingTags(db, inserted.id, tags, now);
 
         report.added += 1;
       }
@@ -265,7 +265,7 @@ async function syncPostings(
 
     db.update(postings).set(values).where(eq(postings.id, existing.id)).run();
 
-    storePostingTags(db, existing.id, tags);
+    storePostingTags(db, existing.id, tags, now);
 
     report.updated += 1;
   }

@@ -19,6 +19,12 @@ import {
   runBackfillJob,
   runSweepJob,
 } from "./catalog/discovery.ts";
+import {
+  TAG_FALLBACK_JOB_KIND,
+  ensureTagFallbackQueued,
+  runTagFallbackJob,
+} from "./catalog/llm-tagging.ts";
+import { createAnthropicLlmPort } from "./platform/llm/anthropic-batches.ts";
 
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 
@@ -70,6 +76,25 @@ const catalogJobHandlers: JobHandlers = {
   },
 };
 
+const tagDeps = {
+  db,
+  clock,
+  llm: createAnthropicLlmPort({
+    baseUrl: env.ANTHROPIC_BASE_URL,
+    apiKey: env.ANTHROPIC_API_KEY,
+    model: env.ANTHROPIC_MODEL,
+  }),
+};
+
+const llmJobHandlers: JobHandlers =
+  env.ANTHROPIC_API_KEY === undefined
+    ? {}
+    : {
+        [TAG_FALLBACK_JOB_KIND]: async () => {
+          await runTagFallbackJob(tagDeps);
+        },
+      };
+
 const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
   ? {
       "test.ping": async (payload) => {
@@ -101,7 +126,7 @@ const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
 const worker = startJobWorker(
   db,
   clock,
-  { ...catalogJobHandlers, ...testJobHandlers },
+  { ...catalogJobHandlers, ...llmJobHandlers, ...testJobHandlers },
   shutdownController.signal,
   (notify) => {
     registerEnqueueNotify(notify);
@@ -110,12 +135,20 @@ const worker = startJobWorker(
 
 ensureSweepQueued(catalogDeps);
 
+if (env.ANTHROPIC_API_KEY !== undefined) {
+  ensureTagFallbackQueued(db, clock);
+}
+
 const app = createApp({
   db,
   clock,
   staticRoot: env.STATIC_ROOT,
   testRoutes: env.ENABLE_TEST_ROUTES,
-  jobHandlers: { ...catalogJobHandlers, ...testJobHandlers },
+  jobHandlers: {
+    ...catalogJobHandlers,
+    ...llmJobHandlers,
+    ...testJobHandlers,
+  },
 });
 
 const server = Bun.serve({ port: env.PORT, fetch: app.fetch });
