@@ -87,9 +87,8 @@ _Avoid_: blocklist, never-apply list
 
 ## Mail
 
-**Job-search address**:
-The address Overture gives each user on `mail.tryoverture.com`; it is the email on every application form, and employers' replies to it appear in the Inbox.
-_Avoid_: alias, inbox address, real-email mode
+**Forwarding address**:
+The private address Overture gives each user on `tryoverture.com` (`in-…@`). The user forwards only ATS mail to it; it is never typed on an application form, where the user's real email goes (ADR 0028).
 
 ## The admin
 

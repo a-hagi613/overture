@@ -1,5 +1,5 @@
 ---
-status: accepted (inbound path replaced by ADR 0024)
+status: superseded by ADR 0028
 ---
 
 # A generated job-search address per user; the personal mailbox is never connected

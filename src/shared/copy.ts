@@ -214,9 +214,9 @@ export const copy = {
     limitWindow: "08:00 to 20:00",
     limitWindowDetail:
       "Applications go out only in daytime, your local time, at least 20 minutes apart.",
-    limitCompany: "1 company per 7 days",
+    limitCompany: "1 company per 30 days",
     limitCompanyDetail:
-      "After an application to a company, Overture waits 7 days before applying there again.",
+      "After an application to a company, Overture waits 30 days before applying there again.",
     limitRepost: "60 days",
     limitRepostDetail: "A role that is reposted is skipped for 60 days after you applied to it.",
     limitsFixed: "These limits are fixed. Nothing here can be turned up, down or off.",
