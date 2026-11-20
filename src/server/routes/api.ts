@@ -1,13 +1,43 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { createSseStream } from "../platform/sse/stream.ts";
 import { getAllKillSwitches, getAllSettings, getSetting } from "../platform/settings/index.ts";
+import { searchPostings } from "../platform/search/search.ts";
+
+const searchQuerySchema = z.object({
+  q: z.string().min(1).max(200),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
 
 export function createApiRoutes(db: AppDatabase, clock: Clock) {
   const routes = new Hono();
+
+  routes.get("/search", zValidator("query", searchQuerySchema), (context) => {
+    const { q, limit } = context.req.valid("query");
+
+    const startedAt = performance.now();
+    const hits = searchPostings(db, { text: q, openOnly: true, limit });
+    const durationMs = performance.now() - startedAt;
+
+    return context.json({
+      hits: hits.map((hit) => ({
+        id: hit.id,
+        title: hit.title,
+        company: hit.company,
+        location: hit.location,
+        department: hit.department,
+        url: hit.url,
+        ats: hit.ats,
+        postedAt: hit.postedAt,
+      })),
+      durationMs: Math.round(durationMs * 100) / 100,
+    });
+  });
 
   routes.get("/events", (context) => {
     const lastEventId = context.req.header("Last-Event-ID") ?? null;

@@ -7,7 +7,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { JobHandlers } from "../platform/jobs/run-due.ts";
 import type { AdjustableClock } from "../platform/ports/clock.ts";
 
-import { bgJobs } from "../platform/db/schema.ts";
+import { bgJobs, companies, companyBoards, postings } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
@@ -38,6 +38,18 @@ const publishBody = z.object({
   topic: z.string().min(1),
   payload: z.record(z.string(), z.string().or(z.number()).or(z.boolean()).or(z.null())),
   userId: z.string().optional(),
+});
+
+const createCompanyBody = z.object({
+  name: z.string().min(1),
+  domain: z.string().min(1).nullish(),
+});
+
+const createBoardBody = z.object({
+  companyId: z.string().min(1),
+  ats: z.enum(["greenhouse", "lever", "ashby"]),
+  boardToken: z.string().min(1),
+  status: z.enum(["active", "empty", "gone", "disabled"]).default("active"),
 });
 
 export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handlers: JobHandlers) {
@@ -136,6 +148,47 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
     resetTestSpans();
 
     return context.json({ ok: true });
+  });
+
+  routes.post("/catalog/companies", zValidator("json", createCompanyBody), (context) => {
+    const { name, domain } = context.req.valid("json");
+    const id = crypto.randomUUID();
+
+    db.insert(companies)
+      .values({
+        id,
+        name,
+        nameNorm: name.toLowerCase(),
+        domain: domain ?? null,
+        createdAt: clock.now(),
+      })
+      .run();
+
+    return context.json({ id });
+  });
+
+  routes.post("/catalog/boards", zValidator("json", createBoardBody), (context) => {
+    const { companyId, ats, boardToken, status } = context.req.valid("json");
+    const id = crypto.randomUUID();
+
+    db.insert(companyBoards)
+      .values({ id, companyId, ats, boardToken, status, notFoundPolls: 0, createdAt: clock.now() })
+      .onConflictDoNothing()
+      .run();
+
+    return context.json({ id });
+  });
+
+  routes.get("/catalog/boards", (context) => {
+    const rows = db.select().from(companyBoards).all();
+
+    return context.json({ boards: rows });
+  });
+
+  routes.get("/catalog/postings", (context) => {
+    const rows = db.select().from(postings).all();
+
+    return context.json({ postings: rows });
   });
 
   return routes;

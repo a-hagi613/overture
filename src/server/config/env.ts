@@ -10,6 +10,7 @@ const envSchema = z.object({
   DATABASE_PATH: z.string().min(1).optional(),
   STATIC_ROOT: z.string().min(1).default("dist"),
   ENABLE_TEST_ROUTES: booleanFromString.default(false),
+  GREENHOUSE_FEED_BASE_URL: z.string().min(1).optional(),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
   OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
   OTEL_DEBUG: booleanFromString.default(false),

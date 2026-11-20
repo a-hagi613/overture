@@ -28,7 +28,7 @@ export function createRateLimiter(clock: Clock, options: RateLimiterOptions) {
     }
   };
 
-  const acquire = async (): Promise<void> => {
+  const acquire = async () => {
     if (inFlightCount < maxConcurrent) {
       inFlightCount += 1;
 
@@ -42,7 +42,7 @@ export function createRateLimiter(clock: Clock, options: RateLimiterOptions) {
     return acquire();
   };
 
-  const run = async <T>(task: () => Promise<T>): Promise<T> => {
+  const run = async <T>(task: () => Promise<T>) => {
     const earliest = Math.max(nextStartAt, clock.now());
 
     nextStartAt = earliest + minIntervalMs;

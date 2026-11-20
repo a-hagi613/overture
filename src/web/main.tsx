@@ -7,12 +7,14 @@ import { copy } from "../shared/copy.ts";
 import { AppShell } from "./app.tsx";
 import { HomePage } from "./routes/home.tsx";
 import { NotFoundPage } from "./routes/not-found.tsx";
+import { SearchPage } from "./routes/search.tsx";
 
 const router = createBrowserRouter([
   {
     element: <AppShell />,
     children: [
       { path: "/", element: <HomePage /> },
+      { path: "/search", element: <SearchPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },
