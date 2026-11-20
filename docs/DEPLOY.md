@@ -36,15 +36,18 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
 5. Set only the backup and app secrets on the app (values come from the previous step, never the repo):
    `fly secrets set R2_ACCOUNT_ID=… R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… R2_BUCKET_BACKUPS=overture-backups -a overture-web`
    Sign-in (M1-06) adds `BETTER_AUTH_SECRET` (at least 16 random characters), `OWNER_EMAIL`,
-   `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` (a Turnstile widget for `tryoverture.com`), and the OAuth
-   clients `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`
-   (redirect URIs `https://tryoverture.com/api/auth/oauth2/callback/google` and `…/oauth2/callback/linkedin`).
+   `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` (a Turnstile widget for `tryoverture.com`).
+   The OAuth clients are optional until they exist, one pair at a time: `GOOGLE_CLIENT_ID` with
+   `GOOGLE_CLIENT_SECRET`, and `LINKEDIN_CLIENT_ID` with `LINKEDIN_CLIENT_SECRET` (redirect URIs
+   `https://tryoverture.com/api/auth/oauth2/callback/google` and `…/oauth2/callback/linkedin`).
+   A provider whose pair is not both set is not registered and its button does not render; the
+   emailed sign-in link works on its own. Setting only one name of a pair stops the server at boot.
    Resume and Facts (M1-13) add `MASTER_KEY_V1`, generated with `openssl rand -base64 32`
    (base64 that decodes to exactly 32 bytes), never rotated without the re-wrap step that
    re-wraps every user's data key under the new master key.
-   The server refuses to boot without any of them, so the **Deploy** workflow checks every name with
-   `fly secrets list` first and fails before deploying when one is missing; production keeps its
-   current release. Later milestones add their own secrets the same way and to that list; nothing
+   The server refuses to boot without the required ones, so the **Deploy** workflow checks each required
+   name with `fly secrets list` first and fails before deploying when one is missing; production keeps its
+   current release. The OAuth names are not in that check. Later milestones add their own secrets the same way and to that list; nothing
    else exists in `fly.toml`.
 6. Create a deploy token (Full permissions on the app) and store it as a repository secret:
    `gh secret set FLY_API_TOKEN -b <token-in-your-terminal> -R a-hagi613/overture`

@@ -38,19 +38,27 @@ function authDefaults(extraEnvironment: Record<string, string>) {
   return defaults;
 }
 
+export function serverEnvironment(extraEnvironment: Record<string, string>) {
+  const merged = {
+    ...process.env,
+    NODE_ENV: "test",
+    PORT: "0",
+    STATIC_ROOT: "dist",
+    ENABLE_TEST_ROUTES: "true",
+    OTEL_SIMPLE_EXPORT: "true",
+    KILL_TIMEOUT_MS: "1000",
+    ...authDefaults(extraEnvironment),
+    ...extraEnvironment,
+  };
+
+  return Object.fromEntries(Object.entries(merged).filter(([key]) => extraEnvironment[key] !== ""));
+}
+
 async function spawnServer(databasePath: string, extraEnvironment: Record<string, string>) {
   const child = spawn("bun", ["run", "src/server/main.ts"], {
     env: {
-      ...process.env,
-      NODE_ENV: "test",
-      PORT: "0",
+      ...serverEnvironment(extraEnvironment),
       DATABASE_URL: databasePath,
-      STATIC_ROOT: "dist",
-      ENABLE_TEST_ROUTES: "true",
-      OTEL_SIMPLE_EXPORT: "true",
-      KILL_TIMEOUT_MS: "1000",
-      ...authDefaults(extraEnvironment),
-      ...extraEnvironment,
     },
     stdio: ["ignore", "pipe", "inherit"],
   });

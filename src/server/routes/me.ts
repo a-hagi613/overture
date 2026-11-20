@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import type { Auth } from "../auth/index.ts";
+import { enabledSocialProviders } from "../auth/index.ts";
 
 import { env } from "../config/env.ts";
 
@@ -25,6 +26,7 @@ export function createMeRoutes(auth: Auth) {
           }
         : null,
       turnstileSiteKey: env.TURNSTILE_SITE_KEY,
+      socialProviders: enabledSocialProviders,
     });
   });
 

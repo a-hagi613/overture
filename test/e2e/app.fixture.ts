@@ -62,6 +62,13 @@ async function startFreshAppServer(
 
 export { startFreshAppServer };
 
+export const emailOnlyEnvironment = {
+  GOOGLE_CLIENT_ID: "",
+  GOOGLE_CLIENT_SECRET: "",
+  LINKEDIN_CLIENT_ID: "",
+  LINKEDIN_CLIENT_SECRET: "",
+} as const;
+
 export const test = base.extend<TestFixtures, WorkerFixtures>({
   _chromeOwnerStorageWorker: [
     async ({ _appServerWorker }, provide) => {
