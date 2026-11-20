@@ -49,16 +49,16 @@ test("a kill switch set from admin takes effect and shows on catalog health", as
   await page.getByLabel("Reason").fill("drill");
   await page.getByRole("button", { name: "Add the kill switch" }).click();
 
-  const switchList = killSwitchRowSchema
-    .array()
-    .parse(
-      await (await page.request.get(`${adminIsolatedAppServer.url}/api/kill-switches`)).json(),
-    );
+  const readGreenhouseSwitch = async () =>
+    killSwitchRowSchema
+      .array()
+      .parse(
+        await (await page.request.get(`${adminIsolatedAppServer.url}/api/kill-switches`)).json(),
+      )
+      .find((row) => row.scope === "ats" && row.key === "greenhouse");
 
-  const greenhouse = switchList.find((row) => row.scope === "ats" && row.key === "greenhouse");
-
-  expect(greenhouse?.enabled).toBe(1);
-  expect(greenhouse?.reason).toBe("drill");
+  await expect.poll(async () => (await readGreenhouseSwitch())?.enabled).toBe(1);
+  expect((await readGreenhouseSwitch())?.reason).toBe("drill");
 
   const catalog = await page.request.get(`${adminIsolatedAppUrl}/admin/api/catalog`);
 

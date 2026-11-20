@@ -111,9 +111,9 @@ test("an idle database reports lag 0, a pending write reports lag, and a replica
     .poll(async () => (await readReplicaBackups())?.replication, { timeout: 30_000 })
     .toBe("ok");
 
-  const idle = await readReplicaBackups();
-
-  expect(idle?.lagSeconds).toBe(0);
+  await expect
+    .poll(async () => (await readReplicaBackups())?.lagSeconds, { timeout: 30_000 })
+    .toBe(0);
 
   setReplicaLevelPermissions(directory, 0o555);
 
