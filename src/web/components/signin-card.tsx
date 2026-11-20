@@ -49,7 +49,7 @@ export function SignInCard() {
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [siteKey, setSiteKey] = useState<string | null>(null);
-  const { containerRef, consume: consumeTurnstile, hasToken } = useTurnstile(siteKey);
+  const { containerRef, consume: consumeTurnstile } = useTurnstile(siteKey);
 
   useEffect(() => {
     const load = async () => {
@@ -134,7 +134,7 @@ export function SignInCard() {
   return (
     <section
       aria-labelledby="signin-heading"
-      className="relative rounded-xl border border-border bg-card px-[30px] pb-[26px] pt-8 shadow-lift"
+      className="relative rounded-xl border border-border bg-card px-5 pb-[22px] pt-6 shadow-lift min-[961px]:px-[30px] min-[961px]:pb-[26px] min-[961px]:pt-8"
     >
       <div className="mb-[22px] flex flex-col gap-1.5">
         <h1
@@ -161,8 +161,7 @@ export function SignInCard() {
             </div>
           </div>
           <button
-            className="inline-flex min-h-[46px] w-full items-center justify-center rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={siteKey !== null && !hasToken}
+            className="inline-flex min-h-[46px] w-full items-center justify-center rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold hover:bg-muted"
             onClick={() => {
               void onMagic();
             }}
@@ -187,8 +186,7 @@ export function SignInCard() {
       ) : (
         <div>
           <button
-            className="inline-flex min-h-[46px] w-full items-center justify-center gap-2.5 rounded-md bg-foreground px-5 text-sm font-semibold text-card shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] hover:bg-btn-hover disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={siteKey !== null && !hasToken}
+            className="inline-flex min-h-[46px] w-full items-center justify-center gap-2.5 rounded-md bg-foreground px-5 text-sm font-semibold text-card shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] hover:bg-btn-hover"
             onClick={() => {
               void onSocial("google");
             }}
@@ -200,8 +198,7 @@ export function SignInCard() {
             {copy.signIn.google}
           </button>
           <button
-            className="mt-2.5 inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={siteKey !== null && !hasToken}
+            className="mt-2.5 inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold hover:bg-muted"
             onClick={() => {
               void onSocial("linkedin");
             }}
@@ -214,7 +211,7 @@ export function SignInCard() {
           </button>
           <div
             aria-hidden="true"
-            className="my-[18px] flex items-center gap-3 text-xs text-muted-foreground"
+            className="my-[18px] flex items-center gap-3 text-xs text-muted-foreground leading-[18px]"
           >
             <hr className="flex-1 border-border" />
             <span>{copy.signIn.magicLegend}</span>
@@ -228,7 +225,10 @@ export function SignInCard() {
             }}
           >
             <div>
-              <label className="mb-1.5 block text-[12.5px] font-semibold" htmlFor="signin-email">
+              <label
+                className="mb-1 block text-[12.5px] leading-[18px] font-semibold"
+                htmlFor="signin-email"
+              >
                 {copy.signIn.emailLabel}
               </label>
               <input
@@ -244,15 +244,14 @@ export function SignInCard() {
               />
             </div>
             <button
-              className="inline-flex min-h-[46px] w-full items-center justify-center rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={siteKey !== null && !hasToken}
+              className="inline-flex min-h-[46px] w-full items-center justify-center rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold hover:bg-muted"
               type="submit"
             >
               {copy.signIn.magicSubmit}
             </button>
           </form>
           <div ref={containerRef} />
-          <p className="mt-3.5 flex items-start gap-2 text-[12.5px] leading-[1.52] text-muted-foreground">
+          <p className="flex items-start gap-2 text-[12.5px] leading-[1.52] text-muted-foreground">
             <span className="mt-0.5 flex-none">
               <NavGlyph name="lock" size={14} />
             </span>
@@ -261,7 +260,7 @@ export function SignInCard() {
               {mode === "sign-up" ? copy.signIn.signUpNote : copy.signIn.allowNote}
             </span>
           </p>
-          <p className="mt-[18px] text-center text-[13px] text-muted-foreground">
+          <p className="text-center text-[13px] text-muted-foreground">
             {mode === "sign-up" ? copy.signIn.switchBackPrompt : copy.signIn.switchPrompt}{" "}
             <button
               className="inline min-h-[44px] border-0 bg-transparent px-1 text-[13px] font-semibold text-foreground underline underline-offset-[3px]"

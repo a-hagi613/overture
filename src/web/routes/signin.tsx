@@ -12,13 +12,13 @@ export function SignInPage() {
   const { theme, toggleTheme, label } = useTheme();
 
   return (
-    <div className="relative flex min-h-screen flex-wrap bg-background text-foreground">
+    <div className="relative flex min-h-[844px] flex-wrap bg-background text-foreground min-[961px]:min-h-screen">
       <Backdrop />
       <SignInStory />
-      <main className="relative flex min-h-[844px] w-full flex-1 flex-col justify-between gap-5 px-[max(18px,4vw)] pb-7 pt-[18px] min-[961px]:py-7">
-        <div className="mx-auto flex w-full max-w-[560px] items-center justify-between gap-3">
+      <main className="relative flex min-h-[844px] w-full flex-1 flex-col justify-between px-[clamp(18px,4vw,52px)] pb-7 pt-[18px] min-[961px]:pb-8 min-[961px]:pt-7">
+        <div className="flex w-full items-center justify-between gap-3">
           <Link
-            className="-ml-2.5 inline-flex items-center gap-[7px] rounded-md p-2 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="-ml-2.5 inline-flex items-center gap-[7px] rounded-md px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
             to="/"
           >
             <NavGlyph name="back" size={15} />
@@ -34,19 +34,25 @@ export function SignInPage() {
             <NavGlyph name={theme === "dark" ? "sun" : "moon"} />
           </button>
         </div>
-        <div className="mx-auto flex w-full max-w-[418px] flex-col gap-[18px]">
-          <div className="mb-1 flex flex-col items-center gap-2 text-center min-[961px]:hidden">
-            <BrandMark size={34} />
-            <span className="font-serif text-[30px] leading-none">{copy.app.name}</span>
-            <span className="font-serif text-[17px] italic text-muted-foreground">
+        <div className="flex w-full flex-col gap-[18px]">
+          <div className="mb-[4px] flex flex-col items-center gap-2 text-center min-[961px]:mb-0 min-[961px]:hidden">
+            <Link
+              aria-label={copy.brand.homeAria}
+              className="inline-flex items-center gap-[11px]"
+              to="/"
+            >
+              <BrandMark size={34} />
+              <span className="font-serif text-[29px] leading-none">{copy.app.name}</span>
+            </Link>
+            <p className="font-serif text-[17px] leading-[1.5] italic text-muted-foreground">
               {copy.signIn.brandTagline}
-            </span>
+            </p>
           </div>
           <SignInCard />
           <footer className="flex flex-col items-center gap-1.5 text-center text-xs leading-[1.55] text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5 font-mono text-[11px]">
+            <span className="inline-flex items-center gap-1.5 font-mono text-[11px] leading-[28px] whitespace-nowrap">
               <NavGlyph name="lock" size={12} />
-              {copy.signIn.trust}
+              <span>{copy.signIn.trust}</span>
             </span>
             <p>{copy.signIn.legal}</p>
           </footer>

@@ -20,7 +20,7 @@ export default defineConfig({
       expect: {
         toHaveScreenshot: {
           maxDiffPixelRatio: 0.01,
-          pathTemplate: "{testDir}/../design/reference/signin/{arg}{ext}",
+          pathTemplate: "{testDir}/../../design/reference/signin/{arg}{ext}",
         },
       },
     },
