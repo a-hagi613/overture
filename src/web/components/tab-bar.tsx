@@ -7,14 +7,12 @@ const destinations = [
   { glyph: "home", to: "/" },
   { glyph: "board", to: "/board" },
   {
-    aria: copy.sample.reviewTabAria,
     badge: copy.sample.reviewWaiting,
     badgeTone: "need",
     glyph: "review",
     to: "/review",
   },
   {
-    aria: copy.sample.inboxTabAria,
     badge: copy.sample.inboxUnread,
     badgeTone: "well",
     glyph: "inbox",
@@ -31,7 +29,6 @@ export function TabBar() {
     >
       {destinations.map((destination) => (
         <NavLink
-          aria-label={"aria" in destination ? destination.aria : undefined}
           key={destination.to}
           to={destination.to}
           end={destination.to === "/"}

@@ -7,14 +7,12 @@ const destinations = [
   { glyph: "home", to: "/" },
   { glyph: "board", to: "/board" },
   {
-    aria: copy.sample.reviewTabAria,
     badge: copy.sample.reviewWaiting,
     badgeTone: "need",
     glyph: "review",
     to: "/review",
   },
   {
-    aria: copy.sample.inboxTabAria,
     badge: copy.sample.inboxUnread,
     badgeTone: "well",
     glyph: "inbox",
@@ -27,12 +25,7 @@ export function SideNav({ showLabels }: { showLabels: boolean }) {
   return (
     <nav aria-label={copy.nav.label} className="flex w-full flex-col gap-[3px]">
       {destinations.map((destination) => (
-        <NavLink
-          aria-label={"aria" in destination ? destination.aria : undefined}
-          key={destination.to}
-          to={destination.to}
-          end={destination.to === "/"}
-        >
+        <NavLink key={destination.to} to={destination.to} end={destination.to === "/"}>
           {({ isActive }) => (
             <span
               className={`relative flex min-h-10 items-center gap-3 rounded-md border px-3 text-sm font-medium ${

@@ -27,9 +27,7 @@ export const copy = {
   },
   sample: {
     reviewWaiting: "4",
-    reviewTabAria: "Review, 4 waiting",
     inboxUnread: "3",
-    inboxTabAria: "Inbox, 3 unread",
     bellAria: "Notifications, 3 unread",
     applicationsLeft: "63",
     applicationsLeftAria: "63 applications left",

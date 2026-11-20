@@ -1,5 +1,16 @@
 const ownerEmail = "maya.okafor@example.com";
 
+export const testAuthEnvironment = {
+  BETTER_AUTH_SECRET: "e2e-auth-secret-0123456789abcdef",
+  GOOGLE_CLIENT_ID: "e2e-google-client-id",
+  GOOGLE_CLIENT_SECRET: "e2e-google-client-secret",
+  LINKEDIN_CLIENT_ID: "e2e-linkedin-client-id",
+  LINKEDIN_CLIENT_SECRET: "e2e-linkedin-client-secret",
+  OWNER_EMAIL: ownerEmail,
+  TURNSTILE_SECRET: "1x0000000000000000000000000000000AA",
+  TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+} as const;
+
 export const authTestIdentity = {
   ownerEmail,
   ownerName: "Maya Okafor",

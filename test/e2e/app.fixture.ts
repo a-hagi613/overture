@@ -9,7 +9,7 @@ import type { BrowserContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
 import type { IdentityServer } from "./identity-server-test.fixture.ts";
 
-import { authTestIdentity } from "./auth.fixture.ts";
+import { authTestIdentity, testAuthEnvironment } from "./auth.fixture.ts";
 import { startAppServer } from "./app-server.ts";
 import { latestMailLink, requestMagicLink } from "./sign-in.ts";
 import { startIdentityServer } from "./identity-server-test.fixture.ts";
@@ -34,14 +34,7 @@ interface WorkerFixtures {
 
 function authEnv(identityServer: IdentityServer) {
   return {
-    BETTER_AUTH_SECRET: authTestIdentity.secret,
-    OWNER_EMAIL: authTestIdentity.ownerEmail,
-    TURNSTILE_SITE_KEY: authTestIdentity.turnstileSiteKey,
-    TURNSTILE_SECRET: "1x0000000000000000000000000000000AA",
-    GOOGLE_CLIENT_ID: "e2e-google-client-id",
-    GOOGLE_CLIENT_SECRET: "e2e-google-client-secret",
-    LINKEDIN_CLIENT_ID: "e2e-linkedin-client-id",
-    LINKEDIN_CLIENT_SECRET: "e2e-linkedin-client-secret",
+    ...testAuthEnvironment,
     OAUTH_GOOGLE_DISCOVERY_URL: `${identityServer.url}/.well-known/openid-configuration`,
     OAUTH_LINKEDIN_DISCOVERY_URL: `${identityServer.url}/.well-known/openid-configuration`,
     AUTH_ALLOWED_HOSTS: "127.0.0.1,localhost",
