@@ -109,9 +109,10 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Install Litestream
         run: |
-          curl -fsSLo /tmp/litestream.tar.gz https://github.com/benbjohnson/litestream/releases/download/v0.5.18/litestream-0.5.18-linux-x86_64.tar.gz
+          litestream_asset=litestream-0.5.18-linux-x86_64.tar.gz
+          curl -fsSLo "/tmp/$litestream_asset" "https://github.com/benbjohnson/litestream/releases/download/v0.5.18/$litestream_asset"
           curl -fsSLo /tmp/checksums.txt https://github.com/benbjohnson/litestream/releases/download/v0.5.18/checksums.txt
-          grep " litestream-0.5.18-linux-x86_64.tar.gz$" /tmp/checksums.txt | (cd /tmp && sha256sum -c -)
-          tar -xzf /tmp/litestream.tar.gz -C /usr/local/bin litestream
+          grep " $litestream_asset\$" /tmp/checksums.txt | (cd /tmp && sha256sum -c -)
+          tar -xzf "/tmp/$litestream_asset" -C /usr/local/bin litestream
           litestream version
       - run: bun run scripts/restore-drill.ts local
