@@ -692,17 +692,24 @@ function isKnownModule(map: z.infer<typeof reachMapSchema>, file: string) {
   return Object.values(map.tests).some((test) => test.modules.includes(file));
 }
 
-function forcedFull(map: z.infer<typeof reachMapSchema>, touched: readonly string[]) {
+function fullByRule(touched: readonly string[]) {
+  return touched.some((file) => isAlwaysFull(file));
+}
+
+function fullByUnknown(map: z.infer<typeof reachMapSchema>, touched: readonly string[]) {
   return touched.some(
     (file) =>
-      isAlwaysFull(file) ||
-      (!file.endsWith(".test.ts") && map.tests[file] === undefined && !isKnownModule(map, file)),
+      !isAlwaysFull(file) &&
+      !file.endsWith(".test.ts") &&
+      map.tests[file] === undefined &&
+      !isKnownModule(map, file),
   );
 }
 
 function selectionReason(
   isMain: boolean,
-  forced: boolean,
+  rule: boolean,
+  unknown: boolean,
   touched: number,
   selected: number,
   total: number,
@@ -715,7 +722,11 @@ function selectionReason(
     return "the diff touches only documentation, so no e2e file runs";
   }
 
-  if (forced) {
+  if (rule) {
+    return "the diff touches config, platform, routes, web, shared code, dependencies or test infrastructure, so it runs everything";
+  }
+
+  if (unknown) {
     return "the diff reaches a file the map cannot classify, so it runs everything";
   }
 
@@ -740,8 +751,10 @@ function plan() {
 
   const touched = changed.filter((file) => !isIgnored(file));
   const isMain = base === null;
-  const forced = Object.keys(map.tests).length === 0 || forcedFull(map, touched);
-  const full = isMain || forced;
+  const emptyMap = Object.keys(map.tests).length === 0;
+  const rule = emptyMap || fullByRule(touched);
+  const unknown = fullByUnknown(map, touched);
+  const full = isMain || rule || unknown;
 
   let selected = allTests.filter((test) => {
     const reach = map.tests[test];
@@ -768,7 +781,14 @@ function plan() {
     version: 1,
     full,
     container,
-    reason: selectionReason(isMain, forced, touched.length, selected.length, allTests.length),
+    reason: selectionReason(
+      isMain,
+      rule,
+      unknown,
+      touched.length,
+      selected.length,
+      allTests.length,
+    ),
     selected,
     shards: assignShards(selected, readTimings().seconds, shardCount),
   });
