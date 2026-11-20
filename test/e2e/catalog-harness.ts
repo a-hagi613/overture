@@ -106,6 +106,7 @@ export interface CatalogHarness {
   companyId: string;
   boardIds: Record<string, string>;
   runBackfillCycle: () => Promise<void>;
+  runOneJob: (kind: string) => Promise<string>;
   pollThroughScheduledSweep: (clockOffsetMs: number) => Promise<void>;
   postings: () => Promise<PostingRow[]>;
   boards: () => Promise<BoardRow[]>;
@@ -208,7 +209,10 @@ async function waitForJobDone(
   return readUntilSettled();
 }
 
-export async function startCatalogHarness(boardSpecs: BoardSpec[]) {
+export async function startCatalogHarness(
+  boardSpecs: BoardSpec[],
+  extraEnvironment: Record<string, string> = {},
+) {
   const fixture = await startFeedFixtureServer();
   const directory = mkdtempSync(join(tmpdir(), "overture-catalog-"));
   const databasePath = join(directory, "overture.db");
@@ -217,6 +221,7 @@ export async function startCatalogHarness(boardSpecs: BoardSpec[]) {
     GREENHOUSE_FEED_BASE_URL: fixture.url,
     LEVER_FEED_BASE_URL: fixture.url,
     ASHBY_FEED_BASE_URL: fixture.url,
+    ...extraEnvironment,
   });
 
   const companyResponse = await postJson(`${app.url}/__test__/catalog/companies`, {
@@ -259,6 +264,19 @@ export async function startCatalogHarness(boardSpecs: BoardSpec[]) {
     const enqueued = enqueueSchema.parse(await enqueueResponse.json());
 
     lastEventId = await waitForJobDone(app.url, lastEventId, enqueued.id, null);
+  }
+
+  async function runOneJob(kind: string) {
+    const enqueueResponse = await postJson(`${app.url}/__test__/jobs/enqueue`, {
+      kind,
+      payload: "{}",
+    });
+
+    const enqueued = enqueueSchema.parse(await enqueueResponse.json());
+
+    lastEventId = await waitForJobDone(app.url, lastEventId, enqueued.id, null);
+
+    return enqueued.id;
   }
 
   async function pollThroughScheduledSweep(clockOffsetMs: number) {
@@ -306,6 +324,7 @@ export async function startCatalogHarness(boardSpecs: BoardSpec[]) {
     companyId: company.id,
     boardIds,
     runBackfillCycle,
+    runOneJob,
     pollThroughScheduledSweep,
     postings,
     boards,

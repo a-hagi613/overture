@@ -189,3 +189,25 @@ export const postingTags = sqliteTable(
     index("posting_tags_dimension_value").on(t.dimension, t.value),
   ],
 );
+
+export const llmUsage = sqliteTable("llm_usage", {
+  id: text("id").primaryKey(),
+  userId: text("user_id"),
+  purpose: text("purpose").notNull(),
+  model: text("model").notNull(),
+  inputTokens: integer("input_tokens").notNull(),
+  cachedTokens: integer("cached_tokens").notNull(),
+  outputTokens: integer("output_tokens").notNull(),
+  costMicros: integer("cost_micros").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const tagImports = sqliteTable("tag_imports", {
+  id: text("id").primaryKey(),
+  source: text("source").notNull(),
+  fileSha256: text("file_sha256").notNull(),
+  rows: integer("rows").notNull(),
+  matched: integer("matched").notNull(),
+  uploadedBy: text("uploaded_by").notNull(),
+  appliedAt: integer("applied_at").notNull(),
+});

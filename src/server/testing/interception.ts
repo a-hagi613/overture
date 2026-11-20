@@ -4,6 +4,8 @@ import { setupServer } from "msw/node";
 import { env } from "../config/env.ts";
 
 export function startInterception() {
+  const anthropicRoot = env.ANTHROPIC_BASE_URL.replace(/\/+$/u, "");
+
   const server = setupServer(
     http.get(
       `${env.GREENHOUSE_FEED_BASE_URL ?? "https://boards-api.greenhouse.io"}/v1/boards/:token/jobs`,
@@ -20,6 +22,9 @@ export function startInterception() {
       `${env.ASHBY_FEED_BASE_URL ?? "https://api.ashbyhq.com"}/posting-api/job-board/:token`,
       () => passthrough(),
     ),
+    http.post(`${anthropicRoot}/v1/messages/batches`, () => passthrough()),
+    http.get(`${anthropicRoot}/v1/messages/batches/:batchId`, () => passthrough()),
+    http.get(`${anthropicRoot}/v1/messages/batches/:batchId/results`, () => passthrough()),
   );
 
   server.listen({ onUnhandledRequest: "error" });

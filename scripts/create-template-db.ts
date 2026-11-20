@@ -186,7 +186,7 @@ export function seedTemplateCatalog(db: ReturnType<typeof openDatabase>["db"]) {
         .onConflictDoNothing()
         .run();
 
-      storePostingTags(db, postingId, tags);
+      storePostingTags(db, postingId, tags, now);
     }
   }
 }
