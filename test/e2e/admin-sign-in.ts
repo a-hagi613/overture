@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
 
+import { expect } from "@playwright/test";
+
 import { authTestIdentity } from "./auth.fixture.ts";
 import { latestMailLink } from "./sign-in.ts";
 
@@ -67,4 +69,6 @@ export async function openAdminAsOwner(
   if (gateAppeared) {
     await passkeyGate.click();
   }
+
+  await expect(page.getByRole("heading", { name: "Kill switches", exact: true })).toBeVisible();
 }
