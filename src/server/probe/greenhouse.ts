@@ -330,11 +330,11 @@ async function typeCode(page: Page, code: string) {
 async function readConfirmation(page: Page) {
   try {
     await page.waitForFunction(
-      (sources) =>
-        globalThis.location.pathname.endsWith(CONFIRMATION_URL_PATH) ||
+      ({ sources, confirmationPath }) =>
+        globalThis.location.pathname.endsWith(confirmationPath) ||
         (document.querySelector("form#application-form") === null &&
           sources.some((source) => new RegExp(source, "iu").test(document.body.textContent))),
-      CONFIRMATION_SOURCES,
+      { sources: CONFIRMATION_SOURCES, confirmationPath: CONFIRMATION_URL_PATH },
       { timeout: 10_000 },
     );
   } catch {
