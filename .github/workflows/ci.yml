@@ -20,7 +20,7 @@ jobs:
       - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          bun-version: latest
+          bun-version: 1.4.5
       - run: bun install --frozen-lockfile
       - run: bun run lint:config
       - run: bunx oxlint --deny-warnings --format=agent
@@ -31,9 +31,9 @@ jobs:
       - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          bun-version: latest
+          bun-version: 1.4.5
       - run: bun install --frozen-lockfile
-      - run: bun run format:check
+      - run: bun fmt --check
   typecheck:
     runs-on: ubuntu-latest
     steps:
@@ -41,9 +41,9 @@ jobs:
       - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          bun-version: latest
+          bun-version: 1.4.5
       - run: bun install --frozen-lockfile
-      - run: bun run typecheck
+      - run: bun check
   build:
     runs-on: ubuntu-latest
     steps:
@@ -51,7 +51,7 @@ jobs:
       - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          bun-version: latest
+          bun-version: 1.4.5
       - run: bun install --frozen-lockfile
       - run: bun run build
       - run: bun run db:verify
@@ -62,7 +62,7 @@ jobs:
       - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          bun-version: latest
+          bun-version: 1.4.5
       - run: bun install --frozen-lockfile
       - run: bun run test:unit
   e2e:
@@ -72,7 +72,7 @@ jobs:
       - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          bun-version: latest
+          bun-version: 1.4.5
       - run: bun install --frozen-lockfile
       - name: Install Litestream
         run: |
@@ -136,7 +136,7 @@ jobs:
       - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          bun-version: latest
+          bun-version: 1.4.5
       - run: bun install --frozen-lockfile
       - name: Install Litestream
         run: |

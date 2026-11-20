@@ -12,8 +12,9 @@ On top: the Landmines plugins (testing, style, structure, types), Dmitry Mulroy'
 checked against Landmines before it is enabled), every rule of the React, `jsx-a11y` and test plugins, and rules that
 enforce this architecture: domain code may not import vendor SDKs, `Date.now` and `Math.random` are banned outside the
 clock and random ports, `process.env` is read only in the Zod config module, and JSX holds no literal text (copy comes
-from the copy module). oxfmt formats; `tsgo --noEmit` type-checks. Coding agents run lint and format on every edit
-(Oxc's Claude Code hook) and finish only at zero warnings. Landmines wins every conflict.
+from the copy module). `bun fmt` formats, reading `.oxfmtrc.json`; `bun check` type-checks with the same errors as
+TypeScript 7. Coding agents run lint and format on every edit (Oxc's Claude Code hook) and finish only at zero
+warnings. Landmines wins every conflict.
 
 ## Plugins
 
