@@ -24,13 +24,13 @@ function zoneLabel(zone: string) {
   return knownZones.find((candidate) => candidate.value === zone)?.label ?? zone;
 }
 
-function zoneOptions(savedZone: string | null, browserZoneValue: string) {
+function zoneOptions(zones: (string | null)[]) {
   const options: { label: string; value: string }[] = knownZones.map((zone) => ({
     label: zone.label,
     value: zone.value,
   }));
 
-  for (const zone of [browserZoneValue, savedZone]) {
+  for (const zone of zones) {
     if (zone !== null && !options.some((option) => option.value === zone)) {
       options.push({ label: zoneLabel(zone), value: zone });
     }
@@ -57,7 +57,8 @@ export function TimeLanguageSection() {
   });
 
   const savedZone = settingsQuery.data?.timezone ?? null;
-  const zone = savedZone ?? browserZone();
+  const pendingZone = settingsQuery.data?.pendingTimezone ?? null;
+  const zone = pendingZone ?? savedZone ?? browserZone();
   const languages = settingsQuery.data?.languages ?? [];
 
   function persist(nextLanguages: string[], nextZone: string) {
@@ -114,7 +115,7 @@ export function TimeLanguageSection() {
               }}
               value={zone}
             >
-              {zoneOptions(savedZone, browserZone()).map((option) => (
+              {zoneOptions([browserZone(), savedZone, pendingZone]).map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
