@@ -1,6 +1,5 @@
-import { enableVirtualAuthenticator, signInOwnerOnAdmin } from "./admin-sign-in.ts";
+import { openAdminAsOwner } from "./admin-sign-in.ts";
 import { expect, test } from "./admin.fixture.ts";
-import type { Page } from "@playwright/test";
 
 import { z } from "zod";
 
@@ -14,45 +13,6 @@ const killSwitchRowSchema = z.object({
   reason: z.string(),
   scope: z.string(),
 });
-
-async function openAdminAsOwner(
-  page: Page,
-  adminIsolatedAppUrl: string,
-  issueToken: (claims: { email: string }) => Promise<string>,
-) {
-  await enableVirtualAuthenticator(page);
-  await signInOwnerOnAdmin(page, adminIsolatedAppUrl);
-
-  const token = await issueToken({ email: "owner@example.com" });
-
-  await page.context().addCookies([
-    {
-      name: "CF_Authorization",
-      value: token,
-      domain: "localhost",
-      path: "/",
-      expires: -1,
-      httpOnly: true,
-      secure: false,
-      sameSite: "Lax",
-    },
-  ]);
-
-  await page.goto(`${adminIsolatedAppUrl}/admin/settings`);
-
-  const passkeyGate = page.getByRole("button", { name: "Add your passkey" });
-
-  const gateAppeared = await passkeyGate
-    .waitFor({ state: "visible", timeout: 5000 })
-    .then(() => true)
-    .catch(() => false);
-
-  if (gateAppeared) {
-    await passkeyGate.click();
-  }
-
-  await expect(page.getByRole("heading", { name: "Kill switches", exact: true })).toBeVisible();
-}
 
 test("a settings change from admin takes effect", async ({
   page,

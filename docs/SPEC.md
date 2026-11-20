@@ -371,9 +371,10 @@ Order of precedence for role/seniority: `import` (hiring.cafe file, if the owner
    `{apply_url, title, company, role?, subrole?, seniority?, workplace?, employment_type?, salary?}`; rows match a
    posting by `apply_url_norm`; matched rows set `tag_source='import'` and imported tags win over rules, model and
    llm tags for the dimensions they set. The import is recorded in `tag_imports` (who uploaded, when, row count,
-   matched count). Until the admin area lands (M1-12), the import runs through the `importTags` module exposed by the
-   owner-run script `scripts/import-tags.ts --db <overture.db> --file <tags.jsonl>` and by a test-only route; the
-   HTTP route mounts behind the admin owner gate in M1-12. Overture ships no code that fetches hiring.cafe.
+   matched count). The route mounts behind the admin owner gate (§12) and its action is recorded on `admin_audit`;
+   the same `importTags` module runs from the owner-run script `scripts/import-tags.ts --db <overture.db>
+   --file <tags.jsonl>` and from a test-only route. `GET /admin/api/llm-usage` returns the recorded LLM usage
+   (§6.3.4, `llm_usage`) behind the same gate, filterable by `purpose`. Overture ships no code that fetches hiring.cafe.
 
 ### 6.4 Taxonomy (starting lists; the census finalises them)
 
@@ -779,6 +780,9 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
   (`greenhouse`, `lever`, `ashby`) with `hourlyLimit` (from `limits.ats_hourly.<ats>`) and `killSwitchEnabled`
   (null until a kill switch for that ATS is set). Before discovery exists, `discoveredAt` is null. Later slices
   (M1-07) add optional per-ATS fields (`boardCount`, `lastPollAt`, `errorRate`) without changing this contract.
+- `POST /admin/api/tag-imports` mounts the hiring.cafe import seam (§6.3.6) behind the same gate;
+  `PUT /admin/api/settings/:key` and `PUT /admin/api/kill-switches/:scope/:key` are the admin's other write
+  surfaces. `GET /admin/api/llm-usage` returns the recorded LLM usage and cost, filterable by `purpose`.
 - Never shown per person: EEO answers (aggregate counts only), card data (Stripe), password hashes.
 - Act-as is **read-only** and requires an active Reveal.
 
@@ -810,7 +814,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Settings | `GET/PUT /api/settings` (threshold, digest, timezone, languages) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `POST /api/account/delete` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/ses/events` · `POST /internal/mail/inbound` · `GET /internal/mailboxes/:local` |
-| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/mail-health`, `/audit`, `/provider-report` |
+| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/mail-health`, `/audit`, `/provider-report` |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
 `home.updated`, `notification`. TanStack Query invalidates by topic.

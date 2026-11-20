@@ -29,8 +29,10 @@ import { releaseBlockingJobs } from "../testing/blocking-job.ts";
 import { readCompaniesParquet } from "../catalog/companies-parquet.ts";
 import { loadDiscoveredBoards } from "../catalog/discovered-boards.ts";
 import { sweepBatchPerAts } from "../catalog/discovery.ts";
+import { dedupeKeyFor } from "../catalog/dedupe-key.ts";
+import { normalizeApplyUrl, normalizeTitle } from "../catalog/normalize.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags } from "../catalog/tag-import.ts";
-import { readLlmUsage } from "../platform/llm/usage.ts";
+import { readLlmUsage, recordLlmUsage } from "../platform/llm/usage.ts";
 
 const offsetBody = z.object({ offsetMs: z.number().int() });
 
@@ -86,6 +88,24 @@ const userNameBody = z.object({ email: z.email(), name: z.string().min(1) });
 
 const lowercased = (value: string) => value.trim().toLowerCase();
 const roleBody = z.object({ userId: z.string().min(1), role: z.enum(["user", "owner"]) });
+
+const createPostingBody = z.object({
+  boardId: z.string().min(1),
+  companyId: z.string().min(1),
+  ats: z.enum(["greenhouse", "lever", "ashby"]),
+  atsJobId: z.string().min(1),
+  url: z.string().min(1),
+  title: z.string().min(1),
+});
+
+const recordLlmUsageBody = z.object({
+  purpose: z.string().min(1),
+  model: z.string().min(1),
+  inputTokens: z.number().int().min(0),
+  cachedTokens: z.number().int().min(0),
+  outputTokens: z.number().int().min(0),
+  costMicros: z.number().int().min(0),
+});
 
 export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handlers: JobHandlers) {
   const routes = new Hono();
@@ -245,6 +265,35 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
     return context.json({ postings: rows });
   });
 
+  routes.post("/catalog/postings", zValidator("json", createPostingBody), (context) => {
+    const { boardId, companyId, ats, atsJobId, url, title } = context.req.valid("json");
+    const id = crypto.randomUUID();
+    const now = clock.now();
+    const titleNorm = normalizeTitle(title);
+
+    db.insert(postings)
+      .values({
+        id,
+        boardId,
+        companyId,
+        ats,
+        atsJobId,
+        url,
+        applyUrl: null,
+        applyUrlNorm: normalizeApplyUrl(url),
+        title,
+        titleNorm,
+        dedupeKey: dedupeKeyFor({ companyId, titleNorm, countryCode: null, city: null }),
+        firstSeenAt: now,
+        lastSeenAt: now,
+        tagSource: null,
+        closedAt: null,
+      })
+      .run();
+
+    return context.json({ id });
+  });
+
   routes.post(
     "/catalog/discovered-boards",
     zValidator("json", discoveredBoardsBody),
@@ -292,6 +341,23 @@ export function createTestRoutes(db: AppDatabase, clock: AdjustableClock, handle
     });
 
     return context.json(summary);
+  });
+
+  routes.post("/llm/usage", zValidator("json", recordLlmUsageBody), (context) => {
+    const { purpose, model, inputTokens, cachedTokens, outputTokens, costMicros } =
+      context.req.valid("json");
+
+    recordLlmUsage(db, clock, {
+      userId: null,
+      purpose,
+      model,
+      inputTokens,
+      cachedTokens,
+      outputTokens,
+      costMicros,
+    });
+
+    return context.json({ ok: true });
   });
 
   routes.get("/mail", (context) => {

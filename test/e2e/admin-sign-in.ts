@@ -31,3 +31,40 @@ export async function signInOwnerOnAdmin(page: Page, adminAppUrl: string) {
 
   await page.goto(link);
 }
+
+export async function openAdminAsOwner(
+  page: Page,
+  adminAppUrl: string,
+  issueToken: (claims: { email: string }) => Promise<string>,
+) {
+  await enableVirtualAuthenticator(page);
+  await signInOwnerOnAdmin(page, adminAppUrl);
+
+  const token = await issueToken({ email: "owner@example.com" });
+
+  await page.context().addCookies([
+    {
+      name: "CF_Authorization",
+      value: token,
+      domain: "localhost",
+      path: "/",
+      expires: -1,
+      httpOnly: true,
+      secure: false,
+      sameSite: "Lax",
+    },
+  ]);
+
+  await page.goto(`${adminAppUrl}/admin/settings`);
+
+  const passkeyGate = page.getByRole("button", { name: "Add your passkey" });
+
+  const gateAppeared = await passkeyGate
+    .waitFor({ state: "visible", timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (gateAppeared) {
+    await passkeyGate.click();
+  }
+}

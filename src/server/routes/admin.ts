@@ -8,10 +8,12 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { bgJobs, killSwitches, sessions, users } from "../platform/db/schema.ts";
+import { DEFAULT_IMPORT_SOURCE, importTags, readTagImports } from "../catalog/tag-import.ts";
 import { createAccessVerifier } from "../platform/access/index.ts";
 import { env } from "../config/env.ts";
 import { hasRecentPasskeyAssertion } from "../platform/passkey/index.ts";
 import { listAdminAudit, recordAdminAudit } from "../platform/audit/index.ts";
+import { readLlmUsage } from "../platform/llm/usage.ts";
 import {
   getAllKillSwitches,
   getAllSettings,
@@ -25,6 +27,16 @@ const settingBody = z.object({ value: z.string().min(1) });
 const killSwitchBody = z.object({
   enabled: z.boolean(),
   reason: z.string().default(""),
+});
+
+const tagImportBody = z.object({
+  content: z.string().min(1),
+  source: z.string().min(1).default(DEFAULT_IMPORT_SOURCE),
+});
+
+const llmUsageQuery = z.object({
+  purpose: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(1000).default(100),
 });
 
 const ATS_NAMES = ["greenhouse", "lever", "ashby"] as const;
@@ -232,6 +244,35 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth) {
         detail: row.detail,
       })),
     });
+  });
+
+  routes.post("/tag-imports", zValidator("json", tagImportBody), (context) => {
+    const owner = context.get("owner");
+    const { content, source } = context.req.valid("json");
+    const report = importTags(db, clock, { content, source, uploadedBy: owner.userId });
+
+    recordAdminAudit(db, clock, {
+      actorId: owner.userId,
+      action: "tag_imports.create",
+      reason: `Imported a tag file from ${source}`,
+      detail: {
+        id: report.id,
+        source,
+        rows: report.rows,
+        matched: report.matched,
+        unmatched: report.unmatched,
+      },
+    });
+
+    return context.json(report);
+  });
+
+  routes.get("/tag-imports", (context) => context.json({ tagImports: readTagImports(db) }));
+
+  routes.get("/llm-usage", zValidator("query", llmUsageQuery), (context) => {
+    const { purpose, limit } = context.req.valid("query");
+
+    return context.json(readLlmUsage(db, { purpose: purpose ?? null, sinceMs: null, limit }));
   });
 
   return routes;
