@@ -249,6 +249,25 @@ const prepareNativeSubmit = (form: HTMLFormElement) => {
   form.setAttribute("method", "post");
 };
 
+const recordFieldValues = (form: HTMLFormElement) => {
+  const values: Record<string, string> = {};
+
+  for (const element of form.querySelectorAll<
+    HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+  >("input, textarea, select")) {
+    if (element.id === "") {
+      continue;
+    }
+
+    values[element.id] =
+      element instanceof HTMLInputElement && element.type === "file"
+        ? (element.files?.[0]?.name ?? "")
+        : element.value;
+  }
+
+  void fetch("/__fixture__/values", { method: "POST", body: JSON.stringify(values) });
+};
+
 const attachSubmitBehaviour = (form: HTMLFormElement, meta: FixtureMeta) => {
   attachResumeEcho(form);
 
@@ -262,6 +281,8 @@ const attachSubmitBehaviour = (form: HTMLFormElement, meta: FixtureMeta) => {
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
+
+    recordFieldValues(form);
 
     const action = `${form.getAttribute("action")}/application${globalThis.location.search}`;
 
@@ -290,6 +311,8 @@ const attachSubmitBehaviour = (form: HTMLFormElement, meta: FixtureMeta) => {
         if (search.get("confirmation") === "none") {
           return;
         }
+
+        await fetch("/__fixture__/confirmation-shown", { method: "POST" });
 
         if (meta.confirmationPath !== undefined) {
           globalThis.location.assign(meta.confirmationPath);

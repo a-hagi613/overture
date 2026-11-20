@@ -342,6 +342,7 @@ export const postingQuestions = sqliteTable(
     required: integer("required", { mode: "boolean" }).notNull().default(false),
     position: integer("position").notNull(),
     options: text("options").notNull().default("[]"),
+    fieldName: text("field_name"),
   },
   (t) => [primaryKey({ columns: [t.postingId, t.questionId] })],
 );
@@ -413,6 +414,8 @@ export const profiles = sqliteTable("profiles", {
   timezone: text("timezone"),
   pendingTimezone: text("pending_timezone"),
   pendingTimezoneAt: timestamp("pending_timezone_at"),
+  consentVersion: text("consent_version").notNull().default("m1"),
+  consentAt: timestamp("consent_at"),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
 });
@@ -668,6 +671,93 @@ export const applications = sqliteTable(
       .where(sql`status = 'sending'`),
     index("applications_user_company").on(t.userId, t.companyId),
     index("applications_user_sent_at").on(t.userId, t.sentAt),
+  ],
+);
+
+export const applicationSnapshots = sqliteTable("application_snapshots", {
+  applicationId: text("application_id")
+    .primaryKey()
+    .references(() => applications.id, { onDelete: "cascade" }),
+  userId: cascadeUserId(),
+  postingUrl: text("posting_url").notNull(),
+  postingTitle: text("posting_title").notNull(),
+  descriptionHash: text("description_hash"),
+  answersEnc: text("answers_enc").notNull(),
+  coverLetterEnc: text("cover_letter_enc"),
+  resumeId: text("resume_id")
+    .notNull()
+    .references(() => resumes.id, { onDelete: "cascade" }),
+  resumeSha256: text("resume_sha256").notNull(),
+  consentVersion: text("consent_version").notNull(),
+  provider: text("provider").notNull(),
+  providerSessionId: text("provider_session_id"),
+  submittedAt: integer("submitted_at").notNull(),
+  confirmedBy: text("confirmed_by", { enum: ["page", "email"] }).notNull(),
+  costMicros: integer("cost_micros").notNull().default(0),
+});
+
+export const applicationEvents = sqliteTable(
+  "application_events",
+  {
+    id: text("id").primaryKey(),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    userId: cascadeUserId(),
+    at: integer("at").notNull(),
+    kind: text("kind", { enum: ["status", "stage", "email", "checkin", "note"] }).notNull(),
+    fromValue: text("from_value"),
+    toValue: text("to_value"),
+    source: text("source", { enum: ["system", "user", "email", "checkin", "admin"] }).notNull(),
+    detail: text("detail"),
+  },
+  (t) => [index("application_events_application_at").on(t.applicationId, t.at)],
+);
+
+export const attempts = sqliteTable(
+  "attempts",
+  {
+    id: text("id").primaryKey(),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    userId: cascadeUserId(),
+    n: integer("n").notNull(),
+    provider: text("provider", { enum: ["browser_use", "kernel", "local"] }).notNull(),
+    providerSessionId: text("provider_session_id"),
+    startedAt: integer("started_at").notNull(),
+    leaseUntil: integer("lease_until").notNull(),
+    endedAt: integer("ended_at"),
+    submitClickedAt: integer("submit_clicked_at"),
+    submitResponseStatus: integer("submit_response_status"),
+    outcome: text("outcome", {
+      enum: [
+        "sent",
+        "unconfirmed",
+        "captcha_blocked",
+        "code_timeout",
+        "posting_closed",
+        "form_changed",
+        "blocked",
+        "upload_failed",
+        "duplicate",
+        "needs_review",
+        "provider_error",
+        "timeout",
+        "crash",
+        "interrupted",
+      ],
+    }),
+    browserMs: integer("browser_ms"),
+    proxyBytes: integer("proxy_bytes"),
+    captchaSeen: integer("captcha_seen", { mode: "boolean" }).notNull().default(false),
+    codeUsed: integer("code_used", { mode: "boolean" }).notNull().default(false),
+    costMicros: integer("cost_micros"),
+    errorCode: text("error_code"),
+  },
+  (t) => [
+    index("attempts_application").on(t.applicationId, t.startedAt),
+    index("attempts_user_lease").on(t.userId, t.leaseUntil),
   ],
 );
 

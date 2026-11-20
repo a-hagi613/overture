@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -12,6 +12,9 @@ import type { PreparationService } from "../pipeline/prepare.ts";
 import {
   accounts,
   applications,
+  applicationAnswers,
+  applicationSnapshots,
+  attempts,
   bgJobs,
   codeWaits,
   companies,
@@ -140,6 +143,7 @@ const postingTagBody = z.object({
 const seedPostingQuestionBody = z.object({
   text: z.string().min(1).max(2000),
   fieldType: z.enum(QUESTION_FIELD_TYPES),
+  fieldName: z.string().min(1).max(200).nullish(),
   options: z.array(z.string().min(1)).max(200).default([]),
   required: z.boolean().default(false),
   factKey: z.string().min(1).nullish(),
@@ -151,6 +155,22 @@ const sampleLedgerBody = z.object({ email: z.email() });
 
 const tamperLedgerBody = z.object({
   action: z.enum(["delete", "delete-owner", "update"]),
+});
+
+const tamperSnapshotBody = z.object({
+  applicationId: z.string().min(1),
+  action: z.enum(["delete", "delete-owner", "update"]),
+});
+
+const attemptsQuery = z.object({ applicationId: z.string().min(1) });
+
+const seedAnswerBody = z.object({
+  applicationId: z.string().min(1),
+  questionId: z.string().min(1),
+  kind: z.enum(["open_text", "cover_letter"]),
+  sentences: z
+    .array(z.object({ sentence: z.string().min(1), resumeLineIds: z.array(z.string()) }))
+    .min(1),
 });
 
 const SAMPLE_GRANT_QUANTITY = 70;
@@ -351,6 +371,7 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
         required: question.required,
         position,
         options: JSON.stringify(question.options),
+        fieldName: question.fieldName ?? null,
       })
       .onConflictDoNothing()
       .run();
@@ -865,6 +886,117 @@ export function createTestRoutes(
     const rows = db.select().from(applications).where(eq(applications.userId, userId)).all();
 
     return context.json({ applications: rows });
+  });
+
+  routes.post("/application-answers", zValidator("json", seedAnswerBody), async (context) => {
+    const { applicationId, questionId, kind, sentences } = context.req.valid("json");
+
+    const application = db
+      .select({ userId: applications.userId })
+      .from(applications)
+      .where(eq(applications.id, applicationId))
+      .get();
+
+    if (application === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    const existing = db
+      .select({ id: applicationAnswers.id })
+      .from(applicationAnswers)
+      .where(
+        and(
+          eq(applicationAnswers.applicationId, applicationId),
+          eq(applicationAnswers.questionId, questionId),
+        ),
+      )
+      .get();
+
+    const id = existing?.id ?? crypto.randomUUID();
+
+    const sealed = await personal.sealFor(
+      application.userId,
+      { table: "application_answers", column: "sentences_enc", rowId: id },
+      JSON.stringify(sentences),
+    );
+
+    const at = clock.now();
+
+    const wordCount = sentences.reduce(
+      (count, sentence) => count + sentence.sentence.split(/\s+/u).length,
+      0,
+    );
+
+    if (existing === undefined) {
+      db.insert(applicationAnswers)
+        .values({
+          id,
+          applicationId,
+          questionId,
+          userId: application.userId,
+          kind,
+          sentencesEnc: sealed,
+          wordCount,
+          createdAt: at,
+          updatedAt: at,
+        })
+        .run();
+    } else {
+      db.update(applicationAnswers)
+        .set({ sentencesEnc: sealed, wordCount, updatedAt: at })
+        .where(eq(applicationAnswers.id, existing.id))
+        .run();
+    }
+
+    return context.json({ id });
+  });
+
+  routes.get("/attempts", zValidator("query", attemptsQuery), (context) => {
+    const { applicationId } = context.req.valid("query");
+
+    return context.json({
+      attempts: db
+        .select()
+        .from(attempts)
+        .where(eq(attempts.applicationId, applicationId))
+        .orderBy(attempts.startedAt)
+        .all(),
+    });
+  });
+
+  routes.post("/snapshots/tamper", zValidator("json", tamperSnapshotBody), (context) => {
+    const { applicationId, action } = context.req.valid("json");
+
+    const row = db
+      .select()
+      .from(applicationSnapshots)
+      .where(eq(applicationSnapshots.applicationId, applicationId))
+      .get();
+
+    if (row === undefined) {
+      return context.json({ error: "no snapshot" }, 404);
+    }
+
+    try {
+      if (action === "update") {
+        db.update(applicationSnapshots)
+          .set({ consentVersion: "tampered" })
+          .where(eq(applicationSnapshots.applicationId, applicationId))
+          .run();
+      } else if (action === "delete") {
+        db.delete(applicationSnapshots)
+          .where(eq(applicationSnapshots.applicationId, applicationId))
+          .run();
+      } else {
+        db.delete(users).where(eq(users.id, row.userId)).run();
+      }
+
+      return context.json({ refused: false, refusal: null });
+    } catch (error) {
+      const refusal = error instanceof Error ? error.message : String(error);
+
+      return context.json({ refused: true, refusal });
+    }
   });
 
   routes.get("/matches", zValidator("query", userQuery), (context) => {

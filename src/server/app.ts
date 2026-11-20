@@ -14,6 +14,7 @@ import type { ReviewService } from "./pipeline/reviews.ts";
 import { createHealthRoutes } from "./routes/health.ts";
 import { createMeRoutes } from "./routes/me.ts";
 import { createApiRoutes } from "./routes/api.ts";
+import { createApplicationRoutes } from "./routes/applications.ts";
 import { createHomeRoutes } from "./routes/home.ts";
 import { createMatchingRoutes } from "./routes/matching.ts";
 import { createReviewRoutes } from "./routes/reviews.ts";
@@ -98,6 +99,7 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createApiRoutes(deps.db, deps.clock));
   app.route("/api", createProfileRoutes(deps));
   app.route("/api", createHomeRoutes(deps.db, deps.clock, deps.auth, matching));
+  app.route("/api", createApplicationRoutes(deps.db, deps.clock, deps.auth, personal));
   app.route(
     "/api",
     createMatchingRoutes({

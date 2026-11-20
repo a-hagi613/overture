@@ -18,8 +18,10 @@ import {
   companies,
   companyBoards,
   postings,
+  profiles,
   resumes,
 } from "../platform/db/schema.ts";
+import type { SendPlan, SendPlanField } from "./send-plan.ts";
 import { createFactService } from "../profile/facts.ts";
 import { guardPosting } from "./guard/posting-guard.ts";
 import { createOpenTextService, isCoverLetterQuestion } from "./open-text.ts";
@@ -450,8 +452,9 @@ export function createPreparationService(deps: {
   llm: LlmPort;
   personal: PersonalCrypto;
   source: QuestionSource | null;
+  onReady?: (applicationId: string) => void;
 }) {
-  const { db, clock, llm, personal, source } = deps;
+  const { db, clock, llm, personal, source, onReady } = deps;
 
   const catalog = createQuestionCatalog({ db, clock });
   const factsService = createFactService({ db, clock, personal });
@@ -574,6 +577,7 @@ export function createPreparationService(deps: {
         options: input.options,
         companyNames: [posting.companyName],
       }),
+      fieldName: input.fieldName,
       required: input.required,
       options: input.options,
       position,
@@ -606,6 +610,7 @@ export function createPreparationService(deps: {
         required: entry.required,
         position: entry.position,
         options: entry.options,
+        fieldName: entry.fieldName,
       })),
     );
 
@@ -846,11 +851,147 @@ export function createPreparationService(deps: {
         .run();
     }
 
+    if (status === "ready" && row.status !== "ready") {
+      onReady?.(applicationId);
+    }
+
     return { status, blocked: blocked.length };
   }
 
   async function prepareMany(applicationIds: readonly string[]) {
     await Promise.all(applicationIds.map(async (applicationId) => prepare(applicationId)));
+  }
+
+  async function sendPlanFor(applicationId: string) {
+    const row = db
+      .select({
+        id: applications.id,
+        userId: applications.userId,
+        postingId: applications.postingId,
+        ats: postings.ats,
+        url: postings.url,
+        applyUrl: postings.applyUrl,
+        title: postings.title,
+        descriptionHash: postings.descriptionHash,
+        companyName: companies.name,
+      })
+      .from(applications)
+      .innerJoin(postings, eq(postings.id, applications.postingId))
+      .innerJoin(companies, eq(companies.id, postings.companyId))
+      .where(eq(applications.id, applicationId))
+      .get();
+
+    if (row === undefined) {
+      return null;
+    }
+
+    const factRows = await factsService.list(row.userId);
+    const factIndex = indexFacts(factRows);
+
+    const factRevisions = new Map(
+      factRows.map((fact) => [`${fact.key}\u0000${fact.scope}`, fact.revision]),
+    );
+
+    const resume = db
+      .select()
+      .from(resumes)
+      .where(and(eq(resumes.userId, row.userId), eq(resumes.isCurrent, true)))
+      .get();
+
+    const profile = db.select().from(profiles).where(eq(profiles.userId, row.userId)).get();
+
+    const fields = await Promise.all(
+      catalog.forPosting(row.postingId).map(async (question) => {
+        const options = optionsSchema.parse(JSON.parse(question.options));
+
+        if (question.answerKind === "open_text" && isFreeText(question.fieldType)) {
+          const saved = await savedSentences(row.userId, applicationId, question.questionId);
+
+          return {
+            answer: saved === null ? null : saved.map((sentence) => sentence.sentence).join(" "),
+            answerKind: question.answerKind,
+            factKey: question.factKey,
+            factRevision: null,
+            fieldName: question.fieldName,
+            fieldType: question.fieldType,
+            label: question.textDisplay,
+            options,
+            questionId: question.questionId,
+            required: question.required,
+            scope: "",
+            sentences: saved ?? [],
+          } satisfies SendPlanField;
+        }
+
+        const resolution = resolveQuestion({
+          questionText: question.textDisplay,
+          required: question.required,
+          fieldType: question.fieldType,
+          options,
+          answerKind: question.answerKind,
+          factKey: question.factKey,
+          facts: factIndex,
+          hasResume: resume !== undefined,
+        });
+
+        return {
+          answer: question.fieldType === "file" ? null : resolution.answer,
+          answerKind: question.answerKind,
+          factKey: question.factKey,
+          factRevision:
+            question.factKey === null
+              ? null
+              : (factRevisions.get(`${question.factKey}\u0000${resolution.scope}`) ?? null),
+          fieldName: question.fieldName,
+          fieldType: question.fieldType,
+          label: question.textDisplay,
+          options,
+          questionId: question.questionId,
+          required: question.required,
+          scope: resolution.scope,
+          sentences: [],
+        } satisfies SendPlanField;
+      }),
+    );
+
+    const coverLetterField = fields.find(
+      (field) =>
+        field.answerKind === "open_text" &&
+        isFreeText(field.fieldType) &&
+        isCoverLetterQuestion(field.label) &&
+        field.sentences.length > 0,
+    );
+
+    return {
+      applicationId,
+      ats: row.ats,
+      companyName: row.companyName,
+      consentVersion: profile?.consentVersion ?? "m1",
+      coverLetter:
+        coverLetterField === undefined
+          ? null
+          : coverLetterField.sentences.map((sentence) => ({
+              resumeLineIds: sentence.resumeLineIds,
+              sentence: sentence.sentence,
+            })),
+      descriptionHash: row.descriptionHash ?? null,
+      fields,
+      postingTitle: row.title,
+      postingUrl: row.applyUrl ?? row.url,
+      resume:
+        resume === undefined
+          ? null
+          : {
+              filename: await personal.openFor(
+                row.userId,
+                { column: "filename_enc", rowId: resume.id, table: "resumes" },
+                resume.filenameEnc,
+              ),
+              id: resume.id,
+              sha256: resume.sha256,
+            },
+      userId: row.userId,
+    } satisfies SendPlan;
   }
 
   async function answersFor(applicationId: string) {
@@ -883,6 +1024,7 @@ export function createPreparationService(deps: {
           return {
             questionId: question.questionId,
             text: question.textDisplay,
+            fieldName: question.fieldName,
             fieldType: question.fieldType,
             answerKind: question.answerKind,
             factKey: question.factKey,
@@ -908,6 +1050,7 @@ export function createPreparationService(deps: {
         return {
           questionId: question.questionId,
           text: question.textDisplay,
+          fieldName: question.fieldName,
           fieldType: question.fieldType,
           answerKind: question.answerKind,
           factKey: question.factKey,
@@ -921,7 +1064,7 @@ export function createPreparationService(deps: {
     );
   }
 
-  return { answersFor, prepare, prepareMany };
+  return { answersFor, prepare, prepareMany, sendPlanFor };
 }
 
 export type PreparationService = ReturnType<typeof createPreparationService>;
