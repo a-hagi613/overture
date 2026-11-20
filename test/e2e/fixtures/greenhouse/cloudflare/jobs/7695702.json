@@ -24,17 +24,13 @@
     {
       "id": 8654220,
       "name": "Job Posting Location",
-      "value": [
-        "Washington DC, US"
-      ],
+      "value": ["Washington DC, US"],
       "value_type": "multi_select"
     },
     {
       "id": 46546702,
       "name": "Career Site Department",
-      "value": [
-        "Sales"
-      ],
+      "value": ["Sales"],
       "value_type": "multi_select"
     }
   ],

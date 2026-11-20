@@ -24,19 +24,13 @@
     {
       "id": 8654220,
       "name": "Job Posting Location",
-      "value": [
-        "Austin, US",
-        "New York, US"
-      ],
+      "value": ["Austin, US", "New York, US"],
       "value_type": "multi_select"
     },
     {
       "id": 46546702,
       "name": "Career Site Department",
-      "value": [
-        "Engineering",
-        "Security"
-      ],
+      "value": ["Engineering", "Security"],
       "value_type": "multi_select"
     }
   ],

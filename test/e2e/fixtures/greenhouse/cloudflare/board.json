@@ -26,17 +26,13 @@
         {
           "id": 8654220,
           "name": "Job Posting Location",
-          "value": [
-            "Washington DC, US"
-          ],
+          "value": ["Washington DC, US"],
           "value_type": "multi_select"
         },
         {
           "id": 46546702,
           "name": "Career Site Department",
-          "value": [
-            "Sales"
-          ],
+          "value": ["Sales"],
           "value_type": "multi_select"
         }
       ],
@@ -76,17 +72,13 @@
         {
           "id": 8654220,
           "name": "Job Posting Location",
-          "value": [
-            "Munich, Germany"
-          ],
+          "value": ["Munich, Germany"],
           "value_type": "multi_select"
         },
         {
           "id": 46546702,
           "name": "Career Site Department",
-          "value": [
-            "Sales"
-          ],
+          "value": ["Sales"],
           "value_type": "multi_select"
         }
       ],
@@ -126,18 +118,13 @@
         {
           "id": 8654220,
           "name": "Job Posting Location",
-          "value": [
-            "Austin, TX",
-            "San Francisco, CA"
-          ],
+          "value": ["Austin, TX", "San Francisco, CA"],
           "value_type": "multi_select"
         },
         {
           "id": 46546702,
           "name": "Career Site Department",
-          "value": [
-            "Early Talent"
-          ],
+          "value": ["Early Talent"],
           "value_type": "multi_select"
         }
       ],
@@ -177,19 +164,13 @@
         {
           "id": 8654220,
           "name": "Job Posting Location",
-          "value": [
-            "Austin, US",
-            "New York, US"
-          ],
+          "value": ["Austin, US", "New York, US"],
           "value_type": "multi_select"
         },
         {
           "id": 46546702,
           "name": "Career Site Department",
-          "value": [
-            "Engineering",
-            "Security"
-          ],
+          "value": ["Engineering", "Security"],
           "value_type": "multi_select"
         }
       ],
