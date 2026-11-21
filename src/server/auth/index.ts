@@ -79,7 +79,16 @@ export function isAllowedEmail(email: string) {
 
 export type Auth = ReturnType<typeof createAuth>;
 
-export function createAuth(db: AppDatabase, clock: Clock, mailSender: MailSender) {
+export interface AuthOptions {
+  onUserCreated?: (user: { id: string; email: string }) => Promise<void> | void;
+}
+
+export function createAuth(
+  db: AppDatabase,
+  clock: Clock,
+  mailSender: MailSender,
+  options: AuthOptions = {},
+) {
   const adminOrigin = new URL(env.ADMIN_ORIGIN);
 
   const trustedOrigins = [
@@ -159,6 +168,9 @@ export function createAuth(db: AppDatabase, clock: Clock, mailSender: MailSender
             await Promise.resolve(created);
 
             return created;
+          },
+          after: async (user) => {
+            await options.onUserCreated?.({ id: user.id, email: user.email });
           },
         },
       },

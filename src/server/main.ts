@@ -123,7 +123,21 @@ const backups = createBackupMonitor(db, clock);
 void backups.run(shutdownController.signal);
 
 const mailSender = createMailSender(clock);
-const auth = createAuth(db, clock, mailSender);
+const mailboxes = createMailboxService(db, clock, env.INBOUND_HMAC_SECRET ?? "", env.MAIL_DOMAIN);
+
+const auth = createAuth(
+  db,
+  clock,
+  mailSender,
+  env.INBOUND_HMAC_SECRET === undefined
+    ? {}
+    : {
+        onUserCreated: async (user) => {
+          await mailboxes.ensureFor(user.id);
+        },
+      },
+);
+
 const appOrigin = env.APP_ORIGIN ?? "http://localhost:3000";
 
 const jobSingletons = [...SINGLETON_JOB_KINDS, DISPATCH_TICK_JOB_KIND, LIVE_CHECK_JOB_KIND];
@@ -297,8 +311,6 @@ const mailPersonal = createPersonalCrypto(
   env.MASTER_KEY_CURRENT,
 );
 
-const mailboxes = createMailboxService(db, clock, env.INBOUND_HMAC_SECRET ?? "", env.MAIL_DOMAIN);
-
 const resumes = createResumeService({ db, clock, llm: anthropicLlmPort, objects, personal });
 
 const outcomes = createOutcomes({ db, clock, personal, preparation });
@@ -311,6 +323,7 @@ const mailIngest = createMailIngest({
   objects,
   personal: mailPersonal,
   resolver,
+  mailboxes,
   onAuthenticatedMessage: async (input) => {
     await outcomes.confirmMessage(input);
   },

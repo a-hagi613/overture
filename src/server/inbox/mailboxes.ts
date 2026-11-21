@@ -1,12 +1,13 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { forwardingIdFrom, forwardingLocalPart } from "../../shared/inbound-mail.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
-import { mailboxes } from "../platform/db/schema.ts";
+import { mailboxes, retiredAddresses, users } from "../platform/db/schema.ts";
 
 const ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 const ID_LENGTH = 16;
+const ID_ATTEMPTS = 5;
 
 function randomMailboxId() {
   let id = "";
@@ -32,19 +33,57 @@ export function createMailboxService(
   secret: string,
   domain: string,
 ) {
+  const host = domain.trim().toLowerCase();
+
   function addressOf(localPart: string) {
-    return `${localPart}@${domain}`;
+    return `${localPart}@${host}`;
+  }
+
+  function describe(row: { id: string; localPart: string; firstForwardedAt: Date | null }) {
+    return {
+      id: row.id,
+      address: addressOf(row.localPart),
+      firstForwardedAt: row.firstForwardedAt?.getTime() ?? null,
+    };
+  }
+
+  async function freshAddress() {
+    if (secret === "") {
+      throw new Error("A forwarding address needs INBOUND_HMAC_SECRET.");
+    }
+
+    const candidates = await Promise.all(
+      Array.from({ length: ID_ATTEMPTS }, async () => {
+        const id = randomMailboxId();
+
+        return { id, localPart: await forwardingLocalPart(secret, id) };
+      }),
+    );
+
+    const free = candidates.find(
+      (candidate) =>
+        db
+          .select({ localPart: retiredAddresses.localPart })
+          .from(retiredAddresses)
+          .where(eq(retiredAddresses.localPart, candidate.localPart))
+          .get() === undefined,
+    );
+
+    if (free === undefined) {
+      throw new Error("Could not allocate a forwarding address that was never retired.");
+    }
+
+    return free;
   }
 
   async function ensureFor(userId: string) {
     const existing = db.select().from(mailboxes).where(eq(mailboxes.userId, userId)).get();
 
     if (existing !== undefined) {
-      return { id: existing.id, address: addressOf(existing.localPart) };
+      return describe(existing);
     }
 
-    const id = randomMailboxId();
-    const localPart = await forwardingLocalPart(secret, id);
+    const { id, localPart } = await freshAddress();
 
     try {
       db.insert(mailboxes)
@@ -57,7 +96,7 @@ export function createMailboxService(
         })
         .run();
 
-      return { id, address: addressOf(localPart) };
+      return { id, address: addressOf(localPart), firstForwardedAt: null };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
@@ -71,12 +110,18 @@ export function createMailboxService(
         throw error;
       }
 
-      return { id: raced.id, address: addressOf(raced.localPart) };
+      return describe(raced);
     }
   }
 
   async function byForwardingAddress(address: string) {
-    const id = await forwardingIdFrom(secret, address);
+    const [localPart = "", addressHost = ""] = address.trim().toLowerCase().split("@");
+
+    if (addressHost !== host) {
+      return null;
+    }
+
+    const id = await forwardingIdFrom(secret, localPart);
 
     if (id === null) {
       return null;
@@ -97,5 +142,50 @@ export function createMailboxService(
     return mailbox ?? null;
   }
 
-  return { ensureFor, byForwardingAddress, byId };
+  function markFirstForwarded(mailboxId: string, at: number) {
+    db.update(mailboxes)
+      .set({ firstForwardedAt: new Date(at) })
+      .where(and(eq(mailboxes.id, mailboxId), isNull(mailboxes.firstForwardedAt)))
+      .run();
+  }
+
+  function retireFor(userId: string) {
+    const existing = db
+      .select({ id: mailboxes.id })
+      .from(mailboxes)
+      .where(eq(mailboxes.userId, userId))
+      .get();
+
+    if (existing === undefined) {
+      return false;
+    }
+
+    db.delete(mailboxes).where(eq(mailboxes.userId, userId)).run();
+
+    return true;
+  }
+
+  async function ensureForAll() {
+    const missing = db
+      .select({ id: users.id })
+      .from(users)
+      .leftJoin(mailboxes, eq(mailboxes.userId, users.id))
+      .where(isNull(mailboxes.id))
+      .all();
+
+    await Promise.all(missing.map(async (user) => ensureFor(user.id)));
+
+    const total = db.select({ id: mailboxes.id }).from(mailboxes).all().length;
+
+    return { created: missing.length, existing: total - missing.length, total };
+  }
+
+  return {
+    ensureFor,
+    ensureForAll,
+    byForwardingAddress,
+    byId,
+    markFirstForwarded,
+    retireFor,
+  };
 }

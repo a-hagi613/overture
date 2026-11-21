@@ -47,7 +47,11 @@ export function createMailRoutes(deps: {
 
     const mailbox = await mailboxes.ensureFor(user.id);
 
-    return context.json({ address: mailbox.address });
+    return context.json({
+      address: mailbox.address,
+      firstForwardedAt: mailbox.firstForwardedAt,
+      forwardingWorks: mailbox.firstForwardedAt !== null,
+    });
   });
 
   routes.get("/mail/code-waits", async (context) => {

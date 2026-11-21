@@ -231,7 +231,7 @@ updated_at) · `session` · `account` (provider: google, linkedin, credential) �
 | `skip_companies` | id, user_id, company_id NULL, name, name_norm, domain NULL, reason CHECK IN ('current_employer','user'), created_at; UNIQUE(user_id,name_norm). Matching rules in §8.1 |
 | `resumes` | id, user_id, object_key, sha256, bytes, pages, filename_enc, text_enc, parsed_with CHECK IN ('unpdf','llm'), is_current, uploaded_at; partial UNIQUE(user_id) WHERE is_current=1 |
 | `browser_profiles` | user_id, provider, provider_profile_id, country_code, created_at, last_used_at; PK(user_id, provider) |
-| `mailboxes` | id (the forwarding id, `[a-z0-9]{8,32}`), user_id UNIQUE, local_part UNIQUE (the `in-{id}-{mac}` local part), status CHECK IN ('active','receive_only','closed'), receive_until NULL, created_at |
+| `mailboxes` | id (the forwarding id, `[a-z0-9]{8,32}`), user_id UNIQUE, local_part UNIQUE (the `in-{id}-{mac}` local part), status CHECK IN ('active','receive_only','closed'), receive_until NULL, first_forwarded_at NULL (set once by the first ATS mail that arrives; the API reads it as "forwarding works"), created_at |
 | `retired_addresses` | local_part PK, retired_at — **a local part is never reassigned** |
 
 ### 5.3 Catalog
@@ -487,12 +487,16 @@ answers snapshot records the derivation key next to the value.
 
 ### 7.3 Forwarding address (ADR 0028)
 
-- Each user gets `in-{id}-{mac}@tryoverture.com`: `id` is the mailbox id, `mac` a truncated HMAC of it under
-  `INBOUND_HMAC_SECRET`, so the Email Worker drops forged or unknown addresses without a lookup.
+- Each user gets `in-{id}-{mac}@tryoverture.com` when their account is created: `id` is the mailbox id, `mac` a
+  truncated HMAC of it under `INBOUND_HMAC_SECRET`, so the Email Worker drops forged or unknown addresses without a
+  lookup, and `overture-web` also refuses an address outside `MAIL_DOMAIN`. A mailbox deleted for any reason is
+  recorded in `retired_addresses` by a trigger, and a retired local part is never assigned again.
 - The user adds one filter in their own mailbox forwarding only mail from the ATS sender domains
   (`src/shared/ats-mail-domains.ts`) to this address. In M1 the owner creates it by hand; every M2 user gets an address when their account is created, and the onboarding
   step guides the filter for Gmail and Outlook (as drawn on the canvas), shows when the first forwarded mail arrives, and
-  can be skipped: without the filter a verification code is asked for as a paste within its 10-minute wait. The address is never typed on an application form.
+  can be skipped: without the filter a verification code is asked for as a paste within its 10-minute wait. The address is never typed on an application form. The first ATS message that arrives sets
+  `mailboxes.first_forwarded_at` once; `GET /api/profile/mailbox` returns the address with `forwardingWorks` and
+  `firstForwardedAt`, so onboarding and the Profile card can show "forwarding works" without a second lookup.
 - On account deletion the local part moves to `retired_addresses` and is never reused. After cancel,
   `status='receive_only'`, `receive_until = now + 12 months`; after that `closed`, and mail to it is discarded at
   ingest.
@@ -1109,7 +1113,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Review | `GET /api/reviews` · `POST /api/reviews/:id/answer` · `POST /api/reviews/:id/dismiss` |
 | Check-ins | `POST /api/checkins/:id` `{answer}` |
 | Inbox | `GET /api/threads` · `GET /api/threads/:id` · `GET /api/attachments/:id` · `POST /api/messages/:id/read` · `GET /api/mail/code-waits` · `POST /api/mail/code-waits/:id` (paste a code) |
-| Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/strengthen` |
+| Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/mailbox` (read-only address, `forwardingWorks`, `firstForwardedAt`) · `GET /api/profile/strengthen` |
 | Onboarding | `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET /api/onboarding` · `POST /api/onboarding/:step` · `POST /api/onboarding/address/accept` (M2) |
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `POST /api/account/delete` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
