@@ -27,6 +27,7 @@ import {
   openReviewIds,
 } from "./review-store.ts";
 import { recordReviewResolved } from "./review-events.ts";
+import { enqueueApplicationPrepare } from "./prepare-jobs.ts";
 
 const optionsSchema = z.array(z.string());
 
@@ -171,7 +172,15 @@ export function createReviewService(deps: {
     );
   }
 
-  async function answer(userId: string, reviewId: string, value: string) {
+  async function answer(
+    userId: string,
+    reviewId: string,
+    value: string,
+    options: {
+      fact?: { key: string; scope: string };
+      prepare?: "await" | "enqueue";
+    } = {},
+  ) {
     const review = db
       .select()
       .from(reviews)
@@ -182,9 +191,16 @@ export function createReviewService(deps: {
       return null;
     }
 
-    const factKey = review.factKey ?? `q:${review.questionId}`;
+    const target = options.fact ?? null;
+    const factKey = target?.key ?? review.factKey ?? `q:${review.questionId}`;
+    const scope = target?.scope ?? review.scope;
 
-    await factsService.saveFromReview(userId, factKey, value, review.scope);
+    if (target === null) {
+      await factsService.saveFromReview(userId, factKey, value, review.scope);
+    } else {
+      await factsService.save(userId, factKey, value, scope);
+    }
+
     catalog.setMapping(review.questionId, { answerKind: "fact", factKey, mappedBy: "owner" });
 
     const applicationIds = applicationIdsForReview(db, reviewId);
@@ -201,12 +217,18 @@ export function createReviewService(deps: {
       userId,
     });
 
-    await preparation.prepareMany(applicationIds);
+    if (options.prepare === "enqueue") {
+      for (const applicationId of applicationIds) {
+        enqueueApplicationPrepare(db, clock, applicationId);
+      }
+    } else {
+      await preparation.prepareMany(applicationIds);
+    }
 
     publishEvent(db, clock, "review.resolved", JSON.stringify({ reviewId }), userId);
     publishEvent(db, clock, "home.updated", JSON.stringify({ reviewId }), userId);
 
-    return { reviewId, factKey, scope: review.scope, applicationIds };
+    return { reviewId, factKey, scope, applicationIds };
   }
 
   function dismiss(userId: string, reviewId: string) {

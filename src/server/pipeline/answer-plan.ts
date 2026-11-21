@@ -4,7 +4,7 @@ import type { DerivationFact, PostingPlace } from "../catalog/answer-derivations
 import type { AnswerKind, QuestionFieldType } from "../../shared/questions.ts";
 import type { AnswerUnit, FileFact } from "./answer-value.ts";
 
-import { isCountryScopedFactKey } from "../../shared/facts.ts";
+import { isCountryScopedFactKey, isCurrencyScopedFactKey } from "../../shared/facts.ts";
 import { resolveLocation } from "../catalog/geo.ts";
 import {
   countriesNamedIn,
@@ -16,7 +16,12 @@ import {
   isDerivationKey,
   isTargetDerivationKey,
 } from "../catalog/answer-derivations.ts";
-import { acknowledgementOption, answerIsValid, formatFactValue } from "./answer-value.ts";
+import {
+  acknowledgementOption,
+  answerIsValid,
+  currencyNamedIn,
+  formatFactValue,
+} from "./answer-value.ts";
 
 export type BlockReason =
   | "missing_fact"
@@ -194,6 +199,33 @@ function lookupScopedFact(
   return { kind: "review", scope: "" } satisfies ScopedLookup;
 }
 
+function lookupCurrencyFact(key: string, questionText: string, facts: FactIndex) {
+  const currency = currencyNamedIn(questionText);
+
+  if (currency !== null) {
+    const value = facts.scoped.get(key)?.get(currency);
+    const revision = revisionFor(facts, key, currency);
+
+    if (value !== undefined && revision !== null) {
+      return { kind: "answer", value, scope: currency, revision } satisfies ScopedLookup;
+    }
+  }
+
+  const unscoped = facts.unscoped.get(key);
+  const unscopedRevision = revisionFor(facts, key, "");
+
+  if (unscoped !== undefined && unscopedRevision !== null) {
+    return {
+      kind: "answer",
+      value: unscoped,
+      scope: "",
+      revision: unscopedRevision,
+    } satisfies ScopedLookup;
+  }
+
+  return { kind: "review", scope: "" } satisfies ScopedLookup;
+}
+
 const MARKETING_CONSENT =
   /\b(?:marketing|newsletter|promotions?|job alerts|talent pool|future opportunities|whatsapp|sms|text messages|opt[- ]?in)\b/u;
 
@@ -350,14 +382,28 @@ function resolveDerivation(input: ResolveInput) {
     : blank("optional_unfilled");
 }
 
+function scopedLookupFor(input: ResolveInput) {
+  if (input.factKey === null) {
+    return null;
+  }
+
+  if (isCountryScopedFactKey(input.factKey)) {
+    return lookupScopedFact(input.factKey, input.questionText, input.facts, input.posting);
+  }
+
+  if (isCurrencyScopedFactKey(input.factKey)) {
+    return lookupCurrencyFact(input.factKey, input.questionText, input.facts);
+  }
+
+  return null;
+}
+
 function resolveFact(input: ResolveInput) {
   if (input.factKey === null) {
     return input.required ? blocked("missing_fact") : blank("optional_unfilled");
   }
 
-  const scoped = isCountryScopedFactKey(input.factKey)
-    ? lookupScopedFact(input.factKey, input.questionText, input.facts, input.posting)
-    : null;
+  const scoped = scopedLookupFor(input);
 
   if (scoped?.kind === "review") {
     return input.required ? blocked("missing_fact", scoped.scope) : blank("optional_unfilled");

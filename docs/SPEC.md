@@ -451,7 +451,7 @@ as top-20 aggregate Posting counts. Output committed to `docs/research/census.md
 
 | Tier | Keys | When |
 |---|---|---|
-| 1 (required to Start) | legal_name, email (the user's real email, prefilled from the resume and confirmed; the forwarding address §7.3 is never put on a form), phone, current_city, current_country, linkedin_url, work_auth (per target country), sponsorship_required (per target country), notice_period, earliest_start, salary_expectation, willing_relocate, years_total, degree_highest, employment_history, education_history, current_employer, languages | onboarding step 3; most prefilled from the resume and confirmed |
+| 1 (required to Start) | legal_name, email (the user's real email, prefilled from the resume and confirmed; the forwarding address §7.3 is never put on a form), phone, current_city, current_country, linkedin_url, current_job_title, work_auth (per target country), sponsorship_required (per target country), notice_period, earliest_start, salary_expectation (per currency), willing_relocate, years_total, degree_highest, employment_history, education_history, current_employer, how_did_you_hear (optional on the step), languages | onboarding step 3; most prefilled from the resume and confirmed |
 | 2 (encouraged) | preferred_name, github_url, website_url, skills, certifications, security_clearance, drivers_license, spoken_languages_levels, voice_sample, cover_letter_template, eeo_gender, eeo_race_ethnicity, eeo_hispanic_latino, eeo_veteran, eeo_disability (EEO opt-in only) | Profile → "Strengthen your profile", each shows "unlocks N queued jobs" |
 | 3 (learned) | `q:<question_id>` | created by answering a Review; reused for every later application asking that question |
 
@@ -460,6 +460,11 @@ country, with `scope` set to the ISO country code. A question that names a count
 country's Fact; with none it opens a Review for that country. A question that names no country is answered from the
 unscoped Fact; with none, from the country-scoped Facts only when they all agree, otherwise it opens a Review that
 picks none. A question naming several countries is answered only from the unscoped Fact.
+
+`salary_expectation` is stored once per currency, with `scope` set to the ISO 4217 code (the currency the form asks
+in). A salary question that names a currency is answered only from that currency's Fact; with none it opens a Review
+that picks none, and a question that names no currency is answered only from an unscoped Fact (an answer saved on the
+Review screen), never by choosing one currency's figure for another.
 
 **Derived answers.** Some answers are deterministic code over a saved Fact or a Target, not a model output: the
 country or countries a question asks about (`target_countries`, the Posting's country when it is a target, else the
@@ -1090,7 +1095,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Check-ins | `POST /api/checkins/:id` `{answer}` |
 | Inbox | `GET /api/threads` · `GET /api/threads/:id` · `GET /api/attachments/:id` · `POST /api/messages/:id/read` · `GET /api/mail/code-waits` · `POST /api/mail/code-waits/:id` (paste a code) |
 | Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/strengthen` |
-| Onboarding (M2) | `GET /api/onboarding` · `POST /api/onboarding/:step` · `POST /api/onboarding/address/accept` |
+| Onboarding | `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET /api/onboarding` · `POST /api/onboarding/:step` · `POST /api/onboarding/address/accept` (M2) |
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `POST /api/account/delete` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `GET /internal/mailboxes/:local` |

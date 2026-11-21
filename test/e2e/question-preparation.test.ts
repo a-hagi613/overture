@@ -900,7 +900,7 @@ test("Greenhouse questions are read only when an Application is prepared", async
   expect(preparation.feed.stats().questionsRequests).toBe(1);
 });
 
-test("Haiku maps a question that no rule covers", async ({ preparation }) => {
+test("the rules answer the recorded job title, so Haiku is not asked", async ({ preparation }) => {
   const { owner, userId } = await ownerContextFor(preparation.server.url);
 
   const postingId = await seedRecordedPosting(owner, {
@@ -924,16 +924,16 @@ test("Haiku maps a question that no rule covers", async ({ preparation }) => {
   );
 
   expect(question).toMatchObject({
-    answerKind: "unknown",
-    factKey: null,
-    mappedBy: "llm",
+    answerKind: "fact",
+    factKey: "current_job_title",
+    mappedBy: "rules",
   });
 
   expect(
     preparation.anthropic
       .requests()
       .some((request) => request.title.includes("current or previous job title")),
-  ).toBe(true);
+  ).toBe(false);
 });
 
 test("a country's work authorisation never answers another country's question", async ({

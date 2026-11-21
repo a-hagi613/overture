@@ -425,4 +425,30 @@ describe("question rules for derivations", () => {
       factKey: "legal_name",
     });
   });
+
+  test("maps the onboarding job-title and how-you-heard questions to their Facts", () => {
+    expect(mapQuestionByRules("What is your current or previous job title?")).toEqual({
+      answerKind: "fact",
+      factKey: "current_job_title",
+    });
+
+    expect(mapQuestionByRules("Current job title")).toEqual({
+      answerKind: "fact",
+      factKey: "current_job_title",
+    });
+
+    expect(mapQuestionByRules("How did you hear about us?")).toEqual({
+      answerKind: "fact",
+      factKey: "how_did_you_hear",
+    });
+
+    expect(mapQuestionByRules("Where did you first hear about this role?")).toEqual({
+      answerKind: "fact",
+      factKey: "how_did_you_hear",
+    });
+
+    expect(
+      mapQuestionByRules("What is the title of the position you are applying for?"),
+    ).toBeNull();
+  });
 });

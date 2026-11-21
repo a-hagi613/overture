@@ -5,6 +5,7 @@ export const TIER_1_FACT_KEYS = [
   "current_city",
   "current_country",
   "linkedin_url",
+  "current_job_title",
   "work_auth",
   "sponsorship_required",
   "notice_period",
@@ -16,6 +17,7 @@ export const TIER_1_FACT_KEYS = [
   "employment_history",
   "education_history",
   "current_employer",
+  "how_did_you_hear",
   "languages",
 ] as const;
 
@@ -51,6 +53,28 @@ export function isCountryScopedFactKey(key: string): key is CountryScopedFactKey
   return COUNTRY_SCOPED_FACT_KEYS.some((candidate) => candidate === key);
 }
 
+/** Facts kept once per currency, because a form asks for its own currency. */
+export const CURRENCY_SCOPED_FACT_KEYS = ["salary_expectation"] as const;
+
+export type CurrencyScopedFactKey = (typeof CURRENCY_SCOPED_FACT_KEYS)[number];
+
+export function isCurrencyScopedFactKey(key: string): key is CurrencyScopedFactKey {
+  return CURRENCY_SCOPED_FACT_KEYS.some((candidate) => candidate === key);
+}
+
+export function isCurrencyCode(code: string) {
+  return /^[A-Z]{3}$/u.test(code);
+}
+
+/** The Tier 1 questions the onboarding "Your facts" step asks. */
+export const ONBOARDING_QUESTION_FACT_KEYS = {
+  jobTitle: "current_job_title",
+  workAuth: "work_auth",
+  salary: "salary_expectation",
+  hear: "how_did_you_hear",
+  eeo: ["eeo_gender", "eeo_race_ethnicity", "eeo_veteran", "eeo_disability"],
+} as const;
+
 export const factLabels: Record<FactKey, string> = {
   legal_name: "Legal name",
   email: "Job-search email",
@@ -58,6 +82,7 @@ export const factLabels: Record<FactKey, string> = {
   current_city: "City",
   current_country: "Country",
   linkedin_url: "LinkedIn",
+  current_job_title: "Current job title",
   work_auth: "Work authorisation",
   sponsorship_required: "Sponsorship",
   notice_period: "Notice period",
@@ -69,6 +94,7 @@ export const factLabels: Record<FactKey, string> = {
   employment_history: "Employment history",
   education_history: "Education",
   current_employer: "Current employer",
+  how_did_you_hear: "How you heard about us",
   languages: "Languages",
   preferred_name: "Preferred name",
   github_url: "GitHub",

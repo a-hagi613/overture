@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router";
+
 import type { ReactNode } from "react";
 
 import { copy } from "../../shared/copy.ts";
@@ -10,6 +12,8 @@ export function FactRow(props: {
   note: string;
   value: string;
 }) {
+  const navigate = useNavigate();
+
   const actionText =
     props.action === "read-only" ? copy.profile.facts.readOnly : copy.profile.facts.edit;
 
@@ -36,6 +40,13 @@ export function FactRow(props: {
       <button
         aria-label={actionAria}
         className="min-h-10 flex-none px-3.5 text-[13.5px] leading-[normal] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground max-[767px]:min-h-11"
+        onClick={
+          props.action === "edit"
+            ? () => {
+                void navigate("/onboarding/facts");
+              }
+            : undefined
+        }
         type="button"
       >
         {actionText}
