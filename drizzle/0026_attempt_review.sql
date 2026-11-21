@@ -1,0 +1,1 @@
+ALTER TABLE `reviews` ADD `attempt_id` text;

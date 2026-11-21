@@ -80,7 +80,9 @@ const ATTEMPT_OUTCOMES = [
   ["captcha_blocked", "captcha_blocked"],
   ["code_timeout", "code_timeout"],
   ["fill_failed", "form_changed"],
+  ["form_changed", "form_changed"],
   ["form_missing", "form_changed"],
+  ["needs_review", "needs_review"],
   ["sent", "sent"],
   ["timeout", "timeout"],
   ["unconfirmed", "unconfirmed"],
@@ -601,6 +603,40 @@ export function createDispatcher(deps: DispatcherDeps) {
           errorCode: reason,
           outcome: "identity_mismatch",
         });
+      } else if (run.outcome === "needs_review") {
+        releaseAttempt(applicationId, claimed.userId, attemptId);
+
+        preparation.openAttemptReviews({
+          applicationId,
+          attemptId,
+          fields: "unexpectedRequired" in run ? (run.unexpectedRequired ?? []) : [],
+          userId: claimed.userId,
+        });
+
+        db.update(applications)
+          .set({
+            attempts: sql`max(${applications.attempts} - 1, 0)`,
+            status: "needs_review",
+            statusReason: "unknown_question",
+            updatedAt: clock.now(),
+          })
+          .where(eq(applications.id, applicationId))
+          .run();
+
+        recordApplicationEvent(db, clock, {
+          applicationId,
+          userId: claimed.userId,
+          kind: "status",
+          fromValue: "sending",
+          toValue: "needs_review",
+          source: "system",
+        });
+
+        updateAttempt(attemptId, {
+          endedAt: clock.now(),
+          errorCode: "preflight:unknown_required",
+          outcome: "needs_review",
+        });
       } else {
         const current = db.select().from(attempts).where(eq(attempts.id, attemptId)).get();
         const submitted = current?.submitClickedAt ?? null;
@@ -622,9 +658,17 @@ export function createDispatcher(deps: DispatcherDeps) {
             userId: claimed.userId,
           });
 
+          const preflight = "preflight" in run ? (run.preflight ?? []) : [];
+
           updateAttempt(attemptId, {
             captchaSeen: run.outcome === "captcha_blocked",
             endedAt: clock.now(),
+            errorCode:
+              preflight.length === 0
+                ? null
+                : `preflight:${preflight
+                    .map((problem) => `${problem.kind}:${problem.fieldName ?? problem.label}`)
+                    .join(",")}`,
             outcome: outcomeOf(run.outcome),
           });
         }

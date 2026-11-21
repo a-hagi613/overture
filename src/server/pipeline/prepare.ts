@@ -29,8 +29,10 @@ import { guardPosting } from "./guard/posting-guard.ts";
 import { createOpenTextService, isCoverLetterQuestion } from "./open-text.ts";
 import { createTargetsService } from "../profile/targets.ts";
 import { greenhouseBoardUrl } from "./greenhouse-board-url.ts";
+import { countriesNamedIn } from "../catalog/question-normalize.ts";
 import { mapQuestionsWithLlm } from "../catalog/question-mapping.ts";
 import { createQuestionCatalog, questionInputsFromAts } from "../catalog/questions.ts";
+import { isCountryScopedFactKey } from "../../shared/facts.ts";
 import { indexFacts, isUnsupportedBlock, resolveQuestion } from "./answer-plan.ts";
 import {
   attachApplication,
@@ -428,6 +430,76 @@ export function createPreparationService(deps: {
 
       attachApplication(db, reviewId, input.applicationId);
     }
+  }
+
+  function openAttemptReviews(input: {
+    applicationId: string;
+    userId: string;
+    attemptId: string;
+    fields: readonly {
+      label: string;
+      fieldType: QuestionFieldType | null;
+      options: string[];
+      fieldName: string | null;
+    }[];
+  }) {
+    const row = db
+      .select({
+        companyName: companies.name,
+        postingId: postings.id,
+      })
+      .from(applications)
+      .innerJoin(postings, eq(postings.id, applications.postingId))
+      .innerJoin(companies, eq(companies.id, postings.companyId))
+      .where(eq(applications.id, input.applicationId))
+      .get();
+
+    if (row === undefined) {
+      return [];
+    }
+
+    const reviewIds: string[] = [];
+
+    for (const field of input.fields) {
+      if (field.fieldType === null || field.label.trim() === "") {
+        continue;
+      }
+
+      const question = catalog.findOrCreate({
+        companyNames: [row.companyName],
+        fieldType: field.fieldType,
+        options: field.options,
+        text: field.label,
+      });
+
+      catalog.addPostingQuestion(row.postingId, {
+        fieldName: field.fieldName,
+        options: field.options,
+        questionId: question.id,
+        required: true,
+      });
+
+      const [scope] = countriesNamedIn(field.label);
+
+      const factKey = question.answerKind === "fact" ? question.factKey : null;
+
+      const reviewId = ensureOpenReview(db, clock, {
+        attemptId: input.attemptId,
+        factKey,
+        fieldType: field.fieldType,
+        options: field.options,
+        prompt: field.label,
+        questionId: question.id,
+        reason: "unknown_required",
+        scope: factKey !== null && isCountryScopedFactKey(factKey) ? (scope ?? "") : "",
+        userId: input.userId,
+      });
+
+      attachApplication(db, reviewId, input.applicationId);
+      reviewIds.push(reviewId);
+    }
+
+    return reviewIds;
   }
 
   async function prepare(applicationId: string) {
@@ -905,7 +977,7 @@ export function createPreparationService(deps: {
     );
   }
 
-  return { answersFor, prepare, prepareMany, sendPlanFor };
+  return { answersFor, openAttemptReviews, prepare, prepareMany, sendPlanFor };
 }
 
 export type PreparationService = ReturnType<typeof createPreparationService>;

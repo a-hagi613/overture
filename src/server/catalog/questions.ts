@@ -164,6 +164,42 @@ export function createQuestionCatalog(deps: { db: AppDatabase; clock: Clock }) {
       .all();
   }
 
+  function addPostingQuestion(
+    postingId: string,
+    entry: {
+      questionId: string;
+      required: boolean;
+      options: string[];
+      fieldName: string | null;
+    },
+  ) {
+    const positions = db
+      .select({ position: postingQuestions.position })
+      .from(postingQuestions)
+      .where(eq(postingQuestions.postingId, postingId))
+      .all();
+
+    let highest = -1;
+
+    for (const row of positions) {
+      highest = Math.max(highest, row.position);
+    }
+
+    const position = highest + 1;
+
+    db.insert(postingQuestions)
+      .values({
+        postingId,
+        questionId: entry.questionId,
+        required: entry.required,
+        position,
+        options: JSON.stringify(entry.options),
+        fieldName: entry.fieldName,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+
   function savePostingQuestions(
     postingId: string,
     entries: readonly {
@@ -214,6 +250,7 @@ export function createQuestionCatalog(deps: { db: AppDatabase; clock: Clock }) {
   }
 
   return {
+    addPostingQuestion,
     byId,
     byLabel,
     findOrCreate,
