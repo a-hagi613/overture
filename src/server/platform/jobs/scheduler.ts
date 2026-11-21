@@ -3,11 +3,13 @@ import type { Clock } from "../ports/clock.ts";
 import type { ClaimedJob, JobHandlers } from "./queue.ts";
 
 import { claimJobsToRun, requeueWithoutConsumingAttempt, runClaimedJob } from "./queue.ts";
+import { logError } from "../log.ts";
 import { getSetting } from "../settings/index.ts";
 
 const DEFAULT_POLL_INTERVAL_MS = 15_000;
 const DEFAULT_BATCH_SIZE = 10;
 const MIN_POLL_INTERVAL_MS = 1000;
+const ERROR_RETRY_DELAY_MS = 1000;
 
 interface InFlightJob {
   id: string;
@@ -36,7 +38,7 @@ function readBatchSize(db: AppDatabase) {
   return Number.isFinite(parsed) && parsed >= 1 ? Math.trunc(parsed) : DEFAULT_BATCH_SIZE;
 }
 
-async function sleep(ms: number, signal: AbortSignal, onResolve: (resolve: () => void) => void) {
+async function sleep(ms: number, signal: AbortSignal, onResolve?: (resolve: () => void) => void) {
   return new Promise<void>((resolve) => {
     const timer = setTimeout(resolve, ms);
 
@@ -49,7 +51,7 @@ async function sleep(ms: number, signal: AbortSignal, onResolve: (resolve: () =>
       { once: true },
     );
 
-    onResolve(resolve);
+    onResolve?.(resolve);
   });
 }
 
@@ -101,7 +103,17 @@ export function startJobWorker(
       }
     };
 
-    entry.promise = tracked();
+    const settle = async () => {
+      try {
+        return await tracked();
+      } catch (error) {
+        logError(`jobs.run ${job.kind}`, error);
+
+        return false;
+      }
+    };
+
+    entry.promise = settle();
 
     inFlight.add(entry);
   }
@@ -136,15 +148,21 @@ export function startJobWorker(
       return;
     }
 
-    const intervalMs = readPollIntervalMs(db);
+    try {
+      const intervalMs = readPollIntervalMs(db);
 
-    await sleep(intervalMs, signal, (resolve) => {
-      wakeResolve = resolve;
-    });
+      await sleep(intervalMs, signal, (resolve) => {
+        wakeResolve = resolve;
+      });
 
-    wakeResolve = null;
+      wakeResolve = null;
 
-    runOnce();
+      runOnce();
+    } catch (error) {
+      logError("jobs.loop", error);
+
+      await sleep(ERROR_RETRY_DELAY_MS, signal);
+    }
 
     return step();
   }

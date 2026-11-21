@@ -12,6 +12,7 @@ export interface AppServer {
   stop: () => Promise<void>;
   restart: () => Promise<void>;
   crash: () => Promise<void>;
+  waitForStderr: (pattern: RegExp) => Promise<string>;
 }
 
 async function waitForExit(child: ChildProcess) {
@@ -24,6 +25,48 @@ async function waitForExit(child: ChildProcess) {
       resolve();
     });
   });
+}
+
+interface StderrWaiter {
+  pattern: RegExp;
+  resolve: (line: string) => void;
+}
+
+function createStderrMonitor() {
+  let text = "";
+  const waiters = new Set<StderrWaiter>();
+
+  function settle(line: string) {
+    for (const waiter of waiters) {
+      if (waiter.pattern.test(line)) {
+        waiters.delete(waiter);
+        waiter.resolve(line);
+      }
+    }
+  }
+
+  function onChunk(chunk: string) {
+    process.stderr.write(chunk);
+    text += chunk;
+
+    for (const line of chunk.split("\n")) {
+      settle(line);
+    }
+  }
+
+  async function waitFor(pattern: RegExp) {
+    const existing = text.split("\n").find((line) => pattern.test(line));
+
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    return new Promise<string>((resolve) => {
+      waiters.add({ pattern, resolve });
+    });
+  }
+
+  return { onChunk, waitFor };
 }
 
 function authDefaults(extraEnvironment: Record<string, string>) {
@@ -54,13 +97,22 @@ export function serverEnvironment(extraEnvironment: Record<string, string>) {
   return Object.fromEntries(Object.entries(merged).filter(([key]) => extraEnvironment[key] !== ""));
 }
 
-async function spawnServer(databasePath: string, extraEnvironment: Record<string, string>) {
+async function spawnServer(
+  databasePath: string,
+  extraEnvironment: Record<string, string>,
+  stderr: ReturnType<typeof createStderrMonitor>,
+) {
   const child = spawn("bun", ["run", "src/server/main.ts"], {
     env: {
       ...serverEnvironment(extraEnvironment),
       DATABASE_URL: databasePath,
     },
-    stdio: ["ignore", "pipe", "inherit"],
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (chunk: string) => {
+    stderr.onChunk(chunk);
   });
 
   return new Promise<{ child: ChildProcess; url: string }>((resolve, reject) => {
@@ -96,13 +148,16 @@ export async function startAppServer(
   databasePath: string,
   extraEnvironment: Record<string, string> = {},
 ) {
-  let { child, url } = await spawnServer(databasePath, extraEnvironment);
+  const stderr = createStderrMonitor();
+
+  let { child, url } = await spawnServer(databasePath, extraEnvironment, stderr);
 
   const server: AppServer = {
     get url() {
       return url;
     },
     databasePath,
+    waitForStderr: stderr.waitFor,
     stop: async () => {
       child.kill("SIGTERM");
       await waitForExit(child);
@@ -110,7 +165,12 @@ export async function startAppServer(
     restart: async () => {
       child.kill("SIGTERM");
       await waitForExit(child);
-      const { child: nextChild, url: nextUrl } = await spawnServer(databasePath, extraEnvironment);
+
+      const { child: nextChild, url: nextUrl } = await spawnServer(
+        databasePath,
+        extraEnvironment,
+        stderr,
+      );
 
       child = nextChild;
       url = nextUrl;

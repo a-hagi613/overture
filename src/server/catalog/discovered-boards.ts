@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
+import { WRITE_BATCH_ROWS, yieldToEventLoop } from "../platform/db/batches.ts";
 import { companies, companyBoards } from "../platform/db/schema.ts";
 import { greenhouseBoardTokenFromUrl } from "./greenhouse-feed.ts";
 
@@ -132,7 +133,11 @@ export function normalizeDiscoveredBoards(rows: DiscoveredScraperRow[]) {
   return { boards, stats };
 }
 
-export function loadDiscoveredBoards(db: AppDatabase, clock: Clock, rows: DiscoveredScraperRow[]) {
+export async function loadDiscoveredBoards(
+  db: AppDatabase,
+  clock: Clock,
+  rows: DiscoveredScraperRow[],
+) {
   const { boards, stats } = normalizeDiscoveredBoards(rows);
 
   const report: DiscoveredBoardsLoadReport = {
@@ -143,85 +148,100 @@ export function loadDiscoveredBoards(db: AppDatabase, clock: Clock, rows: Discov
     reusedCompanies: 0,
   };
 
-  db.transaction((tx) => {
-    for (const board of boards) {
-      const existing = tx
-        .select()
-        .from(companyBoards)
-        .where(
-          and(
-            eq(companyBoards.ats, board.ats),
-            eq(companyBoards.region, board.region),
-            eq(companyBoards.boardToken, board.boardToken),
-          ),
-        )
-        .get();
+  async function loadBatch(start: number) {
+    const batch = boards.slice(start, start + WRITE_BATCH_ROWS);
 
-      if (existing !== undefined) {
-        report.existingBoards += 1;
+    db.transaction((tx) => {
+      for (const board of batch) {
+        const existing = tx
+          .select()
+          .from(companyBoards)
+          .where(
+            and(
+              eq(companyBoards.ats, board.ats),
+              eq(companyBoards.region, board.region),
+              eq(companyBoards.boardToken, board.boardToken),
+            ),
+          )
+          .get();
 
-        continue;
-      }
+        if (existing !== undefined) {
+          report.existingBoards += 1;
 
-      const sameToken = tx
-        .select()
-        .from(companyBoards)
-        .where(
-          and(eq(companyBoards.ats, board.ats), eq(companyBoards.boardToken, board.boardToken)),
-        )
-        .all();
+          continue;
+        }
 
-      const misplaced =
-        sameToken.length === 1 && sameToken[0]?.source === "discovered" ? sameToken[0] : undefined;
+        const sameToken = tx
+          .select()
+          .from(companyBoards)
+          .where(
+            and(eq(companyBoards.ats, board.ats), eq(companyBoards.boardToken, board.boardToken)),
+          )
+          .all();
 
-      if (misplaced !== undefined) {
-        tx.update(companyBoards)
-          .set({ region: board.region })
-          .where(eq(companyBoards.id, misplaced.id))
-          .run();
+        const misplaced =
+          sameToken.length === 1 && sameToken[0]?.source === "discovered"
+            ? sameToken[0]
+            : undefined;
 
-        report.existingBoards += 1;
+        if (misplaced !== undefined) {
+          tx.update(companyBoards)
+            .set({ region: board.region })
+            .where(eq(companyBoards.id, misplaced.id))
+            .run();
 
-        continue;
-      }
+          report.existingBoards += 1;
 
-      const nameNorm = board.companyName.toLowerCase();
-      const company = tx.select().from(companies).where(eq(companies.nameNorm, nameNorm)).get();
-      const companyId = company?.id ?? crypto.randomUUID();
+          continue;
+        }
 
-      if (company === undefined) {
-        tx.insert(companies)
+        const nameNorm = board.companyName.toLowerCase();
+        const company = tx.select().from(companies).where(eq(companies.nameNorm, nameNorm)).get();
+        const companyId = company?.id ?? crypto.randomUUID();
+
+        if (company === undefined) {
+          tx.insert(companies)
+            .values({
+              id: companyId,
+              name: board.companyName,
+              nameNorm,
+              createdAt: clock.now(),
+            })
+            .run();
+
+          report.createdCompanies += 1;
+        } else {
+          report.reusedCompanies += 1;
+        }
+
+        tx.insert(companyBoards)
           .values({
-            id: companyId,
-            name: board.companyName,
-            nameNorm,
+            id: crypto.randomUUID(),
+            companyId,
+            ats: board.ats,
+            boardToken: board.boardToken,
+            region: board.region,
+            status: "active",
+            source: "discovered",
+            notFoundPolls: 0,
             createdAt: clock.now(),
           })
+          .onConflictDoNothing()
           .run();
 
-        report.createdCompanies += 1;
-      } else {
-        report.reusedCompanies += 1;
+        report.createdBoards += 1;
       }
+    });
 
-      tx.insert(companyBoards)
-        .values({
-          id: crypto.randomUUID(),
-          companyId,
-          ats: board.ats,
-          boardToken: board.boardToken,
-          region: board.region,
-          status: "active",
-          source: "discovered",
-          notFoundPolls: 0,
-          createdAt: clock.now(),
-        })
-        .onConflictDoNothing()
-        .run();
+    const next = start + batch.length;
 
-      report.createdBoards += 1;
+    if (next < boards.length) {
+      await yieldToEventLoop();
+      await loadBatch(next);
     }
-  });
+  }
+
+  await loadBatch(0);
 
   return report;
 }

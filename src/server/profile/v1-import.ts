@@ -9,6 +9,7 @@ import type { V1AnswerEntry, V1Export, V1LearnedAnswer } from "./v1-export.ts";
 import type { PersonalCrypto } from "./personal-crypto.ts";
 
 import { normalizeQuestionText } from "../catalog/question-normalize.ts";
+import { WRITE_BATCH_ROWS, yieldToEventLoop } from "../platform/db/batches.ts";
 import { answerIsValid } from "../pipeline/answer-value.ts";
 import { facts } from "../platform/db/schema.ts";
 
@@ -506,9 +507,27 @@ export async function importV1Facts(deps: {
     byWrite.set(`${write.key}\u0000${write.scope}`, write);
   }
 
-  const results = await Promise.all(
-    [...byWrite.values()].map(async (write) => ({ write, outcome: await applyWrite(write) })),
-  );
+  const writes = [...byWrite.values()];
+  const results: { write: FactWrite; outcome: Awaited<ReturnType<typeof applyWrite>> }[] = [];
+
+  async function applyWrites(start: number) {
+    const batch = writes.slice(start, start + WRITE_BATCH_ROWS);
+
+    results.push(
+      ...(await Promise.all(
+        batch.map(async (write) => ({ write, outcome: await applyWrite(write) })),
+      )),
+    );
+
+    const next = start + batch.length;
+
+    if (next < writes.length) {
+      await yieldToEventLoop();
+      await applyWrites(next);
+    }
+  }
+
+  await applyWrites(0);
 
   for (const result of results) {
     if (result.outcome === "kept_user_fact") {
@@ -523,13 +542,26 @@ export async function importV1Facts(deps: {
     }
   }
 
-  for (const mapping of collected.mappings) {
-    catalog.setMapping(mapping.questionId, {
-      answerKind: "fact",
-      factKey: mapping.key,
-      mappedBy: "owner",
-    });
+  async function applyMappings(start: number) {
+    const batch = collected.mappings.slice(start, start + WRITE_BATCH_ROWS);
+
+    for (const mapping of batch) {
+      catalog.setMapping(mapping.questionId, {
+        answerKind: "fact",
+        factKey: mapping.key,
+        mappedBy: "owner",
+      });
+    }
+
+    const next = start + batch.length;
+
+    if (next < collected.mappings.length) {
+      await yieldToEventLoop();
+      await applyMappings(next);
+    }
   }
+
+  await applyMappings(0);
 
   const report: V1ImportReport = {
     exported: {

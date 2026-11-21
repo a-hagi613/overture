@@ -212,6 +212,25 @@ request, a log or a test fixture. The two scripts print counts and keys only, ne
    idempotent: it updates the same rows and never overwrites a Fact whose source is `user` or `review`.
 4. Delete the decrypted export from both machines.
 
+## Operator scripts against the live database
+
+Operator scripts run against the same `/data/app.sqlite` the server is using, so every one that writes does it in
+small batches: at most 500 rows per transaction, with the event loop yielded between batches. A long single
+transaction would hold the write lock past the app's `busy_timeout` (5 s); the server would then log `SQLITE_BUSY`,
+retry the claim or poll, and keep serving reads, but the batch would still have stalled writes for seconds.
+
+- `scripts/retag-feed-workplace.ts` clears Lever and Ashby board and posting content hashes in batches of 500 and
+  never touches closed or Greenhouse rows. Re-running it is safe: the second run reports `postingsReset: 0`.
+- `scripts/import-v1-facts.ts` applies encrypted facts in batches of 500 and is idempotent (it updates the same rows
+  and never overwrites a Fact whose source is `user` or `review`).
+- `scripts/load-discovered-boards.ts` inserts discovered boards in transactions of at most 500 boards and is
+  idempotent.
+- `scripts/census.ts` only reads the database and writes its Markdown report to disk.
+
+Do not open a long manual transaction on the volume while the server runs. The server's background job loop, SSE
+poller and request handlers retry `SQLITE_BUSY` and log it instead of exiting; an unhandled rejection from a
+background loop or timer is logged and alerted (`process.unhandled`), not fatal.
+
 ## Restore drill safety
 
 The throwaway machine runs the same image with `LITESTREAM_RESTORE_ONLY=true`: it restores from R2 and

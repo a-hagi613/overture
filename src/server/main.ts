@@ -9,6 +9,7 @@ import { migrateDatabase } from "./platform/db/migrate.ts";
 import { createClock } from "./platform/ports/clock.ts";
 import { createRandom } from "./platform/ports/random.ts";
 import { createBackupMonitor } from "./platform/ports/backup.ts";
+import { installProcessGuards } from "./platform/process-guard.ts";
 import { recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
 import { startJobWorker } from "./platform/jobs/scheduler.ts";
 import { startTelemetry, trace } from "./platform/telemetry/otel.ts";
@@ -108,6 +109,9 @@ if (env.ENABLE_TEST_ROUTES) {
 
 const clock = createClock();
 const random = createRandom();
+
+installProcessGuards(db, clock);
+
 const shutdownController = new AbortController();
 const backups = createBackupMonitor(db, clock);
 

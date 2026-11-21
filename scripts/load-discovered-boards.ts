@@ -48,6 +48,6 @@ const { db } = openDatabase(databasePath);
 migrateDatabase(db, "drizzle");
 
 const clock = createClock();
-const report = loadDiscoveredBoards(db, clock, rows);
+const report = await loadDiscoveredBoards(db, clock, rows);
 
 process.stdout.write(`${JSON.stringify({ ...report, parquetColumns: columns }, null, 2)}\n`);

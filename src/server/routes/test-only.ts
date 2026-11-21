@@ -889,8 +889,8 @@ export function createTestRoutes(
     return context.json({ boards: rows });
   });
 
-  routes.post("/catalog/retag-open-postings", (context) => {
-    const report = resetFeedContentHashes(db);
+  routes.post("/catalog/retag-open-postings", async (context) => {
+    const report = await resetFeedContentHashes(db);
 
     return context.json(report);
   });
@@ -960,7 +960,7 @@ export function createTestRoutes(
       const body = context.req.valid("json");
 
       if ("rows" in body) {
-        return context.json(loadDiscoveredBoards(db, clock, body.rows));
+        return context.json(await loadDiscoveredBoards(db, clock, body.rows));
       }
 
       const bytes = readFileSync(body.path);
@@ -969,7 +969,7 @@ export function createTestRoutes(
       new Uint8Array(file).set(bytes);
 
       const { rows } = await readCompaniesParquet(file);
-      const report = loadDiscoveredBoards(db, clock, rows);
+      const report = await loadDiscoveredBoards(db, clock, rows);
 
       return context.json(report);
     },

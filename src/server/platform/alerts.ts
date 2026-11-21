@@ -22,6 +22,7 @@ export const ALERT_KINDS = [
   "backup.failure",
   "health",
   "disk",
+  "process.unhandled",
 ] as const;
 
 export type AlertKind = (typeof ALERT_KINDS)[number];
