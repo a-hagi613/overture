@@ -8,12 +8,7 @@ import type { APIRequestContext } from "@playwright/test";
 import { dkimSign } from "mailauth";
 import { z } from "zod";
 
-import {
-  INBOUND_HEADERS,
-  forwardingIdFrom,
-  forwardingLocalPart,
-  signInbound,
-} from "./inbound-mail.fixture.ts";
+import { INBOUND_HEADERS, forwardingLocalPart, signInbound } from "./inbound-mail.fixture.ts";
 
 import type { AppServer } from "./app-server.ts";
 import type { IdentityServer } from "./identity-server-test.fixture.ts";
@@ -29,7 +24,24 @@ const signingDomain = "us.greenhouse-mail.io";
 const selector = "overture";
 const code = "A1B2C3D4";
 
-const mailboxSchema = z.object({ address: z.string() });
+const mailboxSchema = z.object({
+  address: z.string(),
+  forwardingWorks: z.boolean(),
+  firstForwardedAt: z.number().nullable(),
+});
+
+const mailboxesSchema = z.object({
+  mailboxes: z.array(
+    z.object({
+      id: z.string(),
+      localPart: z.string(),
+      status: z.string(),
+      firstForwardedAt: z.number().nullable(),
+    }),
+  ),
+});
+
+const userSchema = z.object({ user: z.object({ id: z.string() }).nullable() });
 
 const messageSchema = z.object({
   id: z.string(),
@@ -152,6 +164,32 @@ async function storedMessages() {
   return messagesSchema.parse(await response.json()).messages;
 }
 
+async function messagesFor(id: string) {
+  const response = await api.get(
+    `${baseUrl()}/__test__/mail/messages?mailboxId=${encodeURIComponent(id)}`,
+  );
+
+  return messagesSchema.parse(await response.json()).messages;
+}
+
+async function readMailbox() {
+  const response = await api.get(`${baseUrl()}/api/profile/mailbox`);
+
+  return mailboxSchema.parse(await response.json());
+}
+
+async function mailboxesFor(userId: string) {
+  const response = await api.get(
+    `${baseUrl()}/__test__/mailboxes?userId=${encodeURIComponent(userId)}`,
+  );
+
+  return mailboxesSchema.parse(await response.json()).mailboxes;
+}
+
+async function setMailboxStatus(id: string, status: "active" | "receive_only" | "closed") {
+  return api.post(`${baseUrl()}/__test__/mailboxes/${id}/status`, { data: { status } });
+}
+
 async function createWait() {
   const response = await api.post(`${baseUrl()}/__test__/mail/code-waits`, {
     data: { mailboxId, attemptId: crypto.randomUUID() },
@@ -217,19 +255,23 @@ test.beforeAll(async () => {
 
   await api.get(link);
 
-  const mailboxResponse = await api.get(`${server.url}/api/profile/mailbox`);
+  const meResponse = await api.get(`${server.url}/api/me`);
+  const me = userSchema.parse(await meResponse.json());
 
-  const { address: generated } = mailboxSchema.parse(await mailboxResponse.json());
-
-  address = generated;
-
-  const id = await forwardingIdFrom(secret, address);
-
-  if (id === null) {
-    throw new Error(`The app returned an invalid forwarding address: ${address}`);
+  if (me.user === null) {
+    throw new Error("The owner is not signed in.");
   }
 
-  mailboxId = id;
+  const owned = await api.get(`${server.url}/__test__/mailboxes?userId=${me.user.id}`);
+  const { mailboxes: created } = mailboxesSchema.parse(await owned.json());
+  const [mailboxRow] = created;
+
+  if (mailboxRow === undefined || created.length !== 1) {
+    throw new Error("The new account did not get exactly one forwarding address.");
+  }
+
+  address = `${mailboxRow.localPart}@tryoverture.com`;
+  mailboxId = mailboxRow.id;
 });
 
 test.afterAll(async () => {
@@ -248,7 +290,27 @@ test.afterAll(async () => {
   }
 });
 
-test("a signed ATS message is stored, threaded and authenticated", async () => {
+test("a new account has one address, and its first forwarded ATS message records that forwarding works", async () => {
+  const meResponse = await api.get(`${baseUrl()}/api/me`);
+  const me = userSchema.parse(await meResponse.json());
+
+  if (me.user === null) {
+    throw new Error("The owner is not signed in.");
+  }
+
+  const owned = await mailboxesFor(me.user.id);
+
+  expect(owned).toHaveLength(1);
+  expect(owned[0]?.localPart).toBe(address.split("@")[0]);
+  expect(owned[0]?.status).toBe("active");
+  expect(owned[0]?.firstForwardedAt).toBeNull();
+
+  const before = await readMailbox();
+
+  expect(before.address).toBe(address);
+  expect(before.forwardingWorks).toBe(false);
+  expect(before.firstForwardedAt).toBeNull();
+
   ackId = crypto.randomUUID();
 
   const ack = fixture("greenhouse-ack.eml").replaceAll("__MESSAGE_ID__", ackId);
@@ -276,6 +338,12 @@ test("a signed ATS message is stored, threaded and authenticated", async () => {
   expect(first.snippet).not.toContain("\n");
   expect(first.htmlObjectKey).toBeNull();
   expect(first.attachments).toHaveLength(0);
+
+  const after = await readMailbox();
+
+  expect(after.address).toBe(address);
+  expect(after.forwardingWorks).toBe(true);
+  expect(after.firstForwardedAt).not.toBeNull();
 
   const threadsResponse = await api.get(
     `${baseUrl()}/__test__/mail/threads?mailboxId=${encodeURIComponent(mailboxId)}`,
@@ -362,6 +430,99 @@ test("an unknown forwarding address stores nothing", async () => {
   });
 
   expect(read.status()).toBe(404);
+});
+
+test("a forged MAC or another domain for an existing mailbox stores nothing", async () => {
+  const before = (await storedMessages()).length;
+  const forged = `in-${mailboxId}-0000000000@tryoverture.com`;
+  const foreign = `${address.split("@")[0] ?? ""}@elsewhere.test`;
+
+  const raw = await sign(
+    fixture("greenhouse-ack.eml").replaceAll("__MESSAGE_ID__", crypto.randomUUID()),
+  );
+
+  expect((await postInbound(raw, forged)).status()).toBe(204);
+  expect((await postInbound(raw, foreign)).status()).toBe(204);
+
+  await runDueJobs();
+  expect((await storedMessages()).length).toBe(before);
+});
+
+test("a closed address is discarded and a receive-only one never resolves a code", async () => {
+  const before = (await storedMessages()).length;
+
+  const raw = await sign(
+    fixture("greenhouse-ack.eml").replaceAll("__MESSAGE_ID__", crypto.randomUUID()),
+  );
+
+  expect((await setMailboxStatus(mailboxId, "closed")).status()).toBe(200);
+  expect((await postInbound(raw, address)).status()).toBe(204);
+
+  await runDueJobs();
+  expect((await storedMessages()).length).toBe(before);
+
+  expect((await setMailboxStatus(mailboxId, "receive_only")).status()).toBe(200);
+
+  const wait = await createWait();
+
+  const codeMessage = await sign(
+    fixture("greenhouse-code.eml")
+      .replaceAll("__MESSAGE_ID__", crypto.randomUUID())
+      .replaceAll("__ACK_ID__", ackId),
+  );
+
+  expect((await postInbound(codeMessage, address)).status()).toBe(204);
+
+  await runDueJobs();
+  await expect.poll(async () => (await storedMessages()).length).toBe(before + 1);
+
+  const storedWait = await readWait(wait.id);
+
+  expect(storedWait.resolvedAt).toBeNull();
+  expect(storedWait.resolvedBy).toBeNull();
+
+  const pasted = await pasteCode(wait.id, "Q1W2E3R4");
+
+  expect(pasted.status()).toBe(200);
+  expect((await setMailboxStatus(mailboxId, "active")).status()).toBe(200);
+});
+
+test("mail for another user's address is ingested for that user only", async () => {
+  const ownerBefore = (await storedMessages()).length;
+
+  const created = await api.post(`${baseUrl()}/__test__/users`, {
+    data: { email: "burner@example.com", name: "Burner" },
+  });
+
+  const { id: burnerId } = z.object({ id: z.string() }).parse(await created.json());
+  const burners = await mailboxesFor(burnerId);
+
+  expect(burners).toHaveLength(1);
+
+  const [burner] = burners;
+
+  if (burner === undefined) {
+    throw new Error("The second user got no forwarding address.");
+  }
+
+  expect(burner.status).toBe("active");
+  expect(burner.localPart).not.toBe(address.split("@")[0]);
+
+  const raw = await sign(
+    fixture("greenhouse-ack.eml").replaceAll("__MESSAGE_ID__", crypto.randomUUID()),
+  );
+
+  const posted = await postInbound(raw, `${burner.localPart}@tryoverture.com`);
+
+  expect(posted.status()).toBe(204);
+
+  await runDueJobs();
+  await expect.poll(async () => (await messagesFor(burner.id)).length).toBe(1);
+  expect((await storedMessages()).length).toBe(ownerBefore);
+
+  const [stored] = await messagesFor(burner.id);
+
+  expect(stored?.auth).toBe("pass");
 });
 
 test("unauthenticated mail is stored and labelled but never used for a code", async () => {

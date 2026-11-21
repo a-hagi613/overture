@@ -72,6 +72,7 @@ import { mapQuestionByRules } from "../catalog/question-rules.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
 import { createCodeWait, wakeCodeWaits } from "../inbox/waits.ts";
+import { createMailboxService } from "../inbox/mailboxes.ts";
 import { readLiveCheckResults } from "../live-checks/store.ts";
 import { runAlertDrill } from "../live-checks/alerts.ts";
 import { env } from "../config/env.ts";
@@ -579,6 +580,11 @@ export function createTestRoutes(
     parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
     env.MASTER_KEY_CURRENT,
   );
+
+  const testMailboxes =
+    env.INBOUND_HMAC_SECRET === undefined
+      ? null
+      : createMailboxService(db, clock, env.INBOUND_HMAC_SECRET, env.MAIL_DOMAIN);
 
   function seedReviewRow(body: z.infer<typeof seedReviewBody>) {
     const now = clock.now();
@@ -1093,7 +1099,7 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
-  routes.post("/users", zValidator("json", createUserBody), (context) => {
+  routes.post("/users", zValidator("json", createUserBody), async (context) => {
     const { email, name } = context.req.valid("json");
     const id = crypto.randomUUID();
     const now = new Date(clock.now());
@@ -1109,6 +1115,8 @@ export function createTestRoutes(
         updatedAt: now,
       })
       .run();
+
+    await testMailboxes?.ensureFor(id);
 
     return context.json({ id });
   });
@@ -2493,6 +2501,51 @@ export function createTestRoutes(
 
     return context.json({ threads });
   });
+
+  routes.get(
+    "/mailboxes",
+    zValidator("query", z.object({ userId: z.string().min(1) })),
+    (context) => {
+      const rows = db
+        .select()
+        .from(mailboxes)
+        .where(eq(mailboxes.userId, context.req.valid("query").userId))
+        .all();
+
+      return context.json({
+        mailboxes: rows.map((row) => ({
+          id: row.id,
+          localPart: row.localPart,
+          status: row.status,
+          receiveUntil: row.receiveUntil?.getTime() ?? null,
+          firstForwardedAt: row.firstForwardedAt?.getTime() ?? null,
+        })),
+      });
+    },
+  );
+
+  routes.post(
+    "/mailboxes/:id/status",
+    zValidator("json", z.object({ status: z.enum(["active", "receive_only", "closed"]) })),
+    (context) => {
+      const { status } = context.req.valid("json");
+
+      const updated = db
+        .update(mailboxes)
+        .set({ status })
+        .where(eq(mailboxes.id, context.req.param("id")))
+        .returning({ id: mailboxes.id })
+        .all();
+
+      const id = updated[0]?.id;
+
+      if (id === undefined) {
+        return context.json({ error: "not found" }, 404);
+      }
+
+      return context.json({ id, status });
+    },
+  );
 
   return routes;
 }

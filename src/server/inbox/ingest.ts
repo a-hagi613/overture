@@ -4,6 +4,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import type { createMailboxService } from "./mailboxes.ts";
 
 import { Buffer } from "node:buffer";
 
@@ -69,9 +70,11 @@ export function createMailIngest(deps: {
   objects: ObjectStore;
   personal: PersonalCrypto;
   resolver: DNSResolver;
+  mailboxes: ReturnType<typeof createMailboxService>;
   onAuthenticatedMessage?: (input: { userId: string; messageId: string }) => Promise<void>;
 }) {
   const { db, clock, objects, personal, resolver, onAuthenticatedMessage } = deps;
+  const { mailboxes: mailboxService } = deps;
 
   async function sealObject(userId: string, key: string, bytes: Uint8Array<ArrayBuffer>) {
     const sealed = await personal.sealFor(
@@ -276,6 +279,10 @@ export function createMailIngest(deps: {
     });
 
     await objects.delete(job.objectKey);
+
+    if (isAtsMailDomain(senderDomain)) {
+      mailboxService.markFirstForwarded(mailbox.id, clock.now());
+    }
 
     publishEvent(
       db,

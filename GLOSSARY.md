@@ -120,7 +120,9 @@ _Avoid_: blocklist, never-apply list
 ## Mail
 
 **Forwarding address**:
-The private address Overture gives each user on `tryoverture.com` (`in-…@`). The user forwards only ATS mail to it; it is never typed on an application form, where the user's real email goes (ADR 0028).
+The private address Overture gives each user on `tryoverture.com` (`in-…@`) when their account is created. The user
+forwards only ATS mail to it; it is read-only in the app, never typed on an application form, where the user's real
+email goes (ADR 0028), and a retired local part is never reused.
 
 **Invite**:
 The owner's permission for one email address to join the beta. Accepting it by signing in with that email creates the account and an admin grant of 300 applications over 30 days.

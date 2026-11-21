@@ -506,6 +506,7 @@ export const mailboxes = sqliteTable("mailboxes", {
     .notNull()
     .default("active"),
   receiveUntil: timestamp("receive_until"),
+  firstForwardedAt: timestamp("first_forwarded_at"),
   createdAt: timestamp("created_at").notNull(),
 });
 
