@@ -826,7 +826,6 @@ export const copy = {
     signedOutMessage: "You are signed out on your other devices.",
     signedOutToasts: "Signed out everywhere",
     legalHeading: "Terms and privacy",
-    legalFolio: "fig. 6",
     legalTerms: "Terms of Service",
     legalTermsDetail: "What Overture promises, and what you agree to.",
     legalPrivacy: "Privacy Policy",

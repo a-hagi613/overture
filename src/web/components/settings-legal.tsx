@@ -23,14 +23,9 @@ export function SettingsLegal() {
       aria-labelledby="settings-legal"
       className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh min-[900px]:col-span-2"
     >
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-serif text-[26px] leading-[1.1]" id="settings-legal">
-          {copy.settings.legalHeading}
-        </h2>
-        <span className="font-serif text-sm italic text-muted-foreground">
-          {copy.settings.legalFolio}
-        </span>
-      </div>
+      <h2 className="font-serif text-[26px] leading-[1.1]" id="settings-legal">
+        {copy.settings.legalHeading}
+      </h2>
       <div className="mt-2.5">
         <SettingsLegalRow
           detail={copy.settings.legalTermsDetail}
