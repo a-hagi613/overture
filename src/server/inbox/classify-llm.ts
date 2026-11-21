@@ -2,11 +2,13 @@ import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
+import type { DegradedFlagReader } from "../platform/degraded.ts";
 import type { LlmOutputSchema, LlmPort, LlmRequest } from "../platform/ports/llm.ts";
 
 import { checkLlmCaps } from "../platform/llm/caps.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
 import { raiseAlert } from "../platform/alerts.ts";
+import { logInfo } from "../platform/log.ts";
 import type { MailClassification } from "./codes.ts";
 
 export const EMAIL_CLASSIFY_PURPOSE = "email_classify";
@@ -63,9 +65,20 @@ export function emailClassifyRequest(input: { customId: string; subject: string;
 }
 
 export async function classifyWithLlm(
-  deps: { db: AppDatabase; clock: Clock; llm: LlmPort },
+  deps: {
+    db: AppDatabase;
+    clock: Clock;
+    llm: LlmPort;
+    degraded?: DegradedFlagReader | undefined;
+  },
   input: { userId: string; messageId: string; subject: string; text: string },
 ) {
+  if (deps.degraded !== undefined && (await deps.degraded.isDegraded())) {
+    logInfo("degraded", "email_classify skipped while degraded: rules only");
+
+    return "other";
+  }
+
   const request = emailClassifyRequest({
     customId: `email-classify-${input.messageId}`,
     subject: input.subject,

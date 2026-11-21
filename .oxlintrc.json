@@ -527,7 +527,8 @@
         "**/*.config.{ts,mts,mjs,js}",
         "test/e2e/global-setup.ts",
         "tools/oxlint/architecture/index.ts",
-        "workers/inbound-mail/src/index.ts"
+        "workers/inbound-mail/src/index.ts",
+        "workers/sentinel/src/index.ts"
       ],
       "rules": {
         "import/no-default-export": "off"
