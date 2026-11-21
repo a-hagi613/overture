@@ -147,7 +147,7 @@ refusal is stamped in `reserve_refused_at` and the cap refusal in `refused_at`, 
 The admin overview shows the month's count and says which of the two stops is in force. Tests reach Cloudflare only
 through MSW (ADR 0013, 0016).
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
-Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set; a half-set pair stops the server at boot and with neither the app boots and runs as in M2. `POST /webhooks/stripe` verifies the `Stripe-Signature` header (HMAC-SHA256 over the timestamped raw body, five-minute window) before it reads or writes any billing row, and a bad or stale signature is refused with 400. `STRIPE_PRICE_WEEK` and `STRIPE_PRICE_MONTH` name the Stripe prices a Checkout session sells; a missing one answers 503 `billing_not_configured` without a Stripe call.
+Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set; a half-set pair stops the server at boot and with neither the app boots and runs as in M2. `POST /webhooks/stripe` verifies the `Stripe-Signature` header (HMAC-SHA256 over the timestamped raw body, five-minute window) before it reads or writes any billing row, and a bad or stale signature is refused with 400. `STRIPE_PRICE_WEEK` and `STRIPE_PRICE_MONTH` name the Stripe prices a Checkout session sells; a missing one answers 503 `billing_not_configured` without a Stripe call. What each plan buys is configuration in `src/server/billing/plans.ts`: Week 70 Applications over 7 days, Month 300 over 30 days (ADR 0018); the price itself lives in Stripe and reaches Overture only as a price id.
 
 ### 3.3 Domains and DNS
 
@@ -214,7 +214,7 @@ interface RemoteBrowser { cdpUrl: string; sessionId: string; liveViewUrl: string
 interface MailSender { sendRaw(m: OutboundMime): Promise<{ providerMessageId: string }> }
 interface ObjectStore { put(k: string, b: Uint8Array, meta?): Promise<void>; get(k: string): Promise<Uint8Array | null>; delete(k: string): Promise<void>; list(prefix: string): AsyncIterable<string> }
 interface SearchIndex { indexPosting(p): void; removePosting(id): void; search(q: SearchQuery): SearchHit[] }
-interface Payments { createCheckoutSession(req: { userId; email; customerId: string | null; priceId; successUrl; cancelUrl }): Promise<{ id; url }>; createPortalSession(req: { customerId; returnUrl }): Promise<{ id; url }>; verifyWebhook(payload: string, signature: string | null): Promise<PaymentEvent> }
+interface Payments { createCheckoutSession(req: { userId; email; customerId: string | null; plan: "week" | "month"; priceId; successUrl; cancelUrl }): Promise<{ id; url }>; createPortalSession(req: { customerId; returnUrl }): Promise<{ id; url }>; verifyWebhook(payload: string, signature: string | null): Promise<PaymentEvent> }
 interface PushSender { send(sub: PushSubscription, payload: PushPayload): Promise<"ok" | "gone"> }
 interface FxRates { perUsd(currency: string, date: string): number | null }
 interface Clock { now(): number }
@@ -321,6 +321,14 @@ and expired in the same transaction (`release` then `expire`), so it never retur
 set in one transaction, so a replay finds the row and does nothing; a bad signature never reaches the table. A signed
 `checkout.session.completed` links `customers.stripe_customer_id` to the user named by `client_reference_id` (or
 `metadata.user_id`), and `customer.created`/`customer.updated` link the same way from `metadata.user_id`.
+`invoice.paid` issues the period grant: `source='period'`, the plan's quantity, `starts_at` at the invoice line's
+period start and `expires_at` at its end (or at receipt and the plan's own period from receipt when the invoice names
+none), and `stripe_invoice_id` the invoice id, which is also the grant's ledger idempotency key, so a replay grants
+once and a renewal's new invoice issues the next period's grant starting where the old one ends. The plan comes from
+the subscription metadata the Checkout session set, falling back to the price the invoice line names. A demo account
+never receives a period grant. An hourly `billing.grant-expiry` pass releases a reservation still held on a grant past its period end
+and then expires its available balance, so it never returns to spendable (ADR 0008); until that pass runs,
+"Applications left" already ignores the ended grant.
 
 ### 5.7 Platform
 

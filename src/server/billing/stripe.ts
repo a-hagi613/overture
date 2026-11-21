@@ -29,6 +29,31 @@ const portalSessionSchema = z.object({
   url: z.url(),
 });
 
+const metadataSchema = z.object({
+  plan: z.string().optional(),
+  user_id: z.string().optional(),
+});
+
+const planNames = ["month", "week"] as const;
+
+function planOf(value: string | undefined) {
+  return planNames.find((plan) => plan === value) ?? null;
+}
+
+const lineSchema = z.object({
+  period: z
+    .object({ end: z.number().optional(), start: z.number().optional() })
+    .nullable()
+    .optional(),
+  price: z.object({ id: z.string() }).nullable().optional(),
+  pricing: z
+    .object({
+      price_details: z.object({ price: z.string() }).nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+});
+
 const eventSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),
@@ -37,7 +62,24 @@ const eventSchema = z.object({
       id: z.string().optional(),
       client_reference_id: z.string().nullable().optional(),
       customer: z.string().nullable().optional(),
-      metadata: z.object({ user_id: z.string().optional() }).nullable().optional(),
+      lines: z
+        .object({ data: z.array(lineSchema).optional() })
+        .nullable()
+        .optional(),
+      metadata: metadataSchema.nullable().optional(),
+      parent: z
+        .object({
+          subscription_details: z
+            .object({ metadata: metadataSchema.nullable().optional() })
+            .nullable()
+            .optional(),
+        })
+        .nullable()
+        .optional(),
+      subscription_details: z
+        .object({ metadata: metadataSchema.nullable().optional() })
+        .nullable()
+        .optional(),
     }),
   }),
 });
@@ -100,14 +142,39 @@ function matchesAnySignature(expected: string, candidates: readonly string[]) {
   });
 }
 
+function priceIdOf(line: z.infer<typeof lineSchema>) {
+  return line.pricing?.price_details?.price ?? line.price?.id ?? null;
+}
+
 function eventFrom(parsed: z.infer<typeof eventSchema>) {
   const { object } = parsed.data;
-  const userId = object.client_reference_id ?? object.metadata?.user_id ?? null;
+
+  const subscriptionMetadata =
+    object.parent?.subscription_details?.metadata ?? object.subscription_details?.metadata ?? null;
+
+  const userId =
+    object.client_reference_id ?? subscriptionMetadata?.user_id ?? object.metadata?.user_id ?? null;
+
   const customerId = object.customer ?? (parsed.type.startsWith("customer.") ? object.id : null);
+  const lines = object.lines?.data ?? [];
+  let periodEndSeconds = 0;
+  let periodStartSeconds = 0;
+  let priceId: string | null = null;
+
+  for (const line of lines) {
+    periodEndSeconds = Math.max(periodEndSeconds, line.period?.end ?? 0);
+    periodStartSeconds = Math.max(periodStartSeconds, line.period?.start ?? 0);
+    priceId ??= priceIdOf(line);
+  }
 
   const event: PaymentEvent = {
     customerId: customerId ?? null,
     id: parsed.id,
+    invoiceId: parsed.type.startsWith("invoice.") ? (object.id ?? null) : null,
+    periodEndMs: periodEndSeconds > 0 ? periodEndSeconds * 1000 : null,
+    periodStartMs: periodStartSeconds > 0 ? periodStartSeconds * 1000 : null,
+    plan: planOf(object.metadata?.plan) ?? planOf(subscriptionMetadata?.plan),
+    priceId,
     type: parsed.type,
     userId,
   };
@@ -198,8 +265,10 @@ export function createStripePayments(config: StripePaymentsConfig) {
         client_reference_id: request.userId,
         "line_items[0][price]": request.priceId,
         "line_items[0][quantity]": "1",
+        "metadata[plan]": request.plan,
         "metadata[user_id]": request.userId,
         mode: "subscription",
+        "subscription_data[metadata][plan]": request.plan,
         "subscription_data[metadata][user_id]": request.userId,
         success_url: request.successUrl,
         cancel_url: request.cancelUrl,

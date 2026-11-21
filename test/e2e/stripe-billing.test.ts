@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { createHmac } from "node:crypto";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,30 +7,28 @@ import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
 
-import { authTestIdentity } from "./auth.fixture.ts";
-import { expect, startFreshAppServer, test } from "./app.fixture.ts";
+import { startFreshAppServer, expect, test } from "./app.fixture.ts";
+import {
+  appNowSeconds,
+  BILLING_APP_ORIGIN as APP_ORIGIN,
+  BILLING_CUSTOMER_ID as CUSTOMER_ID,
+  BILLING_PRICE_MONTH as STRIPE_MOCK_PRICE_MONTH,
+  BILLING_PRICE_WEEK as STRIPE_MOCK_PRICE_WEEK,
+  BILLING_SECRET_KEY as SECRET_KEY,
+  BILLING_WEBHOOK_SECRET as WEBHOOK_SECRET,
+  DEMO_LOGIN_EMAIL as demoLoginEmail,
+  postWebhook,
+  signInOwner,
+  signPayload,
+} from "./billing-harness.ts";
 import { serverEnvironment } from "./app-server.ts";
 import { startStripeMock } from "./stripe-mock.fixture.ts";
-import { latestMailLink, requestMagicLink } from "./sign-in.ts";
-
-const fixtureToken = (...parts: string[]) => parts.join("_");
-const WEBHOOK_SECRET = fixtureToken("whsec", "fixture");
-
-const SECRET_KEY = fixtureToken("sk", "test", "fixture");
-const STRIPE_MOCK_PRICE_WEEK = "price_e2e_week";
-const STRIPE_MOCK_PRICE_MONTH = "price_e2e_month";
-const APP_ORIGIN = "http://localhost:3000";
-const CUSTOMER_ID = "cus_e2e_owner";
-const demoLoginEmail = "test@email.com";
+import { authTestIdentity } from "./auth.fixture.ts";
 
 const fixturePayload = readFileSync(
   "test/e2e/fixtures/stripe/checkout-session-completed.json",
   "utf8",
 );
-
-const authStateSchema = z.object({
-  users: z.array(z.object({ email: z.string(), id: z.string(), role: z.string() })),
-});
 
 const billingStatusSchema = z.object({ customer: z.boolean(), enabled: z.boolean() });
 
@@ -51,66 +48,14 @@ const stripeStateSchema = z.object({
   ),
 });
 
-const clockSchema = z.object({ now: z.number() });
-
-async function appNowSeconds(request: APIRequestContext, appUrl: string) {
-  const { now } = clockSchema.parse(await (await request.get(`${appUrl}/__test__/clock`)).json());
-
-  return Math.trunc(now / 1000);
-}
-
-function signPayload(payload: string, timestamp: number) {
-  const signature = createHmac("sha256", WEBHOOK_SECRET)
-    .update(`${String(timestamp)}.${payload}`)
-    .digest("hex");
-
-  return `t=${String(timestamp)},v1=${signature}`;
-}
-
 function payloadFor(userId: string) {
   return fixturePayload.replaceAll("__USER_ID__", userId);
-}
-
-async function postWebhook(
-  request: APIRequestContext,
-  appUrl: string,
-  payload: string,
-  signature: string,
-) {
-  return request.post(`${appUrl}/webhooks/stripe`, {
-    data: payload,
-    headers: { "content-type": "application/json", "stripe-signature": signature },
-  });
 }
 
 async function stripeState(request: APIRequestContext, appUrl: string) {
   return stripeStateSchema.parse(
     await (await request.get(`${appUrl}/__test__/stripe-state`)).json(),
   );
-}
-
-async function signInOwner(request: APIRequestContext, appUrl: string) {
-  const requested = await requestMagicLink(appUrl, request, authTestIdentity.ownerEmail);
-
-  if (!requested.ok()) {
-    throw new Error(`The magic link request failed: ${await requested.text()}`);
-  }
-
-  const link = await latestMailLink(appUrl, request, authTestIdentity.ownerEmail);
-
-  await request.get(link);
-
-  const state = authStateSchema.parse(
-    await (await request.get(`${appUrl}/__test__/auth/state`)).json(),
-  );
-
-  const owner = state.users.find((user) => user.email === authTestIdentity.ownerEmail);
-
-  if (owner === undefined) {
-    throw new Error(`The owner did not sign in: ${JSON.stringify(state.users)}`);
-  }
-
-  return owner.id;
 }
 
 test("a signed event is processed once, a replay and bad signatures change nothing, and checkout and portal use Stripe", async ({

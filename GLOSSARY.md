@@ -153,6 +153,18 @@ works for 24 hours and opens with the key the server generated and wrapped for t
 link and never stored in plaintext or logged; after that the archive is deleted, and a new request replaces a ready one.
 _Avoid_: download, data dump, archive
 
+## Plans and billing
+
+**Plan**:
+What the user pays for: Week gives 70 Applications over 7 days and Month gives 300 over 30 days, both renewing until
+cancelled; the trial gives 3 once (ADR 0018).
+_Avoid_: subscription tier, package, level
+
+**Period grant**:
+The Applications one paid period makes available. It expires at the period's end, so unused ones do not roll over,
+and a reservation still open then is released and expired with it.
+_Avoid_: credit, allowance, rollover, plan balance
+
 ## Mail
 
 **Inbox**:
