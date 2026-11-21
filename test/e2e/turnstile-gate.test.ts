@@ -150,3 +150,65 @@ appTest("production refuses to boot when the Turnstile allowlist names localhost
   expect(outcome.code).not.toBe(0);
   expect(outcome.stderr).toContain("TURNSTILE_HOSTNAMES must not include localhost in production.");
 });
+
+appTest("production refuses to boot with the test routes enabled", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "overture-e2e-testroutes-"));
+
+  const child = spawn("bun", ["run", "src/server/main.ts"], {
+    env: {
+      ...serverEnvironment({
+        NODE_ENV: "production",
+        APP_ORIGIN: "https://tryoverture.com",
+        TURNSTILE_HOSTNAMES: "tryoverture.com",
+        ENABLE_TEST_ROUTES: "true",
+      }),
+      DATABASE_URL: join(directory, "overture.db"),
+    },
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+
+  const outcome = await new Promise<{ code: number | null; stderr: string }>((resolve) => {
+    let stderr = "";
+
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    child.once("exit", (code) => {
+      resolve({ code, stderr });
+    });
+  });
+
+  expect(outcome.code).not.toBe(0);
+  expect(outcome.stderr).toContain("ENABLE_TEST_ROUTES must not be true in production or on Fly.");
+});
+
+appTest("a Fly machine refuses to boot with the test routes enabled", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "overture-e2e-flyroutes-"));
+
+  const child = spawn("bun", ["run", "src/server/main.ts"], {
+    env: {
+      ...serverEnvironment({
+        FLY_APP_NAME: "overture-web",
+        ENABLE_TEST_ROUTES: "true",
+      }),
+      DATABASE_URL: join(directory, "overture.db"),
+    },
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+
+  const outcome = await new Promise<{ code: number | null; stderr: string }>((resolve) => {
+    let stderr = "";
+
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    child.once("exit", (code) => {
+      resolve({ code, stderr });
+    });
+  });
+
+  expect(outcome.code).not.toBe(0);
+  expect(outcome.stderr).toContain("ENABLE_TEST_ROUTES must not be true in production or on Fly.");
+});
