@@ -57,6 +57,8 @@ import {
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
+import { attachApplication, ensureOpenReview } from "../pipeline/review-store.ts";
+import { ensureApplyFailuresQueued } from "../notify/failure-digest.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
 import { createConsentService } from "../profile/consent.ts";
@@ -760,7 +762,7 @@ export function createTestRoutes(
     );
   }
 
-  function seedReviewRow(body: z.infer<typeof seedReviewBody>) {
+  function questionForReview(body: z.infer<typeof seedReviewBody>) {
     const now = clock.now();
     const textNormHash = questionVariantHash(body.prompt);
 
@@ -794,6 +796,12 @@ export function createTestRoutes(
         .run();
     }
 
+    return questionId;
+  }
+
+  function seedReviewRow(body: z.infer<typeof seedReviewBody>) {
+    const now = clock.now();
+    const questionId = questionForReview(body);
     const reviewId = crypto.randomUUID();
 
     db.insert(reviews)
@@ -815,6 +823,28 @@ export function createTestRoutes(
 
     for (const applicationId of body.applicationIds) {
       db.insert(reviewApplications).values({ reviewId, applicationId }).onConflictDoNothing().run();
+    }
+
+    return { questionId, reviewId };
+  }
+
+  function openReviewThroughStore(body: z.infer<typeof seedReviewBody>) {
+    const questionId = questionForReview(body);
+
+    const reviewId = ensureOpenReview(db, clock, {
+      ats: null,
+      factKey: body.factKey ?? null,
+      fieldType: body.fieldType,
+      options: body.options,
+      prompt: body.prompt,
+      questionId,
+      reason: body.reason,
+      scope: body.scope,
+      userId: body.userId,
+    });
+
+    for (const applicationId of body.applicationIds) {
+      attachApplication(db, reviewId, applicationId);
     }
 
     return { questionId, reviewId };
@@ -1763,6 +1793,14 @@ export function createTestRoutes(
 
   routes.post("/reviews/seed", zValidator("json", seedReviewBody), (context) =>
     context.json(seedReviewRow(context.req.valid("json"))),
+  );
+
+  routes.post("/reviews/open", zValidator("json", seedReviewBody), (context) =>
+    context.json(openReviewThroughStore(context.req.valid("json"))),
+  );
+
+  routes.post("/notify/apply-failures/ensure", (context) =>
+    context.json({ queued: ensureApplyFailuresQueued(db, clock) }),
   );
 
   routes.get("/reviews", zValidator("query", userQuery), (context) => {

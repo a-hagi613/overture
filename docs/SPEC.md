@@ -777,15 +777,16 @@ stateDiagram-v2
   dispatcher does (§9.3), so the Application is back in `ready` before a browser ever opens.
 - **At send** the executor fills only the approved plan and the preflight compares the live form with it (§9.4,
   §10.3).
-- **The Recap email** (M1). The daily run (§8.2) finishes by queueing `ready.notify`, which sends one email, and
-  only when the run produced something: at least one new Ready Application or at least one new open Review. It comes
-  from `no-reply@tryoverture.com` through Cloudflare Email Sending (§11.2) to the user's verified email, lists each
-  new Ready Application by employer and job title (no answers) and how many Reviews are open ("10 ready to approve,
-  2 need an answer"), and carries one link to `{APP_ORIGIN}/ready`. At most one is sent to a user per local day, a
-  retried run sends no second one, and the job retries a failed send without failing the run. Opening that link only
-  shows the page, because mail scanners open links; nothing is ever approved or sent by a GET. It is recorded as a
-  `notifications` row (`kind='ready'`, `emailed_at`). There is no per-application email and no second recap that day.
-  M2 adds push.
+- **The Recap email** (M1, extended in M2). The daily run (§8.2) finishes by queueing `ready.notify`, which sends one
+  email, and only when the run produced something: at least one new Ready Application or at least one new open Review.
+  It comes from `no-reply@tryoverture.com` through Cloudflare Email Sending (§11.2) to the user's verified email, lists
+  each new Ready Application by employer and job title (no answers), how many Reviews are open ("10 ready to approve,
+  2 need an answer"), and yesterday's sends and the employers who replied, and carries one link to
+  `{APP_ORIGIN}/ready`. At most one is sent to a user per local day, a retried run sends no second one, and the job
+  retries a failed send without failing the run. Opening that link only shows the page, because mail scanners open
+  links; nothing is ever approved or sent by a GET. It is recorded as a `notifications` row (`kind='ready'`,
+  `emailed_at`). There is no per-application email and no second recap that day. M2 adds its push, which opens Ready
+  and is a separate switch from the email.
 
 > Considered for later, out of scope: an opt-in "send without asking" switch per user, off by default and
 > admin-gated (ADR 0029). Nothing is built for it.
@@ -1298,7 +1299,14 @@ the app (the recap and a Ready item open Ready); **nothing is approved by a push
 phone inside the app. The header bell opens the in-app Notifications list: unread rows carry a dot, Mark all as read
 clears them, and a push endpoint the service says is gone is deleted. There is no separate 08:00 digest: the one daily
 email is the recap, which also lists yesterday's sends and replies, and the user can turn the email and each kind of
-push off in Settings.
+push off in Settings. Each kind's switch is stored per user and read again when a push is dispatched and when a row is
+written, so turning a kind off stops both; the one exception is the Recap row itself, which is also the per-day marker
+the email dedupes on, so its push switch only stops the push. "Couldn't apply" notices are written from the hour's
+failure events, one row and one push per user per hour.
+
+An authenticated employer message that says none of the stages (a human reply, not a receipt and not a code) raises
+the reply notice; mail that moves the card raises the interview or offer notice instead, and a move that is not one of
+those raises the auto-move notice with its Undo link.
 
 ---
 

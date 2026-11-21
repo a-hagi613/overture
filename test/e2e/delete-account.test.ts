@@ -219,6 +219,10 @@ function counts(server: AppServer, userId: string) {
     facts: n("SELECT COUNT(*) AS n FROM facts WHERE user_id = ?", userId),
     llmUsage: n("SELECT COUNT(*) AS n FROM llm_usage WHERE user_id = ?", userId),
     messages: n("SELECT COUNT(*) AS n FROM messages WHERE user_id = ?", userId),
+    preferences: n(
+      "SELECT COUNT(*) AS n FROM settings WHERE updated_by = ? AND key LIKE 'notify.preferences.%'",
+      userId,
+    ),
     sessions: n("SELECT COUNT(*) AS n FROM session WHERE user_id = ?", userId),
     userKeys: n("SELECT COUNT(*) AS n FROM user_keys WHERE user_id = ?", userId),
     users: n("SELECT COUNT(*) AS n FROM users WHERE id = ?", userId),
@@ -306,6 +310,10 @@ test("a fresh signed-in session still needs a recent sign-in, then deletes every
     const userId = await signInOwner(owner, harness.server.url);
     const profileId = await seedPersonalData(owner, harness, userId);
 
+    await owner.put("/api/notifications/preferences", {
+      data: { enabled: false, kind: "review" },
+    });
+
     const mailboxResponse = await owner.get("/api/profile/mailbox");
 
     expect(mailboxResponse.ok()).toBe(true);
@@ -361,6 +369,7 @@ test("a fresh signed-in session still needs a recent sign-in, then deletes every
       facts: 0,
       llmUsage: 0,
       messages: 0,
+      preferences: 0,
       sessions: 0,
       userKeys: 0,
       users: 0,
@@ -520,6 +529,7 @@ test("a failing confirmation mail never blocks the erase", async ({ identityServ
       facts: 0,
       llmUsage: 0,
       messages: 0,
+      preferences: 0,
       sessions: 0,
       userKeys: 0,
       users: 0,

@@ -330,6 +330,8 @@ export const copy = {
     recapBody: (input: {
       ready: { title: string; company: string }[];
       needAnswer: number;
+      sent: { title: string; company: string }[];
+      replied: { company: string }[];
       url: string;
     }) => {
       const lines =
@@ -350,6 +352,24 @@ export const copy = {
           input.needAnswer === 1
             ? "1 question needs an answer."
             : `${String(input.needAnswer)} questions need an answer.`,
+        );
+      }
+
+      if (input.sent.length > 0) {
+        lines.push(
+          "",
+          "Sent yesterday:",
+          ...input.sent.map((application) => `- ${application.title} at ${application.company}`),
+        );
+      }
+
+      if (input.replied.length > 0) {
+        lines.push(
+          "",
+          input.replied.length === 1
+            ? "1 employer replied yesterday:"
+            : "Employers replied yesterday:",
+          ...input.replied.map((reply) => `- ${reply.company}`),
         );
       }
 
@@ -1710,6 +1730,44 @@ export const copy = {
         `${input.title} at ${input.company} is now in ${input.stage}. Open the Board to undo it.`,
       url: "/board",
       kind: "stage_move",
+    },
+    review: {
+      title: "A question for you",
+      body: "Open Review to answer it so these applications can go ahead.",
+      url: "/review",
+      kind: "review",
+    },
+    reply: {
+      title: (company: string) => `${company} replied`,
+      body: (title: string) => `About ${title}. Read it in Inbox.`,
+      url: "/inbox",
+      kind: "reply",
+    },
+    interview: {
+      title: (company: string) => `Interview request: ${company}`,
+      body: (title: string) => `${title}. Open the thread in Inbox to see the details.`,
+      url: "/inbox",
+      kind: "interview",
+    },
+    offer: {
+      title: (company: string) => `Offer from ${company}`,
+      body: (title: string) =>
+        `${title}. Open the thread in Inbox to see the details and what comes next.`,
+      url: "/inbox",
+      kind: "offer",
+    },
+    paused: {
+      url: "/",
+      kind: "paused",
+    },
+    failedSummary: {
+      title: (count: number) =>
+        count === 1
+          ? "Couldn't apply to 1 application"
+          : `Couldn't apply to ${String(count)} applications`,
+      body: (window: string) => `Between ${window}. Open Home to see why each one stopped.`,
+      url: "/",
+      kind: "failed",
     },
     noResponse: {
       title: "Closed as No response",

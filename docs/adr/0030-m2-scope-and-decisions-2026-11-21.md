@@ -25,6 +25,10 @@ M2 row in SPEC §2 and spec #6 carry the details.
   XML feed keyed by `referencenumber`, with a measured choice between a streamed daily pass on the machine and an
   off-box pass. Each 20-form probe reads forms by plain HTTP first and uses a Browser Use session only for the few forms
   where a fill must be proven, so the testing phase spends little.
+- **Per-user notification preferences wait in `settings`.** Each user's push kinds and the recap-email switch are one
+  JSON row under the `notify.preferences.<userId>` key, which the global settings readers skip and account erasure
+  deletes, because every migration slot up to 0042 is held by in-flight work. They move to their own table once a
+  slot frees.
 - **Legal:** business name "Overture", contact `admin@tryoverture.com`, postal address the placeholder
   `[POSTAL ADDRESS]` until the owner supplies one.
 - **Moved into M2:** adopting the Browser Use SDK and the proxy-cost levers (#180), and the synthetic lab and provider
