@@ -13,7 +13,7 @@ import {
   postingUserState,
   skipCompanies,
 } from "../platform/db/schema.ts";
-import { SETTING_DEFAULTS, getSetting, getAllKillSwitches } from "../platform/settings/index.ts";
+import { getSettingNumber, getAllKillSwitches } from "../platform/settings/index.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { createFactService } from "../profile/facts.ts";
 import { createLanguagesService } from "../profile/languages.ts";
@@ -206,14 +206,6 @@ function recencyScore(postedAt: number | null, at: number) {
   }
 
   return 0;
-}
-
-function settingNumber(db: AppDatabase, key: keyof typeof SETTING_DEFAULTS) {
-  const raw = getSetting(db, key);
-  const parsed = raw === null ? Number.NaN : Number(raw);
-  const fallback = Number(SETTING_DEFAULTS[key]);
-
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 function workAuthorisation(records: { key: string; scope: string; value: string }[]) {
@@ -488,8 +480,8 @@ export function createCandidateService(deps: CandidateDeps) {
       .from(applications)
       .all();
 
-    const cooldownDays = settingNumber(db, "limits.company_cooldown_days");
-    const repostDays = settingNumber(db, "limits.repost_guard_days");
+    const cooldownDays = getSettingNumber(db, "limits.company_cooldown_days");
+    const repostDays = getSettingNumber(db, "limits.repost_guard_days");
 
     const activeCompanies = new Set<string>();
     const recentCompanies = new Set<string>();
@@ -569,8 +561,8 @@ export function createCandidateService(deps: CandidateDeps) {
       atsOff,
       crowdByCompany,
       crowdByPosting,
-      crowdEmployer: settingNumber(db, "limits.crowd_per_employer_week"),
-      crowdPosting: settingNumber(db, "limits.crowd_per_posting"),
+      crowdEmployer: getSettingNumber(db, "limits.crowd_per_employer_week"),
+      crowdPosting: getSettingNumber(db, "limits.crowd_per_posting"),
       employerOff,
       globalOff,
       hidden,
