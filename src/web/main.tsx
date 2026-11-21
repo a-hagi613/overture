@@ -29,6 +29,7 @@ import { ThemeProvider } from "./lib/theme.tsx";
 import { AdminShell } from "./routes/admin/shell.tsx";
 import { AdminSettingsPage } from "./routes/admin/settings.tsx";
 import { CatalogPage } from "./routes/admin/catalog.tsx";
+import { MailHealthPage } from "./routes/admin/mail-health.tsx";
 import { OverviewPage } from "./routes/admin/overview.tsx";
 import { GrantsPage } from "./routes/admin/grants.tsx";
 import { InvitesPage } from "./routes/admin/invites.tsx";
@@ -57,6 +58,7 @@ const router = createBrowserRouter([
       { path: "/admin", element: <OverviewPage /> },
       { path: "/admin/settings", element: <AdminSettingsPage /> },
       { path: "/admin/catalog", element: <CatalogPage /> },
+      { path: "/admin/mail-health", element: <MailHealthPage /> },
       { path: "/admin/grants", element: <GrantsPage /> },
       { path: "/admin/users", element: <UsersPage /> },
       { path: "/admin/users/:id", element: <UserPage /> },

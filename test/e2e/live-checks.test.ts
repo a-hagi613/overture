@@ -458,10 +458,12 @@ test("every spec alert fires from the test-only drill route", async () => {
       "disk",
       "health",
       "llm.spend",
+      "mail.domain_reply_rate",
+      "mail.reply_rate",
       "process.unhandled",
       "provider.success",
       "queue.age",
     ].toSorted(),
   );
-  expect(report.results).toHaveLength(11);
+  expect(report.results).toHaveLength(13);
 });
