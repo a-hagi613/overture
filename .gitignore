@@ -41,3 +41,6 @@ test/e2e/.tmp/
 # Owner profile and run files (personal data, SPEC: these live privately outside the repo)
 profile/*
 !profile/README.md
+
+# Recorded feeds and measurement output (orchestrator recordings)
+.measure/

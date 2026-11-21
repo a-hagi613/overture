@@ -70,6 +70,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "drizzle-kit": "^0.31.11",
+    "htmlparser2": "10.1.0",
     "msw": "^2.15.0",
     "oxlint": "^1.94.0",
     "oxlint-tsgolint": "^7.0.2007",
