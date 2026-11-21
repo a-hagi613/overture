@@ -34,7 +34,7 @@ jobs:
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: steps.guard.outputs.skip != 'true'
       - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
         if: steps.guard.outputs.skip != 'true'
