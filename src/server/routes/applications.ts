@@ -40,6 +40,7 @@ const stageMoveSchema = z.object({
 const snapshotAnswerSchema = z.array(
   z.object({
     answer: z.string().nullable(),
+    by_user: z.boolean().optional(),
     fact_key: z.string().nullable(),
     fact_revision: z.number().nullable(),
     kind: z.string(),
@@ -50,7 +51,11 @@ const snapshotAnswerSchema = z.array(
 );
 
 const coverLetterSchema = z.array(
-  z.object({ resume_line_ids: z.array(z.string()), sentence: z.string() }),
+  z.object({
+    by_user: z.boolean().optional(),
+    resume_line_ids: z.array(z.string()),
+    sentence: z.string(),
+  }),
 );
 
 function isStage(value: string): value is (typeof STAGES)[number] {

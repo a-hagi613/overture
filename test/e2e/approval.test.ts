@@ -134,7 +134,9 @@ const cardSchema = z.object({
       answers: z.array(
         z.object({
           answer: z.string().nullable(),
+          byUser: z.boolean(),
           label: z.string(),
+          questionId: z.string(),
           source: z.string().nullable(),
         }),
       ),
@@ -180,6 +182,22 @@ const applicationSchema = z.object({
 });
 
 const applicationsSchema = z.object({ applications: z.array(applicationRowSchema) });
+
+const sentDetailSchema = z.object({
+  application: applicationRowSchema,
+  snapshot: z
+    .object({
+      answers: z.array(
+        z.object({
+          answer: z.string().nullable(),
+          by_user: z.boolean().optional(),
+          label: z.string(),
+          resume_line_ids: z.array(z.string()),
+        }),
+      ),
+    })
+    .nullable(),
+});
 
 const jobsSchema = z.object({ jobs: z.array(z.object({ id: z.string(), kind: z.string() })) });
 
@@ -636,6 +654,47 @@ test("dispatch claims only approved Applications and returns one whose Fact chan
   expect(JSON.parse(afterChange.application.changes ?? "[]")).toEqual(["An answer changed"]);
 });
 
+const factsSchema = z.object({
+  facts: z.array(
+    z.object({
+      key: z.string(),
+      revision: z.number(),
+      scope: z.string(),
+      source: z.string(),
+      value: z.string(),
+    }),
+  ),
+});
+
+const editResultSchema = z.object({
+  answer: z.string(),
+  byUser: z.boolean(),
+  factKey: z.string().nullable(),
+  factRevision: z.number().nullable(),
+});
+
+async function editAnswer(
+  owner: APIRequestContext,
+  applicationId: string,
+  questionId: string,
+  value: string,
+) {
+  return owner.put(
+    `/api/applications/${encodeURIComponent(applicationId)}/answers/${encodeURIComponent(questionId)}`,
+    { data: { value } },
+  );
+}
+
+function questionIdOf(card: z.infer<typeof cardSchema> | undefined, label: string) {
+  const answer = card?.plan?.answers.find((candidate) => candidate.label === label);
+
+  if (answer === undefined) {
+    throw new Error(`no plan answer labelled ${label}`);
+  }
+
+  return answer;
+}
+
 test("no path submits an Application that is not approved", async ({ approval }) => {
   const { applicationId, owner } = await readyApplication(approval);
 
@@ -666,4 +725,221 @@ test("no path submits an Application that is not approved", async ({ approval })
   expect(sent.application.status).toBe("sent");
   expect(sent.application.attempts).toBe(1);
   expect((await fixtureState(approval.fixture)).submissions).toBe(1);
+});
+
+test("editing a factual answer saves the Fact and returns every approval that used it to Ready", async ({
+  approval,
+}) => {
+  const { applicationId, owner, userId } = await readyApplication(approval);
+
+  const secondPosting = await seedPostingFor(owner, approval.fixture.url, "2");
+
+  const second = await seedApplication(owner, {
+    postingId: secondPosting,
+    status: "ready",
+    userId,
+  });
+
+  await approveApplication(owner, second);
+
+  const emailCompany = await seedCompany(owner, "Email Only Co", "emailonly.example");
+  const emailBoard = await seedBoard(owner, emailCompany, "greenhouse", "emailonly");
+
+  const emailPosting = await seedPosting(owner, {
+    atsJobId: "8004209999",
+    boardId: emailBoard,
+    companyId: emailCompany,
+    questions: [
+      {
+        answerKind: "fact",
+        factKey: "email",
+        fieldName: "email",
+        fieldType: "email",
+        required: true,
+        text: "Email",
+      },
+      {
+        answerKind: "skip",
+        fieldName: "resume",
+        fieldType: "file",
+        required: true,
+        text: "Resume/CV",
+      },
+    ],
+    title: "Email only",
+    url: `${approval.fixture.url}/emailonly/jobs/8004209999`,
+  });
+
+  const untouched = await seedApplication(owner, {
+    postingId: emailPosting,
+    status: "ready",
+    userId,
+  });
+
+  await approveApplication(owner, untouched);
+
+  const before = (await readyOf(owner)).cards.find((card) => card.id === applicationId);
+  const country = questionIdOf(before, "Country");
+
+  expect(country.answer).toBe("United Kingdom");
+
+  const factsBefore = factsSchema.parse(await (await owner.get("/api/profile/facts")).json());
+
+  const revisionBefore =
+    factsBefore.facts.find((fact) => fact.key === "current_country")?.revision ?? 0;
+
+  const refusedEdit = await editAnswer(owner, second, country.questionId, "Canada");
+
+  expect(refusedEdit.status()).toBe(409);
+  expect(z.object({ error: z.string() }).parse(await refusedEdit.json()).error).toBe(
+    "not_editable",
+  );
+
+  const unknownQuestion = await editAnswer(owner, applicationId, crypto.randomUUID(), "Canada");
+
+  expect(unknownQuestion.status()).toBe(404);
+
+  const invalid = await editAnswer(owner, applicationId, country.questionId, "France");
+
+  expect(invalid.status()).toBe(422);
+  expect((await applicationOf(owner, second)).application.status).toBe("approved");
+
+  const edited = await editAnswer(owner, applicationId, country.questionId, "Canada");
+
+  expect(edited.ok()).toBe(true);
+
+  const result = editResultSchema.parse(await edited.json());
+
+  expect(result).toEqual({
+    answer: "Canada",
+    byUser: false,
+    factKey: "current_country",
+    factRevision: revisionBefore + 1,
+  });
+
+  const factsList = factsSchema.parse(await (await owner.get("/api/profile/facts")).json());
+  const countryFact = factsList.facts.find((fact) => fact.key === "current_country");
+
+  expect(countryFact?.value).toBe("Canada");
+  expect(countryFact?.revision).toBe(revisionBefore + 1);
+  expect(countryFact?.source).toBe("user");
+
+  const stale = await applicationOf(owner, second);
+
+  expect(stale.application.status).toBe("ready");
+  expect(stale.application.approvedAt).toBeNull();
+  expect(stale.application.approvedPlanSha256).toBeNull();
+  expect(stale.application.stage).toBe("ready");
+  expect(JSON.parse(stale.application.changes ?? "[]")).toEqual(["An answer changed"]);
+  expect(
+    stale.timeline.some(
+      (event) =>
+        event.kind === "status" &&
+        event.fromValue === "approved" &&
+        event.toValue === "ready" &&
+        event.source === "system",
+    ),
+  ).toBe(true);
+
+  expect((await applicationOf(owner, untouched)).application.status).toBe("approved");
+
+  const after = (await readyOf(owner)).cards.find((card) => card.id === applicationId);
+
+  expect(questionIdOf(after, "Country").answer).toBe("Canada");
+});
+
+test("editing open text keeps the user's own words and records them in the Snapshot", async ({
+  approval,
+}) => {
+  const { applicationId, owner } = await readyApplication(approval);
+
+  const before = (await readyOf(owner)).cards.find((card) => card.id === applicationId);
+  const website = questionIdOf(before, "Website");
+
+  expect(website.answer).toBeNull();
+
+  const text = "I build payment platforms that settle across twelve markets.";
+
+  const edited = await editAnswer(owner, applicationId, website.questionId, text);
+
+  expect(edited.ok()).toBe(true);
+  expect(editResultSchema.parse(await edited.json())).toEqual({
+    answer: text,
+    byUser: true,
+    factKey: null,
+    factRevision: null,
+  });
+
+  const after = (await readyOf(owner)).cards.find((card) => card.id === applicationId);
+
+  expect(questionIdOf(after, "Website").answer).toBe(text);
+  expect(questionIdOf(after, "Website").byUser).toBe(true);
+  expect(questionIdOf(after, "Website").source).toBe("open_text");
+
+  await runJob(owner, "application.prepare", JSON.stringify({ applicationId }));
+
+  const afterPrepare = (await readyOf(owner)).cards.find((card) => card.id === applicationId);
+
+  expect(questionIdOf(afterPrepare, "Website").answer).toBe(text);
+  expect(questionIdOf(afterPrepare, "Website").byUser).toBe(true);
+
+  const empty = await editAnswer(owner, applicationId, website.questionId, "   ");
+
+  expect(empty.status()).toBe(400);
+
+  await approveApplication(owner, applicationId);
+
+  const sent = await owner.post("/__test__/jobs/run-now", {
+    data: {
+      kind: SEND_JOB,
+      payload: JSON.stringify({ applicationId }),
+    },
+    timeout: 120_000,
+  });
+
+  expect(sent.ok()).toBe(true);
+
+  await expect
+    .poll(async () => (await applicationOf(owner, applicationId)).application.status, {
+      timeout: 20_000,
+    })
+    .toBe("sent");
+
+  const detail = sentDetailSchema.parse(
+    await (await owner.get(`/api/applications/${encodeURIComponent(applicationId)}`)).json(),
+  );
+
+  const answer = detail.snapshot?.answers.find((candidate) => candidate.label === "Website");
+
+  expect(answer?.answer).toBe(text);
+  expect(answer?.by_user).toBe(true);
+  expect(answer?.resume_line_ids).toEqual([]);
+  expect((await fixtureState(approval.fixture)).submissions).toBe(1);
+});
+
+test("a resume change returns an approval that used the old resume to Ready with what changed", async ({
+  approval,
+}) => {
+  const { applicationId, owner } = await readyApplication(approval);
+
+  await approveApplication(owner, applicationId);
+
+  const replacement = await owner.post("/api/profile/resume", {
+    multipart: {
+      file: {
+        buffer: Buffer.from(resumeBytes),
+        mimeType: "application/pdf",
+        name: "maya-okafor-2026.pdf",
+      },
+    },
+  });
+
+  expect(replacement.ok()).toBe(true);
+
+  const after = await applicationOf(owner, applicationId);
+
+  expect(after.application.status).toBe("ready");
+  expect(after.application.approvedAt).toBeNull();
+  expect(after.application.approvedPlanSha256).toBeNull();
+  expect(JSON.parse(after.application.changes ?? "[]")).toEqual(["Your resume changed"]);
 });

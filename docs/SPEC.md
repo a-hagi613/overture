@@ -262,8 +262,8 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `matches` | user_id, posting_id, code_rank REAL, score NULL, reason NULL, resume_id NULL, targets_version NULL, scored_at NULL; PK(user_id,posting_id). A score is valid only while `resume_id` and `targets_version` equal the user's current ones |
 | `posting_user_state` | user_id, posting_id, state CHECK IN ('saved','hidden'), updated_at; PK(user_id,posting_id) |
 | `applications` | id, user_id, posting_id, company_id, origin CHECK IN ('auto','manual'), status CHECK IN ('preparing','needs_review','ready','approved','sending','confirming','sent','failed','skipped','withdrawn'), status_reason NULL (§11), stage CHECK IN ('queued','ready','applied','screening','interviewing','offer','closed') NULL, stage_locked INTEGER DEFAULT 0, board_position REAL, score_at_queue, scheduled_for NULL, attempts INTEGER DEFAULT 0, ready_at NULL, approved_at NULL, approved_plan_sha256 NULL, approved_plan_enc NULL (the frozen send plan, sealed; §8.7), changes JSON NULL (what changed since the last approval, shown on the card), sent_at NULL, closed_reason CHECK IN ('rejected','no_response','withdrawn','offer_declined','offer_accepted','other') NULL, created_at, updated_at; UNIQUE(user_id,posting_id); partial UNIQUE(user_id) WHERE status='sending'. `withdrawn` applies only before `sent` (the user stops a queued application, or presses Skip on a Ready card); a sent application cannot be un-sent, so the user moves it to Closed with `closed_reason='withdrawn'` |
-| `application_snapshots` | application_id PK, user_id, posting_url, posting_title, description_hash, answers_enc (JSON array `{question_id, label, answer, fact_key, fact_revision, kind, resume_line_ids}`), cover_letter_enc NULL (JSON `[{sentence, resume_line_ids}]`), resume_id, resume_sha256, consent_version, approved_at, approved_plan_sha256, provider, provider_session_id, submitted_at, confirmed_by CHECK IN ('page','email'), cost_micros. **Immutable**: a `BEFORE UPDATE` trigger always raises; a `BEFORE DELETE` trigger raises `WHEN EXISTS (SELECT 1 FROM user WHERE id = OLD.user_id)`, so rows go only when the user row is gone (account deletion cascade). Flow 29 proves both |
-| `application_answers` | id, application_id, question_id, user_id, kind CHECK IN ('open_text','cover_letter'), sentences_enc (JSON `[{sentence, resumeLineIds}]`, sealed), word_count, created_at, updated_at; UNIQUE(application_id,question_id). The generated, grounded open text and letter kept from preparation until the Snapshot takes them |
+| `application_snapshots` | application_id PK, user_id, posting_url, posting_title, description_hash, answers_enc (JSON array `{question_id, label, answer, fact_key, fact_revision, kind, resume_line_ids, by_user}`), cover_letter_enc NULL (JSON `[{sentence, resume_line_ids, by_user}]`), resume_id, resume_sha256, consent_version, approved_at, approved_plan_sha256, provider, provider_session_id, submitted_at, confirmed_by CHECK IN ('page','email'), cost_micros. **Immutable**: a `BEFORE UPDATE` trigger always raises; a `BEFORE DELETE` trigger raises `WHEN EXISTS (SELECT 1 FROM user WHERE id = OLD.user_id)`, so rows go only when the user row is gone (account deletion cascade). Flow 29 proves both |
+| `application_answers` | id, application_id, question_id, user_id, kind CHECK IN ('open_text','cover_letter'), sentences_enc (JSON `[{sentence, resumeLineIds, byUser?}]`, sealed), word_count, created_at, updated_at; UNIQUE(application_id,question_id). The generated, grounded open text and letter kept from preparation until the Snapshot takes them; `byUser: true` marks text the user edited on the card, which preparation keeps |
 | `application_events` | id, application_id, user_id, at, kind CHECK IN ('status','stage','email','checkin','note'), from_value, to_value, source CHECK IN ('system','user','email','checkin','admin'), detail JSON; the card timeline and stage history |
 | `attempts` | id, application_id, user_id, n, provider, provider_session_id, started_at, lease_until, ended_at NULL, submit_clicked_at NULL, submit_response_status INTEGER NULL, outcome CHECK IN ('sent','unconfirmed','captcha_blocked','code_timeout','posting_closed','form_changed','blocked','upload_failed','duplicate','needs_review','provider_error','timeout','crash','interrupted') NULL, browser_ms, proxy_bytes, captcha_seen, code_used, cost_micros, error_code NULL |
 | `reviews` | id, user_id, question_id, fact_key NULL, scope ('' or an ISO 3166-1 alpha-2 country), prompt, field_type, options JSON, reason CHECK IN ('unknown_required','option_missing'), attempt_id NULL (the attempt whose live-form check opened it), status CHECK IN ('open','answered','dismissed'), created_at, resolved_at; UNIQUE(user_id,question_id,scope) WHERE status='open' |
@@ -461,7 +461,8 @@ as top-20 aggregate Posting counts. Output committed to `docs/research/census.md
 | 2 (encouraged) | preferred_name, github_url, website_url, skills, certifications, security_clearance, drivers_license, spoken_languages_levels, voice_sample, cover_letter_template, eeo_gender, eeo_race_ethnicity, eeo_hispanic_latino, eeo_veteran, eeo_disability (EEO opt-in only) | Profile → "Strengthen your profile", each shows "unlocks N queued jobs" |
 | 3 (learned) | `q:<question_id>` | created by answering a Review; reused for every later application asking that question |
 
-Each fact has `revision`; snapshots record the revision used. `work_auth` and `sponsorship_required` are stored per
+Each fact has `revision`; snapshots record the revision used, and a revision changes only when the value does, so
+saving an unchanged Fact never invalidates an approval that used it (§8.7). `work_auth` and `sponsorship_required` are stored per
 country, with `scope` set to the ISO country code. A question that names a country is answered only from that
 country's Fact; with none it opens a Review for that country. A question that names no country is answered from the
 unscoped Fact; with none, from the country-scoped Facts only when they all agree, otherwise it opens a Review that
@@ -737,16 +738,18 @@ stateDiagram-v2
   and its slot. It is refused once `sending` has started (a conditional update on `status='approved'`).
 - **Skip** is the existing withdraw (`POST /api/applications/:id/withdraw`), allowed in `ready` and `approved`:
   status `withdrawn`. It never adds the company to the Skip list.
-- **Edit an answer** (`PUT /api/applications/:id/answers/:questionId`). A factual answer is a Fact (ADR 0007), so
-  editing it saves the Fact (a new revision, `source='user'`) as Profile would, and every unsent Application whose
-  plan uses that Fact key and scope is prepared again; any that were `approved` go back to `ready` with `changes`
-  set. The value is validated against the field type and options like any planned value. Editing open text or the
-  cover letter changes that Application only: the user's text replaces the generated sentences, marked
-  `by_user: true` in `sentences_enc` and in the Snapshot, checked against the field type and length but not against
-  the resume (they are the user's own words).
+- **Edit an answer** (`PUT /api/applications/:id/answers/:questionId`). Only a `ready` Application can be edited; an
+  approved one shows Undo, not Edit. A factual answer is a Fact (ADR 0007), so editing it saves the Fact (a new
+  revision, `source='user'`) as Profile would, and every unsent Application whose plan uses that Fact key and scope
+  is prepared again; any that were `approved` go back to `ready` with `changes` set. The value is validated against
+  the field type and options like any planned value. Editing open text or the cover letter changes that Application
+  only: the user's text replaces the generated sentences, marked `byUser: true` in `sentences_enc` and `by_user` in
+  the Snapshot, checked against the field type and length but not against the resume (they are the user's own
+  words). Preparation keeps a `byUser` answer and never regenerates it.
 - **Anything that changes the plan clears the approval**: a Fact or resume change the plan used, an answered
   Review, a form difference found at send. Overture never re-plans an approved Application silently; the user sees
-  `changes` and approves again.
+  `changes` and approves again. Saving a profile Fact or uploading a resume checks every approval the same way the
+  dispatcher does (§9.3), so the Application is back in `ready` before a browser ever opens.
 - **At send** the executor fills only the approved plan and the preflight compares the live form with it (§9.4,
   §10.3).
 - **The Recap email** (M1). The daily run (§8.2) finishes by sending one email, and only when it produced something:

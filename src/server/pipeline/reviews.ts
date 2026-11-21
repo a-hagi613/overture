@@ -28,6 +28,7 @@ import {
 } from "./review-store.ts";
 import { recordReviewResolved } from "./review-events.ts";
 import { enqueueApplicationPrepare } from "./prepare-jobs.ts";
+import { returnStaleApprovals } from "./approval-invalidation.ts";
 
 const optionsSchema = z.array(z.string());
 
@@ -216,6 +217,8 @@ export function createReviewService(deps: {
       reviewId,
       userId,
     });
+
+    await returnStaleApprovals({ clock, db, personal, userId });
 
     if (options.prepare === "enqueue") {
       for (const applicationId of applicationIds) {

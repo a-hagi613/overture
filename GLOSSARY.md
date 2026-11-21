@@ -39,7 +39,8 @@ _Avoid_: pending, draft, awaiting approval
 
 **Approval**:
 The user pressing Send on a Ready Application. It freezes the exact job, resume file, answers and letter that will be
-sent, and is the user's consent for that one application. It can be undone until sending starts.
+sent, and is the user's consent for that one application. It can be undone until sending starts, and anything that
+changes its plan (a Fact or resume it used, an answered Review) returns it to Ready with what changed.
 _Avoid_: confirmation, sign-off, go-ahead
 
 **Approved**:

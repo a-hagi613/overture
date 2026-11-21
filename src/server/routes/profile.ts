@@ -16,6 +16,7 @@ import { createResumeService, MAX_RESUME_BYTES } from "../profile/resume.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createSkipCompanyService } from "../profile/skip-companies.ts";
 import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
+import { returnStaleApprovals } from "../pipeline/approval-invalidation.ts";
 import {
   languagesInputSchema,
   profileSettingsInputSchema,
@@ -96,6 +97,8 @@ export function createProfileRoutes(deps: {
       await skipCompanyService.setCurrentEmployer(account.id, employer.value);
     }
 
+    await returnStaleApprovals({ clock, db, personal, userId: account.id });
+
     return context.json(
       { ...upload.resume, prefilledFacts: prefilled.map((fact) => fact.key) },
       201,
@@ -159,6 +162,8 @@ export function createProfileRoutes(deps: {
         ),
       )
     ).toSorted((left, right) => left.key.localeCompare(right.key));
+
+    await returnStaleApprovals({ clock, db, personal, userId: account.id });
 
     return context.json({ facts: saved });
   });

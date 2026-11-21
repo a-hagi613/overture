@@ -7,12 +7,18 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { applications, facts, resumes } from "../platform/db/schema.ts";
 import { sendPlanSchema } from "./send-plan.ts";
 
-import type { SendPlan, SendPlanField } from "./send-plan.ts";
+import type { PlannedSentence, SendPlan, SendPlanField } from "./send-plan.ts";
 
 export interface ApprovedPlan {
   approvedAt: number;
   plan: SendPlan;
   sha256: string;
+}
+
+function sentenceJson(sentence: PlannedSentence) {
+  return sentence.byUser === true
+    ? { byUser: true, resumeLineIds: sentence.resumeLineIds, sentence: sentence.sentence }
+    : { resumeLineIds: sentence.resumeLineIds, sentence: sentence.sentence };
 }
 
 function fieldJson(field: SendPlanField) {
@@ -30,10 +36,7 @@ function fieldJson(field: SendPlanField) {
     questionId: field.questionId,
     required: field.required,
     scope: field.scope,
-    sentences: field.sentences.map((sentence) => ({
-      resumeLineIds: sentence.resumeLineIds,
-      sentence: sentence.sentence,
-    })),
+    sentences: field.sentences.map((sentence) => sentenceJson(sentence)),
     source: field.source,
     unit:
       field.unit === null
@@ -54,12 +57,7 @@ export function canonicalPlanJson(plan: SendPlan) {
     companyName: plan.companyName,
     consentVersion: plan.consentVersion,
     coverLetter:
-      plan.coverLetter === null
-        ? null
-        : plan.coverLetter.map((sentence) => ({
-            resumeLineIds: sentence.resumeLineIds,
-            sentence: sentence.sentence,
-          })),
+      plan.coverLetter === null ? null : plan.coverLetter.map((sentence) => sentenceJson(sentence)),
     descriptionHash: plan.descriptionHash,
     fields: plan.fields.map((field) => fieldJson(field)),
     postingTitle: plan.postingTitle,
