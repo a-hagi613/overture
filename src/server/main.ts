@@ -35,6 +35,7 @@ import {
   runTagFallbackJob,
 } from "./catalog/llm-tagging.ts";
 import { createAnthropicLlmPort } from "./platform/llm/anthropic-batches.ts";
+import { createDegradedFlag } from "./platform/degraded.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
 import { createGreenhouseQuestionSource } from "./catalog/greenhouse-questions.ts";
@@ -360,6 +361,8 @@ const objects =
       })
     : createDiskObjectStore(env.OBJECT_STORE_ROOT);
 
+const degradedFlag = createDegradedFlag({ clock, objects });
+
 const mailPersonal = createPersonalCrypto(
   db,
   parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
@@ -373,6 +376,7 @@ const outcomes = createOutcomes({ db, clock, personal });
 const mailMoves = createMailMoves({
   clock,
   db,
+  degraded: degradedFlag,
   llm: anthropicLlmPort,
   personal: mailPersonal,
 });
@@ -510,6 +514,7 @@ const liveCheckDeps = {
   clock,
   databasePath,
   db,
+  degraded: degradedFlag,
   llm: anthropicLlmPort,
   mail: mailSender,
   mailAddress: liveCheckAddressValue,

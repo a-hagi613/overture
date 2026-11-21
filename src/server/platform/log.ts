@@ -15,3 +15,7 @@ export function logRetry(scope: string, attempt: number, cause: unknown) {
     `overture ${scope}: attempt ${String(attempt)} hit ${describe(cause)}; retrying\n`,
   );
 }
+
+export function logState(scope: string, message: string) {
+  process.stderr.write(`overture ${scope}: ${message}\n`);
+}

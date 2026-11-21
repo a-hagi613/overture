@@ -15,3 +15,14 @@ export interface LiveCheckResult {
 export function failedResult(check: string, startedAt: number, error: string, durationMs = 0) {
   return { check, ok: false, startedAt, durationMs, detail: { error } } satisfies LiveCheckResult;
 }
+
+/** A check deliberately not run because the app is degraded; it is not a failure. */
+export function skippedResult(check: string, startedAt: number, reason: string) {
+  return {
+    check,
+    ok: true,
+    startedAt,
+    durationMs: 0,
+    detail: { skipped: reason },
+  } satisfies LiveCheckResult;
+}

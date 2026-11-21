@@ -1,0 +1,23 @@
+{
+  "name": "overture-sentinel",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "observability": {
+    "enabled": true,
+  },
+  "limits": {
+    "cpu_ms": 50,
+  },
+  "triggers": {
+    "crons": ["*/10 * * * *"],
+  },
+  "vars": {
+    "OVERTURE_HEALTH_URL": "https://tryoverture.com/api/health",
+  },
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "overture-files",
+    },
+  ],
+}

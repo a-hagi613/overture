@@ -121,6 +121,8 @@ jobs:
       - run: bun run db:verify
       - name: Build the inbound mail Worker
         run: cd workers/inbound-mail && bun run dry-run
+      - name: Build the sentinel Worker
+        run: cd workers/sentinel && bun run dry-run
       - uses: actions/upload-artifact@v7
         with:
           name: dist

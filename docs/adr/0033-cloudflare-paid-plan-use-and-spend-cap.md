@@ -7,8 +7,9 @@ status: accepted
 From the research in `docs/research/cloudflare-paid-plan.md`. The owner accepted the decision and the stated trade
 on 2026-11-21; the first layer is live: the Workers and Durable Objects spending limits at 1¢ and the $0.50
 account-wide budget alert exist on the account, and their commands, reading and lifting are in
-`docs/research/cloudflare-spend-guard-runbook.md`. The sentinel, the Queue, the app-side counters and the R2 bounds
-are separate tickets (#281–#287).
+`docs/research/cloudflare-spend-guard-runbook.md`. The sentinel is built (#283, `workers/sentinel`): it probes
+health from outside Fly, watches the Workable snapshot's age and Cloudflare usage, and writes the degraded flag the app
+reads. The Queue, the app-side counters and the R2 bounds are separate tickets (#281–#287).
 
 ## Context
 
