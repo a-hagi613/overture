@@ -31,6 +31,8 @@ const SETTING_DEFAULTS = {
   "browser.max_concurrent_sessions": "3",
   "checkin.after_days": "21",
   "checkin.close_after_days": "45",
+  "invite.grant_quantity": "300",
+  "invite.grant_days": "30",
   "jobs.poll_interval_ms": "15000",
   "jobs.batch_size": "10",
   "catalog.sweep_max_boards": "20",

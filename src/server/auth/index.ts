@@ -21,6 +21,13 @@ import {
 } from "../platform/db/schema.ts";
 import { recordPasskeyAssertion } from "../platform/passkey/index.ts";
 import { isSameMailbox } from "./email.ts";
+import {
+  acceptInvite,
+  isSuspendedUser,
+  liveInviteFor,
+  pendingInviteFor,
+  suspendedUserWithEmail,
+} from "./invites.ts";
 import { verifyTurnstile } from "./turnstile-gate.ts";
 
 const GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration";
@@ -73,6 +80,8 @@ export const enabledSocialProviders = providerConfigs.map((config) => config.pro
 
 const ownerEmail = env.OWNER_EMAIL;
 
+const inviteHashSecret = env.BETTER_AUTH_SECRET;
+
 export function isAllowedEmail(email: string) {
   return isSameMailbox(email, ownerEmail);
 }
@@ -90,6 +99,9 @@ export function createAuth(
   options: AuthOptions = {},
 ) {
   const adminOrigin = new URL(env.ADMIN_ORIGIN);
+
+  const mayJoin = (email: string) =>
+    isAllowedEmail(email) || liveInviteFor(db, inviteHashSecret, email) !== null;
 
   const trustedOrigins = [
     ...(env.APP_ORIGIN === undefined ? [] : [env.APP_ORIGIN]),
@@ -150,7 +162,7 @@ export function createAuth(
           before: async (user) => {
             const email = user.email.trim().toLowerCase();
 
-            if (!isAllowedEmail(email)) {
+            if (!mayJoin(email)) {
               throw new APIError("FORBIDDEN", {
                 code: "forbidden",
                 message: copy.auth.accountRefused,
@@ -170,7 +182,60 @@ export function createAuth(
             return created;
           },
           after: async (user) => {
+            const email = user.email.trim().toLowerCase();
+
+            const invite = user.emailVerified
+              ? pendingInviteFor(db, inviteHashSecret, email)
+              : null;
+
             await options.onUserCreated?.({ id: user.id, email: user.email });
+            await Promise.resolve(invite);
+
+            if (!user.emailVerified || isSameMailbox(email, ownerEmail)) {
+              return;
+            }
+
+            const accepted = invite === null ? null : acceptInvite(db, clock, invite, user.id);
+
+            if (accepted === null) {
+              db.delete(users).where(eq(users.id, user.id)).run();
+
+              throw new APIError("FORBIDDEN", {
+                code: "forbidden",
+                message: copy.auth.accountRefused,
+              });
+            }
+          },
+        },
+        update: {
+          after: async (user) => {
+            const email = user.email.trim().toLowerCase();
+
+            const invite = user.emailVerified
+              ? pendingInviteFor(db, inviteHashSecret, email)
+              : null;
+
+            await Promise.resolve(invite);
+
+            if (invite !== null && !isSameMailbox(email, ownerEmail)) {
+              acceptInvite(db, clock, invite, user.id);
+            }
+          },
+        },
+      },
+      session: {
+        create: {
+          before: async (session) => {
+            const suspended = isSuspendedUser(db, session.userId);
+
+            await Promise.resolve(suspended);
+
+            if (suspended) {
+              throw new APIError("FORBIDDEN", {
+                code: "account_suspended",
+                message: copy.auth.accountSuspended,
+              });
+            }
           },
         },
       },
@@ -195,10 +260,17 @@ export function createAuth(
         sendMagicLink: async (data) => {
           const email = data.email.trim().toLowerCase();
 
-          if (!isAllowedEmail(email)) {
+          if (!mayJoin(email)) {
             throw new APIError("FORBIDDEN", {
               code: "forbidden",
               message: copy.auth.accountRefused,
+            });
+          }
+
+          if (suspendedUserWithEmail(db, email)) {
+            throw new APIError("FORBIDDEN", {
+              code: "account_suspended",
+              message: copy.auth.accountSuspended,
             });
           }
 

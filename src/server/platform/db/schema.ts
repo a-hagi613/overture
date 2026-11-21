@@ -82,8 +82,12 @@ export const rateLimits = sqliteTable("rate_limit", {
 export const invites = sqliteTable("invites", {
   id: text("id").primaryKey(),
   emailHash: text("email_hash").notNull().unique(),
+  emailEnc: text("email_enc"),
   invitedBy: text("invited_by"),
   acceptedAt: timestamp("accepted_at"),
+  acceptedUserId: text("accepted_user_id").references(() => users.id, { onDelete: "set null" }),
+  revokedAt: timestamp("revoked_at"),
+  grantId: text("grant_id").references(() => grants.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull(),
 });
 

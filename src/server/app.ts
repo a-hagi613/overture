@@ -74,14 +74,18 @@ async function staticResponseFrom(root: string, url: string) {
 }
 
 export function createApp(deps: AppDependencies) {
-  const adminApi = createAdminApi(deps.db, deps.clock, deps.auth, { providers: deps.providers });
-  const adminHost = new Hono();
-
   const personal = createPersonalCrypto(
     deps.db,
     parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
     env.MASTER_KEY_CURRENT,
   );
+
+  const adminApi = createAdminApi(deps.db, deps.clock, deps.auth, {
+    providers: deps.providers,
+    personal,
+  });
+
+  const adminHost = new Hono();
 
   const matching = createMatchingService({
     db: deps.db,
