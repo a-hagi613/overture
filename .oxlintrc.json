@@ -163,7 +163,8 @@
           "src/server/platform/outbound-guard.test.ts",
           "src/server/platform/ports/replica-listing.test.ts",
           "src/server/platform/jobs/scheduler.test.ts",
-          "src/shared/copy.test.ts"
+          "src/shared/copy.test.ts",
+          "src/server/auth/client-ip.test.ts"
         ]
       }
     ],
