@@ -25,7 +25,7 @@ The owner pays $5 a month for Workers Paid and wants no spend above $5 a month i
   design: a Litestream sync interval chosen from measured Class A operations, a lag read that lists one replica level
   instead of ten, a five-minute L0 retention check, lifecycle rules and a size alert. The measured list floor is about
   104k Class A a month before writes (#281, `docs/research/cloudflare-paid-plan.md` §2).
-- **The owner accepts the stated trade:** if the Workers limit trips, the Email Worker stops and inbound mail is lost until the period resets or the limit is lifted.
+- **The owner accepts the stated trade:** if the Workers limit trips, the Email Worker stops and inbound mail is lost until the period resets or the limit is lifted. The Queue (#286) narrows this: a tripped limit also stops the queue consumer, but mail already queued waits inside its 14-day retention and is delivered when the limit is lifted; only mail that arrives while the Email Worker itself cannot run is lost. There is no non-Worker delivery path.
 - **The sentinel reports through R2, not logs.** A Worker has no `process.stderr` and the lint rule set bans `console`, so the sentinel cannot log like the app. Instead each run records itself as `lastRun` in `ops/sentinel-state.json` — the object it already writes for alert de-duplication — with the instant, what it saw, the alerts it sent and anything it could not do; a failed state write throws so Cloudflare marks the invocation as an error. One `wrangler r2 object get` answers "is the cron alive and what did it find?". The degraded flag at `ops/degraded.json` is written only when its content changes, so a degraded period does not add a Class A write every ten minutes.
 
 ## Considered Options

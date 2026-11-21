@@ -14,6 +14,7 @@ import type { ReviewService } from "./pipeline/reviews.ts";
 import type { createMailboxService } from "./inbox/mailboxes.ts";
 import type { BrowserProviderRegistry } from "./dispatch/browser/provider.ts";
 import type { CatalogSweepWorker } from "./catalog/sweep-worker-runner.ts";
+import type { AccountEraser } from "./account/erase.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
 import { createMeRoutes } from "./routes/me.ts";
@@ -21,6 +22,7 @@ import { createApiRoutes } from "./routes/api.ts";
 import { createNotificationRoutes } from "./routes/notifications.ts";
 import { createApplicationRoutes } from "./routes/applications.ts";
 import { createHomeRoutes } from "./routes/home.ts";
+import { createNavRoutes } from "./routes/nav.ts";
 import { createCheckinRoutes } from "./routes/checkins.ts";
 import { createCalendarRoutes } from "./routes/calendar.ts";
 import { createReadyRoutes } from "./routes/ready.ts";
@@ -38,6 +40,7 @@ import { createMatchingService } from "./matching/score.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
 import { createPasswordResetRoutes } from "./routes/password-reset.ts";
+import { createAccountRoutes } from "./routes/account.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { securityHeaders } from "./security-headers.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
@@ -60,6 +63,7 @@ export interface AppDependencies {
   singletonJobKinds: readonly string[];
   providers: BrowserProviderRegistry | null;
   catalogWorker: CatalogSweepWorker;
+  eraser: AccountEraser;
 }
 
 async function staticResponseFrom(root: string, url: string) {
@@ -143,6 +147,15 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createProfileRoutes(deps));
   app.route(
     "/api",
+    createAccountRoutes({
+      auth: deps.auth,
+      clock: deps.clock,
+      db: deps.db,
+      eraser: deps.eraser,
+    }),
+  );
+  app.route(
+    "/api",
     createOnboardingRoutes({
       auth: deps.auth,
       clock: deps.clock,
@@ -170,6 +183,7 @@ export function createApp(deps: AppDependencies) {
       reviews: deps.reviews,
     }),
   );
+  app.route("/api", createNavRoutes({ auth: deps.auth, db: deps.db, reviews: deps.reviews }));
   app.route("/api", createApplicationRoutes(deps.db, deps.clock, deps.auth, personal));
   app.route("/api", createCheckinRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
   app.route("/api", createCalendarRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));

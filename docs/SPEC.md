@@ -109,7 +109,8 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Cloudflare R2 | backups, encrypted files and mail | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES`, `R2_BUCKET_BACKUPS`; `R2_ENDPOINT` overrides the endpoint for tests | disk object store adapter (real implementation, also used in local dev); the R2 adapter runs against a local S3-compatible server (`test/e2e/s3-server.ts`) |
 | Cloudflare Turnstile | bot check on auth forms | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES` (optional, defaults to the `APP_ORIGIN` hostname; production must not list localhost or 127.0.0.1) | Cloudflare's published always-pass test keys; siteverify intercepted with recorded-shape responses (`test/e2e/turnstile-gate.test.ts`) |
 | Cloudflare Access | admin host gate | `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_JWKS_URL` (tests override the certs URL) | real verification against a test signing key |
-| Cloudflare Email Routing + Email Worker | inbound mail (ADR 0028) | `INBOUND_HMAC_SECRET` (shared by the Worker and `overture-web`) | the Worker's handler run against recorded `.eml` fixtures; signed requests to the real `POST /internal/mail/inbound`; DKIM checked by `mailauth` against recorded keys |
+| Cloudflare Email Routing + Email Worker + Queues | inbound mail (ADR 0028) | `INBOUND_HMAC_SECRET` (shared by the Worker and `overture-web`); the `overture-inbound-mail` and `overture-inbound-mail-dlq` queues, the `INBOUND_QUEUE` producer and `INBOUND_SPILL` R2 binding in `workers/inbound-mail/wrangler.jsonc`, with the queue names and retry policy in `src/shared/inbound-queue.ts` | the Worker's `email` and `queue` handlers run against recorded `.eml` fixtures (`test/e2e/inbound-mail-worker.test.ts`), and the queue consumer against the real app: an outage, a retry, a recovery and a redelivery store the message exactly once (`test/e2e/inbound-mail-queue.test.ts`); signed requests to the real `POST /internal/mail/inbound`; DKIM checked by `mailauth` against recorded keys |
+| Cloudflare R2 `overture-inbound-mail-spill` | inbound mail over the 128 KB Queue limit (ADR 0028) | the `INBOUND_SPILL` Worker binding; objects under `spill/{reference}.eml` | a fake R2 binding in the Worker tests (put, get, delete) |
 | Browser Use Cloud | primary browser | `BROWSER_USE_API_KEY`, `BROWSER_USE_API_BASE_URL` (test-only override) | `local` provider: real local Chrome filling saved forms from the fixture server (§10.5); control API from recorded responses, through MSW in-process or a local recorded fixture server for the app |
 | Kernel | fallback browser | `KERNEL_API_KEY`, `KERNEL_API_BASE_URL` (test-only override) | local recorded control-API server with real local Chrome behind it; lab only |
 | Anthropic | LLM (prod) | `ANTHROPIC_API_KEY` | real adapter; API intercepted by MSW with responses recorded by the daily live check |
@@ -122,6 +123,11 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Google + LinkedIn (OIDC) | OAuth sign-in providers | `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID` with `LINKEDIN_CLIENT_SECRET`; each pair optional, both or neither (a half-set pair stops boot); an unset pair leaves that provider unregistered and hidden | local OIDC identity server; discovery URLs overridable via `OAUTH_GOOGLE_DISCOVERY_URL`, `OAUTH_LINKEDIN_DISCOVERY_URL` |
 | Auth | better-auth sessions | `BETTER_AUTH_SECRET`, `AUTH_ALLOWED_HOSTS` | local test secret and loopback hosts |
 | App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com` (forwarding addresses), `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `ALERT_NTFY_URL` (optional) | |
+
+Inbound mail is buffered on the `overture-inbound-mail` Queue (100 retries, 14-day retention) and its dead-letter queue
+`overture-inbound-mail-dlq`; spilled messages live in the separate R2 bucket `overture-inbound-mail-spill` under
+`spill/`, are deleted after delivery, and a 30-day lifecycle rule removes anything that never delivered. The queue and
+the bucket are Worker bindings, not Fly secrets.
 
 All secrets are Fly secrets; local dev reads `.env` (chmod 600, never committed).
 Overture's own mail (magic links, the daily live check) goes through the Cloudflare Email Sending adapter whenever
@@ -982,25 +988,37 @@ stopping before Submit. The developer machine never drives a browser against a r
 1. Email Routing on `tryoverture.com` sends the catch-all to the Email Worker (ADR 0028); literal rules such as
    `hello@` keep forwarding to the owner. The Worker drops an address whose MAC does not verify, forwards Gmail and
    Outlook forwarding-confirmation messages to the owner's verified destination, drops mail whose original sender is
-   not in the ATS mail domain list, and POSTs the raw MIME with the envelope to `POST /internal/mail/inbound`, signed
-   with HMAC-SHA256 under `INBOUND_HMAC_SECRET` over a timestamp and the body (5-minute replay window). Email
-   Workers accept messages up to 25 MiB. The reserved local part `live-check@tryoverture.com` belongs to no user:
-   the Worker forwards it without the ATS-sender filter, and the endpoint verifies its DKIM/DMARC and records the
-   result for the daily live check (§16.4).
-2. The endpoint verifies the signature and timestamp. For a forwarding address it stores the raw message encrypted
+   not in the ATS mail domain list, and enqueues the raw MIME with the envelope on the `overture-inbound-mail` Queue
+   (`INBOUND_QUEUE`). A message whose queue body would exceed the 128 KB Queue limit — every message over 128 KB, and
+   any message whose base64 body plus envelope does not fit — is written to R2 `overture-inbound-mail-spill` under
+   `spill/{reference}.eml` first, and the queue carries that pointer instead of the body. Email Workers accept
+   messages up to 25 MiB. The reserved local part `live-check@tryoverture.com` belongs to no user: the Worker enqueues
+   it without the ATS-sender filter, and the endpoint verifies its DKIM/DMARC and records the result for the daily
+   live check (§16.4).
+2. A queue consumer in the same Worker signs the raw MIME with HMAC-SHA256 under `INBOUND_HMAC_SECRET` over a
+   timestamp and the body (5-minute replay window) and POSTs it with the envelope to `POST /internal/mail/inbound`.
+   A 2xx acks the message and deletes its spilled R2 object; a network error, `5xx`, `408`, `425` or `429` retries it
+   after 5 minutes; any other refusal is dead-lettered at once. The queue keeps messages 14 days and retries a message
+   up to 100 times; what is still undelivered goes to the `overture-inbound-mail-dlq` queue, whose consumer posts a
+   signed `POST /internal/mail/dead-letter` and raises the owner's `mail.dead_letter` alert with the reason
+   (`refused`, `spill_missing`, `malformed` or `retries_exhausted`), the attempt count and the spill key when there is
+   one. Message content is never logged. Nothing else sweeps.
+3. The endpoint verifies the signature and timestamp. For a forwarding address it stores the raw message encrypted
    and enqueues `mail.ingest`; for `live-check@` it stores the raw MIME under `recordings/mail/`, records the auth
-   verdict on the pending live check, and touches no user. A non-2xx makes Email Routing retry; nothing else sweeps.
-3. Job `mail.ingest`: unknown or `closed` local part → delete the raw object, store nothing. Otherwise parse
+   verdict on the pending live check, and touches no user. A redelivered message — queue delivery is at least once —
+   is posted again and deduplicated by RFC Message-ID when `mail.ingest` runs, so every message is stored exactly
+   once.
+4. Job `mail.ingest`: unknown or `closed` local part → delete the raw object, store nothing. Otherwise parse
    (`mailparser`) and verify with `mailauth`: `auth='pass'` when DKIM passes aligned with the original From domain
    (forwarding breaks SPF but keeps the DKIM signature), `fail` on a failing signature, `none` when unsigned; encrypt subject, text, from, to, snippet; HTML and attachments → R2 encrypted;
    delete the stored raw message. **Nothing for a live address is dropped**: failed auth is stored and labelled "Couldn't
    verify sender". Ingest wakes any attempt waiting for a code from that mailbox.
-4. Threading by `In-Reply-To`/`References`, else new thread; `employer_started=1` when the first message is inbound.
-5. Link to an application: sender domain ∈ company domain or ATS mail domains (Greenhouse, Lever, Ashby,
+5. Threading by `In-Reply-To`/`References`, else new thread; `employer_started=1` when the first message is inbound.
+6. Link to an application: sender domain ∈ company domain or ATS mail domains (Greenhouse, Lever, Ashby,
    Workable and Personio sender lists in `src/shared/ats-mail-domains.ts`) **and** company
    name or posting title found in subject/body, choosing the most recent sent application to that company.
-6. Automation (codes, stage moves) only when `auth='pass'`.
-7. Code waits: while a verification prompt is open, an attempt records a `code_waits` row with `started_at` and
+7. Automation (codes, stage moves) only when `auth='pass'`.
+8. Code waits: while a verification prompt is open, an attempt records a `code_waits` row with `started_at` and
    `expires_at = started_at + 10 min`. Ingest resolves the oldest open, unexpired wait for that mailbox when an
    `auth='pass'` message classified as a code arrives from an ATS domain at or after its start, storing the code
    encrypted and publishing `code.wait_resolved`. Five minutes after the wait opened with no code, Overture creates a
@@ -1118,9 +1136,16 @@ body, sender or attachment, so the admin never sees message content.
   (`docs/SALVAGE.md`). Ciphertext format `v1:{key_version}:{iv}:{tag}:{data}`; associated data =
   `table:column:row_id`.
 - Encrypted: all `_enc` columns, resume files, mail HTML and attachments, exports.
-- **Delete account** (Settings, re-auth): delete Browser Use/Kernel profiles via API, delete `user_keys` (shred),
-  cascade-delete rows, delete R2 prefixes `files/{user_id}/`, move mailbox local part to `retired_addresses`, keep
-  only `card_fingerprints` (unlinked HMAC) and admin audit rows. Completes within 24 h; user gets a confirmation email.
+- **Delete account** (Settings → Delete account, re-auth): a signed-in session must re-authenticate first, with the
+  password for a password account or a session created by a fresh sign-in link (or provider sign-in) for any account.
+  The request queues one `account.erase` job.
+  The job deletes `user_keys` first (crypto-shredding), deletes Browser Use/Kernel profiles through the provider API,
+  retires the mailbox local part into `retired_addresses`, deletes R2 prefixes `files/{user_id}/`, `mail/{user_id}/`
+  and `exports/{user_id}/`, then cascade-deletes the user row (all remaining personal rows and the session). It keeps
+  only unlinked card fingerprints (M3) and admin audit rows. It completes within 24 h, sends the confirmation email,
+  and is idempotent across retries. The confirmation mail is queued as its own `account.deleted.notice`
+  job after the transaction, so a mail failure never leaves a keyless account behind. Backups and Litestream replicas keep only the shredded ciphertext
+  until normal rotation; without the wrapped key no copy is readable.
 - **Export**: JSON (profile, facts, applications, snapshots, messages metadata + text) + resume + attachments, zipped,
   encrypted link valid 24 h.
 - Logs/traces never contain names, emails, phone numbers, answers, letters or mail content; a redaction processor in
@@ -1172,6 +1197,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Area | Routes |
 |---|---|
 | Session | `GET /api/me` |
+| Shell | `GET /api/nav` (the counts behind the nav badges: Applications in Ready, open Reviews, unread employer mail; a zero hides its badge) |
 | Events | `GET /api/events` (SSE; `Last-Event-ID` replay from `events`; heartbeat 25 s) |
 | Home | `GET /api/home` (running and pause reason, applications left, today's sent/remaining, ready-to-send count, queued count + next send time, sent/replies/interviews and a per-day or per-week series for 7D/30D/90D, open Reviews grouped by jobs unlocked, recent authenticated Inbox items, up next, activity, check-ins) · `POST /api/running` `{running}` |
 | Board | `GET /api/board` · `PATCH /api/applications/:id/stage` `{stage, position}` · `POST /api/applications/:id/undo-stage` · `POST /api/applications/:id/withdraw` (before `sending`: Queued, or Skip on a Ready card) |
@@ -1185,9 +1211,9 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/mailbox` (read-only address, `forwardingWorks`, `firstForwardedAt`) · `GET/PUT /api/profile/strengthen` (the Tier 2 Facts that would unlock queued Applications, each with its count; answering saves the Fact and resolves the Reviews it answers) |
 | Consent | `GET /api/consent` (public current version and text; the signed-in user's accepted version and date) · `GET /api/consent/versions` (every published version, newest first) · `POST /api/consent/accept` `{version}` (refuses `version_changed` when a newer version is published) |
 | Onboarding | `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET/PUT /api/onboarding/targets` (the "What you want" step: the saved Targets, the choices that have open Postings, and the live count) · `PUT /api/onboarding/timezone` (the browser's zone through the seven-day rule) · `GET /api/onboarding` (the step, `onboarded_at`, pause reason, current resume, skip list and whether an invited user must onboard) · `POST /api/onboarding/:step` (records a finished step and returns the state; step 2 refuses without a resume) · `POST /api/onboarding/address/accept` (M2) |
-| Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `POST /api/account/delete` · `GET /api/support-access` |
+| Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `GET /api/account/deletion` (has a password, re-authenticated) · `POST /api/account/reauth` `{password}` · `POST /api/account/reauth/link` (a fresh sign-in link) · `POST /api/account/delete` `{confirm: true}` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
-| Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `GET /internal/mailboxes/:local` |
+| Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `POST /internal/mail/dead-letter` · `GET /internal/mailboxes/:local` |
 | Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
@@ -1202,7 +1228,7 @@ from mail (#296, ADR 0034).
 Visual design: the canvas artifact `P3aiZsEXkoUKBrknvvBNJJ`, Section A, is the wireframe and the build matches it
 pixel for pixel; `DESIGN.md` is its written contract. Boards that contradict this spec are redrawn before the slice
 that builds them (`DESIGN.md` §13). Six destinations, in this order: **Home, Ready, Board, Review, Inbox,
-Profile** (Ready added by ADR 0029); Settings from the avatar; desktop hover submenus; phone bottom tab bar; sub-sections are list pages on phone.
+Profile** (Ready added by ADR 0029); Settings from the avatar; desktop hover submenus; phone bottom tab bar; sub-sections are list pages on phone. Nav badges are live counts — Ready, open Reviews, unread Inbox mail — hidden at zero, and the link's accessible name carries the count.
 
 | Surface | Content | Key states |
 |---|---|---|
@@ -1212,7 +1238,7 @@ Profile** (Ready added by ADR 0029); Settings from the avatar; desktop hover sub
 | Review | Open questions grouped by jobs unlocked; answer input matches field type; dismiss | none open |
 | Inbox | Threads list (linked company/card), message view, attachments, "Couldn't verify sender" label; read-only (no reply, §11.2); the code-paste prompt | empty, address explainer |
 | Profile | Resume, facts by tier, targets with live job count, skip list, forwarding address, "Strengthen your profile" | missing Tier 1 facts |
-| Settings | Threshold (60/50), digest, notifications, timezone, languages, forwarding address (read-only), the fixed limits explained (10 a day, 08:00–20:00, one company per 30 days; not editable), Terms, Privacy and the consent version you agreed to, plan & billing (M3), sign out all devices, export, delete, support access log | |
+| Settings | Threshold (60/50), digest, notifications, timezone, languages, forwarding address (read-only), the fixed limits explained (10 a day, 08:00–20:00, one company per 30 days; not editable), Terms, Privacy and the consent version you agreed to, plan & billing (M3), sign out all devices, export, delete, support access log. Account pages share the five tabs: Notifications, Export, Delete account, Support access, Terms and privacy; Delete shows the warning, re-authentication, confirmation, erasing and confirmation-email states | |
 | Onboarding (M2) | 1 Sign in (invite) · 2 Resume · 3 Your facts (Tier 1, prefilled) · 4 What you want (roles, locations, workplace, seniority and a salary floor from choices that have open Postings, live count, browser timezone saved without asking; posting languages start as English and employment type as full-time until Settings) · 5 Forward ATS mail (the Gmail and Outlook filter guide, forwarding detected, or skip to the paste fallback) + consent + trial card (M3) + Start; PWA install + push prompt after Start; each step saved as it is finished | resume unreadable → manual entry, filter skipped → codes by paste |
 | Admin | Same design system: Overview (success per provider × ATS, cost per completed application, queue, spend), Users, Applications/Attempts (live view/replay embed), Reviews, Kill switches & Settings, Catalog health, Mail health, Provider report, Fixture capture, Grants/Refunds, Audit | |
 | Public (M3) | Landing, pricing, privacy, terms; prerendered static HTML; the landing says Overture prepares every application and sends it when you approve | |
@@ -1322,7 +1348,7 @@ OTel traces for every request and job; metrics: `attempt_outcome_total{provider,
 attempts), provider success < 60 %, code or CAPTCHA rate > 20 %, queue age > 30 min, LLM spend > 80 % of the global
 or tagging cap, Litestream lag > 5 min, backup failure, health check failing, disk > 80 %, a catalog sweep worker crash,
 an employer reply rate under 5 % after 10 sends in the last 30 days, the domain-wide reply rate under 5 % after 20
-sends (§11.4), and an
+sends (§11.4), an inbound message dead-lettered by the mail Worker, and an
 unhandled rejection in a background loop or timer (logged to stderr, alerted at most once a minute). The alert path is the
 in-app `alert.raised` event plus a notification for every owner; with `ALERT_NTFY_URL` set, the same alert is pushed
 to the owner's phone. No Grafana is provisioned by this repository; dashboards stay with the owner's Grafana account

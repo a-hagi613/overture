@@ -2,40 +2,29 @@ import PostalMime from "postal-mime";
 
 import { isAtsMailDomain } from "../../../src/shared/ats-mail-domains.ts";
 import {
-  INBOUND_HEADERS,
   INBOUND_MAX_BYTES,
-  INBOUND_PATH,
   forwardingIdFrom,
   isLiveCheckAddress,
-  signInbound,
 } from "../../../src/shared/inbound-mail.ts";
+import {
+  INBOUND_QUEUE_MAX_BYTES,
+  INBOUND_SPILL_PREFIX,
+  bytesToBase64,
+  inboundQueueMessageBytes,
+} from "../../../src/shared/inbound-queue.ts";
+
+import type { InboundQueueMessage } from "../../../src/shared/inbound-queue.ts";
+import type { ForwardableEmailMessage, InboundMailEnv } from "./env.ts";
+
+import { millisecondsNow } from "./clock.ts";
 
 const CONFIRMATION_SENDERS = new Set(["forwarding-noreply@google.com", "no-reply@microsoft.com"]);
-
-export interface InboundMailEnv {
-  INBOUND_HMAC_SECRET: string;
-  OVERTURE_ORIGIN: string;
-  OWNER_FORWARD_TO: string;
-}
-
-export interface ForwardableEmailMessage {
-  from: string;
-  to: string;
-  rawSize: number;
-  raw: ReadableStream<Uint8Array>;
-  forward: (to: string) => Promise<void>;
-  setReject: (reason: string) => void;
-}
 
 function domainOf(address: string) {
   return address
     .slice(address.lastIndexOf("@") + 1)
     .trim()
     .toLowerCase();
-}
-
-function secondsNow() {
-  return Math.floor((performance.timeOrigin + performance.now()) / 1000);
 }
 
 export async function email(message: ForwardableEmailMessage, env: InboundMailEnv) {
@@ -66,25 +55,36 @@ export async function email(message: ForwardableEmailMessage, env: InboundMailEn
     }
   }
 
-  const signed = await signInbound(env.INBOUND_HMAC_SECRET, {
-    timestamp: secondsNow(),
+  const envelope = {
     rcptTo: message.to,
-    body: raw,
-  });
+    mailFrom: message.from,
+    receivedAt: millisecondsNow(),
+    reference: crypto.randomUUID(),
+  };
 
-  const response = await fetch(new URL(INBOUND_PATH, env.OVERTURE_ORIGIN), {
-    method: "POST",
-    headers: {
-      "content-type": "message/rfc822",
-      [INBOUND_HEADERS.timestamp]: signed.timestamp,
-      [INBOUND_HEADERS.signature]: signed.signature,
-      [INBOUND_HEADERS.rcptTo]: message.to,
-      [INBOUND_HEADERS.mailFrom]: message.from,
-    },
-    body: raw,
-  });
+  if (raw.byteLength <= INBOUND_QUEUE_MAX_BYTES) {
+    const inline: InboundQueueMessage = {
+      kind: "inline",
+      ...envelope,
+      bodyBase64: bytesToBase64(raw),
+    };
 
-  if (!response.ok) {
-    throw new Error(`Inbound mail was refused with status ${String(response.status)}.`);
+    if (inboundQueueMessageBytes(inline) <= INBOUND_QUEUE_MAX_BYTES) {
+      await env.INBOUND_QUEUE.send(inline);
+
+      return;
+    }
+  }
+
+  const spillKey = `${INBOUND_SPILL_PREFIX}${envelope.reference}.eml`;
+
+  await env.INBOUND_SPILL.put(spillKey, raw);
+
+  try {
+    await env.INBOUND_QUEUE.send({ kind: "spill", ...envelope, spillKey });
+  } catch (error) {
+    await env.INBOUND_SPILL.delete(spillKey);
+
+    throw error;
   }
 }

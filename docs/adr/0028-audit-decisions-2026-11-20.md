@@ -33,9 +33,37 @@ risk that one shared `mail.tryoverture.com` domain is blocklisted for every user
 - Email Routing on the apex `tryoverture.com` sends the catch-all to one Email Worker. Literal rules such as `hello@`
   keep forwarding to the owner. Catch-all works on the apex, which is where the forwarding addresses live.
 - The Worker checks the address MAC, forwards Gmail and Outlook forwarding-confirmation messages to the owner's
-  verified destination, drops mail whose original sender is not an ATS domain, and POSTs the **raw MIME** with the
-  envelope as an HMAC-SHA256-signed request (timestamped, 5-minute replay window) to `POST /internal/mail/inbound`.
-  No LLM runs in the Worker.
+  verified destination, drops mail whose original sender is not an ATS domain, and hands the **raw MIME** with the
+  envelope to the app. No LLM runs in the Worker.
+- **The hand-off is a Cloudflare Queue, not a direct POST (#286).** The Worker enqueues the raw MIME (envelope as
+  metadata) on `overture-inbound-mail`; a consumer in the same Worker signs it with HMAC-SHA256 (timestamped, 5-minute
+  replay window) and POSTs it to `POST /internal/mail/inbound`. A 2xx acks the message; a network error or a `5xx`,
+  `408`, `425` or `429` retries it after 5 minutes; any other refusal is dead-lettered at once. The queue keeps
+  messages 14 days and retries each up to 100 times. Mail that arrives during a deploy or a restart is therefore
+  delivered when the app returns, where the old direct POST lost it.
+- **A message over the 128 KB Queue limit is spilled to R2.** A Cloudflare Queue message is at most 128 KB, and the
+  signed body is base64 inside it, so any message whose encoded body would not fit (every message over 128 KB, and
+  messages above about 95 KB raw) is written to the R2 bucket `overture-inbound-mail-spill` at
+  `spill/{reference}.eml` and the queue carries that pointer. The consumer reads it, and deletes the object only
+  after a 2xx. A 30-day lifecycle rule removes objects that never delivered; the dead-letter alert names the key so
+  the owner can replay one. The queue and the spool hold the raw MIME unsealed while it is in flight, as any mail
+  transport does; both are private to Overture's account, the spool is bounded by the lifecycle rule, and the durable
+  copy `mail.ingest` keeps is sealed per user (ADR 0014). A dead-lettered message's body stays in its queue or spool
+  until retention or the lifecycle rule removes it; the alert never contains the content.
+- **A dead-lettered message raises an alert.** Messages that exhaust their retries move to
+  `overture-inbound-mail-dlq`. Its consumer posts a signed `POST /internal/mail/dead-letter` to the app, which raises
+  the owner's `mail.dead_letter` alert (`refused`, `spill_missing`, `malformed` or `retries_exhausted`, the attempt
+  count, the mailbox and the spill key); the alert is the same in-app notification plus phone push as every other
+  alert, and message content is never logged.
+- **Delivery is at least once; storage is exactly once.** A lost ack or a retried POST sends the same MIME again, and
+  the existing `(mailbox, RFC Message-ID)` check in `mail.ingest` drops the duplicate, so a mailbox never shows a
+  message twice. The e2e test runs an outage, a retry, a recovery and a redelivery against the real app and asserts one
+  stored message.
+- **The cap guard applies to the consumer too (ADR 0033, #280).** A tripped Workers spending limit blocks queue
+  consumers exactly as it blocks the Email Worker: the consumer stops, queued mail waits (up to the 14-day retention)
+  and is delivered when the limit is lifted or the period resets, and mail that arrives while the Email Worker itself
+  cannot run is still lost. There is no non-Worker delivery path that could bypass the limit, and the sentinel's
+  degraded flag (#283) only has to keep the app's side cheap, not police this queue.
 - `overture-web` verifies DKIM and DMARC itself on the raw message with `mailauth`. That answers ADR 0024's
   objection that the Worker gets no authentication results: Overture no longer depends on the receiver's verdicts.
   Forwarding breaks SPF but leaves the original DKIM signature intact, so `auth='pass'` means the original From
@@ -43,7 +71,7 @@ risk that one shared `mail.tryoverture.com` domain is blocklisted for every user
 - Ingest, threading, linking and "automate only on `auth='pass'`" are unchanged (SPEC §11.1, ADR 0006). Codes are
   read by deterministic patterns. If no code arrives within five minutes, the user is asked to paste it; the wait and
   the browser session stay open to the ten-minute expiry, so the paste resumes the same attempt.
-- No AWS for inbound: no SES receiving, S3 or SNS, and no `mail.sweep`; Email Routing retries on a non-2xx.
+- No AWS for inbound: no SES receiving, S3 or SNS, and no `mail.sweep`.
 
 This supersedes ADR 0024.
 
@@ -168,3 +196,8 @@ Gem, or restates its scope is the owner's call.
 - **SES receiving (ADR 0024).** It gives receiver verdicts, but needs AWS credentials, S3, SNS and a sweep. With raw
   MIME and `mailauth`, the verdicts are no longer needed.
 - **Switching browser providers before M2.** The owner accepts Browser Use's terms, so the switch buys nothing now.
+- **Keep the direct POST from the Email Worker (#286).** Email Routing retries only a Worker that answers non-2xx, an
+  app outage can outlast those retries, and nothing recorded what was lost. The Queue adds retries, 14-day retention,
+  a dead-letter queue and an alert, on a product the paid plan already covers.
+- **Put the whole message in the queue.** Rejected: a Queue message is capped at 128 KB, so oversized mail goes to R2
+  and the queue carries a pointer.

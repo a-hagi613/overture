@@ -79,16 +79,13 @@ export function TimeLanguageSection() {
       className="flex flex-col rounded-lg border border-border bg-card p-[20px_16px_22px] shadow-sh min-[768px]:p-[24px_28px_26px]"
       data-testid="settings-time-language"
     >
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1.5">
+      <div>
         <h2
           className="font-serif text-[28px] leading-[1.1] tracking-[-0.005em]"
           id="settings-time-language"
         >
           {copy.settings.timeLanguageHeading}
         </h2>
-        <span className="font-serif text-sm leading-[1.5] italic text-muted-foreground">
-          {copy.settings.timeLanguageFolio}
-        </span>
       </div>
       <div className="mt-2.5">
         <div

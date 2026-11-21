@@ -37,14 +37,9 @@ export function GrantsPage() {
         aria-labelledby="admin-grants"
         className="mt-7 rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
       >
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 id="admin-grants" className="font-serif text-[26px] leading-[1.1]">
-            {copy.admin.grantsHeading}
-          </h2>
-          <span className="font-serif text-sm italic text-muted-foreground">
-            {copy.admin.folio1}
-          </span>
-        </div>
+        <h2 id="admin-grants" className="font-serif text-[26px] leading-[1.1]">
+          {copy.admin.grantsHeading}
+        </h2>
         <p className="mt-1 text-[12.5px] text-muted-foreground">{copy.admin.grantsIntro}</p>
         <div className="mt-4">
           {rows.length === 0 ? (

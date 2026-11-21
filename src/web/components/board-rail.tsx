@@ -1,45 +1,23 @@
 import { NavLink } from "react-router";
 
+import type { NavCounts } from "../lib/nav-api.ts";
+
 import { copy } from "../../shared/copy.ts";
 import { AvatarLink } from "./avatar-link.tsx";
 import { BrandMark } from "./brand-mark.tsx";
 import { NavGlyph } from "./nav-glyph.tsx";
 import { UsageRing } from "./usage-ring.tsx";
+import { NAV_DESTINATIONS, navBadgeClass, navBadgeCount, navLabel } from "../lib/nav-api.ts";
 
-const destinations = [
-  { glyph: "home", to: "/" },
-  { badge: copy.sample.readyToSend, badgeTone: "ok", glyph: "ready", to: "/ready" },
-  { glyph: "board", to: "/board" },
-  { badge: copy.sample.reviewWaiting, badgeTone: "need", glyph: "review", to: "/review" },
-  { badge: copy.sample.inboxUnread, badgeTone: "well", glyph: "inbox", to: "/inbox" },
-  { glyph: "profile", to: "/profile" },
-] as const;
-
-function labelFor(destination: (typeof destinations)[number]) {
-  if (!("badge" in destination)) {
-    return copy.nav[destination.glyph];
-  }
-
-  if (destination.glyph === "ready") {
-    return copy.sample.readyAria;
-  }
-
-  if (destination.glyph === "review") {
-    return copy.shell.counters.reviewAria;
-  }
-
-  return copy.shell.counters.inboxAria;
-}
-
-function badgeClass(tone: "ok" | "need" | "well") {
-  if (tone === "need") {
-    return "bg-need-soft text-need";
-  }
-
-  return tone === "ok" ? "bg-ok-soft text-ok" : "bg-muted text-foreground";
-}
-
-export function BoardRail({ onExpand, name }: { onExpand: () => void; name: string | null }) {
+export function BoardRail({
+  counts,
+  name,
+  onExpand,
+}: {
+  counts: NavCounts;
+  name: string | null;
+  onExpand: () => void;
+}) {
   return (
     <aside className="board hidden bg-sidebar px-0 pb-[18px] pt-5 shadow-[1px_0_0_var(--color-hl)] md:flex md:w-[76px] md:flex-col md:items-center md:border-r md:border-border">
       <NavLink aria-label={copy.brand.homeAria} className="flex" to="/">
@@ -55,22 +33,30 @@ export function BoardRail({ onExpand, name }: { onExpand: () => void; name: stri
       </button>
       <hr className="rule mt-4 w-9" />
       <nav aria-label={copy.nav.label} className="mt-4 flex flex-col items-center gap-1.5">
-        {destinations.map((destination) => (
-          <NavLink
-            aria-label={labelFor(destination)}
-            className={({ isActive }) => `rl ${isActive ? "on" : ""}`}
-            end={destination.to === "/"}
-            key={destination.to}
-            to={destination.to}
-          >
-            <NavGlyph name={destination.glyph} size={20} />
-            {"badge" in destination ? (
-              <span className={`rb num ${badgeClass(destination.badgeTone)}`}>
-                {destination.badge}
-              </span>
-            ) : null}
-          </NavLink>
-        ))}
+        {NAV_DESTINATIONS.map((destination) => {
+          const count = navBadgeCount(counts, destination.glyph);
+
+          return (
+            <NavLink
+              className={({ isActive }) => `rl ${isActive ? "on" : ""}`}
+              end={destination.to === "/"}
+              key={destination.to}
+              to={destination.to}
+            >
+              <span className="sr-only">{navLabel(destination.glyph, count)}</span>
+              <NavGlyph name={destination.glyph} size={20} />
+              {count === 0 ? null : (
+                <span
+                  aria-hidden="true"
+                  className={`rb num ${navBadgeClass(destination.glyph)}`}
+                  data-nav-badge={destination.glyph}
+                >
+                  {count}
+                </span>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
       <div className="mt-auto flex flex-col items-center gap-3.5">
         <UsageRing />
