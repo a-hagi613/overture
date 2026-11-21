@@ -172,6 +172,8 @@ const captureFormPage = `<!doctype html>
 
 const MINUTE_MS = 60_000;
 
+const SEND_AT = Date.parse("2026-03-10T12:00:10.000Z");
+
 async function ownerFor(server: AppServer) {
   const { owner, userId } = await ownerContextFor(server.url);
 
@@ -685,24 +687,139 @@ async function putSetting(owner: APIRequestContext, key: string, value: string) 
   expect(response.ok()).toBe(true);
 }
 
-async function enqueueSendJob(owner: APIRequestContext, applicationId: string, runAt: number) {
-  const response = await owner.post("/__test__/jobs/enqueue", {
-    data: { kind: SEND_JOB, payload: JSON.stringify({ applicationId }), runAt },
-  });
-
-  expect(response.ok()).toBe(true);
+interface SendJobRequest {
+  kind: string;
+  payload: string;
+  runAt: number;
+  dedupeKey?: string;
 }
 
-async function runSend(owner: APIRequestContext, applicationId: string) {
-  const response = await owner.post("/__test__/jobs/run-now", {
-    data: { kind: SEND_JOB, payload: JSON.stringify({ applicationId }) },
-  });
+async function enqueueSendJob(
+  owner: APIRequestContext,
+  applicationId: string,
+  runAt: number,
+  dedupeKey?: string,
+) {
+  const data: SendJobRequest = {
+    kind: SEND_JOB,
+    payload: JSON.stringify({ applicationId }),
+    runAt,
+  };
 
-  if (!response.ok()) {
-    throw new Error(`send ${applicationId} failed: ${await response.text()}`);
+  if (dedupeKey !== undefined) {
+    data.dedupeKey = dedupeKey;
   }
 
-  return response;
+  const response = await owner.post("/__test__/jobs/enqueue", { data });
+
+  expect(response.ok()).toBe(true);
+
+  return createdSchema.parse(await response.json()).id;
+}
+
+async function jobRows(owner: APIRequestContext) {
+  return jobsSchema.parse(await (await owner.get("/__test__/jobs")).json()).jobs;
+}
+
+async function jobStatus(owner: APIRequestContext, jobId: string) {
+  return (await jobRows(owner)).find((job) => job.id === jobId)?.status ?? "missing";
+}
+
+const sendPayloadSchema = z.object({ applicationId: z.string() });
+
+async function sendJobsFor(owner: APIRequestContext, applicationId: string) {
+  return (await jobRows(owner)).filter((job) => {
+    const payload: unknown = JSON.parse(job.payload);
+
+    return (
+      job.kind === SEND_JOB &&
+      sendPayloadSchema.safeParse(payload).data?.applicationId === applicationId
+    );
+  });
+}
+
+async function holdTheOnlyBrowserSession(owner: APIRequestContext) {
+  const gate = Promise.withResolvers<undefined>();
+  const state = { hits: 0 };
+
+  const page = Bun.serve({
+    port: 0,
+    async fetch() {
+      state.hits += 1;
+      await gate.promise;
+
+      return new Response(captureFormPage, { headers: { "content-type": "text/html" } });
+    },
+  });
+
+  const capture = runCapture(owner, `http://127.0.0.1:${String(page.port)}/form`);
+
+  await expect.poll(() => state.hits, { timeout: 30_000 }).toBeGreaterThan(0);
+
+  return {
+    capture,
+    page,
+    release: () => {
+      gate.resolve(undefined);
+    },
+  };
+}
+
+async function applicationsDueAtSendTime(pacing: PacingHarness, regions: readonly ("us" | "eu")[]) {
+  const { owner, userId } = await ownerFor(pacing.server);
+
+  await moveClockTo(owner, "2026-03-10T12:00:00.000Z");
+  await uploadResume(owner);
+  await saveFacts(owner);
+  await ensureMailbox(owner);
+  await grantApplications(owner, 5);
+
+  const applicationIds = await Promise.all(
+    regions.map(async (region) => {
+      const postingId = await seedPostingFor(owner, pacing.fixture.url, region);
+
+      const applicationId = await seedApplication(owner, { postingId, status: "ready", userId });
+
+      await seedWebsiteAnswer(owner, userId, applicationId, postingId);
+      await approveApplication(owner, applicationId);
+
+      return applicationId;
+    }),
+  );
+
+  const drained = await owner.post("/__test__/jobs/run-due");
+
+  expect(drained.ok()).toBe(true);
+
+  const pinned = await Promise.all(
+    applicationIds.map(async (applicationId) =>
+      owner.post("/__test__/applications/status", {
+        data: { applicationId, scheduledFor: SEND_AT, status: "approved" },
+      }),
+    ),
+  );
+
+  for (const response of pinned) {
+    expect(response.ok()).toBe(true);
+  }
+
+  await moveClockTo(owner, new Date(SEND_AT).toISOString());
+
+  return { applicationIds, owner, userId };
+}
+
+async function startSendJob(owner: APIRequestContext, applicationId: string, runAt: number) {
+  const jobId = await enqueueSendJob(owner, applicationId, runAt, `${SEND_JOB}:${applicationId}`);
+
+  await expect.poll(async () => jobStatus(owner, jobId), { timeout: 30_000 }).toBe("running");
+
+  return jobId;
+}
+
+async function waitForSendJobToSettle(owner: APIRequestContext, jobId: string) {
+  await expect
+    .poll(async () => jobStatus(owner, jobId), { timeout: 120_000 })
+    .toMatch(/^(?<settled>done|dead|failed)$/u);
 }
 
 async function runCapture(owner: APIRequestContext, applyUrl: string) {
@@ -764,90 +881,115 @@ test("dispatch queues no more sends than the browser session cap holds", async (
 test("a send waits for a browser session before it marks the Application sending", async ({
   pacing,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(120_000);
 
-  const { owner, userId } = await ownerFor(pacing.server);
+  const { applicationIds, owner, userId } = await applicationsDueAtSendTime(pacing, ["us"]);
+  const [applicationId] = applicationIds;
 
-  await moveClockTo(owner, "2026-03-10T12:00:00.000Z");
-  await uploadResume(owner);
-  await saveFacts(owner);
-  await ensureMailbox(owner);
-  await grantApplications(owner, 5);
+  if (applicationId === undefined) {
+    throw new Error("the harness seeded no Application");
+  }
 
-  const postingId = await seedPostingFor(owner, pacing.fixture.url, "us");
+  await putSetting(owner, "browser.max_concurrent_sessions", "1");
 
-  const applicationId = await seedApplication(owner, { postingId, status: "ready", userId });
-
-  await approveApplication(owner, applicationId);
-
-  const pageGate = Promise.withResolvers<undefined>();
-
-  let pageHits = 0;
-
-  const page = Bun.serve({
-    port: 0,
-    async fetch() {
-      pageHits += 1;
-      await pageGate.promise;
-
-      return new Response(captureFormPage, { headers: { "content-type": "text/html" } });
-    },
-  });
+  const slot = await holdTheOnlyBrowserSession(owner);
 
   try {
-    await putSetting(owner, "browser.max_concurrent_sessions", "1");
+    const jobId = await startSendJob(owner, applicationId, SEND_AT);
 
-    let captureFinished = false;
+    expect(await statusOf(owner, userId, applicationId)).toBe("approved");
 
-    const capture = runCapture(owner, `http://127.0.0.1:${String(page.port)}/form`);
+    slot.release();
 
-    void (async () => {
-      await capture;
-      captureFinished = true;
-    })();
-
-    await expect.poll(() => pageHits, { timeout: 30_000 }).toBeGreaterThan(0);
-
-    const send = runSend(owner, applicationId);
-
-    let winner = "waiting";
-    let sendingSamples = 0;
-
-    await expect
-      .poll(
-        async () => {
-          if (captureFinished) {
-            winner = "capture-finished";
-
-            return winner;
-          }
-
-          if ((await statusOf(owner, userId, applicationId)) === "sending") {
-            sendingSamples += 1;
-
-            if (sendingSamples >= 2) {
-              winner = "sending";
-            }
-
-            return winner;
-          }
-
-          return winner;
-        },
-        { intervals: [25], timeout: 90_000 },
-      )
-      .not.toBe("waiting");
-
-    expect(winner).toBe("capture-finished");
-
-    pageGate.resolve(undefined);
-
-    await capture;
-    await send;
+    await slot.capture;
+    await waitForSendJobToSettle(owner, jobId);
 
     expect(await statusOf(owner, userId, applicationId)).toBe("sent");
   } finally {
-    pageGate.resolve(undefined);
-    await page.stop(true);
+    slot.release();
+    await slot.page.stop(true);
+  }
+});
+
+test("a send waiting for a browser slot is counted, so the tick never queues it twice", async ({
+  pacing,
+}) => {
+  test.setTimeout(120_000);
+
+  const { applicationIds, owner, userId } = await applicationsDueAtSendTime(pacing, ["us", "eu"]);
+  const [waiting, next] = applicationIds;
+
+  if (waiting === undefined || next === undefined) {
+    throw new Error("the harness seeded fewer than two Applications");
+  }
+
+  await putSetting(owner, "browser.max_concurrent_sessions", "1");
+
+  const slot = await holdTheOnlyBrowserSession(owner);
+
+  try {
+    const jobId = await startSendJob(owner, waiting, SEND_AT);
+
+    expect(await statusOf(owner, userId, waiting)).toBe("approved");
+
+    const before = new Set(await sendJobIds(owner));
+
+    await runJob(owner, "dispatch.tick", "{}");
+
+    expect(await newSendJobs(owner, before)).toEqual([]);
+    expect((await sendJobsFor(owner, waiting)).map((job) => job.id)).toEqual([jobId]);
+    expect(await statusOf(owner, userId, next)).toBe("approved");
+
+    await putSetting(owner, "browser.max_concurrent_sessions", "2");
+    await runJob(owner, "dispatch.tick", "{}");
+
+    expect(await newSendJobs(owner, before)).toEqual([]);
+
+    slot.release();
+
+    await slot.capture;
+    await waitForSendJobToSettle(owner, jobId);
+
+    expect(await statusOf(owner, userId, waiting)).toBe("sent");
+  } finally {
+    slot.release();
+    await slot.page.stop(true);
+  }
+});
+
+test("a kill switch flipped while a send waits for a slot stops that send", async ({ pacing }) => {
+  test.setTimeout(120_000);
+
+  const { applicationIds, owner, userId } = await applicationsDueAtSendTime(pacing, ["us"]);
+  const [applicationId] = applicationIds;
+
+  if (applicationId === undefined) {
+    throw new Error("the harness seeded no Application");
+  }
+
+  await putSetting(owner, "browser.max_concurrent_sessions", "1");
+
+  const slot = await holdTheOnlyBrowserSession(owner);
+
+  try {
+    const jobId = await startSendJob(owner, applicationId, SEND_AT);
+
+    expect(await statusOf(owner, userId, applicationId)).toBe("approved");
+
+    const switched = await owner.put("/__test__/kill-switches/ats/greenhouse", {
+      data: { enabled: true, reason: "testing the send re-check", setBy: "owner" },
+    });
+
+    expect(switched.ok()).toBe(true);
+
+    slot.release();
+
+    await slot.capture;
+    await waitForSendJobToSettle(owner, jobId);
+
+    expect(await statusOf(owner, userId, applicationId)).toBe("approved");
+  } finally {
+    slot.release();
+    await slot.page.stop(true);
   }
 });

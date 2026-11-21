@@ -437,6 +437,10 @@ export function createDispatcher(deps: DispatcherDeps) {
     const releaseSessionSlot = await acquireBrowserSession(signal);
 
     try {
+      if (switchedOffAtSend(applicationId, provider.id)) {
+        return false;
+      }
+
       return await attemptWithSlot(applicationId, provider);
     } finally {
       releaseSessionSlot();

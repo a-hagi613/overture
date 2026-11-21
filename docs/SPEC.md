@@ -796,15 +796,20 @@ bound: the planner gives it the first free slot at or after that time inside a w
 
 ### 9.3 Dispatcher
 
-Job `dispatch.tick` every 15 s claims at most `free_slots = session_cap − sending_count − queued_sends` applications
+Job `dispatch.tick` every 15 s claims at most `free_slots = session_cap − active_sends` applications
 in `approved` (never `ready`) that pass every gate below, in order, where `session_cap` is
-`browser.max_concurrent_sessions`, the same process-wide browser session cap every send holds a slot from. An
-Application becomes `sending` only after it holds one of those slots, so `sending` never counts an Application that
+`browser.max_concurrent_sessions`, the same process-wide browser session cap every send holds a slot from, and
+`active_sends` is the number of distinct Applications with send work in flight: those in `sending`, plus those with an
+`application.send` job still `queued` or `running` (a job waiting in the session-slot queue is `running` while its
+Application is still `approved`). An Application becomes `sending` only after it holds one of those slots, so a send
+that is queued or waiting for a browser already counts against the cap and `sending` never counts an Application that
 is still waiting for a browser:
 
 1. Global and provider kill switches off; ATS and employer kill switches off.
 2. User `running=1`, not suspended, has a current resume and an active mailbox.
-3. User has no other application in `sending` (enforced by the partial unique index).
+3. User has no other application in `sending` (enforced by the partial unique index) and no `application.send` job
+   `queued` or `running`; an Application with a live send job is never queued again, so a waiting or retrying send
+   cannot be duplicated, bypass its retry time or count twice.
 4. Applications left ≥ 1 and today's used + reserved < daily cap (10).
 5. Per-ATS global hourly cap not exceeded; crowd limits (20 Overture applicants per posting, 50 per employer per
    7 days) not exceeded.
@@ -959,7 +964,8 @@ Preparation reads a Lever or Ashby form over plain HTTP from `overture-web` firs
 capture path only when the plain read cannot see the form; the path that ran is kept in `plan_cache`.
 Every browser session, whether a capture, the early cloud probe or a dispatch send, takes a slot from one
 process-wide semaphore sized by `browser.max_concurrent_sessions` (default 3). That one setting is both the semaphore
-and the dispatcher's in-flight send cap (§9.3); a send takes its slot before it marks the Application `sending`. A
+and the dispatcher's in-flight send cap (§9.3); a send takes its slot before it marks the Application `sending`, and a
+send that is queued or still waiting for its slot counts against that cap. A
 capture that cannot get a slot waits without failing or spending an attempt. A 429 from the provider's create-session call is retried with backoff or the
 `Retry-After` delay and does not spend an attempt, and a `goto` that times out is retried once.
 On production the same job is queued from the machine with

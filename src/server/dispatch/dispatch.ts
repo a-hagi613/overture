@@ -12,6 +12,8 @@ import {
   sql,
 } from "drizzle-orm";
 
+import { z } from "zod";
+
 import type { Ats, BoardRegion } from "../catalog/board-feed.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -102,6 +104,60 @@ function settingNumber(db: AppDatabase, key: string, fallback: number) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
+const sendJobPayloadSchema = z.object({ applicationId: z.string().min(1) });
+
+function sendJobApplicationId(payload: string) {
+  try {
+    const parsed = sendJobPayloadSchema.safeParse(JSON.parse(payload));
+
+    return parsed.success ? parsed.data.applicationId : null;
+  } catch {
+    return null;
+  }
+}
+
+function activeSendWork(db: AppDatabase) {
+  const sending = db
+    .select({ applicationId: applications.id, userId: applications.userId })
+    .from(applications)
+    .where(eq(applications.status, "sending"))
+    .all();
+
+  const queuedOrRunningIds = db
+    .select({ payload: bgJobs.payload })
+    .from(bgJobs)
+    .where(
+      and(
+        eq(bgJobs.kind, APPLICATION_SEND_JOB_KIND),
+        inArray(bgJobs.status, ["queued", "running"]),
+      ),
+    )
+    .all()
+    .map((job) => sendJobApplicationId(job.payload))
+    .filter((applicationId): applicationId is string => applicationId !== null);
+
+  const userByApplication = new Map(sending.map((row) => [row.applicationId, row.userId]));
+
+  const unresolved = queuedOrRunningIds.filter(
+    (applicationId) => !userByApplication.has(applicationId),
+  );
+
+  if (unresolved.length > 0) {
+    for (const row of db
+      .select({ applicationId: applications.id, userId: applications.userId })
+      .from(applications)
+      .where(inArray(applications.id, unresolved))
+      .all()) {
+      userByApplication.set(row.applicationId, row.userId);
+    }
+  }
+
+  return {
+    applicationIds: new Set([...userByApplication.keys(), ...queuedOrRunningIds]),
+    userIds: new Set(userByApplication.values()),
+  };
+}
+
 export function createDispatcherTick(deps: DispatchDeps) {
   const { db, clock, providerId, liveness, enqueueSend, personal } = deps;
 
@@ -141,7 +197,12 @@ export function createDispatcherTick(deps: DispatchDeps) {
     return row.timezone ?? "UTC";
   }
 
-  function userGate(userId: string, now: number, dailyCap: number) {
+  function userGate(
+    userId: string,
+    now: number,
+    dailyCap: number,
+    activeSendUsers: ReadonlySet<string>,
+  ) {
     const profile = db
       .select({ running: profiles.running })
       .from(profiles)
@@ -196,13 +257,7 @@ export function createDispatcherTick(deps: DispatchDeps) {
       return { block: { reason: "daily_cap", scope: "user" }, timeZone };
     }
 
-    const sending = db
-      .select({ total: count() })
-      .from(applications)
-      .where(and(eq(applications.userId, userId), eq(applications.status, "sending")))
-      .get();
-
-    if ((sending?.total ?? 0) > 0) {
+    if (activeSendUsers.has(userId)) {
       return { block: { reason: "sending", scope: "user" }, timeZone };
     }
 
@@ -357,20 +412,9 @@ export function createDispatcherTick(deps: DispatchDeps) {
     );
 
     const concurrency = maxConcurrentSessionsFromSetting(db);
+    const activeSends = activeSendWork(db);
 
-    const sending = db
-      .select({ total: count() })
-      .from(applications)
-      .where(eq(applications.status, "sending"))
-      .get();
-
-    const queuedSends = db
-      .select({ total: count() })
-      .from(bgJobs)
-      .where(and(eq(bgJobs.kind, APPLICATION_SEND_JOB_KIND), eq(bgJobs.status, "queued")))
-      .get();
-
-    let freeSlots = Math.max(0, concurrency - (sending?.total ?? 0) - (queuedSends?.total ?? 0));
+    let freeSlots = Math.max(0, concurrency - activeSends.applicationIds.size);
 
     if (freeSlots === 0) {
       return summary;
@@ -401,6 +445,7 @@ export function createDispatcherTick(deps: DispatchDeps) {
       )
       .orderBy(asc(applications.approvedAt), asc(applications.createdAt))
       .all()
+      .filter((row) => !activeSends.applicationIds.has(row.id))
       .flatMap((row) => (isDispatchAts(row.ats) ? [{ ...row, ats: row.ats }] : []));
 
     if (rows.length === 0) {
@@ -440,7 +485,7 @@ export function createDispatcherTick(deps: DispatchDeps) {
         break;
       }
 
-      const gate = userGate(userId, now, dailyCap);
+      const gate = userGate(userId, now, dailyCap, activeSends.userIds);
 
       if (gate.block !== null) {
         summary.blocked += 1;
