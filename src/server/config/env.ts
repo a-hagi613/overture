@@ -94,6 +94,9 @@ const envSchema = z
     CLOUDFLARE_ZONE_ID: z.string().min(1).optional(),
     CLOUDFLARE_EMAIL_API_BASE_URL: z.url().default("https://api.cloudflare.com/client/v4"),
     REQUIRE_EMAIL_SENDING: booleanFromString.default(false),
+    VAPID_PUBLIC_KEY: z.string().min(1).optional(),
+    VAPID_PRIVATE_KEY: z.string().min(1).optional(),
+    VAPID_SUBJECT: z.string().min(1).default("mailto:admin@tryoverture.com"),
     INBOUND_HMAC_SECRET: z.string().min(16).optional(),
     INBOUND_DNS_SERVER: z.string().min(1).optional(),
     ALERT_NTFY_URL: z.url().optional(),
@@ -174,6 +177,14 @@ const envSchema = z
             ? "CLOUDFLARE_EMAIL_API_TOKEN"
             : "CLOUDFLARE_ACCOUNT_ID",
         ],
+      });
+    }
+
+    if ((value.VAPID_PUBLIC_KEY === undefined) !== (value.VAPID_PRIVATE_KEY === undefined)) {
+      context.addIssue({
+        code: "custom",
+        message: "VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are set together or not at all.",
+        path: [value.VAPID_PUBLIC_KEY === undefined ? "VAPID_PUBLIC_KEY" : "VAPID_PRIVATE_KEY"],
       });
     }
 

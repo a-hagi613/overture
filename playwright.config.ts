@@ -134,5 +134,9 @@ export default defineConfig({
         },
       },
     },
+    {
+      name: "notifications-boards",
+      testMatch: /board-match-notifications\.test\.ts/u,
+    },
   ],
 });

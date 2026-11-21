@@ -4,6 +4,7 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { zonedTimeToEpoch } from "../../src/server/platform/local-time.ts";
 import { authTestIdentity } from "./auth.fixture.ts";
+import { seedUnreadNotifications } from "./notification-seed.ts";
 import { latestMailLink, requestMagicLink, verifyAuthState } from "./sign-in.ts";
 
 const createdSchema = z.object({ id: z.string() });
@@ -263,6 +264,7 @@ export async function seedBoardOwner(request: APIRequestContext, appServerUrl: s
   await request.post(`${appServerUrl}/__test__/ledger/sample`, {
     data: { email: authTestIdentity.ownerEmail },
   });
+  await seedUnreadNotifications(request, appServerUrl);
   const homeProbe = await request.get("/api/home");
 
   if (!homeProbe.ok()) {

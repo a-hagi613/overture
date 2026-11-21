@@ -6,6 +6,12 @@ export default defineConfig({
   plugins: [tailwindcss(), react()],
   build: {
     outDir: "dist",
+    rolldownOptions: {
+      input: { main: "index.html", sw: "src/web/sw.ts" },
+      output: {
+        entryFileNames: (chunk) => (chunk.name === "sw" ? "sw.js" : "assets/[name]-[hash].js"),
+      },
+    },
   },
   server: {
     proxy: {

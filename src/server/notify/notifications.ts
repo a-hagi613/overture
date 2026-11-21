@@ -3,6 +3,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 
 import { notifications } from "../platform/db/schema.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
+import { enqueueNotificationPush } from "./push.ts";
 
 export interface NotificationInput {
   userId: string;
@@ -28,6 +29,7 @@ export function createNotification(db: AppDatabase, clock: Clock, input: Notific
     .run();
 
   publishEvent(db, clock, "notification", JSON.stringify({ id, kind: input.kind }), input.userId);
+  enqueueNotificationPush(db, clock, id);
 
   return id;
 }

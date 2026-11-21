@@ -47,6 +47,12 @@ import {
   parseReadyNotifyPayload,
   runReadyNotifyJob,
 } from "./notify/ready-recap.ts";
+import {
+  PUSH_NOTIFY_JOB_KIND,
+  parsePushNotifyPayload,
+  runNotificationPushJob,
+} from "./notify/push.ts";
+import { createPushSender } from "./platform/push/index.ts";
 import { createReviewService } from "./pipeline/reviews.ts";
 import { createResumeService } from "./profile/resume.ts";
 import { createBrowserProvider } from "./dispatch/browser/index.ts";
@@ -135,6 +141,7 @@ const backups = createBackupMonitor(db, clock);
 void backups.run(shutdownController.signal);
 
 const mailSender = createMailSender(clock);
+const pushSender = createPushSender(env, clock);
 const mailboxes = createMailboxService(db, clock, env.INBOUND_HMAC_SECRET ?? "", env.MAIL_DOMAIN);
 
 const auth = createAuth(
@@ -280,6 +287,14 @@ const readyNotifyJobHandlers: JobHandlers = {
     const { since, userId } = parseReadyNotifyPayload(payload);
 
     await runReadyNotifyJob({ appOrigin, clock, db, mail: mailSender }, userId, since);
+  },
+};
+
+const pushNotifyJobHandlers: JobHandlers = {
+  [PUSH_NOTIFY_JOB_KIND]: async (payload) => {
+    const { notificationId } = parsePushNotifyPayload(payload);
+
+    await runNotificationPushJob({ clock, db, push: pushSender }, notificationId);
   },
 };
 
@@ -492,6 +507,7 @@ const allJobHandlers: JobHandlers = {
   ...llmJobHandlers,
   ...prepDailyJobHandlers,
   ...readyNotifyJobHandlers,
+  ...pushNotifyJobHandlers,
   ...mailJobHandlers,
   ...dispatchJobHandlers,
   ...fixtureJobHandlers,

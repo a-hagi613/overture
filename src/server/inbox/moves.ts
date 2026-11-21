@@ -279,7 +279,7 @@ export function createMailMoves(deps: {
         }),
         kind: copy.notifications.stageMove.kind,
         title: copy.notifications.stageMove.title(label),
-        url: copy.notifications.stageMove.url,
+        url: `${copy.notifications.stageMove.url}?undo=${input.applicationId}`,
         userId: input.userId,
       });
     }

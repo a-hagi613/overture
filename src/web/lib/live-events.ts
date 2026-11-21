@@ -50,6 +50,10 @@ export function useLiveUpdates() {
     const refresh = (event: MessageEvent) => {
       void queryClient.invalidateQueries({ queryKey: ["home"] });
 
+      if (event.type === "notification") {
+        void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      }
+
       if (event.type === "review.created" || event.type === "review.resolved") {
         void queryClient.invalidateQueries({ queryKey: ["reviews"] });
       }

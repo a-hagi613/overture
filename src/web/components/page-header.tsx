@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { copy } from "../../shared/copy.ts";
 import { initialsOf } from "../lib/identity.ts";
 import { authClient } from "../lib/auth-client.ts";
+import { useUnreadNotificationCount } from "../lib/notifications-api.ts";
 import { NavGlyph } from "./nav-glyph.tsx";
 import { RunningSwitch } from "./running-switch.tsx";
 import { useTheme } from "../lib/theme-context.ts";
@@ -14,6 +15,7 @@ export function PageHeader({ lead, titleNode }: { lead: string; titleNode: React
   const { theme, toggleTheme, label } = useTheme();
   const { data: session } = authClient.useSession();
   const name = session === null ? null : session.user.name;
+  const unread = useUnreadNotificationCount();
 
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
@@ -56,16 +58,19 @@ export function PageHeader({ lead, titleNode }: { lead: string; titleNode: React
         >
           {theme === "dark" ? <NavGlyph name="sun" /> : <NavGlyph name="moon" />}
         </button>
-        <button
-          aria-label={copy.sample.bellAria}
+        <Link
+          aria-label={unread > 0 ? copy.shell.notifications(unread) : copy.shell.notificationsEmpty}
+          aria-current={pathname === "/notifications" ? "page" : undefined}
           className="relative flex h-10 w-10 items-center justify-center rounded-md border border-input bg-card hover:bg-muted max-[767px]:h-11 max-[767px]:w-11"
-          type="button"
+          to="/notifications"
         >
           <NavGlyph name="bell" />
-          <span className="absolute -right-1.5 -top-1.5 flex h-[19px] min-w-[19px] items-center justify-center rounded-[10px] border-2 border-background bg-foreground text-[11px] font-bold text-background tabular-nums">
-            {copy.sample.inboxUnread}
-          </span>
-        </button>
+          {unread > 0 ? (
+            <span className="absolute -right-1.5 -top-1.5 flex h-[19px] min-w-[19px] items-center justify-center rounded-[10px] border-2 border-background bg-signal px-[5px] text-[11px] font-bold text-card tabular-nums">
+              {unread}
+            </span>
+          ) : null}
+        </Link>
         <Link
           aria-label={
             name === null ? copy.shell.settings : `${initialsOf(name)}, ${copy.shell.settings}`

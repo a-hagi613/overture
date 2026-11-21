@@ -10,6 +10,7 @@ import type { AppServer } from "./app-server.ts";
 
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
+import { seedUnreadNotifications } from "./notification-seed.ts";
 import { latestMailLink, requestMagicLink } from "./sign-in.ts";
 
 const test = appTest.extend<{ boardServer: AppServer }>({
@@ -268,6 +269,8 @@ async function seedOwner(request: APIRequestContext, appServerUrl: string) {
   const link = await latestMailLink(appServerUrl, request, authTestIdentity.ownerEmail);
 
   await request.get(link);
+
+  await seedUnreadNotifications(request, appServerUrl);
 
   const seeded = await request.put("/api/profile/settings", {
     data: { languages: ["en"], timezone: "America/Toronto" },
