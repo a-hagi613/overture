@@ -24,6 +24,7 @@ const meSchema = z.object({
 const callbackCopy = new Map<string, string>([
   ["email_not_verified", copy.signIn.emailNotVerified],
   ["forbidden", copy.signIn.refusedEmail],
+  ["account_suspended", copy.signIn.accountSuspended],
   ["rate_limited", copy.signIn.rateLimited],
 ]);
 
@@ -34,7 +35,11 @@ const headlineByMode = {
 
 function presentError(status: number, code: string | undefined) {
   if (status === 403) {
-    return code === "captcha_failed" ? copy.signIn.captchaFailed : copy.signIn.refusedEmail;
+    if (code === "captcha_failed") {
+      return copy.signIn.captchaFailed;
+    }
+
+    return code === "account_suspended" ? copy.signIn.accountSuspended : copy.signIn.refusedEmail;
   }
 
   if (status === 429) {

@@ -198,8 +198,8 @@ export const copy = {
     legalPrivacy: "Privacy Policy",
     legalEnd: ".",
     trust: "No password to keep · Google, LinkedIn or an emailed link",
-    refusedEmail:
-      "That email is not allowed in yet. Only the owner can sign in during this milestone.",
+    refusedEmail: "That email has no invite to Overture yet. Ask the owner for one.",
+    accountSuspended: "This account is suspended, so it cannot sign in.",
     emailNotVerified:
       "That provider has not verified your email, so this app cannot let it in. Verify the address and try again.",
     linkFailed: "The link did not work. It may be used or expired. Ask for a new one.",
@@ -252,7 +252,8 @@ export const copy = {
       google: "Google",
       linkedin: "LinkedIn",
     },
-    accountRefused: "Only the owner can sign in during this milestone.",
+    accountRefused: "That email has no invite to Overture yet. Ask the owner for one.",
+    accountSuspended: "This account is suspended, so it cannot sign in.",
   },
   mail: {
     magicLinkSubject: "Your Overture sign-in link",

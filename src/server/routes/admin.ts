@@ -7,12 +7,15 @@ import type { Auth } from "../auth/index.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
+import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import type { InviteRow } from "../auth/invites.ts";
 
 import {
   applications,
   attempts,
   bgJobs,
   grants,
+  invites,
   killSwitches,
   postings,
   sessions,
@@ -37,6 +40,8 @@ import {
   setKillSwitch,
   setSetting,
 } from "../platform/settings/index.ts";
+import { inviteEmailHash, inviteStatus } from "../auth/invites.ts";
+import { isSameMailbox } from "../auth/email.ts";
 
 const settingBody = z.object({ value: z.string().min(1) });
 
@@ -57,6 +62,8 @@ const tagImportBody = z.object({
   source: z.string().min(1).default(DEFAULT_IMPORT_SOURCE),
 });
 
+const inviteBody = z.object({ email: z.email() });
+
 const llmUsageQuery = z.object({
   purpose: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(1000).default(100),
@@ -71,6 +78,7 @@ const captureBody = fixtureCapturePayloadSchema;
 
 export interface AdminDeps {
   providers: BrowserProviderRegistry | null;
+  personal: PersonalCrypto;
 }
 
 const ATS_NAMES = ["greenhouse", "lever", "ashby"] as const;
@@ -139,6 +147,35 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
     return context.json({ error: ADMIN_REFUSAL_CODES.accessRequired }, 401);
   });
+
+  const inviteSecret = env.BETTER_AUTH_SECRET;
+
+  async function invitationView(invite: InviteRow, ownerId: string) {
+    const sealedBy = invite.invitedBy ?? ownerId;
+
+    const email =
+      invite.emailEnc === null
+        ? null
+        : await deps.personal
+            .openFor(
+              sealedBy,
+              { table: "invites", column: "email_enc", rowId: invite.id },
+              invite.emailEnc,
+            )
+            .catch(() => null);
+
+    return {
+      acceptedAt: invite.acceptedAt === null ? null : invite.acceptedAt.getTime(),
+      acceptedUserId: invite.acceptedUserId,
+      createdAt: invite.createdAt.getTime(),
+      email,
+      grantId: invite.grantId,
+      id: invite.id,
+      invitedBy: invite.invitedBy,
+      revokedAt: invite.revokedAt === null ? null : invite.revokedAt.getTime(),
+      status: inviteStatus(invite),
+    };
+  }
 
   routes.get("/overview", (context) => {
     const jobCounts = db
@@ -303,6 +340,138 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
   });
 
   routes.get("/tag-imports", (context) => context.json({ tagImports: readTagImports(db) }));
+
+  routes.get("/invites", async (context) => {
+    const owner = context.get("owner");
+    const rows = db.select().from(invites).orderBy(desc(invites.createdAt)).all();
+
+    const views = await Promise.all(rows.map(async (row) => invitationView(row, owner.userId)));
+
+    return context.json({ invites: views });
+  });
+
+  routes.post("/invites", zValidator("json", inviteBody), async (context) => {
+    const owner = context.get("owner");
+    const email = context.req.valid("json").email.trim();
+
+    const currentUser = db
+      .select({ email: users.email })
+      .from(users)
+      .all()
+      .find((row) => isSameMailbox(row.email, email));
+
+    if (currentUser !== undefined) {
+      return context.json({ error: "user_exists" }, 409);
+    }
+
+    const emailHash = inviteEmailHash(inviteSecret, email);
+    const existing = db.select().from(invites).where(eq(invites.emailHash, emailHash)).get();
+
+    if (existing !== undefined) {
+      if (existing.acceptedAt !== null) {
+        return context.json({ error: "already_accepted" }, 409);
+      }
+
+      if (existing.revokedAt === null) {
+        return context.json({ error: "already_invited" }, 409);
+      }
+    }
+
+    const id = existing?.id ?? crypto.randomUUID();
+
+    const emailEnc = await deps.personal.sealFor(
+      owner.userId,
+      { table: "invites", column: "email_enc", rowId: id },
+      email,
+    );
+
+    const createdAt = new Date(clock.now());
+
+    if (existing === undefined) {
+      db.insert(invites)
+        .values({
+          id,
+          emailHash,
+          emailEnc,
+          invitedBy: owner.userId,
+          acceptedAt: null,
+          acceptedUserId: null,
+          revokedAt: null,
+          grantId: null,
+          createdAt,
+        })
+        .run();
+    } else {
+      db.update(invites)
+        .set({
+          emailEnc,
+          invitedBy: owner.userId,
+          acceptedAt: null,
+          acceptedUserId: null,
+          revokedAt: null,
+          grantId: null,
+          createdAt,
+        })
+        .where(eq(invites.id, id))
+        .run();
+    }
+
+    recordAdminAudit(db, clock, {
+      actorId: owner.userId,
+      action: "invites.create",
+      reason: `Invited ${email} to the beta`,
+      detail: { email, inviteId: id },
+    });
+
+    const row = db.select().from(invites).where(eq(invites.id, id)).get();
+
+    if (row === undefined) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    return context.json({ invite: await invitationView(row, owner.userId) }, 201);
+  });
+
+  routes.post("/invites/:id/revoke", async (context) => {
+    const owner = context.get("owner");
+
+    const row = db
+      .select()
+      .from(invites)
+      .where(eq(invites.id, context.req.param("id")))
+      .get();
+
+    if (row === undefined) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    if (row.acceptedAt !== null) {
+      return context.json({ error: "already_accepted" }, 409);
+    }
+
+    if (row.revokedAt === null) {
+      const revokedAt = new Date(clock.now());
+
+      db.update(invites).set({ revokedAt }).where(eq(invites.id, row.id)).run();
+
+      recordAdminAudit(db, clock, {
+        actorId: owner.userId,
+        action: "invites.revoke",
+        reason: `Revoked the invitation for ${row.id}`,
+        detail: { inviteId: row.id },
+      });
+
+      const revoked = db.select().from(invites).where(eq(invites.id, row.id)).get();
+
+      if (revoked === undefined) {
+        return context.json({ error: "not_found" }, 404);
+      }
+
+      return context.json({ invite: await invitationView(revoked, owner.userId) });
+    }
+
+    return context.json({ invite: await invitationView(row, owner.userId) });
+  });
 
   routes.get("/grants", (context) => {
     const rows = db

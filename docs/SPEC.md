@@ -218,7 +218,7 @@ data key (§13.2). Drizzle schema in `src/server/**/schema.ts` is the source of 
 
 `user` (id, name, email UNIQUE, email_verified, image, role CHECK IN ('user','owner'), suspended_at, created_at,
 updated_at) · `session` · `account` (provider: google, linkedin, credential) · `verification` · `passkey` (owner only)
-· `invites` (id, email_hash UNIQUE, invited_by, created_at, accepted_at, accepted_user_id NULL, revoked_at NULL, grant_id NULL) — M1 allowlist = `OWNER_EMAIL`, M2 = invites (§13.1); the invited email is stored hashed and shown to the owner as typed only in the admin, from an encrypted copy.
+· `invites` (id, email_hash UNIQUE, email_enc NULL, invited_by, created_at, accepted_at, accepted_user_id NULL, revoked_at NULL, grant_id NULL) — M1 allowlist = `OWNER_EMAIL`, M2 = invites (§13.1); the invited email is stored hashed and shown to the owner as typed only in the admin, from an encrypted copy sealed under the inviter's data key.
 
 ### 5.2 Profile
 
