@@ -35,11 +35,17 @@ export function LegalShell({ children }: { children: ReactNode }) {
               aria-label={copy.legal.footerLinksLabel}
               className="mt-1 flex items-center gap-[6px] font-serif text-[14px] leading-[1.6] text-muted-foreground"
             >
-              <Link className="underline underline-offset-[3px]" to="/terms">
+              <Link
+                className="underline underline-offset-[3px] transition-colors hover:text-foreground"
+                to="/terms"
+              >
                 {copy.legal.termsLink}
               </Link>
               <span aria-hidden="true">{copy.legal.footerSeparator.trim()}</span>
-              <Link className="underline underline-offset-[3px]" to="/privacy">
+              <Link
+                className="underline underline-offset-[3px] transition-colors hover:text-foreground"
+                to="/privacy"
+              >
                 {copy.legal.privacyLink}
               </Link>
             </nav>

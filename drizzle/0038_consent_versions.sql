@@ -28,3 +28,14 @@ ALTER TABLE `__new_profiles` RENAME TO `profiles`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint
 INSERT INTO `consent_versions` (`version`, `text`, `published_at`) VALUES ('1', 'Overture fills in each application for me from the resume and facts I saved. It sends an application only after I approve it, and the answers, resume and cover letter it sends are the ones I approved.', 1795219200);--> statement-breakpoint
 UPDATE `profiles` SET `consent_version` = '1' WHERE `consent_version` = 'm1';
+--> statement-breakpoint
+CREATE TRIGGER `consent_versions_no_update`
+BEFORE UPDATE ON `consent_versions`
+BEGIN
+SELECT RAISE(ABORT, 'a published consent version is never edited');
+END;--> statement-breakpoint
+CREATE TRIGGER `consent_versions_no_delete`
+BEFORE DELETE ON `consent_versions`
+BEGIN
+SELECT RAISE(ABORT, 'a published consent version is never deleted');
+END;

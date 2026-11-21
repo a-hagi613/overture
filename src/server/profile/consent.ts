@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -19,10 +19,7 @@ function nextVersion(latest: string) {
 export function createConsentService(deps: { db: AppDatabase; clock: Clock }) {
   const { db, clock } = deps;
 
-  const newestFirst = [
-    desc(consentVersions.publishedAt),
-    sql`CAST(${consentVersions.version} AS INTEGER) DESC`,
-  ];
+  const newestFirst = [sql`CAST(${consentVersions.version} AS INTEGER) DESC`];
 
   function list() {
     return db
@@ -36,13 +33,11 @@ export function createConsentService(deps: { db: AppDatabase; clock: Clock }) {
     return list().at(0) ?? null;
   }
 
-  function publish(text: string) {
+  function publish(text: string, publishedAt = new Date(clock.now())) {
     const latest = list().at(0);
     const version = latest === undefined ? INITIAL_CONSENT_VERSION : nextVersion(latest.version);
 
-    db.insert(consentVersions)
-      .values({ publishedAt: new Date(clock.now()), text, version })
-      .run();
+    db.insert(consentVersions).values({ publishedAt, text, version }).run();
 
     const published = db
       .select()

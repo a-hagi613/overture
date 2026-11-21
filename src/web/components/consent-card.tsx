@@ -51,11 +51,17 @@ export function ConsentCard({ state }: { state: ConsentState }) {
       <p className="mt-[14px] text-[14px] leading-[1.6] md:text-[14.5px]">{state.current.text}</p>
       <p className="mt-[14px] text-[14px] leading-[1.6] md:text-[14.5px]">
         {copy.consent.readNoticeBefore}
-        <Link className="underline decoration-input underline-offset-[3px]" to="/terms">
+        <Link
+          className="underline decoration-input underline-offset-[3px] transition-colors hover:decoration-foreground"
+          to="/terms"
+        >
           {copy.legal.termsLink}
         </Link>
         {copy.consent.readNoticeBetween}
-        <Link className="underline decoration-input underline-offset-[3px]" to="/privacy">
+        <Link
+          className="underline decoration-input underline-offset-[3px] transition-colors hover:decoration-foreground"
+          to="/privacy"
+        >
           {copy.legal.privacyLink}
         </Link>
         {copy.consent.readNoticeEnd}

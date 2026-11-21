@@ -32,6 +32,7 @@ import {
   mailThreads,
   messageAttachments,
   messages,
+  consentVersions,
   notifications,
   planCache,
   postingTags,
@@ -119,7 +120,12 @@ const publishBody = z.object({
   userId: z.string().optional(),
 });
 
-const consentPublishBody = z.object({ text: z.string().trim().min(1).max(10_000) });
+const consentPublishBody = z.object({
+  publishedAt: z.number().int().positive().optional(),
+  text: z.string().trim().min(1).max(10_000),
+});
+
+const consentTamperBody = z.object({ action: z.enum(["update", "delete"]) });
 
 const createCompanyBody = z.object({
   name: z.string().min(1),
@@ -791,13 +797,37 @@ export function createTestRoutes(
   routes.get("/clock", (context) => context.json({ now: clock.now(), offsetMs: clock.offset() }));
 
   routes.post("/consent/publish", zValidator("json", consentPublishBody), (context) => {
-    const published = createConsentService({ clock, db }).publish(context.req.valid("json").text);
+    const { publishedAt, text } = context.req.valid("json");
+
+    const published = createConsentService({ clock, db }).publish(
+      text,
+      publishedAt === undefined ? undefined : new Date(publishedAt),
+    );
 
     return context.json({
       publishedAt: published.publishedAt.toISOString(),
       text: published.text,
       version: published.version,
     });
+  });
+
+  routes.post("/consent/tamper", zValidator("json", consentTamperBody), (context) => {
+    const { action } = context.req.valid("json");
+
+    try {
+      if (action === "update") {
+        db.update(consentVersions).set({ text: "tampered" }).run();
+      } else {
+        db.delete(consentVersions).run();
+      }
+
+      return context.json({ refused: false, refusal: null });
+    } catch (error) {
+      return context.json({
+        refused: true,
+        refusal: error instanceof Error ? error.message : "refused",
+      });
+    }
   });
 
   routes.post("/clock/offset", zValidator("json", offsetBody), (context) => {

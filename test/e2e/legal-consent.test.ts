@@ -121,35 +121,70 @@ test("the consent is versioned, the accepted version is on the profile, and olde
 
   await expect(page).toHaveURL(/\/terms$/u);
 
-  const published = await owner.post("/__test__/consent/publish", {
-    data: { text: "A later consent wording for the next version." },
+  const firstPublishedAt = new Date(first.current.publishedAt).getTime();
+
+  const backwards = await owner.post("/__test__/consent/publish", {
+    data: {
+      publishedAt: firstPublishedAt - 86_400_000,
+      text: "A later consent wording for the next version.",
+    },
   });
 
-  expect(published.ok()).toBe(true);
-  expect(z.object({ version: z.string() }).parse(await published.json()).version).toBe("2");
+  expect(backwards.ok()).toBe(true);
+  expect(z.object({ version: z.string() }).parse(await backwards.json()).version).toBe("2");
 
-  const afterPublish = consentStateSchema.parse(await (await owner.get("/api/consent")).json());
+  const afterBackwards = consentStateSchema.parse(await (await owner.get("/api/consent")).json());
 
-  expect(afterPublish.current.version).toBe("2");
-  expect(afterPublish.accepted?.version).toBe("1");
+  expect(afterBackwards.current.version).toBe("2");
+  expect(afterBackwards.accepted?.version).toBe("1");
+
+  const backwardsVersions = consentVersionsSchema.parse(
+    await (await owner.get("/api/consent/versions")).json(),
+  );
+
+  expect(backwardsVersions.versions.map((version) => version.version)).toEqual(["2", "1"]);
+  expect(backwardsVersions.versions[0]?.text).toBe("A later consent wording for the next version.");
+
+  const tied = await owner.post("/__test__/consent/publish", {
+    data: { publishedAt: firstPublishedAt, text: "A third consent wording." },
+  });
+
+  expect(tied.ok()).toBe(true);
+  expect(z.object({ version: z.string() }).parse(await tied.json()).version).toBe("3");
+
+  const afterTie = consentStateSchema.parse(await (await owner.get("/api/consent")).json());
+
+  expect(afterTie.current.version).toBe("3");
+  expect(afterTie.accepted?.version).toBe("1");
 
   const versions = consentVersionsSchema.parse(
     await (await owner.get("/api/consent/versions")).json(),
   );
 
-  expect(versions.versions.map((version) => version.version)).toEqual(["2", "1"]);
-  expect(versions.versions[0]?.text).toBe("A later consent wording for the next version.");
-  expect(versions.versions[1]?.text).toBe(first.current.text);
+  expect(versions.versions.map((version) => version.version)).toEqual(["3", "2", "1"]);
+  expect(versions.versions[2]?.text).toBe(first.current.text);
+
+  const updateRefusal = await owner.post("/__test__/consent/tamper", {
+    data: { action: "update" },
+  });
+
+  const deleteRefusal = await owner.post("/__test__/consent/tamper", {
+    data: { action: "delete" },
+  });
+
+  expect(z.object({ refused: z.boolean() }).parse(await updateRefusal.json()).refused).toBe(true);
+  expect(z.object({ refused: z.boolean() }).parse(await deleteRefusal.json()).refused).toBe(true);
 
   await page.goto(`${legalServer.url}/consent`);
 
   await expect(page.getByRole("heading", { name: "Earlier versions" })).toBeVisible();
+  await expect(page.getByText("A third consent wording.")).toBeVisible();
   await expect(page.getByText("A later consent wording for the next version.")).toBeVisible();
   await expect(page.getByRole("checkbox", { name: "I agree to this." })).not.toBeChecked();
 
   await page.getByRole("checkbox", { name: "I agree to this." }).click();
 
-  await expect.poll(async () => (await acceptedFirst()).accepted?.version).toBe("2");
+  await expect.poll(async () => (await acceptedFirst()).accepted?.version).toBe("3");
 
   await context.close();
   await owner.dispose();
@@ -206,6 +241,7 @@ test("Settings fits every width without sideways scroll", async ({
         storageState: ownerStorageState,
         viewport: { height: 900, width },
       });
+
       const page = await context.newPage();
 
       await expectNoSidewaysScroll(

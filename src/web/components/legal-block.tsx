@@ -41,7 +41,10 @@ export function LegalBlockView({ block }: { block: LegalBlock }) {
     return (
       <p className="text-[15px] leading-[1.7] md:leading-[1.6]">
         {block.before}
-        <a className="underline decoration-input underline-offset-[3px]" href={block.href}>
+        <a
+          className="underline decoration-input underline-offset-[3px] transition-colors hover:decoration-foreground"
+          href={block.href}
+        >
           {block.link}
         </a>
         {block.after}
