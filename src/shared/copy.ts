@@ -19,11 +19,34 @@ const COUNT_WORDS = [
   "seventeen",
   "eighteen",
   "nineteen",
+] as const;
+
+const TENS_WORDS = [
+  "",
+  "",
   "twenty",
+  "thirty",
+  "forty",
+  "fifty",
+  "sixty",
+  "seventy",
+  "eighty",
+  "ninety",
 ] as const;
 
 function countWord(count: number) {
-  return COUNT_WORDS[count] ?? String(count);
+  if (count < 20) {
+    return COUNT_WORDS[count] ?? String(count);
+  }
+
+  if (count < 100) {
+    const tens = TENS_WORDS[Math.floor(count / 10)] ?? "";
+    const ones = count % 10;
+
+    return ones === 0 ? tens : `${tens}-${COUNT_WORDS[ones] ?? ""}`;
+  }
+
+  return String(count);
 }
 
 function capitalize(word: string) {
@@ -51,6 +74,7 @@ export const copy = {
   shell: {
     settings: "Settings",
     collapseSidebar: "Collapse sidebar",
+    expandSidebar: "Expand sidebar",
     searchLabel: "Search",
     searchPlaceholder: "Search applications, reviews, emails",
     searchShortcut: "⌘K",
@@ -461,6 +485,108 @@ export const copy = {
       repliesTo: "Replies go to",
       repliesToValue: "Your Inbox",
       changeNote: "The address can only be changed through support.",
+    },
+  },
+  board: {
+    lead: (applications: number) =>
+      `${capitalize(countWord(applications))} ${applications === 1 ? "application" : "applications"} across six stages`,
+    titlePlain: "Your",
+    titleItalic: "Board",
+    searchLabel: "Search the board",
+    filter: "Filter",
+    running: "Running",
+    paused: "Paused",
+    start: "Start",
+    pause: "Pause",
+    stagesLabel: "Stages",
+    columns: {
+      queued: "Queued",
+      applied: "Applied",
+      screening: "Screening",
+      interviewing: "Interviewing",
+      offer: "Offer",
+      closed: "Closed",
+    },
+    more: (count: number, stage: string) => `${String(count)} more ${stage.toLowerCase()}`,
+    openCard: (title: string, company: string) => `Open ${title} at ${company}`,
+    keyboardHint: "Press the left or right arrow key to move this card to another stage.",
+    moveTo: (title: string, stage: string) => `Move ${title} to ${stage}`,
+    moved: (stage: string) => `Moved to ${stage}`,
+    undo: "Undo",
+    checking: "Checking with the employer",
+    sheetLabel: "Application detail",
+    closeDetail: "Close detail",
+    previousCard: "Previous card",
+    nextCard: "Next card",
+    grabHandle: "Drag to resize or close detail",
+    folio: (reference: string) => `Application · no. ${reference}`,
+    openPosting: "Open original posting",
+    moveStage: "Move stage",
+    archive: "Archive",
+    archiveNote: "Archiving withdraws this application. It leaves the Board.",
+    archiveOnlyQueued: "Only a queued application can be archived.",
+    sectionsLabel: "Application sections",
+    tabs: {
+      timeline: "Timeline",
+      answers: "Answers",
+      cover: "Cover letter & resume",
+      emails: "Emails",
+    },
+    salary: (minimum: string, maximum: string | null, currency: string, suffix: string) =>
+      maximum === null
+        ? `${currency} ${minimum}${suffix}`
+        : `${currency} ${minimum}–${maximum}${suffix}`,
+    match: (score: number) => `Match ${String(score)}`,
+    matchLabel: "Match",
+    loadingDetail: "Loading the application…",
+    emptyColumn: "No applications here yet.",
+    timeline: {
+      found: "Found",
+      scored: (score: number) => `Scored ${String(score)}`,
+      foundBody: (company: string) => `Posting found on the ${company} career board.`,
+      prepared: "Prepared",
+      needsReview: "Waiting on a Review",
+      checked: "Checked",
+      submitted: "Submitted",
+      confirming: "Checking with the employer",
+      confirmed: "Confirmed",
+      couldNotApply: "Couldn't apply",
+      skipped: "Skipped",
+      withdrawn: "Withdrawn",
+      moved: (stage: string) => `Moved to ${stage}`,
+      email: "Reply received",
+      checkin: "Check-in",
+      note: "Note",
+      empty: "Nothing has happened yet.",
+    },
+    answers: {
+      title: "What was sent",
+      empty: "Nothing was sent, so there are no answers to show.",
+      noSnapshot: "This application has not been sent yet.",
+      label: "Question",
+      fromResume: "From your resume",
+      fromSaved: "From your saved facts",
+      typedHere: "Typed here",
+    },
+    cover: {
+      title: "The letter and the file",
+      empty: "No letter was sent with this application.",
+      noSnapshot: "This application has not been sent yet.",
+      resume: "Resume file",
+      hash: "SHA-256",
+      lines: (count: number) => (count === 1 ? "1 resume line" : `${String(count)} resume lines`),
+    },
+    emails: {
+      title: "Linked mail",
+      empty: "No mail is linked to this application yet.",
+      from: "From",
+    },
+    states: {
+      checking: "Checking with the employer",
+      needsYou: "Needs you",
+      sentToday: "Sent today",
+      sent: "Sent",
+      sendsAbout: (time: string) => `Sends about ${time}`,
     },
   },
   review: {

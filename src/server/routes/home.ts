@@ -9,6 +9,7 @@ import type { MatchingService } from "../matching/score.ts";
 
 import { applicationsLeft, committedSince, planApplications } from "../billing/ledger.ts";
 import { profiles } from "../platform/db/schema.ts";
+import { eq } from "drizzle-orm";
 import { getSetting } from "../platform/settings/index.ts";
 import { createTimeZoneService } from "../profile/time-zone.ts";
 import { localDayStart } from "../platform/local-time.ts";
@@ -50,6 +51,13 @@ export function createHomeRoutes(
     const at = clock.now();
     const userId = user.id;
     const { timezone } = await zones.current(userId);
+
+    const profile = db
+      .select({ running: profiles.running })
+      .from(profiles)
+      .where(eq(profiles.userId, userId))
+      .get();
+
     const dayStart = localDayStart(at, timezone ?? "UTC");
     const sentToday = committedSince(db, userId, dayStart);
     const dailyCap = dailyCapOf(db);
@@ -58,6 +66,7 @@ export function createHomeRoutes(
     return context.json({
       applicationsLeft: left,
       planApplications: planApplications(db, userId, at),
+      running: profile?.running ?? true,
       sentToday,
       dailyCap,
       remainingToday: Math.max(0, Math.min(dailyCap, left) - sentToday),

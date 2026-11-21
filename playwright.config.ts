@@ -45,6 +45,26 @@ export default defineConfig({
       },
     },
     {
+      name: "board-boards",
+      testMatch: /board-match-board\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/../../design/reference/board/{arg}{ext}",
+        },
+      },
+    },
+    {
+      name: "board-phone-boards",
+      testMatch: /board-match-board-phone\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/.tmp/board-baselines/{arg}{ext}",
+        },
+      },
+    },
+    {
       name: "review-boards",
       testMatch: /board-match-review\.test\.ts/u,
       expect: {
