@@ -64,6 +64,12 @@ import { releaseBlockingJobs } from "../testing/blocking-job.ts";
 import { clearPushRequests, listPushRequests } from "../testing/push-recorder.ts";
 import { setTurnstileScenario, turnstileScenarioBody } from "../testing/turnstile-scenario.ts";
 import {
+  setTurnstileBrowserScenario,
+  turnstileBrowserScenario,
+  turnstileBrowserScenarioBody,
+} from "../testing/turnstile-browser-scenario.ts";
+import { turnstileBrowserStub } from "../testing/turnstile-browser-stub.ts";
+import {
   emailSendingScenarios,
   setEmailSendingScenario,
 } from "../testing/email-sending-scenario.ts";
@@ -1010,6 +1016,21 @@ export function createTestRoutes(
 
     return context.json({ ok: true });
   });
+
+  routes.get("/turnstile/browser", (context) => context.json(turnstileBrowserScenario()));
+
+  routes.post("/turnstile/browser", zValidator("json", turnstileBrowserScenarioBody), (context) => {
+    setTurnstileBrowserScenario(context.req.valid("json"));
+
+    return context.json({ ok: true });
+  });
+
+  routes.get("/turnstile-api.js", (context) =>
+    context.body(turnstileBrowserStub, 200, {
+      "cache-control": "no-store",
+      "content-type": "text/javascript; charset=utf-8",
+    }),
+  );
 
   routes.post("/jobs/run-due", async (context) => {
     const ran = await runDueJobs(db, clock, handlers, singletonJobKinds);

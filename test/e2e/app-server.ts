@@ -88,6 +88,7 @@ export function serverEnvironment(extraEnvironment: Record<string, string>) {
     PORT: "0",
     STATIC_ROOT: "dist",
     ENABLE_TEST_ROUTES: "true",
+    TURNSTILE_SCRIPT_URL: "/__test__/turnstile-api.js",
     OTEL_SIMPLE_EXPORT: "true",
     KILL_TIMEOUT_MS: "1000",
     ...authDefaults(extraEnvironment),
