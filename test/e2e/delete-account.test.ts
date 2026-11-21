@@ -124,41 +124,47 @@ async function seedPersonalData(request: APIRequestContext, server: DeleteHarnes
   const profile = z.object({ id: z.string() }).parse(await profileResponse.json());
 
   const database = new DatabaseSync(server.server.databasePath);
+
+  database.exec("PRAGMA busy_timeout = 5000;");
+
   const seededAt = Math.floor(Date.UTC(2026, 10, 21) / 1000);
 
-  database
-    .prepare(
-      "INSERT INTO browser_profiles (user_id, provider, provider_profile_id, country_code, created_at, last_used_at) VALUES (?, ?, ?, ?, ?, ?)",
-    )
-    .run(userId, "browser_use", profile.id, "ca", seededAt, seededAt);
+  try {
+    database
+      .prepare(
+        "INSERT INTO browser_profiles (user_id, provider, provider_profile_id, country_code, created_at, last_used_at) VALUES (?, ?, ?, ?, ?, ?)",
+      )
+      .run(userId, "browser_use", profile.id, "ca", seededAt, seededAt);
 
-  database
-    .prepare(
-      "INSERT INTO admin_audit (id, at, actor_id, action, target_user_id, reason, detail) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    )
-    .run(
-      crypto.randomUUID(),
-      Date.UTC(2026, 10, 21),
-      "owner",
-      "account.open",
-      userId,
-      "support request",
-      "{}",
-    );
-  database
-    .prepare(
-      "INSERT INTO profiles (user_id, running, pause_reason, created_at, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET running = 1, pause_reason = NULL, updated_at = excluded.updated_at",
-    )
-    .run(userId, 1, null, seededAt, seededAt);
-  database
-    .prepare("INSERT INTO events (user_id, topic, payload, created_at) VALUES (?, ?, ?, ?)")
-    .run(userId, "test.event", "{}", seededAt);
-  database
-    .prepare(
-      "INSERT INTO llm_usage (id, user_id, purpose, model, input_tokens, cached_tokens, output_tokens, cost_micros, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    )
-    .run(crypto.randomUUID(), userId, "test", "test-model", 0, 0, 0, 0, seededAt);
-  database.close();
+    database
+      .prepare(
+        "INSERT INTO admin_audit (id, at, actor_id, action, target_user_id, reason, detail) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(
+        crypto.randomUUID(),
+        Date.UTC(2026, 10, 21),
+        "owner",
+        "account.open",
+        userId,
+        "support request",
+        "{}",
+      );
+    database
+      .prepare(
+        "INSERT INTO profiles (user_id, running, pause_reason, created_at, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET running = 1, pause_reason = NULL, updated_at = excluded.updated_at",
+      )
+      .run(userId, 1, null, seededAt, seededAt);
+    database
+      .prepare("INSERT INTO events (user_id, topic, payload, created_at) VALUES (?, ?, ?, ?)")
+      .run(userId, "test.event", "{}", seededAt);
+    database
+      .prepare(
+        "INSERT INTO llm_usage (id, user_id, purpose, model, input_tokens, cached_tokens, output_tokens, cost_micros, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(crypto.randomUUID(), userId, "test", "test-model", 0, 0, 0, 0, seededAt);
+  } finally {
+    database.close();
+  }
 
   mkdirSync(join(server.objectRoot, "mail", userId, "attachments"), { recursive: true });
   writeFileSync(join(server.objectRoot, "mail", userId, "attachments", "letter.pdf"), "sealed");

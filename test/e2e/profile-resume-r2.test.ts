@@ -77,6 +77,7 @@ test("a resume lives in the R2 files bucket as ciphertext and reads back byte fo
     expect(Buffer.from(returned).equals(pdfBytes)).toBe(true);
 
     const sqlite = new DatabaseSync(server.databasePath, { readOnly: true });
+    sqlite.exec("PRAGMA busy_timeout = 5000;");
 
     const row = resumeRowSchema.parse(
       sqlite.prepare("select object_key, user_id from resumes limit 1").get(),

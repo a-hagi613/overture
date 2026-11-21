@@ -87,6 +87,7 @@ test("an uploaded resume is stored encrypted and retrievable byte for byte", asy
   expect(Buffer.from(returned).equals(pdfBytes)).toBe(true);
 
   const sqlite = new DatabaseSync(appDatabasePath, { readOnly: true });
+  sqlite.exec("PRAGMA busy_timeout = 5000;");
 
   const row = resumeRowSchema.parse(
     sqlite.prepare("select sha256, bytes, is_current from resumes limit 1").get(),
@@ -215,6 +216,7 @@ test("a scanned resume falls back to the LLM port and a usage row is recorded", 
     expect(singles[0]?.pdfBytes).toBeGreaterThan(0);
 
     const sqlite = new DatabaseSync(server.databasePath, { readOnly: true });
+    sqlite.exec("PRAGMA busy_timeout = 5000;");
 
     const usageRows = sqlite
       .prepare("select purpose, model, input_tokens, output_tokens, cost_micros from llm_usage")
@@ -284,6 +286,7 @@ test("over the cap the scanned upload still succeeds but the text stays empty", 
     expect(listed.facts.filter((fact) => fact.source === "resume")).toHaveLength(0);
 
     const sqlite = new DatabaseSync(server.databasePath, { readOnly: true });
+    sqlite.exec("PRAGMA busy_timeout = 5000;");
 
     const usageRows = sqlite
       .prepare("select purpose from llm_usage where purpose = 'resume_pdf'")
