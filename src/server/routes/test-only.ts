@@ -5,15 +5,12 @@ import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { z } from "zod";
 
-import { Buffer } from "node:buffer";
-
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { JobHandlers } from "../platform/jobs/run-due.ts";
 import type { AdjustableClock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
 import type { CatalogSweepWorker } from "../catalog/sweep-worker-runner.ts";
-import type { ObjectStore } from "../platform/ports/object-store.ts";
 
 import {
   accountExports,
@@ -863,6 +860,7 @@ export function createTestRoutes(
       body.attachments.map(async (attachment) => {
         const attachmentId = crypto.randomUUID();
         const objectKey = `mail/${body.userId}/attachments/${attachmentId}`;
+
         const bytes =
           attachment.base64 === undefined
             ? Buffer.from(attachment.text ?? "", "utf8")
