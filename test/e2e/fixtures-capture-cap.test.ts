@@ -27,6 +27,29 @@ const jobsSchema = z.object({ jobs: z.array(jobSchema) });
 const CAPTURE_KIND = "fixtures.capture";
 const MAX_CONCURRENT_SESSIONS = 2;
 const CAPTURE_COUNT = 24;
+const RETRY_GOTO_TIMEOUT_MS = 2500;
+const STALLED_FIRST_LOAD_MS = 10_000;
+
+async function holdUntilAborted(signal: AbortSignal, timeoutMs: number) {
+  return new Promise<void>((resolve) => {
+    let timer: ReturnType<typeof setTimeout>;
+
+    const finish = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", finish);
+      resolve();
+    };
+
+    if (signal.aborted) {
+      finish();
+
+      return;
+    }
+
+    timer = setTimeout(finish, timeoutMs);
+    signal.addEventListener("abort", finish, { once: true });
+  });
+}
 
 interface CaptureHarness {
   fixture: BrowserUseFixture;
@@ -287,9 +310,7 @@ test("a capture whose first load times out retries the goto once and saves the f
       loads += 1;
 
       if (loads === 1) {
-        await new Promise((resolve) => {
-          setTimeout(resolve, 5000);
-        });
+        await holdUntilAborted(request.signal, STALLED_FIRST_LOAD_MS);
       }
 
       return new Response(captureFormPage, { headers: { "content-type": "text/html" } });
@@ -300,7 +321,7 @@ test("a capture whose first load times out retries the goto once and saves the f
     identityServer,
     {},
     {
-      BROWSER_NAVIGATION_TIMEOUT_MS: "500",
+      BROWSER_NAVIGATION_TIMEOUT_MS: String(RETRY_GOTO_TIMEOUT_MS),
     },
   );
 

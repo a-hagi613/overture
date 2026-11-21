@@ -200,7 +200,10 @@ export async function claimAndRunDueJobs(
   batchSize: number,
   singletonKinds: readonly string[] = [],
 ) {
-  const claimed = claimJobsToRun(db, clock, batchSize, singletonKinds, []);
+  const claimed = await retryWhenBusy(
+    () => claimJobsToRun(db, clock, batchSize, singletonKinds, []),
+    "jobs.claim",
+  );
 
   const tasks = claimed.map(async (job) => runClaimedJob(db, clock, job, handlers, signal));
 
