@@ -87,6 +87,7 @@ const envSchema = z
       .default("tryoverture.com"),
     INBOUND_HMAC_SECRET: z.string().min(16).optional(),
     INBOUND_DNS_SERVER: z.string().min(1).optional(),
+    ALERT_NTFY_URL: z.url().optional(),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
     OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
     OTEL_DEBUG: booleanFromString.default(false),

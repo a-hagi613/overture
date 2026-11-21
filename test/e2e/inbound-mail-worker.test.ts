@@ -162,6 +162,26 @@ test("a forged forwarding address is dropped without a request", async () => {
   expect(rejected).toHaveLength(0);
 });
 
+test("a live check message reaches the app even though its sender is not an ATS", async () => {
+  const edge = startEdge(secret);
+  const raw = fixture("non-ats-newsletter.eml");
+  const { message, forwarded, rejected } = forwardable(raw, "live-check@tryoverture.com");
+
+  try {
+    await worker.email(message, env(edge.origin));
+  } finally {
+    await edge.stop();
+  }
+
+  expect(edge.requests).toHaveLength(1);
+  expect(edge.requests[0]?.path).toBe(INBOUND_PATH);
+  expect(edge.requests[0]?.verdict).toEqual({ ok: true });
+  expect(edge.requests[0]?.rcptTo).toBe("live-check@tryoverture.com");
+  expect(edge.requests[0]?.body).toEqual(raw);
+  expect(forwarded).toHaveLength(0);
+  expect(rejected).toHaveLength(0);
+});
+
 test("a Gmail forwarding confirmation is forwarded to the owner", async () => {
   const edge = startEdge(secret);
 

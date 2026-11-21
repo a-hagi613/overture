@@ -69,6 +69,15 @@ import {
   parseApplicationPreparePayload,
 } from "./pipeline/prepare-jobs.ts";
 import { createMailDnsResolver } from "./inbox/dns.ts";
+import { liveCheckAddress } from "../shared/inbound-mail.ts";
+import {
+  LIVE_CHECK_JOB_KIND,
+  LIVE_CHECK_MAIL_JOB_KIND,
+  ensureLiveCheckQueued,
+  runLiveCheckMailJob,
+  runLiveChecks,
+  scheduleDailyLiveCheck,
+} from "./live-checks/job.ts";
 import { createMailIngest, MAIL_INGEST_JOB_KIND } from "./inbox/ingest.ts";
 import { createMailboxService } from "./inbox/mailboxes.ts";
 import { FIXTURE_CAPTURE_JOB_KIND, runFixtureCaptureJob } from "./fixtures/job.ts";
@@ -107,7 +116,7 @@ void backups.run(shutdownController.signal);
 const mailSender = createMailSender(clock);
 const auth = createAuth(db, clock, mailSender);
 
-const jobSingletons = [...SINGLETON_JOB_KINDS, DISPATCH_TICK_JOB_KIND];
+const jobSingletons = [...SINGLETON_JOB_KINDS, DISPATCH_TICK_JOB_KIND, LIVE_CHECK_JOB_KIND];
 
 recoverStaleLocks(db, clock, jobSingletons);
 
@@ -245,12 +254,14 @@ const resumes = createResumeService({ db, clock, llm: anthropicLlmPort, objects,
 
 const outcomes = createOutcomes({ db, clock, personal, preparation });
 
+const resolver = createMailDnsResolver(env.INBOUND_DNS_SERVER);
+
 const mailIngest = createMailIngest({
   db,
   clock,
   objects,
   personal: mailPersonal,
-  resolver: createMailDnsResolver(env.INBOUND_DNS_SERVER),
+  resolver,
   onAuthenticatedMessage: async (input) => {
     await outcomes.confirmMessage(input);
   },
@@ -353,6 +364,33 @@ const watchJobHandlers: JobHandlers = {
   },
 };
 
+const liveCheckAddressValue = liveCheckAddress(env.MAIL_DOMAIN);
+
+const liveCheckDeps = {
+  backups,
+  clock,
+  databasePath,
+  db,
+  llm: anthropicLlmPort,
+  mail: mailSender,
+  mailAddress: liveCheckAddressValue,
+  objects,
+  providers: browserProviders,
+};
+
+const liveCheckJobHandlers: JobHandlers = {
+  [LIVE_CHECK_JOB_KIND]: async (payload) => {
+    try {
+      await runLiveChecks(liveCheckDeps, payload);
+    } finally {
+      scheduleDailyLiveCheck(db, clock);
+    }
+  },
+  [LIVE_CHECK_MAIL_JOB_KIND]: async (payload) => {
+    await runLiveCheckMailJob(liveCheckDeps, payload);
+  },
+};
+
 const allJobHandlers: JobHandlers = {
   ...catalogJobHandlers,
   ...preparationJobHandlers,
@@ -362,6 +400,7 @@ const allJobHandlers: JobHandlers = {
   ...dispatchJobHandlers,
   ...fixtureJobHandlers,
   ...watchJobHandlers,
+  ...liveCheckJobHandlers,
   ...testJobHandlers,
 };
 
@@ -390,6 +429,10 @@ ensurePlannerQueuedForRunningUsers(db, clock);
 
 ensureSweepQueued(catalogDeps);
 
+if (env.NODE_ENV === "production") {
+  ensureLiveCheckQueued(db, clock);
+}
+
 if (env.ANTHROPIC_API_KEY !== undefined) {
   ensureTagFallbackQueued(db, clock);
   ensureMatchFillQueued(db, clock);
@@ -405,6 +448,8 @@ const app = createApp({
   objects,
   llm: anthropicLlmPort,
   mailboxes,
+  resolver,
+  liveCheckAddress: liveCheckAddressValue,
   preparation,
   reviews,
   singletonJobKinds: jobSingletons,

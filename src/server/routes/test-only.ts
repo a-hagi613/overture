@@ -22,6 +22,7 @@ import {
   companyBoards,
   fxRates,
   ledger,
+  liveCheckMail,
   matches,
   postingQuestions,
   mailboxes,
@@ -63,6 +64,8 @@ import { mapQuestionByRules } from "../catalog/question-rules.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
 import { createCodeWait, wakeCodeWaits } from "../inbox/waits.ts";
+import { readLiveCheckResults } from "../live-checks/store.ts";
+import { runAlertDrill } from "../live-checks/alerts.ts";
 import { env } from "../config/env.ts";
 import {
   applicationsLeft,
@@ -700,6 +703,35 @@ export function createTestRoutes(
       });
     },
   );
+
+  routes.get("/live-checks", (context) => context.json({ results: readLiveCheckResults(db, 200) }));
+
+  routes.get("/live-checks/mail", (context) => {
+    const rows = db.select().from(liveCheckMail).all();
+
+    return context.json({ mail: rows });
+  });
+
+  routes.post(
+    "/live-checks/mail/expire",
+    zValidator("json", z.object({ id: z.string().min(1) })),
+    (context) => {
+      const { id } = context.req.valid("json");
+
+      db.update(liveCheckMail)
+        .set({ sentAt: clock.now() - 60 * 60_000 })
+        .where(eq(liveCheckMail.id, id))
+        .run();
+
+      return context.json({ id, expired: true });
+    },
+  );
+
+  routes.post("/live-checks/drill", (context) => {
+    const report = runAlertDrill(db, clock);
+
+    return context.json(report);
+  });
 
   routes.post("/turnstile", zValidator("json", turnstileScenarioBody), (context) => {
     setTurnstileScenario(context.req.valid("json"));

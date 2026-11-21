@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { DNSResolver } from "mailauth";
 import { join, resolve } from "node:path";
 
 import type { AppDatabase } from "./platform/db/client.ts";
@@ -41,6 +42,8 @@ export interface AppDependencies {
   objects: ObjectStore;
   llm: LlmPort;
   mailboxes: ReturnType<typeof createMailboxService>;
+  resolver: DNSResolver;
+  liveCheckAddress: string;
   preparation: PreparationService;
   reviews: ReviewService;
   singletonJobKinds: readonly string[];
@@ -143,6 +146,8 @@ export function createApp(deps: AppDependencies) {
       objects: deps.objects,
       personal,
       mailboxes,
+      resolver: deps.resolver,
+      liveCheckAddress: deps.liveCheckAddress,
       secret: env.INBOUND_HMAC_SECRET,
     }),
   );

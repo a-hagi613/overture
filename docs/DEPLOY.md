@@ -184,6 +184,26 @@ completed application against the $0.03 gate.
 this repository. The probe needs no other configuration.
 
 
+## Daily live checks
+
+`live.check` runs daily on `overture-web`; its first run is about five minutes after the first production boot, and
+after that at the next UTC midnight. Run it on demand from the owner's terminal with the admin API, using the
+Cloudflare Access cookie and the owner's session:
+`curl -X POST https://admin.tryoverture.com/admin/api/live-checks`, then
+`curl https://admin.tryoverture.com/admin/api/live-checks` for the recorded pass/fail and timing per check. The same
+rows are in the `live_check_results` table.
+
+The forms check captures one open posting per ATS from the catalog and never fills or submits. The mail check sends
+to the reserved `live-check@tryoverture.com` (which maps to no user), and the follow-up `live.check.mail` job records
+whether it came back through Email Routing and the Worker with `auth='pass'` and the matching code within
+`live_checks.mail_wait_minutes` (default 5, a Settings value). Failures raise `alert.raised`, create an owner
+notification, and push to the phone when `ALERT_NTFY_URL` is set as a Fly secret.
+
+No Grafana is provisioned by this repository: the OTLP endpoint and dashboards remain in the owner's Grafana account.
+The application computes the SPEC §16.5 alert thresholds from its own database and machine, so the daily check and
+the test-only drill route exercise every alert kind without Grafana. If dashboards are wanted, set
+`OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS` on the app and create them by hand in Grafana.
+
 ## Capturing fixtures
 
 After a deploy, queue one capture for each M1 ATS on `overture-web` (it never clicks Submit):

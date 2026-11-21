@@ -6,6 +6,7 @@ import {
   INBOUND_MAX_BYTES,
   INBOUND_PATH,
   forwardingIdFrom,
+  isLiveCheckAddress,
   signInbound,
 } from "../../../src/shared/inbound-mail.ts";
 
@@ -38,7 +39,9 @@ function secondsNow() {
 }
 
 export async function email(message: ForwardableEmailMessage, env: InboundMailEnv) {
-  if ((await forwardingIdFrom(env.INBOUND_HMAC_SECRET, message.to)) === null) {
+  const liveCheck = isLiveCheckAddress(message.to);
+
+  if (!liveCheck && (await forwardingIdFrom(env.INBOUND_HMAC_SECRET, message.to)) === null) {
     return;
   }
 
@@ -47,17 +50,20 @@ export async function email(message: ForwardableEmailMessage, env: InboundMailEn
   }
 
   const raw = new Uint8Array(await new Response(message.raw).arrayBuffer());
-  const parsed = await new PostalMime().parse(raw);
-  const from = (parsed.from?.address ?? "").trim().toLowerCase();
 
-  if (CONFIRMATION_SENDERS.has(from)) {
-    await message.forward(env.OWNER_FORWARD_TO);
+  if (!liveCheck) {
+    const parsed = await new PostalMime().parse(raw);
+    const from = (parsed.from?.address ?? "").trim().toLowerCase();
 
-    return;
-  }
+    if (CONFIRMATION_SENDERS.has(from)) {
+      await message.forward(env.OWNER_FORWARD_TO);
 
-  if (!isAtsMailDomain(domainOf(from))) {
-    return;
+      return;
+    }
+
+    if (!isAtsMailDomain(domainOf(from))) {
+      return;
+    }
   }
 
   const signed = await signInbound(env.INBOUND_HMAC_SECRET, {

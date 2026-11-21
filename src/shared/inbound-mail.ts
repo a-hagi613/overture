@@ -12,6 +12,7 @@ export const INBOUND_REPLAY_WINDOW_SECONDS = 300;
 export const INBOUND_MAX_BYTES = 25 * 1024 * 1024;
 
 const ADDRESS_PREFIX = "in-";
+export const LIVE_CHECK_LOCAL_PART = "live-check";
 const MAC_LENGTH = 10;
 const ID_PATTERN = /^[a-z0-9]{8,32}$/u;
 const encoder = new TextEncoder();
@@ -51,6 +52,19 @@ export async function forwardingLocalPart(secret: string, id: string) {
   }
 
   return `${ADDRESS_PREFIX}${id}-${await addressMac(secret, id)}`;
+}
+
+export function liveCheckAddress(domain: string) {
+  return `${LIVE_CHECK_LOCAL_PART}@${domain.trim().toLowerCase()}`;
+}
+
+export function isLiveCheckAddress(address: string, domain?: string) {
+  const [local = "", host = ""] = address.trim().toLowerCase().split("@");
+
+  return (
+    local === LIVE_CHECK_LOCAL_PART &&
+    (domain === undefined || host === domain.trim().toLowerCase())
+  );
 }
 
 export async function forwardingIdFrom(secret: string, address: string) {

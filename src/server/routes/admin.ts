@@ -27,6 +27,8 @@ import { readLlmUsage } from "../platform/llm/usage.ts";
 import { applicationsLeft, grantApplications } from "../billing/ledger.ts";
 import { buildCostSummary, buildProviderReport } from "../dispatch/report.ts";
 import { FIXTURE_CAPTURE_JOB_KIND, fixtureCapturePayloadSchema } from "../fixtures/job.ts";
+import { enqueueLiveCheckNow } from "../live-checks/job.ts";
+import { readLiveCheckResults } from "../live-checks/store.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import {
   getAllKillSwitches,
@@ -475,6 +477,22 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
   routes.get("/provider-report", (context) =>
     context.json({ providers: buildProviderReport(db, clock) }),
   );
+
+  routes.get("/live-checks", (context) => context.json({ results: readLiveCheckResults(db, 100) }));
+
+  routes.post("/live-checks", (context) => {
+    const owner = context.get("owner");
+    const job = enqueueLiveCheckNow(db, clock);
+
+    recordAdminAudit(db, clock, {
+      actorId: owner.userId,
+      action: "live-checks.run",
+      reason: "Run the daily live checks now",
+      detail: { jobId: job.id },
+    });
+
+    return context.json({ jobId: job.id });
+  });
 
   routes.post("/fixtures/capture", zValidator("json", captureBody), (context) => {
     if (deps.providers === null) {

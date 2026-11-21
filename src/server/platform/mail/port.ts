@@ -12,6 +12,13 @@ export interface SentMail {
   sentAt: number;
 }
 
+export interface OutboundCheckMail {
+  to: string;
+  subject: string;
+  body: string;
+}
+
 export interface MailSender {
   sendMagicLink: (mail: OutboundMagicLinkMail) => Promise<void>;
+  sendCheck: (mail: OutboundCheckMail) => Promise<void>;
 }
