@@ -30,8 +30,10 @@ import {
   waitForCode,
 } from "../inbox/waits.ts";
 import { createNotification } from "../notify/notifications.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
 import { copy } from "../../shared/copy.ts";
 import { recordApplicationEvent } from "./outcomes.ts";
+import { nextSendSlot as nextSlotInWindow, parseSendWindow } from "./planning.ts";
 
 export const APPLICATION_SEND_JOB_KIND = "application.send";
 
@@ -41,7 +43,6 @@ const ATTEMPT_LEASE_MS = 15 * 60_000;
 const SESSION_TIMEOUT_MINUTES = 15;
 const RECOVER_INTERVAL_MS = 60_000;
 const RETRY_DELAY_MS = 6 * 60 * 60_000;
-const DAY_MS = 24 * 60 * 60_000;
 
 const sendPayloadSchema = z.object({ applicationId: z.string().min(1) });
 
@@ -109,48 +110,8 @@ function settingNumber(db: AppDatabase, key: string, fallback: number) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function minutesOf(value: string) {
-  const [hours, mins] = value.split(":").map(Number);
-
-  return (hours ?? 0) * 60 + (mins ?? 0);
-}
-
 function sendWindow(db: AppDatabase) {
-  const raw = getSetting(db, "limits.send_window");
-
-  try {
-    const parsed = z.object({ start: z.string(), end: z.string() }).parse(JSON.parse(raw ?? "{}"));
-
-    return { end: minutesOf(parsed.end), start: minutesOf(parsed.start) };
-  } catch {
-    return { end: 20 * 60, start: 8 * 60 };
-  }
-}
-
-function offsetOf(at: number, timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    hour: "2-digit",
-    hourCycle: "h23",
-    minute: "2-digit",
-    month: "2-digit",
-    second: "2-digit",
-    timeZone,
-    year: "numeric",
-  }).formatToParts(new Date(at));
-
-  const values = new Map(parts.map((part) => [part.type, part.value]));
-
-  const asUtc = Date.UTC(
-    Number(values.get("year")),
-    Number(values.get("month")) - 1,
-    Number(values.get("day")),
-    Number(values.get("hour")),
-    Number(values.get("minute")),
-    Number(values.get("second")),
-  );
-
-  return asUtc - Math.floor(at / 1000) * 1000;
+  return parseSendWindow(getSetting(db, "limits.send_window"));
 }
 
 function nextSendSlot(db: AppDatabase, userId: string, earliest: number) {
@@ -161,30 +122,7 @@ function nextSendSlot(db: AppDatabase, userId: string, earliest: number) {
       .where(eq(profiles.userId, userId))
       .get()?.timezone ?? "UTC";
 
-  let offset: number;
-
-  try {
-    offset = offsetOf(earliest, timezone);
-  } catch {
-    offset = 0;
-  }
-
-  const window = sendWindow(db);
-  const local = earliest + offset;
-  const minuteOfDay = (((local % DAY_MS) + DAY_MS) % DAY_MS) / 60_000;
-
-  if (minuteOfDay >= window.start && minuteOfDay < window.end) {
-    return earliest;
-  }
-
-  const dayStart = local - (((local % DAY_MS) + DAY_MS) % DAY_MS);
-
-  const target =
-    minuteOfDay < window.start
-      ? dayStart + window.start * 60_000
-      : dayStart + DAY_MS + window.start * 60_000;
-
-  return target - offset;
+  return nextSlotInWindow(earliest, timezone, sendWindow(db));
 }
 
 export function createDispatcher(deps: DispatcherDeps) {
@@ -206,6 +144,17 @@ export function createDispatcher(deps: DispatcherDeps) {
 
   function updateAttempt(attemptId: string, values: Partial<AttemptRow>) {
     db.update(attempts).set(values).where(eq(attempts.id, attemptId)).run();
+  }
+
+  function announce(applicationId: string, userId: string, status: string) {
+    publishEvent(
+      db,
+      clock,
+      "application.updated",
+      JSON.stringify({ applicationId, status }),
+      userId,
+    );
+    publishEvent(db, clock, "home.updated", JSON.stringify({ applicationId }), userId);
   }
 
   function latestAttempt(applicationId: string) {
@@ -243,6 +192,8 @@ export function createDispatcher(deps: DispatcherDeps) {
       source: "system",
     });
 
+    announce(applicationId, userId, "ready");
+
     return slot;
   }
 
@@ -268,6 +219,8 @@ export function createDispatcher(deps: DispatcherDeps) {
       toValue: "ready",
       source: "system",
     });
+
+    announce(applicationId, userId, "ready");
 
     return slot;
   }
@@ -313,6 +266,8 @@ export function createDispatcher(deps: DispatcherDeps) {
       toValue: null,
       source: "system",
     });
+
+    announce(applicationId, userId, "failed");
 
     return "failed" as const;
   }
@@ -723,6 +678,7 @@ export function createDispatcher(deps: DispatcherDeps) {
             .where(eq(applications.id, applicationId))
             .run();
 
+          announce(applicationId, claimed.userId, "confirming");
           updateAttempt(attemptId, { endedAt: clock.now(), outcome: outcomeOf(run.outcome) });
         } else {
           finishBeforeSubmit({
@@ -759,6 +715,7 @@ export function createDispatcher(deps: DispatcherDeps) {
           .where(eq(applications.id, applicationId))
           .run();
 
+        announce(applicationId, claimed.userId, "confirming");
         updateAttempt(attemptId, {
           endedAt: clock.now(),
           outcome: isShuttingDown() ? "unconfirmed" : "crash",
@@ -827,6 +784,7 @@ export function createDispatcher(deps: DispatcherDeps) {
           .where(eq(applications.id, application.id))
           .run();
 
+        announce(application.id, application.userId, "confirming");
         updateAttempt(attempt.id, {
           browserMs: attempt.browserMs ?? Math.max(0, clock.now() - attempt.startedAt),
           costMicros: attempt.costMicros ?? 0,

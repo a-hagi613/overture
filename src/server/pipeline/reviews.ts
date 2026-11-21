@@ -19,6 +19,7 @@ import { countryNameFor } from "../catalog/geo.ts";
 import { reviewCategory } from "../catalog/question-normalize.ts";
 import { createFactService } from "../profile/facts.ts";
 import { factLabelFor } from "../../shared/facts.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
 import {
   applicationIdsForReview,
   dismissEmptyReview,
@@ -202,6 +203,9 @@ export function createReviewService(deps: {
 
     await preparation.prepareMany(applicationIds);
 
+    publishEvent(db, clock, "review.resolved", JSON.stringify({ reviewId }), userId);
+    publishEvent(db, clock, "home.updated", JSON.stringify({ reviewId }), userId);
+
     return { reviewId, factKey, scope: review.scope, applicationIds };
   }
 
@@ -241,6 +245,9 @@ export function createReviewService(deps: {
       reviewId,
       userId,
     });
+
+    publishEvent(db, clock, "review.resolved", JSON.stringify({ reviewId }), userId);
+    publishEvent(db, clock, "home.updated", JSON.stringify({ reviewId }), userId);
 
     return { reviewId, applicationIds };
   }

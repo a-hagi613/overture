@@ -1,23 +1,100 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 import type { MatchingService } from "../matching/score.ts";
+import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import type { ReviewService } from "../pipeline/reviews.ts";
 
 import { applicationsLeft, committedSince, planApplications } from "../billing/ledger.ts";
-import { profiles } from "../platform/db/schema.ts";
-import { eq } from "drizzle-orm";
+import {
+  applicationEvents,
+  applications,
+  companies,
+  mailThreads,
+  messages,
+  postings,
+  profiles,
+} from "../platform/db/schema.ts";
 import { getSetting } from "../platform/settings/index.ts";
 import { createTimeZoneService } from "../profile/time-zone.ts";
-import { localDayStart } from "../platform/local-time.ts";
+import { addLocalDays, localDateAt, localDayStartFor } from "../platform/local-time.ts";
 import { enqueuePlannerDay } from "../dispatch/planner.ts";
+import { nextSendSlot, parseSendWindow } from "../dispatch/planning.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
+import { copy } from "../../shared/copy.ts";
 
 const UP_NEXT_LIMIT = 6;
+const MAX_REVIEW_ROWS = 4;
+const MAX_INBOX_ROWS = 4;
+const REVIEW_HIDDEN_COMPANIES = 2;
 
 const runningBody = z.object({ running: z.boolean() });
+
+const RANGE_KEYS = ["7D", "30D", "90D"] as const;
+
+type RangeKey = (typeof RANGE_KEYS)[number];
+
+interface RangeSpec {
+  startOffsetDays: number;
+  previousStartOffsetDays: number;
+  per: "day" | "week";
+  buckets: number;
+  labelIndexes: readonly number[];
+  labelKind: "weekday" | "dayMonth" | "month";
+}
+
+const RANGE_BY_KEY: Record<RangeKey, RangeSpec> = {
+  "7D": {
+    buckets: 7,
+    labelIndexes: [0, 1, 2, 3, 4, 5, 6],
+    labelKind: "weekday",
+    per: "day",
+    previousStartOffsetDays: -13,
+    startOffsetDays: -6,
+  },
+  "30D": {
+    buckets: 30,
+    labelIndexes: [0, 7, 14, 21, 29],
+    labelKind: "dayMonth",
+    per: "day",
+    previousStartOffsetDays: -59,
+    startOffsetDays: -29,
+  },
+  "90D": {
+    buckets: 13,
+    labelIndexes: [0, 4, 8, 12],
+    labelKind: "month",
+    per: "week",
+    previousStartOffsetDays: -181,
+    startOffsetDays: -90,
+  },
+};
+
+interface HomeRangeView {
+  applicationsSent: number;
+  sentDelta: number;
+  replies: number;
+  interviewsBooked: number;
+  chart: {
+    per: "day" | "week";
+    labels: string[];
+    points: { at: number; count: number }[];
+  };
+}
+
+interface HomeInboxView {
+  id: string;
+  company: string;
+  text: string;
+  detail: string | null;
+  at: number;
+  kind: string;
+}
 
 function dailyCapOf(db: AppDatabase) {
   const stored = getSetting(db, "limits.daily_cap");
@@ -26,12 +103,143 @@ function dailyCapOf(db: AppDatabase) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
 }
 
-export function createHomeRoutes(
-  db: AppDatabase,
-  clock: Clock,
-  auth: Auth,
-  matching: MatchingService,
+function stageLabel(stage: string | null) {
+  if (stage === "queued") {
+    return copy.stages.queued;
+  }
+
+  if (stage === "applied") {
+    return copy.stages.applied;
+  }
+
+  if (stage === "screening") {
+    return copy.stages.screening;
+  }
+
+  if (stage === "interviewing") {
+    return copy.stages.interviewing;
+  }
+
+  if (stage === "offer") {
+    return copy.stages.offer;
+  }
+
+  if (stage === "closed") {
+    return copy.stages.closed;
+  }
+
+  return null;
+}
+
+function displayNameOf(from: string) {
+  const angle = from.indexOf("<");
+  const name = (angle === -1 ? "" : from.slice(0, angle)).trim().replaceAll(/^"|"$/gu, "");
+
+  return name === "" ? null : name;
+}
+
+function inboxPhrase(kind: string | null, subject: string, postingTitle: string | null) {
+  if (kind === "ack") {
+    return copy.home.inbox.ack;
+  }
+
+  if (kind === "screening") {
+    return copy.home.inbox.screening;
+  }
+
+  if (kind === "rejection") {
+    return copy.home.inbox.rejection(postingTitle);
+  }
+
+  if (kind === "offer") {
+    return copy.home.inbox.offer;
+  }
+
+  if (kind === "interview") {
+    return copy.home.inbox.interview(subject);
+  }
+
+  return copy.home.inbox.replied(subject);
+}
+
+function labelAt(spec: RangeSpec, at: number, zone: string) {
+  if (spec.labelKind === "weekday") {
+    return new Intl.DateTimeFormat(copy.home.dateLocale, {
+      timeZone: zone,
+      weekday: "short",
+    }).format(new Date(at));
+  }
+
+  if (spec.labelKind === "dayMonth") {
+    return new Intl.DateTimeFormat(copy.home.dateLocale, {
+      day: "numeric",
+      month: "short",
+      timeZone: zone,
+    }).format(new Date(at));
+  }
+
+  return new Intl.DateTimeFormat(copy.home.dateLocale, {
+    month: "short",
+    timeZone: zone,
+  }).format(new Date(at));
+}
+
+function countIn(rows: readonly { at: number }[], start: number, end: number) {
+  return rows.filter((row) => row.at >= start && row.at < end).length;
+}
+
+function rangeLabels(spec: RangeSpec, starts: readonly number[], zone: string) {
+  return spec.labelIndexes.flatMap((index) => {
+    const at = starts[index];
+
+    return at === undefined ? [] : [labelAt(spec, at, zone)];
+  });
+}
+
+function rangeView(
+  spec: RangeSpec,
+  now: number,
+  zone: string,
+  startFor: (offsetDays: number) => number,
+  sentRows: readonly { at: number }[],
+  replyRows: readonly { at: number }[],
+  interviewRows: readonly { at: number }[],
 ) {
+  const start = startFor(spec.startOffsetDays);
+  const previousStart = startFor(spec.previousStartOffsetDays);
+  const starts: number[] = [];
+
+  for (let index = 0; index < spec.buckets; index += 1) {
+    starts.push(startFor(spec.startOffsetDays + index * (spec.per === "day" ? 1 : 7)));
+  }
+
+  const points = starts.map((at, index) => {
+    const next = starts[index + 1] ?? now + 1;
+
+    return { at, count: countIn(sentRows, at, next) };
+  });
+
+  const applicationsSent = countIn(sentRows, start, now + 1);
+
+  return {
+    applicationsSent,
+    chart: { labels: rangeLabels(spec, starts, zone), per: spec.per, points },
+    interviewsBooked: countIn(interviewRows, start, now + 1),
+    replies: countIn(replyRows, start, now + 1),
+    sentDelta: applicationsSent - countIn(sentRows, previousStart, start),
+  } satisfies HomeRangeView;
+}
+
+export function createHomeRoutes(deps: {
+  db: AppDatabase;
+  clock: Clock;
+  auth: Auth;
+  matching: MatchingService;
+  personal: PersonalCrypto;
+  reviews: ReviewService;
+}) {
+  const { db, clock, auth, matching, personal, reviews } = deps;
+
   const routes = new Hono();
   const zones = createTimeZoneService({ db, clock });
 
@@ -41,6 +249,121 @@ export function createHomeRoutes(
     return result?.user ?? null;
   }
 
+  function profileOf(userId: string) {
+    const row = db
+      .select({ pauseReason: profiles.pauseReason, running: profiles.running })
+      .from(profiles)
+      .where(eq(profiles.userId, userId))
+      .get();
+
+    return row ?? { pauseReason: "onboarding" as const, running: false };
+  }
+
+  async function inboxViews(userId: string) {
+    const rows = db
+      .select({
+        applicationId: mailThreads.applicationId,
+        classification: messages.classification,
+        companyName: companies.name,
+        createdAt: messages.createdAt,
+        fromEnc: messages.fromEnc,
+        id: messages.id,
+        postingTitle: postings.title,
+        stage: applications.stage,
+        subjectEnc: messages.subjectEnc,
+      })
+      .from(messages)
+      .leftJoin(mailThreads, eq(mailThreads.id, messages.threadId))
+      .leftJoin(applications, eq(applications.id, mailThreads.applicationId))
+      .leftJoin(postings, eq(postings.id, applications.postingId))
+      .leftJoin(companies, eq(companies.id, applications.companyId))
+      .where(
+        and(
+          eq(messages.userId, userId),
+          eq(messages.direction, "in"),
+          eq(messages.auth, "pass"),
+          or(isNull(messages.classification), sql`${messages.classification} IS NOT 'code'`),
+        ),
+      )
+      .orderBy(desc(messages.createdAt))
+      .limit(MAX_INBOX_ROWS)
+      .all();
+
+    const applicationIds = rows.flatMap((row) =>
+      row.applicationId === null ? [] : [row.applicationId],
+    );
+
+    const stageEvents =
+      applicationIds.length === 0
+        ? []
+        : db
+            .select()
+            .from(applicationEvents)
+            .where(
+              and(
+                eq(applicationEvents.userId, userId),
+                eq(applicationEvents.kind, "stage"),
+                inArray(applicationEvents.applicationId, applicationIds),
+              ),
+            )
+            .orderBy(asc(applicationEvents.at))
+            .all();
+
+    const latestEvent = new Map<string, (typeof stageEvents)[number]>();
+
+    for (const event of stageEvents) {
+      latestEvent.set(event.applicationId, event);
+    }
+
+    return Promise.all(
+      rows.map(async (row) => {
+        const subject = await personal.openFor(
+          userId,
+          { column: "subject_enc", rowId: row.id, table: "messages" },
+          row.subjectEnc,
+        );
+
+        const from = await personal.openFor(
+          userId,
+          { column: "from_enc", rowId: row.id, table: "messages" },
+          row.fromEnc,
+        );
+
+        const event = row.applicationId === null ? undefined : latestEvent.get(row.applicationId);
+
+        const stage = stageLabel(row.stage);
+
+        let detail: string | null = null;
+
+        if (event !== undefined && event.toValue !== null) {
+          const to = stageLabel(event.toValue);
+
+          if (to !== null) {
+            const fromStage = event.fromValue === null ? null : stageLabel(event.fromValue);
+
+            detail =
+              fromStage === null || event.toValue === "closed"
+                ? copy.home.inbox.movedTo(to)
+                : copy.home.inbox.movedFromTo(fromStage, to);
+          }
+        }
+
+        if (detail === null && stage !== null) {
+          detail = copy.home.inbox.filedUnder(stage);
+        }
+
+        return {
+          at: row.createdAt.getTime(),
+          company: row.companyName ?? displayNameOf(from) ?? from,
+          detail,
+          id: row.id,
+          kind: row.classification ?? "other",
+          text: inboxPhrase(row.classification, subject, row.postingTitle),
+        } satisfies HomeInboxView;
+      }),
+    );
+  }
+
   routes.get("/home", async (context) => {
     const user = await sessionUser(context.req.raw.headers);
 
@@ -48,28 +371,141 @@ export function createHomeRoutes(
       return context.json({ error: "sign_in_required" }, 401);
     }
 
-    const at = clock.now();
+    const now = clock.now();
     const userId = user.id;
     const { timezone } = await zones.current(userId);
-
-    const profile = db
-      .select({ running: profiles.running })
-      .from(profiles)
-      .where(eq(profiles.userId, userId))
-      .get();
-
-    const dayStart = localDayStart(at, timezone ?? "UTC");
+    const zone = timezone ?? "UTC";
+    const today = localDateAt(now, zone);
+    const dayStart = localDayStartFor(today, zone);
     const sentToday = committedSince(db, userId, dayStart);
     const dailyCap = dailyCapOf(db);
-    const left = applicationsLeft(db, userId, at);
+    const left = applicationsLeft(db, userId, now);
+    const profile = profileOf(userId);
+
+    const startFor = (offsetDays: number) =>
+      localDayStartFor(addLocalDays(today, offsetDays), zone);
+
+    const oldestStart = startFor(RANGE_BY_KEY["90D"].previousStartOffsetDays);
+
+    const sentRows = db
+      .select({ at: applications.sentAt })
+      .from(applications)
+      .where(
+        and(
+          eq(applications.userId, userId),
+          isNotNull(applications.sentAt),
+          gte(applications.sentAt, oldestStart),
+          lt(applications.sentAt, now + 1),
+        ),
+      )
+      .all()
+      .flatMap((row) => (row.at === null ? [] : [{ at: row.at }]));
+
+    const replyRows = db
+      .select({ at: messages.createdAt })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.userId, userId),
+          eq(messages.direction, "in"),
+          eq(messages.auth, "pass"),
+          or(isNull(messages.classification), sql`${messages.classification} IS NOT 'code'`),
+          gte(messages.createdAt, new Date(oldestStart)),
+          lt(messages.createdAt, new Date(now + 1)),
+        ),
+      )
+      .all()
+      .map((row) => ({ at: row.at.getTime() }));
+
+    const interviewRows = db
+      .select({ at: applicationEvents.at })
+      .from(applicationEvents)
+      .where(
+        and(
+          eq(applicationEvents.userId, userId),
+          eq(applicationEvents.kind, "stage"),
+          inArray(applicationEvents.toValue, ["interviewing", "offer"]),
+          gte(applicationEvents.at, oldestStart),
+          lt(applicationEvents.at, now + 1),
+        ),
+      )
+      .all();
+
+    const ranges: Record<RangeKey, HomeRangeView> = {
+      "7D": rangeView(RANGE_BY_KEY["7D"], now, zone, startFor, sentRows, replyRows, interviewRows),
+      "30D": rangeView(
+        RANGE_BY_KEY["30D"],
+        now,
+        zone,
+        startFor,
+        sentRows,
+        replyRows,
+        interviewRows,
+      ),
+      "90D": rangeView(
+        RANGE_BY_KEY["90D"],
+        now,
+        zone,
+        startFor,
+        sentRows,
+        replyRows,
+        interviewRows,
+      ),
+    };
+
+    const readyRows = db
+      .select({ scheduledFor: applications.scheduledFor })
+      .from(applications)
+      .where(and(eq(applications.userId, userId), eq(applications.status, "ready")))
+      .all();
+
+    const scheduled = readyRows.flatMap((row) =>
+      row.scheduledFor === null ? [] : [row.scheduledFor],
+    );
+
+    const window = parseSendWindow(getSetting(db, "limits.send_window"));
+
+    let nextSendAt: number | null = null;
+
+    if (scheduled.length > 0) {
+      nextSendAt = Math.min(...scheduled);
+    } else if (readyRows.length > 0) {
+      nextSendAt = nextSendSlot(now, zone, window);
+    }
+
+    const reviewList = reviews.list(userId);
+    const inbox = await inboxViews(userId);
 
     return context.json({
       applicationsLeft: left,
-      planApplications: planApplications(db, userId, at),
-      running: profile?.running ?? false,
-      sentToday,
       dailyCap,
+      nextSendAt,
+      now,
+      pauseReason: profile.pauseReason,
+      planApplications: planApplications(db, userId, now),
+      queued: readyRows.length,
+      ranges,
+      recentInbox: inbox,
       remainingToday: Math.max(0, Math.min(dailyCap, left) - sentToday),
+      reviews: {
+        applications: reviewList.reduce((total, review) => total + review.unlocked, 0),
+        list: reviewList.slice(0, MAX_REVIEW_ROWS).map((review) => {
+          const names = [...new Set(review.applications.map((application) => application.company))];
+          const shown = Math.max(1, review.companies - REVIEW_HIDDEN_COMPANIES);
+
+          return {
+            companyCount: review.companies,
+            companies: names.slice(0, shown),
+            id: review.id,
+            prompt: review.prompt,
+            unlocked: review.unlocked,
+          };
+        }),
+        total: reviewList.length,
+      },
+      running: profile.running,
+      sentToday,
+      timeZone: zone,
       upNext: await matching.upNext(userId, UP_NEXT_LIMIT),
     });
   });
@@ -103,6 +539,8 @@ export function createHomeRoutes(
     if (running) {
       enqueuePlannerDay(db, clock, user.id);
     }
+
+    publishEvent(db, clock, "home.updated", JSON.stringify({ running }), user.id);
 
     return context.json({ pauseReason, running });
   });

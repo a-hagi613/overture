@@ -53,6 +53,10 @@ function capitalize(word: string) {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
+function plural(count: number, one: string, many: string) {
+  return count === 1 ? one : many;
+}
+
 export const copy = {
   app: {
     name: "Overture",
@@ -200,13 +204,20 @@ export const copy = {
     magicLinkBody: (url: string) =>
       `Open this link to sign in to Overture. It works once and expires in 15 minutes.\n\n${url}\n`,
   },
+  stages: {
+    queued: "Queued",
+    applied: "Applied",
+    screening: "Screening",
+    interviewing: "Interviewing",
+    offer: "Offer",
+    closed: "Closed",
+  },
   home: {
     title: "Home",
     dateLocale: "en-US",
     greetingMorning: "Good morning,",
     greetingAfternoon: "Good afternoon,",
     greetingEvening: "Good evening,",
-    eyebrow: "Your search",
     applicationsLeft: "Applications left",
     sentToday: "Sent today",
     usageCount: String,
@@ -214,12 +225,72 @@ export const copy = {
     usageSentToday: (sent: number, cap: number) =>
       `${String(sent)} of ${String(cap)} sent today · resets at midnight`,
     usageAria: (count: number) => `${String(count)} applications left`,
-    nextSend: "Next send",
+    daySoFar: "The day so far",
+    folio: "folio 01",
+    rangeLabel: "Date range",
+    ranges: { d7: "7D", d30: "30D", d90: "90D" },
+    running: "Auto-apply running",
+    paused: "Auto-apply paused",
+    pause: "Pause",
+    start: "Start",
+    switchAria: (running: boolean) => (running ? "Pause auto-apply" : "Start auto-apply"),
+    kpi: {
+      sent: "Applications sent",
+      queued: "Queued, ready to send",
+      replies: "Replies · interviews",
+      needsYou: "Needs you",
+    },
+    sentDelta: (delta: number, days: number) =>
+      `${delta < 0 ? "−" : "+"}${String(Math.abs(delta))} vs the previous ${String(days)} days`,
+    nextSends: (time: string) => `Next one sends about ${time}`,
     nextSendValue: "None yet",
-    ready: "Overture is ready",
-    skeletonNote:
-      "The walking skeleton is running. Every screen you see here is served by the real stack.",
-    nothingYet: "Nothing sent yet",
+    interviewsBooked: (count: number) =>
+      `${String(count)} ${plural(count, "interview", "interviews")} booked`,
+    applicationsWait: (count: number) =>
+      `${capitalize(countWord(count))} ${plural(count, "application waits", "applications wait")} on these`,
+    chart: {
+      fig: "fig. 1",
+      title: "Applications sent",
+      today: (count: number) => `Today ${String(count)}`,
+      thisWeek: (count: number) => `This week ${String(count)}`,
+      aria: (subtitle: string, total: number) =>
+        `Applications sent, ${subtitle.toLowerCase()}, total ${String(total)}`,
+      perDay7: "Per day, last 7 days",
+      perDay30: "Per day, last 30 days",
+      perWeek90: "Per week, last 90 days",
+    },
+    needsYou: {
+      fig: "fig. 2",
+      title: "Needs you",
+      note: "Open questions, grouped by jobs unlocked",
+      jobsUnlocked: (count: number) =>
+        `${String(count)} ${plural(count, "job unlocked", "jobs unlocked")}`,
+      footer: (questions: number, applications: number) =>
+        `${capitalize(countWord(questions))} ${plural(questions, "question", "questions")}, ` +
+        `${countWord(applications)} ${plural(applications, "application", "applications")} waiting`,
+      open: "Open Review",
+      empty: "Nothing needs you right now.",
+    },
+    inbox: {
+      fig: "fig. 3",
+      title: "Recent in your Inbox",
+      open: "Open Inbox",
+      ack: "confirmed they received your application",
+      screening: "invited you to a screening call",
+      offer: "sent you an offer",
+      rejection: (title: string | null) =>
+        title === null ? "is not moving forward" : `is not moving forward with ${title}`,
+      replied: (subject: string) =>
+        subject.trim() === "" ? "replied" : `replied: ${subject.trim()}`,
+      interview: (subject: string) =>
+        subject.trim() === ""
+          ? "asked to schedule an interview"
+          : `asked to schedule an interview: ${subject.trim()}`,
+      movedFromTo: (from: string, to: string) => `Moved from ${from} to ${to}`,
+      movedTo: (to: string) => `Moved to ${to}`,
+      filedUnder: (stage: string) => `Filed under ${stage}`,
+      empty: "No employer mail yet.",
+    },
   },
   settings: {
     title: "Settings",

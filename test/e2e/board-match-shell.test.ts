@@ -86,9 +86,11 @@ for (const width of [390, 1280] as const) {
         });
       }
 
+      await page.request.post(`${appServerUrl}/api/running`, { data: { running: true } });
+
       await page.goto(`${appServerUrl}/`);
-      await expect(page.getByRole("heading", { name: "Overture is ready" })).toBeVisible();
-      await expect(page.locator("dd").filter({ hasText: "63" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+      await expect(page.getByText("of 70 on your week plan")).toHaveCount(1);
       await page.evaluate(async () => {
         await document.fonts.ready;
       });

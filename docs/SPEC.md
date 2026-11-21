@@ -935,7 +935,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 |---|---|
 | Session | `GET /api/me` |
 | Events | `GET /api/events` (SSE; `Last-Event-ID` replay from `events`; heartbeat 25 s) |
-| Home | `GET /api/home` (status, applications left, today's sent/remaining, queue position + ETA, up next, activity, check-ins) · `POST /api/running` `{running}` |
+| Home | `GET /api/home` (running and pause reason, applications left, today's sent/remaining, queued count + next send time, sent/replies/interviews and a per-day or per-week series for 7D/30D/90D, open Reviews grouped by jobs unlocked, recent authenticated Inbox items, up next, activity, check-ins) · `POST /api/running` `{running}` |
 | Board | `GET /api/board` · `PATCH /api/applications/:id/stage` `{stage, position}` · `POST /api/applications/:id/undo-stage` · `POST /api/applications/:id/withdraw` (queued only) |
 | Application | `GET /api/applications/:id` (card + timeline + snapshot "proof": answers with sources, letter with mapped lines, resume hash) |
 | Jobs | `GET /api/search?q&filters` (FTS ≤ 50 ms; filters: `role`, `seniority`, `workplace`, `location` = resolved city, `employmentType`) · `GET /api/postings/:id` (scores on open) · `POST /api/postings/:id/apply` · `PUT /api/postings/:id/state` `{saved|hidden|null}` |

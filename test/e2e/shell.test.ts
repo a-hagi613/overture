@@ -26,7 +26,7 @@ async function openShell(page: Page, appServerUrl: string, theme: string) {
   }
 
   await page.goto(`${appServerUrl}/`);
-  await expect(page.getByRole("heading", { name: "Overture is ready" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
 }
 
 async function expectShellAxeClean(

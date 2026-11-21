@@ -49,7 +49,7 @@ emailOnlyTest(
     const link = await latestMailLink(emailOnlyServer.url, request, authTestIdentity.ownerEmail);
 
     await page.goto(link);
-    await expect(page.getByRole("heading", { name: "Overture is ready" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
 
     const state = await verifyAuthState(emailOnlyServer.url, request);
 

@@ -24,7 +24,7 @@ test("the owner signs in from the sign-in screen with an emailed link", async ({
   const link = await latestMailLink(appServerUrl, page.request, authTestIdentity.ownerEmail);
 
   await page.goto(link);
-  await expect(page.getByRole("heading", { name: "Overture is ready" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
 
   const state = await verifyAuthState(appServerUrl, page.request);
   const owner = state.users.at(-1);
@@ -49,7 +49,7 @@ test("the owner signs in with Google through the local identity server", async (
 
   await expect(googleButton).toBeEnabled();
   await googleButton.click();
-  await expect(page.getByRole("heading", { name: "Overture is ready" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
 
   const state = await verifyAuthState(appServerUrl, page.request);
   const owner = state.users.at(-1);
@@ -73,7 +73,7 @@ test("the owner signs in with LinkedIn through the local identity server", async
 
   await expect(linkedinButton).toBeEnabled();
   await linkedinButton.click();
-  await expect(page.getByRole("heading", { name: "Overture is ready" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
 
   const state = await verifyAuthState(appServerUrl, page.request);
 
@@ -200,13 +200,13 @@ test("sign out of all devices ends every other session and keeps this one", asyn
   const appServerUrl = isolatedAppServer.url;
 
   await signInByMagicLink(page, appServerUrl, request, authTestIdentity.ownerEmail);
-  await expect(page.getByRole("heading", { name: "Overture is ready" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
 
   const otherContext = await browser.newContext();
   const otherPage = await otherContext.newPage();
 
   await signInByMagicLink(otherPage, appServerUrl, request, authTestIdentity.ownerEmail);
-  await expect(otherPage.getByRole("heading", { name: "Overture is ready" })).toBeVisible();
+  await expect(otherPage.getByRole("heading", { name: "The day so far" })).toBeVisible();
 
   expect((await verifyAuthState(appServerUrl, request)).sessions).toHaveLength(2);
 
@@ -232,7 +232,7 @@ test("a second sign-in method on the same verified email joins the one account",
 
   await identityServer.setPersona(personas.owner("google-owner"));
   await signInByMagicLink(page, appServerUrl, request, authTestIdentity.ownerEmail);
-  await expect(page.getByRole("heading", { name: "Overture is ready" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
 
   const secondContext = await browser.newContext();
   const secondPage = await secondContext.newPage();
@@ -240,7 +240,7 @@ test("a second sign-in method on the same verified email joins the one account",
   await setTurnstileScenario(request, appServerUrl, { action: "signin" });
   await secondPage.goto(`${appServerUrl}/signin`);
   await secondPage.getByRole("button", { name: "Continue with Google" }).click();
-  await expect(secondPage.getByRole("heading", { name: "Overture is ready" })).toBeVisible();
+  await expect(secondPage.getByRole("heading", { name: "The day so far" })).toBeVisible();
   await secondContext.close();
 
   const state = await verifyAuthState(appServerUrl, request);

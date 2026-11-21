@@ -76,7 +76,7 @@ export default defineConfig({
     },
     {
       name: "home-boards",
-      testMatch: /board-match-home-usage\.test\.ts/u,
+      testMatch: /board-match-home.*\.test\.ts/u,
       expect: {
         toHaveScreenshot: {
           maxDiffPixelRatio: 0.01,

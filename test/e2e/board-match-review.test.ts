@@ -112,6 +112,7 @@ async function seedOwner(request: APIRequestContext, appServerUrl: string) {
   await request.post(`${appServerUrl}/__test__/user/name`, {
     data: { email: authTestIdentity.ownerEmail, name: authTestIdentity.ownerName },
   });
+  await request.post("/api/running", { data: { running: true } });
   await request.post(`${appServerUrl}/__test__/ledger/sample`, {
     data: { email: authTestIdentity.ownerEmail },
   });

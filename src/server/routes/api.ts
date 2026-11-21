@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
+import type { Auth } from "../auth/index.ts";
 
 import { createSseStream } from "../platform/sse/stream.ts";
 import { getAllKillSwitches, getAllSettings, getSetting } from "../platform/settings/index.ts";
@@ -20,7 +21,7 @@ const searchQuerySchema = z.object({
   employmentType: z.enum(EMPLOYMENT_TYPES).optional(),
 });
 
-export function createApiRoutes(db: AppDatabase, clock: Clock) {
+export function createApiRoutes(db: AppDatabase, clock: Clock, auth: Auth) {
   const routes = new Hono();
 
   routes.get("/search", zValidator("query", searchQuerySchema), (context) => {
@@ -59,15 +60,25 @@ export function createApiRoutes(db: AppDatabase, clock: Clock) {
     });
   });
 
-  routes.get("/events", (context) => {
+  routes.get("/events", async (context) => {
     const lastEventId = context.req.header("Last-Event-ID") ?? null;
     const abortController = new AbortController();
+
+    const session = await auth.api
+      .getSession({ headers: context.req.raw.headers })
+      .catch(() => null);
 
     context.req.raw.signal.addEventListener("abort", () => {
       abortController.abort();
     });
 
-    const stream = createSseStream(db, clock, lastEventId, null, abortController.signal);
+    const stream = createSseStream(
+      db,
+      clock,
+      lastEventId,
+      session?.user.id ?? null,
+      abortController.signal,
+    );
 
     return new Response(stream, {
       headers: {

@@ -11,6 +11,7 @@ import { SideNav } from "./components/side-nav.tsx";
 import { TabBar } from "./components/tab-bar.tsx";
 import { UsageCard } from "./components/usage.tsx";
 import { authClient } from "./lib/auth-client.ts";
+import { useLiveUpdates } from "./lib/live-events.ts";
 
 const collapsedStorageKey = "overture.rail";
 
@@ -25,6 +26,8 @@ export function AppShell() {
 
     return stored === "1" || (stored === null && pathname === "/board");
   });
+
+  useLiveUpdates();
 
   useEffect(() => {
     if (!isPending && session === null) {
