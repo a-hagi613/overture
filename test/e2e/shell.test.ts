@@ -80,6 +80,12 @@ test("the shell lists the five destinations on desktop and opens settings from t
   await expect(shellPage.getByText(authTestIdentity.ownerEmail).first()).toBeVisible();
   await expect(shellPage.getByRole("button", { name: "Sign out everywhere" })).toBeVisible();
 
+  await shellPage.goto(`${appServerUrl}/inbox`);
+  await expect(shellPage.getByRole("heading", { name: "Inbox" })).toBeVisible();
+
+  await shellPage.goto(`${appServerUrl}/missing-route`);
+  await expect(shellPage.getByRole("heading", { name: "Not found" })).toBeVisible();
+
   await desktop.close();
 });
 
