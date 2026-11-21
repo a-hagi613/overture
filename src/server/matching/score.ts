@@ -459,7 +459,10 @@ export function createMatchingService(deps: MatchDeps) {
       .select({ status: applications.status })
       .from(applications)
       .where(
-        and(eq(applications.userId, userId), inArray(applications.status, ["preparing", "ready"])),
+        and(
+          eq(applications.userId, userId),
+          inArray(applications.status, ["preparing", "ready", "approved"]),
+        ),
       )
       .all();
 

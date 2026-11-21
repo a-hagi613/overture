@@ -214,7 +214,17 @@ export async function seedApplication(
   input: {
     userId: string;
     postingId: string;
-    status: "preparing" | "needs_review" | "ready" | "sending" | "confirming" | "sent" | "failed";
+    status:
+      | "preparing"
+      | "needs_review"
+      | "ready"
+      | "approved"
+      | "sending"
+      | "confirming"
+      | "sent"
+      | "failed"
+      | "skipped"
+      | "withdrawn";
     sentAt?: number | null;
     createdAt?: number | null;
   },

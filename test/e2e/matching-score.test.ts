@@ -431,3 +431,42 @@ test("manual Apply refuses every hard filter and scores only what it may apply t
 
   await owner.dispose();
 });
+
+test("an approved Application counts toward the preparation buffer", async ({ matching }) => {
+  const { owner, userId } = await ownerContextFor(matching.server.url);
+
+  await clearCatalog(owner);
+  await grantApplications(owner, 70);
+  await configureMatching(owner);
+
+  const now = await clockNow(owner);
+
+  const paid = await seedCompanies(owner, "buffer-paid", 10, {
+    postedAt: now - 20 * 86_400_000,
+    salaryMinMinor: 15_000_000,
+  });
+
+  await seedCompanies(owner, "buffer-unpaid", 10, {
+    postedAt: now - 15 * 86_400_000,
+    salaryMinMinor: null,
+  });
+
+  const approved = paid.slice(0, 3);
+
+  await Promise.all(
+    approved.map(async (postingId) => {
+      await seedApplication(owner, { postingId, status: "approved", userId });
+    }),
+  );
+
+  await runMatchFill(owner, matching.server.url);
+
+  const applications = await applicationsFor(owner, userId);
+  const approvedIds = new Set(approved);
+
+  expect(applications).toHaveLength(15);
+  expect(applications.filter((row) => !approvedIds.has(row.postingId))).toHaveLength(12);
+  expect(matching.anthropic.requests()).toHaveLength(12);
+
+  await owner.dispose();
+});

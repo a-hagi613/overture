@@ -19,6 +19,7 @@ import { createFactService } from "../profile/facts.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createTargetsService, matchedRoleTags, roleTargetMatches } from "../profile/targets.ts";
 import { resolveLocation } from "../catalog/geo.ts";
+import { ACTIVE_APPLICATION_STATUSES } from "./applications.ts";
 import { salaryMeetsFloor } from "./fx.ts";
 import { countryInRegion, remoteRegionOf } from "./regions.ts";
 import { skipMatches } from "./skip-match.ts";
@@ -37,14 +38,6 @@ const SENIORITY_ORDER: readonly string[] = [
   "manager",
   "director",
 ];
-
-const ACTIVE_APPLICATION_STATUSES = [
-  "preparing",
-  "needs_review",
-  "ready",
-  "sending",
-  "confirming",
-] as const;
 
 type TagDimension = "role" | "subrole" | "seniority";
 

@@ -46,6 +46,8 @@ const test = appTest.extend<{
 const applicationRowSchema = z.object({
   id: z.string(),
   postingId: z.string(),
+  readyAt: z.number().nullable(),
+  stage: z.string().nullable(),
   status: z.string(),
   statusReason: z.string().nullable(),
 });
@@ -334,6 +336,8 @@ test("an Application whose Facts answer every required question reaches ready", 
   );
 
   expect(application?.status).toBe("ready");
+  expect(application?.stage).toBe("ready");
+  expect(application?.readyAt).not.toBeNull();
   expect(
     (await reviewsFor(owner, userId)).reviews.filter((candidate) => candidate.status === "open"),
   ).toEqual([]);
@@ -385,6 +389,8 @@ test("one Review unlocks every Application waiting on its question", async ({ pr
   let rows = await applicationsFor(owner, userId);
 
   expect(rows.find((row) => row.id === firstApplication)?.status).toBe("needs_review");
+  expect(rows.find((row) => row.id === firstApplication)?.stage).toBe("queued");
+  expect(rows.find((row) => row.id === firstApplication)?.readyAt).toBeNull();
   expect(rows.find((row) => row.id === secondApplication)?.status).toBe("needs_review");
 
   const open = await reviewsFor(owner, userId);

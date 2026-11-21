@@ -42,6 +42,7 @@ import {
   openReviewsForApplication,
 } from "./review-store.ts";
 import { recordAutoAnswer } from "./review-events.ts";
+import { stageForStatus } from "./stage.ts";
 
 const optionsSchema = z.array(z.string());
 
@@ -838,11 +839,15 @@ export function createPreparationService(deps: {
     const status = blocked.length === 0 ? "ready" : "needs_review";
 
     if (status !== row.status) {
+      const now = clock.now();
+
       db.update(applications)
         .set({
           status,
           statusReason: status === "needs_review" ? "unknown_question" : null,
-          updatedAt: clock.now(),
+          stage: stageForStatus(status),
+          readyAt: status === "ready" ? now : null,
+          updatedAt: now,
         })
         .where(eq(applications.id, applicationId))
         .run();

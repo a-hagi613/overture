@@ -4,10 +4,11 @@ import type { AppDatabase } from "../platform/db/client.ts";
 
 import { applications } from "../platform/db/schema.ts";
 
-export const QUEUED_STATUSES = [
+export const ACTIVE_APPLICATION_STATUSES = [
   "preparing",
   "needs_review",
   "ready",
+  "approved",
   "sending",
   "confirming",
 ] as const;
@@ -69,7 +70,7 @@ export function activeApplicationCompanies(db: AppDatabase, userId: string) {
   const companies = new Set<string>();
 
   for (const row of rows) {
-    if (QUEUED_STATUSES.some((status) => status === row.status)) {
+    if (ACTIVE_APPLICATION_STATUSES.some((status) => status === row.status)) {
       companies.add(row.companyId);
     }
   }

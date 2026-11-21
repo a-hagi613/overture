@@ -23,6 +23,7 @@ import { enqueueJob } from "../platform/jobs/queue.ts";
 import { releaseForApplication, reserveForApplication } from "../billing/ledger.ts";
 import { getSetting, isKillSwitchEnabled, setKillSwitch } from "../platform/settings/index.ts";
 import { raiseAlert } from "../platform/alerts.ts";
+import { stageForStatus } from "../pipeline/stage.ts";
 import { ProviderUnavailableError } from "./browser/provider.ts";
 import { applySendProxyTrim } from "./browser/proxy-trim.ts";
 import { runAshbyAttempt } from "./ats/ashby.ts";
@@ -598,6 +599,7 @@ export function createDispatcher(deps: DispatcherDeps) {
 
         db.update(applications)
           .set({
+            stage: null,
             status: "skipped",
             statusReason: `posting_identity:${reason}`,
             updatedAt: clock.now(),
@@ -667,6 +669,7 @@ export function createDispatcher(deps: DispatcherDeps) {
         db.update(applications)
           .set({
             attempts: sql`max(${applications.attempts} - 1, 0)`,
+            stage: stageForStatus("needs_review"),
             status: "needs_review",
             statusReason: "unknown_question",
             updatedAt: clock.now(),
