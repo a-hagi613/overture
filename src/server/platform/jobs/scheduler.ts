@@ -38,20 +38,47 @@ function readBatchSize(db: AppDatabase) {
   return Number.isFinite(parsed) && parsed >= 1 ? Math.trunc(parsed) : DEFAULT_BATCH_SIZE;
 }
 
-async function sleep(ms: number, signal: AbortSignal, onResolve?: (resolve: () => void) => void) {
-  return new Promise<void>((resolve) => {
-    const timer = setTimeout(resolve, ms);
+/**
+ * Waits for `ms`, or until the signal aborts, or until the caller wakes it
+ * through the callback. The abort listener is removed as soon as the wait
+ * ends, so a worker that polls for days does not grow the shutdown signal's
+ * listener list.
+ * @param ms How long to wait when neither the signal nor the caller wakes it.
+ * @param signal The shutdown signal.
+ * @param onWake Receives the function that ends the wait early.
+ * @returns Nothing; the wait always resolves.
+ */
+export async function waitForWake(
+  ms: number,
+  signal: AbortSignal,
+  onWake?: (wake: () => void) => void,
+) {
+  if (signal.aborted) {
+    return;
+  }
 
-    signal.addEventListener(
-      "abort",
-      () => {
+  await new Promise<void>((resolve) => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let settled = false;
+
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+
+      if (timer !== null) {
         clearTimeout(timer);
-        resolve();
-      },
-      { once: true },
-    );
+      }
 
-    onResolve?.(resolve);
+      signal.removeEventListener("abort", finish);
+      resolve();
+    };
+
+    timer = setTimeout(finish, ms);
+    signal.addEventListener("abort", finish, { once: true });
+    onWake?.(finish);
   });
 }
 
@@ -151,8 +178,8 @@ export function startJobWorker(
     try {
       const intervalMs = readPollIntervalMs(db);
 
-      await sleep(intervalMs, signal, (resolve) => {
-        wakeResolve = resolve;
+      await waitForWake(intervalMs, signal, (wake) => {
+        wakeResolve = wake;
       });
 
       wakeResolve = null;
@@ -161,7 +188,7 @@ export function startJobWorker(
     } catch (error) {
       logError("jobs.loop", error);
 
-      await sleep(ERROR_RETRY_DELAY_MS, signal);
+      await waitForWake(ERROR_RETRY_DELAY_MS, signal);
     }
 
     return step();
