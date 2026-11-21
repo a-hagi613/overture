@@ -35,6 +35,11 @@ export function createDemoSafeMailSender(db: AppDatabase, sender: MailSender) {
         await sender.sendPasswordReset(mail);
       }
     },
+    sendAccountDeleted: async (mail) => {
+      if (allowed(mail.to)) {
+        await sender.sendAccountDeleted(mail);
+      }
+    },
     sendReadyRecap: async (mail) => {
       if (allowed(mail.to)) {
         await sender.sendReadyRecap(mail);

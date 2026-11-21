@@ -54,7 +54,7 @@ import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
 import { createConsentService } from "../profile/consent.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
-import { clearSinkMail, listSinkMail } from "../platform/mail/sink.ts";
+import { clearSinkMail, failNextSinkMail, listSinkMail } from "../platform/mail/sink.ts";
 import {
   clearCloudflareEmailRequests,
   listCloudflareEmailRequests,
@@ -1922,6 +1922,16 @@ export function createTestRoutes(
 
     return context.json({ ok: true });
   });
+
+  routes.post(
+    "/mail/fail-next",
+    zValidator("json", z.object({ count: z.number().int().min(1).max(100).default(1) })),
+    (context) => {
+      failNextSinkMail(context.req.valid("json").count);
+
+      return context.json({ ok: true });
+    },
+  );
 
   routes.get("/cloudflare-email", (context) =>
     context.json({ requests: listCloudflareEmailRequests() }),
