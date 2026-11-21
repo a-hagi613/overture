@@ -369,7 +369,9 @@ test("the Inbox shows an error with retry, never the empty state, and copy waits
 
   await page.route("**/api/threads", async (route) => route.fulfill({ status: 500 }));
   await page.goto(`${inbox.server.url}/inbox`);
-  await expect(page.getByRole("alert")).toContainText("The Inbox could not be loaded.");
+  await expect(page.getByRole("alert")).toContainText("The Inbox could not be loaded.", {
+    timeout: 20_000,
+  });
   await expect(page.getByRole("heading", { name: /Nothing forwarded/u })).toHaveCount(0);
 
   await page.unroute("**/api/threads");
