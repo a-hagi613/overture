@@ -9,6 +9,9 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { InviteRow } from "../auth/invites.ts";
+import { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
+import type { AdminEnv } from "./admin-refusals.ts";
+import { createAdminRevealRoutes } from "./admin-reveal.ts";
 
 import {
   applications,
@@ -122,21 +125,7 @@ export interface AdminDeps {
 
 const ATS_NAMES = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
 
-export const ADMIN_REFUSAL_CODES = {
-  accessRequired: "access_required",
-  signInRequired: "sign_in_required",
-  ownerRequired: "owner_required",
-  passkeyRequired: "passkey_required",
-} as const;
-
-interface OwnerContext {
-  userId: string;
-  email: string;
-}
-
-interface AdminEnv {
-  Variables: { owner: OwnerContext };
-}
+export { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
 
 export function isAdminHost(hostname: string, adminOrigin: string) {
   try {
@@ -558,7 +547,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
   });
 
-  routes.post("/users/:id/suspend", zValidator("json", suspendBody), (context) => {
+  routes.post("/users/:id/suspend", zValidator("json", suspendBody), async (context) => {
     const owner = context.get("owner");
     const { reason } = context.req.valid("json");
 
@@ -598,7 +587,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
         .run();
     });
 
-    recordAdminAudit(db, clock, {
+    await recordAdminAudit(db, clock, {
       actorId: owner.userId,
       action: "users.suspend",
       detail: { email: user.email, suspendedAt: at.getTime() },
@@ -609,7 +598,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     return context.json({ id: user.id, suspendedAt: at.getTime() });
   });
 
-  routes.post("/users/:id/reinstate", zValidator("json", suspendBody), (context) => {
+  routes.post("/users/:id/reinstate", zValidator("json", suspendBody), async (context) => {
     const owner = context.get("owner");
     const { reason } = context.req.valid("json");
 
@@ -634,7 +623,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
         .run();
     });
 
-    recordAdminAudit(db, clock, {
+    await recordAdminAudit(db, clock, {
       actorId: owner.userId,
       action: "users.reinstate",
       detail: { email: user.email, reinstatedAt: at.getTime() },
@@ -704,7 +693,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
   routes.get("/settings", (context) => context.json({ settings: getAllSettings(db) }));
 
-  routes.put("/settings/:key", zValidator("json", settingBody), (context) => {
+  routes.put("/settings/:key", zValidator("json", settingBody), async (context) => {
     const { key } = context.req.param();
     const { value } = context.req.valid("json");
 
@@ -714,7 +703,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
     setSetting(db, clock, key, value, owner.userId);
 
-    recordAdminAudit(db, clock, {
+    await recordAdminAudit(db, clock, {
       actorId: owner.userId,
       action: "settings.update",
       reason: "Changed from the admin settings page",
@@ -726,7 +715,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
   routes.get("/kill-switches", (context) => context.json({ switches: getAllKillSwitches(db) }));
 
-  routes.put("/kill-switches/:scope/:key", zValidator("json", killSwitchBody), (context) => {
+  routes.put("/kill-switches/:scope/:key", zValidator("json", killSwitchBody), async (context) => {
     const { scope, key } = context.req.param();
     const { enabled, reason } = context.req.valid("json");
     const owner = context.get("owner");
@@ -742,7 +731,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
     setKillSwitch(db, clock, scopeCheck.data, key, enabled, reason, "owner");
 
-    recordAdminAudit(db, clock, {
+    await recordAdminAudit(db, clock, {
       actorId: owner.userId,
       action: "kill_switch.update",
       reason: reason.length > 0 ? reason : "Changed from the admin kill switches page",
@@ -801,12 +790,12 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
   });
 
-  routes.post("/tag-imports", zValidator("json", tagImportBody), (context) => {
+  routes.post("/tag-imports", zValidator("json", tagImportBody), async (context) => {
     const owner = context.get("owner");
     const { content, source } = context.req.valid("json");
     const report = importTags(db, clock, { content, source, uploadedBy: owner.userId });
 
-    recordAdminAudit(db, clock, {
+    await recordAdminAudit(db, clock, {
       actorId: owner.userId,
       action: "tag_imports.create",
       reason: `Imported a tag file from ${source}`,
@@ -908,10 +897,10 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
         .run();
     }
 
-    recordAdminAudit(db, clock, {
+    await recordAdminAudit(db, clock, {
       actorId: owner.userId,
       action: "invites.create",
-      reason: `Invited ${email} to the beta`,
+      reason: `Invited a person to the beta`,
       detail: { email, inviteId: id },
     });
 
@@ -946,7 +935,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
       db.update(invites).set({ revokedAt }).where(eq(invites.id, row.id)).run();
 
-      recordAdminAudit(db, clock, {
+      await recordAdminAudit(db, clock, {
         actorId: owner.userId,
         action: "invites.revoke",
         reason: `Revoked the invitation for ${row.id}`,
@@ -987,7 +976,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
   });
 
-  routes.post("/grants", zValidator("json", grantBody), (context) => {
+  routes.post("/grants", zValidator("json", grantBody), async (context) => {
     const { email, expiresInDays, idempotencyKey, quantity } = context.req.valid("json");
     const owner = context.get("owner");
     const user = db.select().from(users).where(eq(users.email, email.trim().toLowerCase())).get();
@@ -1008,7 +997,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
 
     if (placed.created) {
-      recordAdminAudit(db, clock, {
+      await recordAdminAudit(db, clock, {
         actorId: owner.userId,
         action: "grants.create",
         detail: {
@@ -1016,7 +1005,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
           grantId: placed.grantId,
           quantity,
         },
-        reason: `Granted ${String(quantity)} Applications to ${user.email} from the admin grants page`,
+        reason: `Granted ${String(quantity)} Applications from the admin grants page`,
         targetUserId: user.id,
       });
     }
@@ -1141,11 +1130,11 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
   routes.get("/live-checks", (context) => context.json({ results: readLiveCheckResults(db, 100) }));
 
-  routes.post("/live-checks", (context) => {
+  routes.post("/live-checks", async (context) => {
     const owner = context.get("owner");
     const job = enqueueLiveCheckNow(db, clock);
 
-    recordAdminAudit(db, clock, {
+    await recordAdminAudit(db, clock, {
       actorId: owner.userId,
       action: "live-checks.run",
       reason: "Run the daily live checks now",
@@ -1155,7 +1144,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     return context.json({ jobId: job.id });
   });
 
-  routes.post("/fixtures/capture", zValidator("json", captureBody), (context) => {
+  routes.post("/fixtures/capture", zValidator("json", captureBody), async (context) => {
     if (deps.providers === null) {
       return context.json({ error: "browser_provider_unconfigured" }, 503);
     }
@@ -1168,7 +1157,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
       maxAttempts: 1,
     });
 
-    recordAdminAudit(db, clock, {
+    await recordAdminAudit(db, clock, {
       actorId: owner.userId,
       action: "fixtures.capture",
       reason: `Capture ${input.ats} forms for the test fixtures`,
@@ -1177,6 +1166,8 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
     return context.json({ jobId: job.id });
   });
+
+  routes.route("/", createAdminRevealRoutes(db, clock, deps.personal));
 
   return routes;
 }

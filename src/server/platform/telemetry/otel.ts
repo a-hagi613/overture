@@ -50,6 +50,8 @@ export const OTEL_ATTRIBUTE_ALLOWLIST = new Set([
   "setting.key",
   "kill_switch.scope",
   "kill_switch.key",
+  "admin.action",
+  "admin.target_user_id",
   "otel.status_code",
   "otel.status_description",
 ]);
