@@ -314,7 +314,7 @@ export const questions = sqliteTable(
     optionsHash: text("options_hash"),
     factKey: text("fact_key"),
     answerKind: text("answer_kind", {
-      enum: ["fact", "open_text", "consent", "skip", "unknown"],
+      enum: ["fact", "target", "derived", "open_text", "consent", "skip", "unknown"],
     }).notNull(),
     mappedBy: text("mapped_by", { enum: ["rules", "llm", "owner"] }),
     seenCount: integer("seen_count").notNull().default(1),

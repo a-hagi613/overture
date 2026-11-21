@@ -4,7 +4,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmOutputSchema, LlmPort, LlmRequest } from "../platform/ports/llm.ts";
 
-import { ANSWER_KINDS } from "../../shared/questions.ts";
+import { MODEL_ANSWER_KINDS } from "../../shared/questions.ts";
 import { FACT_KEYS } from "../../shared/facts.ts";
 import { checkLlmCaps } from "../platform/llm/caps.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
@@ -17,7 +17,7 @@ const OUTPUT_SCHEMA: LlmOutputSchema = {
   properties: {
     answer_kind: {
       type: "string",
-      enum: [...ANSWER_KINDS],
+      enum: [...MODEL_ANSWER_KINDS],
       description:
         "How the question is answered: a saved fact, generated open text, a standard consent, a blank, or unknown.",
     },
@@ -31,7 +31,7 @@ const OUTPUT_SCHEMA: LlmOutputSchema = {
 };
 
 const outputSchema = z.object({
-  answer_kind: z.enum(ANSWER_KINDS),
+  answer_kind: z.enum(MODEL_ANSWER_KINDS),
   fact_key: z.string(),
 });
 

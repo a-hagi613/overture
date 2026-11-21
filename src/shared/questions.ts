@@ -15,9 +15,19 @@ export const QUESTION_FIELD_TYPES = [
 
 export type QuestionFieldType = (typeof QUESTION_FIELD_TYPES)[number];
 
-export const ANSWER_KINDS = ["fact", "open_text", "consent", "skip", "unknown"] as const;
+export const ANSWER_KINDS = [
+  "fact",
+  "target",
+  "derived",
+  "open_text",
+  "consent",
+  "skip",
+  "unknown",
+] as const;
 
 export type AnswerKind = (typeof ANSWER_KINDS)[number];
+
+export const MODEL_ANSWER_KINDS = ["fact", "open_text", "consent", "skip", "unknown"] as const;
 
 export const QUESTION_MAPPERS = ["rules", "llm", "owner"] as const;
 

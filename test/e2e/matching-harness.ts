@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
 
+import type { AnswerKind } from "../../src/shared/questions.ts";
+
 import { authTestIdentity } from "./auth.fixture.ts";
 import { latestMailLink, requestMagicLink, verifyAuthState } from "./sign-in.ts";
 import { readSseEventUntil } from "./sse.ts";
@@ -129,7 +131,7 @@ export async function seedPosting(
     questions?: {
       text: string;
       fieldName?: string | null;
-      fieldType:
+      fieldType?:
         | "text"
         | "textarea"
         | "select"
@@ -142,10 +144,11 @@ export async function seedPosting(
         | "email"
         | "phone"
         | "url";
+      atsFieldType?: string;
       options?: string[];
       required?: boolean;
       factKey?: string | null;
-      answerKind?: "fact" | "open_text" | "consent" | "skip" | "unknown";
+      answerKind?: AnswerKind;
       mappedBy?: "rules" | "llm" | "owner" | null;
     }[];
   },

@@ -166,20 +166,78 @@ async function seedRecordedPosting(
     boardToken: string;
     atsJobId: string;
     title: string;
+    companyId?: string;
+    boardId?: string;
+    countryCode?: string | null;
+    region?: string | null;
+    city?: string | null;
+    locationRaw?: string;
+    workplace?: "remote" | "hybrid" | "onsite" | "unknown";
+    questions?: SeedQuestion[];
   },
 ) {
-  const companyId = await seedCompany(owner, input.companyName, input.domain);
-  const boardId = await seedBoard(owner, companyId, "greenhouse", input.boardToken);
+  const companyId = input.companyId ?? (await seedCompany(owner, input.companyName, input.domain));
+
+  const boardId =
+    input.boardId ?? (await seedBoard(owner, companyId, "greenhouse", input.boardToken));
 
   return seedPosting(owner, {
     atsJobId: input.atsJobId,
     boardId,
+    city: input.city ?? null,
     companyId,
+    countryCode: input.countryCode === undefined ? "CA" : input.countryCode,
+    locationRaw: input.locationRaw ?? "Remote, Canada",
+    questions: input.questions ?? [],
+    region: input.region ?? null,
     tags: [{ dimension: "subrole", value: "Backend" }],
     title: input.title,
     url: `https://${input.domain}/${input.atsJobId}`,
+    workplace: input.workplace ?? "remote",
   });
 }
+
+const recordedQuestionsSchema = z.object({
+  questions: z.array(
+    z.object({
+      label: z.string(),
+      required: z.boolean(),
+      fields: z.array(
+        z.object({
+          name: z.string(),
+          type: z.string(),
+          values: z.array(z.object({ label: z.string() })).default([]),
+        }),
+      ),
+    }),
+  ),
+});
+
+function recordedQuestions(company: string, atsJobId: string) {
+  const path = `test/e2e/fixtures/greenhouse/${company}/jobs/${atsJobId}.questions.json`;
+
+  return recordedQuestionsSchema
+    .parse(JSON.parse(readFileSync(path, "utf8")))
+    .questions.flatMap((question) => {
+      const field = question.fields.at(0);
+
+      if (field === undefined) {
+        return [];
+      }
+
+      return [
+        {
+          atsFieldType: field.type,
+          fieldName: field.name,
+          options: field.values.map((value) => value.label),
+          required: question.required,
+          text: question.label,
+        },
+      ];
+    });
+}
+
+type SeedQuestion = ReturnType<typeof recordedQuestions>[number];
 
 async function runJob(owner: APIRequestContext, kind: string, payload: string) {
   const response = await owner.post("/__test__/jobs/run-now", { data: { kind, payload } });
@@ -872,19 +930,19 @@ test("Haiku maps a question that no rule covers", async ({ preparation }) => {
   await prepare(owner, applicationId);
 
   const question = (await questionsFor(owner, userId, postingId)).find((candidate) =>
-    candidate.text.startsWith("Please select the country or countries you anticipate working in"),
+    candidate.text.startsWith("What is your current or previous job title?"),
   );
 
   expect(question).toMatchObject({
-    answerKind: "fact",
-    factKey: "current_country",
+    answerKind: "unknown",
+    factKey: null,
     mappedBy: "llm",
   });
 
   expect(
     preparation.anthropic
       .requests()
-      .some((request) => request.title.includes("country or countries you anticipate working in")),
+      .some((request) => request.title.includes("current or previous job title")),
   ).toBe(true);
 });
 
@@ -1184,4 +1242,322 @@ test("a scoped Fact with no matching option opens a Review with the option_missi
   );
 
   expect(review).toMatchObject({ status: "open", reason: "option_missing", scope: "GB" });
+});
+
+test("the recorded Greenhouse forms lose the derivable Review families", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await uploadResume(owner);
+
+  await saveFacts(owner, [
+    { key: "legal_name", value: "Maya Okafor" },
+    { key: "email", value: "maya.okafor@mail.overture.test" },
+    { key: "phone", value: "+1 416 555 0199" },
+    { key: "current_city", value: "Toronto" },
+    { key: "current_country", value: "Canada" },
+    { key: "work_auth", scope: "CA", value: "Citizen" },
+    { key: "sponsorship_required", scope: "CA", value: "No" },
+    { key: "willing_relocate", value: "Yes" },
+    { key: "employment_history", value: "Brightwave Analytics, 2020-2024" },
+    { key: "current_employer", value: "Brightwave Analytics" },
+  ]);
+
+  const targets = await owner.put("/api/profile/targets", {
+    data: {
+      employmentTypes: ["full_time"],
+      locations: ["Toronto, ON", "United States", "United Kingdom", "Germany", "Australia"],
+      roles: ["Backend"],
+      salaryCurrency: null,
+      salaryFloorMinor: null,
+      salaryPeriod: "year",
+      seniorities: ["senior"],
+      workplaces: ["remote", "hybrid", "onsite"],
+    },
+  });
+
+  expect(targets.ok()).toBe(true);
+
+  const cloudflare = {
+    boardToken: "cloudflare",
+    companyName: "Cloudflare",
+    domain: "cloudflare.example",
+  };
+
+  const stripe = { boardToken: "stripe", companyName: "Stripe", domain: "stripe.example" };
+
+  const vercel = { boardToken: "vercel", companyName: "Vercel", domain: "vercel.example" };
+
+  const cloudflareId = await seedCompany(owner, cloudflare.companyName, cloudflare.domain);
+  const stripeId = await seedCompany(owner, stripe.companyName, stripe.domain);
+  const vercelId = await seedCompany(owner, vercel.companyName, vercel.domain);
+
+  const cloudflareBoard = await seedBoard(owner, cloudflareId, "greenhouse", "cloudflare");
+  const stripeBoard = await seedBoard(owner, stripeId, "greenhouse", "stripe");
+  const vercelBoard = await seedBoard(owner, vercelId, "greenhouse", "vercel");
+
+  const postings = [
+    {
+      ...cloudflare,
+      atsJobId: "8097321",
+      boardId: cloudflareBoard,
+      city: null,
+      companyId: cloudflareId,
+      countryCode: null,
+      locationRaw: "Hybrid",
+      title: "AI Security Research & Red Team Engineer",
+      workplace: "hybrid" as const,
+    },
+    {
+      ...cloudflare,
+      atsJobId: "8287256",
+      boardId: cloudflareBoard,
+      city: null,
+      companyId: cloudflareId,
+      countryCode: null,
+      locationRaw: "Hybrid",
+      title: "Associate, Strategic Finance & Investor Relations",
+      workplace: "hybrid" as const,
+    },
+    {
+      ...cloudflare,
+      atsJobId: "8392878",
+      boardId: cloudflareBoard,
+      city: null,
+      companyId: cloudflareId,
+      countryCode: null,
+      locationRaw: "Hybrid",
+      title: "Account Executive, Start Ups",
+      workplace: "hybrid" as const,
+    },
+    {
+      ...cloudflare,
+      atsJobId: "7695702",
+      boardId: cloudflareBoard,
+      city: null,
+      companyId: cloudflareId,
+      countryCode: null,
+      locationRaw: "Hybrid",
+      title: "Account Executive, FedCiv",
+      workplace: "hybrid" as const,
+    },
+    {
+      ...stripe,
+      atsJobId: "8138044",
+      boardId: stripeBoard,
+      city: "San Francisco",
+      companyId: stripeId,
+      countryCode: "US",
+      locationRaw: "San Francisco, CA",
+      region: "California",
+      title: "Account Executive, AI Sales",
+      workplace: "onsite" as const,
+    },
+    {
+      ...stripe,
+      atsJobId: "8332467",
+      boardId: stripeBoard,
+      city: "San Francisco",
+      companyId: stripeId,
+      countryCode: "US",
+      locationRaw: "San Francisco, CA",
+      region: "California",
+      title: "Account Executive, AI Sales",
+      workplace: "onsite" as const,
+    },
+    {
+      ...stripe,
+      atsJobId: "8172510",
+      boardId: stripeBoard,
+      city: "Seattle",
+      companyId: stripeId,
+      countryCode: "US",
+      locationRaw: "Seattle, San Francisco, New York City",
+      region: "Washington",
+      title: "Abuse Investigator",
+      workplace: "hybrid" as const,
+    },
+    {
+      ...stripe,
+      atsJobId: "8238731",
+      boardId: stripeBoard,
+      city: "San Francisco",
+      companyId: stripeId,
+      countryCode: "US",
+      locationRaw: "San Francisco, CA",
+      region: "California",
+      title: "Account Executive, AI Startups - Grower",
+      workplace: "onsite" as const,
+    },
+    {
+      ...vercel,
+      atsJobId: "5841911004",
+      boardId: vercelBoard,
+      city: "Sydney",
+      companyId: vercelId,
+      countryCode: "AU",
+      locationRaw: "Hybrid - Sydney",
+      region: "New South Wales",
+      title: "Account Executive, Majors (APAC)",
+      workplace: "hybrid" as const,
+    },
+    {
+      ...vercel,
+      atsJobId: "6100103004",
+      boardId: vercelBoard,
+      city: "Sydney",
+      companyId: vercelId,
+      countryCode: "AU",
+      locationRaw: "Hybrid - Sydney",
+      region: "New South Wales",
+      title: "Account Executive, Majors- Install Base (APAC)",
+      workplace: "hybrid" as const,
+    },
+    {
+      ...vercel,
+      atsJobId: "5999792004",
+      boardId: vercelBoard,
+      city: "London",
+      companyId: vercelId,
+      countryCode: "GB",
+      locationRaw: "Hybrid - London",
+      region: "England",
+      title: "Account Executive, Majors",
+      workplace: "hybrid" as const,
+    },
+    {
+      ...vercel,
+      atsJobId: "6231864004",
+      boardId: vercelBoard,
+      city: null,
+      companyId: vercelId,
+      countryCode: "DE",
+      locationRaw: "Remote - Germany",
+      region: null,
+      title: "Account Executive, Commercial",
+      workplace: "remote" as const,
+    },
+  ];
+
+  const seeded = await Promise.all(
+    postings.map(async (posting) => {
+      const postingId = await seedRecordedPosting(owner, {
+        ...posting,
+        questions: recordedQuestions(posting.boardToken, posting.atsJobId),
+      });
+
+      const applicationId = await seedApplication(owner, {
+        postingId,
+        status: "preparing",
+        userId,
+      });
+
+      return [posting.atsJobId, applicationId] as const;
+    }),
+  );
+
+  const applications = new Map(seeded);
+
+  await Promise.all(
+    [...applications.values()].map(async (applicationId) => prepare(owner, applicationId)),
+  );
+
+  const rows = await applicationsFor(owner, userId);
+
+  const statusFor = (atsJobId: string) =>
+    rows.find((row) => row.id === applications.get(atsJobId))?.status;
+
+  expect(statusFor("8172510")).toBe("skipped");
+  expect(statusFor("8238731")).toBe("skipped");
+
+  for (const atsJobId of [
+    "8097321",
+    "8287256",
+    "8392878",
+    "7695702",
+    "8138044",
+    "8332467",
+    "5841911004",
+    "6100103004",
+    "5999792004",
+    "6231864004",
+  ]) {
+    expect(statusFor(atsJobId)).toBe("needs_review");
+  }
+
+  const prompts = [
+    ...new Set(
+      (await reviewsFor(owner, userId)).reviews
+        .filter((review) => review.status === "open")
+        .map((review) => review.prompt.trim()),
+    ),
+  ].toSorted();
+
+  expect(prompts).toEqual([
+    "Are you authorized to work in the UK?",
+    "How did you hear about this job?",
+    "What is your current or previous job title?",
+    "Where did you first hear about this role?",
+  ]);
+
+  const removedFamilies = [
+    "country or countries you anticipate working in",
+    "work from a remote location",
+    "South San Francisco office",
+    "Sydney office",
+    "live in one of the following states",
+    "employed by Stripe",
+    "Legal Name (if different than above)",
+    "currently located in one of the hub locations",
+  ];
+
+  for (const family of removedFamilies) {
+    expect(prompts.some((prompt) => prompt.includes(family))).toBe(false);
+  }
+
+  const stripeAnswers = await answersFor(owner, applications.get("8138044") ?? "");
+
+  const stripeAnswer = (prefix: string) =>
+    stripeAnswers.find((answer) => answer.text.startsWith(prefix))?.answer;
+
+  expect(stripeAnswer("Please select the country or countries you anticipate working in")).toBe(
+    "US",
+  );
+  expect(stripeAnswer("If this role offers the option to work from a remote location")).toBe(
+    "Yes, I intend to work remotely.",
+  );
+  expect(stripeAnswer("Have you ever been employed by Stripe")).toBe("No");
+  expect(stripeAnswer("If located in the US, in what city and state do you reside?")).toBe(
+    "Toronto, Ontario",
+  );
+
+  const officeAnswers = await answersFor(owner, applications.get("8238731") ?? "");
+
+  expect(
+    officeAnswers.find((answer) =>
+      answer.text.startsWith("Are you open to working from the South San Francisco office"),
+    )?.answer,
+  ).toBe("Yes");
+
+  const cloudflareAnswers = await answersFor(owner, applications.get("8097321") ?? "");
+
+  const cloudflareAnswer = (prefix: string) =>
+    cloudflareAnswers.find((answer) => answer.text.startsWith(prefix))?.answer;
+
+  expect(cloudflareAnswer("Legal Name (if different than above)")).toBe("Maya Okafor");
+  expect(cloudflareAnswer("This role requires that you live in one of the following hubs")).toBe(
+    "I am willing to relocate to this job's location.",
+  );
+  expect(cloudflareAnswer("Please indicate your current city, state, and country.")).toBe(
+    "Toronto, Ontario, Canada",
+  );
+
+  const sydneyAnswers = await answersFor(owner, applications.get("6100103004") ?? "");
+
+  const sydneyAnswer = (prefix: string) =>
+    sydneyAnswers.find((answer) => answer.text.startsWith(prefix))?.answer;
+
+  expect(sydneyAnswer("This role is Sydney based.")).toBe("Yes");
+  expect(sydneyAnswer("Do you live in one of the following states?")).toBe("No");
 });
