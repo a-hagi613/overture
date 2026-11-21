@@ -57,6 +57,7 @@ const ATTEMPT_OUTCOMES = [
   ["sent", "sent"],
   ["unconfirmed", "unconfirmed"],
   ["upload_failed", "upload_failed"],
+  ["identity_mismatch", "identity_mismatch"],
 ] as const satisfies readonly (readonly [string, AttemptRow["outcome"]])[];
 
 function outcomeOf(outcome: string) {
@@ -330,12 +331,17 @@ export function createDispatcher(deps: DispatcherDeps) {
         page,
         {
           fields: plan.fields,
+          identity: {
+            boardToken: plan.boardToken,
+            companyName: plan.companyName,
+            jobId: plan.atsJobId,
+            url: plan.postingUrl,
+          },
           resume: {
             bytes: resumeFile.bytes,
             fieldName: null,
             filename: resumeFile.filename,
           },
-          url: plan.postingUrl,
         },
         {
           onResponse: (status) => {
@@ -378,6 +384,27 @@ export function createDispatcher(deps: DispatcherDeps) {
           .run();
 
         updateAttempt(attemptId, { endedAt: clock.now(), outcome: "unconfirmed" });
+      } else if (run.outcome === "identity_mismatch") {
+        const reason = run.identityReason ?? "unreadable";
+
+        releaseAttempt(applicationId, claimed.userId, attemptId, clock.now());
+
+        db.update(applications)
+          .set({
+            status: "skipped",
+            statusReason: `posting_identity:${reason}`,
+            updatedAt: clock.now(),
+          })
+          .where(eq(applications.id, applicationId))
+          .run();
+
+        recordEvent(db, clock, applicationId, claimed.userId, "status", "sending", "skipped");
+
+        updateAttempt(attemptId, {
+          endedAt: clock.now(),
+          errorCode: reason,
+          outcome: "identity_mismatch",
+        });
       } else {
         releaseAttempt(applicationId, claimed.userId, attemptId, clock.now());
         updateAttempt(attemptId, {

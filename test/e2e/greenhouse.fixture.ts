@@ -28,6 +28,9 @@ export const NO_FORM_PAGE =
 
 const CODE_DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7"];
 
+const REDIRECT_TO_BOARD = "/curaleaf/jobs/8925575002";
+const OTHER_EMPLOYER_FORM = join(FIXTURE_FORMS_DIR, "curaleaf-8925575002.fixture.html");
+
 const valuesSchema = z.record(z.string(), z.string());
 
 const holdSchema = z.object({ form: z.boolean().optional(), confirmation: z.boolean().optional() });
@@ -163,6 +166,18 @@ export function startGreenhouseFixture() {
       }
 
       const { board, job, confirmation } = match.groups;
+
+      const redirect = url.searchParams.get("redirect");
+
+      if (request.method !== "POST" && redirect === "board") {
+        return new Response(null, { status: 302, headers: { location: REDIRECT_TO_BOARD } });
+      }
+
+      if (request.method !== "POST" && redirect === "company") {
+        return new Response(new Uint8Array(readFileSync(OTHER_EMPLOYER_FORM)), {
+          headers: { "content-type": "text/html" },
+        });
+      }
 
       if (confirmation !== undefined && request.method !== "POST") {
         state.confirmationLoads += 1;
