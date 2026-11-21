@@ -276,6 +276,8 @@ async function seedTwoApproved(owner: APIRequestContext, userId: string, fixture
 
   await approveApplication(owner, firstApplication);
   await approveApplication(owner, secondApplication);
+
+  return { firstApplication, secondApplication };
 }
 
 async function runJob(owner: APIRequestContext, kind: string, payload: string) {
@@ -629,7 +631,12 @@ test("an approval that cannot fit today's remaining slots rolls to the next wind
   const cap = await owner.put("/__test__/settings/limits.daily_cap", { data: { value: "1" } });
 
   expect(cap.ok()).toBe(true);
-  await seedTwoApproved(owner, userId, pacing.fixture.url);
+
+  const { firstApplication, secondApplication } = await seedTwoApproved(
+    owner,
+    userId,
+    pacing.fixture.url,
+  );
 
   await runJob(owner, "planner.day", JSON.stringify({ userId }));
 
@@ -647,4 +654,14 @@ test("an approval that cannot fit today's remaining slots rolls to the next wind
   expect(firstSlot).toBeLessThan(Date.parse("2026-03-10T20:00:00.000Z"));
   expect(secondSlot).toBeGreaterThanOrEqual(tomorrow + 8 * 60 * MINUTE_MS);
   expect(secondSlot).toBeLessThan(tomorrow + 20 * 60 * MINUTE_MS);
+
+  await moveClockTo(owner, "2026-03-11T00:05:00.000Z");
+  await runJob(owner, "planner.day", JSON.stringify({ userId }));
+
+  const nextDay = await applicationsFor(owner, userId);
+  const firstNext = nextDay.find((row) => row.id === firstApplication)?.scheduledFor ?? 0;
+  const secondNext = nextDay.find((row) => row.id === secondApplication)?.scheduledFor ?? 0;
+
+  expect(firstNext).toBeGreaterThan(0);
+  expect(secondNext).toBeGreaterThan(firstNext);
 });

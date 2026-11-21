@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -132,44 +132,62 @@ export function createPlanner(deps: PlannerDeps) {
       .orderBy(asc(applications.approvedAt), asc(applications.createdAt))
       .all();
 
-    const plannedInTarget = approved.filter(
+    const firstNeedsSlot = approved.findIndex(
+      (application) =>
+        application.scheduledFor === null || application.scheduledFor < target.dayStart,
+    );
+
+    const kept = firstNeedsSlot === -1 ? approved : approved.slice(0, firstNeedsSlot);
+
+    const replan = firstNeedsSlot === -1 ? [] : approved.slice(firstNeedsSlot);
+
+    const keptInTarget = kept.filter(
       (application) =>
         application.scheduledFor !== null &&
         application.scheduledFor >= target.dayStart &&
         application.scheduledFor < target.nextDayStart,
     );
 
-    const needsSlot = approved.filter(
-      (application) =>
-        application.scheduledFor === null || application.scheduledFor < target.dayStart,
-    );
-
-    const remaining = Math.max(0, dailyCap - usage - plannedInTarget.length);
-
-    const plannedSlots = plannedInTarget.flatMap((application) =>
+    const keptSlots = kept.flatMap((application) =>
       application.scheduledFor === null ? [] : [application.scheduledFor],
     );
 
-    const latestPlanned = plannedSlots.length === 0 ? 0 : Math.max(...plannedSlots);
+    const latestKept = keptSlots.length === 0 ? 0 : Math.max(...keptSlots);
+
+    const remaining = Math.max(0, dailyCap - usage - keptInTarget.length);
+
+    const staleSlots = replan.filter((application) => application.scheduledFor !== null);
+
+    if (staleSlots.length > 0) {
+      db.update(applications)
+        .set({ scheduledFor: null, updatedAt: now })
+        .where(
+          inArray(
+            applications.id,
+            staleSlots.map((application) => application.id),
+          ),
+        )
+        .run();
+    }
 
     const slots = planSlots({
-      blocked: plannedSlots,
-      count: Math.min(remaining, needsSlot.length),
-      now: Math.max(now, latestPlanned),
+      blocked: keptSlots,
+      count: Math.min(remaining, replan.length),
+      now: Math.max(now, latestKept),
       random: random.next,
       spacingMs,
       timeZone,
       window,
     });
 
-    let windowEnd = planningWindow(Math.max(now, latestPlanned), timeZone, window).end;
+    let windowEnd = planningWindow(Math.max(now, latestKept), timeZone, window).end;
 
-    for (let day = 0; day < MAX_PLANNED_DAYS && slots.length < needsSlot.length; day += 1) {
+    for (let day = 0; day < MAX_PLANNED_DAYS && slots.length < replan.length; day += 1) {
       const next = planningWindow(windowEnd, timeZone, window);
 
       const later = planSlots({
         blocked: slots,
-        count: Math.min(dailyCap, needsSlot.length - slots.length),
+        count: Math.min(dailyCap, replan.length - slots.length),
         now: next.start,
         random: random.next,
         spacingMs,
@@ -185,7 +203,7 @@ export function createPlanner(deps: PlannerDeps) {
       windowEnd = next.end + 1;
     }
 
-    for (const [index, application] of needsSlot.slice(0, slots.length).entries()) {
+    for (const [index, application] of replan.slice(0, slots.length).entries()) {
       const scheduledFor = slots[index];
 
       if (scheduledFor === undefined) {
