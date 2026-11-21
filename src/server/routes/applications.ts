@@ -475,7 +475,7 @@ export function createApplicationRoutes(
     const { id } = context.req.param();
 
     const row = db
-      .select({ id: applications.id, stage: applications.stage })
+      .select({ id: applications.id, stage: applications.stage, status: applications.status })
       .from(applications)
       .where(and(eq(applications.id, id), eq(applications.userId, session.user.id)))
       .get();
@@ -484,7 +484,10 @@ export function createApplicationRoutes(
       return context.json({ error: "not_found" }, 404);
     }
 
-    if (row.stage !== "queued") {
+    const withdrawable =
+      row.status === "ready" || row.status === "approved" || row.stage === "queued";
+
+    if (!withdrawable) {
       return context.json({ error: "not_queued" }, 409);
     }
 
@@ -493,7 +496,12 @@ export function createApplicationRoutes(
     db.transaction((tx) => {
       tx.update(applications)
         .set({
+          approvedAt: null,
+          approvedPlanEnc: null,
+          approvedPlanSha256: null,
+          changes: null,
           closedReason: "withdrawn",
+          scheduledFor: null,
           stage: null,
           stageLocked: true,
           status: "withdrawn",

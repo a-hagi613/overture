@@ -14,6 +14,7 @@ import { expect, startFreshAppServer, test } from "./app.fixture.ts";
 import { startBrowserUseFixture } from "./browser-use-server.fixture.ts";
 import { startGreenhouseFixture } from "./greenhouse.fixture.ts";
 import {
+  approveApplication,
   grantApplications,
   ownerContextFor,
   seedApplication,
@@ -228,6 +229,7 @@ async function readyApplication(
   });
 
   await grantApplications(owner, 3);
+  await approveApplication(owner, applicationId);
 
   return { applicationId, owner, userId };
 }
@@ -416,7 +418,7 @@ test("a 402 from Browser Use pauses dispatch, alerts the owner and is never retr
 
     await runSend(owner, applicationId);
 
-    expect(await statusOf(owner, applicationId)).toBe("ready");
+    expect(await statusOf(owner, applicationId)).toBe("approved");
 
     const [attempt] = await attemptsOf(owner, applicationId);
 

@@ -233,12 +233,14 @@ export async function seedApplication(
       | "withdrawn";
     sentAt?: number | null;
     createdAt?: number | null;
+    scheduledFor?: number | null;
   },
 ) {
   const response = await request.post("/__test__/applications/seed", {
     data: {
       createdAt: input.createdAt ?? null,
       origin: "auto",
+      scheduledFor: input.scheduledFor ?? null,
       sentAt: input.sentAt ?? null,
       status: input.status,
       postingId: input.postingId,
@@ -251,6 +253,41 @@ export async function seedApplication(
 
 export function idsOf(home: Home) {
   return home.upNext.map((candidate) => candidate.id);
+}
+
+const readyCardSchema = z.object({
+  id: z.string(),
+  plan: z.object({ planSha256: z.string() }).nullable(),
+  status: z.string(),
+});
+
+const readySchema = z.object({ cards: z.array(readyCardSchema) });
+
+export async function readyCards(request: APIRequestContext) {
+  return readySchema.parse(await (await request.get("/api/ready")).json()).cards;
+}
+
+export async function planShaFor(request: APIRequestContext, applicationId: string) {
+  const card = (await readyCards(request)).find((candidate) => candidate.id === applicationId);
+
+  if (card?.plan === null || card?.plan === undefined) {
+    throw new Error(`the Ready card ${applicationId} has no plan`);
+  }
+
+  return card.plan.planSha256;
+}
+
+export async function approveApplication(request: APIRequestContext, applicationId: string) {
+  const response = await request.post(
+    `/api/applications/${encodeURIComponent(applicationId)}/approve`,
+    { data: { planSha256: await planShaFor(request, applicationId) } },
+  );
+
+  if (!response.ok()) {
+    throw new Error(`approving ${applicationId} failed: ${await response.text()}`);
+  }
+
+  return z.object({ planSha256: z.string(), status: z.string() }).parse(await response.json());
 }
 
 const clockSchema = z.object({ now: z.number(), offsetMs: z.number() });

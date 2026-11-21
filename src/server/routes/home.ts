@@ -377,7 +377,7 @@ export function createHomeRoutes(deps: {
     const scheduled = db
       .select({ at: applications.scheduledFor })
       .from(applications)
-      .where(and(eq(applications.userId, userId), eq(applications.status, "ready")))
+      .where(and(eq(applications.userId, userId), eq(applications.status, "approved")))
       .orderBy(asc(applications.scheduledFor))
       .all()
       .flatMap((row) => (row.at === null ? [] : [row.at]));
@@ -653,13 +653,19 @@ export function createHomeRoutes(deps: {
       ),
     };
 
-    const readyRows = db
+    const approvedRows = db
       .select({ scheduledFor: applications.scheduledFor })
       .from(applications)
-      .where(and(eq(applications.userId, userId), eq(applications.status, "ready")))
+      .where(and(eq(applications.userId, userId), eq(applications.status, "approved")))
       .all();
 
-    const scheduled = readyRows.flatMap((row) =>
+    const readyToSend = db
+      .select({ total: sql<number>`count(*)` })
+      .from(applications)
+      .where(and(eq(applications.userId, userId), eq(applications.status, "ready")))
+      .get();
+
+    const scheduled = approvedRows.flatMap((row) =>
       row.scheduledFor === null ? [] : [row.scheduledFor],
     );
 
@@ -669,7 +675,7 @@ export function createHomeRoutes(deps: {
 
     if (scheduled.length > 0) {
       nextSendAt = Math.min(...scheduled);
-    } else if (readyRows.length > 0) {
+    } else if (approvedRows.length > 0) {
       nextSendAt = nextSendSlot(now, zone, window);
     }
 
@@ -686,7 +692,8 @@ export function createHomeRoutes(deps: {
       pauseReason: profile.pauseReason,
       planApplications: planApplications(db, userId, now),
       queue: queueOf(userId, now),
-      queued: readyRows.length,
+      queued: approvedRows.length,
+      readyToSend: readyToSend?.total ?? 0,
       ranges,
       recentInbox: inbox,
       remainingToday: Math.max(0, Math.min(dailyCap, left) - sentToday),

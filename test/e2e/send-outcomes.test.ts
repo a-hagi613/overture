@@ -18,6 +18,7 @@ import { startTxtDnsServer } from "./dns.fixture.ts";
 import { startGreenhouseFixture } from "./greenhouse.fixture.ts";
 import { INBOUND_HEADERS, forwardingIdFrom, signInbound } from "./inbound-mail.fixture.ts";
 import {
+  approveApplication,
   grantApplications,
   ownerContextFor,
   seedApplication,
@@ -298,6 +299,7 @@ async function readyApplication(harness: OutcomeHarness, verify = false) {
   });
 
   await grantApplications(owner, 3);
+  await approveApplication(owner, applicationId);
 
   return { applicationId, owner, userId };
 }
@@ -511,7 +513,7 @@ test("a 428 before Submit retries once, in a fresh session and never Confirming"
   const afterFirst = await applicationOf(owner, applicationId);
   const firstAttempts = await attemptsOf(owner, applicationId);
 
-  expect(afterFirst.application.status).toBe("ready");
+  expect(afterFirst.application.status).toBe("approved");
   expect(afterFirst.application.attempts).toBe(1);
   expect(afterFirst.snapshot).toBeNull();
   expect(firstAttempts).toHaveLength(1);
@@ -680,7 +682,7 @@ test("a graceful shutdown before Submit interrupts the send without using a try 
   const [application] = await applicationsOf(recovered, userId);
   const attempts = await attemptsOf(recovered, applicationId);
 
-  expect(application?.status).toBe("ready");
+  expect(application?.status).toBe("approved");
   expect(application?.attempts).toBe(0);
   expect(application?.scheduledFor).not.toBeNull();
   expect(attempts).toHaveLength(1);

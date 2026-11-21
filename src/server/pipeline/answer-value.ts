@@ -9,9 +9,13 @@ import {
   normalizeQuestionText,
 } from "../catalog/question-normalize.ts";
 
-export type AnswerPeriod = "hour" | "day" | "week" | "month" | "year";
+export const ANSWER_PERIODS = ["hour", "day", "week", "month", "year"] as const;
 
-export type FileFact = "resume" | "cover_letter";
+export type AnswerPeriod = (typeof ANSWER_PERIODS)[number];
+
+export const FILE_FACTS = ["resume", "cover_letter"] as const;
+
+export type FileFact = (typeof FILE_FACTS)[number];
 
 export interface AnswerUnit {
   currency: string | null;

@@ -770,11 +770,11 @@ approved Application's queue position and an ETA computed from the planner's slo
 
 Job `planner.day` runs at each user's local midnight and whenever an Application is approved or its approval is
 undone: picks `k = min(remaining_today, approved count)` random times in the remaining part of the user's local
-08:00–20:00 window, at least 20 minutes apart, and assigns them in approval order. Undoing an approval frees its
-slot. Approval never bypasses pacing, the company cooldown, the crowd limits or the caps; the daily cap counts
-sends, not approvals. Outside the window nothing is sent; leftovers roll to
-tomorrow's planning. A retry's earliest time (§9.4) is a lower bound: the planner gives it the first free slot at or
-after that time inside a window.
+08:00–20:00 window, at least 20 minutes apart, and assigns them in approval order. A later approval is planned after
+the latest slot already held, so sends stay in approval order. Undoing an approval frees its slot. Approval never
+bypasses pacing, the company cooldown, the crowd limits or the caps; the daily cap counts sends, not approvals.
+Outside the window nothing is sent; leftovers roll to tomorrow's planning. A retry's earliest time (§9.4) is a lower
+bound: the planner gives it the first free slot at or after that time inside a window.
 
 ### 9.3 Dispatcher
 

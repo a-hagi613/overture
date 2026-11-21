@@ -1,23 +1,13 @@
-import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  gte,
-  isNotNull,
-  isNull,
-  lte,
-  notInArray,
-  sql,
-} from "drizzle-orm";
+import { and, asc, count, eq, gte, isNotNull, isNull, lte, notInArray, sql } from "drizzle-orm";
 
 import type { Ats, BoardRegion } from "../catalog/board-feed.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
+import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { PostingLiveness, PostingLivenessChecker } from "./liveness.ts";
 
 import {
+  applicationEvents,
   applications,
   attempts,
   bgJobs,
@@ -33,8 +23,11 @@ import { applicationsLeft, dailyUsageSince } from "../billing/ledger.ts";
 import { skipClosedPostingApplications } from "../catalog/posting-close.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { getSetting } from "../platform/settings/index.ts";
-import { localDayStart } from "../platform/local-time.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
+import { localDayStart } from "../platform/local-time.ts";
+import { approvalProblem, openApprovedPlan } from "../pipeline/approved-plan.ts";
+import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
+import { stageForStatus } from "../pipeline/stage.ts";
 import { parseSendWindow, planningWindow } from "./planning.ts";
 import { APPLICATION_SEND_JOB_KIND } from "./executor.ts";
 
@@ -62,6 +55,7 @@ export interface DispatchDeps {
   providerId: string;
   liveness: PostingLivenessChecker;
   enqueueSend: (applicationId: string) => string;
+  personal: PersonalCrypto;
 }
 
 interface Block {
@@ -89,7 +83,7 @@ function settingNumber(db: AppDatabase, key: string, fallback: number) {
 }
 
 export function createDispatcherTick(deps: DispatchDeps) {
-  const { db, clock, providerId, liveness, enqueueSend } = deps;
+  const { db, clock, providerId, liveness, enqueueSend, personal } = deps;
 
   function ensureQueued(runAt?: number) {
     return enqueueJob(db, clock, DISPATCH_TICK_JOB_KIND, "{}", {
@@ -268,6 +262,55 @@ export function createDispatcherTick(deps: DispatchDeps) {
     }
   }
 
+  function sendBackToReady(candidate: Candidate, problem: string, now: number) {
+    const claim = db
+      .update(applications)
+      .set({
+        approvedAt: null,
+        approvedPlanEnc: null,
+        approvedPlanSha256: null,
+        changes: JSON.stringify([problem]),
+        scheduledFor: null,
+        stage: stageForStatus("ready"),
+        status: "ready",
+        statusReason: null,
+        updatedAt: now,
+      })
+      .where(and(eq(applications.id, candidate.id), eq(applications.status, "approved")))
+      .returning({ id: applications.id })
+      .all()
+      .at(0);
+
+    if (claim === undefined) {
+      return;
+    }
+
+    db.insert(applicationEvents)
+      .values({
+        applicationId: candidate.id,
+        at: now,
+        detail: JSON.stringify({ changes: [problem] }),
+        fromValue: "approved",
+        id: crypto.randomUUID(),
+        kind: "status",
+        source: "system",
+        toValue: "ready",
+        userId: candidate.userId,
+      })
+      .run();
+
+    enqueueApplicationPrepare(db, clock, candidate.id);
+
+    publishEvent(
+      db,
+      clock,
+      "application.updated",
+      JSON.stringify({ applicationId: candidate.id, status: "ready" }),
+      candidate.userId,
+    );
+    publishEvent(db, clock, "home.updated", JSON.stringify({ approved: false }), candidate.userId);
+  }
+
   async function run() {
     const now = clock.now();
     const summary: DispatchSummary = { blocked: 0, claimed: 0, skipped: 0 };
@@ -326,12 +369,12 @@ export function createDispatcherTick(deps: DispatchDeps) {
       .innerJoin(companyBoards, eq(companyBoards.id, postings.boardId))
       .where(
         and(
-          eq(applications.status, "ready"),
+          eq(applications.status, "approved"),
           isNotNull(applications.scheduledFor),
           lte(applications.scheduledFor, now),
         ),
       )
-      .orderBy(desc(applications.scoreAtQueue), asc(applications.createdAt))
+      .orderBy(asc(applications.approvedAt), asc(applications.createdAt))
       .all();
 
     if (rows.length === 0) {
@@ -431,6 +474,24 @@ export function createDispatcherTick(deps: DispatchDeps) {
       }),
     );
 
+    const approvalPlans = new Map(
+      await Promise.all(
+        eligible.map(async (candidate) => {
+          const plan = await openApprovedPlan({
+            applicationId: candidate.id,
+            db,
+            personal,
+            userId: candidate.userId,
+          }).catch(() => null);
+
+          return [candidate.id, plan] as const;
+        }),
+      ),
+    );
+
+    const sendable: Candidate[] = [];
+    const stale: { candidate: Candidate; problem: string }[] = [];
+
     for (const candidate of eligible) {
       if (freeSlots === 0) {
         break;
@@ -451,9 +512,31 @@ export function createDispatcherTick(deps: DispatchDeps) {
         continue;
       }
 
+      const approved = approvalPlans.get(candidate.id) ?? null;
+
+      const problem =
+        approved === null
+          ? "The plan could not be read"
+          : approvalProblem(db, candidate.userId, approved.plan);
+
+      if (problem !== null) {
+        stale.push({ candidate, problem });
+        summary.blocked += 1;
+
+        continue;
+      }
+
+      sendable.push(candidate);
+      freeSlots -= 1;
+    }
+
+    for (const { candidate, problem } of stale) {
+      sendBackToReady(candidate, problem, now);
+    }
+
+    for (const candidate of sendable) {
       enqueueSend(candidate.id);
       summary.claimed += 1;
-      freeSlots -= 1;
     }
 
     return summary;

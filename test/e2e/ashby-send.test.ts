@@ -12,6 +12,7 @@ import type { IdentityServer } from "./identity-server-test.fixture.ts";
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { startAshbyFixture } from "./ashby.fixture.ts";
 import {
+  approveApplication,
   grantApplications,
   ownerContextFor,
   seedApplication,
@@ -226,6 +227,7 @@ async function seededApplication(harness: AshbyHarness, facts: typeof baseFacts,
   });
 
   await grantApplications(owner, 3);
+  await approveApplication(owner, applicationId);
 
   return { applicationId, owner, userId };
 }

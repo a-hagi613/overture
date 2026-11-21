@@ -51,6 +51,11 @@ The one preparation pass each running user gets per local day (07:00 by default)
 the free Ready slots; it never sends.
 _Avoid_: match fill, hourly run, batch
 
+**Skip**:
+The user withdrawing a Ready or Approved Application instead of sending it. It is the ordinary withdrawal that leaves
+the Board and never adds the company to the Skip list.
+_Avoid_: reject, dismiss
+
 **Confirming**:
 The Status after the employer may have received the Application and before its confirmation was seen. Shown as "Checking with the employer".
 

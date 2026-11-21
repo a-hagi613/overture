@@ -12,6 +12,7 @@ import type { LeverFixture } from "./lever.fixture.ts";
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { recordedLeverFormQuestions, startLeverFixture } from "./lever.fixture.ts";
 import {
+  approveApplication,
   grantApplications,
   ownerContextFor,
   seedApplication,
@@ -248,6 +249,7 @@ async function seededApplication(harness: LeverHarness) {
   });
 
   await grantApplications(owner, 3);
+  await approveApplication(owner, applicationId);
 
   return { applicationId, owner, postingId, userId };
 }

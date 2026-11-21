@@ -20,6 +20,7 @@ import { createMeRoutes } from "./routes/me.ts";
 import { createApiRoutes } from "./routes/api.ts";
 import { createApplicationRoutes } from "./routes/applications.ts";
 import { createHomeRoutes } from "./routes/home.ts";
+import { createReadyRoutes } from "./routes/ready.ts";
 import { createMatchingRoutes } from "./routes/matching.ts";
 import { createReviewRoutes } from "./routes/reviews.ts";
 import { createAdminApi, isAdminHost } from "./routes/admin.ts";
@@ -127,6 +128,16 @@ export function createApp(deps: AppDependencies) {
     }),
   );
   app.route("/api", createApplicationRoutes(deps.db, deps.clock, deps.auth, personal));
+  app.route(
+    "/api",
+    createReadyRoutes({
+      auth: deps.auth,
+      clock: deps.clock,
+      db: deps.db,
+      personal,
+      preparation: deps.preparation,
+    }),
+  );
   app.route(
     "/api",
     createMatchingRoutes({

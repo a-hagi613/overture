@@ -17,6 +17,7 @@ import { startTxtDnsServer } from "./dns.fixture.ts";
 import { startGreenhouseFixture } from "./greenhouse.fixture.ts";
 import { INBOUND_HEADERS, forwardingIdFrom, signInbound } from "./inbound-mail.fixture.ts";
 import {
+  approveApplication,
   grantApplications,
   homeFor,
   ownerContextFor,
@@ -382,6 +383,7 @@ async function readyApplication(harness: CodeHarness) {
 
   await seedOpenText(owner, userId, applicationId, postingId);
   await grantApplications(owner, 3);
+  await approveApplication(owner, applicationId);
 
   return { applicationId, owner, userId };
 }
@@ -662,7 +664,7 @@ test("no code within the limit ends the try before Submit, asks for a paste at f
 
   const detail = await applicationOf(owner, applicationId);
 
-  expect(detail.application.status).toBe("ready");
+  expect(detail.application.status).toBe("approved");
   expect(detail.snapshot).toBeNull();
 
   const attempts = await attemptsOf(owner, applicationId);

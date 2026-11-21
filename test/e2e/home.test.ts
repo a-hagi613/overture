@@ -8,6 +8,7 @@ import type { AppServer } from "./app-server.ts";
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, test as appTest } from "./app.fixture.ts";
 import {
+  approveApplication,
   configureMatching,
   grantApplications,
   ownerContextFor,
@@ -184,7 +185,12 @@ test("Queue position and next send time match the planner", async ({ homeServer 
   const { owner, userId } = await ownerContextFor(homeServer.url);
 
   await moveClockTo(owner, serverNow);
-  await seedReadyApplications(owner, userId, 5);
+
+  await Promise.all(
+    (await seedReadyApplications(owner, userId, 5)).map(async (applicationId) =>
+      approveApplication(owner, applicationId),
+    ),
+  );
 
   const start = await owner.post("/api/running", { data: { running: true } });
 
@@ -204,9 +210,11 @@ test("Queue position and next send time match the planner", async ({ homeServer 
     })
     .parse(await (await owner.get(`/__test__/applications?userId=${userId}`)).json());
 
-  const ready = applications.applications.filter((application) => application.status === "ready");
+  const approved = applications.applications.filter(
+    (application) => application.status === "approved",
+  );
 
-  const slots = ready.flatMap((application) =>
+  const slots = approved.flatMap((application) =>
     application.scheduledFor === null ? [] : [application.scheduledFor],
   );
 
