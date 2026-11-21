@@ -117,6 +117,14 @@ _Avoid_: blocklist, never-apply list
 **Forwarding address**:
 The private address Overture gives each user on `tryoverture.com` (`in-…@`). The user forwards only ATS mail to it; it is never typed on an application form, where the user's real email goes (ADR 0028).
 
+**Invite**:
+The owner's permission for one email address to join the beta. Accepting it by signing in with that email creates the account and an admin grant of 300 applications over 30 days.
+_Avoid_: waitlist spot, access code
+
+**Code paste**:
+Typing a verification code into Overture when the forwarded email did not arrive within five minutes. The wait lasts ten minutes and the same application resumes.
+_Avoid_: manual code entry, OTP
+
 ## The admin
 
 **Kill switch**:
