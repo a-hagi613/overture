@@ -41,16 +41,29 @@ export function OnboardingTargetsPage() {
       <OnboardingShell step={4}>
         <OnboardingLoadState
           onRetry={retry}
+          retrying={targets.isFetching || state.isFetching}
           state={targets.isError || state.isError ? "error" : "loading"}
         />
       </OnboardingShell>
     );
   }
 
-  if (targets.data.choices.roles.length === 0 && targets.data.choices.locations.length === 0) {
+  const { choices, targets: saved } = targets.data;
+
+  const nothingToPick =
+    choices.roles.length === 0 &&
+    choices.locations.length === 0 &&
+    saved.roles.length === 0 &&
+    saved.locations.length === 0;
+
+  if (nothingToPick) {
     return (
       <OnboardingShell step={4}>
-        <OnboardingLoadState onRetry={retry} state="empty" />
+        <OnboardingLoadState
+          onRetry={retry}
+          retrying={targets.isFetching || state.isFetching}
+          state="empty"
+        />
       </OnboardingShell>
     );
   }

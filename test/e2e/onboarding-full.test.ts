@@ -182,6 +182,15 @@ test("the What you want step shows a loading, error or empty state, never nothin
   await expect(page.getByRole("heading", { name: "Nothing to choose from yet" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
 
+  await page.unroute("**/api/onboarding/targets");
+  await page.route("**/api/onboarding", async (route) => {
+    await route.fulfill({ body: "{}", status: 500 });
+  });
+
+  await page.goto(`${onboardingServer.url}/onboarding/resume`);
+  await expect(page.getByRole("alert")).toContainText("That did not load");
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+
   await context.close();
   await request.dispose();
 });

@@ -2,7 +2,15 @@ import { copy } from "../../shared/copy.ts";
 
 type LoadState = "empty" | "error" | "loading";
 
-export function OnboardingLoadState({ onRetry, state }: { onRetry: () => void; state: LoadState }) {
+export function OnboardingLoadState({
+  onRetry,
+  retrying = false,
+  state,
+}: {
+  onRetry: () => void;
+  retrying?: boolean;
+  state: LoadState;
+}) {
   if (state === "loading") {
     return (
       <output
@@ -29,8 +37,18 @@ export function OnboardingLoadState({ onRetry, state }: { onRetry: () => void; s
         {title}
       </h2>
       <p className="mt-2 max-w-[52ch] text-[14.5px] text-muted-foreground">{message}</p>
-      <button className="btn mt-5" onClick={onRetry} style={{ minHeight: 44 }} type="button">
-        {copy.onboarding.retry}
+      <button
+        aria-disabled={retrying}
+        className="btn mt-5"
+        onClick={() => {
+          if (!retrying) {
+            onRetry();
+          }
+        }}
+        style={{ minHeight: 44 }}
+        type="button"
+      >
+        {retrying ? copy.onboarding.retrying : copy.onboarding.retry}
       </button>
     </section>
   );
