@@ -146,6 +146,7 @@ async function calendarOf(request: APIRequestContext, from: number, to: number) 
   );
 
   expect(response.status()).toBe(200);
+  expect(response.headers()["cache-control"]).toBe("no-store");
 
   return calendarSchema.parse(await response.json());
 }
@@ -437,6 +438,10 @@ test("the Calendar refuses a window over 42 days and never shows another user's 
   );
 
   expect(refused.status()).toBe(401);
+
+  const refusedWithoutQuery = await anonymous.get("/api/calendar");
+
+  expect(refusedWithoutQuery.status()).toBe(401);
 
   const fortyTwoDays = await owner.get(
     `/api/calendar?from=${encodeURIComponent(iso(Date.UTC(2026, 10, 1)))}&to=${encodeURIComponent(iso(Date.UTC(2026, 11, 13)))}`,

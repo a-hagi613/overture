@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
 import { and, eq, gte, inArray, lt } from "drizzle-orm";
 import { z } from "zod";
 
@@ -305,7 +304,7 @@ export function createCalendarRoutes(deps: { auth: Auth; clock: Clock; db: AppDa
     return items;
   }
 
-  routes.get("/calendar", zValidator("query", rangeQuery), async (context) => {
+  routes.get("/calendar", async (context) => {
     const session = await auth.api
       .getSession({ headers: context.req.raw.headers })
       .catch(() => null);
@@ -314,7 +313,18 @@ export function createCalendarRoutes(deps: { auth: Auth; clock: Clock; db: AppDa
       return context.json({ error: "sign_in_required" }, 401);
     }
 
-    const { from, to } = context.req.valid("query");
+    context.header("Cache-Control", "no-store");
+
+    const range = rangeQuery.safeParse({
+      from: context.req.query("from"),
+      to: context.req.query("to"),
+    });
+
+    if (!range.success) {
+      return context.json({ error: "range_invalid" }, 400);
+    }
+
+    const { from, to } = range.data;
     const start = Date.parse(from);
     const end = Date.parse(to);
     const userId = session.user.id;
