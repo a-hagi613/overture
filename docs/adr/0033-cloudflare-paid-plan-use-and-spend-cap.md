@@ -1,10 +1,14 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Use the Workers Paid plan inside its allowances, with layered spend guards
 
-Draft from the research in `docs/research/cloudflare-paid-plan.md`. The owner decides; nothing here is built yet.
+From the research in `docs/research/cloudflare-paid-plan.md`. The owner accepted the decision and the stated trade
+on 2026-11-21; the first layer is live: the Workers and Durable Objects spending limits at 1¢ and the $0.50
+account-wide budget alert exist on the account, and their commands, reading and lifting are in
+`docs/research/cloudflare-spend-guard-runbook.md`. The sentinel, the Queue, the app-side counters and the R2 bounds
+are separate tickets (#281–#287).
 
 ## Context
 
@@ -14,7 +18,10 @@ The owner pays $5 a month for Workers Paid and wants no spend above $5 a month i
 
 - **Use Cloudflare for what it does free at Overture's volume:** the inbound-mail Email Worker, a cron sentinel Worker, Workers Static Assets for the marketing pages, a Queue under the inbound mail path, and R2 as today.
 - **Do not adopt** Browser Run for sending (no residential proxy or CAPTCHA solving, and a non-removable bot signature; ADR 0003 and 0016 stand), D1, KV, Durable Objects, Workflows, Vectorize, Hyperdrive, Containers or Images. The Workable pass stays on the GitHub Action (ADR 0032).
-- **Guards, layered:** a Workers and a Durable Objects spending limit at $0.01, a budget alert, a sentinel Worker that watches usage and sets a degraded flag, and app-side counters for Email Sending and, if adopted, Workers AI. R2 cannot be blocked natively, so it is bounded by design: a Litestream sync interval chosen from measured Class A operations, lifecycle rules and a size alert.
+- **Guards, layered:** a Workers and a Durable Objects spending limit at $0.01, each emailing the owner at 80% and
+  100%; a $0.50 account-wide budget alert; a sentinel Worker that watches usage and sets a degraded flag; and
+  app-side counters for Email Sending and, if adopted, Workers AI. R2 cannot be blocked natively, so it is bounded by
+  design: a Litestream sync interval chosen from measured Class A operations, lifecycle rules and a size alert.
 - **The owner accepts the stated trade:** if the Workers limit trips, the Email Worker stops and inbound mail is lost until the period resets or the limit is lifted.
 
 ## Considered Options
