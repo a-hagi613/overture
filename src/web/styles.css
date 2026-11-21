@@ -860,6 +860,39 @@ body {
   flex: none;
 }
 
+.onb .chipsx {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.onb .cpx {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 15px;
+  border-radius: 999px;
+  border: 1px solid var(--line2);
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: normal;
+  cursor: pointer;
+}
+
+.onb .cpx:hover {
+  background: var(--well);
+}
+
+.onb .cpx.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+
 .onb .inp {
   width: 100%;
   height: 40px;
@@ -1009,6 +1042,12 @@ body {
   .onb .ibtn {
     width: 44px;
     height: 44px;
+  }
+}
+
+@media (max-width: 767px) {
+  .onb .cpx {
+    min-height: 44px;
   }
 }
 

@@ -266,8 +266,8 @@ test("the page saves as the answers change and hides a pill with nothing waiting
 
   await page.getByRole("button", { name: "Continue" }).click();
 
-  await expect(page).toHaveURL(/\/profile#profile-facts$/u);
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/\/onboarding\/targets$/u);
+  await expect(page.getByRole("heading", { level: 2, name: /What do you want/u })).toBeVisible();
 
   await context.close();
 });
