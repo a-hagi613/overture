@@ -74,7 +74,6 @@ export function createApiRoutes(db: AppDatabase, clock: Clock, auth: Auth) {
 
     const stream = createSseStream(
       db,
-      clock,
       lastEventId,
       session?.user.id ?? null,
       abortController.signal,
