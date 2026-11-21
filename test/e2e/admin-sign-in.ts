@@ -42,7 +42,7 @@ export async function openAdminAsOwner(
   await enableVirtualAuthenticator(page);
   await signInOwnerOnAdmin(page, adminAppUrl);
 
-  const token = await issueToken({ email: "owner@example.com" });
+  const token = await issueToken({ email: authTestIdentity.ownerEmail });
 
   await page.context().addCookies([
     {
