@@ -644,15 +644,35 @@ const server = Bun.serve({
 
 process.stdout.write(`overture listening on ${String(server.port)}\n`);
 
+const SHUTDOWN_HARD_EXIT_GRACE_MS = 1000;
+
+let shuttingDown = false;
+
+async function stopTelemetry() {
+  try {
+    await sdk.shutdown();
+  } catch {}
+}
+
 function handleShutdown() {
+  if (shuttingDown) {
+    return;
+  }
+
+  shuttingDown = true;
   shutdownController.abort();
 
   const killTimer = setTimeout(() => {
     void server.stop(true);
-    void sdk.shutdown();
+    void stopTelemetry();
   }, env.KILL_TIMEOUT_MS);
 
+  const hardExitTimer = setTimeout(() => {
+    process.kill(process.pid, "SIGKILL");
+  }, env.KILL_TIMEOUT_MS + SHUTDOWN_HARD_EXIT_GRACE_MS);
+
   killTimer.unref();
+  hardExitTimer.unref();
 
   void (async () => {
     await server.stop(false);
@@ -660,7 +680,7 @@ function handleShutdown() {
     catalogWorker.stop();
 
     clearTimeout(killTimer);
-    await sdk.shutdown();
+    await stopTelemetry();
   })();
 }
 
