@@ -292,6 +292,8 @@ const attachSubmitBehaviour = (form: HTMLFormElement, meta: FixtureMeta) => {
     return;
   }
 
+  form.noValidate = true;
+
   const button = form.querySelector<HTMLButtonElement>("#btn-submit");
 
   if (button !== null) {
@@ -373,8 +375,30 @@ const ADDED_FIELDS = new Map([
   ],
 ]);
 
+const STRIPE_UNRECONCILED_FIELDS = [
+  "question_68935508",
+  "question_68935515",
+  "candidate-location",
+  "school--0",
+  "degree--0",
+];
+
 const REMOVED_FIELDS = new Map<string, string[]>([
   ["stripe-without-whatsapp", ["question_68935515"]],
+  ["stripe-send", STRIPE_UNRECONCILED_FIELDS],
+  ["stripe-select-option-changed", STRIPE_UNRECONCILED_FIELDS],
+  ["stripe-checkbox-option-changed", STRIPE_UNRECONCILED_FIELDS],
+]);
+
+const RENAMED_CHECKBOXES = new Map<string, { id: string; label: string }[]>([
+  [
+    "stripe-checkbox-option-changed",
+    [{ id: "question_68935510[]_749881996", label: "United States of America" }],
+  ],
+]);
+
+const REMOVED_SELECT_OPTIONS = new Map<string, { field: string; label: string }[]>([
+  ["stripe-select-option-changed", [{ field: "question_68935509", label: "Canada" }]],
 ]);
 
 const mutateForm = (form: HTMLFormElement, meta: FixtureMeta) => {
@@ -395,7 +419,25 @@ const mutateForm = (form: HTMLFormElement, meta: FixtureMeta) => {
   }
 
   for (const id of REMOVED_FIELDS.get(mutation) ?? []) {
-    form.querySelector<HTMLElement>(`#${id}`)?.closest(".field-wrapper")?.remove();
+    const field = form.querySelector<HTMLElement>(`#${CSS.escape(id)}`);
+
+    (field?.closest(".field-wrapper") ?? field?.closest(".select"))?.remove();
+  }
+
+  for (const rename of RENAMED_CHECKBOXES.get(mutation) ?? []) {
+    const label = form.querySelector<HTMLLabelElement>(`label[for="${CSS.escape(rename.id)}"]`);
+
+    if (label !== null) {
+      label.textContent = rename.label;
+    }
+  }
+
+  for (const change of REMOVED_SELECT_OPTIONS.get(mutation) ?? []) {
+    const options = meta.options[change.field];
+
+    if (options !== undefined) {
+      meta.options[change.field] = options.filter((option) => option.label !== change.label);
+    }
   }
 
   if (mutation === "option-changed" || search.get("change-option") === "country") {

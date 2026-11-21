@@ -115,6 +115,52 @@ const WHATSAPP = "Do you opt-in to receive WhatsApp messages from Stripe Recruit
 
 const withoutWhatsapp = allQuestions.filter((question) => question.text !== WHATSAPP);
 
+const countryQuestion = {
+  text: "Country",
+  fieldName: "country",
+  fieldType: "select" as const,
+  options: ["Canada", "United Kingdom", "United States"],
+  factKey: "current_country",
+  answerKind: "fact" as const,
+  required: true,
+};
+
+const withoutTitleOrWhatsapp = [
+  ...allQuestions.filter((question) => question.text !== JOB_TITLE && question.text !== WHATSAPP),
+  countryQuestion,
+];
+
+const STRIPE_PATH = "/embed/stripe/jobs/8172510";
+
+const answersSchema = z.object({
+  answers: z.array(
+    z.object({
+      text: z.string(),
+      answer: z.string().nullable(),
+      required: z.boolean(),
+      resolved: z.boolean(),
+    }),
+  ),
+});
+
+const attemptsSchema = z.object({
+  attempts: z.array(
+    z.object({
+      errorCode: z.string().nullable(),
+      outcome: z.string().nullable(),
+      submitClickedAt: z.number().nullable(),
+      submitResponseStatus: z.number().nullable(),
+    }),
+  ),
+});
+
+const sentDetailSchema = z.object({
+  application: applicationRowSchema,
+  snapshot: z
+    .object({ answers: z.array(z.object({ label: z.string(), answer: z.string().nullable() })) })
+    .nullable(),
+});
+
 async function setVariant(fixtureUrl: string, mutation: string | null) {
   const response = await fetch(`${fixtureUrl}/__fixture__/mutate`, {
     body: JSON.stringify({ mutation }),
@@ -221,6 +267,22 @@ async function openReviewPrompts(owner: APIRequestContext, userId: string) {
     .map((review) => ({ prompt: review.prompt.trim(), reason: review.reason }));
 }
 
+async function answersOf(owner: APIRequestContext, applicationId: string) {
+  const response = await owner.get(
+    `/__test__/prepared-answers?applicationId=${encodeURIComponent(applicationId)}`,
+  );
+
+  return answersSchema.parse(await response.json()).answers;
+}
+
+async function attemptsOf(owner: APIRequestContext, applicationId: string) {
+  const response = await owner.get(
+    `/__test__/attempts?applicationId=${encodeURIComponent(applicationId)}`,
+  );
+
+  return attemptsSchema.parse(await response.json()).attempts;
+}
+
 async function preparingApplication(
   stripe: StripeHarness,
   questions: PostingQuestions,
@@ -240,6 +302,104 @@ async function preparingApplication(
 
   return { applicationId, owner, userId };
 }
+
+test("with a Fact or Target for every mappable required question, the Stripe send posts JSON to submitPath and completes", async ({
+  stripe,
+}) => {
+  const { applicationId, owner, userId } = await preparingApplication(
+    stripe,
+    withoutTitleOrWhatsapp,
+    "stripe-send",
+  );
+
+  await prepare(owner, applicationId);
+
+  expect((await applicationOf(owner, userId, applicationId)).status).toBe("ready");
+  expect(await openReviewPrompts(owner, userId)).toEqual([]);
+
+  const answers = await answersOf(owner, applicationId);
+
+  expect(answers.filter((answer) => answer.required && !answer.resolved)).toEqual([]);
+
+  const answerFor = (prefix: string) =>
+    answers.find((answer) => answer.text.startsWith(prefix))?.answer;
+
+  expect(answerFor("Who is your current or previous employer?")).toBe("Brightwave Analytics");
+  expect(answerFor("Please select the country where you currently reside.")).toBe("Canada");
+  expect(answerFor("Please select the country or countries you anticipate working in")).toBe("US");
+  expect(answerFor("If this role offers the option to work from a remote location")).toBe(
+    "Yes, I intend to work remotely.",
+  );
+  expect(answerFor("Have you ever been employed by Stripe")).toBe("No");
+
+  await runSend(owner, applicationId);
+
+  const application = await applicationOf(owner, userId, applicationId);
+
+  const attempts = await attemptsOf(owner, applicationId);
+
+  expect(application.status).toBe("sent");
+  expect(application.attempts).toBe(1);
+  expect(stripe.fixture.state.applicationPaths).toEqual([STRIPE_PATH]);
+  expect(stripe.fixture.state.applicationContentTypes).toEqual(["application/json"]);
+  expect(stripe.fixture.state.submissions).toBe(1);
+  expect(stripe.fixture.state.lastForm["email"]).toBe("maya.okafor@mail.overture.test");
+
+  expect(attempts).toHaveLength(1);
+  expect(attempts[0]?.outcome).toBe("sent");
+  expect(attempts[0]?.submitClickedAt).not.toBeNull();
+  expect(attempts[0]?.submitResponseStatus).toBe(201);
+
+  const detail = sentDetailSchema.parse(
+    await (await owner.get(`/api/applications/${applicationId}`)).json(),
+  );
+
+  const snapshotAnswer = (prefix: string) =>
+    detail.snapshot?.answers.find((answer) => answer.label.startsWith(prefix))?.answer;
+
+  expect(snapshotAnswer("Who is your current or previous employer?")).toBe("Brightwave Analytics");
+  expect(snapshotAnswer("Please select the country where you currently reside.")).toBe("Canada");
+});
+
+test("a missing react-select option ends form_changed and submits nothing", async ({ stripe }) => {
+  const { applicationId, owner } = await preparingApplication(
+    stripe,
+    withoutTitleOrWhatsapp,
+    "stripe-select-option-changed",
+  );
+
+  await prepare(owner, applicationId);
+  await runSend(owner, applicationId);
+
+  const attempts = await attemptsOf(owner, applicationId);
+
+  expect(attempts[0]?.outcome).toBe("form_changed");
+  expect(attempts[0]?.submitClickedAt).toBeNull();
+  expect(attempts[0]?.errorCode).toContain("preflight:option_missing:question_68935509");
+  expect(stripe.fixture.state.applicationPaths).toEqual([]);
+  expect(stripe.fixture.state.submissions).toBe(0);
+});
+
+test("a changed checkbox-group option ends form_changed and submits nothing", async ({
+  stripe,
+}) => {
+  const { applicationId, owner } = await preparingApplication(
+    stripe,
+    withoutTitleOrWhatsapp,
+    "stripe-checkbox-option-changed",
+  );
+
+  await prepare(owner, applicationId);
+  await runSend(owner, applicationId);
+
+  const attempts = await attemptsOf(owner, applicationId);
+
+  expect(attempts[0]?.outcome).toBe("form_changed");
+  expect(attempts[0]?.submitClickedAt).toBeNull();
+  expect(attempts[0]?.errorCode).toContain("preflight:option_missing:question_68935510[]");
+  expect(stripe.fixture.state.applicationPaths).toEqual([]);
+  expect(stripe.fixture.state.submissions).toBe(0);
+});
 
 test("a required question with no Fact opens a Review and nothing is posted to submitPath", async ({
   stripe,
