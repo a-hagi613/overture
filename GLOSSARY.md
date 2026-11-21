@@ -46,6 +46,11 @@ _Avoid_: confirmation, sign-off, go-ahead
 The Status after Approval and before sending: the Application waits for its time to send within the daily limits.
 _Avoid_: scheduled, queued
 
+**Daily run**:
+The one preparation pass each running user gets per local day (07:00 by default). It matches, prepares and stops at
+the free Ready slots; it never sends.
+_Avoid_: match fill, hourly run, batch
+
 **Confirming**:
 The Status after the employer may have received the Application and before its confirmation was seen. Shown as "Checking with the employer".
 
@@ -124,6 +129,11 @@ _Avoid_: waitlist spot, access code
 **Code paste**:
 Typing a verification code into Overture when the forwarded email did not arrive within five minutes. The wait lasts ten minutes and the same application resumes.
 _Avoid_: manual code entry, OTP
+
+**Recap**:
+The one email after a user's Daily run that lists the new Ready Applications and the open Reviews, with one link to
+Ready. It is never sent when the run produced nothing, and opening it never sends an Application.
+_Avoid_: Ready email, digest, notification
 
 ## The admin
 

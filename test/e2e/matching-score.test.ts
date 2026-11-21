@@ -14,7 +14,7 @@ import {
   configureMatching,
   grantApplications,
   ownerContextFor,
-  runMatchFill,
+  runPrepDaily,
   seedApplication,
   seedBoard,
   seedCompany,
@@ -110,7 +110,7 @@ async function applicationsFor(owner: APIRequestContext, userId: string) {
   return applicationsSchema.parse(body).applications;
 }
 
-test("scoring fills today's slots plus a buffer in rank order and never scores twice", async ({
+test("the daily run fills the free Ready slots in rank order and never scores twice", async ({
   matching,
 }) => {
   const { owner, userId } = await ownerContextFor(matching.server.url);
@@ -131,25 +131,21 @@ test("scoring fills today's slots plus a buffer in rank order and never scores t
     salaryMinMinor: null,
   });
 
-  await runMatchFill(owner, matching.server.url);
+  await runPrepDaily(owner, matching.server.url, userId);
 
   const applications = await applicationsFor(owner, userId);
   const matches = await matchesFor(owner, userId);
   const scored = matches.filter((row) => row.score !== null);
 
-  expect(applications).toHaveLength(15);
-  expect(scored).toHaveLength(15);
-  expect(matching.anthropic.requests()).toHaveLength(15);
+  expect(applications).toHaveLength(10);
+  expect(scored).toHaveLength(10);
+  expect(matching.anthropic.requests()).toHaveLength(10);
 
   for (const id of paid) {
     expect(scored.some((row) => row.postingId === id)).toBe(true);
   }
 
-  for (const id of unpaid.slice(0, 5)) {
-    expect(scored.some((row) => row.postingId === id)).toBe(true);
-  }
-
-  for (const id of unpaid.slice(5)) {
+  for (const id of unpaid) {
     expect(scored.some((row) => row.postingId === id)).toBe(false);
   }
 
@@ -157,11 +153,11 @@ test("scoring fills today's slots plus a buffer in rank order and never scores t
 
   expect(reasons.every((reason) => reason !== null && reason.length <= 140)).toBe(true);
 
-  await runMatchFill(owner, matching.server.url);
+  await runPrepDaily(owner, matching.server.url, userId);
 
-  expect(await applicationsFor(owner, userId)).toHaveLength(15);
-  expect((await matchesFor(owner, userId)).filter((row) => row.score !== null)).toHaveLength(15);
-  expect(matching.anthropic.requests()).toHaveLength(15);
+  expect(await applicationsFor(owner, userId)).toHaveLength(10);
+  expect((await matchesFor(owner, userId)).filter((row) => row.score !== null)).toHaveLength(10);
+  expect(matching.anthropic.requests()).toHaveLength(10);
 
   await owner.dispose();
 });
@@ -283,7 +279,7 @@ test("an application is created only for a score at or above the threshold", asy
     ),
   );
 
-  await runMatchFill(owner, matching.server.url);
+  await runPrepDaily(owner, matching.server.url, userId);
 
   const applications = await applicationsFor(owner, userId);
   const matches = await matchesFor(owner, userId);
@@ -432,7 +428,7 @@ test("manual Apply refuses every hard filter and scores only what it may apply t
   await owner.dispose();
 });
 
-test("an approved Application counts toward the preparation buffer", async ({ matching }) => {
+test("ready and approved Applications reduce the daily run", async ({ matching }) => {
   const { owner, userId } = await ownerContextFor(matching.server.url);
 
   await clearCatalog(owner);
@@ -459,14 +455,14 @@ test("an approved Application counts toward the preparation buffer", async ({ ma
     }),
   );
 
-  await runMatchFill(owner, matching.server.url);
+  await runPrepDaily(owner, matching.server.url, userId);
 
   const applications = await applicationsFor(owner, userId);
   const approvedIds = new Set(approved);
 
-  expect(applications).toHaveLength(15);
-  expect(applications.filter((row) => !approvedIds.has(row.postingId))).toHaveLength(12);
-  expect(matching.anthropic.requests()).toHaveLength(12);
+  expect(applications).toHaveLength(10);
+  expect(applications.filter((row) => !approvedIds.has(row.postingId))).toHaveLength(7);
+  expect(matching.anthropic.requests()).toHaveLength(7);
 
   await owner.dispose();
 });

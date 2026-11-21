@@ -526,25 +526,32 @@ logged for the owner: when unsure, Overture does not apply.
 10 / country 5 / remote 15, salary known and ≥ floor 10, recency (posted ≤ 3 days 10, ≤ 14 days 5). Candidate rows
 are refreshed by job `match.refresh` when a posting is created/changed or a user's targets change.
 
-### 8.2 Lazy scoring
+### 8.2 The daily preparation run
 
-Job `match.fill` runs per running user every hour and after any event that frees a slot:
+Preparation happens once a day, not through the day. Job `prep.daily` runs per running user at their local
+`prep.run_local_time` (default 07:00). If that time passed while the app was down, the run is caught up when it
+starts later that day; a user never gets a second run in the same local day.
 
 ```
-need = remaining_today + buffer − waiting     (buffer = max(2, ceil(remaining_today × 0.5)))
+free = min(limits.daily_cap, applications left) − Applications in preparing, ready or approved
 for candidate in candidates ordered by code_rank desc, unscored-or-stale first:
-    stop when need ≤ 0 or LLM caps hit
+    stop when free ≤ 0 or LLM caps hit
     score = cached if valid else Haiku score (§8.6)
-    if score ≥ auto_threshold: create application(origin='auto', status='preparing'); need -= 1
+    if score ≥ auto_threshold: create application(origin='auto', status='preparing'); free -= 1
+prepare every new Application in the run (§8.3)
+send the one Recap email (§8.7) when the run produced anything
 ```
 
-- `remaining_today` = min(daily cap, applications left) − today's used/reserved.
-- `waiting` = the user's Applications in `preparing`, `ready` or `approved`. A `ready` Application waits for
-  approval until its Posting closes or the user skips it, and it keeps counting here, so Overture never prepares
-  more than `remaining_today + buffer` while the user is away (ADR 0029).
+- The Ready list never holds more than one day's work: `free` subtracts every Application already waiting for the
+  user, so unapproved Ready Applications reduce the next day's run and nothing piles up beyond the daily cap
+  (ADR 0029). Applications already `preparing` count too, so a retried or concurrent run cannot overfill the day.
+- Lever or Ashby Applications whose form signature is not cached get their one read-only form read in this run
+  (§8.3); Greenhouse questions come from its API as before.
+- The run never schedules or sends anything: an Application is queued only after its Approval (§8.7, §9).
 - Scores are cached per (posting, resume_id, targets_version); a job is never scored twice for the same inputs.
 - Browsing: Home "Up next" and Search show code-ranked candidates; opening a card scores it if unscored
-  (`match.score_on_open`). Manual Apply is allowed below threshold (`origin='manual'`).
+  (`match.score_on_open`). Manual Apply is allowed below threshold (`origin='manual'`) and is prepared by
+  `application.prepare` when it is created.
 - Badge "Strong match" at score ≥ 80.
 
 ### 8.3 Preparation
@@ -696,7 +703,7 @@ stateDiagram-v2
 
 - **Ready.** An Application in `ready` is prepared and waiting for approval (UI "Ready"). It waits until its Posting
   closes (→ `skipped`, `status_reason='posting_closed'`, found by the catalog sweep or a liveness check) or the user
-  skips it; it never expires on a timer and counts toward the preparation buffer (§8.2).
+  skips it; it never expires on a timer and counts toward the free slots the next daily run may fill (§8.2).
 - **The approval card** shows the job title and employer with a link to the Posting, the Match score, the exact
   resume file (name and upload date of the revision the plan uses), every answer exactly as it will be typed with
   its source, the cover letter when the form has one, and the consent line. When the Application came back from an
@@ -728,13 +735,13 @@ stateDiagram-v2
   `changes` and approves again.
 - **At send** the executor fills only the approved plan and the preflight compares the live form with it (§9.4,
   §10.3).
-- **The Ready email** (M1). Job `ready.notify` runs every 15 minutes per running user and sends at most one email per
-  local day: when an Application became `ready` since the last Ready email, the user's local time is within
-  08:00–20:00 and 30 minutes have passed since the first such Application (so a batch gathers in one email). It
-  comes from `no-reply@tryoverture.com` through Cloudflare Email Sending (§11.2) to the user's verified email, lists
-  each new Ready Application by employer and job title (no answers), and carries one link to `{APP_ORIGIN}/ready`.
-  Opening that link only shows the page, because mail scanners open links; nothing is ever approved by a GET. It is
-  recorded as a `notifications` row (`kind='ready'`, `emailed_at`). There is no per-application email. M2 adds push.
+- **The Recap email** (M1). The daily run (§8.2) finishes by sending one email, and only when it produced something:
+  at least one new Ready Application or at least one new open Review. It comes from `no-reply@tryoverture.com`
+  through Cloudflare Email Sending (§11.2) to the user's verified email, lists each new Ready Application by
+  employer and job title (no answers) and how many Reviews are open ("10 ready to approve, 2 need an answer"), and
+  carries one link to `{APP_ORIGIN}/ready`. Opening that link only shows the page, because mail scanners open links;
+  nothing is ever approved or sent by a GET. It is recorded as a `notifications` row (`kind='ready'`,
+  `emailed_at`). There is no per-application email and no second recap that day. M2 adds push.
 
 > Considered for later, out of scope: an opt-in "send without asking" switch per user, off by default and
 > admin-gated (ADR 0029). Nothing is built for it.
@@ -746,8 +753,9 @@ stateDiagram-v2
 ### 9.1 Send queue
 
 Applications in `approved` with `scheduled_for ≤ now`, ordered by user round-robin, then `approved_at` ascending:
-approved Applications are sent in approval order (ADR 0029). A `ready` Application is never in this queue. Home and
-the Ready page show each approved Application's queue position and an ETA computed from the planner's slots.
+approved Applications are sent in approval order (ADR 0029). A `ready` Application is never in this queue, and the
+daily preparation run never adds to it (§8.2): only an Approval schedules a send. Home and the Ready page show each
+approved Application's queue position and an ETA computed from the planner's slots.
 
 ### 9.2 Planner (pacing)
 
@@ -1130,7 +1138,8 @@ User-facing copy never uses the banned words (see the Words rule at the top; ADR
 
 ### 15.1 Notifications
 
-M1: the Ready email, sent once by the daily preparation run (#198, #196, §8.7); it links to the Ready page and never sends
+M1: the Recap email, sent once by the daily preparation run (#198, #196, §8.7) and only when the run produced
+something, listing the new Ready Applications and open Reviews (§8.2). It links to the Ready page, which never sends
 from the link.
 
 M2 adds **push** (PWA, Web Push with VAPID) and an in-app list that mirrors it. Push: the daily recap ("10 ready to approve,
@@ -1161,7 +1170,7 @@ open-text, optional blank · 15. Review unlocks N applications · 16. planner wi
 crypto-shred (M2) · 30. admin Reveal + audit + support access log (M2) · 31. Stripe checkout, renewal, expiry,
 payment-failure pause (M3) · 32. admin fixture capture job writes sanitised forms to R2 and never submits ·
 33. approval: Send freezes the plan, a stale `planSha256` is refused, Undo before `sending`, Skip withdraws, Send all,
-Edit an answer clears the approvals that used the Fact, the Ready email's link never sends · 34. a live form that
+Edit an answer clears the approvals that used the Fact, the Recap email's link never sends · 34. a live form that
 differs from the approved plan stops before Submit and returns the Application to Ready with what changed.
 
 Plus: route reachability for every page, axe on every page, 30 visual snapshots (Home, Board, Review, Inbox, Profile
@@ -1300,4 +1309,4 @@ v1 runs on Fly app `ai-auto-apply` (volume `data`, yyz). In order:
 | Stripe declines Managed Payments for the account | the `Payments` port; plain Stripe Billing with Stripe Tax behind it (ADR 0018); found early in "M3: owner setup" |
 | Public sign-up exposes spend (LLM, browser) before anyone pays | nothing is prepared until a trial card is verified or a plan is paid; per-IP and per-email limits; `llm.cap_global_day_usd`; a global spend alert |
 | Email-classification mistakes move cards wrongly | forward-only, undo, never over manual drags, confidence threshold |
-| Approval slows sending: Ready cards pile up while the user is away and fewer applications go out | the preparation buffer bounds unapproved work (§8.2); one Ready email a day; Send all; measured against the 25-application M1 gate (ADR 0029) |
+| Approval slows sending: Ready cards pile up while the user is away and fewer applications go out | one daily preparation run stops at the free slots to bound unapproved work (§8.2); one Recap email per run; Send all; measured against the 25-application M1 gate (ADR 0029) |

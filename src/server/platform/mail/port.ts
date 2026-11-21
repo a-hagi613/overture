@@ -18,7 +18,14 @@ export interface OutboundCheckMail {
   body: string;
 }
 
+export interface OutboundReadyRecapMail {
+  to: string;
+  subject: string;
+  body: string;
+}
+
 export interface MailSender {
   sendMagicLink: (mail: OutboundMagicLinkMail) => Promise<void>;
   sendCheck: (mail: OutboundCheckMail) => Promise<void>;
+  sendReadyRecap: (mail: OutboundReadyRecapMail) => Promise<void>;
 }

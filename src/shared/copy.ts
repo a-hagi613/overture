@@ -258,6 +258,43 @@ export const copy = {
     magicLinkSubject: "Your Overture sign-in link",
     magicLinkBody: (url: string) =>
       `Open this link to sign in to Overture. It works once and expires in 15 minutes.\n\n${url}\n`,
+    recapSubject: (ready: number, needAnswer: number) => {
+      const readyPart = `${String(ready)} ready to approve`;
+
+      return needAnswer > 0
+        ? `Overture recap: ${readyPart}, ${String(needAnswer)} need an answer`
+        : `Overture recap: ${readyPart}`;
+    },
+    recapBody: (input: {
+      ready: { title: string; company: string }[];
+      needAnswer: number;
+      url: string;
+    }) => {
+      const lines =
+        input.ready.length === 0
+          ? ["No new applications are ready to approve."]
+          : [
+              input.ready.length === 1
+                ? "1 application is ready to approve:"
+                : `${String(input.ready.length)} applications are ready to approve:`,
+              ...input.ready.map(
+                (application) => `- ${application.title} at ${application.company}`,
+              ),
+            ];
+
+      if (input.needAnswer > 0) {
+        lines.push(
+          "",
+          input.needAnswer === 1
+            ? "1 question needs an answer."
+            : `${String(input.needAnswer)} questions need an answer.`,
+        );
+      }
+
+      lines.push("", `Review them at ${input.url}`);
+
+      return `${lines.join("\n")}\n`;
+    },
   },
   stages: {
     queued: "Queued",

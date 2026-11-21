@@ -25,6 +25,7 @@ import { getSetting } from "../platform/settings/index.ts";
 import { createTimeZoneService } from "../profile/time-zone.ts";
 import { addLocalDays, localDateAt, localDayStartFor } from "../platform/local-time.ts";
 import { enqueuePlannerDay } from "../dispatch/planner.ts";
+import { ensurePrepDailyQueued } from "../pipeline/daily-prep.ts";
 import { nextSendSlot, parseSendWindow } from "../dispatch/planning.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { copy, failedReasonText } from "../../shared/copy.ts";
@@ -739,6 +740,7 @@ export function createHomeRoutes(deps: {
 
     if (running) {
       enqueuePlannerDay(db, clock, user.id);
+      ensurePrepDailyQueued(db, clock, user.id);
     }
 
     publishEvent(db, clock, "home.updated", JSON.stringify({ running }), user.id);

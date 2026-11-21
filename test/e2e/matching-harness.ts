@@ -191,10 +191,16 @@ export async function homeFor(owner: APIRequestContext) {
 
 const jobEventSchema = z.object({ id: z.string() });
 
-export async function runMatchFill(request: APIRequestContext, appServerUrl: string) {
+export async function runPrepDaily(
+  request: APIRequestContext,
+  appServerUrl: string,
+  userId: string,
+) {
+  await request.post("/__test__/profile/running", { data: { running: true, userId } });
+
   const body: unknown = await (
     await request.post("/__test__/jobs/enqueue", {
-      data: { kind: "match.fill", payload: "{}" },
+      data: { kind: "prep.daily", payload: JSON.stringify({ userId }) },
     })
   ).json();
 

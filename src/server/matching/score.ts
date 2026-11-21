@@ -1,6 +1,6 @@
 import { gunzipSync } from "node:zlib";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -15,25 +15,22 @@ import {
   matches,
   postings,
   postingUserState,
-  profiles,
   resumes,
-  users,
 } from "../platform/db/schema.ts";
-import { applicationsLeft, committedSince } from "../billing/ledger.ts";
+import { applicationsLeft } from "../billing/ledger.ts";
 import { checkLlmCaps } from "../platform/llm/caps.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
 import { raiseAlert } from "../platform/alerts.ts";
-import { enqueueJob } from "../platform/jobs/queue.ts";
 import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
-import { localDayStart } from "../platform/local-time.ts";
 import { SETTING_DEFAULTS, getSetting } from "../platform/settings/index.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createTargetsService } from "../profile/targets.ts";
 import { activeApplicationCompanies, applicationFor, createApplication } from "./applications.ts";
 import { createCandidateService } from "./candidates.ts";
 
-export const MATCH_FILL_JOB_KIND = "match.fill";
 export const SCORE_PURPOSE = "score";
+
+const WAITING_STATUSES = ["preparing", "ready", "approved"] as const;
 
 const CHUNK_SIZE = 5;
 const RESUME_DIGEST_CHARS = 1500;
@@ -424,6 +421,7 @@ export function createMatchingService(deps: MatchDeps) {
     const settings = await targetsService.read(userId);
     const { languages } = await languagesService.read(userId);
     const at = clock.now();
+    const createdIds: string[] = [];
 
     const list = await candidates.ranked(userId, settings.targets, languages);
 
@@ -440,36 +438,35 @@ export function createMatchingService(deps: MatchDeps) {
     const context = await contextFor(userId);
 
     if (list.length === 0) {
-      return { applicationsCreated: 0, blocked: false, candidates: 0, scored: 0 };
+      return {
+        applicationsCreated: 0,
+        blocked: false,
+        candidates: 0,
+        createdIds,
+        scored: 0,
+      };
     }
 
-    const profile = db
-      .select({ timezone: profiles.timezone })
-      .from(profiles)
-      .where(eq(profiles.userId, userId))
-      .get();
-
-    const dayStart = localDayStart(at, profile?.timezone ?? "UTC");
     const dailyCap = settingNumber(db, "limits.daily_cap");
-    const usedToday = committedSince(db, userId, dayStart);
-    const remaining = Math.max(0, Math.min(dailyCap, applicationsLeft(db, userId, at)) - usedToday);
-    const buffer = Math.max(2, Math.ceil(remaining * 0.5));
+    const limit = Math.max(0, Math.min(dailyCap, applicationsLeft(db, userId, at)));
 
-    const activeRows = db
-      .select({ status: applications.status })
-      .from(applications)
-      .where(
-        and(
-          eq(applications.userId, userId),
-          inArray(applications.status, ["preparing", "ready", "approved"]),
-        ),
-      )
-      .all();
+    const waiting =
+      db
+        .select({ total: count() })
+        .from(applications)
+        .where(and(eq(applications.userId, userId), inArray(applications.status, WAITING_STATUSES)))
+        .get()?.total ?? 0;
 
-    let need = Math.max(0, remaining + buffer - activeRows.length);
+    let need = Math.max(0, limit - waiting);
 
     if (need === 0) {
-      return { applicationsCreated: 0, blocked: false, candidates: list.length, scored: 0 };
+      return {
+        applicationsCreated: 0,
+        blocked: false,
+        candidates: list.length,
+        createdIds,
+        scored: 0,
+      };
     }
 
     const companiesUsed = activeApplicationCompanies(db, userId);
@@ -490,9 +487,9 @@ export function createMatchingService(deps: MatchDeps) {
       });
 
       if (created !== null) {
-        enqueueApplicationPrepare(db, clock, created);
         companiesUsed.add(candidate.companyId);
         applicationsCreated += 1;
+        createdIds.push(created);
         need -= 1;
       }
     }
@@ -583,16 +580,9 @@ export function createMatchingService(deps: MatchDeps) {
       applicationsCreated,
       blocked,
       candidates: list.length,
+      createdIds,
       scored,
     };
-  }
-
-  async function fillAllUsers() {
-    const allUsers = db.select({ id: users.id }).from(users).all();
-
-    return Promise.all(
-      allUsers.map(async (user) => ({ report: await fill(user.id), userId: user.id })),
-    );
   }
 
   async function upNext(userId: string, limit: number) {
@@ -645,23 +635,7 @@ export function createMatchingService(deps: MatchDeps) {
     });
   }
 
-  return { applyManually, fill, fillAllUsers, scoreOnOpen, upNext };
+  return { applyManually, fill, scoreOnOpen, upNext };
 }
 
 export type MatchingService = ReturnType<typeof createMatchingService>;
-
-export async function runMatchFillJob(deps: MatchDeps) {
-  const service = createMatchingService(deps);
-
-  return service.fillAllUsers();
-}
-
-export function ensureMatchFillQueued(db: AppDatabase, clock: Clock) {
-  const job = enqueueJob(db, clock, MATCH_FILL_JOB_KIND, "{}", {
-    dedupeKey: MATCH_FILL_JOB_KIND,
-    maxAttempts: 1,
-    runAt: clock.now() + 3_600_000,
-  });
-
-  return job.id;
-}

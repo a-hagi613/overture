@@ -22,6 +22,7 @@ const SETTING_DEFAULTS = {
   "limits.timezone_change_days": "7",
   "match.auto_threshold_default": "60",
   "match.strong": "80",
+  "prep.run_local_time": "07:00",
   "llm.cap_user_day_usd": "0.25",
   "llm.cap_global_day_usd": "10",
   "llm.cap_tagging_day_usd": "1",
