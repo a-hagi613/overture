@@ -12,7 +12,7 @@ export function BoardSheetNavigation(props: {
   return (
     <div className="hidden items-center justify-between border-b border-border px-[22px] pt-4 pr-[22px] pb-3.5 pl-[26px] md:flex">
       <span className="eyebrow">
-        {copy.board.folio(props.detail?.application.id.slice(-4) ?? "")}
+        {copy.board.reference(props.detail?.application.id.slice(-4) ?? "")}
       </span>
       <span className="flex gap-1.5">
         <button

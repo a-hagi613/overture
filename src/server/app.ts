@@ -21,6 +21,7 @@ import { createApiRoutes } from "./routes/api.ts";
 import { createNotificationRoutes } from "./routes/notifications.ts";
 import { createApplicationRoutes } from "./routes/applications.ts";
 import { createHomeRoutes } from "./routes/home.ts";
+import { createNavRoutes } from "./routes/nav.ts";
 import { createCheckinRoutes } from "./routes/checkins.ts";
 import { createCalendarRoutes } from "./routes/calendar.ts";
 import { createReadyRoutes } from "./routes/ready.ts";
@@ -170,6 +171,7 @@ export function createApp(deps: AppDependencies) {
       reviews: deps.reviews,
     }),
   );
+  app.route("/api", createNavRoutes({ auth: deps.auth, db: deps.db, reviews: deps.reviews }));
   app.route("/api", createApplicationRoutes(deps.db, deps.clock, deps.auth, personal));
   app.route("/api", createCheckinRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
   app.route("/api", createCalendarRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));

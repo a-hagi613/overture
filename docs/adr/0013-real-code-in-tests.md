@@ -28,8 +28,9 @@ the facts model (a Fact's scope is validated against its key), the onboarding st
 fixture sanitiser (recorded pages must carry no script, event handler, personal data or token), the v1
 answer-bank mapping, the live-traffic guard (in test and development, an outbound request to an ATS or
 paid-service host is refused), the replica listing (the newest transaction is read from the first non-empty
-Litestream level, so a healthy replica costs one R2 list per read, #281), and the job worker's wait (a completed wait
-retains no abort listener). They import
+Litestream level, so a healthy replica costs one R2 list per read, #281), the job worker's wait (a completed wait
+retains no abort listener), and the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
+a copy string or key). They import
 `bun:test`, run with `bun test src`, and keep the Vitest lint plugin, whose test-shape rules do not depend on the
 runner. CI stays under two minutes on pull requests: six shards balanced by per-file time, and a pull request runs
 only the e2e files its committed reach map says its diff can reach, with everything unclassified running the full

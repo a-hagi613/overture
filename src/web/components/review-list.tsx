@@ -24,9 +24,6 @@ export function ReviewList({
             {copy.review.listNote}
           </p>
         </div>
-        <span className="font-serif text-sm italic text-muted-foreground">
-          {copy.review.figList}
-        </span>
       </div>
       <div className="mt-3 flex flex-col gap-1">
         {many.length > 0 ? (

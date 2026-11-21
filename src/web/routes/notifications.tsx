@@ -94,14 +94,9 @@ export function NotificationsPage() {
       {populated ? (
         <>
           <div className="mt-[22px] flex items-center justify-between gap-3">
-            <div className="flex items-baseline gap-3.5">
-              <h2 className="font-serif text-[26px] leading-[39px]">
-                {copy.notifications.page.today}
-              </h2>
-              <span className="font-serif text-sm italic text-muted-foreground">
-                {copy.notifications.page.folio}
-              </span>
-            </div>
+            <h2 className="font-serif text-[26px] leading-[39px]">
+              {copy.notifications.page.today}
+            </h2>
             {data.unread > 0 ? (
               <button
                 className="flex h-9 items-center justify-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold hover:bg-muted"

@@ -18,13 +18,8 @@ function toneFor(kind: string) {
   return { icon: "mail", tone: "bg-ok-soft text-ok" } as const;
 }
 
-export function HomeInbox(props: {
-  fig?: string;
-  now: number;
-  rows: readonly HomeInboxRow[];
-  zone: string;
-}) {
-  const { fig = copy.home.inbox.fig, now, rows, zone } = props;
+export function HomeInbox(props: { now: number; rows: readonly HomeInboxRow[]; zone: string }) {
+  const { now, rows, zone } = props;
 
   return (
     <section
@@ -32,12 +27,9 @@ export function HomeInbox(props: {
       className="mt-5 rounded-lg border border-border bg-card px-4 pb-2.5 pt-[22px] shadow-sh min-[768px]:px-6"
     >
       <div className="flex items-baseline justify-between gap-3">
-        <div className="flex items-baseline gap-3.5">
-          <h2 className="font-serif text-[26px] leading-[1.5]" id="home-inbox">
-            {copy.home.inbox.title}
-          </h2>
-          <span className="font-serif text-sm italic text-muted-foreground">{fig}</span>
-        </div>
+        <h2 className="font-serif text-[26px] leading-[1.5]" id="home-inbox">
+          {copy.home.inbox.title}
+        </h2>
         <Link
           className="inline-flex min-h-[34px] items-center justify-center rounded-md border border-input bg-card px-3 text-[12.5px] leading-[normal] font-semibold hover:bg-muted"
           to="/inbox"

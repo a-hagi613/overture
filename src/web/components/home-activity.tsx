@@ -18,14 +18,9 @@ export function HomeActivity(props: {
       className="mt-5 rounded-lg border border-border bg-card px-4 pt-[22px] pb-2.5 shadow-sh min-[768px]:px-6"
     >
       <div className="flex items-baseline justify-between gap-3">
-        <div className="flex items-baseline gap-3.5">
-          <h2 className="font-serif text-[26px] leading-[1.5]" id="home-activity">
-            {copy.home.activity.title}
-          </h2>
-          <span className="font-serif text-sm italic text-muted-foreground">
-            {copy.home.activity.fig}
-          </span>
-        </div>
+        <h2 className="font-serif text-[26px] leading-[1.5]" id="home-activity">
+          {copy.home.activity.title}
+        </h2>
         <span className="text-[12.5px] leading-[1.5] text-muted-foreground">
           {copy.home.activity.latest}
         </span>
