@@ -162,6 +162,14 @@ The one email after a user's Daily run that lists the new Ready Applications and
 Ready. It is never sent when the run produced nothing, and opening it never sends an Application.
 _Avoid_: Ready email, digest, notification
 
+## The legal pages
+
+**Consent version**:
+The numbered wording the user agrees to for Overture to prepare and send applications on their behalf. It lives once in
+`consent_versions` and is never edited; the profile records the version the user accepted, and each Snapshot records the
+version its Application was sent under. Publishing a newer version appends a row; earlier ones stay as they were.
+_Avoid_: terms version, policy version, T&C
+
 ## The admin
 
 **Kill switch**:

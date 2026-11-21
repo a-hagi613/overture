@@ -6,6 +6,7 @@ import { createBrowserRouter, RouterProvider } from "react-router";
 import { copy } from "../shared/copy.ts";
 import { AppShell } from "./app.tsx";
 import { BoardPage } from "./routes/board.tsx";
+import { ConsentPage } from "./routes/consent.tsx";
 import { HomePage } from "./routes/home.tsx";
 import { InboxPage } from "./routes/inbox.tsx";
 import { NotificationsPage } from "./routes/notifications.tsx";
@@ -16,12 +17,14 @@ import { OnboardingPage } from "./routes/onboarding.tsx";
 import { OnboardingResumePage } from "./routes/onboarding-resume.tsx";
 import { OnboardingFactsPage } from "./routes/onboarding-facts.tsx";
 import { OnboardingTargetsPage } from "./routes/onboarding-targets.tsx";
+import { PrivacyPage } from "./routes/privacy.tsx";
 import { ReviewPage } from "./routes/review.tsx";
 import { SearchPage } from "./routes/search.tsx";
 import { SettingsPage } from "./routes/settings.tsx";
 import { ForgotPasswordPage } from "./routes/forgot-password.tsx";
 import { ResetPasswordPage } from "./routes/reset-password.tsx";
 import { SignInPage } from "./routes/signin.tsx";
+import { TermsPage } from "./routes/terms.tsx";
 import { ThemeProvider } from "./lib/theme.tsx";
 import { AdminShell } from "./routes/admin/shell.tsx";
 import { AdminSettingsPage } from "./routes/admin/settings.tsx";
@@ -61,6 +64,9 @@ const router = createBrowserRouter([
     ],
   },
   { path: "/signin", element: <SignInPage /> },
+  { path: "/terms", element: <TermsPage /> },
+  { path: "/privacy", element: <PrivacyPage /> },
+  { path: "/consent", element: <ConsentPage /> },
   { path: "/onboarding", element: <OnboardingPage /> },
   { path: "/onboarding/resume", element: <OnboardingResumePage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
