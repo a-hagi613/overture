@@ -455,7 +455,13 @@ const app = createApp({
   catalogWorker,
 });
 
-const server = Bun.serve({ port: env.PORT, fetch: app.fetch });
+const SERVER_IDLE_TIMEOUT_ABOVE_SSE_HEARTBEAT_SECONDS = 60;
+
+const server = Bun.serve({
+  port: env.PORT,
+  fetch: app.fetch,
+  idleTimeout: SERVER_IDLE_TIMEOUT_ABOVE_SSE_HEARTBEAT_SECONDS,
+});
 
 process.stdout.write(`overture listening on ${String(server.port)}\n`);
 
