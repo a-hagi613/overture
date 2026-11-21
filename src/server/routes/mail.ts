@@ -87,6 +87,7 @@ export function createMailRoutes(deps: {
       .all();
 
     return context.json({
+      now: clock.now(),
       waits: rows.map((row) => ({
         id: row.id,
         attemptId: row.attemptId,

@@ -81,7 +81,7 @@ import { normalizeFieldType, questionVariantHash } from "../catalog/question-nor
 import { mapQuestionByRules } from "../catalog/question-rules.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
-import { createCodeWait, wakeCodeWaits } from "../inbox/waits.ts";
+import { CODE_WAIT_TIMEOUT_MS, createCodeWait, wakeCodeWaits } from "../inbox/waits.ts";
 import { createMailboxService } from "../inbox/mailboxes.ts";
 import { readLiveCheckResults } from "../live-checks/store.ts";
 import { runAlertDrill } from "../live-checks/alerts.ts";
@@ -328,6 +328,7 @@ const recordLlmUsageBody = z.object({
 const seedApplicationBody = z.object({
   userId: z.string().min(1),
   postingId: z.string().min(1),
+  id: z.string().min(1).optional(),
   status: z.enum([
     "preparing",
     "needs_review",
@@ -620,6 +621,28 @@ export function createTestRoutes(
     env.INBOUND_HMAC_SECRET === undefined
       ? null
       : createMailboxService(db, clock, env.INBOUND_HMAC_SECRET, env.MAIL_DOMAIN);
+
+  function insertCodeWaitAt(
+    mailbox: { id: string; userId: string },
+    attemptId: string | null,
+    startedAt: number,
+    expiresAt: number,
+  ) {
+    const id = crypto.randomUUID();
+
+    db.insert(codeWaits)
+      .values({
+        attemptId,
+        expiresAt: new Date(expiresAt),
+        id,
+        mailboxId: mailbox.id,
+        startedAt: new Date(startedAt),
+        userId: mailbox.userId,
+      })
+      .run();
+
+    return db.select().from(codeWaits).where(eq(codeWaits.id, id)).get();
+  }
 
   async function seedSampleLedger(userId: string, prefix: string) {
     await retryWhenBusy(
@@ -1309,6 +1332,7 @@ export function createTestRoutes(
     const {
       userId,
       postingId,
+      id: seededId,
       status,
       sentAt,
       createdAt,
@@ -1331,7 +1355,7 @@ export function createTestRoutes(
       return context.json({ error: "not found" }, 404);
     }
 
-    const id = crypto.randomUUID();
+    const id = seededId ?? crypto.randomUUID();
     const now = createdAt ?? clock.now();
     const seededStage = stage === undefined ? stageForStatus(status) : stage;
 
@@ -2683,23 +2707,56 @@ export function createTestRoutes(
     zValidator(
       "json",
       z.object({
-        mailboxId: z.string().min(1),
+        mailboxId: z.string().min(1).optional(),
         attemptId: z.string().min(1).optional(),
+        email: z.string().optional(),
+        expiresAt: z.number().int().optional(),
+        startedAt: z.number().int().optional(),
       }),
     ),
-    (context) => {
-      const { mailboxId, attemptId } = context.req.valid("json");
-      const mailbox = db.select().from(mailboxes).where(eq(mailboxes.id, mailboxId)).get();
+    async (context) => {
+      const body = context.req.valid("json");
 
-      if (mailbox === undefined) {
+      let mailboxId: string | undefined;
+      let ownerId: string | undefined;
+
+      if (body.mailboxId !== undefined) {
+        const mailbox = db.select().from(mailboxes).where(eq(mailboxes.id, body.mailboxId)).get();
+
+        mailboxId = mailbox?.id;
+        ownerId = mailbox?.userId;
+      }
+
+      if (mailboxId === undefined && body.email !== undefined) {
+        const user = db.select().from(users).where(eq(users.email, body.email.toLowerCase())).get();
+
+        if (user === undefined || testMailboxes === null) {
+          return context.json({ error: "not found" }, 404);
+        }
+
+        const ensured = await testMailboxes.ensureFor(user.id);
+
+        mailboxId = ensured.id;
+        ownerId = user.id;
+      }
+
+      if (mailboxId === undefined || ownerId === undefined) {
         return context.json({ error: "not found" }, 404);
       }
 
-      const wait = createCodeWait(db, clock, {
-        userId: mailbox.userId,
-        mailboxId,
-        attemptId: attemptId ?? null,
-      });
+      const wait =
+        body.startedAt === undefined
+          ? createCodeWait(db, clock, {
+              attemptId: body.attemptId ?? null,
+              mailboxId,
+              userId: ownerId,
+            })
+          : insertCodeWaitAt(
+              { id: mailboxId, userId: ownerId },
+              body.attemptId ?? null,
+              body.startedAt,
+              body.expiresAt ?? body.startedAt + CODE_WAIT_TIMEOUT_MS,
+            );
 
       if (wait === undefined) {
         return context.json({ error: "not created" }, 500);

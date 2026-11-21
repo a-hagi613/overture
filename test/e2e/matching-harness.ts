@@ -218,6 +218,7 @@ export async function runPrepDaily(
 export async function seedApplication(
   request: APIRequestContext,
   input: {
+    id?: string;
     userId: string;
     postingId: string;
     status:
@@ -240,6 +241,7 @@ export async function seedApplication(
   const response = await request.post("/__test__/applications/seed", {
     data: {
       createdAt: input.createdAt ?? null,
+      id: input.id,
       origin: "auto",
       readyAt: input.readyAt ?? null,
       scheduledFor: input.scheduledFor ?? null,

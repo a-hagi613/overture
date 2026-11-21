@@ -8,7 +8,7 @@ changes; never edit it by hand.
 
 One folder per screen: `home`, `home-paused` (adds `reasons-1280-light`, all seven pause banners), `ready`, `ready-email`,
 `board`, `review`, `profile`, `settings`, `notifications` (adds `empty-<width>-<theme>`), `signin`,
-`onboarding-welcome`, `onboarding-resume`, `onboarding-questions`, `onboarding-targets`, `users`, `invites`, `user`, `terms`, `privacy`, `consent`. Each variant is named
+`onboarding-welcome`, `onboarding-resume`, `onboarding-questions`, `onboarding-targets`, `users`, `invites`, `user`, `terms`, `privacy`, `consent`, `code-wait` and `code-paste`. Each variant is named
 `<width>-<theme>` (Sign in adds the mode: `sign-in`, `sign-up`, `magic-sent`), and comes as three files:
 
 | File | What it is | Use it for |
@@ -16,6 +16,9 @@ One folder per screen: `home`, `home-paused` (adds `reasons-1280-light`, all sev
 | `<variant>.html` | The fully rendered board as static HTML, every element with its inline styles, no scripts | Open it in a browser and inspect it with devtools, exactly as on the canvas. It renders identically to the canvas (0.0 % pixel difference, checked) |
 | `<variant>.json` | Every visible element: DOM path, text, aria label, box (`x`, `y`, `w`, `h` in CSS px at that width) and computed styles (type, colour, spacing, borders, radius, shadow, layout), plus the CSS custom properties in use | Exact values to build from, and to assert in tests |
 | `<variant>.png` | Full-page screenshot at device scale 1 | The baseline the "matches the board" end-to-end check compares the app against |
+
+`code-wait` and `code-paste` ship the rendered PNG only: the canvas exported those two component boards without an
+element dump, so the tests read the card's box from the board and compare that region.
 
 `source/` holds the board sources (`w5-*.dc.html`; `w5-holds` is the Review screen, `w5-ready-email` the Recap email)
 and the design-system boards
