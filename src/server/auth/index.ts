@@ -20,6 +20,7 @@ import {
   verifications,
 } from "../platform/db/schema.ts";
 import { recordPasskeyAssertion } from "../platform/passkey/index.ts";
+import { isSameMailbox } from "./email.ts";
 import { verifyTurnstile } from "./turnstile-gate.ts";
 
 const GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration";
@@ -70,10 +71,10 @@ const providerConfigs = [googleProviderConfig, linkedinProviderConfig].filter(
 
 export const enabledSocialProviders = providerConfigs.map((config) => config.providerId);
 
-const ownerEmail = env.OWNER_EMAIL.toLowerCase();
+const ownerEmail = env.OWNER_EMAIL;
 
 export function isAllowedEmail(email: string) {
-  return email.trim().toLowerCase() === ownerEmail;
+  return isSameMailbox(email, ownerEmail);
 }
 
 export type Auth = ReturnType<typeof createAuth>;
@@ -148,7 +149,11 @@ export function createAuth(db: AppDatabase, clock: Clock, mailSender: MailSender
             }
 
             const created = {
-              data: { ...user, email, role: email === ownerEmail ? "owner" : "user" },
+              data: {
+                ...user,
+                email,
+                role: isSameMailbox(email, ownerEmail) ? "owner" : "user",
+              },
             };
 
             await Promise.resolve(created);
