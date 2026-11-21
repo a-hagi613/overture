@@ -30,6 +30,7 @@ import {
   BOARD_STAGES,
   canMoveApplicationToStage,
   canWithdrawApplication,
+  isBoardStage,
 } from "../../shared/board.ts";
 
 const STRONG_SCORE = 80;
@@ -61,23 +62,6 @@ const coverLetterSchema = z.array(
     sentence: z.string(),
   }),
 );
-
-function isStage(value: string): value is (typeof BOARD_STAGES)[number] {
-  switch (value) {
-    case "queued":
-    case "applied":
-    case "screening":
-    case "interviewing":
-    case "offer":
-    case "closed": {
-      return true;
-    }
-
-    default: {
-      return false;
-    }
-  }
-}
 
 function closedNote(reason: string | null) {
   switch (reason) {
@@ -467,7 +451,7 @@ export function createApplicationRoutes(
 
     const restored = last.fromValue;
 
-    if (!isStage(restored)) {
+    if (!isBoardStage(restored)) {
       return context.json({ error: "cannot_undo" }, 409);
     }
 

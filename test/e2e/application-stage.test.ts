@@ -188,6 +188,7 @@ test("a Ready Application can be withdrawn before its send starts", async ({
     userId,
   });
 
+  expect((await moveStage(owner, applicationId, "queued")).status()).toBe(409);
   expect((await moveStage(owner, applicationId, "applied")).status()).toBe(409);
   expect((await applicationOf(owner, applicationId)).stage).toBe("ready");
 

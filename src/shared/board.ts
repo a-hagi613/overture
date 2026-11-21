@@ -29,6 +29,10 @@ export const WITHDRAWABLE_APPLICATION_STATUSES = [
 
 export type WithdrawableApplicationStatus = (typeof WITHDRAWABLE_APPLICATION_STATUSES)[number];
 
+export function isBoardStage(value: string): value is BoardStage {
+  return BOARD_STAGES.some((stage) => stage === value);
+}
+
 export function isBoardMoveStage(value: string): value is BoardMoveStage {
   return BOARD_MOVE_STAGES.some((stage) => stage === value);
 }
