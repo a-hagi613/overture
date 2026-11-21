@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, count, desc, eq, isNull, isNotNull } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -15,7 +15,7 @@ import type {
 } from "../../shared/onboarding.ts";
 
 import { applications, postings, reviewApplications, reviews } from "../platform/db/schema.ts";
-import { countryNameFor, resolveLocation } from "../catalog/geo.ts";
+import { countryCodesNamedIn, countryNameFor, resolveLocation } from "../catalog/geo.ts";
 import { currencyNamedIn, parseSalaryExpectation } from "../pipeline/answer-value.ts";
 import { createFactService } from "./facts.ts";
 import { EEO_PREFER_NOT_TO_SAY, WORK_AUTH_OPTIONS } from "../../shared/onboarding.ts";
@@ -137,6 +137,34 @@ function reviewsAnsweredBy(
   );
 }
 
+const CURRENCY_BY_COUNTRY = {
+  AT: "EUR",
+  AU: "AUD",
+  BE: "EUR",
+  CA: "CAD",
+  CH: "CHF",
+  DE: "EUR",
+  DK: "DKK",
+  ES: "EUR",
+  FI: "EUR",
+  FR: "EUR",
+  GB: "GBP",
+  IE: "EUR",
+  IN: "INR",
+  IT: "EUR",
+  NL: "EUR",
+  NO: "NOK",
+  NZ: "NZD",
+  PT: "EUR",
+  SE: "SEK",
+  SG: "SGD",
+  US: "USD",
+} as const satisfies Record<string, string>;
+
+function currencyForCountry(code: string) {
+  return Object.entries(CURRENCY_BY_COUNTRY).find(([country]) => country === code)?.[1];
+}
+
 function targetCountryCodes(targets: Targets) {
   const codes: string[] = [];
 
@@ -228,6 +256,18 @@ export function createOnboardingStepService(deps: {
       .map(([currency]) => currency);
   }
 
+  function openPostingCountries() {
+    return db
+      .select({ code: postings.countryCode, total: count() })
+      .from(postings)
+      .where(and(isNull(postings.closedAt), isNotNull(postings.countryCode)))
+      .groupBy(postings.countryCode)
+      .orderBy(desc(count()), postings.countryCode)
+      .limit(3)
+      .all()
+      .flatMap((row) => (row.code === null ? [] : [row.code]));
+  }
+
   async function read(userId: string) {
     const facts = await factsService.list(userId);
     const { targets } = await readTargets(userId);
@@ -255,12 +295,28 @@ export function createOnboardingStepService(deps: {
       }
     }
 
+    if (countryCodes.length === 0) {
+      const home = countryCodesNamedIn(factValue(facts, "current_country")).at(0);
+
+      countryCodes.push(...(home === undefined ? openPostingCountries() : [home]));
+    }
+
     const currencies = queuedCurrencies(userId);
     const salaryAnswers = salaryAnswersFrom(facts);
 
     for (const saved of salaryAnswers) {
       if (!currencies.includes(saved.currency)) {
         currencies.push(saved.currency);
+      }
+    }
+
+    if (currencies.length === 0) {
+      for (const code of countryCodes) {
+        const currency = currencyForCountry(code);
+
+        if (currency !== undefined && !currencies.includes(currency)) {
+          currencies.push(currency);
+        }
       }
     }
 
