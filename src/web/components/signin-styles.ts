@@ -7,13 +7,13 @@ export const CARD_HEADING =
 export const CARD_DESCRIPTION = "text-[13.5px] leading-normal text-muted-foreground";
 
 export const BTN_SECONDARY =
-  "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[7px] border border-input bg-card px-[18px] text-[13.5px] font-semibold shadow-[0_1px_0_rgba(21,19,17,0.04)] [line-height:normal] max-[960px]:min-h-[46px] hover:bg-muted";
+  "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[7px] border border-input bg-card px-[18px] text-[13.5px] font-semibold shadow-[0_1px_0_rgba(21,19,17,0.04)] [line-height:normal] max-[960px]:min-h-[46px] hover:bg-muted disabled:cursor-not-allowed disabled:opacity-[.45]";
 
 export const BTN_PRIMARY =
-  "inline-flex min-h-[46px] w-full items-center justify-center rounded-[7px] bg-foreground px-5 text-sm font-semibold text-primary-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_1px_2px_rgba(0,0,0,0.08)] [line-height:normal] hover:bg-btn-hover";
+  "inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-[7px] bg-foreground px-5 text-sm font-semibold text-primary-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_1px_2px_rgba(0,0,0,0.08)] [line-height:normal] hover:bg-btn-hover disabled:cursor-not-allowed disabled:opacity-[.45]";
 
 export const BTN_GHOST =
-  "inline-flex min-h-[42px] w-full items-center justify-center rounded-md bg-transparent px-[14px] text-[13.5px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground";
+  "inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-md bg-transparent px-[14px] text-[13.5px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-[.45]";
 
 export const LABEL_CLASS = "mb-[6px] block text-[12.5px] font-semibold [line-height:normal]";
 
