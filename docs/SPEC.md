@@ -1077,9 +1077,10 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
   cascade-delete rows, delete R2 prefixes `files/{user_id}/`, move mailbox local part to `retired_addresses`, keep
   only `card_fingerprints` (unlinked HMAC) and admin audit rows. Completes within 24 h; user gets a confirmation email.
 - **Export**: JSON (profile, facts, applications, snapshots, messages metadata + text) + resume + attachments, zipped,
-  encrypted under a per-export key that only the download link carries (in its fragment), so the page decrypts it in
-  the browser and the server never logs the key. The link is valid 24 h; then the archive is deleted, and a new request
-  replaces a ready one. Built in the background one page of rows at a time, so its memory does not grow with the mailbox.
+  encrypted under a random per-export key that the server generates and wraps under the user's data key. The key is
+  never stored in plaintext or logged; it reaches the page only with the download link (in its fragment), and the page
+  decrypts the archive in the browser. The link is valid 24 h; then the archive is deleted, and a new request replaces a
+  ready one. Built in the background one page of rows at a time, so its memory does not grow with the mailbox.
 - Logs/traces never contain names, emails, phone numbers, answers, letters or mail content; a redaction processor in
   the OTel pipeline drops attributes outside an allowlist.
 

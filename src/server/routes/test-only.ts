@@ -13,6 +13,7 @@ import type { CatalogSweepWorker } from "../catalog/sweep-worker-runner.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 
 import {
+  accountExports,
   accounts,
   applications,
   applicationAnswers,
@@ -82,6 +83,7 @@ import { normalizeFieldType, questionVariantHash } from "../catalog/question-nor
 import { mapQuestionByRules } from "../catalog/question-rules.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
+import { newExportKey } from "../../shared/export-crypto.ts";
 import { createCodeWait, wakeCodeWaits } from "../inbox/waits.ts";
 import { createMailboxService } from "../inbox/mailboxes.ts";
 import { listExportsOf } from "../export/service.ts";
@@ -2087,6 +2089,50 @@ export function createTestRoutes(
 
     return context.json({ count: body.count, threads: body.count });
   });
+
+  routes.post(
+    "/account-exports/seed",
+    zValidator("json", exportsQuery.pick({ userId: true })),
+    async (context) => {
+      if (objects === null) {
+        return context.json({ error: "no object store" }, 503);
+      }
+
+      const { userId } = context.req.valid("json");
+      const id = crypto.randomUUID();
+      const now = clock.now();
+
+      const keyEnc = await personal.sealFor(
+        userId,
+        { column: "key_enc", rowId: id, table: "account_exports" },
+        newExportKey(),
+      );
+
+      const objectKey = `files/${userId}/exports/${id}.ovex`;
+      const bytes = new TextEncoder().encode("seeded export");
+
+      await objects.put(objectKey, bytes);
+
+      db.insert(accountExports)
+        .values({
+          bytes: bytes.length,
+          error: null,
+          expiresAt: new Date(now + 24 * 60 * 60_000),
+          id,
+          keyEnc,
+          notifiedAt: null,
+          objectKey,
+          readyAt: new Date(now),
+          requestedAt: new Date(now),
+          status: "ready",
+          updatedAt: new Date(now),
+          userId,
+        })
+        .run();
+
+      return context.json({ id });
+    },
+  );
 
   routes.get("/account/exports", zValidator("query", exportsQuery), (context) => {
     const { userId } = context.req.valid("query");

@@ -143,8 +143,8 @@ _Avoid_: blocklist, never-apply list
 
 **Export**:
 The one encrypted zip of a user's profile, Facts, Applications, Snapshots, messages, resume and attachments. Its link
-works for 24 hours and decrypts with the key carried only in the link; after that the archive is deleted, and a new
-request replaces a ready one.
+works for 24 hours and opens with the key the server generated and wrapped for that export, delivered only with the
+link and never stored in plaintext or logged; after that the archive is deleted, and a new request replaces a ready one.
 _Avoid_: download, data dump, archive
 
 ## Mail
