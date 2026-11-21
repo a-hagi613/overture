@@ -1174,8 +1174,10 @@ M2 adds **push** (PWA, Web Push with VAPID) and an in-app list that mirrors it. 
 2 need an answer"), a new Review, an employer reply, an interview or offer detected, a card moved automatically (with
 Undo), a verification code to paste, paused (with reason), and "Couldn't apply" summaries batched hourly. A push opens
 the app (the recap and a Ready item open Ready); **nothing is approved by a push or a link**, so a user approves from the
-phone inside the app. There is no separate 08:00 digest: the one daily email is the recap, which also lists yesterday's
-sends and replies, and the user can turn the email and each kind of push off in Settings.
+phone inside the app. The header bell opens the in-app Notifications list: unread rows carry a dot, Mark all as read
+clears them, and a push endpoint the service says is gone is deleted. There is no separate 08:00 digest: the one daily
+email is the recap, which also lists yesterday's sends and replies, and the user can turn the email and each kind of
+push off in Settings.
 
 ---
 

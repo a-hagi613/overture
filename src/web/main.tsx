@@ -8,6 +8,7 @@ import { AppShell } from "./app.tsx";
 import { BoardPage } from "./routes/board.tsx";
 import { HomePage } from "./routes/home.tsx";
 import { InboxPage } from "./routes/inbox.tsx";
+import { NotificationsPage } from "./routes/notifications.tsx";
 import { NotFoundPage } from "./routes/not-found.tsx";
 import { ProfilePage } from "./routes/profile.tsx";
 import { OnboardingPage } from "./routes/onboarding.tsx";
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
       { path: "/board", element: <BoardPage /> },
       { path: "/review", element: <ReviewPage /> },
       { path: "/inbox", element: <InboxPage /> },
+      { path: "/notifications", element: <NotificationsPage /> },
       { path: "/profile", element: <ProfilePage /> },
       { path: "/search", element: <SearchPage /> },
       { path: "/settings", element: <SettingsPage /> },
@@ -71,3 +73,7 @@ createRoot(rootElement).render(
     </QueryClientProvider>
   </StrictMode>,
 );
+
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  void navigator.serviceWorker.register("/sw.js", { type: "module" });
+}

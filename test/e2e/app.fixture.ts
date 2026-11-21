@@ -13,6 +13,7 @@ import { authTestIdentity, testAuthEnvironment } from "./auth.fixture.ts";
 import { startAppServer } from "./app-server.ts";
 import { latestMailLink, requestMagicLink } from "./sign-in.ts";
 import { startIdentityServer } from "./identity-server-test.fixture.ts";
+import { seedUnreadNotifications } from "./notification-seed.ts";
 
 type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
 
@@ -86,6 +87,8 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       await request.post(`${_appServerWorker.url}/__test__/ledger/sample`, {
         data: { email: authTestIdentity.ownerEmail },
       });
+
+      await seedUnreadNotifications(request, _appServerWorker.url);
 
       const storage = await request.storageState();
 

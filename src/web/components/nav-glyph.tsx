@@ -17,7 +17,11 @@ type GlyphName =
   | "signout"
   | "sun"
   | "doc"
-  | "moon";
+  | "moon"
+  | "send"
+  | "hash"
+  | "pause"
+  | "clock";
 
 interface GlyphPaths {
   readonly paths: string[];
@@ -98,6 +102,13 @@ const glyphs: Record<GlyphName, GlyphPaths> = {
   mail: {
     paths: ["M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z", "M3 7l9 6 9-6"],
     strokeWidth: 1.8,
+  },
+  send: { paths: ["m22 2-7 20-4-9-9-4z", "M22 2 11 13"], strokeWidth: 1.6 },
+  hash: { paths: ["M10 3 8 21", "M16 3l-2 18", "M4 9h17", "M3 15h17"], strokeWidth: 1.6 },
+  pause: { paths: ["M9 5v14", "M15 5v14"], strokeWidth: 2.2 },
+  clock: {
+    paths: ["M12 3a9 9 0 100 18 9 9 0 000-18z", "M12 7v5l3 2"],
+    strokeWidth: 1.6,
   },
 };
 

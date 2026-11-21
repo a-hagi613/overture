@@ -12,6 +12,7 @@ import { turnstileSiteverifyUrl } from "../auth/turnstile-gate.ts";
 import { cloudflareSendEmailUrl } from "../platform/mail/cloudflare.ts";
 import { recordCloudflareEmailRequest } from "./cloudflare-email-recorder.ts";
 import { emailSendingScenario } from "./email-sending-scenario.ts";
+import { pushResponseStatus, recordPushRequest } from "./push-recorder.ts";
 
 const turnstileRecordingPath = "test/e2e/recordings/turnstile/siteverify-pass.json";
 
@@ -206,6 +207,16 @@ export function startInterception() {
         });
       },
     ),
+    http.post(/^https:\/\/push\.example\.test\/.+/u, async ({ request }) => {
+      recordPushRequest({
+        body: Buffer.from(await request.arrayBuffer()).toString("base64"),
+        headers: Object.fromEntries(request.headers.entries()),
+        method: request.method,
+        url: request.url,
+      });
+
+      return new HttpResponse(null, { status: pushResponseStatus(request.url) });
+    }),
     http.all(
       ({ request }) => isLiveServiceHost(new URL(request.url).hostname),
       ({ request }) => {

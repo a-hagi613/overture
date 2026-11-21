@@ -8,6 +8,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { seedApplication, seedBoard, seedCompany, seedPosting } from "./matching-harness.ts";
+import { seedUnreadNotifications } from "./notification-seed.ts";
 import { latestMailLink, requestMagicLink, verifyAuthState } from "./sign-in.ts";
 
 const test = appTest.extend<{ reviewServer: AppServer }>({
@@ -112,6 +113,7 @@ async function seedOwner(request: APIRequestContext, appServerUrl: string) {
   await request.post(`${appServerUrl}/__test__/user/name`, {
     data: { email: authTestIdentity.ownerEmail, name: authTestIdentity.ownerName },
   });
+  await seedUnreadNotifications(request, appServerUrl);
   await request.post("/api/running", { data: { running: true } });
   await request.post(`${appServerUrl}/__test__/ledger/sample`, {
     data: { email: authTestIdentity.ownerEmail },
