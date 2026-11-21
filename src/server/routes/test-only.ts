@@ -65,7 +65,11 @@ import {
 import { getTestSpans, resetTestSpans } from "../platform/telemetry/otel.ts";
 import { releaseBlockingJobs } from "../testing/blocking-job.ts";
 import { clearPushRequests, listPushRequests } from "../testing/push-recorder.ts";
-import { setTurnstileScenario, turnstileScenarioBody } from "../testing/turnstile-scenario.ts";
+import {
+  setTurnstileScenario,
+  turnstileRemoteIp,
+  turnstileScenarioBody,
+} from "../testing/turnstile-scenario.ts";
 import {
   setTurnstileBrowserScenario,
   turnstileBrowserScenario,
@@ -1074,6 +1078,8 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
+  routes.get("/turnstile", (context) => context.json({ remoteIp: turnstileRemoteIp() }));
+
   routes.get("/turnstile/browser", (context) => context.json(turnstileBrowserScenario()));
 
   routes.post("/turnstile/browser", zValidator("json", turnstileBrowserScenarioBody), (context) => {
@@ -1114,7 +1120,7 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
-  routes.post("/jobs/enqueue", zValidator("json", enqueueBody), (context) => {
+  routes.post("/jobs/enqueue", zValidator("json", enqueueBody), async (context) => {
     const { kind, payload, runAt, priority, maxAttempts, dedupeKey } = context.req.valid("json");
 
     const opts = {
@@ -1124,7 +1130,10 @@ export function createTestRoutes(
       ...(dedupeKey !== undefined && { dedupeKey }),
     };
 
-    const job = enqueueJob(db, clock, kind, payload, opts);
+    const job = await retryWhenBusy(
+      () => enqueueJob(db, clock, kind, payload, opts),
+      "test.jobs.enqueue",
+    );
 
     return context.json({ id: job.id });
   });
@@ -1152,11 +1161,13 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
-  routes.put("/settings/:key", zValidator("json", settingBody), (context) => {
+  routes.put("/settings/:key", zValidator("json", settingBody), async (context) => {
     const { key } = context.req.param();
     const { value } = context.req.valid("json");
 
-    setSetting(db, clock, key, value, "owner");
+    await retryWhenBusy(() => {
+      setSetting(db, clock, key, value, "owner");
+    }, "test.settings");
 
     return context.json({ key, value });
   });

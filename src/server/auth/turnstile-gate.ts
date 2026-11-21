@@ -10,6 +10,7 @@ import {
   turnstileTokenMaxLength,
 } from "../../shared/turnstile.ts";
 import { env, turnstileHostnames } from "../config/env.ts";
+import { clientIp } from "./client-ip.ts";
 
 export const turnstileSiteverifyUrl = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
@@ -41,18 +42,6 @@ function refuse() {
   );
 }
 
-function clientAddress(request: Request) {
-  const flyClient = request.headers.get("fly-client-ip");
-
-  if (flyClient !== null && flyClient.length > 0) {
-    return flyClient;
-  }
-
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-
-  return forwarded === undefined || forwarded.length === 0 ? null : forwarded;
-}
-
 export async function verifyTurnstile(request: Request) {
   const allowed = gatedEndpoints.get(new URL(request.url).pathname);
 
@@ -68,7 +57,7 @@ export async function verifyTurnstile(request: Request) {
   }
 
   const form = new URLSearchParams({ secret: env.TURNSTILE_SECRET, response: token.data });
-  const remoteip = clientAddress(request);
+  const remoteip = clientIp(request, { flyAppName: env.FLY_APP_NAME, nodeEnv: env.NODE_ENV });
 
   if (remoteip !== null) {
     form.set("remoteip", remoteip);

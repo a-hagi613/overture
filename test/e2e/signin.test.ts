@@ -218,6 +218,46 @@ test("the bot check is required on the auth endpoints", async ({ request, isolat
   expect((await verifyAuthState(appServerUrl, request)).users).toEqual([]);
 });
 
+test("the bot check's remote IP ignores a fly-client-ip no proxy stamped", async ({
+  request,
+  isolatedAppServer,
+}) => {
+  const appServerUrl = isolatedAppServer.url;
+
+  await setTurnstileScenario(request, appServerUrl, { action: "signin" });
+
+  await request.post(`${appServerUrl}/api/auth/sign-in/email`, {
+    data: { email: authTestIdentity.ownerEmail, password: "overture-pass-813" },
+    headers: {
+      "x-captcha-response": authTestIdentity.turnstilePassToken,
+      "x-turnstile-action": "signin",
+      origin: appServerUrl,
+      "x-forwarded-for": "198.51.100.7",
+      "fly-client-ip": "203.0.113.9",
+    },
+  });
+
+  const recorded = await request.get(`${appServerUrl}/__test__/turnstile`);
+
+  expect(await recorded.json()).toEqual({ remoteIp: "198.51.100.7" });
+
+  await setTurnstileScenario(request, appServerUrl, { action: "signin" });
+
+  await request.post(`${appServerUrl}/api/auth/sign-in/email`, {
+    data: { email: authTestIdentity.ownerEmail, password: "overture-pass-813" },
+    headers: {
+      "x-captcha-response": authTestIdentity.turnstilePassToken,
+      "x-turnstile-action": "signin",
+      origin: appServerUrl,
+      "fly-client-ip": "203.0.113.9",
+    },
+  });
+
+  expect(await (await request.get(`${appServerUrl}/__test__/turnstile`)).json()).toEqual({
+    remoteIp: null,
+  });
+});
+
 test("sign out of all devices ends every other session and keeps this one", async ({
   browser,
   page,
