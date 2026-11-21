@@ -95,6 +95,7 @@ import { mapQuestionByRules } from "../catalog/question-rules.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
 import { createCodeWait, wakeCodeWaits } from "../inbox/waits.ts";
+import { ensurePrepQueuedForRunningUsers } from "../pipeline/daily-prep.ts";
 import { createMailboxService } from "../inbox/mailboxes.ts";
 import { readLiveCheckResults } from "../live-checks/store.ts";
 import { runAlertDrill } from "../live-checks/alerts.ts";
@@ -1098,6 +1099,12 @@ export function createTestRoutes(
     const ran = await runDueJobs(db, clock, handlers, singletonJobKinds);
 
     return context.json({ ran });
+  });
+
+  routes.post("/jobs/ensure-prep", (context) => {
+    ensurePrepQueuedForRunningUsers(db, clock);
+
+    return context.json({ ok: true });
   });
 
   routes.post("/jobs/run-now", zValidator("json", runNowBody), async (context) => {
@@ -2986,6 +2993,22 @@ export function createTestRoutes(
           firstForwardedAt: row.firstForwardedAt?.getTime() ?? null,
         })),
       });
+    },
+  );
+
+  routes.post(
+    "/mailboxes/first-forwarded",
+    zValidator("json", z.object({ userId: z.string().min(1) })),
+    async (context) => {
+      if (testMailboxes === null) {
+        return context.json({ error: "inbound_not_configured" }, 503);
+      }
+
+      const mailbox = await testMailboxes.ensureFor(context.req.valid("json").userId);
+
+      testMailboxes.markFirstForwarded(mailbox.id, clock.now());
+
+      return context.json({ ok: true });
     },
   );
 

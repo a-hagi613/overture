@@ -1522,6 +1522,58 @@ export const copy = {
     skipNote: "Skip anything. Unanswered questions wait in Review.",
     back: "Back",
     continue: "Continue",
+    forward: {
+      titlePlain: "Forward your",
+      titleItalic: "job mail",
+      intro:
+        "Employers and job sites write to you through their hiring systems. Forward only those messages to Overture. Your own inbox stays yours.",
+      addressLabel: "Your forwarding address",
+      copy: "Copy",
+      copied: "Copied",
+      copyLabel: "Copy forwarding address",
+      addressNote:
+        "Use this only as the place mail is forwarded to. Never type it on a job application.",
+      loadFailed: "Your forwarding address did not load. Reload the page to try again.",
+      filterTitle: "Set up one Gmail filter",
+      stepOne: {
+        before: "In Gmail, open Settings, then ",
+        bold: "Filters and Blocked Addresses",
+        between: ", then ",
+        boldEnd: "Create a new filter",
+        after: ".",
+      },
+      stepTwo: {
+        before: "In ",
+        bold: "From",
+        after: ", paste these job-site domains. Leave every other field empty.",
+      },
+      stepThree: {
+        before: "Tick ",
+        bold: "Forward it to",
+        after:
+          ", choose your forwarding address above, then create the filter. Gmail confirms the address with Overture automatically.",
+      },
+      checkTitle: "Check it works",
+      waiting:
+        "Waiting for a test email. Send one to your address from a job site, or forward any message from that domain list.",
+      testSubject: "Overture forwarding test",
+      sendTest: "Send a test email",
+      received: "Received. Your filter works, and Overture will show job mail in your Inbox.",
+      skipNote:
+        "Cannot set up a filter? Overture sends a notification instead, and you paste each code within ten minutes.",
+      agreeBefore: "I agree to the ",
+      terms: "Terms",
+      agreeBetween: " and the ",
+      privacy: "Privacy Policy",
+      agreeAfter:
+        ". Overture prepares applications from my facts and sends only the ones I approve.",
+      firstRun:
+        "Overture prepares your first applications at 07:00 tomorrow. Nothing is sent until you approve.",
+      tickToStart: "Tick the box to start.",
+      start: "Start",
+      starting: "Starting",
+      startFailed: "That did not work. Try Start again.",
+    },
     signOut: "Sign out",
     saveFailed: "That did not save. Try again.",
     loading: "Loading…",

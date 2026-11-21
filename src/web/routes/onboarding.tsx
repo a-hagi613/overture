@@ -23,7 +23,7 @@ export function OnboardingPage() {
     } else if (state.step === 4) {
       void navigate("/onboarding/targets", { replace: true });
     } else if (state.step >= 5) {
-      void navigate("/profile", { replace: true });
+      void navigate(state.onboardedAt === null ? "/onboarding/forward" : "/", { replace: true });
     }
   }, [navigate, state]);
 

@@ -30,7 +30,7 @@ export function createOnboardingProgressService(deps: { db: AppDatabase; clock: 
     return {
       step: row?.onboardingStep ?? 1,
       onboardedAt: row?.onboardedAt ?? null,
-      pauseReason: row?.pauseReason ?? "onboarding",
+      pauseReason: row === undefined ? "onboarding" : row.pauseReason,
     } satisfies OnboardingProgress;
   }
 

@@ -8,6 +8,9 @@ import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
 
+import { retryWhenBusy } from "../platform/db/busy.ts";
+import { startOnboarding } from "../profile/onboarding-start.ts";
+import { createConsentService } from "../profile/consent.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createOnboardingProgressService } from "../profile/onboarding-progress.ts";
 import { createOnboardingStepService } from "../profile/onboarding-step.ts";
@@ -57,6 +60,7 @@ export function createOnboardingRoutes(deps: {
   const progress = createOnboardingProgressService({ db, clock });
   const resumes = createResumeService({ db, clock, objects, personal, llm });
   const skipCompanies = createSkipCompanyService({ db, clock });
+  const consent = createConsentService({ db, clock });
 
   const choicesCache = createTargetChoicesCache({
     db,
@@ -136,6 +140,36 @@ export function createOnboardingRoutes(deps: {
     return context.json(await view(account));
   });
 
+  routes.post("/onboarding/start", async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
+
+    if (account === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    if (!account.emailVerified) {
+      return context.json({ error: "email_unverified" }, 403);
+    }
+
+    const locked = demoLocked(account.role);
+
+    if (locked !== null) {
+      return locked;
+    }
+
+    const state = consent.read(account.id);
+
+    if (state.accepted?.version !== state.current.version) {
+      return context.json({ error: "consent_required" }, 409);
+    }
+
+    await retryWhenBusy(() => startOnboarding(db, clock, account.id), "onboarding.start");
+
+    context.header("Cache-Control", "no-store");
+
+    return context.json(await view(account));
+  });
+
   routes.post("/onboarding/:step", async (context) => {
     const account = await sessionUser(auth, context.req.raw);
 
@@ -147,6 +181,10 @@ export function createOnboardingRoutes(deps: {
 
     if (!Number.isInteger(finished) || finished < 1 || finished > ONBOARDING_STEP_COUNT) {
       return context.json({ error: "unknown_step" }, 400);
+    }
+
+    if (finished === ONBOARDING_STEP_COUNT) {
+      return context.json({ error: "start_required" }, 409);
     }
 
     if (finished === 2 && (await resumes.current(account.id)) === null) {

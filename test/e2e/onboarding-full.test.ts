@@ -5,11 +5,14 @@ import type { AppServer } from "./app-server.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { seedOnboardingTargetsFlow } from "./onboarding-targets-harness.ts";
+import { walkOnboardingSteps1To4 } from "./onboarding-walk.ts";
 
 const test = appTest.extend<{ onboardingServer: AppServer }>({
   onboardingServer: [
     async ({ identityServer }, provide) => {
-      const server = await startFreshAppServer(identityServer);
+      const server = await startFreshAppServer(identityServer, {
+        INBOUND_HMAC_SECRET: "e2e-onboarding-hmac-secret-0123456789",
+      });
 
       await provide(server);
       await server.stop();
@@ -18,7 +21,7 @@ const test = appTest.extend<{ onboardingServer: AppServer }>({
   ],
 });
 
-const stateSchema = z.object({ step: z.number() });
+const stateSchema = z.object({ onboardedAt: z.string().nullable(), step: z.number() });
 
 const factsSchema = z.object({
   facts: z.array(z.object({ key: z.string(), scope: z.string(), value: z.string() })),
@@ -27,17 +30,6 @@ const factsSchema = z.object({
 const targetsSchema = z.object({
   targets: z.object({ locations: z.array(z.string()), roles: z.array(z.string()) }),
 });
-
-async function actInTurn<Item>(items: readonly Item[], act: (item: Item) => Promise<void>) {
-  const first = items.at(0);
-
-  if (first === undefined) {
-    return;
-  }
-
-  await act(first);
-  await actInTurn(items.slice(1), act);
-}
 
 test("a brand-new user answers every onboarding step through the UI", async ({
   browser,
@@ -53,60 +45,20 @@ test("a brand-new user answers every onboarding step through the UI", async ({
 
   const page = await context.newPage();
 
-  await page.goto(`${onboardingServer.url}/onboarding`);
-  await expect(page.getByRole("heading", { level: 2, name: /Welcome to Overture/u })).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
-
-  await expect(page).toHaveURL(/\/onboarding\/resume$/u);
-  await page.locator('input[type="file"]').setInputFiles("test/e2e/fixtures/resume-text.pdf");
-  await expect(page.getByText("resume-text.pdf")).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
-
-  await expect(page).toHaveURL(/\/onboarding\/facts$/u);
-  await expect(page.getByLabel("Current job title")).toBeVisible();
-  await expect(page.getByText("0 of 0 answered")).toHaveCount(0);
-
-  const workAuth = page.getByLabel(/^Work authorisation in /u);
-  const salary = page.getByLabel(/^Salary expectation in /u);
-
-  await expect(workAuth.first()).toBeVisible();
-  await expect(salary.first()).toBeVisible();
-
-  await page.getByLabel("Current job title").fill("Staff Platform Engineer");
-
-  await actInTurn(await workAuth.all(), async (field) => {
-    await field.selectOption("Citizen");
-  });
-  await actInTurn(await salary.all(), async (field) => {
-    await field.fill("140,000");
-  });
-  await actInTurn(await page.getByLabel(/^Period for /u).all(), async (field) => {
-    await field.selectOption("a year");
-  });
-
-  await page.getByRole("switch").click();
-  await expect(page.getByLabel("Gender")).toBeEnabled();
-  await page.getByLabel("Gender").selectOption("Woman");
-  await page.getByLabel("How did you hear about us?").fill("A friend");
-
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page).toHaveURL(/\/onboarding\/targets$/u);
-  await expect(page.getByRole("heading", { level: 2, name: /What do you want/u })).toBeVisible();
-  await page.getByRole("button", { name: "Platform Engineer" }).click();
-  await page.getByRole("button", { name: "London" }).click();
-  await page.getByRole("button", { exact: true, name: "Remote" }).click();
-  await page.getByRole("button", { name: "Senior" }).click();
-  await expect(page.getByTestId("targets-match-count")).not.toHaveText("0");
-
-  await page.getByLabel("Salary floor").fill("120,000");
-  await page.getByLabel("Salary floor").blur();
-
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page).toHaveURL(/\/profile#profile-targets$/u);
+  await walkOnboardingSteps1To4(page, onboardingServer.url);
 
   const state = stateSchema.parse(await (await request.get("/api/onboarding")).json());
 
   expect(state.step).toBe(5);
+  expect(state.onboardedAt).toBeNull();
+
+  await page.getByLabel(/I agree to the/u).check();
+  await page.getByRole("button", { name: "Start" }).click();
+  await expect(page).toHaveURL(/\/notifications$/u);
+
+  const started = stateSchema.parse(await (await request.get("/api/onboarding")).json());
+
+  expect(started.onboardedAt).not.toBeNull();
 
   const { facts } = factsSchema.parse(await (await request.get("/api/profile/facts")).json());
 
