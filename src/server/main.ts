@@ -9,7 +9,7 @@ import { seedDemoAccount } from "./demo/seed.ts";
 import { createDemoSafeMailSender } from "./demo/mail-guard.ts";
 import { isDemoUser } from "./demo/role.ts";
 import { demoStartupNotice } from "./demo/startup.ts";
-import { logInfo } from "./platform/log.ts";
+import { logError, logInfo } from "./platform/log.ts";
 import { openDatabase } from "./platform/db/client.ts";
 import { migrateDatabase } from "./platform/db/migrate.ts";
 import { createClock } from "./platform/ports/clock.ts";
@@ -659,23 +659,48 @@ const server = Bun.serve({
 
 process.stdout.write(`overture listening on ${String(server.port)}\n`);
 
+const SHUTDOWN_HARD_EXIT_GRACE_MS = 1000;
+
+let shuttingDown = false;
+
+async function stopTelemetry() {
+  try {
+    await sdk.shutdown();
+  } catch {}
+}
+
 function handleShutdown() {
+  if (shuttingDown) {
+    return;
+  }
+
+  shuttingDown = true;
   shutdownController.abort();
 
   const killTimer = setTimeout(() => {
     void server.stop(true);
-    void sdk.shutdown();
+    void stopTelemetry();
   }, env.KILL_TIMEOUT_MS);
 
+  const hardExitTimer = setTimeout(() => {
+    process.kill(process.pid, "SIGKILL");
+  }, env.KILL_TIMEOUT_MS + SHUTDOWN_HARD_EXIT_GRACE_MS);
+
   killTimer.unref();
+  hardExitTimer.unref();
 
   void (async () => {
-    await server.stop(false);
-    await worker.drain(env.KILL_TIMEOUT_MS);
-    catalogWorker.stop();
+    try {
+      await server.stop(false);
+      await worker.drain(env.KILL_TIMEOUT_MS);
+      catalogWorker.stop();
 
-    clearTimeout(killTimer);
-    await sdk.shutdown();
+      clearTimeout(killTimer);
+    } catch (error) {
+      logError("shutdown", error);
+    } finally {
+      await stopTelemetry();
+    }
   })();
 }
 

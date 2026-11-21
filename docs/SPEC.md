@@ -788,7 +788,10 @@ undone: picks `k = min(remaining_today, approved count)` random times in the rem
 08:00–20:00 window, at least 20 minutes apart, and assigns them in approval order. A later approval is planned after
 the latest slot already held, so sends stay in approval order. Undoing an approval frees its slot. Approval never
 bypasses pacing, the company cooldown, the crowd limits or the caps; the daily cap counts sends, not approvals.
-Outside the window nothing is sent; leftovers roll to tomorrow's planning. A retry's earliest time (§9.4) is a lower
+Outside the window nothing is sent; leftovers roll to tomorrow's planning. The same run plans a leftover
+into the following windows (up to `limits.daily_cap` a day, in approval order) rather than leaving it
+unscheduled until the next midnight planner, so a slot that landed at the end of a window cannot strand
+the next approval. A retry's earliest time (§9.4) is a lower
 bound: the planner gives it the first free slot at or after that time inside a window.
 
 ### 9.3 Dispatcher

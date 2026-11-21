@@ -254,6 +254,32 @@ async function seedWebsiteAnswer(
   expect(seeded.ok()).toBe(true);
 }
 
+async function seedTwoApproved(owner: APIRequestContext, userId: string, fixtureUrl: string) {
+  const firstPosting = await seedPostingFor(owner, fixtureUrl, "us");
+
+  const secondPosting = await seedPostingFor(owner, fixtureUrl, "eu");
+
+  const firstApplication = await seedApplication(owner, {
+    postingId: firstPosting,
+    status: "ready",
+    userId,
+  });
+
+  const secondApplication = await seedApplication(owner, {
+    postingId: secondPosting,
+    status: "ready",
+    userId,
+  });
+
+  await seedWebsiteAnswer(owner, userId, firstApplication, firstPosting);
+  await seedWebsiteAnswer(owner, userId, secondApplication, secondPosting);
+
+  await approveApplication(owner, firstApplication);
+  await approveApplication(owner, secondApplication);
+
+  return { firstApplication, secondApplication };
+}
+
 async function runJob(owner: APIRequestContext, kind: string, payload: string) {
   const response = await owner.post("/__test__/jobs/run-now", { data: { kind, payload } });
 
@@ -527,28 +553,7 @@ test("the clock moves sends only into the window, spaced at least twenty minutes
   await saveFacts(owner);
   await ensureMailbox(owner);
   await grantApplications(owner, 5);
-
-  const firstPosting = await seedPostingFor(owner, pacing.fixture.url, "us");
-
-  const secondPosting = await seedPostingFor(owner, pacing.fixture.url, "eu");
-
-  const firstApplication = await seedApplication(owner, {
-    postingId: firstPosting,
-    status: "ready",
-    userId,
-  });
-
-  const secondApplication = await seedApplication(owner, {
-    postingId: secondPosting,
-    status: "ready",
-    userId,
-  });
-
-  await seedWebsiteAnswer(owner, userId, firstApplication, firstPosting);
-  await seedWebsiteAnswer(owner, userId, secondApplication, secondPosting);
-
-  await approveApplication(owner, firstApplication);
-  await approveApplication(owner, secondApplication);
+  await seedTwoApproved(owner, userId, pacing.fixture.url);
 
   await runJob(owner, "planner.day", JSON.stringify({ userId }));
 
@@ -610,4 +615,53 @@ test("the clock moves sends only into the window, spaced at least twenty minutes
     expect(utcHour(at)).toBeGreaterThanOrEqual(8);
     expect(utcHour(at)).toBeLessThan(20);
   }
+});
+
+test("an approval that cannot fit today's remaining slots rolls to the next window", async ({
+  pacing,
+}) => {
+  const { owner, userId } = await ownerFor(pacing.server);
+
+  await moveClockTo(owner, "2026-03-10T07:00:00.000Z");
+  await uploadResume(owner);
+  await saveFacts(owner);
+  await ensureMailbox(owner);
+  await grantApplications(owner, 5);
+
+  const cap = await owner.put("/__test__/settings/limits.daily_cap", { data: { value: "1" } });
+
+  expect(cap.ok()).toBe(true);
+
+  const { firstApplication, secondApplication } = await seedTwoApproved(
+    owner,
+    userId,
+    pacing.fixture.url,
+  );
+
+  await runJob(owner, "planner.day", JSON.stringify({ userId }));
+
+  const planned = (await applicationsFor(owner, userId)).toSorted(
+    (left, right) => (left.scheduledFor ?? 0) - (right.scheduledFor ?? 0),
+  );
+
+  expect(planned.length).toBe(2);
+
+  const firstSlot = planned[0]?.scheduledFor ?? 0;
+  const secondSlot = planned[1]?.scheduledFor ?? 0;
+  const tomorrow = Date.parse("2026-03-11T00:00:00.000Z");
+
+  expect(firstSlot).toBeGreaterThanOrEqual(Date.parse("2026-03-10T08:00:00.000Z"));
+  expect(firstSlot).toBeLessThan(Date.parse("2026-03-10T20:00:00.000Z"));
+  expect(secondSlot).toBeGreaterThanOrEqual(tomorrow + 8 * 60 * MINUTE_MS);
+  expect(secondSlot).toBeLessThan(tomorrow + 20 * 60 * MINUTE_MS);
+
+  await moveClockTo(owner, "2026-03-11T00:05:00.000Z");
+  await runJob(owner, "planner.day", JSON.stringify({ userId }));
+
+  const nextDay = await applicationsFor(owner, userId);
+  const firstNext = nextDay.find((row) => row.id === firstApplication)?.scheduledFor ?? 0;
+  const secondNext = nextDay.find((row) => row.id === secondApplication)?.scheduledFor ?? 0;
+
+  expect(firstNext).toBeGreaterThan(0);
+  expect(secondNext).toBeGreaterThan(firstNext);
 });
