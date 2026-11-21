@@ -143,6 +143,58 @@ export function OverviewPage() {
           </p>
         </section>
         <section
+          aria-labelledby="admin-overview-mail"
+          className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
+        >
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 id="admin-overview-mail" className="font-serif text-[26px] leading-[1.1]">
+              {copy.admin.overviewMail}
+            </h2>
+            <span className="text-[11px] text-muted-foreground uppercase tracking-[0.14em]">
+              {view.mail.month}
+            </span>
+          </div>
+          <dl className="mt-4 flex flex-wrap gap-8">
+            <div>
+              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {copy.admin.overviewMailSent}
+              </dt>
+              <dd className="font-serif text-3xl tabular-nums">
+                {view.mail.total.toLocaleString("en-US")}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {copy.admin.overviewMailCap}
+              </dt>
+              <dd className="font-serif text-3xl tabular-nums">
+                {view.mail.cap.toLocaleString("en-US")}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {copy.admin.overviewMailReserve}
+              </dt>
+              <dd className="font-serif text-3xl tabular-nums">
+                {view.mail.reserve.toLocaleString("en-US")}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-4 text-[12.5px] text-muted-foreground">
+            {copy.admin.overviewMailNote(view.mail.cap, view.mail.reserve)}
+          </p>
+          {view.mail.refusedAt === null ? null : (
+            <p className="mt-1 text-[12.5px] font-semibold text-foreground">
+              {copy.admin.overviewMailRefused}
+            </p>
+          )}
+          {view.mail.refusedAt !== null || view.mail.reserveRefusedAt === null ? null : (
+            <p className="mt-1 text-[12.5px] font-semibold text-foreground">
+              {copy.admin.overviewMailReservePaused}
+            </p>
+          )}
+        </section>
+        <section
           aria-labelledby="admin-overview-audit"
           className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
         >

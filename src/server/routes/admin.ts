@@ -42,6 +42,7 @@ import { FIXTURE_CAPTURE_JOB_KIND, fixtureCapturePayloadSchema } from "../fixtur
 import { enqueueLiveCheckNow } from "../live-checks/job.ts";
 import { readLiveCheckResults } from "../live-checks/store.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
+import { readMailSummary } from "../platform/mail/budget.ts";
 import {
   getAllKillSwitches,
   getAllSettings,
@@ -679,6 +680,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
         enabled: allSwitches.filter((row) => row.enabled === 1).length,
       },
       cost: buildCostSummary(db),
+      mail: readMailSummary(db, clock.now()),
       audit: audit.map((row) => ({
         id: row.id,
         at: row.at.getTime(),
