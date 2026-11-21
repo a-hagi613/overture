@@ -1,6 +1,6 @@
 import { gunzipSync } from "node:zlib";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -13,6 +13,7 @@ import type { AnswerUnit, FileFact } from "./answer-value.ts";
 import type { QuestionSource } from "../catalog/greenhouse-questions.ts";
 import type { GroundedAnswer } from "./open-text.ts";
 import type { PostingPlace } from "../catalog/answer-derivations.ts";
+import type { FormReadPath, PlainFormReader } from "./form-read.ts";
 
 import {
   applicationAnswers,
@@ -21,10 +22,13 @@ import {
   companyBoards,
   postings,
   profiles,
+  questions as questionsTable,
   resumes,
 } from "../platform/db/schema.ts";
 import type { FormQuestion, SendPlan, SendPlanField } from "./send-plan.ts";
 import { createFactService } from "../profile/facts.ts";
+import { createPlainFormReader } from "./form-read.ts";
+import { createPlanCache } from "./plan-cache.ts";
 import { guardPosting } from "./guard/posting-guard.ts";
 import { createOpenTextService, isCoverLetterQuestion } from "./open-text.ts";
 import { createTargetsService } from "../profile/targets.ts";
@@ -225,12 +229,23 @@ export function createPreparationService(deps: {
   source: QuestionSource | null;
   greenhouseBoardOrigin?: string | undefined;
   onReady?: (applicationId: string, userId: string) => void;
+  plainFormReader?: PlainFormReader;
+  captureForm?: (input: {
+    ats: "lever" | "ashby";
+    region: "us" | "eu";
+    boardToken: string;
+    atsJobId: string;
+    applyUrl: string | null;
+    url: string;
+  }) => Promise<{ questions: FormQuestion[]; formSignature: string } | null>;
 }) {
-  const { db, clock, llm, personal, source, greenhouseBoardOrigin, onReady } = deps;
+  const { db, clock, llm, personal, source, greenhouseBoardOrigin, onReady, captureForm } = deps;
 
   const catalog = createQuestionCatalog({ db, clock });
   const factsService = createFactService({ db, clock, personal });
   const openText = createOpenTextService({ db, clock, llm });
+  const planCache = createPlanCache({ db, clock });
+  const plainFormReader = deps.plainFormReader ?? createPlainFormReader();
 
   async function savedSentences(userId: string, applicationId: string, questionId: string) {
     const row = db
@@ -330,63 +345,174 @@ export function createPreparationService(deps: {
     ats: "greenhouse" | "lever" | "ashby";
     atsJobId: string;
     boardToken: string;
+    boardRegion: "us" | "eu";
     companyName: string;
+    applyUrl: string | null;
+    url: string;
     questionsFetchedAt: number | null;
   }) {
     if (posting.questionsFetchedAt !== null) {
       return;
     }
 
-    if (source === null || posting.ats !== "greenhouse") {
-      return;
-    }
-
-    const atsQuestions = await source.fetchQuestions(posting.boardToken, posting.atsJobId);
-    const inputs = questionInputsFromAts(atsQuestions, [posting.companyName]);
-
-    const entries = inputs.map((input, position) => ({
-      question: catalog.findOrCreate({
-        text: input.text,
-        fieldType: input.fieldType,
-        options: input.options,
-        companyNames: [posting.companyName],
-      }),
-      fieldName: input.fieldName,
-      required: input.required,
-      options: input.options,
-      position,
-    }));
-
-    const unresolved = catalog
-      .unmapped(entries.map((entry) => entry.question.id))
-      .filter((question) => question.fieldType !== "file");
-
-    await mapQuestionsWithLlm(
-      { db, clock, llm },
-      unresolved.map((question) => {
-        const entry = entries.find((candidate) => candidate.question.id === question.id);
+    const recordQuestions = async (
+      inputs: readonly {
+        text: string;
+        fieldType: QuestionFieldType;
+        options: string[];
+        required: boolean;
+        fieldName: string | null;
+      }[],
+    ) => {
+      const entries = inputs.map((input, position) => {
+        const question = catalog.findOrCreate({
+          text: input.text,
+          fieldType: input.fieldType,
+          options: input.options,
+          companyNames: [posting.companyName],
+        });
 
         return {
-          id: question.id,
-          text: question.textDisplay,
-          options: entry?.options ?? [],
+          fieldName: input.fieldName,
+          options: input.options,
+          position,
+          questionId: question.id,
+          required: input.required,
         };
-      }),
-      (questionId, mapping) => {
-        catalog.setMapping(questionId, { ...mapping, mappedBy: "llm" });
-      },
-    );
+      });
 
-    catalog.savePostingQuestions(
-      posting.postingId,
-      entries.map((entry) => ({
-        questionId: entry.question.id,
-        required: entry.required,
-        position: entry.position,
-        options: entry.options,
-        fieldName: entry.fieldName,
-      })),
-    );
+      const unresolved = catalog
+        .unmapped(entries.map((entry) => entry.questionId))
+        .filter((question) => question.fieldType !== "file");
+
+      await mapQuestionsWithLlm(
+        { db, clock, llm },
+        unresolved.map((question) => {
+          const entry = entries.find((candidate) => candidate.questionId === question.id);
+
+          return {
+            id: question.id,
+            text: question.textDisplay,
+            options: entry?.options ?? [],
+          };
+        }),
+        (questionId, mapping) => {
+          catalog.setMapping(questionId, { ...mapping, mappedBy: "llm" });
+        },
+      );
+
+      catalog.savePostingQuestions(posting.postingId, entries);
+
+      return entries;
+    };
+
+    if (posting.ats === "greenhouse") {
+      if (source === null) {
+        return;
+      }
+
+      const atsQuestions = await source.fetchQuestions(posting.boardToken, posting.atsJobId);
+      const inputs = questionInputsFromAts(atsQuestions, [posting.companyName]);
+
+      await recordQuestions(inputs);
+    } else {
+      const target = {
+        applyUrl: posting.applyUrl,
+        ats: posting.ats,
+        atsJobId: posting.atsJobId,
+        boardToken: posting.boardToken,
+        region: posting.boardRegion,
+        url: posting.url,
+      };
+
+      let questions: FormQuestion[] = [];
+      let formSignature = "";
+      let readPath: FormReadPath = "browser";
+      const plain = await plainFormReader.read(target);
+
+      if (plain !== null && plain.questions.length > 0) {
+        ({ questions, formSignature, path: readPath } = plain);
+      } else {
+        const captured = captureForm === undefined ? null : await captureForm(target);
+
+        if (captured !== null && captured.questions.length > 0) {
+          ({ formSignature, questions } = captured);
+          readPath = "browser";
+        }
+      }
+
+      if (questions.length === 0 || formSignature === "") {
+        throw new Error(
+          `form_unreadable: ${posting.ats} ${posting.atsJobId} returned no questions; the Application stays in preparation`,
+        );
+      }
+
+      const cached = planCache.get(posting.ats, formSignature);
+
+      const matched = cached === null ? null : planCache.match(questions, cached.plan.questions);
+
+      let usedCache = false;
+
+      if (cached !== null && matched !== null) {
+        const alive =
+          matched.length === 0
+            ? []
+            : db
+                .select({ id: questionsTable.id })
+                .from(questionsTable)
+                .where(
+                  inArray(
+                    questionsTable.id,
+                    matched.map((entry) => entry.questionId),
+                  ),
+                )
+                .all();
+
+        if (alive.length === matched.length) {
+          catalog.savePostingQuestions(
+            posting.postingId,
+            matched.map((entry) => ({
+              fieldName: entry.fieldName === "" ? null : entry.fieldName,
+              options: entry.options,
+              position: entry.position,
+              questionId: entry.questionId,
+              required: entry.required,
+            })),
+          );
+          planCache.recordHit(cached.id);
+          usedCache = true;
+        } else {
+          planCache.recordFailure(cached.id);
+        }
+      } else if (cached !== null) {
+        planCache.recordFailure(cached.id);
+      }
+
+      if (!usedCache) {
+        const entries = await recordQuestions(
+          questions.map((question) => ({
+            fieldName: question.fieldName === "" ? null : question.fieldName,
+            fieldType: question.fieldType,
+            options: question.options,
+            required: question.required,
+            text: question.label,
+          })),
+        );
+
+        planCache.put(posting.ats, formSignature, {
+          questions: entries.map((entry, position) => ({
+            fieldName: entry.fieldName ?? "",
+            fieldType: questions[position]?.fieldType ?? "text",
+            label: questions[position]?.label ?? "",
+            options: entry.options,
+            position,
+            questionId: entry.questionId,
+            required: entry.required,
+          })),
+          readPath,
+        });
+      }
+    }
 
     db.update(postings)
       .set({ questionsFetchedAt: clock.now() })
@@ -616,6 +742,7 @@ export function createPreparationService(deps: {
         ats: postings.ats,
         atsJobId: postings.atsJobId,
         boardToken: companyBoards.boardToken,
+        boardRegion: companyBoards.region,
         companyName: companies.name,
         countryCode: postings.countryCode,
         city: postings.city,
@@ -624,6 +751,8 @@ export function createPreparationService(deps: {
         language: postings.language,
         title: postings.title,
         descriptionGz: postings.descriptionGz,
+        applyUrl: postings.applyUrl,
+        url: postings.url,
         questionsFetchedAt: postings.questionsFetchedAt,
       })
       .from(applications)

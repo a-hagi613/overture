@@ -960,6 +960,20 @@ export const reviewAuditEvents = sqliteTable(
   ],
 );
 
+export const planCache = sqliteTable(
+  "plan_cache",
+  {
+    id: text("id").primaryKey(),
+    ats: text("ats", { enum: ["lever", "ashby"] }).notNull(),
+    formSignature: text("form_signature").notNull(),
+    plan: text("plan").notNull(),
+    hits: integer("hits").notNull().default(0),
+    failures: integer("failures").notNull().default(0),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [uniqueIndex("plan_cache_ats_signature_unique").on(t.ats, t.formSignature)],
+);
+
 export const fxRates = sqliteTable(
   "fx_rates",
   {

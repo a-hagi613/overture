@@ -102,7 +102,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 
 | Service | Purpose | Env / secret | In tests (ADR 0013) |
 |---|---|---|---|
-| ATS job feeds (Greenhouse, Lever, Ashby) | catalog discovery (§6) | `GREENHOUSE_FEED_BASE_URL`, `LEVER_FEED_BASE_URL`, `LEVER_EU_FEED_BASE_URL`, `ASHBY_FEED_BASE_URL` (test-only overrides of the real hosts) | local fixture server replaying recorded real responses captured by `scripts/record-feeds.ts` |
+| ATS job feeds and hosted forms (Greenhouse, Lever, Ashby) | catalog discovery (§6) and the plain form read in preparation (§8.3) | `GREENHOUSE_FEED_BASE_URL`, `LEVER_FEED_BASE_URL`, `LEVER_EU_FEED_BASE_URL`, `ASHBY_FEED_BASE_URL`, `LEVER_JOBS_BASE_URL`, `LEVER_EU_JOBS_BASE_URL`, `ASHBY_JOBS_BASE_URL` (test-only overrides of the real hosts) | local fixture server replaying recorded real responses captured by `scripts/record-feeds.ts`, and recorded Lever pages plus the Ashby `ApiJobPosting` shape for the form read |
 | Workable XML feed, Personio XML (M2) | catalog discovery (§6.1) | `WORKABLE_FEED_URL`, `PERSONIO_FEED_BASE_URL` (test-only overrides of the real hosts) | local fixture server replaying recorded real responses (a trimmed Workable feed that keeps its real structure) |
 | Cloudflare R2 | backups, encrypted files and mail | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES`, `R2_BUCKET_BACKUPS`; `R2_ENDPOINT` overrides the endpoint for tests | disk object store adapter (real implementation, also used in local dev); the R2 adapter runs against a local S3-compatible server (`test/e2e/s3-server.ts`) |
 | Cloudflare Turnstile | bot check on auth forms | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES` (optional, defaults to the `APP_ORIGIN` hostname; production must not list localhost or 127.0.0.1) | Cloudflare's published always-pass test keys; siteverify intercepted with recorded-shape responses (`test/e2e/turnstile-gate.test.ts`) |
@@ -265,7 +265,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `review_applications` | review_id, application_id; PK(review_id,application_id) |
 | `review_audit_events` | id, user_id, at, kind CHECK IN ('review_opened','review_resolved','auto_answer','snapshot_sent'), application_id NULL, review_id NULL, question_id NULL, ats NULL CHECK IN ('greenhouse','lever','ashby'), source NULL CHECK IN ('fact','target','derived','consent','file','open_text'), fact_key NULL, fact_revision NULL, scope, detail JSON; INDEX(user_id,at), INDEX(kind,at). Append-only by code: every Review opened and resolved, every automatic answer with its source, and every Snapshot sent. The owner's Review-rate and false-answer reports read it (§8.4) |
 | `checkins` | id, application_id UNIQUE, user_id, due_at, status CHECK IN ('open','answered','expired'), answer NULL, created_at |
-| `plan_cache` | id, ats, form_signature, plan JSON, hits, failures, updated_at; UNIQUE(ats,form_signature) |
+| `plan_cache` | id, ats, form_signature, plan JSON (`{readPath, questions}`; each question carries its catalog `question_id`, label, field name, type, options, required and position), hits, failures, updated_at; UNIQUE(ats,form_signature). `hits` counts preparations served from the cache; `failures` counts a cached plan that no longer matched the live form or whose questions no longer exist. It never holds answers: they are rebuilt per user from Facts and Targets |
 | `consent_versions` | version PK, text, published_at — the exact consent wording each `consent_version` refers to; rows are never edited |
 
 ### 5.5 Inbox
@@ -558,9 +558,13 @@ send the one Recap email (§8.7) when the run produced anything
 
 Job `application.prepare`:
 
-1. Load questions: Greenhouse pre-flight via the questions endpoint; Lever/Ashby from `plan_cache` if the form
-   signature is known; otherwise one read-only form read in a browser session (the `fixtures.capture` path: no
-   fill, no Submit) records the form and its signature in `plan_cache` first. An Application never reaches `ready`
+1. Load questions: Greenhouse pre-flight via the questions endpoint. A Lever or Ashby form is read with a
+   plain HTTP request from `overture-web` first — Lever's server-rendered apply page, Ashby's public
+   `ApiJobPosting` GraphQL operation — and only when that read cannot see the form does preparation fall back to
+   the read-only `fixtures.capture` browser path (no fill, no Submit). The read records the form's signature and
+   its questions in `plan_cache` together with the path that ran (`lever_html`, `ashby_graphql` or `browser`);
+   later postings with the same form signature reuse the cached questions and their catalog mappings. The
+   development machine never makes these reads (ADR 0016). An Application never reaches `ready`
    with questions still unknown, because the user approves every answer (ADR 0029).
 2. Map each question to the catalog: normalise text (lowercase, strip punctuation/numbers/company names) → hash →
    `question_variants`; unknown → rules (regex set for common facts) → else Haiku mapping call returning
@@ -923,6 +927,8 @@ Submit. It saves sanitised HTML + assets (names, emails, tokens and employer tra
 `scripts/pull-forms.ts` (R2 read only, no ATS traffic); the local fixture server replays them, including fake
 confirmation pages, a fake code prompt and a fake visible challenge. The capture job opens at most ten URLs per run,
 with no user profile attached, and writes `fixtures/{ats}/{form_signature}/form.html`, its assets and `meta.json`. The ATS apps render the form after load, so the job waits up to 20 s for a form field and otherwise fails with `no_form_rendered`, saving nothing.
+Preparation reads a Lever or Ashby form over plain HTTP from `overture-web` first (§8.3) and falls back to this
+capture path only when the plain read cannot see the form; the path that ran is kept in `plan_cache`.
 Every browser session, whether a capture, the early cloud probe or a dispatch send, takes a slot from one
 process-wide semaphore sized by `browser.max_concurrent_sessions` (default 3). A capture that cannot get a slot waits
 without failing or spending an attempt. A 429 from the provider's create-session call is retried with backoff or the

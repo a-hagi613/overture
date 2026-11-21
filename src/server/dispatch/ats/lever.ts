@@ -56,7 +56,7 @@ export interface LeverRun {
   unexpectedRequired?: LiveFormProblem[];
 }
 
-const SKIP_NAMES = [
+export const LEVER_SKIP_NAMES = [
   "accountId",
   "h-captcha-response",
   "linkedInData",
@@ -70,7 +70,7 @@ const SKIP_NAMES = [
   "timezone",
 ];
 
-const FIELD_TYPES = new Map<string, QuestionFieldType>([
+export const LEVER_FIELD_TYPES = new Map<string, QuestionFieldType>([
   ["email", "email"],
   ["tel", "phone"],
   ["url", "url"],
@@ -207,7 +207,7 @@ export async function readLeverQuestions(page: Page) {
 
       return questions;
     },
-    { fieldTypes: [...FIELD_TYPES], skip: SKIP_NAMES },
+    { fieldTypes: [...LEVER_FIELD_TYPES], skip: LEVER_SKIP_NAMES },
   );
 }
 

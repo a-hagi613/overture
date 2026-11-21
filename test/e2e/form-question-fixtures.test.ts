@@ -6,6 +6,7 @@ import { expect, test } from "@playwright/test";
 import { QUESTION_FIELD_TYPES } from "../../src/shared/questions.ts";
 import { readAshbyQuestions } from "../../src/server/dispatch/ats/ashby.ts";
 import { readLeverQuestions } from "../../src/server/dispatch/ats/lever.ts";
+import { readLeverFormHtml } from "../../src/server/pipeline/form-read.ts";
 
 const FORMS = join(process.cwd(), "test/e2e/fixtures/forms");
 
@@ -131,6 +132,34 @@ test("every recorded Lever and Ashby form parses into questions", async ({ brows
         await page.close();
       }
     }),
+  );
+});
+
+test("the plain HTTP Lever reader returns the same questions as the rendered form", async ({
+  browser,
+}) => {
+  await Promise.all(
+    RECORDED_FORMS.flatMap((candidate) =>
+      candidate.ats === "lever"
+        ? [
+            (async () => {
+              const page = await browser.newPage();
+              const html = readFileSync(join(FORMS, candidate.file), "utf8");
+
+              try {
+                await page.setContent(html, { waitUntil: "load" });
+
+                const rendered = await readLeverQuestions(page);
+                const plain = await readLeverFormHtml(html);
+
+                expect(plain.questions, candidate.file).toEqual(rendered);
+              } finally {
+                await page.close();
+              }
+            })(),
+          ]
+        : [],
+    ),
   );
 });
 

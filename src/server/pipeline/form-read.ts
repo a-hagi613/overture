@@ -1,0 +1,673 @@
+import { createHash } from "node:crypto";
+
+import { z } from "zod";
+
+import type { FormQuestion } from "./send-plan.ts";
+import type { QuestionFieldType } from "../../shared/questions.ts";
+
+import { formSignature, sanitiseFormHtml } from "../fixtures/sanitise.ts";
+import { LEVER_FIELD_TYPES, LEVER_SKIP_NAMES } from "../dispatch/ats/lever.ts";
+
+export const FORM_READ_PATHS = ["lever_html", "ashby_graphql", "browser"] as const;
+
+export type FormReadPath = (typeof FORM_READ_PATHS)[number];
+
+export interface PlainFormReadResult {
+  questions: FormQuestion[];
+  formSignature: string;
+  path: "lever_html" | "ashby_graphql";
+}
+
+export interface FormReadTarget {
+  ats: "lever" | "ashby";
+  region: "us" | "eu";
+  boardToken: string;
+  atsJobId: string;
+  applyUrl: string | null;
+  url: string;
+}
+
+const LEVER_DEFAULT_JOBS_BASE_URL = "https://jobs.lever.co";
+
+const LEVER_EU_DEFAULT_JOBS_BASE_URL = "https://jobs.eu.lever.co";
+
+const ASHBY_DEFAULT_JOBS_BASE_URL = "https://jobs.ashbyhq.com";
+
+const FETCH_TIMEOUT_MS = 15_000;
+
+const USER_AGENT = "Overture/1.0 (application preparation; read-only form read)";
+
+const GENERIC_LABEL = /^please (?:check|select) all that apply:?$/iu;
+
+const CLEAN_SPACE = /\s+/gu;
+
+function cleanText(value: string) {
+  return value
+    .replaceAll(/[✱*]/gu, "")
+    .replaceAll(CLEAN_SPACE, " ")
+    .trim();
+}
+
+interface RawControl {
+  name: string;
+  type: string;
+  value: string;
+  required: boolean;
+  tag: "input" | "select" | "textarea";
+  options: { label: string; value: string }[];
+  checkIndex: number;
+}
+
+interface RawBox {
+  label: string;
+  labelInner: string;
+  required: boolean;
+  heading: string;
+  optionTexts: string[];
+  controls: RawControl[];
+}
+
+function pushOption(box: RawBox | undefined, text: string) {
+  box?.optionTexts.push(cleanText(text));
+}
+
+function rawControlsToQuestions(boxes: readonly RawBox[]) {
+  const questions: FormQuestion[] = [];
+
+  for (const box of boxes) {
+    const inner = cleanText(box.labelInner);
+    const full = cleanText(box.label);
+    let label = inner === "" ? full : inner;
+
+    if (GENERIC_LABEL.test(inner)) {
+      label = box.heading === "" ? inner : box.heading;
+    }
+
+    if (label === "" || box.controls.length === 0) {
+      continue;
+    }
+
+    const groups = new Map<string, RawControl[]>();
+
+    for (const control of box.controls) {
+      groups.set(control.name, [...(groups.get(control.name) ?? []), control]);
+    }
+
+    for (const [fieldName, controls] of groups) {
+      const [first] = controls;
+
+      if (
+        first === undefined ||
+        fieldName === "" ||
+        LEVER_SKIP_NAMES.includes(fieldName) ||
+        (first.tag === "input" &&
+          ["hidden", "submit", "button", "file", "reset", "image"].includes(first.type))
+      ) {
+        continue;
+      }
+
+      const required = box.required || controls.some((control) => control.required);
+
+      if (first.tag === "select") {
+        questions.push({
+          fieldName,
+          fieldType: "select",
+          label,
+          options: first.options.flatMap((option) => (option.value === "" ? [] : [option.label])),
+          required,
+        });
+
+        continue;
+      }
+
+      if (first.tag === "textarea") {
+        questions.push({ fieldName, fieldType: "textarea", label, options: [], required });
+
+        continue;
+      }
+
+      if (first.type === "checkbox" || first.type === "radio") {
+        const checks = controls.filter(
+          (control) => control.type === "checkbox" || control.type === "radio",
+        );
+
+        questions.push({
+          fieldName,
+          fieldType: first.type === "radio" ? "radio" : "multiselect",
+          label,
+          options: checks.map((control) => {
+            const text = box.optionTexts[control.checkIndex] ?? "";
+
+            return text === "" ? control.value : text;
+          }),
+          required,
+        });
+
+        continue;
+      }
+
+      questions.push({
+        fieldName,
+        fieldType: LEVER_FIELD_TYPES.get(first.type) ?? "text",
+        label,
+        options: [],
+        required,
+      });
+    }
+  }
+
+  return questions;
+}
+
+export async function readLeverFormHtml(rawHtml: string) {
+  const html = sanitiseFormHtml(rawHtml);
+  const boxes: RawBox[] = [];
+  const boxStack: RawBox[] = [];
+  const optionStack: string[] = [];
+  const selectStack: RawControl[] = [];
+
+  let headingText = "";
+  let lastHeading = "";
+  let checksInBox = 0;
+
+  const currentBox = () => boxStack.at(-1);
+
+  const rewriter = new HTMLRewriter()
+    .on("h1, h2, h3, h4", {
+      element(element) {
+        headingText = "";
+
+        element.onEndTag(() => {
+          lastHeading = cleanText(headingText);
+        });
+      },
+      text(text) {
+        headingText += text.text;
+      },
+    })
+    .on(".application-question", {
+      element(element) {
+        const box: RawBox = {
+          controls: [],
+          heading: cleanText(lastHeading),
+          label: "",
+          labelInner: "",
+          optionTexts: [],
+          required: false,
+        };
+
+        boxes.push(box);
+        boxStack.push(box);
+        checksInBox = 0;
+
+        element.onEndTag(() => {
+          boxStack.pop();
+        });
+      },
+    })
+    .on(".application-label", {
+      element() {
+        const box = currentBox();
+
+        if (box !== undefined) {
+          box.label = "";
+        }
+      },
+      text(text) {
+        const box = currentBox();
+
+        if (box !== undefined) {
+          box.label += text.text;
+        }
+      },
+    })
+    .on(".application-label .text", {
+      element() {
+        const box = currentBox();
+
+        if (box !== undefined) {
+          box.labelInner = "";
+        }
+      },
+      text(text) {
+        const box = currentBox();
+
+        if (box !== undefined) {
+          box.labelInner += text.text;
+        }
+      },
+    })
+    .on(".application-question .required", {
+      element() {
+        const box = currentBox();
+
+        if (box !== undefined) {
+          box.required = true;
+        }
+      },
+    })
+    .on(".application-answer-alternative", {
+      element(element) {
+        optionStack.push("");
+
+        element.onEndTag(() => {
+          pushOption(currentBox(), optionStack.pop() ?? "");
+        });
+      },
+      text(text) {
+        optionStack[optionStack.length - 1] = (optionStack.at(-1) ?? "") + text.text;
+      },
+    })
+    .on(".eeo-option-text", {
+      element(element) {
+        optionStack.push("");
+
+        element.onEndTag(() => {
+          pushOption(currentBox(), optionStack.pop() ?? "");
+        });
+      },
+      text(text) {
+        optionStack[optionStack.length - 1] = (optionStack.at(-1) ?? "") + text.text;
+      },
+    })
+    .on("select", {
+      element(element) {
+        const box = currentBox();
+
+        if (box === undefined) {
+          return;
+        }
+
+        const control: RawControl = {
+          checkIndex: 0,
+          name: element.getAttribute("name") ?? "",
+          options: [],
+          required: element.getAttribute("required") !== null,
+          tag: "select",
+          type: "select",
+          value: "",
+        };
+
+        box.controls.push(control);
+        selectStack.push(control);
+        element.onEndTag(() => {
+          selectStack.pop();
+        });
+      },
+    })
+    .on("option", {
+      element(element) {
+        const select = selectStack.at(-1);
+
+        if (select === undefined) {
+          return;
+        }
+
+        select.options.push({ label: "", value: element.getAttribute("value") ?? "" });
+
+        element.onEndTag(() => {
+          const option = select.options.at(-1);
+
+          if (option !== undefined) {
+            option.label = cleanText(option.label);
+          }
+        });
+      },
+      text(text) {
+        const option = selectStack.at(-1)?.options.at(-1);
+
+        if (option !== undefined) {
+          option.label += text.text;
+        }
+      },
+    })
+    .on("textarea", {
+      element(element) {
+        const box = currentBox();
+
+        if (box === undefined) {
+          return;
+        }
+
+        box.controls.push({
+          checkIndex: 0,
+          name: element.getAttribute("name") ?? "",
+          options: [],
+          required: element.getAttribute("required") !== null,
+          tag: "textarea",
+          type: "textarea",
+          value: "",
+        });
+      },
+    })
+    .on("input", {
+      element(element) {
+        const box = currentBox();
+
+        if (box === undefined) {
+          return;
+        }
+
+        const type = (element.getAttribute("type") ?? "text").toLowerCase();
+        let checkIndex = 0;
+
+        if (type === "checkbox" || type === "radio") {
+          checkIndex = checksInBox;
+          checksInBox += 1;
+        }
+
+        const control: RawControl = {
+          checkIndex,
+          name: element.getAttribute("name") ?? "",
+          options: [],
+          required: element.getAttribute("required") !== null,
+          tag: "input",
+          type,
+          value: element.getAttribute("value") ?? "",
+        };
+
+        box.controls.push(control);
+      },
+    });
+
+  await rewriter.transform(new Response(html)).text();
+
+  return {
+    questions: rawControlsToQuestions(boxes),
+    formSignature: formSignature(html),
+    path: "lever_html" as const,
+  } satisfies PlainFormReadResult;
+}
+
+const ashbySelectableValueSchema = z.union([
+  z
+    .object({ label: z.string(), value: z.string().nullish() })
+    .loose()
+    .transform((value) => value.label),
+  z.string(),
+]);
+
+const ashbyFieldSchema = z
+  .object({
+    path: z.string().nullish(),
+    title: z.string().nullish(),
+    type: z.string().nullish(),
+    selectableValues: z.array(ashbySelectableValueSchema).nullish(),
+  })
+  .loose();
+
+const ashbyFieldEntrySchema = z
+  .object({
+    field: ashbyFieldSchema,
+    isRequired: z.boolean().nullish(),
+    isHidden: z.boolean().nullish(),
+  })
+  .loose();
+
+const ashbySectionSchema = z
+  .object({
+    fieldEntries: z.array(ashbyFieldEntrySchema).nullish(),
+  })
+  .loose();
+
+const ashbyFormSchema = z
+  .object({
+    sections: z.array(ashbySectionSchema).nullish(),
+  })
+  .loose();
+
+const ashbyResponseSchema = z
+  .object({
+    data: z
+      .object({
+        jobPosting: z
+          .object({
+            applicationForm: ashbyFormSchema.nullish(),
+            surveyForms: z.array(ashbyFormSchema).nullish(),
+          })
+          .loose()
+          .nullish(),
+      })
+      .loose()
+      .nullish(),
+    errors: z.array(z.object({ message: z.string().nullish() }).loose()).nullish(),
+  })
+  .loose();
+
+const ASHBY_FIELD_TYPES = new Map<string, QuestionFieldType>([
+  ["String", "text"],
+  ["LongText", "textarea"],
+  ["RichText", "textarea"],
+  ["Email", "email"],
+  ["Phone", "phone"],
+  ["Url", "url"],
+  ["Date", "date"],
+  ["Number", "number"],
+  ["Currency", "number"],
+  ["Boolean", "radio"],
+  ["ValueSelect", "radio"],
+  ["MultiValueSelect", "multiselect"],
+  ["DimensionSelect", "select"],
+  ["Location", "text"],
+  ["SocialLink", "url"],
+  ["Score", "text"],
+  ["LinearRating", "number"],
+  ["NPSRating", "number"],
+  ["EducationHistory", "text"],
+]);
+
+const ASHBY_GRAPHQL_QUERY = `query ApiJobPosting($organizationHostedJobsPageName: String!, $jobPostingId: String!) {
+  jobPosting(organizationHostedJobsPageName: $organizationHostedJobsPageName, jobPostingId: $jobPostingId) {
+    id
+    title
+    applicationForm {
+      sections {
+        fieldEntries {
+          field {
+            path
+            title
+            type
+            isNullable
+            selectableValues { label value }
+          }
+          isRequired
+          isHidden
+        }
+      }
+    }
+    surveyForms {
+      sections {
+        fieldEntries {
+          field {
+            path
+            title
+            type
+            isNullable
+            selectableValues { label value }
+          }
+          isRequired
+          isHidden
+        }
+      }
+    }
+  }
+}`;
+
+export function readAshbyGraphqlResponse(body: string) {
+  let json: unknown;
+
+  try {
+    json = JSON.parse(body);
+  } catch {
+    return null;
+  }
+
+  const parsed = ashbyResponseSchema.safeParse(json);
+
+  if (!parsed.success || (parsed.data.errors?.length ?? 0) > 0) {
+    return null;
+  }
+
+  const posting = parsed.data.data?.jobPosting;
+
+  if (posting === null || posting === undefined) {
+    return null;
+  }
+
+  const forms = [posting.applicationForm, ...(posting.surveyForms ?? [])];
+  const questions: FormQuestion[] = [];
+
+  for (const form of forms) {
+    for (const section of form?.sections ?? []) {
+      for (const entry of section.fieldEntries ?? []) {
+        if (entry.isHidden === true) {
+          continue;
+        }
+
+        const { field } = entry;
+        const type = field.type ?? "";
+        const label = cleanText(field.title ?? "");
+        const fieldName = field.path ?? "";
+
+        if (
+          label === "" ||
+          fieldName === "" ||
+          type === "File" ||
+          ASHBY_FIELD_TYPES.get(type) === undefined
+        ) {
+          continue;
+        }
+
+        const options = (field.selectableValues ?? [])
+          .map((value) => cleanText(value))
+          .filter((option) => option !== "");
+
+        questions.push({
+          fieldName,
+          fieldType: ASHBY_FIELD_TYPES.get(type) ?? "text",
+          label,
+          options: type === "Boolean" && options.length === 0 ? ["Yes", "No"] : options,
+          required: entry.isRequired === true,
+        });
+      }
+    }
+  }
+
+  if (questions.length === 0) {
+    return null;
+  }
+
+  return {
+    questions,
+    formSignature: formSignatureForQuestions("ashby_graphql", questions),
+    path: "ashby_graphql" as const,
+  } satisfies PlainFormReadResult;
+}
+
+export function formSignatureForQuestions(
+  action: string,
+  questions: readonly Pick<FormQuestion, "fieldName">[],
+) {
+  return createHash("sha256")
+    .update(
+      `${action}\n${questions
+        .map((question) => question.fieldName)
+        .toSorted()
+        .join("\n")}`,
+    )
+    .digest("hex")
+    .slice(0, 16);
+}
+
+function ashbyGraphqlUrl(baseUrl: string) {
+  try {
+    const url = new URL(baseUrl);
+    url.pathname = "/api/non-user-graphql";
+    url.search = "?op=ApiJobPosting";
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+
+export function createPlainFormReader(
+  options: {
+    ashbyBaseUrl?: string | undefined;
+    fetcher?: Fetcher;
+    leverBaseUrl?: string | undefined;
+    leverEuBaseUrl?: string | undefined;
+    timeoutMs?: number;
+  } = {},
+) {
+  const fetcher: Fetcher =
+    options.fetcher ?? (async (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init));
+
+  const timeoutMs = options.timeoutMs ?? FETCH_TIMEOUT_MS;
+  const leverBase = (options.leverBaseUrl ?? LEVER_DEFAULT_JOBS_BASE_URL).replace(/\/+$/u, "");
+
+  const leverEuBase = (options.leverEuBaseUrl ?? LEVER_EU_DEFAULT_JOBS_BASE_URL).replace(
+    /\/+$/u,
+    "",
+  );
+
+  const ashbyBase = (options.ashbyBaseUrl ?? ASHBY_DEFAULT_JOBS_BASE_URL).replace(/\/+$/u, "");
+
+  async function lever(input: FormReadTarget) {
+    const base = input.region === "eu" ? leverEuBase : leverBase;
+    const url = `${base}/${encodeURIComponent(input.boardToken)}/${encodeURIComponent(input.atsJobId)}/apply`;
+
+    const response = await fetcher(url, {
+      headers: { "user-agent": USER_AGENT },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return readLeverFormHtml(await response.text());
+  }
+
+  async function ashby(input: FormReadTarget) {
+    const url = ashbyGraphqlUrl(ashbyBase);
+
+    if (url === null) {
+      return null;
+    }
+
+    const response = await fetcher(url, {
+      body: JSON.stringify({
+        operationName: "ApiJobPosting",
+        query: ASHBY_GRAPHQL_QUERY,
+        variables: {
+          jobPostingId: input.atsJobId,
+          organizationHostedJobsPageName: input.boardToken,
+        },
+      }),
+      headers: { "content-type": "application/json", "user-agent": USER_AGENT },
+      method: "POST",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return readAshbyGraphqlResponse(await response.text());
+  }
+
+  return {
+    async read(input: FormReadTarget) {
+      try {
+        return input.ats === "lever" ? await lever(input) : await ashby(input);
+      } catch {
+        return null;
+      }
+    },
+  };
+}
+
+export type PlainFormReader = ReturnType<typeof createPlainFormReader>;
