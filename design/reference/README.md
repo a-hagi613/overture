@@ -10,7 +10,9 @@ One folder per screen: `home`, `home-paused` (adds `reasons-1280-light`, all sev
 `board`, `review`, `profile`, `settings`, `settings-delete` (its five signed states), `notifications` (adds `empty-<width>-<theme>`), `inbox` (four boards: list,
 thread, empty and address), `signin`,
 `onboarding-welcome`, `onboarding-resume`, `onboarding-questions`, `onboarding-targets`, `users`, `invites`, `user`, `billing/users`, `billing/refund`, `billing/reconciliation`, `billing/margin` (admin billing, #241; sources in `source/billing/`), `terms`, `privacy`, `consent`,
-`code-wait` and `code-paste`. Each variant is named
+`code-wait`, `code-paste`, and the billing screens from #240: `settings-billing` (Plan and billing), `onb-trial`
+(Onboarding step 6, trial card), `billing-plans` (Choose a plan and the Checkout return), `home-paused-billing` (plan
+ended and payment didn't go through) and `out-of-applications` (out of Applications and the invite grant). Each variant is named
 `<width>-<theme>` (Sign in adds the mode: `sign-in`, `sign-up`, `magic-sent`), and comes as three files:
 
 | File | What it is | Use it for |
