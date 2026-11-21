@@ -20,6 +20,7 @@ import {
 import { commitForApplication, releaseForApplication } from "../billing/ledger.ts";
 import { getSetting } from "../platform/settings/index.ts";
 import { recordSnapshotSent } from "../pipeline/review-events.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
 
 const HOUR_MS = 60 * 60_000;
 
@@ -227,6 +228,21 @@ export function createOutcomes(deps: OutcomeDeps) {
       toValue: "applied",
       source,
     });
+
+    publishEvent(
+      db,
+      clock,
+      "application.updated",
+      JSON.stringify({ applicationId: input.applicationId, status: "sent" }),
+      input.plan.userId,
+    );
+    publishEvent(
+      db,
+      clock,
+      "home.updated",
+      JSON.stringify({ applicationId: input.applicationId }),
+      input.plan.userId,
+    );
   }
 
   function latestAttempt(applicationId: string) {
@@ -495,6 +511,21 @@ export function createOutcomes(deps: OutcomeDeps) {
         toValue: null,
         source: "system",
       });
+
+      publishEvent(
+        db,
+        clock,
+        "application.updated",
+        JSON.stringify({ applicationId: application.id, status: "failed" }),
+        application.userId,
+      );
+      publishEvent(
+        db,
+        clock,
+        "home.updated",
+        JSON.stringify({ applicationId: application.id }),
+        application.userId,
+      );
 
       expired += 1;
     }

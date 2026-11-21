@@ -6,6 +6,7 @@ import { copy } from "../../shared/copy.ts";
 import { initialsOf } from "../lib/identity.ts";
 import { authClient } from "../lib/auth-client.ts";
 import { NavGlyph } from "./nav-glyph.tsx";
+import { RunningSwitch } from "./running-switch.tsx";
 import { useTheme } from "../lib/theme-context.ts";
 
 export function PageHeader({ lead, titleNode }: { lead: string; titleNode: ReactNode }) {
@@ -75,22 +76,7 @@ export function PageHeader({ lead, titleNode }: { lead: string; titleNode: React
         >
           <span aria-hidden="true">{name === null ? "" : initialsOf(name)}</span>
         </Link>
-        <div className="flex h-10 items-center gap-3 rounded-md border border-input bg-card pl-3.5 pr-1.5">
-          <span className="flex items-center gap-2 text-[13px] font-medium">
-            <span className="h-2 w-2 rounded-full bg-signal" />
-            {copy.sample.autoApplyLabel}
-          </span>
-          <button
-            className="inline-flex h-[30px] items-center justify-center gap-2 rounded-md border border-input bg-card px-3 text-[12.5px] font-semibold hover:bg-muted"
-            type="button"
-          >
-            <svg aria-hidden="true" fill="currentColor" height="12" viewBox="0 0 24 24" width="12">
-              <rect height="14" rx="1" width="4" x="6" y="5" />
-              <rect height="14" rx="1" width="4" x="14" y="5" />
-            </svg>
-            {copy.sample.pause}
-          </button>
-        </div>
+        <RunningSwitch />
       </div>
     </header>
   );

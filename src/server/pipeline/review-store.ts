@@ -5,6 +5,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { QuestionFieldType, ReviewReason } from "../../shared/questions.ts";
 
 import { reviewApplications, reviews } from "../platform/db/schema.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
 import type { ReviewAuditAts } from "./review-events.ts";
 import { recordReviewOpened, recordReviewResolved, reviewWasAnswered } from "./review-events.ts";
 
@@ -87,6 +88,9 @@ export function ensureOpenReview(db: AppDatabase, clock: Clock, input: OpenRevie
     scope: input.scope,
     userId: input.userId,
   });
+
+  publishEvent(db, clock, "review.created", JSON.stringify({ reviewId: id }), input.userId);
+  publishEvent(db, clock, "home.updated", JSON.stringify({ reviewId: id }), input.userId);
 
   return id;
 }

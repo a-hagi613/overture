@@ -10,6 +10,7 @@
   --color-foreground: #151311;
   --color-muted-foreground: #5e5850;
   --color-signal: #d2561f;
+  --color-signal-soft: rgba(210, 86, 31, 0.1);
   --color-signal-text: #a9431a;
   --color-signal-soft: rgba(210, 86, 31, 0.1);
   --color-scrim: rgba(21, 19, 17, 0.16);
@@ -43,6 +44,7 @@
   --color-foreground: #f2ede4;
   --color-muted-foreground: #ada69b;
   --color-signal: #f0743a;
+  --color-signal-soft: rgba(240, 116, 58, 0.16);
   --color-signal-text: #f37d44;
   --color-signal-soft: rgba(240, 116, 58, 0.16);
   --color-scrim: rgba(0, 0, 0, 0.38);

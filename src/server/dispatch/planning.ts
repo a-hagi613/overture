@@ -4,6 +4,8 @@ import {
   addLocalDays,
   localDateAt,
   localDayStartFor,
+  localPartsAt,
+  localTimeOn,
   localWindowOn,
 } from "../platform/local-time.ts";
 
@@ -135,6 +137,25 @@ function freeIntervals(start: number, end: number, blocked: readonly number[], s
   }
 
   return intervals.filter((interval) => interval.end > interval.start);
+}
+
+export function nextSendSlot(earliest: number, timeZone: string, window: SendWindow) {
+  const parts = localPartsAt(earliest, timeZone);
+  const minuteOfDay = parts.hour * 60 + parts.minute;
+
+  if (minuteOfDay >= window.startMinutes && minuteOfDay < window.endMinutes) {
+    return earliest;
+  }
+
+  const date = { day: parts.day, month: parts.month, year: parts.year };
+  const target = minuteOfDay < window.startMinutes ? date : addLocalDays(date, 1);
+
+  return localTimeOn(
+    target,
+    Math.trunc(window.startMinutes / 60),
+    window.startMinutes % 60,
+    timeZone,
+  );
 }
 
 export function planSlots(input: PlanSlotsInput) {

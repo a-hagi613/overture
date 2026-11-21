@@ -94,9 +94,19 @@ export function createApp(deps: AppDependencies) {
   app.all("/api/auth/*", async (context) => deps.auth.handler(context.req.raw));
   app.route("/api", createHealthRoutes(deps.db, deps.backups));
   app.route("/api", createMeRoutes(deps.auth));
-  app.route("/api", createApiRoutes(deps.db, deps.clock));
+  app.route("/api", createApiRoutes(deps.db, deps.clock, deps.auth));
   app.route("/api", createProfileRoutes(deps));
-  app.route("/api", createHomeRoutes(deps.db, deps.clock, deps.auth, matching));
+  app.route(
+    "/api",
+    createHomeRoutes({
+      auth: deps.auth,
+      clock: deps.clock,
+      db: deps.db,
+      matching,
+      personal,
+      reviews: deps.reviews,
+    }),
+  );
   app.route("/api", createApplicationRoutes(deps.db, deps.clock, deps.auth, personal));
   app.route(
     "/api",

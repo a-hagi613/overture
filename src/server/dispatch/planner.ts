@@ -7,6 +7,7 @@ import type { Random } from "../platform/ports/random.ts";
 
 import { applications, profiles } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
 import { getSetting } from "../platform/settings/index.ts";
 import { dailyUsageSince } from "../billing/ledger.ts";
 import { localDayStart, nextLocalDayStart } from "../platform/local-time.ts";
@@ -169,6 +170,10 @@ export function createPlanner(deps: PlannerDeps) {
     }
 
     ensureMidnightQueued(userId);
+
+    if (slots.length > 0) {
+      publishEvent(db, clock, "home.updated", JSON.stringify({ planned: slots.length }), userId);
+    }
 
     return { planned: slots.length, remaining };
   }

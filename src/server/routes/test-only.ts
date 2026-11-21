@@ -31,6 +31,7 @@ import {
   notifications,
   postingTags,
   postings,
+  profiles,
   questionVariants,
   questions,
   reviewApplications,
@@ -157,6 +158,21 @@ const seedPostingQuestionBody = z.object({
 
 const sampleLedgerBody = z.object({ email: z.email() });
 
+const homeSampleBody = z.object({ email: z.email() });
+
+const seedMailBody = z.object({
+  userId: z.string().min(1),
+  applicationId: z.string().min(1).nullish(),
+  from: z.string().min(1),
+  senderDomain: z.string().min(1),
+  subject: z.string().min(1),
+  text: z.string().min(1),
+  classification: z
+    .enum(["ack", "code", "rejection", "screening", "interview", "offer", "other"])
+    .default("other"),
+  at: z.number().int().nullish(),
+});
+
 const tamperLedgerBody = z.object({
   action: z.enum(["delete", "delete-owner", "update"]),
 });
@@ -214,6 +230,10 @@ const seedAnswerBody = z.object({
 });
 
 const SAMPLE_GRANT_QUANTITY = 70;
+
+function defaultStageFor(status: "needs_review" | "ready" | "sent") {
+  return status === "sent" ? "applied" : "queued";
+}
 
 const createPostingBody = z.object({
   boardId: z.string().min(1),
@@ -508,6 +528,140 @@ export function createTestRoutes(
     parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
     env.MASTER_KEY_CURRENT,
   );
+
+  function seedReviewRow(body: z.infer<typeof seedReviewBody>) {
+    const now = clock.now();
+    const textNormHash = questionVariantHash(body.prompt);
+
+    const existing = db
+      .select({ id: questions.id })
+      .from(questions)
+      .where(eq(questions.textNormHash, textNormHash))
+      .get();
+
+    const questionId = existing?.id ?? crypto.randomUUID();
+
+    if (existing === undefined) {
+      db.insert(questions)
+        .values({
+          id: questionId,
+          textDisplay: body.prompt,
+          textNormHash,
+          fieldType: body.fieldType,
+          optionsHash: null,
+          factKey: body.factKey ?? null,
+          answerKind: body.answerKind,
+          mappedBy: null,
+          seenCount: 1,
+          createdAt: now,
+        })
+        .run();
+
+      db.insert(questionVariants)
+        .values({ variantHash: textNormHash, questionId })
+        .onConflictDoNothing()
+        .run();
+    }
+
+    const reviewId = crypto.randomUUID();
+
+    db.insert(reviews)
+      .values({
+        id: reviewId,
+        userId: body.userId,
+        questionId,
+        factKey: body.factKey ?? null,
+        scope: body.scope,
+        prompt: body.prompt,
+        fieldType: body.fieldType,
+        options: JSON.stringify(body.options),
+        reason: body.reason,
+        status: "open",
+        createdAt: now,
+        resolvedAt: null,
+      })
+      .run();
+
+    for (const applicationId of body.applicationIds) {
+      db.insert(reviewApplications).values({ reviewId, applicationId }).onConflictDoNothing().run();
+    }
+
+    return { questionId, reviewId };
+  }
+
+  async function insertMailRow(body: z.infer<typeof seedMailBody>) {
+    const at = body.at ?? clock.now();
+    const localPart = `owner-${body.userId.slice(0, 8)}`;
+
+    const existingMailbox = db
+      .select({ id: mailboxes.id })
+      .from(mailboxes)
+      .where(eq(mailboxes.userId, body.userId))
+      .get();
+
+    const mailboxId = existingMailbox?.id ?? crypto.randomUUID();
+
+    if (existingMailbox === undefined) {
+      db.insert(mailboxes)
+        .values({
+          createdAt: new Date(at),
+          id: mailboxId,
+          localPart,
+          status: "active",
+          userId: body.userId,
+        })
+        .run();
+    }
+
+    const threadId = crypto.randomUUID();
+    const messageId = crypto.randomUUID();
+
+    const subjectEnc = await personal.sealFor(
+      body.userId,
+      { column: "subject_enc", rowId: threadId, table: "mail_threads" },
+      body.subject,
+    );
+
+    const scope = (column: string) => ({ column, rowId: messageId, table: "messages" });
+    const snippet = body.text.replaceAll(/\s+/gu, " ").trim().slice(0, 200);
+
+    db.insert(mailThreads)
+      .values({
+        applicationId: body.applicationId ?? null,
+        employerStarted: true,
+        id: threadId,
+        lastMessageAt: new Date(at),
+        subjectEnc,
+        userId: body.userId,
+      })
+      .run();
+
+    db.insert(messages)
+      .values({
+        auth: "pass",
+        classification: body.classification,
+        createdAt: new Date(at),
+        direction: "in",
+        fromEnc: await personal.sealFor(body.userId, scope("from_enc"), body.from),
+        id: messageId,
+        mailboxId,
+        rfcMessageId: `<${messageId}@${body.senderDomain}>`,
+        senderDomain: body.senderDomain,
+        snippetEnc: await personal.sealFor(body.userId, scope("snippet_enc"), snippet),
+        subjectEnc: await personal.sealFor(body.userId, scope("subject_enc"), body.subject),
+        textEnc: await personal.sealFor(body.userId, scope("text_enc"), body.text),
+        threadId,
+        toEnc: await personal.sealFor(
+          body.userId,
+          scope("to_enc"),
+          `in-${localPart}@tryoverture.com`,
+        ),
+        userId: body.userId,
+      })
+      .run();
+
+    return { messageId, threadId };
+  }
 
   routes.get("/clock", (context) => context.json({ now: clock.now(), offsetMs: clock.offset() }));
 
@@ -1033,67 +1187,9 @@ export function createTestRoutes(
     return context.json({ id: userId, suspended });
   });
 
-  routes.post("/reviews/seed", zValidator("json", seedReviewBody), (context) => {
-    const body = context.req.valid("json");
-    const now = clock.now();
-
-    const textNormHash = questionVariantHash(body.prompt);
-
-    const existing = db
-      .select({ id: questions.id })
-      .from(questions)
-      .where(eq(questions.textNormHash, textNormHash))
-      .get();
-
-    const questionId = existing?.id ?? crypto.randomUUID();
-
-    if (existing === undefined) {
-      db.insert(questions)
-        .values({
-          id: questionId,
-          textDisplay: body.prompt,
-          textNormHash,
-          fieldType: body.fieldType,
-          optionsHash: null,
-          factKey: body.factKey ?? null,
-          answerKind: body.answerKind,
-          mappedBy: null,
-          seenCount: 1,
-          createdAt: now,
-        })
-        .run();
-
-      db.insert(questionVariants)
-        .values({ variantHash: textNormHash, questionId })
-        .onConflictDoNothing()
-        .run();
-    }
-
-    const reviewId = crypto.randomUUID();
-
-    db.insert(reviews)
-      .values({
-        id: reviewId,
-        userId: body.userId,
-        questionId,
-        factKey: body.factKey ?? null,
-        scope: body.scope,
-        prompt: body.prompt,
-        fieldType: body.fieldType,
-        options: JSON.stringify(body.options),
-        reason: body.reason,
-        status: "open",
-        createdAt: now,
-        resolvedAt: null,
-      })
-      .run();
-
-    for (const applicationId of body.applicationIds) {
-      db.insert(reviewApplications).values({ reviewId, applicationId }).onConflictDoNothing().run();
-    }
-
-    return context.json({ reviewId, questionId });
-  });
+  routes.post("/reviews/seed", zValidator("json", seedReviewBody), (context) =>
+    context.json(seedReviewRow(context.req.valid("json"))),
+  );
 
   routes.get("/reviews", zValidator("query", userQuery), (context) => {
     const { userId } = context.req.valid("query");
@@ -1406,6 +1502,10 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
+  routes.post("/mail/seed", zValidator("json", seedMailBody), async (context) =>
+    context.json(await insertMailRow(context.req.valid("json"))),
+  );
+
   routes.post("/user/name", zValidator("json", userNameBody), (context) => {
     const { email, name } = context.req.valid("json");
 
@@ -1454,6 +1554,495 @@ export function createTestRoutes(
     }
 
     return context.json({ applicationsLeft: applicationsLeft(db, user.id, clock.now()) });
+  });
+
+  routes.post("/home/sample", zValidator("json", homeSampleBody), async (context) => {
+    const { email } = context.req.valid("json");
+
+    const user = db
+      .select()
+      .from(users)
+      .where(eq(users.email, lowercased(email)))
+      .get();
+
+    if (user === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    const userId = user.id;
+    const now = clock.now();
+    const minute = 60_000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+    const at = new Date(now);
+    const todayStart = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
+    const dayStart = (offset: number) => todayStart + offset * day;
+
+    grantApplications(db, clock, {
+      idempotencyKey: `home-sample-grant:${userId}`,
+      quantity: SAMPLE_GRANT_QUANTITY,
+      source: "admin",
+      userId,
+    });
+
+    for (let index = 1; index <= 7; index += 1) {
+      const applicationId = `home-sample-${String(index)}`;
+
+      reserveForApplication(db, clock, {
+        applicationId,
+        idempotencyKey: `home-sample-reserve:${userId}:${applicationId}`,
+        userId,
+      });
+
+      commitForApplication(db, clock, {
+        applicationId,
+        idempotencyKey: `home-sample-commit:${userId}:${applicationId}`,
+        userId,
+      });
+    }
+
+    db.insert(profiles)
+      .values({
+        createdAt: new Date(now),
+        languages: "[]",
+        pauseReason: null,
+        running: true,
+        timezone: "UTC",
+        updatedAt: new Date(now),
+        userId,
+      })
+      .onConflictDoUpdate({
+        target: profiles.userId,
+        set: { pauseReason: null, running: true, timezone: "UTC", updatedAt: new Date(now) },
+      })
+      .run();
+
+    function addCompany(name: string, domain: string, token: string) {
+      const companyId = crypto.randomUUID();
+      const boardId = crypto.randomUUID();
+
+      db.insert(companies)
+        .values({ createdAt: now, domain, id: companyId, name, nameNorm: name.toLowerCase() })
+        .run();
+
+      db.insert(companyBoards)
+        .values({
+          ats: "greenhouse",
+          backoffLevel: 0,
+          boardToken: token,
+          companyId,
+          consecutiveErrors: 0,
+          createdAt: now,
+          id: boardId,
+          notFoundPolls: 0,
+          region: "us",
+          source: "discovered",
+          status: "active",
+        })
+        .run();
+
+      return { boardId, companyId };
+    }
+
+    let sequence = 0;
+
+    function addPosting(
+      owner: { boardId: string; companyId: string },
+      title: string,
+      atsJobId: string,
+    ) {
+      sequence += 1;
+
+      return seedPosting(
+        db,
+        {
+          ats: "greenhouse",
+          atsJobId,
+          boardId: owner.boardId,
+          companyId: owner.companyId,
+          employmentType: "full_time",
+          questions: [],
+          tags: [],
+          title,
+          url: `https://boards.example/jobs/${atsJobId}`,
+          workplace: "remote",
+        },
+        now,
+      );
+    }
+
+    function addApplication(input: {
+      companyId: string;
+      postingId: string;
+      status: "ready" | "needs_review" | "sent";
+      createdAt?: number;
+      scheduledFor?: number;
+      sentAt?: number;
+      stage?: "applied" | "screening" | "interviewing" | "closed" | "queued";
+    }) {
+      const id = crypto.randomUUID();
+
+      db.insert(applications)
+        .values({
+          attempts: 0,
+          closedReason: input.stage === "closed" ? "rejected" : null,
+          companyId: input.companyId,
+          createdAt: input.createdAt ?? now,
+          id,
+          origin: "auto",
+          postingId: input.postingId,
+          scheduledFor: input.scheduledFor ?? null,
+          scoreAtQueue: null,
+          sentAt: input.sentAt ?? null,
+          stage: input.stage ?? defaultStageFor(input.status),
+          stageLocked: false,
+          status: input.status,
+          statusReason: null,
+          updatedAt: now,
+          userId,
+        })
+        .run();
+
+      return id;
+    }
+
+    function addStageEvent(
+      applicationId: string,
+      eventAt: number,
+      from: string | null,
+      to: string | null,
+    ) {
+      db.insert(applicationEvents)
+        .values({
+          applicationId,
+          at: eventAt,
+          detail: null,
+          fromValue: from,
+          id: crypto.randomUUID(),
+          kind: "stage",
+          source: "email",
+          toValue: to,
+          userId,
+        })
+        .run();
+    }
+
+    const sample = addCompany("Sample Works", "sample.example", "home-sample");
+
+    const feed = [
+      {
+        applicationId: "",
+        at: dayStart(0) + 9 * hour + 12 * minute,
+        classification: "other" as const,
+        company: "Halden Systems",
+        domain: "halden.example",
+        eventAt: dayStart(0) + 9 * hour + 12 * minute,
+        from: "screening",
+        sentAt: dayStart(0) + 8 * hour + 5 * minute,
+        stage: "interviewing" as const,
+        subject: "can you do Thursday at 2 pm?",
+        text: "Thursday at 2 pm works for us. Can you make it?",
+        title: "Platform Engineer",
+        token: "home-halden",
+        to: "interviewing",
+      },
+      {
+        applicationId: "",
+        at: dayStart(0) + 8 * hour + 47 * minute,
+        classification: "ack" as const,
+        company: "Northwind Labs",
+        domain: "northwind.example",
+        eventAt: null,
+        from: null,
+        sentAt: dayStart(0) + 8 * hour + 10 * minute,
+        stage: "applied" as const,
+        subject: "Your application to Northwind Labs",
+        text: "Thank you for applying to Northwind Labs. We received your application.",
+        title: "Staff Platform Engineer",
+        token: "home-northwind",
+        to: null,
+      },
+      {
+        applicationId: "",
+        at: dayStart(-1) + 16 * hour + 30 * minute,
+        classification: "screening" as const,
+        company: "Larkspur Health",
+        domain: "larkspur.example",
+        eventAt: dayStart(-1) + 16 * hour + 30 * minute,
+        from: "applied",
+        sentAt: dayStart(-1) + 9 * hour,
+        stage: "screening" as const,
+        subject: "Phone screen invitation",
+        text: "We would like to invite you to a phone screen with our team.",
+        title: "Platform Engineer",
+        token: "home-larkspur",
+        to: "screening",
+      },
+      {
+        applicationId: "",
+        at: dayStart(-1) + 11 * hour + 5 * minute,
+        classification: "rejection" as const,
+        company: "Ferro Cloud",
+        domain: "ferro.example",
+        eventAt: dayStart(-1) + 11 * hour + 5 * minute,
+        from: "interviewing",
+        sentAt: dayStart(-3) + 10 * hour,
+        stage: "closed" as const,
+        subject: "Not moving forward",
+        text: "Unfortunately we are not moving forward with your application.",
+        title: "DevOps Engineer",
+        token: "home-ferro",
+        to: "closed",
+      },
+    ];
+
+    for (const entry of feed) {
+      const owner = addCompany(entry.company, entry.domain, entry.token);
+      const postingId = addPosting(owner, entry.title, `${entry.token}-1`);
+
+      const applicationId = addApplication({
+        companyId: owner.companyId,
+        postingId,
+        sentAt: entry.sentAt,
+        stage: entry.stage,
+        status: "sent",
+      });
+
+      if (entry.eventAt !== null) {
+        addStageEvent(applicationId, entry.eventAt, entry.from, entry.to);
+      }
+
+      entry.applicationId = applicationId;
+    }
+
+    const dailyCounts = [3, 5, 4, 6, 7, 5, 7];
+    const feedPerDay = [0, 0, 0, 1, 0, 1, 2];
+
+    for (const [index, count] of dailyCounts.entries()) {
+      const offset = index - 6;
+      const interviewDay = offset === -2 || offset === -4 ? 1 : 0;
+      const extras = count - (feedPerDay[index] ?? 0) - interviewDay;
+
+      for (let extra = 0; extra < extras; extra += 1) {
+        const postingId = addPosting(sample, "Backend Engineer", `home-sent-${String(sequence)}`);
+
+        addApplication({
+          companyId: sample.companyId,
+          postingId,
+          sentAt: dayStart(offset) + 9 * hour + extra * 6 * minute + 15 * minute,
+          status: "sent",
+        });
+      }
+    }
+
+    const previousCounts = [4, 4, 5, 4, 4, 5, 5];
+
+    for (const [index, count] of previousCounts.entries()) {
+      const offset = index - 13;
+
+      for (let extra = 0; extra < count; extra += 1) {
+        const postingId = addPosting(sample, "Backend Engineer", `home-prior-${String(sequence)}`);
+
+        addApplication({
+          companyId: sample.companyId,
+          postingId,
+          sentAt: dayStart(offset) + 10 * hour + extra * 5 * minute,
+          status: "sent",
+        });
+      }
+    }
+
+    for (let index = 0; index < 12; index += 1) {
+      const postingId = addPosting(sample, "Backend Engineer", `home-ready-${String(index)}`);
+
+      addApplication({
+        companyId: sample.companyId,
+        postingId,
+        scheduledFor: dayStart(0) + 11 * hour + 40 * minute + index * 20 * minute,
+        stage: "queued",
+        status: "ready",
+      });
+    }
+
+    const interviewExtras = [
+      { offset: -2, at: dayStart(-2) + 15 * hour },
+      { offset: -4, at: dayStart(-4) + 14 * hour },
+    ];
+
+    for (const extra of interviewExtras) {
+      const postingId = addPosting(sample, "Backend Engineer", `home-event-${String(sequence)}`);
+
+      const applicationId = addApplication({
+        companyId: sample.companyId,
+        postingId,
+        sentAt: dayStart(extra.offset) + 10 * hour,
+        stage: "interviewing",
+        status: "sent",
+      });
+
+      addStageEvent(applicationId, extra.at, "screening", "interviewing");
+    }
+
+    const reviewFixtures: {
+      company: string;
+      domain: string;
+      title: string;
+      token: string;
+    }[] = [
+      {
+        company: "Northwind Labs",
+        domain: "review-northwind.example",
+        title: "Platform Engineer",
+        token: "review-northwind",
+      },
+      {
+        company: "Ferro Cloud",
+        domain: "review-ferro.example",
+        title: "Senior DevOps Engineer",
+        token: "review-ferro",
+      },
+      {
+        company: "Halden Systems",
+        domain: "review-halden.example",
+        title: "Site Reliability Engineer",
+        token: "review-halden",
+      },
+      {
+        company: "Larkspur Health",
+        domain: "review-larkspur.example",
+        title: "Platform Engineer",
+        token: "review-larkspur",
+      },
+      {
+        company: "Halden Systems",
+        domain: "review-halden-staff.example",
+        title: "Staff Platform Engineer",
+        token: "review-halden-staff",
+      },
+      {
+        company: "Tideline Software",
+        domain: "review-tideline.example",
+        title: "Backend Engineer",
+        token: "review-tideline",
+      },
+      {
+        company: "Brightwave Analytics",
+        domain: "review-brightwave.example",
+        title: "Infrastructure Engineer",
+        token: "review-brightwave",
+      },
+      {
+        company: "Larkspur Health",
+        domain: "review-larkspur-senior.example",
+        title: "Senior Platform Engineer",
+        token: "review-larkspur-senior",
+      },
+      {
+        company: "Ferro Cloud",
+        domain: "review-ferro-cloud.example",
+        title: "Cloud Engineer",
+        token: "review-ferro-cloud",
+      },
+      {
+        company: "Ferro Cloud",
+        domain: "review-ferro-platform.example",
+        title: "Platform Engineer",
+        token: "review-ferro-platform",
+      },
+    ];
+
+    const reviewApplicationIds: string[] = [];
+
+    for (const [index, entry] of reviewFixtures.entries()) {
+      const owner = addCompany(entry.company, entry.domain, entry.token);
+      const postingId = addPosting(owner, entry.title, `${entry.token}-1`);
+
+      reviewApplicationIds.push(
+        addApplication({
+          companyId: owner.companyId,
+          createdAt: index + 1,
+          postingId,
+          stage: "queued",
+          status: "needs_review",
+        }),
+      );
+    }
+
+    const reviewSeeds = [
+      {
+        applicationIds: reviewApplicationIds.slice(0, 4),
+        fieldType: "select" as const,
+        options: ["Yes", "No"],
+        prompt: "Are you comfortable with a weekly on-call rotation?",
+      },
+      {
+        applicationIds: reviewApplicationIds.slice(4, 7),
+        fieldType: "text" as const,
+        options: [],
+        prompt: "How many years have you run Kubernetes in production?",
+      },
+      {
+        applicationIds: reviewApplicationIds.slice(7, 9),
+        fieldType: "text" as const,
+        options: [],
+        prompt: "Security clearance status",
+      },
+      {
+        applicationIds: reviewApplicationIds.slice(9),
+        fieldType: "url" as const,
+        options: [],
+        prompt: "Link to your portfolio",
+      },
+    ];
+
+    for (const review of reviewSeeds) {
+      seedReviewRow({
+        answerKind: "unknown",
+        applicationIds: review.applicationIds,
+        fieldType: review.fieldType,
+        options: review.options,
+        prompt: review.prompt,
+        reason: "unknown_required",
+        scope: "",
+        userId,
+      });
+    }
+
+    await Promise.all(
+      feed.map(async (entry) =>
+        insertMailRow({
+          applicationId: entry.applicationId,
+          at: entry.at,
+          classification: entry.classification,
+          from: `${entry.company} <no-reply@${entry.domain}>`,
+          senderDomain: entry.domain,
+          subject: entry.subject,
+          text: entry.text,
+          userId,
+        }),
+      ),
+    );
+
+    const olderMessages = [-5, -5, -4, -3, -2].map((offset, index) => ({
+      at: dayStart(offset) + (index % 2 === 0 ? 10 : 15) * hour,
+    }));
+
+    await Promise.all(
+      olderMessages.map(async (message, index) =>
+        insertMailRow({
+          applicationId: null,
+          at: message.at,
+          classification: "other",
+          from: "Tideline Software <no-reply@tideline.example>",
+          senderDomain: "tideline.example",
+          subject: `Update on your application ${String(index + 1)}`,
+          text: "We will be in touch soon.",
+          userId,
+        }),
+      ),
+    );
+
+    return context.json({ ok: true });
   });
 
   routes.post("/ledger/tamper", zValidator("json", tamperLedgerBody), (context) => {
