@@ -942,6 +942,36 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
+  routes.post(
+    "/push/subscriptions",
+    zValidator(
+      "json",
+      z.object({
+        endpoint: z.string().min(1),
+        keys: z.object({ auth: z.string().min(1), p256dh: z.string().min(1) }),
+        userId: z.string().min(1),
+      }),
+    ),
+    (context) => {
+      const { endpoint, keys, userId } = context.req.valid("json");
+
+      db.insert(pushSubscriptions)
+        .values({
+          auth: keys.auth,
+          createdAt: clock.now(),
+          endpoint,
+          id: crypto.randomUUID(),
+          lastOkAt: null,
+          p256dh: keys.p256dh,
+          userId,
+        })
+        .onConflictDoNothing()
+        .run();
+
+      return context.json({ ok: true });
+    },
+  );
+
   routes.get("/live-checks", (context) => context.json({ results: readLiveCheckResults(db, 200) }));
 
   routes.get("/live-checks/mail", (context) => {
