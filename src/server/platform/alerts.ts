@@ -13,6 +13,7 @@ export const ALERT_KINDS = [
   "dispatch.kill_switch",
   "llm.cap",
   "live.check.failure",
+  "mail.dead_letter",
   "mail.reply_rate",
   "mail.domain_reply_rate",
   "ats.success",
