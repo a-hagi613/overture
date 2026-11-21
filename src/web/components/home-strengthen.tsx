@@ -21,7 +21,7 @@ export function HomeStrengthen({ missing }: { missing: number }) {
       </div>
       <Link
         className="inline-flex min-h-10 max-[767px]:min-h-11 flex-none items-center justify-center rounded-md border border-foreground bg-foreground px-[18px] text-[13.5px] font-semibold text-primary-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] hover:bg-btn-hover"
-        to="/profile#profile-facts"
+        to="/profile#profile-strengthen"
       >
         {copy.home.strengthen.action}
       </Link>
