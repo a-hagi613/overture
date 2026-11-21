@@ -170,7 +170,7 @@ src/
 drizzle/             generated migrations
 scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, pull-forms.ts, restore-drill.ts
 test/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
-                     (the seven unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
+                     (the eight unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
 ```
 
@@ -970,11 +970,12 @@ payment-failure pause (M3) · 32. admin fixture capture job writes sanitised for
 Plus: route reachability for every page, axe on every page, 30 visual snapshots (Home, Board, Review, Inbox, Profile
 × 390 / 1280 px × light/dark) in pinned Docker.
 
-### 16.2 Unit tests (six files, Vitest, beside their code)
+### 16.2 Unit tests (eight files, Vitest, beside their code)
 
 `ledger.test.ts` (balances, idempotency, FIFO expiry), `crypto.test.ts` (wrap/unwrap, AAD, shred), `planner.test.ts`
 (window, spacing, DST), `address.test.ts` (slug, transliteration, collisions), `tag-rules.test.ts`,
-`question-normalize.test.ts`.
+`question-normalize.test.ts`, `answer-derivations.test.ts`, `sanitise.test.ts` (recorded pages must carry no script,
+event handler, personal data or token).
 
 ### 16.3 CI
 

@@ -22,8 +22,9 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for seven invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
-derivations. They import
+exist only for eight invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
+derivations, and the fixture sanitiser (recorded pages must carry no script, event handler, personal data or token).
+They import
 `bun:test`, run with `bun test src`, and keep the Vitest lint plugin, whose test-shape rules do not depend on the
 runner. CI stays under two minutes on pull requests: six shards balanced by per-file time, and a pull request runs
 only the e2e files its committed reach map says its diff can reach, with everything unclassified running the full
