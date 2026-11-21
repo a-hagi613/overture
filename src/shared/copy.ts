@@ -269,6 +269,9 @@ export const copy = {
     rateLimited: "Too many tries. Wait a few minutes and ask again.",
     captchaMissing: "Finish the bot check before continuing.",
     captchaFailed: "The bot check did not pass. Finish it again and retry.",
+    captchaTimedOut: "The bot check timed out. Try again.",
+    captchaExpired: "The bot check expired. Try again.",
+    captchaUnavailable: "The bot check could not load. Check your connection and try again.",
     sampleLabel: "Sample data",
     story: {
       pill: "Personal job-search agent",

@@ -30,14 +30,6 @@ emailOnlyTest(
   "with both OAuth pairs unset the sign-in screen offers only the emailed link, and the link signs the owner in",
   async ({ page, request, emailOnlyServer }) => {
     await page.goto(`${emailOnlyServer.url}/signin`);
-    await expect
-      .poll(
-        async () =>
-          await page
-            .locator('[data-turnstile="magic"] input[name="cf-turnstile-response"]')
-            .inputValue(),
-      )
-      .not.toBe("");
 
     await expect(page.getByRole("button", { name: "Continue with Google" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Continue with LinkedIn" })).toHaveCount(0);

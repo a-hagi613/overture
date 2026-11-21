@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { copy } from "../../shared/copy.ts";
 import { turnstileActionHeader, turnstileTokenHeader } from "../../shared/turnstile.ts";
+import { BusyIndicator } from "../components/busy-indicator.tsx";
 import { NavGlyph } from "../components/nav-glyph.tsx";
 import { PasswordField } from "../components/password-field.tsx";
 import { SignInLayout } from "../components/signin-layout.tsx";
@@ -18,23 +19,25 @@ import {
 } from "../components/signin-styles.ts";
 import { authClient } from "../lib/auth-client.ts";
 import { fetchOnboardingState } from "../lib/onboarding-api.ts";
-import { useTurnstile } from "../lib/turnstile.ts";
-import { useTurnstileSiteKey } from "../lib/turnstile-site-key.ts";
+import { useTurnstile, turnstileFailureMessage } from "../lib/turnstile.ts";
+import { useTurnstileConfig } from "../lib/turnstile-config.ts";
 
 export function ResetPasswordPage() {
   const navigate = useNavigate();
   const [search] = useSearchParams();
   const token = search.get("token") ?? "";
-  const siteKey = useTurnstileSiteKey();
+  const config = useTurnstileConfig();
 
   const { containerRef: resetContainer, obtainToken: obtainResetToken } = useTurnstile(
-    siteKey,
+    config === undefined ? undefined : config.siteKey,
     "reset",
+    config?.scriptUrl,
   );
 
   const { containerRef: signInContainer, obtainToken: obtainSignInToken } = useTurnstile(
-    siteKey,
+    config === undefined ? undefined : config.siteKey,
     "signin",
+    config?.scriptUrl,
   );
 
   const [email, setEmail] = useState<string | null>(null);
@@ -84,22 +87,23 @@ export function ResetPasswordPage() {
       return;
     }
 
-    const tokenForReset = await obtainResetToken();
+    setSaving(true);
 
-    if (tokenForReset === null) {
-      setError(copy.signIn.captchaMissing);
+    const resetToken = await obtainResetToken();
+
+    if (resetToken.token === null) {
+      setSaving(false);
+      setError(turnstileFailureMessage(resetToken.failure));
 
       return;
     }
-
-    setSaving(true);
 
     const result = await authClient
       .resetPassword({
         newPassword: password,
         token,
         fetchOptions: {
-          headers: { [turnstileTokenHeader]: tokenForReset, [turnstileActionHeader]: "reset" },
+          headers: { [turnstileTokenHeader]: resetToken.token, [turnstileActionHeader]: "reset" },
         },
       })
       .catch(() => null);
@@ -123,16 +127,16 @@ export function ResetPasswordPage() {
     }
 
     if (email !== null) {
-      const tokenForSignIn = await obtainSignInToken();
+      const signInToken = await obtainSignInToken();
 
-      if (tokenForSignIn !== null) {
+      if (signInToken.token !== null) {
         const signedIn = await authClient.signIn
           .email({
             email,
             password,
             fetchOptions: {
               headers: {
-                [turnstileTokenHeader]: tokenForSignIn,
+                [turnstileTokenHeader]: signInToken.token,
                 [turnstileActionHeader]: "signin",
               },
             },
@@ -209,7 +213,13 @@ export function ResetPasswordPage() {
                 value={confirm}
               />
             </div>
-            <button className={`${BTN_PRIMARY} mt-1`} disabled={saving} type="submit">
+            <button
+              aria-busy={saving || undefined}
+              className={`${BTN_PRIMARY} mt-1`}
+              disabled={saving}
+              type="submit"
+            >
+              {saving ? <BusyIndicator /> : null}
               {copy.signIn.resetSubmit}
             </button>
           </form>

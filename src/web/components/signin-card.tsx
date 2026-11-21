@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { z } from "zod";
@@ -7,6 +7,7 @@ import { copy } from "../../shared/copy.ts";
 import { isDemoEmail } from "../../shared/demo.ts";
 import { turnstileActionHeader, turnstileTokenHeader } from "../../shared/turnstile.ts";
 import type { TurnstileAction } from "../../shared/turnstile.ts";
+import { BusyIndicator } from "./busy-indicator.tsx";
 import { GoogleMark } from "./google-mark.tsx";
 import { NavGlyph } from "./nav-glyph.tsx";
 import { SignInForm } from "./signin-form.tsx";
@@ -25,13 +26,21 @@ import {
 } from "./signin-styles.ts";
 import { authClient } from "../lib/auth-client.ts";
 import { fetchOnboardingState } from "../lib/onboarding-api.ts";
-import { useTurnstile } from "../lib/turnstile.ts";
+import { useTurnstile, turnstileFailureMessage } from "../lib/turnstile.ts";
+import type { TurnstileTokenResult } from "../lib/turnstile.ts";
 
 type Mode = "sign-in" | "sign-up";
 
 type SocialProvider = "google" | "linkedin";
 
+type Pending = "google" | "linkedin" | "magic" | "password" | "verify";
+
 type Phase = "form" | "magic-sent" | "refused" | "suspended" | "verify-sent";
+
+interface TurnstileCardConfig {
+  scriptUrl: string | undefined;
+  siteKey: string | null;
+}
 
 const CALLBACK_URL = "/signin";
 const VERIFIED_CALLBACK_URL = "/signin?verified=1";
@@ -39,6 +48,7 @@ const VERIFIED_CALLBACK_URL = "/signin?verified=1";
 const meSchema = z.object({
   user: z.unknown().nullable(),
   turnstileSiteKey: z.string().optional(),
+  turnstileScriptUrl: z.string().optional(),
   socialProviders: z.array(z.enum(["google", "linkedin"])).default([]),
 });
 
@@ -113,49 +123,62 @@ export function SignInCard() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [actionError, setActionError] = useState<string | null>(callbackMessage(callbackError));
-  const [siteKey, setSiteKey] = useState<string | null | undefined>(undefined);
+
+  const [turnstileConfig, setTurnstileConfig] = useState<TurnstileCardConfig | undefined>(
+    undefined,
+  );
+
   const [socialProviders, setSocialProviders] = useState<SocialProvider[]>([]);
+  const [pending, setPending] = useState<Pending | null>(null);
+  const pendingRef = useRef(false);
+  const siteKey = turnstileConfig === undefined ? undefined : turnstileConfig.siteKey;
   const socialAction: TurnstileAction = mode === "sign-up" ? "signup" : "signin";
   const passwordAction: TurnstileAction = mode === "sign-up" ? "signup" : "signin";
 
   const { containerRef: socialContainer, obtainToken: obtainSocialToken } = useTurnstile(
     socialProviders.length > 0 ? siteKey : null,
     socialAction,
+    turnstileConfig?.scriptUrl,
   );
 
   const { containerRef: passwordContainer, obtainToken: obtainPasswordToken } = useTurnstile(
     siteKey,
     passwordAction,
+    turnstileConfig?.scriptUrl,
   );
 
   const { containerRef: magicContainer, obtainToken: obtainMagicToken } = useTurnstile(
     siteKey,
     "magiclink",
+    turnstileConfig?.scriptUrl,
   );
 
   const { containerRef: verifyContainer, obtainToken: obtainVerifyToken } = useTurnstile(
     siteKey,
     "signup",
+    turnstileConfig?.scriptUrl,
   );
 
   useEffect(() => {
     const load = async () => {
       let key: string | null = null;
+      let scriptUrl: string | undefined;
 
       try {
-        const response = await fetch("/api/me");
+        const response = await fetch("/api/me", { signal: AbortSignal.timeout(10_000) });
 
         if (response.ok) {
           const parsed = meSchema.parse(await response.json());
 
           key = parsed.turnstileSiteKey ?? null;
+          scriptUrl = parsed.turnstileScriptUrl;
           setSocialProviders(parsed.socialProviders);
         }
       } catch {
         key = null;
       }
 
-      setSiteKey(key);
+      setTurnstileConfig({ scriptUrl, siteKey: key });
     };
 
     void load();
@@ -177,56 +200,83 @@ export function SignInCard() {
     void check();
   }, [navigate, phase]);
 
-  const confirmToken = async (obtainToken: () => Promise<string | null>) => {
-    const token = await obtainToken();
+  const confirmToken = async (obtainToken: () => Promise<TurnstileTokenResult>) => {
+    const result = await obtainToken();
 
-    if (token === null) {
-      setActionError(copy.signIn.captchaMissing);
+    if (result.token === null) {
+      setActionError(turnstileFailureMessage(result.failure));
 
       return null;
     }
 
-    return token;
+    return result.token;
   };
 
-  const onSocial = async (provider: SocialProvider) => {
-    const token = await confirmToken(obtainSocialToken);
-
-    if (token === null) {
+  const runPending = async (kind: Pending, task: () => Promise<void>) => {
+    if (pendingRef.current) {
       return;
     }
 
-    const result = await authClient.signIn
-      .social({
-        provider,
-        callbackURL: CALLBACK_URL,
-        errorCallbackURL: CALLBACK_URL,
-        fetchOptions: {
-          headers: { [turnstileTokenHeader]: token, [turnstileActionHeader]: socialAction },
-        },
-      })
-      .catch(() => null);
+    pendingRef.current = true;
+    setPending(kind);
+    setActionError(null);
 
-    if (result !== null && result.error !== null) {
-      const next = presentError(result.error.status, result.error.code);
-
-      if (result.error.code === "forbidden") {
-        setPhase("refused");
-        setActionError(null);
-      } else if (
-        result.error.code === "email_not_verified" ||
-        result.error.code === "account_not_linked"
-      ) {
-        setActionError(copy.signIn.emailNotVerified);
-      } else if (result.error.code === "account_suspended") {
-        setPhase("suspended");
-      } else {
-        setActionError(next);
-      }
+    try {
+      await task();
+    } catch {
+      setActionError(copy.signIn.genericError);
     }
+
+    pendingRef.current = false;
+    setPending(null);
   };
 
-  const onPassword = async () => {
+  const onSocial = async (provider: SocialProvider) => {
+    await runPending(provider, async () => {
+      const token = await confirmToken(obtainSocialToken);
+
+      if (token === null) {
+        return;
+      }
+
+      const result = await authClient.signIn
+        .social({
+          provider,
+          callbackURL: CALLBACK_URL,
+          errorCallbackURL: CALLBACK_URL,
+          fetchOptions: {
+            headers: { [turnstileTokenHeader]: token, [turnstileActionHeader]: socialAction },
+          },
+        })
+        .catch(() => null);
+
+      if (result !== null && result.error !== null) {
+        const next = presentError(result.error.status, result.error.code);
+
+        if (result.error.code === "forbidden") {
+          setPhase("refused");
+          setActionError(null);
+        } else if (
+          result.error.code === "email_not_verified" ||
+          result.error.code === "account_not_linked"
+        ) {
+          setActionError(copy.signIn.emailNotVerified);
+        } else if (result.error.code === "account_suspended") {
+          setPhase("suspended");
+        } else {
+          setActionError(next);
+        }
+      }
+    });
+  };
+
+  const submitPassword = async () => {
+    if (mode === "sign-up" && password.length < 10) {
+      setActionError(copy.signIn.passwordShort);
+
+      return;
+    }
+
     const token = await confirmToken(obtainPasswordToken);
 
     if (token === null) {
@@ -237,12 +287,6 @@ export function SignInCard() {
     const headers = { [turnstileTokenHeader]: token, [turnstileActionHeader]: passwordAction };
 
     if (mode === "sign-up") {
-      if (password.length < 10) {
-        setActionError(copy.signIn.passwordShort);
-
-        return;
-      }
-
       const result = await authClient.signUp
         .email({
           email: trimmed,
@@ -314,7 +358,7 @@ export function SignInCard() {
     }
   };
 
-  const onMagic = async () => {
+  const submitMagic = async () => {
     const token = await confirmToken(obtainMagicToken);
 
     if (token === null) {
@@ -393,13 +437,25 @@ export function SignInCard() {
     }
   };
 
+  const onPassword = async () => {
+    await runPending("password", submitPassword);
+  };
+
+  const onMagic = async () => {
+    await runPending("magic", submitMagic);
+  };
+
+  const onVerifyResend = async () => {
+    await runPending("verify", submitVerify);
+  };
+
   const switchMode = (next: Mode) => {
     setMode(next);
     setPhase("form");
     setActionError(null);
   };
 
-  const onVerifyResend = async () => {
+  const submitVerify = async () => {
     const token = await confirmToken(obtainVerifyToken);
 
     if (token === null) {
@@ -428,7 +484,9 @@ export function SignInCard() {
       <>
         {socialProviders.includes("google") ? (
           <button
+            aria-busy={pending === "google" || undefined}
             className={BTN_SECONDARY}
+            disabled={pending !== null}
             onClick={() => {
               void onSocial("google");
             }}
@@ -442,7 +500,9 @@ export function SignInCard() {
         ) : null}
         {socialProviders.includes("linkedin") ? (
           <button
+            aria-busy={pending === "linkedin" || undefined}
             className={BTN_SECONDARY}
+            disabled={pending !== null}
             onClick={() => {
               void onSocial("linkedin");
             }}
@@ -510,6 +570,7 @@ export function SignInCard() {
 
   if (phase === "magic-sent" || phase === "verify-sent") {
     const verify = phase === "verify-sent";
+    const busyResend = verify ? pending === "verify" : pending === "magic";
 
     return (
       <>
@@ -541,19 +602,23 @@ export function SignInCard() {
               </div>
             </output>
             <button
+              aria-busy={busyResend || undefined}
               className={BTN_SECONDARY}
+              disabled={pending !== null}
               onClick={() => {
                 void (verify ? onVerifyResend() : onMagic());
               }}
               type="button"
             >
+              {busyResend ? <BusyIndicator /> : null}
               {verify ? copy.signIn.verifyResend : copy.signIn.resend}
             </button>
             <p className="text-center text-[13.5px] text-muted-foreground">
               {copy.signIn.resendHint}
             </p>
             <button
-              className={BTN_GHOST}
+              className={`${BTN_GHOST} disabled:cursor-not-allowed disabled:opacity-[.45]`}
+              disabled={pending !== null}
               onClick={() => {
                 setPhase("form");
                 setEmail("");
@@ -573,7 +638,8 @@ export function SignInCard() {
           <p className={SWITCH_CLASS}>
             {copy.signIn.verifyAlready}{" "}
             <button
-              className="inline min-h-[44px] border-0 bg-transparent px-1 text-[13px] font-semibold text-foreground underline underline-offset-[3px]"
+              className="inline min-h-[44px] border-0 bg-transparent px-1 text-[13px] font-semibold text-foreground underline underline-offset-[3px] disabled:cursor-not-allowed disabled:opacity-[.45]"
+              disabled={pending !== null}
               onClick={() => {
                 switchMode("sign-in");
               }}
@@ -632,7 +698,13 @@ export function SignInCard() {
         >
           {copy.signIn.refusedField}
         </p>
-        <button className={BTN_PRIMARY} type="submit">
+        <button
+          aria-busy={pending === "magic" || undefined}
+          className={BTN_PRIMARY}
+          disabled={pending !== null}
+          type="submit"
+        >
+          {pending === "magic" ? <BusyIndicator /> : null}
           {copy.signIn.magicSubmit}
         </button>
       </form>
@@ -647,6 +719,8 @@ export function SignInCard() {
           void onPassword();
         }}
         password={password}
+        pending={pending !== null}
+        busy={pending === "password"}
         showPassword={showPassword}
         togglePassword={() => {
           setShowPassword(!showPassword);
@@ -664,6 +738,8 @@ export function SignInCard() {
             void onPassword();
           }}
           password={password}
+          pending={pending !== null}
+          busy={pending === "password"}
           showPassword={showPassword}
           togglePassword={() => {
             setShowPassword(!showPassword);
@@ -678,12 +754,15 @@ export function SignInCard() {
           <hr className="flex-1 border-border" />
         </div>
         <button
+          aria-busy={pending === "magic" || undefined}
           className={BTN_SECONDARY}
+          disabled={pending !== null}
           onClick={() => {
             void onMagic();
           }}
           type="button"
         >
+          {pending === "magic" ? <BusyIndicator /> : null}
           {copy.signIn.magicSubmit}
         </button>
         <p className="flex items-start gap-[9px] text-pretty text-[12.5px] leading-[1.52] text-muted-foreground">
@@ -747,7 +826,9 @@ export function SignInCard() {
       <p className={SWITCH_CLASS}>
         {switchPrompt}{" "}
         <button
-          className="inline min-h-[44px] border-0 bg-transparent px-1 text-[13px] font-semibold text-foreground underline underline-offset-[3px]"
+          aria-busy={pending !== null || undefined}
+          className="inline min-h-[44px] border-0 bg-transparent px-1 text-[13px] font-semibold text-foreground underline underline-offset-[3px] disabled:cursor-not-allowed disabled:opacity-[.45]"
+          disabled={pending !== null}
           onClick={() => {
             switchMode(switchToSignUp ? "sign-up" : "sign-in");
           }}
