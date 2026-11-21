@@ -7,6 +7,8 @@ import { z } from "zod";
 import { env } from "../config/env.ts";
 import { spendTurnstileToken, turnstileScenario } from "./turnstile-scenario.ts";
 import { turnstileSiteverifyUrl } from "../auth/turnstile-gate.ts";
+import { sesSendEmailUrl } from "../platform/mail/ses.ts";
+import { recordSesRequest } from "./ses-recorder.ts";
 
 const turnstileRecordingPath = "test/e2e/recordings/turnstile/siteverify-pass.json";
 
@@ -85,6 +87,16 @@ export function startInterception() {
     http.get(`${anthropicRoot}/v1/messages/batches/:batchId`, () => passthrough()),
     http.get(`${anthropicRoot}/v1/messages/batches/:batchId/results`, () => passthrough()),
     http.post(turnstileSiteverifyUrl, async ({ request }) => siteverifyResponse(request)),
+    http.post(sesSendEmailUrl(env.AWS_REGION ?? "ca-central-1"), async ({ request }) => {
+      recordSesRequest({
+        method: request.method,
+        url: request.url,
+        headers: Object.fromEntries(request.headers.entries()),
+        body: await request.text(),
+      });
+
+      return HttpResponse.json({ MessageId: "0100018f-ses-send-email" });
+    }),
   );
 
   server.listen({ onUnhandledRequest: "error" });

@@ -85,6 +85,10 @@ const envSchema = z
       .min(1)
       .regex(/^[a-z0-9.-]+$/u)
       .default("tryoverture.com"),
+    AWS_ACCESS_KEY_ID: z.string().min(1).optional(),
+    AWS_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    AWS_REGION: z.literal("ca-central-1").optional(),
+    SES_CONFIGURATION_SET: z.string().min(1).optional(),
     INBOUND_HMAC_SECRET: z.string().min(16).optional(),
     INBOUND_DNS_SERVER: z.string().min(1).optional(),
     ALERT_NTFY_URL: z.url().optional(),
@@ -149,6 +153,27 @@ const envSchema = z
           path: [value[idName] === undefined ? idName : secretName],
         });
       }
+    }
+
+    const sesNames = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"] as const;
+    const sesPresent = sesNames.filter((name) => value[name] !== undefined);
+
+    if (sesPresent.length > 0 && sesPresent.length < sesNames.length) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_REGION are set together or not at all: all three send mail through SES, none uses the sink.",
+        path: ["AWS_ACCESS_KEY_ID"],
+      });
+    }
+
+    if (value.SES_CONFIGURATION_SET !== undefined && sesPresent.length < sesNames.length) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "SES_CONFIGURATION_SET needs AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_REGION.",
+        path: ["SES_CONFIGURATION_SET"],
+      });
     }
 
     const r2Credentials = [value.R2_ACCOUNT_ID, value.R2_ACCESS_KEY_ID, value.R2_SECRET_ACCESS_KEY];
