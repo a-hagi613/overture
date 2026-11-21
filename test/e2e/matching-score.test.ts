@@ -8,6 +8,7 @@ import type { AnthropicFixtureServer } from "./anthropic-fixture-server.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { startAnthropicFixtureServer } from "./anthropic-fixture-server.ts";
+import { startGreenhouseQuestionsFixture } from "./greenhouse-questions.fixture.ts";
 import {
   clearCatalog,
   clockNow,
@@ -21,25 +22,32 @@ import {
   seedPosting,
 } from "./matching-harness.ts";
 
-const test = appTest.extend<{ matching: { anthropic: AnthropicFixtureServer; server: AppServer } }>(
-  {
-    matching: [
-      async ({ identityServer }, provide) => {
-        const anthropic = await startAnthropicFixtureServer();
+const test = appTest.extend<{
+  matching: {
+    anthropic: AnthropicFixtureServer;
+    questions: ReturnType<typeof startGreenhouseQuestionsFixture>;
+    server: AppServer;
+  };
+}>({
+  matching: [
+    async ({ identityServer }, provide) => {
+      const anthropic = await startAnthropicFixtureServer();
+      const questions = startGreenhouseQuestionsFixture();
 
-        const server = await startFreshAppServer(identityServer, {
-          ANTHROPIC_API_KEY: "test-anthropic-key",
-          ANTHROPIC_BASE_URL: anthropic.url,
-        });
+      const server = await startFreshAppServer(identityServer, {
+        ANTHROPIC_API_KEY: "test-anthropic-key",
+        ANTHROPIC_BASE_URL: anthropic.url,
+        GREENHOUSE_FEED_BASE_URL: questions.url,
+      });
 
-        await provide({ anthropic, server });
-        await server.stop();
-        anthropic.stop();
-      },
-      { scope: "test" },
-    ],
-  },
-);
+      await provide({ anthropic, questions, server });
+      await server.stop();
+      anthropic.stop();
+      questions.stop();
+    },
+    { scope: "test" },
+  ],
+});
 
 const matchRowSchema = z.object({
   postingId: z.string(),
