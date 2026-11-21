@@ -2,8 +2,14 @@ import { z } from "zod";
 
 import { createApp } from "./app.ts";
 import { createAuth } from "./auth/index.ts";
+import type { AuthOptions } from "./auth/index.ts";
 import { databasePath, env } from "./config/env.ts";
 import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
+import { seedDemoAccount } from "./demo/seed.ts";
+import { createDemoSafeMailSender } from "./demo/mail-guard.ts";
+import { isDemoUser } from "./demo/role.ts";
+import { demoStartupNotice } from "./demo/startup.ts";
+import { logError, logInfo } from "./platform/log.ts";
 import { openDatabase } from "./platform/db/client.ts";
 import { migrateDatabase } from "./platform/db/migrate.ts";
 import { createClock } from "./platform/ports/clock.ts";
@@ -11,6 +17,11 @@ import { createRandom } from "./platform/ports/random.ts";
 import { createBackupMonitor } from "./platform/ports/backup.ts";
 import { installProcessGuards } from "./platform/process-guard.ts";
 import { recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
+import {
+  ensureRetentionQueued,
+  RETENTION_JOB_KIND,
+  retentionJobHandler,
+} from "./platform/jobs/retention.ts";
 import { startJobWorker } from "./platform/jobs/scheduler.ts";
 import { startTelemetry, trace } from "./platform/telemetry/otel.ts";
 import { createDiskObjectStore } from "./platform/ports/object-store.ts";
@@ -150,22 +161,45 @@ const backups = createBackupMonitor(db, clock);
 
 void backups.run(shutdownController.signal);
 
-const mailSender = createMailSender(clock);
+const mailSender = createDemoSafeMailSender(db, createMailSender(clock));
 const pushSender = createPushSender(env, clock);
 const mailboxes = createMailboxService(db, clock, env.INBOUND_HMAC_SECRET ?? "", env.MAIL_DOMAIN);
 
-const auth = createAuth(
-  db,
-  clock,
-  mailSender,
-  env.INBOUND_HMAC_SECRET === undefined
-    ? {}
-    : {
-        onUserCreated: async (user) => {
-          await mailboxes.ensureFor(user.id);
-        },
-      },
-);
+const objects =
+  env.R2_ACCOUNT_ID !== undefined &&
+  env.R2_ACCESS_KEY_ID !== undefined &&
+  env.R2_SECRET_ACCESS_KEY !== undefined &&
+  env.R2_BUCKET_FILES !== undefined
+    ? createR2ObjectStore({
+        endpoint: env.R2_ENDPOINT ?? `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        bucket: env.R2_BUCKET_FILES,
+        accessKeyId: env.R2_ACCESS_KEY_ID,
+        secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+      })
+    : createDiskObjectStore(env.OBJECT_STORE_ROOT);
+
+const authOptions: AuthOptions = {};
+
+if (env.INBOUND_HMAC_SECRET !== undefined) {
+  authOptions.onUserCreated = async (user) => {
+    await mailboxes.ensureFor(user.id);
+  };
+}
+
+if (env.DEMO_LOGIN_ENABLED) {
+  authOptions.ensureDemoUser = async () => {
+    const seeded = await seedDemoAccount({
+      clock,
+      db,
+      objects,
+      personal,
+    });
+
+    return seeded.userId;
+  };
+}
+
+const auth = createAuth(db, clock, mailSender, authOptions);
 
 const appOrigin = env.APP_ORIGIN ?? "http://localhost:3000";
 
@@ -175,11 +209,14 @@ const jobSingletons = [
   DISPATCH_TICK_JOB_KIND,
   LIVE_CHECK_JOB_KIND,
   WORKABLE_INGEST_JOB_KIND,
+  RETENTION_JOB_KIND,
 ];
 
 recoverStaleLocks(db, clock, jobSingletons);
 
 ensureCheckinSweepQueued(db, clock);
+
+ensureRetentionQueued(db, clock);
 
 const tracer = trace.getTracer("overture");
 
@@ -218,6 +255,13 @@ const personal = createPersonalCrypto(
   parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
   env.MASTER_KEY_CURRENT,
 );
+
+if (env.DEMO_LOGIN_ENABLED) {
+  const demo = await seedDemoAccount({ clock, db, objects, personal });
+
+  logInfo("demo", demoStartupNotice(db, env.NODE_ENV));
+  logInfo("demo", `account ready: ${demo.userId}`);
+}
 
 const planner = createPlanner({ clock, db, random });
 
@@ -280,6 +324,10 @@ const llmJobHandlers: JobHandlers =
 const prepDailyJobHandlers: JobHandlers = {
   [PREP_DAILY_JOB_KIND]: async (payload) => {
     const { since, userId } = parsePrepDailyPayload(payload);
+
+    if (isDemoUser(db, userId)) {
+      return;
+    }
 
     try {
       if (env.ANTHROPIC_API_KEY === undefined) {
@@ -346,19 +394,6 @@ const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
       },
     }
   : {};
-
-const objects =
-  env.R2_ACCOUNT_ID !== undefined &&
-  env.R2_ACCESS_KEY_ID !== undefined &&
-  env.R2_SECRET_ACCESS_KEY !== undefined &&
-  env.R2_BUCKET_FILES !== undefined
-    ? createR2ObjectStore({
-        endpoint: env.R2_ENDPOINT ?? `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-        bucket: env.R2_BUCKET_FILES,
-        accessKeyId: env.R2_ACCESS_KEY_ID,
-        secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-      })
-    : createDiskObjectStore(env.OBJECT_STORE_ROOT);
 
 const mailPersonal = createPersonalCrypto(
   db,
@@ -460,6 +495,10 @@ const planningJobHandlers: JobHandlers = {
   [PLANNER_DAY_JOB_KIND]: async (payload) => {
     const { userId } = parsePlannerDayPayload(payload);
 
+    if (isDemoUser(db, userId)) {
+      return;
+    }
+
     try {
       planner.plan(userId);
     } finally {
@@ -531,7 +570,14 @@ const liveCheckJobHandlers: JobHandlers = {
   },
 };
 
+const retentionJobHandlers: JobHandlers = {
+  [RETENTION_JOB_KIND]: async () => {
+    await retentionJobHandler(db, clock);
+  },
+};
+
 const allJobHandlers: JobHandlers = {
+  ...retentionJobHandlers,
   ...catalogJobHandlers,
   ...preparationJobHandlers,
   ...planningJobHandlers,
@@ -613,23 +659,48 @@ const server = Bun.serve({
 
 process.stdout.write(`overture listening on ${String(server.port)}\n`);
 
+const SHUTDOWN_HARD_EXIT_GRACE_MS = 1000;
+
+let shuttingDown = false;
+
+async function stopTelemetry() {
+  try {
+    await sdk.shutdown();
+  } catch {}
+}
+
 function handleShutdown() {
+  if (shuttingDown) {
+    return;
+  }
+
+  shuttingDown = true;
   shutdownController.abort();
 
   const killTimer = setTimeout(() => {
     void server.stop(true);
-    void sdk.shutdown();
+    void stopTelemetry();
   }, env.KILL_TIMEOUT_MS);
 
+  const hardExitTimer = setTimeout(() => {
+    process.kill(process.pid, "SIGKILL");
+  }, env.KILL_TIMEOUT_MS + SHUTDOWN_HARD_EXIT_GRACE_MS);
+
   killTimer.unref();
+  hardExitTimer.unref();
 
   void (async () => {
-    await server.stop(false);
-    await worker.drain(env.KILL_TIMEOUT_MS);
-    catalogWorker.stop();
+    try {
+      await server.stop(false);
+      await worker.drain(env.KILL_TIMEOUT_MS);
+      catalogWorker.stop();
 
-    clearTimeout(killTimer);
-    await sdk.shutdown();
+      clearTimeout(killTimer);
+    } catch (error) {
+      logError("shutdown", error);
+    } finally {
+      await stopTelemetry();
+    }
   })();
 }
 

@@ -41,6 +41,7 @@ import { indexFacts, isUnsupportedBlock, resolveQuestion } from "./answer-plan.t
 import { answerIsValid, formatFactValue } from "./answer-value.ts";
 import { prepareUsersOfFacts, returnStaleApprovals } from "./approval-invalidation.ts";
 import { wordCount } from "./grounding.ts";
+import { INITIAL_CONSENT_VERSION } from "../../shared/consent.ts";
 import {
   attachApplication,
   detachApplication,
@@ -1181,7 +1182,7 @@ export function createPreparationService(deps: {
       atsJobId: row.atsJobId,
       boardToken: row.boardToken,
       companyName: row.companyName,
-      consentVersion: profile?.consentVersion ?? "m1",
+      consentVersion: profile?.consentVersion ?? INITIAL_CONSENT_VERSION,
       coverLetter:
         coverLetterField === undefined
           ? null

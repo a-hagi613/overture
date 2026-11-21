@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, lte } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -14,6 +14,7 @@ import {
   mailThreads,
   messages,
   postings,
+  users,
 } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { getSetting } from "../platform/settings/index.ts";
@@ -112,11 +113,13 @@ export function runCheckinSweep(deps: { db: AppDatabase; clock: Clock }) {
     .from(applications)
     .innerJoin(companies, eq(companies.id, applications.companyId))
     .innerJoin(postings, eq(postings.id, applications.postingId))
+    .innerJoin(users, eq(users.id, applications.userId))
     .where(
       and(
         eq(applications.stage, "applied"),
         eq(applications.status, "sent"),
         isNotNull(applications.sentAt),
+        sql`${users.role} <> 'demo'`,
       ),
     )
     .all();

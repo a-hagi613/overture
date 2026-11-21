@@ -390,7 +390,7 @@ test("a ready Application on the recorded Greenhouse form ends sent, charged onc
 
   expect(snapshot.confirmedBy).toBe("page");
   expect(snapshot.provider).toBe("local");
-  expect(snapshot.consentVersion).toBe("m1");
+  expect(snapshot.consentVersion).toBe("1");
   expect(snapshot.approvedAt).not.toBeNull();
   expect(snapshot.approvedPlanSha256).toBe(approval.planSha256);
   expect(snapshot.resumeSha256).toBe(sha256Hex(resumeBytes));
@@ -463,9 +463,15 @@ test("a ready Application on the recorded Greenhouse form ends sent, charged onc
 
   expect(deleteRefusal.refused).toBe(true);
 
+  const published = await owner.post("/__test__/consent/publish", {
+    data: { text: "A later consent wording for the next version." },
+  });
+
+  expect(published.ok()).toBe(true);
+
   const unchanged = await applicationOf(owner, applicationId);
 
-  expect(unchanged.snapshot?.consentVersion).toBe("m1");
+  expect(unchanged.snapshot?.consentVersion).toBe("1");
 });
 
 test("a 4xx answer to the application request leaves submit_clicked_at unset and charges nothing", async ({

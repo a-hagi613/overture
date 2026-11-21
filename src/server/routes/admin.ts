@@ -637,7 +637,11 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
       .groupBy(bgJobs.status)
       .all();
 
-    const userTotals = db.select({ total: count() }).from(users).all();
+    const userTotals = db
+      .select({ total: count() })
+      .from(users)
+      .where(sql`${users.role} <> 'demo'`)
+      .all();
 
     const ownerTotals = db
       .select({ total: count() })
@@ -645,7 +649,12 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
       .where(sql`${users.role} = 'owner'`)
       .all();
 
-    const sessionTotals = db.select({ total: count() }).from(sessions).all();
+    const sessionTotals = db
+      .select({ total: count() })
+      .from(sessions)
+      .innerJoin(users, eq(sessions.userId, users.id))
+      .where(sql`${users.role} <> 'demo'`)
+      .all();
 
     const allSwitches = getAllKillSwitches(db);
     const audit = listAdminAudit(db, 20);

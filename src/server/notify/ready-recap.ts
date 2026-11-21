@@ -125,12 +125,12 @@ export async function runReadyNotifyJob(deps: ReadyNotifyDeps, userId: string, s
   }
 
   const to = deps.db
-    .select({ email: users.email, verified: users.emailVerified })
+    .select({ email: users.email, role: users.role, verified: users.emailVerified })
     .from(users)
     .where(eq(users.id, userId))
     .get();
 
-  if (to === undefined || !to.verified) {
+  if (to === undefined || !to.verified || to.role === "demo") {
     return null;
   }
 
