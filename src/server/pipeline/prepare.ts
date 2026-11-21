@@ -38,6 +38,9 @@ import { mapQuestionsWithLlm } from "../catalog/question-mapping.ts";
 import { createQuestionCatalog, questionInputsFromAts } from "../catalog/questions.ts";
 import { isCountryScopedFactKey } from "../../shared/facts.ts";
 import { indexFacts, isUnsupportedBlock, resolveQuestion } from "./answer-plan.ts";
+import { answerIsValid, formatFactValue } from "./answer-value.ts";
+import { prepareUsersOfFacts, returnStaleApprovals } from "./approval-invalidation.ts";
+import { wordCount } from "./grounding.ts";
 import {
   attachApplication,
   detachApplication,
@@ -51,7 +54,11 @@ import { stageForStatus } from "./stage.ts";
 const optionsSchema = z.array(z.string());
 
 const sentencesSchema = z.array(
-  z.object({ sentence: z.string().min(1), resumeLineIds: z.array(z.string()) }),
+  z.object({
+    byUser: z.boolean().optional(),
+    resumeLineIds: z.array(z.string()),
+    sentence: z.string().min(1),
+  }),
 );
 
 const EMPLOYER_SPLIT = /[\n;|]+/u;
@@ -87,6 +94,12 @@ function employerNames(facts: ReadonlyMap<string, string>) {
 }
 
 const PREPARABLE_STATUSES = ["preparing", "needs_review", "ready"] as const;
+
+interface StoredSentence {
+  sentence: string;
+  resumeLineIds: string[];
+  byUser?: boolean | undefined;
+}
 
 interface BlockedQuestion {
   questionId: string;
@@ -290,7 +303,7 @@ export function createPreparationService(deps: {
     applicationId: string;
     questionId: string;
     kind: "open_text" | "cover_letter";
-    sentences: { sentence: string; resumeLineIds: string[] }[];
+    sentences: StoredSentence[];
     words: number;
   }) {
     const existing = db
@@ -857,9 +870,25 @@ export function createPreparationService(deps: {
       }
     }
 
+    const userEditedOpenText = new Map<string, StoredSentence[]>();
+
+    await Promise.all(
+      openTextQuestions.map(async (question) => {
+        const saved = await savedSentences(row.userId, applicationId, question.questionId);
+
+        if (saved?.some((sentence) => sentence.byUser === true) === true) {
+          userEditedOpenText.set(question.questionId, saved);
+        }
+      }),
+    );
+
+    const generatedQuestions = openTextQuestions.filter(
+      (question) => !userEditedOpenText.has(question.questionId),
+    );
+
     let generated = new Map<string, GroundedAnswer>();
 
-    if (openTextQuestions.length > 0 && resumeText.trim() !== "") {
+    if (generatedQuestions.length > 0 && resumeText.trim() !== "") {
       generated = await openText.generate({
         userId: row.userId,
         resumeText,
@@ -871,7 +900,7 @@ export function createPreparationService(deps: {
           description: descriptionText(row.descriptionGz),
         },
         facts: factValues.unscoped,
-        questions: openTextQuestions.map((question) => ({
+        questions: generatedQuestions.map((question) => ({
           questionId: question.questionId,
           text: question.text,
           kind: question.kind,
@@ -879,7 +908,7 @@ export function createPreparationService(deps: {
       });
 
       await Promise.all(
-        openTextQuestions.map(async (question) => {
+        generatedQuestions.map(async (question) => {
           const answer = generated.get(question.questionId);
 
           if (answer === undefined) {
@@ -900,8 +929,9 @@ export function createPreparationService(deps: {
 
     for (const question of openTextQuestions) {
       const answer = generated.get(question.questionId) ?? null;
+      const userEdited = userEditedOpenText.get(question.questionId) ?? null;
 
-      if (answer === null) {
+      if (answer === null && userEdited === null) {
         clearSentences(applicationId, question.questionId);
 
         if (question.required) {
@@ -911,7 +941,7 @@ export function createPreparationService(deps: {
 
       resolutions.set(
         question.questionId,
-        openTextResolution(answer?.sentences ?? null, question.required),
+        openTextResolution(userEdited ?? answer?.sentences ?? null, question.required),
       );
     }
 
@@ -991,6 +1021,110 @@ export function createPreparationService(deps: {
 
   async function prepareMany(applicationIds: readonly string[]) {
     await Promise.all(applicationIds.map(async (applicationId) => prepare(applicationId)));
+  }
+
+  async function editAnswer(input: {
+    applicationId: string;
+    questionId: string;
+    userId: string;
+    value: string;
+  }) {
+    const row = db
+      .select({ status: applications.status, userId: applications.userId })
+      .from(applications)
+      .where(eq(applications.id, input.applicationId))
+      .get();
+
+    if (row === undefined || row.userId !== input.userId) {
+      return { kind: "not_found" };
+    }
+
+    if (row.status !== "ready") {
+      return { kind: "not_editable" };
+    }
+
+    const plan = await sendPlanFor(input.applicationId);
+
+    if (plan === null) {
+      return { kind: "not_editable" };
+    }
+
+    const field = plan.fields.find((candidate) => candidate.questionId === input.questionId);
+
+    if (field === undefined) {
+      return { kind: "question_not_found" };
+    }
+
+    const value = input.value.trim();
+
+    if (field.answerKind === "fact" && field.factKey !== null) {
+      const formatted = formatFactValue({
+        questionText: field.label,
+        factKey: field.factKey,
+        fieldType: field.fieldType,
+        options: field.options,
+        value,
+      });
+
+      if (formatted === null || !answerIsValid(field.fieldType, field.options, formatted.value)) {
+        return { kind: "invalid_answer" };
+      }
+
+      const saved = await factsService.save(input.userId, field.factKey, value, field.scope);
+
+      const invalidated = await returnStaleApprovals({
+        clock,
+        db,
+        personal,
+        userId: input.userId,
+      });
+
+      if (saved.revision !== field.factRevision) {
+        await prepareUsersOfFacts({
+          answersFor,
+          clock,
+          db,
+          facts: [{ key: field.factKey, scope: field.scope }],
+          skip: invalidated.map((stale) => stale.applicationId),
+          userId: input.userId,
+        });
+      }
+
+      return {
+        answer: formatted.value,
+        byUser: false,
+        factKey: field.factKey,
+        factRevision: saved.revision,
+        invalidated: invalidated.map((stale) => stale.applicationId),
+        kind: "saved",
+      };
+    }
+
+    if (field.answerKind === "open_text" && isFreeText(field.fieldType)) {
+      if (!answerIsValid(field.fieldType, field.options, value)) {
+        return { kind: "invalid_answer" };
+      }
+
+      await saveSentences({
+        applicationId: input.applicationId,
+        kind: isCoverLetterQuestion(field.label) ? "cover_letter" : "open_text",
+        questionId: field.questionId,
+        sentences: [{ byUser: true, resumeLineIds: [], sentence: value }],
+        userId: input.userId,
+        words: wordCount(value),
+      });
+
+      return {
+        answer: value,
+        byUser: true,
+        factKey: null,
+        factRevision: null,
+        invalidated: [],
+        kind: "saved",
+      };
+    }
+
+    return { kind: "not_editable" };
   }
 
   async function sendPlanFor(applicationId: string) {
@@ -1130,6 +1264,7 @@ export function createPreparationService(deps: {
         coverLetterField === undefined
           ? null
           : coverLetterField.sentences.map((sentence) => ({
+              byUser: sentence.byUser === true,
               resumeLineIds: sentence.resumeLineIds,
               sentence: sentence.sentence,
             })),
@@ -1236,6 +1371,7 @@ export function createPreparationService(deps: {
 
   return {
     answersFor,
+    editAnswer,
     openAttemptReviews,
     prepare,
     prepareMany,

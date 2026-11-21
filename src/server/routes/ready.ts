@@ -38,6 +38,8 @@ const approveAllBody = z.object({
     .max(50),
 });
 
+const answerBody = z.object({ value: z.string().trim().min(1).max(5000) });
+
 const STRONG_SCORE = 80;
 
 interface ReadyCardRow {
@@ -66,6 +68,7 @@ function answersOf(plan: SendPlan) {
   return plan.fields.map((field) => ({
     answer: field.answer,
     block: field.block,
+    byUser: field.sentences.some((sentence) => sentence.byUser === true),
     factKey: field.factKey,
     factRevision: field.factRevision,
     kind: field.answerKind,
@@ -488,6 +491,50 @@ export function createReadyRoutes(deps: {
 
     return context.json({ status: "ready" });
   });
+
+  routes.put(
+    "/applications/:id/answers/:questionId",
+    zValidator("json", answerBody),
+    async (context) => {
+      const user = await sessionUser(context.req.raw.headers);
+
+      if (user === null) {
+        return context.json({ error: "sign_in_required" }, 401);
+      }
+
+      const { id, questionId } = context.req.param();
+      const { value } = context.req.valid("json");
+
+      const result = await preparation.editAnswer({
+        applicationId: id,
+        questionId,
+        userId: user.id,
+        value,
+      });
+
+      if (result.kind === "saved") {
+        return context.json({
+          answer: result.answer,
+          applicationId: id,
+          byUser: result.byUser,
+          factKey: result.factKey,
+          factRevision: result.factRevision,
+          questionId,
+          status: "ready",
+        });
+      }
+
+      if (result.kind === "not_found" || result.kind === "question_not_found") {
+        return context.json({ error: result.kind }, 404);
+      }
+
+      if (result.kind === "invalid_answer") {
+        return context.json({ error: result.kind }, 422);
+      }
+
+      return context.json({ error: result.kind }, 409);
+    },
+  );
 
   return routes;
 }

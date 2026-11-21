@@ -91,6 +91,7 @@ export function createOutcomes(deps: OutcomeDeps) {
 
     const answers = plan.fields.map((field) => ({
       answer: field.fieldType === "file" ? (plan.resume?.filename ?? null) : field.answer,
+      by_user: field.sentences.some((sentence) => sentence.byUser === true),
       fact_key: field.factKey,
       fact_revision: field.factRevision,
       kind: field.fieldType === "file" ? "file" : field.answerKind,
@@ -117,6 +118,7 @@ export function createOutcomes(deps: OutcomeDeps) {
             },
             JSON.stringify(
               plan.coverLetter.map((sentence) => ({
+                by_user: sentence.byUser === true,
                 resume_line_ids: sentence.resumeLineIds,
                 sentence: sentence.sentence,
               })),

@@ -112,7 +112,16 @@ export function createFactService(deps: {
       .limit(1);
 
     const row = rows.at(0);
-    const revision = (row?.revision ?? 0) + 1;
+
+    const unchanged =
+      row !== undefined &&
+      (await personal.openFor(
+        userId,
+        { table: "facts", column: "value_enc", rowId: row.id },
+        row.valueEnc,
+      )) === value;
+
+    const revision = row === undefined || !unchanged ? (row?.revision ?? 0) + 1 : row.revision;
     const rowId = row?.id ?? crypto.randomUUID();
 
     const valueEnc = await personal.sealFor(

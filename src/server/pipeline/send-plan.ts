@@ -11,6 +11,7 @@ import type { AnswerUnit, FileFact } from "./answer-value.ts";
 export interface PlannedSentence {
   sentence: string;
   resumeLineIds: string[];
+  byUser?: boolean | undefined;
 }
 
 export interface SendPlanField {
@@ -63,6 +64,7 @@ export interface SendPlan {
 }
 
 const plannedSentenceSchema = z.object({
+  byUser: z.boolean().optional(),
   resumeLineIds: z.array(z.string()),
   sentence: z.string(),
 });
