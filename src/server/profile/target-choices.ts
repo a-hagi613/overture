@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { EmploymentType, Seniority, Workplace } from "../../shared/tag-taxonomy.ts";
@@ -8,6 +8,7 @@ import { countryNameFor } from "../catalog/geo.ts";
 import { EMPLOYMENT_TYPES, SENIORITIES } from "../../shared/tag-taxonomy.ts";
 
 const MAX_ROLE_CHOICES = 12;
+const MAX_ROLE_CANDIDATES = 80;
 const MAX_LOCATION_CHOICES = 8;
 
 const shownWorkplaces = ["remote", "hybrid", "onsite"] as const satisfies readonly Workplace[];
@@ -34,48 +35,135 @@ export interface TargetChoices {
 export function targetChoices(db: AppDatabase) {
   const open = isNull(postings.closedAt);
 
-  const roleRows = db
+  const roleCandidates = db
     .select({ total: count(), value: postingTags.value })
     .from(postingTags)
-    .innerJoin(postings, eq(postings.id, postingTags.postingId))
-    .where(and(open, inArray(postingTags.dimension, ["role", "subrole"])))
+    .where(inArray(postingTags.dimension, ["role", "subrole"]))
     .groupBy(postingTags.value)
     .orderBy(desc(count()), postingTags.value)
+    .limit(MAX_ROLE_CANDIDATES)
     .all();
 
-  const seniorityRows = db
-    .select({ value: postingTags.value })
+  const hasOpenPosting = (dimensions: ("role" | "subrole" | "seniority")[], value: string) =>
+    db
+      .select({ one: sql`1` })
+      .from(postingTags)
+      .innerJoin(postings, eq(postings.id, postingTags.postingId))
+      .where(and(open, inArray(postingTags.dimension, dimensions), eq(postingTags.value, value)))
+      .limit(1)
+      .get() !== undefined;
+
+  const seniorityValues = db
+    .selectDistinct({ value: postingTags.value })
     .from(postingTags)
-    .innerJoin(postings, eq(postings.id, postingTags.postingId))
-    .where(and(open, eq(postingTags.dimension, "seniority")))
-    .groupBy(postingTags.value)
-    .all();
+    .where(eq(postingTags.dimension, "seniority"))
+    .all()
+    .map((row) => row.value);
 
-  const workplaceRows = db
-    .select({ value: postings.workplace })
-    .from(postings)
-    .where(open)
-    .groupBy(postings.workplace)
-    .all();
+  const seniorityPresent = new Set(seniorityValues);
 
-  const employmentRows = db
-    .select({ value: postings.employmentType })
-    .from(postings)
-    .where(open)
-    .groupBy(postings.employmentType)
-    .all();
+  const hasWorkplace = (value: Workplace) =>
+    db
+      .select({ one: sql`1` })
+      .from(postings)
+      .where(and(open, eq(postings.workplace, value)))
+      .limit(1)
+      .get() !== undefined;
 
-  const seniorities = new Set(seniorityRows.map((row) => row.value));
-  const workplaces = new Set(workplaceRows.map((row) => row.value));
-  const employmentTypes = new Set(employmentRows.map((row) => row.value));
+  const hasEmploymentType = (value: EmploymentType) =>
+    db
+      .select({ one: sql`1` })
+      .from(postings)
+      .where(and(open, eq(postings.employmentType, value)))
+      .limit(1)
+      .get() !== undefined;
 
   return {
-    employmentTypes: shownEmploymentTypes.filter((value) => employmentTypes.has(value)),
+    employmentTypes: shownEmploymentTypes.filter((value) => hasEmploymentType(value)),
     locations: locationChoices(db),
-    roles: roleRows.slice(0, MAX_ROLE_CHOICES).map((row) => row.value),
-    seniorities: SENIORITIES.filter((value) => seniorities.has(value)),
-    workplaces: shownWorkplaces.filter((value) => workplaces.has(value)),
+    roles: roleCandidates
+      .filter((row) => hasOpenPosting(["role", "subrole"], row.value))
+      .slice(0, MAX_ROLE_CHOICES)
+      .map((row) => row.value),
+    seniorities: SENIORITIES.filter(
+      (value) => seniorityPresent.has(value) && hasOpenPosting(["seniority"], value),
+    ),
+    workplaces: shownWorkplaces.filter((value) => hasWorkplace(value)),
   } satisfies TargetChoices;
+}
+
+export function createTargetChoicesCache(deps: {
+  db: AppDatabase;
+  now: () => number;
+  staleMs: number;
+}) {
+  const { db, now, staleMs } = deps;
+  let cached: { at: number; stamp: number; value: TargetChoices } | null = null;
+  let refreshing = false;
+
+  function openPostingCount() {
+    return (
+      db.select({ total: count() }).from(postings).where(isNull(postings.closedAt)).get()?.total ??
+      0
+    );
+  }
+
+  function compute() {
+    const stamp = openPostingCount();
+    const value = targetChoices(db);
+
+    cached = { at: now(), stamp, value };
+
+    return value;
+  }
+
+  function refreshInBackground() {
+    if (refreshing) {
+      return;
+    }
+
+    refreshing = true;
+
+    setTimeout(() => {
+      try {
+        compute();
+      } catch {
+        refreshing = false;
+      } finally {
+        refreshing = false;
+      }
+    }, 0);
+  }
+
+  function read() {
+    if (cached === null) {
+      return compute();
+    }
+
+    if (now() - cached.at < staleMs) {
+      return cached.value;
+    }
+
+    if (openPostingCount() === cached.stamp) {
+      cached = { ...cached, at: now() };
+
+      return cached.value;
+    }
+
+    if (staleMs === 0) {
+      return compute();
+    }
+
+    refreshInBackground();
+
+    return cached.value;
+  }
+
+  function warm() {
+    refreshInBackground();
+  }
+
+  return { read, warm };
 }
 
 function locationLabel(row: {

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
+import { OnboardingLoadState } from "../components/onboarding-load-state.tsx";
 import { OnboardingFactsCard } from "../components/onboarding-facts-card.tsx";
 import { OnboardingShell } from "../components/onboarding-shell.tsx";
 import {
@@ -11,16 +12,19 @@ import {
 
 export function OnboardingFactsPage() {
   const navigate = useNavigate();
-  const { data, isPending } = useOnboardingFacts();
+  const { data, isPending, refetch } = useOnboardingFacts();
   const mutation = useSaveOnboardingFacts();
   const finish = useFinishOnboardingStep();
 
   return (
     <OnboardingShell labels={copy.onboarding.factsStepLabels} step={3}>
       {data === undefined ? (
-        <p className="mt-8 text-[13.5px] text-muted-foreground">
-          {isPending ? "" : copy.onboarding.loadFailed}
-        </p>
+        <OnboardingLoadState
+          onRetry={() => {
+            void refetch();
+          }}
+          state={isPending ? "loading" : "error"}
+        />
       ) : (
         <OnboardingFactsCard
           backTo="/onboarding/resume"

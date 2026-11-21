@@ -14,7 +14,9 @@ import { createOnboardingStepService } from "../profile/onboarding-step.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { createResumeService } from "../profile/resume.ts";
 import { createSkipCompanyService } from "../profile/skip-companies.ts";
-import { targetChoices } from "../profile/target-choices.ts";
+import type { TargetChoices } from "../profile/target-choices.ts";
+
+import { createTargetChoicesCache } from "../profile/target-choices.ts";
 import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
 import { env } from "../config/env.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
@@ -25,7 +27,7 @@ import {
 } from "../../shared/onboarding.ts";
 import { targetsInputSchema } from "../../shared/targets.ts";
 
-type TargetChoices = ReturnType<typeof targetChoices>;
+const CHOICES_STALE_MS = 10 * 60_000;
 
 function defaultEmploymentTypes(choices: TargetChoices) {
   const fullTime = choices.employmentTypes.filter((value) => value === "full_time");
@@ -55,6 +57,16 @@ export function createOnboardingRoutes(deps: {
   const resumes = createResumeService({ db, clock, objects, personal, llm });
   const skipCompanies = createSkipCompanyService({ db, clock });
 
+  const choicesCache = createTargetChoicesCache({
+    db,
+    now: () => clock.now(),
+    staleMs: env.ENABLE_TEST_ROUTES ? 0 : CHOICES_STALE_MS,
+  });
+
+  if (!env.ENABLE_TEST_ROUTES) {
+    choicesCache.warm();
+  }
+
   const step = createOnboardingStepService({
     db,
     clock,
@@ -75,7 +87,7 @@ export function createOnboardingRoutes(deps: {
 
   async function targetsView(userId: string) {
     const languages = await ensureLanguages(userId);
-    const choices = targetChoices(db);
+    const choices = choicesCache.read();
     let saved = await targetsService.read(userId);
     const employmentTypes = defaultEmploymentTypes(choices);
 
