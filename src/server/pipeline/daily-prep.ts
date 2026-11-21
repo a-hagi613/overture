@@ -132,6 +132,15 @@ export function ensurePrepDailyQueued(db: AppDatabase, clock: Clock, userId: str
     return;
   }
 
+  const onboarded = db
+    .select({ onboardedAt: profiles.onboardedAt })
+    .from(profiles)
+    .where(eq(profiles.userId, userId))
+    .get()?.onboardedAt;
+
+  const startedAfterTodaysRun =
+    onboarded !== null && onboarded !== undefined && onboarded.getTime() >= todayAt;
+
   const todayKey = dedupeKeyFor(userId, todayAt, timeZone);
 
   const todayQueued = db
@@ -140,7 +149,7 @@ export function ensurePrepDailyQueued(db: AppDatabase, clock: Clock, userId: str
     .where(eq(bgJobs.dedupeKey, todayKey))
     .get();
 
-  if (todayQueued === undefined) {
+  if (todayQueued === undefined && !startedAfterTodaysRun) {
     enqueueRun(db, clock, userId, now, todayKey, now);
   }
 

@@ -42,7 +42,7 @@ const jobsSchema = z.object({
 
 const errorSchema = z.object({ error: z.string() });
 
-const clockSchema = z.object({ now: z.number() });
+const clockSchema = z.object({ now: z.number(), offsetMs: z.number() });
 
 async function signedInAtStepFive(
   browser: Parameters<Parameters<typeof test>[2]>[0]["browser"],
@@ -138,6 +138,44 @@ test("skipping the filter never blocks Start", async ({ browser, onboardingServe
   await expectStartedWithoutRunning(request, userId);
 
   await context.close();
+  await request.dispose();
+});
+
+test("a restart after Start past 07:00 queues no same-day catch-up run", async ({
+  onboardingServer,
+}) => {
+  const request = await apiRequest.newContext({ baseURL: onboardingServer.url });
+
+  await seedOnboardingTargetsFlow(request, onboardingServer.url);
+
+  const session = sessionSchema.parse(await (await request.get("/api/auth/get-session")).json());
+  const { now, offsetMs } = clockSchema.parse(await (await request.get("/__test__/clock")).json());
+  const noon = new Date(now);
+
+  noon.setUTCHours(12, 0, 0, 0);
+
+  expect((await request.put("/api/onboarding/timezone", { data: { timezone: "UTC" } })).ok()).toBe(
+    true,
+  );
+  expect(
+    (
+      await request.post("/__test__/clock/offset", {
+        data: { offsetMs: noon.getTime() - (now - offsetMs) },
+      })
+    ).ok(),
+  ).toBe(true);
+
+  const consent = consentSchema.parse(await (await request.get("/api/consent")).json());
+
+  expect(
+    (
+      await request.post("/api/consent/accept", { data: { version: consent.current.version } })
+    ).ok(),
+  ).toBe(true);
+  expect((await request.post("/api/onboarding/start")).ok()).toBe(true);
+  expect((await request.post("/__test__/jobs/ensure-prep")).ok()).toBe(true);
+
+  await expectStartedWithoutRunning(request, session.user.id);
   await request.dispose();
 });
 

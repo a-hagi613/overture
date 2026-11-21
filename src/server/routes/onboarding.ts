@@ -8,7 +8,8 @@ import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
 
-import { ensurePrepNextQueued } from "../pipeline/daily-prep.ts";
+import { retryWhenBusy } from "../platform/db/busy.ts";
+import { startOnboarding } from "../profile/onboarding-start.ts";
 import { createConsentService } from "../profile/consent.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createOnboardingProgressService } from "../profile/onboarding-progress.ts";
@@ -29,8 +30,6 @@ import {
   onboardingTimezoneInputSchema,
 } from "../../shared/onboarding.ts";
 import { targetsInputSchema } from "../../shared/targets.ts";
-import { profiles } from "../platform/db/schema.ts";
-import { and, eq } from "drizzle-orm";
 
 const CHOICES_STALE_MS = 10 * 60_000;
 
@@ -158,18 +157,9 @@ export function createOnboardingRoutes(deps: {
       return context.json({ error: "consent_required" }, 409);
     }
 
-    await progress.finish(account.id, ONBOARDING_STEP_COUNT);
+    await retryWhenBusy(() => startOnboarding(db, clock, account.id), "onboarding.start");
 
-    const cleared = db
-      .update(profiles)
-      .set({ pauseReason: null, running: true, updatedAt: new Date(clock.now()) })
-      .where(and(eq(profiles.userId, account.id), eq(profiles.pauseReason, "onboarding")))
-      .returning({ userId: profiles.userId })
-      .all();
-
-    if (cleared.length > 0) {
-      ensurePrepNextQueued(db, clock, account.id);
-    }
+    context.header("Cache-Control", "no-store");
 
     return context.json(await view(account));
   });
