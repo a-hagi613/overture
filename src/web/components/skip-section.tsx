@@ -48,7 +48,6 @@ export function SkipSection() {
   return (
     <Section id="profile-skip" labelledBy="profile-skip-heading">
       <SectionHead
-        folio={list.folio}
         headingId="profile-skip-heading"
         intro={list.intro}
         title={

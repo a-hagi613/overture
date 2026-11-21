@@ -152,6 +152,12 @@ The private address Overture gives each user on `tryoverture.com` (`in-…@`) wh
 forwards only ATS mail to it; it is read-only in the app, never typed on an application form, where the user's real
 email goes (ADR 0028), and a retired local part is never reused.
 
+**Erasing**:
+Deleting an account after the signed-in user re-authenticates. The wrapped user key is destroyed first, so every
+remaining encrypted copy is unreadable, then the vendor browser profiles, the forwarding address, the stored objects
+and the personal rows go; admin audit rows stay. It completes within 24 hours and sends one confirmation email.
+_Avoid_: wiping, purge, hard delete
+
 **Sending domain**:
 `tryoverture.com` onboarded to Cloudflare Email Sending so Overture can mail any recipient, not only the owner. It adds bounce MX, SPF and DKIM on `cf-bounce.tryoverture.com` and keeps the Email Routing records on the apex; the `mail.sending` live check and the deploy guard verify it once `REQUIRE_EMAIL_SENDING` is on (M2-02).
 

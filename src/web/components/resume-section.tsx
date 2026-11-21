@@ -10,7 +10,6 @@ export function ResumeSection() {
   return (
     <Section id="profile-resume" labelledBy="profile-resume-heading">
       <SectionHead
-        folio={resume.folio}
         headingId="profile-resume-heading"
         intro={resume.sub}
         title={copy.profile.tabs.resume}

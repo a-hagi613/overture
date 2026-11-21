@@ -173,6 +173,10 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
         return context.json({ error: ADMIN_REFUSAL_CODES.ownerRequired }, 403);
       }
 
+      if (!isSameMailbox(identity.email, session.user.email)) {
+        return context.json({ error: ADMIN_REFUSAL_CODES.ownerRequired }, 403);
+      }
+
       if (!hasRecentPasskeyAssertion(db, clock, session.user.id)) {
         return context.json({ error: ADMIN_REFUSAL_CODES.passkeyRequired }, 403);
       }

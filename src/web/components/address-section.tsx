@@ -11,7 +11,6 @@ export function AddressSection() {
   return (
     <Section id="profile-address" labelledBy="profile-address-heading">
       <SectionHead
-        folio={address.folio}
         headingId="profile-address-heading"
         intro={address.intro}
         title={

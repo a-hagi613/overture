@@ -7,7 +7,7 @@ changes; never edit it by hand.
 ## What is here
 
 One folder per screen: `home`, `home-paused` (adds `reasons-1280-light`, all seven pause banners), `ready`, `ready-email`,
-`board`, `review`, `profile`, `settings`, `notifications` (adds `empty-<width>-<theme>`), `signin`,
+`board`, `review`, `profile`, `settings`, `settings-delete` (its five signed states), `notifications` (adds `empty-<width>-<theme>`), `signin`,
 `onboarding-welcome`, `onboarding-resume`, `onboarding-questions`, `onboarding-targets`, `users`, `invites`, `user`, `terms`, `privacy`, `consent`. Each variant is named
 `<width>-<theme>` (Sign in adds the mode: `sign-in`, `sign-up`, `magic-sent`), and comes as three files:
 

@@ -71,7 +71,7 @@ function writeFixtureFiles(repoDir: string, runsLog: string) {
         scripts: {
           verify: "bun run scripts/verify.ts",
           lint: `bun -e ${JSON.stringify(logScript)}`,
-          build: 'bun -e ""',
+          "build:checked": 'bun -e ""',
           "lint:config": 'bun -e ""',
           "db:verify": 'bun -e ""',
         },

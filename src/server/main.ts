@@ -16,7 +16,7 @@ import { createClock } from "./platform/ports/clock.ts";
 import { createRandom } from "./platform/ports/random.ts";
 import { createBackupMonitor } from "./platform/ports/backup.ts";
 import { installProcessGuards } from "./platform/process-guard.ts";
-import { recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
+import { enqueueJob, recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
 import {
   ensureRetentionQueued,
   RETENTION_JOB_KIND,
@@ -121,6 +121,8 @@ import { createMailIngest, MAIL_INGEST_JOB_KIND } from "./inbox/ingest.ts";
 import { createMailMoves, MAIL_CLASSIFY_JOB_KIND } from "./inbox/moves.ts";
 import { createMailboxService } from "./inbox/mailboxes.ts";
 import { FIXTURE_CAPTURE_JOB_KIND, runFixtureCaptureJob } from "./fixtures/job.ts";
+import { ACCOUNT_ERASE_JOB_KIND, createAccountEraser } from "./account/erase.ts";
+import { ACCOUNT_DELETED_NOTICE_JOB_KIND, createDeletionNoticeCrypto } from "./account/notice.ts";
 
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 
@@ -442,6 +444,34 @@ const mailJobHandlers: JobHandlers = {
 
 const browserProviders = createBrowserProvider(env, clock, db);
 
+const noticeCrypto = createDeletionNoticeCrypto(
+  parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
+);
+
+const eraser = createAccountEraser({
+  clock,
+  db,
+  enqueueNotice: async (notice) => {
+    const payload = await noticeCrypto.seal(notice);
+
+    enqueueJob(db, clock, ACCOUNT_DELETED_NOTICE_JOB_KIND, payload, { maxAttempts: 5 });
+  },
+  mailboxes,
+  objects,
+  providers: browserProviders,
+});
+
+const accountJobHandlers: JobHandlers = {
+  [ACCOUNT_ERASE_JOB_KIND]: async (payload) => {
+    await eraser.run(payload);
+  },
+  [ACCOUNT_DELETED_NOTICE_JOB_KIND]: async (payload) => {
+    const notice = await noticeCrypto.open(payload);
+
+    await mailSender.sendAccountDeleted(notice);
+  },
+};
+
 const activeDispatcher =
   browserProviders === null
     ? null
@@ -596,6 +626,7 @@ const allJobHandlers: JobHandlers = {
   ...watchJobHandlers,
   ...checkinJobHandlers,
   ...liveCheckJobHandlers,
+  ...accountJobHandlers,
   ...testJobHandlers,
 };
 
@@ -652,6 +683,7 @@ const app = createApp({
   backups,
   providers: browserProviders,
   catalogWorker,
+  eraser,
 });
 
 const SERVER_IDLE_TIMEOUT_ABOVE_SSE_HEARTBEAT_SECONDS = 60;

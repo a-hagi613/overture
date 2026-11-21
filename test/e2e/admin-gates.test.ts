@@ -139,3 +139,19 @@ test("the admin API refuses a session that is not the owner or has no recent pas
   expect(nonOwner.status()).toBe(403);
   expect(await nonOwner.json()).toEqual({ error: "owner_required" });
 });
+
+test("the admin API refuses an Access identity that is not the signed-in owner's mailbox", async ({
+  request,
+  adminIsolatedAppUrl,
+  accessServer,
+}) => {
+  const cookieHeader = await ownerCookieHeader(adminIsolatedAppUrl);
+  const foreignIdentity = await accessServer.issueToken({ email: "someone.else@example.com" });
+
+  const refused = await request.get(`${adminIsolatedAppUrl}/admin/api/overview`, {
+    headers: { "cf-access-jwt-assertion": foreignIdentity, cookie: cookieHeader },
+  });
+
+  expect(refused.status()).toBe(403);
+  expect(await refused.json()).toEqual({ error: "owner_required" });
+});

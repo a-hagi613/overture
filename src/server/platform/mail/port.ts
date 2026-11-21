@@ -34,10 +34,16 @@ export interface OutboundReadyRecapMail {
   body: string;
 }
 
+export interface OutboundAccountDeletedMail {
+  to: string;
+  name: string;
+}
+
 export interface MailSender {
   sendMagicLink: (mail: OutboundMagicLinkMail) => Promise<void>;
   sendEmailVerification: (mail: OutboundVerificationMail) => Promise<void>;
   sendPasswordReset: (mail: OutboundPasswordResetMail) => Promise<void>;
   sendCheck: (mail: OutboundCheckMail) => Promise<void>;
   sendReadyRecap: (mail: OutboundReadyRecapMail) => Promise<void>;
+  sendAccountDeleted: (mail: OutboundAccountDeletedMail) => Promise<void>;
 }

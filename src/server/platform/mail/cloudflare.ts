@@ -91,6 +91,14 @@ export function createCloudflareMailSender(config: CloudflareMailConfig) {
     sendReadyRecap: async (mail) => {
       await sendEmail(config, mail.to, mail.subject, mail.body);
     },
+    sendAccountDeleted: async (mail) => {
+      await sendEmail(
+        config,
+        mail.to,
+        copy.mail.accountDeletedSubject,
+        copy.mail.accountDeletedBody(mail.name),
+      );
+    },
   };
 
   return sender;
