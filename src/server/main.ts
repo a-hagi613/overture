@@ -335,7 +335,15 @@ const fixtureJobHandlers: JobHandlers =
     ? {}
     : {
         [FIXTURE_CAPTURE_JOB_KIND]: async (payload) => {
-          await runFixtureCaptureJob({ clock, objects, providers: browserProviders }, payload);
+          await runFixtureCaptureJob(
+            {
+              clock,
+              gotoTimeoutMs: env.BROWSER_NAVIGATION_TIMEOUT_MS,
+              objects,
+              providers: browserProviders,
+            },
+            payload,
+          );
         },
       };
 

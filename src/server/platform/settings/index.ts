@@ -27,6 +27,7 @@ const SETTING_DEFAULTS = {
   "llm.cap_tagging_day_usd": "1",
   "browser.provider": "browser_use",
   "browser.concurrency": "10",
+  "browser.max_concurrent_sessions": "3",
   "checkin.after_days": "21",
   "checkin.close_after_days": "45",
   "jobs.poll_interval_ms": "15000",

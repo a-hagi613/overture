@@ -38,7 +38,14 @@ export interface BrowserUseFixture {
   stoppedAttemptIds: string[];
   profiles: { id: string; name: string; userId: string }[];
   deletedProfileIds: string[];
+  peakActiveSessions: number;
+  rateLimitResponses: number;
   close: () => void;
+}
+
+export interface BrowserUseFixtureOptions {
+  maxConcurrentSessions?: number;
+  rateLimitFirstSessionCreates?: number;
 }
 
 const bodySchema = z.object({ action: z.literal("stop") });
@@ -61,12 +68,15 @@ const view = (session: SessionState) => ({
   timeoutAt: new Date(Date.parse(session.startedAt) + 15 * 60_000).toISOString(),
 });
 
-export function startBrowserUseFixture() {
+export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
   const sessions: SessionState[] = [];
   const stoppedSessionIds: string[] = [];
   const stoppedAttemptIds: string[] = [];
   const profiles: { id: string; name: string; userId: string }[] = [];
   const deletedProfileIds: string[] = [];
+  let peakActiveSessions = 0;
+  let rateLimitResponses = 0;
+  let firstCreatesRateLimited = options.rateLimitFirstSessionCreates ?? 0;
 
   const server = Bun.serve({
     port: 0,
@@ -106,6 +116,24 @@ export function startBrowserUseFixture() {
           return Response.json({ detail: "invalid session" }, { status: 422 });
         }
 
+        const active = sessions.filter((session) => !session.stopped).length;
+        const limit = options.maxConcurrentSessions;
+        const overLimit = limit !== undefined && active >= limit;
+        const forced = firstCreatesRateLimited > 0;
+
+        if (overLimit || forced) {
+          if (forced) {
+            firstCreatesRateLimited -= 1;
+          }
+
+          rateLimitResponses += 1;
+
+          return new Response(
+            `Browser Use API 429 on /api/v4/browsers: Free plan limit: ${String(limit ?? 1)} concurrent sessions reached`,
+            { status: 429 },
+          );
+        }
+
         const chromium = await launchLocalChromium();
 
         const session: SessionState = {
@@ -118,6 +146,7 @@ export function startBrowserUseFixture() {
         };
 
         sessions.push(session);
+        peakActiveSessions = Math.max(peakActiveSessions, active + 1);
 
         return Response.json(view(session), { status: 201 });
       }
@@ -181,7 +210,13 @@ export function startBrowserUseFixture() {
       void server.stop(true);
     },
     deletedProfileIds,
+    get peakActiveSessions() {
+      return peakActiveSessions;
+    },
     profiles,
+    get rateLimitResponses() {
+      return rateLimitResponses;
+    },
     sessions,
     stoppedAttemptIds,
     stoppedSessionIds,

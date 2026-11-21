@@ -4,6 +4,10 @@ import type { Browser, Route } from "playwright-core";
 
 import type { Clock } from "../platform/ports/clock.ts";
 
+import {
+  acquireBrowserSession,
+  configureBrowserSessionLimitFromSetting,
+} from "../dispatch/browser/session-slots.ts";
 import { BrowserUseClient } from "../dispatch/browser/browser-use.ts";
 import type { BrowserSession } from "../dispatch/browser/browser-use.ts";
 import type { ProbeConsole } from "./console.ts";
@@ -165,6 +169,8 @@ export async function runProbe(deps: ProbeDeps) {
 
   const client = BrowserUseClient(deps.apiKey, deps.apiBaseUrl);
   const { db } = openProbeDatabase(deps.databasePath);
+
+  configureBrowserSessionLimitFromSetting(db);
   const results: ProbeFormResult[] = [];
 
   const runFrom = async (index: number) => {
@@ -203,6 +209,8 @@ async function runPosting(
   io.writeLine(
     `${label}: starting a Browser Use session (residential exit in ${deps.runFile.country}, solver on, ${String(SESSION_TIMEOUT_MINUTES)}-minute timeout)`,
   );
+
+  const releaseSlot = await acquireBrowserSession();
 
   try {
     session = await client.createSession({
@@ -252,6 +260,8 @@ async function runPosting(
         io.writeLine(`${label}: stopping the session through the API failed`);
       }
     }
+
+    releaseSlot();
   }
 
   let view: BrowserSession | null = null;

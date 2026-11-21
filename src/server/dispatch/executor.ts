@@ -33,6 +33,7 @@ import { createNotification } from "../notify/notifications.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { copy } from "../../shared/copy.ts";
 import { recordApplicationEvent } from "./outcomes.ts";
+import { acquireBrowserSession } from "./browser/session-slots.ts";
 import { nextSendSlot as nextSlotInWindow, parseSendWindow } from "./planning.ts";
 
 export const APPLICATION_SEND_JOB_KIND = "application.send";
@@ -364,6 +365,7 @@ export function createDispatcher(deps: DispatcherDeps) {
     activeAttempts.add(attemptId);
 
     let browser: RemoteBrowser | null = null;
+    let releaseSessionSlot: (() => void) | null = null;
     let usage = zeroUsage;
     let outcome: AttemptRow["outcome"] = "provider_error";
     let shutdownActive = false;
@@ -408,6 +410,8 @@ export function createDispatcher(deps: DispatcherDeps) {
       if (isShuttingDown()) {
         throw new Error("shutting down before the browser opened");
       }
+
+      releaseSessionSlot = await acquireBrowserSession(signal);
 
       browser = await provider.open({
         attemptId,
@@ -747,6 +751,10 @@ export function createDispatcher(deps: DispatcherDeps) {
         }
 
         await provider.stop(browser.sessionId).catch(() => undefined);
+      }
+
+      if (releaseSessionSlot !== null) {
+        releaseSessionSlot();
       }
 
       const finished = db.select().from(attempts).where(eq(attempts.id, attemptId)).get();

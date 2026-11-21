@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { RetryLaterError } from "../../platform/jobs/retry.ts";
+
 export const browserSessionSchema = z.object({
   id: z.string().min(1),
   status: z.enum(["active", "stopped"]),
@@ -50,10 +52,33 @@ export interface ListSessionsInput {
 
 const apiBase = "https://api.browser-use.com";
 
+const RATE_LIMIT_MAX_RETRIES = 6;
+const RATE_LIMIT_BASE_DELAY_MS = 1000;
+const RATE_LIMIT_MAX_DELAY_MS = 30_000;
+
 const errors = {
   requestFailed: (status: number, path: string, body: string) =>
     `Browser Use API ${String(status)} on ${path}: ${body.slice(0, 500)}`,
 };
+
+export class BrowserUseApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+
+    this.name = "BrowserUseApiError";
+    this.status = status;
+  }
+}
+
+const rateLimited = (error: BrowserUseApiError) => error.status === 429;
+
+async function pause(ms: number) {
+  await new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
 export function BrowserUseClient(apiKey: string, baseUrl: string | undefined) {
   const root =
@@ -69,7 +94,10 @@ export function BrowserUseClient(apiKey: string, baseUrl: string | undefined) {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(errors.requestFailed(response.status, path, body));
+      throw new BrowserUseApiError(
+        response.status,
+        errors.requestFailed(response.status, path, body),
+      );
     }
 
     return response;
@@ -81,9 +109,9 @@ export function BrowserUseClient(apiKey: string, baseUrl: string | undefined) {
     return browserSessionSchema.parse(await response.json());
   };
 
-  return {
-    createSession: async (input: CreateSessionInput) =>
-      parsedSession("/api/v4/browsers", {
+  const createSession = async (input: CreateSessionInput, attempt = 0) => {
+    try {
+      return await parsedSession("/api/v4/browsers", {
         method: "POST",
         headers: headers(),
         body: JSON.stringify({
@@ -93,7 +121,24 @@ export function BrowserUseClient(apiKey: string, baseUrl: string | undefined) {
           solveCaptchas: input.solveCaptchas,
           metadata: input.metadata,
         }),
-      }),
+      });
+    } catch (error) {
+      if (!(error instanceof BrowserUseApiError) || !rateLimited(error)) {
+        throw error;
+      }
+
+      if (attempt >= RATE_LIMIT_MAX_RETRIES) {
+        throw new RetryLaterError(error.message);
+      }
+
+      await pause(Math.min(RATE_LIMIT_BASE_DELAY_MS * 2 ** attempt, RATE_LIMIT_MAX_DELAY_MS));
+
+      return createSession(input, attempt + 1);
+    }
+  };
+
+  return {
+    createSession: async (input: CreateSessionInput) => createSession(input),
     getSession: async (sessionId: string) =>
       parsedSession(`/api/v4/browsers/${sessionId}`, { headers: headers() }),
     listSessions: async (input: ListSessionsInput = {}) => {

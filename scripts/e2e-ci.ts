@@ -447,7 +447,14 @@ function jobHandlerModules(files: Set<string>) {
   const file = "src/server/main.ts";
   const bindings = importBindings(file);
   const blocks = declarationBlocks(file);
-  const used = collectBlocks(blocks, ["catalogJobHandlers", "llmJobHandlers", "testJobHandlers"]);
+
+  const used = collectBlocks(blocks, [
+    "catalogJobHandlers",
+    "fixtureJobHandlers",
+    "llmJobHandlers",
+    "testJobHandlers",
+  ]);
+
   const modules = new Set<string>();
 
   for (const identifier of used) {
