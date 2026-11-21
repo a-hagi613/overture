@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import type { TargetsInput } from "../../shared/targets.ts";
 
+import { QUESTION_FIELD_TYPES } from "../../shared/questions.ts";
+import { TIER_2_FACT_KEYS } from "../../shared/facts.ts";
 import { targetsInputSchema } from "../../shared/targets.ts";
 
 const targetsResponseSchema = z.object({
@@ -22,6 +24,20 @@ const skipCompanySchema = z.object({
 const skipCompaniesSchema = z.object({ companies: z.array(skipCompanySchema) });
 
 const languagesSchema = z.object({ languages: z.array(z.string()) });
+
+const strengthenFactSchema = z.object({
+  key: z.enum(TIER_2_FACT_KEYS),
+  label: z.string(),
+  prompt: z.string(),
+  fieldType: z.enum(QUESTION_FIELD_TYPES),
+  options: z.array(z.string()),
+  unlocked: z.number(),
+});
+
+const strengthenSchema = z.object({
+  facts: z.array(strengthenFactSchema),
+  unlocks: z.number(),
+});
 
 const profileSettingsSchema = z.object({
   languages: z.array(z.string()),
@@ -84,6 +100,22 @@ export async function saveSkipCompanies(companies: { name: string; domain: strin
   );
 }
 
+export async function fetchStrengthen() {
+  return strengthenSchema.parse(await jsonFrom(await fetch("/api/profile/strengthen")));
+}
+
+export async function saveStrengthen(key: string, value: string) {
+  return strengthenSchema.parse(
+    await jsonFrom(
+      await fetch("/api/profile/strengthen", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ key, value }),
+      }),
+    ),
+  );
+}
+
 export async function fetchLanguages() {
   return languagesSchema.parse(await jsonFrom(await fetch("/api/profile/languages")));
 }
@@ -119,3 +151,7 @@ export async function saveProfileSettings(settings: { languages: string[]; timez
 export type TargetsResponse = z.infer<typeof targetsResponseSchema>;
 
 export type SkipCompany = z.infer<typeof skipCompanySchema>;
+
+export type StrengthenFact = z.infer<typeof strengthenFactSchema>;
+
+export type StrengthenView = z.infer<typeof strengthenSchema>;

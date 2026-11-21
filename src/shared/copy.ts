@@ -630,6 +630,17 @@ export const copy = {
         label: "Tier 3 · Learned from Reviews",
         count: "3",
       },
+      strengthen: {
+        empty:
+          "Nothing to add right now. When a question cannot be answered from your facts, it appears here with the number of queued applications it unlocks.",
+        unlocks: (count: number) =>
+          `Unlocks ${String(count)} queued ${plural(count, "application", "applications")}`,
+        note: "Optional. Each fact answers common questions, so the queued applications waiting on them can go ahead.",
+        foot: "Facts you add here are used on every application that asks.",
+        save: "Save fact",
+        saveAria: (label: string) => `Save fact: ${label}`,
+        saving: "Saving",
+      },
       fromResume: "From your resume",
       typedHere: "Typed here",
       assignedBy: "Assigned by Overture",
