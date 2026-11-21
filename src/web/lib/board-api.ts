@@ -141,6 +141,7 @@ export const applicationDetailSchema = z.object({
       coverLetter: z.array(coverLetterLineSchema).nullable(),
       provider: z.string(),
       resume: z.object({ bytes: z.number(), filename: z.string(), sha256: z.string() }).nullable(),
+      resumeLines: z.array(z.object({ id: z.string(), text: z.string() })),
       resumeSha256: z.string(),
       submittedAt: z.number(),
     })

@@ -24,6 +24,18 @@ export function BoardCover({ detail }: { detail: ApplicationDetail }) {
               <p className="mono mt-1 text-[11px] text-muted-foreground">
                 {copy.board.cover.lines(line.resume_line_ids.length)}
               </p>
+              {line.resume_line_ids.map((id) => {
+                const cited = snapshot.resumeLines.find((resumeLine) => resumeLine.id === id);
+
+                return cited === undefined ? null : (
+                  <p
+                    className="mono mt-1 border-l border-border pl-2 text-[11px] text-muted-foreground"
+                    key={id}
+                  >
+                    {`${cited.id} · ${cited.text}`}
+                  </p>
+                );
+              })}
             </div>
           ))}
         </div>

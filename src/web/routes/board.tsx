@@ -18,8 +18,6 @@ const STAGE_ORDER = ["queued", "applied", "screening", "interviewing", "offer", 
 
 const HOLD_MS = 250;
 
-type Filter = "all" | "needs" | "checking";
-
 function nextStage(current: StageKey, direction: -1 | 1) {
   const index = STAGE_ORDER.indexOf(current);
   const target = STAGE_ORDER[index + direction];
@@ -38,8 +36,6 @@ export function BoardPage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [holdingId, setHoldingId] = useState<string | null>(null);
   const [hoverStage, setHoverStage] = useState<StageKey | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
-  const [filterOpen, setFilterOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const holdTimer = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const toastTimer = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
@@ -47,6 +43,7 @@ export function BoardPage() {
   const dragCard = useRef<BoardCard | null>(null);
   const dragging = useRef(false);
   const held = useRef<string | null>(null);
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const suppressClick = useRef(false);
   const { data: detailData } = useApplication(selectedId);
   const detail = detailData ?? null;
@@ -72,7 +69,6 @@ export function BoardPage() {
     const onKey = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
         setSelectedId(null);
-        setFilterOpen(false);
       }
     };
 
@@ -94,19 +90,6 @@ export function BoardPage() {
       setToast(null);
     }, 4000);
   };
-
-  const visibleCards = (columnCards: BoardCard[]) =>
-    columnCards.filter((card) => {
-      if (filter === "needs") {
-        return card.needsYou;
-      }
-
-      if (filter === "checking") {
-        return card.status === "confirming";
-      }
-
-      return true;
-    });
 
   const moveTo = (id: string, stage: StageKey) => {
     moveStage.mutate(
@@ -275,22 +258,12 @@ export function BoardPage() {
     counts[stage] = columns.find((column) => column.stage === stage)?.cards.length ?? 0;
   }
 
-  const phoneCards = visibleCards(
-    columns.find((column) => column.stage === mobileStage)?.cards ?? [],
-  );
+  const phoneCards = columns.find((column) => column.stage === mobileStage)?.cards ?? [];
 
   return (
     <div className="board">
       <div className="hidden flex-1 flex-col pt-[26px] pb-7 pl-8 md:flex">
         <BoardPageHeader
-          filterOpen={filterOpen}
-          onFilter={(next) => {
-            setFilter(next);
-            setFilterOpen(false);
-          }}
-          onToggleFilter={() => {
-            setFilterOpen((current) => !current);
-          }}
           onToggleRunning={() => {
             running.mutate(home?.running !== true);
           }}
@@ -305,7 +278,7 @@ export function BoardPage() {
           <div className="cols mt-[26px] flex flex-1 items-start gap-4 overflow-x-auto pr-8 pt-1 pb-3.5">
             {STAGE_ORDER.map((stage) => (
               <BoardColumn
-                cards={visibleCards(columns.find((column) => column.stage === stage)?.cards ?? [])}
+                cards={columns.find((column) => column.stage === stage)?.cards ?? []}
                 draggingId={draggingId}
                 key={stage}
                 onOpen={open}
@@ -340,7 +313,34 @@ export function BoardPage() {
         />
         <div
           aria-label={copy.board.columns[mobileStage]}
-          className="mt-3 flex flex-1 flex-col gap-3 overflow-y-auto px-5 pb-4"
+          className="mt-3 flex flex-1 touch-pan-y flex-col gap-3 overflow-y-auto px-5 pb-4"
+          onPointerDown={(event) => {
+            swipeStart.current = { x: event.clientX, y: event.clientY };
+          }}
+          onPointerUp={(event) => {
+            const start = swipeStart.current;
+
+            swipeStart.current = null;
+
+            if (start === null || held.current !== null || dragging.current) {
+              return;
+            }
+
+            const dx = event.clientX - start.x;
+            const dy = event.clientY - start.y;
+
+            if (Math.abs(dx) < 60 || Math.abs(dx) <= Math.abs(dy)) {
+              return;
+            }
+
+            suppressClick.current = true;
+            setMobileStage((current) => {
+              const index = STAGE_ORDER.indexOf(current);
+              const next = STAGE_ORDER[index + (dx < 0 ? 1 : -1)];
+
+              return next ?? current;
+            });
+          }}
           role="tabpanel"
         >
           {phoneCards.map((card) => (

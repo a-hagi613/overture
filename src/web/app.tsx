@@ -20,9 +20,11 @@ export function AppShell() {
   const { data: session, isPending } = authClient.useSession();
   const name = session?.user.name ?? null;
 
-  const [railCollapsed, setRailCollapsed] = useState(
-    () => globalThis.localStorage.getItem(collapsedStorageKey) === "1",
-  );
+  const [railCollapsed, setRailCollapsed] = useState(() => {
+    const stored = globalThis.localStorage.getItem(collapsedStorageKey);
+
+    return stored === "1" || (stored === null && pathname === "/board");
+  });
 
   useEffect(() => {
     if (!isPending && session === null) {

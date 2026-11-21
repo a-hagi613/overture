@@ -24,6 +24,7 @@ import {
 import { localDayStart, localPartsAt } from "../platform/local-time.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { createTimeZoneService } from "../profile/time-zone.ts";
+import { resumeLines as splitResumeLines } from "../pipeline/grounding.ts";
 
 const STAGES = ["queued", "applied", "screening", "interviewing", "offer", "closed"] as const;
 
@@ -143,7 +144,11 @@ function noteFor(
   }
 
   if (row.stage === "applied") {
-    return row.sentAt !== null && row.sentAt >= options.dayStart
+    if (row.sentAt === null) {
+      return null;
+    }
+
+    return row.sentAt >= options.dayStart
       ? { label: "Sent today", tone: "accent" }
       : { label: "Sent", tone: "accent" };
   }
@@ -302,7 +307,7 @@ export function createApplicationRoutes(
         cards: cards.filter((card) => card.stage === stage),
         stage,
       })),
-      total: cards.length,
+      total: cards.filter((card) => card.stage !== null).length,
       updatedAt: now,
     };
   }
@@ -662,11 +667,58 @@ export function createApplicationRoutes(
         title: row.posting.title,
         url: row.posting.url,
       },
-      snapshot: snapshotView,
+      snapshot:
+        snapshotView === null
+          ? null
+          : {
+              ...snapshotView,
+              resumeLines: await citedResumeLines(userId, snapshot?.resumeId ?? null, snapshotView),
+            },
       timeZone,
       timeline,
     });
   });
+
+  async function citedResumeLines(
+    userId: string,
+    resumeId: string | null,
+    snapshot: {
+      answers: { resume_line_ids: string[] }[];
+      coverLetter: { resume_line_ids: string[] }[] | null;
+    },
+  ) {
+    if (resumeId === null) {
+      return [];
+    }
+
+    const row = db.select().from(resumes).where(eq(resumes.id, resumeId)).get();
+
+    if (row === undefined) {
+      return [];
+    }
+
+    const cited = new Set<string>();
+
+    for (const answer of snapshot.answers) {
+      for (const id of answer.resume_line_ids) {
+        cited.add(id);
+      }
+    }
+
+    for (const line of snapshot.coverLetter ?? []) {
+      for (const id of line.resume_line_ids) {
+        cited.add(id);
+      }
+    }
+
+    const text = await personal.openFor(
+      userId,
+      { column: "text_enc", rowId: row.id, table: "resumes" },
+      row.textEnc,
+    );
+
+    return splitResumeLines(text).filter((line) => cited.has(line.id));
+  }
 
   async function resumeFile(userId: string, resumeId: string) {
     const row = db.select().from(resumes).where(eq(resumes.id, resumeId)).get();

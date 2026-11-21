@@ -14,6 +14,18 @@ const destinations = [
   { glyph: "profile", to: "/profile" },
 ] as const;
 
+function labelFor(destination: (typeof destinations)[number]) {
+  if (!("badge" in destination)) {
+    return copy.nav[destination.glyph];
+  }
+
+  if (destination.glyph === "review") {
+    return copy.shell.counters.reviewAria;
+  }
+
+  return copy.shell.counters.inboxAria;
+}
+
 export function BoardRail({ onExpand, name }: { onExpand: () => void; name: string | null }) {
   return (
     <aside className="board hidden bg-sidebar px-0 pb-[18px] pt-5 shadow-[1px_0_0_var(--color-hl)] md:flex md:w-[76px] md:flex-col md:items-center md:border-r md:border-border">
@@ -32,11 +44,7 @@ export function BoardRail({ onExpand, name }: { onExpand: () => void; name: stri
       <nav aria-label={copy.nav.label} className="mt-4 flex flex-col items-center gap-1.5">
         {destinations.map((destination) => (
           <NavLink
-            aria-label={
-              "badge" in destination
-                ? `${copy.nav[destination.glyph]}, ${destination.badge} waiting`
-                : copy.nav[destination.glyph]
-            }
+            aria-label={labelFor(destination)}
             className={({ isActive }) => `rl ${isActive ? "on" : ""}`}
             end={destination.to === "/"}
             key={destination.to}

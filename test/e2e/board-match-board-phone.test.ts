@@ -30,7 +30,8 @@ async function writePhoneBaseline(browser: Browser, theme: string) {
   mkdirSync(directory, { recursive: true });
 
   const source = readFileSync(`design/reference/board/390-${theme}.png`).toString("base64");
-  const page = await browser.newPage();
+  const cropContext = await browser.newContext();
+  const page = await cropContext.newPage();
 
   const cropped = await page.evaluate(
     async (input: { base64: string; height: number; width: number }) => {
@@ -57,7 +58,7 @@ async function writePhoneBaseline(browser: Browser, theme: string) {
     { base64: source, height: PHONE_HEIGHT, width: PHONE_WIDTH },
   );
 
-  await page.close();
+  await cropContext.close();
   writeFileSync(`${directory}/390-${theme}.png`, Buffer.from(cropped, "base64"));
 }
 
