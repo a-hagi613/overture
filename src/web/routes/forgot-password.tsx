@@ -3,6 +3,7 @@ import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
 import { turnstileActionHeader, turnstileTokenHeader } from "../../shared/turnstile.ts";
+import { BusyIndicator } from "../components/busy-indicator.tsx";
 import { NavGlyph } from "../components/nav-glyph.tsx";
 import { SignInLayout } from "../components/signin-layout.tsx";
 import {
@@ -15,49 +16,68 @@ import {
   SWITCH_CLASS,
 } from "../components/signin-styles.ts";
 import { authClient } from "../lib/auth-client.ts";
-import { useTurnstile } from "../lib/turnstile.ts";
-import { useTurnstileSiteKey } from "../lib/turnstile-site-key.ts";
+import { useTurnstile, turnstileFailureMessage } from "../lib/turnstile.ts";
+import { useTurnstileConfig } from "../lib/turnstile-config.ts";
 
 export function ForgotPasswordPage() {
-  const siteKey = useTurnstileSiteKey();
-  const { containerRef, obtainToken } = useTurnstile(siteKey, "reset");
+  const config = useTurnstileConfig();
+
+  const { containerRef, obtainToken } = useTurnstile(
+    config === undefined ? undefined : config.siteKey,
+    "reset",
+    config?.scriptUrl,
+  );
+
   const [email, setEmail] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
-  const onSubmit = async () => {
-    const token = await obtainToken();
+  const submit = async () => {
+    const result = await obtainToken();
 
-    if (token === null) {
-      setError(copy.signIn.captchaMissing);
+    if (result.token === null) {
+      setError(turnstileFailureMessage(result.failure));
 
       return;
     }
 
-    const result = await authClient
+    const authResult = await authClient
       .requestPasswordReset({
         email: email.trim(),
         redirectTo: `${globalThis.location.origin}/reset-password`,
         fetchOptions: {
-          headers: { [turnstileTokenHeader]: token, [turnstileActionHeader]: "reset" },
+          headers: { [turnstileTokenHeader]: result.token, [turnstileActionHeader]: "reset" },
         },
       })
       .catch(() => null);
 
-    if (result === null) {
+    if (authResult === null) {
       setError(copy.signIn.genericError);
 
       return;
     }
 
-    if (result.error !== null) {
-      setError(result.error.status === 429 ? copy.signIn.rateLimited : copy.signIn.genericError);
+    if (authResult.error !== null) {
+      setError(
+        authResult.error.status === 429 ? copy.signIn.rateLimited : copy.signIn.genericError,
+      );
 
       return;
     }
 
     setError(null);
     setNotice(copy.signIn.forgotSent);
+  };
+
+  const onSubmit = async () => {
+    if (pending) {
+      return;
+    }
+
+    setPending(true);
+    await submit();
+    setPending(false);
   };
 
   return (
@@ -93,7 +113,13 @@ export function ForgotPasswordPage() {
                 value={email}
               />
             </div>
-            <button className={BTN_PRIMARY} type="submit">
+            <button
+              aria-busy={pending || undefined}
+              className={BTN_PRIMARY}
+              disabled={pending}
+              type="submit"
+            >
+              {pending ? <BusyIndicator /> : null}
               {copy.signIn.forgotSubmit}
             </button>
           </form>

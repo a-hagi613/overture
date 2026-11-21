@@ -26,6 +26,7 @@ export function createMeRoutes(auth: Auth) {
           }
         : null,
       turnstileSiteKey: env.TURNSTILE_SITE_KEY,
+      turnstileScriptUrl: env.TURNSTILE_SCRIPT_URL,
       socialProviders: enabledSocialProviders,
     });
   });
