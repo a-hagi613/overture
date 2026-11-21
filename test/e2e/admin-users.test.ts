@@ -113,8 +113,13 @@ test("the owner invites, grants and suspends a person from the admin", async ({
 
   await page.getByLabel("Email").fill(guestEmail);
   await page.getByLabel("Applications", { exact: true }).fill("5");
+
+  const grantRows = page.getByText(`${guestEmail} · granted`, { exact: false });
+
+  await expect(grantRows).toHaveCount(1);
+
   await page.getByRole("button", { name: "Grant the Applications" }).click();
-  await expect(page.getByText(`${guestEmail} · granted`)).toBeVisible({ timeout: 15_000 });
+  await expect(grantRows).toHaveCount(2, { timeout: 15_000 });
 
   await page.goto(detailUrl);
 
