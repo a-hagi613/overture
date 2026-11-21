@@ -1,0 +1,53 @@
+{
+  "errors": [],
+  "messages": [],
+  "success": true,
+  "result": [
+    {
+      "content": "route1.mx.cloudflare.net",
+      "name": "cf-bounce.tryoverture.com",
+      "priority": 10,
+      "ttl": 1,
+      "type": "MX"
+    },
+    {
+      "content": "route2.mx.cloudflare.net",
+      "name": "cf-bounce.tryoverture.com",
+      "priority": 20,
+      "ttl": 1,
+      "type": "MX"
+    },
+    {
+      "content": "route3.mx.cloudflare.net",
+      "name": "cf-bounce.tryoverture.com",
+      "priority": 30,
+      "ttl": 1,
+      "type": "MX"
+    },
+    {
+      "content": "v=spf1 include:_spf.mx.cloudflare.net ~all",
+      "name": "cf-bounce.tryoverture.com",
+      "ttl": 1,
+      "type": "TXT"
+    },
+    {
+      "content": "v=DKIM1; h=sha256; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtest",
+      "name": "cf-bounce._domainkey.tryoverture.com",
+      "ttl": 1,
+      "type": "TXT"
+    },
+    {
+      "content": "v=DMARC1; p=reject; rua=mailto:dmarc@tryoverture.com",
+      "name": "_dmarc.tryoverture.com",
+      "ttl": 1,
+      "type": "TXT"
+    }
+  ],
+  "result_info": {
+    "count": 6,
+    "page": 1,
+    "per_page": 20,
+    "total_count": 6,
+    "total_pages": 1
+  }
+}

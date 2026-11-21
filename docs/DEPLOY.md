@@ -50,7 +50,8 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    (base64 that decodes to exactly 32 bytes), never rotated without the re-wrap step that
    re-wraps every user's data key under the new master key.
    Outbound mail (M1-90) adds `CLOUDFLARE_EMAIL_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; the pair is set together or
-   not at all, and the Cloudflare section below covers them. With neither the in-memory sink is used, as in development
+   not at all, and the Cloudflare section below covers them. `CLOUDFLARE_ZONE_ID` joins them for the M2-02 sending-domain
+   script and guards. With neither the in-memory sink is used, as in development
    and tests.
    The server refuses to boot without the required ones, so the **Deploy** workflow checks each required
    name with `fly secrets list` first and fails before deploying when one is missing; production keeps its
@@ -111,7 +112,7 @@ The server sends with a bearer token by `fetch`; no SDK and no configuration set
 
 ### The deploy gate
 
-The **Deploy** workflow lists the two Cloudflare names in its required-secret gate, behind the repository variable
+The **Deploy** workflow lists the Cloudflare names in its required-secret gate, behind the repository variable
 `REQUIRE_CLOUDFLARE_EMAIL_SECRETS`, so the gate stays green until production relies on Cloudflare. Once the secrets
 above exist, flip it:
 
@@ -124,6 +125,82 @@ gh variable set REQUIRE_CLOUDFLARE_EMAIL_SECRETS -b true -R a-hagi613/overture
 Request a sign-in link at `https://tryoverture.com/signin`, confirm it arrives from `no-reply@tryoverture.com`, and
 open it to sign in. Development and the e2e suite never call Cloudflare: ADR 0013 intercepts the send endpoint inside
 the app process with MSW and asserts the request body.
+
+## M2-02: Cloudflare Email Sending for every recipient (owner runbook)
+
+Sending to anyone but the owner needs **Workers Paid** and `tryoverture.com` onboarded as a sending domain
+([issue #211](https://github.com/a-hagi613/overture/issues/211), SPEC §11.2, ADR 0028,
+`docs/research/cloudflare-email-sending.md`). This section is what the owner runs once the plan is paid. Nothing here
+is needed for the owner-only phase, and the guards stay gated until `REQUIRE_EMAIL_SENDING` is turned on.
+
+### 1. Set the Fly secrets
+
+The script and the live check read the same secrets as the sender, plus the zone id:
+
+```sh
+fly secrets set CLOUDFLARE_EMAIL_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… CLOUDFLARE_ZONE_ID=… -a overture-web
+```
+
+`CLOUDFLARE_ZONE_ID` is on the `tryoverture.com` overview page in the Cloudflare dashboard (right-hand column). The
+API token needs **Email Sending: Edit** (API name `Email Sending Write`); if `CLOUDFLARE_ZONE_ID` is not set, the
+script tries `GET /zones?name=tryoverture.com`, which also needs **Zone: Read**. Setting the zone id avoids that
+second permission. The token is never printed, committed or copied anywhere.
+
+### 2. Run the onboarding script on `overture-web`
+
+```sh
+fly ssh console -a overture-web -C "bun run /app/scripts/onboard-email-sending.ts --dry-run"
+fly ssh console -a overture-web -C "bun run /app/scripts/onboard-email-sending.ts"
+```
+
+The script is idempotent: it lists the sending subdomains first and only creates (or re-enables) the one that is
+missing, so a second run prints `action: none` and changes nothing. `--dry-run` prints what it would do and sends no
+request that writes. It reads the expected records back from Cloudflare and verifies the four the sending domain
+needs:
+
+| Record | Name | Check |
+|---|---|---|
+| bounce MX | `cf-bounce.tryoverture.com` | at least one, pointing at `*.mx.cloudflare.net` |
+| SPF | `cf-bounce.tryoverture.com` | `v=spf1 include:_spf.mx.cloudflare.net` |
+| DKIM | `cf-bounce._domainkey.tryoverture.com` | `v=DKIM1` with a public key |
+| DMARC | `_dmarc.tryoverture.com` | `v=DMARC1; p=reject` |
+
+It never writes a zone DNS record: only the sending subdomain is created, so the apex MX, the apex SPF include and the
+`cf2024-1._domainkey` record that Email Routing and the inbound Worker depend on are untouched. Cloudflare manages the
+records it adds, including a DMARC record only when the domain has none; Overture's existing `p=reject; rua=…` record
+is kept.
+
+`--check` is the read-only form used by the deploy guard and by the daily live check:
+
+```sh
+fly ssh console -a overture-web -C "bun run /app/scripts/onboard-email-sending.ts --check"
+```
+
+It prints the plan state (`Workers Paid` when Cloudflare's Email Sending API answers), the domain state and each
+record, then exits 0 only when every record verifies.
+
+### 3. Turn the guards on
+
+The guards are gated so they never block anything before the owner pays. Turn both switches on after the script
+prints `verdict: verified`:
+
+```sh
+fly secrets set REQUIRE_EMAIL_SENDING=true -a overture-web
+gh variable set REQUIRE_EMAIL_SENDING -b true -R a-hagi613/overture
+```
+
+- The **deploy guard** in `.github/workflows/deploy.yml` runs `onboard-email-sending.ts --check` on the running
+  release before every deploy. While the switch is off it prints a warning and the deploy continues; with the switch
+  on it refuses the deploy with a clear message when the sending domain is missing, disabled or its records do not
+  verify.
+- The **live-check guard** is the `mail.sending` result in the daily `mail` check group. While the switch is off it
+  records `status: "gated"` and does not alert. With the switch on it verifies the domain and all four records and
+  fails (with the owner's alert path) when they do not pass. The same group then sends the check message to the
+  reserved `live-check@tryoverture.com`, which is not the owner's address, and expects it back through Email Routing.
+
+Run the daily check once from the owner's terminal (`POST https://admin.tryoverture.com/admin/api/live-checks`) and
+confirm `mail.sending` and `mail` pass. If the records were just created, Cloudflare usually propagates in 5–15
+minutes; re-run `--check` until it prints `verdict: ready`.
 
 ## Verifying the acceptance criteria
 
@@ -272,11 +349,14 @@ Cloudflare Access cookie and the owner's session:
 `curl https://admin.tryoverture.com/admin/api/live-checks` for the recorded pass/fail and timing per check. The same
 rows are in the `live_check_results` table.
 
-The forms check captures one open posting per ATS from the catalog and never fills or submits. The mail check sends
-to the reserved `live-check@tryoverture.com` (which maps to no user), and the follow-up `live.check.mail` job records
-whether it came back through Email Routing and the Worker with `auth='pass'` and the matching code within
-`live_checks.mail_wait_minutes` (default 5, a Settings value). Failures raise `alert.raised`, create an owner
-notification, and push to the phone when `ALERT_NTFY_URL` is set as a Fly secret.
+The forms check captures one open posting per ATS from the catalog and never fills or submits. The mail group first
+runs the `mail.sending` guard: gated with `status: "gated"` until `REQUIRE_EMAIL_SENDING` is on, then it verifies
+`tryoverture.com` and its bounce MX, SPF, DKIM and DMARC records and fails with the owner's alert path when one is
+missing. When it passes, the mail check sends to the reserved `live-check@tryoverture.com` (which maps to no user; it
+is never the owner's address), and the follow-up `live.check.mail` job records whether it came back through Email
+Routing and the Worker with `auth='pass'` and the matching code within `live_checks.mail_wait_minutes` (default 5, a
+Settings value). Failures raise `alert.raised`, create an owner notification, and push to the phone when
+`ALERT_NTFY_URL` is set as a Fly secret.
 
 No Grafana is provisioned by this repository: the OTLP endpoint and dashboards remain in the owner's Grafana account.
 The application computes the SPEC §16.5 alert thresholds from its own database and machine, so the daily check and

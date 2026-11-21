@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createApp } from "./app.ts";
 import { createAuth } from "./auth/index.ts";
 import { databasePath, env } from "./config/env.ts";
-import { createMailSender } from "./platform/mail/index.ts";
+import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
 import { openDatabase } from "./platform/db/client.ts";
 import { migrateDatabase } from "./platform/db/migrate.ts";
 import { createClock } from "./platform/ports/clock.ts";
@@ -437,6 +437,7 @@ const liveCheckDeps = {
   llm: anthropicLlmPort,
   mail: mailSender,
   mailAddress: liveCheckAddressValue,
+  emailSending: { required: env.REQUIRE_EMAIL_SENDING, config: emailSendingConfigFromEnv() },
   objects,
   providers: browserProviders,
 };

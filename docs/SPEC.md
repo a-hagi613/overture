@@ -127,6 +127,9 @@ Overture's own mail (magic links, the daily live check) goes through the Cloudfl
 the test and development adapter. A half-set pair stops the server at boot. The sender is a plain `fetch` to
 `POST /accounts/{account_id}/email/sending/send` under `https://api.cloudflare.com/client/v4`, with the token in a
 bearer header; the research and the Beta terms are in `docs/research/cloudflare-email-sending.md` and ADR 0028.
+`CLOUDFLARE_ZONE_ID` scopes the M2-02 sending-domain script and guards. `REQUIRE_EMAIL_SENDING` gates the live
+`mail.sending` guard: unset, the check records `status: "gated"` and does not alert; set, it verifies the sending
+domain and alerts while a send to a non-owner recipient would be refused.
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
 
 ### 3.3 Domains and DNS
@@ -989,10 +992,13 @@ suppression list and delivery-event webhooks of the old design are not built; a 
 
 Overture's own mail (magic links, verification, the daily recap email, receipts) leaves `no-reply@tryoverture.com` through
 Cloudflare Email Sending (ADR 0028, `docs/research/cloudflare-email-sending.md`); SES and Resend are no longer used.
-Sending to anyone but the owner needs Workers Paid ($5 a month) and `tryoverture.com` onboarded as a sending domain. One
-M2 ticket builds an idempotent operator script that does the onboarding and checks the DNS records, plus a deploy and
-live-check guard that fails loudly while sends to a non-owner recipient would be refused, so the switch is one command once
-the plan is paid.
+Sending to anyone but the owner needs Workers Paid ($5 a month) and `tryoverture.com` onboarded as a sending domain. The
+idempotent operator script `scripts/onboard-email-sending.ts` does the onboarding and checks the bounce MX, SPF, DKIM and
+DMARC records; `--dry-run` calls nothing that writes and `--check` is the read-only form. A deploy guard runs `--check`
+before deploying and a live-check guard (`mail.sending`) runs it daily; both are gated by `REQUIRE_EMAIL_SENDING`, so
+they warn while the switch is off and refuse the deploy or alert the owner once the owner turns it on. The live mail
+check then sends to the reserved non-owner `live-check@tryoverture.com`. The switch is one command once the plan is
+paid (docs/DEPLOY.md, M2-02).
 
 ### 11.3 Classification
 
@@ -1229,7 +1235,7 @@ and none submits an application or touches a user:
 |---|---|---|
 | Forms | the `fixtures.capture` path opens one posting per ATS chosen from the open catalog, saves its form and assets, reports a changed form signature, and never fills or submits | saved forms in R2 `fixtures/` (§10.5) |
 | AI | four fixed, deterministic Haiku calls (score, open text, question mapping, tag fallback) through `LlmPort`, checked against their output schemas and the resume-line rule | MSW recordings in R2 `recordings/anthropic/` |
-| Mail | a DKIM-signed message from `no-reply@tryoverture.com` to the reserved `live-check@tryoverture.com`, through Cloudflare Email Sending, Email Routing and the Worker, ingested with `auth='pass'` and its code matched within `live_checks.mail_wait_minutes` (default 5) | recorded `.eml` fixtures in R2 `recordings/mail/` |
+| Mail | a DKIM-signed message from `no-reply@tryoverture.com` to the reserved `live-check@tryoverture.com`, through Cloudflare Email Sending, Email Routing and the Worker, ingested with `auth='pass'` and its code matched within `live_checks.mail_wait_minutes` (default 5); first the same group's `mail.sending` guard verifies the sending domain's bounce MX, SPF, DKIM and DMARC records when `REQUIRE_EMAIL_SENDING` is set (gated and non-alerting before that) | recorded `.eml` fixtures in R2 `recordings/mail/` |
 | Storage | an R2 put, get, list and delete | — |
 
 The mail check is two-phase: `live.check` sends and enqueues `live.check.mail` for the wait window, so a restart

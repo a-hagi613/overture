@@ -129,6 +129,9 @@ The private address Overture gives each user on `tryoverture.com` (`in-…@`) wh
 forwards only ATS mail to it; it is read-only in the app, never typed on an application form, where the user's real
 email goes (ADR 0028), and a retired local part is never reused.
 
+**Sending domain**:
+`tryoverture.com` onboarded to Cloudflare Email Sending so Overture can mail any recipient, not only the owner. It adds bounce MX, SPF and DKIM on `cf-bounce.tryoverture.com` and keeps the Email Routing records on the apex; the `mail.sending` live check and the deploy guard verify it once `REQUIRE_EMAIL_SENDING` is on (M2-02).
+
 **Invite**:
 The owner's permission for one email address to join the beta. Accepting it by signing in with that email creates the account and an admin grant of 300 applications over 30 days.
 _Avoid_: waitlist spot, access code

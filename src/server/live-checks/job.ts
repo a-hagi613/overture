@@ -9,6 +9,7 @@ import type { MailSender } from "../platform/mail/port.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
 import type { LiveCheckGroup, LiveCheckResult } from "./types.ts";
+import type { EmailSendingGuard } from "./sending-domain.ts";
 
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { raiseAlert } from "../platform/alerts.ts";
@@ -18,6 +19,7 @@ import { collectAlertMetrics, evaluateAlerts } from "./alerts.ts";
 import { runFormsCheck } from "./forms.ts";
 import { runLlmCheck } from "./llm.ts";
 import { resolveDueLiveCheckMail, resolveLiveCheckMail, sendLiveCheckMail } from "./mail.ts";
+import { runEmailSendingGuard } from "./sending-domain.ts";
 import { runStorageCheck } from "./r2.ts";
 import { latestLiveCheckAt, recordLiveCheckResult } from "./store.ts";
 import { LIVE_CHECK_GROUPS, failedResult } from "./types.ts";
@@ -42,6 +44,7 @@ export interface LiveCheckDeps {
   llm: LlmPort;
   mail: MailSender;
   mailAddress: string;
+  emailSending: EmailSendingGuard;
   providers: BrowserProviderRegistry | null;
   backups: BackupMonitor;
   databasePath: string;
@@ -118,9 +121,15 @@ export async function runLiveChecks(deps: LiveCheckDeps, payload: string) {
       results.push(
         ...(await runGroup(deps, group, async () => {
           const overdue = resolveDueLiveCheckMail(mailDeps);
+          const sending = await runEmailSendingGuard(deps.emailSending, deps.clock);
+
+          if (!sending.ok) {
+            return [...overdue, sending];
+          }
+
           const sent = await sendLiveCheckMail(mailDeps);
 
-          return [...overdue, sent.result];
+          return [...overdue, sending, sent.result];
         })),
       );
     }

@@ -9,8 +9,15 @@ import { spendTurnstileToken, turnstileScenario } from "./turnstile-scenario.ts"
 import { turnstileSiteverifyUrl } from "../auth/turnstile-gate.ts";
 import { cloudflareSendEmailUrl } from "../platform/mail/cloudflare.ts";
 import { recordCloudflareEmailRequest } from "./cloudflare-email-recorder.ts";
+import { emailSendingScenario } from "./email-sending-scenario.ts";
 
 const turnstileRecordingPath = "test/e2e/recordings/turnstile/siteverify-pass.json";
+
+function recordedEmailSending(name: string) {
+  return z
+    .json()
+    .parse(JSON.parse(readFileSync(`test/e2e/recordings/cloudflare-email/${name}.json`, "utf8")));
+}
 
 const recordedVerificationSchema = z.object({
   success: z.boolean(),
@@ -54,9 +61,61 @@ async function siteverifyResponse(request: Request) {
 
 export function startInterception() {
   const anthropicRoot = env.ANTHROPIC_BASE_URL.replace(/\/+$/u, "");
+  const cloudflareRoot = env.CLOUDFLARE_EMAIL_API_BASE_URL.replace(/\/+$/u, "");
+  const cloudflareZone = env.CLOUDFLARE_ZONE_ID ?? "unconfigured-zone";
 
   const server = setupServer(
     ...loopbackPassthrough,
+    http.get(`${cloudflareRoot}/zones/${cloudflareZone}/email/sending/subdomains`, () => {
+      const scenario = emailSendingScenario();
+
+      if (scenario === "not-entitled") {
+        return HttpResponse.json(recordedEmailSending("subdomains-not-entitled"), { status: 403 });
+      }
+
+      return HttpResponse.json(
+        recordedEmailSending(
+          scenario === "not-onboarded" ? "subdomains-empty" : "subdomains-ready",
+        ),
+      );
+    }),
+    http.get(`${cloudflareRoot}/zones/${cloudflareZone}/email/sending/subdomains/:tag/dns`, () =>
+      HttpResponse.json(
+        recordedEmailSending(
+          emailSendingScenario() === "records-incomplete"
+            ? "subdomain-dns-incomplete"
+            : "subdomain-dns-ready",
+        ),
+      ),
+    ),
+    http.post(
+      `${cloudflareRoot}/zones/${cloudflareZone}/email/sending/subdomains`,
+      async ({ request }) => {
+        recordCloudflareEmailRequest({
+          method: request.method,
+          url: request.url,
+          headers: Object.fromEntries(request.headers.entries()),
+          body: await request.text(),
+        });
+
+        return HttpResponse.json({
+          success: true,
+          errors: [],
+          messages: [],
+          result: {
+            enabled: true,
+            name: "tryoverture.com",
+            tag: "aabbccdd11223344aabbccdd11223344",
+            created: "2026-11-21T00:00:00Z",
+            dkim_selector: "cf-bounce",
+            drop_suppressed_recipients: false,
+            modified: "2026-11-21T00:00:00Z",
+            preview_enabled: true,
+            return_path_domain: "cf-bounce.tryoverture.com",
+          },
+        });
+      },
+    ),
     http.get(
       `${env.GREENHOUSE_FEED_BASE_URL ?? "https://boards-api.greenhouse.io"}/v1/boards/:token/jobs`,
       () => passthrough(),

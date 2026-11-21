@@ -57,6 +57,10 @@ import {
 import { getTestSpans, resetTestSpans } from "../platform/telemetry/otel.ts";
 import { releaseBlockingJobs } from "../testing/blocking-job.ts";
 import { setTurnstileScenario, turnstileScenarioBody } from "../testing/turnstile-scenario.ts";
+import {
+  emailSendingScenarios,
+  setEmailSendingScenario,
+} from "../testing/email-sending-scenario.ts";
 import { readCompaniesParquet } from "../catalog/companies-parquet.ts";
 import { contentHash } from "../catalog/content-hash.ts";
 import { loadDiscoveredBoards } from "../catalog/discovered-boards.ts";
@@ -1618,6 +1622,18 @@ export function createTestRoutes(
 
     return context.json({ ok: true });
   });
+
+  routes.post(
+    "/cloudflare-email/sending-scenario",
+    zValidator("json", z.object({ scenario: z.enum(emailSendingScenarios) })),
+    (context) => {
+      const { scenario } = context.req.valid("json");
+
+      setEmailSendingScenario(scenario);
+
+      return context.json({ scenario });
+    },
+  );
 
   routes.post("/mail/seed", zValidator("json", seedMailBody), async (context) =>
     context.json(await insertMailRow(context.req.valid("json"))),

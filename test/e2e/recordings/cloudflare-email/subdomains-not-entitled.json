@@ -1,0 +1,10 @@
+{
+  "errors": [
+    {
+      "code": 10000,
+      "message": "Email Sending is not enabled for this account. Upgrade to Workers Paid to send email."
+    }
+  ],
+  "messages": [],
+  "success": false
+}
