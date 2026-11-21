@@ -41,6 +41,7 @@ import {
   ensureOpenReview,
   openReviewsForApplication,
 } from "./review-store.ts";
+import { recordAutoAnswer } from "./review-events.ts";
 
 const optionsSchema = z.array(z.string());
 
@@ -396,6 +397,7 @@ export function createPreparationService(deps: {
     userId: string;
     applicationId: string;
     attemptId?: string;
+    ats: "greenhouse" | "lever" | "ashby";
     blocked: readonly {
       questionId: string;
       factKey: string | null;
@@ -420,6 +422,7 @@ export function createPreparationService(deps: {
     for (const entry of input.blocked) {
       const reviewId = ensureOpenReview(db, clock, {
         attemptId: input.attemptId ?? null,
+        ats: input.ats,
         userId: input.userId,
         questionId: entry.questionId,
         factKey: entry.factKey,
@@ -447,6 +450,7 @@ export function createPreparationService(deps: {
   }) {
     const row = db
       .select({
+        ats: postings.ats,
         companyName: companies.name,
         postingId: postings.id,
       })
@@ -486,6 +490,7 @@ export function createPreparationService(deps: {
       const factKey = question.answerKind === "fact" ? question.factKey : null;
 
       const reviewId = ensureOpenReview(db, clock, {
+        ats: row.ats,
         attemptId: input.attemptId,
         factKey,
         fieldType: field.fieldType,
@@ -514,6 +519,7 @@ export function createPreparationService(deps: {
         userId: applications.userId,
         postingId: applications.postingId,
         companyName: companies.name,
+        ats: postings.ats,
       })
       .from(applications)
       .innerJoin(postings, eq(postings.id, applications.postingId))
@@ -571,8 +577,26 @@ export function createPreparationService(deps: {
       });
     }
 
+    for (const answer of prepared) {
+      if (!answer.resolved) {
+        continue;
+      }
+
+      recordAutoAnswer(db, clock, {
+        applicationId: input.applicationId,
+        ats: row.ats,
+        factKey: answer.factKey,
+        factRevision: answer.factRevision,
+        questionId: answer.questionId,
+        scope: answer.scope,
+        source: answer.source,
+        userId: row.userId,
+      });
+    }
+
     syncReviews({
       applicationId: input.applicationId,
+      ats: row.ats,
       attemptId: input.attemptId,
       blocked,
       userId: row.userId,
@@ -772,8 +796,9 @@ export function createPreparationService(deps: {
     }
 
     syncReviews({
-      userId: row.userId,
       applicationId,
+      ats: row.ats,
+      userId: row.userId,
       blocked: unsupportedReason === null ? blocked : [],
     });
 
@@ -789,6 +814,25 @@ export function createPreparationService(deps: {
         .run();
 
       return { status: "skipped" as const, blocked: 0 };
+    }
+
+    for (const question of questionRows) {
+      const resolution = resolutions.get(question.questionId);
+
+      if (resolution?.kind !== "answer") {
+        continue;
+      }
+
+      recordAutoAnswer(db, clock, {
+        applicationId,
+        ats: row.ats,
+        factKey: question.factKey,
+        factRevision: resolution.factRevision,
+        questionId: question.questionId,
+        scope: resolution.scope,
+        source: resolution.source,
+        userId: row.userId,
+      });
     }
 
     const status = blocked.length === 0 ? "ready" : "needs_review";

@@ -5,6 +5,8 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { QuestionFieldType, ReviewReason } from "../../shared/questions.ts";
 
 import { reviewApplications, reviews } from "../platform/db/schema.ts";
+import type { ReviewAuditAts } from "./review-events.ts";
+import { recordReviewOpened, recordReviewResolved, reviewWasAnswered } from "./review-events.ts";
 
 export interface OpenReviewInput {
   userId: string;
@@ -17,6 +19,7 @@ export interface OpenReviewInput {
   reason: ReviewReason;
   /** The attempt whose live-form check asked for this Fact, if any. */
   attemptId?: string | null;
+  ats: ReviewAuditAts | null;
 }
 
 export function ensureOpenReview(db: AppDatabase, clock: Clock, input: OpenReviewInput) {
@@ -54,6 +57,8 @@ export function ensureOpenReview(db: AppDatabase, clock: Clock, input: OpenRevie
 
   const id = crypto.randomUUID();
 
+  const repeat = reviewWasAnswered(db, input.userId, input.questionId, input.scope);
+
   db.insert(reviews)
     .values({
       id,
@@ -71,6 +76,17 @@ export function ensureOpenReview(db: AppDatabase, clock: Clock, input: OpenRevie
       attemptId: input.attemptId ?? null,
     })
     .run();
+
+  recordReviewOpened(db, clock, {
+    ats: input.ats,
+    factKey: input.factKey,
+    questionId: input.questionId,
+    reason: input.reason,
+    repeat,
+    reviewId: id,
+    scope: input.scope,
+    userId: input.userId,
+  });
 
   return id;
 }
@@ -119,10 +135,27 @@ export function attachmentCount(db: AppDatabase, reviewId: string) {
 
 export function dismissEmptyReview(db: AppDatabase, clock: Clock, reviewId: string) {
   if (attachmentCount(db, reviewId) === 0) {
+    const review = db
+      .select({ userId: reviews.userId, questionId: reviews.questionId, status: reviews.status })
+      .from(reviews)
+      .where(eq(reviews.id, reviewId))
+      .get();
+
+    if (review?.status !== "open") {
+      return;
+    }
+
     db.update(reviews)
       .set({ status: "dismissed", resolvedAt: clock.now() })
       .where(and(eq(reviews.id, reviewId), eq(reviews.status, "open")))
       .run();
+
+    recordReviewResolved(db, clock, {
+      questionId: review.questionId,
+      resolution: "auto_dismissed",
+      reviewId,
+      userId: review.userId,
+    });
   }
 }
 

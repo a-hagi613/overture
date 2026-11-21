@@ -25,6 +25,7 @@ import {
   detachApplication,
   openReviewIds,
 } from "./review-store.ts";
+import { recordReviewResolved } from "./review-events.ts";
 
 const optionsSchema = z.array(z.string());
 
@@ -192,6 +193,13 @@ export function createReviewService(deps: {
       .where(eq(reviews.id, reviewId))
       .run();
 
+    recordReviewResolved(db, clock, {
+      questionId: review.questionId,
+      resolution: "answered",
+      reviewId,
+      userId,
+    });
+
     await preparation.prepareMany(applicationIds);
 
     return { reviewId, factKey, scope: review.scope, applicationIds };
@@ -199,7 +207,7 @@ export function createReviewService(deps: {
 
   function dismiss(userId: string, reviewId: string) {
     const review = db
-      .select({ id: reviews.id })
+      .select({ id: reviews.id, questionId: reviews.questionId })
       .from(reviews)
       .where(and(eq(reviews.id, reviewId), eq(reviews.userId, userId), eq(reviews.status, "open")))
       .get();
@@ -226,6 +234,13 @@ export function createReviewService(deps: {
       .set({ status: "dismissed", resolvedAt: clock.now() })
       .where(eq(reviews.id, reviewId))
       .run();
+
+    recordReviewResolved(db, clock, {
+      questionId: review.questionId,
+      resolution: "dismissed",
+      reviewId,
+      userId,
+    });
 
     return { reviewId, applicationIds };
   }
