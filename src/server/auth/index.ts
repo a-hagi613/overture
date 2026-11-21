@@ -34,6 +34,7 @@ import {
 import { consumeEmailRateLimit } from "./rate-limit.ts";
 import type { EmailRateLimitBucket } from "./rate-limit.ts";
 import { verifyTurnstile } from "./turnstile-gate.ts";
+import { clientIpHeaders } from "./client-ip.ts";
 import { demoLoginPlugin, DEMO_SESSION_MS } from "./demo-login.ts";
 import { isDemoUser } from "../demo/role.ts";
 
@@ -244,6 +245,14 @@ export function createAuth(
       ],
     },
     trustedOrigins,
+    advanced: {
+      ipAddress: {
+        ipAddressHeaders: clientIpHeaders({
+          flyAppName: env.FLY_APP_NAME,
+          nodeEnv: env.NODE_ENV,
+        }),
+      },
+    },
     secret: env.BETTER_AUTH_SECRET,
     database: drizzleAdapter(db, {
       provider: "sqlite",
