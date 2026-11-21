@@ -18,6 +18,7 @@ export const PLANNER_DAY_JOB_KIND = "planner.day";
 const DEFAULT_DAILY_CAP = 10;
 const DEFAULT_SPACING_MINUTES = 20;
 const MINUTE_MS = 60_000;
+const MAX_PLANNED_DAYS = 366;
 
 const payloadSchema = z.object({ userId: z.string().min(1) });
 
@@ -160,6 +161,29 @@ export function createPlanner(deps: PlannerDeps) {
       timeZone,
       window,
     });
+
+    let windowEnd = planningWindow(Math.max(now, latestPlanned), timeZone, window).end;
+
+    for (let day = 0; day < MAX_PLANNED_DAYS && slots.length < needsSlot.length; day += 1) {
+      const next = planningWindow(windowEnd, timeZone, window);
+
+      const later = planSlots({
+        blocked: slots,
+        count: Math.min(dailyCap, needsSlot.length - slots.length),
+        now: next.start,
+        random: random.next,
+        spacingMs,
+        timeZone,
+        window,
+      });
+
+      if (later.length === 0) {
+        break;
+      }
+
+      slots.push(...later);
+      windowEnd = next.end + 1;
+    }
 
     for (const [index, application] of needsSlot.slice(0, slots.length).entries()) {
       const scheduledFor = slots[index];
