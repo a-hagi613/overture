@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
 import { AccountRow } from "../components/account-row.tsx";
@@ -83,6 +84,20 @@ export function SettingsPage() {
               label={copy.settings.jobSearchAddress}
               detail={copy.settings.addressDetail}
             />
+            <div className="flex items-center justify-between gap-4 border-t border-border py-3.5">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">{copy.settings.exportRow}</p>
+                <p className="text-[12.5px] text-muted-foreground">
+                  {copy.settings.exportRowDetail}
+                </p>
+              </div>
+              <Link
+                className="inline-flex h-11 flex-none items-center justify-center rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold hover:bg-muted"
+                to="/settings/export"
+              >
+                {copy.settings.exportRowButton}
+              </Link>
+            </div>
             <div className="flex items-center justify-between gap-4 border-t border-border py-3.5">
               <div className="min-w-0">
                 <p className="text-sm font-semibold">{copy.settings.signOutAll}</p>

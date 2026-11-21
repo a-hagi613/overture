@@ -1077,7 +1077,9 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
   cascade-delete rows, delete R2 prefixes `files/{user_id}/`, move mailbox local part to `retired_addresses`, keep
   only `card_fingerprints` (unlinked HMAC) and admin audit rows. Completes within 24 h; user gets a confirmation email.
 - **Export**: JSON (profile, facts, applications, snapshots, messages metadata + text) + resume + attachments, zipped,
-  encrypted link valid 24 h.
+  encrypted under a per-export key that only the download link carries (in its fragment), so the page decrypts it in
+  the browser and the server never logs the key. The link is valid 24 h; then the archive is deleted, and a new request
+  replaces a ready one. Built in the background one page of rows at a time, so its memory does not grow with the mailbox.
 - Logs/traces never contain names, emails, phone numbers, answers, letters or mail content; a redaction processor in
   the OTel pipeline drops attributes outside an allowlist.
 
@@ -1135,7 +1137,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Inbox | `GET /api/threads` · `GET /api/threads/:id` · `GET /api/attachments/:id` · `POST /api/messages/:id/read` · `GET /api/mail/code-waits` · `POST /api/mail/code-waits/:id` (paste a code) |
 | Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/mailbox` (read-only address, `forwardingWorks`, `firstForwardedAt`) · `GET/PUT /api/profile/strengthen` (the Tier 2 Facts that would unlock queued Applications, each with its count; answering saves the Fact and resolves the Reviews it answers) |
 | Onboarding | `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET/PUT /api/onboarding/targets` (the "What you want" step: the saved Targets, the choices that have open Postings, and the live count) · `PUT /api/onboarding/timezone` (the browser's zone through the seven-day rule) · `GET /api/onboarding` (the step, `onboarded_at`, pause reason, current resume, skip list and whether an invited user must onboard) · `POST /api/onboarding/:step` (records a finished step and returns the state; step 2 refuses without a resume) · `POST /api/onboarding/address/accept` (M2) |
-| Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `POST /api/account/delete` · `GET /api/support-access` |
+| Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `GET /api/account/export` · `POST /api/account/export` · `GET /api/account/export/:id/download` · `POST /api/account/delete` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `GET /internal/mailboxes/:local` |
 | Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |

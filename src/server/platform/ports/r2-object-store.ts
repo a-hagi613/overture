@@ -36,6 +36,28 @@ export function createR2ObjectStore(config: R2ObjectStoreConfig) {
     put: async (key: string, data: Uint8Array<ArrayBuffer>) => {
       await client.write(key, data);
     },
+    putStream: async (key: string, data: AsyncIterable<Uint8Array>) => {
+      const writer = client.file(key).writer();
+
+      let bytes = 0;
+
+      try {
+        for await (const chunk of data) {
+          bytes += chunk.length;
+
+          await writer.write(chunk);
+          await writer.flush();
+        }
+
+        await writer.end();
+      } catch (error) {
+        await writer.end(error instanceof Error ? error : new Error(String(error)));
+
+        throw error;
+      }
+
+      return bytes;
+    },
     get: async (key: string) => {
       const file = client.file(key);
 
@@ -44,6 +66,15 @@ export function createR2ObjectStore(config: R2ObjectStoreConfig) {
       }
 
       return new Uint8Array(await file.arrayBuffer());
+    },
+    getStream: async (key: string) => {
+      const file = client.file(key);
+
+      if (!(await file.exists())) {
+        return null;
+      }
+
+      return file.stream();
     },
     delete: async (key: string) => {
       await client.delete(key);
