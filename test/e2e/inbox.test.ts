@@ -329,7 +329,11 @@ test("a fresh user walks the Inbox through the real UI, from empty to the Board 
   const briefRow = page.getByRole("article").filter({ hasText: "Interview with Acme: the brief" });
 
   await briefRow.getByRole("link", { name: "Acme", exact: true }).click();
-  await expect(page).toHaveURL(/\/inbox\/[^/]+$/u);
+  const briefThread = (await threadsOf(owner)).threads.find((thread) =>
+    thread.subject.includes("brief"),
+  );
+
+  await expect(page).toHaveURL(`${inbox.server.url}/inbox/${briefThread?.id ?? ""}`);
 
   const attachmentLink = page.getByRole("link", { name: "Download" });
 
