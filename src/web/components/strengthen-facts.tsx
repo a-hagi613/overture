@@ -8,7 +8,7 @@ import { ReviewAnswer } from "./review-answer.tsx";
 import { fetchStrengthen, saveStrengthen } from "../lib/profile-api.ts";
 
 function saveButtonLook() {
-  return "inline-flex min-h-10 flex-none items-center justify-center gap-2 rounded-md border border-foreground bg-foreground px-4 text-[13.5px] leading-[normal] font-semibold text-btn-ink shadow-[inset_0_1px_0_rgba(255,255,255,.14)] hover:bg-btn-hover disabled:opacity-[.45] max-[767px]:min-h-12 max-[767px]:flex-[1_1_100%]";
+  return "inline-flex min-h-10 flex-none items-center justify-center gap-2 rounded-md border border-foreground bg-foreground px-4 text-[13.5px] leading-[normal] font-semibold text-primary-ink shadow-[inset_0_1px_0_rgba(255,255,255,.14)] hover:bg-btn-hover disabled:opacity-[.45] max-[767px]:min-h-12 max-[767px]:flex-[1_1_100%]";
 }
 
 export function StrengthenFacts() {

@@ -53,7 +53,7 @@ function floorFromInput(raw: string) {
 }
 
 function saveButtonLook() {
-  return "inline-flex min-h-11 items-center gap-2 rounded-md border border-foreground bg-foreground px-[18px] text-[13.5px] leading-[normal] font-semibold text-btn-ink shadow-[inset_0_1px_0_rgba(255,255,255,.14)] hover:bg-btn-hover max-[767px]:min-h-12 max-[767px]:flex-[1_1_100%]";
+  return "inline-flex min-h-11 items-center gap-2 rounded-md border border-foreground bg-foreground px-[18px] text-[13.5px] leading-[normal] font-semibold text-primary-ink shadow-[inset_0_1px_0_rgba(255,255,255,.14)] hover:bg-btn-hover max-[767px]:min-h-12 max-[767px]:flex-[1_1_100%]";
 }
 
 export function TargetsSection() {
