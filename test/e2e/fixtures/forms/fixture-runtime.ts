@@ -249,7 +249,7 @@ const prepareNativeSubmit = (form: HTMLFormElement) => {
   form.setAttribute("method", "post");
 };
 
-const recordFieldValues = (form: HTMLFormElement) => {
+const fieldValues = (form: HTMLFormElement) => {
   const values: Record<string, string> = {};
 
   for (const element of form.querySelectorAll<
@@ -265,7 +265,11 @@ const recordFieldValues = (form: HTMLFormElement) => {
         : element.value;
   }
 
-  void fetch("/__fixture__/values", { method: "POST", body: JSON.stringify(values) });
+  return values;
+};
+
+const recordFieldValues = (form: HTMLFormElement) => {
+  void fetch("/__fixture__/values", { method: "POST", body: JSON.stringify(fieldValues(form)) });
 };
 
 const attachSubmitBehaviour = (form: HTMLFormElement, meta: FixtureMeta) => {
@@ -284,14 +288,23 @@ const attachSubmitBehaviour = (form: HTMLFormElement, meta: FixtureMeta) => {
 
     recordFieldValues(form);
 
-    const action = `${form.getAttribute("action")}/application${globalThis.location.search}`;
+    const declared = /"?submitPath"?\s*:\s*"(?<path>[^"]+)"/u.exec(
+      document.documentElement.innerHTML,
+    )?.groups?.path;
+
+    const submitPath =
+      declared === undefined
+        ? `${form.getAttribute("action")}/application${globalThis.location.search}`
+        : new URL(declared, globalThis.location.href).pathname;
+
+    const jobApplication = fieldValues(form);
 
     void (async () => {
       try {
-        const response = await fetch(action, {
+        const response = await fetch(submitPath, {
           method: "POST",
-          body: new FormData(form),
-          headers: { "x-requested-with": "fetch" },
+          body: JSON.stringify({ job_application: jobApplication }),
+          headers: { "content-type": "application/json", "x-requested-with": "fetch" },
         });
 
         if (response.status === 428) {

@@ -10,6 +10,7 @@ import {
   readConfirmation,
   submitButton,
   typeCode,
+  submitPathnameOf,
   uploadFile,
   watchApplicationResponse,
 } from "../forms/engine.ts";
@@ -124,9 +125,11 @@ export async function runGreenhouseAttempt(
   const submitAndWatch = async () => {
     hooks.onWillSubmit();
 
+    const submitPathname = await submitPathnameOf(page, null);
+
     const settled = await Promise.allSettled([
       submitButton(page).click(),
-      watchApplicationResponse(page),
+      watchApplicationResponse(page, submitPathname),
     ]);
 
     const [, response] = settled;

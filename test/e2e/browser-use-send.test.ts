@@ -127,6 +127,7 @@ async function startHarness(identityServer: IdentityServer, hardTimeoutMs = 30_0
     BROWSER_PROXY_COUNTRY: "ca",
     BROWSER_USE_API_BASE_URL: fixture.url,
     BROWSER_USE_API_KEY: "browser-use-send-test-key",
+    GREENHOUSE_BOARD_BASE_URL: greenhouse.url,
     OBJECT_STORE_ROOT: join(directory, "objects"),
     SEND_HARD_TIMEOUT_MS: String(hardTimeoutMs),
   });
@@ -140,7 +141,7 @@ async function closeHarness(harness: SendHarness) {
   harness.greenhouse.close();
 }
 
-async function readyApplication(harness: SendHarness, url: string) {
+async function readyApplication(harness: SendHarness, url: string, atsJobId = "8004209003") {
   const { owner, userId } = await ownerContextFor(harness.server.url);
 
   await owner.put("/api/profile/facts", { data: { facts } });
@@ -162,7 +163,7 @@ async function readyApplication(harness: SendHarness, url: string) {
   const boardId = await seedBoard(owner, companyId, "greenhouse", "blankstreet");
 
   const postingId = await seedPosting(owner, {
-    atsJobId: "8004209003",
+    atsJobId,
     boardId,
     companyId,
     questions,
@@ -247,6 +248,7 @@ test("a send try that cannot find the form still stops its Browser Use session",
     const { applicationId, owner } = await readyApplication(
       harness,
       `${harness.greenhouse.url}/blankstreet/jobs/not-a-form`,
+      "not-a-form",
     );
 
     await runSend(owner, applicationId);

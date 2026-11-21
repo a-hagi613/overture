@@ -11,6 +11,7 @@ import {
   submitButton,
   typeCode,
   uploadFile,
+  submitPathnameOf,
   watchApplicationResponse,
 } from "../dispatch/forms/engine.ts";
 
@@ -115,9 +116,11 @@ export async function probeGreenhouse(
     return { ...attemptStructure.empty("dry_run_filled", filledIds), resumeUploaded };
   }
 
+  const submitPathname = await submitPathnameOf(page, null);
+
   const response = await Promise.allSettled([
     submitButton(page).click(),
-    watchApplicationResponse(page),
+    watchApplicationResponse(page, submitPathname),
   ]).then((settled) => settled[1]);
 
   const firstStatus = response.status === "fulfilled" ? response.value.status() : null;
@@ -147,7 +150,7 @@ export async function probeGreenhouse(
 
   const second = await Promise.allSettled([
     submitButton(page).click(),
-    watchApplicationResponse(page),
+    watchApplicationResponse(page, submitPathname),
   ]).then((settled) => settled[1]);
 
   const secondStatus = second.status === "fulfilled" ? second.value.status() : null;

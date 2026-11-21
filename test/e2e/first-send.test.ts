@@ -9,6 +9,8 @@ import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
 import type { GreenhouseFixture } from "./greenhouse.fixture.ts";
 
+import { greenhouseBoardUrl } from "../../src/server/pipeline/greenhouse-board-url.ts";
+import { runGreenhouseAttempt } from "../../src/server/dispatch/ats/greenhouse.ts";
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { startGreenhouseFixture } from "./greenhouse.fixture.ts";
 import {
@@ -36,6 +38,7 @@ const test = appTest.extend<{ send: SendHarness }>({
       const server = await startFreshAppServer(identityServer, {
         BROWSER_PROVIDER: "local",
         BROWSER_SESSION_DIR: sessionDirectory,
+        GREENHOUSE_BOARD_BASE_URL: fixture.url,
       });
 
       await provide({ fixture, server, sessionDirectory });
@@ -477,12 +480,13 @@ test("a 4xx answer to the application request leaves submit_clicked_at unset and
     questions: blankStreetQuestions,
     tags: [{ dimension: "subrole", value: "Operations" }],
     title: "Assistant General Manager | Durham",
-    url: `${send.fixture.url}/blankstreet/jobs/8004209003?refuse=1`,
+    url: `${send.fixture.url}/blankstreet/jobs/8004209003`,
   });
 
   const applicationId = await seedApplication(owner, { postingId, status: "ready", userId });
 
   await grantApplications(owner, 3);
+  send.fixture.state.refuse = true;
 
   await runSend(owner, applicationId);
 
@@ -642,7 +646,7 @@ test("a redirect to another board skips the Application with a reason and never 
     questions: blankStreetQuestions,
     tags: [{ dimension: "subrole", value: "Operations" }],
     title: "Assistant General Manager | Durham",
-    url: `${send.fixture.url}/blankstreet/jobs/8004209003?redirect=board`,
+    url: `${send.fixture.url}/blankstreet/jobs/8004209003`,
   });
 
   const applicationId = await seedApplication(owner, {
@@ -652,6 +656,7 @@ test("a redirect to another board skips the Application with a reason and never 
   });
 
   await grantApplications(owner, 3);
+  send.fixture.state.redirect = "board";
 
   const response = await runSend(owner, applicationId);
 
@@ -699,7 +704,7 @@ test("a page showing another company skips the Application with a reason and nev
     questions: blankStreetQuestions,
     tags: [{ dimension: "subrole", value: "Operations" }],
     title: "Assistant General Manager | Durham",
-    url: `${send.fixture.url}/blankstreet/jobs/8004209003?redirect=company`,
+    url: `${send.fixture.url}/blankstreet/jobs/8004209003`,
   });
 
   const applicationId = await seedApplication(owner, {
@@ -709,6 +714,7 @@ test("a page showing another company skips the Application with a reason and nev
   });
 
   await grantApplications(owner, 3);
+  send.fixture.state.redirect = "company";
 
   const response = await runSend(owner, applicationId);
 
@@ -736,4 +742,59 @@ test("a page showing another company skips the Application with a reason and nev
   const home = homeSchema.parse(await (await owner.get("/api/home")).json());
 
   expect(home.applicationsLeft).toBe(3);
+});
+
+const recordedStripeJob = z
+  .object({ title: z.string(), absolute_url: z.string() })
+  .parse(JSON.parse(readFileSync("test/e2e/fixtures/greenhouse/stripe/jobs/8172510.json", "utf8")));
+
+class StopBeforeSubmitError extends Error {
+  override name = "StopBeforeSubmitError";
+}
+
+test("a Greenhouse posting whose absolute_url is on the company site opens its embed form, passes the identity check and stops before Submit", async ({
+  send,
+  page,
+}) => {
+  const url = greenhouseBoardUrl({
+    atsJobId: "8172510",
+    boardToken: "stripe",
+    origin: send.fixture.url,
+    region: "us",
+  });
+
+  expect(url).not.toBe(recordedStripeJob.absolute_url);
+
+  let reachedSubmit = false;
+
+  await expect(
+    runGreenhouseAttempt(
+      page,
+      {
+        fields: [],
+        identity: { boardToken: "stripe", companyName: "Stripe", jobId: "8172510", url },
+        resume: null,
+      },
+      {
+        onCodeTyped: () => undefined,
+        onResponse: () => undefined,
+        requestCode: () => {
+          throw new StopBeforeSubmitError("no code is requested before Submit");
+        },
+        onWillSubmit: () => {
+          reachedSubmit = true;
+          throw new StopBeforeSubmitError("stop before Submit");
+        },
+      },
+    ),
+  ).rejects.toThrow(StopBeforeSubmitError);
+
+  expect(reachedSubmit).toBe(true);
+  expect(page.url()).toBe(url);
+
+  const state = await fixtureState(send.fixture);
+
+  expect(state.formLoads).toBe(1);
+  expect(state.applicationRequests).toBe(0);
+  expect(state.submissions).toBe(0);
 });

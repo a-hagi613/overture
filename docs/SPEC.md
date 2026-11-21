@@ -325,7 +325,8 @@ board row's URL decides `eu` at seed time). Discovery runs from `overture-web` d
 | Recruitee (M2) | one API | `{token}.recruitee.com/api/offers/` | content hash | 2 concurrent, 1 req/s |
 
 The apply link is the feed's own apply URL (`applyUrl` on Lever and Ashby) when present; the posting URL stays
-`hostedUrl`/`jobUrl`. Greenhouse's `content` arrives double-encoded, so HTML entities are decoded and tags stripped
+`hostedUrl`/`jobUrl`. Greenhouse feeds have no apply URL, and its `absolute_url` may be the employer's own site, so the
+send opens the Greenhouse embed form instead (§10.3 step 2). Greenhouse's `content` arrives double-encoded, so HTML entities are decoded and tags stripped
 before the salary and location rules see the text. Lever and Ashby hand the feed's structured `workplaceType`
 straight to tagging; Ashby's `isRemote` is ignored because Ashby sets it on hybrid roles.
 
@@ -711,7 +712,7 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 ### 10.3 Attempt steps (`submit.run`)
 
 1. Open provider browser (15-minute vendor timeout, attempt id as metadata); `page.route` aborts `image`, `font`, `media` and known analytics hosts.
-2. Navigate to `apply_url`; if the page says the job is closed → `posting_closed`. Check that the live page's
+2. Navigate to the apply link: for Greenhouse the embed form `https://job-boards.greenhouse.io/embed/job_app?for={board_token}&token={ats_job_id}` (`job-boards.eu.greenhouse.io` when the board's `region` is `eu`), never the employer's `absolute_url` and never the plain `/{board_token}/jobs/{id}` board page, which redirects to the employer's own site on boards with a custom careers domain; otherwise `apply_url`. The identity check reads `for` and `token` from that path. If the page says the job is closed → `posting_closed`. Check that the live page's
    host, board token, job id and company name match the Posting; a redirect or any other mismatch → `identity_mismatch`
    (release, `skipped` with `status_reason` `posting_identity:<field>`, never submit).
 3. Compute the form signature; load the cached plan or build one.

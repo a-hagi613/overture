@@ -23,6 +23,7 @@ const envSchema = z
     STATIC_ROOT: z.string().min(1).default("dist"),
     ENABLE_TEST_ROUTES: booleanFromString.default(false),
     GREENHOUSE_FEED_BASE_URL: z.string().min(1).optional(),
+    GREENHOUSE_BOARD_BASE_URL: z.url().optional(),
     LEVER_FEED_BASE_URL: z.string().min(1).optional(),
     LEVER_EU_FEED_BASE_URL: z.string().min(1).optional(),
     ASHBY_FEED_BASE_URL: z.string().min(1).optional(),

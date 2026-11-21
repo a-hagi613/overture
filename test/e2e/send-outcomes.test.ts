@@ -58,6 +58,7 @@ const test = appTest.extend<{ outcomes: OutcomeHarness }>({
       const server = await startFreshAppServer(identityServer, {
         BROWSER_PROVIDER: "local",
         BROWSER_SESSION_DIR: sessionDirectory,
+        GREENHOUSE_BOARD_BASE_URL: fixture.url,
         GREENHOUSE_FEED_BASE_URL: fixture.url,
         INBOUND_DNS_SERVER: dns.server,
         INBOUND_HMAC_SECRET: secret,
@@ -266,11 +267,7 @@ async function prepare(owner: APIRequestContext) {
   expect(factsResponse.ok()).toBe(true);
 }
 
-async function seedBlankStreetPosting(
-  owner: APIRequestContext,
-  fixtureUrl: string,
-  verify: boolean,
-) {
+async function seedBlankStreetPosting(owner: APIRequestContext, fixtureUrl: string) {
   const companyId = await seedCompany(owner, "Blank Street", "blankstreet.example");
   const boardId = await seedBoard(owner, companyId, "greenhouse", "blankstreet");
 
@@ -281,7 +278,7 @@ async function seedBlankStreetPosting(
     questions: formQuestions,
     tags: [{ dimension: "subrole", value: "Operations" }],
     title: "Assistant General Manager | Durham",
-    url: `${fixtureUrl}/blankstreet/jobs/8004209003${verify ? "?verify=1" : ""}`,
+    url: `${fixtureUrl}/blankstreet/jobs/8004209003`,
   });
 }
 
@@ -290,7 +287,9 @@ async function readyApplication(harness: OutcomeHarness, verify = false) {
 
   await prepare(owner);
 
-  const postingId = await seedBlankStreetPosting(owner, harness.fixture.url, verify);
+  harness.fixture.state.codePrompt = verify;
+
+  const postingId = await seedBlankStreetPosting(owner, harness.fixture.url);
 
   const applicationId = await seedApplication(owner, {
     postingId,
