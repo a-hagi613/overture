@@ -35,7 +35,9 @@ const recordedVerificationSchema = z.object({
   messages: z.array(z.string()).optional(),
 });
 
-const loopbackPassthrough = [http.all(/^http:\/\/127\.0\.0\.1:\d+\/.*/u, () => passthrough())];
+const loopbackPassthrough = [
+  http.all(/^http:\/\/(?:127\.0\.0\.1|localhost):\d+\/.*/u, () => passthrough()),
+];
 
 function fixturePassthrough(request: Request) {
   assertNoLiveTraffic(request.url, request.method, env.NODE_ENV);

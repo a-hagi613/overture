@@ -13,7 +13,7 @@ export const POSTING_LIVENESS = ["open", "closed", "unknown"] as const;
 export type PostingLiveness = (typeof POSTING_LIVENESS)[number];
 
 export interface LivenessTarget {
-  ats: Ats;
+  ats: Ats | "workable";
   boardToken: string;
   region: BoardRegion;
   atsJobId: string;
@@ -126,6 +126,10 @@ export function createPostingLiveness(env: Env) {
 
   return {
     check: async (target) => {
+      if (target.ats === "workable") {
+        return "open";
+      }
+
       if (target.ats === "greenhouse") {
         return greenhouse(target);
       }

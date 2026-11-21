@@ -153,7 +153,7 @@ const createCompanyBody = z.object({
 
 const createBoardBody = z.object({
   companyId: z.string().min(1),
-  ats: z.enum(["greenhouse", "lever", "ashby", "personio"]),
+  ats: z.enum(["greenhouse", "lever", "ashby", "workable", "personio"]),
   boardToken: z.string().min(1),
   region: z.enum(["us", "eu"]).default("us"),
   status: z.enum(["active", "empty", "gone", "disabled"]).default("active"),
@@ -354,7 +354,7 @@ function defaultStageFor(status: "approved" | "failed" | "needs_review" | "ready
 const createPostingBody = z.object({
   boardId: z.string().min(1),
   companyId: z.string().min(1),
-  ats: z.enum(["greenhouse", "lever", "ashby", "personio"]),
+  ats: z.enum(["greenhouse", "lever", "ashby", "workable", "personio"]),
   atsJobId: z.string().min(1),
   url: z.string().min(1),
   title: z.string().min(1),

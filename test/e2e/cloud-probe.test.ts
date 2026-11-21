@@ -68,6 +68,7 @@ const singlePostingRunFile = (harness: ProbeHarness, record: RunFilePosting) => 
 
 const examplePosting = (url: string) =>
   ({
+    ats: "greenhouse",
     board: "exampleco",
     company: "Example Company",
     jobId: "7006005001",
@@ -616,5 +617,95 @@ test("a submit whose POST is answered instantly and navigates away still capture
 
     expect(form.submitResponseStatus).toBe(201);
     expect(harness.fixture.state.submissions).toBe(1);
+  });
+});
+
+const workableQuestions = [
+  { approved: true, id: "firstname", value: "Jane" },
+  { approved: true, id: "lastname", value: "Doe" },
+  { approved: true, id: "email", value: "jane.doe@example.com" },
+  { approved: true, id: "QA_1001", value: "No" },
+  { approved: true, id: "QA_1003", value: "Yes" },
+];
+
+const workablePosting = (url: string) =>
+  ({
+    ats: "workable",
+    board: "workable-corp",
+    company: "Workable Corp",
+    jobId: "WK-1001",
+    questions: workableQuestions,
+    resumeFieldId: "resume",
+    title: "Senior Platform Engineer",
+    url,
+  }) satisfies RunFilePosting;
+
+test("a Workable dry run reads the recorded form, fills it and stops before submit", async () => {
+  await withHarness(async (harness) => {
+    const url = `${harness.workable.url}/j/WK-1001`;
+
+    const results = await runProbe(
+      command(harness, false, {
+        runFile: {
+          country: runFileTemplate.country,
+          postings: [workablePosting(url)],
+          resumePath: harness.resumePath,
+        },
+      }),
+    );
+
+    const [result] = results;
+
+    if (result === undefined) {
+      throw new Error("no result for the Workable posting");
+    }
+
+    expect(result.outcome).toBe("dry_run_filled");
+    expect(result.submitted).toBe(false);
+    expect(result.confirmationSeen).toBe(false);
+    expect(result.postingUrl).toBe(url);
+    expect(harness.workable.state.submissions).toBe(0);
+    expect(harness.browserUse.sessionCount).toBe(1);
+    expect(harness.browserUse.stoppedSessionIds).toHaveLength(1);
+
+    const [form] = storedForms(harness);
+
+    expect(form?.outcome).toBe("dry_run_filled");
+    expect(form?.submitted).toBe(0);
+  });
+});
+
+test("a confirmed Workable probe submits the filled form and records the confirmation", async () => {
+  await withHarness(async (harness) => {
+    const url = `${harness.workable.url}/j/WK-1001`;
+
+    const results = await runProbe(
+      command(harness, true, {
+        runFile: {
+          country: runFileTemplate.country,
+          postings: [workablePosting(url)],
+          resumePath: harness.resumePath,
+        },
+      }),
+    );
+
+    const [result] = results;
+
+    if (result === undefined) {
+      throw new Error("no result for the Workable posting");
+    }
+
+    expect(result.outcome).toBe("sent");
+    expect(result.submitted).toBe(true);
+    expect(result.confirmationSeen).toBe(true);
+    expect(harness.workable.state.submissions).toBe(1);
+    expect(harness.workable.state.lastForm["firstname"]).toBe("Jane");
+    expect(harness.workable.state.lastForm["QA_1001"]).toBe("No");
+
+    const [form] = storedForms(harness);
+
+    expect(form?.submitted).toBe(1);
+    expect(form?.confirmationSeen).toBe(1);
+    expect(form?.submitResponseStatus).toBe(201);
   });
 });

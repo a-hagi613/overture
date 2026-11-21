@@ -14,7 +14,9 @@ import type { BrowserSession } from "../dispatch/browser/browser-use.ts";
 import type { ProbeConsole } from "./console.ts";
 import { probeGreenhouse } from "./greenhouse.ts";
 import type { GreenhouseAttempt } from "./greenhouse.ts";
-import { GREENHOUSE_BOARD_ORIGIN, postingUrl } from "./run-file.ts";
+import { probeWorkable } from "./workable.ts";
+import type { WorkableAttempt } from "./workable.ts";
+import { postingUrl } from "./run-file.ts";
 import type { RunFile, RunFilePosting } from "./run-file.ts";
 import { openProbeDatabase, recordProbeForm } from "./store.ts";
 import type { ProbeDatabase, ProbeFormRecord } from "./store.ts";
@@ -92,7 +94,7 @@ const minutesBetween = (startedAt: string, finishedAt: string | null | undefined
   return Number.isFinite(millis) && millis > 0 ? millis / 60_000 : 0;
 };
 
-const attemptOutcome = (attempt: GreenhouseAttempt | null, fallback: string) => {
+const attemptOutcome = (attempt: GreenhouseAttempt | WorkableAttempt | null, fallback: string) => {
   if (attempt === null) {
     return fallback;
   }
@@ -190,7 +192,7 @@ async function runPosting(
   const label = `posting ${String(index + 1)} (${posting.company} — ${posting.title})`;
   let session: BrowserSession | null = null;
   let browser: Browser | null = null;
-  let attempt: Awaited<ReturnType<typeof probeGreenhouse>> | null = null;
+  let attempt: GreenhouseAttempt | WorkableAttempt | null = null;
   let outcome = "browser_error";
 
   io.writeLine(
@@ -205,7 +207,7 @@ async function runPosting(
       proxyCountryCode: deps.runFile.country,
       timeoutMinutes: SESSION_TIMEOUT_MINUTES,
       solveCaptchas: true,
-      metadata: { purpose: PROBE_METADATA_PURPOSE, posting: String(index + 1) },
+      metadata: { purpose: PROBE_METADATA_PURPOSE, ats: posting.ats, posting: String(index + 1) },
     });
 
     const { cdpUrl } = session;
@@ -221,14 +223,12 @@ async function runPosting(
 
     await applySendProxyTrim(context);
 
-    attempt = await probeGreenhouse(
-      page,
-      posting,
-      postingUrl(posting, deps.postingUrlOrigin ?? GREENHOUSE_BOARD_ORIGIN),
-      deps.runFile.resumePath,
-      io,
-      deps.confirm,
-    );
+    const url = postingUrl(posting, deps.postingUrlOrigin);
+
+    attempt =
+      posting.ats === "workable"
+        ? await probeWorkable(page, posting, url, deps.runFile.resumePath, io, deps.confirm)
+        : await probeGreenhouse(page, posting, url, deps.runFile.resumePath, io, deps.confirm);
   } catch (error) {
     outcome = error instanceof Error ? `error: ${error.message}` : "error: unknown";
 
@@ -268,14 +268,14 @@ async function runPosting(
 
   const result: ProbeFormResult = {
     id: crypto.randomUUID(),
-    postingUrl: postingUrl(posting, GREENHOUSE_BOARD_ORIGIN),
+    postingUrl: postingUrl(posting, undefined),
     company: posting.company,
     title: posting.title,
     confirmMode: deps.confirm,
     outcome: attemptOutcome(attempt, outcome),
     submitted: sent,
     confirmationSeen: attempt?.confirmationSeen === true,
-    codeAsked: attempt?.codeAsked === true,
+    codeAsked: attempt !== null && "codeAsked" in attempt && attempt.codeAsked,
     proxyMb,
     browserMinutes,
     costUsd: proxyCost + browserCost,

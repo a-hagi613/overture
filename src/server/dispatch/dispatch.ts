@@ -14,7 +14,7 @@ import {
 
 import { z } from "zod";
 
-import type { Ats, BoardRegion } from "../catalog/board-feed.ts";
+import type { BoardRegion } from "../catalog/board-feed.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
@@ -77,7 +77,7 @@ interface Block {
   reason: string;
 }
 
-const DISPATCHABLE_ATS = ["greenhouse", "lever", "ashby"] as const;
+const DISPATCHABLE_ATS = ["greenhouse", "lever", "ashby", "workable"] as const;
 
 type DispatchAts = (typeof DISPATCHABLE_ATS)[number];
 
@@ -91,7 +91,7 @@ interface Candidate {
   postingId: string;
   companyId: string;
   scheduledFor: number | null;
-  ats: Ats;
+  ats: DispatchAts;
   boardToken: string;
   region: BoardRegion;
   atsJobId: string;

@@ -1,7 +1,7 @@
 import type { Page } from "playwright-core";
 
 export interface PostingIdentity {
-  ats: "greenhouse" | "lever" | "ashby";
+  ats: "greenhouse" | "lever" | "ashby" | "workable";
   url: string;
   boardToken: string;
   jobId: string;
@@ -22,6 +22,8 @@ const LEVER_BOARD_HOSTS: ReadonlySet<string> = new Set(["jobs.lever.co", "jobs.e
 
 const ASHBY_BOARD_HOSTS: ReadonlySet<string> = new Set(["jobs.ashbyhq.com"]);
 
+const WORKABLE_BOARD_HOSTS: ReadonlySet<string> = new Set(["apply.workable.com"]);
+
 const sameHost = (ats: PostingIdentity["ats"], expected: string, live: string) => {
   if (expected === live) {
     return true;
@@ -33,6 +35,10 @@ const sameHost = (ats: PostingIdentity["ats"], expected: string, live: string) =
 
   if (ats === "lever") {
     return LEVER_BOARD_HOSTS.has(expected) && LEVER_BOARD_HOSTS.has(live);
+  }
+
+  if (ats === "workable") {
+    return WORKABLE_BOARD_HOSTS.has(expected) && WORKABLE_BOARD_HOSTS.has(live);
   }
 
   return ASHBY_BOARD_HOSTS.has(expected) && ASHBY_BOARD_HOSTS.has(live);
@@ -62,6 +68,15 @@ function postingPath(ats: PostingIdentity["ats"], url: URL) {
     return jobsIndex < 1 || boardToken === undefined || jobId === undefined
       ? null
       : { boardToken, jobId };
+  }
+
+  if (ats === "workable") {
+    const jobsIndex = segments.indexOf("j");
+    const jobId = segments[jobsIndex + 1];
+
+    return jobsIndex === -1 || jobId === undefined
+      ? null
+      : { boardToken: segments[jobsIndex - 1] ?? "", jobId };
   }
 
   const [boardToken, jobId] = segments;
@@ -126,12 +141,16 @@ export async function checkPostingIdentity(page: Page, expected: PostingIdentity
     return mismatch("unreadable");
   }
 
-  if (livePosting.boardToken.toLowerCase() !== expected.boardToken.toLowerCase()) {
-    return mismatch("board_token");
-  }
-
   if (livePosting.jobId !== expected.jobId) {
     return mismatch("job_id");
+  }
+
+  if (expected.ats === "workable") {
+    return matched;
+  }
+
+  if (livePosting.boardToken.toLowerCase() !== expected.boardToken.toLowerCase()) {
+    return mismatch("board_token");
   }
 
   const liveCompany = companyFromTitle(expected.ats, await page.title());

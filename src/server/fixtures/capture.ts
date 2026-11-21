@@ -8,10 +8,11 @@ import type { BrowserProviderRegistry, RemoteBrowser } from "../dispatch/browser
 
 import { acquireBrowserSession } from "../dispatch/browser/session-slots.ts";
 import { readAshbyQuestions } from "../dispatch/ats/ashby.ts";
+import { readWorkableQuestions } from "../dispatch/ats/workable.ts";
 import { readLeverQuestions } from "../dispatch/ats/lever.ts";
 import { assetExtension, formSignature, sanitiseFormHtml } from "./sanitise.ts";
 
-export const ATS_NAMES = ["greenhouse", "lever", "ashby"] as const;
+export const ATS_NAMES = ["greenhouse", "lever", "ashby", "workable"] as const;
 
 export type FixtureAts = (typeof ATS_NAMES)[number];
 
@@ -19,6 +20,8 @@ export const FORM_FIELD_SELECTORS = {
   ashby: "#_systemfield_email, form.ashby-application-form input:not([type='hidden'])",
   greenhouse: "form input:not([type='hidden'])",
   lever: "form input:not([type='hidden'])",
+  workable:
+    "form.application-form input:not([type='hidden']), form#application-form input:not([type='hidden']), input[name='firstname'], input[type='file']",
 } as const satisfies Record<FixtureAts, string>;
 
 export const FORM_RENDER_TIMEOUT_MS = 20_000;
@@ -194,6 +197,18 @@ async function withFormPage<T>(
   }
 }
 
+async function questionsFor(ats: FixtureAts, page: Page) {
+  if (ats === "lever") {
+    return readLeverQuestions(page);
+  }
+
+  if (ats === "workable") {
+    return readWorkableQuestions(page);
+  }
+
+  return readAshbyQuestions(page);
+}
+
 async function captureOne(deps: FixtureCaptureDeps, ats: FixtureAts, applyUrl: string) {
   return withFormPage(deps, ats, applyUrl, async ({ page, html, signature }) => {
     const prefix = `fixtures/${ats}/${signature}`;
@@ -225,7 +240,7 @@ async function captureOne(deps: FixtureCaptureDeps, ats: FixtureAts, applyUrl: s
       capturedAt,
       formSignature: signature,
       objectKey: `${prefix}/form.html`,
-      questions: ats === "lever" ? await readLeverQuestions(page) : await readAshbyQuestions(page),
+      questions: await questionsFor(ats, page),
       sourceUrl: applyUrl,
     } satisfies CapturedFixture;
   });

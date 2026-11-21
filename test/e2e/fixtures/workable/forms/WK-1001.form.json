@@ -1,0 +1,40 @@
+[
+  {
+    "name": "Personal information",
+    "fields": [
+      { "id": "firstname", "label": "First name", "type": "text", "required": true },
+      { "id": "lastname", "label": "Last name", "type": "text", "required": true },
+      { "id": "email", "label": "Email", "type": "email", "required": true },
+      { "id": "phone", "label": "Phone", "type": "text", "required": false },
+      { "id": "resume", "label": "Resume", "type": "file", "required": true }
+    ]
+  },
+  {
+    "name": "Questions",
+    "fields": [
+      {
+        "id": "QA_1001",
+        "label": "Will you now, or in the future, require visa sponsorship to legally work in the country where this role is based?",
+        "type": "boolean",
+        "required": true
+      },
+      {
+        "id": "QA_1002",
+        "label": "How did you hear about this role?",
+        "type": "dropdown",
+        "required": false,
+        "options": [
+          { "name": "opt_job_board", "value": "Job board" },
+          { "name": "opt_referral", "value": "Referral" },
+          { "name": "opt_other", "value": "Other" }
+        ]
+      },
+      {
+        "id": "QA_1003",
+        "label": "I agree to the privacy notice and the processing of my personal data.",
+        "type": "boolean",
+        "required": true
+      }
+    ]
+  }
+]

@@ -1070,7 +1070,7 @@ export const planCache = sqliteTable(
   "plan_cache",
   {
     id: text("id").primaryKey(),
-    ats: text("ats", { enum: ["lever", "ashby"] }).notNull(),
+    ats: text("ats", { enum: ["lever", "ashby", "workable"] }).notNull(),
     formSignature: text("form_signature").notNull(),
     plan: text("plan").notNull(),
     hits: integer("hits").notNull().default(0),
