@@ -459,7 +459,9 @@ state the boundary rather than the marketing line.
   source tags differ by outline style, the active tab is underlined, the active nav item carries a
   marker.
 - **Target size.** 44px minimum on touch: phone buttons 48, tab bar 60, stage pills 44, icon buttons
-  44, toggles 44. Pointer-only desktop controls may be 40.
+  44, toggles 44. Pointer-only desktop controls may be 40. A compact control that must stay 34px
+  visually (notification CTAs) is the 44px element, with a -5px top and bottom margin so the row does
+  not grow; the painted 34px box is an inner span.
 - **Focus.** 2px solid ink ring with a 2–3px offset on every interactive element. Never removed, never
   orange.
 - **Real elements.** `button`, `a`, `input` with a label or `aria-label`. Decorative SVG is
