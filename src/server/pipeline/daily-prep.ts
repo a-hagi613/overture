@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -154,7 +154,9 @@ export function ensurePrepQueuedForRunningUsers(db: AppDatabase, clock: Clock) {
     .select({ userId: profiles.userId })
     .from(profiles)
     .innerJoin(users, eq(users.id, profiles.userId))
-    .where(and(eq(profiles.running, true), eq(users.emailVerified, true)))
+    .where(
+      and(eq(profiles.running, true), eq(users.emailVerified, true), sql`${users.role} <> 'demo'`),
+    )
     .all();
 
   for (const row of running) {
@@ -173,13 +175,18 @@ export function ensurePrepQueuedForRunningUsers(db: AppDatabase, clock: Clock) {
  */
 export async function runPrepDailyJob(deps: PrepDailyDeps, userId: string, since: number) {
   const profile = deps.db
-    .select({ emailVerified: users.emailVerified, running: profiles.running })
+    .select({ emailVerified: users.emailVerified, role: users.role, running: profiles.running })
     .from(profiles)
     .innerJoin(users, eq(users.id, profiles.userId))
     .where(eq(profiles.userId, userId))
     .get();
 
-  if (profile === undefined || !profile.running || !profile.emailVerified) {
+  if (
+    profile === undefined ||
+    !profile.running ||
+    !profile.emailVerified ||
+    profile.role === "demo"
+  ) {
     return {
       applicationsCreated: 0,
       candidates: 0,

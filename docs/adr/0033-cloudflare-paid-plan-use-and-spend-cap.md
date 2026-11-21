@@ -21,7 +21,9 @@ The owner pays $5 a month for Workers Paid and wants no spend above $5 a month i
 - **Guards, layered:** a Workers and a Durable Objects spending limit at $0.01, each emailing the owner at 80% and
   100%; a $0.50 account-wide budget alert; a sentinel Worker that watches usage and sets a degraded flag; and
   app-side counters for Email Sending and, if adopted, Workers AI. R2 cannot be blocked natively, so it is bounded by
-  design: a Litestream sync interval chosen from measured Class A operations, lifecycle rules and a size alert.
+  design: a Litestream sync interval chosen from measured Class A operations, a lag read that lists one replica level
+  instead of ten, a five-minute L0 retention check, lifecycle rules and a size alert. The measured list floor is about
+  104k Class A a month before writes (#281, `docs/research/cloudflare-paid-plan.md` §2).
 - **The owner accepts the stated trade:** if the Workers limit trips, the Email Worker stops and inbound mail is lost until the period resets or the limit is lifted.
 
 ## Considered Options

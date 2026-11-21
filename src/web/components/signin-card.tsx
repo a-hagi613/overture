@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { z } from "zod";
 
 import { copy } from "../../shared/copy.ts";
+import { isDemoEmail } from "../../shared/demo.ts";
 import { turnstileActionHeader, turnstileTokenHeader } from "../../shared/turnstile.ts";
 import type { TurnstileAction } from "../../shared/turnstile.ts";
 import { GoogleMark } from "./google-mark.tsx";
@@ -40,6 +41,8 @@ const meSchema = z.object({
   turnstileSiteKey: z.string().optional(),
   socialProviders: z.array(z.enum(["google", "linkedin"])).default([]),
 });
+
+const authErrorSchema = z.object({ code: z.string().optional() });
 
 const callbackPhase = new Map<string, Phase>([
   ["forbidden", "refused"],
@@ -316,6 +319,45 @@ export function SignInCard() {
 
     if (token === null) {
       return;
+    }
+
+    const trimmed = email.trim();
+    const headers = { [turnstileTokenHeader]: token, [turnstileActionHeader]: "magiclink" };
+
+    if (isDemoEmail(trimmed)) {
+      const response = await fetch("/api/auth/demo/sign-in", {
+        body: JSON.stringify({ email: trimmed }),
+        headers: { ...headers, "content-type": "application/json" },
+        method: "POST",
+      }).catch(() => null);
+
+      if (response === null) {
+        setActionError(copy.signIn.genericError);
+
+        return;
+      }
+
+      if (response.ok) {
+        void navigate(await nextAfterSignIn(), { replace: true });
+
+        return;
+      }
+
+      if (response.status !== 404) {
+        const parsed = authErrorSchema.safeParse(await response.json().catch(() => null));
+        const code = parsed.success ? parsed.data.code : undefined;
+
+        if (code === "captcha_failed") {
+          setActionError(copy.signIn.captchaFailed);
+        } else if (response.status === 403) {
+          setPhase("refused");
+          setActionError(null);
+        } else {
+          setActionError(presentError(response.status, code));
+        }
+
+        return;
+      }
     }
 
     const result = await authClient.signIn

@@ -230,7 +230,7 @@ updated_at) · `session` · `account` (provider: google, linkedin, credential) �
 | Table | Columns |
 |---|---|
 | `user_keys` | user_id PK, wrapped_dek BLOB, master_key_version INTEGER, created_at. **Deleting this row is crypto-shredding.** |
-| `profiles` | user_id PK, running, pause_reason CHECK IN ('user','onboarding','no_resume','plan_ended','payment_failed','suspended','no_mailbox') NULL, timezone (IANA, taken from the browser at sign-up; the first zone saved applies at once; a later change is stored in pending_timezone with pending_timezone_at = now + `limits.timezone_change_days` (7) and the current zone stays in force until then; every read of the zone applies a due pending change first, through one function), pending_timezone, pending_timezone_at, languages TEXT JSON (ISO 639-1), auto_threshold CHECK IN (50,60) DEFAULT 60, onboarding_step, onboarded_at, digest_enabled DEFAULT 1, push_prompted_at, consent_version, consent_at, created_at, updated_at. M1-14 creates the row with `languages`, `timezone` and the timestamps; the remaining columns arrive with the slices that read them. M1-22 adds `running` and `pause_reason`: `running` defaults to 0 and `pause_reason` to `onboarding`, so no send is planned until the owner presses Start; `POST /api/running {running:true}` clears the reason, and setting `running:false` records `user`. `consent_version` defaults to `m1` for the owner-only milestone; the wording it refers to lands with the M2 legal-pages ticket (#6) |
+| `profiles` | user_id PK, running, pause_reason CHECK IN ('user','onboarding','no_resume','plan_ended','payment_failed','suspended','no_mailbox') NULL, timezone (IANA, taken from the browser at sign-up; the first zone saved applies at once; a later change is stored in pending_timezone with pending_timezone_at = now + `limits.timezone_change_days` (7) and the current zone stays in force until then; every read of the zone applies a due pending change first, through one function), pending_timezone, pending_timezone_at, languages TEXT JSON (ISO 639-1), auto_threshold CHECK IN (50,60) DEFAULT 60, onboarding_step, onboarded_at, digest_enabled DEFAULT 1, push_prompted_at, consent_version, consent_at, created_at, updated_at. M1-14 creates the row with `languages`, `timezone` and the timestamps; the remaining columns arrive with the slices that read them. M1-22 adds `running` and `pause_reason`: `running` defaults to 0 and `pause_reason` to `onboarding`, so no send is planned until the owner presses Start; `POST /api/running {running:true}` clears the reason, and setting `running:false` records `user`. `consent_version` defaults to the published `1` (migration 0038 replaces the M1 `m1` placeholder); `consent_at` is set only when the user accepts the consent at /consent, and the accepted version stays on the profile when a later version is published |
 | `facts` | id, user_id, key, scope ('' or an ISO 3166-1 alpha-2 country), value_enc, source CHECK IN ('resume','user','review','import'), confirmed, revision, updated_at; UNIQUE(user_id,key,scope). Keys from the fact catalog (§7.1) or `q:<question_id>` for learned answers. `work_auth` and `sponsorship_required` are country-scoped; every other key has `scope=''` |
 | `targets` | user_id PK, roles JSON (strings as typed), seniorities JSON, workplaces JSON, locations JSON (strings as typed), employment_types JSON, salary_floor_minor NULL, salary_currency NULL, salary_period CHECK IN ('year','month','hour') NULL, version INTEGER, updated_at |
 | `skip_companies` | id, user_id, company_id NULL, name, name_norm, domain NULL, reason CHECK IN ('current_employer','user'), created_at; UNIQUE(user_id,name_norm). Matching rules in §8.1 |
@@ -272,7 +272,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `review_audit_events` | id, user_id, at, kind CHECK IN ('review_opened','review_resolved','auto_answer','snapshot_sent'), application_id NULL, review_id NULL, question_id NULL, ats NULL CHECK IN ('greenhouse','lever','ashby'), source NULL CHECK IN ('fact','target','derived','consent','file','open_text'), fact_key NULL, fact_revision NULL, scope, detail JSON; INDEX(user_id,at), INDEX(kind,at). Append-only by code: every Review opened and resolved, every automatic answer with its source, and every Snapshot sent. The owner's Review-rate and false-answer reports read it (§8.4) |
 | `checkins` | id, application_id UNIQUE, user_id, due_at, status CHECK IN ('open','answered','expired'), answer CHECK IN ('rejected','interviewing','still_waiting') NULL, created_at |
 | `plan_cache` | id, ats, form_signature, plan JSON (`{readPath, questions}`; each question carries its catalog `question_id`, label, field name, type, options, required and position), hits, failures, updated_at; UNIQUE(ats,form_signature). `hits` counts preparations served from the cache; `failures` counts a cached plan that no longer matched the live form or whose questions no longer exist. It never holds answers: they are rebuilt per user from Facts and Targets |
-| `consent_versions` | version PK, text, published_at — the exact consent wording each `consent_version` refers to; rows are never edited |
+| `consent_versions` | version PK (a whole number as text), text, published_at — the exact consent wording each `consent_version` refers to. Rows are never edited: publishing a version appends the next number with its text and date (`scripts/publish-consent-version.ts`), so an accepted version and every Snapshot keep the wording and version they were made under. Version 1 is seeded by migration 0038 |
 
 ### 5.5 Inbox
 
@@ -788,7 +788,10 @@ undone: picks `k = min(remaining_today, approved count)` random times in the rem
 08:00–20:00 window, at least 20 minutes apart, and assigns them in approval order. A later approval is planned after
 the latest slot already held, so sends stay in approval order. Undoing an approval frees its slot. Approval never
 bypasses pacing, the company cooldown, the crowd limits or the caps; the daily cap counts sends, not approvals.
-Outside the window nothing is sent; leftovers roll to tomorrow's planning. A retry's earliest time (§9.4) is a lower
+Outside the window nothing is sent; leftovers roll to tomorrow's planning. The same run plans a leftover
+into the following windows (up to `limits.daily_cap` a day, in approval order) rather than leaving it
+unscheduled until the next midnight planner, so a slot that landed at the end of a window cannot strand
+the next approval. A retry's earliest time (§9.4) is a lower
 bound: the planner gives it the first free slot at or after that time inside a window.
 
 ### 9.3 Dispatcher
@@ -1066,6 +1069,19 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
   applications over 30 days (no card). A sign-in with any other email is refused with the same copy for every method; an
   invite can be revoked until accepted; a suspended user cannot sign in. An accepted invite lands in onboarding after
   sign-in until its steps are finished; the owner and legacy accounts go to Home, whose setup banner opens onboarding. M3 public.
+- **Demo account** (`DEMO_LOGIN_ENABLED=true`, off by default): entering `test@email.com` on the sign-in page signs in
+  as the demo user with one click and sends no mail; with the flag off the same email is refused like any other. The
+  demo is seeded idempotently (`bun run db:seed-demo`, or on its first sign-in) with fictional facts, a resume,
+  targets, ~4 months of Applications across every status and Stage, Ready cards, Reviews, Inbox mail, notifications,
+  Check-ins and an admin grant with its ledger. Role `demo` never sends: the dispatcher, the executor, preparation,
+  push, every outbound mail and the Check-in sweep skip it, no ATS or Browser Use call is made for it, it reads only
+  its own rows, and it is left out of admin counts and the M1 provider report. Its sessions expire after 24 h, and up
+  to 20 visitors may hold one at once (the oldest is evicted). The demo is read-only: every non-GET `/api` call except
+  sign-in and sign-out returns a 403 that points at a real account, so shared demo data cannot be changed, and the
+  cost-bearing posting read is refused the same way; better-auth account mutations (email, password, linked accounts,
+  session revocation and deletion) are refused too. In production a startup check logs the enablement and the
+  guarantees, and refuses to start if `test@email.com` belongs to a non-demo role; the seed runs once at boot and only
+  completes on sign-in when it is missing. Turnstile still applies to its sign-in endpoint.
 
 ### 13.2 Encryption and deletion
 
@@ -1108,9 +1124,12 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
 
 ### 13.4 Legal minimum before M2
 
-Terms of Service and Privacy Policy as public pages, and the per-application consent text versioned in `consent_version`.
-The business name is "Overture"; the contact is `admin@tryoverture.com` (it exists); the postal address is the literal
-placeholder `[POSTAL ADDRESS]` until the owner supplies one, and the pages say so plainly in the build, never invented.
+Terms of Service (`/terms`) and Privacy Policy (`/privacy`) as public pages for signed-out visitors, linked from
+sign-in, the consent card and Settings, and the per-application consent text versioned in `consent_version`. The
+consent card (`/consent`) shows the current `consent_versions` row and records the accepted version on the profile;
+earlier rows and every Snapshot keep their version and wording. The business name is "Overture"; the contact is
+`admin@tryoverture.com` (it exists); the postal address is the literal placeholder `[POSTAL ADDRESS]` until the owner
+supplies one, and the pages say so plainly in the build, never invented.
 Sub-processors listed: Fly, Cloudflare (DNS, Email Routing and Sending, R2, Workers), Browser Use, Kernel (fallback),
 Anthropic, Grafana; Stripe joins in M3. AWS is not used. Vendors' standard published DPAs are accepted as-is; no vendor
 outreach. Drafts for owner review, not legal advice.
@@ -1134,6 +1153,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Check-ins | `POST /api/checkins/:id` `{answer}` |
 | Inbox | `GET /api/threads` · `GET /api/threads/:id` · `GET /api/attachments/:id` · `POST /api/messages/:id/read` · `GET /api/mail/code-waits` · `POST /api/mail/code-waits/:id` (paste a code) |
 | Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/mailbox` (read-only address, `forwardingWorks`, `firstForwardedAt`) · `GET/PUT /api/profile/strengthen` (the Tier 2 Facts that would unlock queued Applications, each with its count; answering saves the Fact and resolves the Reviews it answers) |
+| Consent | `GET /api/consent` (public current version and text; the signed-in user's accepted version and date) · `GET /api/consent/versions` (every published version, newest first) · `POST /api/consent/accept` `{version}` (refuses `version_changed` when a newer version is published) |
 | Onboarding | `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET/PUT /api/onboarding/targets` (the "What you want" step: the saved Targets, the choices that have open Postings, and the live count) · `PUT /api/onboarding/timezone` (the browser's zone through the seven-day rule) · `GET /api/onboarding` (the step, `onboarded_at`, pause reason, current resume, skip list and whether an invited user must onboard) · `POST /api/onboarding/:step` (records a finished step and returns the state; step 2 refuses without a resume) · `POST /api/onboarding/address/accept` (M2) |
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `POST /api/account/delete` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
@@ -1160,7 +1180,7 @@ Profile** (Ready added by ADR 0029); Settings from the avatar; desktop hover sub
 | Review | Open questions grouped by jobs unlocked; answer input matches field type; dismiss | none open |
 | Inbox | Threads list (linked company/card), message view, attachments, "Couldn't verify sender" label; read-only (no reply, §11.2); the code-paste prompt | empty, address explainer |
 | Profile | Resume, facts by tier, targets with live job count, skip list, forwarding address, "Strengthen your profile" | missing Tier 1 facts |
-| Settings | Threshold (60/50), digest, notifications, timezone, languages, forwarding address (read-only), the fixed limits explained (10 a day, 08:00–20:00, one company per 30 days; not editable), plan & billing (M3), sign out all devices, export, delete, support access log | |
+| Settings | Threshold (60/50), digest, notifications, timezone, languages, forwarding address (read-only), the fixed limits explained (10 a day, 08:00–20:00, one company per 30 days; not editable), Terms, Privacy and the consent version you agreed to, plan & billing (M3), sign out all devices, export, delete, support access log | |
 | Onboarding (M2) | 1 Sign in (invite) · 2 Resume · 3 Your facts (Tier 1, prefilled) · 4 What you want (roles, locations, workplace, seniority and a salary floor from choices that have open Postings, live count, browser timezone saved without asking; posting languages start as English and employment type as full-time until Settings) · 5 Forward ATS mail (the Gmail and Outlook filter guide, forwarding detected, or skip to the paste fallback) + consent + trial card (M3) + Start; PWA install + push prompt after Start; each step saved as it is finished | resume unreadable → manual entry, filter skipped → codes by paste |
 | Admin | Same design system: Overview (success per provider × ATS, cost per completed application, queue, spend), Users, Applications/Attempts (live view/replay embed), Reviews, Kill switches & Settings, Catalog health, Mail health, Provider report, Fixture capture, Grants/Refunds, Audit | |
 | Public (M3) | Landing, pricing, privacy, terms; prerendered static HTML; the landing says Overture prepares every application and sends it when you approve | |
@@ -1204,10 +1224,13 @@ crypto-shred (M2) · 30. admin Reveal + audit + support access log (M2) · 31. S
 payment-failure pause (M3) · 32. admin fixture capture job writes sanitised forms to R2 and never submits ·
 33. approval: Send freezes the plan, a stale `planSha256` is refused, Undo before `sending`, Skip withdraws, Send all,
 Edit an answer clears the approvals that used the Fact, the Recap email's link never sends · 34. a live form that
-differs from the approved plan stops before Submit and returns the Application to Ready with what changed.
+differs from the approved plan stops before Submit and returns the Application to Ready with what changed · 35. Terms and Privacy
+render for a signed-out visitor (axe clean, reachable from sign-in), the consent card records the accepted version, and
+publishing version 2 leaves version 1 and an already sent Snapshot on version 1 (M2)
 
-Plus: route reachability for every page, axe on every page, 30 visual snapshots (Home, Board, Review, Inbox, Profile
-× 390 / 1280 px × light/dark; Ready joins them once it is drawn) in pinned Docker.
+Plus: route reachability for every page, axe on every page, and the visual snapshots against `design/reference/` (Home, Board,
+Review, Inbox, Profile, Settings and the legal and consent boards × 390 / 1280 px × light/dark; Ready joins them once it is
+drawn) in pinned Docker.
 
 ### 16.2 Unit tests (nine files, Vitest, beside their code)
 

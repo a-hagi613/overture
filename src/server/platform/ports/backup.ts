@@ -6,9 +6,11 @@ import { z } from "zod";
 
 import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "./clock.ts";
+import type { ReplicaTransaction } from "./replica-listing.ts";
 
 import { databasePath, env } from "../../config/env.ts";
 import { getSetting } from "../settings/index.ts";
+import { compareTransactions, readNewestReplicaTransaction } from "./replica-listing.ts";
 
 const ltxFileSchema = z.object({
   max_txid: z.string().min(1),
@@ -17,7 +19,7 @@ const ltxFileSchema = z.object({
 
 const ltxListingSchema = z.array(ltxFileSchema);
 
-export type ReplicaTransaction = z.infer<typeof ltxFileSchema>;
+export type { ReplicaTransaction } from "./replica-listing.ts";
 
 const DEFAULT_READ_INTERVAL_MS = 30_000;
 const MIN_READ_INTERVAL_MS = 1000;
@@ -33,20 +35,6 @@ type Observation =
   | { replication: "unavailable" }
   | { replication: "ok"; replicaTxid: string; oldestUnreplicatedAt: number | null };
 
-function compareTransactions(left: ReplicaTransaction, right: ReplicaTransaction) {
-  if (left.max_txid < right.max_txid) {
-    return -1;
-  }
-
-  return left.max_txid > right.max_txid ? 1 : 0;
-}
-
-function newestTransaction(transactions: ReplicaTransaction[]) {
-  const ordered = transactions.toSorted(compareTransactions);
-
-  return ordered.at(-1);
-}
-
 function oldestUnreplicatedTransaction(local: ReplicaTransaction[], replica: ReplicaTransaction) {
   const ordered = local.toSorted(compareTransactions);
 
@@ -60,18 +48,14 @@ async function observeReplica(configPath: string) {
     join(dirname(absoluteDatabasePath), `.${basename(absoluteDatabasePath)}-litestream`),
   ).href;
 
-  const [replicaListing, localListing] = await Promise.all([
-    listTransactions(["-config", configPath, databasePath]),
-    listTransactions([shadowDirectory]),
+  const [newestReplica, localListing] = await Promise.all([
+    readNewestReplicaTransaction(async (level) =>
+      listTransactions(String(level), ["-config", configPath, databasePath]),
+    ),
+    listTransactions("all", [shadowDirectory]),
   ]);
 
-  if (replicaListing === null || localListing === null) {
-    return { replication: "unavailable" } as const satisfies Observation;
-  }
-
-  const newestReplica = newestTransaction(replicaListing);
-
-  if (newestReplica === undefined) {
+  if (newestReplica === null || newestReplica === undefined || localListing === null) {
     return { replication: "unavailable" } as const satisfies Observation;
   }
 
@@ -85,10 +69,10 @@ async function observeReplica(configPath: string) {
   } as const satisfies Observation;
 }
 
-async function listTransactions(ltxArguments: string[]) {
+async function listTransactions(level: string, ltxArguments: string[]) {
   try {
     const child = Bun.spawn(
-      [env.LITESTREAM_BINARY, "ltx", "-json", "-level", "all", ...ltxArguments],
+      [env.LITESTREAM_BINARY, "ltx", "-json", "-level", level, ...ltxArguments],
       {
         stdout: "pipe",
         stderr: "ignore",
