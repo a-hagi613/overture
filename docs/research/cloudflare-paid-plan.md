@@ -8,7 +8,8 @@ All facts below come from `developers.cloudflare.com` pages read on 2026-11-21 (
 
 - **No native hard cap exists for the account as a whole.** Cloudflare offers a _spending limit_ for Workers and a separate one for Durable Objects only, and says plainly that "a limit does not guarantee a maximum invoice amount". Every other product (R2, Queues, KV, D1, Workers AI, Browser Run, Vectorize, Email Sending) has no native limit; at most there is an email alert.
 - **The $5 is already the subscription.** Read literally, "never above $5" means _zero overage on every product_. The design below keeps every use inside its included allowance, caps what Cloudflare can cap natively, and adds a small watchdog Worker for the rest.
-- **One live risk to check first:** `litestream.yml` syncs to R2 every second. A write every second is up to about 2.6 million R2 Class A operations a month against 1 million included, which is about $7 of overage on its own. Measure it before adding anything else (follow-up 1).
+- **The measured risk is the operation count, not the sync rate.** `litestream.yml` syncs to R2 every second, but Litestream only uploads when the WAL changed: over 2026-11-01..21 `overture-backups` saw 56.4k PutObject and 3.0k UploadPart, not the ~1.8M a literal one-write-per-second would produce. ListObjects was the largest Class A line at 70.6k (~50% of ~140k total). Measurement and cause: §2.
+- **The LIST floor was about to pass the allowance.** Two fixed costs, independent of how many users exist: the app read the replica's lag with `litestream ltx -level all` every 30 s (ten ListObjectsV2 calls, 28.8k/day), and Litestream's L0 retention monitor listed the replica twice every 15 s (11.5k/day). Together that is ~40.3k/day, ~1.21M a month against 1M included, with no users at all. Both are now cut to ~3.5k/day (§3).
 
 ## 1. Every product: allowance, overage, Overture fit
 
@@ -20,7 +21,7 @@ Allowances are monthly on Workers Paid unless stated. Sources: [Workers pricing]
 | [Workers AI](https://developers.cloudflare.com/workers-ai/platform/pricing/)                                    | 10,000 Neurons a day (the same free allocation as Free)                                                                                                                                                | $0.011 per 1,000 Neurons                                                                        | **Fits, marginal:** `email_classify` fallback (SPEC §8.6). See ranking 6. Not for answers or letters (ADR 0007, quality).                                                                                                                                                                       |
 | [D1](https://developers.cloudflare.com/d1/platform/pricing/)                                                    | 25 B rows read; 50 M rows written; 5 GB                                                                                                                                                                | $0.001 per M rows read; $1.00 per M rows written; $0.75 per GB-month                            | **No fit:** the system of record is one SQLite file on the Fly volume (ADR 0002). A second database adds a sync problem for nothing.                                                                                                                                                            |
 | [Workers KV](https://developers.cloudflare.com/kv/platform/pricing/)                                            | 10 M reads; 1 M writes, deletes and lists; 1 GB                                                                                                                                                        | $0.50 per M reads; $5.00 per M writes, deletes, lists; $0.50 per GB-month                       | **No fit:** no edge-read workload. The only shared state is in SQLite.                                                                                                                                                                                                                          |
-| [R2](https://developers.cloudflare.com/r2/pricing/)                                                             | 10 GB-month; 1 M Class A; 10 M Class B; egress free                                                                                                                                                    | $0.015 per GB-month; $4.50 per M Class A; $0.36 per M Class B                                   | **Already used** (Litestream backups, sealed files, Stapply discovery bucket, mail, ADR 0032 snapshot). The one product that can breach the cap today; see §3 and follow-up 1.                                                                                                                  |
+| [R2](https://developers.cloudflare.com/r2/pricing/)                                                             | 10 GB-month; 1 M Class A; 10 M Class B; egress free                                                                                                                                                    | $0.015 per GB-month; $4.50 per M Class A; $0.36 per M Class B                                   | **Already used** (Litestream backups, sealed files, Stapply discovery bucket, mail, ADR 0032 snapshot). List operations, not writes, are the largest line and are now bounded by design; see §3.                                                                                                  |
 | [Queues](https://developers.cloudflare.com/queues/platform/pricing/)                                            | 1 M operations (3 per message: write, read, delete)                                                                                                                                                    | $0.40 per M operations                                                                          | **Fits:** durable buffer between the Email Worker and `overture-web` (ranking 5). Message limit 128 KB, so large mail goes to R2 with a pointer.                                                                                                                                                |
 | [Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/)                          | 1 M requests; 400,000 GB-s; SQLite 25 B rows read, 50 M written, 5 GB                                                                                                                                  | $0.15 per M requests; $12.50 per M GB-s; $1.00 per M rows written; $0.20 per GB-month           | **No fit:** pacing and reserve-commit-release already live in SQLite on the one machine (ADR 0008, 0010). A second coordinator would split the truth. Has its own spending limit.                                                                                                               |
 | [Workflows](https://developers.cloudflare.com/workflows/reference/pricing/)                                     | 10 M requests; 30 M CPU-ms; 1 GB-month; 500,000 steps (steps and storage billed from 2026-08-10)                                                                                                       | $0.80 per 100,000 steps; $0.20 per GB-month                                                     | **No fit:** `bg_jobs` leases and recovery sweeps already do this (SPEC §9.4).                                                                                                                                                                                                                   |
@@ -59,7 +60,55 @@ ADR 0016 also names Browser Use as the only browser that reaches real forms. Rev
 
 **Workable ingest on a Worker instead of the GitHub Action (ADR 0032).** Not recommended. The Action is free, has run on 159 MB of memory, and writes to R2 already. On Workers the measured full tagging pass is about one CPU-hour a day (3.6 M CPU-ms), which is 108 M a month against 30 M included (about $1.56 overage) and over the 5-minute CPU ceiling per invocation. The filtered 3-minute pass fits, but needs the tagging code and O\*NET index ported to a Worker and gains nothing over the Action. Only the freshness watch moves to Cloudflare (ranking 3).
 
-**R2 for backups and exports.** Already in place. Keep it inside the free tier by: the Litestream interval from follow-up 1, R2 lifecycle rules on old snapshots ([lifecycle rules](https://developers.cloudflare.com/r2/buckets/object-lifecycles/)), and a size alert at 8 GB of the 10 GB.
+### R2 for backups and exports
+
+Already in place. Keep it inside the free tier by the Litestream settings chosen from the measurement below, R2 lifecycle rules on old snapshots ([lifecycle rules](https://developers.cloudflare.com/r2/buckets/object-lifecycles/)), and a size alert at 8 GB of the 10 GB. The commands and how to read them are in `docs/research/cloudflare-spend-guard-runbook.md` §7.
+
+Measured 2026-11-01..21 with GraphQL Analytics, dataset `r2OperationsAdaptiveGroups`, filtered to bucket `overture-backups`, grouped by `actionType` ([R2 metrics](https://developers.cloudflare.com/r2/platform/metrics-analytics/)):
+
+| Operation          | Count   | What it is                                        |
+| ------------------ | ------- | ------------------------------------------------- |
+| ListObjects        | 70,600  | largest line, about half of the month's Class A   |
+| PutObject          | 56,400  | only when the WAL changed, not once per sync tick |
+| DeleteObjects      | 7,300   | Litestream retention deletes, batch form          |
+| UploadPart         | 3,000   | snapshot and large-LTX multipart uploads          |
+| multipart (create + complete) | ~1,500 | one group per multipart file             |
+| **total**          | **~140,000** | 14% of the 1 M Class A included               |
+
+`overture-files` saw about 700 operations. Storage was nowhere near the 10 GB included.
+
+**The month is not a run rate.** The first production deploy was 2026-11-20T22:04Z, so the app ran for
+about two of the 21 days. The measured counts are consistent with that: the fixed LIST cost below is
+~40k a day, and 70.6k ListObjects is about two days of it plus the snapshot and dashboard traffic. A
+full month of the same code would have been ~1.21 M Class A and overage, so the "today's volume"
+reading of this measurement was misleading even though every individual number is right.
+
+**Two fixed LIST costs, both independent of user count** (class A, and the cause of 70.6k):
+
+1. `src/server/platform/ports/backup.ts` read the replica's lag with `litestream ltx -json -level all`
+   every `backups.replica_read_interval_ms` (30 s). `-level all` iterates levels 0..9, and each level is
+   one ListObjectsV2 call: 10 calls × 2 a minute = **28,800 a day**, ~864k a month if the machine is up.
+2. Litestream v0.5.18 runs `Store.monitorL0Retention` every `l0-retention-check-interval` (default 15 s).
+   `DB.EnforceL0RetentionByTime` lists level 1, then level 0 when level 1 is non-empty: two
+   ListObjectsV2 calls per tick = **11,520 a day**, ~346k a month for one database. Snapshot retention
+   and compaction do not list per tick; their level info is memoised, and snapshot retention runs on the
+   24 h snapshot tick.
+
+**What changed for #281.** The lag read now asks for one level at a time, 0 upward, and stops at the
+first level that holds a file (new transactions always land at level 0, and compaction only moves or
+deletes older files upward), so steady state is **one** list instead of ten: 28,800 → 2,880 a day.
+`litestream.yml` sets `l0-retention-check-interval: 5m`, so the retention monitor lists twice every five
+minutes instead of every fifteen seconds: 11,520 → 576 a day. The fixed floor is now **~3,500 a
+day, ~104k a month, 10% of the allowance**, before writes.
+
+**Retention settings cannot lower the list cost without losing the restore.** `snapshot.retention: 720h`
+(with `snapshot.interval: 24h`) is the 30-day restore: it is enforced once per snapshot tick and costs
+almost nothing in ListObjects, so shortening it would lose restore coverage for no Class A saving.
+`l0-retention-check-interval` is the only retention knob that lowers ListObjects, and it does not touch
+the 30-day restore at all: it only delays sweeping L0 files that are already older than the
+`l0-retention: 5m` mark, i.e. fine-grained per-sync restore points, not snapshot coverage. `sync-interval: 1s` stays: PUTs
+were 56.4k in the window and are driven by the write rate, not by the tick.
+
 
 ## 3. The $5 hard cap
 
@@ -90,7 +139,7 @@ Layer these. None is exact; together they keep the plan inside its allowances.
 5. **A scheduled sentinel Worker as the self-stopping part for products with no native limit.** Every 15 minutes it reads usage (GraphQL Analytics for R2 operations, Queues operations and Worker CPU; the alpha billable-usage API as a cross-check) and compares each metric to its allowance:
    - at 70%: push to the owner's ntfy URL;
    - at 90%: act on what Overture controls, by writing a "degraded" flag the app reads (stop non-essential R2 writes such as export copies, use rules only for `email_classify`, queue mail without retries) and ntfy again.
-   - It cannot natively block R2: the only hard action is revoking the R2 API token, which would stop backups, so it must not do that. R2 is therefore kept safe by design (item 1, follow-up 1 and the lifecycle rules) and alerted on, not blocked.
+   - It cannot natively block R2: the only hard action is revoking the R2 API token, which would stop backups, so it must not do that. R2 is therefore kept safe by design (the measured list cost in §2, the lifecycle rules and the 8 GB size alert) and alerted on, not blocked.
 6. **App-side counters for the rest**, matching the existing fail-closed caps in SPEC §8.6: a monthly Email Sending count (3,000 included, refuse above 2,700), and a daily Workers AI Neuron count if ranking 6 is built (stop at 8,000 of 10,000, fall back to rules and Haiku). An AI Gateway spend limit is an optional second belt for Workers AI.
 
 **What "self-stopping" cannot promise:** because the limits are eventually consistent and the usage API is alpha, a sudden spike (a loop, a leaked token) can still cost a few cents to dollars before it is stopped. Cloudflare offers a goal here, not a guarantee, and the owner should treat "never above $5" that way.
@@ -101,7 +150,7 @@ For the orchestrator to cut. Order is the ranking above.
 
 | #   | Title                                                                           | Scope in one line                                                                                                                                                  | Blocked by                                                         |
 | --- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| 1   | Measure R2 Class A operations from Litestream and set a safe `sync-interval`    | Read the last 30 days of R2 operation counts for `overture-backups` in the billable-usage dashboard, then decide the interval and lifecycle rules with the owner.  | none (needs the owner's dashboard or a read-only billing token)    |
+| 1   | ~~Measure R2 Class A operations from Litestream and set a safe `sync-interval`~~ | Done in #281: measured 2026-11-01..21, ListObjects found to be the driver (the lag read and the L0 retention monitor), the read cut from ten lists to one, `l0-retention-check-interval: 5m`, lifecycle rules and an 8 GB alert. | closed |
 | 2   | Owner setup: Workers and Durable Objects spending limits and budget alerts      | Create the two `usage_block` policies and a budget alert with `notification_email`; document the trade (the Email Worker stops when tripped) in the runbook.        | owner decision on ADR 0033; token with Billing Edit                |
 | 3   | Sentinel Worker: external health probe, Workable freshness, usage watchdog      | Cron Worker with ntfy alerts, a usage check against allowances and a degraded flag the app reads; tests with recorded GraphQL fixtures.                            | 2                                                                  |
 | 4   | App: monthly Email Sending counter                                              | Count sends, refuse above 2,700 a month, alert the owner; tested against the real adapter.                                                                         | none                                                               |
@@ -114,5 +163,5 @@ For the orchestrator to cut. Order is the ranking above.
 
 - The alpha billable-usage API response shape was not called; the sentinel ticket must record a real response first.
 - Whether Workers AI's free 10,000 Neurons a day counts toward an AI Gateway spend limit is not stated on the pages read.
-- The current R2 operation counts and sizes for Overture's buckets were not read (no Cloudflare access from this task).
+- The R2 operation counts are measured (§2). Storage size per bucket was not read; the 8 GB alert is the first reading. Re-measure once M2 users arrive and record Class A per user per month (#281).
 - Cloudflare Registrar renewals and any plan on another Cloudflare product (Access, Turnstile, DNS) are outside the Workers plan and not counted here.

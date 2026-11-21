@@ -13,7 +13,7 @@ No secret value ever appears in this repository: secrets are set with `fly secre
 |---|---|
 | `Dockerfile` | Multi-stage build on Bun 1.4: installs, builds the SPA (`dist/`), ships a slim runtime with Litestream 0.5.18 (checksum-verified) |
 | `scripts/docker-entrypoint.sh` | On start: Litestream restores `/data/app.sqlite` from the replica if it does not exist, then runs `litestream replicate -exec "bun run /app/src/server/main.ts"`; migrations run inside `main.ts` |
-| `litestream.yml` | Continuous replication (1 s sync) to R2 `overture-backups`, nightly snapshot (`interval: 24h`) kept 30 days (`retention: 720h`) |
+| `litestream.yml` | Continuous replication (1 s sync) to R2 `overture-backups`, nightly snapshot (`interval: 24h`) kept 30 days (`retention: 720h`); the L0 retention check runs every 5 minutes so its ListObjects cost stays bounded (#281) |
 | `fly.toml` | App `overture-web`, region `yyz`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health` |
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`) and a `restore-drill` job (Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations) |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: `flyctl deploy --remote-only` with `FLY_API_TOKEN`, then polls the production health route |
@@ -35,6 +35,8 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    Object Read & Write scoped to that bucket. Note the account ID, access key ID and secret access key.
    The encrypted files bucket is a second R2 bucket named `overture-files`; `R2_BUCKET_FILES` is required
    alongside the other R2 names. The bucket exists and the secret is set on `overture-web`.
+   Add the 35-day lifecycle rule on `overture-backups` (prefix `app.sqlite/`) and the 8 GB storage alert;
+   the exact commands, the JSON and the read-backs are in `docs/research/cloudflare-spend-guard-runbook.md` §7.
 5. Set only the backup and app secrets on the app (values come from the previous step, never the repo):
    `fly secrets set R2_ACCOUNT_ID=… R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… R2_BUCKET_BACKUPS=overture-backups R2_BUCKET_FILES=overture-files -a overture-web`
    With `R2_BUCKET_FILES` set the app stores encrypted resumes and mail in R2, and a half-set R2 files config (the
@@ -213,7 +215,8 @@ minutes; re-run `--check` until it prints `verdict: ready`.
   Lag: `curl -fsS https://overture-web.fly.dev/api/health | jq .backups` →
   `{"replication":"ok","lagSeconds":<n>,"replicaTxid":"…","readAgeSeconds":<n>}`. `lagSeconds` measures how
   far the replica (`replicaTxid`) is behind the local database. The server reads the replica's newest
-  transaction id and the local database's transactions (`litestream ltx -level all`) in the background every
+  transaction id (one level at a time from level 0, which holds the newest file, so a healthy replica costs
+  one R2 list per read) and the local database's transactions (`litestream ltx -level all`) in the background every
   `backups.replica_read_interval_ms` (default `30000`, changed in Settings). `/api/health` only serves that
   cached reading and never runs litestream, so it answers in milliseconds even when the R2 listing is slow.
   `readAgeSeconds` is how old that reading is. `lagSeconds` is `0` when the replica holds every local

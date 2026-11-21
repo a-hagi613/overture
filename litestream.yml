@@ -3,6 +3,11 @@ snapshot:
   retention: 720h
 retention:
   enabled: true
+# The L0 retention monitor's only job is to delete compacted level-0 files after l0-retention (5m).
+# Every tick lists the replica twice, so the 15s default is ~11.5k Class A operations a day for one
+# database (#281). Five minutes sweeps those files within 5 extra minutes and leaves the 30-day
+# restore untouched: that comes from snapshot.retention above, not from L0 files.
+l0-retention-check-interval: 5m
 dbs:
   - path: /data/app.sqlite
     replicas:

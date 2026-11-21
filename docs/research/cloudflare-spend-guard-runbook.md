@@ -206,3 +206,113 @@ Overture the plausible ones are R2 (Litestream's write rate, #281), Email Sendin
 #282) and, if adopted, Workers AI neurons. R2 cannot be blocked natively: revoking its token would stop the backups,
 so it stays bounded by design, lifecycle rules and a size alert. The budget alert at $0.50 is the only account-wide
 signal until the sentinel (#283) and the app-side counters land.
+
+## 7. R2: lifecycle rules and the 8 GB size alert
+
+The measurement and the reason for these two controls are in `docs/research/cloudflare-paid-plan.md` §2. R2
+cannot be blocked natively: revoking its token would stop the backups. It is bounded by design instead. The
+Litestream side of that bound shipped in #281 (`litestream.yml`, and the backup lag read in
+`src/server/platform/ports/backup.ts`); this section is the account side: one lifecycle rule that outlives
+Litestream, and one alert before the 10 GB included storage runs out.
+
+**State:** the commands below are the owner-run step and are not applied yet. The development box holds no
+Cloudflare token, and none of these calls belongs in the app or in tests (ADR 0016). Run them once with a
+token that has **Workers R2 Storage Write** (lifecycle) and **Account Notifications Edit** (alert), then
+paste the read-backs into this section.
+
+### 7.1 Lifecycle rule: expire Litestream files older than 35 days
+
+Litestream already deletes its own files at 30 days (`snapshot.retention: 720h`,
+`retention.enabled: true`). The lifecycle rule is the backstop for a stopped or broken retention run: it
+deletes anything under the replica path that is older than 35 days, five days after Litestream's own window,
+so it can never remove a file the 30-day restore still needs. It touches only the `app.sqlite/` prefix, which
+holds every Litestream level (`app.sqlite/0000/` through `app.sqlite/0009/`). It never touches
+`overture-files` or another bucket.
+
+`maxAge` is in seconds: 35 days = 3,024,000. The abort rule covers multipart uploads abandoned by a crashed
+snapshot (R2's default rule for that is 7 days, repeated here so one PUT owns the whole policy).
+
+```json
+[
+  {
+    "id": "expire-litestream-backups",
+    "enabled": true,
+    "conditions": { "prefix": "app.sqlite/" },
+    "deleteObjectsTransition": { "condition": { "type": "Age", "maxAge": 3024000 } },
+    "abortMultipartUploadsTransition": { "condition": { "type": "Age", "maxAge": 604800 } }
+  }
+]
+```
+
+`cf r2 buckets lifecycle update` **replaces** the whole rule set. Read it first and carry any other rule over.
+
+```sh
+# Read the current rules; today this is expected to be empty.
+cf r2 buckets lifecycle get overture-backups
+
+# Save the array above as r2-lifecycle.json, then validate and apply.
+cf r2 buckets lifecycle update overture-backups --rules @r2-lifecycle.json --dry-run
+cf r2 buckets lifecycle update overture-backups --rules @r2-lifecycle.json --force
+
+# Read back: one rule, enabled, prefix app.sqlite/, maxAge 3024000.
+cf r2 buckets lifecycle get overture-backups
+```
+
+Dashboard equivalent: **R2 → overture-backups → Settings → Object Lifecycle Rules → Add rule**, prefix
+`app.sqlite/`, delete after 35 days, abort incomplete multipart uploads after 7 days.
+
+The rule does not change what a restore can reach: every file a 30-day restore needs is younger than 30 days,
+and Litestream deletes its own expired files before the rule's 35th day.
+
+### 7.2 Size alert at 8 GB of the 10 GB included
+
+R2 includes 10 GB of storage a month. Alert at 8 GB (80%), which leaves two gigabytes to investigate before
+storage starts to bill ($0.015 per GB-month, so the cents are not the point; an unexpected jump is).
+
+**Dashboard (primary).** Notifications → **Add** → **Billable Usage** → product **R2**, storage metric,
+threshold **8 GB** (the wizard labels the unit), recipient the owner. Usage notifications are available on
+pay-as-you-go accounts; this account is one.
+
+**CLI (record the same policy).** Cloudflare does not document the `product` value or the unit of `limit` for
+this alert type ([cloudflare-docs#35095](https://github.com/cloudflare/cloudflare-docs/issues/35095)), so read
+the values this account accepts before creating it:
+
+```sh
+cf alerting available-alerts get --alert-type billing_usage_alert
+
+# Then, with the R2 product value and the account's unit for the storage limit:
+cf alerting policies create \
+  --name 'Overture R2 storage 8 GB' \
+  --description 'R2 storage for overture-backups crossed 8 GB of the 10 GB included (ADR 0033, #281).' \
+  --alert-type billing_usage_alert --enabled true \
+  --filters-product '<r2 product value from available-alerts>' \
+  --filters-limit '<8, in the unit available-alerts reports>' \
+  --mechanisms-email '[{"id":"<owner address>"}]'
+
+cf alerting policies list
+```
+
+If `billing_usage_alert` does not list R2 for this account, use an **Alerts → Monitors** threshold monitor
+over the R2 storage dataset instead (same 8 GB threshold, same recipient) and record its query here.
+
+### 7.3 Reading the size, and what to do at 8 GB
+
+```sh
+cf r2 buckets metrics list            # account-level R2 metrics
+```
+
+The bucket's **Metrics** tab in the dashboard shows `payloadSize + metadataSize` and `objectCount` per bucket;
+the GraphQL dataset is `r2StorageAdaptiveGroups` (`max { payloadSize metadataSize objectCount }`, filter
+`bucketName: overture-backups`).
+
+At 8 GB, in order:
+
+1. Compare `objectCount` with the expected snapshot count. A jump with a flat object count is one large
+   object (a runaway export or upload), not backup growth.
+2. If the growth is old Litestream files, check that `retention.enabled: true` is still in the deployed
+   `litestream.yml` and that the 35-day lifecycle rule above exists; then read the replica listing for files
+   older than 30 days (`litestream ltx -level all`) and delete only those, not the current snapshot.
+3. If it is `overture-files`, find the largest objects in the R2 dashboard and fix the writer; never delete a
+   user's sealed files to stay under a storage line.
+4. Never disable Litestream, revoke its token or shorten `snapshot.retention` to save storage: a missing
+   backup is worse than a storage line, and the 30-day restore is the product's promise (SPEC §3.1).
