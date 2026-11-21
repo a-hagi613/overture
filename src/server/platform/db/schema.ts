@@ -402,6 +402,15 @@ export const llmUsage = sqliteTable("llm_usage", {
   createdAt: integer("created_at").notNull(),
 });
 
+export const mailUsage = sqliteTable("mail_usage", {
+  month: text("month").primaryKey(),
+  authSends: integer("auth_sends").notNull().default(0),
+  systemSends: integer("system_sends").notNull().default(0),
+  noticeSends: integer("notice_sends").notNull().default(0),
+  warnedAt: integer("warned_at"),
+  refusedAt: integer("refused_at"),
+});
+
 export const tagImports = sqliteTable("tag_imports", {
   id: text("id").primaryKey(),
   source: text("source").notNull(),

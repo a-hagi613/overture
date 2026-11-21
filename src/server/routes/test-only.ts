@@ -26,6 +26,7 @@ import {
   fxRates,
   ledger,
   liveCheckMail,
+  mailUsage,
   matches,
   postingQuestions,
   mailboxes,
@@ -74,6 +75,7 @@ import { resetFeedContentHashes } from "../catalog/feed-retag.ts";
 import { normalizeApplyUrl, normalizeTitle } from "../catalog/normalize.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags } from "../catalog/tag-import.ts";
 import { readLlmUsage, recordLlmUsage } from "../platform/llm/usage.ts";
+import { monthKey, readMailSummary } from "../platform/mail/budget.ts";
 import { ANSWER_KINDS, QUESTION_FIELD_TYPES, REVIEW_REASONS } from "../../shared/questions.ts";
 import { normalizeFieldType, questionVariantHash } from "../catalog/question-normalize.ts";
 import { mapQuestionByRules } from "../catalog/question-rules.ts";
@@ -422,6 +424,12 @@ const fxRateBody = z.object({
   date: z.string().min(10).max(10),
   currency: z.string().length(3),
   perUsd: z.number().positive(),
+});
+
+const mailUsageBody = z.object({
+  auth: z.number().int().min(0),
+  system: z.number().int().min(0),
+  notice: z.number().int().min(0),
 });
 
 const seedReviewBody = z.object({
@@ -1224,6 +1232,23 @@ export function createTestRoutes(
     });
 
     return context.json({ ok: true });
+  });
+
+  routes.get("/mail/usage", (context) => context.json(readMailSummary(db, clock.now())));
+
+  routes.post("/mail/usage", zValidator("json", mailUsageBody), (context) => {
+    const { auth, system, notice } = context.req.valid("json");
+    const month = monthKey(clock.now());
+
+    db.insert(mailUsage)
+      .values({ authSends: auth, month, noticeSends: notice, systemSends: system })
+      .onConflictDoUpdate({
+        set: { authSends: auth, noticeSends: notice, systemSends: system },
+        target: mailUsage.month,
+      })
+      .run();
+
+    return context.json(readMailSummary(db, clock.now()));
   });
 
   routes.post("/fx-rates", zValidator("json", fxRateBody), (context) => {

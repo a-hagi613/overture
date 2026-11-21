@@ -31,6 +31,18 @@ export const overviewSchema = z.object({
     proxyMbPerCompleted: z.number().nullable(),
     proxyTrend: z.boolean(),
   }),
+  mail: z.object({
+    month: z.string(),
+    total: z.number(),
+    cap: z.number(),
+    reserve: z.number(),
+    noticeLimit: z.number(),
+    auth: z.number(),
+    system: z.number(),
+    notice: z.number(),
+    warnedAt: z.number().nullable(),
+    refusedAt: z.number().nullable(),
+  }),
   audit: z.array(auditRowSchema),
 });
 

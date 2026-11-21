@@ -132,6 +132,12 @@ bearer header; the research and the Beta terms are in `docs/research/cloudflare-
 `CLOUDFLARE_ZONE_ID` scopes the M2-02 sending-domain script and guards. `REQUIRE_EMAIL_SENDING` gates the live
 `mail.sending` guard: unset, the check records `status: "gated"` and does not alert; set, it verifies the sending
 domain and alerts while a send to a non-owner recipient would be refused.
+Email Sending includes 3,000 emails a month and no Cloudflare limit covers it, so the app counts every send in
+`mail_usage` (one row per UTC month and kind) before the request leaves the machine. `mail.monthly_cap` (2,700)
+refuses further sends and `mail.sign_in_reserve` (270) keeps the last sends for magic links, verification, resets and
+the live check, so a Recap cannot starve them; a refused send fails closed like §8.6, and the owner is alerted at 80%
+of the cap and at the first refusal. The admin overview shows the month's count. Tests reach Cloudflare only through
+MSW (ADR 0013, 0016).
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
 
 ### 3.3 Domains and DNS
@@ -1043,6 +1049,7 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
 | `match.auto_threshold_default` | 60 (user may pick 50) | 0011 |
 | `match.strong` | 80 | 0011 |
 | `llm.cap_user_day_usd` / `llm.cap_global_day_usd` / `llm.cap_tagging_day_usd` | 0.25 / 10 / 1 | 0011, 0017 |
+| `mail.monthly_cap` / `mail.sign_in_reserve` | 2700 / 270 (sends a UTC month, and the share kept for sign-in mail and the live check) | 0033 |
 | `browser.provider` | `browser_use` | 0003 |
 | `browser.concurrency` | 10 | 0003 |
 | `browser.max_concurrent_sessions` | 3 | — |

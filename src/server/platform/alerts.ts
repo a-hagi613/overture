@@ -11,6 +11,7 @@ import { publishEvent } from "./sse/stream.ts";
 export const ALERT_KINDS = [
   "browser.proxy_trend",
   "dispatch.kill_switch",
+  "mail.cap",
   "llm.cap",
   "live.check.failure",
   "ats.success",

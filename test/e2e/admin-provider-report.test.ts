@@ -21,6 +21,13 @@ const overviewSchema = z.object({
     proxyMbPerCompleted: z.number().nullable(),
     proxyTrend: z.boolean(),
   }),
+  mail: z.object({
+    total: z.number(),
+    cap: z.number(),
+    reserve: z.number(),
+    noticeLimit: z.number(),
+    refusedAt: z.number().nullable(),
+  }),
 });
 
 const reportSchema = z.object({
@@ -353,6 +360,10 @@ test("the admin Overview and provider report show proxy MB and cost per complete
 
   await openAdminAsOwner(page, captureAppUrl, accessServer.issueToken);
 
+  await owner.post("/__test__/mail/usage", {
+    data: { auth: 60, notice: 2070, system: 30 },
+  });
+
   const overview = overviewSchema.parse(
     await (await page.request.get(`${captureAppUrl}/admin/api/overview`)).json(),
   );
@@ -362,6 +373,12 @@ test("the admin Overview and provider report show proxy MB and cost per complete
   expect(overview.cost.costMicrosPerCompleted).toBe(20_000);
   expect(overview.cost.costGateMet).toBe(true);
   expect(overview.cost.proxyTrend).toBe(true);
+  expect(overview.mail).toMatchObject({
+    cap: 2700,
+    noticeLimit: 2430,
+    reserve: 270,
+    total: 2160,
+  });
 
   const report = reportSchema.parse(
     await (await page.request.get(`${captureAppUrl}/admin/api/provider-report`)).json(),
@@ -379,6 +396,10 @@ test("the admin Overview and provider report show proxy MB and cost per complete
   await expect(page.getByRole("heading", { name: "Cost and proxy" })).toBeVisible();
   await expect(page.getByText("Proxy MB per completed Application")).toBeVisible();
   await expect(page.getByText("Proxy use per completed Application is trending up.")).toBeVisible();
+  await expect(page.getByText("Email sending")).toBeVisible();
+  await expect(page.getByText("Sent this month")).toBeVisible();
+  await expect(page.getByText("2,160")).toBeVisible();
+  await expect(page.getByText("Sends stop at 2,700; the last 270 are kept")).toBeVisible();
 });
 
 test("an attempt's live view and replay open from the admin", async ({
