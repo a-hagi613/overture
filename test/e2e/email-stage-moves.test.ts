@@ -37,7 +37,7 @@ interface MovesHarness {
 const test = appTest.extend<{ moves: MovesHarness }>({
   moves: [
     async ({ identityServer }, provide) => {
-      const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 1024 });
+      const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 
       const privateKeyPem = privateKey.export({ format: "pem", type: "pkcs8" });
       const publicDer = publicKey.export({ format: "der", type: "spki" });
