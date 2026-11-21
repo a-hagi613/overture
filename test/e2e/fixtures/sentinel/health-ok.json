@@ -1,0 +1,10 @@
+{
+  "status": "ok",
+  "database": "ok",
+  "backups": {
+    "replication": "ok",
+    "lagSeconds": 0,
+    "replicaTxid": "000000000000d9b7",
+    "readAgeSeconds": 11
+  }
+}

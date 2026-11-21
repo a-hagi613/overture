@@ -21,6 +21,7 @@ import { enqueueJob } from "../platform/jobs/queue.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { classifyWithLlm } from "./classify-llm.ts";
 import type { MailClassification } from "./codes.ts";
+import type { DegradedFlagReader } from "../platform/degraded.ts";
 
 export const MAIL_CLASSIFY_JOB_KIND = "mail.classify";
 
@@ -79,8 +80,9 @@ export function createMailMoves(deps: {
   clock: Clock;
   personal: PersonalCrypto;
   llm: LlmPort;
+  degraded?: DegradedFlagReader;
 }) {
-  const { db, clock, personal, llm } = deps;
+  const { db, clock, personal, llm, degraded } = deps;
 
   async function contentsOf(message: typeof messages.$inferSelect) {
     return {
@@ -355,7 +357,7 @@ export function createMailMoves(deps: {
     const contents = await contentsOf(message);
 
     const classification = await classifyWithLlm(
-      { clock, db, llm },
+      { clock, db, degraded, llm },
       {
         messageId: message.id,
         subject: contents.subject,
