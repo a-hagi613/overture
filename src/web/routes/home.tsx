@@ -115,6 +115,8 @@ export function HomePage() {
       return;
     }
 
+    updateSheet({ error: null });
+
     paste.mutate(
       { code, waitId: sheet.wait.id },
       {
@@ -128,7 +130,7 @@ export function HomePage() {
                 : { ...current, error: copy.codePaste.errors.expired, mode: "expired" },
             );
           } else if (outcome === "resolved") {
-            setSheet((current) => (current === null ? current : { ...current, mode: "accepted" }));
+            updateSheet({ error: null, mode: "accepted" });
           } else {
             setSheet((current) =>
               current === null
@@ -144,7 +146,7 @@ export function HomePage() {
           }
         },
         onSuccess: () => {
-          setSheet((current) => (current === null ? current : { ...current, mode: "accepted" }));
+          updateSheet({ error: null, mode: "accepted" });
         },
       },
     );
@@ -249,7 +251,7 @@ export function HomePage() {
             setSheet(null);
           }}
           onNoCode={() => {
-            updateSheet({ mode: "no_code" });
+            updateSheet({ error: null, mode: "no_code" });
           }}
           onSubmit={submitCode}
           pending={paste.isPending}

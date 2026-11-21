@@ -427,9 +427,15 @@ for (const width of [390, 1280] as const) {
       await expect(sheet.getByText("Checking with the employer", { exact: true })).toBeVisible();
       await expect(sheet.getByRole("link", { name: "Open Board" })).toBeVisible();
 
+      await expect(sheet.getByRole("alert")).toHaveCount(0);
+
       if (width === 390) {
         await expectTouchTargets(page, "code-paste-sheet");
       }
+
+      await sheet.getByRole("link", { name: "Back to Home" }).click();
+
+      await expect(sheet).toHaveCount(0);
 
       await context.close();
     });

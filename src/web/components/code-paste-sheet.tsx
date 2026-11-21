@@ -116,8 +116,13 @@ export function CodePasteSheet({
   const entry = stateCopy(shown, wait.company);
   const finished = shown === "accepted";
   const typing = shown === "waiting" || shown === "no_code";
+  const shownError = finished ? null : error;
 
   function submit() {
+    if (pending) {
+      return;
+    }
+
     if (/^[A-Za-z0-9]{8}$/u.test(code)) {
       setInvalid(false);
       onSubmit(code);
@@ -181,7 +186,7 @@ export function CodePasteSheet({
               {copy.codePaste.label}
             </label>
             <input
-              aria-describedby={invalid || error !== null ? "code-paste-error" : undefined}
+              aria-describedby={invalid || shownError !== null ? "code-paste-error" : undefined}
               autoComplete="one-time-code"
               className={`mono mt-2 h-[50px] w-full rounded-md border border-input px-[13px] text-[15px] tracking-[0.3em] uppercase placeholder:normal-case placeholder:tracking-[0.28em] placeholder:text-muted-foreground focus:border-foreground ${
                 closed ? "bg-muted text-muted-foreground" : "bg-card"
@@ -220,13 +225,13 @@ export function CodePasteSheet({
           </div>
         )}
 
-        {invalid || error !== null ? (
+        {invalid || shownError !== null ? (
           <p
             className="mt-2 text-[12.5px] leading-[1.5] text-need"
             id="code-paste-error"
             role="alert"
           >
-            {invalid ? copy.codePaste.invalid : error}
+            {invalid ? copy.codePaste.invalid : shownError}
           </p>
         ) : null}
 
@@ -251,7 +256,7 @@ export function CodePasteSheet({
             </>
           ) : (
             <>
-              <Link className={PRIMARY} to="/">
+              <Link className={PRIMARY} onClick={onClose} to="/">
                 {copy.codePaste.expired.primary}
               </Link>
               <Link className={SECONDARY} to="/board">
