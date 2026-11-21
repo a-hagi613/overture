@@ -4,6 +4,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
 
+import { logInfo } from "../platform/log.ts";
 import { LAB_PAGE_KEYS } from "./pages.ts";
 import { runLab } from "./runner.ts";
 
@@ -37,8 +38,23 @@ export function parseLabRunPayload(payload: string) {
 export async function runLabJob(deps: LabJobDeps, payload: string) {
   const parsed = parseLabRunPayload(payload);
 
-  return await runLab(
+  const summary = await runLab(
     { baseUrl: deps.baseUrl, clock: deps.clock, db: deps.db, providers: deps.providers },
     parsed,
   );
+
+  const completed = summary.sessions.filter((session) => session.outcome === "completed").length;
+
+  const blocked = summary.sessions.filter(
+    (session) => session.outcome === "challenge_blocked",
+  ).length;
+
+  const failed = summary.sessions.length - completed - blocked;
+
+  logInfo(
+    "lab.run",
+    `run ${summary.runId}: ${String(summary.sessions.length)} sessions, ${String(completed)} completed, ${String(blocked)} blocked, ${String(failed)} failed`,
+  );
+
+  return summary;
 }
