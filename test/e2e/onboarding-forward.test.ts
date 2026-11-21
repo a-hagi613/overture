@@ -155,7 +155,7 @@ for (const width of [390, 1280]) {
       await page.evaluate((value) => {
         globalThis.localStorage.setItem("overture.theme", value);
       }, theme);
-      await page.reload();
+      await page.goto(`${onboardingServer.url}/onboarding/forward`);
       await expect(
         page.getByRole("heading", { level: 2, name: /Forward your job mail/u }),
       ).toBeVisible();
