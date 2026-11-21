@@ -34,23 +34,11 @@ export function isBoardMoveStage(value: string): value is BoardMoveStage {
 }
 
 export function canMoveApplicationToStage(status: string, stage: BoardStage) {
-  if (stage === "ready") {
-    return false;
-  }
-
   if (status === "preparing" || status === "needs_review") {
     return stage === "applied" || stage === "queued";
   }
 
-  if (status === "ready" || status === "approved") {
-    return false;
-  }
-
-  if (status === "failed" || status === "skipped" || status === "withdrawn") {
-    return false;
-  }
-
-  return isBoardMoveStage(stage);
+  return status === "sent" && isBoardMoveStage(stage);
 }
 
 export function canWithdrawApplication(status: string) {

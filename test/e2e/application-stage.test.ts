@@ -86,6 +86,45 @@ test("the Ready Stage holds ready, approved, sending and confirming, and a failu
   await owner.dispose();
 });
 
+async function expectInFlightRefusal(
+  owner: APIRequestContext,
+  input: { boardId: string; companyId: string; status: "confirming" | "sending"; userId: string },
+) {
+  const postingId = await seedPosting(owner, {
+    atsJobId: `inflight-${input.status}`,
+    boardId: input.boardId,
+    companyId: input.companyId,
+    url: `https://inflight.example/${input.status}`,
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: input.status,
+    userId: input.userId,
+  });
+
+  expect((await moveStage(owner, applicationId, "screening")).status()).toBe(409);
+  expect((await withdraw(owner, applicationId)).status()).toBe(409);
+
+  const detail = await applicationOf(owner, applicationId);
+
+  expect(detail.status).toBe(input.status);
+  expect(detail.stage).toBe("ready");
+}
+
+test("an in-flight sending or confirming Application cannot be dragged or withdrawn", async ({
+  isolatedAppServer: { url },
+}) => {
+  const { owner, userId } = await ownerContextFor(url);
+  const companyId = await seedCompany(owner, "In Flight Co", "inflight.example");
+  const boardId = await seedBoard(owner, companyId, "greenhouse", "inflight-co");
+
+  await expectInFlightRefusal(owner, { boardId, companyId, status: "sending", userId });
+  await expectInFlightRefusal(owner, { boardId, companyId, status: "confirming", userId });
+
+  await owner.dispose();
+});
+
 test("a sent Application moves within Applied…Closed but never back to Queued, and cannot be withdrawn", async ({
   isolatedAppServer: { url },
 }) => {
