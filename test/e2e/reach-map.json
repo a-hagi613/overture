@@ -164,6 +164,7 @@
         "/__test__/catalog/postings",
         "/__test__/catalog/postings/close-all",
         "/__test__/clock",
+        "/__test__/jobs",
         "/__test__/jobs/enqueue",
         "/__test__/jobs/run-due",
         "/__test__/ledger/grant",
