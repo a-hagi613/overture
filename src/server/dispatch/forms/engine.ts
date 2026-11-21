@@ -300,11 +300,11 @@ function optionField(fieldType: QuestionFieldType | null) {
   );
 }
 
-async function readLiveForm(page: Page) {
-  return page.evaluate(() => {
-    const form = document.querySelector("form#application-form");
+async function readLiveForm(page: Page, formSelector: string) {
+  return page.evaluate((selector: string) => {
+    const roots = [...document.querySelectorAll(selector)];
 
-    if (form === null) {
+    if (roots.length === 0) {
       return null;
     }
 
@@ -325,7 +325,7 @@ async function readLiveForm(page: Page) {
           return null;
         }
 
-        if (element.getAttribute("role") === "combobox") {
+        if (element.getAttribute("role") === "combobox" && element.hasAttribute("aria-controls")) {
           return "select";
         }
 
@@ -392,7 +392,15 @@ async function readLiveForm(page: Page) {
           return id;
         }
 
-        return element.getAttribute("name") ?? "";
+        const name = element.getAttribute("name");
+
+        if (name !== null && name !== "") {
+          return name;
+        }
+
+        const entry = element.closest("[class*='fieldEntry']");
+
+        return entry?.querySelector("label[for]")?.getAttribute("for") ?? "";
       },
       labelFor: (element: Element) => {
         const group = element.closest("[role='group'][aria-labelledby]");
@@ -433,7 +441,7 @@ async function readLiveForm(page: Page) {
         const id = element.getAttribute("id");
 
         if (id !== null && id !== "") {
-          for (const label of form.querySelectorAll("label[for]")) {
+          for (const label of document.querySelectorAll("label[for]")) {
             if (label.getAttribute("for") === id) {
               return dom.textOf(label);
             }
@@ -455,7 +463,7 @@ async function readLiveForm(page: Page) {
         const id = element.getAttribute("id");
 
         if (id !== null && id !== "") {
-          for (const label of form.querySelectorAll("label[for]")) {
+          for (const label of document.querySelectorAll("label[for]")) {
             if (label.getAttribute("for") === id) {
               return dom.textOf(label);
             }
@@ -479,78 +487,57 @@ async function readLiveForm(page: Page) {
     const controls: LiveControl[] = [];
     const seenRadios = new Set<string>();
 
-    for (const element of form.querySelectorAll("input, select, textarea")) {
-      if (element instanceof HTMLInputElement && element.type === "hidden") {
-        continue;
-      }
-
-      const fieldType = dom.fieldTypeOf(element);
-
-      if (fieldType === null) {
-        continue;
-      }
-
-      if (fieldType === "radio" && element instanceof HTMLInputElement) {
-        if (seenRadios.has(element.name)) {
+    for (const root of roots) {
+      for (const element of root.querySelectorAll("input, select, textarea")) {
+        if (element instanceof HTMLInputElement && element.type === "hidden") {
           continue;
         }
 
-        seenRadios.add(element.name);
+        const fieldType = dom.fieldTypeOf(element);
 
-        const group = [...form.querySelectorAll("input[type='radio']")].filter(
-          (candidate): candidate is HTMLInputElement =>
-            candidate instanceof HTMLInputElement && candidate.name === element.name,
-        );
+        if (fieldType === null) {
+          continue;
+        }
 
-        const checked = group.find((candidate) => candidate.checked) ?? null;
+        if (fieldType === "radio" && element instanceof HTMLInputElement) {
+          if (seenRadios.has(element.name)) {
+            continue;
+          }
 
-        controls.push({
-          checked: checked !== null,
-          disabled: group.every((candidate) => dom.disabledOf(candidate)),
-          fieldType,
-          file: null,
-          hidden: group.every((candidate) => dom.hiddenOf(candidate)),
-          key: element.name,
-          label: dom.labelFor(element),
-          name: element.name,
-          options: group.map((candidate) => ({
-            label: dom.optionLabel(candidate),
-            value: candidate.value,
-          })),
-          required: group.some((candidate) => dom.requiredOf(candidate)),
-          value: checked === null ? null : dom.optionLabel(checked),
-        });
+          seenRadios.add(element.name);
 
-        continue;
-      }
+          const group = [...document.querySelectorAll("input[type='radio']")].filter(
+            (candidate): candidate is HTMLInputElement =>
+              candidate instanceof HTMLInputElement && candidate.name === element.name,
+          );
 
-      if (element instanceof HTMLSelectElement) {
-        const selected = [...element.selectedOptions];
+          const checked = group.find((candidate) => candidate.checked) ?? null;
 
-        controls.push({
-          checked: null,
-          disabled: dom.disabledOf(element),
-          fieldType,
-          file: null,
-          hidden: dom.hiddenOf(element),
-          key: dom.keyOf(element),
-          label: dom.labelFor(element),
-          name: dom.nameOf(element),
-          options: [...element.options].map((option) => ({
-            label: dom.textOf(option),
-            value: option.value,
-          })),
-          required: dom.requiredOf(element),
-          value: selected.map((option) => dom.textOf(option)).join(", "),
-        });
-
-        continue;
-      }
-
-      if (element instanceof HTMLInputElement) {
-        if (fieldType === "checkbox") {
           controls.push({
-            checked: element.checked,
+            checked: checked !== null,
+            disabled: group.every((candidate) => dom.disabledOf(candidate)),
+            fieldType,
+            file: null,
+            hidden: group.every((candidate) => dom.hiddenOf(candidate)),
+            key: element.name,
+            label: dom.labelFor(element),
+            name: element.name,
+            options: group.map((candidate) => ({
+              label: dom.optionLabel(candidate),
+              value: candidate.value,
+            })),
+            required: group.some((candidate) => dom.requiredOf(candidate)),
+            value: checked === null ? null : dom.optionLabel(checked),
+          });
+
+          continue;
+        }
+
+        if (element instanceof HTMLSelectElement) {
+          const selected = [...element.selectedOptions];
+
+          controls.push({
+            checked: null,
             disabled: dom.disabledOf(element),
             fieldType,
             file: null,
@@ -558,64 +545,107 @@ async function readLiveForm(page: Page) {
             key: dom.keyOf(element),
             label: dom.labelFor(element),
             name: dom.nameOf(element),
-            options: [],
+            options: [...element.options].map((option) => ({
+              label: dom.textOf(option),
+              value: option.value,
+            })),
             required: dom.requiredOf(element),
-            value: element.checked ? "true" : "false",
+            value: selected.map((option) => dom.textOf(option)).join(", "),
           });
 
           continue;
         }
 
-        if (fieldType === "file") {
-          controls.push({
-            checked: null,
-            disabled: dom.disabledOf(element),
-            fieldType,
-            file: dom.fileOf(element),
-            hidden: dom.hiddenOf(element),
-            key: dom.keyOf(element),
-            label: dom.labelFor(element),
-            name: dom.nameOf(element),
-            options: [],
-            required: dom.requiredOf(element),
-            value: null,
-          });
+        if (element instanceof HTMLInputElement) {
+          if (fieldType === "checkbox") {
+            controls.push({
+              checked: element.checked,
+              disabled: dom.disabledOf(element),
+              fieldType,
+              file: null,
+              hidden: dom.hiddenOf(element),
+              key: dom.keyOf(element),
+              label: dom.labelFor(element),
+              name: dom.nameOf(element),
+              options: [],
+              required: dom.requiredOf(element),
+              value: element.checked ? "true" : "false",
+            });
 
-          continue;
-        }
+            continue;
+          }
 
-        if (element.getAttribute("role") === "combobox") {
-          const listboxId = element.getAttribute("aria-controls") ?? "";
-          const listbox = listboxId === "" ? null : dom.byId(listboxId);
+          if (fieldType === "file") {
+            controls.push({
+              checked: null,
+              disabled: dom.disabledOf(element),
+              fieldType,
+              file: dom.fileOf(element),
+              hidden: dom.hiddenOf(element),
+              key: dom.keyOf(element),
+              label: dom.labelFor(element),
+              name: dom.nameOf(element),
+              options: [],
+              required: dom.requiredOf(element),
+              value: null,
+            });
 
-          const options =
-            listbox === null
-              ? []
-              : [...listbox.querySelectorAll("[role='option']")].map((option) => ({
-                  label: dom.textOf(option),
-                  value:
-                    (option instanceof HTMLElement ? option.dataset.value : null) ??
-                    option.getAttribute("value") ??
-                    dom.textOf(option),
-                }));
+            continue;
+          }
 
-          const container = element.closest(".select__container");
-          const shown = dom.textOf(container?.querySelector(".select__single-value") ?? null);
+          if (
+            element.getAttribute("role") === "combobox" &&
+            element.hasAttribute("aria-controls")
+          ) {
+            const listboxId = element.getAttribute("aria-controls") ?? "";
+            const listbox = listboxId === "" ? null : dom.byId(listboxId);
 
-          let selected = shown;
+            const options =
+              listbox === null
+                ? []
+                : [...listbox.querySelectorAll("[role='option']")].map((option) => ({
+                    label: dom.textOf(option),
+                    value:
+                      (option instanceof HTMLElement ? option.dataset.value : null) ??
+                      option.getAttribute("value") ??
+                      dom.textOf(option),
+                  }));
 
-          if (selected === "") {
-            const hidden = [...form.querySelectorAll("input[type='hidden']")].find(
-              (candidate) => candidate.getAttribute("name") === element.id,
-            );
+            const container = element.closest(".select__container");
+            const shown = dom.textOf(container?.querySelector(".select__single-value") ?? null);
 
-            const raw = hidden instanceof HTMLInputElement ? hidden.value : "";
+            let selected = shown;
 
-            const matched = options.find(
-              (option) => option.value === raw || option.label.toLowerCase() === raw.toLowerCase(),
-            );
+            if (selected === "") {
+              const hidden = [...document.querySelectorAll("input[type='hidden']")].find(
+                (candidate) => candidate.getAttribute("name") === element.id,
+              );
 
-            selected = matched?.label ?? raw;
+              const raw = hidden instanceof HTMLInputElement ? hidden.value : "";
+
+              const matched = options.find(
+                (option) =>
+                  option.value === raw || option.label.toLowerCase() === raw.toLowerCase(),
+              );
+
+              selected = matched?.label ?? raw;
+            }
+
+            controls.push({
+              checked: null,
+              disabled: dom.disabledOf(element),
+              fieldType,
+              file: null,
+              hidden: dom.hiddenOf(element),
+              key: dom.keyOf(element),
+              label: dom.labelFor(element),
+              name: dom.nameOf(element),
+              options,
+              required: dom.requiredOf(element),
+              value: selected,
+            });
+
+            continue;
           }
 
           controls.push({
@@ -627,57 +657,42 @@ async function readLiveForm(page: Page) {
             key: dom.keyOf(element),
             label: dom.labelFor(element),
             name: dom.nameOf(element),
-            options,
+            options: [],
             required: dom.requiredOf(element),
-            value: selected,
+            value: element.value,
           });
 
           continue;
         }
 
-        controls.push({
-          checked: null,
-          disabled: dom.disabledOf(element),
-          fieldType,
-          file: null,
-          hidden: dom.hiddenOf(element),
-          key: dom.keyOf(element),
-          label: dom.labelFor(element),
-          name: dom.nameOf(element),
-          options: [],
-          required: dom.requiredOf(element),
-          value: element.value,
-        });
-
-        continue;
-      }
-
-      if (element instanceof HTMLTextAreaElement) {
-        controls.push({
-          checked: null,
-          disabled: dom.disabledOf(element),
-          fieldType,
-          file: null,
-          hidden: dom.hiddenOf(element),
-          key: dom.keyOf(element),
-          label: dom.labelFor(element),
-          name: dom.nameOf(element),
-          options: [],
-          required: dom.requiredOf(element),
-          value: element.value,
-        });
+        if (element instanceof HTMLTextAreaElement) {
+          controls.push({
+            checked: null,
+            disabled: dom.disabledOf(element),
+            fieldType,
+            file: null,
+            hidden: dom.hiddenOf(element),
+            key: dom.keyOf(element),
+            label: dom.labelFor(element),
+            name: dom.nameOf(element),
+            options: [],
+            required: dom.requiredOf(element),
+            value: element.value,
+          });
+        }
       }
     }
 
     return { controls };
-  });
+  }, formSelector);
 }
 
 const checkLiveForm: (
   page: Page,
   expectations: readonly LiveFormExpectation[],
-) => Promise<LiveFormCheck> = async (page, expectations) => {
-  const live = await readLiveForm(page);
+  formSelector: string,
+) => Promise<LiveFormCheck> = async (page, expectations, formSelector) => {
+  const live = await readLiveForm(page, formSelector);
 
   if (live === null) {
     return {
@@ -907,13 +922,19 @@ const decideLiveFormVerdict: (check: LiveFormCheck) => LiveFormVerdict = (check)
  *
  * @param page The live application form.
  * @param expectations Every planned answer, option, file and consent.
+ * @param formSelector The live form roots to read; defaults to Greenhouse's form.
  * @returns The preflight outcome for this attempt.
  */
 export const preflightForm: (
   page: Page,
   expectations: readonly LiveFormExpectation[],
-) => Promise<LiveFormVerdict> = async (page, expectations) => {
-  const check = await checkLiveForm(page, expectations);
+  formSelector?: string,
+) => Promise<LiveFormVerdict> = async (
+  page,
+  expectations,
+  formSelector = "form#application-form",
+) => {
+  const check = await checkLiveForm(page, expectations, formSelector);
 
   return decideLiveFormVerdict(check);
 };

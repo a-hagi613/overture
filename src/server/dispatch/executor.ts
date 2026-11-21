@@ -7,6 +7,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ResumeService } from "../profile/resume.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
+import type { FormQuestion } from "../pipeline/send-plan.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { BrowserProviderRegistry, BrowserUsage, RemoteBrowser } from "./browser/provider.ts";
 import type { createMailboxService } from "../inbox/mailboxes.ts";
@@ -16,7 +17,12 @@ import { applications, attempts, postings, profiles } from "../platform/db/schem
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { releaseForApplication, reserveForApplication } from "../billing/ledger.ts";
 import { getSetting, isKillSwitchEnabled } from "../platform/settings/index.ts";
+import { runAshbyAttempt } from "./ats/ashby.ts";
+import type { AshbyRun } from "./ats/ashby.ts";
 import { runGreenhouseAttempt } from "./ats/greenhouse.ts";
+import type { GreenhouseRun } from "./ats/greenhouse.ts";
+import { runLeverAttempt } from "./ats/lever.ts";
+import type { LeverRun } from "./ats/lever.ts";
 import {
   CODE_WAIT_TIMEOUT_MS,
   createCodeWait,
@@ -55,6 +61,8 @@ export interface DispatcherDeps {
 
 type AttemptRow = typeof attempts.$inferSelect;
 
+type AttemptRun = GreenhouseRun | LeverRun | AshbyRun;
+
 const zeroUsage: BrowserUsage = { browserMs: 0, costMicros: 0, proxyBytes: 0 };
 
 async function withDeadline<T extends { outcome: string }>(run: Promise<T>, timeoutMs: number) {
@@ -82,6 +90,7 @@ const ATTEMPT_OUTCOMES = [
   ["fill_failed", "form_changed"],
   ["form_changed", "form_changed"],
   ["form_missing", "form_changed"],
+  ["flagged_spam", "blocked"],
   ["needs_review", "needs_review"],
   ["sent", "sent"],
   ["timeout", "timeout"],
@@ -478,77 +487,109 @@ export function createDispatcher(deps: DispatcherDeps) {
         await route.fallback();
       });
 
-      const runPromise = runGreenhouseAttempt(
-        page,
-        {
-          fields: plan.fields,
-          identity: {
-            boardToken: plan.boardToken,
-            companyName: plan.companyName,
-            jobId: plan.atsJobId,
-            url: plan.postingUrl,
-          },
-          resume: {
-            bytes: resumeFile.bytes,
-            fieldName: null,
-            filename: resumeFile.filename,
-          },
+      let sendPlan = plan;
+
+      const attemptHooks = {
+        onCodeTyped: () => {
+          updateAttempt(attemptId, { codeUsed: true });
         },
-        {
-          onCodeTyped: () => {
-            updateAttempt(attemptId, { codeUsed: true });
-          },
-          onResponse: (status) => {
-            if (status !== null && status >= 400 && status < 500) {
-              updateAttempt(attemptId, { submitClickedAt: null, submitResponseStatus: status });
-            } else {
-              updateAttempt(attemptId, { submitResponseStatus: status });
-            }
-          },
-          onWillSubmit: () => {
-            updateAttempt(attemptId, { submitClickedAt: clock.now() });
-          },
-          requestCode: async () => {
-            const mailbox = await mailboxes.ensureFor(claimed.userId);
+        onResponse: (status: number | null) => {
+          if (status !== null && status >= 400 && status < 500) {
+            updateAttempt(attemptId, { submitClickedAt: null, submitResponseStatus: status });
+          } else {
+            updateAttempt(attemptId, { submitResponseStatus: status });
+          }
+        },
+        onWillSubmit: () => {
+          updateAttempt(attemptId, { submitClickedAt: clock.now() });
+        },
+        requestCode: async () => {
+          const mailbox = await mailboxes.ensureFor(claimed.userId);
 
-            const wait = createCodeWait(db, clock, {
-              attemptId,
-              mailboxId: mailbox.id,
-              userId: claimed.userId,
-            });
+          const wait = createCodeWait(db, clock, {
+            attemptId,
+            mailboxId: mailbox.id,
+            userId: claimed.userId,
+          });
 
-            if (wait === undefined) {
-              return null;
-            }
+          if (wait === undefined) {
+            return null;
+          }
 
-            const resolved = await waitForCode(
-              { db, clock, personal },
-              {
-                onAskToPaste: () => {
-                  createNotification(db, clock, {
-                    body: copy.notifications.codeWait.body(CODE_WAIT_TIMEOUT_MS / 60_000),
-                    kind: copy.notifications.codeWait.kind,
-                    title: copy.notifications.codeWait.title(plan.companyName),
-                    url: copy.notifications.codeWait.url,
-                    userId: claimed.userId,
-                  });
-                },
-                waitId: wait.id,
+          const resolved = await waitForCode(
+            { db, clock, personal },
+            {
+              onAskToPaste: () => {
+                createNotification(db, clock, {
+                  body: copy.notifications.codeWait.body(CODE_WAIT_TIMEOUT_MS / 60_000),
+                  kind: copy.notifications.codeWait.kind,
+                  title: copy.notifications.codeWait.title(plan.companyName),
+                  url: copy.notifications.codeWait.url,
+                  userId: claimed.userId,
+                });
               },
-            );
+              waitId: wait.id,
+            },
+          );
 
-            if (resolved === null) {
-              return null;
-            }
+          if (resolved === null) {
+            return null;
+          }
 
-            if (resolved.messageId !== null) {
-              markCodeConsumed(db, clock, resolved.messageId);
-            }
+          if (resolved.messageId !== null) {
+            markCodeConsumed(db, clock, resolved.messageId);
+          }
 
-            return resolved.code;
-          },
+          return resolved.code;
         },
-      );
+      };
+
+      const formHooks = {
+        ...attemptHooks,
+        onFormQuestions: async (questions: readonly FormQuestion[]) => {
+          const recorded = await preparation.recordBrowserQuestions({
+            applicationId,
+            attemptId,
+            questions,
+          });
+
+          if (recorded.blocked > 0) {
+            return { kind: "needs_review" as const };
+          }
+
+          sendPlan = (await preparation.sendPlanFor(applicationId)) ?? plan;
+
+          return { fields: sendPlan.fields, kind: "continue" as const };
+        },
+      };
+
+      const planForRun = {
+        fields: plan.fields,
+        identity: {
+          ats: plan.ats,
+          boardToken: plan.boardToken,
+          companyName: plan.companyName,
+          jobId: plan.atsJobId,
+          url: plan.postingUrl,
+        },
+        resume: {
+          bytes: resumeFile.bytes,
+          fieldName: null,
+          filename: resumeFile.filename,
+        },
+      };
+
+      const runPromise: Promise<AttemptRun> = (async () => {
+        if (plan.ats === "greenhouse") {
+          return runGreenhouseAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "lever") {
+          return runLeverAttempt(page, planForRun, formHooks);
+        }
+
+        return runAshbyAttempt(page, planForRun, formHooks);
+      })();
 
       void Promise.allSettled([runPromise]);
 
@@ -572,7 +613,7 @@ export function createDispatcher(deps: DispatcherDeps) {
             confirmedBy: "page",
             costMicros: usage.costMicros,
             markAttemptSent: true,
-            plan,
+            plan: sendPlan,
           });
         }
       } else if (run.outcome === "identity_mismatch") {
@@ -602,6 +643,41 @@ export function createDispatcher(deps: DispatcherDeps) {
           endedAt: clock.now(),
           errorCode: reason,
           outcome: "identity_mismatch",
+        });
+      } else if (run.outcome === "flagged_spam") {
+        releaseAttempt(applicationId, claimed.userId, attemptId);
+
+        db.update(applications)
+          .set({
+            stage: null,
+            status: "failed",
+            statusReason: "ats_flagged",
+            updatedAt: clock.now(),
+          })
+          .where(eq(applications.id, applicationId))
+          .run();
+
+        recordApplicationEvent(db, clock, {
+          applicationId,
+          userId: claimed.userId,
+          kind: "status",
+          fromValue: "sending",
+          toValue: "failed",
+          source: "system",
+        });
+        recordApplicationEvent(db, clock, {
+          applicationId,
+          userId: claimed.userId,
+          kind: "stage",
+          fromValue: "queued",
+          toValue: null,
+          source: "system",
+        });
+
+        updateAttempt(attemptId, {
+          endedAt: clock.now(),
+          errorCode: "ats_flagged",
+          outcome: "blocked",
         });
       } else if (run.outcome === "needs_review") {
         releaseAttempt(applicationId, claimed.userId, attemptId);

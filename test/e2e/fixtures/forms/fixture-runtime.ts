@@ -237,6 +237,12 @@ const attachResumeEcho = (form: HTMLFormElement) => {
       return;
     }
 
+    const filename = form.querySelector<HTMLElement>(".filename");
+
+    if (filename !== null) {
+      filename.textContent = file.name;
+    }
+
     const body = new FormData();
 
     body.set("resume", file);
@@ -256,11 +262,13 @@ const fieldValues = (form: HTMLFormElement) => {
   for (const element of form.querySelectorAll<
     HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
   >("input, textarea, select")) {
-    if (element.id === "") {
+    const key = element.name === "" ? element.id : element.name;
+
+    if (key === "") {
       continue;
     }
 
-    values[element.id] =
+    values[key] =
       element instanceof HTMLInputElement && element.type === "file"
         ? (element.files?.[0]?.name ?? "")
         : element.value;
@@ -282,6 +290,14 @@ const attachSubmitBehaviour = (form: HTMLFormElement, meta: FixtureMeta) => {
     prepareNativeSubmit(form);
 
     return;
+  }
+
+  const button = form.querySelector<HTMLButtonElement>("#btn-submit");
+
+  if (button !== null) {
+    button.addEventListener("click", () => {
+      form.requestSubmit();
+    });
   }
 
   form.addEventListener("submit", (event) => {

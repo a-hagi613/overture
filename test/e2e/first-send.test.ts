@@ -771,7 +771,13 @@ test("a Greenhouse posting whose absolute_url is on the company site opens its e
     page,
     {
       fields: [],
-      identity: { boardToken: "stripe", companyName: "Stripe", jobId: "8172510", url },
+      identity: {
+        ats: "greenhouse",
+        boardToken: "stripe",
+        companyName: "Stripe",
+        jobId: "8172510",
+        url,
+      },
       resume: null,
     },
     {

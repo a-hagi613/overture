@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Pyka - Chief Of Staff</title>
+  </head>
+  <body class="application header-compact">
+    <div class="page application">
+      <div class="main-header page-full-width section-wrapper">
+        <div class="main-header-content page-centered narrow-section page-full-width">
+          <a href="#" class="main-header-logo"></a>
+        </div>
+      </div>
+    </div>
+    <div class="content-wrapper application-page">
+      <div class="content">
+        <div class="section-wrapper accent-section small-accent page-full-width">
+          <div class="section page-centered posting-header">
+            <h2>Chief Of Staff</h2>
+            <div class="posting-categories">
+              <div
+                href="#"
+                class="sort-by-time posting-category medium-category-label width-full capitalize-labels location"
+              >
+                Alameda HQ
+              </div>
+              <div
+                href="#"
+                class="sort-by-team posting-category medium-category-label capitalize-labels department"
+              >
+                Executive Management – Executive Management /
+              </div>
+              <div
+                href="#"
+                class="sort-by-commitment posting-category medium-category-label capitalize-labels commitment"
+              >
+                Full-Time /
+              </div>
+              <div
+                href="#"
+                class="sort-by-time posting-category medium-category-label capitalize-labels workplaceTypes"
+              >
+                On-site
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="section-wrapper page-full-width">
+          <form
+            id="application-form"
+            enctype="multipart/form-data"
+            method="POST"
+            action="/pyka/2c7db323-e4e8-4c07-8ec6-ad351b0f24eb/apply"
+          >
+            <div class="section page-centered application-form">
+              <h4>Submit your application</h4>
+              <ul>
+                <li class="application-question resume">
+                  <label
+                    ><div class="application-label">Resume/CV <span class="required">✱</span></div>
+                    <div class="application-field">
+                      <a href="#" class="postings-btn template-btn-utility visible-resume-upload"
+                        ><svg
+                          class="icon icon-paperclip"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 16 16"
+                        >
+                          <path
+                            id="Vector"
+                            d="M4 3.375C4 1.5125 5.5125 0 7.375 0C9.2375 0 10.75 1.5125 10.75 3.375V10.75C10.75 11.9937 9.74375 13 8.5 13C7.25625 13 6.25 11.9937 6.25 10.75V4.75C6.25 4.33437 6.58437 4 7 4C7.41563 4 7.75 4.33437 7.75 4.75V10.75C7.75 11.1656 8.08437 11.5 8.5 11.5C8.91563 11.5 9.25 11.1656 9.25 10.75V3.375C9.25 2.34063 8.40937 1.5 7.375 1.5C6.34063 1.5 5.5 2.34063 5.5 3.375V11.5C5.5 13.1562 6.84375 14.5 8.5 14.5C10.1562 14.5 11.5 13.1562 11.5 11.5V4.75C11.5 4.33437 11.8344 4 12.25 4C12.6656 4 13 4.33437 13 4.75V11.5C13 13.9844 10.9844 16 8.5 16C6.01562 16 4 13.9844 4 11.5V3.375Z"
+                          ></path></svg
+                        ><span class="filename"></span
+                        ><span class="default-label">ATTACH RESUME/CV</span
+                        ><input
+                          class="application-file-input invisible-resume-upload"
+                          id="resume-upload-input"
+                          name="resume"
+                          tabindex="-1"
+                          type="file" /></a
+                      ><span class="resume-upload-failure"
+                        ><div class="resume-upload-label">Couldn't auto-read resume.</div></span
+                      ><span class="resume-upload-working"
+                        ><div class="loading-indicator"></div>
+                        <div class="resume-upload-label">Analyzing resume...</div></span
+                      ><span class="resume-upload-success"
+                        ><div class="loading-indicator completed">
+                          <svg class="icon icon-check" width="16" height="16" viewBox="0 0 16 16">
+                            <path
+                              d="M15.6652 3.32222C16.1116 3.75184 16.1116 4.44954 15.6652 4.87916L6.52338 13.6778C6.077 14.1074 5.35208 14.1074 4.9057 13.6778L0.334784 9.27847C-0.111595 8.84885 -0.111595 8.15115 0.334784 7.72153C0.781163 7.29191 1.50608 7.29191 1.95246 7.72153L5.71633 11.3407L14.0511 3.32222C14.4975 2.89259 15.2224 2.89259 15.6688 3.32222H15.6652Z"
+                            ></path>
+                          </svg>
+                        </div>
+                        <div class="resume-upload-label">Success!</div></span
+                      >
+                    </div></label
+                  ><span class="resume-upload-oversize"
+                    ><p class="error-message">
+                      File exceeds the maximum upload size of <b>100MB</b>. Please try a smaller
+                      size.
+                    </p></span
+                  >
+                </li>
+                <li class="application-question">
+                  <label
+                    ><div class="application-label">Full name<span class="required">✱</span></div>
+                    <div class="application-field">
+                      <input type="text" name="name" required="" value="" /></div
+                  ></label>
+                </li>
+                <li class="application-question">
+                  <div class="application-label multiple-select">Pronouns</div>
+                  <div class="application-field">
+                    <ul id="candidatePronounsCheckboxes">
+                      <div class="column-wrapper">
+                        <div class="table-row">
+                          <li class="column">
+                            <label
+                              ><input
+                                type="checkbox"
+                                name="pronouns"
+                                value="He/him"
+                                class="standardPronounsOption"
+                              /><span class="application-answer-alternative">He/him</span></label
+                            >
+                          </li>
+                          <li class="column">
+                            <label
+                              ><input
+                                type="checkbox"
+                                name="pronouns"
+                                value="She/her"
+                                class="standardPronounsOption"
+                              /><span class="application-answer-alternative">She/her</span></label
+                            >
+                          </li>
+                          <li class="column">
+                            <label
+                              ><input
+                                type="checkbox"
+                                name="pronouns"
+                                value="They/them"
+                                class="standardPronounsOption"
+                              /><span class="application-answer-alternative">They/them</span></label
+                            >
+                          </li>
+                        </div>
+                        <div class="table-row">
+                          <li class="column">
+                            <label
+                              ><input
+                                type="checkbox"
+                                name="pronouns"
+                                value="Xe/xem"
+                                class="standardPronounsOption"
+                              /><span class="application-answer-alternative">Xe/xem</span></label
+                            >
+                          </li>
+                          <li class="column">
+                            <label
+                              ><input
+                                type="checkbox"
+                                name="pronouns"
+                                value="Ze/hir"
+                                class="standardPronounsOption"
+                              /><span class="application-answer-alternative">Ze/hir</span></label
+                            >
+                          </li>
+                          <li class="column">
+                            <label
+                              ><input
+                                type="checkbox"
+                                name="pronouns"
+                                value="Ey/em"
+                                class="standardPronounsOption"
+                              /><span class="application-answer-alternative">Ey/em</span></label
+                            >
+                          </li>
+                        </div>
+                        <div class="table-row">
+                          <li class="column">
+                            <label
+                              ><input
+                                type="checkbox"
+                                name="pronouns"
+                                value="Hir/hir"
+                                class="standardPronounsOption"
+                              /><span class="application-answer-alternative">Hir/hir</span></label
+                            >
+                          </li>
+                          <li class="column">
+                            <label
+                              ><input
+                                type="checkbox"
+                                name="pronouns"
+                                value="Fae/faer"
+                                class="standardPronounsOption"
+                              /><span class="application-answer-alternative">Fae/faer</span></label
+                            >
+                          </li>
+                          <li class="column">
+                            <label
+                              ><input
+                                type="checkbox"
+                                name="pronouns"
+                                value="Hu/hu"
+                                class="standardPronounsOption"
+                              /><span class="application-answer-alternative">Hu/hu</span></label
+                            >
+                          </li>
+                        </div>
+                      </div>
+                      <hr />
+                      <li>
+                        <label
+                          ><input
+                            type="checkbox"
+                            name="pronouns"
+                            value="Use name only"
+                            id="useNameOnlyPronounsOption"
+                          /><span class="application-answer-alternative">Use name only</span></label
+                        >
+                      </li>
+                      <hr />
+                      <li>
+                        <label
+                          ><input type="checkbox" value="Custom" id="customPronounsOption" /><span
+                            class="application-answer-alternative"
+                            >Custom</span
+                          ></label
+                        ><input
+                          class="card-field-input"
+                          style="display: none"
+                          id="customPronounsTextField"
+                          type="text"
+                          maxlength="40"
+                          placeholder="Write here..."
+                          name="pronouns"
+                          value=""
+                        />
+                      </li>
+                      <p class="description">Please share your preferred pronouns (optional)</p>
+                    </ul>
+                  </div>
+                </li>
+                <li class="application-question">
+                  <label
+                    ><div class="application-label">Email<span class="required">✱</span></div>
+                    <div class="application-field">
+                      <input
+                        name="email"
+                        type="email"
+                        pattern="[a-zA-Z0-9.#$%&amp;'*+\/=?^_`{|}~][a-zA-Z0-9.!#$%&amp;'*+\/=?^_`{|}~-]*@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*"
+                        required=""
+                        value=""
+                      /></div
+                  ></label>
+                </li>
+                <li class="application-question">
+                  <label
+                    ><div class="application-label">Phone <span class="required">✱</span></div>
+                    <div class="application-field">
+                      <input type="text" name="phone" required="" value="" /></div
+                  ></label>
+                </li>
+                <li class="application-question">
+                  <label
+                    ><div class="application-label">
+                      Current location <span class="required">✱</span>
+                    </div>
+                    <div class="application-field">
+                      <input
+                        class="location-input"
+                        id="location-input"
+                        type="text"
+                        maxlength="100"
+                        name="location"
+                        required=""
+                        value=""
+                      />
+                      <div
+                        class="momentum-body flex flex-column items-start width-full height-auto bg-gray-800 text-gray-200 rounded dropdown-container"
+                      >
+                        <div class="dropdown-results width-full cursor-pointer"></div>
+                        <div
+                          class="dropdown-no-results width-full break-word py1 px2 pointer-events-none"
+                        >
+                          No location found. Try entering a different location
+                        </div>
+                        <div
+                          class="dropdown-loading-results width-full break-word height-full py1 px2 pointer-events-none"
+                        >
+                          <div class="theme-inverse items-center">
+                            <svg
+                              class="icon icon-loading-spinner animation-rotate-infinite animation-linear animation-duration-500ms"
+                              width="16px"
+                              height="16px"
+                              viewBox="0 0 16 16"
+                            >
+                              <path
+                                opacity="0.2"
+                                d="M16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8C0 3.58172 3.58172 0 8 0C12.4183 0 16 3.58172 16 8ZM3.99687 8C3.99687 10.2109 5.78914 12.0031 8 12.0031C10.2109 12.0031 12.0031 10.2109 12.0031 8C12.0031 5.78914 10.2109 3.99687 8 3.99687C5.78914 3.99687 3.99687 5.78914 3.99687 8Z"
+                              ></path>
+                              <path
+                                d="M8 0C9.58225 1.88681e-08 11.129 0.469192 12.4446 1.34824C13.7602 2.22729 14.7855 3.47672 15.391 4.93853C15.9965 6.40034 16.155 8.00887 15.8463 9.56072C15.5376 11.1126 14.7757 12.538 13.6569 13.6569L10.8306 10.8306C11.3905 10.2708 11.7717 9.5575 11.9262 8.78097C12.0807 8.00444 12.0014 7.19955 11.6984 6.46807C11.3954 5.73659 10.8823 5.11139 10.224 4.67152C9.56571 4.23165 8.79174 3.99687 8 3.99687L8 0Z"
+                              ></path></svg
+                            ><span>Loading</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div></label
+                  >
+                </li>
+                <li class="application-question">
+                  <label
+                    ><div class="application-label">Current company</div>
+                    <div class="application-field"><input type="text" name="org" value="" /></div
+                  ></label>
+                </li>
+              </ul>
+            </div>
+            <div class="section page-centered application-form">
+              <h4>Links</h4>
+              <ul>
+                <li class="application-question">
+                  <label
+                    ><div class="application-label">
+                      LinkedIn URL<span class="required">✱</span>
+                    </div>
+                    <div class="application-field">
+                      <input type="text" name="urls[LinkedIn]" required="" value="" /></div
+                  ></label>
+                </li>
+                <li class="application-question">
+                  <label
+                    ><div class="application-label">Twitter URL</div>
+                    <div class="application-field">
+                      <input type="text" name="urls[Twitter]" value="" /></div
+                  ></label>
+                </li>
+                <li class="application-question">
+                  <label
+                    ><div class="application-label">GitHub URL</div>
+                    <div class="application-field">
+                      <input type="text" name="urls[GitHub]" value="" /></div
+                  ></label>
+                </li>
+                <li class="application-question">
+                  <label
+                    ><div class="application-label">Portfolio URL</div>
+                    <div class="application-field">
+                      <input type="text" name="urls[Portfolio]" value="" /></div
+                  ></label>
+                </li>
+                <li class="application-question">
+                  <label
+                    ><div class="application-label">Other URL</div>
+                    <div class="application-field">
+                      <input type="text" name="urls[Other]" value="" /></div
+                  ></label>
+                </li>
+              </ul>
+            </div>
+            <div class="section page-centered application-form">
+              <h4>Logistical Questions</h4>
+              <ul>
+                <li class="application-question custom-question">
+                  <div>
+                    <div class="application-label full-width dropdown">
+                      <div class="text">
+                        Are you legally authorized to work in the United States?<span
+                          class="required"
+                          >✱</span
+                        >
+                      </div>
+                    </div>
+                    <div class="application-field full-width required-field">
+                      <div class="application-dropdown">
+                        <select
+                          name="cards[e71c4b64-41f5-44a8-9637-9dab78656f8f][field0]"
+                          required=""
+                        >
+                          <option value="">Select...</option>
+                          <option value="Yes">Yes</option>
+                          <option value="No">No</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+                <li class="application-question custom-question">
+                  <div>
+                    <div class="application-label full-width dropdown">
+                      <div class="text">
+                        How did you hear about this position?<span class="required">✱</span>
+                      </div>
+                    </div>
+                    <div class="application-field full-width required-field">
+                      <div class="application-dropdown">
+                        <select
+                          name="cards[e71c4b64-41f5-44a8-9637-9dab78656f8f][field1]"
+                          required=""
+                        >
+                          <option value="">Select...</option>
+                          <option value="LinkedIn">LinkedIn</option>
+                          <option value="Google (Job Search)">Google (Job Search)</option>
+                          <option value="ZipRecruiter">ZipRecruiter</option>
+                          <option value="Climatebase">Climatebase</option>
+                          <option value="Indeed">Indeed</option>
+                          <option value="Wellfound">Wellfound</option>
+                          <option value="College of Alameda">College of Alameda</option>
+                          <option value="Stanford Solar Car Project">
+                            Stanford Solar Car Project
+                          </option>
+                          <option value="MIT Design, Built, Fly">MIT Design, Built, Fly</option>
+                          <option value="SJSU Spartans">SJSU Spartans</option>
+                          <option value="Waterloo Aerial Robotics Group">
+                            Waterloo Aerial Robotics Group
+                          </option>
+                          <option value="WaterlooWorks Website">WaterlooWorks Website</option>
+                          <option value="Bay Area Women in Space and Aerospace">
+                            Bay Area Women in Space and Aerospace
+                          </option>
+                          <option
+                            value="Employee Referral (please specify employee's full name below)"
+                          >
+                            Employee Referral (please specify employee's full name below)
+                          </option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+                <li class="application-question custom-question">
+                  <div>
+                    <div class="application-label full-width text">
+                      <div class="text">
+                        If you chose "Other" or "Employee Referral" above, please specify:
+                      </div>
+                    </div>
+                    <div class="application-field full-width">
+                      <input
+                        class="card-field-input"
+                        type="text"
+                        placeholder="Type your response"
+                        value=""
+                        name="cards[e71c4b64-41f5-44a8-9637-9dab78656f8f][field2]"
+                      />
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+            <div class="section page-centered application-form">
+              <h4>Compensation expectations (salary)</h4>
+              <ul>
+                <li class="application-question custom-question">
+                  <div>
+                    <div class="application-label full-width text">
+                      <div class="text">
+                        What are your annual salary expectations for this role?<span
+                          class="required"
+                          >✱</span
+                        >
+                      </div>
+                    </div>
+                    <div class="application-field full-width required-field">
+                      <input
+                        required="required"
+                        class="card-field-input"
+                        type="text"
+                        placeholder="Type your response"
+                        value=""
+                        name="cards[a393de4b-14c9-4cbe-80d6-aa250e4c5033][field0]"
+                      />
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+            <div class="section page-centered application-form">
+              <h4>Hybrid Work Schedule</h4>
+              <ul>
+                <li class="application-question custom-question">
+                  <div>
+                    <div class="application-label full-width dropdown">
+                      <div class="text">
+                        This role is based in Alameda, CA, and requires on-site work at least three
+                        days per week. Are you able to reliably commute to Alameda for this
+                        schedule?<span class="required">✱</span>
+                      </div>
+                    </div>
+                    <div class="application-field full-width required-field">
+                      <div class="application-dropdown">
+                        <select
+                          name="cards[021e60de-4072-4b55-a0d3-a3168bfea04e][field0]"
+                          required=""
+                        >
+                          <option value="">Select...</option>
+                          <option value="Yes">Yes</option>
+                          <option value="No">No</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+            <div id="h-captcha" class="h-captcha"></div>
+            <div class="section page-centered application-form last-section-apply">
+              <button
+                id="btn-submit"
+                type="button"
+                class="postings-btn template-btn-submit hex-color"
+                href="#"
+              >
+                Submit application
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="main-footer page-full-width">
+      <div class="main-footer-text">
+        <p><a href="#">Pyka Home Page</a></p>
+        <div class="mt1">
+          <p>
+            We may use artificial intelligence (AI) tools to support parts of the hiring process,
+            such as reviewing applications, analyzing resumes, or assessing responses. These tools
+            assist our recruitment team but do not replace human judgment. Final hiring decisions
+            are ultimately made by humans.
+          </p>
+        </div>
+        <a href="#" class="image-link"><span>Jobs powered by </span></a>
+      </div>
+    </div>
+    <script>
+      globalThis.fixtureMeta = {
+        options: {},
+        jobLocation: "Alameda HQ",
+        confirmationMessage:
+          "<h2>Thank you for applying to Pyka</h2>\n<p>Your application has been received.</p>",
+        confirmationPath: "/pyka/2c7db323-e4e8-4c07-8ec6-ad351b0f24eb/thanks",
+        submitPath: "/pyka/2c7db323-e4e8-4c07-8ec6-ad351b0f24eb/apply",
+      };
+    </script>
+    <script type="module" src="/__fixture__/runtime.js"></script>
+  </body>
+</html>

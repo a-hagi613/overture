@@ -32,6 +32,14 @@ export interface SendPlanResume {
   filename: string;
 }
 
+export interface FormQuestion {
+  fieldName: string;
+  label: string;
+  fieldType: QuestionFieldType;
+  required: boolean;
+  options: string[];
+}
+
 export interface SendPlan {
   applicationId: string;
   userId: string;
