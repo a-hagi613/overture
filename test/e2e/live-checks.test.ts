@@ -247,7 +247,7 @@ test.describe.configure({ mode: "serial" });
 test.beforeAll(async () => {
   test.setTimeout(180_000);
 
-  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 1024 });
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 
   privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" });
 

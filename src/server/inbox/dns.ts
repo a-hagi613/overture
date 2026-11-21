@@ -12,6 +12,12 @@ export function createMailDnsResolver(server: string | undefined) {
       return [];
     }
 
-    return resolver === null ? resolve(name, "TXT") : resolver.resolveTxt(name);
+    const rows = resolver === null ? await resolve(name, "TXT") : await resolver.resolveTxt(name);
+
+    if (name.includes("._domainkey.")) {
+      return [rows.map((row) => row.join("")).join("")];
+    }
+
+    return rows;
   };
 }
