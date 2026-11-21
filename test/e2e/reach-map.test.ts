@@ -16,9 +16,9 @@ const webRouteEntryPattern =
 const importBindingPattern =
   /import\s+\{\s*(?<name>[A-Za-z0-9_]+)\s*\}\s+from\s+"(?<specifier>[^"]+)"/gu;
 
-test("every route in src/web/main.tsx maps to at least one browser test", () => {
+test("every route in src/web/route-table.tsx maps to at least one browser test", () => {
   const map = buildReachMap();
-  const mainSource = readFileSync("src/web/main.tsx", "utf8");
+  const mainSource = readFileSync("src/web/route-table.tsx", "utf8");
   const bindings = new Map<string, string>();
 
   for (const match of mainSource.matchAll(importBindingPattern)) {

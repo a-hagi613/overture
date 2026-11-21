@@ -1,11 +1,12 @@
 const bloomStyle = {
-  background: "radial-gradient(closest-side, var(--color-bloom), transparent)",
+  background:
+    "radial-gradient(circle 350px at calc(100% - 110px) 350px, var(--color-bloom), transparent)",
   height: "700px",
   pointerEvents: "none",
   position: "absolute",
-  right: "-240px",
+  right: "0",
   top: "-260px",
-  width: "700px",
+  width: "100%",
   zIndex: 0,
 } as const;
 

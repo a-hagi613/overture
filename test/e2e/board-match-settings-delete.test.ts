@@ -61,12 +61,20 @@ async function seedOwner(request: APIRequestContext, appServerUrl: string) {
 
 const MAX_TEXT_ANTIALIAS_DRIFT = 0.12;
 
+async function parkAtViewportTop(section: Locator) {
+  await section.evaluate((element) => {
+    element.scrollIntoView({ behavior: "instant", block: "start" });
+  });
+}
+
 async function compareRegion(
   page: Page,
   section: Locator,
   expectedPath: string,
   region: z.infer<typeof boxSchema>,
 ) {
+  await parkAtViewportTop(section);
+
   const actualBox = await section.evaluate((element) => {
     const rect = element.getBoundingClientRect();
 

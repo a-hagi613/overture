@@ -27,7 +27,8 @@ export function ProfilePage() {
       />
       <nav
         aria-label={copy.profile.sectionsLabel}
-        className="mt-[26px] flex gap-x-[26px] overflow-x-auto border-b border-border"
+        className="mt-[26px] flex gap-x-[26px] overflow-x-auto overflow-y-hidden border-b border-border"
+        data-scroll-region
       >
         {tabs.map((tab) => (
           <a

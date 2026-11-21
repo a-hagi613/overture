@@ -66,7 +66,7 @@ const alwaysFull = [
   /^src\/server\/(?:app|main)\.ts$/u,
   /^src\/server\/config\/env\.ts$/u,
   /^src\/server\/platform\/db\//u,
-  /^src\/web\/(?:main\.tsx|styles\.css)$/u,
+  /^src\/web\/(?:main\.tsx|route-table\.tsx|styles\.css)$/u,
   /^test\/e2e\/(?:global-setup|app-server|app\.fixture|auth\.fixture|identity-server-test\.fixture|sign-in)\.ts$/u,
 ];
 
@@ -592,7 +592,8 @@ function isReachModule(file: string) {
     file !== "src/server/app.ts" &&
     file !== "src/server/main.ts" &&
     file !== "src/server/config/env.ts" &&
-    file !== "src/web/main.tsx"
+    file !== "src/web/main.tsx" &&
+    file !== "src/web/route-table.tsx"
   );
 }
 
@@ -666,7 +667,7 @@ export function webRouteEntries(
   files: Set<string>,
   serverRoutes: readonly RouteModuleEntry[],
 ) {
-  const mainFile = "src/web/main.tsx";
+  const mainFile = "src/web/route-table.tsx";
   const bindings = importBindings(mainFile);
   const text = textOf(mainFile);
   const entries: WebRouteEntry[] = [];

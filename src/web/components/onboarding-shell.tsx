@@ -27,7 +27,7 @@ export function OnboardingShell({
   }, [navigate, session, isPending]);
 
   return (
-    <div className="board onb min-h-screen">
+    <div className="board onb min-h-screen overflow-x-clip">
       <Backdrop />
       <div className="relative z-[1]">
         <OnboardingStepHeader />
