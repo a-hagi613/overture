@@ -10,6 +10,7 @@ import type { AdjustableClock } from "./platform/ports/clock.ts";
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 import type { LlmPort } from "./platform/ports/llm.ts";
 import type { ObjectStore } from "./platform/ports/object-store.ts";
+import type { Payments } from "./platform/ports/payments.ts";
 import type { PreparationService } from "./pipeline/prepare.ts";
 import type { ReviewService } from "./pipeline/reviews.ts";
 import type { createMailboxService } from "./inbox/mailboxes.ts";
@@ -45,6 +46,7 @@ import { createMailRoutes } from "./routes/mail.ts";
 import { createPasswordResetRoutes } from "./routes/password-reset.ts";
 import { createSupportAccessRoutes } from "./routes/support-access.ts";
 import { createAccountRoutes } from "./routes/account.ts";
+import { createBillingRoutes, createStripeWebhookRoutes } from "./routes/billing.ts";
 import { createInboxRoutes } from "./routes/inbox.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { securityHeaders } from "./security-headers.ts";
@@ -70,6 +72,7 @@ export interface AppDependencies {
   catalogWorker: CatalogSweepWorker;
   eraser: AccountEraser;
   exports: ExportService;
+  payments: Payments | null;
 }
 
 async function staticResponseFrom(root: string, url: string) {
@@ -201,6 +204,15 @@ export function createApp(deps: AppDependencies) {
     }),
   );
   app.route("/api", createNavRoutes({ auth: deps.auth, db: deps.db, reviews: deps.reviews }));
+  app.route(
+    "/api",
+    createBillingRoutes({
+      appOrigin: env.APP_ORIGIN ?? "http://localhost:3000",
+      auth: deps.auth,
+      db: deps.db,
+      payments: deps.payments,
+    }),
+  );
   app.route("/api", createApplicationRoutes(deps.db, deps.clock, deps.auth, personal));
   app.route("/api", createCheckinRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
   app.route("/api", createCalendarRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
@@ -262,6 +274,14 @@ export function createApp(deps: AppDependencies) {
       resolver: deps.resolver,
       liveCheckAddress: deps.liveCheckAddress,
       secret: env.INBOUND_HMAC_SECRET,
+    }),
+  );
+  app.route(
+    "/",
+    createStripeWebhookRoutes({
+      clock: deps.clock,
+      db: deps.db,
+      payments: deps.payments,
     }),
   );
 

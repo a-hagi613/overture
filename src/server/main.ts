@@ -6,6 +6,7 @@ import type { AuthOptions } from "./auth/index.ts";
 import { databasePath, env } from "./config/env.ts";
 import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
 import { MailCapExceededError } from "./platform/mail/metered.ts";
+import { createPayments } from "./billing/index.ts";
 import { seedDemoAccount } from "./demo/seed.ts";
 import { createDemoSafeMailSender } from "./demo/mail-guard.ts";
 import { isDemoUser } from "./demo/role.ts";
@@ -173,6 +174,7 @@ const backups = createBackupMonitor(db, clock);
 void backups.run(shutdownController.signal);
 
 const mailSender = createDemoSafeMailSender(db, createMailSender(db, clock));
+const payments = createPayments(clock);
 const pushSender = createPushSender(env, clock);
 const mailboxes = createMailboxService(db, clock, env.INBOUND_HMAC_SECRET ?? "", env.MAIL_DOMAIN);
 
@@ -730,6 +732,7 @@ const app = createApp({
   catalogWorker,
   eraser,
   exports,
+  payments,
 });
 
 const SERVER_IDLE_TIMEOUT_ABOVE_SSE_HEARTBEAT_SECONDS = 60;

@@ -180,6 +180,20 @@ jobs:
           tar -xzf "/tmp/$litestream_asset" -C "$HOME/.local/bin" litestream
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/litestream" version
+      - name: Install stripe-mock 0.206.0 and verify its sha256
+        shell: bash
+        env:
+          STRIPE_MOCK_SHA256: b6fe5a8f02aaeb5a5001710b304fc93a222f1983a9a6050a38f55cfdc48b8d19
+        run: |
+          set -euo pipefail
+          work=$(mktemp -d)
+          curl -fsSLo "$work/stripe-mock.tar.gz" https://github.com/stripe/stripe-mock/releases/download/v0.206.0/stripe-mock_0.206.0_linux_amd64.tar.gz
+          echo "${STRIPE_MOCK_SHA256}  $work/stripe-mock.tar.gz" | sha256sum -c -
+          tar -xzf "$work/stripe-mock.tar.gz" -C "$work" stripe-mock
+          mkdir -p "$HOME/.local/bin"
+          install -m 0755 "$work/stripe-mock" "$HOME/.local/bin/stripe-mock"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/stripe-mock" --version
       - name: Run this shard
         run: bun node_modules/playwright/cli.js test --workers=3 ${{ steps.shard.outputs.files }}
       - uses: actions/upload-artifact@v7
