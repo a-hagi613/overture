@@ -12,7 +12,12 @@
         "/api/kill-switches",
         "/api/settings/limits.daily_cap"
       ],
-      "routes": ["/admin", "/admin/catalog", "/admin/settings", "/signin"],
+      "routes": [
+        "/admin",
+        "/admin/catalog",
+        "/admin/settings",
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -50,6 +55,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -231,7 +237,11 @@
         "/__test__/user/name",
         "/:param"
       ],
-      "routes": ["/admin", "/admin/settings", "/signin"],
+      "routes": [
+        "/admin",
+        "/admin/settings",
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -269,6 +279,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -474,6 +485,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -587,7 +599,13 @@
         "/__test__/user/name",
         "/:param"
       ],
-      "routes": ["/", "/admin", "/admin/grants", "/admin/settings", "/signin"],
+      "routes": [
+        "/",
+        "/admin",
+        "/admin/grants",
+        "/admin/settings",
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -625,6 +643,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -852,7 +871,12 @@
         "/__test__/user/name",
         "/:param"
       ],
-      "routes": ["/admin", "/admin/mail-health", "/admin/settings", "/signin"],
+      "routes": [
+        "/admin",
+        "/admin/mail-health",
+        "/admin/settings",
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -895,6 +919,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -1089,7 +1114,11 @@
         "/__test__/user/name",
         "/:param"
       ],
-      "routes": ["/admin", "/admin/settings", "/signin"],
+      "routes": [
+        "/admin",
+        "/admin/settings",
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -1127,6 +1156,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -1307,7 +1337,11 @@
         "/__test__/user/name",
         "/:param"
       ],
-      "routes": ["/admin", "/admin/settings", "/signin"],
+      "routes": [
+        "/admin",
+        "/admin/settings",
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -1350,6 +1384,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -1548,7 +1583,11 @@
         "/invites",
         "/users/:param/reveal"
       ],
-      "routes": ["/admin", "/admin/settings", "/signin"],
+      "routes": [
+        "/admin",
+        "/admin/settings",
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -1586,6 +1625,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -1758,7 +1798,10 @@
         "/__test__/user/name",
         "/:param"
       ],
-      "routes": ["/admin", "/signin"],
+      "routes": [
+        "/admin",
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -1796,6 +1839,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -2013,6 +2057,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -2200,7 +2245,10 @@
         "/__test__/user/name",
         "/:param"
       ],
-      "routes": ["/admin", "/signin"],
+      "routes": [
+        "/admin",
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -2238,6 +2286,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -2609,6 +2658,7 @@
         "src/server/dispatch/ats/greenhouse.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -2834,6 +2884,7 @@
         "src/server/dispatch/ats/greenhouse.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -2994,7 +3045,11 @@
     },
     "test/e2e/backup-health-cache.test.ts": {
       "full": false,
-      "paths": ["/__test__/clock/offset", "/__test__/turnstile-api.js", "/api/health"],
+      "paths": [
+        "/__test__/clock/offset",
+        "/__test__/turnstile-api.js",
+        "/api/health"
+      ],
       "routes": [],
       "designs": [],
       "modules": [
@@ -3127,6 +3182,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -3250,7 +3306,9 @@
         "/api/profile/settings",
         "/api/running"
       ],
-      "routes": ["/board"],
+      "routes": [
+        "/board"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -3290,6 +3348,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -3479,8 +3538,12 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": ["/consent"],
-      "designs": ["design/reference/consent/"],
+      "routes": [
+        "/consent"
+      ],
+      "designs": [
+        "design/reference/consent/"
+      ],
       "modules": [
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3596,8 +3659,12 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": ["/privacy"],
-      "designs": ["design/reference/privacy/"],
+      "routes": [
+        "/privacy"
+      ],
+      "designs": [
+        "design/reference/privacy/"
+      ],
       "modules": [
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3712,8 +3779,12 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": ["/terms"],
-      "designs": ["design/reference/terms/"],
+      "routes": [
+        "/terms"
+      ],
+      "designs": [
+        "design/reference/terms/"
+      ],
       "modules": [
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3842,8 +3913,13 @@
         "/api/profile/settings",
         "/api/running"
       ],
-      "routes": ["/board"],
-      "designs": ["design/reference/board/", "design/reference/review/"],
+      "routes": [
+        "/board"
+      ],
+      "designs": [
+        "design/reference/board/",
+        "design/reference/review/"
+      ],
       "modules": [
         "src/server/admin/reveal-view.ts",
         "src/server/auth/client-ip.ts",
@@ -3882,6 +3958,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -4085,7 +4162,9 @@
         "/api/profile/settings",
         "/api/running"
       ],
-      "routes": ["/board"],
+      "routes": [
+        "/board"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -4125,6 +4204,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -4323,8 +4403,12 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": ["/"],
-      "designs": ["design/reference/code-wait/"],
+      "routes": [
+        "/"
+      ],
+      "designs": [
+        "design/reference/code-wait/"
+      ],
       "modules": [
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -4479,8 +4563,12 @@
         "/__test__/user/name",
         "/api/running"
       ],
-      "routes": ["/"],
-      "designs": ["design/reference/home/"],
+      "routes": [
+        "/"
+      ],
+      "designs": [
+        "design/reference/home/"
+      ],
       "modules": [
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -4636,8 +4724,12 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": ["/"],
-      "designs": ["design/reference/home/"],
+      "routes": [
+        "/"
+      ],
+      "designs": [
+        "design/reference/home/"
+      ],
       "modules": [
         "src/server/billing/ledger.ts",
         "src/server/catalog/answer-derivations.ts",
@@ -4810,8 +4902,13 @@
         "/:param.example/:param",
         "/api/profile/settings"
       ],
-      "routes": ["/inbox", "/inbox/address"],
-      "designs": ["design/reference/inbox/"],
+      "routes": [
+        "/inbox",
+        "/inbox/address"
+      ],
+      "designs": [
+        "design/reference/inbox/"
+      ],
       "modules": [
         "src/server/admin/reveal-view.ts",
         "src/server/auth/client-ip.ts",
@@ -4850,6 +4947,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -5035,8 +5133,12 @@
         "/__test__/user/name",
         "/settings"
       ],
-      "routes": ["/notifications"],
-      "designs": ["design/reference/notifications/"],
+      "routes": [
+        "/notifications"
+      ],
+      "designs": [
+        "design/reference/notifications/"
+      ],
       "modules": [
         "src/server/admin/reveal-view.ts",
         "src/server/auth/email.ts",
@@ -5066,6 +5168,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -5216,8 +5319,12 @@
         "/api/profile/targets",
         "/api/running"
       ],
-      "routes": ["/onboarding/facts"],
-      "designs": ["design/reference/onboarding-questions/"],
+      "routes": [
+        "/onboarding/facts"
+      ],
+      "designs": [
+        "design/reference/onboarding-questions/"
+      ],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -5374,7 +5481,9 @@
         "/api/profile/resume"
       ],
       "routes": [],
-      "designs": ["design/reference/onboarding-resume/"],
+      "designs": [
+        "design/reference/onboarding-resume/"
+      ],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -5503,8 +5612,12 @@
         "/api/profile/languages",
         "/api/profile/targets"
       ],
-      "routes": ["/onboarding/targets"],
-      "designs": ["design/reference/onboarding-targets/"],
+      "routes": [
+        "/onboarding/targets"
+      ],
+      "designs": [
+        "design/reference/onboarding-targets/"
+      ],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -5650,8 +5763,12 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": ["/onboarding"],
-      "designs": ["design/reference/onboarding-welcome/"],
+      "routes": [
+        "/onboarding"
+      ],
+      "designs": [
+        "design/reference/onboarding-welcome/"
+      ],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -5796,8 +5913,12 @@
         "/__test__/user/name",
         "/settings"
       ],
-      "routes": ["/"],
-      "designs": ["design/reference/home-paused/"],
+      "routes": [
+        "/"
+      ],
+      "designs": [
+        "design/reference/home-paused/"
+      ],
       "modules": [
         "src/server/admin/reveal-view.ts",
         "src/server/auth/email.ts",
@@ -5829,6 +5950,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -5997,8 +6119,12 @@
         "/api/profile/targets",
         "/api/running"
       ],
-      "routes": ["/profile"],
-      "designs": ["design/reference/profile/"],
+      "routes": [
+        "/profile"
+      ],
+      "designs": [
+        "design/reference/profile/"
+      ],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -6185,8 +6311,12 @@
         "/api/ready",
         "/api/running"
       ],
-      "routes": ["/ready"],
-      "designs": ["design/reference/ready/"],
+      "routes": [
+        "/ready"
+      ],
+      "designs": [
+        "design/reference/ready/"
+      ],
       "modules": [
         "src/server/admin/reveal-view.ts",
         "src/server/auth/client-ip.ts",
@@ -6225,6 +6355,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -6390,7 +6521,9 @@
         "/api/profile/targets",
         "/api/running"
       ],
-      "routes": ["/review"],
+      "routes": [
+        "/review"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -6430,6 +6563,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -6608,8 +6742,12 @@
         "/__test__/user/name",
         "/settings/delete"
       ],
-      "routes": ["/settings/delete"],
-      "designs": ["design/reference/settings-delete/"],
+      "routes": [
+        "/settings/delete"
+      ],
+      "designs": [
+        "design/reference/settings-delete/"
+      ],
       "modules": [
         "src/server/account/erase.ts",
         "src/server/admin/reveal-view.ts",
@@ -6640,6 +6778,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -6763,8 +6902,13 @@
         "/__test__/user/name",
         "/api/running"
       ],
-      "routes": ["/"],
-      "designs": ["design/reference/board/", "design/reference/home/"],
+      "routes": [
+        "/"
+      ],
+      "designs": [
+        "design/reference/board/",
+        "design/reference/home/"
+      ],
       "modules": [
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -6916,8 +7060,13 @@
         "/__test__/turnstile",
         "/__test__/user/name"
       ],
-      "routes": ["/forgot-password", "/signin"],
-      "designs": ["design/reference/signin/"],
+      "routes": [
+        "/forgot-password",
+        "/signin"
+      ],
+      "designs": [
+        "design/reference/signin/"
+      ],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -7155,6 +7304,7 @@
         "src/server/dispatch/ats/greenhouse.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -7464,6 +7614,285 @@
         "test/e2e/notification-seed.ts"
       ]
     },
+    "test/e2e/calendar-page.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/applications/seed",
+        "/__test__/auth/state",
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/postings",
+        "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/ledger/sample",
+        "/__test__/mail",
+        "/__test__/notifications/seed",
+        "/__test__/turnstile-api.js",
+        "/__test__/user/name",
+        "/:param.example/:param",
+        "/api/applications/:param/stage"
+      ],
+      "routes": [
+        "/",
+        "/board",
+        "/calendar"
+      ],
+      "designs": [],
+      "modules": [
+        "src/server/admin/reveal-view.ts",
+        "src/server/auth/client-ip.ts",
+        "src/server/auth/demo-login.ts",
+        "src/server/auth/email.ts",
+        "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
+        "src/server/auth/rate-limit.ts",
+        "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
+        "src/server/catalog/answer-derivations.ts",
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/companies-parquet.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/feed-retag.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/personio-feed.ts",
+        "src/server/catalog/question-mapping.ts",
+        "src/server/catalog/question-normalize.ts",
+        "src/server/catalog/question-rules.ts",
+        "src/server/catalog/questions.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/sweep-config.ts",
+        "src/server/catalog/tag-import.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/catalog/worker-restarts.ts",
+        "src/server/demo/guard.ts",
+        "src/server/demo/role.ts",
+        "src/server/dispatch/ats/ashby.ts",
+        "src/server/dispatch/ats/lever.ts",
+        "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
+        "src/server/dispatch/browser/session-slots.ts",
+        "src/server/dispatch/forms/engine.ts",
+        "src/server/dispatch/planner.ts",
+        "src/server/dispatch/planning.ts",
+        "src/server/dispatch/posting-identity.ts",
+        "src/server/dispatch/report.ts",
+        "src/server/export/archive.ts",
+        "src/server/export/service.ts",
+        "src/server/export/zip.ts",
+        "src/server/fixtures/capture.ts",
+        "src/server/fixtures/job.ts",
+        "src/server/fixtures/sanitise.ts",
+        "src/server/inbox/codes.ts",
+        "src/server/inbox/health.ts",
+        "src/server/inbox/mailboxes.ts",
+        "src/server/inbox/waits.ts",
+        "src/server/live-checks/alerts.ts",
+        "src/server/live-checks/forms.ts",
+        "src/server/live-checks/job.ts",
+        "src/server/live-checks/llm.ts",
+        "src/server/live-checks/mail.ts",
+        "src/server/live-checks/r2.ts",
+        "src/server/live-checks/sending-domain.ts",
+        "src/server/live-checks/store.ts",
+        "src/server/live-checks/types.ts",
+        "src/server/matching/applications.ts",
+        "src/server/matching/candidates.ts",
+        "src/server/matching/fx.ts",
+        "src/server/matching/regions.ts",
+        "src/server/matching/score.ts",
+        "src/server/matching/skip-match.ts",
+        "src/server/notify/notifications.ts",
+        "src/server/notify/push.ts",
+        "src/server/notify/ready-recap.ts",
+        "src/server/pipeline/answer-plan.ts",
+        "src/server/pipeline/answer-value.ts",
+        "src/server/pipeline/approval-invalidation.ts",
+        "src/server/pipeline/approved-plan.ts",
+        "src/server/pipeline/checkins.ts",
+        "src/server/pipeline/daily-prep.ts",
+        "src/server/pipeline/form-read.ts",
+        "src/server/pipeline/greenhouse-board-url.ts",
+        "src/server/pipeline/grounding.ts",
+        "src/server/pipeline/guard/posting-guard.ts",
+        "src/server/pipeline/open-text.ts",
+        "src/server/pipeline/plan-cache.ts",
+        "src/server/pipeline/prepare-jobs.ts",
+        "src/server/pipeline/prepare.ts",
+        "src/server/pipeline/review-events.ts",
+        "src/server/pipeline/review-store.ts",
+        "src/server/pipeline/reviews.ts",
+        "src/server/pipeline/send-plan.ts",
+        "src/server/pipeline/stage.ts",
+        "src/server/platform/access/index.ts",
+        "src/server/platform/alerts.ts",
+        "src/server/platform/audit/index.ts",
+        "src/server/platform/audit/loki.ts",
+        "src/server/platform/audit/reveal.ts",
+        "src/server/platform/crypto.ts",
+        "src/server/platform/jobs/queue.ts",
+        "src/server/platform/jobs/retry.ts",
+        "src/server/platform/jobs/run-due.ts",
+        "src/server/platform/llm/caps.ts",
+        "src/server/platform/llm/usage.ts",
+        "src/server/platform/local-time.ts",
+        "src/server/platform/log.ts",
+        "src/server/platform/mail/budget.ts",
+        "src/server/platform/mail/metered.ts",
+        "src/server/platform/mail/sending-domain.ts",
+        "src/server/platform/mail/sink.ts",
+        "src/server/platform/outbound-guard.ts",
+        "src/server/platform/passkey/index.ts",
+        "src/server/platform/ports/clock.ts",
+        "src/server/platform/process-guard.ts",
+        "src/server/platform/push/endpoint.ts",
+        "src/server/platform/search/search.ts",
+        "src/server/platform/settings/index.ts",
+        "src/server/platform/sse/hub.ts",
+        "src/server/platform/sse/stream.ts",
+        "src/server/platform/telemetry/otel.ts",
+        "src/server/profile/consent.ts",
+        "src/server/profile/facts.ts",
+        "src/server/profile/languages.ts",
+        "src/server/profile/onboarding-progress.ts",
+        "src/server/profile/onboarding-start.ts",
+        "src/server/profile/onboarding-step.ts",
+        "src/server/profile/personal-crypto.ts",
+        "src/server/profile/resume.ts",
+        "src/server/profile/skip-companies.ts",
+        "src/server/profile/target-choices.ts",
+        "src/server/profile/targets.ts",
+        "src/server/profile/time-zone.ts",
+        "src/server/routes/admin-refusals.ts",
+        "src/server/routes/admin-reveal.ts",
+        "src/server/routes/admin.ts",
+        "src/server/routes/api.ts",
+        "src/server/routes/applications.ts",
+        "src/server/routes/calendar.ts",
+        "src/server/routes/checkins.ts",
+        "src/server/routes/consent.ts",
+        "src/server/routes/health.ts",
+        "src/server/routes/home.ts",
+        "src/server/routes/inbox.ts",
+        "src/server/routes/mail.ts",
+        "src/server/routes/me.ts",
+        "src/server/routes/nav.ts",
+        "src/server/routes/notifications.ts",
+        "src/server/routes/onboarding.ts",
+        "src/server/routes/password-reset.ts",
+        "src/server/routes/ready.ts",
+        "src/server/routes/reviews.ts",
+        "src/server/routes/support-access.ts",
+        "src/server/routes/test-only.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/server/testing/cloudflare-email-recorder.ts",
+        "src/server/testing/email-sending-scenario.ts",
+        "src/server/testing/push-recorder.ts",
+        "src/server/testing/turnstile-browser-scenario.ts",
+        "src/server/testing/turnstile-browser-stub.ts",
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/board.ts",
+        "src/shared/checkins.ts",
+        "src/shared/code-wait.ts",
+        "src/shared/consent.ts",
+        "src/shared/copy.ts",
+        "src/shared/demo.ts",
+        "src/shared/export-crypto.ts",
+        "src/shared/facts.ts",
+        "src/shared/inbound-mail.ts",
+        "src/shared/live-service-hosts.ts",
+        "src/shared/onboarding.ts",
+        "src/shared/questions.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/targets.ts",
+        "src/shared/turnstile.ts",
+        "src/web/app.tsx",
+        "src/web/components/avatar-link.tsx",
+        "src/web/components/backdrop.tsx",
+        "src/web/components/board-answers.tsx",
+        "src/web/components/board-card.tsx",
+        "src/web/components/board-column.tsx",
+        "src/web/components/board-cover.tsx",
+        "src/web/components/board-emails.tsx",
+        "src/web/components/board-mobile-header.tsx",
+        "src/web/components/board-page-header.tsx",
+        "src/web/components/board-phone-card.tsx",
+        "src/web/components/board-rail.tsx",
+        "src/web/components/board-ready-card.tsx",
+        "src/web/components/board-sheet-actions.tsx",
+        "src/web/components/board-sheet-header.tsx",
+        "src/web/components/board-sheet-navigation.tsx",
+        "src/web/components/board-sheet-panel.tsx",
+        "src/web/components/board-sheet-pills.tsx",
+        "src/web/components/board-sheet.tsx",
+        "src/web/components/board-stage-pills.tsx",
+        "src/web/components/board-timeline.tsx",
+        "src/web/components/brand-mark.tsx",
+        "src/web/components/calendar-agenda.tsx",
+        "src/web/components/calendar-cell-body.tsx",
+        "src/web/components/calendar-chip.tsx",
+        "src/web/components/calendar-day-panel.tsx",
+        "src/web/components/calendar-day-rows.tsx",
+        "src/web/components/calendar-day-sheet.tsx",
+        "src/web/components/calendar-kind-dot.tsx",
+        "src/web/components/calendar-month-grid.tsx",
+        "src/web/components/calendar-sent-rollup.tsx",
+        "src/web/components/code-paste-header.tsx",
+        "src/web/components/code-paste-sheet.tsx",
+        "src/web/components/header-controls.tsx",
+        "src/web/components/home-activity-failed-card.tsx",
+        "src/web/components/home-activity-sent-row.tsx",
+        "src/web/components/home-activity.tsx",
+        "src/web/components/home-chart.tsx",
+        "src/web/components/home-checkin.tsx",
+        "src/web/components/home-code-wait.tsx",
+        "src/web/components/home-inbox.tsx",
+        "src/web/components/home-kpis.tsx",
+        "src/web/components/home-needs-you.tsx",
+        "src/web/components/home-pause-banner.tsx",
+        "src/web/components/home-queue.tsx",
+        "src/web/components/home-ready-card.tsx",
+        "src/web/components/home-strengthen.tsx",
+        "src/web/components/nav-glyph.tsx",
+        "src/web/components/page-header.tsx",
+        "src/web/components/running-switch.tsx",
+        "src/web/components/side-nav.tsx",
+        "src/web/components/source-chip.tsx",
+        "src/web/components/tab-bar.tsx",
+        "src/web/components/theme-toggle.tsx",
+        "src/web/components/usage-ring.tsx",
+        "src/web/components/usage.tsx",
+        "src/web/lib/auth-client.ts",
+        "src/web/lib/board-api.ts",
+        "src/web/lib/board-format.ts",
+        "src/web/lib/calendar-api.ts",
+        "src/web/lib/calendar-format.ts",
+        "src/web/lib/calendar-grid.ts",
+        "src/web/lib/calendar-style.ts",
+        "src/web/lib/code-wait-api.ts",
+        "src/web/lib/home-api.ts",
+        "src/web/lib/home-time.ts",
+        "src/web/lib/identity.ts",
+        "src/web/lib/inbox-time.ts",
+        "src/web/lib/live-events.ts",
+        "src/web/lib/media-query.ts",
+        "src/web/lib/nav-api.ts",
+        "src/web/lib/notifications-api.ts",
+        "src/web/lib/theme-context.ts",
+        "src/web/routes/board.tsx",
+        "src/web/routes/calendar.tsx",
+        "src/web/routes/home.tsx",
+        "test/e2e/identity-persona.ts",
+        "test/e2e/matching-harness.ts",
+        "test/e2e/notification-seed.ts"
+      ]
+    },
     "test/e2e/catalog-backfill.test.ts": {
       "full": false,
       "paths": [
@@ -7538,6 +7967,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -7766,6 +8196,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -7994,6 +8425,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -8224,6 +8656,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -8452,6 +8885,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -8680,6 +9114,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -8909,6 +9344,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -9136,6 +9572,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -9317,7 +9754,9 @@
         "/api/events",
         "/api/search"
       ],
-      "routes": ["/search"],
+      "routes": [
+        "/search"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -9372,6 +9811,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -9564,7 +10004,9 @@
         "/__test__/user/name",
         "/api/search"
       ],
-      "routes": ["/search"],
+      "routes": [
+        "/search"
+      ],
       "designs": [],
       "modules": [
         "src/server/billing/ledger.ts",
@@ -9757,6 +10199,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -9985,6 +10428,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -10213,6 +10657,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -10442,6 +10887,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -10669,6 +11115,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -11015,6 +11462,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -11192,7 +11640,9 @@
         "/api/checkins/:param",
         "/api/home"
       ],
-      "routes": ["/"],
+      "routes": [
+        "/"
+      ],
       "designs": [],
       "modules": [
         "src/server/billing/ledger.ts",
@@ -11580,6 +12030,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -11745,7 +12196,9 @@
     },
     "test/e2e/cloud-probe.test.ts": {
       "full": false,
-      "paths": ["/:param/jobs/:param"],
+      "paths": [
+        "/:param/jobs/:param"
+      ],
       "routes": [],
       "designs": [],
       "modules": [
@@ -11777,6 +12230,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/provider.ts",
         "src/server/dispatch/browser/proxy-trim.ts",
@@ -11812,6 +12266,7 @@
         "src/server/notify/push.ts",
         "src/server/notify/ready-recap.ts",
         "src/server/pipeline/daily-prep.ts",
+        "src/server/pipeline/form-read.ts",
         "src/server/pipeline/prepare-jobs.ts",
         "src/server/pipeline/stage.ts",
         "src/server/platform/access/index.ts",
@@ -11831,6 +12286,7 @@
         "src/server/platform/mail/metered.ts",
         "src/server/platform/mail/sending-domain.ts",
         "src/server/platform/mail/sink.ts",
+        "src/server/platform/outbound-guard.ts",
         "src/server/platform/passkey/index.ts",
         "src/server/platform/ports/clock.ts",
         "src/server/platform/process-guard.ts",
@@ -11843,6 +12299,7 @@
         "src/server/probe/run-file.ts",
         "src/server/probe/run-probe.ts",
         "src/server/probe/store.ts",
+        "src/server/probe/workable.ts",
         "src/server/profile/consent.ts",
         "src/server/profile/facts.ts",
         "src/server/profile/languages.ts",
@@ -11869,6 +12326,7 @@
         "src/shared/export-crypto.ts",
         "src/shared/facts.ts",
         "src/shared/inbound-mail.ts",
+        "src/shared/live-service-hosts.ts",
         "src/shared/questions.ts",
         "src/shared/tag-taxonomy.ts",
         "src/shared/targets.ts",
@@ -11876,7 +12334,8 @@
         "test/e2e/browser-use-records.fixture.ts",
         "test/e2e/greenhouse.fixture.ts",
         "test/e2e/local-chromium.fixture.ts",
-        "test/e2e/probe-harness.fixture.ts"
+        "test/e2e/probe-harness.fixture.ts",
+        "test/e2e/workable.fixture.ts"
       ]
     },
     "test/e2e/cloudflare-email.test.ts": {
@@ -12013,7 +12472,10 @@
         "/settings",
         "/settings/delete"
       ],
-      "routes": ["/settings", "/settings/delete"],
+      "routes": [
+        "/settings",
+        "/settings/delete"
+      ],
       "designs": [],
       "modules": [
         "src/server/account/erase.ts",
@@ -12057,6 +12519,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -12272,7 +12735,16 @@
         "/api/running",
         "/settings"
       ],
-      "routes": ["/", "/board", "/inbox", "/profile", "/ready", "/review", "/settings", "/signin"],
+      "routes": [
+        "/",
+        "/board",
+        "/inbox",
+        "/profile",
+        "/ready",
+        "/review",
+        "/settings",
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -12320,6 +12792,7 @@
         "src/server/dispatch/ats/greenhouse.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -12797,6 +13270,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -12935,7 +13409,9 @@
         "/api/board",
         "/api/profile/mailbox"
       ],
-      "routes": ["/board"],
+      "routes": [
+        "/board"
+      ],
       "designs": [],
       "modules": [
         "src/server/billing/ledger.ts",
@@ -13154,7 +13630,9 @@
         "/api/profile/targets",
         "/settings/export"
       ],
-      "routes": ["/settings/export"],
+      "routes": [
+        "/settings/export"
+      ],
       "designs": [],
       "modules": [
         "src/server/account/erase.ts",
@@ -13197,6 +13675,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -13421,6 +13900,7 @@
         "src/server/dispatch/ats/greenhouse.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -13616,6 +14096,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -13798,6 +14279,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -13934,13 +14416,15 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/posting-identity.ts",
         "src/server/fixtures/sanitise.ts",
         "src/server/pipeline/form-read.ts",
         "src/server/platform/outbound-guard.ts",
         "src/shared/live-service-hosts.ts",
-        "src/shared/questions.ts"
+        "src/shared/questions.ts",
+        "test/e2e/workable.fixture.ts"
       ]
     },
     "test/e2e/graceful-stop-requeue.test.ts": {
@@ -14218,7 +14702,9 @@
         "/api/ready",
         "/api/running"
       ],
-      "routes": ["/"],
+      "routes": [
+        "/"
+      ],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -14749,7 +15235,12 @@
         "/api/threads",
         "/api/threads/:param"
       ],
-      "routes": ["/board", "/inbox", "/inbox/:id", "/inbox/address"],
+      "routes": [
+        "/board",
+        "/inbox",
+        "/inbox/:id",
+        "/inbox/address"
+      ],
       "designs": [],
       "modules": [
         "src/server/billing/ledger.ts",
@@ -14958,7 +15449,12 @@
         "/__test__/user/suspend",
         "/:param"
       ],
-      "routes": ["/", "/admin", "/admin/settings", "/signin"],
+      "routes": [
+        "/",
+        "/admin",
+        "/admin/settings",
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -14996,6 +15492,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -15507,6 +16004,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -15730,7 +16228,14 @@
         "/api/consent/versions",
         "/settings"
       ],
-      "routes": ["/", "/consent", "/privacy", "/settings", "/signin", "/terms"],
+      "routes": [
+        "/",
+        "/consent",
+        "/privacy",
+        "/settings",
+        "/signin",
+        "/terms"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -15768,6 +16273,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -16040,6 +16546,7 @@
         "src/server/dispatch/ats/greenhouse.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -16263,6 +16770,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -16746,6 +17254,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -16929,6 +17438,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -17111,6 +17621,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -17231,7 +17742,9 @@
         "/api/home",
         "/api/nav"
       ],
-      "routes": ["/"],
+      "routes": [
+        "/"
+      ],
       "designs": [],
       "modules": [
         "src/server/billing/ledger.ts",
@@ -17407,7 +17920,9 @@
         "/api/push/subscribe",
         "/api/push/unsubscribe"
       ],
-      "routes": ["/notifications"],
+      "routes": [
+        "/notifications"
+      ],
       "designs": [],
       "modules": [
         "src/server/billing/ledger.ts",
@@ -17576,7 +18091,9 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": ["/signin"],
+      "routes": [
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -17739,7 +18256,10 @@
         "/api/profile/targets",
         "/api/running"
       ],
-      "routes": ["/", "/onboarding/facts"],
+      "routes": [
+        "/",
+        "/onboarding/facts"
+      ],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -17942,7 +18462,12 @@
         "/api/profile/skip-companies",
         "/api/profile/targets"
       ],
-      "routes": ["/", "/onboarding", "/onboarding/facts", "/onboarding/resume"],
+      "routes": [
+        "/",
+        "/onboarding",
+        "/onboarding/facts",
+        "/onboarding/resume"
+      ],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -18156,7 +18681,11 @@
         "/api/onboarding/start",
         "/api/onboarding/timezone"
       ],
-      "routes": ["/", "/onboarding", "/onboarding/forward"],
+      "routes": [
+        "/",
+        "/onboarding",
+        "/onboarding/forward"
+      ],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -18200,6 +18729,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -18405,7 +18935,12 @@
         "/api/profile/facts",
         "/api/profile/targets"
       ],
-      "routes": ["/", "/onboarding", "/onboarding/resume", "/onboarding/targets"],
+      "routes": [
+        "/",
+        "/onboarding",
+        "/onboarding/resume",
+        "/onboarding/targets"
+      ],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -18612,7 +19147,10 @@
         "/api/profile/settings",
         "/api/profile/targets"
       ],
-      "routes": ["/", "/onboarding/targets"],
+      "routes": [
+        "/",
+        "/onboarding/targets"
+      ],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -18860,6 +19398,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -19073,6 +19612,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -19284,6 +19824,7 @@
         "src/server/dispatch/ats/greenhouse.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -19448,7 +19989,11 @@
         "/__test__/user/name",
         "/api/running"
       ],
-      "routes": ["/", "/forgot-password", "/signin"],
+      "routes": [
+        "/",
+        "/forgot-password",
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -19713,6 +20258,7 @@
         "src/server/dispatch/ats/greenhouse.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -19895,6 +20441,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -20156,7 +20703,9 @@
         "/api/profile/targets",
         "/api/running"
       ],
-      "routes": ["/profile"],
+      "routes": [
+        "/profile"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -20201,6 +20750,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -20419,7 +20969,10 @@
         "/api/profile/targets/match-count",
         "/settings"
       ],
-      "routes": ["/profile", "/settings"],
+      "routes": [
+        "/profile",
+        "/settings"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -20457,6 +21010,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -20830,6 +21384,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -20999,7 +21554,10 @@
     },
     "test/e2e/reach-map.test.ts": {
       "full": false,
-      "paths": ["/api/applications", "/api/applications/:param/approve"],
+      "paths": [
+        "/api/applications",
+        "/api/applications/:param/approve"
+      ],
       "routes": [],
       "designs": [],
       "modules": [
@@ -21081,7 +21639,11 @@
         "/__test__/user/name",
         "/api/health"
       ],
-      "routes": ["/", "/forgot-password", "/reset-password"],
+      "routes": [
+        "/",
+        "/forgot-password",
+        "/reset-password"
+      ],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -21297,7 +21859,9 @@
         "/api/ready/approve",
         "/api/running"
       ],
-      "routes": ["/ready"],
+      "routes": [
+        "/ready"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -21337,6 +21901,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -21794,6 +22359,7 @@
         "src/server/dispatch/ats/greenhouse.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -21947,7 +22513,9 @@
         "/__test__/user/name",
         "/api/health"
       ],
-      "routes": ["/signin"],
+      "routes": [
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -22102,7 +22670,9 @@
         "/__test__/user/name",
         "/__test__/user/suspend"
       ],
-      "routes": ["/signin"],
+      "routes": [
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -22324,6 +22894,7 @@
         "src/server/dispatch/ats/greenhouse.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -22602,8 +23173,12 @@
         "/api/profile/settings",
         "/settings"
       ],
-      "routes": ["/settings"],
-      "designs": ["design/reference/settings/"],
+      "routes": [
+        "/settings"
+      ],
+      "designs": [
+        "design/reference/settings/"
+      ],
       "modules": [
         "src/server/admin/reveal-view.ts",
         "src/server/auth/client-ip.ts",
@@ -22640,6 +23215,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -22792,7 +23368,11 @@
         "/__test__/user/name",
         "/settings"
       ],
-      "routes": ["*", "/", "/inbox"],
+      "routes": [
+        "*",
+        "/",
+        "/inbox"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -22823,6 +23403,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -23093,7 +23674,9 @@
         "/__test__/turnstile/browser",
         "/__test__/user/name"
       ],
-      "routes": ["/signin"],
+      "routes": [
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -23249,7 +23832,11 @@
         "/__test__/user/name",
         "/settings"
       ],
-      "routes": ["/", "/settings", "/signin"],
+      "routes": [
+        "/",
+        "/settings",
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -23287,6 +23874,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -23484,7 +24072,10 @@
         "/__test__/user/name",
         "/settings"
       ],
-      "routes": ["/", "/settings"],
+      "routes": [
+        "/",
+        "/settings"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -23522,6 +24113,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/session-slots.ts",
         "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
@@ -23696,7 +24288,9 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": ["/signin"],
+      "routes": [
+        "/signin"
+      ],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -24269,6 +24863,7 @@
         "src/server/dispatch/ats/greenhouse.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -24515,6 +25110,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -24744,6 +25340,7 @@
         "src/server/dispatch/ats/ashby.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -25411,7 +26008,9 @@
         "/api/profile/resume",
         "/api/ready"
       ],
-      "routes": ["/"],
+      "routes": [
+        "/"
+      ],
       "designs": [],
       "modules": [
         "src/server/admin/reveal-view.ts",
@@ -25458,6 +26057,7 @@
         "src/server/dispatch/ats/greenhouse.ts",
         "src/server/dispatch/ats/lever.ts",
         "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
         "src/server/dispatch/browser/browser-use-provider.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/browser/index.ts",
@@ -25659,6 +26259,209 @@
       "routes": [],
       "designs": [],
       "modules": []
+    },
+    "test/e2e/workable-send.test.ts": {
+      "full": false,
+      "paths": [
+        "/__test__/applications/seed",
+        "/__test__/attempts",
+        "/__test__/auth/state",
+        "/__test__/catalog/boards",
+        "/__test__/catalog/companies",
+        "/__test__/catalog/postings",
+        "/__test__/jobs/run-now",
+        "/__test__/kill-switches/ats/workable",
+        "/__test__/ledger/grant",
+        "/__test__/ledger/sample",
+        "/__test__/mail",
+        "/__test__/notifications/seed",
+        "/__test__/settings/jobs.poll_interval_ms",
+        "/__test__/turnstile-api.js",
+        "/__test__/user/name",
+        "/api/applications/:param",
+        "/api/applications/:param/approve",
+        "/api/home",
+        "/api/profile/facts",
+        "/api/profile/resume",
+        "/api/ready",
+        "/api/reviews"
+      ],
+      "routes": [],
+      "designs": [],
+      "modules": [
+        "src/server/auth/client-ip.ts",
+        "src/server/auth/demo-login.ts",
+        "src/server/auth/email.ts",
+        "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
+        "src/server/auth/rate-limit.ts",
+        "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
+        "src/server/catalog/answer-derivations.ts",
+        "src/server/catalog/ashby-feed.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/companies-parquet.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/dedupe-key.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/feed-retag.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/greenhouse-questions.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/lever-feed.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/personio-feed.ts",
+        "src/server/catalog/posting-close.ts",
+        "src/server/catalog/question-mapping.ts",
+        "src/server/catalog/question-normalize.ts",
+        "src/server/catalog/question-rules.ts",
+        "src/server/catalog/questions.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/catalog/sweep-config.ts",
+        "src/server/catalog/tag-import.ts",
+        "src/server/catalog/tag-store.ts",
+        "src/server/catalog/worker-restarts.ts",
+        "src/server/demo/guard.ts",
+        "src/server/demo/pdf.ts",
+        "src/server/demo/role.ts",
+        "src/server/demo/sample-data.ts",
+        "src/server/demo/seed.ts",
+        "src/server/demo/startup.ts",
+        "src/server/dispatch/ats/ashby.ts",
+        "src/server/dispatch/ats/greenhouse.ts",
+        "src/server/dispatch/ats/lever.ts",
+        "src/server/dispatch/ats/shared.ts",
+        "src/server/dispatch/ats/workable.ts",
+        "src/server/dispatch/browser/browser-use-provider.ts",
+        "src/server/dispatch/browser/browser-use.ts",
+        "src/server/dispatch/browser/index.ts",
+        "src/server/dispatch/browser/kernel-provider.ts",
+        "src/server/dispatch/browser/kernel.ts",
+        "src/server/dispatch/browser/local.ts",
+        "src/server/dispatch/browser/profiles.ts",
+        "src/server/dispatch/browser/provider.ts",
+        "src/server/dispatch/browser/proxy-trim.ts",
+        "src/server/dispatch/browser/session-slots.ts",
+        "src/server/dispatch/dispatch.ts",
+        "src/server/dispatch/executor.ts",
+        "src/server/dispatch/forms/engine.ts",
+        "src/server/dispatch/liveness.ts",
+        "src/server/dispatch/outcomes.ts",
+        "src/server/dispatch/planner.ts",
+        "src/server/dispatch/planning.ts",
+        "src/server/dispatch/posting-identity.ts",
+        "src/server/export/archive.ts",
+        "src/server/export/service.ts",
+        "src/server/export/zip.ts",
+        "src/server/fixtures/capture.ts",
+        "src/server/fixtures/sanitise.ts",
+        "src/server/inbox/auth.ts",
+        "src/server/inbox/classify-llm.ts",
+        "src/server/inbox/codes.ts",
+        "src/server/inbox/dns.ts",
+        "src/server/inbox/health.ts",
+        "src/server/inbox/ingest.ts",
+        "src/server/inbox/mailboxes.ts",
+        "src/server/inbox/moves.ts",
+        "src/server/inbox/waits.ts",
+        "src/server/live-checks/alerts.ts",
+        "src/server/live-checks/store.ts",
+        "src/server/matching/applications.ts",
+        "src/server/matching/candidates.ts",
+        "src/server/matching/fx.ts",
+        "src/server/matching/regions.ts",
+        "src/server/matching/score.ts",
+        "src/server/matching/skip-match.ts",
+        "src/server/notify/notifications.ts",
+        "src/server/notify/push.ts",
+        "src/server/notify/ready-recap.ts",
+        "src/server/pipeline/answer-plan.ts",
+        "src/server/pipeline/answer-value.ts",
+        "src/server/pipeline/approval-invalidation.ts",
+        "src/server/pipeline/approved-plan.ts",
+        "src/server/pipeline/checkins.ts",
+        "src/server/pipeline/daily-prep.ts",
+        "src/server/pipeline/form-read.ts",
+        "src/server/pipeline/greenhouse-board-url.ts",
+        "src/server/pipeline/grounding.ts",
+        "src/server/pipeline/guard/posting-guard.ts",
+        "src/server/pipeline/open-text.ts",
+        "src/server/pipeline/plan-cache.ts",
+        "src/server/pipeline/prepare-jobs.ts",
+        "src/server/pipeline/prepare.ts",
+        "src/server/pipeline/review-events.ts",
+        "src/server/pipeline/review-store.ts",
+        "src/server/pipeline/reviews.ts",
+        "src/server/pipeline/send-plan.ts",
+        "src/server/pipeline/stage.ts",
+        "src/server/platform/alerts.ts",
+        "src/server/platform/crypto.ts",
+        "src/server/platform/degraded.ts",
+        "src/server/platform/jobs/queue.ts",
+        "src/server/platform/jobs/retry.ts",
+        "src/server/platform/jobs/run-due.ts",
+        "src/server/platform/llm/anthropic-batches.ts",
+        "src/server/platform/llm/caps.ts",
+        "src/server/platform/llm/usage.ts",
+        "src/server/platform/local-time.ts",
+        "src/server/platform/log.ts",
+        "src/server/platform/mail/budget.ts",
+        "src/server/platform/mail/metered.ts",
+        "src/server/platform/mail/sink.ts",
+        "src/server/platform/outbound-guard.ts",
+        "src/server/platform/passkey/index.ts",
+        "src/server/platform/ports/clock.ts",
+        "src/server/platform/ports/object-store.ts",
+        "src/server/platform/ports/r2-object-store.ts",
+        "src/server/platform/process-guard.ts",
+        "src/server/platform/settings/index.ts",
+        "src/server/platform/sse/hub.ts",
+        "src/server/platform/sse/stream.ts",
+        "src/server/platform/telemetry/otel.ts",
+        "src/server/profile/consent.ts",
+        "src/server/profile/facts.ts",
+        "src/server/profile/languages.ts",
+        "src/server/profile/personal-crypto.ts",
+        "src/server/profile/resume.ts",
+        "src/server/profile/skip-companies.ts",
+        "src/server/profile/strengthen.ts",
+        "src/server/profile/targets.ts",
+        "src/server/profile/time-zone.ts",
+        "src/server/routes/applications.ts",
+        "src/server/routes/home.ts",
+        "src/server/routes/profile.ts",
+        "src/server/routes/ready.ts",
+        "src/server/routes/reviews.ts",
+        "src/server/routes/test-only.ts",
+        "src/server/testing/blocking-job.ts",
+        "src/server/testing/cloudflare-email-recorder.ts",
+        "src/server/testing/email-sending-scenario.ts",
+        "src/server/testing/push-recorder.ts",
+        "src/server/testing/turnstile-browser-scenario.ts",
+        "src/server/testing/turnstile-browser-stub.ts",
+        "src/server/testing/turnstile-scenario.ts",
+        "src/shared/ats-mail-domains.ts",
+        "src/shared/board.ts",
+        "src/shared/checkins.ts",
+        "src/shared/code-wait.ts",
+        "src/shared/consent.ts",
+        "src/shared/copy.ts",
+        "src/shared/degraded.ts",
+        "src/shared/demo.ts",
+        "src/shared/export-crypto.ts",
+        "src/shared/facts.ts",
+        "src/shared/inbound-mail.ts",
+        "src/shared/live-service-hosts.ts",
+        "src/shared/questions.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/targets.ts",
+        "src/shared/turnstile.ts",
+        "test/e2e/identity-persona.ts",
+        "test/e2e/matching-harness.ts",
+        "test/e2e/notification-seed.ts",
+        "test/e2e/workable.fixture.ts"
+      ]
     }
   }
 }

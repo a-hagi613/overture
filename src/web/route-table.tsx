@@ -1,6 +1,7 @@
 import type { RouteObject } from "react-router";
 
 import { BoardPage } from "./routes/board.tsx";
+import { CalendarPage } from "./routes/calendar.tsx";
 import { ForgotPasswordPage } from "./routes/forgot-password.tsx";
 import { HomePage } from "./routes/home.tsx";
 import { InboxAddressPage } from "./routes/inbox-address.tsx";
@@ -41,6 +42,7 @@ const appShellChildren: RouteObject[] = [
   { path: "/ready", element: <ReadyPage /> },
   { path: "/board", element: <BoardPage /> },
   { path: "/review", element: <ReviewPage /> },
+  { path: "/calendar", element: <CalendarPage /> },
   { path: "/inbox", element: <InboxPage /> },
   { path: "/inbox/address", element: <InboxAddressPage /> },
   { path: "/inbox/:id", element: <InboxThreadPage /> },

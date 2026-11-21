@@ -2,7 +2,9 @@ type GlyphName =
   | "back"
   | "bell"
   | "board"
+  | "calendar"
   | "check"
+  | "close"
   | "chevron"
   | "copy"
   | "dash"
@@ -70,6 +72,16 @@ const glyphs: Record<GlyphName, GlyphPaths> = {
       "M12 3a9 9 0 100 18 9 9 0 000-18z",
       "M9.5 9.5a2.5 2.5 0 015 .5c0 1.5-2.5 2-2.5 3.5",
       "M12 17h.01",
+    ],
+    strokeWidth: 1.6,
+  },
+  close: { paths: ["M6 6l12 12", "M18 6L6 18"], strokeWidth: 1.8 },
+  calendar: {
+    paths: [
+      "M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z",
+      "M3 10h18",
+      "M8 3v4",
+      "M16 3v4",
     ],
     strokeWidth: 1.6,
   },

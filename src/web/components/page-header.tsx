@@ -5,11 +5,13 @@ import { HeaderControls } from "./header-controls.tsx";
 
 export function PageHeader({
   backLink,
+  calendar = false,
   lead,
   showRunningSwitch = true,
   titleNode,
 }: {
   backLink?: { href: string; label: string };
+  calendar?: boolean;
   lead: string;
   showRunningSwitch?: boolean;
   titleNode: ReactNode;
@@ -39,7 +41,7 @@ export function PageHeader({
           </p>
         )}
       </div>
-      <HeaderControls running={showRunningSwitch} />
+      <HeaderControls calendar={calendar} running={showRunningSwitch} />
     </header>
   );
 }

@@ -8,7 +8,13 @@ import { NavGlyph } from "./nav-glyph.tsx";
 import { RunningSwitch } from "./running-switch.tsx";
 import { useTheme } from "../lib/theme-context.ts";
 
-export function HeaderControls({ running }: { running: boolean }) {
+export function HeaderControls({
+  calendar = false,
+  running,
+}: {
+  calendar?: boolean;
+  running: boolean;
+}) {
   const { pathname } = useLocation();
   const { theme, toggleTheme, label } = useTheme();
   const { data: session } = authClient.useSession();
@@ -42,6 +48,16 @@ export function HeaderControls({ running }: { running: boolean }) {
           {copy.shell.searchShortcut}
         </kbd>
       </label>
+      {calendar ? (
+        <Link
+          aria-label={copy.nav.calendar}
+          className="flex h-10 w-10 flex-none items-center justify-center rounded-md border border-input bg-card hover:bg-muted max-[767px]:h-11 max-[767px]:w-11"
+          title={copy.nav.calendar}
+          to="/calendar"
+        >
+          <NavGlyph name="calendar" />
+        </Link>
+      ) : null}
       <button
         aria-label={label}
         aria-pressed={theme === "dark"}
