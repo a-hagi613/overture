@@ -97,6 +97,37 @@ test("targets and languages keep only postings that fit", async ({
   await owner.dispose();
 });
 
+test("a posting added after Up next was read shows on the next read", async ({
+  isolatedAppServer: { url },
+}) => {
+  const { owner } = await ownerContextFor(url);
+  await clearCatalog(owner);
+  const { boardId, companyId } = await catalog(owner, "Fresh Guild", "fresh-guild.example");
+
+  const first = await seedPosting(owner, {
+    atsJobId: "first",
+    boardId,
+    companyId,
+    url: "https://fresh-guild.example/first",
+  });
+
+  await configureMatching(owner);
+
+  expect(idsOf(await homeFor(owner))).toEqual([first]);
+
+  const second = await seedPosting(owner, {
+    atsJobId: "second",
+    boardId,
+    companyId,
+    title: "Second Backend Engineer",
+    url: "https://fresh-guild.example/second",
+  });
+
+  expect(idsOf(await homeFor(owner))).toContain(second);
+
+  await owner.dispose();
+});
+
 test("remote postings match their country, or work authorisation when none is named", async ({
   isolatedAppServer: { url },
 }) => {

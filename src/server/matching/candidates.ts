@@ -27,6 +27,8 @@ import { skipMatches } from "./skip-match.ts";
 import type { SkipTarget } from "./skip-match.ts";
 
 const DAY_MS = 86_400_000;
+const POOL_TTL_MS = 30_000;
+const POOL_CACHE_MAX_ENTRIES = 50;
 
 const SENIORITY_ORDER: readonly string[] = [
   "intern",
@@ -357,7 +359,7 @@ export function createCandidateService(deps: CandidateDeps) {
     dedupeKey: postings.dedupeKey,
   };
 
-  function pool(userId: string, targets: TargetsInput, languages: readonly string[]) {
+  function loadPool(targets: TargetsInput, languages: readonly string[]) {
     const roleTags = matchedRoleTags(db, targets.roles);
 
     if (
@@ -420,6 +422,52 @@ export function createCandidateService(deps: CandidateDeps) {
     }
 
     return candidates;
+  }
+
+  const poolCache = new Map<
+    string,
+    { loadedAt: number; version: string; rows: readonly CandidatePosting[] }
+  >();
+
+  function catalogVersion() {
+    const [row] = db.all<{ lastRow: number | null; lastClosed: number | null }>(
+      sql`SELECT max(rowid) AS lastRow, max(closed_at) AS lastClosed FROM postings`,
+    );
+
+    return `${String(row?.lastRow)}:${String(row?.lastClosed)}`;
+  }
+
+  function pool(targets: TargetsInput, languages: readonly string[]) {
+    const key = JSON.stringify([
+      targets.roles.toSorted(),
+      targets.seniorities.toSorted(),
+      targets.workplaces.toSorted(),
+      targets.employmentTypes.toSorted(),
+      languages.map((language) => language.toLowerCase()).toSorted(),
+    ]);
+
+    const now = clock.now();
+    const version = catalogVersion();
+    const cached = poolCache.get(key);
+
+    if (cached?.version === version && now - cached.loadedAt < POOL_TTL_MS) {
+      return cached.rows;
+    }
+
+    const rows = loadPool(targets, languages);
+
+    poolCache.delete(key);
+    poolCache.set(key, { loadedAt: now, version, rows });
+
+    if (poolCache.size > POOL_CACHE_MAX_ENTRIES) {
+      const oldest = poolCache.keys().next();
+
+      if (oldest.done !== true) {
+        poolCache.delete(oldest.value);
+      }
+    }
+
+    return rows;
   }
 
   function singlePosting(postingId: string) {
@@ -756,7 +804,7 @@ export function createCandidateService(deps: CandidateDeps) {
 
     const rankedRows: RankedCandidate[] = [];
 
-    for (const posting of pool(userId, targets, languages)) {
+    for (const posting of pool(targets, languages)) {
       const verdict = evaluatePosting(posting, context, true);
 
       if (verdict.reason !== null) {
