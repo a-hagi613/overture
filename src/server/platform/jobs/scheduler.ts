@@ -4,6 +4,7 @@ import type { ClaimedJob, JobHandlers } from "./queue.ts";
 
 import { claimJobsToRun, requeueWithoutConsumingAttempt, runClaimedJob } from "./queue.ts";
 import { logError } from "../log.ts";
+import { RETENTION_INTERVAL_MS, runRetention } from "./retention.ts";
 import { getSetting } from "../settings/index.ts";
 
 const DEFAULT_POLL_INTERVAL_MS = 15_000;
@@ -131,10 +132,34 @@ export function startJobWorker(
     }
   });
 
+  let lastRetentionAt = Number.NEGATIVE_INFINITY;
+  let retentionRunning = false;
+
+  function maybeRunRetention() {
+    const now = clock.now();
+
+    if (retentionRunning || now - lastRetentionAt < RETENTION_INTERVAL_MS) {
+      return;
+    }
+
+    retentionRunning = true;
+    lastRetentionAt = now;
+
+    void runRetention(db, clock)
+      .catch((error: unknown) => {
+        logError("jobs.retention", error);
+      })
+      .finally(() => {
+        retentionRunning = false;
+      });
+  }
+
   function runOnce() {
     if (signal.aborted) {
       return;
     }
+
+    maybeRunRetention();
 
     const claimed = claimJobsToRun(db, clock, readBatchSize(db), singletonKinds, busyKinds());
 
