@@ -1,5 +1,5 @@
 import { authTestIdentity, personas } from "./auth.fixture.ts";
-import { expect, test } from "./app.fixture.ts";
+import { expect, startFreshAppServer, test } from "./app.fixture.ts";
 import {
   clearSinkMail,
   latestMailLink,
@@ -61,25 +61,32 @@ test("the owner signs in with Google through the local identity server", async (
 test("the owner signs in with the dotless Gmail form of a dotted OWNER_EMAIL", async ({
   page,
   request,
-  isolatedAppServer,
   identityServer,
 }) => {
-  const appServerUrl = isolatedAppServer.url;
+  const appServer = await startFreshAppServer(identityServer, {
+    OWNER_EMAIL: authTestIdentity.dottedGmailOwnerEmail,
+  });
 
-  await setTurnstileScenario(request, appServerUrl, { action: "signin" });
-  await identityServer.setPersona(personas.ownerDotless("google-owner-dotless"));
-  await page.goto(`${appServerUrl}/signin`);
-  const googleButton = page.getByRole("button", { name: "Continue with Google" });
+  const appServerUrl = appServer.url;
 
-  await expect(googleButton).toBeEnabled();
-  await googleButton.click();
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  try {
+    await setTurnstileScenario(request, appServerUrl, { action: "signin" });
+    await identityServer.setPersona(personas.ownerDotless("google-owner-dotless"));
+    await page.goto(`${appServerUrl}/signin`);
+    const googleButton = page.getByRole("button", { name: "Continue with Google" });
 
-  const state = await verifyAuthState(appServerUrl, page.request);
-  const owner = state.users.at(-1);
+    await expect(googleButton).toBeEnabled();
+    await googleButton.click();
+    await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
 
-  expect(owner?.role).toBe("owner");
-  expect(state.accounts.map((account) => account.providerId)).toContain("google");
+    const state = await verifyAuthState(appServerUrl, page.request);
+    const owner = state.users.at(-1);
+
+    expect(owner?.role).toBe("owner");
+    expect(state.accounts.map((account) => account.providerId)).toContain("google");
+  } finally {
+    await appServer.stop();
+  }
 });
 
 test("the owner signs in with LinkedIn through the local identity server", async ({

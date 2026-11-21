@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
-const ownerEmail = "maya.okafor@gmail.com";
+const ownerEmail = "maya.okafor@example.com";
+const dottedGmailOwnerEmail = "maya.okafor@gmail.com";
 const ownerDotlessEmail = "mayaokafor@gmail.com";
 const masterKeyBytes = createHash("sha256").update("overture e2e master key v1").digest();
 
@@ -19,6 +20,7 @@ export const testAuthEnvironment = {
 
 export const authTestIdentity = {
   ownerEmail,
+  dottedGmailOwnerEmail,
   ownerDotlessEmail,
   ownerName: "Maya Okafor",
   secret: "e2e-auth-secret-0123456789abcdef",
