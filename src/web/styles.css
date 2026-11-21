@@ -227,6 +227,24 @@ body {
   background: var(--well);
 }
 
+.board .toast-act {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.board .toast-act:hover {
+  background: var(--well);
+}
+
 .board .rule {
   border: 0;
   border-top: 1px solid var(--line);

@@ -405,7 +405,11 @@ export function createApplicationRoutes(
     const { id } = context.req.param();
 
     const row = db
-      .select({ id: applications.id, stage: applications.stage })
+      .select({
+        closedReason: applications.closedReason,
+        id: applications.id,
+        stage: applications.stage,
+      })
       .from(applications)
       .where(and(eq(applications.id, id), eq(applications.userId, session.user.id)))
       .get();
@@ -435,7 +439,12 @@ export function createApplicationRoutes(
 
     db.transaction((tx) => {
       tx.update(applications)
-        .set({ stage: restored, stageLocked: false, updatedAt: now })
+        .set({
+          closedReason: restored === "closed" ? row.closedReason : null,
+          stage: restored,
+          stageLocked: false,
+          updatedAt: now,
+        })
         .where(eq(applications.id, id))
         .run();
 
@@ -459,6 +468,13 @@ export function createApplicationRoutes(
       clock,
       "board.moved",
       JSON.stringify({ applicationId: id, stage: restored }),
+      session.user.id,
+    );
+    publishEvent(
+      db,
+      clock,
+      "application.updated",
+      JSON.stringify({ applicationId: id }),
       session.user.id,
     );
 

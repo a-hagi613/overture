@@ -948,6 +948,13 @@ export const copy = {
       url: "/",
       kind: "code_wait",
     },
+    stageMove: {
+      title: (stage: string) => `Moved to ${stage}`,
+      body: (input: { company: string; title: string; stage: string }) =>
+        `${input.title} at ${input.company} is now in ${input.stage}. Open the Board to undo it.`,
+      url: "/board",
+      kind: "stage_move",
+    },
   },
   placeholder: {
     lead: "Coming in a later slice",

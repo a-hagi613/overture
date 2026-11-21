@@ -85,6 +85,7 @@ import {
   scheduleDailyLiveCheck,
 } from "./live-checks/job.ts";
 import { createMailIngest, MAIL_INGEST_JOB_KIND } from "./inbox/ingest.ts";
+import { createMailMoves, MAIL_CLASSIFY_JOB_KIND } from "./inbox/moves.ts";
 import { createMailboxService } from "./inbox/mailboxes.ts";
 import { FIXTURE_CAPTURE_JOB_KIND, runFixtureCaptureJob } from "./fixtures/job.ts";
 
@@ -315,6 +316,13 @@ const resumes = createResumeService({ db, clock, llm: anthropicLlmPort, objects,
 
 const outcomes = createOutcomes({ db, clock, personal, preparation });
 
+const mailMoves = createMailMoves({
+  clock,
+  db,
+  llm: anthropicLlmPort,
+  personal: mailPersonal,
+});
+
 const resolver = createMailDnsResolver(env.INBOUND_DNS_SERVER);
 
 const mailIngest = createMailIngest({
@@ -326,10 +334,14 @@ const mailIngest = createMailIngest({
   mailboxes,
   onAuthenticatedMessage: async (input) => {
     await outcomes.confirmMessage(input);
+    await mailMoves.handleAuthenticatedMessage(input);
   },
 });
 
 const mailJobHandlers: JobHandlers = {
+  [MAIL_CLASSIFY_JOB_KIND]: async (payload) => {
+    await mailMoves.runClassification(payload);
+  },
   [MAIL_INGEST_JOB_KIND]: async (payload) => {
     await mailIngest.run(payload);
   },
