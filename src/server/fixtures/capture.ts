@@ -3,8 +3,9 @@ import { chromium, errors } from "playwright-core";
 
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
-import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
+import type { BrowserProviderRegistry, RemoteBrowser } from "../dispatch/browser/provider.ts";
 
+import { acquireBrowserSession } from "../dispatch/browser/session-slots.ts";
 import { assetExtension, formSignature, sanitiseFormHtml } from "./sanitise.ts";
 
 export const ATS_NAMES = ["greenhouse", "lever", "ashby"] as const;
@@ -18,6 +19,8 @@ export const FORM_FIELD_SELECTORS = {
 } as const satisfies Record<FixtureAts, string>;
 
 export const FORM_RENDER_TIMEOUT_MS = 20_000;
+export const GOTO_TIMEOUT_MS = 30_000;
+export const GOTO_ATTEMPTS = 2;
 
 export class FormNotRenderedError extends Error {
   readonly code = "no_form_rendered";
@@ -52,6 +55,7 @@ export interface FixtureCaptureDeps {
   clock: Clock;
   objects: ObjectStore;
   providers: BrowserProviderRegistry;
+  gotoTimeoutMs?: number;
 }
 
 const resourceUrl = (value: string, base: string) => {
@@ -127,25 +131,40 @@ async function waitForForm(page: Page, ats: FixtureAts) {
   }
 }
 
+async function loadPage(page: Page, applyUrl: string, timeout: number, attempt = 1) {
+  try {
+    await page.goto(applyUrl, { timeout, waitUntil: "load" });
+  } catch (error) {
+    if (!(error instanceof errors.TimeoutError) || attempt >= GOTO_ATTEMPTS) {
+      throw error;
+    }
+
+    await page.goto("about:blank", { timeout, waitUntil: "load" });
+    await loadPage(page, applyUrl, timeout, attempt + 1);
+  }
+}
+
 async function captureOne(deps: FixtureCaptureDeps, ats: FixtureAts, applyUrl: string) {
   const provider = deps.providers.pick();
   const attemptId = `capture-${crypto.randomUUID()}`;
-
-  const browser = await provider.open({
-    attemptId,
-    country: "ca",
-    profileId: null,
-    timeoutMinutes: 15,
-  });
+  const releaseSlot = await acquireBrowserSession();
+  let browser: RemoteBrowser | null = null;
 
   try {
+    browser = await provider.open({
+      attemptId,
+      country: "ca",
+      profileId: null,
+      timeoutMinutes: 15,
+    });
+
     const cdp = await chromium.connectOverCDP(browser.cdpUrl);
 
     try {
       const context = cdp.contexts()[0] ?? (await cdp.newContext());
       const page = context.pages()[0] ?? (await context.newPage());
 
-      await page.goto(applyUrl, { waitUntil: "load" });
+      await loadPage(page, applyUrl, deps.gotoTimeoutMs ?? GOTO_TIMEOUT_MS);
       await waitForForm(page, ats);
 
       const raw = await page.content();
@@ -186,8 +205,12 @@ async function captureOne(deps: FixtureCaptureDeps, ats: FixtureAts, applyUrl: s
       await cdp.close().catch(() => undefined);
     }
   } finally {
-    await browser.close().catch(() => undefined);
-    await provider.stop(browser.sessionId).catch(() => undefined);
+    if (browser !== null) {
+      await browser.close().catch(() => undefined);
+      await provider.stop(browser.sessionId).catch(() => undefined);
+    }
+
+    releaseSlot();
   }
 }
 

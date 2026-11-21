@@ -785,6 +785,10 @@ Submit. It saves sanitised HTML + assets (names, emails, tokens and employer tra
 `scripts/pull-forms.ts` (R2 read only, no ATS traffic); the local fixture server replays them, including fake
 confirmation pages, a fake code prompt and a fake visible challenge. The capture job opens at most ten URLs per run,
 with no user profile attached, and writes `fixtures/{ats}/{form_signature}/form.html`, its assets and `meta.json`. The ATS apps render the form after load, so the job waits up to 20 s for a form field and otherwise fails with `no_form_rendered`, saving nothing.
+Every browser session, whether a capture, the early cloud probe or a dispatch send, takes a slot from one
+process-wide semaphore sized by `browser.max_concurrent_sessions` (default 3). A capture that cannot get a slot waits
+without failing or spending an attempt. A 429 from the provider's create-session call is retried with backoff and does
+not spend an attempt, and a `goto` that times out is retried once.
 On production the same job is queued from the machine with
 `bun run scripts/capture-forms.ts --ats <ats> --url <apply_url> [--url <apply_url> …]`; the running worker picks it
 up and the files land under the `fixtures/{ats}/` prefix in R2. Live smoke checks are the same kind of admin job,
@@ -862,6 +866,7 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
 | `llm.cap_user_day_usd` / `llm.cap_global_day_usd` / `llm.cap_tagging_day_usd` | 0.25 / 10 / 1 | 0011, 0017 |
 | `browser.provider` | `browser_use` | 0003 |
 | `browser.concurrency` | 10 | 0003 |
+| `browser.max_concurrent_sessions` | 3 | — |
 | `checkin.after_days` / `checkin.close_after_days` | 21 / 45 | 0012 |
 | Plans (M3) | trial 3 one-time; week $12 → 70 / 7 days; month $35 → 300 / 30 days; renewals; no rollover | 0018 |
 

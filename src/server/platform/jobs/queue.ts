@@ -5,6 +5,7 @@ import type { Clock } from "../ports/clock.ts";
 
 import { bgJobs } from "../db/schema.ts";
 import { publishEvent } from "../sse/stream.ts";
+import { RETRY_LATER_DELAY_MS, RetryLaterError } from "./retry.ts";
 
 export type JobHandlers = Readonly<Record<string, (payload: string) => Promise<void>>>;
 
@@ -33,6 +34,23 @@ async function runJob(
     return true;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (error instanceof RetryLaterError) {
+      db.update(bgJobs)
+        .set({
+          status: "queued",
+          attempts: Math.max(0, job.attempts - 1),
+          lastError: errorMessage,
+          lockedUntil: null,
+          runAt: clock.now() + RETRY_LATER_DELAY_MS,
+          updatedAt: clock.now(),
+        })
+        .where(eq(bgJobs.id, job.id))
+        .run();
+
+      return false;
+    }
+
     const nextAttempts = job.attempts;
     const isDead = nextAttempts >= job.maxAttempts;
     const backoffMs = isDead ? 0 : Math.min(60_000 * 2 ** (nextAttempts - 1), 3_600_000);

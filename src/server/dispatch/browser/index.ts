@@ -10,8 +10,11 @@ import { createBrowserProfileStore } from "./profiles.ts";
 import { KernelClient } from "./kernel.ts";
 import { createKernelBrowserProvider } from "./kernel-provider.ts";
 import { createLocalBrowserProvider } from "./local.ts";
+import { configureBrowserSessionLimitFromSetting } from "./session-slots.ts";
 
 export function createBrowserProvider(env: Env, clock: Clock, db: AppDatabase) {
+  configureBrowserSessionLimitFromSetting(db);
+
   if (env.BROWSER_PROVIDER === undefined && env.BROWSER_USE_API_KEY === undefined) {
     return null;
   }
