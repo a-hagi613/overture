@@ -96,7 +96,6 @@ async function seedCodeWait(request: APIRequestContext, appServerUrl: string, us
   });
 
   const applicationId = await seedApplication(request, {
-    id: "00000000-0000-4000-8000-000000000419",
     postingId,
     status: "sending",
     userId,
@@ -141,6 +140,32 @@ async function seedScene(appServerUrl: string) {
   await request.dispose();
 
   return storageState;
+}
+
+async function expectTouchTargets(page: Page, testId: string) {
+  const sizes = await page
+    .getByTestId(testId)
+    .locator("button, a")
+    .evaluateAll((nodes) =>
+      nodes
+        .map((node) => {
+          const box = node.getBoundingClientRect();
+
+          return {
+            height: Math.round(box.height),
+            label: (node.getAttribute("aria-label") ?? node.textContent).trim().slice(0, 24),
+            width: Math.round(box.width),
+          };
+        })
+        .filter((size) => size.width > 0 || size.height > 0),
+    );
+
+  expect(sizes.length).toBeGreaterThan(0);
+
+  for (const size of sizes) {
+    expect(size.height, size.label).toBeGreaterThanOrEqual(44);
+    expect(size.width, size.label).toBeGreaterThanOrEqual(44);
+  }
 }
 
 async function expectNoOverflow(page: Page) {
@@ -306,6 +331,10 @@ for (const width of [390, 1280] as const) {
 
       await expectNoOverflow(page);
 
+      if (width === 390) {
+        await expectTouchTargets(page, "home-code-wait");
+      }
+
       const { violations } = await new AxeBuilder({ page }).analyze();
 
       expect(violations, variant).toEqual([]);
@@ -363,6 +392,11 @@ for (const width of [390, 1280] as const) {
       expect(Math.round(inputBox?.height ?? 0)).toBe(50);
 
       await expectNoOverflow(page);
+      await expect(sheet.getByText(/\bno\./u)).toHaveCount(0);
+
+      if (width === 390) {
+        await expectTouchTargets(page, "code-paste-sheet");
+      }
 
       const { violations } = await new AxeBuilder({ page }).analyze();
 
@@ -392,6 +426,10 @@ for (const width of [390, 1280] as const) {
       await expect(sheet.getByText("Code accepted")).toBeVisible();
       await expect(sheet.getByText("Checking with the employer", { exact: true })).toBeVisible();
       await expect(sheet.getByRole("link", { name: "Open Board" })).toBeVisible();
+
+      if (width === 390) {
+        await expectTouchTargets(page, "code-paste-sheet");
+      }
 
       await context.close();
     });
@@ -433,3 +471,51 @@ for (const width of [768, 1920, 2560] as const) {
     await context.close();
   });
 }
+
+test("the sheet holds the keyboard inside and gives focus back when it closes", async ({
+  browser,
+  codePasteServer,
+}) => {
+  const storageState = await seedScene(codePasteServer.url);
+
+  const context = await browser.newContext({
+    deviceScaleFactor: 1,
+    storageState,
+    viewport: { height: 1000, width: 390 },
+  });
+
+  const page = await context.newPage();
+
+  await page.goto(`${codePasteServer.url}/`);
+
+  const opener = page.getByRole("button", { name: "Paste the code" });
+  const sheet = page.getByTestId("code-paste-sheet");
+
+  await opener.focus();
+  await page.keyboard.press("Enter");
+
+  await expect(sheet).toBeVisible();
+  await expect(page.getByLabel("Verification code")).toBeFocused();
+
+  await sheet.getByRole("button", { name: "No code yet" }).focus();
+  await page.keyboard.press("Tab");
+
+  const wrapped = await page.evaluate(() => {
+    const active = document.activeElement;
+
+    return {
+      inside: active?.closest('[data-testid="code-paste-sheet"]') !== null,
+      label: active?.getAttribute("aria-label") ?? "",
+    };
+  });
+
+  expect(wrapped.inside).toBe(true);
+  expect(wrapped.label).toBe("Close the code-paste sheet");
+
+  await page.keyboard.press("Escape");
+
+  await expect(sheet).toHaveCount(0);
+  await expect(opener).toBeFocused();
+
+  await context.close();
+});

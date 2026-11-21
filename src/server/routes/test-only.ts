@@ -328,7 +328,6 @@ const recordLlmUsageBody = z.object({
 const seedApplicationBody = z.object({
   userId: z.string().min(1),
   postingId: z.string().min(1),
-  id: z.string().min(1).optional(),
   status: z.enum([
     "preparing",
     "needs_review",
@@ -1332,7 +1331,6 @@ export function createTestRoutes(
     const {
       userId,
       postingId,
-      id: seededId,
       status,
       sentAt,
       createdAt,
@@ -1355,7 +1353,7 @@ export function createTestRoutes(
       return context.json({ error: "not found" }, 404);
     }
 
-    const id = seededId ?? crypto.randomUUID();
+    const id = crypto.randomUUID();
     const now = createdAt ?? clock.now();
     const seededStage = stage === undefined ? stageForStatus(status) : stage;
 
