@@ -2,6 +2,12 @@ import { copy } from "../../../shared/copy.ts";
 
 export const adminDestinations = [
   { end: true, glyph: "home", label: copy.admin.navOverview, to: "/admin" },
+  {
+    end: true,
+    glyph: "check",
+    label: copy.admin.navProviderReport,
+    to: "/admin/provider-report",
+  },
   { end: false, glyph: "users", label: copy.admin.navUsers, to: "/admin/users" },
   { end: false, glyph: "mail", label: copy.admin.navInvites, to: "/admin/invites" },
   { end: false, glyph: "tag", label: copy.admin.navGrants, to: "/admin/grants" },

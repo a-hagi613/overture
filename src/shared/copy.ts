@@ -1943,6 +1943,82 @@ export const copy = {
     overviewCostEmpty: "No completed Applications yet.",
     overviewCostTrend: "Proxy use per completed Application is trending up.",
     overviewCostNoTrend: "Proxy use per completed Application is steady.",
+    navProviderReport: "Provider report",
+    reportTitlePlain: "The provider",
+    reportTitleItalic: "report",
+    reportLead: "How each browser and job board is doing, and what the lab measured",
+    reportSendHeading: "Send results",
+    reportSendIntro:
+      "Every send try, per browser and job board. Cost counts attempted Applications, failed tries included.",
+    reportSendEmpty: "No send has run yet.",
+    reportLabHeading: "The synthetic lab",
+    reportLabIntro:
+      "Sessions against Overture's own challenge pages and recorded forms. No employer is involved, and the lab's cost is reported beside the gate, not inside it.",
+    reportLabEmpty: "The lab has not run yet.",
+    reportColumnBrowser: "Browser",
+    reportColumnJobBoard: "Job board",
+    reportColumnPage: "Lab page",
+    reportColumnAttempted: "Attempted",
+    reportColumnSessions: "Sessions",
+    reportColumnCompleted: "Completed",
+    reportColumnCompletion: "Completion",
+    reportColumnChallenge: "Challenge",
+    reportColumnCode: "Code",
+    reportColumnP50: "p50 duration",
+    reportColumnP95: "p95 duration",
+    reportColumnProxy: "Proxy per completed",
+    reportColumnCost: "Cost per completed",
+    reportColumnGate: "Gate",
+    reportColumnScore: "reCAPTCHA score",
+    reportCostGate: (cost: string, gate: string) => `${cost} against the ${gate} gate`,
+    reportCostInside: "Inside the gate",
+    reportCostOver: "Over the gate",
+    reportRate: (rate: number) => `${String(Math.round(rate * 100))}%`,
+    reportNone: "—",
+    reportSeconds: (millis: number) => `${(millis / 1000).toFixed(1)} s`,
+    reportMegabytes: (megabytes: number) => `${megabytes.toFixed(2)} MB`,
+    reportDollars: (micros: number) => `$${(micros / 1_000_000).toFixed(4)}`,
+    reportBrowserName: (provider: string) => {
+      if (provider === "browser_use") {
+        return "Browser Use";
+      }
+
+      if (provider === "kernel") {
+        return "Kernel";
+      }
+
+      return provider === "local" ? "Local Chrome" : provider;
+    },
+    reportLabPageName: (page: string) => {
+      if (page === "recaptcha_v3") {
+        return "reCAPTCHA v3";
+      }
+
+      if (page === "hcaptcha") {
+        return "hCaptcha";
+      }
+
+      if (page === "turnstile") {
+        return "Turnstile";
+      }
+
+      if (page === "form:greenhouse") {
+        return "Recorded Greenhouse form";
+      }
+
+      if (page === "form:lever") {
+        return "Recorded Lever form";
+      }
+
+      return page === "form:ashby" ? "Recorded Ashby form" : page;
+    },
+    reportLabRunHeading: "Run the lab",
+    reportLabRunIntro:
+      "Each session opens a browser on the lab pages. Nothing leaves Overture. Up to 200 sessions per page and browser.",
+    reportLabSessionsLabel: "Sessions per page and browser",
+    reportLabRun: "Run the lab",
+    reportLabQueued: "The lab run is queued. Results appear here when it finishes.",
+    reportLabFailed: "The lab run did not start.",
     switchesTitlePlain: "Kill switches",
     switchesTitleItalic: "and settings",
     switchesLead: "Turn Overture's work off, and tune the limits that pace it",

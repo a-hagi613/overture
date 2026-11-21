@@ -686,6 +686,33 @@ export const liveCheckMail = sqliteTable(
   (t) => [index("live_check_mail_sent").on(t.sentAt)],
 );
 
+export const labRuns = sqliteTable(
+  "lab_runs",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id").notNull(),
+    provider: text("provider", { enum: ["browser_use", "kernel", "local"] }).notNull(),
+    page: text("page", { enum: ["recaptcha_v3", "hcaptcha", "turnstile", "form"] }).notNull(),
+    ats: text("ats"),
+    outcome: text("outcome", { enum: ["completed", "challenge_blocked", "error"] }).notNull(),
+    challengeSeen: integer("challenge_seen", { mode: "boolean" }).notNull().default(false),
+    codeAsked: integer("code_asked", { mode: "boolean" }).notNull().default(false),
+    captchaScore: real("captcha_score"),
+    durationMs: integer("duration_ms").notNull(),
+    proxyBytes: integer("proxy_bytes"),
+    costMicros: integer("cost_micros"),
+    sessionId: text("session_id"),
+    startedAt: integer("started_at").notNull(),
+    endedAt: integer("ended_at").notNull(),
+    errorCode: text("error_code"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [
+    index("lab_runs_provider_started").on(t.provider, t.startedAt),
+    index("lab_runs_run").on(t.runId),
+  ],
+);
+
 export const notifications = sqliteTable(
   "notifications",
   {

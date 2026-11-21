@@ -20,6 +20,7 @@ import type { AccountEraser } from "./account/erase.ts";
 import type { ExportService } from "./export/service.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
+import { createLabRoutes } from "./routes/lab.ts";
 import { createMeRoutes } from "./routes/me.ts";
 import { createApiRoutes } from "./routes/api.ts";
 import { createNotificationRoutes } from "./routes/notifications.ts";
@@ -34,7 +35,7 @@ import { createReviewRoutes } from "./routes/reviews.ts";
 import { createAdminApi, isAdminHost } from "./routes/admin.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
 import { stripUntrustedIpHeaders } from "./auth/client-ip.ts";
-import { env } from "./config/env.ts";
+import { env, labEnvironment } from "./config/env.ts";
 import { demoLocked } from "./demo/guard.ts";
 import { createProfileRoutes } from "./routes/profile.ts";
 import { createOnboardingRoutes } from "./routes/onboarding.ts";
@@ -172,6 +173,15 @@ export function createApp(deps: AppDependencies) {
 
   app.all("/api/auth/*", async (context) =>
     deps.auth.handler(stripUntrustedIpHeaders(context.req.raw, clientIpConfig)),
+  );
+  app.route(
+    "/lab",
+    createLabRoutes({
+      clock: deps.clock,
+      environment: labEnvironment,
+      recaptchaSecret: env.LAB_RECAPTCHA_SECRET,
+      recaptchaVerifyUrl: env.LAB_RECAPTCHA_VERIFY_URL,
+    }),
   );
   app.route("/api", createHealthRoutes(deps.db, deps.backups));
   app.route("/api", createMeRoutes(deps.auth));

@@ -113,6 +113,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Cloudflare R2 `overture-inbound-mail-spill` | inbound mail over the 128 KB Queue limit (ADR 0028) | the `INBOUND_SPILL` Worker binding; objects under `spill/{reference}.eml` | a fake R2 binding in the Worker tests (put, get, delete) |
 | Browser Use Cloud | primary browser | `BROWSER_USE_API_KEY`, `BROWSER_USE_API_BASE_URL` (test-only override) | `local` provider: real local Chrome filling saved forms from the fixture server (§10.5); control API from recorded responses, through MSW in-process or a local recorded fixture server for the app |
 | Kernel | fallback browser | `KERNEL_API_KEY`, `KERNEL_API_BASE_URL` (test-only override) | local recorded control-API server with real local Chrome behind it; lab only |
+| reCAPTCHA v3, hCaptcha, Turnstile | synthetic lab challenge pages (§10.4) | `LAB_RECAPTCHA_SCRIPT_URL`, `LAB_HCAPTCHA_SCRIPT_URL`, `LAB_TURNSTILE_SCRIPT_URL`, `LAB_RECAPTCHA_SITE_KEY`, `LAB_HCAPTCHA_SITE_KEY`, `LAB_TURNSTILE_SITE_KEY`, `LAB_RECAPTCHA_VERIFY_URL`, `LAB_RECAPTCHA_SECRET` (all optional; the script and verify URLs default to the vendors') | same-origin `/__test__/lab-*.js` stubs and a local recorded siteverify; no challenge host is contacted (ADR 0016) |
 | Anthropic | LLM (prod) | `ANTHROPIC_API_KEY` | real adapter; API intercepted by MSW with responses recorded by the daily live check |
 | OpenCode Go | LLM (local dev only) | `OPENCODE_API_KEY` | — |
 | Cloudflare Email Sending | outbound mail (magic links, live check, later notices) | `CLOUDFLARE_EMAIL_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (both or neither); `CLOUDFLARE_EMAIL_API_BASE_URL` (test-only override of the real API host) | real adapter; the send endpoint is intercepted by MSW and the request body asserted (`test/e2e/cloudflare-email.test.ts`) |
@@ -122,7 +123,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Master key | envelope encryption | `MASTER_KEY_V1` (32 bytes base64), `MASTER_KEY_CURRENT=1` | fixed test key |
 | Google + LinkedIn (OIDC) | OAuth sign-in providers | `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID` with `LINKEDIN_CLIENT_SECRET`; each pair optional, both or neither (a half-set pair stops boot); an unset pair leaves that provider unregistered and hidden | local OIDC identity server; discovery URLs overridable via `OAUTH_GOOGLE_DISCOVERY_URL`, `OAUTH_LINKEDIN_DISCOVERY_URL` |
 | Auth | better-auth sessions | `BETTER_AUTH_SECRET`, `AUTH_ALLOWED_HOSTS` | local test secret and loopback hosts |
-| App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com` (forwarding addresses), `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `ALERT_NTFY_URL` (optional) | |
+| App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com` (forwarding addresses), `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `LAB_BASE_URL` (defaults to `APP_ORIGIN`), `ALERT_NTFY_URL` (optional) | |
 
 Inbound mail is buffered on the `overture-inbound-mail` Queue (100 retries, 14-day retention) and its dead-letter queue
 `overture-inbound-mail-dlq`; spilled messages live in the separate R2 bucket `overture-inbound-mail-spill` under
@@ -990,12 +991,26 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 
 ### 10.4 Synthetic lab and provider report (M1)
 
-- Synthetic: `https://tryoverture.com/lab/*` pages with reCAPTCHA v3 (score logged server-side), hCaptcha, Turnstile
-  and recorded ATS fixture forms; 200 sessions per provider (Browser Use and Kernel); no employer involved.
+- Synthetic: `https://tryoverture.com/lab/*` pages with reCAPTCHA v3 (score checked and logged server-side), hCaptcha,
+  Turnstile and recorded ATS-shaped forms. The pages render a vendor script only; the score endpoint posts the token to
+  reCAPTCHA's siteverify and reports the score the vendor returns, so a page can show the score but never set it.
+  `LAB_BASE_URL` (default `APP_ORIGIN`) is the origin the runner drives. The `lab.run` job takes
+  `{providers, pages, sessionsPerPage, challenge}`, capped at 200 sessions per page and provider, opens one browser
+  session per session, fills and submits the recorded forms (a confirmation page, no employer), and records one
+  `lab_runs` row per session: provider, page, ATS, outcome (`completed`, `challenge_blocked`, `error`), challenge and
+  code flags, reCAPTCHA score, duration, proxy bytes, cost and session id. `challenge: "blocked"` runs the same pages
+  with the widget held visible, so the challenge rate is measured, not assumed. Every session takes a slot from the
+  same process-wide browser semaphore as a send.
+- No live vendor traffic in development or tests (ADR 0016): `LAB_RECAPTCHA_SCRIPT_URL`, `LAB_HCAPTCHA_SCRIPT_URL`,
+  `LAB_TURNSTILE_SCRIPT_URL` and `LAB_RECAPTCHA_VERIFY_URL` are env overrides; tests point them at `/__test__/lab-*.js`
+  stubs and a local recorded siteverify, so a lab run contacts no challenge host.
 - Live: the owner's real applications, each approved by the owner, on Browser Use only; ≥ 25 for the M1 gate
   (ADR 0029).
-- Admin report: completion rate, code rate, challenge rate, p50/p95 duration, proxy MB and cost per completed
-  application, per provider × ATS. Overview shows proxy MB and cost per completed application against the $0.03 gate.
+- Admin report (`GET /admin/api/provider-report`, and the Provider report page at `/admin/provider-report`): completion
+  rate, code rate, challenge rate, p50/p95 duration, proxy MB and cost per completed application, per provider × ATS;
+  the synthetic lab is reported beside it, aggregated per provider × lab page with the same rates, durations, proxy and
+  cost and the average reCAPTCHA score, and is never counted inside the gate. `POST /admin/api/lab/runs` queues a lab
+  run (audited). Overview shows proxy MB and cost per completed application against the $0.03 gate.
   The report raises `browser.proxy_trend` when the latest 20 completed applications use more than 1.2× the proxy bytes
   per completed application of the 20 before them. Kernel stays the fallback unless the lab shows it clearly ahead
   and the owner decides otherwise.

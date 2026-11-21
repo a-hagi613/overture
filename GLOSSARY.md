@@ -245,6 +245,19 @@ _Avoid_: inbox analytics, mail report
 The daily `live.check` job on `overture-web` that exercises a real form capture, real Haiku calls, the mail loop and R2, records pass/fail and timing, and alerts the owner on failure. It never submits an application or touches a user.
 _Avoid_: smoke test, canary, health probe
 
+**Synthetic lab**:
+The employer-free pages under `/lab/*` (reCAPTCHA v3 with its score checked on the server, hCaptcha, Turnstile and
+recorded ATS-shaped forms) and the `lab.run` job that drives them in each browser provider. A lab run records one row
+per session in `lab_runs`; the admin provider report shows the lab beside the live send report and never inside the
+cost gate.
+_Avoid_: test site, sandbox, benchmark, challenge farm
+
+**Provider report**:
+The admin view of send results per browser provider and ATS — attempted, completed, completion rate, challenge and
+code rates, p50/p95 duration, proxy MB and cost per completed Application against the $0.03 gate — plus the synthetic
+lab's results per provider and lab page.
+_Avoid_: browser stats, vendor dashboard
+
 ## Never in anything a user can read
 
 `Hold`, runner, lease, provider, dispatch, attempt, ledger, credit, CAPTCHA, Brain, Hands, workspace, Job Board (say Board), Answer Bank, Memory Base, Live Tab.
