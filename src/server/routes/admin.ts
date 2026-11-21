@@ -568,6 +568,8 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     db.transaction((tx) => {
       tx.update(users).set({ suspendedAt: at, updatedAt: at }).where(eq(users.id, user.id)).run();
 
+      tx.delete(sessions).where(eq(sessions.userId, user.id)).run();
+
       tx.insert(profiles)
         .values({
           userId: user.id,
