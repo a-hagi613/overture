@@ -22,7 +22,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for eighteen invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
+exist only for nineteen invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
 derivations, the answer planner (a salary Fact kept per currency is chosen only for the currency a question names),
 the facts model (a Fact's scope is validated against its key), the onboarding step's salary and EEO reading, the
 fixture sanitiser (recorded pages must carry no script, event handler, personal data or token), the v1
@@ -30,14 +30,19 @@ answer-bank mapping, the live-traffic guard (in test and development, an outboun
 paid-service host is refused), the replica listing (the newest transaction is read from the first non-empty
 Litestream level, so a healthy replica costs one R2 list per read, #281), the job worker's wait (a completed wait
 retains no abort listener), the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
-a copy string or key), and the trusted client IP (only the header Fly's proxy stamps is believed; a forged
-`x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), and the SQLite handle guard (a file
+a copy string or key), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
+`x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the SQLite handle guard (a file
 in `src/` or `test/` that opens a `new DatabaseSync` also configures `PRAGMA busy_timeout`, or is a documented opt-out
-in `scripts/database-sync-guard.ts`, so an unconfigured handle cannot stall `main` with `SQLITE_BUSY` again). They
+in `scripts/database-sync-guard.ts`, so an unconfigured handle cannot stall `main` with `SQLITE_BUSY` again), and the
+monthly mail budget (`budget.test.ts`: one row per UTC month counts every send by kind and fails closed, notices stop
+at the sign-in reserve while sign-in mail and the live check may spend it, each stop is stamped once in its own column
+so the reserve alert never hides the cap alert, and the count survives reopening the database, #282). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
-depend on the runner. CI stays under two minutes on pull requests: six shards balanced by per-file time, and a pull
-request runs only the e2e files its committed reach map says its diff can reach, with everything unclassified running
-the full suite. Main always runs all of them. No sleeps, no retries, no lowered timeouts.
+depend on the runner. The mail count runs the real SQLite file and the real migrations, so the invariant is exercised
+against the shipped schema rather than a stand-in. CI stays under two minutes on pull requests: six shards balanced by
+per-file time, and a pull request runs only the e2e files its committed reach map says its diff can reach, with
+everything unclassified running the full suite. Main always runs all of them. No sleeps, no retries, no lowered
+timeouts.
 
 ## Considered Options
 

@@ -138,6 +138,14 @@ bearer header; the research and the Beta terms are in `docs/research/cloudflare-
 `CLOUDFLARE_ZONE_ID` scopes the M2-02 sending-domain script and guards. `REQUIRE_EMAIL_SENDING` gates the live
 `mail.sending` guard: unset, the check records `status: "gated"` and does not alert; set, it verifies the sending
 domain and alerts while a send to a non-owner recipient would be refused.
+Email Sending includes 3,000 emails a month and no Cloudflare limit covers it, so the app counts every send in
+`mail_usage` (one row per UTC month and kind) before the request leaves the machine. `mail.monthly_cap` (2,700)
+refuses further sends and `mail.sign_in_reserve` (270) keeps the last sends for magic links, verification, resets and
+the live check, so a Recap cannot starve them; a refused send fails closed like §8.6. The owner is alerted at 80% of
+the cap, once when notices pause at the reserve, and once when every kind of mail stops at the cap — the reserve
+refusal is stamped in `reserve_refused_at` and the cap refusal in `refused_at`, so the first never hides the second.
+The admin overview shows the month's count and says which of the two stops is in force. Tests reach Cloudflare only
+through MSW (ADR 0013, 0016).
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
 
 ### 3.3 Domains and DNS
@@ -917,7 +925,7 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 
 ### 10.3 Attempt steps (`submit.run`)
 
-1. Open provider browser (15-minute vendor timeout, attempt id as metadata); `page.route` aborts fonts, media (audio and video) and known analytics/tracker hosts. Images, scripts, XHR and CAPTCHA hosts (hCaptcha, reCAPTCHA, Turnstile) are never blocked: proxy traffic is about 90 % of Browser Use's bill at $5/GB, and those requests are what the form needs.
+1. Open provider browser (15-minute vendor timeout, attempt id as metadata); `page.route` aborts fonts, media (audio and video) and known analytics/tracker hosts. Images, scripts, XHR and CAPTCHA hosts (hCaptcha, reCAPTCHA, Turnstile) are never blocked: at $5/GB proxy is 59 % of Browser Use's bill at the one recorded session usage (2.71 MB, 9 min 16 s) and reaches 80–90 % only on a form of about 10 MB or more, so those requests cost money but they are what the form needs (§10.4, `docs/research/cost-m1.md`).
 2. Navigate to the apply link: for Greenhouse the embed form `https://job-boards.greenhouse.io/embed/job_app?for={board_token}&token={ats_job_id}` (`job-boards.eu.greenhouse.io` when the board's `region` is `eu`), never the employer's `absolute_url` and never the plain `/{board_token}/jobs/{id}` board page, which redirects to the employer's own site on boards with a custom careers domain; otherwise `apply_url`. The identity check reads `for` and `token` from that path. If the page says the job is closed → `posting_closed`. Check that the live page's
    host, board token, job id and company name match the Posting; a redirect or any other mismatch → `identity_mismatch`
    (release, `skipped` with `status_reason` `posting_identity:<field>`, never submit).
@@ -1097,6 +1105,7 @@ body, sender or attachment, so the admin never sees message content.
 | `match.auto_threshold_default` | 60 (user may pick 50) | 0011 |
 | `match.strong` | 80 | 0011 |
 | `llm.cap_user_day_usd` / `llm.cap_global_day_usd` / `llm.cap_tagging_day_usd` | 0.25 / 10 / 1 | 0011, 0017 |
+| `mail.monthly_cap` / `mail.sign_in_reserve` | 2700 / 270 (sends a UTC month, and the share kept for sign-in mail and the live check) | 0033 |
 | `browser.provider` | `browser_use` | 0003 |
 | `browser.max_concurrent_sessions` | 3 (the browser semaphore and the dispatcher's in-flight send cap) | 0003 |
 | `checkin.after_days` / `checkin.close_after_days` | 21 / 45 | 0012 |
@@ -1113,7 +1122,7 @@ body, sender or attachment, so the admin never sees message content.
 - Turnstile + rate limits: magic link 3/15 min, demo sign-in 3/15 min, social sign-in 10/15 min (IP), and the delete-account sign-in link 3 per window.
 - Turnstile gate (our own, in front of `/api/auth/sign-in/social`, `/api/auth/sign-in/magic-link` and `/api/auth/demo/sign-in`, before any auth logic): the token comes from `x-captcha-response` and must be a non-empty string of at most 2048 characters. The surface's action comes from `x-turnstile-action` and must be allowed for that endpoint: `signin` for social, `magiclink` for the emailed link and the demo sign-in. Each sign-in widget renders with its surface's action and resets after each submit. The server calls siteverify once per token (form-encoded `secret`, `response`, `remoteip`; 10 s timeout). Any missing or over-long token, non-OK response, error, `success: false`, `action` other than the surface's, or `hostname` outside `TURNSTILE_HOSTNAMES` gets a 403 `captcha_failed`. `TURNSTILE_HOSTNAMES` (comma-separated) defaults to the `APP_ORIGIN` hostname, or to localhost and 127.0.0.1 when `APP_ORIGIN` is unset outside production; boot fails in production if the list includes localhost or 127.0.0.1, or if neither `APP_ORIGIN` nor `TURNSTILE_HOSTNAMES` is set.
 - Cookies httpOnly, Secure, SameSite=Lax; CSRF by Origin check on state-changing routes; sessions 30 days rolling;
-  "Sign out all devices" in Settings.
+  "Sign out" (this device only) and "Sign out all devices" (every other session) in Settings. "Sign out" ends the current session and returns to `/signin`; it is also the only sign-out inside the signed-in app, and the demo account may use it.
 - M1 allowlist = owner; **M2 invites**: the admin creates an invite for an email; the first verified sign-in with that email by any
   method (magic link, Google, LinkedIn) accepts it, creates the account and issues one admin grant of 300
   applications over 30 days (no card). A sign-in with any other email is refused with the same copy for every method; an
@@ -1248,7 +1257,7 @@ Profile** (Ready added by ADR 0029); Settings from the avatar; desktop hover sub
 | Review | Open questions grouped by jobs unlocked; answer input matches field type; dismiss | none open |
 | Inbox | Threads list (linked company/card), message view, attachments, "Couldn't verify sender" label; read-only (no reply, §11.2); the code-paste prompt | empty, address explainer |
 | Profile | Resume, facts by tier, targets with live job count, skip list, forwarding address, "Strengthen your profile" | missing Tier 1 facts |
-| Settings | Threshold (60/50), digest, notifications, timezone, languages, forwarding address (read-only), the fixed limits explained (10 a day, 08:00–20:00, one company per 30 days; not editable), Terms, Privacy and the consent version you agreed to, plan & billing (M3), sign out all devices, export, delete, support access log. Account pages share the five tabs: Notifications, Export, Delete account, Support access, Terms and privacy; Delete shows the warning, re-authentication, confirmation, erasing and confirmation-email states | |
+| Settings | Threshold (60/50), digest, notifications, timezone, languages, forwarding address (read-only), the fixed limits explained (10 a day, 08:00–20:00, one company per 30 days; not editable), Terms, Privacy and the consent version you agreed to, plan & billing (M3), sign out (this device), sign out all devices, export, delete, support access log. Account pages share the five tabs: Notifications, Export, Delete account, Support access, Terms and privacy; Delete shows the warning, re-authentication, confirmation, erasing and confirmation-email states | |
 | Onboarding (M2) | 1 Sign in (invite) · 2 Resume · 3 Your facts (Tier 1, prefilled) · 4 What you want (roles, locations, workplace, seniority and a salary floor from choices that have open Postings, live count, browser timezone saved without asking; posting languages start as English and employment type as full-time until Settings) · 5 Forward ATS mail (the Gmail and Outlook filter guide, forwarding detected, or skip to the paste fallback) + consent + trial card (M3) + Start; PWA install + push prompt after Start; each step saved as it is finished | resume unreadable → manual entry, filter skipped → codes by paste |
 | Admin | Same design system: Overview (success per provider × ATS, cost per completed application, queue, spend), Users, Applications/Attempts (live view/replay embed), Reviews, Kill switches & Settings, Catalog health, Mail health, Provider report, Fixture capture, Grants/Refunds, Audit | |
 | Public (M3) | Landing, pricing, privacy, terms; prerendered static HTML; the landing says Overture prepares every application and sends it when you approve | |

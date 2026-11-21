@@ -33,6 +33,8 @@ const SETTING_DEFAULTS = {
   "checkin.close_after_days": "45",
   "invite.grant_quantity": "300",
   "invite.grant_days": "30",
+  "mail.monthly_cap": "2700",
+  "mail.sign_in_reserve": "270",
   "jobs.poll_interval_ms": "15000",
   "jobs.batch_size": "10",
   "catalog.sweep_max_boards": "20",
@@ -44,7 +46,7 @@ export { SETTING_DEFAULTS };
 
 const DEFAULT_LOOKUP = new Map<string, string>(Object.entries(SETTING_DEFAULTS));
 
-export function getSetting(db: AppDatabase, key: string) {
+export function getSetting(db: Pick<AppDatabase, "select">, key: string) {
   const row = db.select().from(settings).where(eq(settings.key, key)).get();
 
   return row?.value ?? DEFAULT_LOOKUP.get(key) ?? null;
