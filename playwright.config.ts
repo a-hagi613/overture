@@ -148,5 +148,9 @@ export default defineConfig({
       name: "notifications-boards",
       testMatch: /board-match-notifications\.test\.ts/u,
     },
+    {
+      name: "settings-delete-boards",
+      testMatch: /board-match-settings-delete\.test\.ts/u,
+    },
   ],
 });
