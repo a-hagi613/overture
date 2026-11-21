@@ -79,7 +79,7 @@ export function HomeCheckIn({ checkIns }: { checkIns: HomeCheckin[] }) {
         </button>
       )}
       {answer.isError ? (
-        <p className="w-full text-[12.5px] leading-[1.5] text-destructive" role="alert">
+        <p className="w-full text-[12.5px] leading-[1.5] text-need" role="alert">
           {copy.home.checkIn.failed}
         </p>
       ) : null}
