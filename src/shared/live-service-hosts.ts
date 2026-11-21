@@ -16,6 +16,7 @@ const PAID_SERVICE_DOMAINS = [
   "onkernel.com",
   "cloudflare.com",
   "cloudflarestorage.com",
+  "grafana.net",
   "stripe.com",
 ] as const;
 
