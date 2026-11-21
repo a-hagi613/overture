@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
 
+import { BOARD_STAGES } from "../../src/shared/board.ts";
+import { applications } from "../../src/server/platform/db/schema.ts";
 import { expect, test } from "./app.fixture.ts";
 import {
   ownerContextFor,
@@ -31,6 +33,16 @@ async function moveTo(owner: APIRequestContext, applicationId: string, status: s
   });
 
   expect(response.ok()).toBe(true);
+}
+
+async function moveStage(owner: APIRequestContext, applicationId: string, stage: string) {
+  return owner.patch(`/api/applications/${encodeURIComponent(applicationId)}/stage`, {
+    data: { position: null, stage },
+  });
+}
+
+async function withdraw(owner: APIRequestContext, applicationId: string) {
+  return owner.post(`/api/applications/${encodeURIComponent(applicationId)}/withdraw`);
 }
 
 test("the Ready Stage holds ready, approved, sending and confirming, and a failure leaves the Board", async ({
@@ -72,4 +84,86 @@ test("the Ready Stage holds ready, approved, sending and confirming, and a failu
   expect((await applicationOf(owner, applicationId)).stage).toBeNull();
 
   await owner.dispose();
+});
+
+test("a sent Application moves within Applied…Closed but never back to Queued, and cannot be withdrawn", async ({
+  isolatedAppServer: { url },
+}) => {
+  const { owner, userId } = await ownerContextFor(url);
+  const companyId = await seedCompany(owner, "Sent Co", "sent.example");
+  const boardId = await seedBoard(owner, companyId, "greenhouse", "sent-co");
+
+  const postingId = await seedPosting(owner, {
+    atsJobId: "sent-1",
+    boardId,
+    companyId,
+    url: "https://sent.example/1",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    sentAt: 1_700_000_000_000,
+    status: "sent",
+    userId,
+  });
+
+  expect((await applicationOf(owner, applicationId)).stage).toBe("applied");
+
+  expect((await moveStage(owner, applicationId, "queued")).status()).toBe(409);
+  expect((await moveStage(owner, applicationId, "ready")).status()).toBe(409);
+
+  const afterRefusedMove = await applicationOf(owner, applicationId);
+
+  expect(afterRefusedMove.stage).toBe("applied");
+  expect(afterRefusedMove.status).toBe("sent");
+
+  expect((await withdraw(owner, applicationId)).status()).toBe(409);
+
+  const afterRefusedWithdraw = await applicationOf(owner, applicationId);
+
+  expect(afterRefusedWithdraw.status).toBe("sent");
+
+  expect((await moveStage(owner, applicationId, "closed")).status()).toBe(200);
+  expect((await applicationOf(owner, applicationId)).stage).toBe("closed");
+
+  await owner.dispose();
+});
+
+test("a Ready Application can be withdrawn before its send starts", async ({
+  isolatedAppServer: { url },
+}) => {
+  const { owner, userId } = await ownerContextFor(url);
+  const companyId = await seedCompany(owner, "Ready Co", "ready.example");
+  const boardId = await seedBoard(owner, companyId, "greenhouse", "ready-co");
+
+  const postingId = await seedPosting(owner, {
+    atsJobId: "ready-1",
+    boardId,
+    companyId,
+    url: "https://ready.example/1",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "ready",
+    userId,
+  });
+
+  expect((await moveStage(owner, applicationId, "applied")).status()).toBe(409);
+  expect((await applicationOf(owner, applicationId)).stage).toBe("ready");
+
+  const response = await withdraw(owner, applicationId);
+
+  expect(response.status()).toBe(200);
+
+  const withdrawn = await applicationOf(owner, applicationId);
+
+  expect(withdrawn.status).toBe("withdrawn");
+  expect(withdrawn.stage).toBeNull();
+
+  await owner.dispose();
+});
+
+test("the Board stages are the schema's stages", () => {
+  expect(applications.stage.enumValues).toEqual([...BOARD_STAGES]);
 });

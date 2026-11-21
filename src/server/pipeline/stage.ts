@@ -1,8 +1,9 @@
 import type { applications } from "../platform/db/schema.ts";
+import type { BoardStage } from "../../shared/board.ts";
 
 export type ApplicationStatus = (typeof applications.$inferSelect)["status"];
 
-export type BoardStage = NonNullable<(typeof applications.$inferSelect)["stage"]>;
+export type { BoardStage } from "../../shared/board.ts";
 
 const STAGE_BY_STATUS = {
   approved: "ready",

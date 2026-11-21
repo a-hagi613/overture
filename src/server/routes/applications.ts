@@ -26,25 +26,18 @@ import { restartCheckinAfterUndo } from "../pipeline/checkins.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { createTimeZoneService } from "../profile/time-zone.ts";
 import { resumeLines as splitResumeLines } from "../pipeline/grounding.ts";
-
-const MOVE_STAGES = ["queued", "applied", "screening", "interviewing", "offer", "closed"] as const;
-
-const STAGES = [
-  "queued",
-  "ready",
-  "applied",
-  "screening",
-  "interviewing",
-  "offer",
-  "closed",
-] as const;
+import {
+  BOARD_STAGES,
+  canMoveApplicationToStage,
+  canWithdrawApplication,
+} from "../../shared/board.ts";
 
 const STRONG_SCORE = 80;
 
 const DAY_MS = 24 * 60 * 60_000;
 
 const stageMoveSchema = z.object({
-  stage: z.enum(MOVE_STAGES),
+  stage: z.enum(BOARD_STAGES),
   position: z.number().nullable().default(null),
 });
 
@@ -69,7 +62,7 @@ const coverLetterSchema = z.array(
   }),
 );
 
-function isStage(value: string): value is (typeof STAGES)[number] {
+function isStage(value: string): value is (typeof BOARD_STAGES)[number] {
   switch (value) {
     case "queued":
     case "applied":
@@ -341,7 +334,7 @@ export function createApplicationRoutes(
     }));
 
     return {
-      columns: STAGES.map((stage) => ({
+      columns: BOARD_STAGES.map((stage) => ({
         cards: cards.filter((card) => card.stage === stage),
         stage,
       })),
@@ -376,6 +369,7 @@ export function createApplicationRoutes(
         id: applications.id,
         stage: applications.stage,
         stageLocked: applications.stageLocked,
+        status: applications.status,
       })
       .from(applications)
       .where(and(eq(applications.id, id), eq(applications.userId, session.user.id)))
@@ -387,6 +381,10 @@ export function createApplicationRoutes(
 
     if (row.stage === null) {
       return context.json({ error: "off_board" }, 409);
+    }
+
+    if (!canMoveApplicationToStage(row.status, stage)) {
+      return context.json({ error: "invalid_transition" }, 409);
     }
 
     db.transaction((tx) => {
@@ -542,11 +540,10 @@ export function createApplicationRoutes(
       return context.json({ error: "not_found" }, 404);
     }
 
-    const withdrawable =
-      row.status === "ready" || row.status === "approved" || row.stage === "queued";
+    const withdrawable = canWithdrawApplication(row.status);
 
     if (!withdrawable) {
-      return context.json({ error: "not_queued" }, 409);
+      return context.json({ error: "not_withdrawable" }, 409);
     }
 
     const now = clock.now();
