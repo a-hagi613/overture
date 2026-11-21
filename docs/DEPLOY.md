@@ -111,6 +111,23 @@ The script is idempotent (objects already in R2 with the same sha256 are skipped
 different key, and never deletes the local files. When it prints `verified`, it also prints the exact
 `rm -rf` command for the local copy; run it only after checking R2.
 
+## M1-19: importing the owner's v1 Facts (owner run)
+
+The v1 export holds the owner's answers, so it is encrypted at rest and never enters the repository, a pull
+request, a log or a test fixture. The two scripts print counts and keys only, never values.
+
+1. Export on the v1 machine, with the v1 database mounted read-only. The script opens the file with
+   `readonly: true`, refuses a database without the answer-bank and learned-answer tables, and writes one
+   JSON file with mode 600:
+   `bun run scripts/export-v1-facts.ts --db <v1 database> --out <export.json>`
+2. Move the export off the v1 machine, encrypt it, and keep it with the other private files.
+3. Import into `overture-web` for the owner's account:
+   `bun run scripts/import-v1-facts.ts --db <v2 database> --user <owner email> --in <export.json>`
+   The report lists every fact it imported or updated (with its key and v1 source key) and every skipped row
+   with one of `no_catalog_key`, `unknown_question`, `invalid_value` or `kept_user_fact`. Re-running is
+   idempotent: it updates the same rows and never overwrites a Fact whose source is `user` or `review`.
+4. Delete the decrypted export from both machines.
+
 ## Restore drill safety
 
 The throwaway machine runs the same image with `LITESTREAM_RESTORE_ONLY=true`: it restores from R2 and

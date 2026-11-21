@@ -112,6 +112,10 @@ export function createQuestionCatalog(deps: { db: AppDatabase; clock: Clock }) {
     return create(input, mapped ?? fallback);
   }
 
+  function byLabel(text: string) {
+    return byVariantHash(questionVariantHash(text));
+  }
+
   function byId(id: string) {
     return db
       .select({
@@ -209,7 +213,15 @@ export function createQuestionCatalog(deps: { db: AppDatabase; clock: Clock }) {
       .all();
   }
 
-  return { byId, findOrCreate, forPosting, savePostingQuestions, setMapping, unmapped };
+  return {
+    byId,
+    byLabel,
+    findOrCreate,
+    forPosting,
+    savePostingQuestions,
+    setMapping,
+    unmapped,
+  };
 }
 
 export function questionInputsFromAts(

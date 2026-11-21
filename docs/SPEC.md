@@ -973,12 +973,12 @@ payment-failure pause (M3) · 32. admin fixture capture job writes sanitised for
 Plus: route reachability for every page, axe on every page, 30 visual snapshots (Home, Board, Review, Inbox, Profile
 × 390 / 1280 px × light/dark) in pinned Docker.
 
-### 16.2 Unit tests (eight files, Vitest, beside their code)
+### 16.2 Unit tests (nine files, Vitest, beside their code)
 
 `ledger.test.ts` (balances, idempotency, FIFO expiry), `crypto.test.ts` (wrap/unwrap, AAD, shred), `planner.test.ts`
 (window, spacing, DST), `address.test.ts` (slug, transliteration, collisions), `tag-rules.test.ts`,
 `question-normalize.test.ts`, `answer-derivations.test.ts`, `sanitise.test.ts` (recorded pages must carry no script,
-event handler, personal data or token).
+event handler, personal data or token), `v1-import.test.ts` (the v1 answer-bank and learned-answer mapping).
 
 ### 16.3 CI
 
@@ -1065,9 +1065,12 @@ v1 runs on Fly app `ai-auto-apply` (volume `data`, yyz). In order:
 
 1. Snapshot the v1 volume (kept until v1 is destroyed).
 2. Export from the v1 database, read-only: `company_boards`, the owner's answer-bank tables and `learned_answers`
-   (`docs/SALVAGE.md`). The export is encrypted and kept off the repository; boards are not personal data.
+   (`docs/SALVAGE.md`), with `scripts/export-v1-facts.ts`. The export is encrypted and kept off the repository; boards
+   are not personal data.
 3. Stop the v1 machines. Nothing sends from v1 again.
-4. Create `overture-web` with a fresh v2 database seeded from the ats-scrapers dataset (§6.2); the owner's exported answer-bank and learned answers import with the Facts work (#26). No v1 schema migrates.
+4. Create `overture-web` with a fresh v2 database seeded from the ats-scrapers dataset (§6.2); the owner's exported
+   answer-bank and learned answers import with the Facts work (#26) through `scripts/import-v1-facts.ts`. No v1 schema
+   migrates.
 5. Destroy `ai-auto-apply` and its snapshot after a week of the owner using v2.
 
 ## 19. Open risks
