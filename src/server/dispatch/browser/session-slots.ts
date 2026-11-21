@@ -1,6 +1,6 @@
 import type { AppDatabase } from "../../platform/db/client.ts";
 
-import { getSetting } from "../../platform/settings/index.ts";
+import { getSettingNumber } from "../../platform/settings/index.ts";
 
 export const DEFAULT_MAX_CONCURRENT_SESSIONS = 3;
 export const MAX_CONCURRENT_SESSIONS_SETTING = "browser.max_concurrent_sessions";
@@ -17,12 +17,11 @@ let active = 0;
 let limitSource = () => DEFAULT_MAX_CONCURRENT_SESSIONS;
 
 export function maxConcurrentSessionsFromSetting(db: AppDatabase) {
-  const raw = getSetting(db, MAX_CONCURRENT_SESSIONS_SETTING);
-  const parsed = raw === null ? Number.NaN : Number(raw);
-
-  return Number.isFinite(parsed) && parsed >= MIN_CONCURRENT_SESSIONS
-    ? Math.trunc(parsed)
-    : DEFAULT_MAX_CONCURRENT_SESSIONS;
+  return getSettingNumber(db, MAX_CONCURRENT_SESSIONS_SETTING, {
+    fallback: DEFAULT_MAX_CONCURRENT_SESSIONS,
+    integer: true,
+    minimum: MIN_CONCURRENT_SESSIONS,
+  });
 }
 
 export function configureBrowserSessionLimitFromSetting(db: AppDatabase) {

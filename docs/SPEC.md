@@ -796,8 +796,11 @@ bound: the planner gives it the first free slot at or after that time inside a w
 
 ### 9.3 Dispatcher
 
-Job `dispatch.tick` every 15 s claims at most `free_slots = provider_concurrency − sending_count` applications
-in `approved` (never `ready`) that pass every gate below, in order:
+Job `dispatch.tick` every 15 s claims at most `free_slots = session_cap − sending_count − queued_sends` applications
+in `approved` (never `ready`) that pass every gate below, in order, where `session_cap` is
+`browser.max_concurrent_sessions`, the same process-wide browser session cap every send holds a slot from. An
+Application becomes `sending` only after it holds one of those slots, so `sending` never counts an Application that
+is still waiting for a browser:
 
 1. Global and provider kill switches off; ATS and employer kill switches off.
 2. User `running=1`, not suspended, has a current resume and an active mailbox.
@@ -955,8 +958,9 @@ with no user profile attached, and writes `fixtures/{ats}/{form_signature}/form.
 Preparation reads a Lever or Ashby form over plain HTTP from `overture-web` first (§8.3) and falls back to this
 capture path only when the plain read cannot see the form; the path that ran is kept in `plan_cache`.
 Every browser session, whether a capture, the early cloud probe or a dispatch send, takes a slot from one
-process-wide semaphore sized by `browser.max_concurrent_sessions` (default 3). A capture that cannot get a slot waits
-without failing or spending an attempt. A 429 from the provider's create-session call is retried with backoff or the
+process-wide semaphore sized by `browser.max_concurrent_sessions` (default 3). That one setting is both the semaphore
+and the dispatcher's in-flight send cap (§9.3); a send takes its slot before it marks the Application `sending`. A
+capture that cannot get a slot waits without failing or spending an attempt. A 429 from the provider's create-session call is retried with backoff or the
 `Retry-After` delay and does not spend an attempt, and a `goto` that times out is retried once.
 On production the same job is queued from the machine with
 `bun run scripts/capture-forms.ts --ats <ats> --url <apply_url> [--url <apply_url> …]`; the running worker picks it
@@ -1047,8 +1051,7 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
 | `match.strong` | 80 | 0011 |
 | `llm.cap_user_day_usd` / `llm.cap_global_day_usd` / `llm.cap_tagging_day_usd` | 0.25 / 10 / 1 | 0011, 0017 |
 | `browser.provider` | `browser_use` | 0003 |
-| `browser.concurrency` | 10 | 0003 |
-| `browser.max_concurrent_sessions` | 3 | — |
+| `browser.max_concurrent_sessions` | 3 (the browser semaphore and the dispatcher's in-flight send cap) | 0003 |
 | `checkin.after_days` / `checkin.close_after_days` | 21 / 45 | 0012 |
 | Plans (M3) | trial 3 one-time; week $12 → 70 / 7 days; month $35 → 300 / 30 days; renewals; no rollover | 0018 |
 
