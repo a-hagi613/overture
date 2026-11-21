@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
+import { eq } from "drizzle-orm";
+
 import { openDatabase } from "../platform/db/client.ts";
 import { migrateDatabase } from "../platform/db/migrate.ts";
 import { createClock } from "../platform/ports/clock.ts";
-import { users } from "../platform/db/schema.ts";
+import { setSetting } from "../platform/settings/index.ts";
+import { acceptInvite, INVITE_GRANT_QUANTITY_KEY } from "../auth/invites.ts";
+import { grants, invites, users } from "../platform/db/schema.ts";
 
 import {
   applicationsLeft,
@@ -403,6 +407,62 @@ describe("the ledger", () => {
     expect(dailyUsageSince(db, userId, at)).toBe(2);
     expect(committedSince(db, userId, at)).toBe(2);
     expect(dailyUsageSince(db, userId, clock.now() + 1)).toBe(0);
+
+    sqlite.close();
+  });
+});
+
+function acceptInviteWith(quantity: string) {
+  const { clock, db, sqlite, userId } = freshLedger();
+
+  setSetting(db, clock, INVITE_GRANT_QUANTITY_KEY, quantity, "test");
+
+  db.insert(invites)
+    .values({ createdAt: new Date(clock.now()), emailHash: `hash-${quantity}`, id: "invite-1" })
+    .run();
+
+  const invite = db.select().from(invites).where(eq(invites.id, "invite-1")).get();
+
+  if (invite === undefined) {
+    throw new Error("the invite fixture was not stored");
+  }
+
+  const accepted = acceptInvite(db, clock, invite, userId);
+  const grant = db.select().from(grants).where(eq(grants.userId, userId)).get();
+
+  return { accepted, clock, db, grant, sqlite, userId };
+}
+
+describe("an invite grant reads its quantity once", () => {
+  test("grants the configured quantity", () => {
+    const { accepted, clock, db, sqlite, userId } = acceptInviteWith("5");
+
+    expect(accepted).not.toBeNull();
+    expect(applicationsLeft(db, userId, clock.now())).toBe(5);
+
+    sqlite.close();
+  });
+
+  test("never turns an unusable quantity into a zero-application grant", () => {
+    const { clock, db, sqlite, userId } = acceptInviteWith("0");
+
+    expect(applicationsLeft(db, userId, clock.now())).toBe(300);
+
+    sqlite.close();
+  });
+
+  test("never truncates a fraction below one into a zero-application grant", () => {
+    const { clock, db, sqlite, userId } = acceptInviteWith("0.5");
+
+    expect(applicationsLeft(db, userId, clock.now())).toBe(300);
+
+    sqlite.close();
+  });
+
+  test("truncates a fractional quantity to whole applications", () => {
+    const { clock, db, sqlite, userId } = acceptInviteWith("2.5");
+
+    expect(applicationsLeft(db, userId, clock.now())).toBe(2);
 
     sqlite.close();
   });
