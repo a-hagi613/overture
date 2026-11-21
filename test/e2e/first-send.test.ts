@@ -477,7 +477,7 @@ test("a 4xx answer to the application request leaves submit_clicked_at unset and
     questions: blankStreetQuestions,
     tags: [{ dimension: "subrole", value: "Operations" }],
     title: "Assistant General Manager | Durham",
-    url: `${send.fixture.url}/blankstreet/jobs/8004209003?verify=1`,
+    url: `${send.fixture.url}/blankstreet/jobs/8004209003?refuse=1`,
   });
 
   const applicationId = await seedApplication(owner, { postingId, status: "ready", userId });
@@ -492,8 +492,8 @@ test("a 4xx answer to the application request leaves submit_clicked_at unset and
   expect(application?.status).toBe("ready");
   expect(attempts.length).toBe(1);
   expect(attempts[0]?.submitClickedAt).toBeNull();
-  expect(attempts[0]?.submitResponseStatus).toBe(428);
-  expect(attempts[0]?.outcome).toBe("captcha_blocked");
+  expect(attempts[0]?.submitResponseStatus).toBe(403);
+  expect(attempts[0]?.outcome).toBe("blocked");
 
   const state = await fixtureState(send.fixture);
 

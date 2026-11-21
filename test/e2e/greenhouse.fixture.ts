@@ -23,6 +23,10 @@ export interface GreenhouseFixture {
   close: () => void;
 }
 
+export interface GreenhouseFixtureOptions {
+  code?: string;
+}
+
 export const NO_FORM_PAGE =
   "<!doctype html><html><body><p>This position is no longer accepting applications.</p></body></html>";
 
@@ -35,7 +39,7 @@ const valuesSchema = z.record(z.string(), z.string());
 
 const holdSchema = z.object({ form: z.boolean().optional(), confirmation: z.boolean().optional() });
 
-export function startGreenhouseFixture() {
+export function startGreenhouseFixture(options: GreenhouseFixtureOptions = {}) {
   const transpiler = new Bun.Transpiler({ loader: "ts" });
   const runtime = transpiler.transformSync(readFileSync(RUNTIME_SOURCE, "utf8"));
 
@@ -44,7 +48,7 @@ export function startGreenhouseFixture() {
     applicationRequests: 0,
     formLoads: 0,
     confirmationLoads: 0,
-    code: "48211357",
+    code: options.code ?? "48211357",
     codeAsked: false,
     lastForm: {},
     lastChoices: {},
@@ -225,6 +229,10 @@ export function startGreenhouseFixture() {
 
       state.submissions += 1;
       state.applicationRequests += 1;
+
+      if (url.searchParams.get("refuse") === "1") {
+        return new Response("The application was refused.", { status: 403 });
+      }
 
       const wantsCode = url.searchParams.get("verify") === "1";
 

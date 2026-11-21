@@ -27,6 +27,7 @@ import {
   mailThreads,
   messageAttachments,
   messages,
+  notifications,
   postingTags,
   postings,
   questionVariants,
@@ -59,7 +60,7 @@ import { normalizeFieldType, questionVariantHash } from "../catalog/question-nor
 import { mapQuestionByRules } from "../catalog/question-rules.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
-import { createCodeWait } from "../inbox/waits.ts";
+import { createCodeWait, wakeCodeWaits } from "../inbox/waits.ts";
 import { env } from "../config/env.ts";
 import {
   applicationsLeft,
@@ -418,9 +419,37 @@ export function createTestRoutes(
     const { offsetMs } = context.req.valid("json");
 
     clock.setOffset(offsetMs);
+    wakeCodeWaits();
 
     return context.json({ now: clock.now(), offsetMs: clock.offset() });
   });
+
+  routes.get(
+    "/notifications",
+    zValidator("query", z.object({ userId: z.string().min(1) })),
+    (context) => {
+      const { userId } = context.req.valid("query");
+
+      const rows = db
+        .select()
+        .from(notifications)
+        .where(eq(notifications.userId, userId))
+        .orderBy(asc(notifications.createdAt))
+        .all();
+
+      return context.json({
+        notifications: rows.map((row) => ({
+          id: row.id,
+          kind: row.kind,
+          title: row.title,
+          body: row.body,
+          url: row.url,
+          createdAt: row.createdAt,
+          readAt: row.readAt?.getTime() ?? null,
+        })),
+      });
+    },
+  );
 
   routes.post("/turnstile", zValidator("json", turnstileScenarioBody), (context) => {
     setTurnstileScenario(context.req.valid("json"));

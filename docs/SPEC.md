@@ -716,18 +716,21 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 4. Fill answers; upload the resume with `setInputFiles({name, mimeType, buffer})` from the decrypted file.
 5. Any required field the prepared answers do not cover: map it (§8.3 step 2); if it is factual and unknown →
    stop, outcome `needs_review` (nothing submitted).
-6. Submit. If a verification-code prompt appears (on Greenhouse, after a 428 answer to the application request, an
-   8-character code), wait for the user's mailbox (`auth='pass'`, sender domain in the ATS domain list, received
-   after `started_at`; woken by ingest, checked every 5 s as a backstop) for ≤ 5 min, extract the code (ported code extractor), type
-   it, mark `code_consumed_at`, and Submit again. None → `code_timeout`. Whether a timeout is `code_timeout` or
-   `unconfirmed` depends only on whether `submit_clicked_at` was set (§9.4), never on where the prompt appeared.
+6. Submit. If a verification-code prompt appears (on Greenhouse, a `#verification_code` step after a 428 answer to the
+   application request, an 8-character code), open a `code_waits` row for the attempt and its mailbox (§11.1) and wait
+   for it to resolve: mail with `auth='pass'` from an ATS sender domain received after `started_at` resolves it, woken
+   by ingest and checked every 5 s as a backstop. Five minutes without a code creates the owner's "paste it"
+   notification, and the paste endpoint (§14) resumes the same wait and the same browser session until the row's
+   ten-minute expiry. Type the code, mark `code_consumed_at` and `attempts.code_used`, and Submit again. No code by the
+   expiry → `code_timeout`. Whether a timeout is `code_timeout` or `unconfirmed` depends only on whether
+   `submit_clicked_at` was set (§9.4), never on where the prompt appeared.
 7. If a CAPTCHA is visible: stop interacting, wait 10 s, re-inspect, up to 3 times (vendor solver works meanwhile).
    Still visible → `captcha_blocked`.
 8. Click the final Submit; set `submit_clicked_at` per §9.4 from the application request's answer. Confirm success by the ATS confirmation signal
    (URL/heading/text per ATS). No signal within 30 s → `unconfirmed` (§9.4). A missing or changed field found
    **before** the click → `form_changed`.
 9. Close the browser; record `browser_ms`, `proxy_bytes`, `cost_micros` from the provider usage report.
-10. Hard timeout 10 min → `timeout` before the click, `unconfirmed` after it.
+10. Hard timeout 15 min (the browser session and the attempt lease) → `timeout` before the click, `unconfirmed` after it.
 
 ### 10.4 Synthetic lab and provider report (M1)
 
@@ -774,10 +777,12 @@ stopping before Submit. The developer machine never drives a browser against a r
 7. Code waits: while a verification prompt is open, an attempt records a `code_waits` row with `started_at` and
    `expires_at = started_at + 10 min`. Ingest resolves the oldest open, unexpired wait for that mailbox when an
    `auth='pass'` message classified as a code arrives from an ATS domain at or after its start, storing the code
-   encrypted and publishing `code.wait_resolved`. The owner may instead paste the code through
-   `POST /api/mail/code-waits/:id` while the wait is unexpired; an expired or already-resolved wait is refused.
-   `GET /internal/mail/code-waits` lists the open waits for a forwarding address, authenticated with the same
-   HMAC-SHA256 headers as inbound mail.
+   encrypted and publishing `code.wait_resolved`. Five minutes after the wait opened with no code, Overture creates a
+   `notifications` row for the owner and publishes the `notification` topic, asking for a paste; the wait stays open to
+   its expiry. The owner may instead paste the code through `POST /api/mail/code-waits/:id` while the wait is
+   unexpired; an expired or already-resolved wait is refused. `GET /api/mail/code-waits` lists the signed-in owner's
+   open waits with the Application they belong to; `GET /internal/mail/code-waits` lists the open waits for a
+   forwarding address, authenticated with the same HMAC-SHA256 headers as inbound mail.
 
 ### 11.2 Outbound (M2)
 
@@ -896,7 +901,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Jobs | `GET /api/search?q&filters` (FTS ≤ 50 ms; filters: `role`, `seniority`, `workplace`, `location` = resolved city, `employmentType`) · `GET /api/postings/:id` (scores on open) · `POST /api/postings/:id/apply` · `PUT /api/postings/:id/state` `{saved|hidden|null}` |
 | Review | `GET /api/reviews` · `POST /api/reviews/:id/answer` · `POST /api/reviews/:id/dismiss` |
 | Check-ins | `POST /api/checkins/:id` `{answer}` |
-| Inbox | `GET /api/threads` · `GET /api/threads/:id` · `POST /api/threads/:id/reply` (M2) · `GET /api/attachments/:id` · `POST /api/messages/:id/read` |
+| Inbox | `GET /api/threads` · `GET /api/threads/:id` · `POST /api/threads/:id/reply` (M2) · `GET /api/attachments/:id` · `POST /api/messages/:id/read` · `GET /api/mail/code-waits` · `POST /api/mail/code-waits/:id` (paste a code) |
 | Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/strengthen` |
 | Onboarding (M2) | `GET /api/onboarding` · `POST /api/onboarding/:step` · `POST /api/onboarding/address/accept` |
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `POST /api/account/delete` · `GET /api/support-access` |
