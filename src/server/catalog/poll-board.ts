@@ -1,4 +1,4 @@
-import { and, count, eq, gte, isNull, notInArray, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNull, notInArray, sql } from "drizzle-orm";
 
 import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -8,6 +8,7 @@ import { normalizeApplyUrl, normalizeTitle } from "./normalize.ts";
 import { contentHash } from "./content-hash.ts";
 import { dedupeKeyFor } from "./dedupe-key.ts";
 import { skipClosedPostingApplications } from "./posting-close.ts";
+import { WRITE_BATCH_ROWS, yieldToEventLoop } from "../platform/db/batches.ts";
 import { storePostingTags, salaryPeriodForColumn } from "./tag-store.ts";
 import { tagPosting } from "./tag-rules.ts";
 
@@ -172,10 +173,6 @@ function gzip(descriptionText: string) {
   return Buffer.from(Bun.gzipSync(descriptionText));
 }
 
-async function yieldToEventLoop() {
-  await Bun.sleep(0);
-}
-
 function latestChangeMsForBoard(db: AppDatabase, boardId: string) {
   const row = db
     .select({
@@ -205,7 +202,7 @@ async function fetchDetailOrNull(feed: BoardFeed, boardToken: string, atsJobId: 
   }
 }
 
-function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow, now: number) {
+async function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow, now: number) {
   const latestChangeMs = latestChangeMsForBoard(db, board.id);
 
   db.update(postings)
@@ -215,7 +212,7 @@ function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow, now:
     )
     .run();
 
-  const closed = closeMissingPostings(db, clock, board.id);
+  const closed = await closeMissingPostings(db, clock, board.id);
 
   db.update(companyBoards)
     .set({
@@ -238,51 +235,67 @@ function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow, now:
   } satisfies PollBoardReport;
 }
 
-function closeMissingPostings(db: AppDatabase, clock: Clock, boardId: string) {
+async function closeMissingPostings(db: AppDatabase, clock: Clock, boardId: string) {
   const now = clock.now();
 
-  const run = db.transaction((tx) => {
-    const closed = tx
-      .update(postings)
-      .set({ closedAt: now })
-      .where(
-        and(
-          eq(postings.boardId, boardId),
-          isNull(postings.closedAt),
-          gte(postings.missingPolls, MISSING_POLLS_TO_CLOSE),
+  const closeChunk: () => Promise<number> = async () => {
+    const run = db.transaction((tx) => {
+      const chunk = tx
+        .select({ id: postings.id })
+        .from(postings)
+        .where(
+          and(
+            eq(postings.boardId, boardId),
+            isNull(postings.closedAt),
+            gte(postings.missingPolls, MISSING_POLLS_TO_CLOSE),
+          ),
+        )
+        .limit(WRITE_BATCH_ROWS);
+
+      const closed = tx
+        .update(postings)
+        .set({ closedAt: now })
+        .where(inArray(postings.id, chunk))
+        .returning({ id: postings.id })
+        .all();
+
+      return {
+        closed,
+        skipped: skipClosedPostingApplications(
+          tx,
+          now,
+          closed.map((row) => row.id),
         ),
-      )
-      .returning({ id: postings.id })
-      .all();
+      };
+    });
 
-    return {
-      closed,
-      skipped: skipClosedPostingApplications(
-        tx,
-        now,
-        closed.map((row) => row.id),
-      ),
-    };
-  });
+    for (const application of run.skipped) {
+      publishEvent(
+        db,
+        clock,
+        "application.updated",
+        JSON.stringify({ applicationId: application.applicationId, status: "skipped" }),
+        application.userId,
+      );
+      publishEvent(
+        db,
+        clock,
+        "home.updated",
+        JSON.stringify({ applicationId: application.applicationId }),
+        application.userId,
+      );
+    }
 
-  for (const application of run.skipped) {
-    publishEvent(
-      db,
-      clock,
-      "application.updated",
-      JSON.stringify({ applicationId: application.applicationId, status: "skipped" }),
-      application.userId,
-    );
-    publishEvent(
-      db,
-      clock,
-      "home.updated",
-      JSON.stringify({ applicationId: application.applicationId }),
-      application.userId,
-    );
-  }
+    if (run.closed.length < WRITE_BATCH_ROWS) {
+      return run.closed.length;
+    }
 
-  return run.closed.length;
+    await yieldToEventLoop();
+
+    return run.closed.length + (await closeChunk());
+  };
+
+  return closeChunk();
 }
 
 function postingValues(
@@ -470,7 +483,7 @@ async function syncPostings(
     .where(missingFilter)
     .run();
 
-  report.closed += closeMissingPostings(db, clock, board.id);
+  report.closed += await closeMissingPostings(db, clock, board.id);
 
   return report;
 }
@@ -579,7 +592,7 @@ export const pollBoard = async (
     }
 
     if (bulk.status === "not_modified") {
-      return touchWithoutChange(db, clock, board, now);
+      return await touchWithoutChange(db, clock, board, now);
     }
 
     const rows = await syncPostings(db, clock, feed, board, bulk.postings, now);
@@ -609,11 +622,11 @@ export const pollBoard = async (
   }
 
   if (result.status === "not_modified") {
-    return touchWithoutChange(db, clock, board, now);
+    return await touchWithoutChange(db, clock, board, now);
   }
 
   if (conditionMatchesByHash(board, result.bodyHash)) {
-    return touchWithoutChange(db, clock, board, now);
+    return await touchWithoutChange(db, clock, board, now);
   }
 
   let feedPostings = result.postings;

@@ -15,3 +15,20 @@ export interface LiveCheckResult {
 export function failedResult(check: string, startedAt: number, error: string, durationMs = 0) {
   return { check, ok: false, startedAt, durationMs, detail: { error } } satisfies LiveCheckResult;
 }
+
+/**
+ * Records a check deliberately not run because the app is degraded; it is not a failure.
+ * @param check the check's name
+ * @param startedAt when the group started, in epoch milliseconds
+ * @param reason why it was skipped, shown in the recorded result
+ * @returns an ok result carrying the skip reason
+ */
+export function skippedResult(check: string, startedAt: number, reason: string) {
+  return {
+    check,
+    ok: true,
+    startedAt,
+    durationMs: 0,
+    detail: { skipped: reason },
+  } satisfies LiveCheckResult;
+}
