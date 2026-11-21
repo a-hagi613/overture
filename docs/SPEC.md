@@ -76,8 +76,8 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
                      └───────────────────────────────────────────────┘
         │CDP/WSS        │HTTPS            │HTTPS          │OTLP           │S3 API
         ▼               ▼                 ▼               ▼               ▼
-  Browser Use Cloud  Anthropic API    Amazon SES     Grafana Cloud      Cloudflare R2
-  (Kernel fallback)  (Haiku 5.5)      (ca-central-1) (LGTM)             backups · files · mail
+  Browser Use Cloud  Anthropic API    Cloudflare      Grafana Cloud      Cloudflare R2
+  (Kernel fallback)  (Haiku 5.5)      Email Sending   (LGTM)             backups · files · mail
                                           ▲
   employers ──mail──▶ user's inbox ──ATS-only filter──▶ Email Routing + Worker (tryoverture.com) ──signed raw MIME──▶ overture-web
 ```
@@ -110,7 +110,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Kernel | fallback browser | `KERNEL_API_KEY`, `KERNEL_API_BASE_URL` (test-only override) | local recorded control-API server with real local Chrome behind it; lab only |
 | Anthropic | LLM (prod) | `ANTHROPIC_API_KEY` | real adapter; API intercepted by MSW with responses recorded by the daily live check |
 | OpenCode Go | LLM (local dev only) | `OPENCODE_API_KEY` | — |
-| Amazon SES + SNS | outbound mail, bounces | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION=ca-central-1` (all three or none), `SES_CONFIGURATION_SET` (optional configuration set) | real adapter; SES API intercepted by MSW, request bodies asserted |
+| Cloudflare Email Sending | outbound mail (magic links, live check, later notices) | `CLOUDFLARE_EMAIL_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (both or neither); `CLOUDFLARE_EMAIL_API_BASE_URL` (test-only override of the real API host) | real adapter; the send endpoint is intercepted by MSW and the request body asserted (`test/e2e/cloudflare-email.test.ts`) |
 | Stripe (M3) | Managed Payments | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | stripe-mock (Stripe's own local server) + signed webhook fixtures |
 | Grafana Cloud | logs/metrics/traces | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | local LGTM docker |
 | Web Push | notifications | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | real adapter; push endpoints via MSW |
@@ -120,19 +120,22 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com` (forwarding addresses), `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `ALERT_NTFY_URL` (optional) | |
 
 All secrets are Fly secrets; local dev reads `.env` (chmod 600, never committed).
-Overture's own mail (magic links, the daily live check) goes through the SES adapter whenever `AWS_ACCESS_KEY_ID`,
-`AWS_SECRET_ACCESS_KEY` and `AWS_REGION` are set; otherwise the in-memory sink is used, which is the test and
-development adapter. A half-set trio, or `SES_CONFIGURATION_SET` without all three, stops the server at boot.
+Overture's own mail (magic links, the daily live check) goes through the Cloudflare Email Sending adapter whenever
+`CLOUDFLARE_EMAIL_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are both set; otherwise the in-memory sink is used, which is
+the test and development adapter. A half-set pair stops the server at boot. The sender is a plain `fetch` to
+`POST /accounts/{account_id}/email/sending/send` under `https://api.cloudflare.com/client/v4`, with the token in a
+bearer header; the research and the Beta terms are in `docs/research/cloudflare-email-sending.md` and ADR 0028.
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
 
 ### 3.3 Domains and DNS
 
 - `tryoverture.com` is registered (Cloudflare Registrar, owner's account).
-- `tryoverture.com`: app, marketing, Overture's own mail (`no-reply@` sent through SES; `hello@` forwarded to the
-  owner by Email Routing), the forwarding addresses `in-{id}-{mac}@` (ADR 0028), and the system address
-  `live-check@` that maps to no user. MX → Cloudflare Email Routing,
-  whose catch-all goes to the Email Worker. SES DKIM (3 CNAMEs), SPF `include:amazonses.com` plus Email Routing's
-  include, DMARC `p=reject; rua=…`, custom MAIL FROM `bounce.tryoverture.com`.
+- `tryoverture.com`: app, marketing, Overture's own mail (`no-reply@` sent through Cloudflare Email Sending from the
+  `cf-bounce` sending setup; `hello@` forwarded to the owner by Email Routing), the forwarding addresses
+  `in-{id}-{mac}@` (ADR 0028), and the system address `live-check@` that maps to no user. MX → Cloudflare Email Routing,
+  whose catch-all goes to the Email Worker. Email Sending adds its bounce MX, SPF and DKIM on
+  `cf-bounce.tryoverture.com`; Email Routing keeps the apex MX and SPF include, and DMARC stays
+  `p=reject; rua=…`.
 - `mail.tryoverture.com` is not used (it was the ADR 0005 job-search address domain).
 - `admin.tryoverture.com`: Cloudflare Access application (owner identity only).
 
@@ -149,7 +152,7 @@ M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 obj
 | Web | Vite 8, React 19, React Router 7 (library mode, Zod-typed search params), TanStack Query, Hono RPC client, Tailwind v4, shadcn/ui, 21st.dev, dnd-kit, lucide |
 | Browser control | `playwright-core` `chromium.connectOverCDP` |
 | PDF | `unpdf`; Haiku 5.5 PDF fallback |
-| Mail | `mailparser`, `mailauth` (SPF/DKIM/DMARC verification), SES v2 `SendEmail` over a small SigV4-signed fetch |
+| Mail | `mailparser`, `mailauth` (SPF/DKIM/DMARC verification), Cloudflare Email Sending over a small `fetch` to its REST endpoint |
 | Telemetry | OpenTelemetry SDK (traces, metrics, logs) → OTLP |
 | Lint/format | oxlint, every category at error + type-aware (`oxlint-tsgolint`), from Landmines' own configuration, plus `@interfere/landmines`, vendored anti-slop, React / `jsx-a11y` / Vitest plugins and architecture rules (ADR 0023), with the Cloudflare preset rules; `bun lint` runs Oxlint with `--deny-warnings`; `bun fmt` formats |
 | Tests | Playwright e2e (sharded), `bun test` for the ADR 0013 invariant files, MSW at the network edge, daily live checks on Fly (ADR 0013) |
@@ -849,9 +852,9 @@ stopping before Submit. The developer machine never drives a browser against a r
 
 Reopened by ADR 0028: under real email a reply from Overture would come from an address the employer never saw, so
 nothing here is built until the owner decides. The previous design, kept for reference: reply composer in Inbox; allowed only in threads with `employer_started=1`, ≤ 20 per user per day, attachments
-≤ 10 MB total; sent via SES `SendRawEmail` from `local_part@mail.tryoverture.com` with correct `In-Reply-To`/`References`;
-SES events (delivery, bounce, complaint) via SNS → `POST /internal/ses/events` (SNS signature verified) → suppression
-list. Overture's own mail (magic links, verification, digest, receipts) from `no-reply@tryoverture.com` via SES.
+≤ 10 MB total, with correct `In-Reply-To`/`References`; delivery, bounce and complaint events feed the suppression
+list. Overture's own mail (magic links, verification, digest, receipts) from `no-reply@tryoverture.com` through
+Cloudflare Email Sending (ADR 0028, `docs/research/cloudflare-email-sending.md`); SES and Resend are no longer used.
 
 ### 11.3 Classification
 
@@ -1070,7 +1073,7 @@ and none submits an application or touches a user:
 |---|---|---|
 | Forms | the `fixtures.capture` path opens one posting per ATS chosen from the open catalog, saves its form and assets, reports a changed form signature, and never fills or submits | saved forms in R2 `fixtures/` (§10.5) |
 | AI | four fixed, deterministic Haiku calls (score, open text, question mapping, tag fallback) through `LlmPort`, checked against their output schemas and the resume-line rule | MSW recordings in R2 `recordings/anthropic/` |
-| Mail | a DKIM-signed message from `no-reply@tryoverture.com` to the reserved `live-check@tryoverture.com`, through SES, Email Routing and the Worker, ingested with `auth='pass'` and its code matched within `live_checks.mail_wait_minutes` (default 5) | recorded `.eml` fixtures in R2 `recordings/mail/` |
+| Mail | a DKIM-signed message from `no-reply@tryoverture.com` to the reserved `live-check@tryoverture.com`, through Cloudflare Email Sending, Email Routing and the Worker, ingested with `auth='pass'` and its code matched within `live_checks.mail_wait_minutes` (default 5) | recorded `.eml` fixtures in R2 `recordings/mail/` |
 | Storage | an R2 put, get, list and delete | — |
 
 The mail check is two-phase: `live.check` sends and enqueues `live.check.mail` for the wait window, so a restart
@@ -1149,7 +1152,7 @@ v1 runs on Fly app `ai-auto-apply` (volume `data`, yyz). In order:
 | Invisible reCAPTCHA scores too low → code/CAPTCHA rate high | M1 lab and live numbers; Anchor sticky-IP or self-hosted as later options |
 | Browser Use profile encryption at rest undocumented | profiles hold cookies/storage only (no resume or facts); deleted via API on account deletion |
 | No city/fixed-IP targeting; uncovered countries | country map fallback; measure per country in M2 |
-| SES production access denied or slow | apply on day one of the domain; Resend as emergency fallback behind `MailSender` |
+| Cloudflare Email Sending is Beta and may change or be withdrawn | owner accepted the Beta terms for sign-in mail (ADR 0028); the in-memory sink and one-file provider swap stay behind `MailSender`; the daily mail live check alerts on a stop |
 | hiring.cafe import legality and reliability | owner's call; seam only, never a dependency |
 | Trademark conflict on "Overture" | owner's CIPO/USPTO search before brand spend |
 | Single-machine SQLite outage | Litestream + tested restore; Postgres path via Drizzle when > ~200 paying users |

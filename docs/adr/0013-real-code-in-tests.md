@@ -7,7 +7,7 @@ status: accepted
 Every external dependency sits behind a port, and domain code imports ports only. Tests do not replace any of them
 with hand-written stand-ins: they run the production adapters. Where a real local equivalent exists, tests use it
 (SQLite, a local Chrome filling saved ATS forms served by the fixture server, a disk object store, the real signed
-inbound-mail endpoint). Third-party HTTP APIs (Anthropic, SES, Browser Use's control API, the ATS feeds, push
+inbound-mail endpoint). Third-party HTTP APIs (Anthropic, Cloudflare Email Sending, Browser Use's control API, the ATS feeds, push
 services, the FX feed, Stripe) are intercepted at the network by MSW, inside the app process, with
 `onUnhandledRequest: "error"` and responses recorded from the real service. MSW is pinned to 2.x: 3.x intercepts
 nothing under Bun, and a CI check fails if a request to an unmocked host gets through. Time comes from the real clock adapter,
@@ -17,7 +17,7 @@ arrives rather than by polling alone.
 
 What this cannot catch (an employer changes a form, Browser Use is blocked, Haiku's output drifts, mail stops
 arriving) is caught by **daily live checks** on `overture-web`: real forms filled and stopped before Submit, a small set
-of real Haiku calls, a real mail loop through SES to an Overture-owned check address, and a real R2
+of real Haiku calls, a real mail loop through Cloudflare Email Sending to an Overture-owned check address, and a real R2
 round trip. Each check alerts on failure and refreshes the saved forms and recordings the tests replay. None submits
 an application or touches a user.
 

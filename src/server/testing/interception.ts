@@ -7,8 +7,8 @@ import { z } from "zod";
 import { env } from "../config/env.ts";
 import { spendTurnstileToken, turnstileScenario } from "./turnstile-scenario.ts";
 import { turnstileSiteverifyUrl } from "../auth/turnstile-gate.ts";
-import { sesSendEmailUrl } from "../platform/mail/ses.ts";
-import { recordSesRequest } from "./ses-recorder.ts";
+import { cloudflareSendEmailUrl } from "../platform/mail/cloudflare.ts";
+import { recordCloudflareEmailRequest } from "./cloudflare-email-recorder.ts";
 
 const turnstileRecordingPath = "test/e2e/recordings/turnstile/siteverify-pass.json";
 
@@ -87,16 +87,33 @@ export function startInterception() {
     http.get(`${anthropicRoot}/v1/messages/batches/:batchId`, () => passthrough()),
     http.get(`${anthropicRoot}/v1/messages/batches/:batchId/results`, () => passthrough()),
     http.post(turnstileSiteverifyUrl, async ({ request }) => siteverifyResponse(request)),
-    http.post(sesSendEmailUrl(env.AWS_REGION ?? "ca-central-1"), async ({ request }) => {
-      recordSesRequest({
-        method: request.method,
-        url: request.url,
-        headers: Object.fromEntries(request.headers.entries()),
-        body: await request.text(),
-      });
+    http.post(
+      cloudflareSendEmailUrl(
+        env.CLOUDFLARE_EMAIL_API_BASE_URL,
+        env.CLOUDFLARE_ACCOUNT_ID ?? "unconfigured-account",
+      ),
+      async ({ request }) => {
+        recordCloudflareEmailRequest({
+          method: request.method,
+          url: request.url,
+          headers: Object.fromEntries(request.headers.entries()),
+          body: await request.text(),
+        });
 
-      return HttpResponse.json({ MessageId: "0100018f-ses-send-email" });
-    }),
+        return HttpResponse.json({
+          success: true,
+          errors: [],
+          messages: [],
+          result: {
+            message_id: "<cloudflare-email-send@tryoverture.com>",
+            delivered: [],
+            permanent_bounces: [],
+            queued: [],
+            suppressed_recipients: [],
+          },
+        });
+      },
+    ),
   );
 
   server.listen({ onUnhandledRequest: "error" });
