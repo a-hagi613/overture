@@ -177,7 +177,7 @@ The append-only record in `admin_audit` of every action taken in the admin: who,
 _Avoid_: log entry, change history
 
 **Suspension**:
-The owner stopping one account at once: sign-in is refused, running pauses with the `suspended` reason, sent
+The owner stopping one account at once: sign-in is refused and live sessions end, running pauses with the `suspended` reason, sent
 Applications stay sent and Inbox mail keeps arriving, and the typed reason is written to the admin audit. Reinstating
 clears the suspension and leaves running paused until the person starts it.
 _Avoid_: ban, block, lockout
