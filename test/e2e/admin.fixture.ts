@@ -15,7 +15,10 @@ import { startBrowserUseFixture } from "./browser-use-server.fixture.ts";
 import type { BrowserUseFixture } from "./browser-use-server.fixture.ts";
 import { startAppServer } from "./app-server.ts";
 import { accessTeamIdentity, startAccessServer } from "./access-server.ts";
+import { startLokiServer } from "./loki-server.ts";
 import { latestMailLink, requestMagicLink } from "./sign-in.ts";
+
+import type { LokiServer } from "./loki-server.ts";
 
 type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
 
@@ -33,6 +36,9 @@ interface AdminTestFixtures {
   captureAppServer: AppServer;
   captureAppUrl: string;
   browserUseApi: BrowserUseFixture;
+  lokiServer: LokiServer;
+  revealAppServer: AppServer;
+  revealAppUrl: string;
 }
 
 interface AdminWorkerFixtures {
@@ -41,6 +47,7 @@ interface AdminWorkerFixtures {
   _adminAppServerWorker: AppServer;
   _ownerAccessHeadersWorker: Record<string, string>;
   _ownerAccessCookieStateWorker: { state: StorageState; token: string };
+  _lokiServerWorker: LokiServer;
 }
 
 const ADMIN_PORT_BASE = 4600;
@@ -96,6 +103,15 @@ export const test = base.extend<AdminTestFixtures, AdminWorkerFixtures>({
   _accessServerWorker: [
     async ({ browser: _browser }, provide) => {
       const server = await startAccessServer();
+
+      await provide(server);
+      await server.stop();
+    },
+    { scope: "worker" },
+  ],
+  _lokiServerWorker: [
+    async ({ browser: _browser }, provide) => {
+      const server = await startLokiServer();
 
       await provide(server);
       await server.stop();
@@ -169,6 +185,26 @@ export const test = base.extend<AdminTestFixtures, AdminWorkerFixtures>({
   },
   adminIsolatedAppUrl: async ({ adminIsolatedAppServer }, provide) => {
     await provide(adminUrlOf(adminIsolatedAppServer));
+  },
+  lokiServer: async ({ _lokiServerWorker }, provide) => {
+    _lokiServerWorker.clear();
+
+    await provide(_lokiServerWorker);
+  },
+  revealAppServer: async (
+    { _identityServerWorker, _accessServerWorker, _lokiServerWorker },
+    provide,
+  ) => {
+    const server = await startFreshAdminServer(_identityServerWorker, _accessServerWorker, 3, {
+      LOKI_SERVICE_NAME: "overture-e2e",
+      LOKI_URL: _lokiServerWorker.url,
+    });
+
+    await provide(server);
+    await server.stop();
+  },
+  revealAppUrl: async ({ revealAppServer }, provide) => {
+    await provide(adminUrlOf(revealAppServer));
   },
   browserUseApi: async ({ browser: _browser }, provide) => {
     const fixture = startBrowserUseFixture();

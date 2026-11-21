@@ -15,6 +15,7 @@ const LIVE_URLS = [
   "https://api.browser-use.com/api/v3/sessions",
   "https://api.cloudflare.com/client/v4/accounts/account/email/sending/send",
   "https://hiring.cafe/api/jobs",
+  "https://logs-prod-us-central1.grafana.net/loki/api/v1/push",
 ] as const;
 
 for (const environment of ["test", "development"] as const) {
