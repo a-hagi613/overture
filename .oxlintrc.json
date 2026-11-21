@@ -161,7 +161,8 @@
           "src/server/profile/onboarding-step.test.ts",
           "src/server/pipeline/answer-plan.test.ts",
           "src/server/platform/outbound-guard.test.ts",
-          "src/server/platform/ports/replica-listing.test.ts"
+          "src/server/platform/ports/replica-listing.test.ts",
+          "src/server/platform/jobs/scheduler.test.ts"
         ]
       }
     ],
@@ -527,7 +528,8 @@
         "**/*.config.{ts,mts,mjs,js}",
         "test/e2e/global-setup.ts",
         "tools/oxlint/architecture/index.ts",
-        "workers/inbound-mail/src/index.ts"
+        "workers/inbound-mail/src/index.ts",
+        "workers/sentinel/src/index.ts"
       ],
       "rules": {
         "import/no-default-export": "off"

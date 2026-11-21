@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { turnstileScriptUrl } from "../../shared/turnstile.ts";
+
 const booleanFromString = z.enum(["true", "false"]).transform((value) => value === "true");
 
 const oauthPairs = [
@@ -56,6 +58,13 @@ const envSchema = z
     OWNER_EMAIL: z.email(),
     TURNSTILE_SITE_KEY: z.string().min(1),
     TURNSTILE_SECRET: z.string().min(1),
+    TURNSTILE_SCRIPT_URL: z
+      .string()
+      .min(1)
+      .refine((value) => value.startsWith("/") || value.startsWith("https://"), {
+        message: "TURNSTILE_SCRIPT_URL must be an https URL or a same-origin path",
+      })
+      .default(turnstileScriptUrl),
     TURNSTILE_HOSTNAMES: z
       .string()
       .min(1)

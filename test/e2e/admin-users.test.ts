@@ -28,10 +28,6 @@ const auditSchema = z.object({
   ),
 });
 
-const homeSchema = z.object({
-  pauseReason: z.string().nullable(),
-});
-
 async function expectAxeClean(page: Page, label: string) {
   const results = await new AxeBuilder({ page }).analyze();
 
@@ -143,13 +139,13 @@ test("the owner invites, grants and suspends a person from the admin", async ({
   expect(audit.audit.some((entry) => entry.action === "invites.revoke")).toBe(true);
   expect(audit.audit.find((entry) => entry.action === "grants.create")?.detail.quantity).toBe(5);
 
-  const home = homeSchema.parse(await (await page.request.get(`${appUrl}/api/home`)).json());
+  const afterSuspension = await page.request.get(`${appUrl}/api/home`);
 
-  expect(home.pauseReason).toBe("suspended");
+  expect(afterSuspension.status()).toBe(401);
 
-  await page.goto(`${appUrl}/`);
+  const afterState = await verifyAuthState(appUrl, page.request);
 
-  await expect(page.getByText("Your account is under review.")).toBeVisible();
+  expect(afterState.sessions.some((session) => session.userId === guest?.id)).toBe(false);
 
   await clearSinkMail(appUrl, page.request);
   await setTurnstileScenario(page.request, appUrl, { action: "magiclink" });

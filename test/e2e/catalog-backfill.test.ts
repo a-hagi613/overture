@@ -149,6 +149,60 @@ test("a backfill fills the catalog and later reads add, change and close Posting
   }
 });
 
+test("closing a board's missing Postings crosses chunk boundaries", async () => {
+  const harness = await startCatalogHarness([FIXTURE_BOARD]);
+
+  try {
+    await harness.runBackfillCycle();
+
+    const boardId = harness.boardIds[FIXTURE_BOARD] ?? "";
+    const seededCount = 600;
+
+    const onBoard = readFixtureBoard(FIXTURE_BOARD);
+    const ids = Array.from({ length: seededCount }, (_, index) => `missing-${String(index)}`);
+
+    const response = await fetch(`${harness.app.url}/__test__/catalog/postings/bulk`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        postings: ids.map((atsJobId) => ({
+          ats: "greenhouse",
+          atsJobId,
+          boardId,
+          companyId: harness.companyId,
+          title: "Senior Backend Engineer",
+          url: `https://job-boards.greenhouse.io/${FIXTURE_BOARD}/jobs/${atsJobId}`,
+        })),
+      }),
+    });
+
+    expect(response.ok).toBe(true);
+
+    const changedJob = onBoard[0] ?? { id: "", title: "" };
+
+    harness.fixture.mutateBoard("greenhouse", FIXTURE_BOARD, {
+      titleUpdates: { [changedJob.id]: "Principal Platform Engineer" },
+      updatedAtUpdates: {
+        [changedJob.id]: new Date((await clockNow(harness)) - 60_000).toISOString(),
+      },
+    });
+
+    await harness.runBackfillCycle();
+    await harness.runBackfillCycle();
+
+    const rows = postingsOnBoard(await harness.postings(), boardId);
+    const seeded = rows.filter((row) => ids.includes(row.atsJobId));
+
+    expect(seeded.length).toBe(seededCount);
+    expect(seeded.filter((row) => row.closedAt === null)).toEqual([]);
+    expect(rows.filter((row) => !ids.includes(row.atsJobId) && row.closedAt === null).length).toBe(
+      onBoard.length,
+    );
+  } finally {
+    await harness.close();
+  }
+});
+
 function boardFor(boards: Awaited<ReturnType<CatalogHarness["boards"]>>, boardToken: string) {
   const board = boards.find((candidate) => candidate.boardToken === boardToken);
 

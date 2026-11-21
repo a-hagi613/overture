@@ -1,0 +1,79 @@
+{
+  "data": {
+    "viewer": {
+      "accounts": [
+        {
+          "queueMessageOperationsAdaptiveGroups": [],
+          "r2OperationsAdaptiveGroups": [
+            {
+              "dimensions": { "actionStatus": "success", "actionType": "CompleteMultipartUpload" },
+              "sum": { "requests": 818 }
+            },
+            {
+              "dimensions": { "actionStatus": "success", "actionType": "CreateMultipartUpload" },
+              "sum": { "requests": 817 }
+            },
+            {
+              "dimensions": { "actionStatus": "success", "actionType": "HeadObject" },
+              "sum": { "requests": 306 }
+            },
+            {
+              "dimensions": { "actionStatus": "success", "actionType": "DeleteObject" },
+              "sum": { "requests": 2 }
+            },
+            {
+              "dimensions": { "actionStatus": "success", "actionType": "PutBucket" },
+              "sum": { "requests": 2 }
+            },
+            {
+              "dimensions": { "actionStatus": "success", "actionType": "UploadPart" },
+              "sum": { "requests": 3296 }
+            },
+            {
+              "dimensions": { "actionStatus": "internalError", "actionType": "PutObject" },
+              "sum": { "requests": 16 }
+            },
+            {
+              "dimensions": { "actionStatus": "userError", "actionType": "ListObjects" },
+              "sum": { "requests": 138 }
+            },
+            {
+              "dimensions": { "actionStatus": "success", "actionType": "ListBuckets" },
+              "sum": { "requests": 10 }
+            },
+            {
+              "dimensions": { "actionStatus": "internalError", "actionType": "DeleteObjects" },
+              "sum": { "requests": 1 }
+            },
+            {
+              "dimensions": { "actionStatus": "success", "actionType": "PutObject" },
+              "sum": { "requests": 62427 }
+            },
+            {
+              "dimensions": { "actionStatus": "success", "actionType": "GetObject" },
+              "sum": { "requests": 4481 }
+            },
+            {
+              "dimensions": { "actionStatus": "success", "actionType": "ListObjects" },
+              "sum": { "requests": 90108 }
+            },
+            {
+              "dimensions": { "actionStatus": "userError", "actionType": "HeadObject" },
+              "sum": { "requests": 1 }
+            },
+            {
+              "dimensions": { "actionStatus": "internalError", "actionType": "ListObjects" },
+              "sum": { "requests": 22 }
+            },
+            {
+              "dimensions": { "actionStatus": "success", "actionType": "DeleteObjects" },
+              "sum": { "requests": 8806 }
+            }
+          ],
+          "workersInvocationsAdaptive": []
+        }
+      ]
+    }
+  },
+  "errors": null
+}
