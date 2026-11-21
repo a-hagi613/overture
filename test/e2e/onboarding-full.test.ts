@@ -28,6 +28,17 @@ const targetsSchema = z.object({
   targets: z.object({ locations: z.array(z.string()), roles: z.array(z.string()) }),
 });
 
+async function actInTurn<Item>(items: readonly Item[], act: (item: Item) => Promise<void>) {
+  const first = items.at(0);
+
+  if (first === undefined) {
+    return;
+  }
+
+  await act(first);
+  await actInTurn(items.slice(1), act);
+}
+
 test("a brand-new user answers every onboarding step through the UI", async ({
   browser,
   onboardingServer,
@@ -63,14 +74,15 @@ test("a brand-new user answers every onboarding step through the UI", async ({
 
   await page.getByLabel("Current job title").fill("Staff Platform Engineer");
 
-  await Promise.all((await workAuth.all()).map(async (field) => field.selectOption("Citizen")));
-  await Promise.all((await salary.all()).map(async (field) => field.fill("140,000")));
-
-  await Promise.all(
-    (await page.getByLabel(/^Period for /u).all()).map(async (field) =>
-      field.selectOption("a year"),
-    ),
-  );
+  await actInTurn(await workAuth.all(), async (field) => {
+    await field.selectOption("Citizen");
+  });
+  await actInTurn(await salary.all(), async (field) => {
+    await field.fill("140,000");
+  });
+  await actInTurn(await page.getByLabel(/^Period for /u).all(), async (field) => {
+    await field.selectOption("a year");
+  });
 
   await page.getByRole("switch").click();
   await expect(page.getByLabel("Gender")).toBeEnabled();

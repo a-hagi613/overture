@@ -165,6 +165,52 @@ function currencyForCountry(code: string) {
   return Object.entries(CURRENCY_BY_COUNTRY).find(([country]) => country === code)?.[1];
 }
 
+export function currenciesFor(input: {
+  queued: readonly string[];
+  salaryCurrencies: readonly string[];
+  targetCurrency: string | null;
+  countryCodes: readonly string[];
+  inferCountries: boolean;
+}) {
+  const currencies = [...input.queued];
+
+  for (const currency of input.salaryCurrencies) {
+    if (!currencies.includes(currency)) {
+      currencies.push(currency);
+    }
+  }
+
+  if (
+    input.targetCurrency !== null &&
+    isCurrencyCode(input.targetCurrency) &&
+    !currencies.includes(input.targetCurrency)
+  ) {
+    currencies.push(input.targetCurrency);
+  }
+
+  if (currencies.length === 0 && input.inferCountries) {
+    for (const code of input.countryCodes) {
+      const currency = currencyForCountry(code);
+
+      if (currency !== undefined && !currencies.includes(currency)) {
+        currencies.push(currency);
+      }
+    }
+  }
+
+  return currencies;
+}
+
+export function homeCountryCode(facts: readonly FactRecord[]) {
+  const value = factValue(facts, "current_country").trim();
+
+  if (value === "") {
+    return null;
+  }
+
+  return resolveLocation(value).countryCode ?? countryCodesNamedIn(value).at(0) ?? null;
+}
+
 function targetCountryCodes(targets: Targets) {
   const codes: string[] = [];
 
@@ -296,37 +342,20 @@ export function createOnboardingStepService(deps: {
     }
 
     if (countryCodes.length === 0 && options.inferCountries !== false) {
-      const home = countryCodesNamedIn(factValue(facts, "current_country")).at(0);
+      const home = homeCountryCode(facts);
 
-      countryCodes.push(...(home === undefined ? openPostingCountries() : [home]));
+      countryCodes.push(...(home === null ? openPostingCountries() : [home]));
     }
 
-    const currencies = queuedCurrencies(userId);
     const salaryAnswers = salaryAnswersFrom(facts);
 
-    for (const saved of salaryAnswers) {
-      if (!currencies.includes(saved.currency)) {
-        currencies.push(saved.currency);
-      }
-    }
-
-    if (currencies.length === 0 && options.inferCountries !== false) {
-      for (const code of countryCodes) {
-        const currency = currencyForCountry(code);
-
-        if (currency !== undefined && !currencies.includes(currency)) {
-          currencies.push(currency);
-        }
-      }
-    }
-
-    if (
-      targets.salaryCurrency !== null &&
-      isCurrencyCode(targets.salaryCurrency) &&
-      !currencies.includes(targets.salaryCurrency)
-    ) {
-      currencies.push(targets.salaryCurrency);
-    }
+    const currencies = currenciesFor({
+      countryCodes,
+      inferCountries: options.inferCountries !== false,
+      queued: queuedCurrencies(userId),
+      salaryCurrencies: salaryAnswers.map((answer) => answer.currency),
+      targetCurrency: targets.salaryCurrency,
+    });
 
     const stepAnswers = {
       eeo: eeoAnswersFrom(facts),
