@@ -373,6 +373,10 @@ const ADDED_FIELDS = new Map([
   ],
 ]);
 
+const REMOVED_FIELDS = new Map<string, string[]>([
+  ["stripe-without-whatsapp", ["question_68935515"]],
+]);
+
 const mutateForm = (form: HTMLFormElement, meta: FixtureMeta) => {
   const search = new URLSearchParams(globalThis.location.search);
   const mutation = globalThis.fixtureMutation ?? search.get("mutation") ?? "";
@@ -388,6 +392,10 @@ const mutateForm = (form: HTMLFormElement, meta: FixtureMeta) => {
 
   if (removed !== null && removed !== "") {
     form.querySelector<HTMLElement>(`#${removed}`)?.closest(".field-wrapper")?.remove();
+  }
+
+  for (const id of REMOVED_FIELDS.get(mutation) ?? []) {
+    form.querySelector<HTMLElement>(`#${id}`)?.closest(".field-wrapper")?.remove();
   }
 
   if (mutation === "option-changed" || search.get("change-option") === "country") {
