@@ -51,6 +51,7 @@ import { retryWhenBusy } from "../platform/db/busy.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
+import { createConsentService } from "../profile/consent.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { clearSinkMail, listSinkMail } from "../platform/mail/sink.ts";
 import {
@@ -117,6 +118,8 @@ const publishBody = z.object({
   payload: z.record(z.string(), z.string().or(z.number()).or(z.boolean()).or(z.null())),
   userId: z.string().optional(),
 });
+
+const consentPublishBody = z.object({ text: z.string().trim().min(1).max(10_000) });
 
 const createCompanyBody = z.object({
   name: z.string().min(1),
@@ -786,6 +789,16 @@ export function createTestRoutes(
   }
 
   routes.get("/clock", (context) => context.json({ now: clock.now(), offsetMs: clock.offset() }));
+
+  routes.post("/consent/publish", zValidator("json", consentPublishBody), (context) => {
+    const published = createConsentService({ clock, db }).publish(context.req.valid("json").text);
+
+    return context.json({
+      publishedAt: published.publishedAt.toISOString(),
+      text: published.text,
+      version: published.version,
+    });
+  });
 
   routes.post("/clock/offset", zValidator("json", offsetBody), (context) => {
     const { offsetMs } = context.req.valid("json");
