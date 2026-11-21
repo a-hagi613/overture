@@ -218,7 +218,7 @@ export function createPreparationService(deps: {
   llm: LlmPort;
   personal: PersonalCrypto;
   source: QuestionSource | null;
-  onReady?: (applicationId: string) => void;
+  onReady?: (applicationId: string, userId: string) => void;
 }) {
   const { db, clock, llm, personal, source, onReady } = deps;
 
@@ -652,7 +652,7 @@ export function createPreparationService(deps: {
     }
 
     if (status === "ready" && row.status !== "ready") {
-      onReady?.(applicationId);
+      onReady?.(applicationId, row.userId);
     }
 
     return { status, blocked: blocked.length };

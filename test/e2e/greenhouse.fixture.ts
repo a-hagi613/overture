@@ -12,6 +12,7 @@ export interface GreenhouseFixturesState {
   confirmationLoads: number;
   code: string;
   codeAsked: boolean;
+  postingOpen: boolean;
   lastForm: Record<string, string>;
   lastChoices: Record<string, string>;
   lastResumeBytes: Uint8Array | null;
@@ -50,6 +51,7 @@ export function startGreenhouseFixture(options: GreenhouseFixtureOptions = {}) {
     confirmationLoads: 0,
     code: options.code ?? "48211357",
     codeAsked: false,
+    postingOpen: true,
     lastForm: {},
     lastChoices: {},
     lastResumeBytes: null,
@@ -84,6 +86,14 @@ export function startGreenhouseFixture(options: GreenhouseFixtureOptions = {}) {
     async fetch(request) {
       const url = new URL(request.url);
       const path = url.pathname;
+
+      const feedMatch = /^\/v1\/boards\/(?<token>[^/]+)\/jobs\/(?<jobId>[^/]+)$/u.exec(path);
+
+      if (feedMatch !== null) {
+        return state.postingOpen
+          ? Response.json({ id: feedMatch.groups?.["jobId"] ?? "", title: "Fixture Posting" })
+          : new Response(null, { status: 404 });
+      }
 
       if (path === "/__fixture__/runtime.js") {
         return new Response(runtime, { headers: { "content-type": "text/javascript" } });
