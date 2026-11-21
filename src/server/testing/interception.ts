@@ -19,10 +19,7 @@ const recordedVerificationSchema = z.object({
   messages: z.array(z.string()).optional(),
 });
 
-const loopbackPassthrough = [
-  http.get(/^http:\/\/127\.0\.0\.1:\d+\/.*/u, () => passthrough()),
-  http.post(/^http:\/\/127\.0\.0\.1:\d+\/.*/u, () => passthrough()),
-];
+const loopbackPassthrough = [http.all(/^http:\/\/127\.0\.0\.1:\d+\/.*/u, () => passthrough())];
 
 const recorded = recordedVerificationSchema.parse(
   JSON.parse(readFileSync(turnstileRecordingPath, "utf8")),

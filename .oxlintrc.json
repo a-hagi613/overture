@@ -60,7 +60,8 @@
   "env": {
     "builtin": true,
     "node": true,
-    "browser": true
+    "browser": true,
+    "bun": true
   },
   "options": {
     "typeAware": true,
@@ -133,7 +134,8 @@
           "src/server/profile/address.test.ts",
           "src/server/catalog/tag-rules.test.ts",
           "src/server/catalog/question-normalize.test.ts",
-          "src/server/catalog/answer-derivations.test.ts"
+          "src/server/catalog/answer-derivations.test.ts",
+          "src/server/fixtures/sanitise.test.ts"
         ]
       }
     ],
@@ -511,8 +513,5 @@
         "node/no-process-env": "off"
       }
     }
-  ],
-  "globals": {
-    "Bun": "readonly"
-  }
+  ]
 }

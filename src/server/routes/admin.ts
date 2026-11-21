@@ -6,8 +6,18 @@ import { z } from "zod";
 import type { Auth } from "../auth/index.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
+import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
 
-import { bgJobs, grants, killSwitches, sessions, users } from "../platform/db/schema.ts";
+import {
+  applications,
+  attempts,
+  bgJobs,
+  grants,
+  killSwitches,
+  postings,
+  sessions,
+  users,
+} from "../platform/db/schema.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags, readTagImports } from "../catalog/tag-import.ts";
 import { createAccessVerifier } from "../platform/access/index.ts";
 import { env } from "../config/env.ts";
@@ -15,6 +25,9 @@ import { hasRecentPasskeyAssertion } from "../platform/passkey/index.ts";
 import { listAdminAudit, recordAdminAudit } from "../platform/audit/index.ts";
 import { readLlmUsage } from "../platform/llm/usage.ts";
 import { applicationsLeft, grantApplications } from "../billing/ledger.ts";
+import { buildCostSummary, buildProviderReport } from "../dispatch/report.ts";
+import { FIXTURE_CAPTURE_JOB_KIND, fixtureCapturePayloadSchema } from "../fixtures/job.ts";
+import { enqueueJob } from "../platform/jobs/queue.ts";
 import {
   getAllKillSwitches,
   getAllSettings,
@@ -47,6 +60,17 @@ const llmUsageQuery = z.object({
   limit: z.coerce.number().int().min(1).max(1000).default(100),
 });
 
+const attemptsQuery = z.object({
+  applicationId: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+const captureBody = fixtureCapturePayloadSchema;
+
+export interface AdminDeps {
+  providers: BrowserProviderRegistry | null;
+}
+
 const ATS_NAMES = ["greenhouse", "lever", "ashby"] as const;
 
 export const ADMIN_REFUSAL_CODES = {
@@ -73,7 +97,7 @@ export function isAdminHost(hostname: string, adminOrigin: string) {
   }
 }
 
-export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth) {
+export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: AdminDeps) {
   const verifier = createAccessVerifier({
     jwksUrl: env.CF_ACCESS_JWKS_URL,
     teamDomain: env.CF_ACCESS_TEAM_DOMAIN,
@@ -149,6 +173,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth) {
         total: allSwitches.length,
         enabled: allSwitches.filter((row) => row.enabled === 1).length,
       },
+      cost: buildCostSummary(db),
       audit: audit.map((row) => ({
         id: row.id,
         at: row.at.getTime(),
@@ -343,6 +368,135 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth) {
     const { purpose, limit } = context.req.valid("query");
 
     return context.json(readLlmUsage(db, { purpose: purpose ?? null, sinceMs: null, limit }));
+  });
+
+  routes.get("/attempts", zValidator("query", attemptsQuery), (context) => {
+    const { applicationId, limit } = context.req.valid("query");
+
+    const rows = db
+      .select({
+        attempt: attempts,
+        ats: postings.ats,
+        postingTitle: postings.title,
+      })
+      .from(attempts)
+      .innerJoin(applications, eq(attempts.applicationId, applications.id))
+      .innerJoin(postings, eq(applications.postingId, postings.id))
+      .where(applicationId === undefined ? undefined : eq(attempts.applicationId, applicationId))
+      .orderBy(desc(attempts.startedAt))
+      .limit(limit)
+      .all();
+
+    return context.json({
+      attempts: rows.map((row) => ({
+        applicationId: row.attempt.applicationId,
+        ats: row.ats,
+        browserMs: row.attempt.browserMs,
+        costMicros: row.attempt.costMicros,
+        endedAt: row.attempt.endedAt,
+        id: row.attempt.id,
+        outcome: row.attempt.outcome,
+        postingTitle: row.postingTitle,
+        provider: row.attempt.provider,
+        providerSessionId: row.attempt.providerSessionId,
+        proxyBytes: row.attempt.proxyBytes,
+        startedAt: row.attempt.startedAt,
+        liveUrl: `/admin/api/attempts/${row.attempt.id}/live`,
+        replayUrl: `/admin/api/attempts/${row.attempt.id}/replay`,
+      })),
+    });
+  });
+
+  routes.get("/attempts/:id/live", async (context) => {
+    const attempt = db
+      .select()
+      .from(attempts)
+      .where(eq(attempts.id, context.req.param("id")))
+      .get();
+
+    if (attempt === undefined) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    const sessionId = attempt.providerSessionId;
+
+    if (sessionId === null) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    const provider = deps.providers?.all().find((candidate) => candidate.id === attempt.provider);
+
+    if (provider === undefined) {
+      return context.json({ error: "provider_unavailable" }, 404);
+    }
+
+    const view = await provider.view(sessionId);
+
+    if (view === null) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    return context.json(view);
+  });
+
+  routes.get("/attempts/:id/replay", async (context) => {
+    const attempt = db
+      .select()
+      .from(attempts)
+      .where(eq(attempts.id, context.req.param("id")))
+      .get();
+
+    if (attempt === undefined) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    const sessionId = attempt.providerSessionId;
+
+    if (sessionId === null) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    const provider = deps.providers?.all().find((candidate) => candidate.id === attempt.provider);
+
+    if (provider === undefined) {
+      return context.json({ error: "provider_unavailable" }, 404);
+    }
+
+    const view = await provider.view(sessionId);
+    const recordingUrl = view?.recordingUrl ?? null;
+
+    if (recordingUrl === null) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    return context.json({ recordingUrl });
+  });
+
+  routes.get("/provider-report", (context) =>
+    context.json({ providers: buildProviderReport(db, clock) }),
+  );
+
+  routes.post("/fixtures/capture", zValidator("json", captureBody), (context) => {
+    if (deps.providers === null) {
+      return context.json({ error: "browser_provider_unconfigured" }, 503);
+    }
+
+    const owner = context.get("owner");
+
+    const input = context.req.valid("json");
+
+    const job = enqueueJob(db, clock, FIXTURE_CAPTURE_JOB_KIND, JSON.stringify(input), {
+      maxAttempts: 1,
+    });
+
+    recordAdminAudit(db, clock, {
+      actorId: owner.userId,
+      action: "fixtures.capture",
+      reason: `Capture ${input.ats} forms for the test fixtures`,
+      detail: { ats: input.ats, applyUrls: input.applyUrls.length, jobId: job.id },
+    });
+
+    return context.json({ jobId: job.id });
   });
 
   return routes;

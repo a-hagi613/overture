@@ -11,6 +11,7 @@ import type { ObjectStore } from "./platform/ports/object-store.ts";
 import type { PreparationService } from "./pipeline/prepare.ts";
 import type { ReviewService } from "./pipeline/reviews.ts";
 import type { createMailboxService } from "./inbox/mailboxes.ts";
+import type { BrowserProviderRegistry } from "./dispatch/browser/provider.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
 import { createMeRoutes } from "./routes/me.ts";
@@ -43,6 +44,7 @@ export interface AppDependencies {
   preparation: PreparationService;
   reviews: ReviewService;
   singletonJobKinds: readonly string[];
+  providers: BrowserProviderRegistry | null;
 }
 
 async function staticResponseFrom(root: string, url: string) {
@@ -66,7 +68,7 @@ async function staticResponseFrom(root: string, url: string) {
 }
 
 export function createApp(deps: AppDependencies) {
-  const adminApi = createAdminApi(deps.db, deps.clock, deps.auth);
+  const adminApi = createAdminApi(deps.db, deps.clock, deps.auth, { providers: deps.providers });
   const adminHost = new Hono();
 
   const personal = createPersonalCrypto(

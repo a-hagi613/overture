@@ -165,3 +165,19 @@ completed application against the $0.03 gate.
 
 `BROWSER_USE_API_KEY` is a Fly secret on `overture-web`; its value is never stored in or printed by
 this repository. The probe needs no other configuration.
+
+
+## Capturing fixtures
+
+After a deploy, queue one capture for each M1 ATS on `overture-web` (it never clicks Submit):
+
+```sh
+fly ssh console -a overture-web -C "bun run /app/scripts/capture-forms.ts --ats greenhouse --url <apply_url>"
+fly ssh console -a overture-web -C "bun run /app/scripts/capture-forms.ts --ats lever --url <apply_url>"
+fly ssh console -a overture-web -C "bun run /app/scripts/capture-forms.ts --ats ashby --url <apply_url>"
+```
+
+Each command prints the queued job id and exits; the worker opens the page in Browser Use, writes the sanitised form
+and its assets to the `fixtures/{ats}/` prefix in R2, and stops the session through the API. Check the job row in
+`bg_jobs` (`status = done`, no `last_error`) and the R2 prefix; the captured HTML contains no `<script`, event handler,
+filled value, email or token. A developer pulls the files with `scripts/pull-forms.ts`.

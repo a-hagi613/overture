@@ -11,6 +11,8 @@ import type { BrowserContext } from "@playwright/test";
 import type { IdentityServer } from "./identity-server-test.fixture.ts";
 
 import { authTestIdentity } from "./auth.fixture.ts";
+import { startBrowserUseFixture } from "./browser-use-server.fixture.ts";
+import type { BrowserUseFixture } from "./browser-use-server.fixture.ts";
 import { startAppServer } from "./app-server.ts";
 import { accessTeamIdentity, startAccessServer } from "./access-server.ts";
 import { latestMailLink, requestMagicLink } from "./sign-in.ts";
@@ -28,6 +30,9 @@ interface AdminTestFixtures {
   adminIsolatedAppUrl: string;
   ownerAccessHeaders: Record<string, string>;
   ownerAccessCookieState: StorageState;
+  captureAppServer: AppServer;
+  captureAppUrl: string;
+  browserUseApi: BrowserUseFixture;
 }
 
 interface AdminWorkerFixtures {
@@ -44,7 +49,12 @@ function adminPort(offset: number) {
   return ADMIN_PORT_BASE + Number(process.env.TEST_WORKER_INDEX ?? "0") * 10 + offset;
 }
 
-function adminEnv(jwksUrl: string, port: number, identityServer: IdentityServer) {
+function adminEnv(
+  jwksUrl: string,
+  port: number,
+  identityServer: IdentityServer,
+  extra: Record<string, string> = {},
+) {
   return {
     PORT: String(port),
     ADMIN_ORIGIN: `http://localhost:${String(port)}`,
@@ -54,6 +64,7 @@ function adminEnv(jwksUrl: string, port: number, identityServer: IdentityServer)
     CF_ACCESS_AUD: accessTeamIdentity.audience,
     CF_ACCESS_TEAM_DOMAIN: accessTeamIdentity.teamDomain,
     CF_ACCESS_JWKS_URL: jwksUrl,
+    ...extra,
   };
 }
 
@@ -61,6 +72,7 @@ async function startFreshAdminServer(
   identityServer: IdentityServer,
   accessServer: AccessServer,
   offset: number,
+  extraEnvironment: Record<string, string> = {},
 ) {
   const directory = mkdtempSync(join(tmpdir(), "overture-admin-e2e-"));
   const databasePath = join(directory, "overture.db");
@@ -69,7 +81,10 @@ async function startFreshAdminServer(
 
   return startAppServer(
     databasePath,
-    adminEnv(accessServer.url, adminPort(offset), identityServer),
+    adminEnv(accessServer.url, adminPort(offset), identityServer, {
+      OBJECT_STORE_ROOT: join(directory, "objects"),
+      ...extraEnvironment,
+    }),
   );
 }
 
@@ -154,6 +169,29 @@ export const test = base.extend<AdminTestFixtures, AdminWorkerFixtures>({
   },
   adminIsolatedAppUrl: async ({ adminIsolatedAppServer }, provide) => {
     await provide(adminUrlOf(adminIsolatedAppServer));
+  },
+  browserUseApi: async ({ browser: _browser }, provide) => {
+    const fixture = startBrowserUseFixture();
+
+    await provide(fixture);
+    fixture.close();
+  },
+  captureAppServer: async (
+    { _identityServerWorker, _accessServerWorker, browserUseApi },
+    provide,
+  ) => {
+    const server = await startFreshAdminServer(_identityServerWorker, _accessServerWorker, 2, {
+      BROWSER_PROVIDER: "browser_use",
+      BROWSER_USE_API_BASE_URL: browserUseApi.url,
+      BROWSER_USE_API_KEY: "admin-capture-test-key",
+      BROWSER_PROXY_COUNTRY: "ca",
+    });
+
+    await provide(server);
+    await server.stop();
+  },
+  captureAppUrl: async ({ captureAppServer }, provide) => {
+    await provide(adminUrlOf(captureAppServer));
   },
   ownerAccessHeaders: async ({ _ownerAccessHeadersWorker }, provide) => {
     await provide(_ownerAccessHeadersWorker);

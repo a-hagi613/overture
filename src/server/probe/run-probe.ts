@@ -206,6 +206,7 @@ async function runPosting(
 
   try {
     session = await client.createSession({
+      profileId: null,
       proxyCountryCode: deps.runFile.country,
       timeoutMinutes: SESSION_TIMEOUT_MINUTES,
       solveCaptchas: true,

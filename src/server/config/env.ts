@@ -96,7 +96,10 @@ const envSchema = z
     LITESTREAM_BINARY: z.string().min(1).default("litestream"),
     BROWSER_USE_API_KEY: z.string().min(1).optional(),
     BROWSER_USE_API_BASE_URL: z.url().default("https://api.browser-use.com"),
+    KERNEL_API_KEY: z.string().min(1).optional(),
+    KERNEL_API_BASE_URL: z.url().default("https://api.onkernel.com"),
     BROWSER_PROVIDER: z.enum(["local", "browser_use", "kernel"]).optional(),
+    SEND_HARD_TIMEOUT_MS: z.coerce.number().int().min(1).default(900_000),
     BROWSER_SESSION_DIR: z.string().min(1).optional(),
     BROWSER_PROXY_COUNTRY: z
       .string()

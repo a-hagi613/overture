@@ -171,11 +171,11 @@ const noUnlistedUnitTest = defineRule({
     ],
     docs: {
       description:
-        "Allow Vitest unit tests only beside the six ADR 0013 invariants; everything else is a Playwright e2e test.",
+        "Allow Vitest unit tests only beside the ADR 0013 invariants; everything else is a Playwright e2e test.",
     },
     messages: {
       forbidden:
-        "Move this test into test/e2e as a Playwright test, or add it to the six ADR 0013 invariants.",
+        "Move this test into test/e2e as a Playwright test, or add it to the ADR 0013 invariants.",
     },
   },
   create(context) {

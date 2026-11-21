@@ -6,6 +6,18 @@ import { AuditLine } from "./audit-line.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
 import { AdminGateScreen } from "./gate-screen.tsx";
 
+function gateState(cost: Overview["cost"]) {
+  if (cost.completed === 0) {
+    return copy.admin.overviewCostEmpty;
+  }
+
+  if (cost.costGateMet === false) {
+    return copy.admin.overviewCostGateMissed;
+  }
+
+  return copy.admin.overviewCostGateMet;
+}
+
 export function OverviewPage() {
   const { data, refusal, refresh } = useAdminResource(loadOverview);
 
@@ -90,6 +102,55 @@ export function OverviewPage() {
               ))
             )}
           </div>
+        </section>
+        <section
+          aria-labelledby="admin-overview-cost"
+          className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
+        >
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 id="admin-overview-cost" className="font-serif text-[26px] leading-[1.1]">
+              {copy.admin.overviewCost}
+            </h2>
+            <span className="font-serif text-sm italic text-muted-foreground">
+              {copy.admin.folio2}
+            </span>
+          </div>
+          <p className="mt-2 text-[12.5px] text-muted-foreground">{copy.admin.overviewCostIntro}</p>
+          <dl className="mt-4 flex flex-wrap gap-8">
+            <div>
+              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {copy.admin.overviewCostCompleted}
+              </dt>
+              <dd className="font-serif text-3xl tabular-nums">{view.cost.completed}</dd>
+            </div>
+            <div>
+              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {copy.admin.overviewCostProxy}
+              </dt>
+              <dd className="font-serif text-3xl tabular-nums">
+                {view.cost.proxyMbPerCompleted === null
+                  ? "—"
+                  : `${view.cost.proxyMbPerCompleted.toFixed(2)} MB`}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {copy.admin.overviewCostPerApplication}
+              </dt>
+              <dd className="font-serif text-3xl tabular-nums">
+                {view.cost.costMicrosPerCompleted === null
+                  ? "—"
+                  : copy.admin.overviewCostGate(
+                      `$${(view.cost.costMicrosPerCompleted / 1_000_000).toFixed(4)}`,
+                      `$${(view.cost.costGateMicros / 1_000_000).toFixed(2)}`,
+                    )}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-4 text-[12.5px] text-muted-foreground">{gateState(view.cost)}</p>
+          <p className="mt-1 text-[12.5px] text-muted-foreground">
+            {view.cost.proxyTrend ? copy.admin.overviewCostTrend : copy.admin.overviewCostNoTrend}
+          </p>
         </section>
         <section
           aria-labelledby="admin-overview-audit"
