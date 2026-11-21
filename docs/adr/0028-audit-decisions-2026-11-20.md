@@ -75,10 +75,16 @@ repeat-application throttles.
   and 6.1 MB, Cloudflare's 496 jobs and 8.9 MB.
 - **Sweep claims are small.** At most 20 boards per ATS per sweep (`catalog.sweep_max_boards`), so a batch finishes
   well inside its 15-minute claim. There is no lease heartbeat.
-- **No worker thread for now.** HTTP stays responsive since the chunked writes of #80. The orchestrator watches
-  `/api/health` latency during the faster backfill. A worker thread that writes only catalog rows is revisited only if
-  latency regresses; the main thread keeps its read-write connection because sign-in, settings, the ledger and
-  dispatch write from it.
+- **Catalog sweeps run in a Bun Worker.** `catalog.sweep` (fetch, parse, tag and the chunked writes of
+  `company_boards`, `postings` and `posting_tags`) runs in a Bun Worker with its own SQLite connection (WAL, the same
+  `busy_timeout` and #174's `SQLITE_BUSY` retries), and that worker writes only catalog rows. The main thread keeps
+  its read-write connection for sign-in, settings, the ledger and dispatch, schedules the sweep, and receives results
+  and metrics over `postMessage`. Writes stay chunked (at most 500 rows per transaction) and yield between chunks. A
+  crashed worker restarts with backoff, raises the `catalog.worker` alert and never takes the server down; its board
+  claim lapses so the next sweep retries it. An architecture rule reports any catalog table write outside the worker
+  and the narrow, listed non-sweep paths: dispatch closing a dead posting, preparation marking the question cache,
+  tag import, the retag and seed scripts, and the test routes. `catalog.sweep_max_boards` returns to 20 once this
+  ships (#175).
 - **Feed corrections.** The poll passes each feed's structured workplace to tagging; Ashby uses `workplaceType`,
   never `isRemote`. Lever gets an EU region (`api.eu.lever.co` is a separate board for the same slug), paginates
   with `limit=100&skip=N`, keeps slug case and uses `applyUrl`. Greenhouse has no separate EU API (production probe:
@@ -98,8 +104,9 @@ repeat-application throttles.
   interrupted send is released and retried. After it, the Application goes to Confirming and is never resent
   (ADR 0025, SPEC §9.4). The e2e suite covers a kill at each side of Submit.
 - **Large payloads.** Greenhouse `content=true` lists run 3–9 MB, and M2's Workable XML feed is one large file. The
-  orchestrator watches `/api/health` latency and process RSS during the backfill. Workable XML is stream-parsed. If
-  either regresses, catalog parsing moves to a Bun Worker that writes only catalog rows.
+  orchestrator watches `/api/health` latency and process RSS during the backfill. Workable XML is stream-parsed. The
+  catalog sweep moved to the Bun Worker described under Catalog after the 2026-11-21 latency regression (#175);
+  `/api/health` stayed under 300 ms p99 during a sweep of thousands of postings.
 - **Anti-bot drift.** Lever's invisible hCaptcha and Greenhouse and Ashby fraud scoring change over time. Each user
   keeps an isolated Browser Use profile. Selector and pacing changes are driven by measured pass rates per ATS in
   M1 and M2, not by guesses.

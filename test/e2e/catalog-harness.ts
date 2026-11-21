@@ -83,6 +83,8 @@ const jobRowSchema = z.object({
 
 const jobsResponseSchema = z.object({ jobs: z.array(jobRowSchema) });
 const clockResponseSchema = z.object({ now: z.number() });
+const sweepWorkerStatusSchema = z.object({ running: z.boolean(), restarts: z.number() });
+const sweepWorkerCrashSchema = z.object({ crashed: z.boolean() });
 const companyCreatedSchema = z.object({ id: z.string() });
 const boardCreatedSchema = z.object({ id: z.string() });
 const enqueueSchema = z.object({ id: z.string() });
@@ -187,6 +189,8 @@ export interface CatalogHarness {
   boardIds: Record<string, string>;
   runBackfillCycle: () => Promise<void>;
   runOneJob: (kind: string) => Promise<string>;
+  enqueueJob: (kind: string) => Promise<string>;
+  waitForJob: (jobId: string) => Promise<void>;
   pollThroughScheduledSweep: (clockOffsetMs: number) => Promise<void>;
   seedPostings: (tokens: string[]) => Promise<void>;
   postings: () => Promise<PostingRow[]>;
@@ -196,6 +200,8 @@ export interface CatalogHarness {
   putSetting: (key: string, value: string) => Promise<void>;
   moveClock: (offsetMs: number) => Promise<void>;
   clockNow: () => Promise<number>;
+  sweepWorkerStatus: () => Promise<{ running: boolean; restarts: number }>;
+  crashSweepWorker: () => Promise<boolean>;
   close: () => Promise<void>;
 }
 
@@ -364,16 +370,24 @@ export async function startCatalogHarness(
   }
 
   async function runOneJob(kind: string) {
+    const enqueuedId = await enqueueJob(kind);
+
+    lastEventId = await waitForJobDone(app.url, lastEventId, enqueuedId, null);
+
+    return enqueuedId;
+  }
+
+  async function enqueueJob(kind: string) {
     const enqueueResponse = await postJson(`${app.url}/__test__/jobs/enqueue`, {
       kind,
       payload: "{}",
     });
 
-    const enqueued = enqueueSchema.parse(await enqueueResponse.json());
+    return enqueueSchema.parse(await enqueueResponse.json()).id;
+  }
 
-    lastEventId = await waitForJobDone(app.url, lastEventId, enqueued.id, null);
-
-    return enqueued.id;
+  async function waitForJob(jobId: string) {
+    lastEventId = await waitForJobDone(app.url, lastEventId, jobId, null);
   }
 
   async function pollThroughScheduledSweep(clockOffsetMs: number) {
@@ -474,6 +488,18 @@ export async function startCatalogHarness(
     }
   }
 
+  async function sweepWorkerStatus() {
+    const response = await fetch(`${app.url}/__test__/catalog/sweep-worker`);
+
+    return sweepWorkerStatusSchema.parse(await response.json());
+  }
+
+  async function crashSweepWorker() {
+    const response = await postJson(`${app.url}/__test__/catalog/sweep-worker/crash`, {});
+
+    return sweepWorkerCrashSchema.parse(await response.json()).crashed;
+  }
+
   return {
     app,
     fixture,
@@ -482,6 +508,8 @@ export async function startCatalogHarness(
     boardIds,
     runBackfillCycle,
     runOneJob,
+    enqueueJob,
+    waitForJob,
     pollThroughScheduledSweep,
     seedPostings,
     postings,
@@ -491,6 +519,8 @@ export async function startCatalogHarness(
     putSetting,
     moveClock,
     clockNow,
+    sweepWorkerStatus,
+    crashSweepWorker,
     close: async () => {
       await app.stop();
       fixture.stop();

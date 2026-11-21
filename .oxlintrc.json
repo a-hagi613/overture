@@ -117,6 +117,24 @@
         "allow": ["src/server/platform/ports/clock.ts"]
       }
     ],
+    "overture/no-main-thread-catalog-writes": [
+      "error",
+      {
+        "allow": [
+          "src/server/catalog/sweep-worker.ts",
+          "src/server/catalog/sweep-run.ts",
+          "src/server/catalog/poll-board.ts",
+          "src/server/catalog/tag-store.ts",
+          "src/server/catalog/feed-retag.ts",
+          "src/server/catalog/discovered-boards.ts",
+          "src/server/catalog/tag-import.ts",
+          "src/server/routes/test-only.ts",
+          "src/server/pipeline/prepare.ts",
+          "src/server/dispatch/dispatch.ts"
+        ],
+        "allowRoots": ["test/e2e", "scripts"]
+      }
+    ],
     "overture/no-math-random": [
       "error",
       {

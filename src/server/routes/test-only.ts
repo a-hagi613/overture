@@ -8,6 +8,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { JobHandlers } from "../platform/jobs/run-due.ts";
 import type { AdjustableClock } from "../platform/ports/clock.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
+import type { CatalogSweepWorker } from "../catalog/sweep-worker-runner.ts";
 
 import {
   accounts,
@@ -53,7 +54,7 @@ import { setTurnstileScenario, turnstileScenarioBody } from "../testing/turnstil
 import { readCompaniesParquet } from "../catalog/companies-parquet.ts";
 import { contentHash } from "../catalog/content-hash.ts";
 import { loadDiscoveredBoards } from "../catalog/discovered-boards.ts";
-import { sweepBatchPerAts } from "../catalog/discovery.ts";
+import { sweepBatchPerAts } from "../catalog/sweep-config.ts";
 import { dedupeKeyFor } from "../catalog/dedupe-key.ts";
 import { resetFeedContentHashes } from "../catalog/feed-retag.ts";
 import { normalizeApplyUrl, normalizeTitle } from "../catalog/normalize.ts";
@@ -524,6 +525,7 @@ export function createTestRoutes(
   handlers: JobHandlers,
   singletonJobKinds: readonly string[],
   preparation: PreparationService | null = null,
+  catalogWorker: CatalogSweepWorker | null = null,
 ) {
   const routes = new Hono();
 
@@ -897,6 +899,14 @@ export function createTestRoutes(
 
   routes.get("/catalog/sweep-batches", (context) =>
     context.json({ batches: sweepBatchPerAts(db) }),
+  );
+
+  routes.get("/catalog/sweep-worker", (context) =>
+    context.json(catalogWorker?.status() ?? { running: false, restarts: 0 }),
+  );
+
+  routes.post("/catalog/sweep-worker/crash", (context) =>
+    context.json({ crashed: catalogWorker?.crash() ?? false }),
   );
 
   routes.get("/catalog/postings", (context) => {

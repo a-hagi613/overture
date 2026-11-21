@@ -15,10 +15,6 @@ import { startJobWorker } from "./platform/jobs/scheduler.ts";
 import { startTelemetry, trace } from "./platform/telemetry/otel.ts";
 import { createDiskObjectStore } from "./platform/ports/object-store.ts";
 import { createR2ObjectStore } from "./platform/ports/r2-object-store.ts";
-import { createGreenhouseFeed } from "./catalog/greenhouse-feed.ts";
-import { createLeverFeed } from "./catalog/lever-feed.ts";
-import { createAshbyFeed } from "./catalog/ashby-feed.ts";
-import type { BoardFeeds } from "./catalog/board-feed.ts";
 import {
   BACKFILL_JOB_KIND,
   SINGLETON_JOB_KINDS,
@@ -27,6 +23,7 @@ import {
   runBackfillJob,
   runSweepJob,
 } from "./catalog/discovery.ts";
+import { createCatalogSweepWorker } from "./catalog/sweep-worker-runner.ts";
 import {
   TAG_FALLBACK_JOB_KIND,
   ensureTagFallbackQueued,
@@ -128,20 +125,16 @@ const tracer = trace.getTracer("overture");
 
 const otelPayloadSchema = z.record(z.string(), z.string());
 
-const feeds: BoardFeeds = {
-  greenhouse: createGreenhouseFeed(env.GREENHOUSE_FEED_BASE_URL),
-  lever: createLeverFeed(env.LEVER_FEED_BASE_URL, undefined, env.LEVER_EU_FEED_BASE_URL),
-  ashby: createAshbyFeed(env.ASHBY_FEED_BASE_URL),
-};
+const catalogDeps = { db, clock };
 
-const catalogDeps = { db, clock, feeds };
+const catalogWorker = createCatalogSweepWorker({ db, clock });
 
 const catalogJobHandlers: JobHandlers = {
   [BACKFILL_JOB_KIND]: async () => {
-    await runBackfillJob(catalogDeps);
+    await runBackfillJob(catalogWorker, catalogDeps);
   },
   [SWEEP_JOB_KIND]: async () => {
-    await runSweepJob(catalogDeps);
+    await runSweepJob(catalogWorker, catalogDeps);
   },
 };
 
@@ -459,6 +452,7 @@ const app = createApp({
   singletonJobKinds: jobSingletons,
   backups,
   providers: browserProviders,
+  catalogWorker,
 });
 
 const server = Bun.serve({ port: env.PORT, fetch: app.fetch });
@@ -478,6 +472,7 @@ function handleShutdown() {
   void (async () => {
     await server.stop(false);
     await worker.drain(env.KILL_TIMEOUT_MS);
+    catalogWorker.stop();
 
     clearTimeout(killTimer);
     await sdk.shutdown();

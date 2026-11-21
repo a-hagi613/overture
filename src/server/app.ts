@@ -13,6 +13,7 @@ import type { PreparationService } from "./pipeline/prepare.ts";
 import type { ReviewService } from "./pipeline/reviews.ts";
 import type { createMailboxService } from "./inbox/mailboxes.ts";
 import type { BrowserProviderRegistry } from "./dispatch/browser/provider.ts";
+import type { CatalogSweepWorker } from "./catalog/sweep-worker-runner.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
 import { createMeRoutes } from "./routes/me.ts";
@@ -48,6 +49,7 @@ export interface AppDependencies {
   reviews: ReviewService;
   singletonJobKinds: readonly string[];
   providers: BrowserProviderRegistry | null;
+  catalogWorker: CatalogSweepWorker;
 }
 
 async function staticResponseFrom(root: string, url: string) {
@@ -161,6 +163,7 @@ export function createApp(deps: AppDependencies) {
         deps.jobHandlers,
         deps.singletonJobKinds,
         deps.preparation,
+        deps.catalogWorker,
       ),
     );
   }

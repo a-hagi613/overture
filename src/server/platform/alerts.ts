@@ -20,6 +20,7 @@ export const ALERT_KINDS = [
   "llm.spend",
   "backup.lag",
   "backup.failure",
+  "catalog.worker",
   "health",
   "disk",
   "process.unhandled",

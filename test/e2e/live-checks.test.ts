@@ -453,6 +453,7 @@ test("every spec alert fires from the test-only drill route", async () => {
       "ats.success",
       "backup.failure",
       "backup.lag",
+      "catalog.worker",
       "code.challenge_rate",
       "disk",
       "health",
@@ -462,5 +463,5 @@ test("every spec alert fires from the test-only drill route", async () => {
       "queue.age",
     ].toSorted(),
   );
-  expect(report.results).toHaveLength(10);
+  expect(report.results).toHaveLength(11);
 });

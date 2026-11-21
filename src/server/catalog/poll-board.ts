@@ -553,7 +553,7 @@ export const pollBoard = async (
 
     markBoardPolled(db, clock, board, bulk);
 
-    return { boardId: board.id, outcome: "polled", ...rows, error: null };
+    return { boardId: board.id, outcome: "polled", ...rows, error: null } satisfies PollBoardReport;
   }
 
   let result;
@@ -601,5 +601,5 @@ export const pollBoard = async (
     postings: feedPostings,
   });
 
-  return { boardId: board.id, outcome: "polled", ...rows, error: null };
+  return { boardId: board.id, outcome: "polled", ...rows, error: null } satisfies PollBoardReport;
 };
