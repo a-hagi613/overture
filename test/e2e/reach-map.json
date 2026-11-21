@@ -10908,6 +10908,11 @@
         "src/shared/targets.ts",
         "src/shared/turnstile.ts"
       ]
+    },
+    "test/e2e/verify-stamp.test.ts": {
+      "full": true,
+      "paths": [],
+      "modules": []
     }
   }
 }
