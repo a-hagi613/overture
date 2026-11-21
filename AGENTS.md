@@ -6,9 +6,10 @@ Overture finds jobs for one person, prepares every application and sends it when
 
 Lint, format, typecheck and tests define what is allowed. ADR 0023 lists the rules and ADR 0013 the testing rules.
 
-- After every change: `bun lint --fix`, then `bun fmt`.
-- Done means `bun run verify` passes locally, and you paste its summary in your report; e2e and the container build run
-  in CI.
+- **Inner loop while editing (seconds, no heavy queue wait):** batch edits, run `bun fmt` (`~0.3s`) and targeted unit tests (`bun test src/...`, `~1s`) as you go. Never run `bun lint --fix`, `bun check`, `bun run build`, or `bun run verify` after every edit.
+- **Pre-push gate (once at the end):** run `bun lint --fix`, `bun fmt`, and ONE `bun run verify` (writes the `HEAD+tree` verify stamp so `.githooks/pre-push` validates in `< 0.2s` instead of running `verify` twice).
+- **Playwright e2e:** off by default locally (fast delta CI handles browser regression). Backend/API PRs may run targeted non-browser e2e; browser Playwright runs locally ONLY when authoring/editing a browser spec or capturing required `390/1280` UI screenshots, always a single spec file with `--workers=1`. Never use `--no-verify`.
+- Done means `bun run verify` passes locally, and you paste its summary in your report; e2e and the container build run in CI.
 - The commands are `bun lint`, `bun fmt --check`, `bun check`, `bun test src`, `bun run build`, `bun run lint:config`
   and `bun run db:verify`; `bun run verify` runs them all in parallel. `bun run lint:parity` compares lint findings with
   a canary Bun.
