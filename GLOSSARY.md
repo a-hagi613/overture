@@ -114,6 +114,10 @@ _Avoid_: reauth, 2FA, step-up
 The append-only record in `admin_audit` of every action taken in the admin: who, what, when, why.
 _Avoid_: log entry, change history
 
+**Live check**:
+The daily `live.check` job on `overture-web` that exercises a real form capture, real Haiku calls, the mail loop and R2, records pass/fail and timing, and alerts the owner on failure. It never submits an application or touches a user.
+_Avoid_: smoke test, canary, health probe
+
 ## Never in anything a user can read
 
 `Hold`, runner, lease, provider, dispatch, attempt, ledger, credit, CAPTCHA, Brain, Hands, workspace, Job Board (say Board), Answer Bank, Memory Base, Live Tab.

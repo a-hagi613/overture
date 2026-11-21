@@ -1,11 +1,15 @@
 import { Hono } from "hono";
+import type { DNSResolver } from "mailauth";
 
 import { Buffer } from "node:buffer";
+
+import { simpleParser } from "mailparser";
 
 import {
   INBOUND_HEADERS,
   INBOUND_MAX_BYTES,
   INBOUND_PATH,
+  isLiveCheckAddress,
   verifyInbound,
 } from "../../shared/inbound-mail.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -16,7 +20,13 @@ import type { createMailboxService } from "../inbox/mailboxes.ts";
 
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { MAIL_INGEST_JOB_KIND } from "../inbox/ingest.ts";
+import { inboundAuth } from "../inbox/auth.ts";
 import { openCodeWaits } from "../inbox/waits.ts";
+import {
+  liveCheckCodeFromText,
+  liveCheckTokenFromText,
+  recordLiveCheckMailInbound,
+} from "../live-checks/mail.ts";
 
 export function createInboundRoutes(deps: {
   db: AppDatabase;
@@ -24,10 +34,38 @@ export function createInboundRoutes(deps: {
   objects: ObjectStore;
   personal: PersonalCrypto;
   mailboxes: ReturnType<typeof createMailboxService>;
+  resolver: DNSResolver;
+  liveCheckAddress: string;
   secret: string | undefined;
 }) {
-  const { db, clock, objects, personal, mailboxes, secret } = deps;
+  const { db, clock, objects, personal, mailboxes, resolver, liveCheckAddress, secret } = deps;
   const routes = new Hono();
+
+  async function acceptLiveCheck(body: Uint8Array<ArrayBuffer>, mailFrom: string) {
+    const parsed = await simpleParser(Buffer.from(body));
+    const subject = parsed.subject ?? "";
+    const text = parsed.text ?? "";
+
+    const token = liveCheckTokenFromText(`${subject}\n${text}`);
+    const code = liveCheckCodeFromText(`${subject}\n${text}`);
+
+    if (token === null) {
+      return;
+    }
+
+    const sender =
+      parsed.from?.value.flatMap((entry) => (entry.address ? [entry.address] : []))[0] ?? "";
+
+    const fromDomain = sender.slice(sender.lastIndexOf("@") + 1).toLowerCase();
+
+    const auth =
+      fromDomain === ""
+        ? "none"
+        : await inboundAuth(body, { resolver, fromDomain, sender: mailFrom });
+
+    await objects.put(`recordings/mail/${token}.eml`, body);
+    recordLiveCheckMailInbound(db, clock, { auth, code, token });
+  }
 
   routes.post(INBOUND_PATH, async (context) => {
     if (secret === undefined) {
@@ -65,6 +103,12 @@ export function createInboundRoutes(deps: {
 
     if (rcptTo === null) {
       return context.body(null, 401);
+    }
+
+    if (isLiveCheckAddress(rcptTo, liveCheckAddress.split("@")[1])) {
+      await acceptLiveCheck(body, mailFrom);
+
+      return context.body(null, 204);
     }
 
     const mailbox = await mailboxes.byForwardingAddress(rcptTo);

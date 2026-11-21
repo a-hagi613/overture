@@ -34,6 +34,7 @@ const SETTING_DEFAULTS = {
   "jobs.batch_size": "10",
   "catalog.sweep_max_boards": "20",
   "backups.replica_read_interval_ms": "30000",
+  "live_checks.mail_wait_minutes": "5",
 } satisfies Record<string, string>;
 
 export { SETTING_DEFAULTS };

@@ -117,7 +117,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Master key | envelope encryption | `MASTER_KEY_V1` (32 bytes base64), `MASTER_KEY_CURRENT=1` | fixed test key |
 | Google + LinkedIn (OIDC) | OAuth sign-in providers | `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID` with `LINKEDIN_CLIENT_SECRET`; each pair optional, both or neither (a half-set pair stops boot); an unset pair leaves that provider unregistered and hidden | local OIDC identity server; discovery URLs overridable via `OAUTH_GOOGLE_DISCOVERY_URL`, `OAUTH_LINKEDIN_DISCOVERY_URL` |
 | Auth | better-auth sessions | `BETTER_AUTH_SECRET`, `AUTH_ALLOWED_HOSTS` | local test secret and loopback hosts |
-| App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com` (forwarding addresses), `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES` | |
+| App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com` (forwarding addresses), `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `ALERT_NTFY_URL` (optional) | |
 
 All secrets are Fly secrets; local dev reads `.env` (chmod 600, never committed).
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
@@ -126,7 +126,8 @@ M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 obj
 
 - `tryoverture.com` is registered (Cloudflare Registrar, owner's account).
 - `tryoverture.com`: app, marketing, Overture's own mail (`no-reply@` sent through SES; `hello@` forwarded to the
-  owner by Email Routing), and the forwarding addresses `in-{id}-{mac}@` (ADR 0028). MX → Cloudflare Email Routing,
+  owner by Email Routing), the forwarding addresses `in-{id}-{mac}@` (ADR 0028), and the system address
+  `live-check@` that maps to no user. MX → Cloudflare Email Routing,
   whose catch-all goes to the Email Worker. SES DKIM (3 CNAMEs), SPF `include:amazonses.com` plus Email Routing's
   include, DMARC `p=reject; rua=…`, custom MAIL FROM `bounce.tryoverture.com`.
 - `mail.tryoverture.com` is not used (it was the ADR 0005 job-search address domain).
@@ -805,9 +806,12 @@ stopping before Submit. The developer machine never drives a browser against a r
    Outlook forwarding-confirmation messages to the owner's verified destination, drops mail whose original sender is
    not in the ATS mail domain list, and POSTs the raw MIME with the envelope to `POST /internal/mail/inbound`, signed
    with HMAC-SHA256 under `INBOUND_HMAC_SECRET` over a timestamp and the body (5-minute replay window). Email
-   Workers accept messages up to 25 MiB.
-2. The endpoint verifies the signature and timestamp, stores the raw message encrypted, and enqueues
-   `mail.ingest`. A non-2xx makes Email Routing retry; nothing else sweeps.
+   Workers accept messages up to 25 MiB. The reserved local part `live-check@tryoverture.com` belongs to no user:
+   the Worker forwards it without the ATS-sender filter, and the endpoint verifies its DKIM/DMARC and records the
+   result for the daily live check (§16.4).
+2. The endpoint verifies the signature and timestamp. For a forwarding address it stores the raw message encrypted
+   and enqueues `mail.ingest`; for `live-check@` it stores the raw MIME under `recordings/mail/`, records the auth
+   verdict on the pending live check, and touches no user. A non-2xx makes Email Routing retry; nothing else sweeps.
 3. Job `mail.ingest`: unknown or `closed` local part → delete the raw object, store nothing. Otherwise parse
    (`mailparser`) and verify with `mailauth`: `auth='pass'` when DKIM passes aligned with the original From domain
    (forwarding breaks SPF but keeps the DKIM signature), `fail` on a failing signature, `none` when unsigned; encrypt subject, text, from, to, snippet; HTML and attachments → R2 encrypted;
@@ -1044,26 +1048,33 @@ Main deploys only when every job passes.
 
 ### 16.4 Daily live checks (ADR 0013)
 
-Job `live.checks` runs daily on `overture-web` and on demand from admin. Each check alerts the owner on failure and
-none submits an application or touches a user:
+Job `live.check` runs daily on `overture-web` and on demand from admin (`POST /admin/api/live-checks`). It runs
+serially while the browser session cap (#160) is unmerged. Each check records pass/fail and its duration in
+`live_check_results`; a failure raises the owner's alert path and none submits an application or touches a user:
 
 | Check | What is real | Also refreshes |
 |---|---|---|
-| Forms | Browser Use opens a sample of live Greenhouse, Lever and Ashby forms per ATS, fills them from a synthetic profile and stops before Submit; a changed form signature is reported | saved forms in R2 `fixtures/` (§10.5) |
-| AI | a fixed set of real Haiku calls per purpose (§8.6), checked against the output schema and the resume-line rule | MSW recordings in R2 `recordings/anthropic/` |
-| Mail | a DKIM-signed message to an Overture-owned forwarding address on `tryoverture.com`, through Email Routing and the Worker, ingested with `auth='pass'` and its code extracted | recorded `.eml` fixtures |
+| Forms | the `fixtures.capture` path opens one posting per ATS chosen from the open catalog, saves its form and assets, reports a changed form signature, and never fills or submits | saved forms in R2 `fixtures/` (§10.5) |
+| AI | four fixed, deterministic Haiku calls (score, open text, question mapping, tag fallback) through `LlmPort`, checked against their output schemas and the resume-line rule | MSW recordings in R2 `recordings/anthropic/` |
+| Mail | a DKIM-signed message from `no-reply@tryoverture.com` to the reserved `live-check@tryoverture.com`, through SES, Email Routing and the Worker, ingested with `auth='pass'` and its code matched within `live_checks.mail_wait_minutes` (default 5) | recorded `.eml` fixtures in R2 `recordings/mail/` |
 | Storage | an R2 put, get, list and delete | — |
 
-`scripts/pull-forms.ts` brings refreshed fixtures and recordings into `test/e2e/` through a pull request, so a test
-replays only what a real service actually returned.
+The mail check is two-phase: `live.check` sends and enqueues `live.check.mail` for the wait window, so a restart
+never loses the message and the follow-up records the pass or failure. `scripts/pull-forms.ts` brings refreshed
+fixtures and recordings into `test/e2e/` through a pull request, so a test replays only what a real service actually
+returned.
 
 ### 16.5 Observability
 
 OTel traces for every request and job; metrics: `attempt_outcome_total{provider,ats,outcome}`,
 `attempt_cost_micros`, `queue_depth{kind}`, `llm_cost_micros{purpose}`, `mail_inbound_total{auth}`,
-`discovery_poll_total{ats,status}`. Alerts to the owner's phone (Grafana alerting → ntfy/email): ATS success < 70 %
-(1 h), provider success < 60 %, code or CAPTCHA rate > 20 %, domain reply rate down 30 % week over week, queue age
-> 30 min, LLM/vendor spend > 80 % of cap, Litestream lag > 5 min, backup failure, health check failing, disk > 80 %.
+`discovery_poll_total{ats,status}`. Alerts to the owner: ATS success < 70 % over the last hour (at least five
+attempts), provider success < 60 %, code or CAPTCHA rate > 20 %, queue age > 30 min, LLM spend > 80 % of the global
+or tagging cap, Litestream lag > 5 min, backup failure, health check failing, and disk > 80 %. The alert path is the
+in-app `alert.raised` event plus a notification for every owner; with `ALERT_NTFY_URL` set, the same alert is pushed
+to the owner's phone. No Grafana is provisioned by this repository; dashboards stay with the owner's Grafana account
+and read the OTLP endpoint. `live.check` computes the same thresholds from the app database and machine and records
+each one, and the test-only drill route fires every alert kind.
 
 ---
 

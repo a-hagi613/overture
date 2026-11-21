@@ -600,6 +600,40 @@ export const codeWaits = sqliteTable(
   (t) => [index("code_waits_mailbox_open").on(t.mailboxId, t.resolvedAt, t.startedAt)],
 );
 
+export const liveCheckResults = sqliteTable(
+  "live_check_results",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id").notNull(),
+    checkName: text("check_name").notNull(),
+    ok: integer("ok", { mode: "boolean" }).notNull(),
+    startedAt: integer("started_at").notNull(),
+    durationMs: integer("duration_ms").notNull(),
+    detail: text("detail").notNull().default("{}"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [
+    index("live_check_results_run").on(t.runId),
+    index("live_check_results_check_started").on(t.checkName, t.startedAt),
+  ],
+);
+
+export const liveCheckMail = sqliteTable(
+  "live_check_mail",
+  {
+    id: text("id").primaryKey(),
+    token: text("token").notNull().unique(),
+    code: text("code").notNull(),
+    toAddress: text("to_address").notNull(),
+    sentAt: integer("sent_at").notNull(),
+    receivedAt: integer("received_at"),
+    auth: text("auth", { enum: ["pass", "fail", "none"] }),
+    receivedCode: text("received_code"),
+    resolvedAt: integer("resolved_at"),
+  },
+  (t) => [index("live_check_mail_sent").on(t.sentAt)],
+);
+
 export const notifications = sqliteTable(
   "notifications",
   {
