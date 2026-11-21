@@ -86,37 +86,116 @@ function autocompleteIndex(texts: string[], wanted: string) {
   return withRegion === undefined ? (candidates[0]?.index ?? -1) : withRegion.index;
 }
 
-async function optionTexts(list: Locator) {
+interface ComboboxOption {
+  label: string;
+  value: string;
+}
+
+async function comboboxList(page: Page, field: Locator) {
+  const listboxId = await field.getAttribute("aria-controls");
+
+  if (listboxId !== null && listboxId !== "") {
+    return page.locator(`[id="${cssValue(listboxId)}"] [role='option']`);
+  }
+
+  const visible = page.locator("[role='listbox']:visible").first();
+
+  if ((await visible.count()) > 0) {
+    return visible.locator("[role='option']");
+  }
+
+  return page.locator("[role='option']:visible");
+}
+
+async function renderedOptionCount(page: Page, field: Locator) {
+  const listboxId = await field.getAttribute("aria-controls");
+
+  if (listboxId === null || listboxId === "") {
+    return 0;
+  }
+
+  return page.locator(`[id="${cssValue(listboxId)}"] [role='option']`).count();
+}
+
+async function optionEntries(list: Locator) {
   try {
     await list.first().waitFor({ state: "visible", timeout: COMBOBOX_MENU_MS });
   } catch {
     return [];
   }
 
-  return (await list.allInnerTexts()).map((text) => norm(text));
+  return list.evaluateAll((elements) =>
+    elements.map((element) => {
+      const raw = element instanceof HTMLElement ? (element.dataset.value ?? "") : "";
+
+      return {
+        label: element.textContent.replaceAll(/\s+/gu, " ").trim(),
+        value: raw === "" ? element.getAttribute("value") || "" : raw,
+      };
+    }),
+  );
+}
+
+async function chosenComboboxValue(field: Locator) {
+  return field.evaluate((element) => {
+    const container = element.closest(".select__container");
+
+    if (container === null) {
+      return element instanceof HTMLInputElement ? element.value : "";
+    }
+
+    const shown = container.querySelector(".select__single-value")?.textContent ?? "";
+
+    if (shown.trim() !== "") {
+      return shown.replaceAll(/\s+/gu, " ").trim();
+    }
+
+    const id = element.getAttribute("id") ?? "";
+
+    const hidden = [...document.querySelectorAll("input[type='hidden']")].find(
+      (candidate) => id !== "" && candidate.getAttribute("name") === id,
+    );
+
+    return hidden instanceof HTMLInputElement ? hidden.value : "";
+  });
+}
+
+async function verifyComboboxChoice(field: Locator, option: ComboboxOption | undefined) {
+  await field.press("Escape");
+
+  if (option === undefined) {
+    return false;
+  }
+
+  const chosen = await chosenComboboxValue(field);
+  const target = norm(option.label);
+
+  const shown =
+    norm(chosen) !== "" &&
+    (norm(chosen) === target || target.startsWith(norm(chosen)) || norm(chosen).includes(target));
+
+  return shown || (option.value !== "" && chosen === option.value);
 }
 
 async function chooseFromCombobox(page: Page, field: Locator, wanted: string) {
   await field.click();
 
-  const listboxId = await field.getAttribute("aria-controls");
-
-  const list =
-    listboxId === null || listboxId === ""
-      ? page.getByRole("option")
-      : page.locator(`[id="${cssValue(listboxId)}"] [role='option']`);
+  const list = await comboboxList(page, field);
 
   const expanded = await field.getAttribute("aria-expanded");
 
-  const opened = expanded === "false" ? [] : await optionTexts(list);
+  const opened = expanded === "false" ? [] : await optionEntries(list);
 
   if (opened.length > 0) {
-    const index = matchedIndex(opened, norm(wanted));
+    const index = matchedIndex(
+      opened.map((entry) => norm(entry.label)),
+      norm(wanted),
+    );
 
     if (index >= 0) {
       await list.nth(index).click();
 
-      return true;
+      return verifyComboboxChoice(field, opened[index]);
     }
   }
 
@@ -132,31 +211,37 @@ async function chooseFromCombobox(page: Page, field: Locator, wanted: string) {
 
   await field.pressSequentially(query, { delay: COMBOBOX_KEY_DELAY_MS });
 
-  const searched = await optionTexts(list);
+  const searched = await optionEntries(list);
 
   if (searched.length === 0) {
     return false;
   }
 
-  const index = autocompleteIndex(searched, wanted);
+  const index = autocompleteIndex(
+    searched.map((entry) => norm(entry.label)),
+    wanted,
+  );
 
   if (index >= 0) {
     await list.nth(index).click();
 
-    return true;
+    return verifyComboboxChoice(field, searched[index]);
   }
 
   const typed = norm(query);
   const singleSegment = norm(wanted) === typed;
-  const cityOffered = searched.some((text) => cityOf(text) === typed);
+  const cityOffered = searched.some((entry) => cityOf(norm(entry.label)) === typed);
 
   if (singleSegment && !cityOffered) {
-    const fallback = matchedIndex(searched, typed);
+    const fallback = matchedIndex(
+      searched.map((entry) => norm(entry.label)),
+      typed,
+    );
 
     if (fallback >= 0) {
       await list.nth(fallback).click();
 
-      return true;
+      return verifyComboboxChoice(field, searched[fallback]);
     }
   }
 
@@ -186,6 +271,79 @@ async function selectMatchingOption(field: Locator, wanted: string) {
   await field.selectOption(value);
 
   return true;
+}
+
+async function checkboxGroup(page: Page, id: string) {
+  const fieldset = page
+    .locator(`fieldset[id="${cssValue(id)}"], [role='group'][id="${cssValue(id)}"]`)
+    .first();
+
+  if ((await fieldset.count()) > 0) {
+    const boxes = fieldset.locator("input[type='checkbox']");
+
+    if ((await boxes.count()) > 0) {
+      return boxes;
+    }
+  }
+
+  const boxes = page.locator(
+    `input[type='checkbox'][name="${cssValue(id)}"], input[type='checkbox'][id="${cssValue(id)}"]`,
+  );
+
+  return (await boxes.count()) > 1 ? boxes : null;
+}
+
+async function fillCheckboxGroup(boxes: Locator, wanted: string) {
+  const labels = await boxes.evaluateAll((elements) =>
+    elements.map((element) => {
+      const wrapping = element.closest("label");
+
+      if (wrapping !== null) {
+        return wrapping.textContent.replaceAll(/\s+/gu, " ").trim();
+      }
+
+      const id = element.getAttribute("id") ?? "";
+
+      if (id !== "") {
+        const label = [...document.querySelectorAll("label[for]")].find(
+          (candidate) => candidate.getAttribute("for") === id,
+        );
+
+        if (label !== undefined) {
+          return label.textContent.replaceAll(/\s+/gu, " ").trim();
+        }
+      }
+
+      return element.getAttribute("aria-label") ?? element.getAttribute("value") ?? "";
+    }),
+  );
+
+  const wantedParts = wanted
+    .split(", ")
+    .map((part) => norm(part))
+    .filter((part) => part !== "");
+
+  const matched = wantedParts.map((part) =>
+    matchedIndex(
+      labels.map((label) => norm(label)),
+      part,
+    ),
+  );
+
+  const chosen = new Set(matched.filter((index) => index >= 0));
+
+  const setFrom = async (index: number) => {
+    if (index >= labels.length) {
+      return;
+    }
+
+    await boxes.nth(index).setChecked(chosen.has(index));
+    await setFrom(index + 1);
+  };
+
+  await setFrom(0);
+
+  return wantedParts.length > 0 && matched.every((index) => index >= 0);
 }
 
 export const fieldById = (page: Page, id: string) =>
@@ -291,6 +449,68 @@ function liveOptionPresent(control: LiveControl, answer: string) {
   );
 }
 
+const multiValueParts = (answer: string) =>
+  answer
+    .split(", ")
+    .map((part) => norm(part))
+    .filter((part) => part !== "");
+
+function liveOptionsPresent(control: LiveControl, answer: string) {
+  return multiValueParts(answer).every((wanted) =>
+    control.options.some(
+      (option) => norm(option.label) === wanted || norm(option.value) === wanted,
+    ),
+  );
+}
+
+function sameSelectedOptions(control: LiveControl, answer: string) {
+  const selected = multiValueParts(control.value ?? "");
+  const wanted = multiValueParts(answer);
+
+  return selected.length === wanted.length && wanted.every((part) => selected.includes(part));
+}
+
+async function openClosedComboboxes(page: Page, formSelector: string) {
+  const fields = page.locator(`${formSelector} input[role='combobox']`);
+  const count = await fields.count();
+  const options = new Map<string, ComboboxOption[]>();
+
+  const openFrom = async (index: number) => {
+    if (index >= count) {
+      return;
+    }
+
+    const field = fields.nth(index);
+    const key = (await field.getAttribute("id")) ?? (await field.getAttribute("name")) ?? "";
+
+    if (key !== "" && (await renderedOptionCount(page, field)) === 0) {
+      let opened: ComboboxOption[] = [];
+
+      try {
+        if ((await field.isVisible()) && (await field.isEnabled())) {
+          await field.click({ timeout: COMBOBOX_MENU_MS });
+
+          opened = await optionEntries(await comboboxList(page, field));
+        }
+      } catch {
+        opened = [];
+      }
+
+      await field.press("Escape").catch(() => undefined);
+
+      if (opened.length > 0) {
+        options.set(key, opened);
+      }
+    }
+
+    await openFrom(index + 1);
+  };
+
+  await openFrom(0);
+
+  return options;
+}
+
 function optionField(fieldType: QuestionFieldType | null) {
   return (
     fieldType === "select" ||
@@ -325,7 +545,7 @@ async function readLiveForm(page: Page, formSelector: string) {
           return null;
         }
 
-        if (element.getAttribute("role") === "combobox" && element.hasAttribute("aria-controls")) {
+        if (element.getAttribute("role") === "combobox") {
           return "select";
         }
 
@@ -486,6 +706,7 @@ async function readLiveForm(page: Page, formSelector: string) {
 
     const controls: LiveControl[] = [];
     const seenRadios = new Set<string>();
+    const seenCheckboxGroups = new Set<string>();
 
     for (const root of roots) {
       for (const element of root.querySelectorAll("input, select, textarea")) {
@@ -558,6 +779,44 @@ async function readLiveForm(page: Page, formSelector: string) {
 
         if (element instanceof HTMLInputElement) {
           if (fieldType === "checkbox") {
+            if (element.name !== "") {
+              if (seenCheckboxGroups.has(element.name)) {
+                continue;
+              }
+
+              seenCheckboxGroups.add(element.name);
+
+              const group = [...document.querySelectorAll("input[type='checkbox']")].filter(
+                (candidate): candidate is HTMLInputElement =>
+                  candidate instanceof HTMLInputElement && candidate.name === element.name,
+              );
+
+              const legend = element.closest("fieldset")?.querySelector("legend") ?? null;
+
+              const checkedLabels = group.flatMap((candidate) =>
+                candidate.checked ? [dom.optionLabel(candidate)] : [],
+              );
+
+              controls.push({
+                checked: group.some((candidate) => candidate.checked),
+                disabled: group.every((candidate) => dom.disabledOf(candidate)),
+                fieldType,
+                file: null,
+                hidden: group.every((candidate) => dom.hiddenOf(candidate)),
+                key: dom.keyOf(element),
+                label: legend === null ? dom.labelFor(element) : dom.textOf(legend),
+                name: element.name,
+                options: group.map((candidate) => ({
+                  label: dom.optionLabel(candidate),
+                  value: candidate.value,
+                })),
+                required: group.some((candidate) => dom.requiredOf(candidate)),
+                value: checkedLabels.join(", "),
+              });
+
+              continue;
+            }
+
             controls.push({
               checked: element.checked,
               disabled: dom.disabledOf(element),
@@ -593,10 +852,7 @@ async function readLiveForm(page: Page, formSelector: string) {
             continue;
           }
 
-          if (
-            element.getAttribute("role") === "combobox" &&
-            element.hasAttribute("aria-controls")
-          ) {
+          if (element.getAttribute("role") === "combobox") {
             const listboxId = element.getAttribute("aria-controls") ?? "";
             const listbox = listboxId === "" ? null : dom.byId(listboxId);
 
@@ -629,6 +885,10 @@ async function readLiveForm(page: Page, formSelector: string) {
               );
 
               selected = matched?.label ?? raw;
+            }
+
+            if (selected === "" && container === null && element.value.trim() !== "") {
+              selected = element.value;
             }
 
             controls.push({
@@ -711,6 +971,20 @@ const checkLiveForm: (
     };
   }
 
+  const discovered = await openClosedComboboxes(page, formSelector);
+
+  for (const control of live.controls) {
+    if (control.fieldType !== "select" || control.options.length > 0) {
+      continue;
+    }
+
+    const options = discovered.get(control.key) ?? discovered.get(control.name);
+
+    if (options !== undefined) {
+      control.options = options;
+    }
+  }
+
   const problems = new Map<string, LiveFormProblem>();
 
   const add = (problem: LiveFormProblem) => {
@@ -790,7 +1064,14 @@ const checkLiveForm: (
     }
 
     if (optionField(expectation.fieldType) && expectation.fieldType !== "checkbox") {
-      if (expectation.options.length > 0 && !liveOptionPresent(control, answer)) {
+      const multi = expectation.fieldType === "multiselect";
+      const present = multi ? liveOptionsPresent : liveOptionPresent;
+
+      const selected = multi
+        ? sameSelectedOptions(control, answer)
+        : norm(control.value ?? "") === norm(answer);
+
+      if (expectation.options.length > 0 && !present(control, answer)) {
         add({
           answer,
           fieldName: expectation.fieldName,
@@ -804,7 +1085,7 @@ const checkLiveForm: (
         continue;
       }
 
-      if (norm(control.value ?? "") !== norm(answer)) {
+      if (!selected) {
         add({
           answer,
           fieldName: expectation.fieldName,
@@ -944,6 +1225,12 @@ export async function fillField(page: Page, id: string, value: string) {
 
   if ((await field.count()) === 0) {
     return false;
+  }
+
+  const group = await checkboxGroup(page, id);
+
+  if (group !== null) {
+    return fillCheckboxGroup(group, value);
   }
 
   if ((await field.getAttribute("role")) === "combobox") {

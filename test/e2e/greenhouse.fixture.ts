@@ -17,6 +17,7 @@ export interface GreenhouseFixturesState {
   lastChoices: Record<string, string>;
   lastResumeBytes: Uint8Array | null;
   applicationPaths: string[];
+  applicationContentTypes: string[];
   mutation: string | null;
   redirect: "none" | "board" | "company";
   codePrompt: boolean;
@@ -71,6 +72,7 @@ export function startGreenhouseFixture(options: GreenhouseFixtureOptions = {}) {
     lastChoices: {},
     lastResumeBytes: null,
     applicationPaths: [],
+    applicationContentTypes: [],
     mutation: null,
     redirect: "none",
     codePrompt: false,
@@ -274,6 +276,7 @@ export function startGreenhouseFixture(options: GreenhouseFixtureOptions = {}) {
       state.submissions += 1;
       state.applicationRequests += 1;
       state.applicationPaths.push(path);
+      state.applicationContentTypes.push(request.headers.get("content-type") ?? "");
 
       if (state.refuse) {
         return new Response("The application was refused.", { status: 403 });
