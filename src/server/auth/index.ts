@@ -1,9 +1,10 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError } from "better-auth/api";
-import { genericOAuth, magicLink } from "better-auth/plugins";
+import { APIError, createAuthMiddleware } from "better-auth/api";
+import { genericOAuth, haveIBeenPwned, magicLink } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -28,6 +29,8 @@ import {
   pendingInviteFor,
   suspendedUserWithEmail,
 } from "./invites.ts";
+import { consumeEmailRateLimit } from "./rate-limit.ts";
+import type { EmailRateLimitBucket } from "./rate-limit.ts";
 import { verifyTurnstile } from "./turnstile-gate.ts";
 
 const GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration";
@@ -81,6 +84,41 @@ export const enabledSocialProviders = providerConfigs.map((config) => config.pro
 const ownerEmail = env.OWNER_EMAIL;
 
 const inviteHashSecret = env.BETTER_AUTH_SECRET;
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+
+const emailRateLimits = new Map<
+  string,
+  { bucket: EmailRateLimitBucket; max: number; windowMs: number }
+>([
+  ["/sign-in/email", { bucket: "sign-in", max: 10, windowMs: 15 * MINUTE_MS }],
+  ["/sign-up/email", { bucket: "sign-up", max: 5, windowMs: HOUR_MS }],
+  ["/request-password-reset", { bucket: "reset", max: 3, windowMs: HOUR_MS }],
+]);
+
+const emailBodySchema = z.object({ email: z.string().min(1) });
+
+function refuseRateLimit() {
+  return new APIError("TOO_MANY_REQUESTS", {
+    code: "rate_limited",
+    message: copy.signIn.rateLimited,
+  });
+}
+
+function refuseEmail() {
+  return new APIError("FORBIDDEN", {
+    code: "forbidden",
+    message: copy.auth.accountRefused,
+  });
+}
+
+function refuseSuspended() {
+  return new APIError("FORBIDDEN", {
+    code: "account_suspended",
+    message: copy.auth.accountSuspended,
+  });
+}
 
 export function isAllowedEmail(email: string) {
   return isSameMailbox(email, ownerEmail);
@@ -144,7 +182,80 @@ export function createAuth(
       accountLinking: {
         enabled: true,
         allowDifferentEmails: false,
+        requireLocalEmailVerified: true,
       },
+    },
+    emailAndPassword: {
+      enabled: true,
+      minPasswordLength: 10,
+      requireEmailVerification: true,
+      autoSignIn: false,
+      revokeSessionsOnPasswordReset: true,
+      resetPasswordTokenExpiresIn: 60 * 60,
+      sendResetPassword: async (data) => {
+        if (suspendedUserWithEmail(db, data.user.email)) {
+          return;
+        }
+
+        await mailSender.sendPasswordReset({ to: data.user.email, url: data.url });
+      },
+    },
+    emailVerification: {
+      expiresIn: 60 * 60,
+      sendOnSignUp: true,
+      sendOnSignIn: true,
+      autoSignInAfterVerification: true,
+      sendVerificationEmail: async (data) => {
+        if (suspendedUserWithEmail(db, data.user.email)) {
+          return;
+        }
+
+        await mailSender.sendEmailVerification({ to: data.user.email, url: data.url });
+      },
+    },
+    hooks: {
+      before: createAuthMiddleware(async (context) => {
+        await Promise.resolve();
+
+        const { path } = context;
+        const rule = emailRateLimits.get(path);
+
+        if (rule === undefined) {
+          return;
+        }
+
+        const parsed = emailBodySchema.safeParse(context.body);
+
+        if (!parsed.success) {
+          return;
+        }
+
+        const email = parsed.data.email.trim().toLowerCase();
+
+        const allowed = consumeEmailRateLimit(
+          db,
+          clock,
+          inviteHashSecret,
+          rule.bucket,
+          email,
+          rule.windowMs,
+          rule.max,
+        );
+
+        if (!allowed) {
+          throw refuseRateLimit();
+        }
+
+        if (path === "/sign-in/email") {
+          if (!mayJoin(email)) {
+            throw refuseEmail();
+          }
+
+          if (suspendedUserWithEmail(db, email)) {
+            throw refuseSuspended();
+          }
+        }
+      }),
     },
     rateLimit: {
       enabled: true,
@@ -154,6 +265,9 @@ export function createAuth(
       customRules: {
         "/sign-in/magic-link": { window: 15 * 60, max: 3 },
         "/sign-in/social": { window: 15 * 60, max: 10 },
+        "/sign-in/email": { window: 15 * 60, max: 10 },
+        "/sign-up/email": { window: 60 * 60, max: 5 },
+        "/request-password-reset": { window: 60 * 60, max: 3 },
       },
     },
     databaseHooks: {
@@ -276,6 +390,9 @@ export function createAuth(
 
           await mailSender.sendMagicLink({ to: email, url: data.url });
         },
+      }),
+      haveIBeenPwned({
+        customPasswordCompromisedMessage: copy.signIn.passwordCompromised,
       }),
       passkey({
         rpID: adminOrigin.hostname,

@@ -8,7 +8,7 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { PreparationService } from "./prepare.ts";
 
 import { addLocalDays, localDateAt, localPartsAt, localTimeOn } from "../platform/local-time.ts";
-import { applications, bgJobs, profiles } from "../platform/db/schema.ts";
+import { applications, bgJobs, profiles, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { getSetting } from "../platform/settings/index.ts";
 import { effectiveTimeZone } from "../profile/time-zone.ts";
@@ -153,7 +153,8 @@ export function ensurePrepQueuedForRunningUsers(db: AppDatabase, clock: Clock) {
   const running = db
     .select({ userId: profiles.userId })
     .from(profiles)
-    .where(eq(profiles.running, true))
+    .innerJoin(users, eq(users.id, profiles.userId))
+    .where(and(eq(profiles.running, true), eq(users.emailVerified, true)))
     .all();
 
   for (const row of running) {
@@ -172,12 +173,13 @@ export function ensurePrepQueuedForRunningUsers(db: AppDatabase, clock: Clock) {
  */
 export async function runPrepDailyJob(deps: PrepDailyDeps, userId: string, since: number) {
   const profile = deps.db
-    .select({ running: profiles.running })
+    .select({ emailVerified: users.emailVerified, running: profiles.running })
     .from(profiles)
+    .innerJoin(users, eq(users.id, profiles.userId))
     .where(eq(profiles.userId, userId))
     .get();
 
-  if (profile === undefined || !profile.running) {
+  if (profile === undefined || !profile.running || !profile.emailVerified) {
     return {
       applicationsCreated: 0,
       candidates: 0,

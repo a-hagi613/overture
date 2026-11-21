@@ -3,6 +3,16 @@ export interface OutboundMagicLinkMail {
   url: string;
 }
 
+export interface OutboundVerificationMail {
+  to: string;
+  url: string;
+}
+
+export interface OutboundPasswordResetMail {
+  to: string;
+  url: string;
+}
+
 export interface SentMail {
   id: string;
   to: string;
@@ -26,6 +36,8 @@ export interface OutboundReadyRecapMail {
 
 export interface MailSender {
   sendMagicLink: (mail: OutboundMagicLinkMail) => Promise<void>;
+  sendEmailVerification: (mail: OutboundVerificationMail) => Promise<void>;
+  sendPasswordReset: (mail: OutboundPasswordResetMail) => Promise<void>;
   sendCheck: (mail: OutboundCheckMail) => Promise<void>;
   sendReadyRecap: (mail: OutboundReadyRecapMail) => Promise<void>;
 }
