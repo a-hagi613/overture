@@ -9,7 +9,7 @@ import { seedDemoAccount } from "./demo/seed.ts";
 import { createDemoSafeMailSender } from "./demo/mail-guard.ts";
 import { isDemoUser } from "./demo/role.ts";
 import { demoStartupNotice } from "./demo/startup.ts";
-import { logInfo } from "./platform/log.ts";
+import { logError, logInfo } from "./platform/log.ts";
 import { openDatabase } from "./platform/db/client.ts";
 import { migrateDatabase } from "./platform/db/migrate.ts";
 import { createClock } from "./platform/ports/clock.ts";
@@ -675,12 +675,17 @@ function handleShutdown() {
   hardExitTimer.unref();
 
   void (async () => {
-    await server.stop(false);
-    await worker.drain(env.KILL_TIMEOUT_MS);
-    catalogWorker.stop();
+    try {
+      await server.stop(false);
+      await worker.drain(env.KILL_TIMEOUT_MS);
+      catalogWorker.stop();
 
-    clearTimeout(killTimer);
-    await stopTelemetry();
+      clearTimeout(killTimer);
+    } catch (error) {
+      logError("shutdown", error);
+    } finally {
+      await stopTelemetry();
+    }
   })();
 }
 
