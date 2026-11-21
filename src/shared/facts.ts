@@ -43,6 +43,12 @@ export const FACT_KEYS = [...TIER_1_FACT_KEYS, ...TIER_2_FACT_KEYS] as const;
 
 export type Tier1FactKey = (typeof TIER_1_FACT_KEYS)[number];
 
+export type Tier2FactKey = (typeof TIER_2_FACT_KEYS)[number];
+
+export function isTier2FactKey(key: string): key is Tier2FactKey {
+  return TIER_2_FACT_KEYS.some((candidate) => candidate === key);
+}
+
 export type FactKey = (typeof FACT_KEYS)[number];
 
 export const COUNTRY_SCOPED_FACT_KEYS = ["work_auth", "sponsorship_required"] as const;

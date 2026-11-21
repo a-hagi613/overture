@@ -394,9 +394,16 @@ export const copy = {
       waiting: "Next send once sending resumes.",
     },
     checkIn: {
-      action: "Start check-in",
+      answerAria: (answer: string, company: string, title: string) =>
+        `${answer}: ${title} at ${company}`,
       eyebrow: "Weekly check-in",
+      failed: "The check-in did not go through. Try again.",
+      interviewing: "Interviewing",
       note: "Three quick questions about this week. It takes about a minute.",
+      rejected: "Rejected",
+      row: (days: number) => `${countWord(days)} days in Applied`,
+      start: "Start check-in",
+      stillWaiting: "Still waiting",
       title: "How is the search going?",
     },
     activity: {
@@ -639,6 +646,17 @@ export const copy = {
       tier3: {
         label: "Tier 3 · Learned from Reviews",
         count: "3",
+      },
+      strengthen: {
+        empty:
+          "Nothing to add right now. When a question cannot be answered from your facts, it appears here with the number of queued applications it unlocks.",
+        unlocks: (count: number) =>
+          `Unlocks ${String(count)} queued ${plural(count, "application", "applications")}`,
+        note: "Optional. Each fact answers common questions, so the queued applications waiting on them can go ahead.",
+        foot: "Facts you add here are used on every application that asks.",
+        save: "Save fact",
+        saveAria: (label: string) => `Save fact: ${label}`,
+        saving: "Saving",
       },
       fromResume: "From your resume",
       typedHere: "Typed here",
@@ -1115,6 +1133,13 @@ export const copy = {
       title: (stage: string) => `Moved to ${stage}`,
       body: (input: { company: string; title: string; stage: string }) =>
         `${input.title} at ${input.company} is now in ${input.stage}. Open the Board to undo it.`,
+      url: "/board",
+      kind: "stage_move",
+    },
+    noResponse: {
+      title: "Closed as No response",
+      body: (input: { company: string; title: string }) =>
+        `${input.title} at ${input.company} had no reply after 45 days, so it moved to Closed. Open the Board to undo it.`,
       url: "/board",
       kind: "stage_move",
     },

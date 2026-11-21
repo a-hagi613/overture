@@ -111,16 +111,20 @@ export function HomePage() {
               total={home.reviews.total}
             />
           </div>
-          {paused ? (
-            <>
-              <div className="mt-5 flex flex-wrap items-stretch gap-5">
+          {paused || home.checkIns.length > 0 ? (
+            <div className="mt-5 flex flex-wrap items-stretch gap-5">
+              {paused ? (
                 <HomeQueue
                   position={home.queue.position}
                   sendAt={home.queue.sendAt}
                   zone={home.timeZone}
                 />
-                {home.checkInDue > 0 ? <HomeCheckIn /> : null}
-              </div>
+              ) : null}
+              {home.checkIns.length > 0 ? <HomeCheckIn checkIns={home.checkIns} /> : null}
+            </div>
+          ) : null}
+          {paused ? (
+            <>
               <HomeActivity
                 failed={home.activity.failed}
                 now={home.now}

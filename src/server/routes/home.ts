@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -26,6 +26,7 @@ import { createTimeZoneService } from "../profile/time-zone.ts";
 import { addLocalDays, localDateAt, localDayStartFor } from "../platform/local-time.ts";
 import { enqueuePlannerDay } from "../dispatch/planner.ts";
 import { ensurePrepDailyQueued } from "../pipeline/daily-prep.ts";
+import { dueCheckins } from "../pipeline/checkins.ts";
 import { nextSendSlot, parseSendWindow } from "../dispatch/planning.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { copy, failedReasonText } from "../../shared/copy.ts";
@@ -37,7 +38,6 @@ const MAX_INBOX_ROWS = 4;
 const REVIEW_HIDDEN_COMPANIES = 2;
 const ACTIVITY_SENT_LIMIT = 3;
 const ACTIVITY_FAILED_LIMIT = 1;
-const DAY_MS = 24 * 60 * 60_000;
 
 const runningBody = z.object({ running: z.boolean() });
 
@@ -391,52 +391,6 @@ export function createHomeRoutes(deps: {
     return { position: nextIndex + 1, sendAt: scheduled[nextIndex] ?? null };
   }
 
-  function checkInDue(userId: string, now: number) {
-    const configured = Number(getSetting(db, "checkin.after_days"));
-    const afterDays = Number.isFinite(configured) && configured > 0 ? configured : 21;
-    const cutoff = now - afterDays * DAY_MS;
-
-    const candidates = db
-      .select({ id: applications.id })
-      .from(applications)
-      .where(
-        and(
-          eq(applications.userId, userId),
-          eq(applications.stage, "applied"),
-          isNotNull(applications.sentAt),
-          lte(applications.sentAt, cutoff),
-        ),
-      )
-      .all();
-
-    if (candidates.length === 0) {
-      return 0;
-    }
-
-    const linked = db
-      .select({ applicationId: mailThreads.applicationId })
-      .from(mailThreads)
-      .innerJoin(messages, eq(messages.threadId, mailThreads.id))
-      .where(
-        and(
-          eq(mailThreads.userId, userId),
-          eq(messages.direction, "in"),
-          eq(messages.auth, "pass"),
-          inArray(
-            mailThreads.applicationId,
-            candidates.map((candidate) => candidate.id),
-          ),
-        ),
-      )
-      .all();
-
-    const withMail = new Set(
-      linked.flatMap((row) => (row.applicationId === null ? [] : [row.applicationId])),
-    );
-
-    return candidates.filter((candidate) => !withMail.has(candidate.id)).length;
-  }
-
   function strengthenOf(userId: string) {
     const rows = db
       .select({ confirmed: facts.confirmed, key: facts.key })
@@ -703,11 +657,13 @@ export function createHomeRoutes(deps: {
 
     const reviewList = reviews.list(userId);
     const inbox = await inboxViews(userId);
+    const checkIns = dueCheckins({ db, now }, userId);
 
     return context.json({
       activity: activityOf(userId, now),
       applicationsLeft: left,
-      checkInDue: checkInDue(userId, now),
+      checkInDue: checkIns.length,
+      checkIns,
       dailyCap,
       nextSendAt,
       now,
