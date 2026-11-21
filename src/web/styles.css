@@ -569,6 +569,22 @@ body {
   }
 }
 
+/* Ready page buttons use the canvas padding (18px), not the Board's 16px. */
+.ready .btn {
+  padding: 0 18px;
+}
+
+.ready .btn2 {
+  padding: 0 16px;
+}
+
+@media (max-width: 767px) {
+  .ready .btn,
+  .ready .btn2 {
+    min-height: 44px;
+  }
+}
+
 /* Onboarding "Your facts" step (w5-onb-questions, #128). Board order matters: breath first, then fields. */
 .onb {
   background: var(--bg);

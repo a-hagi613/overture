@@ -3,6 +3,7 @@ import { z } from "zod";
 
 export const STAGE_KEYS = [
   "queued",
+  "ready",
   "applied",
   "screening",
   "interviewing",

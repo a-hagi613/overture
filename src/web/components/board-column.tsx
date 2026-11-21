@@ -3,6 +3,7 @@ import type { KeyboardEvent, PointerEvent } from "react";
 import { copy } from "../../shared/copy.ts";
 import type { BoardCard as BoardCardData, StageKey } from "../lib/board-api.ts";
 import { BoardCard } from "./board-card.tsx";
+import { BoardReadyCard } from "./board-ready-card.tsx";
 
 const RULE_COLOURS = {
   applied: "var(--acc)",
@@ -10,6 +11,7 @@ const RULE_COLOURS = {
   interviewing: "var(--ok)",
   offer: "var(--ok)",
   queued: "var(--ink)",
+  ready: "var(--ok)",
   screening: "var(--ok)",
 } satisfies Record<StageKey, string>;
 
@@ -19,6 +21,7 @@ const PREVIEW_LIMIT = {
   interviewing: 5,
   offer: 5,
   queued: 5,
+  ready: 5,
   screening: 5,
 } satisfies Record<StageKey, number>;
 
@@ -30,6 +33,7 @@ export function BoardColumn(props: {
   onPointerDown: (card: BoardCardData, event: PointerEvent<HTMLButtonElement>) => void;
   onPointerMove: (event: PointerEvent<HTMLButtonElement>) => void;
   onPointerUp: (event: PointerEvent<HTMLButtonElement>) => void;
+  onSend: (card: BoardCardData) => void;
   onStageKey: (card: BoardCardData, direction: -1 | 1) => void;
   selectedId: string | null;
   stage: StageKey;
@@ -59,24 +63,28 @@ export function BoardColumn(props: {
         </span>
       </div>
       <div className="flex flex-col gap-3">
-        {visible.map((card) => (
-          <BoardCard
-            card={card}
-            dimmed={props.draggingId === card.id}
-            key={card.id}
-            onKeyDown={keyFor(card)}
-            onOpen={() => {
-              props.onOpen(card.id);
-            }}
-            onPointerCancel={props.onPointerCancel}
-            onPointerDown={(event) => {
-              props.onPointerDown(card, event);
-            }}
-            onPointerMove={props.onPointerMove}
-            onPointerUp={props.onPointerUp}
-            selected={props.selectedId === card.id}
-          />
-        ))}
+        {visible.map((card) =>
+          props.stage === "ready" ? (
+            <BoardReadyCard card={card} key={card.id} onSend={props.onSend} />
+          ) : (
+            <BoardCard
+              card={card}
+              dimmed={props.draggingId === card.id}
+              key={card.id}
+              onKeyDown={keyFor(card)}
+              onOpen={() => {
+                props.onOpen(card.id);
+              }}
+              onPointerCancel={props.onPointerCancel}
+              onPointerDown={(event) => {
+                props.onPointerDown(card, event);
+              }}
+              onPointerMove={props.onPointerMove}
+              onPointerUp={props.onPointerUp}
+              selected={props.selectedId === card.id}
+            />
+          ),
+        )}
         {hidden <= 0 ? null : (
           <p className="serif px-1 pt-0.5 text-[12.5px] text-muted-foreground italic">
             {copy.board.more(hidden, label)}

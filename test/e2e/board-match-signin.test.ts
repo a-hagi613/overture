@@ -199,6 +199,14 @@ async function openSignIn(page: Page, theme: string, serverUrl: string) {
   }
 
   await page.goto(`${serverUrl}/signin`);
+  await expect
+    .poll(
+      async () =>
+        await page
+          .locator('[data-turnstile="magic"] input[name="cf-turnstile-response"]')
+          .inputValue(),
+    )
+    .not.toBe("");
   await page.evaluate(async () => document.fonts.ready.then(() => true));
 }
 
@@ -246,14 +254,6 @@ for (const width of widths) {
           }
 
           if (mode === "magic-sent") {
-            await expect
-              .poll(
-                async () =>
-                  await page
-                    .locator('[data-turnstile="magic"] input[name="cf-turnstile-response"]')
-                    .inputValue(),
-              )
-              .not.toBe("");
             await page.getByRole("button", { name: "Email me a sign-in link" }).click();
             await expect(page.getByText("Link sent to")).toBeVisible();
           }

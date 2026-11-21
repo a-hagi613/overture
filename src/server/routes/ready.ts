@@ -13,6 +13,7 @@ import {
   applicationEvents,
   applications,
   companies,
+  facts,
   matches,
   postings,
   resumes,
@@ -25,6 +26,7 @@ import {
   sendPlanSha256,
 } from "../pipeline/approved-plan.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
+import { isCoverLetterQuestion } from "../pipeline/open-text.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 
 import type { SendPlan } from "../pipeline/send-plan.ts";
@@ -64,13 +66,18 @@ function changesOf(value: string | null) {
   return parsed.success ? parsed.data : [];
 }
 
-function answersOf(plan: SendPlan) {
+function answersOf(plan: SendPlan, factSources: ReadonlyMap<string, string>) {
   return plan.fields.map((field) => ({
     answer: field.answer,
     block: field.block,
     byUser: field.sentences.some((sentence) => sentence.byUser === true),
+    coverLetter: isCoverLetterQuestion(field.label),
     factKey: field.factKey,
     factRevision: field.factRevision,
+    factSource:
+      field.factKey === null
+        ? null
+        : (factSources.get(`${field.scope}\u0000${field.factKey}`) ?? null),
     kind: field.answerKind,
     label: field.label,
     questionId: field.questionId,
@@ -78,6 +85,16 @@ function answersOf(plan: SendPlan) {
     sentences: field.sentences.map((sentence) => sentence.sentence),
     source: field.source,
   }));
+}
+
+function factSourceMap(db: AppDatabase, userId: string) {
+  const rows = db
+    .select({ key: facts.key, scope: facts.scope, source: facts.source })
+    .from(facts)
+    .where(eq(facts.userId, userId))
+    .all();
+
+  return new Map(rows.map((row) => [`${row.scope}\u0000${row.key}`, row.source] as const));
 }
 
 export function createReadyRoutes(deps: {
@@ -120,9 +137,14 @@ export function createReadyRoutes(deps: {
     return { filename, uploadedAt: row.uploadedAt.getTime() };
   }
 
-  async function planView(userId: string, plan: SendPlan, planSha256: string) {
+  async function planView(
+    userId: string,
+    plan: SendPlan,
+    planSha256: string,
+    factSources: ReadonlyMap<string, string>,
+  ) {
     return {
-      answers: answersOf(plan),
+      answers: answersOf(plan, factSources),
       consentVersion: plan.consentVersion,
       coverLetter: plan.coverLetter?.map((sentence) => sentence.sentence) ?? null,
       planSha256,
@@ -132,7 +154,12 @@ export function createReadyRoutes(deps: {
     };
   }
 
-  async function cardView(userId: string, row: ReadyCardRow, position: number | null) {
+  async function cardView(
+    userId: string,
+    row: ReadyCardRow,
+    position: number | null,
+    factSources: ReadonlyMap<string, string>,
+  ) {
     if (row.status === "approved") {
       const approved = await openApprovedPlan({
         applicationId: row.id,
@@ -147,7 +174,10 @@ export function createReadyRoutes(deps: {
         company: row.company,
         id: row.id,
         location: row.location,
-        plan: approved === null ? null : await planView(userId, approved.plan, approved.sha256),
+        plan:
+          approved === null
+            ? null
+            : await planView(userId, approved.plan, approved.sha256, factSources),
         queuePosition: position,
         readyAt: row.readyAt,
         score: row.score,
@@ -167,7 +197,10 @@ export function createReadyRoutes(deps: {
       company: row.company,
       id: row.id,
       location: row.location,
-      plan: plan === null || planSha256 === null ? null : await planView(userId, plan, planSha256),
+      plan:
+        plan === null || planSha256 === null
+          ? null
+          : await planView(userId, plan, planSha256, factSources),
       queuePosition: position,
       readyAt: row.readyAt,
       score: row.score,
@@ -211,10 +244,16 @@ export function createReadyRoutes(deps: {
       .all();
 
     const approvedIds = rows.flatMap((row) => (row.status === "approved" ? [row.id] : []));
+    const factSources = factSourceMap(db, user.id);
 
     const cards = await Promise.all(
       rows.map(async (row) =>
-        cardView(user.id, row, row.status === "approved" ? approvedIds.indexOf(row.id) + 1 : null),
+        cardView(
+          user.id,
+          row,
+          row.status === "approved" ? approvedIds.indexOf(row.id) + 1 : null,
+          factSources,
+        ),
       ),
     );
 
