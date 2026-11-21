@@ -7,6 +7,7 @@ import {
   fillField,
   formLocator,
   norm,
+  preflightForm,
   readConfirmation,
   submitButton,
   typeCode,
@@ -16,6 +17,7 @@ import {
 } from "../forms/engine.ts";
 import { checkPostingIdentity } from "../posting-identity.ts";
 
+import type { LiveFormProblem } from "../forms/engine.ts";
 import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identity.ts";
 
 const FORM_APPEAR_MS = 15_000;
@@ -48,9 +50,11 @@ export type GreenhouseOutcome =
   | "code_timeout"
   | "blocked"
   | "form_missing"
+  | "form_changed"
   | "fill_failed"
   | "upload_failed"
-  | "identity_mismatch";
+  | "identity_mismatch"
+  | "needs_review";
 
 export interface GreenhouseRun {
   outcome: GreenhouseOutcome;
@@ -58,6 +62,10 @@ export interface GreenhouseRun {
   confirmationSeen: boolean;
   submitMayHaveLanded: boolean;
   identityReason?: PostingIdentityMismatch;
+  /** The live form problems that stopped this try before Submit. */
+  preflight?: LiveFormProblem[];
+  /** Unexpected required fields that need a durable Fact from the user. */
+  unexpectedRequired?: LiveFormProblem[];
 }
 
 const RESUME_LABEL = /\b(?:resume|cv|curriculum vitae)\b/u;
@@ -101,11 +109,11 @@ async function fillSendPlanField(page: Page, field: SendPlanField) {
   return fillField(page, fieldId, field.answer);
 }
 
-export async function runGreenhouseAttempt(
+export const runGreenhouseAttempt: (
   page: Page,
   plan: GreenhouseRunPlan,
   hooks: GreenhouseHooks,
-) {
+) => Promise<GreenhouseRun> = async (page, plan, hooks) => {
   await page.goto(plan.identity.url, { waitUntil: "domcontentloaded" });
 
   const identity = await checkPostingIdentity(page, plan.identity);
@@ -151,7 +159,10 @@ export async function runGreenhouseAttempt(
     };
   }
 
-  const fillFrom = async (index: number) => {
+  const { resume } = plan;
+  const resumeField = plan.fields.find((field) => isResumeField(field));
+
+  const fillFrom: (index: number) => Promise<boolean> = async (index) => {
     const field = plan.fields[index];
 
     if (field === undefined) {
@@ -162,24 +173,13 @@ export async function runGreenhouseAttempt(
       return fillFrom(index + 1);
     }
 
-    if (!(await fillSendPlanField(page, field))) {
-      return false;
-    }
+    const filled = await fillSendPlanField(page, field);
+    const rest = await fillFrom(index + 1);
 
-    return fillFrom(index + 1);
+    return filled && rest;
   };
 
-  if (!(await fillFrom(0))) {
-    return {
-      confirmationSeen: false,
-      outcome: "fill_failed",
-      submitMayHaveLanded: false,
-      submitResponseStatus: null,
-    };
-  }
-
-  const { resume } = plan;
-  const resumeField = plan.fields.find((field) => isResumeField(field));
+  const fillFailed = !(await fillFrom(0));
 
   if (resume !== null) {
     const resumeFieldId =
@@ -208,6 +208,46 @@ export async function runGreenhouseAttempt(
         submitResponseStatus: null,
       };
     }
+  }
+
+  const verdict = await preflightForm(
+    page,
+    plan.fields.map((field) => ({
+      answer: field.answer,
+      fieldName: field.fieldName,
+      fieldType: field.fieldType,
+      file:
+        resume !== null && field === resumeField
+          ? { name: resume.filename, size: resume.bytes.byteLength }
+          : null,
+      label: field.label,
+      options: field.options,
+      required: field.required,
+    })),
+  );
+
+  if (verdict.outcome !== "ok" || fillFailed) {
+    const problems =
+      verdict.outcome === "ok"
+        ? []
+        : verdict.problems.map((problem) => ({
+            answer: problem.answer,
+            fieldName: problem.fieldName,
+            fieldType: problem.fieldType,
+            kind: problem.kind,
+            label: problem.label,
+            options: problem.options,
+            unexpected: problem.unexpected,
+          }));
+
+    return {
+      confirmationSeen: false,
+      outcome: verdict.outcome === "ok" ? "form_changed" : verdict.outcome,
+      preflight: problems,
+      submitMayHaveLanded: false,
+      submitResponseStatus: null,
+      ...(verdict.outcome === "needs_review" && { unexpectedRequired: verdict.reviewFields }),
+    };
   }
 
   let status = await submitAndWatch();
@@ -257,4 +297,4 @@ export async function runGreenhouseAttempt(
     submitMayHaveLanded: true,
     submitResponseStatus: status,
   };
-}
+};

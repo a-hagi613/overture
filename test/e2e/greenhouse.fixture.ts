@@ -16,6 +16,7 @@ export interface GreenhouseFixturesState {
   lastForm: Record<string, string>;
   lastChoices: Record<string, string>;
   lastResumeBytes: Uint8Array | null;
+  mutation: string | null;
   redirect: "none" | "board" | "company";
   codePrompt: boolean;
   refuse: boolean;
@@ -43,6 +44,16 @@ const valuesSchema = z.record(z.string(), z.string());
 
 const holdSchema = z.object({ form: z.boolean().optional(), confirmation: z.boolean().optional() });
 
+const mutationSchema = z.object({ mutation: z.string().nullable() });
+
+const withMutation = (html: string, mutation: string | null) =>
+  mutation === null
+    ? html
+    : html.replace(
+        "</body>",
+        `<script>globalThis.fixtureMutation = ${JSON.stringify(mutation)};</script></body>`,
+      );
+
 export function startGreenhouseFixture(options: GreenhouseFixtureOptions = {}) {
   const transpiler = new Bun.Transpiler({ loader: "ts" });
   const runtime = transpiler.transformSync(readFileSync(RUNTIME_SOURCE, "utf8"));
@@ -58,6 +69,7 @@ export function startGreenhouseFixture(options: GreenhouseFixtureOptions = {}) {
     lastForm: {},
     lastChoices: {},
     lastResumeBytes: null,
+    mutation: null,
     redirect: "none",
     codePrompt: false,
     refuse: false,
@@ -160,7 +172,16 @@ export function startGreenhouseFixture(options: GreenhouseFixtureOptions = {}) {
           codeAsked: state.codeAsked,
           holdForm,
           holdConfirmation,
+          mutation: state.mutation,
         });
+      }
+
+      if (path === "/__fixture__/mutate") {
+        const body = mutationSchema.parse(await request.json());
+
+        state.mutation = body.mutation;
+
+        return Response.json({ mutation: state.mutation });
       }
 
       if (path === "/__fixture__/hold") {
@@ -232,18 +253,20 @@ export function startGreenhouseFixture(options: GreenhouseFixtureOptions = {}) {
           await waitForRelease();
         }
 
-        let page = Buffer.from(NO_FORM_PAGE);
+        let page = NO_FORM_PAGE;
 
         try {
-          page = readFileSync(pagePath);
+          page = readFileSync(pagePath, "utf8");
         } catch {
-          return new Response(new Uint8Array(page), {
+          return new Response(page, {
             status: 404,
             headers: { "content-type": "text/html" },
           });
         }
 
-        return new Response(new Uint8Array(page), { headers: { "content-type": "text/html" } });
+        return new Response(withMutation(page, state.mutation), {
+          headers: { "content-type": "text/html" },
+        });
       }
 
       state.submissions += 1;

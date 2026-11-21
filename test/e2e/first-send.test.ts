@@ -767,29 +767,29 @@ test("a Greenhouse posting whose absolute_url is on the company site opens its e
 
   let reachedSubmit = false;
 
-  await expect(
-    runGreenhouseAttempt(
-      page,
-      {
-        fields: [],
-        identity: { boardToken: "stripe", companyName: "Stripe", jobId: "8172510", url },
-        resume: null,
+  const run = await runGreenhouseAttempt(
+    page,
+    {
+      fields: [],
+      identity: { boardToken: "stripe", companyName: "Stripe", jobId: "8172510", url },
+      resume: null,
+    },
+    {
+      onCodeTyped: () => undefined,
+      onResponse: () => undefined,
+      requestCode: () => {
+        throw new StopBeforeSubmitError("no code is requested before Submit");
       },
-      {
-        onCodeTyped: () => undefined,
-        onResponse: () => undefined,
-        requestCode: () => {
-          throw new StopBeforeSubmitError("no code is requested before Submit");
-        },
-        onWillSubmit: () => {
-          reachedSubmit = true;
-          throw new StopBeforeSubmitError("stop before Submit");
-        },
+      onWillSubmit: () => {
+        reachedSubmit = true;
+        throw new StopBeforeSubmitError("stop before Submit");
       },
-    ),
-  ).rejects.toThrow(StopBeforeSubmitError);
+    },
+  );
 
-  expect(reachedSubmit).toBe(true);
+  expect(run.outcome).toBe("needs_review");
+  expect(run.submitMayHaveLanded).toBe(false);
+  expect(reachedSubmit).toBe(false);
   expect(page.url()).toBe(url);
 
   const state = await fixtureState(send.fixture);

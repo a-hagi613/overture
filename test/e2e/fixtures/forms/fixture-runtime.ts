@@ -18,6 +18,7 @@ interface FixtureMeta {
 
 declare global {
   var fixtureMeta: FixtureMeta | undefined;
+  var fixtureMutation: string | undefined;
 }
 
 const optionsFor = (meta: FixtureMeta, fieldId: string) => {
@@ -341,6 +342,46 @@ const attachSubmitBehaviour = (form: HTMLFormElement, meta: FixtureMeta) => {
   });
 };
 
+const ADDED_FIELDS = new Map([
+  [
+    "consent",
+    `<div class="field-wrapper"><input id="consent" type="checkbox" aria-required="true" /><label for="consent">I acknowledge the privacy notice</label></div>`,
+  ],
+  [
+    "one-off",
+    `<div class="field-wrapper"><label for="question_added_one_off">Describe a project you are proud of</label><textarea id="question_added_one_off" aria-required="true"></textarea></div>`,
+  ],
+  [
+    "work-auth",
+    `<div class="field-wrapper"><label for="question_added_work_auth">Are you legally authorized to work in Canada?</label><input id="question_added_work_auth" type="text" aria-required="true" /></div>`,
+  ],
+]);
+
+const mutateForm = (form: HTMLFormElement, meta: FixtureMeta) => {
+  const search = new URLSearchParams(globalThis.location.search);
+  const mutation = globalThis.fixtureMutation ?? search.get("mutation") ?? "";
+
+  const added = ADDED_FIELDS.get(mutation) ?? ADDED_FIELDS.get(search.get("add-field") ?? "");
+
+  if (added !== undefined) {
+    form.insertAdjacentHTML("beforeend", added);
+  }
+
+  const removed =
+    mutation === "field-removed" ? "question_32895467003" : search.get("remove-field");
+
+  if (removed !== null && removed !== "") {
+    form.querySelector<HTMLElement>(`#${removed}`)?.closest(".field-wrapper")?.remove();
+  }
+
+  if (mutation === "option-changed" || search.get("change-option") === "country") {
+    meta.options.country = [
+      { label: "United Kingdom", value: "United Kingdom" },
+      { label: "United States", value: "United States" },
+    ];
+  }
+};
+
 const run = () => {
   const form = document.querySelector<HTMLFormElement>("form#application-form");
   const meta = globalThis.fixtureMeta;
@@ -349,6 +390,7 @@ const run = () => {
     return;
   }
 
+  mutateForm(form, meta);
   attachComboboxes(form, meta);
   attachSubmitBehaviour(form, meta);
 };

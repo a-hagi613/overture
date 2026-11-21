@@ -15,6 +15,8 @@ export interface OpenReviewInput {
   options: string[];
   scope: string;
   reason: ReviewReason;
+  /** The attempt whose live-form check asked for this Fact, if any. */
+  attemptId?: string | null;
 }
 
 export function ensureOpenReview(db: AppDatabase, clock: Clock, input: OpenReviewInput) {
@@ -32,8 +34,19 @@ export function ensureOpenReview(db: AppDatabase, clock: Clock, input: OpenRevie
     .get();
 
   if (existing !== undefined) {
+    const updates: Partial<typeof reviews.$inferInsert> = {};
+    const attemptId = input.attemptId ?? null;
+
     if (existing.reason !== input.reason) {
-      db.update(reviews).set({ reason: input.reason }).where(eq(reviews.id, existing.id)).run();
+      updates.reason = input.reason;
+    }
+
+    if (attemptId !== null) {
+      updates.attemptId = attemptId;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      db.update(reviews).set(updates).where(eq(reviews.id, existing.id)).run();
     }
 
     return existing.id;
@@ -55,6 +68,7 @@ export function ensureOpenReview(db: AppDatabase, clock: Clock, input: OpenRevie
       status: "open",
       createdAt: clock.now(),
       resolvedAt: null,
+      attemptId: input.attemptId ?? null,
     })
     .run();
 

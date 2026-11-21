@@ -22,7 +22,29 @@ import {
   seedPosting,
 } from "./matching-harness.ts";
 
-const questions = [
+interface SeedQuestion {
+  answerKind: "fact" | "open_text" | "consent" | "skip" | "target" | "derived" | "unknown";
+  fieldName: string;
+  fieldType:
+    | "text"
+    | "textarea"
+    | "select"
+    | "multiselect"
+    | "radio"
+    | "checkbox"
+    | "file"
+    | "date"
+    | "number"
+    | "email"
+    | "phone"
+    | "url";
+  required: boolean;
+  text: string;
+  factKey?: string;
+  options?: string[];
+}
+
+const questions: readonly SeedQuestion[] = [
   {
     answerKind: "fact" as const,
     factKey: "legal_name",
@@ -102,6 +124,7 @@ const attemptSchema = z.object({
   browserMs: z.number().nullable(),
   costMicros: z.number().nullable(),
   endedAt: z.number().nullable(),
+  id: z.string(),
   outcome: z.string().nullable(),
   provider: z.string(),
   providerSessionId: z.string().nullable(),
@@ -110,6 +133,15 @@ const attemptSchema = z.object({
 });
 
 const attemptsSchema = z.object({ attempts: z.array(attemptSchema) });
+
+const reviewSchema = z.object({
+  attemptId: z.string().nullable(),
+  id: z.string(),
+  prompt: z.string(),
+  status: z.string(),
+});
+
+const reviewsSchema = z.object({ reviews: z.array(reviewSchema) });
 
 interface SendHarness {
   fixture: BrowserUseFixture;
@@ -141,7 +173,12 @@ async function closeHarness(harness: SendHarness) {
   harness.greenhouse.close();
 }
 
-async function readyApplication(harness: SendHarness, url: string, atsJobId = "8004209003") {
+async function readyApplication(
+  harness: SendHarness,
+  url: string,
+  atsJobId = "8004209003",
+  extraQuestions: readonly SeedQuestion[] = [],
+) {
   const { owner, userId } = await ownerContextFor(harness.server.url);
 
   await owner.put("/api/profile/facts", { data: { facts } });
@@ -166,7 +203,7 @@ async function readyApplication(harness: SendHarness, url: string, atsJobId = "8
     atsJobId,
     boardId,
     companyId,
-    questions,
+    questions: [...questions, ...extraQuestions],
     tags: [{ dimension: "subrole", value: "Operations" }],
     title: "Assistant General Manager | Durham",
     url,
@@ -195,6 +232,28 @@ async function attemptsOf(owner: APIRequestContext, applicationId: string) {
   );
 
   return attemptsSchema.parse(await response.json()).attempts;
+}
+
+async function reviewsOf(owner: APIRequestContext, userId: string) {
+  const response = await owner.get(`/__test__/reviews?userId=${encodeURIComponent(userId)}`);
+
+  return reviewsSchema.parse(await response.json()).reviews;
+}
+
+async function statusOf(owner: APIRequestContext, applicationId: string) {
+  return z
+    .object({ application: z.object({ status: z.string() }) })
+    .parse(await (await owner.get(`/api/applications/${applicationId}`)).json()).application.status;
+}
+
+async function mutateForm(harness: SendHarness, mutation: string) {
+  const response = await fetch(`${harness.greenhouse.url}/__fixture__/mutate`, {
+    body: JSON.stringify({ mutation }),
+    headers: { "content-type": "application/json" },
+    method: "POST",
+  });
+
+  expect(response.ok).toBe(true);
 }
 
 test("a send try through Browser Use records its usage and stops the vendor browser", async ({
@@ -233,6 +292,146 @@ test("a send try through Browser Use records its usage and stops the vendor brow
     expect(attempt.costMicros).toBe(28_800);
     expect(harness.fixture.stoppedSessionIds).toContain(attempt.providerSessionId);
     expect(harness.fixture.stoppedAttemptIds.length).toBeGreaterThan(0);
+    expect(harness.greenhouse.state.submissions).toBe(1);
+  } finally {
+    await closeHarness(harness);
+  }
+});
+
+test("an unexpected required Fact stops before Submit and opens a Review for the attempt", async ({
+  identityServer,
+}) => {
+  const harness = await startHarness(identityServer);
+
+  try {
+    const { applicationId, owner, userId } = await readyApplication(
+      harness,
+      `${harness.greenhouse.url}/blankstreet/jobs/8004209003`,
+    );
+
+    await mutateForm(harness, "work-auth");
+    await runSend(owner, applicationId);
+
+    expect(await statusOf(owner, applicationId)).toBe("needs_review");
+
+    const [attempt] = await attemptsOf(owner, applicationId);
+
+    if (attempt === undefined) {
+      throw new Error("the blocked send try left no attempt");
+    }
+
+    expect(attempt.outcome).toBe("needs_review");
+    expect(attempt.submitClickedAt).toBeNull();
+    expect(harness.greenhouse.state.submissions).toBe(0);
+
+    const review = (await reviewsOf(owner, userId)).find((row) =>
+      row.prompt.includes("authorized to work in Canada"),
+    );
+
+    expect(review).toMatchObject({ attemptId: attempt.id, status: "open" });
+  } finally {
+    await closeHarness(harness);
+  }
+});
+
+test("a one-off field added to the live form ends form_changed and submits nothing", async ({
+  identityServer,
+}) => {
+  const harness = await startHarness(identityServer);
+
+  try {
+    const { applicationId, owner, userId } = await readyApplication(
+      harness,
+      `${harness.greenhouse.url}/blankstreet/jobs/8004209003`,
+    );
+
+    await mutateForm(harness, "one-off");
+    await runSend(owner, applicationId);
+
+    expect(await statusOf(owner, applicationId)).toBe("ready");
+
+    const [attempt] = await attemptsOf(owner, applicationId);
+
+    expect(attempt?.outcome).toBe("form_changed");
+    expect(attempt?.submitClickedAt).toBeNull();
+    expect(harness.greenhouse.state.submissions).toBe(0);
+    expect(await reviewsOf(owner, userId)).toHaveLength(0);
+  } finally {
+    await closeHarness(harness);
+  }
+});
+
+test("a field removed from the live form ends form_changed and submits nothing", async ({
+  identityServer,
+}) => {
+  const harness = await startHarness(identityServer);
+
+  try {
+    const { applicationId, owner } = await readyApplication(
+      harness,
+      `${harness.greenhouse.url}/blankstreet/jobs/8004209003`,
+    );
+
+    await mutateForm(harness, "field-removed");
+    await runSend(owner, applicationId);
+
+    const [attempt] = await attemptsOf(owner, applicationId);
+
+    expect(attempt?.outcome).toBe("form_changed");
+    expect(attempt?.submitClickedAt).toBeNull();
+    expect(harness.greenhouse.state.submissions).toBe(0);
+  } finally {
+    await closeHarness(harness);
+  }
+});
+
+test("an option changed on the live form ends form_changed and submits nothing", async ({
+  identityServer,
+}) => {
+  const harness = await startHarness(identityServer);
+
+  try {
+    const { applicationId, owner } = await readyApplication(
+      harness,
+      `${harness.greenhouse.url}/blankstreet/jobs/8004209003`,
+    );
+
+    await mutateForm(harness, "option-changed");
+    await runSend(owner, applicationId);
+
+    const [attempt] = await attemptsOf(owner, applicationId);
+
+    expect(attempt?.outcome).toBe("form_changed");
+    expect(attempt?.submitClickedAt).toBeNull();
+    expect(harness.greenhouse.state.submissions).toBe(0);
+  } finally {
+    await closeHarness(harness);
+  }
+});
+
+test("a planned consent checkbox is checked before Submit", async ({ identityServer }) => {
+  const harness = await startHarness(identityServer);
+
+  try {
+    const { applicationId, owner } = await readyApplication(
+      harness,
+      `${harness.greenhouse.url}/blankstreet/jobs/8004209003`,
+      "8004209003",
+      [
+        {
+          answerKind: "consent",
+          fieldName: "consent",
+          fieldType: "checkbox",
+          required: true,
+          text: "I acknowledge the privacy notice",
+        },
+      ],
+    );
+
+    await mutateForm(harness, "consent");
+    await runSend(owner, applicationId);
+
+    expect(await statusOf(owner, applicationId)).toBe("sent");
     expect(harness.greenhouse.state.submissions).toBe(1);
   } finally {
     await closeHarness(harness);

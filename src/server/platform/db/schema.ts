@@ -862,6 +862,7 @@ export const reviews = sqliteTable(
     })
       .notNull()
       .default("unknown_required"),
+    attemptId: text("attempt_id"),
     status: text("status", { enum: ["open", "answered", "dismissed"] }).notNull(),
     createdAt: integer("created_at").notNull(),
     resolvedAt: integer("resolved_at"),
