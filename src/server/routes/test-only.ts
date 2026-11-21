@@ -65,7 +65,11 @@ import {
 import { getTestSpans, resetTestSpans } from "../platform/telemetry/otel.ts";
 import { releaseBlockingJobs } from "../testing/blocking-job.ts";
 import { clearPushRequests, listPushRequests } from "../testing/push-recorder.ts";
-import { setTurnstileScenario, turnstileScenarioBody } from "../testing/turnstile-scenario.ts";
+import {
+  setTurnstileScenario,
+  turnstileRemoteIp,
+  turnstileScenarioBody,
+} from "../testing/turnstile-scenario.ts";
 import {
   setTurnstileBrowserScenario,
   turnstileBrowserScenario,
@@ -1072,6 +1076,8 @@ export function createTestRoutes(
 
     return context.json({ ok: true });
   });
+
+  routes.get("/turnstile", (context) => context.json({ remoteIp: turnstileRemoteIp() }));
 
   routes.get("/turnstile/browser", (context) => context.json(turnstileBrowserScenario()));
 

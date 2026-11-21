@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 
 import type { AppDatabase } from "./platform/db/client.ts";
 import type { BackupMonitor } from "./platform/ports/backup.ts";
+import type { ClientIpConfig } from "./auth/client-ip.ts";
 import type { Auth } from "./auth/index.ts";
 import type { AdjustableClock } from "./platform/ports/clock.ts";
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
@@ -30,6 +31,7 @@ import { createMatchingRoutes } from "./routes/matching.ts";
 import { createReviewRoutes } from "./routes/reviews.ts";
 import { createAdminApi, isAdminHost } from "./routes/admin.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
+import { stripUntrustedIpHeaders } from "./auth/client-ip.ts";
 import { env } from "./config/env.ts";
 import { demoLocked } from "./demo/guard.ts";
 import { createProfileRoutes } from "./routes/profile.ts";
@@ -88,6 +90,11 @@ async function staticResponseFrom(root: string, url: string) {
 }
 
 export function createApp(deps: AppDependencies) {
+  const clientIpConfig = {
+    flyAppName: env.FLY_APP_NAME,
+    nodeEnv: env.NODE_ENV,
+  } satisfies ClientIpConfig;
+
   const personal = createPersonalCrypto(
     deps.db,
     parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
@@ -109,7 +116,9 @@ export function createApp(deps: AppDependencies) {
   });
 
   adminHost.route("/admin/api", adminApi);
-  adminHost.all("/api/auth/*", async (context) => deps.auth.handler(context.req.raw));
+  adminHost.all("/api/auth/*", async (context) =>
+    deps.auth.handler(stripUntrustedIpHeaders(context.req.raw, clientIpConfig)),
+  );
 
   const app = new Hono();
 
@@ -139,7 +148,9 @@ export function createApp(deps: AppDependencies) {
     return next();
   });
 
-  app.all("/api/auth/*", async (context) => deps.auth.handler(context.req.raw));
+  app.all("/api/auth/*", async (context) =>
+    deps.auth.handler(stripUntrustedIpHeaders(context.req.raw, clientIpConfig)),
+  );
   app.route("/api", createHealthRoutes(deps.db, deps.backups));
   app.route("/api", createMeRoutes(deps.auth));
   app.route("/api", createPasswordResetRoutes(deps.db, deps.clock));

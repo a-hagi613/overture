@@ -7,7 +7,11 @@ import { z } from "zod";
 import { env } from "../config/env.ts";
 import { assertNoLiveTraffic, LiveServiceRequestError } from "../platform/outbound-guard.ts";
 import { isLiveServiceHost } from "../../shared/live-service-hosts.ts";
-import { spendTurnstileToken, turnstileScenario } from "./turnstile-scenario.ts";
+import {
+  recordTurnstileRemoteIp,
+  spendTurnstileToken,
+  turnstileScenario,
+} from "./turnstile-scenario.ts";
 import { turnstileSiteverifyUrl } from "../auth/turnstile-gate.ts";
 import { cloudflareSendEmailUrl } from "../platform/mail/cloudflare.ts";
 import { recordCloudflareEmailRequest } from "./cloudflare-email-recorder.ts";
@@ -44,8 +48,11 @@ const recorded = recordedVerificationSchema.parse(
 );
 
 async function siteverifyResponse(request: Request) {
-  const token = new URLSearchParams(await request.text()).get("response") ?? "";
+  const form = new URLSearchParams(await request.text());
+  const token = form.get("response") ?? "";
   const scenario = turnstileScenario();
+
+  recordTurnstileRemoteIp(form.get("remoteip"));
 
   if (scenario.outcome === "error") {
     return HttpResponse.json({ "error-codes": ["internal-error"] }, { status: 500 });

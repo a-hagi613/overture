@@ -14,6 +14,8 @@ const spentTokens = new Set<string>();
 
 let current: TurnstileScenario = turnstileScenarioBody.parse({});
 
+let lastRemoteIp: string | null = null;
+
 export function setTurnstileScenario(next: TurnstileScenario) {
   current = next;
   spentTokens.clear();
@@ -21,6 +23,14 @@ export function setTurnstileScenario(next: TurnstileScenario) {
 
 export function turnstileScenario() {
   return current;
+}
+
+export function recordTurnstileRemoteIp(remoteIp: string | null) {
+  lastRemoteIp = remoteIp;
+}
+
+export function turnstileRemoteIp() {
+  return lastRemoteIp;
 }
 
 export function spendTurnstileToken(token: string) {
