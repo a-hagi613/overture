@@ -70,7 +70,3 @@ export function listAdminAudit(db: AppDatabase, limit: number) {
     .all()
     .map((row) => rowOfAudit(row));
 }
-
-export function listAdminAuditForActor(db: AppDatabase, actorId: string) {
-  return listAdminAudit(db, 100).filter((row) => row.actorId === actorId);
-}

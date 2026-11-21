@@ -7,7 +7,6 @@ import { logError } from "../log.ts";
 import { events } from "../db/schema.ts";
 
 const HEARTBEAT_INTERVAL_MS = 25_000;
-const RETENTION_MS = 24 * 60 * 60_000;
 const POLL_INTERVAL_MS = 1000;
 const POLL_ERROR_LOG_INTERVAL_MS = 10_000;
 
@@ -25,14 +24,6 @@ export function publishEvent(
       payload,
       createdAt: clock.now(),
     })
-    .run();
-}
-
-export function purgeOldEvents(db: AppDatabase, clock: Clock) {
-  const cutoff = clock.now() - RETENTION_MS;
-
-  db.delete(events)
-    .where(sql`${events.createdAt} < ${cutoff}`)
     .run();
 }
 
