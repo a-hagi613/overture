@@ -916,8 +916,8 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
    application request, an 8-character code), open a `code_waits` row for the attempt and its mailbox (§11.1) and wait
    for it to resolve: mail with `auth='pass'` from an ATS sender domain received after `started_at` resolves it, woken
    by ingest and checked every 5 s as a backstop. Five minutes without a code creates the owner's "paste it"
-   notification, and the paste endpoint (§14) resumes the same wait and the same browser session until the row's
-   ten-minute expiry. Type the code, mark `code_consumed_at` and `attempts.code_used`, and Submit again. No code by the
+   notification and the same ask on Home (a card with the countdown to expiry), and the paste endpoint (§14) resumes
+   the same wait and the same browser session until the row's ten-minute expiry. Type the code, mark `code_consumed_at` and `attempts.code_used`, and Submit again. No code by the
    expiry → `code_timeout`. Whether a timeout is `code_timeout` or `unconfirmed` depends only on whether
    `submit_clicked_at` was set (§9.4), never on where the prompt appeared.
 7. If a CAPTCHA is visible: stop interacting, wait 10 s, re-inspect, up to 3 times (vendor solver works meanwhile).
@@ -991,11 +991,13 @@ stopping before Submit. The developer machine never drives a browser against a r
    `expires_at = started_at + 10 min`. Ingest resolves the oldest open, unexpired wait for that mailbox when an
    `auth='pass'` message classified as a code arrives from an ATS domain at or after its start, storing the code
    encrypted and publishing `code.wait_resolved`. Five minutes after the wait opened with no code, Overture creates a
-   `notifications` row for the owner and publishes the `notification` topic, asking for a paste; the wait stays open to
-   its expiry. The owner may instead paste the code through `POST /api/mail/code-waits/:id` while the wait is
-   unexpired; an expired or already-resolved wait is refused. `GET /api/mail/code-waits` lists the signed-in owner's
-   open waits with the Application they belong to; `GET /internal/mail/code-waits` lists the open waits for a
-   forwarding address, authenticated with the same HMAC-SHA256 headers as inbound mail.
+   `notifications` row for the owner and publishes the `notification` topic, asking for a paste; Home shows the same ask
+   as a card with the countdown to expiry. The wait stays open to its expiry. The owner may instead paste the code
+   through `POST /api/mail/code-waits/:id` while the wait is unexpired; an expired or already-resolved wait is refused
+   with a message saying so. `GET /api/mail/code-waits` lists the signed-in owner's open waits with the Application
+   they belong to and the server's `now` for the countdown; `GET /internal/mail/code-waits` lists the open waits for
+   a forwarding address, authenticated with the same HMAC-SHA256 headers as inbound mail. A forwarded code that
+   arrives first resolves the wait and Home stops asking.
 
 ### 11.2 Outbound
 
@@ -1158,7 +1160,7 @@ Profile** (Ready added by ADR 0029); Settings from the avatar; desktop hover sub
 
 | Surface | Content | Key states |
 |---|---|---|
-| Home | Start/Pause switch with pause reason; applications left; today sent / remaining; the Ready card ("3 ready to send", opens Ready); queue position + ETA; Up next (code-ranked, score on open, Apply/Save/Hide); activity incl. "Couldn't apply" with reason; check-ins; strengthen-profile prompt | paused (each reason has its own copy and fix), nothing matching, waiting for Review, out of applications |
+| Home | Start/Pause switch with pause reason; applications left; today sent / remaining; the Ready card ("3 ready to send", opens Ready); the "needs a code" card five minutes into a verification-code wait (countdown to expiry, Paste the code, No code yet, opens the paste sheet); queue position + ETA; Up next (code-ranked, score on open, Apply/Save/Hide); activity incl. "Couldn't apply" with reason; check-ins; strengthen-profile prompt | paused (each reason has its own copy and fix), nothing matching, waiting for Review, out of applications, a code wait to paste |
 | Ready | Heading "Ready to send". Approval cards (§8.7): job, employer, resume file, every answer as it will be typed with its source, cover letter, what changed; Send, Skip, Edit an answer; approved cards show "Sends around 14:20" and Undo; "Send all" for everything listed. Never sends from a link | none ready, all approved, a card that came back with changes |
 | Board | Columns Queued, Ready, Applied, Screening, Interviewing, Offer, Closed (Ready holds an Application from Ready until it is confirmed sent); cards with company, title, score, Strong match badge, "why this match"; card sheet: timeline, proof (answers + source, letter, resume file), linked mail, stage buttons; desktop dnd-kit + keyboard; phone one column per screen, swipe, 250 ms hold to drag, stage buttons in sheet | empty board, auto-move undo toast |
 | Review | Open questions grouped by jobs unlocked; answer input matches field type; dismiss | none open |
