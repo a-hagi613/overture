@@ -1256,7 +1256,8 @@ body, sender or attachment, so the admin never sees message content.
   `killSwitchEnabled` (null until a kill switch for that ATS is set; Personio ships engaged until #232 releases it
   after its 20-form probe, so its catalog polling and matching stay off). Before discovery exists, `discoveredAt` is null. Later slices
   (M1-07) add optional per-ATS fields (`boardCount`, `lastPollAt`, `errorRate`) without changing this contract.
-  `POST /admin/api/probes/personio` queues a probe of up to twenty open Personio forms; it reads each form over
+  `POST /admin/api/probes/personio` queues a probe of up to twenty open Personio forms, or of an explicit
+  `{ urls }` list of at most twenty real apply URLs while the kill switch is still engaged; it reads each form over
   plain HTTP, never submits, and records a result per form. `GET /admin/api/probes/personio` returns the last run's
   summary and one row per form for the Catalog page. A form that reads completely is `readable`, a required custom
   question with no rule is an honest `needs_review`, and a control the flow cannot fill is `unsupported`; the probe

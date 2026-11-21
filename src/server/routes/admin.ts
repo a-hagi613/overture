@@ -122,6 +122,10 @@ const mailHealthQuery = z.object({
     .default(30),
 });
 
+const personioProbeBody = z.object({
+  urls: z.array(z.url()).min(1).max(20).optional(),
+});
+
 const personioProbeDetailSchema = z.object({
   index: z.number(),
   postingId: z.string(),
@@ -823,16 +827,19 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
   });
 
-  routes.post("/probes/personio", async (context) => {
+  routes.post("/probes/personio", zValidator("json", personioProbeBody), async (context) => {
     const owner = context.get("owner");
+    const { urls } = context.req.valid("json");
 
-    const job = enqueueJob(db, clock, PERSONIO_PROBE_JOB_KIND, "{}", { maxAttempts: 1 });
+    const job = enqueueJob(db, clock, PERSONIO_PROBE_JOB_KIND, JSON.stringify({ urls }), {
+      maxAttempts: 1,
+    });
 
     await recordAdminAudit(db, clock, {
       actorId: owner.userId,
       action: "probes.personio",
       reason: "Probed the open Personio forms before enabling the ATS",
-      detail: { jobId: job.id },
+      detail: { jobId: job.id, urls: urls?.length ?? 0 },
     });
 
     return context.json({ jobId: job.id });

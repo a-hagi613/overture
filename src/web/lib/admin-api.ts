@@ -417,7 +417,8 @@ type AdminWriteBody =
   | { email: string }
   | { reason: string }
   | { value: string }
-  | { providers: string[]; pages: string[]; sessionsPerPage: number };
+  | { providers: string[]; pages: string[]; sessionsPerPage: number }
+  | { urls?: string[] };
 
 async function adminWrite<T>(
   method: "POST" | "PUT",
@@ -469,8 +470,8 @@ export const loadCatalog = async () => adminGet("/admin/api/catalog", catalogRes
 export const loadPersonioProbe = async () =>
   adminGet("/admin/api/probes/personio", personioProbeSchema);
 
-export const runPersonioProbe = async () =>
-  adminPost("/admin/api/probes/personio", null, probeQueuedSchema);
+export const runPersonioProbe = async (urls?: string[]) =>
+  adminPost("/admin/api/probes/personio", urls === undefined ? {} : { urls }, probeQueuedSchema);
 
 export const loadMailHealth = async (days: number) =>
   adminGet(`/admin/api/mail-health?days=${String(days)}`, mailHealthSchema);

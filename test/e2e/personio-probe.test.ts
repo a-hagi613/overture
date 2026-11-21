@@ -76,6 +76,44 @@ async function seedPosting(appUrl: string, applyUrl: string, index: number) {
   );
 }
 
+test("an explicit list of real apply URLs is probed without enabling the ATS", async ({
+  page,
+  adminIsolatedAppServer,
+  adminIsolatedAppUrl,
+  accessServer,
+}) => {
+  test.setTimeout(120_000);
+
+  const fixture = startPersonioFixture({ variant: "standard" });
+
+  try {
+    const urls = [fixture.applyUrl("920001"), fixture.applyUrl("920002")];
+
+    const queued = await fetch(`${adminIsolatedAppServer.url}/__test__/jobs/run-now`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "probe.personio", payload: JSON.stringify({ urls }) }),
+    });
+
+    expect(queued.ok).toBe(true);
+
+    await openAdminAsOwner(page, adminIsolatedAppUrl, accessServer.issueToken);
+
+    const response = await page.request.get(`${adminIsolatedAppUrl}/admin/api/probes/personio`);
+
+    expect(response.status()).toBe(200);
+
+    const probe = probeSchema.parse(await response.json());
+
+    expect(probe.summary?.total).toBe(2);
+    expect(probe.summary?.readable).toBe(2);
+    expect(probe.summary?.passed).toBe(false);
+    expect(probe.forms.map((form) => form.url).toSorted()).toEqual(urls.toSorted());
+  } finally {
+    fixture.close();
+  }
+});
+
 test("the Personio probe routes are refused without the admin gates", async ({
   request,
   adminIsolatedAppUrl,

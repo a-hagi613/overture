@@ -388,9 +388,9 @@ export const runPersonioAttempt: (
 
   const confirmed = await waitForPersonioConfirmation(page);
 
-  if (status !== null && status >= 200 && status < 300) {
+  if (confirmed) {
     return {
-      confirmationSeen: confirmed,
+      confirmationSeen: true,
       outcome: "sent",
       submitMayHaveLanded: true,
       submitResponseStatus: status,
@@ -402,15 +402,6 @@ export const runPersonioAttempt: (
       confirmationSeen: false,
       outcome: "blocked",
       submitMayHaveLanded: false,
-      submitResponseStatus: status,
-    };
-  }
-
-  if (confirmed) {
-    return {
-      confirmationSeen: true,
-      outcome: "sent",
-      submitMayHaveLanded: true,
       submitResponseStatus: status,
     };
   }

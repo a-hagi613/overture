@@ -140,7 +140,11 @@ import { createMailMoves, MAIL_CLASSIFY_JOB_KIND } from "./inbox/moves.ts";
 import { createMailboxService } from "./inbox/mailboxes.ts";
 import { FIXTURE_CAPTURE_JOB_KIND, runFixtureCaptureJob } from "./fixtures/job.ts";
 import { LAB_JOB_KIND, runLabJob } from "./lab/job.ts";
-import { PERSONIO_PROBE_JOB_KIND, runPersonioProbe } from "./probe/personio.ts";
+import {
+  PERSONIO_PROBE_JOB_KIND,
+  runPersonioProbe,
+  personioProbePayloadSchema,
+} from "./probe/personio.ts";
 import { ACCOUNT_ERASE_JOB_KIND, createAccountEraser } from "./account/erase.ts";
 import { ACCOUNT_DELETED_NOTICE_JOB_KIND, createDeletionNoticeCrypto } from "./account/notice.ts";
 import {
@@ -678,8 +682,10 @@ const watchJobHandlers: JobHandlers = {
 };
 
 const probeJobHandlers: JobHandlers = {
-  [PERSONIO_PROBE_JOB_KIND]: async () => {
-    await runPersonioProbe({ clock, db });
+  [PERSONIO_PROBE_JOB_KIND]: async (payload) => {
+    const { urls } = personioProbePayloadSchema.parse(JSON.parse(payload));
+
+    await runPersonioProbe({ clock, db, urls });
   },
 };
 

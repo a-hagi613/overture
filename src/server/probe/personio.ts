@@ -1,4 +1,5 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
+import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -15,6 +16,10 @@ import { createPlainFormReader } from "../pipeline/form-read.ts";
 export const PERSONIO_PROBE_JOB_KIND = "probe.personio";
 
 export const PERSONIO_PROBE_LIMIT = 20;
+
+export const personioProbePayloadSchema = z.object({
+  urls: z.array(z.url()).min(1).max(20).optional(),
+});
 
 export const PERSONIO_PROBE_OUTCOMES = [
   "readable",
@@ -56,6 +61,7 @@ export interface PersonioProbeDeps {
   clock: Clock;
   reader?: PlainFormReader;
   limit?: number;
+  urls?: readonly string[] | undefined;
 }
 
 function summarise(forms: readonly PersonioProbeForm[]) {
@@ -116,18 +122,27 @@ export async function runPersonioProbe(deps: PersonioProbeDeps) {
   const runId = crypto.randomUUID();
   const limiter = limiterFor("personio", PERSONIO_LIMITS);
 
-  const rows = deps.db
-    .select({
-      id: postings.id,
-      url: postings.url,
-      applyUrl: postings.applyUrl,
-      atsJobId: postings.atsJobId,
-    })
-    .from(postings)
-    .where(and(eq(postings.ats, "personio"), isNull(postings.closedAt)))
-    .orderBy(asc(postings.firstSeenAt), asc(postings.id))
-    .limit(limit)
-    .all();
+  const rows =
+    deps.urls === undefined
+      ? deps.db
+          .select({
+            id: postings.id,
+            url: postings.url,
+            applyUrl: postings.applyUrl,
+            atsJobId: postings.atsJobId,
+          })
+          .from(postings)
+          .where(and(eq(postings.ats, "personio"), isNull(postings.closedAt)))
+          .orderBy(asc(postings.firstSeenAt), asc(postings.id))
+          .limit(limit)
+          .all()
+      : deps.urls.map((url, index) => ({
+          id: "",
+          url,
+          applyUrl: url,
+          atsJobId:
+            /^\/job\/(?<id>\d+)/u.exec(new URL(url).pathname)?.groups?.["id"] ?? String(index),
+        }));
 
   const forms: PersonioProbeForm[] = [];
 
