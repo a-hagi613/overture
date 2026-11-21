@@ -213,15 +213,17 @@ test("the legal pages and the consent fit every width without sideways scroll", 
   await Promise.all(
     widths.map(async (width) => {
       const context = await browser.newContext({ viewport: { height: 900, width } });
-      const page = await context.newPage();
 
       await Promise.all(
         (["/terms", "/privacy", "/consent"] as const).map(async (path) => {
+          const page = await context.newPage();
+
           await expectNoSidewaysScroll(
             page,
             `${appServerUrl}${path}`,
             `${path} at ${String(width)}px`,
           );
+          await page.close();
         }),
       );
 
