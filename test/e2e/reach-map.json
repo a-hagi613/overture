@@ -534,6 +534,7 @@
         "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/reviews",
         "/__test__/turnstile",
         "/__test__/user/name",
         "/api",
@@ -1474,6 +1475,7 @@
       "full": false,
       "paths": [],
       "modules": [
+        "src/server/catalog/question-rules.ts",
         "src/server/config/env.ts",
         "src/server/dispatch/browser/browser-use.ts",
         "src/server/dispatch/forms/engine.ts",
@@ -1561,7 +1563,7 @@
       ]
     },
     "test/e2e/first-send.test.ts": {
-      "full": false,
+      "full": true,
       "paths": [
         "/__test__/application-answers",
         "/__test__/applications",
@@ -1619,8 +1621,11 @@
         "src/server/catalog/tag-rules.ts",
         "src/server/catalog/tag-store.ts",
         "src/server/config/env.ts",
+        "src/server/dispatch/ats/greenhouse.ts",
+        "src/server/dispatch/forms/engine.ts",
         "src/server/dispatch/planner.ts",
         "src/server/dispatch/planning.ts",
+        "src/server/dispatch/posting-identity.ts",
         "src/server/inbox/waits.ts",
         "src/server/matching/applications.ts",
         "src/server/matching/candidates.ts",
@@ -1628,6 +1633,7 @@
         "src/server/matching/regions.ts",
         "src/server/matching/score.ts",
         "src/server/matching/skip-match.ts",
+        "src/server/pipeline/greenhouse-board-url.ts",
         "src/server/pipeline/prepare-jobs.ts",
         "src/server/profile/facts.ts",
         "src/server/profile/languages.ts",
