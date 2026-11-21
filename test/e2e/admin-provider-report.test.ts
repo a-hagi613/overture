@@ -37,6 +37,8 @@ const reportSchema = z.object({
 
 const captureSchema = z.object({ jobId: z.string() });
 
+const jobSchema = z.object({ lastError: z.string().nullable(), status: z.string() });
+
 function objectsRootOf(server: { databasePath: string }) {
   return join(dirname(server.databasePath), "objects");
 }
@@ -131,6 +133,164 @@ test("the capture job never presses Submit and strips personal data", async ({
     await expect.poll(() => new Set(browserUseApi.stoppedSessionIds).size).toBe(1);
   } finally {
     await synthetic.stop(true);
+  }
+});
+
+const delayedFormPage = `<!doctype html>
+<html><body>
+<h1>Platform engineer</h1>
+<p>The job description renders before the form.</p>
+<div id="mount"></div>
+<script>
+setTimeout(() => {
+  document.getElementById("mount").innerHTML =
+    '<form method="post" action="/apply"><label>First name <input type="text" name="first_name" /></label>' +
+    '<label>Email <input type="email" name="email" /></label>' +
+    '<button type="submit">Submit application</button></form>';
+}, 3000);
+</script>
+</body></html>`;
+
+const pageWithoutForm = `<!doctype html>
+<html><body>
+<h1>Platform engineer</h1>
+<p>The job description, and no application form.</p>
+</body></html>`;
+
+async function savedFixtureKeys(server: { databasePath: string }) {
+  const keys: string[] = [];
+
+  try {
+    for await (const key of new Bun.Glob("fixtures/**/*").scan({ cwd: objectsRootOf(server) })) {
+      keys.push(key);
+    }
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) {
+      throw error;
+    }
+  }
+
+  return keys.toSorted();
+}
+
+function servePage(html: string) {
+  let submissions = 0;
+
+  const server = Bun.serve({
+    port: 0,
+    fetch(request) {
+      if (request.method === "POST") {
+        submissions += 1;
+
+        return Response.json({ accepted: true });
+      }
+
+      return new Response(html, { headers: { "content-type": "text/html" } });
+    },
+  });
+
+  return {
+    server,
+    submissions: () => submissions,
+  };
+}
+
+test("the capture waits for a form that renders after load, and saves its inputs", async ({
+  page,
+  captureAppServer,
+  captureAppUrl,
+  browserUseApi,
+  accessServer,
+}) => {
+  const served = servePage(delayedFormPage);
+
+  try {
+    await openAdminAsOwner(page, captureAppUrl, accessServer.issueToken);
+
+    const requested = await page.request.post(`${captureAppUrl}/admin/api/fixtures/capture`, {
+      data: {
+        applyUrls: [`http://127.0.0.1:${String(served.server.port)}/form`],
+        ats: "greenhouse",
+      },
+    });
+
+    expect(requested.ok()).toBe(true);
+    captureSchema.parse(await requested.json());
+
+    const run = await fetch(`${captureAppServer.url}/__test__/jobs/run-due`, { method: "POST" });
+
+    expect(run.ok).toBe(true);
+
+    await expect
+      .poll(
+        async () => {
+          try {
+            return (await formHtml(captureAppServer)).html;
+          } catch {
+            return "";
+          }
+        },
+        { timeout: 60_000 },
+      )
+      .not.toBe("");
+
+    const { html, key } = await formHtml(captureAppServer);
+
+    expect(key).toMatch(/^fixtures\/greenhouse\//u);
+    expect(html).toContain("Platform engineer");
+    expect(html).toContain('name="first_name"');
+    expect(html).toContain('name="email"');
+    expect(html).not.toContain("<script");
+    expect(served.submissions()).toBe(0);
+    await expect.poll(() => new Set(browserUseApi.stoppedSessionIds).size).toBe(1);
+  } finally {
+    await served.server.stop(true);
+  }
+});
+
+test("a page that never renders a form fails the capture with no_form_rendered and saves nothing", async ({
+  page,
+  captureAppServer,
+  captureAppUrl,
+  accessServer,
+}) => {
+  test.setTimeout(90_000);
+
+  const served = servePage(pageWithoutForm);
+
+  try {
+    await openAdminAsOwner(page, captureAppUrl, accessServer.issueToken);
+
+    const requested = await page.request.post(`${captureAppUrl}/admin/api/fixtures/capture`, {
+      data: {
+        applyUrls: [`http://127.0.0.1:${String(served.server.port)}/form`],
+        ats: "greenhouse",
+      },
+    });
+
+    expect(requested.ok()).toBe(true);
+    const { jobId } = captureSchema.parse(await requested.json());
+
+    const run = await fetch(`${captureAppServer.url}/__test__/jobs/run-due`, { method: "POST" });
+
+    expect(run.ok).toBe(true);
+
+    await expect
+      .poll(
+        async () => {
+          const job = jobSchema.parse(
+            await (await fetch(`${captureAppServer.url}/__test__/jobs/${jobId}`)).json(),
+          );
+
+          return job.status === "dead" ? job.lastError : job.status;
+        },
+        { timeout: 60_000 },
+      )
+      .toContain("no_form_rendered");
+    expect(await savedFixtureKeys(captureAppServer)).toEqual([]);
+    expect(served.submissions()).toBe(0);
+  } finally {
+    await served.server.stop(true);
   }
 });
 

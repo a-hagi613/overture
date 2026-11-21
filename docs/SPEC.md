@@ -753,7 +753,7 @@ Submit. It saves sanitised HTML + assets (names, emails, tokens and employer tra
 `fixtures/{ats}/{form_signature}/`. A developer pulls them into `test/e2e/fixtures/forms/` with
 `scripts/pull-forms.ts` (R2 read only, no ATS traffic); the local fixture server replays them, including fake
 confirmation pages, a fake code prompt and a fake visible challenge. The capture job opens at most ten URLs per run,
-with no user profile attached, and writes `fixtures/{ats}/{form_signature}/form.html`, its assets and `meta.json`.
+with no user profile attached, and writes `fixtures/{ats}/{form_signature}/form.html`, its assets and `meta.json`. The ATS apps render the form after load, so the job waits up to 20 s for a form field and otherwise fails with `no_form_rendered`, saving nothing.
 On production the same job is queued from the machine with
 `bun run scripts/capture-forms.ts --ats <ats> --url <apply_url> [--url <apply_url> …]`; the running worker picks it
 up and the files land under the `fixtures/{ats}/` prefix in R2. Live smoke checks are the same kind of admin job,
