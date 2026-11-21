@@ -49,6 +49,8 @@ test("requeueing a job whose key has a queued row leaves one queued row and no r
 
   const database = new DatabaseSync(databasePath);
 
+  database.exec("PRAGMA busy_timeout = 5000;");
+
   try {
     const rows = z
       .array(z.object({ id: z.string(), status: z.string() }))

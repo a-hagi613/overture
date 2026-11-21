@@ -24,11 +24,20 @@ export function lastPasskeyAssertionAt(db: AppDatabase, userId: string) {
 }
 
 export function hasRecentPasskeyAssertion(db: AppDatabase, clock: Clock, userId: string) {
+  return passkeyAssertedWithin(db, clock, userId, PASSKEY_ASSERTION_WINDOW_MS);
+}
+
+export function passkeyAssertedWithin(
+  db: AppDatabase,
+  clock: Clock,
+  userId: string,
+  windowMs: number,
+) {
   const last = lastPasskeyAssertionAt(db, userId);
 
   if (last === null) {
     return false;
   }
 
-  return clock.now() - last.getTime() < PASSKEY_ASSERTION_WINDOW_MS;
+  return clock.now() - last.getTime() < windowMs;
 }

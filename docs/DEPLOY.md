@@ -368,11 +368,13 @@ the test-only drill route exercise every alert kind without Grafana. If dashboar
 
 ## The Workable feed pass (M2-25)
 
-`.github/workflows/workable-feed.yml` runs the off-box pass at 04:00 UTC, on `workflow_dispatch`, and on a push to
-`main`; it never runs on a pull request and the script refuses a live URL unless `WORKABLE_LIVE_FETCH=1`. Set the
-repository secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET_FILES` (and
-`R2_ENDPOINT` when the bucket uses a custom endpoint); `WORKABLE_ALERT_NTFY_URL` is optional and only used to push a
-failure to the owner's phone. `WORKABLE_FEED_URL` is an optional repository variable; the default is
+`.github/workflows/workable-feed.yml` runs the off-box pass at 04:00 UTC and on `workflow_dispatch`; it never runs on a
+pull request or a push. Its first step checks that the repository secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
+`R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES` and `R2_ENDPOINT` are set: while any is missing it writes a skip notice to
+the step summary and the run finishes green without fetching the feed, publishing a snapshot or pushing an alert, so a
+repository without R2 credentials does not turn `main` red every day. The script refuses a live URL unless
+`WORKABLE_LIVE_FETCH=1`, which the workflow sets. `WORKABLE_ALERT_NTFY_URL` is optional and only
+used to push a failure to the owner's phone. `WORKABLE_FEED_URL` is an optional repository variable; the default is
 `https://www.workable.com/boards/workable.xml`.
 
 The pass reads `workable-targets.json` from R2 (the app writes it at 05:00 UTC, values only) and writes

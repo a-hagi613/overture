@@ -1166,9 +1166,12 @@ body, sender or attachment, so the admin never sees message content.
   `Cf-Access-Jwt-Assertion` or the `CF_Authorization` cookie, or one that fails verification against the team JWKS
   with audience `CF_ACCESS_AUD`), `sign_in_required` (no session), `owner_required` (the session's role is not
   `owner`) or `passkey_required` (no passkey assertion within 12 h, recorded in `passkey_assertions` when the
-  better-auth passkey plugin verifies one).
-- **Reveal**: passkey re-assertion + typed reason → 15-minute grant scoped to one user; every reveal and admin
-  action writes `admin_audit` and ships to Loki. Users see their entries in Settings → "Support access".
+  better-auth passkey plugin verifies one). A Reveal-gated act-as request that fails its own gate is refused with
+  `reveal_required` (no active Reveal for that user) or `read_only` (the act-as surface refuses every write).
+- **Reveal**: passkey re-assertion within 5 minutes + typed reason → 15-minute grant scoped to one user; every
+  reveal open/view/expire and admin action writes `admin_audit` and ships to Loki (`LOKI_URL`, unset keeps it on the
+  machine only) as who, action, target and typed reason with `detail` keys only, never its values. Users see their
+  entries in Settings → "Support access" through `GET /api/support-access`.
 - Every admin action on `admin_audit`: `at`, `actor_id`, `action`, `target_user_id` (null), `reason`, `detail`
   JSON; an OTel span carries the action.
 - `/admin/api/catalog` returns `{ discoveredAt, ats }`, where `ats` holds one entry per source
@@ -1180,7 +1183,8 @@ body, sender or attachment, so the admin never sees message content.
   `PUT /admin/api/settings/:key` and `PUT /admin/api/kill-switches/:scope/:key` are the admin's other write
   surfaces. `GET /admin/api/llm-usage` returns the recorded LLM usage and cost, filterable by `purpose`.
 - Never shown per person: EEO answers (aggregate counts only), card data (Stripe), password hashes.
-- Act-as is **read-only** and requires an active Reveal.
+- Act-as is **read-only** and requires an active Reveal: `GET /admin/api/act-as/:userId` returns the user's
+  profile, Facts (EEO answers withheld), targets and board, and every other method answers `read_only`.
 
 ### 13.4 Legal minimum before M2
 
@@ -1220,7 +1224,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `GET /api/account/export` · `POST /api/account/export` · `GET /api/account/export/:id/download` · `GET /api/account/deletion` (has a password, re-authenticated) · `POST /api/account/reauth` `{password}` · `POST /api/account/reauth/link` (a fresh sign-in link) · `POST /api/account/delete` `{confirm: true}` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `POST /internal/mail/dead-letter` · `GET /internal/mailboxes/:local` |
-| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
+| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
 `home.updated`, `notification`. TanStack Query invalidates by topic. The Calendar needs no topic of its own: it
