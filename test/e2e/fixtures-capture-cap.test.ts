@@ -14,9 +14,11 @@ import { startBrowserUseFixture } from "./browser-use-server.fixture.ts";
 const enqueuedSchema = z.object({ id: z.string() });
 
 const jobSchema = z.object({
+  attempts: z.number(),
   id: z.string(),
   kind: z.string(),
   lastError: z.string().nullable(),
+  runAt: z.number(),
   status: z.string(),
 });
 
@@ -211,6 +213,59 @@ test("a 429 on session create is retried without consuming the job's only attemp
     expect(jobs).toHaveLength(1);
     expect(jobs[0]?.lastError).toBeNull();
     expect(harness.fixture.rateLimitResponses).toBe(1);
+    expect(harness.fixture.sessions).toHaveLength(1);
+  } finally {
+    await harness.stop();
+  }
+});
+
+test("a 429 with a long Retry-After requeues the job for exactly that delay", async ({
+  identityServer,
+}) => {
+  const harness = await startCaptureHarness(identityServer, {
+    rateLimitFirstSessionCreates: 1,
+    retryAfterSeconds: 300,
+  });
+
+  try {
+    await enqueueCapture(harness.server, harness.pageUrl(1), 1);
+    await runDueJobs(harness.server);
+
+    await expect
+      .poll(async () => (await captureJobs(harness.server))[0]?.status ?? "missing")
+      .toBe("queued");
+
+    const [queued] = await captureJobs(harness.server);
+
+    const clock = z
+      .object({ now: z.number() })
+      .parse(await (await fetch(`${harness.server.url}/__test__/clock`)).json());
+
+    expect(queued?.status).toBe("queued");
+    expect(queued?.attempts).toBe(0);
+    expect(queued?.runAt).toBeGreaterThanOrEqual(clock.now + 295_000);
+    expect(queued?.runAt).toBeLessThanOrEqual(clock.now + 310_000);
+    expect(harness.fixture.rateLimitResponses).toBe(1);
+    expect(harness.fixture.sessions).toHaveLength(0);
+
+    await runDueJobs(harness.server);
+
+    expect(harness.fixture.sessions).toHaveLength(0);
+
+    const offset = await fetch(`${harness.server.url}/__test__/clock/offset`, {
+      body: JSON.stringify({ offsetMs: 300_000 }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+
+    expect(offset.ok).toBe(true);
+
+    await runDueJobs(harness.server);
+    await waitForDone(harness.server);
+
+    const [done] = await captureJobs(harness.server);
+
+    expect(done?.status).toBe("done");
     expect(harness.fixture.sessions).toHaveLength(1);
   } finally {
     await harness.stop();

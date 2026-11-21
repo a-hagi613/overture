@@ -188,7 +188,7 @@ No comments in source (Landmines `no-comments`; TSDoc on exported port interface
 
 ```ts
 interface LlmPort { complete<T>(req: LlmRequest<T>): Promise<LlmResult<T>>; batch<T>(reqs: LlmRequest<T>[]): Promise<BatchHandle> }
-interface BrowserProvider { id: "browser_use" | "kernel" | "local"; open(o: { profileId: string | null; country: string; timeoutMinutes: number; attemptId: string }): Promise<RemoteBrowser>; listOpen(): Promise<{ sessionId: string; attemptId: string | null }[]>; stop(sessionId: string): Promise<void>; ensureProfile(userId: string, country: string): Promise<string>; deleteProfile(profileId: string): Promise<void>; view(sessionId: string): Promise<{ liveViewUrl: string | null; recordingUrl: string | null; status: "active" | "stopped" } | null> }
+interface BrowserProvider { id: "browser_use" | "kernel" | "local"; open(o: { profileId: string | null; country: string; timeoutMinutes: number; attemptId: string }): Promise<RemoteBrowser>; listOpen(): Promise<{ sessionId: string; attemptId: string | null }[]>; stop(sessionId: string): Promise<void>; sessionUsage(sessionId: string): Promise<{ status: "active" | "stopped"; usage: UsageReport } | null>; ensureProfile(userId: string, country: string): Promise<string>; deleteProfile(profileId: string): Promise<void>; view(sessionId: string): Promise<{ liveViewUrl: string | null; recordingUrl: string | null; status: "active" | "stopped" } | null> }
 interface RemoteBrowser { cdpUrl: string; sessionId: string; liveViewUrl: string | null; close(): Promise<UsageReport> }
 interface MailSender { sendRaw(m: OutboundMime): Promise<{ providerMessageId: string }> }
 interface ObjectStore { put(k: string, b: Uint8Array, meta?): Promise<void>; get(k: string): Promise<Uint8Array | null>; delete(k: string): Promise<void>; list(prefix: string): AsyncIterable<string> }
@@ -813,14 +813,16 @@ the one-in-flight slot (the partial unique index covers `sending` only) and coun
 closed as `unconfirmed` if `submit_clicked_at` is set, else as `crash`, and the table above applies. A `confirming`
 application past `limits.confirm_wait_hours` without an acknowledgement is released and failed as above. The same sweep
 lists the provider's open sessions and stops any whose attempt is closed or unknown (a crashed process never runs
-`finally`).
+`finally`). It also backfills metering for attempts that ended in the last day with `cost_micros = 0` and a provider
+session id: a session that the provider now reports as stopped has its `browser_ms`, `proxy_bytes` and `cost_micros`
+read from the provider and written to the attempt.
 
 ### 9.5 Automatic kill switches
 
 Evaluated every 10 minutes over the last 50 attempts per scope: ATS success rate < 60 % → ATS switch on; employer
 with ≥ 3 consecutive `blocked`/`captcha_blocked` → employer switch on; provider success < 50 % over 20 attempts →
 provider switch on and traffic moves to the fallback provider. Every switch alerts the owner; only the owner turns
-switches off.
+switches off. A provider that answers 402 or 403 sets its own switch immediately, outside this window (§10.1).
 
 ---
 
@@ -832,6 +834,14 @@ switches off.
   `proxyCountryCode` = user's `current_country` (fallback: nearest supported country from a static map),
   `solveCaptchas: true`, `timeout: 15` (minutes; the default is 60) and the attempt id as metadata; connect with `chromium.connectOverCDP(cdpUrl)`; **always** stop the browser through the
   API in `finally` (closing CDP does not stop billing). The recovery sweep stops any session left open (§9.4). Browser Use stays the provider for M1 and later; the owner accepts its standard terms (ADR 0028). Every attempt records `browser_ms`, `proxy_bytes` and `cost_micros`, and admin Overview shows proxy MB and cost per completed application against the $0.03 gate.
+- **Stop and settle.** A `PATCH .../stop` that answers 404 (the session already ended by timeout) still yields the
+  session's usage: the adapter falls back to `GET /api/v4/browsers/{id}`. When metering has not settled within 30 s, the
+  attempt keeps `cost_micros = 0` and the recovery sweep backfills it later (§9.4). `BROWSER_USE_USAGE_SETTLE_MS` is a
+  test-only override of the 30 s wait, like `SEND_HARD_TIMEOUT_MS`.
+- **429, 402 and 403.** A 429 honours `Retry-After` (seconds or an HTTP date): a short wait is retried in place, a long
+  one (Browser Use sends 300 s) requeues the job for exactly that delay without spending an attempt. A 402 (no credit)
+  or 403 (forbidden) is never retried: it is a provider error, the `provider` kill switch for `browser_use` is set and
+  the owner is alerted, so dispatch pauses until the owner turns the switch off.
 - **Kernel** (emergency fallback): headful browser, stealth on, ISP proxy, per-user profile. Its acceptable-use
   policy bans "bulk unsolicited form submission" (ADR 0003), so it is exercised only against the synthetic lab and
   fixtures, never sent real applications by default; the owner switches real traffic to it only if Browser Use's
@@ -847,7 +857,7 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 
 ### 10.3 Attempt steps (`submit.run`)
 
-1. Open provider browser (15-minute vendor timeout, attempt id as metadata); `page.route` aborts `image`, `font`, `media` and known analytics hosts.
+1. Open provider browser (15-minute vendor timeout, attempt id as metadata); `page.route` aborts fonts, media (audio and video) and known analytics/tracker hosts. Images, scripts, XHR and CAPTCHA hosts (hCaptcha, reCAPTCHA, Turnstile) are never blocked: proxy traffic is about 90 % of Browser Use's bill at $5/GB, and those requests are what the form needs.
 2. Navigate to the apply link: for Greenhouse the embed form `https://job-boards.greenhouse.io/embed/job_app?for={board_token}&token={ats_job_id}` (`job-boards.eu.greenhouse.io` when the board's `region` is `eu`), never the employer's `absolute_url` and never the plain `/{board_token}/jobs/{id}` board page, which redirects to the employer's own site on boards with a custom careers domain; otherwise `apply_url`. The identity check reads `for` and `token` from that path. If the page says the job is closed → `posting_closed`. Check that the live page's
    host, board token, job id and company name match the Posting; a redirect or any other mismatch → `identity_mismatch`
    (release, `skipped` with `status_reason` `posting_identity:<field>`, never submit).
@@ -872,7 +882,7 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 8. Click the final Submit; set `submit_clicked_at` per §9.4 from the application request's answer. Confirm success by the ATS confirmation signal
    (URL/heading/text per ATS). No signal within 30 s → `unconfirmed` (§9.4). A missing or changed field found
    **before** the click → `form_changed`.
-9. Close the browser; record `browser_ms`, `proxy_bytes`, `cost_micros` from the provider usage report.
+9. Close the browser; record `browser_ms`, `proxy_bytes`, `cost_micros` from the provider usage report. A session whose stop fails is read back with `GET`; usage that is still unsettled after 30 s is backfilled by the recovery sweep (§9.4).
 10. Hard timeout 15 min (the browser session and the attempt lease) → `timeout` before the click, `unconfirmed` after it. The limit is fixed in production; `SEND_HARD_TIMEOUT_MS` exists only so the e2e suite can reach the deadline without a fifteen-minute wait.
 
 ### 10.4 Synthetic lab and provider report (M1)
@@ -898,8 +908,8 @@ confirmation pages, a fake code prompt and a fake visible challenge. The capture
 with no user profile attached, and writes `fixtures/{ats}/{form_signature}/form.html`, its assets and `meta.json`. The ATS apps render the form after load, so the job waits up to 20 s for a form field and otherwise fails with `no_form_rendered`, saving nothing.
 Every browser session, whether a capture, the early cloud probe or a dispatch send, takes a slot from one
 process-wide semaphore sized by `browser.max_concurrent_sessions` (default 3). A capture that cannot get a slot waits
-without failing or spending an attempt. A 429 from the provider's create-session call is retried with backoff and does
-not spend an attempt, and a `goto` that times out is retried once.
+without failing or spending an attempt. A 429 from the provider's create-session call is retried with backoff or the
+`Retry-After` delay and does not spend an attempt, and a `goto` that times out is retried once.
 On production the same job is queued from the machine with
 `bun run scripts/capture-forms.ts --ats <ats> --url <apply_url> [--url <apply_url> …]`; the running worker picks it
 up and the files land under the `fixtures/{ats}/` prefix in R2. Live smoke checks are the same kind of admin job,

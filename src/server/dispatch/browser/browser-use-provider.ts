@@ -1,14 +1,15 @@
 import type { Clock } from "../../platform/ports/clock.ts";
 import type { BrowserProfileStore } from "./profiles.ts";
-import type { BrowserProvider, OpenBrowserInput } from "./provider.ts";
+import type { BrowserProvider, OpenBrowserInput, OpenSession } from "./provider.ts";
 
+import { ProviderUnavailableError } from "./provider.ts";
 import type { BrowserSession, BrowserUseClient } from "./browser-use.ts";
 
 export const BROWSER_USE_METADATA_PURPOSE = "application";
 
 const USAGE_SETTLE_INTERVAL_MS = 500;
 const USAGE_SETTLE_DEADLINE_MS = 30_000;
-const PROFILE_PAGE_SIZE = 100;
+const SESSION_PAGE_SIZE = 100;
 
 const toNumber = (raw: string | null | undefined) => {
   const parsed = Number(raw ?? 0);
@@ -39,12 +40,18 @@ export interface BrowserUseProviderConfig {
   clock: Clock;
   profiles: BrowserProfileStore;
   client: ReturnType<typeof BrowserUseClient>;
+  usageSettleDeadlineMs?: number;
 }
 
 export function createBrowserUseBrowserProvider(config: BrowserUseProviderConfig) {
   const { clock, profiles, client } = config;
 
-  async function readSettledUsage(sessionId: string, deadline: number) {
+  const settleDeadlineMs = config.usageSettleDeadlineMs ?? USAGE_SETTLE_DEADLINE_MS;
+
+  const readSettledUsage: (sessionId: string, deadline: number) => Promise<BrowserSession> = async (
+    sessionId,
+    deadline,
+  ) => {
     const session = await client.getSession(sessionId);
 
     if (!usageUnsettled(session) || clock.now() >= deadline) {
@@ -54,7 +61,7 @@ export function createBrowserUseBrowserProvider(config: BrowserUseProviderConfig
     await wait();
 
     return readSettledUsage(sessionId, deadline);
-  }
+  };
 
   function usageFor(session: BrowserSession, fallbackStart: number) {
     const startedAt = parsedTime(session.startedAt) ?? fallbackStart;
@@ -67,6 +74,24 @@ export function createBrowserUseBrowserProvider(config: BrowserUseProviderConfig
       ),
       proxyBytes: Math.round(toNumber(session.proxyUsedMb) * 1_000_000),
     };
+  }
+
+  const emptyUsage = (startedAt: number) => ({
+    browserMs: Math.max(0, clock.now() - startedAt),
+    costMicros: 0,
+    proxyBytes: 0,
+  });
+
+  async function openedUsage(sessionId: string, deadline: number) {
+    try {
+      return await readSettledUsage(sessionId, deadline);
+    } catch (error) {
+      if (error instanceof ProviderUnavailableError) {
+        throw error;
+      }
+
+      return null;
+    }
   }
 
   async function open(input: OpenBrowserInput) {
@@ -91,27 +116,58 @@ export function createBrowserUseBrowserProvider(config: BrowserUseProviderConfig
     return {
       cdpUrl,
       close: async () => {
-        await client.stopSession(created.id);
-        const settled = await readSettledUsage(created.id, clock.now() + USAGE_SETTLE_DEADLINE_MS);
+        const deadline = clock.now() + settleDeadlineMs;
 
-        return usageFor(settled, startedAt);
+        try {
+          await client.stopSession(created.id);
+        } catch (error) {
+          if (error instanceof ProviderUnavailableError) {
+            throw error;
+          }
+        }
+
+        const settled = await openedUsage(created.id, deadline);
+
+        return settled === null ? emptyUsage(startedAt) : usageFor(settled, startedAt);
       },
       liveViewUrl: created.liveUrl ?? null,
       sessionId: created.id,
     };
   }
 
-  async function listOpen() {
-    const sessions = await client.listSessions({ filterBy: "active", pageSize: PROFILE_PAGE_SIZE });
+  const listOpen: (pageNumber?: number) => Promise<OpenSession[]> = async (pageNumber = 1) => {
+    const sessions = await client.listSessions({
+      filterBy: "active",
+      pageNumber,
+      pageSize: SESSION_PAGE_SIZE,
+    });
 
-    return sessions.items.map((session) => ({
+    const found = sessions.items.map((session) => ({
       attemptId: session.metadata?.attemptId ?? null,
       sessionId: session.id,
     }));
-  }
+
+    if (sessions.items.length === 0 || pageNumber * SESSION_PAGE_SIZE >= sessions.totalItems) {
+      return found;
+    }
+
+    return [...found, ...(await listOpen(pageNumber + 1))];
+  };
 
   async function stop(sessionId: string) {
     await client.stopSession(sessionId);
+  }
+
+  async function sessionUsage(sessionId: string) {
+    let session: BrowserSession;
+
+    try {
+      session = await client.getSession(sessionId);
+    } catch {
+      return null;
+    }
+
+    return { status: session.status, usage: usageFor(session, clock.now()) };
   }
 
   async function ensureProfile(userId: string, country: string) {
@@ -163,6 +219,7 @@ export function createBrowserUseBrowserProvider(config: BrowserUseProviderConfig
     ensureProfile,
     listOpen,
     open,
+    sessionUsage,
     stop,
     view,
   } satisfies BrowserProvider;

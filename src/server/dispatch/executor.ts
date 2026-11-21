@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { chromium } from "playwright-core";
 import { z } from "zod";
 
@@ -9,14 +9,22 @@ import type { ResumeService } from "../profile/resume.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
 import type { FormQuestion } from "../pipeline/send-plan.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
-import type { BrowserProviderRegistry, BrowserUsage, RemoteBrowser } from "./browser/provider.ts";
+import type {
+  BrowserProviderRegistry,
+  BrowserUsage,
+  ProviderUnavailableReason,
+  RemoteBrowser,
+} from "./browser/provider.ts";
 import type { createMailboxService } from "../inbox/mailboxes.ts";
 import type { Outcomes } from "./outcomes.ts";
 
 import { applications, attempts, postings, profiles } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { releaseForApplication, reserveForApplication } from "../billing/ledger.ts";
-import { getSetting, isKillSwitchEnabled } from "../platform/settings/index.ts";
+import { getSetting, isKillSwitchEnabled, setKillSwitch } from "../platform/settings/index.ts";
+import { raiseAlert } from "../platform/alerts.ts";
+import { ProviderUnavailableError } from "./browser/provider.ts";
+import { applySendProxyTrim } from "./browser/proxy-trim.ts";
 import { runAshbyAttempt } from "./ats/ashby.ts";
 import type { AshbyRun } from "./ats/ashby.ts";
 import { runGreenhouseAttempt } from "./ats/greenhouse.ts";
@@ -44,6 +52,12 @@ const ATTEMPT_LEASE_MS = 15 * 60_000;
 const SESSION_TIMEOUT_MINUTES = 15;
 const RECOVER_INTERVAL_MS = 60_000;
 const RETRY_DELAY_MS = 6 * 60 * 60_000;
+const USAGE_BACKFILL_WINDOW_MS = 24 * 60 * 60_000;
+
+const PROVIDER_PAUSE_REASONS = {
+  forbidden: "the provider answered 403 (forbidden)",
+  no_credit: "the provider answered 402 (no credit)",
+} satisfies Record<ProviderUnavailableReason, string>;
 
 const sendPayloadSchema = z.object({ applicationId: z.string().min(1) });
 
@@ -156,6 +170,21 @@ export function createDispatcher(deps: DispatcherDeps) {
       userId,
     );
     publishEvent(db, clock, "home.updated", JSON.stringify({ applicationId }), userId);
+  }
+
+  function pauseProvider(providerId: string, reason: ProviderUnavailableReason) {
+    if (isKillSwitchEnabled(db, "provider", providerId)) {
+      return;
+    }
+
+    const detail = PROVIDER_PAUSE_REASONS[reason];
+
+    setKillSwitch(db, clock, "provider", providerId, true, detail, "auto");
+    raiseAlert(db, clock, "dispatch.kill_switch", {
+      key: providerId,
+      reason: detail,
+      scope: "provider",
+    });
   }
 
   function latestAttempt(applicationId: string) {
@@ -387,8 +416,6 @@ export function createDispatcher(deps: DispatcherDeps) {
         } catch {
           usage = zeroUsage;
         }
-
-        await provider.stop(target.sessionId).catch(() => undefined);
       })();
     };
 
@@ -434,17 +461,7 @@ export function createDispatcher(deps: DispatcherDeps) {
         throw new Error("shutting down before the form loaded");
       }
 
-      await context.route("**/*", async (route) => {
-        const type = route.request().resourceType();
-
-        if (type === "image" || type === "font" || type === "media") {
-          await route.abort().catch(() => undefined);
-
-          return;
-        }
-
-        await route.fallback();
-      });
+      await applySendProxyTrim(context);
 
       let sendPlan = plan;
 
@@ -559,7 +576,6 @@ export function createDispatcher(deps: DispatcherDeps) {
       await cdp.close().catch(() => undefined);
 
       usage = await browser.close();
-      await provider.stop(browser.sessionId).catch(() => undefined);
       browser = null;
 
       if (run.outcome === "sent") {
@@ -709,7 +725,11 @@ export function createDispatcher(deps: DispatcherDeps) {
           });
         }
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof ProviderUnavailableError) {
+        pauseProvider(error.providerId, error.reason);
+      }
+
       const attempt = db.select().from(attempts).where(eq(attempts.id, attemptId)).get();
       const submitted = attempt?.submitClickedAt ?? null;
 
@@ -746,11 +766,13 @@ export function createDispatcher(deps: DispatcherDeps) {
       if (browser !== null) {
         try {
           usage = await browser.close();
-        } catch {
+        } catch (error) {
+          if (error instanceof ProviderUnavailableError) {
+            pauseProvider(error.providerId, error.reason);
+          }
+
           usage = zeroUsage;
         }
-
-        await provider.stop(browser.sessionId).catch(() => undefined);
       }
 
       if (releaseSessionSlot !== null) {
@@ -863,11 +885,57 @@ export function createDispatcher(deps: DispatcherDeps) {
       }),
     );
 
+    const pendingUsage = providers.all().flatMap((provider) =>
+      db
+        .select()
+        .from(attempts)
+        .where(
+          and(
+            eq(attempts.provider, provider.id),
+            eq(attempts.costMicros, 0),
+            isNotNull(attempts.endedAt),
+            isNotNull(attempts.providerSessionId),
+            gte(attempts.endedAt, clock.now() - USAGE_BACKFILL_WINDOW_MS),
+          ),
+        )
+        .all()
+        .map((attempt) => ({ attempt, provider })),
+    );
+
+    const filled = await Promise.all(
+      pendingUsage.map(async ({ attempt, provider }) => {
+        const sessionId = attempt.providerSessionId;
+
+        if (sessionId === null) {
+          return 0;
+        }
+
+        const reported = await provider.sessionUsage(sessionId).catch(() => null);
+
+        if (reported?.status !== "stopped") {
+          return 0;
+        }
+
+        if (reported.usage.costMicros === 0 && reported.usage.proxyBytes === 0) {
+          return 0;
+        }
+
+        updateAttempt(attempt.id, {
+          browserMs: reported.usage.browserMs,
+          costMicros: reported.usage.costMicros,
+          proxyBytes: reported.usage.proxyBytes,
+        });
+
+        return 1;
+      }),
+    );
+
     return {
       confirming: confirmingCount,
       expired,
       released,
       sessionsStopped: stopped.filter((count) => count === 1).length,
+      usageBackfilled: filled.filter((count) => count === 1).length,
     };
   }
 

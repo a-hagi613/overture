@@ -7,7 +7,7 @@ import { z } from "zod";
 import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
 import type { IdentityServer } from "./identity-server-test.fixture.ts";
-import type { BrowserUseFixture } from "./browser-use-server.fixture.ts";
+import type { BrowserUseFixture, BrowserUseFixtureOptions } from "./browser-use-server.fixture.ts";
 import type { GreenhouseFixture } from "./greenhouse.fixture.ts";
 
 import { expect, startFreshAppServer, test } from "./app.fixture.ts";
@@ -149,20 +149,32 @@ interface SendHarness {
   server: AppServer;
 }
 
-async function startHarness(identityServer: IdentityServer, hardTimeoutMs = 30_000) {
+interface SendHarnessOptions {
+  fixture?: BrowserUseFixtureOptions;
+  usageSettleMs?: number;
+}
+
+async function startHarness(
+  identityServer: IdentityServer,
+  hardTimeoutMs = 30_000,
+  options: SendHarnessOptions = {},
+) {
   const directory = mkdtempSync(join(tmpdir(), "overture-browser-use-send-"));
-  const fixture = startBrowserUseFixture();
+  const fixture = startBrowserUseFixture(options.fixture);
   const greenhouse = startGreenhouseFixture();
 
-  const server = await startFreshAppServer(identityServer, {
+  const environment = {
     BROWSER_PROVIDER: "browser_use",
     BROWSER_PROXY_COUNTRY: "ca",
     BROWSER_USE_API_BASE_URL: fixture.url,
     BROWSER_USE_API_KEY: "browser-use-send-test-key",
+    BROWSER_USE_USAGE_SETTLE_MS: String(options.usageSettleMs ?? 30_000),
     GREENHOUSE_BOARD_BASE_URL: greenhouse.url,
     OBJECT_STORE_ROOT: join(directory, "objects"),
     SEND_HARD_TIMEOUT_MS: String(hardTimeoutMs),
-  });
+  } satisfies Record<string, string>;
+
+  const server = await startFreshAppServer(identityServer, environment);
 
   return { fixture, greenhouse, server };
 }
@@ -246,6 +258,25 @@ async function statusOf(owner: APIRequestContext, applicationId: string) {
     .parse(await (await owner.get(`/api/applications/${applicationId}`)).json()).application.status;
 }
 
+const killSwitchesSchema = z.array(
+  z.object({
+    enabled: z.number(),
+    key: z.string(),
+    reason: z.string(),
+    scope: z.string(),
+  }),
+);
+
+const notificationsSchema = z.object({
+  notifications: z.array(z.object({ body: z.string(), kind: z.string(), title: z.string() })),
+});
+
+async function runRecover(owner: APIRequestContext) {
+  return owner.post("/__test__/jobs/run-now", {
+    data: { kind: "dispatch.recover", payload: "{}" },
+  });
+}
+
 async function mutateForm(harness: SendHarness, mutation: string) {
   const response = await fetch(`${harness.greenhouse.url}/__fixture__/mutate`, {
     body: JSON.stringify({ mutation }),
@@ -293,6 +324,126 @@ test("a send try through Browser Use records its usage and stops the vendor brow
     expect(harness.fixture.stoppedSessionIds).toContain(attempt.providerSessionId);
     expect(harness.fixture.stoppedAttemptIds.length).toBeGreaterThan(0);
     expect(harness.greenhouse.state.submissions).toBe(1);
+  } finally {
+    await closeHarness(harness);
+  }
+});
+
+test("a send try whose stop answers 404 still records the session's usage", async ({
+  identityServer,
+}) => {
+  const harness = await startHarness(identityServer, 30_000, { fixture: { failStops: true } });
+
+  try {
+    const { applicationId, owner } = await readyApplication(
+      harness,
+      `${harness.greenhouse.url}/blankstreet/jobs/8004209003`,
+    );
+
+    await runSend(owner, applicationId);
+
+    expect(await statusOf(owner, applicationId)).toBe("sent");
+
+    const [attempt] = await attemptsOf(owner, applicationId);
+
+    if (attempt === undefined) {
+      throw new Error("the send try left no attempt");
+    }
+
+    expect(attempt.outcome).toBe("sent");
+    expect(attempt.browserMs).toBe(556_000);
+    expect(attempt.proxyBytes).toBe(2_710_000);
+    expect(attempt.costMicros).toBe(28_800);
+    expect(harness.fixture.stoppedSessionIds).toEqual([]);
+    expect(harness.greenhouse.state.submissions).toBe(1);
+  } finally {
+    await closeHarness(harness);
+  }
+});
+
+test("the recovery sweep backfills usage that had not settled when the send try ended", async ({
+  identityServer,
+}) => {
+  const harness = await startHarness(identityServer, 30_000, {
+    fixture: { holdUsage: true },
+    usageSettleMs: 200,
+  });
+
+  try {
+    const { applicationId, owner } = await readyApplication(
+      harness,
+      `${harness.greenhouse.url}/blankstreet/jobs/8004209003`,
+    );
+
+    await runSend(owner, applicationId);
+
+    expect(await statusOf(owner, applicationId)).toBe("sent");
+
+    const [unsettled] = await attemptsOf(owner, applicationId);
+
+    if (unsettled === undefined) {
+      throw new Error("the send try left no attempt");
+    }
+
+    expect(unsettled.outcome).toBe("sent");
+    expect(unsettled.proxyBytes).toBe(0);
+    expect(unsettled.costMicros).toBe(0);
+
+    harness.fixture.settleUsage();
+
+    expect((await runRecover(owner)).ok()).toBe(true);
+
+    const [backfilled] = await attemptsOf(owner, applicationId);
+
+    expect(backfilled?.browserMs).toBe(556_000);
+    expect(backfilled?.proxyBytes).toBe(2_710_000);
+    expect(backfilled?.costMicros).toBe(28_800);
+  } finally {
+    await closeHarness(harness);
+  }
+});
+
+test("a 402 from Browser Use pauses dispatch, alerts the owner and is never retried", async ({
+  identityServer,
+}) => {
+  const harness = await startHarness(identityServer, 30_000, { fixture: { createStatus: 402 } });
+
+  try {
+    const { applicationId, owner, userId } = await readyApplication(
+      harness,
+      `${harness.greenhouse.url}/blankstreet/jobs/8004209003`,
+    );
+
+    await runSend(owner, applicationId);
+
+    expect(await statusOf(owner, applicationId)).toBe("ready");
+
+    const [attempt] = await attemptsOf(owner, applicationId);
+
+    expect(attempt?.outcome).toBe("provider_error");
+    expect(attempt?.submitClickedAt).toBeNull();
+    expect(harness.fixture.sessions).toHaveLength(0);
+
+    const switches = killSwitchesSchema.parse(await (await owner.get("/api/kill-switches")).json());
+
+    expect(switches).toContainEqual(
+      expect.objectContaining({ enabled: 1, key: "browser_use", scope: "provider" }),
+    );
+
+    const { notifications } = notificationsSchema.parse(
+      await (
+        await owner.get(`/__test__/notifications?userId=${encodeURIComponent(userId)}`)
+      ).json(),
+    );
+
+    expect(notifications).toContainEqual(
+      expect.objectContaining({ kind: "alert", title: "Overture alert: dispatch.kill_switch" }),
+    );
+
+    await runSend(owner, applicationId);
+
+    expect(harness.fixture.sessions).toHaveLength(0);
+    expect(harness.greenhouse.state.submissions).toBe(0);
   } finally {
     await closeHarness(harness);
   }

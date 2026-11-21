@@ -61,6 +61,28 @@ export function createKernelBrowserProvider(config: KernelProviderConfig) {
     await client.deleteBrowser(sessionId);
   }
 
+  async function sessionUsage(sessionId: string) {
+    let browser: Awaited<ReturnType<typeof client.getBrowser>>;
+
+    try {
+      browser = await client.getBrowser(sessionId);
+    } catch {
+      return null;
+    }
+
+    const deletedAt = browser.deleted_at;
+    const stopped = deletedAt !== null && deletedAt !== undefined;
+
+    return {
+      status: stopped ? ("stopped" as const) : ("active" as const),
+      usage: {
+        browserMs: browser.usage?.uptime_ms ?? 0,
+        costMicros: toMicros(browser.cost?.estimated_usage_spend_usd),
+        proxyBytes: 0,
+      },
+    };
+  }
+
   async function ensureProfile(userId: string, country: string) {
     const existing = profiles.find("kernel", userId);
 
@@ -125,6 +147,7 @@ export function createKernelBrowserProvider(config: KernelProviderConfig) {
     ensureProfile,
     listOpen,
     open,
+    sessionUsage,
     stop,
     view,
   } satisfies BrowserProvider;

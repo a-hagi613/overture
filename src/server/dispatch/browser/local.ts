@@ -100,6 +100,12 @@ async function deleteProfile() {
   await Promise.resolve();
 }
 
+async function sessionUsage() {
+  await Promise.resolve();
+
+  return null;
+}
+
 export function createLocalBrowserProvider(deps: { clock: Clock; sessionDirectory: string }) {
   const { clock, sessionDirectory } = deps;
 
@@ -238,6 +244,7 @@ export function createLocalBrowserProvider(deps: { clock: Clock; sessionDirector
     ensureProfile,
     listOpen,
     open,
+    sessionUsage,
     stop,
     view,
   } satisfies BrowserProvider;

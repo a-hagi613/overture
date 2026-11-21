@@ -2,20 +2,30 @@ import { chromium } from "playwright-core";
 import { expect, test } from "@playwright/test";
 
 import type { BrowserProvider } from "../../src/server/dispatch/browser/provider.ts";
+import type { BrowserUseFixture, BrowserUseFixtureOptions } from "./browser-use-server.fixture.ts";
 
 import { BrowserUseClient } from "../../src/server/dispatch/browser/browser-use.ts";
 import { createBrowserUseBrowserProvider } from "../../src/server/dispatch/browser/browser-use-provider.ts";
 import { KernelClient } from "../../src/server/dispatch/browser/kernel.ts";
 import { createKernelBrowserProvider } from "../../src/server/dispatch/browser/kernel-provider.ts";
 import { createBrowserProfileStore } from "../../src/server/dispatch/browser/profiles.ts";
+import { applySendProxyTrim } from "../../src/server/dispatch/browser/proxy-trim.ts";
+import { ProviderUnavailableError } from "../../src/server/dispatch/browser/provider.ts";
 import { openDatabase } from "../../src/server/platform/db/client.ts";
 import { migrateDatabase } from "../../src/server/platform/db/migrate.ts";
 import { createClock } from "../../src/server/platform/ports/clock.ts";
+import { RetryLaterError } from "../../src/server/platform/jobs/retry.ts";
 import { users } from "../../src/server/platform/db/schema.ts";
 import { startBrowserUseFixture } from "./browser-use-server.fixture.ts";
-import type { BrowserUseFixture } from "./browser-use-server.fixture.ts";
 import { startKernelFixture } from "./kernel-server.fixture.ts";
 import type { KernelFixture } from "./kernel-server.fixture.ts";
+import {
+  ALLOWED_WEIGHT_PATHS,
+  TRIMMED_WEIGHT_PATHS,
+  allowedWeightBytes,
+  startProxyWeightFixture,
+  trimmedWeightBytes,
+} from "./proxy-weight.fixture.ts";
 
 interface Harness {
   browserUse: BrowserUseFixture;
@@ -39,8 +49,8 @@ function userRow(id: string, email: string) {
   };
 }
 
-function startHarness() {
-  const browserUse = startBrowserUseFixture();
+function startHarness(fixtureOptions: BrowserUseFixtureOptions = {}) {
+  const browserUse = startBrowserUseFixture(fixtureOptions);
   const kernel = startKernelFixture();
   const { db, sqlite } = openDatabase(":memory:");
 
@@ -60,7 +70,7 @@ function startHarness() {
 
   const buildUse = () =>
     createBrowserUseBrowserProvider({
-      client: BrowserUseClient("test-key", browserUse.url),
+      client: BrowserUseClient("test-key", browserUse.url, clock),
       clock,
       profiles,
     });
@@ -96,6 +106,45 @@ async function usesCdp(cdpUrl: string) {
   await browser.close();
 
   return text;
+}
+
+async function rejectionOf(run: Promise<unknown>) {
+  try {
+    await run;
+  } catch (error) {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+
+  throw new Error("the call was expected to fail");
+}
+
+async function expectProviderUnavailable(status: number, reason: string) {
+  const harness = startHarness({ createStatus: status });
+
+  try {
+    const provider = harness.buildUse();
+    const profileId = await provider.ensureProfile("user-one", "ca");
+
+    const error = await rejectionOf(
+      provider.open({
+        attemptId: "attempt-unavailable",
+        country: "ca",
+        profileId,
+        timeoutMinutes: 15,
+      }),
+    );
+
+    expect(error).toBeInstanceOf(ProviderUnavailableError);
+
+    if (!(error instanceof ProviderUnavailableError)) {
+      throw new TypeError("the provider error was not surfaced");
+    }
+
+    expect(error.providerId).toBe("browser_use");
+    expect(error.reason).toBe(reason);
+  } finally {
+    harness.close();
+  }
 }
 
 test("a Browser Use session opens, is used, is stopped through the API and reports its cost", async () => {
@@ -134,6 +183,187 @@ test("a Browser Use session opens, is used, is stopped through the API and repor
     expect(stopped?.recordingUrl).toContain(remote.sessionId);
     await expect(provider.listOpen()).resolves.toEqual([]);
   } finally {
+    harness.close();
+  }
+});
+
+test("a stop that fails still reports the usage of the ended session", async () => {
+  const harness = startHarness({ failStops: true });
+
+  try {
+    const provider = harness.buildUse();
+    const profileId = await provider.ensureProfile("user-one", "ca");
+
+    const remote = await provider.open({
+      attemptId: "attempt-stop-failed",
+      country: "ca",
+      profileId,
+      timeoutMinutes: 15,
+    });
+
+    const usage = await remote.close();
+
+    expect(usage.browserMs).toBe(556_000);
+    expect(usage.proxyBytes).toBe(2_710_000);
+    expect(usage.costMicros).toBe(28_800);
+    expect(harness.browserUse.stoppedSessionIds).toEqual([]);
+  } finally {
+    harness.close();
+  }
+});
+
+test("a stopped session still reports its usage to the recovery sweep", async () => {
+  const harness = startHarness();
+
+  try {
+    const provider = harness.buildUse();
+    const profileId = await provider.ensureProfile("user-one", "ca");
+
+    const remote = await provider.open({
+      attemptId: "attempt-sweep-usage",
+      country: "ca",
+      profileId,
+      timeoutMinutes: 15,
+    });
+
+    await provider.stop(remote.sessionId);
+
+    await expect(provider.sessionUsage(remote.sessionId)).resolves.toEqual({
+      status: "stopped",
+      usage: { browserMs: 556_000, costMicros: 28_800, proxyBytes: 2_710_000 },
+    });
+
+    await expect(provider.sessionUsage("session-that-never-existed")).resolves.toBeNull();
+  } finally {
+    harness.close();
+  }
+});
+
+test("a 429 with a long Retry-After moves the retry to that delay instead of hammering", async () => {
+  const harness = startHarness({ rateLimitFirstSessionCreates: 1, retryAfterSeconds: 300 });
+
+  try {
+    const provider = harness.buildUse();
+    const profileId = await provider.ensureProfile("user-one", "ca");
+
+    const error = await rejectionOf(
+      provider.open({
+        attemptId: "attempt-retry-after",
+        country: "ca",
+        profileId,
+        timeoutMinutes: 15,
+      }),
+    );
+
+    expect(error).toBeInstanceOf(RetryLaterError);
+
+    if (!(error instanceof RetryLaterError)) {
+      throw new TypeError("the 429 did not ask the job to wait");
+    }
+
+    expect(error.delayMs).toBe(300_000);
+    expect(harness.browserUse.rateLimitResponses).toBe(1);
+    expect(harness.browserUse.sessions).toEqual([]);
+  } finally {
+    harness.close();
+  }
+});
+
+test("402 and 403 pause the provider instead of being retried", async () => {
+  await expectProviderUnavailable(402, "no_credit");
+  await expectProviderUnavailable(403, "forbidden");
+});
+
+test("a send session trims fonts, media and tracker hosts and keeps images, scripts and captchas", async () => {
+  const harness = startHarness();
+  const weight = startProxyWeightFixture();
+
+  try {
+    const provider = harness.buildUse();
+    const profileId = await provider.ensureProfile("user-one", "ca");
+
+    const remote = await provider.open({
+      attemptId: "attempt-proxy-trim",
+      country: "ca",
+      profileId,
+      timeoutMinutes: 15,
+    });
+
+    const browser = await chromium.connectOverCDP(remote.cdpUrl);
+    const context = browser.contexts()[0] ?? (await browser.newContext());
+
+    await applySendProxyTrim(context);
+
+    const page = context.pages()[0] ?? (await context.newPage());
+
+    await page.goto(weight.url);
+
+    await expect
+      .poll(() => weight.requests().filter((request) => request.path === "/data.json").length)
+      .toBe(1);
+
+    const reached = weight.requests();
+    const reachedPaths = reached.map((request) => request.path);
+    const reachedHosts = reached.map((request) => request.host);
+
+    expect(reachedPaths).toContain("/");
+
+    for (const path of ALLOWED_WEIGHT_PATHS.filter((entry) => entry !== "/")) {
+      expect(reachedPaths).toContain(path);
+    }
+
+    expect(reachedHosts).toContain("hcaptcha.com");
+    expect(reachedHosts).not.toContain("www.doubleclick.net");
+    expect(reachedHosts).not.toContain("clarity.ms");
+
+    for (const path of TRIMMED_WEIGHT_PATHS) {
+      expect(reachedPaths).not.toContain(path);
+    }
+
+    expect(weight.bytesServed()).toBeGreaterThanOrEqual(allowedWeightBytes);
+    expect(weight.bytesServed()).toBeLessThan(allowedWeightBytes + trimmedWeightBytes);
+
+    await browser.close();
+    await remote.close();
+
+    weight.reset();
+
+    const control = await provider.open({
+      attemptId: "attempt-proxy-control",
+      country: "ca",
+      profileId,
+      timeoutMinutes: 15,
+    });
+
+    const controlBrowser = await chromium.connectOverCDP(control.cdpUrl);
+    const controlContext = await controlBrowser.newContext();
+    const controlPage = await controlContext.newPage();
+
+    await controlPage.goto(weight.url);
+
+    await expect
+      .poll(() => weight.requests().filter((request) => request.path === "/data.json").length)
+      .toBe(1);
+
+    const untrimmed = weight.requests();
+    const untrimmedPaths = untrimmed.map((request) => request.path);
+    const untrimmedHosts = untrimmed.map((request) => request.host);
+
+    expect(untrimmedPaths).toContain("/");
+
+    for (const path of [...ALLOWED_WEIGHT_PATHS, ...TRIMMED_WEIGHT_PATHS].filter(
+      (entry) => entry !== "/",
+    )) {
+      expect(untrimmedPaths).toContain(path);
+    }
+
+    expect(untrimmedHosts).toContain("www.doubleclick.net");
+    expect(untrimmedHosts).toContain("clarity.ms");
+
+    await controlBrowser.close();
+    await control.close();
+  } finally {
+    weight.close();
     harness.close();
   }
 });
@@ -216,6 +446,11 @@ test("a Kernel session runs the same port, keeps its own profile and reports upt
     expect(usage.proxyBytes).toBe(0);
     expect(harness.kernel.deletedSessionIds).toContain(remote.sessionId);
     expect(harness.kernel.deletedAttemptIds).toContain("attempt-kernel-1");
+
+    await expect(provider.sessionUsage(remote.sessionId)).resolves.toEqual({
+      status: "stopped",
+      usage: { browserMs: 556_000, costMicros: 28_800, proxyBytes: 0 },
+    });
 
     const replay = await provider.view(remote.sessionId);
 
