@@ -47,12 +47,12 @@ jobs:
         if: steps.guard.outputs.skip != 'true'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-          REQUIRE_SES_SECRETS: ${{ vars.REQUIRE_SES_SECRETS }}
+          REQUIRE_CLOUDFLARE_EMAIL_SECRETS: ${{ vars.REQUIRE_CLOUDFLARE_EMAIL_SECRETS }}
         run: |
           set -euo pipefail
           required="R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET_BACKUPS R2_BUCKET_FILES BETTER_AUTH_SECRET OWNER_EMAIL TURNSTILE_SITE_KEY TURNSTILE_SECRET MASTER_KEY_V1"
-          if [ "${REQUIRE_SES_SECRETS:-}" = "true" ]; then
-            required="$required AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION"
+          if [ "${REQUIRE_CLOUDFLARE_EMAIL_SECRETS:-}" = "true" ]; then
+            required="$required CLOUDFLARE_EMAIL_API_TOKEN CLOUDFLARE_ACCOUNT_ID"
           fi
           present="$(flyctl secrets list -a overture-web --json | jq -r '.[].name')"
           missing=""

@@ -49,13 +49,13 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    Resume and Facts (M1-13) add `MASTER_KEY_V1`, generated with `openssl rand -base64 32`
    (base64 that decodes to exactly 32 bytes), never rotated without the re-wrap step that
    re-wraps every user's data key under the new master key.
-   Outbound mail (M1-90) adds `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_REGION=ca-central-1`,
-   plus optionally `SES_CONFIGURATION_SET`; the three AWS names are set together or not at all, and the SES section
-   below covers them. With none of them the in-memory sink is used, as in development and tests.
+   Outbound mail (M1-90) adds `CLOUDFLARE_EMAIL_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; the pair is set together or
+   not at all, and the Cloudflare section below covers them. With neither the in-memory sink is used, as in development
+   and tests.
    The server refuses to boot without the required ones, so the **Deploy** workflow checks each required
    name with `fly secrets list` first and fails before deploying when one is missing; production keeps its
-   current release. The OAuth names are not in that check, and the SES names join it only once
-   `REQUIRE_SES_SECRETS` is set (M1-90 section below). Later milestones add their own secrets the same way and to that list; nothing
+   current release. The OAuth names are not in that check, and the Cloudflare mail names join it only once
+   `REQUIRE_CLOUDFLARE_EMAIL_SECRETS` is set (M1-90 section below). Later milestones add their own secrets the same way and to that list; nothing
    else exists in `fly.toml`.
 6. Create a deploy token (Full permissions on the app) and store it as a repository secret:
    `gh secret set FLY_API_TOKEN -b <token-in-your-terminal> -R a-hagi613/overture`
@@ -69,85 +69,61 @@ maps the `FLY_API_TOKEN` repository secret to an environment variable and skips 
 successfully, with a `::notice::` annotation and a job summary pointing at this document. The weekly
 drill and every merge-to-`main` deploy therefore stay green while the one-time steps are pending.
 
-## M1-90: outbound mail through Amazon SES (owner runbook)
+## M1-90: outbound mail through Cloudflare Email Sending (owner runbook)
 
-Overture's own mail (magic links first, later verification, digests and receipts) leaves from
-`no-reply@tryoverture.com` through Amazon SES v2 in `ca-central-1` ([issue #90](https://github.com/a-hagi613/overture/issues/90),
-SPEC §11, ADR 0028). The app selects the SES adapter only when `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and
-`AWS_REGION` are all set; `SES_CONFIGURATION_SET` (a configuration set name) is optional. With none of them it keeps the
-in-memory sink used in development and tests. A partly set trio, or `SES_CONFIGURATION_SET` on its own, stops the server at
-boot with a message naming the missing variables.
+Overture's own mail (magic links first, later verification, digests, receipts and "ready to send" notices) leaves from
+`no-reply@tryoverture.com` through Cloudflare Email Sending ([issue #90](https://github.com/a-hagi613/overture/issues/90),
+SPEC §11, ADR 0028, `docs/research/cloudflare-email-sending.md`). The app selects the Cloudflare adapter only when
+`CLOUDFLARE_EMAIL_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are both set. With neither it keeps the in-memory sink used in
+development and tests. A half-set pair stops the server at boot with a message naming the missing variable.
 
-### DNS records for `tryoverture.com`
+Email Sending is in Beta and Cloudflare's terms call Beta Services "intended for testing purposes only"; the owner
+accepted that risk for sign-in mail on 2026-11-21 (ADR 0028). Sending to arbitrary recipients needs the **Workers Paid**
+plan: 3,000 emails a month included, then $0.35 per 1,000.
 
-Create these in Cloudflare DNS (DNS only, never proxied) and wait until the SES console shows the domain identity as
-verified. The three DKIM CNAME names and values are exactly the ones SES generates for the identity; the table shows
-their shape.
+### Onboarding the sending domain
+
+In the Cloudflare dashboard, **Compute → Email Service → Email Sending → Onboard Domain**, choose `tryoverture.com`
+and review the records Cloudflare will add. `tryoverture.com` is already on Cloudflare DNS, which the service requires.
+Onboarding adds these records on the `cf-bounce` subdomain:
 
 | Type | Name | Value |
 |---|---|---|
-| CNAME | `<token-1>._domainkey.tryoverture.com` | `<token-1>.dkim.amazonses.com` |
-| CNAME | `<token-2>._domainkey.tryoverture.com` | `<token-2>.dkim.amazonses.com` |
-| CNAME | `<token-3>._domainkey.tryoverture.com` | `<token-3>.dkim.amazonses.com` |
-| TXT | `tryoverture.com` | `v=spf1 include:amazonses.com include:_spf.mx.cloudflare.net ~all` |
-| TXT | `_dmarc.tryoverture.com` | `v=DMARC1; p=reject; rua=mailto:hello@tryoverture.com` |
-| MX | `bounce.tryoverture.com` | `10 feedback-smtp.ca-central-1.amazonses.com` |
-| TXT | `bounce.tryoverture.com` | `v=spf1 include:amazonses.com ~all` |
+| MX | `cf-bounce.tryoverture.com` | `route1.mx.cloudflare.net`, `route2…`, `route3…` (priorities assigned by Cloudflare) |
+| TXT | `cf-bounce.tryoverture.com` | `v=spf1 include:_spf.mx.cloudflare.net ~all` |
+| TXT | `cf-bounce._domainkey.tryoverture.com` | `v=DKIM1; h=sha256; k=rsa; p=…` (Cloudflare generates and manages the key) |
+| TXT | `_dmarc.tryoverture.com` | Cloudflare adds `v=DMARC1; p=reject;` only when no DMARC record exists; an existing record is kept |
 
-- The apex must keep **exactly one** SPF TXT record. If Cloudflare Email Routing already created one, add
-  `include:amazonses.com` to that record instead of creating a second. Email Routing's MX records are unrelated to
-  outbound mail and stay where they are.
-- `_dmarc.tryoverture.com` may already exist (SPEC §3.3); keep one record and use `p=reject` with a reporting address
-  the owner reads.
-- In SES, set the identity's **Custom MAIL FROM domain** to `bounce.tryoverture.com`. SES then uses that subdomain's
-  MX and SPF record, and DKIM keeps the signature aligned with the visible `tryoverture.com` From address.
+The apex MX, the apex SPF include and the `cf2024-1._domainkey` DKIM record belong to Email Routing and the inbound
+Worker; Email Sending does not touch them. DNS usually propagates in 5–15 minutes for Cloudflare-hosted domains, up to
+24 hours globally. The `cf-bounce` records stay managed by Email Sending for the life of the domain configuration.
 
-### IAM policy
+### API token and Fly secrets
 
-Create an IAM user whose access key lives only in Fly secrets, and attach only this policy (replace the account id).
-It grants `ses:SendEmail` on the sending identity and nothing else; no S3 or SNS permission is needed (ADR 0028 keeps
-inbound mail off AWS).
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "SendOvertureMail",
-      "Effect": "Allow",
-      "Action": "ses:SendEmail",
-      "Resource": "arn:aws:ses:ca-central-1:<account-id>:identity/tryoverture.com"
-    }
-  ]
-}
-```
-
-Create a configuration set such as `overture-outbound` in `ca-central-1` and pass its name as `SES_CONFIGURATION_SET`. It
-carries no event destination in M1: no SNS, no `POST /internal/ses/events`.
-
-### Fly secrets, the deploy gate and the sandbox
+Create a Cloudflare API token with the **Email Sending: Edit** permission (API name `Email Sending Write`), preferably
+scoped to this account, and note the account id from the dashboard. Put both on the app:
 
 ```sh
-fly secrets set AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… AWS_REGION=ca-central-1 SES_CONFIGURATION_SET=overture-outbound -a overture-web
+fly secrets set CLOUDFLARE_EMAIL_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… -a overture-web
 ```
 
-The **Deploy** workflow lists the three AWS names in its required-secret gate, behind the repository variable
-`REQUIRE_SES_SECRETS`, so the gate stays green until production relies on SES. Once the secrets above exist, flip it:
+The server sends with a bearer token by `fetch`; no SDK and no configuration set are involved.
+
+### The deploy gate
+
+The **Deploy** workflow lists the two Cloudflare names in its required-secret gate, behind the repository variable
+`REQUIRE_CLOUDFLARE_EMAIL_SECRETS`, so the gate stays green until production relies on Cloudflare. Once the secrets
+above exist, flip it:
 
 ```sh
-gh variable set REQUIRE_SES_SECRETS -b true -R a-hagi613/overture
+gh variable set REQUIRE_CLOUDFLARE_EMAIL_SECRETS -b true -R a-hagi613/overture
 ```
-
-While the AWS account is in the SES sandbox, only verified recipients receive mail: verify the owner's address in the
-SES console, which is enough for M1 sign-in. SES production access is requested on day one (SPEC §19 risk table); until
-it is granted, the daily mail live check can only pass for a verified recipient. Resend stays the documented emergency
-fallback behind `MailSender` if SES production access is denied or slow.
 
 ### Verifying
 
 Request a sign-in link at `https://tryoverture.com/signin`, confirm it arrives from `no-reply@tryoverture.com`, and
-open it to sign in. Development and the e2e suite never call AWS: ADR 0013 intercepts the SES API inside the app
-process with MSW and asserts the request body.
+open it to sign in. Development and the e2e suite never call Cloudflare: ADR 0013 intercepts the send endpoint inside
+the app process with MSW and asserts the request body.
 
 ## Verifying the acceptance criteria
 

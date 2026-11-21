@@ -47,7 +47,10 @@ import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { clearSinkMail, listSinkMail } from "../platform/mail/sink.ts";
-import { clearSesRequests, listSesRequests } from "../testing/ses-recorder.ts";
+import {
+  clearCloudflareEmailRequests,
+  listCloudflareEmailRequests,
+} from "../testing/cloudflare-email-recorder.ts";
 import { getTestSpans, resetTestSpans } from "../platform/telemetry/otel.ts";
 import { releaseBlockingJobs } from "../testing/blocking-job.ts";
 import { setTurnstileScenario, turnstileScenarioBody } from "../testing/turnstile-scenario.ts";
@@ -1545,10 +1548,12 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
-  routes.get("/ses", (context) => context.json({ requests: listSesRequests() }));
+  routes.get("/cloudflare-email", (context) =>
+    context.json({ requests: listCloudflareEmailRequests() }),
+  );
 
-  routes.post("/ses/clear", (context) => {
-    clearSesRequests();
+  routes.post("/cloudflare-email/clear", (context) => {
+    clearCloudflareEmailRequests();
 
     return context.json({ ok: true });
   });

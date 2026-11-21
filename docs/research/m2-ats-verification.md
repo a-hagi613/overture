@@ -239,6 +239,9 @@ public feed first.
 **Verdict: not generally available (Beta); the price is right only when restated; DKIM and our sender domain are
 fine; the terms make it unusual for production auth mail today.**
 
+**Superseded 2026-11-21.** The owner accepted the Beta terms and moved all Overture mail to Cloudflare; the rebuild is
+in `docs/research/cloudflare-email-sending.md` and ADR 0028. The evidence below stands as the 2026-11-20 reading.
+
 **Evidence — GA.** <https://developers.cloudflare.com/email-service/> (page updated 2026-10-15, read 2026-11-20):
 
 > **Email Sending** Beta sends outbound transactional emails. Available on Workers Paid plan
@@ -303,7 +306,7 @@ board read was Personio's own two-position board, once per language. No personal
 | **Gem** | Public per-company job-board JSON API, no key for reads, no published limit; terms restrict copying | **Defer**; second choice behind Pinpoint, needs a vanity-path list |
 | **Pinpoint** | Public per-company `postings.json`, no key, no published limit, English fallback; terms restrict republishing | **Defer** as the first Recruitee replacement candidate; needs a subdomain list and an employer opt-out |
 | **Discovery licences** | ats-scrapers MIT, freehire MIT, open-jobs CC0, ats-directory CC0; yc-oss unlicensed; job-board-aggregator data CC BY-NC; SimplifyJobs unlicensed | **Build** the weekly merge from the four permitted lists only; record the excluded three in the ingester and its NOTICE |
-| **Cloudflare Email Sending** | Beta, not GA; $5 Workers Paid includes 3,000 then $0.35/1k; DKIM works; transactional only | **Do not use** for #90; keep SES and revisit at GA |
+| **Cloudflare Email Sending** | Beta, not GA; $5 Workers Paid includes 3,000 then $0.35/1k; DKIM works; transactional only | **Adopted 2026-11-21** for #90 and all Overture mail, accepting the Beta terms (owner decision; `docs/research/cloudflare-email-sending.md`) |
 
 Consequences the ADR has not yet recorded:
 

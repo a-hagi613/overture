@@ -112,10 +112,17 @@ repeat-application throttles.
   M1 and M2, not by guesses.
 - **Users who skip the forwarding filter (M2).** The 10-minute paste fallback (a phone notification, then paste the
   code) has to be quick, so it is designed as a first-class path, not an error screen.
-- **Outbound sign-in mail (#90).** Magic links go through SES from `no-reply@tryoverture.com`, behind
-  `MailSender`. Cloudflare Email Sending was considered, but it is in Beta ("intended for testing purposes only",
-  <https://www.cloudflare.com/terms/>, <https://developers.cloudflare.com/email-service/>, read 2026-11-20), so it is
-  revisited when it becomes generally available.
+- **Outbound sign-in mail (#90).** Magic links go through Cloudflare Email Sending from
+  `no-reply@tryoverture.com`, behind `MailSender`, over its REST API (`fetch`, `CLOUDFLARE_EMAIL_API_TOKEN` and
+  `CLOUDFLARE_ACCOUNT_ID`). The owner decided on 2026-11-21 that Cloudflare is the one mail provider: inbound already
+  runs on Email Routing and the Worker, and SES and Resend are dropped. The service is still in Beta, and Cloudflare's
+  terms say Beta Services are "intended for testing purposes only"
+  (<https://www.cloudflare.com/terms/>, <https://developers.cloudflare.com/email-service/>, read 2026-11-21); the owner
+  accepts that risk for production sign-in. Sending to arbitrary recipients needs the Workers Paid plan (3,000 emails
+  a month included, then $0.35 per 1,000) and an onboarded sending domain, which adds bounce MX, SPF and DKIM records on
+  `cf-bounce.tryoverture.com` and leaves the Email Routing records on the apex alone. The sink stays the test and
+  development adapter, and a half-set pair of Cloudflare names stops the server at boot. Details and quotes:
+  `docs/research/cloudflare-email-sending.md`.
 
 ## Checked before building (M2 and discovery)
 

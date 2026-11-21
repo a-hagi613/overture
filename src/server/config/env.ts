@@ -85,10 +85,9 @@ const envSchema = z
       .min(1)
       .regex(/^[a-z0-9.-]+$/u)
       .default("tryoverture.com"),
-    AWS_ACCESS_KEY_ID: z.string().min(1).optional(),
-    AWS_SECRET_ACCESS_KEY: z.string().min(1).optional(),
-    AWS_REGION: z.literal("ca-central-1").optional(),
-    SES_CONFIGURATION_SET: z.string().min(1).optional(),
+    CLOUDFLARE_EMAIL_API_TOKEN: z.string().min(1).optional(),
+    CLOUDFLARE_ACCOUNT_ID: z.string().min(1).optional(),
+    CLOUDFLARE_EMAIL_API_BASE_URL: z.url().default("https://api.cloudflare.com/client/v4"),
     INBOUND_HMAC_SECRET: z.string().min(16).optional(),
     INBOUND_DNS_SERVER: z.string().min(1).optional(),
     ALERT_NTFY_URL: z.url().optional(),
@@ -155,24 +154,19 @@ const envSchema = z
       }
     }
 
-    const sesNames = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"] as const;
-    const sesPresent = sesNames.filter((name) => value[name] !== undefined);
-
-    if (sesPresent.length > 0 && sesPresent.length < sesNames.length) {
+    if (
+      (value.CLOUDFLARE_EMAIL_API_TOKEN === undefined) !==
+      (value.CLOUDFLARE_ACCOUNT_ID === undefined)
+    ) {
       context.addIssue({
         code: "custom",
         message:
-          "AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_REGION are set together or not at all: all three send mail through SES, none uses the sink.",
-        path: ["AWS_ACCESS_KEY_ID"],
-      });
-    }
-
-    if (value.SES_CONFIGURATION_SET !== undefined && sesPresent.length < sesNames.length) {
-      context.addIssue({
-        code: "custom",
-        message:
-          "SES_CONFIGURATION_SET needs AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_REGION.",
-        path: ["SES_CONFIGURATION_SET"],
+          "CLOUDFLARE_EMAIL_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are set together or not at all: both send mail through Cloudflare Email Sending, neither uses the sink.",
+        path: [
+          value.CLOUDFLARE_EMAIL_API_TOKEN === undefined
+            ? "CLOUDFLARE_EMAIL_API_TOKEN"
+            : "CLOUDFLARE_ACCOUNT_ID",
+        ],
       });
     }
 
