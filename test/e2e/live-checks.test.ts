@@ -1,5 +1,8 @@
 import { Buffer } from "node:buffer";
 import { generateKeyPairSync } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { request as apiRequest, expect, test } from "@playwright/test";
 import type { APIRequestContext } from "@playwright/test";
@@ -438,6 +441,46 @@ test("a failing browser, Haiku and storage each record a failure instead of hidi
     await brokenApp.stop();
     await failingBrowser.stop(true);
     await failingAnthropic.stop(true);
+  }
+});
+
+test("a degraded flag makes the storage check skip its R2 round trip and record why", async () => {
+  const objectRoot = mkdtempSync(join(tmpdir(), "overture-degraded-"));
+
+  const degradedApp = await startFreshAppServer(identityServer(), {
+    OBJECT_STORE_ROOT: objectRoot,
+  });
+
+  mkdirSync(join(objectRoot, "ops"), { recursive: true });
+
+  writeFileSync(
+    join(objectRoot, "ops/degraded.json"),
+    JSON.stringify({
+      version: 1,
+      degraded: true,
+      since: "2026-11-21T15:00:00.000Z",
+      metrics: [
+        { metric: "r2.class_a_operations", used: 950_000, allowance: 1_000_000, share: 0.95 },
+      ],
+    }),
+  );
+
+  try {
+    await runJob("live.check", JSON.stringify({ groups: ["r2"] }), degradedApp.url);
+
+    const results = await liveCheckResults(degradedApp.url);
+    const r2 = results.find((row) => row.check === "r2");
+
+    expect(r2?.ok).toBe(true);
+    expect(r2?.detail["skipped"]).toBe("degraded");
+    expect(existsSync(join(objectRoot, "live-checks"))).toBe(false);
+
+    const logged = await degradedApp.waitForStderr(/r2 live check skipped while degraded/u);
+
+    expect(logged).toContain("non-essential write");
+  } finally {
+    await degradedApp.stop();
+    rmSync(objectRoot, { recursive: true, force: true });
   }
 });
 

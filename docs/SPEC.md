@@ -788,7 +788,10 @@ undone: picks `k = min(remaining_today, approved count)` random times in the rem
 08:00–20:00 window, at least 20 minutes apart, and assigns them in approval order. A later approval is planned after
 the latest slot already held, so sends stay in approval order. Undoing an approval frees its slot. Approval never
 bypasses pacing, the company cooldown, the crowd limits or the caps; the daily cap counts sends, not approvals.
-Outside the window nothing is sent; leftovers roll to tomorrow's planning. A retry's earliest time (§9.4) is a lower
+Outside the window nothing is sent; leftovers roll to tomorrow's planning. The same run plans a leftover
+into the following windows (up to `limits.daily_cap` a day, in approval order) rather than leaving it
+unscheduled until the next midnight planner, so a slot that landed at the end of a window cannot strand
+the next approval. A retry's earliest time (§9.4) is a lower
 bound: the planner gives it the first free slot at or after that time inside a window.
 
 ### 9.3 Dispatcher
@@ -1086,6 +1089,19 @@ body, sender or attachment, so the admin never sees message content.
   applications over 30 days (no card). A sign-in with any other email is refused with the same copy for every method; an
   invite can be revoked until accepted; a suspended user cannot sign in. An accepted invite lands in onboarding after
   sign-in until its steps are finished; the owner and legacy accounts go to Home, whose setup banner opens onboarding. M3 public.
+- **Demo account** (`DEMO_LOGIN_ENABLED=true`, off by default): entering `test@email.com` on the sign-in page signs in
+  as the demo user with one click and sends no mail; with the flag off the same email is refused like any other. The
+  demo is seeded idempotently (`bun run db:seed-demo`, or on its first sign-in) with fictional facts, a resume,
+  targets, ~4 months of Applications across every status and Stage, Ready cards, Reviews, Inbox mail, notifications,
+  Check-ins and an admin grant with its ledger. Role `demo` never sends: the dispatcher, the executor, preparation,
+  push, every outbound mail and the Check-in sweep skip it, no ATS or Browser Use call is made for it, it reads only
+  its own rows, and it is left out of admin counts and the M1 provider report. Its sessions expire after 24 h, and up
+  to 20 visitors may hold one at once (the oldest is evicted). The demo is read-only: every non-GET `/api` call except
+  sign-in and sign-out returns a 403 that points at a real account, so shared demo data cannot be changed, and the
+  cost-bearing posting read is refused the same way; better-auth account mutations (email, password, linked accounts,
+  session revocation and deletion) are refused too. In production a startup check logs the enablement and the
+  guarantees, and refuses to start if `test@email.com` belongs to a non-demo role; the seed runs once at boot and only
+  completes on sign-in when it is missing. Turnstile still applies to its sign-in endpoint.
 
 ### 13.2 Encryption and deletion
 
@@ -1156,6 +1172,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Review | `GET /api/reviews` · `POST /api/reviews/:id/answer` · `POST /api/reviews/:id/dismiss` |
 | Check-ins | `POST /api/checkins/:id` `{answer}` |
 | Inbox | `GET /api/threads` · `GET /api/threads/:id` · `GET /api/attachments/:id` · `POST /api/messages/:id/read` · `GET /api/mail/code-waits` · `POST /api/mail/code-waits/:id` (paste a code) |
+| Calendar | `GET /api/calendar?from&to` (signed in only, `Cache-Control: no-store`; at most 42 days, counted in the user's timezone: every Sent Application, Stage move and Check-in with its job, employer and Stage, ordered by time; the response carries the user's `timeZone` so the client buckets days the same way; no mail body and no answers) |
 | Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/mailbox` (read-only address, `forwardingWorks`, `firstForwardedAt`) · `GET/PUT /api/profile/strengthen` (the Tier 2 Facts that would unlock queued Applications, each with its count; answering saves the Fact and resolves the Reviews it answers) |
 | Consent | `GET /api/consent` (public current version and text; the signed-in user's accepted version and date) · `GET /api/consent/versions` (every published version, newest first) · `POST /api/consent/accept` `{version}` (refuses `version_changed` when a newer version is published) |
 | Onboarding | `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET/PUT /api/onboarding/targets` (the "What you want" step: the saved Targets, the choices that have open Postings, and the live count) · `PUT /api/onboarding/timezone` (the browser's zone through the seven-day rule) · `GET /api/onboarding` (the step, `onboarded_at`, pause reason, current resume, skip list and whether an invited user must onboard) · `POST /api/onboarding/:step` (records a finished step and returns the state; step 2 refuses without a resume) · `POST /api/onboarding/address/accept` (M2) |
@@ -1165,7 +1182,9 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
-`home.updated`, `notification`. TanStack Query invalidates by topic.
+`home.updated`, `notification`. TanStack Query invalidates by topic. The Calendar needs no topic of its own: it
+invalidates on `application.updated` and `board.moved`, and gains `calendar.updated` only with interview dates read
+from mail (#296, ADR 0034).
 
 ---
 
@@ -1300,6 +1319,13 @@ in-app `alert.raised` event plus a notification for every owner; with `ALERT_NTF
 to the owner's phone. No Grafana is provisioned by this repository; dashboards stay with the owner's Grafana account
 and read the OTLP endpoint. `live.check` computes the same thresholds from the app database and machine and records
 each one, and the test-only drill route fires every alert kind.
+
+Two of those alerts do not depend on the app being up, because they come from the sentinel Worker
+(`workers/sentinel`, ADR 0033): the health probe calls `/api/health` from outside Fly, and the Workable snapshot's
+age is judged from `workable/manifest.json` in R2. The same Worker compares month-to-date R2, Queues and Workers
+usage with each allowance, pushes at 70 % and, at 90 %, writes `ops/degraded.json`; the app reads it through
+`src/server/platform/degraded.ts`, runs `email_classify` rules-only, skips the live-check R2 round trip, and logs
+each change of state with the metrics that caused it.
 
 ---
 

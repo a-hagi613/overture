@@ -10,6 +10,7 @@ import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
 
 import { env } from "../config/env.ts";
+import { demoLocked } from "../demo/guard.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
 import { createFactService } from "../profile/facts.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
@@ -96,6 +97,12 @@ export function createProfileRoutes(deps: {
       return context.json({ error: "unauthorised" }, 401);
     }
 
+    const locked = demoLocked(account.role);
+
+    if (locked !== null) {
+      return locked;
+    }
+
     const form = uploadSchema.parse({
       file: (await context.req.formData()).get("file"),
     });
@@ -138,6 +145,12 @@ export function createProfileRoutes(deps: {
       return context.json({ error: "unauthorised" }, 401);
     }
 
+    const locked = demoLocked(account.role);
+
+    if (locked !== null) {
+      return locked;
+    }
+
     const file = await resumesService.currentFileBytes(account.id);
 
     if (file === null) {
@@ -169,7 +182,21 @@ export function createProfileRoutes(deps: {
       return context.json({ error: "unauthorised" }, 401);
     }
 
-    const body = factsSchema.parse(await context.req.json());
+    let raw: unknown;
+
+    try {
+      raw = await context.req.json();
+    } catch {
+      return context.json({ error: "invalid_json" }, 400);
+    }
+
+    const parsed = factsSchema.safeParse(raw);
+
+    if (!parsed.success) {
+      return context.json({ error: "invalid_request", issues: parsed.error.issues }, 400);
+    }
+
+    const body = parsed.data;
 
     const saved = (
       await Promise.all(

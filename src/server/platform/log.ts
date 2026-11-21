@@ -6,6 +6,10 @@ function describe(cause: unknown) {
   return String(cause);
 }
 
+export function logInfo(scope: string, message: string) {
+  process.stderr.write(`overture ${scope}: ${message}\n`);
+}
+
 export function logError(scope: string, cause: unknown) {
   process.stderr.write(`overture ${scope}: ${describe(cause)}\n`);
 }

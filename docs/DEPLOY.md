@@ -13,7 +13,7 @@ No secret value ever appears in this repository: secrets are set with `fly secre
 |---|---|
 | `Dockerfile` | Multi-stage build on Bun 1.4: installs, builds the SPA (`dist/`), ships a slim runtime with Litestream 0.5.18 (checksum-verified) |
 | `scripts/docker-entrypoint.sh` | On start: Litestream restores `/data/app.sqlite` from the replica if it does not exist, then runs `litestream replicate -exec "bun run /app/src/server/main.ts"`; migrations run inside `main.ts` |
-| `litestream.yml` | Continuous replication (1 s sync) to R2 `overture-backups`, nightly snapshot (`interval: 24h`) kept 30 days (`retention: 720h`) |
+| `litestream.yml` | Continuous replication (1 s sync) to R2 `overture-backups`, nightly snapshot (`interval: 24h`) kept 30 days (`retention: 720h`); the L0 retention check runs every 5 minutes so its ListObjects cost stays bounded (#281) |
 | `fly.toml` | App `overture-web`, region `yyz`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health` |
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`) and a `restore-drill` job (Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations) |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: `flyctl deploy --remote-only` with `FLY_API_TOKEN`, then polls the production health route |
@@ -35,6 +35,8 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    Object Read & Write scoped to that bucket. Note the account ID, access key ID and secret access key.
    The encrypted files bucket is a second R2 bucket named `overture-files`; `R2_BUCKET_FILES` is required
    alongside the other R2 names. The bucket exists and the secret is set on `overture-web`.
+   Add the 35-day lifecycle rule on `overture-backups` (prefix `app.sqlite/`) and the 8 GB storage alert;
+   the exact commands, the JSON and the read-backs are in `docs/research/cloudflare-spend-guard-runbook.md` §7.
 5. Set only the backup and app secrets on the app (values come from the previous step, never the repo):
    `fly secrets set R2_ACCOUNT_ID=… R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… R2_BUCKET_BACKUPS=overture-backups R2_BUCKET_FILES=overture-files -a overture-web`
    With `R2_BUCKET_FILES` set the app stores encrypted resumes and mail in R2, and a half-set R2 files config (the
@@ -213,7 +215,8 @@ minutes; re-run `--check` until it prints `verdict: ready`.
   Lag: `curl -fsS https://overture-web.fly.dev/api/health | jq .backups` →
   `{"replication":"ok","lagSeconds":<n>,"replicaTxid":"…","readAgeSeconds":<n>}`. `lagSeconds` measures how
   far the replica (`replicaTxid`) is behind the local database. The server reads the replica's newest
-  transaction id and the local database's transactions (`litestream ltx -level all`) in the background every
+  transaction id (one level at a time from level 0, which holds the newest file, so a healthy replica costs
+  one R2 list per read) and the local database's transactions (`litestream ltx -level all`) in the background every
   `backups.replica_read_interval_ms` (default `30000`, changed in Settings). `/api/health` only serves that
   cached reading and never runs litestream, so it answers in milliseconds even when the R2 listing is slow.
   `readAgeSeconds` is how old that reading is. `lagSeconds` is `0` when the replica holds every local
@@ -378,6 +381,47 @@ more than 20 % from the previous run; `workflow_dispatch` with `--allow-row-drop
 ingests the manifest at 05:00 UTC in `catalog.workable`, behind the `ats`/`workable` kill switch, which stays on until
 the 20-form probe (#235). The alerts are `workable.feed` for a missing snapshot, one older than 26 hours, a row drop
 or a failed ingest, and the GitHub job itself fails loudly.
+
+## The sentinel Worker (#283)
+
+`workers/sentinel` is a cron Worker that watches Overture from outside Fly (ADR 0033). Every ten minutes it probes
+`https://tryoverture.com/api/health`, reads `workable/manifest.json` from the `overture-files` bucket, and reads
+month-to-date R2, Queues and Workers usage from the Cloudflare GraphQL Analytics API. It pushes to
+`ALERT_NTFY_URL` at 70 % of an allowance and at 90 % writes `ops/degraded.json`, which the app reads and logs: mail
+classification goes rules-only and the live-check R2 round trip is skipped. It never revokes an R2 token — that would
+stop Litestream.
+
+```sh
+cd workers/sentinel
+bunx wrangler secret put ALERT_NTFY_URL          # the owner's ntfy topic
+bunx wrangler secret put CLOUDFLARE_ACCOUNT_TAG  # the 32-character account tag
+bunx wrangler secret put CLOUDFLARE_ANALYTICS_TOKEN # token with Account Analytics: Read
+bunx wrangler deploy
+```
+
+`workers/sentinel/README.md` has the thresholds, the alert keys and the monthly invocation budget. The Worker has no
+public route (`workers_dev` is false) and writes no console output: each run records itself as `lastRun` inside
+`ops/sentinel-state.json`, so one command shows the last run, its alerts and any error:
+
+```sh
+bunx wrangler r2 object get overture-files/ops/sentinel-state.json --pipe
+```
+
+Cloudflare's dashboard still shows the crons' invocation and error counts; a run whose state write fails throws, so it
+appears there as an errored invocation.
+
+What each push means and what to check first:
+
+| Alert | Meaning | First check |
+|---|---|---|
+| `health` | `/api/health` failed or answered a body that is not `"status":"ok"` from outside Fly | the URL from the owner's machine, then `fly status -a overture-web` and `fly logs -a overture-web` |
+| `health.recovered` | the probe passes again | nothing; the app's own health alerts record the incident |
+| `workable` | `workable/manifest.json` is older than 26 h, missing or unparseable | the last `workable-feed` GitHub Action run, then `bunx wrangler r2 object get overture-files/workable/manifest.json --pipe` |
+| `workable.recovered` | the manifest is young again | nothing |
+| `usage.<metric>.warn` | one allowance passed 70 % | §3–§5 of `docs/research/cloudflare-spend-guard-runbook.md` |
+| `usage.degraded` | one or more allowances passed 90 %; `ops/degraded.json` is set and the app runs rules-only | the same runbook; the flag clears itself when usage drops below 90 % |
+| `usage.error` | the GraphQL analytics answer could not be read; the flag, if set, stands | `CLOUDFLARE_ANALYTICS_TOKEN` expiry and Cloudflare's status page |
+| `usage.unconfigured` | `CLOUDFLARE_ACCOUNT_TAG` or `CLOUDFLARE_ANALYTICS_TOKEN` is missing | set both secrets and redeploy |
 
 ## Capturing fixtures
 

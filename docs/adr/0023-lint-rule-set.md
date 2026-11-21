@@ -74,6 +74,9 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
   a posting, preparation marking the question cache, tag import, the retag and seed scripts, the test routes) are
   listed in `.oxlintrc.json`; adding one needs a written reason here. A new sweep write goes into
   `src/server/catalog/sweep-worker.ts` and its worker-only modules (`poll-board.ts`, `workable-ingest.ts`).
+  `src/server/demo/seed.ts` is also listed there (#278): it writes fictional catalog rows for the demo account's
+  sample Applications, never real Postings, and only when `DEMO_LOGIN_ENABLED=true` or the operator runs
+  `bun run db:seed-demo`.
 - **The off-list and every scoped override are checked.** CI fails if the rules turned off in the configuration
   differ from the table below, if an override turns a rule down or changes its options without appearing in the
   "Rules off in one folder only" table, or if that table lists an override that does not exist.
@@ -108,7 +111,7 @@ compares this table with `.oxlintrc.json`.
 
 | Rule | Where | Reason |
 |---|---|---|
-| `import/no-default-export` | `**/*.config.{ts,mts,mjs,js}`, `test/e2e/global-setup.ts`, `tools/oxlint/architecture/index.ts`, `workers/inbound-mail/src/index.ts` | Vite, Vitest, Playwright and Drizzle config files, Playwright's global setup hook, the Oxc plugin registration and the Cloudflare Email Worker entry all require a default export |
+| `import/no-default-export` | `**/*.config.{ts,mts,mjs,js}`, `test/e2e/global-setup.ts`, `tools/oxlint/architecture/index.ts`, `workers/inbound-mail/src/index.ts`, `workers/sentinel/src/index.ts` | Vite, Vitest, Playwright and Drizzle config files, Playwright's global setup hook, the Oxc plugin registration and the Cloudflare Worker entries (the Email Worker and the cron sentinel) all require a default export |
 | `node/no-process-env` | `src/server/config/env.ts`, `drizzle.config.ts`, `test/e2e/**` | `src/server/config/env.ts` is the one module that reads the process environment inside the app; the Drizzle CLI config and the e2e harness read it from outside the app |
 
 Two React options are set rather than turned off: `react/jsx-filename-extension` allows `.tsx`, and

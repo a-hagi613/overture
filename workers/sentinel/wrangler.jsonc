@@ -1,0 +1,29 @@
+{
+  "name": "overture-sentinel",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "observability": {
+    "enabled": true,
+  },
+  "limits": {
+    // A runaway loop stops long before it can spend CPU; a real run parses one GraphQL answer
+    // and is far below this. 4,320 runs a month cannot reach the 30 M CPU-ms allowance even if
+    // every run maxed the limit (ADR 0033).
+    "cpu_ms": 500,
+  },
+  "triggers": {
+    "crons": ["*/10 * * * *"],
+  },
+  "vars": {
+    "OVERTURE_HEALTH_URL": "https://tryoverture.com/api/health",
+  },
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "overture-files",
+    },
+  ],
+  // The Worker only answers cron triggers; no public route or workers.dev hostname.
+  "workers_dev": false,
+}
