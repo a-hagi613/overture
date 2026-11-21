@@ -21,6 +21,9 @@ probe waits for the orchestrator's capture (see the ask on issue #235). The fiel
 must exercise: standard text and email fields, a resume upload, a boolean screening question, a dropdown, and a
 consent question.
 
+A `group` control (education, experience) is not in the fixture: the reader skips it whole, because it is a
+repeatable compound rather than one answerable control, and a required group stops the send as a form change.
+
 The e2e fixture server renders its page from that same JSON, so the plain read and the page cannot drift apart in a
 test; the form-change test omits one field from the rendered page only. When the real recordings arrive, replace this
 file with them (and the rendered page with the recorded page) before turning Workable's kill switch off.

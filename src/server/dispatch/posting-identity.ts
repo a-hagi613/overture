@@ -141,16 +141,16 @@ export async function checkPostingIdentity(page: Page, expected: PostingIdentity
     return mismatch("unreadable");
   }
 
-  if (livePosting.jobId !== expected.jobId) {
-    return mismatch("job_id");
-  }
-
   if (expected.ats === "workable") {
-    return matched;
+    return livePosting.jobId === expected.jobId ? matched : mismatch("job_id");
   }
 
   if (livePosting.boardToken.toLowerCase() !== expected.boardToken.toLowerCase()) {
     return mismatch("board_token");
+  }
+
+  if (livePosting.jobId !== expected.jobId) {
+    return mismatch("job_id");
   }
 
   const liveCompany = companyFromTitle(expected.ats, await page.title());

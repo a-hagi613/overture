@@ -34,6 +34,10 @@ export interface WorkableFixturesState {
   lastResumeBytes: Uint8Array | null;
   /** The field the page omits while the form endpoint still lists it, for a form-change test. */
   omitField: string | null;
+  /** Whether a successful submit shows the confirmation page; "none" keeps the form, for the confirming test. */
+  confirmation: "page" | "none";
+  /** The shortcode the last apply page was served for, so a mismatch test can point at another one. */
+  pageJobId: string | null;
 }
 
 export interface WorkableFixture {
@@ -149,7 +153,7 @@ function renderPage(
 <body>
 <main>
   <h1>${escapeHtml(title)}</h1>
-  <form class="application-form" id="application-form" data-apply-url="/api/v1/jobs/${encodeURIComponent(jobId)}/apply">
+  <form class="application-form" id="application-form" data-apply-url="/api/v1/jobs/${encodeURIComponent(jobId)}/apply" data-confirmation="${state.confirmation}">
     ${body}
     <p id="form-error" role="alert"></p>
     <button type="submit">Submit application</button>
@@ -164,6 +168,10 @@ function renderPage(
 
     if (!response.ok) {
       document.querySelector("#form-error").textContent = "The application was refused.";
+      return;
+    }
+
+    if (form.dataset.confirmation === "none") {
       return;
     }
 
@@ -189,6 +197,8 @@ export function startWorkableFixture(options: WorkableFixtureOptions = {}) {
     lastForm: {},
     lastResumeBytes: null,
     omitField: null,
+    confirmation: "page",
+    pageJobId: null,
   };
 
   const server = Bun.serve({
@@ -241,10 +251,15 @@ export function startWorkableFixture(options: WorkableFixtureOptions = {}) {
         return Response.json({ ok: true }, { status: 201 });
       }
 
-      if (path === `/j/${jobId}` && request.method === "GET") {
-        state.formLoads += 1;
+      const pageMatch = /^\/j\/(?<id>[^/]+)$/u.exec(path);
 
-        return new Response(renderPage(sections, state, jobId, title), {
+      if (pageMatch?.groups !== undefined && request.method === "GET") {
+        const pageJobId = pageMatch.groups["id"] ?? jobId;
+
+        state.formLoads += 1;
+        state.pageJobId = pageJobId;
+
+        return new Response(renderPage(sections, state, pageJobId, title), {
           headers: { "content-type": "text/html" },
         });
       }

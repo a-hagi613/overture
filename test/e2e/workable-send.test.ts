@@ -169,6 +169,7 @@ async function seededApplication(
   harness: WorkableHarness,
   facts: typeof baseFacts,
   enableWorkable = true,
+  postingUrl = `${harness.fixture.url}/j/${JOB_ID}`,
 ) {
   const { owner, userId } = await ownerFor(harness.server, enableWorkable);
 
@@ -183,7 +184,7 @@ async function seededApplication(
     boardId,
     companyId,
     title: TITLE,
-    url: `${harness.fixture.url}/j/${JOB_ID}`,
+    url: postingUrl,
   });
 
   const applicationId = await seedApplication(owner, {
@@ -387,4 +388,63 @@ test("a Workable form the plain endpoint cannot serve is captured in a browser a
     },
     (fixture) => `${fixture.url}/unavailable`,
   );
+});
+
+test("a Workable 2xx without the confirmation page stays confirming and is never called sent", async ({
+  workable,
+}) => {
+  const { applicationId, owner } = await seededApplication(workable, [
+    ...baseFacts,
+    sponsorshipFact,
+  ]);
+
+  workable.fixture.state.confirmation = "none";
+
+  await approveForSend(owner, applicationId);
+
+  const response = await runSend(owner, applicationId);
+
+  expect(response.ok()).toBe(true);
+
+  const detail = await applicationOf(owner, applicationId);
+
+  expect(detail.application.status).toBe("confirming");
+  expect(detail.snapshot).toBeNull();
+  expect(workable.fixture.state.submissions).toBe(1);
+
+  const attempts = await attemptsOf(owner, applicationId);
+
+  expect(attempts).toHaveLength(1);
+  expect(attempts[0]?.outcome).toBe("unconfirmed");
+  expect(attempts[0]?.submitClickedAt).not.toBeNull();
+});
+
+test("a Workable page whose shortcode differs from the approved plan is skipped without submitting", async ({
+  workable,
+}) => {
+  const { applicationId, owner } = await seededApplication(
+    workable,
+    [...baseFacts, sponsorshipFact],
+    true,
+    `${workable.fixture.url}/j/WK-9999`,
+  );
+
+  await approveForSend(owner, applicationId);
+
+  const response = await runSend(owner, applicationId);
+
+  expect(response.ok()).toBe(true);
+
+  const detail = await applicationOf(owner, applicationId);
+
+  expect(detail.application.status).toBe("skipped");
+  expect(detail.application.statusReason).toBe("posting_identity:job_id");
+  expect(detail.snapshot).toBeNull();
+  expect(workable.fixture.state.submissions).toBe(0);
+  expect(workable.fixture.state.pageJobId).toBe("WK-9999");
+
+  const attempts = await attemptsOf(owner, applicationId);
+
+  expect(attempts).toHaveLength(1);
+  expect(attempts[0]?.outcome).toBe("identity_mismatch");
 });

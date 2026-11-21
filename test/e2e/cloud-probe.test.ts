@@ -709,3 +709,34 @@ test("a confirmed Workable probe submits the filled form and records the confirm
     expect(form?.submitResponseStatus).toBe(201);
   });
 });
+
+test("a Workable probe whose page shows no confirmation records unconfirmed, never sent", async () => {
+  await withHarness(async (harness) => {
+    harness.workable.state.confirmation = "none";
+
+    const results = await runProbe(
+      command(harness, true, {
+        runFile: {
+          country: runFileTemplate.country,
+          postings: [workablePosting(`${harness.workable.url}/j/WK-1001`)],
+          resumePath: harness.resumePath,
+        },
+      }),
+    );
+
+    const [result] = results;
+
+    if (result === undefined) {
+      throw new Error("no result for the Workable posting");
+    }
+
+    expect(result.outcome).toBe("unconfirmed");
+    expect(result.submitted).toBe(true);
+    expect(result.confirmationSeen).toBe(false);
+    expect(harness.workable.state.submissions).toBe(1);
+
+    const [form] = storedForms(harness);
+
+    expect(form?.confirmationSeen).toBe(0);
+  });
+});

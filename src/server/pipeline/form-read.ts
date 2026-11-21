@@ -569,6 +569,8 @@ export function readAshbyGraphqlResponse(body: string) {
   } satisfies PlainFormReadResult;
 }
 
+const WORKABLE_STRUCTURAL_TYPES = new Set(["group", "hidden", "info"]);
+
 const WORKABLE_FIELD_TYPES = new Map<string, QuestionFieldType>([
   ["text", "text"],
   ["string", "text"],
@@ -638,7 +640,12 @@ export function readWorkableFormResponse(body: string) {
       const rawType = (field.type ?? "").trim().toLowerCase();
       const fieldType = WORKABLE_FIELD_TYPES.get(rawType);
 
-      if (fieldName === "" || label === "" || fieldType === undefined) {
+      if (
+        fieldName === "" ||
+        label === "" ||
+        WORKABLE_STRUCTURAL_TYPES.has(rawType) ||
+        fieldType === undefined
+      ) {
         continue;
       }
 

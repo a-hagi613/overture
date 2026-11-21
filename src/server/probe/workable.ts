@@ -150,11 +150,9 @@ export async function probeWorkable(
   const confirmationSeen =
     status !== null && status < 400 ? await workableConfirmationSeen(page) : false;
 
-  const accepted = status !== null && status >= 200 && status < 300;
-
   let outcome: WorkableAttempt["outcome"] = "unconfirmed";
 
-  if (confirmationSeen || accepted) {
+  if (confirmationSeen) {
     outcome = "sent";
   } else if (status !== null && status >= 400) {
     outcome = "blocked";
