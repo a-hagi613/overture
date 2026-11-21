@@ -5,8 +5,8 @@ status: accepted
 # A Calendar destination: our own month grid over existing events
 
 Draft from `docs/research/calendar.md`. The owner drew and published the boards (#292) and opened the build tickets
-(#293–#297); it is built in slices: the boards and `GET /api/calendar` are done, the page, phone agenda and interview
-dates from mail follow.
+(#293–#297); it is built in slices, and every slice is now in: the boards and `GET /api/calendar`, the page and phone
+agenda (#380), and interview dates from mail (#296).
 
 ## Context
 

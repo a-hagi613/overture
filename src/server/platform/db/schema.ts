@@ -904,6 +904,32 @@ export const applicationEvents = sqliteTable(
   (t) => [index("application_events_application_at").on(t.applicationId, t.at)],
 );
 
+export const interviewEvents = sqliteTable(
+  "interview_events",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    messageId: text("message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    uid: text("uid").notNull(),
+    sequence: integer("sequence").notNull().default(0),
+    startsAt: integer("starts_at").notNull(),
+    endsAt: integer("ends_at"),
+    tz: text("tz"),
+    source: text("source", { enum: ["ics"] }).notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("interview_events_user_uid_unique").on(t.userId, t.uid),
+    index("interview_events_user_starts").on(t.userId, t.startsAt),
+    index("interview_events_message").on(t.messageId),
+  ],
+);
+
 export const attempts = sqliteTable(
   "attempts",
   {
