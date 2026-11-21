@@ -66,13 +66,17 @@ export function BoardSheet(props: {
             <p className="text-[13px] text-muted-foreground">{copy.board.loadingDetail}</p>
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-6 [&>*]:flex-none md:px-[26px] md:pt-[22px] md:pb-0">
+          <div
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-6 [&>*]:flex-none md:px-[26px] md:pt-[22px] md:pb-0"
+            data-scroll-region
+          >
             <BoardSheetHeader detail={detail} />
             <BoardSheetPills detail={detail} />
             <BoardSheetActions detail={detail} onArchive={props.onArchive} onMove={props.onMove} />
             <div
               aria-label={copy.board.sectionsLabel}
               className="hs mt-3.5 -mx-5 flex overflow-x-auto border-b border-border px-5 md:mx-0 md:mt-[22px] md:px-0"
+              data-scroll-region
               role="tablist"
             >
               {tabButton("timeline", copy.board.tabs.timeline)}

@@ -9,7 +9,7 @@ import { AdminSideIdentity } from "./admin-side.tsx";
 
 export function AdminShell() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen overflow-x-clip bg-background text-foreground">
       <div className="mx-auto flex min-h-screen w-full max-w-[1440px] items-stretch">
         <aside className="hidden w-[244px] shrink-0 flex-col border-r border-border bg-sidebar px-4 pb-6 pt-[26px] lg:flex">
           <div className="flex items-center gap-2.5 px-1.5">
