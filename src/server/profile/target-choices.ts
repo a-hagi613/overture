@@ -146,18 +146,3 @@ export function locationChoices(db: AppDatabase) {
     .slice(0, MAX_LOCATION_CHOICES)
     .map(([label]) => label);
 }
-
-export function mergeSelected(
-  choices: readonly string[],
-  selected: readonly (string | null | undefined)[],
-) {
-  const merged = [...choices];
-
-  for (const value of selected) {
-    if (value !== undefined && value !== null && value !== "" && !merged.includes(value)) {
-      merged.push(value);
-    }
-  }
-
-  return merged;
-}
