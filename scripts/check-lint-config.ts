@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 
 import { z } from "zod";
 
+import { findUnguardedDatabaseSyncHandles } from "./database-sync-guard.ts";
+
 const severitySchema = z.union([z.string(), z.array(z.unknown())]);
 const rulesSchema = z.record(z.string(), severitySchema);
 
@@ -189,6 +191,19 @@ function formatScopedDifference(
   return failures;
 }
 
+function trackedSources() {
+  const listed = spawnSync("git", ["ls-files", "-z", "--", "src", "test"], { encoding: "utf8" });
+
+  if (listed.status !== 0) {
+    throw new Error(`git ls-files failed: ${listed.stderr}`);
+  }
+
+  return listed.stdout
+    .split("\0")
+    .filter((path) => path.endsWith(".ts") || path.endsWith(".tsx"))
+    .map((path) => ({ path, source: readFileSync(path, "utf8") }));
+}
+
 const printed = spawnSync("bunx", ["oxlint", "--print-config"], { encoding: "utf8" });
 
 if (printed.status !== 0) {
@@ -259,6 +274,10 @@ for (const rule of notAtError) {
   failures.push(`${rule} is not at error`);
 }
 
+const appSources = trackedSources();
+
+failures.push(...findUnguardedDatabaseSyncHandles(appSources));
+
 if (failures.length > 0) {
   throw new Error(failures.join("\n"));
 }
@@ -269,4 +288,8 @@ const enabled = Object.values(printedLines.rules).filter(
 
 process.stdout.write(
   `lint configuration verified: ${String(enabled)} rules at error, ${String(configuredSet.size)} off, ${String(configuredScoped.size)} documented scoped overrides\n`,
+);
+
+process.stdout.write(
+  `sqlite handles verified: ${String(appSources.length)} src/test files, every DatabaseSync sets busy_timeout or opts out\n`,
 );
