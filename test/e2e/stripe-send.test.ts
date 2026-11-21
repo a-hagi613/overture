@@ -15,6 +15,7 @@ import { startAnthropicFixtureServer } from "./anthropic-fixture-server.ts";
 import { startFeedFixtureServer } from "./feed-fixture-server.ts";
 import { startGreenhouseFixture } from "./greenhouse.fixture.ts";
 import {
+  approveApplication,
   grantApplications,
   ownerContextFor,
   seedApplication,
@@ -313,8 +314,9 @@ test("with a Fact or Target for every mappable required question, the Stripe sen
   );
 
   await prepare(owner, applicationId);
+  await approveApplication(owner, applicationId);
 
-  expect((await applicationOf(owner, userId, applicationId)).status).toBe("ready");
+  expect((await applicationOf(owner, userId, applicationId)).status).toBe("approved");
   expect(await openReviewPrompts(owner, userId)).toEqual([]);
 
   const answers = await answersOf(owner, applicationId);
@@ -369,6 +371,7 @@ test("a missing react-select option ends form_changed and submits nothing", asyn
   );
 
   await prepare(owner, applicationId);
+  await approveApplication(owner, applicationId);
   await runSend(owner, applicationId);
 
   const attempts = await attemptsOf(owner, applicationId);
@@ -390,6 +393,7 @@ test("a changed checkbox-group option ends form_changed and submits nothing", as
   );
 
   await prepare(owner, applicationId);
+  await approveApplication(owner, applicationId);
   await runSend(owner, applicationId);
 
   const attempts = await attemptsOf(owner, applicationId);

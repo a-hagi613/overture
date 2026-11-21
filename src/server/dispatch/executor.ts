@@ -23,6 +23,7 @@ import { enqueueJob } from "../platform/jobs/queue.ts";
 import { releaseForApplication, reserveForApplication } from "../billing/ledger.ts";
 import { getSetting, isKillSwitchEnabled, setKillSwitch } from "../platform/settings/index.ts";
 import { raiseAlert } from "../platform/alerts.ts";
+import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 import { ProviderUnavailableError } from "./browser/provider.ts";
 import { applySendProxyTrim } from "./browser/proxy-trim.ts";
@@ -210,32 +211,10 @@ export function createDispatcher(deps: DispatcherDeps) {
     const slot = nextSendSlot(db, userId, at + RETRY_DELAY_MS);
 
     db.update(applications)
-      .set({ scheduledFor: slot, status: "ready", statusReason: null, updatedAt: clock.now() })
-      .where(eq(applications.id, applicationId))
-      .run();
-
-    recordApplicationEvent(db, clock, {
-      applicationId,
-      userId,
-      kind: "status",
-      fromValue: "sending",
-      toValue: "ready",
-      source: "system",
-    });
-
-    announce(applicationId, userId, "ready");
-
-    return slot;
-  }
-
-  function requestInterrupt(applicationId: string, userId: string, at: number) {
-    const slot = nextSendSlot(db, userId, at);
-
-    db.update(applications)
       .set({
-        attempts: sql`max(${applications.attempts} - 1, 0)`,
         scheduledFor: slot,
-        status: "ready",
+        stage: stageForStatus("approved"),
+        status: "approved",
         statusReason: null,
         updatedAt: clock.now(),
       })
@@ -247,11 +226,40 @@ export function createDispatcher(deps: DispatcherDeps) {
       userId,
       kind: "status",
       fromValue: "sending",
-      toValue: "ready",
+      toValue: "approved",
       source: "system",
     });
 
-    announce(applicationId, userId, "ready");
+    announce(applicationId, userId, "approved");
+
+    return slot;
+  }
+
+  function requestInterrupt(applicationId: string, userId: string, at: number) {
+    const slot = nextSendSlot(db, userId, at);
+
+    db.update(applications)
+      .set({
+        attempts: sql`max(${applications.attempts} - 1, 0)`,
+        scheduledFor: slot,
+        stage: stageForStatus("approved"),
+        status: "approved",
+        statusReason: null,
+        updatedAt: clock.now(),
+      })
+      .where(eq(applications.id, applicationId))
+      .run();
+
+    recordApplicationEvent(db, clock, {
+      applicationId,
+      userId,
+      kind: "status",
+      fromValue: "sending",
+      toValue: "approved",
+      source: "system",
+    });
+
+    announce(applicationId, userId, "approved");
 
     return slot;
   }
@@ -269,6 +277,37 @@ export function createDispatcher(deps: DispatcherDeps) {
     releaseAttempt(applicationId, userId, attemptId);
 
     const maxAttempts = settingNumber(db, "limits.max_attempts", 2);
+
+    if (used < maxAttempts && outcome === "form_changed") {
+      db.update(applications)
+        .set({
+          approvedAt: null,
+          approvedPlanEnc: null,
+          approvedPlanSha256: null,
+          changes: JSON.stringify(["The form changed"]),
+          scheduledFor: null,
+          stage: stageForStatus("ready"),
+          status: "ready",
+          statusReason: null,
+          updatedAt: at,
+        })
+        .where(eq(applications.id, applicationId))
+        .run();
+
+      recordApplicationEvent(db, clock, {
+        applicationId,
+        userId,
+        kind: "status",
+        fromValue: "sending",
+        toValue: "ready",
+        source: "system",
+      });
+
+      enqueueApplicationPrepare(db, clock, applicationId);
+      announce(applicationId, userId, "ready");
+
+      return "retry" as const;
+    }
 
     if (used < maxAttempts) {
       scheduleRetry(applicationId, userId, at);
@@ -340,7 +379,7 @@ export function createDispatcher(deps: DispatcherDeps) {
         statusReason: null,
         updatedAt: at,
       })
-      .where(and(eq(applications.id, applicationId), eq(applications.status, "ready")))
+      .where(and(eq(applications.id, applicationId), eq(applications.status, "approved")))
       .returning({ attempts: applications.attempts, userId: applications.userId })
       .all()
       .at(0);
@@ -361,7 +400,7 @@ export function createDispatcher(deps: DispatcherDeps) {
       db.update(applications)
         .set({
           attempts: sql`max(${applications.attempts} - 1, 0)`,
-          status: "ready",
+          status: "approved",
           updatedAt: clock.now(),
         })
         .where(eq(applications.id, applicationId))

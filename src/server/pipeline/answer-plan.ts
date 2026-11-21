@@ -23,18 +23,30 @@ import {
   formatFactValue,
 } from "./answer-value.ts";
 
-export type BlockReason =
-  | "missing_fact"
-  | "option_mismatch"
-  | "type_mismatch"
-  | "non_standard_consent"
-  | "file_unavailable"
-  | "unsupported_field"
-  | "optional_unfilled"
-  | "marketing_opt_in"
-  | "open_text_ungrounded";
+export const BLOCK_REASONS = [
+  "missing_fact",
+  "option_mismatch",
+  "type_mismatch",
+  "non_standard_consent",
+  "file_unavailable",
+  "unsupported_field",
+  "optional_unfilled",
+  "marketing_opt_in",
+  "open_text_ungrounded",
+] as const;
 
-export type AnswerSource = "fact" | "consent" | "file" | "open_text" | "target" | "derived";
+export type BlockReason = (typeof BLOCK_REASONS)[number];
+
+export const ANSWER_SOURCES = [
+  "fact",
+  "consent",
+  "file",
+  "open_text",
+  "target",
+  "derived",
+] as const;
+
+export type AnswerSource = (typeof ANSWER_SOURCES)[number];
 
 export interface PlanAnswer {
   kind: "answer";

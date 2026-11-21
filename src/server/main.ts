@@ -362,6 +362,7 @@ const dispatchTick =
         db,
         enqueueSend: (applicationId) => activeDispatcher.enqueueSend(applicationId),
         liveness: createPostingLiveness(env),
+        personal,
         providerId: browserProviders === null ? "local" : browserProviders.pick().id,
       });
 

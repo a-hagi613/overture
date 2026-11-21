@@ -12,6 +12,7 @@ import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { startGreenhouseFixture } from "./greenhouse.fixture.ts";
 import { readSseEventUntil } from "./sse.ts";
 import {
+  approveApplication,
   grantApplications,
   ownerContextFor,
   seedApplication,
@@ -320,10 +321,16 @@ test("every dispatcher gate blocks a send until it is cleared", async ({ pacing 
   const { owner, userId } = await ownerFor(pacing.server);
 
   await moveClockTo(owner, "2026-03-10T12:00:00.000Z");
+  await uploadResume(owner);
+  await saveFacts(owner);
+  await ensureMailbox(owner);
+  await grantApplications(owner, 5);
 
   const postingId = await seedPostingFor(owner, pacing.fixture.url, "us");
 
   const applicationId = await seedApplication(owner, { postingId, status: "ready", userId });
+
+  await approveApplication(owner, applicationId);
 
   await runJob(owner, "planner.day", JSON.stringify({ userId }));
 
@@ -348,18 +355,12 @@ test("every dispatcher gate blocks a send until it is cleared", async ({ pacing 
     return (await sendJobIds(owner)).length === before.length;
   };
 
+  const pause = await owner.post("/api/running", { data: { running: false } });
+
+  expect(pause.ok()).toBe(true);
   expect(await blockedTick()).toBe(true);
 
-  await uploadResume(owner);
-  await saveFacts(owner);
-
-  expect(await blockedTick()).toBe(true);
-
-  await ensureMailbox(owner);
-
-  expect(await blockedTick()).toBe(true);
-
-  await grantApplications(owner, 5);
+  await owner.post("/api/running", { data: { running: true } });
 
   await owner.put("/__test__/kill-switches/global/all", {
     data: { enabled: true, reason: "test", setBy: "owner" },
@@ -437,13 +438,6 @@ test("every dispatcher gate blocks a send until it is cleared", async ({ pacing 
     data: { value: "50" },
   });
 
-  const pause = await owner.post("/api/running", { data: { running: false } });
-
-  expect(pause.ok()).toBe(true);
-  expect(await blockedTick()).toBe(true);
-
-  await owner.post("/api/running", { data: { running: true } });
-
   await owner.post("/__test__/user/suspend", { data: { suspended: true, userId } });
 
   expect(await blockedTick()).toBe(true);
@@ -479,10 +473,16 @@ test("a Posting closed since preparation is skipped, not sent", async ({ pacing 
   const { owner, userId } = await ownerFor(pacing.server);
 
   await moveClockTo(owner, "2026-03-10T12:00:00.000Z");
+  await uploadResume(owner);
+  await saveFacts(owner);
+  await ensureMailbox(owner);
+  await grantApplications(owner, 3);
 
   const postingId = await seedPostingFor(owner, pacing.fixture.url, "us");
 
   const applicationId = await seedApplication(owner, { postingId, status: "ready", userId });
+
+  await approveApplication(owner, applicationId);
 
   await runJob(owner, "planner.day", JSON.stringify({ userId }));
 
@@ -493,10 +493,6 @@ test("a Posting closed since preparation is skipped, not sent", async ({ pacing 
   }
 
   await moveClockTo(owner, new Date(planned.scheduledFor).toISOString());
-  await uploadResume(owner);
-  await saveFacts(owner);
-  await ensureMailbox(owner);
-  await grantApplications(owner, 3);
 
   pacing.fixture.state.postingOpen = false;
 
@@ -550,6 +546,9 @@ test("the clock moves sends only into the window, spaced at least twenty minutes
 
   await seedWebsiteAnswer(owner, userId, firstApplication, firstPosting);
   await seedWebsiteAnswer(owner, userId, secondApplication, secondPosting);
+
+  await approveApplication(owner, firstApplication);
+  await approveApplication(owner, secondApplication);
 
   await runJob(owner, "planner.day", JSON.stringify({ userId }));
 

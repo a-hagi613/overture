@@ -264,8 +264,8 @@ const seedAnswerBody = z.object({
 
 const SAMPLE_GRANT_QUANTITY = 70;
 
-function defaultStageFor(status: "failed" | "needs_review" | "ready" | "sent") {
-  return status === "sent" ? "applied" : "queued";
+function defaultStageFor(status: "approved" | "failed" | "needs_review" | "ready" | "sent") {
+  return status === "sent" ? "applied" : stageForStatus(status);
 }
 
 const createPostingBody = z.object({
@@ -1798,7 +1798,7 @@ export function createTestRoutes(
     function addApplication(input: {
       companyId: string;
       postingId: string;
-      status: "ready" | "needs_review" | "sent" | "failed";
+      status: "approved" | "ready" | "needs_review" | "sent" | "failed";
       createdAt?: number;
       scheduledFor?: number;
       sentAt?: number;
@@ -1996,7 +1996,7 @@ export function createTestRoutes(
         postingId,
         scheduledFor,
         stage: "queued",
-        status: "ready",
+        status: "approved",
       });
     }
 

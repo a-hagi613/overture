@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -118,38 +118,42 @@ export function createPlanner(deps: PlannerDeps) {
     const todayStart = localDayStart(now, timeZone);
     const usage = target.dayStart === todayStart ? dailyUsageSince(db, userId, target.dayStart) : 0;
 
-    const ready = db
+    const approved = db
       .select({
+        approvedAt: applications.approvedAt,
         createdAt: applications.createdAt,
         id: applications.id,
         scheduledFor: applications.scheduledFor,
-        scoreAtQueue: applications.scoreAtQueue,
       })
       .from(applications)
-      .where(and(eq(applications.userId, userId), eq(applications.status, "ready")))
-      .orderBy(desc(applications.scoreAtQueue), asc(applications.createdAt))
+      .where(and(eq(applications.userId, userId), eq(applications.status, "approved")))
+      .orderBy(asc(applications.approvedAt), asc(applications.createdAt))
       .all();
 
-    const plannedInTarget = ready.filter(
+    const plannedInTarget = approved.filter(
       (application) =>
         application.scheduledFor !== null &&
         application.scheduledFor >= target.dayStart &&
         application.scheduledFor < target.nextDayStart,
     );
 
-    const needsSlot = ready.filter(
+    const needsSlot = approved.filter(
       (application) =>
         application.scheduledFor === null || application.scheduledFor < target.dayStart,
     );
 
     const remaining = Math.max(0, dailyCap - usage - plannedInTarget.length);
 
+    const plannedSlots = plannedInTarget.flatMap((application) =>
+      application.scheduledFor === null ? [] : [application.scheduledFor],
+    );
+
+    const latestPlanned = plannedSlots.length === 0 ? 0 : Math.max(...plannedSlots);
+
     const slots = planSlots({
-      blocked: plannedInTarget.flatMap((application) =>
-        application.scheduledFor === null ? [] : [application.scheduledFor],
-      ),
+      blocked: plannedSlots,
       count: Math.min(remaining, needsSlot.length),
-      now,
+      now: Math.max(now, latestPlanned),
       random: random.next,
       spacingMs,
       timeZone,

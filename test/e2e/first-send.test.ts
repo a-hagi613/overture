@@ -14,6 +14,7 @@ import { runGreenhouseAttempt } from "../../src/server/dispatch/ats/greenhouse.t
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { startGreenhouseFixture } from "./greenhouse.fixture.ts";
 import {
+  approveApplication,
   grantApplications,
   ownerContextFor,
   seedApplication,
@@ -359,6 +360,7 @@ async function readyApplication(harness: SendHarness) {
   ]);
 
   await grantApplications(owner, 3);
+  await approveApplication(owner, applicationId);
 
   return { applicationId, owner, userId };
 }
@@ -486,6 +488,7 @@ test("a 4xx answer to the application request leaves submit_clicked_at unset and
   const applicationId = await seedApplication(owner, { postingId, status: "ready", userId });
 
   await grantApplications(owner, 3);
+  await approveApplication(owner, applicationId);
   send.fixture.state.refuse = true;
 
   await runSend(owner, applicationId);
@@ -493,7 +496,7 @@ test("a 4xx answer to the application request leaves submit_clicked_at unset and
   const [application] = await applicationsOf(owner, userId);
   const attempts = await attemptsOf(owner, applicationId);
 
-  expect(application?.status).toBe("ready");
+  expect(application?.status).toBe("approved");
   expect(attempts.length).toBe(1);
   expect(attempts[0]?.submitClickedAt).toBeNull();
   expect(attempts[0]?.submitResponseStatus).toBe(403);
@@ -550,7 +553,7 @@ test("a kill before submit_clicked_at releases the Application, stops its browse
   const [application] = await applicationsOf(recovered.owner, userId);
   const attempts = await attemptsOf(recovered.owner, applicationId);
 
-  expect(application?.status).toBe("ready");
+  expect(application?.status).toBe("approved");
   expect(application?.attempts).toBe(0);
   expect(attempts.length).toBe(1);
   expect(attempts[0]?.outcome).toBe("interrupted");
@@ -656,6 +659,7 @@ test("a redirect to another board skips the Application with a reason and never 
   });
 
   await grantApplications(owner, 3);
+  await approveApplication(owner, applicationId);
   send.fixture.state.redirect = "board";
 
   const response = await runSend(owner, applicationId);
@@ -714,6 +718,7 @@ test("a page showing another company skips the Application with a reason and nev
   });
 
   await grantApplications(owner, 3);
+  await approveApplication(owner, applicationId);
   send.fixture.state.redirect = "company";
 
   const response = await runSend(owner, applicationId);
