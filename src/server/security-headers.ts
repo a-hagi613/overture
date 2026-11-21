@@ -23,8 +23,8 @@ const HSTS_SECONDS = 15_552_000;
  * @param production Whether to send Strict-Transport-Security (only meaningful over HTTPS).
  * @returns Hono middleware that adds the headers after the route has answered.
  */
-export function securityHeaders(production: boolean): MiddlewareHandler {
-  return async (context, next) => {
+export function securityHeaders(production: boolean) {
+  const handler: MiddlewareHandler = async (context, next) => {
     await next();
 
     context.res.headers.set("content-security-policy", CONTENT_SECURITY_POLICY);
@@ -41,4 +41,6 @@ export function securityHeaders(production: boolean): MiddlewareHandler {
       context.res.headers.set("strict-transport-security", `max-age=${String(HSTS_SECONDS)}`);
     }
   };
+
+  return handler;
 }
