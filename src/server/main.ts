@@ -381,6 +381,9 @@ const mailIngest = createMailIngest({
     await outcomes.confirmMessage(input);
     await mailMoves.handleAuthenticatedMessage(input);
   },
+  onStoredMessage: async (input) => {
+    await mailMoves.linkMessage(input);
+  },
 });
 
 const mailJobHandlers: JobHandlers = {

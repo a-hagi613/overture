@@ -10,7 +10,15 @@ import { NavGlyph } from "./nav-glyph.tsx";
 import { RunningSwitch } from "./running-switch.tsx";
 import { useTheme } from "../lib/theme-context.ts";
 
-export function PageHeader({ lead, titleNode }: { lead: string; titleNode: ReactNode }) {
+export function PageHeader({
+  lead,
+  runningSwitch = true,
+  titleNode,
+}: {
+  lead: string;
+  runningSwitch?: boolean;
+  titleNode: ReactNode;
+}) {
   const { pathname } = useLocation();
   const { theme, toggleTheme, label } = useTheme();
   const { data: session } = authClient.useSession();
@@ -81,7 +89,7 @@ export function PageHeader({ lead, titleNode }: { lead: string; titleNode: React
         >
           <span aria-hidden="true">{name === null ? "" : initialsOf(name)}</span>
         </Link>
-        <RunningSwitch />
+        {runningSwitch ? <RunningSwitch /> : null}
       </div>
     </header>
   );

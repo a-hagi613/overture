@@ -34,6 +34,7 @@ import { createMatchingService } from "./matching/score.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
 import { createPasswordResetRoutes } from "./routes/password-reset.ts";
+import { createInboxRoutes } from "./routes/inbox.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
 
@@ -174,6 +175,16 @@ export function createApp(deps: AppDependencies) {
     }),
   );
   app.route(
+    "/api",
+    createInboxRoutes({
+      auth: deps.auth,
+      clock: deps.clock,
+      db: deps.db,
+      objects: deps.objects,
+      personal,
+    }),
+  );
+  app.route(
     "/",
     createInboundRoutes({
       db: deps.db,
@@ -197,6 +208,7 @@ export function createApp(deps: AppDependencies) {
         deps.singletonJobKinds,
         deps.preparation,
         deps.catalogWorker,
+        deps.objects,
       ),
     );
   }

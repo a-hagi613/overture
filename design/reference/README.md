@@ -7,8 +7,9 @@ changes; never edit it by hand.
 ## What is here
 
 One folder per screen: `home`, `home-paused` (adds `reasons-1280-light`, all seven pause banners), `ready`, `ready-email`,
-`board`, `review`, `profile`, `settings`, `notifications` (adds `empty-<width>-<theme>`), `signin`,
-`onboarding-welcome`, `onboarding-resume`, `onboarding-questions`, `onboarding-targets`, `users`, `invites`, `user`. Each variant is named
+`board`, `review`, `profile`, `settings`, `notifications` (adds `empty-<width>-<theme>`), `inbox` (four boards: list,
+thread, empty and address), `signin`, `onboarding-welcome`, `onboarding-resume`, `onboarding-questions`,
+`onboarding-targets`, `users`, `invites`, `user`. Each variant is named
 `<width>-<theme>` (Sign in adds the mode: `sign-in`, `sign-up`, `magic-sent`), and comes as three files:
 
 | File | What it is | Use it for |
@@ -19,7 +20,9 @@ One folder per screen: `home`, `home-paused` (adds `reasons-1280-light`, all sev
 
 `source/` holds the board sources (`w5-*.dc.html`; `w5-holds` is the Review screen, `w5-ready-email` the Recap email)
 and the design-system boards
-(`ds-2`, `ds-3`), for reading the intent behind a value.
+(`ds-2`, `ds-3`), for reading the intent behind a value. The Inbox boards ship as the captured PNGs only;
+`inbox/main/` holds them cropped to the content area, without the sidebar or the phone tab bar, and the Inbox check
+compares those crops so it does not assert shell destinations owned by other tickets.
 
 ## Rules for building a screen
 
