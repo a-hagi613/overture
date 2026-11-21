@@ -74,6 +74,9 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
   a posting, preparation marking the question cache, tag import, the retag and seed scripts, the test routes) are
   listed in `.oxlintrc.json`; adding one needs a written reason here. A new sweep write goes into
   `src/server/catalog/sweep-worker.ts` and its worker-only modules (`poll-board.ts`, `workable-ingest.ts`).
+  `src/server/demo/seed.ts` is also listed there (#278): it writes fictional catalog rows for the demo account's
+  sample Applications, never real Postings, and only when `DEMO_LOGIN_ENABLED=true` or the operator runs
+  `bun run db:seed-demo`.
 - **The off-list and every scoped override are checked.** CI fails if the rules turned off in the configuration
   differ from the table below, if an override turns a rule down or changes its options without appearing in the
   "Rules off in one folder only" table, or if that table lists an override that does not exist.

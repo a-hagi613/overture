@@ -1,9 +1,9 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
-import { applications, attempts, postings } from "../platform/db/schema.ts";
+import { applications, attempts, postings, users } from "../platform/db/schema.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 
 export const COST_GATE_MICROS = 30_000;
@@ -143,6 +143,8 @@ function attemptRows(db: AppDatabase) {
     .from(attempts)
     .innerJoin(applications, eq(attempts.applicationId, applications.id))
     .innerJoin(postings, eq(applications.postingId, postings.id))
+    .innerJoin(users, eq(users.id, applications.userId))
+    .where(sql`${users.role} <> 'demo'`)
     .orderBy(asc(attempts.startedAt))
     .all();
 }

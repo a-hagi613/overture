@@ -26,7 +26,7 @@ export const users = sqliteTable("users", {
   email: text("email").notNull().unique(),
   emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
   image: text("image"),
-  role: text("role", { enum: ["user", "owner"] })
+  role: text("role", { enum: ["user", "owner", "demo"] })
     .notNull()
     .default("user"),
   suspendedAt: timestamp("suspended_at"),
@@ -134,6 +134,12 @@ export const settings = sqliteTable("settings", {
   value: text("value").notNull(),
   updatedAt: integer("updated_at").notNull(),
   updatedBy: text("updated_by").notNull(),
+});
+
+export const consentVersions = sqliteTable("consent_versions", {
+  version: text("version").primaryKey(),
+  text: text("text").notNull(),
+  publishedAt: timestamp("published_at").notNull(),
 });
 
 export const passkeys = sqliteTable("passkey", {
@@ -455,7 +461,7 @@ export const profiles = sqliteTable("profiles", {
   timezone: text("timezone"),
   pendingTimezone: text("pending_timezone"),
   pendingTimezoneAt: timestamp("pending_timezone_at"),
-  consentVersion: text("consent_version").notNull().default("m1"),
+  consentVersion: text("consent_version").notNull().default("1"),
   consentAt: timestamp("consent_at"),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),

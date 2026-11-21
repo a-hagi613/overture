@@ -7,14 +7,16 @@ import type { Clock } from "../platform/ports/clock.ts";
 
 import { grantApplications } from "../billing/ledger.ts";
 import { invites, users } from "../platform/db/schema.ts";
-import { getSetting } from "../platform/settings/index.ts";
+import { getSettingNumber } from "../platform/settings/index.ts";
+
+import type { SETTING_DEFAULTS } from "../platform/settings/index.ts";
 import { normaliseEmail } from "./email.ts";
 
-export const INVITE_GRANT_QUANTITY_KEY = "invite.grant_quantity";
-export const INVITE_GRANT_DAYS_KEY = "invite.grant_days";
+export const INVITE_GRANT_QUANTITY_KEY =
+  "invite.grant_quantity" satisfies keyof typeof SETTING_DEFAULTS;
 
-const DEFAULT_GRANT_QUANTITY = 300;
-const DEFAULT_GRANT_DAYS = 30;
+export const INVITE_GRANT_DAYS_KEY = "invite.grant_days" satisfies keyof typeof SETTING_DEFAULTS;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type InviteRow = typeof invites.$inferSelect;
@@ -81,17 +83,15 @@ export function isSuspendedUser(db: AppDatabase, userId: string) {
   return user !== undefined && user.suspendedAt !== null;
 }
 
-function settingNumber(db: AppDatabase, key: string, fallback: number) {
-  const raw = getSetting(db, key);
-  const parsed = raw === null ? Number.NaN : Number(raw);
-
-  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : fallback;
-}
-
 export function acceptInvite(db: AppDatabase, clock: Clock, invite: InviteRow, userId: string) {
   const at = clock.now();
-  const quantity = settingNumber(db, INVITE_GRANT_QUANTITY_KEY, DEFAULT_GRANT_QUANTITY);
-  const days = settingNumber(db, INVITE_GRANT_DAYS_KEY, DEFAULT_GRANT_DAYS);
+
+  const quantity = getSettingNumber(db, INVITE_GRANT_QUANTITY_KEY, {
+    integer: true,
+    minimum: 1,
+  });
+
+  const days = getSettingNumber(db, INVITE_GRANT_DAYS_KEY, { integer: true, minimum: 1 });
 
   return db.transaction((tx) => {
     const claimed = tx

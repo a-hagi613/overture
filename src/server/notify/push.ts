@@ -7,6 +7,7 @@ import type { PushSender } from "../platform/ports/push.ts";
 
 import { notifications, pushSubscriptions } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
+import { isDemoUser } from "../demo/role.ts";
 
 export const PUSH_NOTIFY_JOB_KIND = "push.notify";
 
@@ -56,6 +57,10 @@ export async function runNotificationPushJob(deps: PushNotifyDeps, notificationI
     .get();
 
   if (notification === undefined || notification.pushedAt !== null) {
+    return { gone: 0, sent: 0, skipped: true };
+  }
+
+  if (isDemoUser(deps.db, notification.userId)) {
     return { gone: 0, sent: 0, skipped: true };
   }
 
