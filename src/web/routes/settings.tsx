@@ -4,6 +4,7 @@ import { copy } from "../../shared/copy.ts";
 import { AccountRow } from "../components/account-row.tsx";
 import { LimitRow } from "../components/limit-row.tsx";
 import { PageHeader } from "../components/page-header.tsx";
+import { SettingsLegal } from "../components/settings-legal.tsx";
 import { TimeLanguageSection } from "../components/time-language-section.tsx";
 import { authClient } from "../lib/auth-client.ts";
 
@@ -59,6 +60,7 @@ export function SettingsPage() {
           </p>
         </section>
         <TimeLanguageSection />
+        <SettingsLegal />
         <section
           aria-labelledby="settings-account"
           className="rounded-lg border border-border bg-card p-[22px_24px_10px] shadow-sh min-[900px]:col-span-2"

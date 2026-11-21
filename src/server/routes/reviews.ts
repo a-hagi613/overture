@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import type { Auth } from "../auth/index.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
+import { demoLocked } from "../demo/guard.ts";
 
 const answerBody = z.object({ value: z.string().trim().min(1).max(2000) });
 
@@ -32,6 +33,12 @@ export function createReviewRoutes(deps: { auth: Auth; reviews: ReviewService })
 
     if (account === null) {
       return context.json({ error: "unauthorised" }, 401);
+    }
+
+    const locked = demoLocked(account.role);
+
+    if (locked !== null) {
+      return locked;
     }
 
     const { id } = context.req.param();

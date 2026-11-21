@@ -1,4 +1,4 @@
-import { and, eq, isNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, isNull, lt, lte, ne, notInArray, or, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
@@ -52,18 +52,11 @@ async function runJob(
       try {
         await retryWhenBusy(
           () =>
-            db
-              .update(bgJobs)
-              .set({
-                status: "queued",
-                attempts: Math.max(0, job.attempts - 1),
-                lastError: errorMessage,
-                lockedUntil: null,
-                runAt: clock.now() + (error.delayMs ?? RETRY_LATER_DELAY_MS),
-                updatedAt: clock.now(),
-              })
-              .where(eq(bgJobs.id, job.id))
-              .run(),
+            queueAgain(db, clock, job.id, {
+              attempts: Math.max(0, job.attempts - 1),
+              lastError: errorMessage,
+              runAt: clock.now() + (error.delayMs ?? RETRY_LATER_DELAY_MS),
+            }),
           "jobs.retry",
         );
       } catch (bookkeepingError) {
@@ -78,21 +71,27 @@ async function runJob(
     const backoffMs = isDead ? 0 : Math.min(60_000 * 2 ** (nextAttempts - 1), 3_600_000);
 
     try {
-      await retryWhenBusy(
-        () =>
-          db
-            .update(bgJobs)
+      await retryWhenBusy(() => {
+        if (isDead) {
+          db.update(bgJobs)
             .set({
-              status: isDead ? "dead" : "queued",
+              status: "dead",
               lastError: errorMessage,
               lockedUntil: null,
-              runAt: isDead ? job.runAt : clock.now() + backoffMs,
+              runAt: job.runAt,
               updatedAt: clock.now(),
             })
             .where(eq(bgJobs.id, job.id))
-            .run(),
-        "jobs.failed",
-      );
+            .run();
+
+          return;
+        }
+
+        queueAgain(db, clock, job.id, {
+          lastError: errorMessage,
+          runAt: clock.now() + backoffMs,
+        });
+      }, "jobs.failed");
     } catch (bookkeepingError) {
       logError("jobs.failed", bookkeepingError);
     }
@@ -107,15 +106,7 @@ export function requeueWithoutConsumingAttempt(
   jobId: string,
   originalAttempts: number,
 ) {
-  db.update(bgJobs)
-    .set({
-      status: "queued",
-      attempts: originalAttempts,
-      lockedUntil: null,
-      updatedAt: clock.now(),
-    })
-    .where(eq(bgJobs.id, jobId))
-    .run();
+  queueAgain(db, clock, jobId, { attempts: originalAttempts });
 }
 
 export function claimDueJobs(
@@ -261,16 +252,81 @@ export function recoverStaleLocks(
     conditions.push(notInArray(bgJobs.kind, [...singletonKinds]));
   }
 
-  db.update(bgJobs)
-    .set({ status: "queued", lockedUntil: null, updatedAt: now })
+  const stale = db
+    .select({ id: bgJobs.id })
+    .from(bgJobs)
     .where(and(...conditions))
-    .run();
+    .all();
+
+  for (const job of stale) {
+    queueAgain(db, clock, job.id, {});
+  }
 }
 
 let enqueueNotify: (() => void) | null = null;
 
 export function registerEnqueueNotify(notify: () => void) {
   enqueueNotify = notify;
+}
+
+function queuedDuplicateOf(db: AppDatabase, id: string, dedupeKey: string) {
+  return db
+    .select({ id: bgJobs.id })
+    .from(bgJobs)
+    .where(and(eq(bgJobs.dedupeKey, dedupeKey), eq(bgJobs.status, "queued"), ne(bgJobs.id, id)))
+    .get();
+}
+
+interface QueueAgain {
+  attempts?: number;
+  lastError?: string;
+  runAt?: number;
+}
+
+function queueAgain(db: AppDatabase, clock: Clock, jobId: string, input: QueueAgain) {
+  const row = db
+    .select({ dedupeKey: bgJobs.dedupeKey })
+    .from(bgJobs)
+    .where(eq(bgJobs.id, jobId))
+    .get();
+
+  const duplicate =
+    row?.dedupeKey === null || row?.dedupeKey === undefined
+      ? undefined
+      : queuedDuplicateOf(db, jobId, row.dedupeKey);
+
+  if (duplicate !== undefined && input.runAt !== undefined) {
+    const queued = db
+      .select({ runAt: bgJobs.runAt })
+      .from(bgJobs)
+      .where(eq(bgJobs.id, duplicate.id))
+      .get();
+
+    if (queued !== undefined && queued.runAt < input.runAt) {
+      db.update(bgJobs)
+        .set({ runAt: input.runAt, updatedAt: clock.now() })
+        .where(eq(bgJobs.id, duplicate.id))
+        .run();
+    }
+  }
+
+  if (duplicate !== undefined) {
+    db.delete(bgJobs).where(eq(bgJobs.id, jobId)).run();
+
+    return;
+  }
+
+  db.update(bgJobs)
+    .set({
+      status: "queued",
+      lockedUntil: null,
+      updatedAt: clock.now(),
+      ...(input.attempts !== undefined && { attempts: input.attempts }),
+      ...(input.runAt !== undefined && { runAt: input.runAt }),
+      ...(input.lastError !== undefined && { lastError: input.lastError }),
+    })
+    .where(eq(bgJobs.id, jobId))
+    .run();
 }
 
 export function enqueueJob(

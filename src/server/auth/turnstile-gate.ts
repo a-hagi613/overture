@@ -18,6 +18,7 @@ const siteverifyTimeoutMs = 10_000;
 const gatedEndpoints = new Map<string, readonly TurnstileAction[]>([
   ["/api/auth/sign-in/social", ["signin", "signup"]],
   ["/api/auth/sign-in/magic-link", ["magiclink"]],
+  ["/api/auth/demo/sign-in", ["magiclink"]],
   ["/api/auth/sign-in/email", ["signin"]],
   ["/api/auth/sign-up/email", ["signup"]],
   ["/api/auth/send-verification-email", ["signup"]],

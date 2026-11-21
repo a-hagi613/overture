@@ -22,6 +22,7 @@ const envSchema = z
     DATABASE_PATH: z.string().min(1).optional(),
     STATIC_ROOT: z.string().min(1).default("dist"),
     ENABLE_TEST_ROUTES: booleanFromString.default(false),
+    DEMO_LOGIN_ENABLED: booleanFromString.default(false),
     GREENHOUSE_FEED_BASE_URL: z.string().min(1).optional(),
     GREENHOUSE_BOARD_BASE_URL: z.url().optional(),
     LEVER_FEED_BASE_URL: z.string().min(1).optional(),
@@ -130,6 +131,14 @@ const envSchema = z
     FLY_MACHINE_ID: z.string().min(1).optional(),
   })
   .superRefine((value, context) => {
+    if (value.ENABLE_TEST_ROUTES && (value.NODE_ENV === "production" || value.FLY_APP_NAME)) {
+      context.addIssue({
+        code: "custom",
+        message: "ENABLE_TEST_ROUTES must not be true in production or on Fly.",
+        path: ["ENABLE_TEST_ROUTES"],
+      });
+    }
+
     if (value.NODE_ENV === "production") {
       const hostnames =
         value.TURNSTILE_HOSTNAMES ??

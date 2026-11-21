@@ -1,3 +1,5 @@
+import { clearVerifyStamp, writeVerifyStamp } from "./stamp.ts";
+
 const checks = [
   ["lint", ["bun", "run", "lint"]],
   ["format", ["bun", "fmt", "--check"]],
@@ -59,5 +61,8 @@ process.stdout.write(
 );
 
 if (failed.length > 0) {
+  clearVerifyStamp(process.cwd());
   process.exitCode = 1;
+} else {
+  writeVerifyStamp(process.cwd());
 }

@@ -1,5 +1,7 @@
 import { Buffer } from "node:buffer";
 
+import { env } from "../../config/env.ts";
+import { isAllowedPushEndpoint } from "./endpoint.ts";
 import type { Clock } from "../ports/clock.ts";
 import type { PushPayload, PushSender, PushSubscription } from "../ports/push.ts";
 
@@ -202,8 +204,8 @@ export function createWebPushSender(config: VapidConfig, clock: Clock) {
 
   const sender: PushSender = {
     send: async (subscription, payload) => {
-      if (!subscription.endpoint.startsWith("https://")) {
-        throw new Error("A push endpoint must use HTTPS.");
+      if (!isAllowedPushEndpoint(subscription.endpoint, env.NODE_ENV)) {
+        throw new Error("A push endpoint must be an HTTPS address of a known push service.");
       }
 
       const body = await encryptPayload(subscription, payload);
@@ -225,6 +227,7 @@ export function createWebPushSender(config: VapidConfig, clock: Clock) {
           urgency: "normal",
         },
         body,
+        redirect: "manual",
         signal: AbortSignal.timeout(PUSH_TIMEOUT_MS),
       });
 
