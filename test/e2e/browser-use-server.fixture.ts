@@ -40,33 +40,42 @@ export interface BrowserUseFixture {
   deletedProfileIds: string[];
   peakActiveSessions: number;
   rateLimitResponses: number;
+  settleUsage: () => void;
   close: () => void;
 }
 
 export interface BrowserUseFixtureOptions {
+  createStatus?: number;
+  failStops?: boolean;
+  holdUsage?: boolean;
   maxConcurrentSessions?: number;
   rateLimitFirstSessionCreates?: number;
+  retryAfterSeconds?: number;
 }
 
 const bodySchema = z.object({ action: z.literal("stop") });
 
-const view = (session: SessionState) => ({
-  browserCost: session.stopped ? recordedBrowserCost : "0",
-  cdpUrl: session.chromium.cdpUrl,
-  finishedAt: session.stopped
-    ? new Date(Date.parse(session.startedAt) + recordedBrowserSeconds * 1000).toISOString()
-    : null,
-  id: session.id,
-  liveUrl: session.stopped ? null : `https://live.browser-use.test/${session.id}`,
-  metadata:
-    session.attemptId === null ? {} : { attemptId: session.attemptId, purpose: "application" },
-  proxyCost: session.stopped ? recordedProxyCost : "0",
-  proxyUsedMb: session.stopped ? recordedProxyUsedMb : "0",
-  recordingUrl: session.stopped ? `https://recordings.browser-use.test/${session.id}.mp4` : null,
-  startedAt: session.startedAt,
-  status: session.stopped ? "stopped" : "active",
-  timeoutAt: new Date(Date.parse(session.startedAt) + 15 * 60_000).toISOString(),
-});
+const view = (session: SessionState, usageSettled: boolean) => {
+  const withheld = session.stopped && !usageSettled;
+
+  return {
+    browserCost: session.stopped && !withheld ? recordedBrowserCost : "0",
+    cdpUrl: session.chromium.cdpUrl,
+    finishedAt: session.stopped
+      ? new Date(Date.parse(session.startedAt) + recordedBrowserSeconds * 1000).toISOString()
+      : null,
+    id: session.id,
+    liveUrl: session.stopped ? null : `https://live.browser-use.test/${session.id}`,
+    metadata:
+      session.attemptId === null ? {} : { attemptId: session.attemptId, purpose: "application" },
+    proxyCost: session.stopped && !withheld ? recordedProxyCost : "0",
+    proxyUsedMb: session.stopped && !withheld ? recordedProxyUsedMb : "0",
+    recordingUrl: session.stopped ? `https://recordings.browser-use.test/${session.id}.mp4` : null,
+    startedAt: session.startedAt,
+    status: session.stopped ? "stopped" : "active",
+    timeoutAt: new Date(Date.parse(session.startedAt) + 15 * 60_000).toISOString(),
+  };
+};
 
 export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
   const sessions: SessionState[] = [];
@@ -76,6 +85,7 @@ export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
   const deletedProfileIds: string[] = [];
   let peakActiveSessions = 0;
   let rateLimitResponses = 0;
+  let usageSettled = !options.holdUsage;
   let firstCreatesRateLimited = options.rateLimitFirstSessionCreates ?? 0;
 
   const server = Bun.serve({
@@ -83,6 +93,12 @@ export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
     async fetch(request) {
       const url = new URL(request.url);
       const path = url.pathname;
+
+      if (request.method === "POST" && path === "/__fixture__/settle-usage") {
+        usageSettled = true;
+
+        return Response.json({ settled: true });
+      }
 
       if (request.method === "POST" && path === "/api/v4/profiles") {
         const parsed = profileSchema.safeParse(await request.json());
@@ -116,6 +132,12 @@ export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
           return Response.json({ detail: "invalid session" }, { status: 422 });
         }
 
+        if (options.createStatus !== undefined) {
+          return new Response("Browser Use account cannot start a session", {
+            status: options.createStatus,
+          });
+        }
+
         const active = sessions.filter((session) => !session.stopped).length;
         const limit = options.maxConcurrentSessions;
         const overLimit = limit !== undefined && active >= limit;
@@ -128,9 +150,15 @@ export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
 
           rateLimitResponses += 1;
 
+          const init: ResponseInit = { status: 429 };
+
+          if (options.retryAfterSeconds !== undefined) {
+            init.headers = { "retry-after": String(options.retryAfterSeconds) };
+          }
+
           return new Response(
             `Browser Use API 429 on /api/v4/browsers: Free plan limit: ${String(limit ?? 1)} concurrent sessions reached`,
-            { status: 429 },
+            init,
           );
         }
 
@@ -148,14 +176,14 @@ export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
         sessions.push(session);
         peakActiveSessions = Math.max(peakActiveSessions, active + 1);
 
-        return Response.json(view(session), { status: 201 });
+        return Response.json(view(session, usageSettled), { status: 201 });
       }
 
       if (request.method === "GET" && path === "/api/v4/browsers") {
         const active = sessions.filter((session) => !session.stopped);
 
         return Response.json({
-          items: active.map((session) => view(session)),
+          items: active.map((session) => view(session, usageSettled)),
           pageNumber: 1,
           pageSize: 100,
           totalItems: active.length,
@@ -177,7 +205,7 @@ export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
       }
 
       if (request.method === "GET") {
-        return Response.json(view(session));
+        return Response.json(view(session, usageSettled));
       }
 
       if (request.method === "PATCH") {
@@ -187,6 +215,12 @@ export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
           return Response.json({ detail: "invalid action" }, { status: 422 });
         }
 
+        if (options.failStops === true) {
+          session.stopped = true;
+
+          return new Response("session already stopped", { status: 404 });
+        }
+
         session.stopped = true;
         stoppedSessionIds.push(session.id);
 
@@ -194,7 +228,7 @@ export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
           stoppedAttemptIds.push(session.attemptId);
         }
 
-        return Response.json(view(session));
+        return Response.json(view(session, usageSettled));
       }
 
       return new Response("not found", { status: 404 });
@@ -218,6 +252,9 @@ export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
       return rateLimitResponses;
     },
     sessions,
+    settleUsage: () => {
+      usageSettled = true;
+    },
     stoppedAttemptIds,
     stoppedSessionIds,
     url: `http://127.0.0.1:${String(server.port)}`,

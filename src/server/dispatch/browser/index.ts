@@ -36,9 +36,10 @@ export function createBrowserProvider(env: Env, clock: Clock, db: AppDatabase) {
     providers.set(
       "browser_use",
       createBrowserUseBrowserProvider({
-        client: BrowserUseClient(env.BROWSER_USE_API_KEY, env.BROWSER_USE_API_BASE_URL),
+        client: BrowserUseClient(env.BROWSER_USE_API_KEY, env.BROWSER_USE_API_BASE_URL, clock),
         clock,
         profiles,
+        usageSettleDeadlineMs: env.BROWSER_USE_USAGE_SETTLE_MS,
       }),
     );
   }

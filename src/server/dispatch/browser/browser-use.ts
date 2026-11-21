@@ -1,6 +1,9 @@
 import { z } from "zod";
 
+import type { Clock } from "../../platform/ports/clock.ts";
+
 import { RetryLaterError } from "../../platform/jobs/retry.ts";
+import { ProviderUnavailableError } from "./provider.ts";
 
 export const browserSessionSchema = z.object({
   id: z.string().min(1),
@@ -47,6 +50,7 @@ export interface CreateSessionInput {
 
 export interface ListSessionsInput {
   filterBy?: "active" | "stopped";
+  pageNumber?: number;
   pageSize?: number;
 }
 
@@ -62,17 +66,35 @@ const errors = {
 };
 
 export class BrowserUseApiError extends Error {
+  readonly retryAfterMs: number | null;
   readonly status: number;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, retryAfterMs: number | null = null) {
     super(message);
 
     this.name = "BrowserUseApiError";
+    this.retryAfterMs = retryAfterMs;
     this.status = status;
   }
 }
 
 const rateLimited = (error: BrowserUseApiError) => error.status === 429;
+
+function retryAfterMilliseconds(header: string | null, now: number) {
+  if (header === null) {
+    return null;
+  }
+
+  const seconds = Number(header);
+
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.round(seconds * 1000);
+  }
+
+  const at = Date.parse(header);
+
+  return Number.isFinite(at) ? Math.max(0, at - now) : null;
+}
 
 async function pause(ms: number) {
   await new Promise((resolve) => {
@@ -80,7 +102,7 @@ async function pause(ms: number) {
   });
 }
 
-export function BrowserUseClient(apiKey: string, baseUrl: string | undefined) {
+export function BrowserUseClient(apiKey: string, baseUrl: string | undefined, clock: Clock) {
   const root =
     baseUrl !== undefined && baseUrl.trim() !== "" ? baseUrl.replace(/\/+$/u, "") : apiBase;
 
@@ -94,9 +116,20 @@ export function BrowserUseClient(apiKey: string, baseUrl: string | undefined) {
 
     if (!response.ok) {
       const body = await response.text();
+      const message = errors.requestFailed(response.status, path, body);
+
+      if (response.status === 402) {
+        throw new ProviderUnavailableError("browser_use", "no_credit", message);
+      }
+
+      if (response.status === 403) {
+        throw new ProviderUnavailableError("browser_use", "forbidden", message);
+      }
+
       throw new BrowserUseApiError(
         response.status,
-        errors.requestFailed(response.status, path, body),
+        message,
+        retryAfterMilliseconds(response.headers.get("retry-after"), clock.now()),
       );
     }
 
@@ -127,11 +160,15 @@ export function BrowserUseClient(apiKey: string, baseUrl: string | undefined) {
         throw error;
       }
 
-      if (attempt >= RATE_LIMIT_MAX_RETRIES) {
-        throw new RetryLaterError(error.message);
+      const delay =
+        error.retryAfterMs ??
+        Math.min(RATE_LIMIT_BASE_DELAY_MS * 2 ** attempt, RATE_LIMIT_MAX_DELAY_MS);
+
+      if (attempt >= RATE_LIMIT_MAX_RETRIES || delay > RATE_LIMIT_MAX_DELAY_MS) {
+        throw new RetryLaterError(error.message, delay);
       }
 
-      await pause(Math.min(RATE_LIMIT_BASE_DELAY_MS * 2 ** attempt, RATE_LIMIT_MAX_DELAY_MS));
+      await pause(delay);
 
       return createSession(input, attempt + 1);
     }
@@ -148,6 +185,7 @@ export function BrowserUseClient(apiKey: string, baseUrl: string | undefined) {
         parameters.set("filterBy", input.filterBy);
       }
 
+      parameters.set("pageNumber", String(input.pageNumber ?? 1));
       parameters.set("pageSize", String(input.pageSize ?? 100));
 
       const response = await call(`/api/v4/browsers?${parameters.toString()}`, {

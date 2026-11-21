@@ -37,6 +37,7 @@ export async function launchLocalChromium() {
     "--disable-dev-shm-usage",
     "--headless=new",
     "--disable-gpu",
+    "--host-resolver-rules=MAP * 127.0.0.1",
     "--no-sandbox",
     "about:blank",
   ];

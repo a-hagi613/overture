@@ -59,7 +59,7 @@ async function runJob(
                 attempts: Math.max(0, job.attempts - 1),
                 lastError: errorMessage,
                 lockedUntil: null,
-                runAt: clock.now() + RETRY_LATER_DELAY_MS,
+                runAt: clock.now() + (error.delayMs ?? RETRY_LATER_DELAY_MS),
                 updatedAt: clock.now(),
               })
               .where(eq(bgJobs.id, job.id))

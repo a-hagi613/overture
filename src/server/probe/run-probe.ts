@@ -1,6 +1,6 @@
 import { chromium } from "playwright-core";
 
-import type { Browser, Route } from "playwright-core";
+import type { Browser } from "playwright-core";
 
 import type { Clock } from "../platform/ports/clock.ts";
 
@@ -9,6 +9,7 @@ import {
   configureBrowserSessionLimitFromSetting,
 } from "../dispatch/browser/session-slots.ts";
 import { BrowserUseClient } from "../dispatch/browser/browser-use.ts";
+import { applySendProxyTrim } from "../dispatch/browser/proxy-trim.ts";
 import type { BrowserSession } from "../dispatch/browser/browser-use.ts";
 import type { ProbeConsole } from "./console.ts";
 import { probeGreenhouse } from "./greenhouse.ts";
@@ -91,20 +92,6 @@ const minutesBetween = (startedAt: string, finishedAt: string | null | undefined
   return Number.isFinite(millis) && millis > 0 ? millis / 60_000 : 0;
 };
 
-const routeHandler = async (route: Route) => {
-  const resourceType = route.request().resourceType();
-
-  if (resourceType === "image" || resourceType === "font" || resourceType === "media") {
-    try {
-      await route.abort();
-    } catch {}
-
-    return;
-  }
-
-  await route.fallback();
-};
-
 const attemptOutcome = (attempt: GreenhouseAttempt | null, fallback: string) => {
   if (attempt === null) {
     return fallback;
@@ -167,7 +154,7 @@ export async function runProbe(deps: ProbeDeps) {
     );
   }
 
-  const client = BrowserUseClient(deps.apiKey, deps.apiBaseUrl);
+  const client = BrowserUseClient(deps.apiKey, deps.apiBaseUrl, deps.clock);
   const { db } = openProbeDatabase(deps.databasePath);
 
   configureBrowserSessionLimitFromSetting(db);
@@ -232,7 +219,7 @@ async function runPosting(
     const context = browser.contexts()[0] ?? (await browser.newContext());
     const page = context.pages()[0] ?? (await context.newPage());
 
-    await context.route("**/*", routeHandler);
+    await applySendProxyTrim(context);
 
     attempt = await probeGreenhouse(
       page,
