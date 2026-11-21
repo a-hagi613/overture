@@ -13,6 +13,8 @@ export function createNavRoutes(deps: { auth: Auth; db: AppDatabase; reviews: Re
   const routes = new Hono();
 
   routes.get("/nav", async (context) => {
+    context.header("Cache-Control", "no-store");
+
     const session = await auth.api
       .getSession({ headers: context.req.raw.headers })
       .catch(() => null);

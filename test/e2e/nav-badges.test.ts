@@ -50,6 +50,7 @@ async function navCounts(request: Awaited<ReturnType<typeof apiRequest.newContex
   const response = await request.get("/api/nav");
 
   expect(response.ok()).toBe(true);
+  expect(response.headers()["cache-control"]).toBe("no-store");
 
   return navCountsSchema.parse(await response.json());
 }
@@ -166,5 +167,16 @@ test("a seeded user's shell shows the live counts at 1280 and 390", async ({
   await expect(tabBar.locator('[data-nav-badge="inbox"]')).toHaveText(String(counts.inboxUnread));
 
   await context.close();
+  await request.dispose();
+});
+
+test("GET /api/nav refuses a signed-out caller and is never cached", async ({ badgeServer }) => {
+  const request = await apiRequest.newContext({ baseURL: badgeServer.url });
+  const response = await request.get("/api/nav");
+
+  expect(response.status()).toBe(401);
+  expect(response.headers()["cache-control"]).toBe("no-store");
+  expect(await response.json()).toEqual({ error: "sign_in_required" });
+
   await request.dispose();
 });
