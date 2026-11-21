@@ -65,9 +65,10 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
 
 - **No disable directives.** Any `oxlint-disable`, `eslint-disable` or `@ts-ignore` comment is an error. `no-comments`
   runs with an empty `allow` list, so `// WARNING:` notes are errors too.
-- **Seven unit test files only.** A unit test file is allowed only beside the seven invariants in ADR 0013 (ledger,
-  crypto, planner, address, tag rules, question normalisation, answer derivations), by an explicit path allowlist. Any
-  other unit test file is an error. Every other test is a Playwright end-to-end test.
+- **Nine unit test files only.** A unit test file is allowed only beside the nine invariants in ADR 0013 (ledger,
+  crypto, planner, address, tag rules, question normalisation, answer derivations, the fixture sanitiser, the v1
+  answer-bank mapping), by an explicit path allowlist. Any other unit test file is an error. Every other test is a
+  Playwright end-to-end test.
 - **The off-list and every scoped override are checked.** CI fails if the rules turned off in the configuration
   differ from the table below, if an override turns a rule down or changes its options without appearing in the
   "Rules off in one folder only" table, or if that table lists an override that does not exist.

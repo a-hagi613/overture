@@ -47,6 +47,9 @@ From the v1 production database on Fly app `ai-auto-apply` (volume `data`, yyz),
 | `answer_entries`, `answer_years`, `answer_achievements`, `answer_aliases` | the owner's `facts` |
 | `learned_answers` (449) | the owner's Tier 3 facts `q:<question_id>`, via the question catalog |
 
-`profile/` in this repository holds the owner's resume PDF (sent byte for byte), the answer bank and
-the cover-letter template. The answer bank's "Email on application forms" row is **not** imported: the
-email on every form is the job-search address (`SPEC.md` §7.1).
+`scripts/export-v1-facts.ts` reads the v1 SQLite file read-only and writes one JSON export (answer-bank entries, years,
+achievements, aliases, settings and learned answers). `scripts/import-v1-facts.ts` maps that export into a v2 user's
+Facts. The export holds the owner's answers, so it is encrypted and kept off the repository (`SPEC.md` §18).
+
+The answer bank's "Email on application forms" row **is** imported as the `email` Fact: the user's real email goes on
+forms (ADR 0028), and the forwarding address is never a Fact.
