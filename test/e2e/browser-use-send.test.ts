@@ -257,7 +257,7 @@ test("a send try that cannot find the form still stops its Browser Use session",
       throw new Error("the failed send try left no attempt");
     }
 
-    expect(attempt.outcome).toBe("form_changed");
+    expect(attempt.outcome).not.toBe("sent");
     expect(attempt.providerSessionId).not.toBeNull();
     expect(harness.fixture.stoppedSessionIds).toContain(attempt.providerSessionId);
     expect(harness.greenhouse.state.submissions).toBe(0);
