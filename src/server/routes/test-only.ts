@@ -378,6 +378,22 @@ const seedGrantBody = z.object({
   idempotencyKey: z.string().min(1),
 });
 
+const seedFactsBody = z.object({
+  userId: z.string().min(1),
+  facts: z
+    .array(
+      z.object({
+        confirmed: z.boolean().default(true),
+        key: z.string().min(1),
+        scope: z.string().max(3).default(""),
+        source: z.enum(["resume", "user", "review", "import"]).default("user"),
+        value: z.string().min(1).max(2000),
+      }),
+    )
+    .min(1)
+    .max(64),
+});
+
 const applicationStatusBody = z.object({
   applicationId: z.string().min(1),
   status: z.enum([
@@ -393,6 +409,7 @@ const applicationStatusBody = z.object({
     "withdrawn",
   ]),
   statusReason: z.string().nullable().default(null),
+  scheduledFor: z.number().nullable().optional(),
 });
 
 const userSuspendBody = z.object({
@@ -1352,14 +1369,83 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
+  routes.post("/facts/seed", zValidator("json", seedFactsBody), async (context) => {
+    const { facts: records, userId } = context.req.valid("json");
+    const saved = [];
+
+    const prepared = await Promise.all(
+      records.map(async (record) => {
+        const existing = db
+          .select({ id: facts.id, revision: facts.revision })
+          .from(facts)
+          .where(
+            and(eq(facts.userId, userId), eq(facts.key, record.key), eq(facts.scope, record.scope)),
+          )
+          .get();
+
+        const rowId = existing?.id ?? crypto.randomUUID();
+
+        const valueEnc = await personal.sealFor(
+          userId,
+          { column: "value_enc", rowId, table: "facts" },
+          record.value,
+        );
+
+        return {
+          existing,
+          record,
+          revision: existing === undefined ? 1 : existing.revision + 1,
+          rowId,
+          valueEnc,
+        };
+      }),
+    );
+
+    for (const row of prepared) {
+      const { existing, record, revision, rowId, valueEnc } = row;
+
+      if (existing === undefined) {
+        db.insert(facts)
+          .values({
+            confirmed: record.confirmed,
+            id: rowId,
+            key: record.key,
+            revision,
+            scope: record.scope,
+            source: record.source,
+            updatedAt: new Date(clock.now()),
+            userId,
+            valueEnc,
+          })
+          .run();
+      } else {
+        db.update(facts)
+          .set({
+            confirmed: record.confirmed,
+            revision,
+            source: record.source,
+            updatedAt: new Date(clock.now()),
+            valueEnc,
+          })
+          .where(eq(facts.id, rowId))
+          .run();
+      }
+
+      saved.push({ key: record.key, revision, scope: record.scope });
+    }
+
+    return context.json({ saved });
+  });
+
   routes.post("/applications/status", zValidator("json", applicationStatusBody), (context) => {
-    const { applicationId, status, statusReason } = context.req.valid("json");
+    const { applicationId, scheduledFor, status, statusReason } = context.req.valid("json");
 
     const stage = stageForStatus(status);
 
     const updated = db
       .update(applications)
       .set({
+        scheduledFor: scheduledFor === undefined ? undefined : scheduledFor,
         status,
         statusReason,
         stage,
@@ -1901,7 +1987,7 @@ export function createTestRoutes(
       createdAt?: number;
       scheduledFor?: number;
       sentAt?: number;
-      stage?: "applied" | "screening" | "interviewing" | "closed" | "queued" | null;
+      stage?: "applied" | "screening" | "interviewing" | "closed" | "queued" | "ready" | null;
       statusReason?: string | null;
       updatedAt?: number;
     }) {
@@ -2077,7 +2163,7 @@ export function createTestRoutes(
       }
     }
 
-    for (let index = 0; index < 12; index += 1) {
+    for (let index = 0; index < 11; index += 1) {
       const postingId = addPosting(sample, "Backend Engineer", `home-ready-${String(index)}`);
 
       let scheduledFor: number;
@@ -2098,6 +2184,55 @@ export function createTestRoutes(
         status: "approved",
       });
     }
+
+    const readySeeds = [
+      {
+        company: "Northwind Labs",
+        domain: "ready-northwind.example",
+        title: "Platform Engineer",
+        token: "home-ready-northwind",
+      },
+      {
+        company: "Halden Systems",
+        domain: "ready-halden.example",
+        title: "Site Reliability Engineer",
+        token: "home-ready-halden",
+      },
+    ];
+
+    for (const entry of readySeeds) {
+      const owner = addCompany(entry.company, entry.domain, entry.token);
+      const postingId = addPosting(owner, entry.title, `${entry.token}-1`);
+
+      addApplication({
+        companyId: owner.companyId,
+        postingId,
+        stage: "ready",
+        status: "ready",
+        updatedAt: dayStart(0) + 7 * hour,
+      });
+    }
+
+    const approvedOwner = addCompany(
+      "Larkspur Health",
+      "ready-larkspur.example",
+      "home-ready-larkspur",
+    );
+
+    const approvedPosting = addPosting(
+      approvedOwner,
+      "Senior Backend Engineer",
+      "home-ready-larkspur-1",
+    );
+
+    addApplication({
+      companyId: approvedOwner.companyId,
+      postingId: approvedPosting,
+      scheduledFor: dayStart(0) + 14 * hour + 20 * minute,
+      stage: "ready",
+      status: "approved",
+      updatedAt: dayStart(0) + 7 * hour + minute,
+    });
 
     const failedOwner = addCompany("Ferro Cloud", "ferro-failed.example", "home-ferro-failed");
     const failedPosting = addPosting(failedOwner, "DevOps Engineer", "home-ferro-failed-1");

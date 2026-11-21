@@ -14,6 +14,7 @@ import { HomeKpis } from "../components/home-kpis.tsx";
 import { HomeNeedsYou } from "../components/home-needs-you.tsx";
 import { HomePauseBanner } from "../components/home-pause-banner.tsx";
 import { HomeQueue } from "../components/home-queue.tsx";
+import { HomeReadyCard } from "../components/home-ready-card.tsx";
 import { HomeStrengthen } from "../components/home-strengthen.tsx";
 import { PageHeader } from "../components/page-header.tsx";
 
@@ -70,6 +71,7 @@ export function HomePage() {
       {home?.pauseReason === null || home?.pauseReason === undefined ? null : (
         <HomePauseBanner reason={home.pauseReason} />
       )}
+      {paused || home === undefined ? null : <HomeReadyCard ready={home.ready} />}
       <div className="mt-[30px] flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-3.5">
           <h2 className="font-serif text-[26px] leading-[1.5]">{copy.home.daySoFar}</h2>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 
 import type { PointerEvent } from "react";
 
@@ -21,15 +22,40 @@ import { BoardPhoneCard } from "../components/board-phone-card.tsx";
 import { BoardSheet } from "../components/board-sheet.tsx";
 import { BoardStagePills } from "../components/board-stage-pills.tsx";
 
-const STAGE_ORDER = ["queued", "applied", "screening", "interviewing", "offer", "closed"] as const;
+const STAGE_ORDER = [
+  "queued",
+  "ready",
+  "applied",
+  "screening",
+  "interviewing",
+  "offer",
+  "closed",
+] as const;
+
+const NEXT_STAGE = {
+  applied: "screening",
+  closed: null,
+  interviewing: "offer",
+  offer: "closed",
+  queued: "applied",
+  ready: null,
+  screening: "interviewing",
+} satisfies Record<StageKey, StageKey | null>;
+
+const PREVIOUS_STAGE = {
+  applied: "queued",
+  closed: "offer",
+  interviewing: "screening",
+  offer: "interviewing",
+  queued: null,
+  ready: null,
+  screening: "applied",
+} satisfies Record<StageKey, StageKey | null>;
 
 const HOLD_MS = 250;
 
 function nextStage(current: StageKey, direction: -1 | 1) {
-  const index = STAGE_ORDER.indexOf(current);
-  const target = STAGE_ORDER[index + direction];
-
-  return target ?? null;
+  return direction === 1 ? (NEXT_STAGE[current] ?? null) : (PREVIOUS_STAGE[current] ?? null);
 }
 
 export function BoardPage() {
@@ -39,6 +65,7 @@ export function BoardPage() {
   const withdraw = useWithdraw();
   const { data: home } = useHomeData();
   const running = useRunning();
+  const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mobileStage, setMobileStage] = useState<StageKey>("queued");
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -285,6 +312,7 @@ export function BoardPage() {
     interviewing: 0,
     offer: 0,
     queued: 0,
+    ready: 0,
     screening: 0,
   };
 
@@ -294,6 +322,9 @@ export function BoardPage() {
 
   const phoneCards = columns.find((column) => column.stage === mobileStage)?.cards ?? [];
 
+  const stageTotal =
+    (board?.total ?? 0) - (columns.find((column) => column.stage === "ready")?.cards.length ?? 0);
+
   return (
     <div className="board">
       <div className="hidden flex-1 flex-col pt-[26px] pb-7 pl-8 md:flex">
@@ -302,7 +333,7 @@ export function BoardPage() {
             running.mutate(home?.running !== true);
           }}
           running={home?.running ?? true}
-          total={board?.total ?? 0}
+          total={stageTotal}
         />
         {board === undefined || board.total === 0 ? (
           <div className="mt-7 rounded-lg border border-border bg-card p-6 shadow-sh">
@@ -320,6 +351,9 @@ export function BoardPage() {
                 onPointerDown={startDrag}
                 onPointerMove={moveDrag}
                 onPointerUp={endDrag}
+                onSend={() => {
+                  void navigate("/ready");
+                }}
                 onStageKey={onKey}
                 selectedId={selectedId}
                 stage={stage}
@@ -333,7 +367,7 @@ export function BoardPage() {
         <BoardMobileHeader />
         <div className="px-5">
           <p className="serif text-[14px] text-muted-foreground italic">
-            {copy.board.lead(board?.total ?? 0)}
+            {copy.board.lead(stageTotal)}
           </p>
           <h1 className="serif text-[36px] leading-[1.05]">
             {copy.board.titlePlain} <span className="italic">{copy.board.titleItalic}</span>

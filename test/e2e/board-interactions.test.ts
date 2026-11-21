@@ -177,10 +177,20 @@ test("swiping the phone column changes the stage", async ({ boardServer, browser
   });
 
   await page.clock.install();
-  await page.mouse.move(box.x + box.width / 2, box.y + 40);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width / 2 - 120, box.y + 40, { steps: 5 });
-  await page.mouse.up();
+
+  const swipe = async () => {
+    await page.mouse.move(box.x + box.width / 2, box.y + 40);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 - 120, box.y + 40, { steps: 5 });
+    await page.mouse.up();
+  };
+
+  await swipe();
+
+  await expect(page.getByRole("tab", { name: /Ready/u })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tabpanel", { name: "Ready" })).toBeVisible();
+
+  await swipe();
 
   await expect(page.getByRole("tab", { name: /Applied/u })).toHaveAttribute(
     "aria-selected",

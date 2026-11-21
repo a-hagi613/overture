@@ -24,6 +24,10 @@ export function stageLabel(value: string | null) {
       return copy.board.columns.queued;
     }
 
+    case "ready": {
+      return copy.board.columns.ready;
+    }
+
     case "applied": {
       return copy.board.columns.applied;
     }
@@ -54,6 +58,10 @@ export function stageOf(value: string | undefined) {
   switch (value) {
     case "queued": {
       return "queued";
+    }
+
+    case "ready": {
+      return "ready";
     }
 
     case "applied": {

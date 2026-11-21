@@ -665,6 +665,28 @@ export function createHomeRoutes(deps: {
       .where(and(eq(applications.userId, userId), eq(applications.status, "ready")))
       .get();
 
+    const approvedReady = db
+      .select({ total: sql<number>`count(*)` })
+      .from(applications)
+      .where(
+        and(
+          eq(applications.userId, userId),
+          eq(applications.status, "approved"),
+          eq(applications.stage, "ready"),
+        ),
+      )
+      .get();
+
+    const readyCompanies = db
+      .select({ company: companies.name })
+      .from(applications)
+      .innerJoin(companies, eq(companies.id, applications.companyId))
+      .where(and(eq(applications.userId, userId), eq(applications.status, "ready")))
+      .orderBy(asc(applications.readyAt))
+      .limit(3)
+      .all()
+      .map((row) => row.company);
+
     const scheduled = approvedRows.flatMap((row) =>
       row.scheduledFor === null ? [] : [row.scheduledFor],
     );
@@ -693,6 +715,11 @@ export function createHomeRoutes(deps: {
       planApplications: planApplications(db, userId, now),
       queue: queueOf(userId, now),
       queued: approvedRows.length,
+      ready: {
+        approved: approvedReady?.total ?? 0,
+        companies: readyCompanies,
+        ready: readyToSend?.total ?? 0,
+      },
       readyToSend: readyToSend?.total ?? 0,
       ranges,
       recentInbox: inbox,

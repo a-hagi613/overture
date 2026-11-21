@@ -64,6 +64,11 @@ const homeResponseSchema = z.object({
   planApplications: z.number(),
   queue: z.object({ position: z.number().nullable(), sendAt: z.number().nullable() }),
   queued: z.number(),
+  ready: z.object({
+    approved: z.number(),
+    companies: z.array(z.string()),
+    ready: z.number(),
+  }),
   ranges: z.object({ "7D": rangeSchema, "30D": rangeSchema, "90D": rangeSchema }),
   recentInbox: z.array(inboxRowSchema),
   remainingToday: z.number(),

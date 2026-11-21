@@ -8,6 +8,7 @@ import { UsageRing } from "./usage-ring.tsx";
 
 const destinations = [
   { glyph: "home", to: "/" },
+  { badge: copy.sample.readyToSend, badgeTone: "ok", glyph: "ready", to: "/ready" },
   { glyph: "board", to: "/board" },
   { badge: copy.sample.reviewWaiting, badgeTone: "need", glyph: "review", to: "/review" },
   { badge: copy.sample.inboxUnread, badgeTone: "well", glyph: "inbox", to: "/inbox" },
@@ -19,11 +20,23 @@ function labelFor(destination: (typeof destinations)[number]) {
     return copy.nav[destination.glyph];
   }
 
+  if (destination.glyph === "ready") {
+    return copy.sample.readyAria;
+  }
+
   if (destination.glyph === "review") {
     return copy.shell.counters.reviewAria;
   }
 
   return copy.shell.counters.inboxAria;
+}
+
+function badgeClass(tone: "ok" | "need" | "well") {
+  if (tone === "need") {
+    return "bg-need-soft text-need";
+  }
+
+  return tone === "ok" ? "bg-ok-soft text-ok" : "bg-muted text-foreground";
 }
 
 export function BoardRail({ onExpand, name }: { onExpand: () => void; name: string | null }) {
@@ -52,13 +65,7 @@ export function BoardRail({ onExpand, name }: { onExpand: () => void; name: stri
           >
             <NavGlyph name={destination.glyph} size={20} />
             {"badge" in destination ? (
-              <span
-                className={`rb num ${
-                  destination.badgeTone === "need"
-                    ? "bg-need-soft text-need"
-                    : "bg-muted text-foreground"
-                }`}
-              >
+              <span className={`rb num ${badgeClass(destination.badgeTone)}`}>
                 {destination.badge}
               </span>
             ) : null}

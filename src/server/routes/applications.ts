@@ -26,14 +26,24 @@ import { publishEvent } from "../platform/sse/stream.ts";
 import { createTimeZoneService } from "../profile/time-zone.ts";
 import { resumeLines as splitResumeLines } from "../pipeline/grounding.ts";
 
-const STAGES = ["queued", "applied", "screening", "interviewing", "offer", "closed"] as const;
+const MOVE_STAGES = ["queued", "applied", "screening", "interviewing", "offer", "closed"] as const;
+
+const STAGES = [
+  "queued",
+  "ready",
+  "applied",
+  "screening",
+  "interviewing",
+  "offer",
+  "closed",
+] as const;
 
 const STRONG_SCORE = 80;
 
 const DAY_MS = 24 * 60 * 60_000;
 
 const stageMoveSchema = z.object({
-  stage: z.enum(STAGES),
+  stage: z.enum(MOVE_STAGES),
   position: z.number().nullable().default(null),
 });
 
@@ -140,6 +150,28 @@ function noteFor(
 
   if (options.needsYou) {
     return { label: "Needs you", tone: "need" };
+  }
+
+  if (row.stage === "ready") {
+    if (row.status === "approved") {
+      return {
+        label:
+          row.scheduledFor === null
+            ? "Approved"
+            : `Approved · ~${clockLabel(row.scheduledFor, options.timeZone)}`,
+        tone: "ok",
+      };
+    }
+
+    if (row.status === "ready") {
+      return { label: "Ready to send", tone: "ok" };
+    }
+
+    if (row.status === "sending") {
+      return { label: "Sending", tone: "muted" };
+    }
+
+    return { label: "Checking with the employer", tone: "ink" };
   }
 
   if (row.stage === "queued") {

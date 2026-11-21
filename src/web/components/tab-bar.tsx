@@ -5,6 +5,12 @@ import { NavGlyph } from "./nav-glyph.tsx";
 
 const destinations = [
   { glyph: "home", to: "/" },
+  {
+    badge: copy.sample.readyToSend,
+    badgeTone: "ok",
+    glyph: "ready",
+    to: "/ready",
+  },
   { glyph: "board", to: "/board" },
   {
     badge: copy.sample.reviewWaiting,
@@ -20,6 +26,14 @@ const destinations = [
   },
   { glyph: "profile", to: "/profile" },
 ] as const;
+
+function badgeClass(tone: "ok" | "need" | "well") {
+  if (tone === "need") {
+    return "bg-need-soft text-need";
+  }
+
+  return tone === "ok" ? "bg-ok-soft text-ok" : "bg-muted text-foreground";
+}
 
 export function TabBar() {
   return (
@@ -43,11 +57,7 @@ export function TabBar() {
               {copy.nav[destination.glyph]}
               {"badge" in destination ? (
                 <span
-                  className={`absolute left-[calc(50%+6px)] top-[5px] flex h-4 min-w-4 items-center justify-center rounded-lg px-1 text-[10px] font-bold tabular-nums ${
-                    destination.badgeTone === "need"
-                      ? "bg-need-soft text-need"
-                      : "bg-muted text-foreground"
-                  }`}
+                  className={`absolute left-[calc(50%+6px)] top-[5px] flex h-4 min-w-4 items-center justify-center rounded-lg px-1 text-[10px] font-bold tabular-nums ${badgeClass(destination.badgeTone)}`}
                 >
                   {destination.badge}
                 </span>
