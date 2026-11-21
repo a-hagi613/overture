@@ -1,4 +1,6 @@
 import type { AnswerKind, QuestionFieldType } from "../../shared/questions.ts";
+import type { AnswerSource, BlockReason } from "./answer-plan.ts";
+import type { AnswerUnit, FileFact } from "./answer-value.ts";
 
 export interface PlannedSentence {
   sentence: string;
@@ -18,6 +20,10 @@ export interface SendPlanField {
   factRevision: number | null;
   scope: string;
   sentences: PlannedSentence[];
+  source: AnswerSource | null;
+  file: FileFact | null;
+  unit: AnswerUnit | null;
+  block: BlockReason | null;
 }
 
 export interface SendPlanResume {

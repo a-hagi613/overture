@@ -93,8 +93,15 @@ const answersSchema = z.object({
       factKey: z.string().nullable(),
       scope: z.string(),
       answerKind: z.string(),
+      required: z.boolean(),
       resolved: z.boolean(),
+      source: z.string().nullable(),
       answer: z.string().nullable(),
+      file: z.string().nullable(),
+      unit: z.object({ currency: z.string().nullable(), period: z.string().nullable() }).nullable(),
+      factRevision: z.number().nullable(),
+      block: z.string().nullable(),
+      reason: z.string().nullable(),
     }),
   ),
 });
@@ -730,6 +737,17 @@ test("a required non-resume file field skips the Application even with a resume"
 
   expect(application?.status).toBe("skipped");
   expect(application?.statusReason).toBe("form_unsupported");
+
+  const portfolio = (await answersFor(owner, applicationId)).find(
+    (answer) => answer.text === "Portfolio PDF",
+  );
+
+  expect(portfolio).toMatchObject({
+    answer: null,
+    block: "unsupported_field",
+    file: null,
+    resolved: false,
+  });
 });
 
 test("a required resume file resolves once a resume is uploaded", async ({ preparation }) => {
@@ -755,6 +773,9 @@ test("a required resume file resolves once a resume is uploaded", async ({ prepa
   expect((await applicationsFor(owner, userId)).find((row) => row.id === missing)?.status).toBe(
     "skipped",
   );
+  expect(
+    (await answersFor(owner, missing)).find((answer) => answer.text === "Resume/CV"),
+  ).toMatchObject({ answer: null, block: "file_unavailable", file: "resume", resolved: false });
 
   await uploadResume(owner);
 
@@ -778,6 +799,9 @@ test("a required resume file resolves once a resume is uploaded", async ({ prepa
   expect(
     (await applicationsFor(owner, userId)).find((row) => row.id === readyApplication)?.status,
   ).toBe("ready");
+  expect(
+    (await answersFor(owner, readyApplication)).find((answer) => answer.text === "Resume/CV"),
+  ).toMatchObject({ answer: null, file: "resume", resolved: true, source: "file" });
 });
 
 test("a recorded form with a required file field does not reach ready without a resume", async ({
@@ -1560,4 +1584,643 @@ test("the recorded Greenhouse forms lose the derivable Review families", async (
 
   expect(sydneyAnswer("This role is Sydney based.")).toBe("Yes");
   expect(sydneyAnswer("Do you live in one of the following states?")).toBe("No");
+});
+
+test("ready means every required field has a built value that passed validation", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await uploadResume(owner);
+  await saveFacts(owner, [
+    { key: "email", value: "maya.okafor@mail.overture.test" },
+    { key: "salary_expectation", value: "USD 110,000 to 128,000 per year" },
+    { key: "notice_period", value: "Four weeks" },
+    { key: "earliest_start", value: "31 December 2026" },
+  ]);
+
+  const postingId = await seedQuestions(owner, {
+    atsJobId: "validated-1",
+    boardToken: "validated-co",
+    companyName: "Validated Co",
+    domain: "validated.example",
+    questions: [
+      { answerKind: "fact", factKey: "email", fieldType: "email", required: true, text: "Email" },
+      {
+        answerKind: "fact",
+        factKey: "salary_expectation",
+        fieldType: "text",
+        required: true,
+        text: "What is your salary expectation?",
+      },
+      {
+        answerKind: "fact",
+        factKey: "notice_period",
+        fieldType: "number",
+        required: true,
+        text: "How many weeks' notice can you give?",
+      },
+      {
+        answerKind: "fact",
+        factKey: "earliest_start",
+        fieldType: "date",
+        required: true,
+        text: "Earliest start date",
+      },
+      {
+        answerKind: "unknown",
+        fieldType: "file",
+        required: true,
+        text: "Resume/CV",
+      },
+      {
+        answerKind: "consent",
+        fieldType: "select",
+        options: ["Acknowledge/Confirm"],
+        required: true,
+        text: "Please review and acknowledge our privacy notice.",
+      },
+      {
+        answerKind: "consent",
+        fieldType: "checkbox",
+        required: true,
+        text: "I acknowledge that I have read the privacy notice.",
+      },
+    ],
+    title: "Staff Platform Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  expect(
+    (await applicationsFor(owner, userId)).find((row) => row.id === applicationId)?.status,
+  ).toBe("ready");
+
+  const answers = await answersFor(owner, applicationId);
+
+  expect(answers).toHaveLength(7);
+
+  for (const answer of answers) {
+    expect(answer.block).toBeNull();
+
+    if (answer.required) {
+      expect(answer.resolved).toBe(true);
+    }
+  }
+
+  const byText = new Map(answers.map((answer) => [answer.text, answer]));
+
+  expect(byText.get("What is your salary expectation?")).toMatchObject({
+    answer: "USD 110,000 to 128,000 per year",
+    resolved: true,
+    source: "fact",
+    unit: { currency: "USD", period: "year" },
+  });
+  expect(byText.get("How many weeks' notice can you give?")).toMatchObject({
+    answer: "4",
+    resolved: true,
+    unit: { currency: null, period: "week" },
+  });
+  expect(byText.get("Earliest start date")).toMatchObject({
+    answer: "2026-12-31",
+    resolved: true,
+  });
+  expect(byText.get("Resume/CV")).toMatchObject({
+    answer: null,
+    file: "resume",
+    resolved: true,
+    source: "file",
+  });
+  expect(byText.get("Please review and acknowledge our privacy notice.")).toMatchObject({
+    answer: "Acknowledge/Confirm",
+    resolved: true,
+    source: "consent",
+  });
+  expect(byText.get("I acknowledge that I have read the privacy notice.")).toMatchObject({
+    answer: "Yes",
+    resolved: true,
+    source: "consent",
+  });
+});
+
+test("a required value that fails its field type never reaches ready", async ({ preparation }) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await saveFacts(owner, [{ key: "email", value: "not an email address" }]);
+
+  const postingId = await seedQuestions(owner, {
+    atsJobId: "invalid-email-1",
+    boardToken: "invalid-email",
+    companyName: "Invalid Email Co",
+    domain: "invalid-email.example",
+    questions: [
+      { answerKind: "fact", factKey: "email", fieldType: "email", required: true, text: "Email" },
+    ],
+    title: "Backend Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  expect(
+    (await applicationsFor(owner, userId)).find((row) => row.id === applicationId)?.status,
+  ).toBe("needs_review");
+
+  const email = (await answersFor(owner, applicationId)).find((answer) => answer.text === "Email");
+
+  expect(email).toMatchObject({
+    answer: null,
+    block: "type_mismatch",
+    resolved: false,
+    source: null,
+  });
+  expect(
+    (await reviewsFor(owner, userId)).reviews.filter((review) => review.status === "open"),
+  ).toHaveLength(1);
+});
+
+test("a marketing opt-in is never checked, and a required one skips", async ({ preparation }) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  const question = {
+    answerKind: "skip" as const,
+    fieldType: "select" as const,
+    options: ["Yes", "No"],
+    text: "Do you opt-in to receive WhatsApp messages from Stripe Recruiting?",
+  };
+
+  const optionalPosting = await seedQuestions(owner, {
+    atsJobId: "marketing-optional-1",
+    boardToken: "marketing-optional",
+    companyName: "Marketing Optional Co",
+    domain: "marketing-optional.example",
+    questions: [{ ...question, required: false }],
+    title: "Backend Engineer",
+  });
+
+  const optionalApplication = await seedApplication(owner, {
+    postingId: optionalPosting,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, optionalApplication);
+
+  expect(
+    (await applicationsFor(owner, userId)).find((row) => row.id === optionalApplication)?.status,
+  ).toBe("ready");
+
+  const marketing = (await answersFor(owner, optionalApplication)).find((answer) =>
+    answer.text.startsWith("Do you opt-in"),
+  );
+
+  expect(marketing).toMatchObject({
+    answer: null,
+    block: "marketing_opt_in",
+    resolved: false,
+    source: null,
+  });
+  expect(["Yes", "No"]).not.toContain(marketing?.answer);
+
+  const requiredPosting = await seedQuestions(owner, {
+    atsJobId: "marketing-required-1",
+    boardToken: "marketing-required",
+    companyName: "Marketing Required Co",
+    domain: "marketing-required.example",
+    questions: [{ ...question, required: true }],
+    title: "Backend Engineer",
+  });
+
+  const requiredApplication = await seedApplication(owner, {
+    postingId: requiredPosting,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, requiredApplication);
+
+  const required = (await applicationsFor(owner, userId)).find(
+    (row) => row.id === requiredApplication,
+  );
+
+  expect(required?.status).toBe("skipped");
+  expect(required?.statusReason).toBe("form_unsupported");
+});
+
+test("a privacy consent that only offers a refusal is never accepted", async ({ preparation }) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  const postingId = await seedQuestions(owner, {
+    atsJobId: "consent-refusal-1",
+    boardToken: "consent-refusal",
+    companyName: "Consent Refusal Co",
+    domain: "consent-refusal.example",
+    questions: [
+      {
+        answerKind: "consent",
+        fieldType: "select",
+        options: ["I do not consent"],
+        required: true,
+        text: "Please review and acknowledge our privacy notice.",
+      },
+    ],
+    title: "Backend Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const application = (await applicationsFor(owner, userId)).find(
+    (row) => row.id === applicationId,
+  );
+
+  expect(application?.status).toBe("skipped");
+  expect(application?.statusReason).toBe("form_unsupported");
+
+  const consent = (await answersFor(owner, applicationId)).find((answer) =>
+    answer.text.startsWith("Please review and acknowledge"),
+  );
+
+  expect(consent).toMatchObject({ answer: null, block: "unsupported_field", resolved: false });
+});
+
+test("a cover-letter file slot maps to the cover-letter Fact and never the resume", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await uploadResume(owner);
+  await saveFacts(owner, [{ key: "email", value: "maya.okafor@mail.overture.test" }]);
+
+  const optionalPosting = await seedQuestions(owner, {
+    atsJobId: "cover-letter-optional-1",
+    boardToken: "cover-letter-optional",
+    companyName: "Cover Letter Optional Co",
+    domain: "cover-letter-optional.example",
+    questions: [
+      { answerKind: "fact", factKey: "email", fieldType: "email", required: true, text: "Email" },
+      { answerKind: "open_text", fieldType: "file", required: false, text: "Cover Letter" },
+    ],
+    title: "Backend Engineer",
+  });
+
+  const optionalApplication = await seedApplication(owner, {
+    postingId: optionalPosting,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, optionalApplication);
+
+  expect(
+    (await applicationsFor(owner, userId)).find((row) => row.id === optionalApplication)?.status,
+  ).toBe("ready");
+
+  const coverLetter = (await answersFor(owner, optionalApplication)).find(
+    (answer) => answer.text === "Cover Letter",
+  );
+
+  expect(coverLetter).toMatchObject({
+    answer: null,
+    block: "file_unavailable",
+    file: "cover_letter",
+    resolved: false,
+  });
+  expect(coverLetter?.file).not.toBe("resume");
+
+  const requiredPosting = await seedQuestions(owner, {
+    atsJobId: "cover-letter-required-1",
+    boardToken: "cover-letter-required",
+    companyName: "Cover Letter Required Co",
+    domain: "cover-letter-required.example",
+    questions: [
+      { answerKind: "open_text", fieldType: "file", required: true, text: "Cover Letter" },
+    ],
+    title: "Backend Engineer",
+  });
+
+  const requiredApplication = await seedApplication(owner, {
+    postingId: requiredPosting,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, requiredApplication);
+
+  const required = (await applicationsFor(owner, userId)).find(
+    (row) => row.id === requiredApplication,
+  );
+
+  expect(required?.status).toBe("skipped");
+  expect(required?.statusReason).toBe("form_unsupported");
+});
+
+test("a salary keeps its currency and period in text and number fields", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await saveFacts(owner, [{ key: "salary_expectation", value: "140,000 CAD a year" }]);
+
+  const postingId = await seedQuestions(owner, {
+    atsJobId: "salary-kept-1",
+    boardToken: "salary-kept",
+    companyName: "Salary Kept Co",
+    domain: "salary-kept.example",
+    questions: [
+      {
+        answerKind: "fact",
+        factKey: "salary_expectation",
+        fieldType: "text",
+        required: true,
+        text: "What is your salary expectation?",
+      },
+      {
+        answerKind: "fact",
+        factKey: "salary_expectation",
+        fieldType: "number",
+        required: true,
+        text: "Expected annual salary in CAD",
+      },
+    ],
+    title: "Backend Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  expect(
+    (await applicationsFor(owner, userId)).find((row) => row.id === applicationId)?.status,
+  ).toBe("ready");
+
+  const answers = await answersFor(owner, applicationId);
+  const byText = new Map(answers.map((answer) => [answer.text, answer]));
+
+  expect(byText.get("What is your salary expectation?")).toMatchObject({
+    answer: "140,000 CAD a year",
+    unit: { currency: "CAD", period: "year" },
+  });
+  expect(byText.get("Expected annual salary in CAD")).toMatchObject({
+    answer: "140000",
+    unit: { currency: "CAD", period: "year" },
+  });
+});
+
+test("a salary range is never silently truncated to one number", async ({ preparation }) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await saveFacts(owner, [{ key: "salary_expectation", value: "USD 110,000 to 128,000 per year" }]);
+
+  const postingId = await seedQuestions(owner, {
+    atsJobId: "salary-range-1",
+    boardToken: "salary-range",
+    companyName: "Salary Range Co",
+    domain: "salary-range.example",
+    questions: [
+      {
+        answerKind: "fact",
+        factKey: "salary_expectation",
+        fieldType: "number",
+        required: true,
+        text: "What is your expected annual salary?",
+      },
+    ],
+    title: "Backend Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  expect(
+    (await applicationsFor(owner, userId)).find((row) => row.id === applicationId)?.status,
+  ).toBe("needs_review");
+
+  const answer = (await answersFor(owner, applicationId)).find((row) =>
+    row.text.startsWith("What is your expected annual salary"),
+  );
+
+  expect(answer).toMatchObject({
+    answer: null,
+    block: "type_mismatch",
+    resolved: false,
+  });
+});
+
+test("a notice period keeps its unit and never becomes a bare number", async ({ preparation }) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await saveFacts(owner, [{ key: "notice_period", value: "Four weeks" }]);
+
+  const withUnit = await seedQuestions(owner, {
+    atsJobId: "notice-weeks-1",
+    boardToken: "notice-weeks",
+    companyName: "Notice Weeks Co",
+    domain: "notice-weeks.example",
+    questions: [
+      {
+        answerKind: "fact",
+        factKey: "notice_period",
+        fieldType: "number",
+        required: true,
+        text: "How many weeks' notice can you give?",
+      },
+    ],
+    title: "Backend Engineer",
+  });
+
+  const withUnitApplication = await seedApplication(owner, {
+    postingId: withUnit,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, withUnitApplication);
+
+  expect(
+    (await applicationsFor(owner, userId)).find((row) => row.id === withUnitApplication)?.status,
+  ).toBe("ready");
+
+  expect(
+    (await answersFor(owner, withUnitApplication)).find((answer) =>
+      answer.text.startsWith("How many weeks"),
+    ),
+  ).toMatchObject({ answer: "4", unit: { currency: null, period: "week" } });
+
+  const withoutUnit = await seedQuestions(owner, {
+    atsJobId: "notice-bare-1",
+    boardToken: "notice-bare",
+    companyName: "Notice Bare Co",
+    domain: "notice-bare.example",
+    questions: [
+      {
+        answerKind: "fact",
+        factKey: "notice_period",
+        fieldType: "number",
+        required: true,
+        text: "Notice period",
+      },
+    ],
+    title: "Backend Engineer",
+  });
+
+  const withoutUnitApplication = await seedApplication(owner, {
+    postingId: withoutUnit,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, withoutUnitApplication);
+
+  expect(
+    (await applicationsFor(owner, userId)).find((row) => row.id === withoutUnitApplication)?.status,
+  ).toBe("needs_review");
+
+  expect(
+    (await answersFor(owner, withoutUnitApplication)).find(
+      (answer) => answer.text === "Notice period",
+    ),
+  ).toMatchObject({ answer: null, block: "type_mismatch", resolved: false });
+});
+
+test("a date is formatted from the Fact, not the server's time zone", async ({ preparation }) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  const postingId = await seedQuestions(owner, {
+    atsJobId: "date-last-day-1",
+    boardToken: "date-last-day",
+    companyName: "Date Last Day Co",
+    domain: "date-last-day.example",
+    questions: [
+      {
+        answerKind: "fact",
+        factKey: "earliest_start",
+        fieldType: "date",
+        required: true,
+        text: "Earliest start date",
+      },
+    ],
+    title: "Backend Engineer",
+  });
+
+  await saveFacts(owner, [{ key: "earliest_start", value: "31 December 2026" }]);
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  expect(
+    (await applicationsFor(owner, userId)).find((row) => row.id === applicationId)?.status,
+  ).toBe("ready");
+  expect(
+    (await answersFor(owner, applicationId)).find(
+      (answer) => answer.text === "Earliest start date",
+    ),
+  ).toMatchObject({ answer: "2026-12-31", resolved: true });
+
+  const vaguePosting = await seedQuestions(owner, {
+    atsJobId: "date-vague-1",
+    boardToken: "date-vague",
+    companyName: "Date Vague Co",
+    domain: "date-vague.example",
+    questions: [
+      {
+        answerKind: "fact",
+        factKey: "earliest_start",
+        fieldType: "date",
+        required: true,
+        text: "Earliest start date",
+      },
+    ],
+    title: "Backend Engineer",
+  });
+
+  await saveFacts(owner, [{ key: "earliest_start", value: "ASAP" }]);
+
+  const vagueApplication = await seedApplication(owner, {
+    postingId: vaguePosting,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, vagueApplication);
+
+  expect(
+    (await applicationsFor(owner, userId)).find((row) => row.id === vagueApplication)?.status,
+  ).toBe("needs_review");
+  expect(
+    (await answersFor(owner, vagueApplication)).find(
+      (answer) => answer.text === "Earliest start date",
+    ),
+  ).toMatchObject({ answer: null, block: "type_mismatch", resolved: false });
+});
+
+test("a salary in another currency never fills a field that names one", async ({ preparation }) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await saveFacts(owner, [{ key: "salary_expectation", value: "140,000 CAD a year" }]);
+
+  const postingId = await seedQuestions(owner, {
+    atsJobId: "salary-currency-1",
+    boardToken: "salary-currency",
+    companyName: "Salary Currency Co",
+    domain: "salary-currency.example",
+    questions: [
+      {
+        answerKind: "fact",
+        factKey: "salary_expectation",
+        fieldType: "number",
+        required: true,
+        text: "Expected annual salary in EUR",
+      },
+    ],
+    title: "Backend Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  expect(
+    (await applicationsFor(owner, userId)).find((row) => row.id === applicationId)?.status,
+  ).toBe("needs_review");
+
+  expect(
+    (await answersFor(owner, applicationId)).find(
+      (answer) => answer.text === "Expected annual salary in EUR",
+    ),
+  ).toMatchObject({ answer: null, block: "type_mismatch", resolved: false });
 });

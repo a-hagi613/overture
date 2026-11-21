@@ -6,13 +6,13 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
-import type { FactRecord } from "../profile/facts.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { AnswerKind, QuestionFieldType, ReviewReason } from "../../shared/questions.ts";
-import type { Targets } from "../../shared/targets.ts";
+import type { AnswerSource, BlockReason, PlanResolution } from "./answer-plan.ts";
+import type { AnswerUnit, FileFact } from "./answer-value.ts";
 import type { QuestionSource } from "../catalog/greenhouse-questions.ts";
 import type { GroundedAnswer } from "./open-text.ts";
-import type { DerivationFact, PostingPlace } from "../catalog/answer-derivations.ts";
+import type { PostingPlace } from "../catalog/answer-derivations.ts";
 
 import {
   applicationAnswers,
@@ -30,22 +30,7 @@ import { createOpenTextService, isCoverLetterQuestion } from "./open-text.ts";
 import { createTargetsService } from "../profile/targets.ts";
 import { mapQuestionsWithLlm } from "../catalog/question-mapping.ts";
 import { createQuestionCatalog, questionInputsFromAts } from "../catalog/questions.ts";
-import { resolveLocation } from "../catalog/geo.ts";
-import {
-  deriveAnswer,
-  isDerivationKey,
-  isTargetDerivationKey,
-} from "../catalog/answer-derivations.ts";
-import {
-  AFFIRMATIVE_OPTION,
-  NEGATIVE_OPTION,
-  affirmativeOption,
-  countriesNamedIn,
-  matchOption,
-  normalizeQuestionText,
-  referencesUserCountry,
-} from "../catalog/question-normalize.ts";
-import { isCountryScopedFactKey } from "../../shared/facts.ts";
+import { indexFacts, isUnsupportedBlock, resolveQuestion } from "./answer-plan.ts";
 import {
   attachApplication,
   detachApplication,
@@ -94,422 +79,137 @@ function employerNames(facts: ReadonlyMap<string, string>) {
 
 const PREPARABLE_STATUSES = ["preparing", "needs_review", "ready"] as const;
 
-const AFFIRMATIVE_FACT_VALUES = new Set([
-  "1",
-  "agree",
-  "agreed",
-  "authorised",
-  "authorized",
-  "citizen",
-  "eligible",
-  "i agree",
-  "i am authorised",
-  "i am authorized",
-  "permanent resident",
-  "true",
-  "y",
-  "yes",
-]);
-
-const NEGATIVE_FACT_VALUES = new Set([
-  "0",
-  "disagree",
-  "false",
-  "i do not require sponsorship",
-  "i will not require sponsorship",
-  "n",
-  "no",
-  "not authorised",
-  "not authorized",
-  "none",
-]);
-
-interface ScopedFactEntry {
-  scope: string;
-  value: string;
-}
-
-interface FactIndex {
-  unscoped: ReadonlyMap<string, string>;
-  scoped: ReadonlyMap<string, ReadonlyMap<string, string>>;
-  all: ReadonlyMap<string, readonly ScopedFactEntry[]>;
-  details: ReadonlyMap<string, DerivationFact>;
-}
-
-interface ResolveInput {
-  questionText: string;
-  required: boolean;
+interface BlockedQuestion {
+  questionId: string;
+  factKey: string | null;
+  prompt: string;
   fieldType: QuestionFieldType;
-  options: readonly string[];
+  options: string[];
+  scope: string;
+  reason: ReviewReason;
+}
+
+interface PreparedAnswer {
+  questionId: string;
+  text: string;
+  fieldName: string | null;
+  fieldType: QuestionFieldType;
   answerKind: AnswerKind;
   factKey: string | null;
-  facts: FactIndex;
-  targets: Targets;
-  posting: PostingPlace;
-  hasResume: boolean;
-}
-
-function indexFacts(records: readonly FactRecord[]) {
-  const unscoped = new Map<string, string>();
-  const scoped = new Map<string, Map<string, string>>();
-  const all = new Map<string, ScopedFactEntry[]>();
-  const details = new Map<string, DerivationFact>();
-
-  for (const record of records) {
-    if (record.scope === "") {
-      unscoped.set(record.key, record.value);
-      details.set(record.key, { value: record.value, confirmed: record.confirmed });
-    } else {
-      const byScope = scoped.get(record.key) ?? new Map<string, string>();
-
-      byScope.set(record.scope, record.value);
-      scoped.set(record.key, byScope);
-    }
-
-    const entries = all.get(record.key) ?? [];
-
-    entries.push({ scope: record.scope, value: record.value });
-    all.set(record.key, entries);
-  }
-
-  return { unscoped, scoped, all, details } satisfies FactIndex;
-}
-
-type QuestionScope = { kind: "country"; code: string } | { kind: "multiple" } | { kind: "generic" };
-
-type ScopedLookup =
-  | { kind: "answer"; value: string; scope: string }
-  | { kind: "review"; scope: string };
-
-function questionScope(questionText: string, facts: FactIndex) {
-  const named = countriesNamedIn(questionText);
-
-  if (named.length > 1) {
-    return { kind: "multiple" } satisfies QuestionScope;
-  }
-
-  const [code] = named;
-
-  if (code !== undefined) {
-    return { kind: "country", code } satisfies QuestionScope;
-  }
-
-  if (referencesUserCountry(questionText)) {
-    const resident = facts.unscoped.get("current_country");
-    const countryCode = resident === undefined ? null : resolveLocation(resident).countryCode;
-
-    if (countryCode !== null) {
-      return { kind: "country", code: countryCode } satisfies QuestionScope;
-    }
-  }
-
-  return { kind: "generic" } satisfies QuestionScope;
-}
-
-function lookupScopedFact(key: string, questionText: string, facts: FactIndex) {
-  const scope = questionScope(questionText, facts);
-
-  if (scope.kind === "country") {
-    const value = facts.scoped.get(key)?.get(scope.code);
-
-    return value === undefined
-      ? ({ kind: "review", scope: scope.code } satisfies ScopedLookup)
-      : ({ kind: "answer", value, scope: scope.code } satisfies ScopedLookup);
-  }
-
-  const unscoped = facts.unscoped.get(key);
-
-  if (unscoped !== undefined) {
-    return { kind: "answer", value: unscoped, scope: "" } satisfies ScopedLookup;
-  }
-
-  if (scope.kind === "multiple") {
-    return { kind: "review", scope: "" } satisfies ScopedLookup;
-  }
-
-  const values = new Set((facts.all.get(key) ?? []).map((entry) => entry.value));
-  const [only] = [...values];
-
-  if (values.size === 1 && only !== undefined) {
-    return { kind: "answer", value: only, scope: "" } satisfies ScopedLookup;
-  }
-
-  return { kind: "review", scope: "" } satisfies ScopedLookup;
-}
-
-function splitName(value: string) {
-  const parts = value
-    .trim()
-    .split(/\s+/u)
-    .filter((part) => part !== "");
-
-  return { first: parts.at(0) ?? "", last: parts.at(-1) ?? "" };
-}
-
-interface FormattedValue {
-  value: string | null;
-  reason: ReviewReason | null;
-}
-
-const formatted: (value: string | null) => FormattedValue = (value) => ({
-  value,
-  reason: null,
-});
-
-const OPTION_MISSING_VALUE: FormattedValue = { value: null, reason: "option_missing" };
-
-function formatSelectValue(value: string, options: readonly string[]) {
-  if (options.length === 0) {
-    const folded = value.trim().toLowerCase();
-
-    if (AFFIRMATIVE_FACT_VALUES.has(folded)) {
-      return formatted(AFFIRMATIVE_OPTION);
-    }
-
-    if (NEGATIVE_FACT_VALUES.has(folded)) {
-      return formatted(NEGATIVE_OPTION);
-    }
-
-    return formatted(null);
-  }
-
-  const match = matchOption(value, options);
-
-  return match.matched ? formatted(match.option) : OPTION_MISSING_VALUE;
-}
-
-function formatMultiselectValue(value: string, options: readonly string[]) {
-  const parts = value
-    .split(/[,;|]/u)
-    .map((part) => part.trim())
-    .filter((part) => part !== "");
-
-  const matches = parts.map((part) => matchOption(part, options));
-  const matched = matches.filter((match) => match.matched);
-
-  if (matched.length !== matches.length) {
-    return OPTION_MISSING_VALUE;
-  }
-
-  return formatted(matched.map((match) => match.option).join(", "));
-}
-
-function formatFactValue(input: {
-  questionText: string;
-  fieldType: QuestionFieldType;
-  options: readonly string[];
-  value: string;
-}) {
-  const value = input.value.trim();
-
-  if (value === "") {
-    return formatted(null);
-  }
-
-  const normalizedQuestion = normalizeQuestionText(input.questionText);
-
-  if (
-    input.fieldType === "select" ||
-    input.fieldType === "radio" ||
-    input.fieldType === "checkbox"
-  ) {
-    return formatSelectValue(value, input.options);
-  }
-
-  if (input.fieldType === "multiselect") {
-    return formatMultiselectValue(value, input.options);
-  }
-
-  if (input.fieldType === "email") {
-    return formatted(value.includes("@") ? value : null);
-  }
-
-  if (input.fieldType === "phone") {
-    const digits = value.replaceAll(/[^0-9]/gu, "");
-
-    return formatted(digits.length >= 7 ? value : null);
-  }
-
-  if (input.fieldType === "url") {
-    return formatted(URL.canParse(value) || /^[a-z][a-z0-9+.-]*:/iu.test(value) ? value : null);
-  }
-
-  if (input.fieldType === "number") {
-    const number = /[0-9]+(?:\.[0-9]+)?/u.exec(value);
-
-    return formatted(number?.[0] ?? null);
-  }
-
-  if (input.fieldType === "date") {
-    const parsed = new Date(value);
-
-    return formatted(Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10));
-  }
-
-  if (normalizedQuestion === "first name" || normalizedQuestion === "given name") {
-    const name = splitName(value).first;
-
-    return formatted(name === "" ? null : name);
-  }
-
-  if (
-    normalizedQuestion === "last name" ||
-    normalizedQuestion === "family name" ||
-    normalizedQuestion === "surname"
-  ) {
-    const name = splitName(value).last;
-
-    return formatted(name === "" ? null : name);
-  }
-
-  return formatted(value);
-}
-
-const resolveQuestion: (input: ResolveInput) => Resolution = resolveQuestionValue;
-
-const STANDARD_CONSENT =
-  /\b(?:privacy|data processing|terms|acknowledg|accuracy|double check|double-check)\b/u;
-
-const MARKETING_CONSENT =
-  /\b(?:marketing|newsletter|promotion|job alerts|talent pool|whatsapp|sms|text messages)\b/u;
-
-const RESUME_QUESTION = /\b(?:resume|cv|curriculum vitae)\b/u;
-
-type ResolutionKind = "ready" | "needs_review" | "skip";
-
-interface Resolution {
-  kind: ResolutionKind;
+  required: boolean;
+  options: string[];
+  resolved: boolean;
+  source: AnswerSource | null;
   answer: string | null;
+  file: FileFact | null;
+  unit: AnswerUnit | null;
+  factRevision: number | null;
   scope: string;
+  block: BlockReason | null;
   reason: ReviewReason | null;
+  sentences: { sentence: string; resumeLineIds: string[] }[];
 }
 
-function consentAnswer(questionText: string, options: readonly string[]) {
-  const normalized = normalizeQuestionText(questionText);
-
-  if (!STANDARD_CONSENT.test(normalized) || MARKETING_CONSENT.test(normalized)) {
-    return null;
-  }
-
-  const [single] = options;
-
-  if (options.length === 1 && single !== undefined) {
-    return single;
-  }
-
-  return affirmativeOption(options) ?? (options.length === 0 ? AFFIRMATIVE_OPTION : null);
+function reviewReasonFor(reason: BlockReason) {
+  return reason === "option_mismatch" ? "option_missing" : "unknown_required";
 }
 
-const SKIPPED_FORM: Resolution = { kind: "skip", answer: null, scope: "", reason: null };
+function toPreparedAnswer(input: {
+  question: {
+    questionId: string;
+    textDisplay: string;
+    fieldName: string | null;
+    fieldType: QuestionFieldType;
+    answerKind: AnswerKind;
+    factKey: string | null;
+    required: boolean;
+  };
+  options: string[];
+  resolution: PlanResolution;
+  sentences: { sentence: string; resumeLineIds: string[] }[];
+}) {
+  const common = {
+    questionId: input.question.questionId,
+    text: input.question.textDisplay,
+    fieldName: input.question.fieldName,
+    fieldType: input.question.fieldType,
+    answerKind: input.question.answerKind,
+    factKey: input.question.factKey,
+    required: input.question.required,
+    options: input.options,
+    sentences: input.sentences,
+  };
 
-function reviewFor(scope: string, reason: ReviewReason = "unknown_required") {
-  return { kind: "needs_review", answer: null, scope, reason } satisfies Resolution;
+  if (input.resolution.kind === "answer") {
+    return {
+      ...common,
+      resolved: true,
+      source: input.resolution.source,
+      answer: input.resolution.value,
+      file: input.resolution.file,
+      unit: input.resolution.unit,
+      factRevision: input.resolution.factRevision,
+      scope: input.resolution.scope,
+      block: null,
+      reason: null,
+    } satisfies PreparedAnswer;
+  }
+
+  if (input.resolution.kind === "blocked") {
+    return {
+      ...common,
+      resolved: false,
+      source: null,
+      answer: null,
+      file: input.resolution.file,
+      unit: null,
+      factRevision: null,
+      scope: input.resolution.scope,
+      block: input.resolution.reason,
+      reason: reviewReasonFor(input.resolution.reason),
+    } satisfies PreparedAnswer;
+  }
+
+  return {
+    ...common,
+    resolved: false,
+    source: null,
+    answer: null,
+    file: input.resolution.file,
+    unit: null,
+    factRevision: null,
+    scope: "",
+    block: input.resolution.reason,
+    reason: null,
+  } satisfies PreparedAnswer;
 }
 
-function ready(answer: string | null, scope = "") {
-  return { kind: "ready", answer, scope, reason: null } satisfies Resolution;
-}
-
-function resolveQuestionValue(input: ResolveInput) {
-  const { required } = input;
-
-  if (input.fieldType === "file") {
-    if (RESUME_QUESTION.test(normalizeQuestionText(input.questionText))) {
-      return input.hasResume || !required ? ready(null) : SKIPPED_FORM;
-    }
-
-    return required ? SKIPPED_FORM : ready(null);
+function openTextResolution(
+  saved: { sentence: string; resumeLineIds: string[] }[] | null,
+  required: boolean,
+) {
+  if (saved !== null) {
+    return {
+      kind: "answer",
+      value: saved.map((sentence) => sentence.sentence).join(" "),
+      source: "open_text",
+      file: null,
+      unit: null,
+      scope: "",
+      factRevision: null,
+    } satisfies PlanResolution;
   }
 
-  if (input.answerKind === "consent") {
-    const answer = consentAnswer(input.questionText, input.options);
-
-    if (answer !== null) {
-      return ready(answer);
-    }
-
-    return required ? SKIPPED_FORM : ready(null);
+  if (required) {
+    return {
+      kind: "blocked",
+      reason: "open_text_ungrounded",
+      scope: "",
+      file: null,
+    } satisfies PlanResolution;
   }
 
-  if (input.answerKind === "skip") {
-    return required ? SKIPPED_FORM : ready(null);
-  }
-
-  if (input.answerKind === "target" || input.answerKind === "derived") {
-    const key = input.factKey;
-
-    if (
-      key === null ||
-      !isDerivationKey(key) ||
-      (input.answerKind === "target") !== isTargetDerivationKey(key)
-    ) {
-      return required ? reviewFor("") : ready(null);
-    }
-
-    const derived = deriveAnswer(key, {
-      questionText: input.questionText,
-      fieldType: input.fieldType,
-      options: input.options,
-      targets: input.targets,
-      posting: input.posting,
-      facts: input.facts.details,
-    });
-
-    if (derived !== null) {
-      return ready(derived);
-    }
-
-    return required ? reviewFor("") : ready(null);
-  }
-
-  if (input.answerKind !== "fact" || input.factKey === null) {
-    return required ? reviewFor("") : ready(null);
-  }
-
-  if (isCountryScopedFactKey(input.factKey)) {
-    const lookup = lookupScopedFact(input.factKey, input.questionText, input.facts);
-
-    if (lookup.kind === "review") {
-      return required ? reviewFor(lookup.scope) : ready(null);
-    }
-
-    const scopedAnswer = formatFactValue({
-      questionText: input.questionText,
-      fieldType: input.fieldType,
-      options: input.options,
-      value: lookup.value,
-    });
-
-    if (scopedAnswer.value !== null) {
-      return ready(scopedAnswer.value, lookup.scope);
-    }
-
-    return required
-      ? reviewFor(lookup.scope, scopedAnswer.reason ?? "unknown_required")
-      : ready(null);
-  }
-
-  const value = input.facts.unscoped.get(input.factKey);
-
-  const answer =
-    value === undefined
-      ? formatted(null)
-      : formatFactValue({
-          questionText: input.questionText,
-          fieldType: input.fieldType,
-          options: input.options,
-          value,
-        });
-
-  if (answer.value !== null) {
-    return ready(answer.value);
-  }
-
-  if (!required) {
-    return ready(null);
-  }
-
-  return reviewFor("", answer.reason ?? "unknown_required");
+  return { kind: "blank", reason: "optional_unfilled", file: null } satisfies PlanResolution;
 }
 
 export function createPreparationService(deps: {
@@ -789,15 +489,8 @@ export function createPreparationService(deps: {
       locationRaw: row.locationRaw,
     };
 
-    const blocked: {
-      questionId: string;
-      factKey: string | null;
-      prompt: string;
-      fieldType: QuestionFieldType;
-      options: string[];
-      scope: string;
-      reason: ReviewReason;
-    }[] = [];
+    const blocked: BlockedQuestion[] = [];
+    const resolutions = new Map<string, PlanResolution>();
 
     const openTextQuestions: {
       questionId: string;
@@ -835,22 +528,25 @@ export function createPreparationService(deps: {
         targets: settings.targets,
         posting,
         hasResume: resume !== undefined,
+        hasCoverLetter: false,
       });
 
-      if (resolution.kind === "skip") {
-        unsupportedReason ??= "form_unsupported";
-      }
+      resolutions.set(question.questionId, resolution);
 
-      if (resolution.kind === "needs_review") {
-        blocked.push({
-          questionId: question.questionId,
-          factKey: question.answerKind === "fact" ? question.factKey : null,
-          prompt: question.textDisplay,
-          fieldType: question.fieldType,
-          options,
-          scope: resolution.scope,
-          reason: resolution.reason ?? "unknown_required",
-        });
+      if (resolution.kind === "blocked") {
+        if (isUnsupportedBlock(resolution.reason)) {
+          unsupportedReason ??= "form_unsupported";
+        } else {
+          blocked.push({
+            questionId: question.questionId,
+            factKey: question.answerKind === "fact" ? question.factKey : null,
+            prompt: question.textDisplay,
+            fieldType: question.fieldType,
+            options,
+            scope: resolution.scope,
+            reason: reviewReasonFor(resolution.reason),
+          });
+        }
       }
     }
 
@@ -896,13 +592,30 @@ export function createPreparationService(deps: {
     }
 
     for (const question of openTextQuestions) {
-      if (!generated.has(question.questionId)) {
+      const answer = generated.get(question.questionId) ?? null;
+
+      if (answer === null) {
         clearSentences(applicationId, question.questionId);
 
         if (question.required) {
           unsupportedReason ??= "open_text_ungrounded";
         }
       }
+
+      resolutions.set(
+        question.questionId,
+        openTextResolution(answer?.sentences ?? null, question.required),
+      );
+    }
+
+    const complete = questionRows.every((question) => {
+      const resolution = resolutions.get(question.questionId);
+
+      return !question.required || resolution?.kind === "answer";
+    });
+
+    if (!complete && unsupportedReason === null && blocked.length === 0) {
+      unsupportedReason = "form_unsupported";
     }
 
     syncReviews({
@@ -991,10 +704,6 @@ export function createPreparationService(deps: {
       locationRaw: row.locationRaw,
     };
 
-    const factRevisions = new Map(
-      factRows.map((fact) => [`${fact.key}\u0000${fact.scope}`, fact.revision]),
-    );
-
     const resume = db
       .select()
       .from(resumes)
@@ -1013,16 +722,20 @@ export function createPreparationService(deps: {
           return {
             answer: saved === null ? null : saved.map((sentence) => sentence.sentence).join(" "),
             answerKind: question.answerKind,
+            block: saved === null ? "optional_unfilled" : null,
             factKey: question.factKey,
             factRevision: null,
             fieldName: question.fieldName,
             fieldType: question.fieldType,
+            file: null,
             label: question.textDisplay,
             options,
             questionId: question.questionId,
             required: question.required,
             scope: "",
             sentences: saved ?? [],
+            source: saved === null ? null : "open_text",
+            unit: null,
           } satisfies SendPlanField;
         }
 
@@ -1037,24 +750,31 @@ export function createPreparationService(deps: {
           targets: settings.targets,
           posting,
           hasResume: resume !== undefined,
+          hasCoverLetter: false,
         });
 
+        const resolved = resolution.kind === "answer" ? resolution : null;
+
         return {
-          answer: question.fieldType === "file" ? null : resolution.answer,
-          answerKind: question.answerKind,
-          factKey: question.factKey,
-          factRevision:
-            question.factKey === null
+          answer:
+            resolved === null || resolved.source === "file" || question.fieldType === "file"
               ? null
-              : (factRevisions.get(`${question.factKey}\u0000${resolution.scope}`) ?? null),
+              : resolved.value,
+          answerKind: question.answerKind,
+          block: resolution.kind === "answer" ? null : resolution.reason,
+          factKey: question.factKey,
+          factRevision: resolved?.factRevision ?? null,
           fieldName: question.fieldName,
           fieldType: question.fieldType,
+          file: resolved?.file ?? null,
           label: question.textDisplay,
           options,
           questionId: question.questionId,
           required: question.required,
-          scope: resolution.scope,
+          scope: resolved?.scope ?? "",
           sentences: [],
+          source: resolved?.source ?? null,
+          unit: resolved?.unit ?? null,
         } satisfies SendPlanField;
       }),
     );
@@ -1147,20 +867,12 @@ export function createPreparationService(deps: {
         if (question.answerKind === "open_text" && isFreeText(question.fieldType)) {
           const saved = await savedSentences(row.userId, applicationId, question.questionId);
 
-          return {
-            questionId: question.questionId,
-            text: question.textDisplay,
-            fieldName: question.fieldName,
-            fieldType: question.fieldType,
-            answerKind: question.answerKind,
-            factKey: question.factKey,
-            required: question.required,
-            resolved: saved !== null,
-            answer: saved === null ? null : saved.map((sentence) => sentence.sentence).join(" "),
-            reason: null,
+          return toPreparedAnswer({
+            question,
+            options,
+            resolution: openTextResolution(saved, question.required),
             sentences: saved ?? [],
-            scope: "",
-          };
+          });
         }
 
         const resolution = resolveQuestion({
@@ -1174,22 +886,10 @@ export function createPreparationService(deps: {
           targets: settings.targets,
           posting,
           hasResume: resume !== undefined,
+          hasCoverLetter: false,
         });
 
-        return {
-          questionId: question.questionId,
-          text: question.textDisplay,
-          fieldName: question.fieldName,
-          fieldType: question.fieldType,
-          answerKind: question.answerKind,
-          factKey: question.factKey,
-          required: question.required,
-          resolved: resolution.kind === "ready",
-          answer: resolution.answer,
-          reason: resolution.reason,
-          sentences: [],
-          scope: resolution.scope,
-        };
+        return toPreparedAnswer({ question, options, resolution, sentences: [] });
       }),
     );
   }

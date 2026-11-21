@@ -527,20 +527,26 @@ Job `application.prepare`:
    `{fact_key | 'open_text' | 'consent' | 'skip' | 'unknown'}` from the fixed fact list. Rules alone may also map a
    question to `target` or `derived` with a derivation key; the model never returns either. Result stored on
    `questions`. Posting text passes the posting guard (`docs/SALVAGE.md`) first and never decides a factual answer.
-3. Answer: `fact` → saved fact value (formatted to the field type/options; select options matched by normalised
-   text, then the explicit synonym tables for work-authorisation types, countries, degrees, notice periods and
-   salary periods, else an `option_missing` Review; never a fuzzy or model pick). A `work_auth` or
-   `sponsorship_required` answer is country-scoped
-   (§7.1): the question's country decides which Fact may answer it, and another country's Fact never does.
+3. Answer every field into a plan entry, with a built value or a typed block. `fact` → saved Fact value formatted
+   to the field type/options; select options matched by normalised text, then the explicit synonym tables for
+   work-authorisation types, countries, degrees, notice periods and salary periods, else an `option_missing` Review;
+   never a fuzzy or model pick. The formatted value is re-validated against the field type (email, phone, url,
+   number, date, option list); a value that does not pass is a typed block, never a guess. Salary, notice-period and
+   date Facts keep currency and period: a text field keeps the whole Fact, a number field carries the
+   currency/period alongside the amount and is used only when the question asks for that unit, a salary range never
+   collapses into one number, and a date is parsed without a timezone shift. A `work_auth` or
+   `sponsorship_required` answer is country-scoped (§7.1): the question's country decides which Fact may answer it,
+   and another country's Fact never does.
    `target` and `derived` → the deterministic derivation in §7.1, from Targets and the Posting for the former and
    from saved Facts for the latter; a value that cannot be derived never becomes a model guess (required → Review,
    optional → blank). The question's stored `fact_key` is the derivation key.
    `open_text` → Haiku from resume text + guarded posting (≤ 120 words unless the field states a limit), returned as
    `[{sentence, resume_line_ids}]` with the same rule as cover letters: a sentence that makes a factual claim
    without a resume line is removed; a choice field (`select`, `radio`, multi-select, checkbox) never takes generated
-   prose, so an open-text mapping there stays factual and becomes a Review when unknown; `consent` → only the
-   Overture-standard consents the user accepted (privacy notice / data processing acknowledgements), never marketing
-   opt-ins; `skip` → blank.
+   prose, so an open-text mapping there stays factual and becomes a Review when unknown. `consent` → only an
+   allowlisted Overture-standard acknowledgement (privacy notice, data-processing acknowledgement or accuracy
+   confirmation) that has a positive option to select; never a marketing opt-in and never a refusal option.
+   `skip` → blank. A file field maps to a named file Fact (resume or cover letter), never to "any file".
 4. Cover letter only if the form has a cover-letter field: ≤ 200 words, in the posting's language, generated from
    resume + posting + the user's cover-letter template (its fixed text kept verbatim, its blanks filled) or, without a
    template, the voice sample; every sentence with a factual claim must map to a resume line (the model returns
@@ -551,14 +557,15 @@ Job `application.prepare`:
    architected, mentored, expert, senior, staff, principal) or inflated title, else the sentence is removed. A claim
    is checked against the cited lines only; a cited line is not proof of entailment. (Anthropic Citations cannot be
    combined with structured outputs, so the check is ours.)
-5. Unknown **required** factual question, or a required derivation the user's values cannot answer → status
-   `needs_review`, create/attach a Review. Unknown **optional** → left blank, never blocking. A required open-text
-   answer or cover letter whose surviving sentences are empty (no resume, or nothing the resume grounds) is never a
-   Review: the Application is `skipped` with `status_reason='open_text_ungrounded'`. A required consent resolves only
-   when it is a standard privacy or data-processing acknowledgement with an option to select; a required marketing
-   opt-in, a required `skip`, or a required file field other than the resume slot never becomes a Review: the
-   Application is `skipped` with `status_reason='form_unsupported'`. A required resume slot resolves only when a
-   current resume exists.
+5. `ready` only when every required field has a built value that passed type and option validation. Unknown
+   **required** factual question, or a required derivation the user's values cannot answer → status `needs_review`,
+   create/attach a Review. Unknown **optional** → left blank, never blocking. A required open-text answer or cover
+   letter whose surviving sentences are empty (no resume, or nothing the resume grounds) is never a Review: the
+   Application is `skipped` with `status_reason='open_text_ungrounded'`. A required non-standard consent, a required
+   marketing opt-in, a required `skip`, and a required file field that is neither the resume nor the cover-letter slot
+   never become a Review: the Application is `skipped` with `status_reason='form_unsupported'`. The same applies to a
+   required cover-letter slot while no cover-letter file exists. A required resume slot resolves only when a current
+   resume exists. Optional marketing opt-ins stay unchecked.
 6. All answered → status `ready`, `scheduled_for` assigned by the planner (§9.2).
 
 ### 8.4 Reviews
