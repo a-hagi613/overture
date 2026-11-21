@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  plan:
+  gate:
     runs-on: ubuntu-latest
     outputs:
       e2e: ${{ steps.plan.outputs.e2e }}
@@ -27,6 +27,15 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: 1.4.5
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
       - run: bun install --frozen-lockfile
       - id: plan
         env:
@@ -38,12 +47,20 @@ jobs:
           else
             bun run scripts/e2e-ci.ts plan --out e2e-plan.json --github-output "${GITHUB_OUTPUT}"
           fi
+      - run: bun run verify
+      - name: Build the inbound mail Worker
+        run: cd workers/inbound-mail && bun run dry-run
       - uses: actions/upload-artifact@v7
         with:
           name: e2e-plan
           path: e2e-plan.json
           retention-days: 1
-  secrets:
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist
+          retention-days: 1
+  security-and-restore:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -53,6 +70,16 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: 1.4.5
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+      - run: bun install --frozen-lockfile
       - name: Install gitleaks 8.30.1 and verify its sha256
         env:
           GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
@@ -77,84 +104,36 @@ jobs:
         run: gitleaks git --log-opts="${BASE_SHA}..${HEAD_SHA}" --config .gitleaks.toml --redact --exit-code 1 --no-banner
       - name: Private-files guard
         run: bun run scripts/check-private-files.ts
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
-        with:
-          bun-version: 1.4.5
-      - run: bun install --frozen-lockfile
-      - run: bun run lint:config
-      - run: bun run lint
-  format:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
-        with:
-          bun-version: 1.4.5
-      - run: bun install --frozen-lockfile
-      - run: bun fmt --check
-  typecheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
-        with:
-          bun-version: 1.4.5
-      - run: bun install --frozen-lockfile
-      - run: bun check
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
-        with:
-          bun-version: 1.4.5
-      - run: bun install --frozen-lockfile
-      - run: bun run build
-      - run: bun run db:verify
-      - name: Build the inbound mail Worker
-        run: cd workers/inbound-mail && bun run dry-run
-      - uses: actions/upload-artifact@v7
-        with:
-          name: dist
-          path: dist
-          retention-days: 1
-  unit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
-        with:
-          bun-version: 1.4.5
-      - run: bun install --frozen-lockfile
-      - run: bun test src
+      - name: Install Litestream
+        run: |
+          litestream_asset=litestream-0.5.18-linux-x86_64.tar.gz
+          curl -fsSLo "/tmp/$litestream_asset" "https://github.com/benbjohnson/litestream/releases/download/v0.5.18/$litestream_asset"
+          curl -fsSLo /tmp/checksums.txt https://github.com/benbjohnson/litestream/releases/download/v0.5.18/checksums.txt
+          grep " $litestream_asset\$" /tmp/checksums.txt | (cd /tmp && sha256sum -c -)
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf "/tmp/$litestream_asset" -C "$HOME/.local/bin" litestream
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/litestream" version
+      - run: bun run scripts/restore-drill.ts local
   e2e:
     runs-on: ubuntu-latest
-    # Fail fast: e2e starts only after the cheap checks pass, and one failing shard cancels the rest.
-    needs: [plan, build, lint, format, typecheck, unit]
-    if: needs.plan.outputs.e2e == 'true'
+    # Fail fast: e2e starts only after the gate checks pass, and one failing shard cancels the rest.
+    needs: [gate]
+    if: needs.gate.outputs.e2e == 'true'
     container:
       image: mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
       options: --user 1001
     strategy:
       fail-fast: true
-      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.gate.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v7
-      - name: Take the built app from the build job
+      - name: Take the built app from the gate job
         uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
-      - name: Take the shard plan from the plan job
+      - name: Take the shard plan from the gate job
         uses: actions/download-artifact@v8
         with:
           name: e2e-plan
@@ -167,8 +146,28 @@ jobs:
           install -m 0755 /tmp/bun/bun-linux-x64/bun "$HOME/.bun/bin/bun"
           echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
           "$HOME/.bun/bin/bun" --version
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-e2e-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-e2e-bun-
       - run: bun install --frozen-lockfile
+      - name: Resolve shard files
+        id: shard
+        run: |
+          files=$(bun run scripts/e2e-ci.ts shard --plan e2e-plan.json --shard "${{ matrix.shard }}")
+          echo "files=${files}" >> "${GITHUB_OUTPUT}"
+          if echo " ${files} " | grep -q "test/e2e/backup-"; then
+            echo "needs_litestream=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "needs_litestream=false" >> "${GITHUB_OUTPUT}"
+          fi
       - name: Install Litestream
+        if: steps.shard.outputs.needs_litestream == 'true'
         run: |
           litestream_asset=litestream-0.5.18-linux-x86_64.tar.gz
           curl -fsSLo "/tmp/$litestream_asset" "https://github.com/benbjohnson/litestream/releases/download/v0.5.18/$litestream_asset"
@@ -179,9 +178,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/litestream" version
       - name: Run this shard
-        run: |
-          files=$(bun run scripts/e2e-ci.ts shard --plan e2e-plan.json --shard "${{ matrix.shard }}")
-          bun node_modules/playwright/cli.js test $files
+        run: bun node_modules/playwright/cli.js test --workers=3 ${{ steps.shard.outputs.files }}
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -227,8 +224,8 @@ jobs:
           git push --no-verify || { git pull --rebase origin main && git push --no-verify; }
   container:
     runs-on: ubuntu-latest
-    needs: [plan, lint, typecheck, unit]
-    if: needs.plan.outputs.container == 'true'
+    needs: [gate]
+    if: needs.gate.outputs.container == 'true'
     steps:
       - uses: actions/checkout@v7
       - name: Set up Docker Buildx (docker/setup-buildx-action v4.4.1 @ f87e599)
@@ -293,28 +290,9 @@ jobs:
       - run: docker rm -f overture-ci
         if: always()
 
-  restore-drill:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
-        with:
-          bun-version: 1.4.5
-      - run: bun install --frozen-lockfile
-      - name: Install Litestream
-        run: |
-          litestream_asset=litestream-0.5.18-linux-x86_64.tar.gz
-          curl -fsSLo "/tmp/$litestream_asset" "https://github.com/benbjohnson/litestream/releases/download/v0.5.18/$litestream_asset"
-          curl -fsSLo /tmp/checksums.txt https://github.com/benbjohnson/litestream/releases/download/v0.5.18/checksums.txt
-          grep " $litestream_asset\$" /tmp/checksums.txt | (cd /tmp && sha256sum -c -)
-          tar -xzf "/tmp/$litestream_asset" -C /usr/local/bin litestream
-          litestream version
-      - run: bun run scripts/restore-drill.ts local
-
   ci-ok:
     if: always()
-    needs: [secrets, lint, format, typecheck, build, unit, e2e, container, restore-drill]
+    needs: [gate, security-and-restore, e2e, container]
     runs-on: ubuntu-latest
     steps:
       - name: Every needed job succeeded, or was deliberately skipped

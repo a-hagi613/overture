@@ -131,7 +131,8 @@
           "src/server/catalog/tag-import.ts",
           "src/server/routes/test-only.ts",
           "src/server/pipeline/prepare.ts",
-          "src/server/dispatch/dispatch.ts"
+          "src/server/dispatch/dispatch.ts",
+          "src/server/demo/seed.ts"
         ],
         "allowRoots": ["test/e2e", "scripts"]
       }
