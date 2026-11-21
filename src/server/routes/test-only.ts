@@ -223,6 +223,9 @@ const seedMailBody = z.object({
   senderDomain: z.string().min(1),
   subject: z.string().min(1),
   text: z.string().min(1),
+  auth: z.enum(["pass", "fail", "none"]).default("pass"),
+  direction: z.enum(["in", "out"]).default("in"),
+  outStatus: z.enum(["queued", "sent", "bounced", "failed"]).nullish(),
   classification: z
     .enum(["ack", "code", "rejection", "screening", "interview", "offer", "other"])
     .default("other"),
@@ -775,13 +778,14 @@ export function createTestRoutes(
 
     db.insert(messages)
       .values({
-        auth: "pass",
-        classification: body.classification,
+        auth: body.auth,
+        classification: body.direction === "in" ? body.classification : null,
         createdAt: new Date(at),
-        direction: "in",
+        direction: body.direction,
         fromEnc: await personal.sealFor(body.userId, scope("from_enc"), body.from),
         id: messageId,
         mailboxId,
+        outStatus: body.outStatus ?? null,
         rfcMessageId: `<${messageId}@${body.senderDomain}>`,
         senderDomain: body.senderDomain,
         snippetEnc: await personal.sealFor(body.userId, scope("snippet_enc"), snippet),
@@ -2549,7 +2553,9 @@ export function createTestRoutes(
         insertMailRow({
           applicationId: entry.applicationId,
           at: entry.at,
+          auth: "pass",
           classification: entry.classification,
+          direction: "in",
           from: `${entry.company} <no-reply@${entry.domain}>`,
           senderDomain: entry.domain,
           subject: entry.subject,
@@ -2568,7 +2574,9 @@ export function createTestRoutes(
         insertMailRow({
           applicationId: null,
           at: message.at,
+          auth: "pass",
           classification: "other",
+          direction: "in",
           from: "Tideline Software <no-reply@tideline.example>",
           senderDomain: "tideline.example",
           subject: `Update on your application ${String(index + 1)}`,

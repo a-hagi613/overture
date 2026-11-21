@@ -18,7 +18,7 @@ import { publishEvent } from "../platform/sse/stream.ts";
 import { createFactService } from "../profile/facts.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createTargetsService, matchedRoleTags, roleTargetMatches } from "../profile/targets.ts";
-import { resolveLocation } from "../catalog/geo.ts";
+import { resolveLocation, sameRegion } from "../catalog/geo.ts";
 import { ACTIVE_APPLICATION_STATUSES } from "./applications.ts";
 import { salaryMeetsFloor } from "./fx.ts";
 import { countryInRegion, remoteRegionOf } from "./regions.ts";
@@ -146,11 +146,7 @@ function locationMatch(
       continue;
     }
 
-    if (
-      place.region !== null &&
-      posting.region !== null &&
-      posting.region.toLowerCase() === place.region.toLowerCase()
-    ) {
+    if (place.region !== null && sameRegion(posting.countryCode, posting.region, place.region)) {
       best = Math.max(best, 10);
     }
   }

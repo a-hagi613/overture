@@ -7,4 +7,5 @@ export const adminDestinations = [
   { end: false, glyph: "tag", label: copy.admin.navGrants, to: "/admin/grants" },
   { end: false, glyph: "link", label: copy.admin.navSwitches, to: "/admin/settings" },
   { end: false, glyph: "grid", label: copy.admin.navCatalog, to: "/admin/catalog" },
+  { end: false, glyph: "send", label: copy.admin.navMailHealth, to: "/admin/mail-health" },
 ] as const;

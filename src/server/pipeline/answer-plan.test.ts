@@ -3,7 +3,10 @@ import { describe, expect, test } from "bun:test";
 import type { FactRecord } from "../profile/facts.ts";
 
 import { emptyTargets } from "../../shared/targets.ts";
+
+import type { QuestionFieldType } from "../../shared/questions.ts";
 import { indexFacts, resolveQuestion } from "./answer-plan.ts";
+import { parseSalaryExpectation } from "./answer-value.ts";
 
 const posting = {
   city: "Toronto",
@@ -17,7 +20,11 @@ function fact(key: string, value: string, scope = "") {
   return { confirmed: true, key, revision: 1, scope, source: "user", value } satisfies FactRecord;
 }
 
-function resolve(questionText: string, facts: readonly FactRecord[], fieldType = "text" as const) {
+function resolve(
+  questionText: string,
+  facts: readonly FactRecord[],
+  fieldType: QuestionFieldType = "text",
+) {
   return resolveQuestion({
     answerKind: "fact",
     factKey: "salary_expectation",
@@ -73,6 +80,37 @@ describe("a salary Fact kept once per currency", () => {
     expect(resolve("What is your expected salary in CAD?", unscoped)).toMatchObject({
       kind: "answer",
       value: "CAD 140,000 a year",
+    });
+  });
+
+  test("keeps both ends of a range whose currency repeats", () => {
+    expect(parseSalaryExpectation("£50,000 - £60,000 per annum")).toEqual({
+      currency: "GBP",
+      maxMinor: 6_000_000,
+      minMinor: 5_000_000,
+      period: "year",
+    });
+
+    expect(parseSalaryExpectation("$120,000 - $150,000")).toEqual({
+      currency: null,
+      maxMinor: 15_000_000,
+      minMinor: 12_000_000,
+      period: null,
+    });
+
+    expect(parseSalaryExpectation("CAD 90,000 to CAD 110,000 a year")).toEqual({
+      currency: "CAD",
+      maxMinor: 11_000_000,
+      minMinor: 9_000_000,
+      period: "year",
+    });
+  });
+
+  test("does not put the lower bound of a range into a numeric field", () => {
+    const ranged = [fact("salary_expectation", "£50,000 - £60,000 per annum", "GBP")];
+
+    expect(resolve("Expected annual salary (GBP)", ranged, "number")).toMatchObject({
+      kind: "blocked",
     });
   });
 });
