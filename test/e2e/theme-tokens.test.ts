@@ -89,7 +89,7 @@ const builtIns = new Set([
 ]);
 
 const utility =
-  /(?<![\w-])(?:[a-z0-9[\]:&>*_()-]+:)*(?:text|bg|border|ring|fill|stroke|outline|divide|decoration|from|to|via|shadow)-(?<token>[a-z][a-z0-9-]*)(?![\w[(-]|\/\[)/gu;
+  /(?<![\w-])(?:text|bg|border|ring|fill|stroke|outline|divide|decoration|from|to|via|shadow)-(?<token>[a-z][a-z0-9-]*)(?![\w[(-]|\/\[)/gu;
 
 function offenders() {
   const found: string[] = [];
