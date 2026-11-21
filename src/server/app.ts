@@ -26,6 +26,7 @@ import { createAdminApi, isAdminHost } from "./routes/admin.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
 import { env } from "./config/env.ts";
 import { createProfileRoutes } from "./routes/profile.ts";
+import { createOnboardingRoutes } from "./routes/onboarding.ts";
 import { createMatchingService } from "./matching/score.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
@@ -101,6 +102,15 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createMeRoutes(deps.auth));
   app.route("/api", createApiRoutes(deps.db, deps.clock, deps.auth));
   app.route("/api", createProfileRoutes(deps));
+  app.route(
+    "/api",
+    createOnboardingRoutes({
+      auth: deps.auth,
+      clock: deps.clock,
+      db: deps.db,
+      reviews: deps.reviews,
+    }),
+  );
   app.route(
     "/api",
     createHomeRoutes({

@@ -38,7 +38,7 @@ const factsSchema = z.object({
         value: z.string().max(2000),
         scope: z
           .string()
-          .regex(/^(?:|[A-Z]{2})$/u)
+          .regex(/^(?:|[A-Z]{2}|[A-Z]{3})$/u)
           .default(""),
       }),
     )

@@ -94,5 +94,15 @@ export default defineConfig({
         },
       },
     },
+    {
+      name: "onboarding-boards",
+      testMatch: /board-match-onboarding.*\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/../../design/reference/onboarding-questions/{arg}{ext}",
+        },
+      },
+    },
   ],
 });

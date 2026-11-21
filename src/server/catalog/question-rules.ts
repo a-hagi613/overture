@@ -54,6 +54,15 @@ const RULES: readonly { pattern: RegExp; mapping: RuleMapping }[] = [
     mapping: { answerKind: "derived", factKey: "city_region" },
   },
   {
+    pattern:
+      /\b(?:current or previous|current|present|previous|most recent)\s+(?:job|role|position)\s+title\b|\b(?:job|role|position) title\b/u,
+    mapping: { answerKind: "fact", factKey: "current_job_title" },
+  },
+  {
+    pattern: /\b(?:how|where) did you (?:first )?(?:hear|find out|learn) about\b/u,
+    mapping: { answerKind: "fact", factKey: "how_did_you_hear" },
+  },
+  {
     pattern: /\blegal name\b/u,
     mapping: { answerKind: "fact", factKey: "legal_name" },
   },

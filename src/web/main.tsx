@@ -10,6 +10,7 @@ import { HomePage } from "./routes/home.tsx";
 import { InboxPage } from "./routes/inbox.tsx";
 import { NotFoundPage } from "./routes/not-found.tsx";
 import { ProfilePage } from "./routes/profile.tsx";
+import { OnboardingFactsPage } from "./routes/onboarding-facts.tsx";
 import { ReviewPage } from "./routes/review.tsx";
 import { SearchPage } from "./routes/search.tsx";
 import { SettingsPage } from "./routes/settings.tsx";
@@ -45,6 +46,7 @@ const router = createBrowserRouter([
     ],
   },
   { path: "/signin", element: <SignInPage /> },
+  { path: "/onboarding/facts", element: <OnboardingFactsPage /> },
 ]);
 
 const queryClient = new QueryClient();

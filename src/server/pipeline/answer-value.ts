@@ -186,6 +186,10 @@ function detectCurrency(text: string) {
   return null;
 }
 
+export function currencyNamedIn(text: string) {
+  return detectCurrency(text);
+}
+
 function detectPeriod(text: string) {
   for (const [pattern, period] of PERIODS) {
     if (pattern.test(text)) {

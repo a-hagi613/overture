@@ -7,7 +7,12 @@ import type { PersonalCrypto } from "./personal-crypto.ts";
 
 import { facts } from "../platform/db/schema.ts";
 import { isCountryCode } from "../catalog/geo.ts";
-import { FACT_KEYS, isCountryScopedFactKey } from "../../shared/facts.ts";
+import {
+  FACT_KEYS,
+  isCountryScopedFactKey,
+  isCurrencyCode,
+  isCurrencyScopedFactKey,
+} from "../../shared/facts.ts";
 
 const factKeySchema = z.union([z.enum(FACT_KEYS), z.string().regex(/^q:[A-Za-z0-9-]+$/u)]);
 
@@ -29,6 +34,7 @@ export interface FactService {
     value: string,
     scope?: string,
   ) => Promise<FactRecord>;
+  remove: (userId: string, key: string, scope?: string | null) => Promise<number>;
   prefillFromResume: (userId: string, text: string) => Promise<FactRecord[]>;
 }
 
@@ -40,6 +46,14 @@ function assertFactKey(key: string) {
 
 function assertScope(key: string, scope: string) {
   if (scope === "") {
+    return;
+  }
+
+  if (isCurrencyScopedFactKey(key)) {
+    if (!isCurrencyCode(scope)) {
+      throw new Error(`unknown currency scope: ${scope}`);
+    }
+
     return;
   }
 
@@ -59,7 +73,31 @@ export function createFactService(deps: {
 }) {
   const { db, clock, personal } = deps;
 
-  async function upsert(
+  const writes = new Map<string, Promise<unknown>>();
+
+  async function inWriteOrder<T>(writeKey: string, run: () => Promise<T>) {
+    const prior = writes.get(writeKey) ?? Promise.resolve();
+
+    const queued = (async () => {
+      await prior.catch(() => undefined);
+
+      return await run();
+    })();
+
+    const settled = Promise.allSettled([queued]);
+
+    writes.set(writeKey, settled);
+
+    try {
+      return await queued;
+    } finally {
+      if (writes.get(writeKey) === settled) {
+        writes.delete(writeKey);
+      }
+    }
+  }
+
+  async function write(
     userId: string,
     key: string,
     scope: string,
@@ -106,6 +144,19 @@ export function createFactService(deps: {
     return { key, scope, value, source, confirmed, revision };
   }
 
+  async function upsert(
+    userId: string,
+    key: string,
+    scope: string,
+    value: string,
+    source: FactRecord["source"],
+    confirmed: boolean,
+  ) {
+    return inWriteOrder(`${userId}\u0000${key}\u0000${scope}`, async () =>
+      write(userId, key, scope, value, source, confirmed),
+    );
+  }
+
   return {
     list: async (userId: string) => {
       const rows = await db.select().from(facts).where(eq(facts.userId, userId));
@@ -144,6 +195,20 @@ export function createFactService(deps: {
       assertScope(key, scope);
 
       return upsert(userId, key, scope, value, "review", true);
+    },
+    remove: async (userId: string, key: string, scope: string | null = null) => {
+      assertFactKey(key);
+
+      const where =
+        scope === null
+          ? and(eq(facts.userId, userId), eq(facts.key, key))
+          : and(eq(facts.userId, userId), eq(facts.key, key), eq(facts.scope, scope));
+
+      const removed = db.select({ id: facts.id }).from(facts).where(where).all();
+
+      await db.delete(facts).where(where);
+
+      return removed.length;
     },
     prefillFromResume: async (userId: string, text: string) => {
       const parsed = parseResumeFacts(text);

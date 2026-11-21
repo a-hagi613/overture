@@ -3,7 +3,9 @@ type GlyphName =
   | "bell"
   | "board"
   | "check"
+  | "chevron"
   | "dash"
+  | "forward"
   | "home"
   | "inbox"
   | "lock"
@@ -11,6 +13,7 @@ type GlyphName =
   | "profile"
   | "rail"
   | "review"
+  | "signout"
   | "sun"
   | "moon";
 
@@ -35,6 +38,12 @@ const glyphs: Record<GlyphName, GlyphPaths> = {
     strokeWidth: 1.6,
   },
   check: { paths: ["M5 12.5l4.5 4.5L19 7.5"], strokeWidth: 2 },
+  chevron: { paths: ["M6 9l6 6 6-6"], strokeWidth: 1.8 },
+  forward: { paths: ["M5 12h14", "M13 6l6 6-6 6"], strokeWidth: 1.8 },
+  signout: {
+    paths: ["M9 4H5a1 1 0 00-1 1v14a1 1 0 001 1h4", "M16 8l4 4-4 4", "M20 12H9"],
+    strokeWidth: 1.7,
+  },
   dash: { paths: ["M5 12h14"], strokeWidth: 1.8 },
   review: {
     paths: [
