@@ -94,7 +94,9 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
   Browser Use browser on a residential IP in the user's country, controlled by `overture-web` over CDP. `overture-web`
   itself calls only the ATSes' public job-feed APIs (discovery §6, the liveness re-check §9.3), which exist for
   programmatic reading. The developer machine never contacts an ATS, a job site or a Browser Use session; it runs
-  code and tests against the local fixture server only.
+  code and tests against the local fixture server only. Outside production the app and its catalog worker install an
+  outbound guard (ADR 0016): a request to an ATS or paid-service host that is not a local fixture throws instead of
+  leaving the machine.
 - Litestream replicates continuously to R2 `overture-backups`; a nightly snapshot is kept 30 days; a restore drill
   runs in CI weekly against a throwaway machine.
 

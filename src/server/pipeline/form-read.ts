@@ -7,6 +7,7 @@ import type { QuestionFieldType } from "../../shared/questions.ts";
 
 import { formSignature, sanitiseFormHtml } from "../fixtures/sanitise.ts";
 import { LEVER_FIELD_TYPES, LEVER_SKIP_NAMES } from "../dispatch/ats/lever.ts";
+import { assertNoLiveTraffic, LiveServiceRequestError } from "../platform/outbound-guard.ts";
 
 export const FORM_READ_PATHS = ["lever_html", "ashby_graphql", "browser"] as const;
 
@@ -596,6 +597,7 @@ type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respons
 export function createPlainFormReader(
   options: {
     ashbyBaseUrl?: string | undefined;
+    environment?: string | undefined;
     fetcher?: Fetcher;
     leverBaseUrl?: string | undefined;
     leverEuBaseUrl?: string | undefined;
@@ -604,6 +606,16 @@ export function createPlainFormReader(
 ) {
   const fetcher: Fetcher =
     options.fetcher ?? (async (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init));
+
+  const { environment } = options;
+
+  async function guardedFetch(input: string, init: RequestInit) {
+    if (environment !== undefined) {
+      assertNoLiveTraffic(input, init.method ?? "GET", environment);
+    }
+
+    return fetcher(input, init);
+  }
 
   const timeoutMs = options.timeoutMs ?? FETCH_TIMEOUT_MS;
   const leverBase = (options.leverBaseUrl ?? LEVER_DEFAULT_JOBS_BASE_URL).replace(/\/+$/u, "");
@@ -619,7 +631,7 @@ export function createPlainFormReader(
     const base = input.region === "eu" ? leverEuBase : leverBase;
     const url = `${base}/${encodeURIComponent(input.boardToken)}/${encodeURIComponent(input.atsJobId)}/apply`;
 
-    const response = await fetcher(url, {
+    const response = await guardedFetch(url, {
       headers: { "user-agent": USER_AGENT },
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -638,7 +650,7 @@ export function createPlainFormReader(
       return null;
     }
 
-    const response = await fetcher(url, {
+    const response = await guardedFetch(url, {
       body: JSON.stringify({
         operationName: "ApiJobPosting",
         query: ASHBY_GRAPHQL_QUERY,
@@ -663,7 +675,11 @@ export function createPlainFormReader(
     async read(input: FormReadTarget) {
       try {
         return input.ats === "lever" ? await lever(input) : await ashby(input);
-      } catch {
+      } catch (error) {
+        if (error instanceof LiveServiceRequestError) {
+          throw error;
+        }
+
         return null;
       }
     },

@@ -45,6 +45,7 @@ import {
   users,
 } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
+import { retryWhenBusy } from "../platform/db/busy.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
@@ -589,6 +590,45 @@ export function createTestRoutes(
     env.INBOUND_HMAC_SECRET === undefined
       ? null
       : createMailboxService(db, clock, env.INBOUND_HMAC_SECRET, env.MAIL_DOMAIN);
+
+  async function seedSampleLedger(userId: string, prefix: string) {
+    await retryWhenBusy(
+      () =>
+        grantApplications(db, clock, {
+          idempotencyKey: `${prefix}-grant:${userId}`,
+          quantity: SAMPLE_GRANT_QUANTITY,
+          source: "admin",
+          userId,
+        }),
+      `test.${prefix}.grant`,
+    );
+
+    await Promise.all(
+      Array.from({ length: 7 }, async (_unused, offset) => {
+        const applicationId = `${prefix}-${String(offset + 1)}`;
+
+        await retryWhenBusy(
+          () =>
+            reserveForApplication(db, clock, {
+              applicationId,
+              idempotencyKey: `${prefix}-reserve:${userId}:${applicationId}`,
+              userId,
+            }),
+          `test.${prefix}.reserve`,
+        );
+
+        await retryWhenBusy(
+          () =>
+            commitForApplication(db, clock, {
+              applicationId,
+              idempotencyKey: `${prefix}-commit:${userId}:${applicationId}`,
+              userId,
+            }),
+          `test.${prefix}.commit`,
+        );
+      }),
+    );
+  }
 
   function seedReviewRow(body: z.infer<typeof seedReviewBody>) {
     const now = clock.now();
@@ -1571,7 +1611,7 @@ export function createTestRoutes(
     return context.json({ matches: rows });
   });
 
-  routes.post("/ledger/grant", zValidator("json", seedGrantBody), (context) => {
+  routes.post("/ledger/grant", zValidator("json", seedGrantBody), async (context) => {
     const { email, quantity, idempotencyKey } = context.req.valid("json");
 
     const user = db
@@ -1584,12 +1624,16 @@ export function createTestRoutes(
       return context.json({ error: "not found" }, 404);
     }
 
-    grantApplications(db, clock, {
-      idempotencyKey,
-      quantity,
-      source: "admin",
-      userId: user.id,
-    });
+    await retryWhenBusy(
+      () =>
+        grantApplications(db, clock, {
+          idempotencyKey,
+          quantity,
+          source: "admin",
+          userId: user.id,
+        }),
+      "test.ledger.grant",
+    );
 
     return context.json({ applicationsLeft: applicationsLeft(db, user.id, clock.now()) });
   });
@@ -1650,7 +1694,7 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
-  routes.post("/ledger/sample", zValidator("json", sampleLedgerBody), (context) => {
+  routes.post("/ledger/sample", zValidator("json", sampleLedgerBody), async (context) => {
     const { email } = context.req.valid("json");
 
     const user = db
@@ -1663,28 +1707,7 @@ export function createTestRoutes(
       return context.json({ error: "not found" }, 404);
     }
 
-    grantApplications(db, clock, {
-      idempotencyKey: `sample-grant:${user.id}`,
-      quantity: SAMPLE_GRANT_QUANTITY,
-      source: "admin",
-      userId: user.id,
-    });
-
-    for (let index = 1; index <= 7; index += 1) {
-      const applicationId = `sample-${String(index)}`;
-
-      reserveForApplication(db, clock, {
-        applicationId,
-        idempotencyKey: `sample-reserve:${user.id}:${applicationId}`,
-        userId: user.id,
-      });
-
-      commitForApplication(db, clock, {
-        applicationId,
-        idempotencyKey: `sample-commit:${user.id}:${applicationId}`,
-        userId: user.id,
-      });
-    }
+    await seedSampleLedger(user.id, "sample");
 
     return context.json({ applicationsLeft: applicationsLeft(db, user.id, clock.now()) });
   });
@@ -1711,28 +1734,7 @@ export function createTestRoutes(
     const todayStart = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
     const dayStart = (offset: number) => todayStart + offset * day;
 
-    grantApplications(db, clock, {
-      idempotencyKey: `home-sample-grant:${userId}`,
-      quantity: SAMPLE_GRANT_QUANTITY,
-      source: "admin",
-      userId,
-    });
-
-    for (let index = 1; index <= 7; index += 1) {
-      const applicationId = `home-sample-${String(index)}`;
-
-      reserveForApplication(db, clock, {
-        applicationId,
-        idempotencyKey: `home-sample-reserve:${userId}:${applicationId}`,
-        userId,
-      });
-
-      commitForApplication(db, clock, {
-        applicationId,
-        idempotencyKey: `home-sample-commit:${userId}:${applicationId}`,
-        userId,
-      });
-    }
+    await seedSampleLedger(userId, "home-sample");
 
     const paused = variant === "paused";
 
