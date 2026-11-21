@@ -13,6 +13,7 @@ import {
   accounts,
   applications,
   applicationAnswers,
+  applicationEvents,
   applicationSnapshots,
   attempts,
   bgJobs,
@@ -233,6 +234,7 @@ const createPostingBody = z.object({
   region: z.string().nullish(),
   city: z.string().nullish(),
   salaryMinMinor: z.number().int().nonnegative().nullish(),
+  salaryMaxMinor: z.number().int().nonnegative().nullish(),
   salaryCurrency: z.string().length(3).nullish(),
   salaryPeriod: z.enum(["year", "month", "hour"]).nullish(),
   postedAt: z.number().int().nullish(),
@@ -270,6 +272,42 @@ const seedApplicationBody = z.object({
   sentAt: z.number().int().nullable().default(null),
   createdAt: z.number().int().nullable().default(null),
   origin: z.enum(["auto", "manual"]).default("auto"),
+  stage: z
+    .enum(["queued", "applied", "screening", "interviewing", "offer", "closed"])
+    .nullable()
+    .optional(),
+  stageLocked: z.boolean().default(false),
+  boardPosition: z.number().nullable().default(null),
+  closedReason: z
+    .enum(["rejected", "no_response", "withdrawn", "offer_declined", "offer_accepted", "other"])
+    .nullable()
+    .default(null),
+  scheduledFor: z.number().int().nullable().default(null),
+});
+
+const seedMatchBody = z.object({
+  userId: z.string().min(1),
+  postingId: z.string().min(1),
+  score: z.number().int().min(0).max(100).nullable().default(null),
+  reason: z.string().max(140).nullable().default(null),
+  codeRank: z.number().default(0),
+});
+
+const seedEventBody = z.object({
+  applicationId: z.string().min(1),
+  events: z
+    .array(
+      z.object({
+        at: z.number().int(),
+        kind: z.enum(["status", "stage", "email", "checkin", "note"]),
+        fromValue: z.string().nullable().default(null),
+        toValue: z.string().nullable().default(null),
+        source: z.enum(["system", "user", "email", "checkin", "admin"]),
+        detail: z.string().nullable().default(null),
+      }),
+    )
+    .min(1)
+    .max(60),
 });
 
 const seedGrantBody = z.object({
@@ -361,6 +399,7 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
       workplace: row.workplace,
       employmentType: row.employmentType,
       salaryMinMinor: row.salaryMinMinor ?? null,
+      salaryMaxMinor: row.salaryMaxMinor ?? null,
       salaryCurrency: row.salaryCurrency ?? null,
       salaryPeriod: row.salaryPeriod ?? null,
       postedAt: row.postedAt ?? null,
@@ -833,7 +872,19 @@ export function createTestRoutes(
   });
 
   routes.post("/applications/seed", zValidator("json", seedApplicationBody), (context) => {
-    const { userId, postingId, status, sentAt, createdAt, origin } = context.req.valid("json");
+    const {
+      userId,
+      postingId,
+      status,
+      sentAt,
+      createdAt,
+      origin,
+      stage,
+      stageLocked,
+      boardPosition,
+      closedReason,
+      scheduledFor,
+    } = context.req.valid("json");
 
     const posting = db
       .select({ companyId: postings.companyId })
@@ -847,6 +898,11 @@ export function createTestRoutes(
 
     const id = crypto.randomUUID();
     const now = createdAt ?? clock.now();
+    let seededStage = stage;
+
+    if (seededStage === undefined) {
+      seededStage = status === "sent" ? "applied" : "queued";
+    }
 
     db.insert(applications)
       .values({
@@ -854,9 +910,13 @@ export function createTestRoutes(
         userId,
         postingId,
         companyId: posting.companyId,
+        boardPosition,
+        closedReason,
         origin,
+        scheduledFor,
         status,
-        stage: status === "sent" ? "applied" : "queued",
+        stage: seededStage,
+        stageLocked,
         sentAt,
         createdAt: now,
         updatedAt: now,
@@ -864,6 +924,61 @@ export function createTestRoutes(
       .run();
 
     return context.json({ id });
+  });
+
+  routes.post("/matches/seed", zValidator("json", seedMatchBody), (context) => {
+    const { userId, postingId, score, reason, codeRank } = context.req.valid("json");
+
+    db.insert(matches)
+      .values({
+        codeRank,
+        postingId,
+        reason,
+        resumeId: null,
+        score,
+        scoredAt: clock.now(),
+        targetsVersion: 1,
+        userId,
+      })
+      .onConflictDoUpdate({
+        target: [matches.userId, matches.postingId],
+        set: { codeRank, reason, score, scoredAt: clock.now() },
+      })
+      .run();
+
+    return context.json({ ok: true });
+  });
+
+  routes.post("/applications/events/seed", zValidator("json", seedEventBody), (context) => {
+    const { applicationId, events } = context.req.valid("json");
+
+    const application = db
+      .select({ userId: applications.userId })
+      .from(applications)
+      .where(eq(applications.id, applicationId))
+      .get();
+
+    if (application === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    db.insert(applicationEvents)
+      .values(
+        events.map((event) => ({
+          at: event.at,
+          applicationId,
+          detail: event.detail,
+          fromValue: event.fromValue,
+          id: crypto.randomUUID(),
+          kind: event.kind,
+          source: event.source,
+          toValue: event.toValue,
+          userId: application.userId,
+        })),
+      )
+      .run();
+
+    return context.json({ ok: true });
   });
 
   routes.post("/applications/status", zValidator("json", applicationStatusBody), (context) => {
