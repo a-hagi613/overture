@@ -127,7 +127,7 @@ test("choices come from open Postings, the count follows them, and the browser z
 
   await page.getByRole("button", { name: "Continue" }).click();
 
-  await expect(page).toHaveURL(/\/profile#profile-targets$/u);
+  await expect(page).toHaveURL(/\/onboarding\/forward$/u);
 
   const state = stateSchema.parse(await (await request.get("/api/onboarding")).json());
 
