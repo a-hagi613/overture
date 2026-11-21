@@ -305,14 +305,14 @@ test("a crashed poll's board is held by its claim and polled again once the clai
         : false,
     );
 
+    expect(await inFlightRequestPath).toBe(listPathFor("vercel"));
+
     const claimedNow = await harness.clockNow();
     const claimedBoard = boardFor(await harness.boards(), "vercel");
 
     expect(claimedBoard.lastPolledAt).toBe(bandedLastPolledAt);
     expect(claimedBoard.nextPollAt).toBeGreaterThan(claimedNow);
     expect((claimedBoard.nextPollAt ?? 0) - claimedNow).toBeLessThanOrEqual(SWEEP_CLAIM_MS);
-
-    expect(await inFlightRequestPath).toBe(listPathFor("vercel"));
 
     await harness.app.crash();
 

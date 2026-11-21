@@ -18,7 +18,6 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { PostingLiveness, PostingLivenessChecker } from "./liveness.ts";
 
 import {
-  applicationEvents,
   applications,
   attempts,
   bgJobs,
@@ -31,9 +30,11 @@ import {
   users,
 } from "../platform/db/schema.ts";
 import { applicationsLeft, dailyUsageSince } from "../billing/ledger.ts";
+import { skipClosedPostingApplications } from "../catalog/posting-close.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { getSetting } from "../platform/settings/index.ts";
 import { localDayStart } from "../platform/local-time.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
 import { parseSendWindow, planningWindow } from "./planning.ts";
 import { APPLICATION_SEND_JOB_KIND } from "./executor.ts";
 
@@ -240,35 +241,31 @@ export function createDispatcherTick(deps: DispatchDeps) {
   }
 
   function skipClosed(candidate: Candidate, now: number) {
-    db.transaction((tx) => {
-      tx.update(applications)
-        .set({
-          stage: null,
-          status: "skipped",
-          statusReason: "posting_closed",
-          updatedAt: now,
-        })
-        .where(and(eq(applications.id, candidate.id), eq(applications.status, "ready")))
-        .run();
-
-      tx.insert(applicationEvents)
-        .values({
-          applicationId: candidate.id,
-          at: now,
-          fromValue: "ready",
-          id: crypto.randomUUID(),
-          kind: "status",
-          source: "system",
-          toValue: "skipped",
-          userId: candidate.userId,
-        })
-        .run();
-
+    const skipped = db.transaction((tx) => {
       tx.update(postings)
         .set({ closedAt: now })
         .where(and(eq(postings.id, candidate.postingId), isNull(postings.closedAt)))
         .run();
+
+      return skipClosedPostingApplications(tx, now, [candidate.postingId]);
     });
+
+    for (const application of skipped) {
+      publishEvent(
+        db,
+        clock,
+        "application.updated",
+        JSON.stringify({ applicationId: application.applicationId, status: "skipped" }),
+        application.userId,
+      );
+      publishEvent(
+        db,
+        clock,
+        "home.updated",
+        JSON.stringify({ applicationId: application.applicationId }),
+        application.userId,
+      );
+    }
   }
 
   async function run() {
