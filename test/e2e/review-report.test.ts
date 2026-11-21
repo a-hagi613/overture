@@ -12,6 +12,7 @@ import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { authTestIdentity, testAuthEnvironment } from "./auth.fixture.ts";
 import { startGreenhouseFixture } from "./greenhouse.fixture.ts";
 import {
+  approveApplication,
   grantApplications,
   ownerContextFor,
   seedApplication,
@@ -478,6 +479,7 @@ test("Reviews, auto-answers and sent Snapshots are recorded, and the report read
   ).toBe("ready");
 
   await grantApplications(owner, 3);
+  await approveApplication(owner, sendApplication);
   await runJob(owner, "application.send", JSON.stringify({ applicationId: sendApplication }));
 
   expect(
@@ -599,6 +601,7 @@ test("the report script writes values only to a mode-600 file", async ({ reportH
 
   await prepare(owner, applicationId);
   await grantApplications(owner, 3);
+  await approveApplication(owner, applicationId);
   await runJob(owner, "application.send", JSON.stringify({ applicationId }));
 
   const directory = mkdtempSync(join(tmpdir(), "overture-review-report-out-"));
