@@ -170,6 +170,25 @@ test("the lab scores a reCAPTCHA v3 token on the server and never trusts the pag
   expect(scoreSchema.parse(await refused.json()).score).toBe(0.1);
 });
 
+test("the score endpoint refuses a burst of tokens from one client", async ({ labAppUrl }) => {
+  const statuses = await Promise.all(
+    Array.from(
+      { length: 31 },
+      async () =>
+        (
+          await fetch(`${labAppUrl}/lab/recaptcha/score`, {
+            body: JSON.stringify({ token: "lab-recaptcha-token" }),
+            headers: { "content-type": "application/json" },
+            method: "POST",
+          })
+        ).status,
+    ),
+  );
+
+  expect(statuses.filter((status) => status === 200)).toHaveLength(30);
+  expect(statuses.filter((status) => status === 429)).toHaveLength(1);
+});
+
 test("a lab run records a session per browser and lab page, and the provider report shows them", async ({
   page,
   labAppServer,
@@ -197,7 +216,19 @@ test("a lab run records a session per browser and lab page, and the provider rep
   });
 
   expect(requested.ok()).toBe(true);
-  jobSchema.parse(await requested.json());
+  const first = jobSchema.parse(await requested.json());
+
+  const repeated = await page.request.post(`${labAppUrl}/admin/api/lab/runs`, {
+    data: {
+      challenge: "pass",
+      pages: ["recaptcha_v3"],
+      providers: ["browser_use"],
+      sessionsPerPage: 1,
+    },
+  });
+
+  expect(repeated.ok()).toBe(true);
+  expect(jobSchema.parse(await repeated.json()).jobId).toBe(first.jobId);
 
   await runDueJobs(labAppServer.url);
 

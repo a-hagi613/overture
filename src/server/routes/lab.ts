@@ -1,10 +1,12 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { z } from "zod";
 
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { logInfo } from "../platform/log.ts";
+import { createScoreLimiter } from "../lab/limit.ts";
 import { labScript, labStylesheet } from "../lab/client.ts";
 import {
   renderConfirmationPage,
@@ -72,8 +74,22 @@ const style = (body: string) =>
     },
   });
 
+const SCORE_LIMIT = 30;
+const SCORE_WINDOW_MS = 60_000;
+
+const clientKey = (context: Context) =>
+  context.req.header("cf-connecting-ip") ??
+  context.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+  "local";
+
 export function createLabRoutes(deps: LabRouteDeps) {
   const routes = new Hono();
+
+  const scoreLimiter = createScoreLimiter({
+    limit: SCORE_LIMIT,
+    now: () => deps.clock.now(),
+    windowMs: SCORE_WINDOW_MS,
+  });
 
   routes.get("/", () => html(renderLabIndex()));
 
@@ -118,6 +134,10 @@ export function createLabRoutes(deps: LabRouteDeps) {
 
     if (origin !== undefined && origin !== new URL(context.req.url).origin) {
       return context.json({ reason: "cross_origin", score: null, success: false }, 403);
+    }
+
+    if (!scoreLimiter.allow(clientKey(context))) {
+      return context.json({ reason: "rate_limited", score: null, success: false }, 429);
     }
 
     if (deps.recaptchaSecret === undefined) {

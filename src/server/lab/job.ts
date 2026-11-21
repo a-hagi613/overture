@@ -5,7 +5,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
 
 import { LAB_PAGE_KEYS } from "./pages.ts";
-import { recordLabSummary, runLab } from "./runner.ts";
+import { runLab } from "./runner.ts";
 
 export const LAB_JOB_KIND = "lab.run";
 
@@ -37,12 +37,8 @@ export function parseLabRunPayload(payload: string) {
 export async function runLabJob(deps: LabJobDeps, payload: string) {
   const parsed = parseLabRunPayload(payload);
 
-  const summary = await runLab(
-    { baseUrl: deps.baseUrl, clock: deps.clock, providers: deps.providers },
+  return await runLab(
+    { baseUrl: deps.baseUrl, clock: deps.clock, db: deps.db, providers: deps.providers },
     parsed,
   );
-
-  recordLabSummary(deps.db, deps.clock, summary);
-
-  return summary;
 }

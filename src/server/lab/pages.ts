@@ -8,6 +8,31 @@ export type LabChallengePage = (typeof LAB_CHALLENGE_PAGES)[number];
 
 export type LabRunPage = "form" | LabChallengePage;
 
+export interface LabFormField {
+  label: string;
+  name: string;
+  type: "email" | "file" | "text";
+}
+
+export const LAB_FORM_FIELDS = {
+  ashby: [
+    { label: "Name", name: "_systemfield_name", type: "text" },
+    { label: "Email", name: "_systemfield_email", type: "email" },
+    { label: "Resume", name: "_systemfield_resume", type: "file" },
+  ],
+  greenhouse: [
+    { label: "First name", name: "first_name", type: "text" },
+    { label: "Last name", name: "last_name", type: "text" },
+    { label: "Email", name: "email", type: "email" },
+    { label: "Resume/CV", name: "resume", type: "file" },
+  ],
+  lever: [
+    { label: "Full name", name: "name", type: "text" },
+    { label: "Email", name: "email", type: "email" },
+    { label: "Resume/CV", name: "resume", type: "file" },
+  ],
+} satisfies Record<LabFormAts, readonly LabFormField[]>;
+
 export interface LabPageDefinition {
   key: string;
   page: LabRunPage;
@@ -61,7 +86,13 @@ export type LabChallengeMode = "pass" | "blocked";
 const escapeAttribute = (value: string) =>
   value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 
-const shell = (input: { body: string; page: LabRunPage; scripts: string[]; title: string }) =>
+const shell = (input: {
+  attributes?: string;
+  body: string;
+  page: LabRunPage;
+  scripts: string[];
+  title: string;
+}) =>
   `<!doctype html>
 <html lang="en">
 <head>
@@ -72,7 +103,7 @@ const shell = (input: { body: string; page: LabRunPage; scripts: string[]; title
 ${input.scripts.map((src) => `<script src="${escapeAttribute(src)}" defer></script>`).join("\n")}
 <script src="/lab/lab.js" defer></script>
 </head>
-<body data-lab-page="${input.page}">
+<body data-lab-page="${input.page}"${input.attributes === undefined ? "" : ` ${input.attributes}`}>
 <main>
 ${input.body}
 <p class="lab-note">This is an Overture lab page. No employer is involved.</p>
@@ -99,6 +130,7 @@ ${statusBlock}`;
 
 export function renderReCaptchaPage(environment: LabPageEnvironment, mode: LabChallengeMode) {
   return shell({
+    attributes: `data-lab-action="lab" data-lab-challenge="${mode}" data-lab-score-endpoint="/lab/recaptcha/score" data-lab-sitekey="${escapeAttribute(environment.recaptchaSiteKey)}"`,
     body: challengeBody(
       mode,
       `<div id="lab-recaptcha" data-sitekey="${escapeAttribute(environment.recaptchaSiteKey)}"></div>`,
@@ -106,10 +138,7 @@ export function renderReCaptchaPage(environment: LabPageEnvironment, mode: LabCh
     page: "recaptcha_v3",
     scripts: [environment.recaptchaScriptUrl],
     title: "reCAPTCHA v3",
-  }).replace(
-    "<body",
-    `<body data-lab-action="lab" data-lab-challenge="${mode}" data-lab-score-endpoint="/lab/recaptcha/score" data-lab-sitekey="${escapeAttribute(environment.recaptchaSiteKey)}"`,
-  );
+  });
 }
 
 export function renderHCaptchaPage(environment: LabPageEnvironment, mode: LabChallengeMode) {
@@ -118,10 +147,11 @@ export function renderHCaptchaPage(environment: LabPageEnvironment, mode: LabCha
       mode,
       `<div class="h-captcha" data-callback="overtureLabChallengePassed" data-sitekey="${escapeAttribute(environment.hcaptchaSiteKey)}"></div>`,
     ),
+    attributes: `data-lab-challenge="${mode}"`,
     page: "hcaptcha",
     scripts: [environment.hcaptchaScriptUrl],
     title: "hCaptcha",
-  }).replace("<body", `<body data-lab-challenge="${mode}"`);
+  });
 }
 
 export function renderTurnstilePage(environment: LabPageEnvironment, mode: LabChallengeMode) {
@@ -130,30 +160,36 @@ export function renderTurnstilePage(environment: LabPageEnvironment, mode: LabCh
       mode,
       `<div class="cf-turnstile" data-callback="overtureLabChallengePassed" data-sitekey="${escapeAttribute(environment.turnstileSiteKey)}"></div>`,
     ),
+    attributes: `data-lab-challenge="${mode}"`,
     page: "turnstile",
     scripts: [environment.turnstileScriptUrl],
     title: "Turnstile",
-  }).replace("<body", `<body data-lab-challenge="${mode}"`);
+  });
 }
 
-const formFields = (ats: LabFormAts) => {
-  if (ats === "ashby") {
-    return `<label>Name <input name="_systemfield_name" type="text" autocomplete="name" required></label>
-<label>Email <input name="_systemfield_email" type="email" autocomplete="email" required></label>
-<label>Resume <input name="_systemfield_resume" type="file" accept="application/pdf" required></label>`;
+const autocompleteFor = (field: LabFormField) => {
+  if (field.type === "email") {
+    return ' autocomplete="email"';
   }
 
-  if (ats === "lever") {
-    return `<label>Full name <input name="name" type="text" autocomplete="name" required></label>
-<label>Email <input name="email" type="email" autocomplete="email" required></label>
-<label>Resume/CV <input name="resume" type="file" accept="application/pdf" required></label>`;
+  if (field.name === "first_name") {
+    return ' autocomplete="given-name"';
   }
 
-  return `<label>First name <input name="first_name" type="text" autocomplete="given-name" required></label>
-<label>Last name <input name="last_name" type="text" autocomplete="family-name" required></label>
-<label>Email <input name="email" type="email" autocomplete="email" required></label>
-<label>Resume/CV <input name="resume" type="file" accept="application/pdf" required></label>`;
+  if (field.name === "last_name") {
+    return ' autocomplete="family-name"';
+  }
+
+  return field.type === "text" ? ' autocomplete="name"' : "";
 };
+
+const formFieldMarkup = (ats: LabFormAts) =>
+  LAB_FORM_FIELDS[ats]
+    .map(
+      (field) =>
+        `<label>${field.label} <input name="${field.name}" type="${field.type}"${autocompleteFor(field)}${field.type === "file" ? ' accept="application/pdf"' : ""} required></label>`,
+    )
+    .join("\n");
 
 export function renderFormPage(ats: LabFormAts) {
   return `<!doctype html>
@@ -169,7 +205,7 @@ export function renderFormPage(ats: LabFormAts) {
 <main>
 <h1>Recorded ${ats} form</h1>
 <form action="/lab/forms/${ats}/submit" method="post">
-${formFields(ats)}
+${formFieldMarkup(ats)}
 <button type="submit">Submit application</button>
 </form>
 <p class="lab-note">This is an Overture lab page. No employer is involved.</p>

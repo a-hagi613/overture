@@ -11,7 +11,7 @@ import type { LabFormAts } from "./pages.ts";
 import { logError } from "../platform/log.ts";
 import { acquireBrowserSession } from "../dispatch/browser/session-slots.ts";
 import { applySendProxyTrim } from "../dispatch/browser/proxy-trim.ts";
-import { labPage } from "./pages.ts";
+import { LAB_FORM_FIELDS, labPage } from "./pages.ts";
 import { recordLabRun } from "./store.ts";
 
 export const LAB_NAVIGATION_TIMEOUT_MS = 30_000;
@@ -22,30 +22,17 @@ const RESUME_BYTES = new TextEncoder().encode(
   "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0/Kids[]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n",
 );
 
-const formFields = {
-  ashby: {
-    fields: [
-      { name: "_systemfield_name", value: "Maya Okafor" },
-      { name: "_systemfield_email", value: "maya.okafor@example.invalid" },
-    ],
-    upload: "_systemfield_resume",
-  },
-  greenhouse: {
-    fields: [
-      { name: "first_name", value: "Maya" },
-      { name: "last_name", value: "Okafor" },
-      { name: "email", value: "maya.okafor@example.invalid" },
-    ],
-    upload: "resume",
-  },
-  lever: {
-    fields: [
-      { name: "name", value: "Maya Okafor" },
-      { name: "email", value: "maya.okafor@example.invalid" },
-    ],
-    upload: "resume",
-  },
-} satisfies Record<LabFormAts, { fields: { name: string; value: string }[]; upload: string }>;
+const answerFor = (name: string) => {
+  if (name.includes("email")) {
+    return "maya.okafor@example.invalid";
+  }
+
+  if (name.includes("first_name")) {
+    return "Maya";
+  }
+
+  return name.includes("last_name") ? "Okafor" : "Maya Okafor";
+};
 
 export interface LabRunInput {
   challenge: "pass" | "blocked";
@@ -56,6 +43,7 @@ export interface LabRunInput {
 
 export interface LabRunDeps {
   clock: Clock;
+  db: AppDatabase;
   providers: BrowserProviderRegistry;
   baseUrl: string;
 }
@@ -155,7 +143,9 @@ async function driveChallenge(
 }
 
 async function driveForm(page: Page, baseUrl: string, ats: LabFormAts) {
-  const fields = formFields[ats];
+  const fields = LAB_FORM_FIELDS[ats];
+  const upload = fields.find((field) => field.type === "file");
+  const textFields = fields.filter((field) => field.type !== "file");
 
   await page.goto(`${baseUrl}/lab/forms/${ats}`, {
     timeout: LAB_NAVIGATION_TIMEOUT_MS,
@@ -164,16 +154,20 @@ async function driveForm(page: Page, baseUrl: string, ats: LabFormAts) {
 
   await page.locator("form").waitFor({ state: "visible", timeout: LAB_STATUS_TIMEOUT_MS });
 
-  await series(fields.fields.length, async (index) => {
-    const field = fields.fields[index];
+  await series(textFields.length, async (index) => {
+    const field = textFields[index];
 
     if (field !== undefined) {
-      await page.fill(`[name="${field.name}"]`, field.value, { timeout: 5000 });
+      await page.fill(`[name="${field.name}"]`, answerFor(field.name), { timeout: 5000 });
     }
   });
 
+  if (upload === undefined) {
+    return failed("lab_unknown_ats");
+  }
+
   await page.setInputFiles(
-    `[name="${fields.upload}"]`,
+    `[name="${upload.name}"]`,
     { buffer: Buffer.from(RESUME_BYTES), mimeType: "application/pdf", name: "resume.pdf" },
     { timeout: 5000 },
   );
@@ -226,7 +220,7 @@ async function runSession(
   const provider = deps.providers.all().find((candidate) => candidate.id === providerId);
 
   if (provider === undefined) {
-    throw new Error(`the ${providerId} browser provider is not configured on this machine`);
+    return recordUnconfigured(deps, runId, key, providerId);
   }
 
   const releaseSlot = await acquireBrowserSession();
@@ -275,7 +269,7 @@ async function runSession(
 
   const endedAt = deps.clock.now();
 
-  return {
+  const session = {
     ats: definition?.ats ?? null,
     captchaScore: driven.captchaScore,
     challengeSeen: driven.challengeSeen,
@@ -292,6 +286,37 @@ async function runSession(
     sessionId,
     startedAt,
   } satisfies LabRunSession;
+
+  recordLabRun(deps.db, deps.clock, runId, session);
+
+  return session;
+}
+
+function recordUnconfigured(deps: LabRunDeps, runId: string, key: string, providerId: LabProvider) {
+  const definition = labPage(key);
+  const at = deps.clock.now();
+
+  const session = {
+    ats: definition?.ats ?? null,
+    captchaScore: null,
+    challengeSeen: false,
+    codeAsked: false,
+    costMicros: null,
+    durationMs: 1,
+    endedAt: at,
+    errorCode: "lab_provider_unconfigured",
+    key,
+    outcome: "error",
+    page: definition?.page ?? "form",
+    provider: providerId,
+    proxyBytes: null,
+    sessionId: null,
+    startedAt: at,
+  } satisfies LabRunSession;
+
+  recordLabRun(deps.db, deps.clock, runId, session);
+
+  return session;
 }
 
 async function series<T>(count: number, run: (index: number) => Promise<T>) {
@@ -330,25 +355,4 @@ export async function runLab(deps: LabRunDeps, input: LabRunInput) {
   );
 
   return { runId, sessions: sessions.flat() } satisfies LabRunSummary;
-}
-
-export function recordLabSummary(db: AppDatabase, clock: Clock, summary: LabRunSummary) {
-  for (const session of summary.sessions) {
-    recordLabRun(db, clock, summary.runId, {
-      ats: session.ats,
-      captchaScore: session.captchaScore,
-      challengeSeen: session.challengeSeen,
-      codeAsked: session.codeAsked,
-      costMicros: session.costMicros,
-      durationMs: session.durationMs,
-      endedAt: session.endedAt,
-      errorCode: session.errorCode,
-      outcome: session.outcome,
-      page: session.page,
-      provider: session.provider,
-      proxyBytes: session.proxyBytes,
-      sessionId: session.sessionId,
-      startedAt: session.startedAt,
-    });
-  }
 }

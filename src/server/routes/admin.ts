@@ -1145,7 +1145,21 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
     const input = context.req.valid("json");
 
-    const job = enqueueJob(db, clock, LAB_JOB_KIND, JSON.stringify(input), { maxAttempts: 1 });
+    const active = db
+      .select({ id: bgJobs.id })
+      .from(bgJobs)
+      .where(and(eq(bgJobs.kind, LAB_JOB_KIND), inArray(bgJobs.status, ["queued", "running"])))
+      .limit(1)
+      .get();
+
+    if (active !== undefined) {
+      return context.json({ jobId: active.id });
+    }
+
+    const job = enqueueJob(db, clock, LAB_JOB_KIND, JSON.stringify(input), {
+      dedupeKey: "lab.run.queued",
+      maxAttempts: 1,
+    });
 
     recordAdminAudit(db, clock, {
       actorId: owner.userId,

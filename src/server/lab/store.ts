@@ -52,6 +52,8 @@ export function recordLabRun(db: AppDatabase, clock: Clock, runId: string, recor
     .run();
 }
 
-export function readLabRuns(db: AppDatabase) {
-  return db.select().from(labRuns).orderBy(desc(labRuns.startedAt)).all();
+const REPORT_ROW_LIMIT = 5000;
+
+export function readLabRuns(db: AppDatabase, limit = REPORT_ROW_LIMIT) {
+  return db.select().from(labRuns).orderBy(desc(labRuns.startedAt)).limit(limit).all();
 }
