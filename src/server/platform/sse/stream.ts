@@ -3,10 +3,13 @@ import { and, gt, isNull, or, sql } from "drizzle-orm";
 import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 
+import { logError } from "../log.ts";
 import { events } from "../db/schema.ts";
 
 const HEARTBEAT_INTERVAL_MS = 25_000;
 const RETENTION_MS = 24 * 60 * 60_000;
+const POLL_INTERVAL_MS = 1000;
+const POLL_ERROR_LOG_INTERVAL_MS = 10_000;
 
 export function publishEvent(
   db: AppDatabase,
@@ -39,7 +42,7 @@ function formatSseMessage(seq: number, topic: string, payload: string) {
 
 export function createSseStream(
   db: AppDatabase,
-  _clock: Clock,
+  clock: Clock,
   lastEventId: string | null,
   userId: string | null,
   signal: AbortSignal,
@@ -54,6 +57,8 @@ export function createSseStream(
 
   const stream = new ReadableStream({
     start(controller) {
+      let lastPollErrorAt: number | null = null;
+
       function sendChunk(text: string) {
         try {
           controller.enqueue(encoder.encode(text));
@@ -62,23 +67,38 @@ export function createSseStream(
         }
       }
 
+      function logPollError(cause: unknown) {
+        const now = clock.now();
+
+        if (lastPollErrorAt !== null && now - lastPollErrorAt < POLL_ERROR_LOG_INTERVAL_MS) {
+          return;
+        }
+
+        lastPollErrorAt = now;
+        logError("sse.poll", cause);
+      }
+
       function poll() {
-        const userFilter =
-          userId === null
-            ? isNull(events.userId)
-            : or(isNull(events.userId), sql`${events.userId} = ${userId}`);
+        try {
+          const userFilter =
+            userId === null
+              ? isNull(events.userId)
+              : or(isNull(events.userId), sql`${events.userId} = ${userId}`);
 
-        const rows = db
-          .select()
-          .from(events)
-          .where(and(gt(events.seq, lastSeq), userFilter))
-          .orderBy(events.seq)
-          .limit(100)
-          .all();
+          const rows = db
+            .select()
+            .from(events)
+            .where(and(gt(events.seq, lastSeq), userFilter))
+            .orderBy(events.seq)
+            .limit(100)
+            .all();
 
-        for (const row of rows) {
-          lastSeq = row.seq;
-          sendChunk(formatSseMessage(row.seq, row.topic, row.payload));
+          for (const row of rows) {
+            lastSeq = row.seq;
+            sendChunk(formatSseMessage(row.seq, row.topic, row.payload));
+          }
+        } catch (error) {
+          logPollError(error);
         }
       }
 
@@ -109,7 +129,7 @@ export function createSseStream(
 
       poll();
 
-      pollTimer = setInterval(poll, 1000);
+      pollTimer = setInterval(poll, POLL_INTERVAL_MS);
       heartbeatTimer = setInterval(heartbeat, HEARTBEAT_INTERVAL_MS);
     },
   });

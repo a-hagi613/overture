@@ -10,6 +10,7 @@ import type { LiveCheckResult } from "./types.ts";
 
 import { raiseAlert } from "../platform/alerts.ts";
 import { llmSpendTodayMicros } from "../platform/llm/usage.ts";
+import { unhandledRejectionCount } from "../platform/process-guard.ts";
 import { getSetting } from "../platform/settings/index.ts";
 import { applications, attempts, bgJobs, postings } from "../platform/db/schema.ts";
 
@@ -41,6 +42,7 @@ export interface AlertMetrics {
   backupLagSeconds: number;
   health: boolean;
   disk: { usedRatio: number; mount: string };
+  unhandledRejections: number;
 }
 
 function capMicros(db: AppDatabase, key: string) {
@@ -167,6 +169,7 @@ export async function collectAlertMetrics(deps: {
     backupLagSeconds: deps.backupLagSeconds,
     health,
     disk: { usedRatio, mount },
+    unhandledRejections: unhandledRejectionCount(),
   };
 }
 
@@ -280,6 +283,10 @@ export function evaluateAlerts(db: AppDatabase, clock: Clock, metrics: AlertMetr
     usedRatio: metrics.disk.usedRatio,
   });
 
+  judge("alert.process.unhandled", metrics.unhandledRejections > 0, "process.unhandled", {
+    count: metrics.unhandledRejections,
+  });
+
   return { results, raised };
 }
 
@@ -294,6 +301,7 @@ export function drillAlertMetrics() {
     backupLagSeconds: 900,
     health: false,
     disk: { usedRatio: 0.95, mount: "/" },
+    unhandledRejections: 3,
   } satisfies AlertMetrics;
 }
 

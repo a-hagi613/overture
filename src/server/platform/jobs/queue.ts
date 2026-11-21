@@ -3,6 +3,8 @@ import { and, eq, isNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
 import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 
+import { retryWhenBusy } from "../db/busy.ts";
+import { logError } from "../log.ts";
 import { bgJobs } from "../db/schema.ts";
 import { publishEvent } from "../sse/stream.ts";
 import { RETRY_LATER_DELAY_MS, RetryLaterError } from "./retry.ts";
@@ -19,34 +21,54 @@ async function runJob(
   job: ClaimedJob,
   handler: (payload: string) => Promise<void>,
 ) {
-  publishEvent(db, clock, "job.started", JSON.stringify({ id: job.id }));
-
   try {
+    await retryWhenBusy(
+      () => publishEvent(db, clock, "job.started", JSON.stringify({ id: job.id })),
+      "jobs.started",
+    );
+
     await handler(job.payload);
 
-    db.update(bgJobs)
-      .set({ status: "done", lockedUntil: null, updatedAt: clock.now() })
-      .where(eq(bgJobs.id, job.id))
-      .run();
+    await retryWhenBusy(
+      () =>
+        db
+          .update(bgJobs)
+          .set({ status: "done", lockedUntil: null, updatedAt: clock.now() })
+          .where(eq(bgJobs.id, job.id))
+          .run(),
+      "jobs.done",
+    );
 
-    publishEvent(db, clock, "job.done", JSON.stringify({ id: job.id }));
+    await retryWhenBusy(
+      () => publishEvent(db, clock, "job.done", JSON.stringify({ id: job.id })),
+      "jobs.done",
+    );
 
     return true;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     if (error instanceof RetryLaterError) {
-      db.update(bgJobs)
-        .set({
-          status: "queued",
-          attempts: Math.max(0, job.attempts - 1),
-          lastError: errorMessage,
-          lockedUntil: null,
-          runAt: clock.now() + RETRY_LATER_DELAY_MS,
-          updatedAt: clock.now(),
-        })
-        .where(eq(bgJobs.id, job.id))
-        .run();
+      try {
+        await retryWhenBusy(
+          () =>
+            db
+              .update(bgJobs)
+              .set({
+                status: "queued",
+                attempts: Math.max(0, job.attempts - 1),
+                lastError: errorMessage,
+                lockedUntil: null,
+                runAt: clock.now() + RETRY_LATER_DELAY_MS,
+                updatedAt: clock.now(),
+              })
+              .where(eq(bgJobs.id, job.id))
+              .run(),
+          "jobs.retry",
+        );
+      } catch (bookkeepingError) {
+        logError("jobs.retry", bookkeepingError);
+      }
 
       return false;
     }
@@ -55,16 +77,25 @@ async function runJob(
     const isDead = nextAttempts >= job.maxAttempts;
     const backoffMs = isDead ? 0 : Math.min(60_000 * 2 ** (nextAttempts - 1), 3_600_000);
 
-    db.update(bgJobs)
-      .set({
-        status: isDead ? "dead" : "queued",
-        lastError: errorMessage,
-        lockedUntil: null,
-        runAt: isDead ? job.runAt : clock.now() + backoffMs,
-        updatedAt: clock.now(),
-      })
-      .where(eq(bgJobs.id, job.id))
-      .run();
+    try {
+      await retryWhenBusy(
+        () =>
+          db
+            .update(bgJobs)
+            .set({
+              status: isDead ? "dead" : "queued",
+              lastError: errorMessage,
+              lockedUntil: null,
+              runAt: isDead ? job.runAt : clock.now() + backoffMs,
+              updatedAt: clock.now(),
+            })
+            .where(eq(bgJobs.id, job.id))
+            .run(),
+        "jobs.failed",
+      );
+    } catch (bookkeepingError) {
+      logError("jobs.failed", bookkeepingError);
+    }
 
     return false;
   }

@@ -341,8 +341,9 @@ straight to tagging; Ashby's `isRemote` is ignored because Ashby sets it on hybr
 1. **Seed**: `scripts/fetch-seed.ts --dir <seed-dir>` downloads the pinned ats-scrapers manifest and
    `companies.parquet` (both sha256-pinned in `src/server/catalog/companies-parquet.ts`), then
    `scripts/load-discovered-boards.ts` loads the dataset's greenhouse, lever and ashby rows as
-   `source='discovered'` — 13,911 boards, in one transaction, idempotent. v1 boards are not imported (the
-   measured comparison is `docs/research/seed-comparison.md`; the runbook is `docs/research/m1-09-runbook.md`).
+   `source='discovered'` — 13,911 boards, in transactions of at most 500 boards with the event loop yielded
+   between them, idempotent. v1 boards are not imported (the measured comparison is
+   `docs/research/seed-comparison.md`; the runbook is `docs/research/m1-09-runbook.md`).
 2. **Backfill**: one pass over every active board inside per-ATS limits; on production it is started with
    `bun run scripts/enqueue-backfill.ts --db /data/app.sqlite`, which enqueues the `catalog.backfill` job and
    prints the per-ATS request counts and the duration estimate at the 2 req/s per-ATS pace.
@@ -374,8 +375,10 @@ straight to tagging; Ashby's `isRemote` is ignored because Ashby sets it on hybr
    leaves `/api/health` answering in milliseconds; the per-ATS limiter and its pacing are untouched.
 8. **One-time re-tag**: `scripts/retag-feed-workplace.ts --db <overture.db>` clears the board and posting
    `content_hash`/`feed_content_hash` for Lever and Ashby once, so the next sweep rewrites every open posting from
-   its feed and tags the feed's structured workplace. It is idempotent (a second run only schedules the same
-   rewrite) and is run once on production after the deploy that adds the structured workplace.
+   its feed and tags the feed's structured workplace. It clears at most 500 rows per transaction and yields between
+   batches, so it never holds the write lock long enough to stall the server or exceed `busy_timeout`. It is
+   idempotent (a second run only schedules the same rewrite) and is run once on production after the deploy that adds
+   the structured workplace.
 
 ### 6.3 Tagging
 
@@ -1076,7 +1079,8 @@ OTel traces for every request and job; metrics: `attempt_outcome_total{provider,
 `attempt_cost_micros`, `queue_depth{kind}`, `llm_cost_micros{purpose}`, `mail_inbound_total{auth}`,
 `discovery_poll_total{ats,status}`. Alerts to the owner: ATS success < 70 % over the last hour (at least five
 attempts), provider success < 60 %, code or CAPTCHA rate > 20 %, queue age > 30 min, LLM spend > 80 % of the global
-or tagging cap, Litestream lag > 5 min, backup failure, health check failing, and disk > 80 %. The alert path is the
+or tagging cap, Litestream lag > 5 min, backup failure, health check failing, disk > 80 %, and an unhandled rejection
+in a background loop or timer (logged to stderr, alerted at most once a minute). The alert path is the
 in-app `alert.raised` event plus a notification for every owner; with `ALERT_NTFY_URL` set, the same alert is pushed
 to the owner's phone. No Grafana is provisioned by this repository; dashboards stay with the owner's Grafana account
 and read the OTLP endpoint. `live.check` computes the same thresholds from the app database and machine and records
