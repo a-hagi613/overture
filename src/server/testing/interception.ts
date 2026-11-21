@@ -5,6 +5,8 @@ import { setupServer } from "msw/node";
 import { z } from "zod";
 
 import { env } from "../config/env.ts";
+import { assertNoLiveTraffic, LiveServiceRequestError } from "../platform/outbound-guard.ts";
+import { isLiveServiceHost } from "../../shared/live-service-hosts.ts";
 import { spendTurnstileToken, turnstileScenario } from "./turnstile-scenario.ts";
 import { turnstileSiteverifyUrl } from "../auth/turnstile-gate.ts";
 import { cloudflareSendEmailUrl } from "../platform/mail/cloudflare.ts";
@@ -29,6 +31,12 @@ const recordedVerificationSchema = z.object({
 });
 
 const loopbackPassthrough = [http.all(/^http:\/\/127\.0\.0\.1:\d+\/.*/u, () => passthrough())];
+
+function fixturePassthrough(request: Request) {
+  assertNoLiveTraffic(request.url, request.method, env.NODE_ENV);
+
+  return passthrough();
+}
 
 const recorded = recordedVerificationSchema.parse(
   JSON.parse(readFileSync(turnstileRecordingPath, "utf8")),
@@ -118,33 +126,39 @@ export function startInterception() {
     ),
     http.get(
       `${env.GREENHOUSE_FEED_BASE_URL ?? "https://boards-api.greenhouse.io"}/v1/boards/:token/jobs`,
-      () => passthrough(),
+      ({ request }) => fixturePassthrough(request),
     ),
     http.get(
       `${env.GREENHOUSE_FEED_BASE_URL ?? "https://boards-api.greenhouse.io"}/v1/boards/:token/jobs/:jobId`,
-      () => passthrough(),
+      ({ request }) => fixturePassthrough(request),
     ),
-    http.get(`${env.LEVER_FEED_BASE_URL ?? "https://api.lever.co"}/v0/postings/:token`, () =>
-      passthrough(),
+    http.get(
+      `${env.LEVER_FEED_BASE_URL ?? "https://api.lever.co"}/v0/postings/:token`,
+      ({ request }) => fixturePassthrough(request),
     ),
     http.get(
       `${env.LEVER_FEED_BASE_URL ?? "https://api.lever.co"}/v0/postings/:token/:postingId`,
-      () => passthrough(),
+      ({ request }) => fixturePassthrough(request),
     ),
-    http.get(`${env.LEVER_EU_FEED_BASE_URL ?? "https://api.eu.lever.co"}/v0/postings/:token`, () =>
-      passthrough(),
+    http.get(
+      `${env.LEVER_EU_FEED_BASE_URL ?? "https://api.eu.lever.co"}/v0/postings/:token`,
+      ({ request }) => fixturePassthrough(request),
     ),
     http.get(
       `${env.LEVER_EU_FEED_BASE_URL ?? "https://api.eu.lever.co"}/v0/postings/:token/:postingId`,
-      () => passthrough(),
+      ({ request }) => fixturePassthrough(request),
     ),
     http.get(
       `${env.ASHBY_FEED_BASE_URL ?? "https://api.ashbyhq.com"}/posting-api/job-board/:token`,
-      () => passthrough(),
+      ({ request }) => fixturePassthrough(request),
     ),
-    http.post(`${anthropicRoot}/v1/messages/batches`, () => passthrough()),
-    http.get(`${anthropicRoot}/v1/messages/batches/:batchId`, () => passthrough()),
-    http.get(`${anthropicRoot}/v1/messages/batches/:batchId/results`, () => passthrough()),
+    http.post(`${anthropicRoot}/v1/messages/batches`, ({ request }) => fixturePassthrough(request)),
+    http.get(`${anthropicRoot}/v1/messages/batches/:batchId`, ({ request }) =>
+      fixturePassthrough(request),
+    ),
+    http.get(`${anthropicRoot}/v1/messages/batches/:batchId/results`, ({ request }) =>
+      fixturePassthrough(request),
+    ),
     http.post(turnstileSiteverifyUrl, async ({ request }) => siteverifyResponse(request)),
     http.post(
       cloudflareSendEmailUrl(
@@ -171,6 +185,12 @@ export function startInterception() {
             suppressed_recipients: [],
           },
         });
+      },
+    ),
+    http.all(
+      ({ request }) => isLiveServiceHost(new URL(request.url).hostname),
+      ({ request }) => {
+        throw new LiveServiceRequestError(request.url, request.method, env.NODE_ENV);
       },
     ),
   );

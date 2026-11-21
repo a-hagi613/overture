@@ -1,6 +1,7 @@
 import { databasePath, env } from "../config/env.ts";
 import { openDatabase } from "../platform/db/client.ts";
 import { createClock } from "../platform/ports/clock.ts";
+import { installOutboundGuard } from "../platform/outbound-guard.ts";
 import { createAshbyFeed } from "./ashby-feed.ts";
 import { createGreenhouseFeed } from "./greenhouse-feed.ts";
 import { createLeverFeed } from "./lever-feed.ts";
@@ -11,6 +12,10 @@ import type { BoardFeeds } from "./board-feed.ts";
 import type { SweepWorkerResponse } from "./sweep-worker-protocol.ts";
 
 const { db } = openDatabase(databasePath);
+
+if (env.NODE_ENV !== "production") {
+  installOutboundGuard(env.NODE_ENV);
+}
 
 const clock = createClock();
 

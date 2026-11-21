@@ -106,6 +106,12 @@ const { db } = openDatabase(databasePath);
 
 migrateDatabase(db, "drizzle");
 
+if (env.NODE_ENV !== "production") {
+  const { installOutboundGuard } = await import("./platform/outbound-guard.ts");
+
+  installOutboundGuard(env.NODE_ENV);
+}
+
 if (env.ENABLE_TEST_ROUTES) {
   const { startInterception } = await import("./testing/interception.ts");
 
@@ -190,6 +196,7 @@ const preparation = createPreparationService({
   greenhouseBoardOrigin: env.GREENHOUSE_BOARD_BASE_URL,
   plainFormReader: createPlainFormReader({
     ashbyBaseUrl: env.ASHBY_JOBS_BASE_URL,
+    environment: env.NODE_ENV,
     leverBaseUrl: env.LEVER_JOBS_BASE_URL,
     leverEuBaseUrl: env.LEVER_EU_JOBS_BASE_URL,
   }),
