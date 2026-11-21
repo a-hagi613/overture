@@ -92,24 +92,34 @@ export function targetChoices(db: AppDatabase) {
   } satisfies TargetChoices;
 }
 
+/**
+ * Serves the onboarding choices from memory. After `staleMs` the stamp (open Posting count and the
+ * newest Posting row) is compared; a change refreshes the choices, in the background unless
+ * `staleMs` is 0.
+ * @param deps The database, a clock reading in milliseconds and how long a copy is trusted.
+ * @returns `read` for the current choices and `warm` to fill the cache without waiting.
+ */
 export function createTargetChoicesCache(deps: {
   db: AppDatabase;
   now: () => number;
   staleMs: number;
 }) {
   const { db, now, staleMs } = deps;
-  let cached: { at: number; stamp: number; value: TargetChoices } | null = null;
+  let cached: { at: number; stamp: string; value: TargetChoices } | null = null;
   let refreshing = false;
 
-  function openPostingCount() {
-    return (
-      db.select({ total: count() }).from(postings).where(isNull(postings.closedAt)).get()?.total ??
-      0
-    );
+  function postingStamp() {
+    const row = db
+      .select({ newest: sql<number>`max(rowid)`, open: count() })
+      .from(postings)
+      .where(isNull(postings.closedAt))
+      .get();
+
+    return `${String(row?.open ?? 0)}:${String(row?.newest ?? 0)}`;
   }
 
   function compute() {
-    const stamp = openPostingCount();
+    const stamp = postingStamp();
     const value = targetChoices(db);
 
     cached = { at: now(), stamp, value };
@@ -144,7 +154,7 @@ export function createTargetChoicesCache(deps: {
       return cached.value;
     }
 
-    if (openPostingCount() === cached.stamp) {
+    if (postingStamp() === cached.stamp) {
       cached = { ...cached, at: now() };
 
       return cached.value;

@@ -168,7 +168,7 @@ export async function saveOnboardingTimezone(timezone: string) {
 }
 
 export function useOnboardingState() {
-  return useQuery({ queryFn: fetchOnboardingState, queryKey: stateKey });
+  return useQuery({ queryFn: fetchOnboardingState, queryKey: stateKey, retry: 1 });
 }
 
 export function useFinishOnboardingStep() {

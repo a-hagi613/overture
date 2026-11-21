@@ -12,7 +12,7 @@ import {
 
 export function OnboardingFactsPage() {
   const navigate = useNavigate();
-  const { data, isPending, refetch } = useOnboardingFacts();
+  const { data, isFetching, isPending, refetch } = useOnboardingFacts();
   const mutation = useSaveOnboardingFacts();
   const finish = useFinishOnboardingStep();
 
@@ -23,6 +23,7 @@ export function OnboardingFactsPage() {
           onRetry={() => {
             void refetch();
           }}
+          retrying={isFetching}
           state={isPending ? "loading" : "error"}
         />
       ) : (
