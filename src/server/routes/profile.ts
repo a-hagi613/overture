@@ -7,7 +7,6 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
-import type { PreparationService } from "../pipeline/prepare.ts";
 
 import { env } from "../config/env.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
@@ -17,7 +16,7 @@ import { createResumeService, MAX_RESUME_BYTES } from "../profile/resume.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createSkipCompanyService } from "../profile/skip-companies.ts";
 import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
-import { prepareUsersOfFacts, returnStaleApprovals } from "../pipeline/approval-invalidation.ts";
+import { returnStaleApprovals } from "../pipeline/approval-invalidation.ts";
 import {
   languagesInputSchema,
   profileSettingsInputSchema,
@@ -53,9 +52,8 @@ export function createProfileRoutes(deps: {
   auth: Auth;
   objects: ObjectStore;
   llm: LlmPort;
-  preparation: PreparationService;
 }) {
-  const { db, clock, auth, objects, llm, preparation } = deps;
+  const { db, clock, auth, objects, llm } = deps;
 
   const personal = createPersonalCrypto(
     db,
@@ -91,8 +89,6 @@ export function createProfileRoutes(deps: {
       bytes: new Uint8Array(await form.file.arrayBuffer()),
     });
 
-    const before = await factsService.list(account.id);
-
     const prefilled = await factsService.prefillFromResume(account.id, upload.text);
 
     const employer = prefilled.find((fact) => fact.key === "current_employer");
@@ -101,24 +97,7 @@ export function createProfileRoutes(deps: {
       await skipCompanyService.setCurrentEmployer(account.id, employer.value);
     }
 
-    const stale = await returnStaleApprovals({ clock, db, personal, userId: account.id });
-
-    await prepareUsersOfFacts({
-      answersFor: preparation.answersFor,
-      clock,
-      db,
-      facts: prefilled.flatMap((fact) => {
-        const previous = before.find(
-          (candidate) => candidate.key === fact.key && candidate.scope === fact.scope,
-        );
-
-        return previous === undefined || previous.value !== fact.value
-          ? [{ key: fact.key, scope: fact.scope }]
-          : [];
-      }),
-      skip: stale.map((entry) => entry.applicationId),
-      userId: account.id,
-    });
+    await returnStaleApprovals({ clock, db, personal, userId: account.id });
 
     return context.json(
       { ...upload.resume, prefilledFacts: prefilled.map((fact) => fact.key) },
@@ -175,7 +154,6 @@ export function createProfileRoutes(deps: {
     }
 
     const body = factsSchema.parse(await context.req.json());
-    const before = await factsService.list(account.id);
 
     const saved = (
       await Promise.all(
@@ -185,24 +163,7 @@ export function createProfileRoutes(deps: {
       )
     ).toSorted((left, right) => left.key.localeCompare(right.key));
 
-    const stale = await returnStaleApprovals({ clock, db, personal, userId: account.id });
-
-    await prepareUsersOfFacts({
-      answersFor: preparation.answersFor,
-      clock,
-      db,
-      facts: body.facts.flatMap((fact) => {
-        const previous = before.find(
-          (candidate) => candidate.key === fact.key && candidate.scope === fact.scope,
-        );
-
-        return previous === undefined || previous.value !== fact.value
-          ? [{ key: fact.key, scope: fact.scope }]
-          : [];
-      }),
-      skip: stale.map((entry) => entry.applicationId),
-      userId: account.id,
-    });
+    await returnStaleApprovals({ clock, db, personal, userId: account.id });
 
     return context.json({ facts: saved });
   });
