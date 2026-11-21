@@ -16,15 +16,9 @@ import {
   targets,
   users,
 } from "../platform/db/schema.ts";
+import { EEO_FACT_KEYS } from "../../shared/facts.ts";
 
-const EEO_FACT_KEYS = [
-  "eeo_gender",
-  "eeo_race_ethnicity",
-  "eeo_veteran",
-  "eeo_disability",
-] as const;
-
-const EEO_FIELDS = ["gender", "ethnicity", "veteran", "disability"] as const;
+const EEO_FIELDS = ["gender", "ethnicity", "hispanicLatino", "veteran", "disability"] as const;
 
 type EeoField = (typeof EEO_FIELDS)[number];
 
@@ -50,6 +44,10 @@ const eeoFieldOf: EeoFieldLookup = (key) => {
 
     case "eeo_race_ethnicity": {
       return "ethnicity";
+    }
+
+    case "eeo_hispanic_latino": {
+      return "hispanicLatino";
     }
 
     case "eeo_veteran": {
@@ -121,6 +119,7 @@ export async function readEeoAggregates(db: AppDatabase, personal: PersonalCrypt
   return {
     gender: aggregateOf(tally.get("gender") ?? new Map<string, number>()),
     ethnicity: aggregateOf(tally.get("ethnicity") ?? new Map<string, number>()),
+    hispanicLatino: aggregateOf(tally.get("hispanicLatino") ?? new Map<string, number>()),
     veteran: aggregateOf(tally.get("veteran") ?? new Map<string, number>()),
     disability: aggregateOf(tally.get("disability") ?? new Map<string, number>()),
   };
@@ -136,7 +135,7 @@ export async function readRevealedFacts(db: AppDatabase, personal: PersonalCrypt
 
   const revealed = await Promise.all(
     rows.map(async (row) => {
-      if (eeoFieldOf(row.key) !== null) {
+      if (row.key.startsWith("eeo_") || eeoFieldOf(row.key) !== null) {
         return null;
       }
 

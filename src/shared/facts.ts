@@ -21,6 +21,14 @@ export const TIER_1_FACT_KEYS = [
   "languages",
 ] as const;
 
+export const EEO_FACT_KEYS = [
+  "eeo_gender",
+  "eeo_race_ethnicity",
+  "eeo_hispanic_latino",
+  "eeo_veteran",
+  "eeo_disability",
+] as const;
+
 export const TIER_2_FACT_KEYS = [
   "preferred_name",
   "github_url",
@@ -32,11 +40,7 @@ export const TIER_2_FACT_KEYS = [
   "spoken_languages_levels",
   "voice_sample",
   "cover_letter_template",
-  "eeo_gender",
-  "eeo_race_ethnicity",
-  "eeo_hispanic_latino",
-  "eeo_veteran",
-  "eeo_disability",
+  ...EEO_FACT_KEYS,
 ] as const;
 
 export const FACT_KEYS = [...TIER_1_FACT_KEYS, ...TIER_2_FACT_KEYS] as const;
@@ -78,7 +82,7 @@ export const ONBOARDING_QUESTION_FACT_KEYS = {
   workAuth: "work_auth",
   salary: "salary_expectation",
   hear: "how_did_you_hear",
-  eeo: ["eeo_gender", "eeo_race_ethnicity", "eeo_veteran", "eeo_disability"],
+  eeo: EEO_FACT_KEYS,
 } as const;
 
 export const factLabels: Record<FactKey, string> = {

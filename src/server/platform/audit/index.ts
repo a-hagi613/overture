@@ -60,41 +60,62 @@ export function auditRowOf(id: string, at: Date, entry: AdminAuditEntry) {
   } satisfies AdminAuditRow;
 }
 
-export async function recordAdminAudit(db: AppDatabase, clock: Clock, entry: AdminAuditEntry) {
-  const span = trace.getTracer("overture").startSpan("admin.audit", {
+export function startAuditSpan(action: string, targetUserId: string | undefined) {
+  return trace.getTracer("overture").startSpan("admin.audit", {
     attributes: {
-      "admin.action": entry.action,
-      "admin.target_user_id": entry.targetUserId ?? "",
+      "admin.action": action,
+      "admin.target_user_id": targetUserId ?? "",
     },
   });
+}
+
+export function failAuditSpan(span: ReturnType<typeof startAuditSpan>, cause: unknown) {
+  logError("admin.audit", cause);
+  span.setStatus({ code: SpanStatusCode.ERROR });
+}
+
+export function insertAdminAudit(
+  db: Pick<AppDatabase, "insert">,
+  clock: Clock,
+  entry: AdminAuditEntry,
+) {
+  const id = crypto.randomUUID();
+  const at = clock.now();
+
+  db.insert(adminAudit)
+    .values({
+      id,
+      at,
+      actorId: entry.actorId,
+      action: entry.action,
+      targetUserId: entry.targetUserId ?? null,
+      reason: entry.reason ?? "",
+      detail: JSON.stringify(entry.detail ?? {}),
+    })
+    .run();
+
+  return auditRowOf(id, new Date(at), entry);
+}
+
+export async function shipAdminAudit(row: AdminAuditRow) {
+  const config = lokiAuditConfig();
+
+  if (config !== null) {
+    await shipAuditToLoki(config, row);
+  }
+}
+
+export async function recordAdminAudit(db: AppDatabase, clock: Clock, entry: AdminAuditEntry) {
+  const span = startAuditSpan(entry.action, entry.targetUserId);
 
   try {
-    const id = crypto.randomUUID();
-    const at = clock.now();
+    const row = insertAdminAudit(db, clock, entry);
 
-    db.insert(adminAudit)
-      .values({
-        id,
-        at,
-        actorId: entry.actorId,
-        action: entry.action,
-        targetUserId: entry.targetUserId ?? null,
-        reason: entry.reason ?? "",
-        detail: JSON.stringify(entry.detail ?? {}),
-      })
-      .run();
+    await shipAdminAudit(row);
 
-    const row = auditRowOf(id, new Date(at), entry);
-    const config = lokiAuditConfig();
-
-    if (config !== null) {
-      await shipAuditToLoki(config, row);
-    }
-
-    return id;
+    return row.id;
   } catch (error) {
-    logError("admin.audit", error);
-    span.setStatus({ code: SpanStatusCode.ERROR });
+    failAuditSpan(span, error);
 
     throw error;
   } finally {

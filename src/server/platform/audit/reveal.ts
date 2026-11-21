@@ -1,12 +1,19 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AdminAuditRow } from "./index.ts";
+import type { AdminAuditEntry, AdminAuditRow } from "./index.ts";
 import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 
 import { adminAudit } from "../db/schema.ts";
-import { auditRowOfStored, recordAdminAudit } from "./index.ts";
+import {
+  auditRowOfStored,
+  failAuditSpan,
+  insertAdminAudit,
+  recordAdminAudit,
+  shipAdminAudit,
+  startAuditSpan,
+} from "./index.ts";
 
 export const REVEAL_DURATION_MS = 15 * 60 * 1000;
 
@@ -42,7 +49,7 @@ export interface RevealOpenInput {
   passkeyAssertedAt: number;
 }
 
-function revealStateRows(db: AppDatabase, actorId: string) {
+function revealStateRows(db: Pick<AppDatabase, "select">, actorId: string) {
   return db
     .select()
     .from(adminAudit)
@@ -90,18 +97,22 @@ function inspectionOf(rows: readonly AdminAuditRow[], now: number) {
   return null;
 }
 
-function inspectReveal(db: AppDatabase, clock: Clock, actorId: string) {
+function inspectReveal(db: Pick<AppDatabase, "select">, clock: Clock, actorId: string) {
   return inspectionOf(revealStateRows(db, actorId), clock.now());
 }
 
-async function recordExpiredReveal(db: AppDatabase, clock: Clock, inspection: RevealInspection) {
-  await recordAdminAudit(db, clock, {
+function expiredEntry(inspection: RevealInspection) {
+  return {
     actorId: inspection.session.actorId,
     action: "reveal.expired",
     targetUserId: inspection.session.targetUserId,
     reason: "The 15-minute Reveal ended",
     detail: { cause: "expired", revealId: inspection.session.id },
-  });
+  } satisfies AdminAuditEntry;
+}
+
+async function recordExpiredReveal(db: AppDatabase, clock: Clock, inspection: RevealInspection) {
+  await recordAdminAudit(db, clock, expiredEntry(inspection));
 }
 
 export async function activeReveal(db: AppDatabase, clock: Clock, actorId: string) {
@@ -121,42 +132,67 @@ export async function activeReveal(db: AppDatabase, clock: Clock, actorId: strin
 }
 
 export async function openReveal(db: AppDatabase, clock: Clock, input: RevealOpenInput) {
-  const inspection = inspectReveal(db, clock, input.actorId);
+  const span = startAuditSpan("reveal.open", input.targetUserId);
 
-  if (inspection !== null) {
-    if (inspection.expired) {
-      await recordExpiredReveal(db, clock, inspection);
-    } else {
-      await recordAdminAudit(db, clock, {
-        actorId: input.actorId,
-        action: "reveal.close",
-        targetUserId: inspection.session.targetUserId,
-        reason: "Superseded by a new Reveal",
-        detail: { cause: "superseded", revealId: inspection.session.id },
-      });
-    }
+  try {
+    const plan = db.transaction((tx) => {
+      const inspection = inspectReveal(tx, clock, input.actorId);
+      const rows: AdminAuditRow[] = [];
+
+      if (inspection !== null) {
+        if (inspection.expired) {
+          rows.push(insertAdminAudit(tx, clock, expiredEntry(inspection)));
+        } else {
+          rows.push(
+            insertAdminAudit(tx, clock, {
+              actorId: input.actorId,
+              action: "reveal.close",
+              targetUserId: inspection.session.targetUserId,
+              reason: "Superseded by a new Reveal",
+              detail: { cause: "superseded", revealId: inspection.session.id },
+            }),
+          );
+        }
+      }
+
+      const id = crypto.randomUUID();
+      const openedAt = clock.now();
+      const expiresAt = openedAt + REVEAL_DURATION_MS;
+
+      rows.push(
+        insertAdminAudit(tx, clock, {
+          actorId: input.actorId,
+          action: "reveal.open",
+          targetUserId: input.targetUserId,
+          reason: input.reason,
+          detail: { expiresAt, passkeyAssertedAt: input.passkeyAssertedAt, revealId: id },
+        }),
+      );
+
+      return { expiresAt, id, openedAt, rows };
+    });
+
+    await Promise.all(
+      plan.rows.map(async (row) => {
+        await shipAdminAudit(row);
+      }),
+    );
+
+    return {
+      id: plan.id,
+      actorId: input.actorId,
+      targetUserId: input.targetUserId,
+      reason: input.reason,
+      openedAt: plan.openedAt,
+      expiresAt: plan.expiresAt,
+    } satisfies RevealSession;
+  } catch (error) {
+    failAuditSpan(span, error);
+
+    throw error;
+  } finally {
+    span.end();
   }
-
-  const id = crypto.randomUUID();
-  const openedAt = clock.now();
-  const expiresAt = openedAt + REVEAL_DURATION_MS;
-
-  await recordAdminAudit(db, clock, {
-    actorId: input.actorId,
-    action: "reveal.open",
-    targetUserId: input.targetUserId,
-    reason: input.reason,
-    detail: { expiresAt, passkeyAssertedAt: input.passkeyAssertedAt, revealId: id },
-  });
-
-  return {
-    id,
-    actorId: input.actorId,
-    targetUserId: input.targetUserId,
-    reason: input.reason,
-    openedAt,
-    expiresAt,
-  } satisfies RevealSession;
 }
 
 export async function closeReveal(db: AppDatabase, clock: Clock, actorId: string) {

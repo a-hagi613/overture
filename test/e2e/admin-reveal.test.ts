@@ -31,6 +31,7 @@ const actAsSchema = z.object({
       disability: z.array(z.object({ count: z.number(), value: z.string() })),
       ethnicity: z.array(z.object({ count: z.number(), value: z.string() })),
       gender: z.array(z.object({ count: z.number(), value: z.string() })),
+      hispanicLatino: z.array(z.object({ count: z.number(), value: z.string() })),
       veteran: z.array(z.object({ count: z.number(), value: z.string() })),
     }),
     facts: z.array(z.object({ key: z.string(), value: z.string() })),
@@ -119,6 +120,7 @@ test("a Reveal needs a fresh passkey and a reason, act-as is read-only and expir
         { key: "legal_name", value: "Alex Rivera" },
         { key: "current_job_title", value: "Support Engineer" },
         { key: "eeo_gender", value: "Woman" },
+        { key: "eeo_hispanic_latino", value: "Yes" },
       ],
     },
   });
@@ -210,8 +212,10 @@ test("a Reveal needs a fresh passkey and a reason, act-as is read-only and expir
   expect(view.user.email).toBe(guestA);
   expect(view.reveal.targetUserId).toBe(userA.id);
   expect(view.facts.some((fact) => fact.key === "legal_name")).toBe(true);
+  expect(view.facts.some((fact) => fact.key === "eeo_hispanic_latino")).toBe(false);
   expect(view.facts.some((fact) => fact.key.startsWith("eeo_"))).toBe(false);
   expect(view.eeoAggregates.gender.find((row) => row.value === "Woman")?.count).toBe(1);
+  expect(view.eeoAggregates.hispanicLatino.find((row) => row.value === "Yes")?.count).toBe(1);
 
   const readOnlyWrite = await page.request.post(`${adminBase}/act-as/${userA.id}`, {
     data: { running: true },
@@ -293,6 +297,46 @@ test("a Reveal needs a fresh passkey and a reason, act-as is read-only and expir
 
   expect(unauthenticated.status()).toBe(401);
   expect(unauthenticated.headers()["cache-control"]).toBe("private, no-store");
+
+  const reopened = await page.request.post(`${adminBase}/users/${userA.id}/reveal`, {
+    data: { reason: "Second look at the same application" },
+  });
+
+  expect(reopened.status()).toBe(201);
+
+  const superseding = await page.request.post(`${adminBase}/users/${userB.id}/reveal`, {
+    data: { reason: "Now looking at the other person" },
+  });
+
+  expect(superseding.status()).toBe(201);
+
+  const supersededView = await page.request.get(`${adminBase}/act-as/${userA.id}`);
+
+  expect(supersededView.status()).toBe(403);
+  expect(await supersededView.json()).toEqual({ error: "reveal_required" });
+
+  const supersedingView = await page.request.get(`${adminBase}/act-as/${userB.id}`);
+
+  expect(supersedingView.status()).toBe(200);
+
+  const { audit: auditAfterSupersede } = auditSchema.parse(
+    await (await page.request.get(`${adminBase}/audit`)).json(),
+  );
+
+  const supersededClose = auditAfterSupersede.find(
+    (row) =>
+      row.action === "reveal.close" &&
+      row.targetUserId === userA.id &&
+      row.detail.cause === "superseded",
+  );
+
+  expect(supersededClose).toBeDefined();
+
+  const shippedClose = lokiAuditEntries(lokiServer).find(
+    (entry) => entry.action === "reveal.close" && entry.targetUserId === userA.id,
+  );
+
+  expect(shippedClose?.reason).toBe("Superseded by a new Reveal");
 
   await anonymous.dispose();
   await guestBContext.dispose();

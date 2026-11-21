@@ -19,7 +19,7 @@ import {
   REVEAL_PASSKEY_WINDOW_MS,
   recordRevealView,
 } from "../platform/audit/reveal.ts";
-import { lastPasskeyAssertionAt, passkeyAssertedWithin } from "../platform/passkey/index.ts";
+import { lastPasskeyAssertionAt } from "../platform/passkey/index.ts";
 import { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
 
 const revealBody = z.object({ reason: z.string().trim().min(1).max(500) });
@@ -54,10 +54,7 @@ export function createAdminRevealRoutes(db: AppDatabase, clock: Clock, personal:
 
     const assertedAt = lastPasskeyAssertionAt(db, owner.userId);
 
-    if (
-      assertedAt === null ||
-      !passkeyAssertedWithin(db, clock, owner.userId, REVEAL_PASSKEY_WINDOW_MS)
-    ) {
+    if (assertedAt === null || clock.now() - assertedAt.getTime() >= REVEAL_PASSKEY_WINDOW_MS) {
       return context.json({ error: ADMIN_REFUSAL_CODES.passkeyRequired }, 403);
     }
 
