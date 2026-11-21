@@ -5,7 +5,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Random } from "../platform/ports/random.ts";
 
-import { applications, profiles } from "../platform/db/schema.ts";
+import { applications, profiles, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { getSetting } from "../platform/settings/index.ts";
@@ -98,12 +98,13 @@ export function createPlanner(deps: PlannerDeps) {
     const now = clock.now();
 
     const profile = db
-      .select({ running: profiles.running })
+      .select({ emailVerified: users.emailVerified, running: profiles.running })
       .from(profiles)
+      .innerJoin(users, eq(users.id, profiles.userId))
       .where(eq(profiles.userId, userId))
       .get();
 
-    if (profile === undefined || !profile.running) {
+    if (profile === undefined || !profile.running || !profile.emailVerified) {
       return { planned: 0, remaining: 0 };
     }
 
@@ -196,7 +197,8 @@ export function ensurePlannerQueuedForRunningUsers(db: AppDatabase, clock: Clock
   const running = db
     .select({ userId: profiles.userId })
     .from(profiles)
-    .where(eq(profiles.running, true))
+    .innerJoin(users, eq(users.id, profiles.userId))
+    .where(and(eq(profiles.running, true), eq(users.emailVerified, true)))
     .all();
 
   for (const row of running) {

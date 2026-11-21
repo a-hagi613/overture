@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -17,17 +17,23 @@ import {
   grants,
   invites,
   killSwitches,
+  mailboxes,
+  messages,
   postings,
+  profiles,
+  resumes,
+  reviews,
   sessions,
+  targets,
   users,
 } from "../platform/db/schema.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags, readTagImports } from "../catalog/tag-import.ts";
 import { createAccessVerifier } from "../platform/access/index.ts";
 import { env } from "../config/env.ts";
-import { hasRecentPasskeyAssertion } from "../platform/passkey/index.ts";
+import { hasRecentPasskeyAssertion, lastPasskeyAssertionAt } from "../platform/passkey/index.ts";
 import { listAdminAudit, recordAdminAudit } from "../platform/audit/index.ts";
 import { readLlmUsage } from "../platform/llm/usage.ts";
-import { applicationsLeft, grantApplications } from "../billing/ledger.ts";
+import { applicationsLeft, balancesPerGrant, grantApplications } from "../billing/ledger.ts";
 import { buildCostSummary, buildProviderReport } from "../dispatch/report.ts";
 import { FIXTURE_CAPTURE_JOB_KIND, fixtureCapturePayloadSchema } from "../fixtures/job.ts";
 import { enqueueLiveCheckNow } from "../live-checks/job.ts";
@@ -40,10 +46,34 @@ import {
   setKillSwitch,
   setSetting,
 } from "../platform/settings/index.ts";
-import { inviteEmailHash, inviteStatus } from "../auth/invites.ts";
+import {
+  inviteEmailHash,
+  inviteStatus,
+  INVITE_GRANT_DAYS_KEY,
+  INVITE_GRANT_QUANTITY_KEY,
+} from "../auth/invites.ts";
 import { isSameMailbox } from "../auth/email.ts";
 
 const settingBody = z.object({ value: z.string().min(1) });
+
+const suspendBody = z.object({ reason: z.string().trim().min(1).max(500) });
+
+const usersQuery = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  q: z.string().trim().default(""),
+  status: z.enum(["all", "active", "suspended", "invited"]).default("all"),
+});
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const USERS_PAGE_SIZE = 5;
+
+function readStringList(value: string) {
+  try {
+    return z.array(z.string()).parse(JSON.parse(value));
+  } catch {
+    return [];
+  }
+}
 
 const killSwitchBody = z.object({
   enabled: z.boolean(),
@@ -150,6 +180,18 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
   const inviteSecret = env.BETTER_AUTH_SECRET;
 
+  function grantViewOf(grantId: string | null) {
+    if (grantId === null) {
+      return null;
+    }
+
+    const row = db.select().from(grants).where(eq(grants.id, grantId)).get();
+
+    return row === undefined
+      ? null
+      : { expiresAt: row.expiresAt, quantity: row.quantity, startsAt: row.startsAt };
+  }
+
   async function invitationView(invite: InviteRow, ownerId: string) {
     const sealedBy = invite.invitedBy ?? ownerId;
 
@@ -169,6 +211,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
       acceptedUserId: invite.acceptedUserId,
       createdAt: invite.createdAt.getTime(),
       email,
+      grant: grantViewOf(invite.grantId),
       grantId: invite.grantId,
       id: invite.id,
       invitedBy: invite.invitedBy,
@@ -176,6 +219,416 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
       status: inviteStatus(invite),
     };
   }
+
+  function lastActivityAt(userId: string) {
+    const session = db
+      .select({ at: sessions.updatedAt })
+      .from(sessions)
+      .where(eq(sessions.userId, userId))
+      .orderBy(desc(sessions.updatedAt))
+      .limit(1)
+      .get();
+
+    const application = db
+      .select({ at: applications.updatedAt })
+      .from(applications)
+      .where(eq(applications.userId, userId))
+      .orderBy(desc(applications.updatedAt))
+      .limit(1)
+      .get();
+
+    const message = db
+      .select({ at: messages.createdAt })
+      .from(messages)
+      .where(eq(messages.userId, userId))
+      .orderBy(desc(messages.createdAt))
+      .limit(1)
+      .get();
+
+    const values = [
+      session?.at.getTime() ?? null,
+      application?.at ?? null,
+      message?.at.getTime() ?? null,
+    ];
+
+    let latest: number | null = null;
+
+    for (const value of values) {
+      if (value !== null && (latest === null || value > latest)) {
+        latest = value;
+      }
+    }
+
+    return latest;
+  }
+
+  function adminGrantFor(userId: string) {
+    const rows = db
+      .select()
+      .from(grants)
+      .where(and(eq(grants.userId, userId), eq(grants.source, "admin")))
+      .orderBy(asc(grants.startsAt))
+      .all();
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    const balances = balancesPerGrant(db, userId);
+    let quantity = 0;
+    let remaining = 0;
+    let used = 0;
+    let opens = false;
+    let startsAt = rows[0]?.startsAt ?? 0;
+    let expiresAt: number | null = null;
+
+    for (const row of rows) {
+      const balance = balances.get(row.id);
+
+      quantity += row.quantity;
+      remaining += balance?.available ?? 0;
+      used += balance?.used ?? 0;
+      startsAt = Math.min(startsAt, row.startsAt);
+
+      if (row.expiresAt === null) {
+        opens = true;
+      } else if (!opens) {
+        expiresAt = Math.max(expiresAt ?? 0, row.expiresAt);
+      }
+    }
+
+    return { expiresAt: opens ? null : expiresAt, quantity, remaining, startsAt, used };
+  }
+
+  function acceptedInviteFor(userId: string) {
+    return (
+      db
+        .select()
+        .from(invites)
+        .where(eq(invites.acceptedUserId, userId))
+        .orderBy(desc(invites.acceptedAt))
+        .get() ?? null
+    );
+  }
+
+  routes.get("/session", (context) => {
+    const owner = context.get("owner");
+
+    const row = db
+      .select({ email: users.email, name: users.name })
+      .from(users)
+      .where(eq(users.id, owner.userId))
+      .get();
+
+    return context.json({
+      now: clock.now(),
+      owner: { email: row?.email ?? owner.email, name: row?.name ?? "" },
+      passkeyAssertedAt: lastPasskeyAssertionAt(db, owner.userId)?.getTime() ?? null,
+    });
+  });
+
+  routes.get("/users", zValidator("query", usersQuery), async (context) => {
+    const { page, q, status } = context.req.valid("query");
+    const owner = context.get("owner");
+    const now = clock.now();
+    const needle = q.toLowerCase();
+
+    const members = db.select().from(users).orderBy(desc(users.createdAt)).all();
+
+    const pendingInvites = db
+      .select()
+      .from(invites)
+      .where(and(isNull(invites.acceptedAt), isNull(invites.revokedAt)))
+      .all();
+
+    const people: {
+      acceptedAt: number | null;
+      createdAt: number;
+      email: string | null;
+      grant: { expiresAt: number | null; quantity: number; startsAt: number } | null;
+      grantsLeft: number | null;
+      id: string;
+      inviteAt: number | null;
+      kind: "invite" | "user";
+      lastActiveAt: number | null;
+      name: string | null;
+      status: "active" | "invited" | "suspended";
+    }[] = members.map((member) => {
+      const invite = acceptedInviteFor(member.id);
+      const adminGrant = adminGrantFor(member.id);
+
+      return {
+        acceptedAt: invite?.acceptedAt?.getTime() ?? null,
+        createdAt: member.createdAt.getTime(),
+        email: member.email,
+        grant:
+          adminGrant === null
+            ? null
+            : {
+                expiresAt: adminGrant.expiresAt,
+                quantity: adminGrant.quantity,
+                startsAt: adminGrant.startsAt,
+              },
+        grantsLeft: applicationsLeft(db, member.id, now),
+        id: member.id,
+        inviteAt: invite?.createdAt.getTime() ?? null,
+        kind: "user",
+        lastActiveAt: lastActivityAt(member.id),
+        name: member.name,
+        status: member.suspendedAt === null ? "active" : "suspended",
+      };
+    });
+
+    const invitedPeople = await Promise.all(
+      pendingInvites.map(async (invite) => {
+        const view = await invitationView(invite, owner.userId);
+
+        return {
+          acceptedAt: null,
+          createdAt: view.createdAt,
+          email: view.email,
+          grant: null,
+          grantsLeft: null,
+          id: `invite:${invite.id}`,
+          inviteAt: view.createdAt,
+          kind: "invite" as const,
+          lastActiveAt: null,
+          name: null,
+          status: "invited" as const,
+        };
+      }),
+    );
+
+    const everyone = [...people, ...invitedPeople].toSorted(
+      (left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id),
+    );
+
+    const counts = {
+      active: everyone.filter((person) => person.status === "active").length,
+      all: everyone.length,
+      invited: everyone.filter((person) => person.status === "invited").length,
+      suspended: everyone.filter((person) => person.status === "suspended").length,
+    };
+
+    const filtered = everyone.filter((person) => {
+      if (status !== "all" && person.status !== status) {
+        return false;
+      }
+
+      if (needle.length === 0) {
+        return true;
+      }
+
+      return (
+        (person.name ?? "").toLowerCase().includes(needle) ||
+        (person.email ?? "").toLowerCase().includes(needle)
+      );
+    });
+
+    const start = (page - 1) * USERS_PAGE_SIZE;
+
+    return context.json({
+      counts,
+      now,
+      page,
+      pageSize: USERS_PAGE_SIZE,
+      rows: filtered.slice(start, start + USERS_PAGE_SIZE),
+      total: filtered.length,
+    });
+  });
+
+  routes.get("/users/:id", async (context) => {
+    const user = db
+      .select()
+      .from(users)
+      .where(eq(users.id, context.req.param("id")))
+      .get();
+
+    if (user === undefined) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    const invite = acceptedInviteFor(user.id);
+    const mailbox = db.select().from(mailboxes).where(eq(mailboxes.userId, user.id)).get();
+
+    const resume = db
+      .select()
+      .from(resumes)
+      .where(and(eq(resumes.userId, user.id), eq(resumes.isCurrent, true)))
+      .get();
+
+    const targetRow = db.select().from(targets).where(eq(targets.userId, user.id)).get();
+    const adminGrant = adminGrantFor(user.id);
+    const now = clock.now();
+    const weekAgo = now - 7 * DAY_MS;
+
+    const resumeFilename =
+      resume === undefined
+        ? null
+        : await deps.personal
+            .openFor(
+              user.id,
+              { table: "resumes", column: "filename_enc", rowId: resume.id },
+              resume.filenameEnc,
+            )
+            .catch(() => null);
+
+    const sentThisWeek =
+      db
+        .select({ total: count() })
+        .from(applications)
+        .where(
+          and(
+            eq(applications.userId, user.id),
+            eq(applications.status, "sent"),
+            gte(applications.sentAt, weekAgo),
+          ),
+        )
+        .get()?.total ?? 0;
+
+    const readyToSend =
+      db
+        .select({ total: count() })
+        .from(applications)
+        .where(
+          and(
+            eq(applications.userId, user.id),
+            inArray(applications.status, ["ready", "approved"]),
+          ),
+        )
+        .get()?.total ?? 0;
+
+    const couldNotApply =
+      db
+        .select({ total: count() })
+        .from(applications)
+        .where(and(eq(applications.userId, user.id), eq(applications.status, "failed")))
+        .get()?.total ?? 0;
+
+    const reviewsOpen =
+      db
+        .select({ total: count() })
+        .from(reviews)
+        .where(and(eq(reviews.userId, user.id), eq(reviews.status, "open")))
+        .get()?.total ?? 0;
+
+    return context.json({
+      now,
+      user: {
+        acceptedAt: invite?.acceptedAt?.getTime() ?? null,
+        applicationsLeft: applicationsLeft(db, user.id, now),
+        createdAt: user.createdAt.getTime(),
+        email: user.email,
+        emailVerified: user.emailVerified,
+        forwardingAddress: mailbox === undefined ? null : `${mailbox.localPart}@${env.MAIL_DOMAIN}`,
+        grant: adminGrant,
+        id: user.id,
+        inviteAt: invite?.createdAt.getTime() ?? null,
+        lastActiveAt: lastActivityAt(user.id),
+        name: user.name,
+        resume:
+          resume === undefined
+            ? null
+            : { filename: resumeFilename, uploadedAt: resume.uploadedAt.getTime() },
+        role: user.role,
+        stats: { couldNotApply, readyToSend, reviewsOpen, sentThisWeek },
+        status: user.suspendedAt === null ? "active" : "suspended",
+        suspendedAt: user.suspendedAt === null ? null : user.suspendedAt.getTime(),
+        targets:
+          targetRow === undefined
+            ? null
+            : {
+                locations: readStringList(targetRow.locations),
+                roles: readStringList(targetRow.roles),
+              },
+      },
+    });
+  });
+
+  routes.post("/users/:id/suspend", zValidator("json", suspendBody), (context) => {
+    const owner = context.get("owner");
+    const { reason } = context.req.valid("json");
+
+    const user = db
+      .select()
+      .from(users)
+      .where(eq(users.id, context.req.param("id")))
+      .get();
+
+    if (user === undefined) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    if (user.role === "owner") {
+      return context.json({ error: "owner_required" }, 409);
+    }
+
+    const at = new Date(clock.now());
+
+    db.transaction((tx) => {
+      tx.update(users).set({ suspendedAt: at, updatedAt: at }).where(eq(users.id, user.id)).run();
+
+      tx.insert(profiles)
+        .values({
+          userId: user.id,
+          running: false,
+          pauseReason: "suspended",
+          createdAt: at,
+          updatedAt: at,
+        })
+        .onConflictDoUpdate({
+          target: profiles.userId,
+          set: { pauseReason: "suspended", running: false, updatedAt: at },
+        })
+        .run();
+    });
+
+    recordAdminAudit(db, clock, {
+      actorId: owner.userId,
+      action: "users.suspend",
+      detail: { email: user.email, suspendedAt: at.getTime() },
+      reason,
+      targetUserId: user.id,
+    });
+
+    return context.json({ id: user.id, suspendedAt: at.getTime() });
+  });
+
+  routes.post("/users/:id/reinstate", zValidator("json", suspendBody), (context) => {
+    const owner = context.get("owner");
+    const { reason } = context.req.valid("json");
+
+    const user = db
+      .select()
+      .from(users)
+      .where(eq(users.id, context.req.param("id")))
+      .get();
+
+    if (user === undefined) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    const at = new Date(clock.now());
+
+    db.transaction((tx) => {
+      tx.update(users).set({ suspendedAt: null, updatedAt: at }).where(eq(users.id, user.id)).run();
+
+      tx.update(profiles)
+        .set({ pauseReason: "user", running: false, updatedAt: at })
+        .where(eq(profiles.userId, user.id))
+        .run();
+    });
+
+    recordAdminAudit(db, clock, {
+      actorId: owner.userId,
+      action: "users.reinstate",
+      detail: { email: user.email, reinstatedAt: at.getTime() },
+      reason,
+      targetUserId: user.id,
+    });
+
+    return context.json({ id: user.id, suspendedAt: null });
+  });
 
   routes.get("/overview", (context) => {
     const jobCounts = db
@@ -347,7 +800,16 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
     const views = await Promise.all(rows.map(async (row) => invitationView(row, owner.userId)));
 
-    return context.json({ invites: views });
+    const quantity = Number(getSetting(db, INVITE_GRANT_QUANTITY_KEY) ?? 300);
+    const days = Number(getSetting(db, INVITE_GRANT_DAYS_KEY) ?? 30);
+
+    return context.json({
+      grant: {
+        days: Number.isFinite(days) && days > 0 ? days : 30,
+        quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 300,
+      },
+      invites: views,
+    });
   });
 
   routes.post("/invites", zValidator("json", inviteBody), async (context) => {

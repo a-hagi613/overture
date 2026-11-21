@@ -711,6 +711,10 @@ export function createHomeRoutes(deps: {
       return context.json({ error: "sign_in_required" }, 401);
     }
 
+    if (!user.emailVerified) {
+      return context.json({ error: "email_unverified" }, 403);
+    }
+
     const { running } = context.req.valid("json");
     const now = clock.now();
     const pauseReason = running ? null : "user";

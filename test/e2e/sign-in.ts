@@ -48,7 +48,7 @@ export async function requestMagicLink(
 }
 
 export interface TurnstileScenario {
-  action: "signin" | "signup" | "magiclink";
+  action: "signin" | "signup" | "magiclink" | "reset";
   hostname?: string;
   outcome?: "pass" | "replay" | "error";
 }
@@ -63,6 +63,62 @@ export async function setTurnstileScenario(
   if (!response.ok()) {
     throw new Error(`Setting the Turnstile scenario failed with ${String(response.status())}.`);
   }
+}
+
+function turnstileHeaders(action: TurnstileScenario["action"], appServerUrl: string) {
+  return {
+    "x-captcha-response": authTestIdentity.turnstilePassToken,
+    "x-turnstile-action": action,
+    origin: appServerUrl,
+  };
+}
+
+export async function signUpWithPassword(
+  appServerUrl: string,
+  request: APIRequestContext,
+  input: { email: string; name?: string; password: string },
+) {
+  return request.post(`${appServerUrl}/api/auth/sign-up/email`, {
+    data: {
+      email: input.email,
+      name: input.name ?? "Test Person",
+      password: input.password,
+    },
+    headers: turnstileHeaders("signup", appServerUrl),
+  });
+}
+
+export async function signInWithPassword(
+  appServerUrl: string,
+  request: APIRequestContext,
+  input: { email: string; password: string },
+) {
+  return request.post(`${appServerUrl}/api/auth/sign-in/email`, {
+    data: { email: input.email, password: input.password },
+    headers: turnstileHeaders("signin", appServerUrl),
+  });
+}
+
+export async function askPasswordReset(
+  appServerUrl: string,
+  request: APIRequestContext,
+  email: string,
+) {
+  return request.post(`${appServerUrl}/api/auth/request-password-reset`, {
+    data: { email, redirectTo: `${appServerUrl}/reset-password` },
+    headers: turnstileHeaders("reset", appServerUrl),
+  });
+}
+
+export async function resetPassword(
+  appServerUrl: string,
+  request: APIRequestContext,
+  input: { password: string; token: string },
+) {
+  return request.post(`${appServerUrl}/api/auth/reset-password`, {
+    data: { newPassword: input.password, token: input.token },
+    headers: turnstileHeaders("reset", appServerUrl),
+  });
 }
 
 export async function latestMailLink(appServerUrl: string, request: APIRequestContext, to: string) {

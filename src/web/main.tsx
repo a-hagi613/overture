@@ -19,6 +19,8 @@ import { OnboardingTargetsPage } from "./routes/onboarding-targets.tsx";
 import { ReviewPage } from "./routes/review.tsx";
 import { SearchPage } from "./routes/search.tsx";
 import { SettingsPage } from "./routes/settings.tsx";
+import { ForgotPasswordPage } from "./routes/forgot-password.tsx";
+import { ResetPasswordPage } from "./routes/reset-password.tsx";
 import { SignInPage } from "./routes/signin.tsx";
 import { ThemeProvider } from "./lib/theme.tsx";
 import { AdminShell } from "./routes/admin/shell.tsx";
@@ -26,6 +28,9 @@ import { AdminSettingsPage } from "./routes/admin/settings.tsx";
 import { CatalogPage } from "./routes/admin/catalog.tsx";
 import { OverviewPage } from "./routes/admin/overview.tsx";
 import { GrantsPage } from "./routes/admin/grants.tsx";
+import { InvitesPage } from "./routes/admin/invites.tsx";
+import { UserPage } from "./routes/admin/user.tsx";
+import { UsersPage } from "./routes/admin/users.tsx";
 
 const router = createBrowserRouter([
   {
@@ -50,11 +55,16 @@ const router = createBrowserRouter([
       { path: "/admin/settings", element: <AdminSettingsPage /> },
       { path: "/admin/catalog", element: <CatalogPage /> },
       { path: "/admin/grants", element: <GrantsPage /> },
+      { path: "/admin/users", element: <UsersPage /> },
+      { path: "/admin/users/:id", element: <UserPage /> },
+      { path: "/admin/invites", element: <InvitesPage /> },
     ],
   },
   { path: "/signin", element: <SignInPage /> },
   { path: "/onboarding", element: <OnboardingPage /> },
   { path: "/onboarding/resume", element: <OnboardingResumePage /> },
+  { path: "/forgot-password", element: <ForgotPasswordPage /> },
+  { path: "/reset-password", element: <ResetPasswordPage /> },
   { path: "/onboarding/facts", element: <OnboardingFactsPage /> },
   { path: "/onboarding/targets", element: <OnboardingTargetsPage /> },
 ]);

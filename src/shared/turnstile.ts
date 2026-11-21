@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const turnstileActionSchema = z.enum(["signin", "signup", "magiclink"]);
+export const turnstileActionSchema = z.enum(["signin", "signup", "magiclink", "reset"]);
 
 export type TurnstileAction = z.infer<typeof turnstileActionSchema>;
 

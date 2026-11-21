@@ -21,6 +21,18 @@ A Posting whose Match score is 80 or above.
 What the user wants: roles, seniorities, workplaces, locations, employment types and a salary floor.
 _Avoid_: preferences, filters
 
+## Signing in
+
+**Verified email**:
+The address a user proved they own by opening the single-use link Overture mailed them. No Application is prepared
+or sent for an unverified address, and an invite is accepted on the first verified sign-in.
+_Avoid_: confirmed address, validated account
+
+**Password reset**:
+A single-use link (one hour) that lets a user choose a new password. Saving it signs the user out of other devices
+and then signs them in on the device that opened it.
+_Avoid_: forgot-password flow, credential recovery
+
 ## Applying
 
 **Application**:
@@ -159,6 +171,12 @@ _Avoid_: reauth, 2FA, step-up
 **Admin audit**:
 The append-only record in `admin_audit` of every action taken in the admin: who, what, when, why.
 _Avoid_: log entry, change history
+
+**Suspension**:
+The owner stopping one account at once: sign-in is refused, running pauses with the `suspended` reason, sent
+Applications stay sent and Inbox mail keeps arriving, and the typed reason is written to the admin audit. Reinstating
+clears the suspension and leaves running paused until the person starts it.
+_Avoid_: ban, block, lockout
 
 **Live check**:
 The daily `live.check` job on `overture-web` that exercises a real form capture, real Haiku calls, the mail loop and R2, records pass/fail and timing, and alerts the owner on failure. It never submits an application or touches a user.

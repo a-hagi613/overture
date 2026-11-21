@@ -10,6 +10,8 @@ import {
   setTurnstileScenario,
   signInByMagicLink,
   clearSinkMail,
+  latestMailLink,
+  signInWithPassword,
   sinkMailCount,
 } from "./sign-in.ts";
 
@@ -252,16 +254,12 @@ test("a revoked or uninvited email is refused the same way by every method", asy
   await identityServer.setPersona(guestPersona("revoked-google", revokedEmail));
   await page.goto(`${appUrl}/signin`);
   await page.getByRole("button", { name: "Continue with Google" }).click();
-  await expect(
-    page.getByText("That email has no invite to Overture yet. Ask the owner for one."),
-  ).toBeVisible();
+  await expect(page.getByText("This email isn't invited yet.")).toBeVisible();
 
   await identityServer.setPersona(guestPersona("revoked-linkedin", revokedEmail));
   await page.goto(`${appUrl}/signin`);
   await page.getByRole("button", { name: "Continue with LinkedIn" }).click();
-  await expect(
-    page.getByText("That email has no invite to Overture yet. Ask the owner for one."),
-  ).toBeVisible();
+  await expect(page.getByText("This email isn't invited yet.")).toBeVisible();
 
   const state = await verifyAuthState(appUrl, request);
 
@@ -314,9 +312,7 @@ test("a suspended user cannot sign in", async ({
   await identityServer.setPersona(guestPersona("suspended-google", suspendedEmail));
   await secondPage.goto(`${appUrl}/signin`);
   await secondPage.getByRole("button", { name: "Continue with Google" }).click();
-  await expect(
-    secondPage.getByText("This account is suspended, so it cannot sign in."),
-  ).toBeVisible();
+  await expect(secondPage.getByText("This account is suspended.")).toBeVisible();
 
   const after = await verifyAuthState(appUrl, secondPage.request);
 
@@ -325,5 +321,84 @@ test("a suspended user cannot sign in", async ({
   );
 
   await secondContext.close();
+  await admin.context.close();
+});
+
+test("an invite is accepted on the first verified password sign-in and grants 300 once", async ({
+  browser,
+  page,
+  request,
+  accessServer,
+  adminIsolatedAppServer,
+  adminIsolatedAppUrl,
+}) => {
+  const appUrl = adminIsolatedAppServer.url;
+  const guestEmail = "guest.password@example.com";
+  const password = "overture-pass-813";
+  const admin = await openAdmin(browser, adminIsolatedAppUrl, accessServer.issueToken);
+
+  await createInvite(admin.page, adminIsolatedAppUrl, guestEmail);
+  await clearSinkMail(appUrl, request);
+  await setTurnstileScenario(page.request, appUrl, { action: "signup" });
+
+  await page.goto(`${appUrl}/signin`);
+  await page.getByRole("button", { name: "Create an account" }).click();
+  await page.getByLabel("Email").fill(guestEmail);
+  await page.getByLabel("Create a password").fill(password);
+  await expect
+    .poll(
+      async () =>
+        await page
+          .locator('[data-turnstile="password"] input[name="cf-turnstile-response"]')
+          .inputValue(),
+    )
+    .not.toBe("");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+
+  const beforeVerification = await verifyAuthState(appUrl, page.request);
+  const pending = beforeVerification.users.find((user) => user.email === guestEmail);
+
+  expect(pending?.emailVerified).toBe(false);
+  expect(beforeVerification.sessions.filter((session) => session.userId === pending?.id)).toEqual(
+    [],
+  );
+
+  const link = await latestMailLink(appUrl, page.request, guestEmail);
+
+  await page.goto(link);
+  await expect(page.getByRole("heading", { name: "Set up your workspace" })).toBeVisible();
+
+  const state = await verifyAuthState(appUrl, page.request);
+  const guest = state.users.find((user) => user.email === guestEmail);
+
+  expect(guest?.role).toBe("user");
+  expect(guest?.emailVerified).toBe(true);
+
+  const invites = await listInvites(admin.page, adminIsolatedAppUrl);
+  const acceptedInvite = invites.find((invite) => invite.email === guestEmail);
+
+  expect(acceptedInvite?.status).toBe("accepted");
+  expect(acceptedInvite?.acceptedUserId).toBe(guest?.id);
+
+  expect(
+    (await listGrants(admin.page, adminIsolatedAppUrl)).filter(
+      (grant) => grant.email === guestEmail,
+    ),
+  ).toHaveLength(1);
+
+  const second = await browser.newContext();
+  const secondPage = await second.newPage();
+
+  await setTurnstileScenario(secondPage.request, appUrl, { action: "signin" });
+
+  const signedIn = await signInWithPassword(appUrl, secondPage.request, {
+    email: guestEmail,
+    password,
+  });
+
+  expect(signedIn.ok()).toBe(true);
+  await second.close();
+
   await admin.context.close();
 });
