@@ -9795,6 +9795,11 @@
         "src/shared/turnstile.ts"
       ]
     },
+    "test/e2e/theme-tokens.test.ts": {
+      "full": true,
+      "paths": [],
+      "modules": []
+    },
     "test/e2e/time-zone-pending.test.ts": {
       "full": false,
       "paths": [

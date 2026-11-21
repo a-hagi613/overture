@@ -130,6 +130,14 @@ const envSchema = z
     FLY_MACHINE_ID: z.string().min(1).optional(),
   })
   .superRefine((value, context) => {
+    if (value.ENABLE_TEST_ROUTES && (value.NODE_ENV === "production" || value.FLY_APP_NAME)) {
+      context.addIssue({
+        code: "custom",
+        message: "ENABLE_TEST_ROUTES must not be true in production or on Fly.",
+        path: ["ENABLE_TEST_ROUTES"],
+      });
+    }
+
     if (value.NODE_ENV === "production") {
       const hostnames =
         value.TURNSTILE_HOSTNAMES ??
