@@ -28,8 +28,11 @@ import { createReviewRoutes } from "./routes/reviews.ts";
 import { createAdminApi, isAdminHost } from "./routes/admin.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
 import { env } from "./config/env.ts";
+import { demoLocked } from "./demo/guard.ts";
 import { createProfileRoutes } from "./routes/profile.ts";
 import { createOnboardingRoutes } from "./routes/onboarding.ts";
+import { createConsentRoutes } from "./routes/consent.ts";
+import { createConsentService } from "./profile/consent.ts";
 import { createMatchingService } from "./matching/score.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
@@ -108,6 +111,28 @@ export function createApp(deps: AppDependencies) {
 
   const { mailboxes } = deps;
 
+  app.use("/api/*", async (context, next) => {
+    if (context.req.method === "GET" || context.req.method === "HEAD") {
+      return next();
+    }
+
+    if (new URL(context.req.url).pathname.startsWith("/api/auth/")) {
+      return next();
+    }
+
+    const session = await deps.auth.api
+      .getSession({ headers: context.req.raw.headers })
+      .catch(() => null);
+
+    const locked = demoLocked(session?.user.role);
+
+    if (locked !== null) {
+      return locked;
+    }
+
+    return next();
+  });
+
   app.all("/api/auth/*", async (context) => deps.auth.handler(context.req.raw));
   app.route("/api", createHealthRoutes(deps.db, deps.backups));
   app.route("/api", createMeRoutes(deps.auth));
@@ -124,6 +149,13 @@ export function createApp(deps: AppDependencies) {
       llm: deps.llm,
       objects: deps.objects,
       reviews: deps.reviews,
+    }),
+  );
+  app.route(
+    "/api",
+    createConsentRoutes({
+      auth: deps.auth,
+      consent: createConsentService({ clock: deps.clock, db: deps.db }),
     }),
   );
   app.route(

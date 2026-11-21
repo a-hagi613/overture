@@ -9,12 +9,13 @@ import type { Auth } from "../auth/index.ts";
 
 import { notifications, pushSubscriptions } from "../platform/db/schema.ts";
 import { env } from "../config/env.ts";
+import { isAllowedPushEndpoint } from "../platform/push/endpoint.ts";
 
 const LIST_LIMIT = 100;
 
 const subscriptionBody = z.object({
-  endpoint: z.url().refine((value) => value.startsWith("https://"), {
-    message: "A push endpoint must use HTTPS.",
+  endpoint: z.url().refine((value) => isAllowedPushEndpoint(value, env.NODE_ENV), {
+    message: "A push endpoint must be an HTTPS address of a known push service.",
   }),
   keys: z.object({
     auth: z.string().min(8).max(200),

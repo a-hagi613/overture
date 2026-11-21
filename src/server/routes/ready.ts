@@ -28,6 +28,7 @@ import {
 import { publishEvent } from "../platform/sse/stream.ts";
 import { isCoverLetterQuestion } from "../pipeline/open-text.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
+import { demoLocked } from "../demo/guard.ts";
 
 import type { SendPlan } from "../pipeline/send-plan.ts";
 
@@ -539,6 +540,12 @@ export function createReadyRoutes(deps: {
 
       if (user === null) {
         return context.json({ error: "sign_in_required" }, 401);
+      }
+
+      const locked = demoLocked(user.role);
+
+      if (locked !== null) {
+        return locked;
       }
 
       const { id, questionId } = context.req.param();
