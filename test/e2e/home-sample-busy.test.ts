@@ -30,7 +30,7 @@ test("a write lock held past busy_timeout does not turn the paused-Home seed int
   }
 
   try {
-    lock.exec("PRAGMA busy_timeout = 0");
+    lock.exec("PRAGMA busy_timeout = 5000");
     lock.exec("BEGIN IMMEDIATE");
 
     const busyLogged = waitForStderr(
