@@ -288,6 +288,7 @@ test("one open application per company, and none for thirty days after a send", 
   const gamma = await catalog(owner, "Gamma Systems", "gamma.example");
   const delta = await catalog(owner, "Delta Systems", "delta.example");
   const epsilon = await catalog(owner, "Epsilon Systems", "epsilon.example");
+  const zeta = await catalog(owner, "Zeta Systems", "zeta.example");
 
   const allowed = await seedPosting(owner, {
     atsJobId: "alpha-1",
@@ -360,6 +361,22 @@ test("one open application per company, and none for thirty days after a send", 
     url: "https://epsilon.example/2",
   });
 
+  const zetaApproved = await seedPosting(owner, {
+    atsJobId: "zeta-1",
+    boardId: zeta.boardId,
+    companyId: zeta.companyId,
+    title: "Senior Platform Engineer",
+    url: "https://zeta.example/1",
+  });
+
+  const zetaCandidate = await seedPosting(owner, {
+    atsJobId: "zeta-2",
+    boardId: zeta.boardId,
+    companyId: zeta.companyId,
+    title: "Lead Backend Engineer",
+    url: "https://zeta.example/2",
+  });
+
   await seedApplication(owner, { postingId: betaOther, status: "preparing", userId });
   await seedApplication(owner, {
     postingId: gammaOther,
@@ -379,6 +396,7 @@ test("one open application per company, and none for thirty days after a send", 
     status: "sent",
     userId,
   });
+  await seedApplication(owner, { postingId: zetaApproved, status: "approved", userId });
 
   await configureMatching(owner);
 
@@ -389,6 +407,7 @@ test("one open application per company, and none for thirty days after a send", 
   expect(ids).not.toContain(betaCandidate);
   expect(ids).not.toContain(gammaCandidate);
   expect(ids).not.toContain(deltaCandidate);
+  expect(ids).not.toContain(zetaCandidate);
 
   await owner.dispose();
 });

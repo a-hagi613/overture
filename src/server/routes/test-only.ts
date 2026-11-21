@@ -44,6 +44,7 @@ import {
   users,
 } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
+import { stageForStatus } from "../pipeline/stage.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
@@ -307,6 +308,7 @@ const seedApplicationBody = z.object({
     "preparing",
     "needs_review",
     "ready",
+    "approved",
     "sending",
     "confirming",
     "sent",
@@ -318,7 +320,7 @@ const seedApplicationBody = z.object({
   createdAt: z.number().int().nullable().default(null),
   origin: z.enum(["auto", "manual"]).default("auto"),
   stage: z
-    .enum(["queued", "applied", "screening", "interviewing", "offer", "closed"])
+    .enum(["queued", "ready", "applied", "screening", "interviewing", "offer", "closed"])
     .nullable()
     .optional(),
   stageLocked: z.boolean().default(false),
@@ -367,6 +369,7 @@ const applicationStatusBody = z.object({
     "preparing",
     "needs_review",
     "ready",
+    "approved",
     "sending",
     "confirming",
     "sent",
@@ -1115,11 +1118,7 @@ export function createTestRoutes(
 
     const id = crypto.randomUUID();
     const now = createdAt ?? clock.now();
-    let seededStage = stage;
-
-    if (seededStage === undefined) {
-      seededStage = status === "sent" ? "applied" : "queued";
-    }
+    const seededStage = stage === undefined ? stageForStatus(status) : stage;
 
     db.insert(applications)
       .values({
@@ -1201,15 +1200,7 @@ export function createTestRoutes(
   routes.post("/applications/status", zValidator("json", applicationStatusBody), (context) => {
     const { applicationId, status, statusReason } = context.req.valid("json");
 
-    let stage: "queued" | "applied" | null = null;
-
-    if (status === "sent") {
-      stage = "applied";
-    }
-
-    if (status === "ready") {
-      stage = "queued";
-    }
+    const stage = stageForStatus(status);
 
     const updated = db
       .update(applications)
