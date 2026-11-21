@@ -147,6 +147,10 @@ _Avoid_: blocklist, never-apply list
 
 ## Mail
 
+**Inbox**:
+The read-only destination of threads of forwarded ATS mail, each linked to its Application. It has no reply; the user
+replies from their own mailbox (SPEC §11.2).
+
 **Forwarding address**:
 The private address Overture gives each user on `tryoverture.com` (`in-…@`) when their account is created. The user
 forwards only ATS mail to it; it is read-only in the app, never typed on an application form, where the user's real

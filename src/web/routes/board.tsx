@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
 import type { PointerEvent } from "react";
 
@@ -66,7 +66,8 @@ export function BoardPage() {
   const { data: home } = useHomeData();
   const running = useRunning();
   const navigate = useNavigate();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get("application"));
   const [mobileStage, setMobileStage] = useState<StageKey>("queued");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [holdingId, setHoldingId] = useState<string | null>(null);
