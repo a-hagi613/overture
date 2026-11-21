@@ -1,6 +1,6 @@
 import type { SalaryRange } from "../../shared/tag-taxonomy.ts";
 
-export type Ats = "greenhouse" | "lever" | "ashby";
+export type Ats = "greenhouse" | "lever" | "ashby" | "personio";
 
 export const BOARD_REGIONS = ["us", "eu"] as const;
 
@@ -25,6 +25,7 @@ export interface FeedPosting {
   applyUrl: string | null;
   locationRaw: string | null;
   workplaceType: string | null;
+  employmentType: string | null;
   language: string | null;
   postedAt: string | null;
   sourceUpdatedAt: string | null;

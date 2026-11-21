@@ -47,6 +47,7 @@ const jobSchema = z.object({
       allLocations: z.array(z.string().nullish()).nullish(),
       department: z.string().nullish(),
       team: z.string().nullish(),
+      commitment: z.string().nullish(),
     })
     .nullish(),
   description: z.string().nullish(),
@@ -138,6 +139,7 @@ export function createLeverFeed(
             ...(job.categories?.allLocations ?? []),
           ]),
           workplaceType: job.workplaceType ?? null,
+          employmentType: job.categories?.commitment ?? null,
           language: null,
           postedAt: isoFromTimestamp(job.createdAt),
           sourceUpdatedAt: null,

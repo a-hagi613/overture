@@ -22,6 +22,7 @@ const postingRowSchema = z.object({
   department: z.string().nullable(),
   locationRaw: z.string().nullable(),
   countryCode: z.string().nullable(),
+  language: z.string().nullable(),
   workplace: z.string(),
   employmentType: z.string(),
   url: z.string(),
@@ -99,6 +100,7 @@ export interface PostingRow {
   department: string | null;
   locationRaw: string | null;
   countryCode: string | null;
+  language: string | null;
   workplace: string;
   employmentType: string;
   url: string;
@@ -161,7 +163,7 @@ const boardSpecSchema = z.union([
       bulk: undefined,
     })),
   z.object({
-    ats: z.enum(["greenhouse", "lever", "ashby"]),
+    ats: z.enum(["greenhouse", "lever", "ashby", "personio"]),
     token: z.string().min(1),
     region: z.enum(["us", "eu"]).default("us"),
     bulk: z
@@ -198,6 +200,7 @@ export interface CatalogHarness {
   boards: () => Promise<BoardRow[]>;
   jobs: () => Promise<JobRow[]>;
   putSetting: (key: string, value: string) => Promise<void>;
+  setKillSwitch: (scope: string, key: string, enabled: boolean) => Promise<void>;
   moveClock: (offsetMs: number) => Promise<void>;
   clockNow: () => Promise<number>;
   sweepWorkerStatus: () => Promise<{ running: boolean; restarts: number }>;
@@ -317,6 +320,7 @@ export async function startCatalogHarness(
     LEVER_FEED_BASE_URL: fixture.url,
     LEVER_EU_FEED_BASE_URL: `${fixture.url}/eu`,
     ASHBY_FEED_BASE_URL: fixture.url,
+    PERSONIO_FEED_BASE_URL: `${fixture.url}/personio/{token}`,
     ...extraEnvironment,
   });
 
@@ -480,6 +484,18 @@ export async function startCatalogHarness(
     }
   }
 
+  async function setKillSwitch(scope: string, key: string, enabled: boolean) {
+    const response = await fetch(`${app.url}/__test__/kill-switches/${scope}/${key}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ enabled, reason: "catalog test", setBy: "owner" }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`kill switch ${scope}/${key} failed`);
+    }
+  }
+
   async function moveClock(offsetMs: number) {
     const response = await postJson(`${app.url}/__test__/clock/offset`, { offsetMs });
 
@@ -517,6 +533,7 @@ export async function startCatalogHarness(
     boards,
     jobs: listJobs,
     putSetting,
+    setKillSwitch,
     moveClock,
     clockNow,
     sweepWorkerStatus,

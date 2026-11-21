@@ -1,13 +1,13 @@
-import { inArray, sql } from "drizzle-orm";
+import { and, inArray, notInArray, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import { companyBoards } from "../platform/db/schema.ts";
-import { M1_ATS_NAMES } from "./discovered-boards.ts";
+import { CATALOG_ATS_NAMES } from "./discovered-boards.ts";
 import { pollBoard } from "./poll-board.ts";
-import { SWEEP_CLAIM_MS, sweepBatchPerAts } from "./sweep-config.ts";
+import { engagedCatalogAts, SWEEP_CLAIM_MS, sweepBatchPerAts } from "./sweep-config.ts";
 
 import type { BoardFeeds } from "./board-feed.ts";
 import type { PollBoardReport } from "./poll-board.ts";
@@ -16,10 +16,12 @@ import type { SweepRunKind } from "./sweep-worker-protocol.ts";
 export async function pollDueBoards(db: AppDatabase, clock: Clock, feeds: BoardFeeds) {
   const now = clock.now();
   const batches = sweepBatchPerAts(db);
+  const engaged = engagedCatalogAts(db);
+  const pollableAts = CATALOG_ATS_NAMES.filter((ats) => !engaged.has(ats));
 
   const claimed = await retryWhenBusy(
     () =>
-      M1_ATS_NAMES.flatMap((ats) =>
+      pollableAts.flatMap((ats) =>
         db
           .update(companyBoards)
           .set({ nextPollAt: now + SWEEP_CLAIM_MS })
@@ -51,13 +53,21 @@ export async function pollDueBoards(db: AppDatabase, clock: Clock, feeds: BoardF
 
 export async function runBackfillPass(db: AppDatabase, clock: Clock, feeds: BoardFeeds) {
   const now = clock.now();
+  const engaged = [...engagedCatalogAts(db)];
 
   await retryWhenBusy(
     () =>
       db
         .update(companyBoards)
         .set({ nextPollAt: now })
-        .where(inArray(companyBoards.status, ["active", "empty"]))
+        .where(
+          engaged.length === 0
+            ? inArray(companyBoards.status, ["active", "empty"])
+            : and(
+                inArray(companyBoards.status, ["active", "empty"]),
+                notInArray(companyBoards.ats, engaged),
+              ),
+        )
         .run(),
     "catalog.backfill",
   );

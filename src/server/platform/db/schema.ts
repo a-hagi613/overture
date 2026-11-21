@@ -212,7 +212,7 @@ export const companyBoards = sqliteTable(
     companyId: text("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
-    ats: text("ats", { enum: ["greenhouse", "lever", "ashby"] }).notNull(),
+    ats: text("ats", { enum: ["greenhouse", "lever", "ashby", "personio"] }).notNull(),
     boardToken: text("board_token").notNull(),
     region: text("region", { enum: ["us", "eu"] })
       .notNull()
@@ -246,7 +246,7 @@ export const postings = sqliteTable(
     companyId: text("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
-    ats: text("ats", { enum: ["greenhouse", "lever", "ashby"] }).notNull(),
+    ats: text("ats", { enum: ["greenhouse", "lever", "ashby", "personio"] }).notNull(),
     atsJobId: text("ats_job_id").notNull(),
     url: text("url").notNull(),
     applyUrl: text("apply_url"),
@@ -951,7 +951,7 @@ export const reviewAuditEvents = sqliteTable(
     }),
     reviewId: text("review_id").references(() => reviews.id, { onDelete: "cascade" }),
     questionId: text("question_id").references(() => questions.id, { onDelete: "cascade" }),
-    ats: text("ats", { enum: ["greenhouse", "lever", "ashby"] }),
+    ats: text("ats", { enum: ["greenhouse", "lever", "ashby", "personio"] }),
     source: text("source", {
       enum: ["fact", "target", "derived", "consent", "file", "open_text"],
     }),

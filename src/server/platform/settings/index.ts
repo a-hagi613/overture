@@ -16,6 +16,7 @@ const SETTING_DEFAULTS = {
   "limits.ats_hourly.greenhouse": "120",
   "limits.ats_hourly.lever": "120",
   "limits.ats_hourly.ashby": "120",
+  "limits.ats_hourly.personio": "120",
   "limits.max_attempts": "2",
   "limits.confirm_wait_hours": "24",
   "limits.reply_per_day": "20",
