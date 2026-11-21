@@ -80,6 +80,121 @@ export const grantCreateResponseSchema = z.object({
   grantId: z.string(),
 });
 
+export const adminStatusSchema = z.enum(["all", "active", "suspended", "invited"]);
+
+export const adminGrantViewSchema = z.object({
+  expiresAt: z.number().nullable(),
+  quantity: z.number(),
+  startsAt: z.number(),
+});
+
+export const adminPersonRowSchema = z.object({
+  acceptedAt: z.number().nullable(),
+  createdAt: z.number(),
+  email: z.string().nullable(),
+  grant: adminGrantViewSchema.nullable(),
+  grantsLeft: z.number().nullable(),
+  id: z.string(),
+  inviteAt: z.number().nullable(),
+  kind: z.enum(["user", "invite"]),
+  lastActiveAt: z.number().nullable(),
+  name: z.string().nullable(),
+  status: z.enum(["active", "suspended", "invited"]),
+});
+
+export const adminUsersResponseSchema = z.object({
+  counts: z.object({
+    active: z.number(),
+    all: z.number(),
+    invited: z.number(),
+    suspended: z.number(),
+  }),
+  now: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+  rows: z.array(adminPersonRowSchema),
+  total: z.number(),
+});
+
+export const adminUserDetailSchema = z.object({
+  now: z.number(),
+  user: z.object({
+    acceptedAt: z.number().nullable(),
+    applicationsLeft: z.number(),
+    createdAt: z.number(),
+    email: z.string(),
+    emailVerified: z.boolean(),
+    forwardingAddress: z.string().nullable(),
+    grant: z
+      .object({
+        expiresAt: z.number().nullable(),
+        quantity: z.number(),
+        remaining: z.number(),
+        startsAt: z.number(),
+        used: z.number(),
+      })
+      .nullable(),
+    id: z.string(),
+    inviteAt: z.number().nullable(),
+    lastActiveAt: z.number().nullable(),
+    name: z.string(),
+    resume: z
+      .object({
+        filename: z.string().nullable(),
+        uploadedAt: z.number(),
+      })
+      .nullable(),
+    role: z.string(),
+    stats: z.object({
+      couldNotApply: z.number(),
+      readyToSend: z.number(),
+      reviewsOpen: z.number(),
+      sentThisWeek: z.number(),
+    }),
+    status: z.enum(["active", "suspended"]),
+    suspendedAt: z.number().nullable(),
+    targets: z
+      .object({
+        locations: z.array(z.string()),
+        roles: z.array(z.string()),
+      })
+      .nullable(),
+  }),
+});
+
+export const adminSessionSchema = z.object({
+  now: z.number(),
+  owner: z.object({ email: z.string(), name: z.string() }),
+  passkeyAssertedAt: z.number().nullable(),
+});
+
+export const adminSuspendResponseSchema = z.object({
+  id: z.string(),
+  suspendedAt: z.number().nullable(),
+});
+
+export const inviteRowSchema = z.object({
+  acceptedAt: z.number().nullable(),
+  acceptedUserId: z.string().nullable(),
+  createdAt: z.number(),
+  email: z.string().nullable(),
+  grant: adminGrantViewSchema.nullable(),
+  grantId: z.string().nullable(),
+  id: z.string(),
+  invitedBy: z.string().nullable(),
+  revokedAt: z.number().nullable(),
+  status: z.enum(["accepted", "pending", "revoked"]),
+});
+
+export const invitesResponseSchema = z.object({
+  grant: z.object({ days: z.number(), quantity: z.number() }),
+  invites: z.array(inviteRowSchema),
+});
+
+export type InvitesResponse = z.infer<typeof invitesResponseSchema>;
+
+export const inviteCreateResponseSchema = z.object({ invite: inviteRowSchema });
+
 export const catalogResponseSchema = z.object({
   discoveredAt: z.number().nullable(),
   ats: z.array(
@@ -92,6 +207,18 @@ export const catalogResponseSchema = z.object({
 });
 
 export type AdminRefusalCode = z.infer<typeof adminRefusalCodeSchema>;
+
+export type AdminStatus = z.infer<typeof adminStatusSchema>;
+
+export type AdminPersonRow = z.infer<typeof adminPersonRowSchema>;
+
+export type AdminUsersResponse = z.infer<typeof adminUsersResponseSchema>;
+
+export type AdminUserDetail = z.infer<typeof adminUserDetailSchema>;
+
+export type AdminSession = z.infer<typeof adminSessionSchema>;
+
+export type InviteRow = z.infer<typeof inviteRowSchema>;
 
 export type Overview = z.infer<typeof overviewSchema>;
 
@@ -141,19 +268,24 @@ type AdminWriteBody =
       idempotencyKey: string;
       quantity: number;
     }
+  | { email: string }
+  | { reason: string }
   | { value: string };
 
 async function adminWrite<T>(
   method: "POST" | "PUT",
   path: string,
-  body: AdminWriteBody,
+  body: AdminWriteBody | null,
   schema: z.ZodType<T>,
 ) {
-  const response = await fetch(path, {
-    body: JSON.stringify(body),
-    headers: { "content-type": "application/json" },
-    method,
-  });
+  const init: RequestInit = { method };
+
+  if (body !== null) {
+    init.body = JSON.stringify(body);
+    init.headers = { "content-type": "application/json" };
+  }
+
+  const response = await fetch(path, init);
 
   const result = await adminRequest(response, schema);
 
@@ -164,7 +296,7 @@ async function adminWrite<T>(
   return result.data;
 }
 
-async function adminPost<T>(path: string, body: AdminWriteBody, schema: z.ZodType<T>) {
+async function adminPost<T>(path: string, body: AdminWriteBody | null, schema: z.ZodType<T>) {
   return adminWrite("POST", path, body, schema);
 }
 
@@ -203,4 +335,45 @@ export const createGrant = async (
     "/admin/api/grants",
     { email, expiresInDays, idempotencyKey, quantity },
     grantCreateResponseSchema,
+  );
+
+export const loadUsers = async (input: { page: number; q: string; status: AdminStatus }) => {
+  const search = new URLSearchParams({
+    page: String(input.page),
+    q: input.q,
+    status: input.status,
+  });
+
+  return adminGet(`/admin/api/users?${search.toString()}`, adminUsersResponseSchema);
+};
+
+export const loadUser = async (id: string) =>
+  adminGet(`/admin/api/users/${encodeURIComponent(id)}`, adminUserDetailSchema);
+
+export const loadAdminSession = async () => adminGet("/admin/api/session", adminSessionSchema);
+
+export const loadInvites = async () => adminGet("/admin/api/invites", invitesResponseSchema);
+
+export const createInvite = async (email: string) =>
+  adminPost("/admin/api/invites", { email }, inviteCreateResponseSchema);
+
+export const revokeInvite = async (id: string) =>
+  adminPost(
+    `/admin/api/invites/${encodeURIComponent(id)}/revoke`,
+    null,
+    inviteCreateResponseSchema,
+  );
+
+export const suspendUser = async (id: string, reason: string) =>
+  adminPost(
+    `/admin/api/users/${encodeURIComponent(id)}/suspend`,
+    { reason },
+    adminSuspendResponseSchema,
+  );
+
+export const reinstateUser = async (id: string, reason: string) =>
+  adminPost(
+    `/admin/api/users/${encodeURIComponent(id)}/reinstate`,
+    { reason },
+    adminSuspendResponseSchema,
   );
