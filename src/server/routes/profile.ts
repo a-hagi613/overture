@@ -175,14 +175,14 @@ export function createProfileRoutes(deps: {
     return context.json({ facts: await factsService.list(account.id) });
   });
 
-  routes.put("/profile/facts", async (context) => {
+  routes.put("/profile/facts", zValidator("json", factsSchema), async (context) => {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
       return context.json({ error: "unauthorised" }, 401);
     }
 
-    const body = factsSchema.parse(await context.req.json());
+    const body = context.req.valid("json");
 
     const saved = (
       await Promise.all(
