@@ -31,13 +31,10 @@ export function ProfilePage() {
       >
         {tabs.map((tab) => (
           <a
-            className="-mb-px flex min-h-11 flex-none items-center gap-2 border-b-2 border-transparent text-[13.5px] leading-[normal] font-semibold text-muted-foreground hover:border-input hover:text-foreground"
+            className="-mb-px flex min-h-11 flex-none items-center border-b-2 border-transparent text-[13.5px] leading-[normal] font-semibold text-muted-foreground hover:border-input hover:text-foreground"
             href={`#${tab.section}`}
             key={tab.key}
           >
-            <span className="font-serif text-[17px] leading-[normal] font-normal italic text-muted-foreground">
-              {copy.profile.tabs.ordinals[tab.key]}
-            </span>
             {copy.profile.tabs[tab.key]}
           </a>
         ))}

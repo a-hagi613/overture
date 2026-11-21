@@ -33,7 +33,6 @@ export function FactsSection() {
   return (
     <Section id="profile-facts" labelledBy="profile-facts-heading">
       <SectionHead
-        folio={facts.folio}
         headingId="profile-facts-heading"
         intro={facts.intro}
         title={

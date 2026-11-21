@@ -159,7 +159,8 @@
           "src/server/profile/facts.test.ts",
           "src/server/profile/onboarding-step.test.ts",
           "src/server/pipeline/answer-plan.test.ts",
-          "src/server/platform/outbound-guard.test.ts"
+          "src/server/platform/outbound-guard.test.ts",
+          "src/shared/copy.test.ts"
         ]
       }
     ],
