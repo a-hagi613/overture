@@ -363,6 +363,22 @@ The application computes the SPEC §16.5 alert thresholds from its own database 
 the test-only drill route exercise every alert kind without Grafana. If dashboards are wanted, set
 `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS` on the app and create them by hand in Grafana.
 
+## The Workable feed pass (M2-25)
+
+`.github/workflows/workable-feed.yml` runs the off-box pass at 04:00 UTC, on `workflow_dispatch`, and on a push to
+`main`; it never runs on a pull request and the script refuses a live URL unless `WORKABLE_LIVE_FETCH=1`. Set the
+repository secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET_FILES` (and
+`R2_ENDPOINT` when the bucket uses a custom endpoint); `WORKABLE_ALERT_NTFY_URL` is optional and only used to push a
+failure to the owner's phone. `WORKABLE_FEED_URL` is an optional repository variable; the default is
+`https://www.workable.com/boards/workable.xml`.
+
+The pass reads `workable-targets.json` from R2 (the app writes it at 05:00 UTC, values only) and writes
+`workable/YYYY-MM-DD.jsonl.gz` plus `workable/manifest.json`. It refuses to publish a snapshot whose row count dropped
+more than 20 % from the previous run; `workflow_dispatch` with `--allow-row-drop` is the deliberate override. The app
+ingests the manifest at 05:00 UTC in `catalog.workable`, behind the `ats`/`workable` kill switch, which stays on until
+the 20-form probe (#235). The alerts are `workable.feed` for a missing snapshot, one older than 26 hours, a row drop
+or a failed ingest, and the GitHub job itself fails loudly.
+
 ## Capturing fixtures
 
 After a deploy, queue one capture for each M1 ATS on `overture-web` (it never clicks Submit):

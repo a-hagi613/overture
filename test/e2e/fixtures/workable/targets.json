@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-21T00:00:00.000Z",
+  "roles": [
+    "Customer Support",
+    "Customer Service",
+    "Software Engineer",
+    "Full Stack Engineer",
+    "DevOps Engineer",
+    "QA",
+    "Data",
+    "Designer",
+    "Product Manager",
+    "Sales"
+  ],
+  "seniorities": ["entry", "mid", "senior", "staff", "principal"],
+  "workplaces": ["remote", "hybrid", "onsite"],
+  "locations": [
+    "United States",
+    "India",
+    "Portugal",
+    "Greece",
+    "Malaysia",
+    "Spain",
+    "Ireland",
+    "Germany"
+  ],
+  "employmentTypes": ["full_time", "contract"]
+}

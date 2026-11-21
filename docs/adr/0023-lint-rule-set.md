@@ -73,7 +73,7 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
   Bun Worker is an error. The narrow non-sweep paths that keep a single-row write on the main thread (dispatch closing
   a posting, preparation marking the question cache, tag import, the retag and seed scripts, the test routes) are
   listed in `.oxlintrc.json`; adding one needs a written reason here. A new sweep write goes into
-  `src/server/catalog/sweep-worker.ts` and its worker-only modules.
+  `src/server/catalog/sweep-worker.ts` and its worker-only modules (`poll-board.ts`, `workable-ingest.ts`).
 - **The off-list and every scoped override are checked.** CI fails if the rules turned off in the configuration
   differ from the table below, if an override turns a rule down or changes its options without appearing in the
   "Rules off in one folder only" table, or if that table lists an override that does not exist.

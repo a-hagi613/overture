@@ -24,6 +24,7 @@ export const ALERT_KINDS = [
   "health",
   "disk",
   "process.unhandled",
+  "workable.feed",
 ] as const;
 
 export type AlertKind = (typeof ALERT_KINDS)[number];

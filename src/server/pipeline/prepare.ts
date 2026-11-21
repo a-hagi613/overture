@@ -355,7 +355,7 @@ export function createPreparationService(deps: {
 
   async function loadQuestions(posting: {
     postingId: string;
-    ats: "greenhouse" | "lever" | "ashby" | "personio";
+    ats: "greenhouse" | "lever" | "ashby" | "workable" | "personio";
     atsJobId: string;
     boardToken: string;
     boardRegion: "us" | "eu";
@@ -418,6 +418,10 @@ export function createPreparationService(deps: {
 
       return entries;
     };
+
+    if (posting.ats === "workable") {
+      return;
+    }
 
     if (posting.ats === "greenhouse") {
       if (source === null) {
@@ -537,7 +541,7 @@ export function createPreparationService(deps: {
     userId: string;
     applicationId: string;
     attemptId?: string;
-    ats: "greenhouse" | "lever" | "ashby" | "personio";
+    ats: "greenhouse" | "lever" | "ashby" | "workable" | "personio";
     blocked: readonly {
       questionId: string;
       factKey: string | null;
@@ -681,6 +685,20 @@ export function createPreparationService(deps: {
 
     if (row === undefined || !PREPARABLE_STATUSES.some((status) => status === row.status)) {
       return null;
+    }
+
+    if (row.ats === "workable") {
+      db.update(applications)
+        .set({
+          status: "skipped",
+          statusReason: "ats_not_enabled",
+          stage: null,
+          updatedAt: clock.now(),
+        })
+        .where(eq(applications.id, applicationId))
+        .run();
+
+      return { status: "skipped" as const, blocked: 0 };
     }
 
     const resume = db
@@ -1058,7 +1076,7 @@ export function createPreparationService(deps: {
       .where(eq(applications.id, applicationId))
       .get();
 
-    if (row === undefined || row.ats === "personio") {
+    if (row === undefined || row.ats === "personio" || row.ats === "workable") {
       return null;
     }
 
