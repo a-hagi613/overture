@@ -68,7 +68,8 @@ export interface GreenhouseRun {
   unexpectedRequired?: LiveFormProblem[];
 }
 
-const RESUME_LABEL = /\b(?:resume|cv|curriculum vitae)\b/u;
+const isResumeField = (field: SendPlanField) =>
+  field.fieldType === "file" && field.file === "resume";
 
 const labelTexts = async (page: Page) =>
   page.evaluate(() =>
@@ -91,9 +92,6 @@ async function fieldIdFor(page: Page, field: SendPlanField) {
 
   return (exact ?? partial)?.forId ?? null;
 }
-
-const isResumeField = (field: SendPlanField) =>
-  field.fieldType === "file" && RESUME_LABEL.test(norm(field.label));
 
 async function fillSendPlanField(page: Page, field: SendPlanField) {
   const fieldId = await fieldIdFor(page, field);

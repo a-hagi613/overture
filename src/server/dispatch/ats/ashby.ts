@@ -17,7 +17,7 @@ import type { LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
 import { checkPostingIdentity } from "../posting-identity.ts";
 
 import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identity.ts";
-import type { FormQuestionsResult, PlannedResume } from "./shared.ts";
+import type { PlannedResume } from "./shared.ts";
 
 import { cssValue, normText } from "./shared.ts";
 
@@ -53,7 +53,6 @@ export interface AshbyRunPlan {
 export interface AshbyHooks {
   onWillSubmit: () => void;
   onResponse: (status: number | null) => void;
-  onFormQuestions: (questions: readonly FormQuestion[]) => Promise<FormQuestionsResult>;
 }
 
 export type AshbyOutcome =
@@ -366,12 +365,10 @@ async function fillPlannedFields(page: Page, fields: readonly SendPlanField[]) {
     }
 
     if (field.fieldName === null || field.fieldName === "") {
-      return false;
+      return fillFrom(index + 1);
     }
 
-    if (!(await fillAshbyField(page, field, field.answer))) {
-      return false;
-    }
+    await fillAshbyField(page, field, field.answer);
 
     return fillFrom(index + 1);
   };
@@ -457,19 +454,7 @@ export const runAshbyAttempt: (
     };
   }
 
-  const questions = await readAshbyQuestions(page);
-  const discovered = await hooks.onFormQuestions(questions);
-
-  if (discovered.kind === "needs_review") {
-    return {
-      confirmationSeen: false,
-      outcome: "needs_review",
-      submitMayHaveLanded: false,
-      submitResponseStatus: null,
-    };
-  }
-
-  if (!(await fillPlannedFields(page, discovered.fields))) {
+  if (!(await fillPlannedFields(page, plan.fields))) {
     return {
       confirmationSeen: false,
       outcome: "fill_failed",
@@ -495,7 +480,7 @@ export const runAshbyAttempt: (
     }
   }
 
-  const expectations: LiveFormExpectation[] = discovered.fields.map((field) => ({
+  const expectations: LiveFormExpectation[] = plan.fields.map((field) => ({
     answer: field.answer,
     fieldName: field.fieldName,
     fieldType: field.fieldType,

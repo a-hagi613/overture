@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { chromium } from "playwright-core";
 import { z } from "zod";
@@ -7,8 +9,8 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ResumeService } from "../profile/resume.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
-import type { FormQuestion } from "../pipeline/send-plan.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import type { LiveFormProblem } from "./forms/engine.ts";
 import type {
   BrowserProviderRegistry,
   BrowserUsage,
@@ -45,6 +47,7 @@ import { copy } from "../../shared/copy.ts";
 import { recordApplicationEvent } from "./outcomes.ts";
 import { acquireBrowserSession } from "./browser/session-slots.ts";
 import { nextSendSlot as nextSlotInWindow, parseSendWindow } from "./planning.ts";
+import { openApprovedPlan } from "../pipeline/approved-plan.ts";
 
 export const APPLICATION_SEND_JOB_KIND = "application.send";
 
@@ -119,6 +122,41 @@ const ATTEMPT_OUTCOMES = [
 
 function outcomeOf(outcome: string) {
   return ATTEMPT_OUTCOMES.find(([name]) => name === outcome)?.[1] ?? "provider_error";
+}
+
+function changeNotes(problems: readonly LiveFormProblem[]) {
+  const notes = new Set<string>();
+
+  for (const problem of problems) {
+    switch (problem.kind) {
+      case "unexpected_required": {
+        notes.add("A new required question");
+        break;
+      }
+
+      case "field_missing": {
+        notes.add("A field was removed");
+        break;
+      }
+
+      case "option_missing":
+      case "option_not_selected": {
+        notes.add(`The options for ${problem.label} changed`);
+        break;
+      }
+
+      case "file_mismatch": {
+        notes.add("Your resume changed");
+        break;
+      }
+
+      default: {
+        notes.add(`The answer for ${problem.label} changed`);
+      }
+    }
+  }
+
+  return [...notes];
 }
 
 function settingNumber(db: AppDatabase, key: string, fallback: number) {
@@ -269,6 +307,7 @@ export function createDispatcher(deps: DispatcherDeps) {
     userId: string;
     attemptId: string;
     attempts: number;
+    changes?: readonly string[];
     outcome: AttemptRow["outcome"];
     at: number;
   }) {
@@ -279,12 +318,17 @@ export function createDispatcher(deps: DispatcherDeps) {
     const maxAttempts = settingNumber(db, "limits.max_attempts", 2);
 
     if (used < maxAttempts && outcome === "form_changed") {
+      const changes =
+        input.changes === undefined || input.changes.length === 0
+          ? ["The form changed"]
+          : [...input.changes];
+
       db.update(applications)
         .set({
           approvedAt: null,
           approvedPlanEnc: null,
           approvedPlanSha256: null,
-          changes: JSON.stringify(["The form changed"]),
+          changes: JSON.stringify(changes),
           scheduledFor: null,
           stage: stageForStatus("ready"),
           status: "ready",
@@ -316,7 +360,16 @@ export function createDispatcher(deps: DispatcherDeps) {
     }
 
     db.update(applications)
-      .set({ stage: null, status: "failed", statusReason: outcome, updatedAt: at })
+      .set({
+        approvedAt: null,
+        approvedPlanEnc: null,
+        approvedPlanSha256: null,
+        scheduledFor: null,
+        stage: null,
+        status: "failed",
+        statusReason: outcome,
+        updatedAt: at,
+      })
       .where(eq(applications.id, applicationId))
       .run();
 
@@ -462,16 +515,45 @@ export function createDispatcher(deps: DispatcherDeps) {
     signal?.addEventListener("abort", closeOnAbort, { once: true });
 
     try {
-      const plan = await preparation.sendPlanFor(applicationId);
+      const approved = await openApprovedPlan({
+        applicationId,
+        db,
+        personal,
+        userId: claimed.userId,
+      }).catch(() => {
+        outcome = "crash";
 
-      if (plan === null) {
-        throw new Error("the send plan could not be built");
+        return null;
+      });
+
+      if (approved === null || approved.plan.applicationId !== applicationId) {
+        outcome = "crash";
+
+        throw new Error("the approved plan is missing");
       }
 
-      const resumeFile = plan.resume === null ? null : await resumes.currentFileBytes(plan.userId);
+      const { plan } = approved;
 
-      if (resumeFile === null) {
-        throw new Error("the resume file could not be read");
+      let resumeBytes: Uint8Array<ArrayBuffer> | null = null;
+
+      if (plan.resume !== null) {
+        const resumeFile = await resumes.currentFileBytes(plan.userId);
+
+        if (resumeFile === null) {
+          outcome = "crash";
+
+          throw new Error("the resume file could not be read");
+        }
+
+        const sha256 = createHash("sha256").update(resumeFile.bytes).digest("hex");
+
+        if (sha256 !== plan.resume.sha256) {
+          outcome = "crash";
+
+          throw new Error("the resume differs from the approved plan");
+        }
+
+        resumeBytes = resumeFile.bytes;
       }
 
       if (isShuttingDown()) {
@@ -502,8 +584,6 @@ export function createDispatcher(deps: DispatcherDeps) {
       }
 
       await applySendProxyTrim(context);
-
-      let sendPlan = plan;
 
       const attemptHooks = {
         onCodeTyped: () => {
@@ -560,25 +640,6 @@ export function createDispatcher(deps: DispatcherDeps) {
         },
       };
 
-      const formHooks = {
-        ...attemptHooks,
-        onFormQuestions: async (questions: readonly FormQuestion[]) => {
-          const recorded = await preparation.recordBrowserQuestions({
-            applicationId,
-            attemptId,
-            questions,
-          });
-
-          if (recorded.blocked > 0) {
-            return { kind: "needs_review" as const };
-          }
-
-          sendPlan = (await preparation.sendPlanFor(applicationId)) ?? plan;
-
-          return { fields: sendPlan.fields, kind: "continue" as const };
-        },
-      };
-
       const planForRun = {
         fields: plan.fields,
         identity: {
@@ -588,11 +649,14 @@ export function createDispatcher(deps: DispatcherDeps) {
           jobId: plan.atsJobId,
           url: plan.postingUrl,
         },
-        resume: {
-          bytes: resumeFile.bytes,
-          fieldName: null,
-          filename: resumeFile.filename,
-        },
+        resume:
+          resumeBytes === null || plan.resume === null
+            ? null
+            : {
+                bytes: resumeBytes,
+                fieldName: null,
+                filename: plan.resume.filename,
+              },
       };
 
       const runPromise: Promise<AttemptRun> = (async () => {
@@ -601,10 +665,10 @@ export function createDispatcher(deps: DispatcherDeps) {
         }
 
         if (plan.ats === "lever") {
-          return runLeverAttempt(page, planForRun, formHooks);
+          return runLeverAttempt(page, planForRun, attemptHooks);
         }
 
-        return runAshbyAttempt(page, planForRun, formHooks);
+        return runAshbyAttempt(page, planForRun, attemptHooks);
       })();
 
       void Promise.allSettled([runPromise]);
@@ -628,7 +692,9 @@ export function createDispatcher(deps: DispatcherDeps) {
             confirmedBy: "page",
             costMicros: usage.costMicros,
             markAttemptSent: true,
-            plan: sendPlan,
+            plan,
+            approvedAt: approved.approvedAt,
+            approvedPlanSha256: approved.sha256,
           });
         }
       } else if (run.outcome === "identity_mismatch") {
@@ -707,7 +773,11 @@ export function createDispatcher(deps: DispatcherDeps) {
 
         db.update(applications)
           .set({
+            approvedAt: null,
+            approvedPlanEnc: null,
+            approvedPlanSha256: null,
             attempts: sql`max(${applications.attempts} - 1, 0)`,
+            scheduledFor: null,
             stage: stageForStatus("needs_review"),
             status: "needs_review",
             statusReason: "unknown_question",
@@ -743,16 +813,17 @@ export function createDispatcher(deps: DispatcherDeps) {
           announce(applicationId, claimed.userId, "confirming");
           updateAttempt(attemptId, { endedAt: clock.now(), outcome: outcomeOf(run.outcome) });
         } else {
+          const preflight = "preflight" in run ? (run.preflight ?? []) : [];
+
           finishBeforeSubmit({
             applicationId,
             attempts: claimed.attempts,
             at: clock.now(),
             attemptId,
+            ...(run.outcome === "form_changed" && { changes: changeNotes(preflight) }),
             outcome: outcomeOf(run.outcome),
             userId: claimed.userId,
           });
-
-          const preflight = "preflight" in run ? (run.preflight ?? []) : [];
 
           updateAttempt(attemptId, {
             captchaSeen: run.outcome === "captcha_blocked",

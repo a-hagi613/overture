@@ -695,6 +695,106 @@ function questionIdOf(card: z.infer<typeof cardSchema> | undefined, label: strin
   return answer;
 }
 
+const questionsSchema = z.object({
+  questions: z.array(z.object({ questionId: z.string(), text: z.string() })),
+});
+
+async function seedOpenText(
+  owner: APIRequestContext,
+  userId: string,
+  applicationId: string,
+  postingId: string,
+  texts: { sentence: string; text: string }[],
+) {
+  const response = await owner.get(
+    `/__test__/questions?userId=${encodeURIComponent(userId)}&postingId=${encodeURIComponent(postingId)}`,
+  );
+
+  const { questions: questionList } = questionsSchema.parse(await response.json());
+
+  await Promise.all(
+    texts.map(async (entry) => {
+      const question = questionList.find((candidate) => candidate.text === entry.text);
+
+      if (question === undefined) {
+        throw new Error(`no seeded question for ${entry.text}`);
+      }
+
+      const seeded = await owner.post("/__test__/application-answers", {
+        data: {
+          applicationId,
+          kind: "open_text",
+          questionId: question.questionId,
+          sentences: [{ resumeLineIds: ["open-text-line"], sentence: entry.sentence }],
+        },
+      });
+
+      expect(seeded.ok()).toBe(true);
+    }),
+  );
+}
+
+test("the send fills the approved plan even after its open text changed behind the approval", async ({
+  approval,
+}) => {
+  const { applicationId, owner, postingId, userId } = await readyApplication(approval);
+
+  const approvedSentence = "I build backend platforms for payments teams.";
+
+  await seedOpenText(owner, userId, applicationId, postingId, [
+    { sentence: approvedSentence, text: "Website" },
+  ]);
+
+  const card = (await readyOf(owner)).cards.find((candidate) => candidate.id === applicationId);
+
+  expect(card?.plan?.answers.find((answer) => answer.label === "Website")?.answer).toBe(
+    approvedSentence,
+  );
+
+  await approveApplication(owner, applicationId);
+
+  const approvedRow = (await applicationOf(owner, applicationId)).application;
+
+  expect(approvedRow.approvedPlanSha256).not.toBeNull();
+
+  await seedOpenText(owner, userId, applicationId, postingId, [
+    { sentence: "This sentence arrived after the approval.", text: "Website" },
+  ]);
+
+  const sent = await owner.post("/__test__/jobs/run-now", {
+    data: { kind: SEND_JOB, payload: JSON.stringify({ applicationId }) },
+    timeout: 120_000,
+  });
+
+  expect(sent.ok()).toBe(true);
+  expect((await applicationOf(owner, applicationId)).application.status).toBe("sent");
+
+  const state = z
+    .object({ applicationRequests: z.number(), submissions: z.number() })
+    .parse(await (await fetch(`${approval.fixture.url}/__fixture__/state`)).json());
+
+  expect(state.submissions).toBe(1);
+  expect(approval.fixture.state.lastForm["question_32895468003"]).toBe(approvedSentence);
+
+  const detail = z
+    .object({
+      snapshot: z
+        .object({
+          approvedAt: z.number().nullable(),
+          approvedPlanSha256: z.string().nullable(),
+          confirmedBy: z.string(),
+        })
+        .nullable(),
+    })
+    .parse(
+      await (await owner.get(`/api/applications/${encodeURIComponent(applicationId)}`)).json(),
+    );
+
+  expect(detail.snapshot?.confirmedBy).toBe("page");
+  expect(detail.snapshot?.approvedAt).not.toBeNull();
+  expect(detail.snapshot?.approvedPlanSha256).toBe(approvedRow.approvedPlanSha256);
+});
+
 test("no path submits an Application that is not approved", async ({ approval }) => {
   const { applicationId, owner } = await readyApplication(approval);
 
