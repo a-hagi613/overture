@@ -1,3 +1,5 @@
+import type { Page } from "@playwright/test";
+
 import type { AppServer } from "./app-server.ts";
 
 import { AxeBuilder } from "@axe-core/playwright";
@@ -111,6 +113,10 @@ test("the consent is versioned, the accepted version is on the profile, and olde
   await expect(page.getByText("The version you agreed to: 1")).toBeVisible();
   await expect(page.getByText(/Agreed .*2026/u)).toBeVisible();
 
+  const settingsResults = await new AxeBuilder({ page }).analyze();
+
+  expect(settingsResults.violations).toEqual([]);
+
   await page.getByRole("link", { name: "Open" }).first().click();
 
   await expect(page).toHaveURL(/\/terms$/u);
@@ -147,4 +153,69 @@ test("the consent is versioned, the accepted version is on the profile, and olde
 
   await context.close();
   await owner.dispose();
+});
+
+const widths = [390, 768, 1280, 1920, 2560] as const;
+
+async function expectNoSidewaysScroll(page: Page, url: string, label: string) {
+  await page.goto(url);
+  await expect(page.locator("main").first()).toBeVisible();
+
+  const layout = await page.evaluate(() => ({
+    body: document.body.scrollWidth,
+    client: document.documentElement.clientWidth,
+    scroll: document.documentElement.scrollWidth,
+  }));
+
+  expect(layout.scroll, label).toBeLessThanOrEqual(layout.client);
+  expect(layout.body, label).toBeLessThanOrEqual(layout.client);
+}
+
+test("the legal pages and the consent fit every width without sideways scroll", async ({
+  browser,
+  appServerUrl,
+}) => {
+  await Promise.all(
+    widths.map(async (width) => {
+      const context = await browser.newContext({ viewport: { height: 900, width } });
+      const page = await context.newPage();
+
+      await Promise.all(
+        (["/terms", "/privacy", "/consent"] as const).map(async (path) => {
+          await expectNoSidewaysScroll(
+            page,
+            `${appServerUrl}${path}`,
+            `${path} at ${String(width)}px`,
+          );
+        }),
+      );
+
+      await context.close();
+    }),
+  );
+});
+
+test("Settings fits every width without sideways scroll", async ({
+  browser,
+  ownerStorageState,
+  appServerUrl,
+}) => {
+  await Promise.all(
+    widths.map(async (width) => {
+      const context = await browser.newContext({
+        storageState: ownerStorageState,
+        viewport: { height: 900, width },
+      });
+      const page = await context.newPage();
+
+      await expectNoSidewaysScroll(
+        page,
+        `${appServerUrl}/settings`,
+        `Settings at ${String(width)}px`,
+      );
+      await expect(page.getByRole("heading", { name: /Your Settings/u })).toBeVisible();
+
+      await context.close();
+    }),
+  );
 });
