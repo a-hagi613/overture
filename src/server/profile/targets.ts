@@ -59,9 +59,16 @@ function locationCondition(raw: string) {
   }
 
   if (resolved.region !== null) {
+    const legacyRegion = resolved.regionCode?.split(".")[1];
+
     return and(
       eq(postings.countryCode, resolved.countryCode),
-      sql`lower(${postings.region}) = ${resolved.region.toLowerCase()}`,
+      or(
+        eq(sql`lower(${postings.region})`, resolved.region.toLowerCase()),
+        legacyRegion === undefined
+          ? undefined
+          : eq(sql`lower(${postings.region})`, legacyRegion.toLowerCase()),
+      ),
     );
   }
 

@@ -38,6 +38,7 @@ import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
 import { createPasswordResetRoutes } from "./routes/password-reset.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
+import { securityHeaders } from "./security-headers.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
 
 export interface AppDependencies {
@@ -105,6 +106,8 @@ export function createApp(deps: AppDependencies) {
   adminHost.all("/api/auth/*", async (context) => deps.auth.handler(context.req.raw));
 
   const app = new Hono();
+
+  app.use("*", securityHeaders(env.NODE_ENV === "production"));
 
   const { mailboxes } = deps;
 
