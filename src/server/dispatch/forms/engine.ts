@@ -9,6 +9,7 @@ export const CONFIRMATION_WAIT_MS = 10_000;
 export const APPLICATION_RESPONSE_MS = 30_000;
 
 const COMBOBOX_MENU_MS = 5000;
+const COMBOBOX_REVEAL_MS = 1000;
 const COMBOBOX_KEY_DELAY_MS = 50;
 
 const FILLABLE_INPUT_TYPES = new Set(["text", "email", "tel", "number", "date", "url"]);
@@ -470,6 +471,22 @@ function sameSelectedOptions(control: LiveControl, answer: string) {
   return selected.length === wanted.length && wanted.every((part) => selected.includes(part));
 }
 
+async function menuOpened(page: Page, field: Locator) {
+  try {
+    await Promise.any([
+      field.and(page.locator("[aria-expanded='true']")).waitFor({ timeout: COMBOBOX_REVEAL_MS }),
+      page
+        .locator("[role='listbox']:visible")
+        .first()
+        .waitFor({ state: "visible", timeout: COMBOBOX_REVEAL_MS }),
+    ]);
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function openClosedComboboxes(page: Page, formSelector: string) {
   const fields = page.locator(`${formSelector} input[role='combobox']`);
   const count = await fields.count();
@@ -490,7 +507,9 @@ async function openClosedComboboxes(page: Page, formSelector: string) {
         if ((await field.isVisible()) && (await field.isEnabled())) {
           await field.click({ timeout: COMBOBOX_MENU_MS });
 
-          opened = await optionEntries(await comboboxList(page, field));
+          if (await menuOpened(page, field)) {
+            opened = await optionEntries(await comboboxList(page, field));
+          }
         }
       } catch {
         opened = [];

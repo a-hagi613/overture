@@ -332,7 +332,7 @@ const mailPersonal = createPersonalCrypto(
 
 const resumes = createResumeService({ db, clock, llm: anthropicLlmPort, objects, personal });
 
-const outcomes = createOutcomes({ db, clock, personal, preparation });
+const outcomes = createOutcomes({ db, clock, personal });
 
 const mailMoves = createMailMoves({
   clock,

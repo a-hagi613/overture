@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
-import type { OnboardingFactsInput } from "../../shared/onboarding.ts";
+import type { OnboardingFactsInput, OnboardingTargetsView } from "../../shared/onboarding.ts";
+import type { TargetsInput } from "../../shared/targets.ts";
 
 import { SALARY_PERIOD_WORDS } from "../../shared/onboarding.ts";
+import { EMPLOYMENT_TYPES, SENIORITIES, WORKPLACES } from "../../shared/tag-taxonomy.ts";
+import { targetsInputSchema } from "../../shared/targets.ts";
 
 const resumeSchema = z.object({
   bytes: z.number(),
@@ -62,11 +65,33 @@ const onboardingFactsSchema = z.object({
   }),
 });
 
+const onboardingTargetsSchema: z.ZodType<OnboardingTargetsView> = z.object({
+  choices: z.object({
+    employmentTypes: z.array(z.enum(EMPLOYMENT_TYPES)),
+    locations: z.array(z.string()),
+    roles: z.array(z.string()),
+    seniorities: z.array(z.enum(SENIORITIES)),
+    workplaces: z.array(z.enum(WORKPLACES)),
+  }),
+  currencies: z.array(z.string()),
+  matchedCount: z.number(),
+  targets: targetsInputSchema,
+});
+
+const timezoneSavedSchema = z.object({
+  languages: z.array(z.string()),
+  pendingTimezone: z.string().nullable(),
+  pendingTimezoneAt: z.string().nullable(),
+  timezone: z.string().nullable(),
+});
+
 export type OnboardingState = z.infer<typeof onboardingStateSchema>;
 
 export const stateKey = ["onboarding-state"] as const;
 
 export const factsKey = ["onboarding-facts"] as const;
+
+export const targetsKey = ["onboarding-targets"] as const;
 
 async function jsonFrom(response: Response) {
   if (!response.ok) {
@@ -107,6 +132,34 @@ export async function saveOnboardingFacts(input: OnboardingFactsInput) {
     await jsonFrom(
       await fetch("/api/onboarding/facts", {
         body: JSON.stringify(input),
+        headers: { "content-type": "application/json" },
+        method: "PUT",
+      }),
+    ),
+  );
+}
+
+export async function fetchOnboardingTargets() {
+  return onboardingTargetsSchema.parse(await jsonFrom(await fetch("/api/onboarding/targets")));
+}
+
+export async function saveOnboardingTargets(targets: TargetsInput) {
+  return onboardingTargetsSchema.parse(
+    await jsonFrom(
+      await fetch("/api/onboarding/targets", {
+        body: JSON.stringify(targets),
+        headers: { "content-type": "application/json" },
+        method: "PUT",
+      }),
+    ),
+  );
+}
+
+export async function saveOnboardingTimezone(timezone: string) {
+  return timezoneSavedSchema.parse(
+    await jsonFrom(
+      await fetch("/api/onboarding/timezone", {
+        body: JSON.stringify({ timezone }),
         headers: { "content-type": "application/json" },
         method: "PUT",
       }),
@@ -156,4 +209,23 @@ export function useSaveOnboardingFacts() {
       client.setQueryData(factsKey, view);
     },
   });
+}
+
+export function useOnboardingTargets() {
+  return useQuery({ queryFn: fetchOnboardingTargets, queryKey: targetsKey });
+}
+
+export function useSaveOnboardingTargets() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: saveOnboardingTargets,
+    onSuccess: (view) => {
+      client.setQueryData(targetsKey, view);
+    },
+  });
+}
+
+export function useSaveOnboardingTimezone() {
+  return useMutation({ mutationFn: saveOnboardingTimezone });
 }

@@ -2,7 +2,6 @@ import { and, asc, desc, eq, gt, isNull, lte } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
-import type { PreparationService } from "../pipeline/prepare.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { SendPlan } from "../pipeline/send-plan.ts";
 
@@ -19,6 +18,7 @@ import {
 } from "../platform/db/schema.ts";
 import { commitForApplication, releaseForApplication } from "../billing/ledger.ts";
 import { getSetting } from "../platform/settings/index.ts";
+import { openApprovedPlan } from "../pipeline/approved-plan.ts";
 import { recordSnapshotSent } from "../pipeline/review-events.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 
@@ -31,7 +31,6 @@ type MessageRow = typeof messages.$inferSelect;
 export interface OutcomeDeps {
   db: AppDatabase;
   clock: Clock;
-  preparation: PreparationService;
   personal: PersonalCrypto;
 }
 
@@ -75,7 +74,7 @@ function sameDomain(sender: string, wanted: string) {
 }
 
 export function createOutcomes(deps: OutcomeDeps) {
-  const { db, clock, preparation, personal } = deps;
+  const { db, clock, personal } = deps;
 
   async function sealSnapshot(
     applicationId: string,
@@ -84,6 +83,7 @@ export function createOutcomes(deps: OutcomeDeps) {
     plan: SendPlan,
     confirmedBy: "page" | "email",
     costMicros: number,
+    approval: { approvedAt: number; approvedPlanSha256: string },
   ) {
     if (plan.resume === null) {
       return null;
@@ -128,6 +128,8 @@ export function createOutcomes(deps: OutcomeDeps) {
     return {
       answersEnc,
       applicationId,
+      approvedAt: approval.approvedAt,
+      approvedPlanSha256: approval.approvedPlanSha256,
       confirmedBy,
       consentVersion: plan.consentVersion,
       costMicros,
@@ -148,6 +150,8 @@ export function createOutcomes(deps: OutcomeDeps) {
     applicationId: string;
     attempt: AttemptRow;
     plan: SendPlan;
+    approvedAt: number;
+    approvedPlanSha256: string;
     costMicros: number;
     confirmedBy: "page" | "email";
     markAttemptSent: boolean;
@@ -163,6 +167,7 @@ export function createOutcomes(deps: OutcomeDeps) {
       input.plan,
       input.confirmedBy,
       input.costMicros,
+      { approvedAt: input.approvedAt, approvedPlanSha256: input.approvedPlanSha256 },
     );
 
     db.transaction((tx) => {
@@ -344,9 +349,14 @@ export function createOutcomes(deps: OutcomeDeps) {
       return false;
     }
 
-    const plan = await preparation.sendPlanFor(applicationId);
+    const approved = await openApprovedPlan({
+      applicationId,
+      db,
+      personal,
+      userId: application.userId,
+    }).catch(() => null);
 
-    if (plan === null) {
+    if (approved === null) {
       return false;
     }
 
@@ -358,10 +368,12 @@ export function createOutcomes(deps: OutcomeDeps) {
     await recordSent({
       applicationId,
       attempt,
+      approvedAt: approved.approvedAt,
+      approvedPlanSha256: approved.sha256,
       confirmedBy: "email",
       costMicros: attempt.costMicros ?? 0,
       markAttemptSent: false,
-      plan,
+      plan: approved.plan,
     });
 
     return true;

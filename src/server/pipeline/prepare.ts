@@ -649,102 +649,6 @@ export function createPreparationService(deps: {
     return reviewIds;
   }
 
-  async function recordBrowserQuestions(input: {
-    applicationId: string;
-    attemptId: string;
-    questions: readonly FormQuestion[];
-  }) {
-    const row = db
-      .select({
-        userId: applications.userId,
-        postingId: applications.postingId,
-        companyName: companies.name,
-        ats: postings.ats,
-      })
-      .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
-      .innerJoin(companies, eq(companies.id, postings.companyId))
-      .where(eq(applications.id, input.applicationId))
-      .get();
-
-    if (row === undefined) {
-      return { blocked: 0 };
-    }
-
-    const entries = input.questions.map((question, position) => {
-      const record = catalog.findOrCreate({
-        text: question.label,
-        fieldType: question.fieldType,
-        options: question.options,
-        companyNames: [row.companyName],
-      });
-
-      return {
-        fieldName: question.fieldName,
-        options: question.options,
-        position,
-        questionId: record.id,
-        required: question.required,
-      };
-    });
-
-    catalog.savePostingQuestions(row.postingId, entries);
-
-    const prepared = await answersFor(input.applicationId);
-    const blocked: BlockedQuestion[] = [];
-
-    for (const answer of prepared) {
-      if (!answer.required || answer.resolved) {
-        continue;
-      }
-
-      if (
-        answer.block === "open_text_ungrounded" ||
-        isUnsupportedBlock(answer.block) ||
-        answer.reason === null
-      ) {
-        continue;
-      }
-
-      blocked.push({
-        factKey: answer.answerKind === "fact" ? answer.factKey : null,
-        fieldType: answer.fieldType,
-        options: answer.options,
-        prompt: answer.text,
-        questionId: answer.questionId,
-        reason: answer.reason,
-        scope: answer.scope,
-      });
-    }
-
-    for (const answer of prepared) {
-      if (!answer.resolved) {
-        continue;
-      }
-
-      recordAutoAnswer(db, clock, {
-        applicationId: input.applicationId,
-        ats: row.ats,
-        factKey: answer.factKey,
-        factRevision: answer.factRevision,
-        questionId: answer.questionId,
-        scope: answer.scope,
-        source: answer.source,
-        userId: row.userId,
-      });
-    }
-
-    syncReviews({
-      applicationId: input.applicationId,
-      ats: row.ats,
-      attemptId: input.attemptId,
-      blocked,
-      userId: row.userId,
-    });
-
-    return { blocked: blocked.length };
-  }
-
   async function prepare(applicationId: string) {
     const row = db
       .select({
@@ -1375,7 +1279,6 @@ export function createPreparationService(deps: {
     openAttemptReviews,
     prepare,
     prepareMany,
-    recordBrowserQuestions,
     sendPlanFor,
   };
 }

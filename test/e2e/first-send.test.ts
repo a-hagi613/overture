@@ -104,6 +104,8 @@ const snapshotSchema = z.object({
       resume_line_ids: z.array(z.string()),
     }),
   ),
+  approvedAt: z.number().nullable(),
+  approvedPlanSha256: z.string().nullable(),
   confirmedBy: z.string(),
   consentVersion: z.string(),
   costMicros: z.number(),
@@ -360,15 +362,15 @@ async function readyApplication(harness: SendHarness) {
   ]);
 
   await grantApplications(owner, 3);
-  await approveApplication(owner, applicationId);
+  const approval = await approveApplication(owner, applicationId);
 
-  return { applicationId, owner, userId };
+  return { applicationId, approval, owner, userId };
 }
 
 test("a ready Application on the recorded Greenhouse form ends sent, charged once, with an immutable Snapshot and an Applied card", async ({
   send,
 }) => {
-  const { applicationId, owner } = await readyApplication(send);
+  const { applicationId, approval, owner } = await readyApplication(send);
 
   const response = await runSend(owner, applicationId);
 
@@ -389,6 +391,8 @@ test("a ready Application on the recorded Greenhouse form ends sent, charged onc
   expect(snapshot.confirmedBy).toBe("page");
   expect(snapshot.provider).toBe("local");
   expect(snapshot.consentVersion).toBe("m1");
+  expect(snapshot.approvedAt).not.toBeNull();
+  expect(snapshot.approvedPlanSha256).toBe(approval.planSha256);
   expect(snapshot.resumeSha256).toBe(sha256Hex(resumeBytes));
   const answers = new Map(snapshot.answers.map((answer) => [answer.label, answer]));
 

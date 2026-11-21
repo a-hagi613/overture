@@ -129,15 +129,6 @@ const fixtureStateSchema = z.object({
 
 const homeSchema = z.object({ applicationsLeft: z.number() });
 
-const testReviewSchema = z.object({
-  attemptId: z.string().nullable(),
-  id: z.string(),
-  prompt: z.string(),
-  status: z.string(),
-});
-
-const testReviewsSchema = z.object({ reviews: z.array(testReviewSchema) });
-
 const reviewViewSchema = z.object({
   reviews: z.array(
     z.object({
@@ -156,6 +147,28 @@ const HEARD_PROMPT = "How did you hear about this position?";
 
 const COMMUTE_PROMPT =
   "This role is based in Alameda, CA, and requires on-site work at least three days per week. Are you able to reliably commute to Alameda for this schedule?";
+
+const LEVER_FACT_KEYS = new Map<string, string>([
+  ["Full name", "legal_name"],
+  ["Email", "email"],
+  ["Phone", "phone"],
+  ["Current location", "current_city"],
+  ["Current company", "current_employer"],
+  ["LinkedIn URL", "linkedin_url"],
+  ["GitHub URL", "github_url"],
+  ["Portfolio URL", "website_url"],
+  ["Are you legally authorized to work in the United States?", "work_auth"],
+  ["How did you hear about this position?", "how_did_you_hear"],
+  ["What are your annual salary expectations for this role?", "salary_expectation"],
+  [COMMUTE_PROMPT, "security_clearance"],
+  [HEARD_PROMPT, "how_did_you_hear"],
+  ["What is/was your GPA?", "degree_highest"],
+  [
+    "Will you now or in the future require sponsorship for employment? If so, please explain in detail (e.g., OPT with STEM extension).",
+    "sponsorship_required",
+  ],
+  ["How did you hear about us?", "how_did_you_hear"],
+]);
 
 const HEARD_OPTIONS = [
   "LinkedIn",
@@ -224,34 +237,51 @@ async function seededApplication(harness: LeverHarness) {
 
   const companyId = await seedCompany(owner, companyName, domain);
   const boardId = await seedBoard(owner, companyId, "lever", boardToken);
-  const questions = await recordedLeverFormQuestions(boardToken, jobId);
+
+  const recorded = await recordedLeverFormQuestions(boardToken, jobId);
 
   const postingId = await seedPosting(owner, {
     ats: "lever",
     atsJobId: jobId,
     boardId,
     companyId,
-    questions: questions.map((question) => ({
-      fieldName: question.fieldName,
-      fieldType: question.fieldType,
-      options: question.options,
-      required: question.required,
-      text: question.label,
-    })),
+    questions: recorded.map((question) => {
+      const factKey = LEVER_FACT_KEYS.get(question.label) ?? null;
+
+      return {
+        answerKind: factKey === null ? ("skip" as const) : ("fact" as const),
+        factKey,
+        fieldName: question.fieldName,
+        fieldType: question.fieldType,
+        options: question.options,
+        required: question.required,
+        text: question.label,
+      };
+    }),
     title,
     url: `${harness.fixture.url}/${boardToken}/${jobId}/apply`,
   });
 
   const applicationId = await seedApplication(owner, {
     postingId,
-    status: "ready",
+    status: "preparing",
     userId,
   });
 
-  await grantApplications(owner, 3);
-  await approveApplication(owner, applicationId);
+  await runJob(owner, "application.prepare", JSON.stringify({ applicationId }));
 
   return { applicationId, owner, postingId, userId };
+}
+
+async function runJob(owner: APIRequestContext, kind: string, payload: string) {
+  const response = await owner.post("/__test__/jobs/run-now", { data: { kind, payload } });
+
+  expect(response.ok()).toBe(true);
+}
+
+async function approveForSend(owner: APIRequestContext, applicationId: string) {
+  await grantApplications(owner, 3);
+  await approveApplication(owner, applicationId);
 }
 
 async function runSend(owner: APIRequestContext, applicationId: string) {
@@ -324,14 +354,10 @@ async function learnReview(
   expect(answered.ok()).toBe(true);
 }
 
-test("an unknown required Lever question opens a Review and nothing is submitted", async ({
+test("an unknown required Lever question opens a Review during preparation and nothing is submitted", async ({
   lever,
 }) => {
-  const { applicationId, owner, userId } = await seededApplication(lever);
-
-  const response = await runSend(owner, applicationId);
-
-  expect(response.ok()).toBe(true);
+  const { applicationId, owner } = await seededApplication(lever);
 
   const detail = await applicationOf(owner, applicationId);
 
@@ -339,13 +365,6 @@ test("an unknown required Lever question opens a Review and nothing is submitted
   expect(detail.application.statusReason).toBe("unknown_question");
   expect(detail.application.stage).toBe("queued");
   expect(detail.snapshot).toBeNull();
-
-  const attempts = await attemptsOf(owner, applicationId);
-
-  expect(attempts).toHaveLength(1);
-  expect(attempts[0]?.outcome).toBe("needs_review");
-  expect(attempts[0]?.submitClickedAt).toBeNull();
-  expect(attempts[0]?.submitResponseStatus).toBeNull();
 
   const state = await fixtureState(lever.fixture);
 
@@ -358,21 +377,9 @@ test("an unknown required Lever question opens a Review and nothing is submitted
     [COMMUTE_PROMPT, HEARD_PROMPT].toSorted(),
   );
 
-  const testReviews = testReviewsSchema.parse(
-    await (await owner.get(`/__test__/reviews?userId=${encodeURIComponent(userId)}`)).json(),
-  );
-
-  const attemptId = attempts[0]?.id;
-  const openReviews = testReviews.reviews.filter((review) => review.status === "open");
-
-  expect(openReviews).toHaveLength(2);
-  expect(openReviews.every((review) => review.attemptId === attemptId)).toBe(true);
-  expect(reviews.every((review) => review.unlocked === 1)).toBe(true);
-  expect(reviews.find((review) => review.prompt === HEARD_PROMPT)?.options).toContain("LinkedIn");
-
   const home = homeSchema.parse(await (await owner.get("/api/home")).json());
 
-  expect(home.applicationsLeft).toBe(3);
+  expect(home.applicationsLeft).toBe(0);
 });
 
 test("a Lever send fills the recorded form and ends sent after its questions are learned", async ({
@@ -394,6 +401,10 @@ test("a Lever send fills the recorded form and ends sent after its questions are
     userId,
     value: "Yes",
   });
+
+  expect((await applicationOf(owner, applicationId)).application.status).toBe("ready");
+
+  await approveForSend(owner, applicationId);
 
   const response = await runSend(owner, applicationId);
 
@@ -460,10 +471,6 @@ test("a Lever card is read by its section heading, not its generic field prompt"
   leverHive,
 }) => {
   const { applicationId, owner } = await seededApplication(leverHive);
-
-  const response = await runSend(owner, applicationId);
-
-  expect(response.ok()).toBe(true);
 
   const detail = await applicationOf(owner, applicationId);
 

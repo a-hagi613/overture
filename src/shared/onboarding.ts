@@ -1,6 +1,28 @@
 import { z } from "zod";
 
+import type { TargetsInput } from "./targets.ts";
+import type { EmploymentType, Seniority, Workplace } from "./tag-taxonomy.ts";
+
+import { timezoneSchema } from "./targets.ts";
+
 export const ONBOARDING_STEP_COUNT = 5;
+
+export const onboardingTimezoneInputSchema = z.object({ timezone: timezoneSchema });
+
+export interface OnboardingTargetChoices {
+  roles: string[];
+  locations: string[];
+  seniorities: Seniority[];
+  workplaces: Workplace[];
+  employmentTypes: EmploymentType[];
+}
+
+export interface OnboardingTargetsView {
+  targets: TargetsInput;
+  matchedCount: number;
+  choices: OnboardingTargetChoices;
+  currencies: string[];
+}
 
 export const WORK_AUTH_OPTIONS = [
   "Citizen",
