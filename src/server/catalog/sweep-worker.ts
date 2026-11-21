@@ -1,16 +1,18 @@
 import { databasePath, env } from "../config/env.ts";
 import { openDatabase } from "../platform/db/client.ts";
 import { createClock } from "../platform/ports/clock.ts";
+import { createConfiguredObjectStore } from "../platform/object-store.ts";
 import { installOutboundGuard } from "../platform/outbound-guard.ts";
 import { createAshbyFeed } from "./ashby-feed.ts";
 import { createGreenhouseFeed } from "./greenhouse-feed.ts";
 import { createLeverFeed } from "./lever-feed.ts";
 import { createPersonioFeed, PERSONIO_DEFAULT_BASE_URL } from "./personio-feed.ts";
 import { pollDueBoards, runBackfillPass, summarizeRun } from "./sweep-run.ts";
-import { sweepRunRequestSchema } from "./sweep-worker-protocol.ts";
+import { runWorkableIngest } from "./workable-ingest.ts";
+import { sweepRunRequestSchema, sweepRunSummarySchema } from "./sweep-worker-protocol.ts";
 
 import type { BoardFeeds } from "./board-feed.ts";
-import type { SweepWorkerResponse } from "./sweep-worker-protocol.ts";
+import type { SweepRunKind, SweepWorkerResponse } from "./sweep-worker-protocol.ts";
 
 const { db } = openDatabase(databasePath);
 
@@ -19,6 +21,7 @@ if (env.NODE_ENV !== "production") {
 }
 
 const clock = createClock();
+const objects = createConfiguredObjectStore();
 
 const feeds: BoardFeeds = {
   greenhouse: createGreenhouseFeed(env.GREENHOUSE_FEED_BASE_URL),
@@ -31,8 +34,26 @@ function send(message: SweepWorkerResponse) {
   postMessage(message, []);
 }
 
-async function run(kind: "sweep" | "backfill") {
+async function run(kind: SweepRunKind) {
   const started = performance.now();
+
+  if (kind === "workable") {
+    const report = await runWorkableIngest({ db, clock, objects });
+
+    return {
+      kind,
+      boards: 0,
+      polled: 0,
+      notModified: 0,
+      gone: 0,
+      errors: 0,
+      added: report.added,
+      updated: report.updated,
+      closed: report.closed,
+      durationMs: Math.round(performance.now() - started),
+      workable: report,
+    };
+  }
 
   const reports =
     kind === "backfill"
@@ -57,7 +78,7 @@ globalThis.addEventListener("message", (event: MessageEvent) => {
     try {
       const summary = await run(kind);
 
-      send({ type: "done", id, summary });
+      send({ type: "done", id, summary: sweepRunSummarySchema.parse(summary) });
     } catch (error) {
       send({ type: "failed", id, error: error instanceof Error ? error.message : String(error) });
     }

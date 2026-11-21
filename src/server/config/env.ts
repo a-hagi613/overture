@@ -31,6 +31,7 @@ const envSchema = z
     ASHBY_FEED_BASE_URL: z.string().min(1).optional(),
     ASHBY_JOBS_BASE_URL: z.string().min(1).optional(),
     PERSONIO_FEED_BASE_URL: z.string().min(1).optional(),
+    WORKABLE_FEED_URL: z.url().optional(),
     APP_ORIGIN: z.url().optional(),
     ADMIN_ORIGIN: z.url().default("https://admin.tryoverture.com"),
     CF_ACCESS_AUD: z.string().min(1).optional(),

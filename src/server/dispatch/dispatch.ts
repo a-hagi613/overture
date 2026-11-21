@@ -1,4 +1,16 @@
-import { and, asc, count, eq, gte, isNotNull, isNull, lte, notInArray, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  notInArray,
+  sql,
+} from "drizzle-orm";
 
 import type { Ats, BoardRegion } from "../catalog/board-feed.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -61,6 +73,14 @@ export interface DispatchDeps {
 interface Block {
   scope: "global" | "user" | "posting";
   reason: string;
+}
+
+const DISPATCHABLE_ATS = ["greenhouse", "lever", "ashby"] as const;
+
+type DispatchAts = (typeof DISPATCHABLE_ATS)[number];
+
+function isDispatchAts(ats: string): ats is DispatchAts {
+  return DISPATCHABLE_ATS.some((name) => name === ats);
 }
 
 interface Candidate {
@@ -370,12 +390,14 @@ export function createDispatcherTick(deps: DispatchDeps) {
       .where(
         and(
           eq(applications.status, "approved"),
+          inArray(postings.ats, DISPATCHABLE_ATS),
           isNotNull(applications.scheduledFor),
           lte(applications.scheduledFor, now),
         ),
       )
       .orderBy(asc(applications.approvedAt), asc(applications.createdAt))
-      .all();
+      .all()
+      .flatMap((row) => (isDispatchAts(row.ats) ? [{ ...row, ats: row.ats }] : []));
 
     if (rows.length === 0) {
       return summary;
