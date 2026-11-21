@@ -175,14 +175,28 @@ export function createProfileRoutes(deps: {
     return context.json({ facts: await factsService.list(account.id) });
   });
 
-  routes.put("/profile/facts", zValidator("json", factsSchema), async (context) => {
+  routes.put("/profile/facts", async (context) => {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
       return context.json({ error: "unauthorised" }, 401);
     }
 
-    const body = context.req.valid("json");
+    let raw: unknown;
+
+    try {
+      raw = await context.req.json();
+    } catch {
+      return context.json({ error: "invalid_json" }, 400);
+    }
+
+    const parsed = factsSchema.safeParse(raw);
+
+    if (!parsed.success) {
+      return context.json({ error: "invalid_request", issues: parsed.error.issues }, 400);
+    }
+
+    const body = parsed.data;
 
     const saved = (
       await Promise.all(

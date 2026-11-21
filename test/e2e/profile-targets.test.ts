@@ -444,6 +444,22 @@ test("languages and the cover-letter template are saved", async ({
 
 test("a malformed facts save is a 400, not a 500", async ({ isolatedAppServer: { url } }) => {
   const owner = await ownerContextFor(url);
+  const anonymous = await apiRequest.newContext({ baseURL: url });
+
+  const anonymousMalformed = await anonymous.put("/api/profile/facts", {
+    data: { facts: "not-an-array" },
+  });
+
+  expect(anonymousMalformed.status()).toBe(401);
+
+  await anonymous.dispose();
+
+  const nonJson = await owner.put("/api/profile/facts", {
+    data: "{not-json",
+    headers: { "content-type": "application/json" },
+  });
+
+  expect(nonJson.status()).toBe(400);
 
   const tooManyFacts = await owner.put("/api/profile/facts", {
     data: {
