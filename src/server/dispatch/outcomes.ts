@@ -19,6 +19,7 @@ import {
 } from "../platform/db/schema.ts";
 import { commitForApplication, releaseForApplication } from "../billing/ledger.ts";
 import { getSetting } from "../platform/settings/index.ts";
+import { recordSnapshotSent } from "../pipeline/review-events.ts";
 
 const HOUR_MS = 60 * 60_000;
 
@@ -169,7 +170,23 @@ export function createOutcomes(deps: OutcomeDeps) {
       });
 
       if (snapshot !== null) {
+        const existing = tx
+          .select({ applicationId: applicationSnapshots.applicationId })
+          .from(applicationSnapshots)
+          .where(eq(applicationSnapshots.applicationId, input.applicationId))
+          .get();
+
         tx.insert(applicationSnapshots).values(snapshot).onConflictDoNothing().run();
+
+        if (existing === undefined) {
+          recordSnapshotSent(tx, clock, {
+            answers: input.plan.fields.length,
+            applicationId: input.applicationId,
+            ats: input.plan.ats,
+            confirmedBy: input.confirmedBy,
+            userId: input.plan.userId,
+          });
+        }
       }
 
       tx.update(applications)

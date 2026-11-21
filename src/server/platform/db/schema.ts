@@ -888,6 +888,36 @@ export const reviewApplications = sqliteTable(
   (t) => [primaryKey({ columns: [t.reviewId, t.applicationId] })],
 );
 
+export const reviewAuditEvents = sqliteTable(
+  "review_audit_events",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    at: integer("at").notNull(),
+    kind: text("kind", {
+      enum: ["review_opened", "review_resolved", "auto_answer", "snapshot_sent"],
+    }).notNull(),
+    applicationId: text("application_id").references(() => applications.id, {
+      onDelete: "cascade",
+    }),
+    reviewId: text("review_id").references(() => reviews.id, { onDelete: "cascade" }),
+    questionId: text("question_id").references(() => questions.id, { onDelete: "cascade" }),
+    ats: text("ats", { enum: ["greenhouse", "lever", "ashby"] }),
+    source: text("source", {
+      enum: ["fact", "target", "derived", "consent", "file", "open_text"],
+    }),
+    factKey: text("fact_key"),
+    factRevision: integer("fact_revision"),
+    scope: text("scope").notNull().default(""),
+    detail: text("detail").notNull().default("{}"),
+  },
+  (t) => [
+    index("review_audit_events_user_at").on(t.userId, t.at),
+    index("review_audit_events_kind_at").on(t.kind, t.at),
+    index("review_audit_events_application").on(t.applicationId),
+  ],
+);
+
 export const fxRates = sqliteTable(
   "fx_rates",
   {

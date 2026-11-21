@@ -254,6 +254,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `attempts` | id, application_id, user_id, n, provider, provider_session_id, started_at, lease_until, ended_at NULL, submit_clicked_at NULL, submit_response_status INTEGER NULL, outcome CHECK IN ('sent','unconfirmed','captcha_blocked','code_timeout','posting_closed','form_changed','blocked','upload_failed','duplicate','needs_review','provider_error','timeout','crash','interrupted') NULL, browser_ms, proxy_bytes, captcha_seen, code_used, cost_micros, error_code NULL |
 | `reviews` | id, user_id, question_id, fact_key NULL, scope ('' or an ISO 3166-1 alpha-2 country), prompt, field_type, options JSON, reason CHECK IN ('unknown_required','option_missing'), attempt_id NULL (the attempt whose live-form check opened it), status CHECK IN ('open','answered','dismissed'), created_at, resolved_at; UNIQUE(user_id,question_id,scope) WHERE status='open' |
 | `review_applications` | review_id, application_id; PK(review_id,application_id) |
+| `review_audit_events` | id, user_id, at, kind CHECK IN ('review_opened','review_resolved','auto_answer','snapshot_sent'), application_id NULL, review_id NULL, question_id NULL, ats NULL CHECK IN ('greenhouse','lever','ashby'), source NULL CHECK IN ('fact','target','derived','consent','file','open_text'), fact_key NULL, fact_revision NULL, scope, detail JSON; INDEX(user_id,at), INDEX(kind,at). Append-only by code: every Review opened and resolved, every automatic answer with its source, and every Snapshot sent. The owner's Review-rate and false-answer reports read it (§8.4) |
 | `checkins` | id, application_id UNIQUE, user_id, due_at, status CHECK IN ('open','answered','expired'), answer NULL, created_at |
 | `plan_cache` | id, ats, form_signature, plan JSON, hits, failures, updated_at; UNIQUE(ats,form_signature) |
 | `consent_versions` | version PK, text, published_at — the exact consent wording each `consent_version` refers to; rows are never edited |
@@ -302,7 +303,8 @@ and expired in the same transaction (`release` then `expire`), so it never retur
 | `admin_audit` | id, at, actor_id, action, target_user_id NULL, reason, detail JSON — also shipped to Loki (off-box, append-only) |
 
 Retention: `events` 24 h; `bg_jobs` done 7 days, dead 30 days; `attempts` 180 days; `llm_usage` 400 days;
-`notifications` 90 days; descriptions 90 days after close; messages for account lifetime.
+`notifications` 90 days; descriptions 90 days after close; messages for account lifetime; `review_audit_events` and
+Snapshots for account lifetime (the audit is only useful across a search).
 
 ---
 
@@ -580,6 +582,21 @@ Job `application.prepare`:
 - Answering saves the fact (Tier 3 `q:<id>` or the mapped fact key), re-runs `application.prepare` on every attached
   application, and closes the Review. Dismiss → attached applications `skipped` (`review_dismissed`).
 - A posting that closes while waiting detaches; a Review with no attachments auto-dismisses.
+- **Measured.** Every Review opened and resolved, every automatic answer with its source (a saved Fact, a
+  derivation, or the consent allowlist; a named file and generated open text are recorded too) and every Snapshot
+  sent appends a row to `review_audit_events` (§5.4). A Review opened for a question and country scope the user
+  already answered is recorded as a repeat. The owner's report is
+  `scripts/review-report.ts --db <path> [--since <ISO date or epoch ms>] [--sample <n>] [--seed <text>] [--out <path>]`:
+  JSON with the Review rate per 100 prepared Applications (Applications created in `preparing`), per ATS (the ATS
+  whose preparation or live-form check opened the Review) and per normalised question hash, the repeat rate,
+  coverage (sent ÷ prepared), the automatic answers by source and the answered/dismissed split with the median time
+  to answer. With `--out` it also writes a seeded, reproducible random sample of sent Snapshots (default 20) with
+  each factual answer's question, value, Fact key and revision to a mode-600 file; stdout carries the keys and
+  sources only. No admin screen is built (ADR 0021).
+- **Targets.** Zero false factual answers in the sampled Snapshot audit, zero wrong-company sends, and fewer than 1
+  Review per 10 sent Applications after the second week of a user's search (research §5.6). The repeat rate target
+  is 0. The Review rate alone proves nothing: a low rate bought by guessing fails the audit, so both are read
+  together.
 
 ### 8.5 Stages and check-ins
 
