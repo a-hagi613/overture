@@ -26,7 +26,7 @@ export function OnboardingFactsPage() {
           backTo="/onboarding/resume"
           onContinue={async () => {
             await finish.mutateAsync(3);
-            await navigate("/profile#profile-facts");
+            await navigate("/onboarding/targets");
           }}
           save={async (input) => mutation.mutateAsync(input)}
           view={data}

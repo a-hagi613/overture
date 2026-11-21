@@ -8,15 +8,30 @@ import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
 
+import { createLanguagesService } from "../profile/languages.ts";
 import { createOnboardingProgressService } from "../profile/onboarding-progress.ts";
 import { createOnboardingStepService } from "../profile/onboarding-step.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { createResumeService } from "../profile/resume.ts";
 import { createSkipCompanyService } from "../profile/skip-companies.ts";
-import { createTargetsService } from "../profile/targets.ts";
+import { targetChoices } from "../profile/target-choices.ts";
+import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
 import { env } from "../config/env.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
-import { ONBOARDING_STEP_COUNT, onboardingFactsInputSchema } from "../../shared/onboarding.ts";
+import {
+  ONBOARDING_STEP_COUNT,
+  onboardingFactsInputSchema,
+  onboardingTimezoneInputSchema,
+} from "../../shared/onboarding.ts";
+import { targetsInputSchema } from "../../shared/targets.ts";
+
+type TargetChoices = ReturnType<typeof targetChoices>;
+
+function defaultEmploymentTypes(choices: TargetChoices) {
+  const fullTime = choices.employmentTypes.filter((value) => value === "full_time");
+
+  return fullTime.length > 0 ? fullTime : choices.employmentTypes.slice(0, 1);
+}
 
 export function createOnboardingRoutes(deps: {
   db: AppDatabase;
@@ -35,6 +50,7 @@ export function createOnboardingRoutes(deps: {
   );
 
   const targetsService = createTargetsService({ db, clock });
+  const languagesService = createLanguagesService({ db, clock });
   const progress = createOnboardingProgressService({ db, clock });
   const resumes = createResumeService({ db, clock, objects, personal, llm });
   const skipCompanies = createSkipCompanyService({ db, clock });
@@ -46,6 +62,34 @@ export function createOnboardingRoutes(deps: {
     readTargets: targetsService.read,
     reviewService,
   });
+
+  async function ensureLanguages(userId: string) {
+    const { languages } = await languagesService.read(userId);
+
+    if (languages.length > 0) {
+      return languages;
+    }
+
+    return languagesService.saveLanguages(userId, { languages: ["en"] });
+  }
+
+  async function targetsView(userId: string) {
+    const languages = await ensureLanguages(userId);
+    const choices = targetChoices(db);
+    let saved = await targetsService.read(userId);
+    const employmentTypes = defaultEmploymentTypes(choices);
+
+    if (saved.targets.employmentTypes.length === 0 && employmentTypes.length > 0) {
+      saved = await targetsService.save(userId, { ...saved.targets, employmentTypes });
+    }
+
+    return {
+      choices,
+      currencies: (await step.read(userId)).currencies,
+      matchedCount: countMatchingPostings(db, saved.targets, languages),
+      targets: saved.targets,
+    };
+  }
 
   async function view(account: { id: string; role?: string | null }) {
     const state = await progress.read(account.id);
@@ -100,6 +144,49 @@ export function createOnboardingRoutes(deps: {
 
     return context.json(await view(account));
   });
+
+  routes.get("/onboarding/targets", async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
+
+    if (account === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    return context.json(await targetsView(account.id));
+  });
+
+  routes.put("/onboarding/targets", zValidator("json", targetsInputSchema), async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
+
+    if (account === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    await targetsService.save(account.id, context.req.valid("json"));
+
+    return context.json(await targetsView(account.id));
+  });
+
+  routes.put(
+    "/onboarding/timezone",
+    zValidator("json", onboardingTimezoneInputSchema),
+    async (context) => {
+      const account = await sessionUser(auth, context.req.raw);
+
+      if (account === null) {
+        return context.json({ error: "unauthorised" }, 401);
+      }
+
+      const languages = await ensureLanguages(account.id);
+
+      return context.json(
+        await languagesService.save(account.id, {
+          languages,
+          timezone: context.req.valid("json").timezone,
+        }),
+      );
+    },
+  );
 
   routes.get("/onboarding/facts", async (context) => {
     const account = await sessionUser(auth, context.req.raw);

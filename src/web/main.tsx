@@ -13,6 +13,7 @@ import { ProfilePage } from "./routes/profile.tsx";
 import { OnboardingPage } from "./routes/onboarding.tsx";
 import { OnboardingResumePage } from "./routes/onboarding-resume.tsx";
 import { OnboardingFactsPage } from "./routes/onboarding-facts.tsx";
+import { OnboardingTargetsPage } from "./routes/onboarding-targets.tsx";
 import { ReviewPage } from "./routes/review.tsx";
 import { SearchPage } from "./routes/search.tsx";
 import { SettingsPage } from "./routes/settings.tsx";
@@ -51,6 +52,7 @@ const router = createBrowserRouter([
   { path: "/onboarding", element: <OnboardingPage /> },
   { path: "/onboarding/resume", element: <OnboardingResumePage /> },
   { path: "/onboarding/facts", element: <OnboardingFactsPage /> },
+  { path: "/onboarding/targets", element: <OnboardingTargetsPage /> },
 ]);
 
 const queryClient = new QueryClient();

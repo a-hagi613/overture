@@ -439,7 +439,7 @@ Order of precedence for role/seniority: `import` (hiring.cafe file, if the owner
   Frontend, Backend, Full-stack, Mobile, Platform, Embedded).
 - **Seniority**: Intern, Entry, Mid, Senior, Staff/Principal, Manager, Director+.
 - **Workplace**: Remote, Hybrid, On-site. **Employment**: Full-time, Part-time, Contract, Internship, Temporary.
-- Onboarding shows only values with ≥ 1 open posting in the user's locations.
+- Onboarding offers only values that have ≥ 1 open posting; the live count applies the user's locations.
 
 ### 6.5 Census
 
@@ -1128,7 +1128,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Check-ins | `POST /api/checkins/:id` `{answer}` |
 | Inbox | `GET /api/threads` · `GET /api/threads/:id` · `GET /api/attachments/:id` · `POST /api/messages/:id/read` · `GET /api/mail/code-waits` · `POST /api/mail/code-waits/:id` (paste a code) |
 | Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/mailbox` (read-only address, `forwardingWorks`, `firstForwardedAt`) · `GET /api/profile/strengthen` |
-| Onboarding | `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET /api/onboarding` (the step, `onboarded_at`, pause reason, current resume, skip list and whether an invited user must onboard) · `POST /api/onboarding/:step` (records a finished step and returns the state; step 2 refuses without a resume) · `POST /api/onboarding/address/accept` (M2) |
+| Onboarding | `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET/PUT /api/onboarding/targets` (the "What you want" step: the saved Targets, the choices that have open Postings, and the live count) · `PUT /api/onboarding/timezone` (the browser's zone through the seven-day rule) · `GET /api/onboarding` (the step, `onboarded_at`, pause reason, current resume, skip list and whether an invited user must onboard) · `POST /api/onboarding/:step` (records a finished step and returns the state; step 2 refuses without a resume) · `POST /api/onboarding/address/accept` (M2) |
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `POST /api/account/delete` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `GET /internal/mailboxes/:local` |
@@ -1155,7 +1155,7 @@ Profile** (Ready added by ADR 0029); Settings from the avatar; desktop hover sub
 | Inbox | Threads list (linked company/card), message view, attachments, "Couldn't verify sender" label; read-only (no reply, §11.2); the code-paste prompt | empty, address explainer |
 | Profile | Resume, facts by tier, targets with live job count, skip list, forwarding address, "Strengthen your profile" | missing Tier 1 facts |
 | Settings | Threshold (60/50), digest, notifications, timezone, languages, forwarding address (read-only), the fixed limits explained (10 a day, 08:00–20:00, one company per 30 days; not editable), plan & billing (M3), sign out all devices, export, delete, support access log | |
-| Onboarding (M2) | 1 Sign in (invite) · 2 Resume · 3 Your facts (Tier 1, prefilled) · 4 What you want (live count, browser timezone) · 5 Forward ATS mail (the Gmail and Outlook filter guide, forwarding detected, or skip to the paste fallback) + consent + trial card (M3) + Start; PWA install + push prompt after Start; each step saved as it is finished | resume unreadable → manual entry, filter skipped → codes by paste |
+| Onboarding (M2) | 1 Sign in (invite) · 2 Resume · 3 Your facts (Tier 1, prefilled) · 4 What you want (roles, locations, workplace, seniority and a salary floor from choices that have open Postings, live count, browser timezone saved without asking; posting languages start as English and employment type as full-time until Settings) · 5 Forward ATS mail (the Gmail and Outlook filter guide, forwarding detected, or skip to the paste fallback) + consent + trial card (M3) + Start; PWA install + push prompt after Start; each step saved as it is finished | resume unreadable → manual entry, filter skipped → codes by paste |
 | Admin | Same design system: Overview (success per provider × ATS, cost per completed application, queue, spend), Users, Applications/Attempts (live view/replay embed), Reviews, Kill switches & Settings, Catalog health, Mail health, Provider report, Fixture capture, Grants/Refunds, Audit | |
 | Public (M3) | Landing, pricing, privacy, terms; prerendered static HTML; the landing says Overture prepares every application and sends it when you approve | |
 

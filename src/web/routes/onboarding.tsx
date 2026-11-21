@@ -18,8 +18,12 @@ export function OnboardingPage() {
 
     if (state.step === 2) {
       void navigate("/onboarding/resume", { replace: true });
-    } else if (state.step >= 3) {
+    } else if (state.step === 3) {
       void navigate("/onboarding/facts", { replace: true });
+    } else if (state.step === 4) {
+      void navigate("/onboarding/targets", { replace: true });
+    } else if (state.step >= 5) {
+      void navigate("/profile", { replace: true });
     }
   }, [navigate, state]);
 
