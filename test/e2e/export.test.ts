@@ -174,7 +174,7 @@ async function seedSentApplication(owner: APIRequestContext, userId: string) {
 
   expect(snapshot.ok()).toBe(true);
 
-  return applicationId;
+  return { applicationId, postingId };
 }
 
 async function seedMail(owner: APIRequestContext, userId: string, text: string, marker: string) {
@@ -288,7 +288,7 @@ test("an export holds only its user's data and downloads from its page", async (
   const { owner, userId } = await ownerContextFor(exportServer.url);
 
   await seedOwner(owner);
-  const applicationId = await seedSentApplication(owner, userId);
+  const { applicationId, postingId } = await seedSentApplication(owner, userId);
   await seedMail(owner, userId, "Your interview is on Tuesday.", "northwind");
 
   const otherResponse = await owner.post("/__test__/users", {
@@ -298,6 +298,22 @@ test("an export holds only its user's data and downloads from its page", async (
   const otherUserId = createdSchema.parse(await otherResponse.json()).id;
 
   await seedMail(owner, otherUserId, "A private note for another person.", "other");
+
+  const otherFacts = await owner.post("/__test__/facts/seed", {
+    data: {
+      facts: [{ key: "phone", value: "+1 999 000 0000" }],
+      userId: otherUserId,
+    },
+  });
+
+  expect(otherFacts.ok()).toBe(true);
+
+  await seedApplication(owner, {
+    postingId,
+    sentAt: referenceNow,
+    status: "sent",
+    userId: otherUserId,
+  });
 
   const storageState = await owner.storageState();
   const context = await browser.newContext({ storageState, timezoneId: "America/Toronto" });
@@ -360,7 +376,8 @@ test("an export holds only its user's data and downloads from its page", async (
     z.array(z.object({ key: z.string(), value: z.string() })),
   );
 
-  expect(facts.find((fact) => fact.key === "phone")?.value).toBe("+1 416 555 0134");
+  expect(facts.map((fact) => fact.value)).toContain("+1 416 555 0134");
+  expect(facts.map((fact) => fact.value)).not.toContain("+1 999 000 0000");
 
   const applications = unzipJson(
     archive,
@@ -368,7 +385,7 @@ test("an export holds only its user's data and downloads from its page", async (
     z.array(z.object({ company: z.string().nullable(), id: z.string() })),
   );
 
-  expect(applications.map((application) => application.company)).toEqual(["Northwind Labs"]);
+  expect(applications.map((application) => application.id)).toEqual([applicationId]);
 
   const snapshots = unzipJson(
     archive,
@@ -424,6 +441,7 @@ test("an export holds only its user's data and downloads from its page", async (
 
   expect(raw).not.toContain("other.person@example.com");
   expect(raw).not.toContain("A private note for another person.");
+  expect(raw).not.toContain("+1 999 000 0000");
 
   await runJobs(owner);
 
@@ -580,6 +598,36 @@ test("the export page fits its phone and desktop viewports without annotation te
   );
 
   expect(overflows.filter((result) => result.overflow > 0)).toEqual([]);
+
+  await owner.dispose();
+});
+
+test("another user's export cannot be downloaded", async ({ exportServer }) => {
+  const { owner } = await ownerContextFor(exportServer.url);
+
+  const other = createdSchema.parse(
+    await (
+      await owner.post("/__test__/users", {
+        data: { email: "other.download@example.com", name: "Other Download" },
+      })
+    ).json(),
+  );
+
+  const seeded = createdSchema.parse(
+    await (
+      await owner.post("/__test__/account-exports/seed", { data: { userId: other.id } })
+    ).json(),
+  );
+
+  expect((await owner.get(`/api/account/export/${seeded.id}/download`)).status()).toBe(404);
+
+  const rows = exportRowsSchema.parse(
+    await (
+      await owner.get(`/__test__/account/exports?userId=${encodeURIComponent(other.id)}`)
+    ).json(),
+  );
+
+  expect(rows.exports[0]?.status).toBe("ready");
 
   await owner.dispose();
 });

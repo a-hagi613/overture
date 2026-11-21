@@ -232,7 +232,7 @@ export function createAccountRoutes(deps: {
       return context.json({ error: "unauthorised" }, 401);
     }
 
-    return context.json(await exports.state(user.id));
+    return context.json(await exports.state(user.id), 200, { "cache-control": "no-store" });
   });
 
   routes.post("/account/export", async (context) => {
@@ -244,7 +244,9 @@ export function createAccountRoutes(deps: {
 
     const result = await exports.request(user.id);
 
-    return context.json({ ...result.state, replaced: result.replaced }, 202);
+    return context.json({ ...result.state, replaced: result.replaced }, 202, {
+      "cache-control": "no-store",
+    });
   });
 
   routes.get("/account/export/:id/download", async (context) => {
