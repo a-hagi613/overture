@@ -153,10 +153,14 @@ export function createDispatcherTick(deps: DispatchDeps) {
     }
 
     const user = db
-      .select({ suspendedAt: users.suspendedAt })
+      .select({ role: users.role, suspendedAt: users.suspendedAt })
       .from(users)
       .where(eq(users.id, userId))
       .get();
+
+    if (user?.role === "demo") {
+      return { block: { reason: "demo", scope: "user" }, timeZone: "UTC" };
+    }
 
     if (user?.suspendedAt !== null && user?.suspendedAt !== undefined) {
       return { block: { reason: "suspended", scope: "user" }, timeZone: "UTC" };
