@@ -603,6 +603,8 @@ export function createApplicationRoutes(
                 ),
               ),
             ),
+            approvedAt: snapshot.approvedAt,
+            approvedPlanSha256: snapshot.approvedPlanSha256,
             confirmedBy: snapshot.confirmedBy,
             consentVersion: snapshot.consentVersion,
             costMicros: snapshot.costMicros,

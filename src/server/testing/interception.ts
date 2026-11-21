@@ -159,6 +159,25 @@ export function startInterception() {
     http.get(`${anthropicRoot}/v1/messages/batches/:batchId/results`, ({ request }) =>
       fixturePassthrough(request),
     ),
+    http.post(
+      `${(env.ASHBY_JOBS_BASE_URL ?? "https://jobs.ashbyhq.com").replace(/\/+$/u, "")}/api/non-user-graphql`,
+      ({ request }) => fixturePassthrough(request),
+    ),
+    http.get(
+      `${(env.LEVER_JOBS_BASE_URL ?? "https://jobs.lever.co").replace(/\/+$/u, "")}/:board/:job/apply`,
+      ({ request }) => fixturePassthrough(request),
+    ),
+    http.get(
+      `${(env.LEVER_EU_JOBS_BASE_URL ?? "https://jobs.eu.lever.co").replace(/\/+$/u, "")}/:board/:job/apply`,
+      ({ request }) => fixturePassthrough(request),
+    ),
+    http.post(`${anthropicRoot}/v1/messages/batches`, ({ request }) => fixturePassthrough(request)),
+    http.get(`${anthropicRoot}/v1/messages/batches/:batchId`, ({ request }) =>
+      fixturePassthrough(request),
+    ),
+    http.get(`${anthropicRoot}/v1/messages/batches/:batchId/results`, ({ request }) =>
+      fixturePassthrough(request),
+    ),
     http.post(turnstileSiteverifyUrl, async ({ request }) => siteverifyResponse(request)),
     http.post(
       cloudflareSendEmailUrl(

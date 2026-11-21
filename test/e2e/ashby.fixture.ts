@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { z } from "zod";
 
+import { readAshbyGraphqlResponse } from "../../src/server/pipeline/form-read.ts";
+
 const FIXTURE_FORMS_DIR = join(process.cwd(), "test/e2e/fixtures/forms/ashby");
 const RUNTIME_SOURCE = join(process.cwd(), "test/e2e/fixtures/forms/ashby-runtime.ts");
 
@@ -35,6 +37,18 @@ const NO_FORM_PAGE =
 interface AshbyFixtureOptions {
   boardToken?: string;
   jobId?: string;
+}
+
+export function recordedAshbyFormQuestions(boardToken: string, jobId: string) {
+  const body = readFileSync(join(FIXTURE_FORMS_DIR, `${boardToken}-${jobId}.form.json`), "utf8");
+
+  const form = readAshbyGraphqlResponse(body);
+
+  if (form === null) {
+    throw new Error(`the recorded Ashby form ${boardToken}/${jobId} could not be read`);
+  }
+
+  return form.questions;
 }
 
 export function startAshbyFixture(options: AshbyFixtureOptions = {}) {
@@ -85,6 +99,30 @@ export function startAshbyFixture(options: AshbyFixtureOptions = {}) {
       if (path === "/api/non-user-graphql") {
         if (request.method !== "POST") {
           return new Response(null, { status: 405 });
+        }
+
+        if (url.searchParams.get("op") === "ApiJobPosting") {
+          const body = z
+            .object({
+              variables: z.object({
+                jobPostingId: z.string(),
+                organizationHostedJobsPageName: z.string(),
+              }),
+            })
+            .parse(await request.json());
+
+          const formFile = join(
+            FIXTURE_FORMS_DIR,
+            `${body.variables.organizationHostedJobsPageName}-${body.variables.jobPostingId}.form.json`,
+          );
+
+          try {
+            return new Response(new Uint8Array(readFileSync(formFile)), {
+              headers: { "content-type": "application/json" },
+            });
+          } catch {
+            return new Response(null, { status: 404 });
+          }
         }
 
         state.applicationRequests += 1;

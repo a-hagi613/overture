@@ -8,9 +8,10 @@ import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
 import type { AshbyFixture } from "./ashby.fixture.ts";
 import type { IdentityServer } from "./identity-server-test.fixture.ts";
+import type { AnswerKind } from "../../src/shared/questions.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
-import { startAshbyFixture } from "./ashby.fixture.ts";
+import { recordedAshbyFormQuestions, startAshbyFixture } from "./ashby.fixture.ts";
 import {
   approveApplication,
   grantApplications,
@@ -64,6 +65,7 @@ const startAshbyHarness = async (identityServer: IdentityServer, site: AshbySite
   const server = await startFreshAppServer(identityServer, {
     BROWSER_PROVIDER: "local",
     BROWSER_SESSION_DIR: sessionDirectory,
+    ASHBY_JOBS_BASE_URL: fixture.url,
   });
 
   return { fixture, server, sessionDirectory, site };
@@ -111,6 +113,9 @@ const SPONSORSHIP_GROUP =
   "aff810b3-1f77-4e76-950f-6c5dfb53f847_d2dcc981-709b-4026-ae4f-d6f6d613e982";
 
 const applicationRowSchema = z.object({
+  approvedAt: z.number().nullable(),
+  approvedPlanSha256: z.string().nullable(),
+  changes: z.string().nullable(),
   id: z.string(),
   status: z.string(),
   statusReason: z.string().nullable(),
@@ -200,7 +205,35 @@ async function prepareProfile(owner: APIRequestContext, facts: typeof baseFacts)
   expect(saved.ok()).toBe(true);
 }
 
-async function seededApplication(harness: AshbyHarness, facts: typeof baseFacts, query = "") {
+async function seededApplication(
+  harness: AshbyHarness,
+  facts: typeof baseFacts,
+  options: {
+    query?: string;
+    questions?: {
+      text: string;
+      fieldName?: string | null;
+      fieldType?:
+        | "text"
+        | "textarea"
+        | "select"
+        | "multiselect"
+        | "radio"
+        | "checkbox"
+        | "file"
+        | "date"
+        | "number"
+        | "email"
+        | "phone"
+        | "url";
+      options?: string[];
+      required?: boolean;
+      factKey?: string | null;
+      answerKind?: AnswerKind;
+      mappedBy?: "rules" | "llm" | "owner" | null;
+    }[];
+  } = {},
+) {
   const { owner, userId } = await ownerFor(harness.server);
 
   await prepareProfile(owner, facts);
@@ -216,20 +249,31 @@ async function seededApplication(harness: AshbyHarness, facts: typeof baseFacts,
     atsJobId: jobId,
     boardId,
     companyId,
+    questions: options.questions ?? [],
     title,
-    url: `${harness.fixture.url}/${boardToken}/${jobId}/application${query}`,
+    url: `${harness.fixture.url}/${boardToken}/${jobId}/application${options.query ?? ""}`,
   });
 
   const applicationId = await seedApplication(owner, {
     postingId,
-    status: "ready",
+    status: "preparing",
     userId,
   });
 
+  await runJob(owner, "application.prepare", JSON.stringify({ applicationId }));
+
+  return { applicationId, owner, postingId, userId };
+}
+
+async function runJob(owner: APIRequestContext, kind: string, payload: string) {
+  const response = await owner.post("/__test__/jobs/run-now", { data: { kind, payload } });
+
+  expect(response.ok()).toBe(true);
+}
+
+async function approveForSend(owner: APIRequestContext, applicationId: string) {
   await grantApplications(owner, 3);
   await approveApplication(owner, applicationId);
-
-  return { applicationId, owner, userId };
 }
 
 async function runSend(owner: APIRequestContext, applicationId: string) {
@@ -261,14 +305,10 @@ async function reviewsOf(owner: APIRequestContext) {
   return reviewViewSchema.parse(await (await owner.get("/api/reviews")).json()).reviews;
 }
 
-test("an unknown required Ashby question opens a Review and nothing is submitted", async ({
+test("an unknown required Ashby question opens a Review during preparation and nothing is submitted", async ({
   ashby,
 }) => {
   const { applicationId, owner } = await seededApplication(ashby, baseFacts);
-
-  const response = await runSend(owner, applicationId);
-
-  expect(response.ok()).toBe(true);
 
   const detail = await applicationOf(owner, applicationId);
 
@@ -276,13 +316,6 @@ test("an unknown required Ashby question opens a Review and nothing is submitted
   expect(detail.application.statusReason).toBe("unknown_question");
   expect(detail.application.stage).toBe("queued");
   expect(detail.snapshot).toBeNull();
-
-  const attempts = await attemptsOf(owner, applicationId);
-
-  expect(attempts).toHaveLength(1);
-  expect(attempts[0]?.outcome).toBe("needs_review");
-  expect(attempts[0]?.submitClickedAt).toBeNull();
-  expect(attempts[0]?.submitResponseStatus).toBeNull();
 
   const state = await fixtureState(ashby.fixture);
 
@@ -298,13 +331,15 @@ test("an unknown required Ashby question opens a Review and nothing is submitted
 
   const home = homeSchema.parse(await (await owner.get("/api/home")).json());
 
-  expect(home.applicationsLeft).toBe(3);
+  expect(home.applicationsLeft).toBe(0);
 });
 
 test("an Ashby send fills the recorded form and ends sent only on the success page", async ({
   ashby,
 }) => {
   const { applicationId, owner } = await seededApplication(ashby, [...baseFacts, sponsorshipFact]);
+
+  await approveForSend(owner, applicationId);
 
   const response = await runSend(owner, applicationId);
 
@@ -353,14 +388,65 @@ test("an Ashby send fills the recorded form and ends sent only on the success pa
   expect(home.applicationsLeft).toBe(2);
 });
 
+test("a live form missing a planned field returns the Application to Ready with what changed", async ({
+  ashby,
+}) => {
+  const recorded = recordedAshbyFormQuestions("volta", "123e02c6-445b-42bb-893c-addb1f6d4752");
+
+  const { applicationId, owner } = await seededApplication(
+    ashby,
+    [...baseFacts, sponsorshipFact, { key: "years_total", value: "5", scope: "" }],
+    {
+      questions: [
+        ...recorded.map((question) => ({
+          fieldName: question.fieldName,
+          fieldType: question.fieldType,
+          options: question.options,
+          required: question.required,
+          text: question.label,
+        })),
+        {
+          answerKind: "fact" as const,
+          factKey: "years_total",
+          fieldName: "question_years_total",
+          fieldType: "number" as const,
+          required: true,
+          text: "How many years of experience do you have?",
+        },
+      ],
+    },
+  );
+
+  await approveForSend(owner, applicationId);
+
+  const response = await runSend(owner, applicationId);
+
+  expect(response.ok()).toBe(true);
+
+  const detail = await applicationOf(owner, applicationId);
+
+  expect(detail.application.status).toBe("ready");
+  expect(detail.application.approvedAt).toBeNull();
+  expect(detail.application.approvedPlanSha256).toBeNull();
+  expect(JSON.parse(detail.application.changes ?? "[]")).toEqual(["A field was removed"]);
+
+  const attempts = await attemptsOf(owner, applicationId);
+
+  expect(attempts).toHaveLength(1);
+  expect(attempts[0]?.outcome).toBe("form_changed");
+  expect(attempts[0]?.submitClickedAt).toBeNull();
+
+  expect((await fixtureState(ashby.fixture)).submissions).toBe(0);
+});
+
 test("an Ashby 2xx without the success page stays Confirming and is never called sent", async ({
   ashby,
 }) => {
-  const { applicationId, owner } = await seededApplication(
-    ashby,
-    [...baseFacts, sponsorshipFact],
-    "?blank=1",
-  );
+  const { applicationId, owner } = await seededApplication(ashby, [...baseFacts, sponsorshipFact], {
+    query: "?blank=1",
+  });
+
+  await approveForSend(owner, applicationId);
 
   const response = await runSend(owner, applicationId);
 
@@ -412,6 +498,8 @@ test("an Ashby send answers a yes/no question from a Fact and presses its option
     { key: "work_auth", value: "Citizen", scope: "" },
   ]);
 
+  await approveForSend(owner, applicationId);
+
   const response = await runSend(owner, applicationId);
 
   expect(response.ok()).toBe(true);
@@ -440,11 +528,27 @@ test("an Ashby send answers a yes/no question from a Fact and presses its option
 test("an Ashby send reads a yes/no question as its options and a bare Location as the city", async ({
   ashbyLocation,
 }) => {
-  const { applicationId, owner } = await seededApplication(ashbyLocation, baseFacts);
-
-  const response = await runSend(owner, applicationId);
-
-  expect(response.ok()).toBe(true);
+  const { applicationId, owner } = await seededApplication(ashbyLocation, baseFacts, {
+    questions: [
+      {
+        answerKind: "fact",
+        factKey: "current_city",
+        fieldName: "_systemfield_location",
+        fieldType: "text",
+        required: true,
+        text: "Location",
+      },
+      {
+        answerKind: "fact",
+        factKey: "work_auth",
+        fieldName: "c60c5d97-5e0f-4258-a5fa-a5b1095af145",
+        fieldType: "radio",
+        options: ["Yes", "No"],
+        required: true,
+        text: "Are you legally authorized to work in Canada?",
+      },
+    ],
+  });
 
   const detail = await applicationOf(owner, applicationId);
 

@@ -503,6 +503,12 @@ test("a one-off field added to the live form ends form_changed and submits nothi
 
     expect(await statusOf(owner, applicationId)).toBe("ready");
 
+    const detail = z
+      .object({ application: z.object({ changes: z.string().nullable() }) })
+      .parse(await (await owner.get(`/api/applications/${applicationId}`)).json());
+
+    expect(JSON.parse(detail.application.changes ?? "[]")).toEqual(["A new required question"]);
+
     const [attempt] = await attemptsOf(owner, applicationId);
 
     expect(attempt?.outcome).toBe("form_changed");
