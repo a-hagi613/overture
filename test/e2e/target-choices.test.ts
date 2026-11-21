@@ -75,6 +75,7 @@ test("role choices: ranks open roles by how many open Postings carry them", () =
   addPosting("c1", { closed: true, role: "Common" });
   addPosting("c2", { closed: true, role: "Rare" });
   addPosting("c3", { closed: true, role: "Rare" });
+  addPosting("c4", { closed: true, role: "Rare" });
 
   expect(targetChoices(db).roles).toEqual(["Common", "Rare"]);
 });
