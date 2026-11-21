@@ -168,7 +168,7 @@ src/
     main.ts          process entry: http + workers + scheduler, graceful shutdown
   web/               React app (routes/, features/, components/ui = shadcn)
 drizzle/             generated migrations
-scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, pull-forms.ts, restore-drill.ts
+scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, capture-fixtures.ts, pull-forms.ts, restore-drill.ts
 test/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
                      (the eight unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
@@ -751,7 +751,10 @@ Submit. It saves sanitised HTML + assets (names, emails, tokens and employer tra
 `fixtures/{ats}/{form_signature}/`. A developer pulls them into `test/e2e/fixtures/forms/` with
 `scripts/pull-forms.ts` (R2 read only, no ATS traffic); the local fixture server replays them, including fake
 confirmation pages, a fake code prompt and a fake visible challenge. The capture job opens at most ten URLs per run,
-with no user profile attached, and writes `fixtures/{ats}/{form_signature}/form.html`, its assets and `meta.json`. Live smoke checks are the same kind of admin job,
+with no user profile attached, and writes `fixtures/{ats}/{form_signature}/form.html`, its assets and `meta.json`.
+On production the same job is queued from the machine with
+`bun run scripts/capture-forms.ts --ats <ats> --url <apply_url> [--url <apply_url> …]`; the running worker picks it
+up and the files land under the `fixtures/{ats}/` prefix in R2. Live smoke checks are the same kind of admin job,
 stopping before Submit. The developer machine never drives a browser against a real form.
 
 ---
