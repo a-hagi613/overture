@@ -740,9 +740,38 @@ function selectionReason(
   return `${String(selected)} of ${String(total)} files are reachable from the diff`;
 }
 
+function selectedLoadSeconds(files: readonly string[], seconds: Record<string, number>) {
+  const fallback = defaultSeconds(seconds);
+  let total = 0;
+
+  for (const file of files) {
+    total += seconds[file] ?? fallback;
+  }
+
+  return total;
+}
+
+function resolveShardCount(
+  explicit: string | null,
+  selected: readonly string[],
+  seconds: Record<string, number>,
+) {
+  if (explicit !== null) {
+    return Number(explicit);
+  }
+
+  if (selected.length === 0) {
+    return 1;
+  }
+
+  const total = selectedLoadSeconds(selected, seconds);
+
+  return Math.min(6, Math.max(1, Math.ceil(total / 75)));
+}
+
 function plan() {
   const base = flagValue("--base");
-  const shardCount = Number(flagValue("--shards") ?? "6");
+  const explicitShards = flagValue("--shards");
   const output = flagValue("--out");
   const map = readReachMap();
   const changed = base === null ? [] : changedFiles(base);
@@ -784,6 +813,9 @@ function plan() {
   const container =
     isMain || touched.some((file) => containerPatterns.some((pattern) => pattern.test(file)));
 
+  const timings = readTimings().seconds;
+  const shardCount = resolveShardCount(explicitShards, selected, timings);
+
   const planBody = planSchema.parse({
     version: 1,
     full,
@@ -797,7 +829,7 @@ function plan() {
       allTests.length,
     ),
     selected,
-    shards: assignShards(selected, readTimings().seconds, shardCount),
+    shards: assignShards(selected, timings, shardCount),
   });
 
   const lines = planBody.shards.map(

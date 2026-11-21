@@ -20,7 +20,7 @@ import type {
 import type { createMailboxService } from "../inbox/mailboxes.ts";
 import type { Outcomes } from "./outcomes.ts";
 
-import { applications, attempts, postings, profiles } from "../platform/db/schema.ts";
+import { applications, attempts, postings, profiles, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { releaseForApplication, reserveForApplication } from "../billing/ledger.ts";
 import { getSetting, isKillSwitchEnabled, setKillSwitch } from "../platform/settings/index.ts";
@@ -419,6 +419,17 @@ export function createDispatcher(deps: DispatcherDeps) {
     const provider = providers.pick();
 
     if (switchedOffAtSend(applicationId, provider.id)) {
+      return false;
+    }
+
+    const demo = db
+      .select({ role: users.role })
+      .from(applications)
+      .innerJoin(users, eq(users.id, applications.userId))
+      .where(eq(applications.id, applicationId))
+      .get();
+
+    if (demo?.role === "demo") {
       return false;
     }
 
@@ -908,7 +919,14 @@ export function createDispatcher(deps: DispatcherDeps) {
 
   async function recover() {
     const confirming = await outcomes.expireConfirming();
-    const sending = db.select().from(applications).where(eq(applications.status, "sending")).all();
+
+    const sending = db
+      .select({ application: applications })
+      .from(applications)
+      .innerJoin(users, eq(users.id, applications.userId))
+      .where(and(eq(applications.status, "sending"), sql`${users.role} <> 'demo'`))
+      .all()
+      .map((row) => row.application);
 
     let confirmingCount = confirming.confirmed;
     const { expired } = confirming;
