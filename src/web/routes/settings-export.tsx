@@ -183,7 +183,10 @@ export function SettingsExportPage() {
         }
       />
       <SettingsAccountTabs active="export" />
-      <div className="mt-[29px] grid grid-cols-1 items-start gap-[22px] min-[900px]:grid-cols-2">
+      <div
+        aria-live="polite"
+        className="mt-[29px] grid grid-cols-1 items-start gap-[22px] min-[900px]:grid-cols-2"
+      >
         {card}
       </div>
       {note === null ? null : (
