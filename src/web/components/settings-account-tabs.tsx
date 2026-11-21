@@ -6,7 +6,7 @@ type TabKey = keyof typeof copy.settingsAccount.tabs;
 
 const tabs: { key: TabKey; to: string | null }[] = [
   { key: "notifications", to: null },
-  { key: "export", to: null },
+  { key: "export", to: "/settings/export" },
   { key: "delete", to: "/settings/delete" },
   { key: "supportAccess", to: null },
   { key: "legal", to: null },
