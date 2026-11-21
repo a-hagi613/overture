@@ -17,6 +17,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -79,6 +80,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -139,6 +141,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -198,6 +201,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -255,6 +259,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -327,6 +332,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -410,6 +416,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -481,6 +488,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -586,6 +594,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -739,6 +748,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -807,6 +817,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -875,6 +886,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -932,6 +944,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -991,6 +1004,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -1056,6 +1070,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -1117,6 +1132,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -1181,6 +1197,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -1253,6 +1270,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -1337,6 +1355,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -1393,6 +1412,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -1484,6 +1504,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -2043,6 +2064,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -2127,6 +2149,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -2576,6 +2599,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -2678,6 +2702,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -2782,6 +2807,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -2854,6 +2880,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -2961,6 +2988,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3054,6 +3082,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3157,6 +3186,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3262,6 +3292,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3363,6 +3394,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3463,6 +3495,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3536,6 +3569,64 @@
         "src/shared/turnstile.ts"
       ]
     },
+    "test/e2e/invites.test.ts": {
+      "full": true,
+      "paths": [
+        "/__test__/auth/state",
+        "/__test__/ledger/sample",
+        "/__test__/mail",
+        "/__test__/mail/clear",
+        "/__test__/turnstile",
+        "/__test__/user/name",
+        "/__test__/user/suspend",
+        "/api"
+      ],
+      "modules": [
+        "src/server/auth/email.ts",
+        "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
+        "src/server/auth/turnstile-gate.ts",
+        "src/server/billing/ledger.ts",
+        "src/server/catalog/board-feed.ts",
+        "src/server/catalog/content-hash.ts",
+        "src/server/catalog/discovered-boards.ts",
+        "src/server/catalog/geo.ts",
+        "src/server/catalog/greenhouse-feed.ts",
+        "src/server/catalog/html-to-text.ts",
+        "src/server/catalog/normalize.ts",
+        "src/server/catalog/question-normalize.ts",
+        "src/server/catalog/question-rules.ts",
+        "src/server/catalog/rate-limiter.ts",
+        "src/server/config/env.ts",
+        "src/server/dispatch/planner.ts",
+        "src/server/dispatch/planning.ts",
+        "src/server/inbox/waits.ts",
+        "src/server/matching/applications.ts",
+        "src/server/matching/candidates.ts",
+        "src/server/matching/fx.ts",
+        "src/server/matching/regions.ts",
+        "src/server/matching/score.ts",
+        "src/server/matching/skip-match.ts",
+        "src/server/notify/notifications.ts",
+        "src/server/notify/ready-recap.ts",
+        "src/server/pipeline/daily-prep.ts",
+        "src/server/pipeline/prepare-jobs.ts",
+        "src/server/pipeline/stage.ts",
+        "src/server/profile/facts.ts",
+        "src/server/profile/languages.ts",
+        "src/server/profile/personal-crypto.ts",
+        "src/server/profile/skip-companies.ts",
+        "src/server/profile/targets.ts",
+        "src/server/profile/time-zone.ts",
+        "src/server/testing/cloudflare-email-recorder.ts",
+        "src/shared/copy.ts",
+        "src/shared/facts.ts",
+        "src/shared/questions.ts",
+        "src/shared/tag-taxonomy.ts",
+        "src/shared/targets.ts",
+        "src/shared/turnstile.ts"
+      ]
+    },
     "test/e2e/job-survives-restart.test.ts": {
       "full": false,
       "paths": [
@@ -3556,6 +3647,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3641,6 +3733,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -3719,6 +3812,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3823,6 +3917,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3941,6 +4036,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -4040,6 +4136,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -4142,6 +4239,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -4226,6 +4324,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -4287,6 +4386,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -4354,6 +4454,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -4432,6 +4533,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -4552,6 +4654,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -4658,6 +4761,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -4742,6 +4846,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -4802,6 +4907,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -4868,6 +4974,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -4935,6 +5042,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -5013,6 +5121,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -5098,6 +5207,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -5155,6 +5265,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -5231,6 +5342,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -5342,6 +5454,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -5434,6 +5547,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -5492,6 +5606,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -5550,6 +5665,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -5607,6 +5723,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -5670,6 +5787,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -5755,6 +5873,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -5832,6 +5951,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -6054,6 +6174,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -6140,6 +6261,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -6196,6 +6318,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/board-feed.ts",
@@ -6281,6 +6404,7 @@
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/index.ts",
+        "src/server/auth/invites.ts",
         "src/server/auth/turnstile-gate.ts",
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
