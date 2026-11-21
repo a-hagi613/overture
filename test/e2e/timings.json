@@ -2,7 +2,7 @@
   "version": 1,
   "seconds": {
     "test/e2e/admin-visual.test.ts": 10.5,
-    "test/e2e/catalog-dedupe.test.ts": 2.5,
+    "test/e2e/catalog-dedupe.test.ts": 2.2,
     "test/e2e/catalog-sweep-claim.test.ts": 15.8,
     "test/e2e/job-survives-restart.test.ts": 1.8,
     "test/e2e/shell.test.ts": 5.4,
@@ -12,13 +12,13 @@
     "test/e2e/graceful-stop-requeue.test.ts": 4,
     "test/e2e/settings-and-kill-switches.test.ts": 0.1,
     "test/e2e/admin-gates.test.ts": 3.4,
-    "test/e2e/catalog-search-filters.test.ts": 5.5,
-    "test/e2e/cloud-probe.test.ts": 75.1,
+    "test/e2e/catalog-search-filters.test.ts": 3.6,
+    "test/e2e/cloud-probe.test.ts": 73.9,
     "test/e2e/reachability.test.ts": 1.1,
     "test/e2e/tag-llm-fallback.test.ts": 10.5,
     "test/e2e/board-match-signin.test.ts": 45.4,
     "test/e2e/admin-catalog.test.ts": 12,
-    "test/e2e/catalog-rate-limit.test.ts": 3.8,
+    "test/e2e/catalog-rate-limit.test.ts": 3.2,
     "test/e2e/clock-and-run-due.test.ts": 0.1,
     "test/e2e/profile-resume.test.ts": 3.5,
     "test/e2e/tag-import.test.ts": 1.9,
@@ -38,11 +38,11 @@
     "test/e2e/profile-targets.test.ts": 4.9,
     "test/e2e/catalog-sweep-single.test.ts": 19,
     "test/e2e/matching-home-api.test.ts": 4.2,
-    "test/e2e/profile-targets-ui.test.ts": 10.1,
+    "test/e2e/profile-targets-ui.test.ts": 5.7,
     "test/e2e/backup-health-cache.test.ts": 8.6,
     "test/e2e/time-zone-pending.test.ts": 2.4,
     "test/e2e/turnstile-gate.test.ts": 8.8,
-    "test/e2e/board-match-home-usage.test.ts": 2.3,
+    "test/e2e/board-match-home-usage.test.ts": 2.4,
     "test/e2e/move-objects-to-r2.test.ts": 0.1,
     "test/e2e/catalog-feed-correctness.test.ts": 29.9,
     "test/e2e/matching-candidates.test.ts": 11.6,
@@ -54,6 +54,7 @@
     "test/e2e/inbound-mail.test.ts": 0.7,
     "test/e2e/first-send.test.ts": 28.2,
     "test/e2e/catalog-greenhouse-bulk.test.ts": 20.4,
-    "test/e2e/telemetry-redaction.test.ts": 0.1
+    "test/e2e/telemetry-redaction.test.ts": 0.1,
+    "test/e2e/matching-score.test.ts": 12.6
   }
 }
