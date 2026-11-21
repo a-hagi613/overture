@@ -2,7 +2,13 @@ import { describe, expect, test } from "bun:test";
 
 import type { FactRecord } from "./facts.ts";
 
-import { eeoAnswersFrom, salaryAnswersFrom, salaryFactValue } from "./onboarding-step.ts";
+import {
+  currenciesFor,
+  eeoAnswersFrom,
+  homeCountryCode,
+  salaryAnswersFrom,
+  salaryFactValue,
+} from "./onboarding-step.ts";
 
 function fact(key: string, value: string, scope = "") {
   return { confirmed: true, key, revision: 1, scope, source: "user", value } satisfies FactRecord;
@@ -72,5 +78,80 @@ describe("reading the EEO answers", () => {
       gender: "Non-binary",
       veteran: "Prefer not to say",
     });
+  });
+});
+
+describe("choosing the currencies the Facts step offers", () => {
+  test("uses the Target currency and nothing else when a saved location would add a second", () => {
+    expect(
+      currenciesFor({
+        countryCodes: ["GB"],
+        inferCountries: true,
+        queued: [],
+        salaryCurrencies: [],
+        targetCurrency: "CAD",
+      }),
+    ).toEqual(["CAD"]);
+  });
+
+  test("guesses from the country only when no queued, saved or Target currency exists", () => {
+    expect(
+      currenciesFor({
+        countryCodes: ["GB"],
+        inferCountries: true,
+        queued: [],
+        salaryCurrencies: [],
+        targetCurrency: null,
+      }),
+    ).toEqual(["GBP"]);
+  });
+
+  test("keeps queued currencies ahead of the Target currency without adding the country guess", () => {
+    expect(
+      currenciesFor({
+        countryCodes: ["GB"],
+        inferCountries: true,
+        queued: ["USD"],
+        salaryCurrencies: [],
+        targetCurrency: "CAD",
+      }),
+    ).toEqual(["USD", "CAD"]);
+  });
+
+  test("keeps saved salary currencies and adds a distinct Target currency", () => {
+    expect(
+      currenciesFor({
+        countryCodes: ["GB"],
+        inferCountries: true,
+        queued: [],
+        salaryCurrencies: ["EUR"],
+        targetCurrency: "CAD",
+      }),
+    ).toEqual(["EUR", "CAD"]);
+  });
+
+  test("infers nothing when inference is off and no answer exists", () => {
+    expect(
+      currenciesFor({
+        countryCodes: ["GB"],
+        inferCountries: false,
+        queued: [],
+        salaryCurrencies: [],
+        targetCurrency: null,
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe("reading the home country", () => {
+  test("resolves a two-letter code, a country name and a city", () => {
+    expect(homeCountryCode([fact("current_country", "CA")])).toBe("CA");
+    expect(homeCountryCode([fact("current_country", "Canada")])).toBe("CA");
+    expect(homeCountryCode([fact("current_country", "London")])).toBe("GB");
+  });
+
+  test("is undefined when the Fact is missing or blank", () => {
+    expect(homeCountryCode([])).toBeNull();
+    expect(homeCountryCode([fact("current_country", "   ")])).toBeNull();
   });
 });
