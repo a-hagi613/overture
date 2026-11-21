@@ -86,8 +86,6 @@ export function HomePage() {
     return open.wait.expiresAt <= (codeWaits?.now ?? 0) ? "expired" : "accepted";
   }
 
-  const sheetMode = sheet === null ? null : liveMode(sheet);
-
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -124,25 +122,16 @@ export function HomePage() {
           const outcome = failure instanceof CodePasteError ? failure.outcome : "failed";
 
           if (outcome === "expired") {
-            setSheet((current) =>
-              current === null
-                ? current
-                : { ...current, error: copy.codePaste.errors.expired, mode: "expired" },
-            );
+            updateSheet({ error: copy.codePaste.errors.expired, mode: "expired" });
           } else if (outcome === "resolved") {
             updateSheet({ error: null, mode: "accepted" });
           } else {
-            setSheet((current) =>
-              current === null
-                ? current
-                : {
-                    ...current,
-                    error:
-                      outcome === "not_found"
-                        ? copy.codePaste.errors.notFound
-                        : copy.codePaste.errors.failed,
-                  },
-            );
+            updateSheet({
+              error:
+                outcome === "not_found"
+                  ? copy.codePaste.errors.notFound
+                  : copy.codePaste.errors.failed,
+            });
           }
         },
         onSuccess: () => {
@@ -243,10 +232,10 @@ export function HomePage() {
           <HomeInbox now={home.now} rows={home.recentInbox} zone={home.timeZone} />
         </>
       )}
-      {sheet === null || sheetMode === null ? null : (
+      {sheet === null ? null : (
         <CodePasteSheet
           error={sheet.error}
-          mode={sheetMode}
+          mode={liveMode(sheet)}
           onClose={() => {
             setSheet(null);
           }}

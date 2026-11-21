@@ -934,8 +934,9 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
    for it to resolve: mail with `auth='pass'` from an ATS sender domain received after `started_at` resolves it, woken
    by ingest and checked every 5 s as a backstop. Five minutes without a code creates the owner's "paste it"
    notification and the same ask on Home (a card with the countdown to expiry), and the paste endpoint (§14) resumes
-   the same wait and the same browser session until the row's ten-minute expiry. Type the code, mark `code_consumed_at` and `attempts.code_used`, and Submit again. No code by the
-   expiry → `code_timeout`. Whether a timeout is `code_timeout` or `unconfirmed` depends only on whether
+   the same wait and the same browser session until the row's ten-minute expiry. Type the code, mark
+   `code_consumed_at` and `attempts.code_used`, and Submit again. No code by the expiry → `code_timeout`. Whether a
+   timeout is `code_timeout` or `unconfirmed` depends only on whether
    `submit_clicked_at` was set (§9.4), never on where the prompt appeared.
 7. If a CAPTCHA is visible: stop interacting, wait 10 s, re-inspect, up to 3 times (vendor solver works meanwhile).
    Still visible → `captcha_blocked`.

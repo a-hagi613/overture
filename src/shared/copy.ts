@@ -1659,7 +1659,6 @@ export const copy = {
     },
   },
   codePaste: {
-    sheetLabel: "Paste a code",
     grabHandle: "Close the code-paste sheet",
     close: "Close",
     eyebrow: "Code paste",
@@ -1706,7 +1705,6 @@ export const copy = {
     invalid: "Enter the 8-character code from the email.",
     errors: {
       expired: "That wait has closed, so nothing was sent. Try the Application again from Board.",
-      resolved: "That code was already handled.",
       notFound: "That wait is no longer open.",
       failed: "The code did not go through. Try again.",
     },
