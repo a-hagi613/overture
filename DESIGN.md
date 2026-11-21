@@ -533,11 +533,11 @@ screen, then built to match. Visual treatment stays; words, structure and behavi
 | Holds | **Redrawn as Review (file `w5-holds`).** Becomes Review: open questions grouped by jobs unlocked |
 | Answer Bank, Resume | **Redrawn: folded into Profile.** Fold into Profile: resume, facts by tier, targets with live count, skip list, job-search address |
 | Settings | **Redrawn.** No approval mode, no "Overnight window", no user-set company limit or daily caps, no UTC reset; the fixed limits explained (10 a day, 08:00–20:00 local, one company per 30 days, reset at local midnight) |
-| Onboarding 1–4 | Five steps: Sign in · Resume · Your facts · What you want · Your job-search address + consent + trial + Start; no "Connect inbox", no Gmail, no "Memory Base" |
+| Onboarding 1–4 | **Your facts step drawn (`w5-onb-questions`, #128); the other steps are still to redraw.** Five steps: Sign in · Resume · Your facts · What you want · Your job-search address + consent + trial + Start; no "Connect inbox", no Gmail, no "Memory Base" |
 | Sign In | **Redrawn (modes sign-in, sign-up, magic-sent).** Google, LinkedIn, magic link (M1); email + password joins in M2 (ADR 0026). Dark uses the sign-in dark ground (§2, ADR 0027) |
-| Product states | No Gmail connect states; add `confirming` ("Checking with the employer"), each pause reason, out of applications |
+| Product states | **Pause reasons drawn on Home (`w5-home-paused`, #157).** No Gmail connect states; add `confirming` ("Checking with the employer"), each pause reason, out of applications |
 | Daily digest | Morning summary of **yesterday** (sends between 08:00 and 20:00); "Needs you", not "Hold" |
 | Landing | Daytime timestamps; card required for the trial (no "No credit card"); Workday removed from Where it applies; plan prices per the spec; no glow on the travelling-dot tiles |
 | Live Tab (3 boards) | Deleted: users never see a browser |
 | Mobile reference | Deleted, already marked to retire |
-| New | Review, check-in on Home, `Couldn't apply` card, **Admin — still to draw.** The M1 admin (overview, kill switches & settings, catalog health; M1-12) is built from the Settings board's components and this document's tokens, with no pixel check of its own until a board exists; pricing and billing (M3) |
+| New | Review; **drawn on Home (`w5-home-paused`, #157): check-in, strengthen-profile prompt, queue position, activity and the `Couldn't apply` card.** **Admin — still to draw.** The M1 admin (overview, kill switches & settings, catalog health; M1-12) is built from the Settings board's components and this document's tokens, with no pixel check of its own until a board exists; pricing and billing (M3) |

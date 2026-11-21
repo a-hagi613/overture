@@ -6,7 +6,7 @@ changes; never edit it by hand.
 
 ## What is here
 
-One folder per screen: `home`, `board`, `review`, `profile`, `settings`, `signin`. Each variant is named
+One folder per screen: `home`, `home-paused` (adds `reasons-1280-light`, all seven pause banners), `board`, `review`, `profile`, `settings`, `signin`, `onboarding-questions`. Each variant is named
 `<width>-<theme>` (Sign in adds the mode: `sign-in`, `sign-up`, `magic-sent`), and comes as three files:
 
 | File | What it is | Use it for |
