@@ -9,6 +9,7 @@ import type { AppServer } from "./app-server.ts";
 
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
+import { seedUnreadNotifications } from "./notification-seed.ts";
 import { latestMailLink, requestMagicLink } from "./sign-in.ts";
 
 const test = appTest.extend<{ boardServer: AppServer }>({
@@ -52,6 +53,7 @@ async function seedOwner(request: APIRequestContext, appServerUrl: string) {
   await request.post(`${appServerUrl}/__test__/user/name`, {
     data: { email: authTestIdentity.ownerEmail, name: authTestIdentity.ownerName },
   });
+  await seedUnreadNotifications(request, appServerUrl);
   await request.post("/api/running", { data: { running: true } });
 
   await request.put("/api/profile/languages", { data: { languages: ["en"] } });

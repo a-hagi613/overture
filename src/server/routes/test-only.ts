@@ -36,6 +36,7 @@ import {
   postingTags,
   postings,
   profiles,
+  pushSubscriptions,
   questionVariants,
   questions,
   reviewApplications,
@@ -57,6 +58,7 @@ import {
 } from "../testing/cloudflare-email-recorder.ts";
 import { getTestSpans, resetTestSpans } from "../platform/telemetry/otel.ts";
 import { releaseBlockingJobs } from "../testing/blocking-job.ts";
+import { clearPushRequests, listPushRequests } from "../testing/push-recorder.ts";
 import { setTurnstileScenario, turnstileScenarioBody } from "../testing/turnstile-scenario.ts";
 import {
   emailSendingScenarios,
@@ -798,11 +800,86 @@ export function createTestRoutes(
           url: row.url,
           createdAt: row.createdAt,
           readAt: row.readAt?.getTime() ?? null,
+          pushedAt: row.pushedAt?.getTime() ?? null,
           emailedAt: row.emailedAt?.getTime() ?? null,
         })),
       });
     },
   );
+
+  const seedNotificationsBody = z.object({
+    email: z.string().min(1),
+    rows: z
+      .array(
+        z.object({
+          at: z.number().int(),
+          body: z.string(),
+          kind: z.string(),
+          pushed: z.boolean().default(false),
+          read: z.boolean().default(false),
+          title: z.string(),
+          url: z.string(),
+        }),
+      )
+      .min(1),
+  });
+
+  routes.post("/notifications/seed", zValidator("json", seedNotificationsBody), (context) => {
+    const body = context.req.valid("json");
+
+    const user = db.select().from(users).where(eq(users.email, body.email.toLowerCase())).get();
+
+    if (user === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    for (const row of body.rows) {
+      db.insert(notifications)
+        .values({
+          body: row.body,
+          createdAt: row.at,
+          id: crypto.randomUUID(),
+          kind: row.kind,
+          pushedAt: row.pushed ? new Date(row.at) : null,
+          readAt: row.read ? new Date(row.at) : null,
+          title: row.title,
+          url: row.url,
+          userId: user.id,
+        })
+        .run();
+    }
+
+    return context.json({ ok: true });
+  });
+
+  routes.get("/push/subscriptions", zValidator("query", userQuery), (context) => {
+    const { userId } = context.req.valid("query");
+
+    const rows = db
+      .select()
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.userId, userId))
+      .orderBy(asc(pushSubscriptions.createdAt))
+      .all();
+
+    return context.json({
+      subscriptions: rows.map((row) => ({
+        createdAt: row.createdAt,
+        endpoint: row.endpoint,
+        id: row.id,
+        lastOkAt: row.lastOkAt?.getTime() ?? null,
+        userId: row.userId,
+      })),
+    });
+  });
+
+  routes.get("/push/requests", (context) => context.json({ requests: listPushRequests() }));
+
+  routes.post("/push/clear", (context) => {
+    clearPushRequests();
+
+    return context.json({ ok: true });
+  });
 
   routes.get("/live-checks", (context) => context.json({ results: readLiveCheckResults(db, 200) }));
 
@@ -2254,6 +2331,39 @@ export function createTestRoutes(
         }),
       ),
     );
+
+    for (const [index, row] of [
+      {
+        body: "Overture prepared your applications this morning. Nothing is sent until you approve.",
+        kind: "ready",
+        title: "Recap: 10 ready to approve, 2 need an answer",
+        url: "/ready",
+      },
+      {
+        body: "Answering it lets 4 applications go ahead.",
+        kind: "review",
+        title: "A question for you",
+        url: "/review",
+      },
+      {
+        body: "About Site Reliability Engineer. Read it in Inbox.",
+        kind: "reply",
+        title: "Halden Systems replied",
+        url: "/inbox",
+      },
+    ].entries()) {
+      db.insert(notifications)
+        .values({
+          body: row.body,
+          createdAt: dayStart(0) + (7 + index) * hour,
+          id: crypto.randomUUID(),
+          kind: row.kind,
+          title: row.title,
+          url: row.url,
+          userId,
+        })
+        .run();
+    }
 
     return context.json({ ok: true });
   });

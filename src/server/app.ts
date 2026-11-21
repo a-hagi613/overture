@@ -18,6 +18,7 @@ import type { CatalogSweepWorker } from "./catalog/sweep-worker-runner.ts";
 import { createHealthRoutes } from "./routes/health.ts";
 import { createMeRoutes } from "./routes/me.ts";
 import { createApiRoutes } from "./routes/api.ts";
+import { createNotificationRoutes } from "./routes/notifications.ts";
 import { createApplicationRoutes } from "./routes/applications.ts";
 import { createHomeRoutes } from "./routes/home.ts";
 import { createReadyRoutes } from "./routes/ready.ts";
@@ -106,6 +107,7 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createHealthRoutes(deps.db, deps.backups));
   app.route("/api", createMeRoutes(deps.auth));
   app.route("/api", createApiRoutes(deps.db, deps.clock, deps.auth));
+  app.route("/api", createNotificationRoutes(deps.db, deps.clock, deps.auth));
   app.route("/api", createProfileRoutes(deps));
   app.route(
     "/api",

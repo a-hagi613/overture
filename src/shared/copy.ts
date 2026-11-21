@@ -140,6 +140,7 @@ export const copy = {
     themeToDark: "Switch to dark mode",
     themeToLight: "Switch to light mode",
     notifications: (count: number) => `Notifications, ${String(count)} unread`,
+    notificationsEmpty: "Notifications",
     notificationsCount: "3",
     autoApplyRunning: "Auto-apply running",
     pause: "Pause",
@@ -1002,6 +1003,44 @@ export const copy = {
     loadFailed: "That did not load. Reload the page.",
   },
   notifications: {
+    page: {
+      title: "Notifications",
+      today: "Today",
+      earlier: "Earlier",
+      folio: "folio 01",
+      markAll: "Mark all as read",
+      emptyTitle: "Nothing yet.",
+      emptyBody:
+        "Overture will list the daily recap, replies, interviews and anything that needs you here, as each push arrives.",
+      emptyAction: "Notification settings",
+      footer: "Each push you turn on is listed here too. Turn kinds on or off in ",
+      settings: "Settings",
+      unread: "Unread",
+      actions: {
+        alert: "Open Home",
+        code_wait: "Paste code",
+        failed: "Open Home",
+        interview: "Open Inbox",
+        offer: "Open Inbox",
+        paused: "Open Home",
+        ready: "Open Ready",
+        reply: "Open Inbox",
+        review: "Open Review",
+        stage_move: "Undo",
+      },
+    },
+    push: {
+      enable: "Turn on notifications",
+      enableDetail:
+        "Push works only from the app on your home screen on most phones. Your browser asks once.",
+      enabled: "Notifications are on for this device.",
+      enabledDetail: "Overture can send the recap and the rest to this device.",
+      disable: "Turn off notifications",
+      denied: "Notifications are blocked in your browser. Allow them in your browser settings.",
+      unsupported: "This browser cannot receive notifications.",
+      failed: "That did not work. Try again.",
+      thisDevice: "Notifications on this device",
+    },
     codeWait: {
       title: (company: string) => `${company} needs a code`,
       body: (minutes: number) =>
