@@ -67,6 +67,12 @@ async function compareRegion(
   expectedPath: string,
   region: z.infer<typeof boxSchema>,
 ) {
+  // The phone tab bar is sticky: park the region at the top of the viewport so the bar never
+  // overlays it in the full-page capture.
+  await section.evaluate((element) => {
+    element.scrollIntoView({ behavior: "instant", block: "start" });
+  });
+
   const actualBox = await section.evaluate((element) => {
     const rect = element.getBoundingClientRect();
 
