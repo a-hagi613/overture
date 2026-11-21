@@ -20,7 +20,7 @@ export function SettingsTabs() {
       {tabs.map((tab) => {
         const active = pathname === tab.path;
 
-        const classes = `inline-flex h-9 items-center rounded-full px-[18px] text-[13.5px] font-semibold leading-none ${
+        const classes = `inline-flex h-11 min-[768px]:h-9 items-center rounded-full px-[18px] text-[13.5px] font-semibold leading-none ${
           active
             ? "border border-foreground bg-foreground text-primary-ink"
             : "border border-border bg-card text-foreground"
@@ -37,7 +37,7 @@ export function SettingsTabs() {
         return (
           <Link
             aria-current={active ? "page" : undefined}
-            className={`${classes} ${active ? "" : "hover:bg-muted"}`}
+            className={`${classes} cursor-pointer ${active ? "" : "hover:bg-muted"}`}
             key={tab.key}
             to={tab.path}
           >

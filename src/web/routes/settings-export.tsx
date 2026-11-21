@@ -35,10 +35,10 @@ function stampText(at: number, zone: string) {
 }
 
 const primaryButton =
-  "inline-flex h-11 items-center justify-center rounded-md bg-foreground px-[18px] text-[13.5px] font-semibold text-primary-ink hover:bg-btn-hover disabled:opacity-70";
+  "inline-flex h-11 cursor-pointer items-center justify-center rounded-md bg-foreground px-[18px] text-[13.5px] font-semibold text-primary-ink hover:bg-btn-hover disabled:cursor-not-allowed disabled:opacity-70";
 
 const secondaryButton =
-  "inline-flex h-11 items-center justify-center rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold text-foreground disabled:opacity-70";
+  "inline-flex h-11 cursor-pointer items-center justify-center rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-70";
 
 export function SettingsExportPage() {
   const queryClient = useQueryClient();
@@ -171,7 +171,7 @@ export function SettingsExportPage() {
   }
 
   return (
-    <div className="pt-[7px]">
+    <div className="mx-auto max-w-[940px] pt-[7px]">
       <SettingsHeader
         eyebrow={copy.settings.exportPage.eyebrow}
         lead={copy.settings.exportPage.lead}
