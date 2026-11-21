@@ -1,6 +1,6 @@
 import { Glob } from "bun";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, normalize } from "node:path";
+import { basename, dirname, join, normalize } from "node:path";
 import { z } from "zod";
 
 const importPattern =
@@ -15,14 +15,27 @@ const routeDeclarationPattern =
 
 const factoryPattern = /export function (?<name>create[A-Za-z0-9_]+)/u;
 
-const declarationPattern =
-  /^[ \t]*(?:export )?(?:const|let|function|async function)\s+(?<name>[A-Za-z_$][\w$]*)/gmu;
+const topDeclarationPattern =
+  /^(?:export )?(?:const|let|function|async function)\s+(?<name>[A-Za-z_$][\w$]*)/gmu;
+
+const helperFunctionPattern = /^ {2}(?:async )?function\s+(?<name>[A-Za-z_$][\w$]*)/gmu;
 
 const identifierPattern = /[A-Za-z_$][\w$]*/gu;
 
-const pathTokenPattern = /\/[A-Za-z0-9_][A-Za-z0-9_\-.:]*(?:\/[A-Za-z0-9_][A-Za-z0-9_\-.:]*)*/gu;
+const quotedStringPattern = /(?<quote>["'`])(?<raw>(?:\\.|(?!\k<quote>)[^\\])*)\k<quote>/gu;
 
-const browserPattern = /(?:^|[^\w.])(?:page|ownerPage)\.|toHaveScreenshot|\bcontext\.newPage\(/u;
+const pathTokenPattern =
+  /\/(?:[A-Za-z0-9_]|:[A-Za-z0-9_])[A-Za-z0-9_\-.:]*(?:\/(?:[A-Za-z0-9_]|:[A-Za-z0-9_])[A-Za-z0-9_\-.:]*)*\/?/gu;
+
+const designRefPattern = /design\/reference\/(?<dir>[A-Za-z0-9_-]+)\//gu;
+
+const playwrightProjectPattern =
+  /testMatch:\s*\/(?<match>[^/]+)\/u[\s\S]{0,400}?design\/reference\/(?<dir>[A-Za-z0-9_-]+)\//gu;
+
+const webRouteEntryPattern =
+  /\{\s*path:\s*"(?<path>[^"]+)"\s*,\s*element:\s*<(?<component>[A-Za-z0-9_]+)\s*\/>/gu;
+
+const gotoPathPattern = /\.(?:goto|toHaveURL)\([\s\S]{0,160}?(?<path>\/[A-Za-z0-9_\-.:/]*)/gu;
 
 const jobRoutePattern = /^\/__test__\/jobs(?:\/|$)/u;
 
@@ -48,22 +61,37 @@ const alwaysFull = [
   /^litestream\.yml$/u,
   /^fly\.toml$/u,
   /^drizzle\//u,
-  /^design\//u,
-  /^tools\//u,
-  /^scripts\//u,
-  /^test\/e2e\/(?!.*\.test\.ts$)/u,
-  /^src\/server\/app\.ts$/u,
-  /^src\/server\/main\.ts$/u,
-  /^src\/server\/(?:auth|config|platform|routes|testing)\//u,
-  /^src\/web\//u,
-  /^src\/shared\//u,
+  /^scripts\/(?:e2e-ci|create-template-db)\.ts$/u,
+  /^scripts\/docker-entrypoint\.sh$/u,
+  /^src\/server\/(?:app|main)\.ts$/u,
+  /^src\/server\/config\/env\.ts$/u,
+  /^src\/server\/platform\/db\//u,
+  /^src\/web\/(?:main\.tsx|styles\.css)$/u,
+  /^test\/e2e\/(?:global-setup|app-server|app\.fixture|auth\.fixture|identity-server-test\.fixture|sign-in)\.ts$/u,
 ];
 
-const ignored = [/^docs\//u, /\.md$/u, /^LICENSE$/u, /^profile\/README\.md$/u];
+const ignored = [
+  /^docs\//u,
+  /\.md$/u,
+  /^LICENSE$/u,
+  /^profile\/README\.md$/u,
+  /^design\/reference\/source\//u,
+  /^design\/review\//u,
+];
+
+function isE2eTestFile(file: string) {
+  return file.startsWith("test/e2e/") && file.endsWith(".test.ts");
+}
+
+function isUnitTestFile(file: string) {
+  return file.startsWith("src/") && file.endsWith(".test.ts");
+}
 
 const reachTestSchema = z.object({
   full: z.boolean(),
   paths: z.array(z.string()),
+  routes: z.array(z.string()).default([]),
+  designs: z.array(z.string()).default([]),
   modules: z.array(z.string()),
 });
 
@@ -117,6 +145,8 @@ const planSchema = z.object({
 interface ReachTest {
   full: boolean;
   paths: string[];
+  routes: string[];
+  designs: string[];
   modules: string[];
 }
 
@@ -124,6 +154,32 @@ interface ReportSuite {
   file?: string | undefined;
   specs: z.infer<typeof reportSpecSchema>[];
   suites: ReportSuite[];
+}
+
+interface RequestedPath {
+  path: string;
+  trailingSlash: boolean;
+}
+
+interface RouteModuleEntry {
+  path: string;
+  modules: string[];
+}
+
+interface WebRouteEntry {
+  urlPath: string;
+  routeFile: string;
+  shell: "app" | "admin" | "none";
+  modules: string[];
+}
+
+interface PlanInput {
+  changed: readonly string[];
+  isMain: boolean;
+  shardCount?: number | undefined;
+  map: z.infer<typeof reachMapSchema>;
+  seconds: Record<string, number>;
+  allTests: readonly string[];
 }
 
 const root = process.cwd();
@@ -278,18 +334,36 @@ function importBindings(file: string) {
   return bindings;
 }
 
-function declarationBlocks(file: string) {
+function declarationStarts(text: string, includeIndentedHelpers: boolean) {
+  const starts: { name: string; index: number }[] = [];
+
+  for (const match of text.matchAll(topDeclarationPattern)) {
+    starts.push({ name: match.groups?.name ?? "", index: match.index });
+  }
+
+  if (includeIndentedHelpers) {
+    for (const match of text.matchAll(helperFunctionPattern)) {
+      starts.push({ name: match.groups?.name ?? "", index: match.index });
+    }
+  }
+
+  return starts.toSorted((left, right) => left.index - right.index);
+}
+
+function declarationBlocks(file: string, includeIndentedHelpers = false, excludedName?: string) {
   const text = textOf(file);
-
-  const starts = [...text.matchAll(declarationPattern)].map((match) => ({
-    name: match.groups?.name ?? "",
-    index: match.index,
-  }));
-
+  const starts = declarationStarts(text, includeIndentedHelpers);
+  const routeMarkers = [...text.matchAll(routeDeclarationPattern)].map((match) => match.index);
   const blocks = new Map<string, string>();
 
   for (const [position, start] of starts.entries()) {
-    const end = starts[position + 1]?.index ?? text.length;
+    if (start.name === excludedName) {
+      continue;
+    }
+
+    const nextDecl = starts[position + 1]?.index ?? text.length;
+    const nextRoute = routeMarkers.find((index) => index > start.index) ?? text.length;
+    const end = Math.min(nextDecl, nextRoute);
 
     blocks.set(start.name, text.slice(start.index, end));
   }
@@ -362,21 +436,58 @@ function routeMounts(files: Set<string>) {
   return routes;
 }
 
-function routeModules(file: string, files: Set<string>) {
-  const mount = routeMounts(files).get(file) ?? "";
+const injectedServices = new Map<string, string>([
+  ["matching", "src/server/matching/score.ts"],
+  ["reviews", "src/server/pipeline/reviews.ts"],
+  ["preparation", "src/server/pipeline/prepare.ts"],
+  ["mailboxes", "src/server/inbox/mailboxes.ts"],
+  ["personal", "src/server/profile/personal-crypto.ts"],
+  ["catalogWorker", "src/server/catalog/sweep-worker-runner.ts"],
+  ["consent", "src/server/profile/consent.ts"],
+  ["providers", "src/server/dispatch/browser/index.ts"],
+]);
+
+const jobHandlerByKind = new Map<string, string[]>([
+  ["catalog.", ["catalogJobHandlers"]],
+  ["application.prepare", ["preparationJobHandlers"]],
+  ["planner.", ["planningJobHandlers"]],
+  ["llm.", ["llmJobHandlers"]],
+  ["prep.daily", ["prepDailyJobHandlers"]],
+  ["ready.", ["readyNotifyJobHandlers"]],
+  ["push.", ["pushNotifyJobHandlers"]],
+  ["mail.", ["mailJobHandlers"]],
+  ["application.send", ["dispatchJobHandlers"]],
+  ["dispatch.recover", ["dispatchJobHandlers"]],
+  ["dispatch.tick", ["dispatchJobHandlers"]],
+  ["fixtures.", ["fixtureJobHandlers"]],
+  ["dispatch.watch", ["watchJobHandlers"]],
+  ["checkin.", ["checkinJobHandlers"]],
+  ["live.", ["liveCheckJobHandlers"]],
+  ["test.", ["testJobHandlers"]],
+]);
+
+function routeModules(file: string, files: Set<string>, mounts: Map<string, string>) {
+  const mount = mounts.get(file) ?? "";
   const bindings = importBindings(file);
-  const blocks = declarationBlocks(file);
   const text = textOf(file);
+  const factory = factoryPattern.exec(text)?.groups?.name;
+  const blocks = declarationBlocks(file, true, factory);
   const declarations = [...text.matchAll(routeDeclarationPattern)];
-  const entries: { path: string; modules: string[] }[] = [];
+  const entries: RouteModuleEntry[] = [];
 
   for (const [position, declaration] of declarations.entries()) {
     const end = declarations[position + 1]?.index ?? text.length;
     const chunk = text.slice(declaration.index, end);
     const collected = collectBlocks(blocks, identifiersIn(chunk));
-    const modules = new Set<string>();
+    const modules = new Set<string>([file]);
 
     for (const identifier of collected) {
+      const injected = injectedServices.get(identifier);
+
+      if (injected !== undefined && files.has(injected)) {
+        modules.add(injected);
+      }
+
       const specifier = bindings.get(identifier);
 
       if (specifier === undefined) {
@@ -399,23 +510,50 @@ function routeModules(file: string, files: Set<string>) {
   return entries;
 }
 
+function allServerRoutes(files: Set<string>) {
+  const mounts = routeMounts(files);
+  const entries: RouteModuleEntry[] = [];
+
+  for (const file of files) {
+    if (file.startsWith("src/server/routes/")) {
+      entries.push(...routeModules(file, files, mounts));
+    }
+  }
+
+  return entries;
+}
+
 function segmentsOf(path: string) {
   return path.split("/").filter((part) => part.length > 0);
 }
 
-function routeMatches(requested: readonly string[], route: readonly string[]) {
-  if (route.length === 0 || requested.length < route.length - 1) {
+export function routeMatches(
+  requested: readonly string[],
+  route: readonly string[],
+  trailingSlash = false,
+) {
+  if (route.length === 0) {
     return false;
   }
 
-  for (const [position, routePart] of route.entries()) {
-    const requestPart = requested[position];
+  const matchesTrailingParam =
+    trailingSlash &&
+    requested.length >= 2 &&
+    requested.length === route.length - 1 &&
+    (route.at(-1)?.startsWith(":") ?? false);
 
-    if (requestPart === undefined) {
-      return position >= route.length - 1;
+  if (!matchesTrailingParam && requested.length !== route.length) {
+    return false;
+  }
+
+  for (const [position, requestPart] of requested.entries()) {
+    const routePart = route[position];
+
+    if (routePart === undefined) {
+      return false;
     }
 
-    if (routePart.startsWith(":")) {
+    if (routePart.startsWith(":") || requestPart.startsWith(":")) {
       continue;
     }
 
@@ -427,34 +565,60 @@ function routeMatches(requested: readonly string[], route: readonly string[]) {
   return true;
 }
 
-function requestedPaths(files: readonly string[]) {
-  const paths = new Set<string>();
+export function requestedPathsFromText(text: string) {
+  const seen = new Map<string, boolean>();
 
-  for (const file of files) {
-    for (const match of textOf(file).matchAll(pathTokenPattern)) {
-      paths.add(match[0]);
+  for (const quoted of text.matchAll(quotedStringPattern)) {
+    const normalized = (quoted.groups?.raw ?? "").replaceAll(/\$\{[^}]+\}/gu, ":param");
+
+    for (const match of normalized.matchAll(pathTokenPattern)) {
+      const [rawToken] = match;
+      const trailingSlash = rawToken.length > 1 && rawToken.endsWith("/");
+      const path = trailingSlash ? rawToken.slice(0, -1) : rawToken;
+
+      seen.set(path, (seen.get(path) ?? false) || trailingSlash);
     }
   }
 
-  return [...paths].toSorted((left, right) => left.localeCompare(right));
+  return [...seen.entries()]
+    .map(([path, trailingSlash]) => ({ path, trailingSlash }))
+    .toSorted((left, right) => left.path.localeCompare(right.path));
 }
 
-function isNodeFile(file: string) {
-  return file.startsWith("src/") && !file.startsWith("src/server/platform/");
+function isReachModule(file: string) {
+  return (
+    file.startsWith("src/") &&
+    !file.startsWith("src/server/platform/db/") &&
+    file !== "src/server/app.ts" &&
+    file !== "src/server/main.ts" &&
+    file !== "src/server/config/env.ts" &&
+    file !== "src/web/main.tsx"
+  );
 }
 
-function jobHandlerModules(files: Set<string>) {
+function jobHandlerModules(files: Set<string>, combinedText: string) {
   const file = "src/server/main.ts";
   const bindings = importBindings(file);
   const blocks = declarationBlocks(file);
+  const roots = new Set<string>();
 
-  const used = collectBlocks(blocks, [
-    "catalogJobHandlers",
-    "fixtureJobHandlers",
-    "llmJobHandlers",
-    "testJobHandlers",
-  ]);
+  for (const [prefix, handlers] of jobHandlerByKind) {
+    if (combinedText.includes(prefix)) {
+      for (const handler of handlers) {
+        roots.add(handler);
+      }
+    }
+  }
 
+  if (roots.size === 0) {
+    for (const handlers of jobHandlerByKind.values()) {
+      for (const handler of handlers) {
+        roots.add(handler);
+      }
+    }
+  }
+
+  const used = collectBlocks(blocks, roots);
   const modules = new Set<string>();
 
   for (const identifier of used) {
@@ -474,28 +638,319 @@ function jobHandlerModules(files: Set<string>) {
   return [...modules];
 }
 
-function testReach(testFile: string, graph: Map<string, string[]>, files: Set<string>) {
-  const reachable = closureFrom(graph, [testFile]);
-  const e2eFiles = [...reachable].filter((file) => file.startsWith("test/e2e/"));
-  const directModules = [...reachable].filter((file) => isNodeFile(file));
-  const paths = requestedPaths(e2eFiles);
-  const routeEntries: { path: string; modules: string[] }[] = [];
+function shellForRoute(urlPath: string) {
+  if (urlPath.startsWith("/admin")) {
+    return "admin" as const;
+  }
 
-  for (const routeFile of files) {
-    if (routeFile.startsWith("src/server/routes/")) {
-      routeEntries.push(...routeModules(routeFile, files));
+  if (
+    urlPath === "/" ||
+    urlPath === "*" ||
+    urlPath === "/ready" ||
+    urlPath === "/board" ||
+    urlPath === "/review" ||
+    urlPath === "/inbox" ||
+    urlPath === "/notifications" ||
+    urlPath === "/profile" ||
+    urlPath === "/search" ||
+    urlPath === "/settings"
+  ) {
+    return "app" as const;
+  }
+
+  return "none" as const;
+}
+
+export function webRouteEntries(
+  graph: Map<string, string[]>,
+  files: Set<string>,
+  serverRoutes: readonly RouteModuleEntry[],
+) {
+  const mainFile = "src/web/main.tsx";
+  const bindings = importBindings(mainFile);
+  const text = textOf(mainFile);
+  const entries: WebRouteEntry[] = [];
+
+  for (const match of text.matchAll(webRouteEntryPattern)) {
+    const urlPath = match.groups?.path;
+    const component = match.groups?.component;
+
+    if (urlPath === undefined || component === undefined) {
+      continue;
     }
+
+    const specifier = bindings.get(component);
+    const routeFile = specifier === undefined ? null : resolveSpecifier(mainFile, specifier, files);
+
+    if (routeFile === null) {
+      continue;
+    }
+
+    const shell = shellForRoute(urlPath);
+    const roots = [routeFile];
+
+    if (shell === "app") {
+      roots.push("src/web/app.tsx");
+    } else if (shell === "admin") {
+      roots.push("src/web/routes/admin/shell.tsx");
+    }
+
+    const webModules = closureFrom(graph, roots);
+    const apiRoots = new Set<string>();
+
+    for (const webFile of webModules) {
+      for (const req of requestedPathsFromText(textOf(webFile))) {
+        if (!req.path.startsWith("/api/") && !req.path.startsWith("/admin/api/")) {
+          continue;
+        }
+
+        const requestedSegments = segmentsOf(req.path);
+
+        for (const serverEntry of serverRoutes) {
+          if (routeMatches(requestedSegments, segmentsOf(serverEntry.path), req.trailingSlash)) {
+            for (const module of serverEntry.modules) {
+              apiRoots.add(module);
+            }
+          }
+        }
+      }
+    }
+
+    const modules = new Set<string>();
+
+    for (const module of webModules) {
+      if (isReachModule(module)) {
+        modules.add(module);
+      }
+    }
+
+    for (const module of closureFrom(graph, [...apiRoots])) {
+      if (isReachModule(module)) {
+        modules.add(module);
+      }
+    }
+
+    entries.push({
+      urlPath,
+      routeFile,
+      shell,
+      modules: [...modules].toSorted((left, right) => left.localeCompare(right)),
+    });
+  }
+
+  return entries;
+}
+
+function collectE2eSlices(testFile: string, files: Set<string>) {
+  const texts: string[] = [textOf(testFile)];
+  const helperFiles = new Set<string>();
+  const pending: { file: string; used: Set<string> }[] = [];
+
+  const directBindings = importBindings(testFile);
+  const directText = texts[0] ?? "";
+
+  for (const [identifier, specifier] of directBindings) {
+    const resolved = resolveSpecifier(testFile, specifier, files);
+
+    if (resolved !== null && resolved.startsWith("test/e2e/") && directText.includes(identifier)) {
+      pending.push({ file: resolved, used: new Set([identifier]) });
+    }
+  }
+
+  const visited = new Map<string, Set<string>>();
+
+  while (pending.length > 0) {
+    const next = pending.pop();
+
+    if (next === undefined) {
+      continue;
+    }
+
+    const seenForFile = visited.get(next.file) ?? new Set<string>();
+    const fresh: string[] = [];
+
+    for (const identifier of next.used) {
+      if (!seenForFile.has(identifier)) {
+        seenForFile.add(identifier);
+        fresh.push(identifier);
+      }
+    }
+
+    visited.set(next.file, seenForFile);
+
+    if (fresh.length === 0) {
+      continue;
+    }
+
+    helperFiles.add(next.file);
+
+    const blocks = declarationBlocks(next.file);
+    const bindings = importBindings(next.file);
+    const collectedIds = collectBlocks(blocks, fresh);
+    let hasBlock = false;
+
+    for (const name of fresh) {
+      const block = blocks.get(name);
+
+      if (block !== undefined) {
+        hasBlock = true;
+        texts.push(block);
+      }
+    }
+
+    if (!hasBlock) {
+      texts.push(textOf(next.file));
+    }
+
+    for (const identifier of collectedIds) {
+      const block = blocks.get(identifier);
+
+      if (block !== undefined) {
+        texts.push(block);
+      }
+
+      const specifier = bindings.get(identifier);
+
+      if (specifier === undefined) {
+        continue;
+      }
+
+      const resolved = resolveSpecifier(next.file, specifier, files);
+
+      if (resolved?.startsWith("test/e2e/")) {
+        pending.push({ file: resolved, used: new Set([identifier]) });
+      }
+    }
+  }
+
+  return { texts, helperFiles };
+}
+
+function playwrightDesignDirs() {
+  const text = textOf("playwright.config.ts");
+  const mappings: { pattern: RegExp; dir: string }[] = [];
+
+  for (const match of text.matchAll(playwrightProjectPattern)) {
+    const rawPattern = match.groups?.match;
+    const dir = match.groups?.dir;
+
+    if (rawPattern !== undefined && dir !== undefined) {
+      mappings.push({ pattern: new RegExp(rawPattern, "u"), dir: `design/reference/${dir}/` });
+    }
+  }
+
+  return mappings;
+}
+
+const uiPathArrayPattern = /(?:adminPaths|path:)\s*(?:\[[\s\S]{0,400}?\]|"[^"]+")/gu;
+
+function visitedUiRoutes(
+  testFile: string,
+  texts: readonly string[],
+  knownRoutes: readonly WebRouteEntry[],
+) {
+  const routes = new Set<string>();
+  const knownPaths = new Set(knownRoutes.map((entry) => entry.urlPath));
+  const combined = texts.join("\n");
+
+  for (const match of combined.matchAll(gotoPathPattern)) {
+    const rawPath = match.groups?.path;
+
+    if (rawPath === undefined || rawPath.startsWith("/api") || rawPath.startsWith("/__")) {
+      continue;
+    }
+
+    if (knownPaths.has(rawPath)) {
+      routes.add(rawPath);
+    } else if (rawPath.startsWith("/admin/users/")) {
+      routes.add("/admin/users/:id");
+    } else if (rawPath === "/missing-route" && knownPaths.has("*")) {
+      routes.add("*");
+    }
+  }
+
+  for (const arrayMatch of combined.matchAll(uiPathArrayPattern)) {
+    for (const req of requestedPathsFromText(arrayMatch[0])) {
+      if (knownPaths.has(req.path)) {
+        routes.add(req.path);
+      }
+    }
+  }
+
+  if (combined.includes('"/terms", "/privacy", "/consent"')) {
+    routes.add("/terms");
+    routes.add("/privacy");
+    routes.add("/consent");
+  }
+
+  if (combined.includes("openBoard(")) {
+    routes.add("/board");
+  }
+
+  if (combined.includes("openAdminAsOwner(") || combined.includes("signInOwnerOnAdmin(")) {
+    routes.add("/admin");
+  }
+
+  if (testFile.endsWith("board-match-shell.test.ts")) {
+    routes.add("/");
+  }
+
+  return [...routes].toSorted((left, right) => left.localeCompare(right));
+}
+
+function testDesigns(
+  testFile: string,
+  texts: readonly string[],
+  playwrightMappings: readonly { pattern: RegExp; dir: string }[],
+) {
+  const designs = new Set<string>();
+  const name = basename(testFile);
+
+  for (const mapping of playwrightMappings) {
+    if (mapping.pattern.test(name)) {
+      designs.add(mapping.dir);
+    }
+  }
+
+  for (const text of texts) {
+    for (const match of text.matchAll(designRefPattern)) {
+      const dir = match.groups?.dir;
+
+      if (dir !== undefined) {
+        designs.add(`design/reference/${dir}/`);
+      }
+    }
+  }
+
+  return [...designs].toSorted((left, right) => left.localeCompare(right));
+}
+
+function testReach(
+  testFile: string,
+  graph: Map<string, string[]>,
+  files: Set<string>,
+  serverRoutes: readonly RouteModuleEntry[],
+  webRoutes: readonly WebRouteEntry[],
+  playwrightMappings: readonly { pattern: RegExp; dir: string }[],
+) {
+  const reachable = closureFrom(graph, [testFile]);
+  const directModules = [...reachable].filter((file) => isReachModule(file));
+  const { texts, helperFiles } = collectE2eSlices(testFile, files);
+  const paths: RequestedPath[] = [];
+
+  for (const text of texts) {
+    paths.push(...requestedPathsFromText(text));
   }
 
   const routeRoots = new Set<string>();
   const matchedPaths = new Set<string>();
 
-  for (const path of paths) {
-    const requested = segmentsOf(path);
+  for (const req of paths) {
+    const requested = segmentsOf(req.path);
 
-    for (const entry of routeEntries) {
-      if (routeMatches(requested, segmentsOf(entry.path))) {
-        matchedPaths.add(path);
+    for (const entry of serverRoutes) {
+      if (routeMatches(requested, segmentsOf(entry.path), req.trailingSlash)) {
+        matchedPaths.add(req.path);
 
         for (const module of entry.modules) {
           routeRoots.add(module);
@@ -504,37 +959,61 @@ function testReach(testFile: string, graph: Map<string, string[]>, files: Set<st
     }
   }
 
-  if (paths.some((path) => jobRoutePattern.test(path))) {
-    for (const module of jobHandlerModules(files)) {
+  if (paths.some((req) => jobRoutePattern.test(req.path))) {
+    for (const module of jobHandlerModules(files, texts.join("\n"))) {
       routeRoots.add(module);
     }
   }
 
-  const usesBrowser = browserPattern.test(textOf(testFile));
   const modules = new Set<string>(directModules);
 
+  for (const helper of helperFiles) {
+    if (!isAlwaysFull(helper)) {
+      modules.add(helper);
+    }
+  }
+
   for (const module of closureFrom(graph, [...routeRoots])) {
-    if (isNodeFile(module)) {
+    if (isReachModule(module)) {
       modules.add(module);
     }
   }
 
+  const uiRoutes = visitedUiRoutes(testFile, texts, webRoutes);
+
+  for (const uiRoute of uiRoutes) {
+    const entry = webRoutes.find((candidate) => candidate.urlPath === uiRoute);
+
+    if (entry !== undefined) {
+      for (const module of entry.modules) {
+        modules.add(module);
+      }
+    }
+  }
+
+  const designs = testDesigns(testFile, texts, playwrightMappings);
+
   return {
-    full: usesBrowser || (routeRoots.size === 0 && directModules.length === 0),
+    full: false,
     paths: [...matchedPaths].toSorted((left, right) => left.localeCompare(right)),
+    routes: uiRoutes,
+    designs,
     modules: [...modules].toSorted((left, right) => left.localeCompare(right)),
   };
 }
 
-function buildReachMap() {
+export function buildReachMap() {
   const files = listSources();
   const graph = buildGraph(files);
   const known = new Set(files);
+  const serverRoutes = allServerRoutes(known);
+  const webRoutes = webRouteEntries(graph, known, serverRoutes);
+  const playwrightMappings = playwrightDesignDirs();
   const tests: Record<string, ReachTest> = {};
 
   for (const file of files) {
     if (file.startsWith("test/e2e/") && file.endsWith(".test.ts")) {
-      tests[file] = testReach(file, graph, known);
+      tests[file] = testReach(file, graph, known, serverRoutes, webRoutes, playwrightMappings);
     }
   }
 
@@ -699,6 +1178,12 @@ function isKnownModule(map: z.infer<typeof reachMapSchema>, file: string) {
   return Object.values(map.tests).some((test) => test.modules.includes(file));
 }
 
+function isKnownDesign(map: z.infer<typeof reachMapSchema>, file: string) {
+  return Object.values(map.tests).some((test) =>
+    test.designs.some((prefix) => file.startsWith(prefix)),
+  );
+}
+
 function fullByRule(touched: readonly string[]) {
   return touched.some((file) => isAlwaysFull(file));
 }
@@ -707,9 +1192,11 @@ function fullByUnknown(map: z.infer<typeof reachMapSchema>, touched: readonly st
   return touched.some(
     (file) =>
       !isAlwaysFull(file) &&
-      !file.endsWith(".test.ts") &&
+      !isE2eTestFile(file) &&
+      !isUnitTestFile(file) &&
       map.tests[file] === undefined &&
-      !isKnownModule(map, file),
+      !isKnownModule(map, file) &&
+      !isKnownDesign(map, file),
   );
 }
 
@@ -730,7 +1217,7 @@ function selectionReason(
   }
 
   if (rule) {
-    return "the diff touches config, platform, routes, web, shared code, dependencies or test infrastructure, so it runs everything";
+    return "the diff touches global config, db schema, shell entrypoints or global test harness, so it runs everything";
   }
 
   if (unknown) {
@@ -752,12 +1239,12 @@ function selectedLoadSeconds(files: readonly string[], seconds: Record<string, n
 }
 
 function resolveShardCount(
-  explicit: string | null,
+  explicit: number | null,
   selected: readonly string[],
   seconds: Record<string, number>,
 ) {
   if (explicit !== null) {
-    return Number(explicit);
+    return explicit;
   }
 
   if (selected.length === 0) {
@@ -769,41 +1256,43 @@ function resolveShardCount(
   return Math.min(6, Math.max(1, Math.ceil(total / 75)));
 }
 
-function plan() {
-  const base = flagValue("--base");
-  const explicitShards = flagValue("--shards");
-  const output = flagValue("--out");
-  const map = readReachMap();
-  const changed = base === null ? [] : changedFiles(base);
-  const knownTests = new Glob("test/e2e/**/*.test.ts").scanSync({ cwd: root });
+export function computePlan(input: PlanInput) {
+  const { changed, isMain, shardCount, map, seconds, allTests } = input;
 
-  const changedTests = changed.filter(
-    (file) => file.endsWith(".test.ts") && existsSync(localPath(file)),
+  const changedTests = new Set(
+    changed.filter((file) => isE2eTestFile(file) && existsSync(localPath(file))),
   );
 
-  const allTests = [
-    ...new Set([...knownTests, ...Object.keys(map.tests), ...changedTests]),
-  ].toSorted((left, right) => left.localeCompare(right));
-
   const touched = changed.filter((file) => !isIgnored(file));
-  const isMain = base === null;
+
+  const testsOnly =
+    touched.length > 0 && touched.every((file) => isE2eTestFile(file) || isUnitTestFile(file));
+
   const emptyMap = Object.keys(map.tests).length === 0;
-  const rule = emptyMap || fullByRule(touched);
-  const unknown = fullByUnknown(map, touched);
+  const rule = !testsOnly && (emptyMap || fullByRule(touched));
+  const unknown = !testsOnly && fullByUnknown(map, touched);
   const full = isMain || rule || unknown;
 
   let selected = allTests.filter((test) => {
     const reach = map.tests[test];
 
-    if (changedTests.includes(test) || reach === undefined) {
+    if (changedTests.has(test) || reach === undefined) {
       return true;
     }
 
-    return reach.full || reach.modules.some((module) => touched.includes(module));
+    if (testsOnly) {
+      return false;
+    }
+
+    return (
+      reach.full ||
+      reach.modules.some((module) => touched.includes(module)) ||
+      reach.designs.some((prefix) => touched.some((file) => file.startsWith(prefix)))
+    );
   });
 
   if (full) {
-    selected = allTests;
+    selected = [...allTests];
   }
 
   if (touched.length === 0 && !isMain) {
@@ -813,10 +1302,9 @@ function plan() {
   const container =
     isMain || touched.some((file) => containerPatterns.some((pattern) => pattern.test(file)));
 
-  const timings = readTimings().seconds;
-  const shardCount = resolveShardCount(explicitShards, selected, timings);
+  const effectiveShards = resolveShardCount(shardCount ?? null, selected, seconds);
 
-  const planBody = planSchema.parse({
+  return planSchema.parse({
     version: 1,
     full,
     container,
@@ -829,7 +1317,31 @@ function plan() {
       allTests.length,
     ),
     selected,
-    shards: assignShards(selected, timings, shardCount),
+    shards: assignShards(selected, seconds, effectiveShards),
+  });
+}
+
+function plan() {
+  const base = flagValue("--base");
+  const explicitShards = flagValue("--shards");
+  const output = flagValue("--out");
+  const map = readReachMap();
+  const changed = base === null ? [] : changedFiles(base);
+  const knownTests = new Glob("test/e2e/**/*.test.ts").scanSync({ cwd: root });
+
+  const changedTests = changed.filter((file) => isE2eTestFile(file) && existsSync(localPath(file)));
+
+  const allTests = [
+    ...new Set([...knownTests, ...Object.keys(map.tests), ...changedTests]),
+  ].toSorted((left, right) => left.localeCompare(right));
+
+  const planBody = computePlan({
+    changed,
+    isMain: base === null,
+    shardCount: explicitShards === null ? undefined : Number(explicitShards),
+    map,
+    seconds: readTimings().seconds,
+    allTests,
   });
 
   const lines = planBody.shards.map(
@@ -872,41 +1384,43 @@ function emitOutputs() {
   writeFileSync(localPath(githubOutput), `${lines.join("\n")}\n`, { flag: "a" });
 }
 
-const command = process.argv.at(2);
+if (import.meta.main) {
+  const command = process.argv.at(2);
 
-switch (command) {
-  case "map": {
-    const output = localPath(flagValue("--out") ?? "test/e2e/reach-map.json");
-    const map = buildReachMap();
+  switch (command) {
+    case "map": {
+      const output = localPath(flagValue("--out") ?? "test/e2e/reach-map.json");
+      const map = buildReachMap();
 
-    mkdirSync(dirname(output), { recursive: true });
-    writeFileSync(output, `${JSON.stringify(map, undefined, 2)}\n`);
-    process.stdout.write(`reach map: ${String(Object.keys(map.tests).length)} test files\n`);
-    break;
-  }
+      mkdirSync(dirname(output), { recursive: true });
+      writeFileSync(output, `${JSON.stringify(map, undefined, 2)}\n`);
+      process.stdout.write(`reach map: ${String(Object.keys(map.tests).length)} test files\n`);
+      break;
+    }
 
-  case "shard": {
-    const planPath = localPath(flagValue("--plan") ?? "e2e-plan.json");
-    const shardNumber = Number(flagValue("--shard") ?? "1");
-    const planBody = planSchema.parse(JSON.parse(readFileSync(planPath, "utf8")));
-    const shard = planBody.shards.find((entry) => entry.shard === shardNumber);
+    case "shard": {
+      const planPath = localPath(flagValue("--plan") ?? "e2e-plan.json");
+      const shardNumber = Number(flagValue("--shard") ?? "1");
+      const planBody = planSchema.parse(JSON.parse(readFileSync(planPath, "utf8")));
+      const shard = planBody.shards.find((entry) => entry.shard === shardNumber);
 
-    process.stdout.write((shard?.files ?? []).join(" "));
-    break;
-  }
+      process.stdout.write((shard?.files ?? []).join(" "));
+      break;
+    }
 
-  case "timings": {
-    writeTimings();
-    break;
-  }
+    case "timings": {
+      writeTimings();
+      break;
+    }
 
-  case "plan": {
-    plan();
-    emitOutputs();
-    break;
-  }
+    case "plan": {
+      plan();
+      emitOutputs();
+      break;
+    }
 
-  default: {
-    throw new Error("usage: bun run scripts/e2e-ci.ts <map|timings|plan> [flags]");
+    default: {
+      throw new Error("usage: bun run scripts/e2e-ci.ts <map|timings|plan> [flags]");
+    }
   }
 }

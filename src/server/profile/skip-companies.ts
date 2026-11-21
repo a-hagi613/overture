@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
+import { retryWhenBusy } from "../platform/db/busy.ts";
 import { companies, skipCompanies } from "../platform/db/schema.ts";
 import { skipCompaniesInputSchema } from "../../shared/targets.ts";
 
@@ -86,33 +87,35 @@ export function createSkipCompanyService(deps: { db: AppDatabase; clock: Clock }
   ) {
     const { companies: rows } = skipCompaniesInputSchema.parse(input);
 
-    await db
-      .delete(skipCompanies)
-      .where(and(eq(skipCompanies.userId, userId), eq(skipCompanies.reason, "user")));
+    await retryWhenBusy(() => {
+      db.delete(skipCompanies)
+        .where(and(eq(skipCompanies.userId, userId), eq(skipCompanies.reason, "user")))
+        .run();
 
-    db.transaction((tx) => {
-      for (const row of rows) {
-        const nameNorm = normalizeCompanyName(row.name);
+      db.transaction((tx) => {
+        for (const row of rows) {
+          const nameNorm = normalizeCompanyName(row.name);
 
-        if (nameNorm === "") {
-          continue;
+          if (nameNorm === "") {
+            continue;
+          }
+
+          tx.insert(skipCompanies)
+            .values({
+              id: crypto.randomUUID(),
+              userId,
+              companyId: companyIdFor(nameNorm),
+              name: row.name,
+              nameNorm,
+              domain: row.domain,
+              reason: "user",
+              createdAt: new Date(clock.now()),
+            })
+            .onConflictDoNothing()
+            .run();
         }
-
-        tx.insert(skipCompanies)
-          .values({
-            id: crypto.randomUUID(),
-            userId,
-            companyId: companyIdFor(nameNorm),
-            name: row.name,
-            nameNorm,
-            domain: row.domain,
-            reason: "user",
-            createdAt: new Date(clock.now()),
-          })
-          .onConflictDoNothing()
-          .run();
-      }
-    });
+      });
+    }, "profile.skip-companies");
 
     return list(userId);
   }
@@ -124,32 +127,34 @@ export function createSkipCompanyService(deps: { db: AppDatabase; clock: Clock }
       return;
     }
 
-    await db
-      .delete(skipCompanies)
-      .where(
-        and(
-          eq(skipCompanies.userId, userId),
-          eq(skipCompanies.reason, "current_employer"),
-          ne(skipCompanies.nameNorm, nameNorm),
-        ),
-      );
+    await retryWhenBusy(() => {
+      db.delete(skipCompanies)
+        .where(
+          and(
+            eq(skipCompanies.userId, userId),
+            eq(skipCompanies.reason, "current_employer"),
+            ne(skipCompanies.nameNorm, nameNorm),
+          ),
+        )
+        .run();
 
-    await db
-      .insert(skipCompanies)
-      .values({
-        id: crypto.randomUUID(),
-        userId,
-        companyId: companyIdFor(nameNorm),
-        name,
-        nameNorm,
-        domain: null,
-        reason: "current_employer",
-        createdAt: new Date(clock.now()),
-      })
-      .onConflictDoUpdate({
-        target: [skipCompanies.userId, skipCompanies.nameNorm],
-        set: { name, companyId: companyIdFor(nameNorm), reason: "current_employer" },
-      });
+      db.insert(skipCompanies)
+        .values({
+          id: crypto.randomUUID(),
+          userId,
+          companyId: companyIdFor(nameNorm),
+          name,
+          nameNorm,
+          domain: null,
+          reason: "current_employer",
+          createdAt: new Date(clock.now()),
+        })
+        .onConflictDoUpdate({
+          target: [skipCompanies.userId, skipCompanies.nameNorm],
+          set: { name, companyId: companyIdFor(nameNorm), reason: "current_employer" },
+        })
+        .run();
+    }, "profile.skip-companies.current-employer");
   }
 
   return { list, replaceUserCompanies, setCurrentEmployer };
