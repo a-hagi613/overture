@@ -46,6 +46,7 @@ import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { clearSinkMail, listSinkMail } from "../platform/mail/sink.ts";
+import { clearSesRequests, listSesRequests } from "../testing/ses-recorder.ts";
 import { getTestSpans, resetTestSpans } from "../platform/telemetry/otel.ts";
 import { releaseBlockingJobs } from "../testing/blocking-job.ts";
 import { setTurnstileScenario, turnstileScenarioBody } from "../testing/turnstile-scenario.ts";
@@ -1530,6 +1531,14 @@ export function createTestRoutes(
 
   routes.post("/mail/clear", (context) => {
     clearSinkMail();
+
+    return context.json({ ok: true });
+  });
+
+  routes.get("/ses", (context) => context.json({ requests: listSesRequests() }));
+
+  routes.post("/ses/clear", (context) => {
+    clearSesRequests();
 
     return context.json({ ok: true });
   });

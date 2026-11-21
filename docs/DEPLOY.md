@@ -49,9 +49,13 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    Resume and Facts (M1-13) add `MASTER_KEY_V1`, generated with `openssl rand -base64 32`
    (base64 that decodes to exactly 32 bytes), never rotated without the re-wrap step that
    re-wraps every user's data key under the new master key.
+   Outbound mail (M1-90) adds `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_REGION=ca-central-1`,
+   plus optionally `SES_CONFIGURATION_SET`; the three AWS names are set together or not at all, and the SES section
+   below covers them. With none of them the in-memory sink is used, as in development and tests.
    The server refuses to boot without the required ones, so the **Deploy** workflow checks each required
    name with `fly secrets list` first and fails before deploying when one is missing; production keeps its
-   current release. The OAuth names are not in that check. Later milestones add their own secrets the same way and to that list; nothing
+   current release. The OAuth names are not in that check, and the SES names join it only once
+   `REQUIRE_SES_SECRETS` is set (M1-90 section below). Later milestones add their own secrets the same way and to that list; nothing
    else exists in `fly.toml`.
 6. Create a deploy token (Full permissions on the app) and store it as a repository secret:
    `gh secret set FLY_API_TOKEN -b <token-in-your-terminal> -R a-hagi613/overture`
@@ -64,6 +68,86 @@ Until step 6 is done, the **Deploy** and **Restore drill** workflows do not go r
 maps the `FLY_API_TOKEN` repository secret to an environment variable and skips the remaining steps
 successfully, with a `::notice::` annotation and a job summary pointing at this document. The weekly
 drill and every merge-to-`main` deploy therefore stay green while the one-time steps are pending.
+
+## M1-90: outbound mail through Amazon SES (owner runbook)
+
+Overture's own mail (magic links first, later verification, digests and receipts) leaves from
+`no-reply@tryoverture.com` through Amazon SES v2 in `ca-central-1` ([issue #90](https://github.com/a-hagi613/overture/issues/90),
+SPEC §11, ADR 0028). The app selects the SES adapter only when `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and
+`AWS_REGION` are all set; `SES_CONFIGURATION_SET` (a configuration set name) is optional. With none of them it keeps the
+in-memory sink used in development and tests. A partly set trio, or `SES_CONFIGURATION_SET` on its own, stops the server at
+boot with a message naming the missing variables.
+
+### DNS records for `tryoverture.com`
+
+Create these in Cloudflare DNS (DNS only, never proxied) and wait until the SES console shows the domain identity as
+verified. The three DKIM CNAME names and values are exactly the ones SES generates for the identity; the table shows
+their shape.
+
+| Type | Name | Value |
+|---|---|---|
+| CNAME | `<token-1>._domainkey.tryoverture.com` | `<token-1>.dkim.amazonses.com` |
+| CNAME | `<token-2>._domainkey.tryoverture.com` | `<token-2>.dkim.amazonses.com` |
+| CNAME | `<token-3>._domainkey.tryoverture.com` | `<token-3>.dkim.amazonses.com` |
+| TXT | `tryoverture.com` | `v=spf1 include:amazonses.com include:_spf.mx.cloudflare.net ~all` |
+| TXT | `_dmarc.tryoverture.com` | `v=DMARC1; p=reject; rua=mailto:hello@tryoverture.com` |
+| MX | `bounce.tryoverture.com` | `10 feedback-smtp.ca-central-1.amazonses.com` |
+| TXT | `bounce.tryoverture.com` | `v=spf1 include:amazonses.com ~all` |
+
+- The apex must keep **exactly one** SPF TXT record. If Cloudflare Email Routing already created one, add
+  `include:amazonses.com` to that record instead of creating a second. Email Routing's MX records are unrelated to
+  outbound mail and stay where they are.
+- `_dmarc.tryoverture.com` may already exist (SPEC §3.3); keep one record and use `p=reject` with a reporting address
+  the owner reads.
+- In SES, set the identity's **Custom MAIL FROM domain** to `bounce.tryoverture.com`. SES then uses that subdomain's
+  MX and SPF record, and DKIM keeps the signature aligned with the visible `tryoverture.com` From address.
+
+### IAM policy
+
+Create an IAM user whose access key lives only in Fly secrets, and attach only this policy (replace the account id).
+It grants `ses:SendEmail` on the sending identity and nothing else; no S3 or SNS permission is needed (ADR 0028 keeps
+inbound mail off AWS).
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SendOvertureMail",
+      "Effect": "Allow",
+      "Action": "ses:SendEmail",
+      "Resource": "arn:aws:ses:ca-central-1:<account-id>:identity/tryoverture.com"
+    }
+  ]
+}
+```
+
+Create a configuration set such as `overture-outbound` in `ca-central-1` and pass its name as `SES_CONFIGURATION_SET`. It
+carries no event destination in M1: no SNS, no `POST /internal/ses/events`.
+
+### Fly secrets, the deploy gate and the sandbox
+
+```sh
+fly secrets set AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… AWS_REGION=ca-central-1 SES_CONFIGURATION_SET=overture-outbound -a overture-web
+```
+
+The **Deploy** workflow lists the three AWS names in its required-secret gate, behind the repository variable
+`REQUIRE_SES_SECRETS`, so the gate stays green until production relies on SES. Once the secrets above exist, flip it:
+
+```sh
+gh variable set REQUIRE_SES_SECRETS -b true -R a-hagi613/overture
+```
+
+While the AWS account is in the SES sandbox, only verified recipients receive mail: verify the owner's address in the
+SES console, which is enough for M1 sign-in. SES production access is requested on day one (SPEC §19 risk table); until
+it is granted, the daily mail live check can only pass for a verified recipient. Resend stays the documented emergency
+fallback behind `MailSender` if SES production access is denied or slow.
+
+### Verifying
+
+Request a sign-in link at `https://tryoverture.com/signin`, confirm it arrives from `no-reply@tryoverture.com`, and
+open it to sign in. Development and the e2e suite never call AWS: ADR 0013 intercepts the SES API inside the app
+process with MSW and asserts the request body.
 
 ## Verifying the acceptance criteria
 

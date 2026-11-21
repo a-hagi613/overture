@@ -110,7 +110,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Kernel | fallback browser | `KERNEL_API_KEY`, `KERNEL_API_BASE_URL` (test-only override) | local recorded control-API server with real local Chrome behind it; lab only |
 | Anthropic | LLM (prod) | `ANTHROPIC_API_KEY` | real adapter; API intercepted by MSW with responses recorded by the daily live check |
 | OpenCode Go | LLM (local dev only) | `OPENCODE_API_KEY` | — |
-| Amazon SES + SNS | outbound mail, bounces | `AWS_REGION=ca-central-1`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `SES_CONFIG_SET` | real adapter; SES API intercepted by MSW, request bodies asserted |
+| Amazon SES + SNS | outbound mail, bounces | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION=ca-central-1` (all three or none), `SES_CONFIGURATION_SET` (optional configuration set) | real adapter; SES API intercepted by MSW, request bodies asserted |
 | Stripe (M3) | Managed Payments | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | stripe-mock (Stripe's own local server) + signed webhook fixtures |
 | Grafana Cloud | logs/metrics/traces | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | local LGTM docker |
 | Web Push | notifications | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | real adapter; push endpoints via MSW |
@@ -120,6 +120,9 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com` (forwarding addresses), `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `ALERT_NTFY_URL` (optional) | |
 
 All secrets are Fly secrets; local dev reads `.env` (chmod 600, never committed).
+Overture's own mail (magic links, the daily live check) goes through the SES adapter whenever `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY` and `AWS_REGION` are set; otherwise the in-memory sink is used, which is the test and
+development adapter. A half-set trio, or `SES_CONFIGURATION_SET` without all three, stops the server at boot.
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
 
 ### 3.3 Domains and DNS
@@ -146,7 +149,7 @@ M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 obj
 | Web | Vite 8, React 19, React Router 7 (library mode, Zod-typed search params), TanStack Query, Hono RPC client, Tailwind v4, shadcn/ui, 21st.dev, dnd-kit, lucide |
 | Browser control | `playwright-core` `chromium.connectOverCDP` |
 | PDF | `unpdf`; Haiku 5.5 PDF fallback |
-| Mail | `mailparser`, `mailauth` (SPF/DKIM/DMARC verification), AWS SDK v3 SES |
+| Mail | `mailparser`, `mailauth` (SPF/DKIM/DMARC verification), SES v2 `SendEmail` over a small SigV4-signed fetch |
 | Telemetry | OpenTelemetry SDK (traces, metrics, logs) → OTLP |
 | Lint/format | oxlint, every category at error + type-aware (`oxlint-tsgolint`), from Landmines' own configuration, plus `@interfere/landmines`, vendored anti-slop, React / `jsx-a11y` / Vitest plugins and architecture rules (ADR 0023), with the Cloudflare preset rules; `bun lint` runs Oxlint with `--deny-warnings`; `bun fmt` formats |
 | Tests | Playwright e2e (sharded), `bun test` for the ADR 0013 invariant files, MSW at the network edge, daily live checks on Fly (ADR 0013) |
