@@ -7,7 +7,7 @@ import {
   titleSimilarityThreshold,
 } from "./tag-rules.ts";
 import { detectLanguage } from "./language.ts";
-import { isRemoteLocationText, resolveLocation } from "./geo.ts";
+import { isRemoteLocationText, regionNameFor, resolveLocation, sameRegion } from "./geo.ts";
 import { parsePayRange } from "./salary.ts";
 
 import type { PostingTagInput } from "../../shared/tag-taxonomy.ts";
@@ -155,7 +155,40 @@ describe("location", () => {
 
     expect(location.countryCode).toBe("PL");
     expect(location.city).toBe("Warsaw");
-    expect(location.region).not.toBeNull();
+    expect(location.region).toBe("Mazovia");
+  });
+
+  test("a city outside the US stores the region name, not its admin1 code", () => {
+    const location = resolveLocation("Toronto, ON, Canada");
+
+    expect(location.countryCode).toBe("CA");
+    expect(location.region).toBe("Ontario");
+    expect(location.regionCode).toBe("CA.08");
+    expect(location.city).toBe("Toronto");
+  });
+
+  test("a country alias at the end is not read as a city", () => {
+    expect(resolveLocation("Texas, USA").city).toBeNull();
+    expect(resolveLocation("Texas, USA").region).toBe("Texas");
+    expect(resolveLocation("Remote, USA")).toEqual({
+      city: null,
+      countryCode: "US",
+      region: null,
+      regionCode: null,
+    });
+  });
+
+  test("a named city keeps its own region in a location that ends in USA", () => {
+    const location = resolveLocation("Austin, TX, USA");
+
+    expect(location.city).toBe("Austin");
+    expect(location.region).toBe("Texas");
+  });
+
+  test("a region name matches a legacy admin1 code", () => {
+    expect(sameRegion("CA", "08", "Ontario")).toBe(true);
+    expect(sameRegion("DE", "16", "Bavaria")).toBe(false);
+    expect(regionNameFor("CA", "08")).toBe("Ontario");
   });
 
   test("remote posting keeps the country and drops city", () => {
