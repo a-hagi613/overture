@@ -37,6 +37,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-
       - run: bun install --frozen-lockfile
+      # Plan after verify: the plan file lands in the repo root and `bun fmt --check` would reject it.
+      - run: bun run verify
       - id: plan
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
@@ -47,7 +49,6 @@ jobs:
           else
             bun run scripts/e2e-ci.ts plan --out e2e-plan.json --github-output "${GITHUB_OUTPUT}"
           fi
-      - run: bun run verify
       - name: Build the inbound mail Worker
         run: cd workers/inbound-mail && bun run dry-run
       - name: Build the sentinel Worker
