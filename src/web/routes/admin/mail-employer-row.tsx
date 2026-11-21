@@ -43,6 +43,7 @@ export function MailEmployerRow({ open, row }: { open: boolean; row: MailHealthE
           <AdminCellLabel label={copy.admin.mailColumnEmployer} />
           <p className="truncate text-[13.5px] font-semibold">{row.employer}</p>
           <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+            <span className="sr-only">{copy.admin.mailColumnAts} </span>
             {copy.admin.mailAtsList(row.ats)}
           </p>
         </div>

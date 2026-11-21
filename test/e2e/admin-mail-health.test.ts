@@ -199,7 +199,7 @@ test("mail health shows recorded mail by employer, expands a row and pauses a br
   const sentAt = (await clockNow(appUrl)) - 24 * 60 * 60 * 1000;
 
   const halden = await seedEmployer(appUrl, "greenhouse", "Halden Systems", "halden");
-  const haldenSends = await seedSends(appUrl, halden, { count: 10, sentAt, userId });
+  const haldenSends = await seedSends(appUrl, halden, { count: 7, sentAt, userId });
 
   await seedMail(appUrl, {
     applicationId: firstApplicationId(haldenSends),
@@ -267,7 +267,7 @@ test("mail health shows recorded mail by employer, expands a row and pauses a br
 
   expect(health.alerts.map((row) => row.employer)).toEqual(["Corvane"]);
   expect(health.domainAlert.active).toBe(true);
-  expect(health.domainAlert.sent).toBe(64);
+  expect(health.domainAlert.sent).toBe(61);
 
   await page.goto(`${adminIsolatedAppUrl}/admin/mail-health`);
 

@@ -1626,6 +1626,7 @@ export const copy = {
     mailRange7: "7 days",
     mailRange30: "30 days",
     mailColumnEmployer: "Employer",
+    mailColumnAts: "ATS",
     mailColumnSent: "Sent",
     mailColumnReplies: "Replies",
     mailColumnBounces: "Bounces",

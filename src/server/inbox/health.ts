@@ -88,6 +88,10 @@ function emptyAuth() {
   return { fail: 0, none: 0, pass: 0 };
 }
 
+function emptyMailTotals() {
+  return { auth: emptyAuth(), bounces: 0, replies: 0 };
+}
+
 function replyRateOf(sent: number, replies: number) {
   return sent === 0 ? null : replies / sent;
 }
@@ -95,7 +99,7 @@ function replyRateOf(sent: number, replies: number) {
 function statusOf(sent: number, replies: number, bounces: number) {
   let status: MailHealthStatus = "healthy";
 
-  if (sent < MAIL_REPLY_MIN_SENDS) {
+  if (sent === 0 || (replies === 0 && sent < MAIL_REPLY_MIN_SENDS)) {
     status = "too_few_sends";
   } else if (replies / sent < MAIL_REPLY_FLOOR) {
     status = "reply_alert";
@@ -205,11 +209,7 @@ export function readMailHealth(
   }
 
   for (const row of mailRows) {
-    const entry = mailByCompany.get(row.companyId) ?? {
-      auth: emptyAuth(),
-      bounces: 0,
-      replies: 0,
-    };
+    const entry = mailByCompany.get(row.companyId) ?? emptyMailTotals();
 
     if (row.direction === "in") {
       entry.replies += row.total;
@@ -246,11 +246,7 @@ export function readMailHealth(
 
   const employers = [...new Set([...sentByCompany.keys(), ...mailByCompany.keys()])].map(
     (companyId) => {
-      const mail = mailByCompany.get(companyId) ?? {
-        auth: emptyAuth(),
-        bounces: 0,
-        replies: 0,
-      };
+      const mail = mailByCompany.get(companyId) ?? emptyMailTotals();
 
       const sent = sentByCompany.get(companyId) ?? 0;
 

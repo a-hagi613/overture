@@ -7,6 +7,7 @@ import { loadMailHealth, setKillSwitch } from "../../lib/admin-api.ts";
 import { useAdminResource } from "../../lib/admin-resource.ts";
 import { adminDay } from "../../lib/admin-date.ts";
 import { AdminGateScreen } from "./gate-screen.tsx";
+import { MailAlertCard } from "./mail-alert-card.tsx";
 import { mailColumnLayout, mailPanelId } from "./mail-columns.ts";
 import { MailEmployerRow } from "./mail-employer-row.tsx";
 
@@ -111,63 +112,22 @@ export function MailHealthPage() {
         </section>
       ) : null}
 
-      {view.alerts.map((alert) => {
-        const employer = view.employers.find((row) => row.companyId === alert.companyId);
-        const paused = employer?.killSwitch?.enabled === true;
-        const open = openCompanyId === alert.companyId;
-
-        return (
-          <section
-            className="mt-4 rounded-lg border border-need bg-need-soft px-5 py-4"
-            key={alert.companyId}
-          >
-            <h2 className="font-serif text-[19px] leading-[1.2]">
-              {copy.admin.mailAlertHeading(alert.employer)}
-            </h2>
-            <p className="mt-1.5 text-[13.5px] leading-relaxed">
-              {copy.admin.mailAlertBody(alert.sent, alert.employer, adminDay(view.since))}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2.5">
-              <button
-                aria-controls={mailPanelId(alert.companyId)}
-                aria-expanded={open}
-                aria-label={
-                  open
-                    ? copy.admin.mailCloseEmployerFor(alert.employer)
-                    : copy.admin.mailOpenEmployerFor(alert.employer)
-                }
-                className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-card px-4 text-[13px] font-semibold hover:bg-muted"
-                onClick={() => {
-                  setOpenCompanyId(open ? null : alert.companyId);
-                }}
-                type="button"
-              >
-                {open ? copy.admin.mailCloseEmployer : copy.admin.mailOpenEmployer}
-              </button>
-              <button
-                aria-label={
-                  paused
-                    ? copy.admin.mailPausedFor(alert.employer)
-                    : copy.admin.mailPauseEmployerFor(alert.employer)
-                }
-                className="inline-flex h-10 items-center justify-center rounded-md border border-need px-4 text-[13px] font-semibold text-need hover:bg-card disabled:opacity-60"
-                disabled={paused}
-                onClick={() => {
-                  void pauseEmployer(alert.companyId);
-                }}
-                type="button"
-              >
-                {paused ? copy.admin.mailPaused : copy.admin.mailPauseEmployer}
-              </button>
-            </div>
-            {pauseError === alert.companyId ? (
-              <p className="mt-2 text-[13px] text-need" role="alert">
-                {copy.admin.mailPauseFailed}
-              </p>
-            ) : null}
-          </section>
-        );
-      })}
+      {view.alerts.map((alert) => (
+        <MailAlertCard
+          alert={alert}
+          employer={view.employers.find((row) => row.companyId === alert.companyId)}
+          key={alert.companyId}
+          onPause={() => {
+            void pauseEmployer(alert.companyId);
+          }}
+          onToggle={() => {
+            setOpenCompanyId(openCompanyId === alert.companyId ? null : alert.companyId);
+          }}
+          open={openCompanyId === alert.companyId}
+          pauseError={pauseError === alert.companyId}
+          since={adminDay(view.since)}
+        />
+      ))}
 
       <section className="mt-6 overflow-hidden rounded-lg border border-border bg-card shadow-sh">
         <div

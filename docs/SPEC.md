@@ -1030,7 +1030,8 @@ body, sender or attachment, so the admin never sees message content.
 
 - **Reply rate** = messages in ÷ Applications sent in the window. An employer with at least 10 sends and a rate
   under 5% shows "Reply alert"; one with at least one bounce and a rate at or above 5% shows "Watch, N bounces";
-  under 10 sends it shows "Too few sends"; otherwise "Healthy".
+  fewer than 10 sends and no replies shows "Too few sends" (a low volume with a reply is judged on its rate);
+  otherwise "Healthy".
 - The alert is **alert-only**: it raises `mail.reply_rate` for the worst employer in the window and
   `mail.domain_reply_rate` when every employer together has at least 20 sends and a rate under 5%, and notifies
   the owner. Sends continue until the owner pauses the employer from the card, which sets the employer kill switch
