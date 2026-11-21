@@ -1,4 +1,5 @@
 import { expect, test } from "./app.fixture.ts";
+import { Database } from "bun:sqlite";
 import {
   clearCatalog,
   clockNow,
@@ -17,6 +18,8 @@ import { z } from "zod";
 import type { APIRequestContext } from "@playwright/test";
 
 const createdSchema = z.object({ id: z.string() });
+
+const SWEEP_LOCK_MS = 6000;
 
 async function catalog(request: APIRequestContext, name: string, domain: string | null) {
   const companyId = await seedCompany(request, name, domain);
@@ -303,6 +306,56 @@ test("the skip list also skips near-match names and domains", async ({
   expect(ids).not.toContain(nearNamePosting);
   expect(ids).not.toContain(exactNamePosting);
   expect(ids).not.toContain(nearDomainPosting);
+
+  await owner.dispose();
+});
+
+test("a skip list saved while the sweep holds the write lock still takes effect", async ({
+  isolatedAppServer,
+}) => {
+  const { url, databasePath } = isolatedAppServer;
+  const { owner } = await ownerContextFor(url);
+  await clearCatalog(owner);
+
+  const allowed = await catalog(owner, "Acme Widgets", "acme.example");
+  const skipped = await catalog(owner, "Northwind Labs", "northwind.example");
+
+  const allowedPosting = await seedPosting(owner, {
+    atsJobId: "allowed",
+    boardId: allowed.boardId,
+    companyId: allowed.companyId,
+    url: "https://acme.example/allowed",
+  });
+
+  await seedPosting(owner, {
+    atsJobId: "skipped",
+    boardId: skipped.boardId,
+    companyId: skipped.companyId,
+    url: "https://northwind.example/skipped",
+  });
+
+  await configureMatching(owner);
+
+  const blocker = new Database(databasePath);
+
+  blocker.run("PRAGMA busy_timeout = 0;");
+  blocker.run("BEGIN IMMEDIATE;");
+
+  const release = setTimeout(() => {
+    blocker.run("COMMIT;");
+  }, SWEEP_LOCK_MS);
+
+  try {
+    const response = await owner.put("/api/profile/skip-companies", {
+      data: { companies: [{ domain: "northwind.example", name: "Northwind Labs" }] },
+    });
+
+    expect(response.ok()).toBe(true);
+    expect(idsOf(await homeFor(owner))).toEqual([allowedPosting]);
+  } finally {
+    clearTimeout(release);
+    blocker.close();
+  }
 
   await owner.dispose();
 });
