@@ -160,7 +160,7 @@ M2 promises sub-day Workable freshness; the other feeds keep their 30-minute to 
 
 ## What this changes
 
-- **ADR 0031** records the decision and the measured budget; ADR 0028's open choice is resolved, not contradicted.
+- **ADR 0032** records the decision and the measured budget; ADR 0028's open choice is resolved, not contradicted.
 - **SPEC §6.1 and §19** now state the off-box pass, the R2 snapshot and the 26-hour alert instead of "M2 measures,
   then decides".
 - **#234** builds the Action and the prod ingest; **#235** keeps the 20-form probe and the enable decision.
