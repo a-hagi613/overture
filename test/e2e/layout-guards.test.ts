@@ -27,14 +27,7 @@ function storageFor(path: string) {
     return "admin" as const;
   }
 
-  if (
-    path === "/signin" ||
-    path === "/terms" ||
-    path === "/privacy" ||
-    path === "/consent" ||
-    path === "/forgot-password" ||
-    path === "/reset-password"
-  ) {
+  if (path === "/signin" || path === "/terms" || path === "/privacy" || path === "/consent") {
     return "anonymous" as const;
   }
 
@@ -245,12 +238,6 @@ async function checkTarget(page: Page, target: Target, url: string, width: numbe
   });
 
   await expectNoOverflow(page, target.path);
-
-  if (target.path === "/signin") {
-    await page.getByRole("button", { name: "Create an account" }).first().click();
-    await expect(page.getByRole("heading", { name: /account/u }).first()).toBeVisible();
-    await expectNoOverflow(page, "/signin sign-up");
-  }
 
   if (shellPaths.has(target.path) && width >= 768) {
     await expectSidebarFixed(page, target.path, width);

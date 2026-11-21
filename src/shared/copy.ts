@@ -154,14 +154,9 @@ export const copy = {
     brandTagline: "The job hunt, handled.",
     back: "Back to Overture",
     title: "Sign in to Overture",
-    signUpTitle: "Create your account",
     sentTitle: "Check your email",
     description: "Continue to your Board and Review.",
-    signUpDescription: "Start with Google, LinkedIn, or an email and password.",
-    sentDescription: "We sent you a link that signs you in. No password needed.",
-    verifyTitle: "Check your email",
-    verifyDescription:
-      "We sent a link to verify your email address. You can sign in once it is verified.",
+    sentDescription: "We sent you a link that signs you in.",
     google: "Continue with Google",
     linkedin: "Continue with LinkedIn",
     linkedinBadge: "in",
@@ -170,33 +165,11 @@ export const copy = {
     emailPlaceholder: "you@example.com",
     magicSubmit: "Email me a sign-in link",
     orPlain: "or",
-    passwordLabel: "Password",
-    createPasswordLabel: "Create a password",
-    newPasswordLabel: "New password",
-    confirmPasswordLabel: "Confirm new password",
-    forgotPassword: "Forgot password?",
-    showPassword: "Show",
-    hidePassword: "Hide",
-    signInSubmit: "Sign in",
-    signUpSubmit: "Create account",
-    passwordHint:
-      "At least 10 characters. Passwords that appear in known data breaches are not accepted.",
-    resetPasswordHint: "At least 10 characters. Pick one you do not use anywhere else.",
-    signUpEmailHint: "Use the email your invitation was sent to.",
     resend: "Send the link again",
     resendHint: "Nothing there? Check spam, or wait a minute before asking again.",
     changeEmail: "Use a different email",
-    verifyHeading: "Verification link sent to",
-    verifyDetail: "Open it on this device to verify your email and finish creating your account.",
-    verifyResend: "Send the email again",
-    verifyAlready: "Already verified?",
     allowHeading: "Invitation only for now.",
-    allowNote: "Google, LinkedIn, a password and emailed links all work with the same email.",
-    signUpNote: "Use the email your invitation was sent to.",
-    switchPrompt: "New to Overture?",
-    switchToSignUp: "Create an account",
-    switchBackPrompt: "Already have an account?",
-    switchToSignIn: "Sign in",
+    allowNote: "Google, LinkedIn and emailed links all work with the same email.",
     sentHeading: "Link sent to",
     sentDetail: "Open it on this device. It works once and expires in 15 minutes.",
     legalIntro: "By continuing, you agree to Overture's",
@@ -204,10 +177,10 @@ export const copy = {
     legalJoin: "and",
     legalPrivacy: "Privacy Policy",
     legalEnd: ".",
-    trust: "Google, LinkedIn, a password or an emailed link",
+    trust: "Google, LinkedIn or an emailed link",
     refusedHeading: "This email isn't invited yet.",
     refusedBody:
-      "Overture is invite-only during the beta. Google, LinkedIn, a password and an emailed link all need an invite for the same email.",
+      "Overture is invite-only during the beta. Google, LinkedIn and an emailed link all need an invite for the same email.",
     refusedDescription:
       "If you expected an invite, check that you are using the email it was sent to.",
     refusedField:
@@ -223,25 +196,6 @@ export const copy = {
     suspendedEmail: "Email admin@tryoverture.com",
     emailNotVerified:
       "That provider has not verified your email, so this app cannot let it in. Verify the address and try again.",
-    badCredentials: "That email and password do not match.",
-    passwordShort: "Use at least 10 characters for your password.",
-    passwordCompromised: "That password has appeared in a data breach. Choose a different one.",
-    passwordMismatch: "The two passwords do not match.",
-    forgotTitle: "Forgot your password?",
-    forgotDescription:
-      "Enter the email you use for Overture and we will send a link to set a new password.",
-    forgotSubmit: "Send reset link",
-    forgotNote:
-      "If an account exists for this email, we will send a link to choose a new password. The link works once.",
-    forgotSent: "If an account exists for this email, the link is on its way.",
-    backToSignIn: "Back to sign in",
-    resetTitle: "Choose a new password",
-    resetDescription: (email: string) =>
-      `This link is for ${email}. Saving the new password signs you in.`,
-    resetSubmit: "Save new password",
-    resetSignOutNote: "Saving signs you out of other devices.",
-    resetInvalid: "That reset link is used or expired. Ask for a new one.",
-    resetSaved: "Password saved. Sign in with your new password.",
     linkFailed: "The link did not work. It may be used or expired. Ask for a new one.",
     genericError: "Sign-in did not go through. Try again.",
     rateLimited: "Too many tries. Wait a few minutes and ask again.",
@@ -298,12 +252,6 @@ export const copy = {
     magicLinkSubject: "Your Overture sign-in link",
     magicLinkBody: (url: string) =>
       `Open this link to sign in to Overture. It works once and expires in 15 minutes.\n\n${url}\n`,
-    verifyEmailSubject: "Verify your Overture email",
-    verifyEmailBody: (url: string) =>
-      `Open this link to verify your email address and finish creating your Overture account. It works once and expires in one hour.\n\n${url}\n`,
-    resetPasswordSubject: "Choose a new Overture password",
-    resetPasswordBody: (url: string) =>
-      `Open this link to choose a new Overture password. It works once and expires in one hour. If you did not ask for this, ignore this email.\n\n${url}\n`,
     accountDeletedSubject: "Your Overture account has been deleted",
     accountDeletedBody: (name: string) => {
       const first = name.trim().split(/\s+/u)[0] ?? "";
@@ -584,7 +532,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "You sign in with Google, LinkedIn, a password or an emailed link, using the email your invitation was sent to. Keep your sign-in details to yourself, and tell us if you think someone else has used your account.",
+              text: "You sign in with Google, LinkedIn or an emailed link, using the email your invitation was sent to. Keep your sign-in details to yourself, and tell us if you think someone else has used your account.",
             },
           ],
         },
@@ -734,7 +682,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "Your files and answers are encrypted, and passwords are stored only as hashes. Access to your data is limited to what the service needs, and every time staff open a user's data it is recorded.",
+              text: "Your files and answers are encrypted. Access to your data is limited to what the service needs, and every time staff open a user's data it is recorded.",
             },
           ],
         },
@@ -1007,16 +955,12 @@ export const copy = {
     completes: "Erasing completes within 24 hours. You get a confirmation email when it is done.",
     continueToDelete: "Continue to delete",
     keepAccount: "Keep my account",
-    reauthHeading: "Enter your password",
-    reauthBody: "Deleting needs a fresh check. Enter the password you sign in with.",
-    passwordLabel: "Password",
-    passwordPlaceholder: "Your password",
-    confirmIdentity: "Confirm",
-    sendLink: "Send a sign-in link instead",
+    reauthHeading: "Confirm it’s you",
+    reauthBody:
+      "Deleting needs a fresh sign-in. We email you a link that works once. Open it on this device, then come back here.",
+    sendLink: "Email me a sign-in link",
     linkSent: "A sign-in link is on its way. Open it on this device, then come back here.",
     reauthenticated: "Confirmed. You can delete your account now.",
-    passwordNotSet: "This account signs in with an emailed link. Send one instead.",
-    wrongPassword: "That password did not match. Try again.",
     confirmHeading: "Delete account",
     confirmCheckbox:
       "I understand my data is erased, and my forwarding address is retired forever.",
@@ -1039,9 +983,6 @@ export const copy = {
     errors: {
       unauthorised: "Sign in again, then come back to this page.",
       reauthRequired: "Confirm it’s you before deleting the account.",
-      passwordRequired: "Enter your password to confirm it’s you.",
-      wrongPassword: "That password did not match. Try again.",
-      passwordNotSet: "This account signs in with an emailed link. Send one instead.",
       linkFailed: "The sign-in link did not go out. Try again.",
       deleteFailed: "The account could not be deleted. Try again.",
       tooMany: "Too many tries. Wait a few minutes and try again.",

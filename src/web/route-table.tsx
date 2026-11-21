@@ -1,7 +1,6 @@
 import type { RouteObject } from "react-router";
 
 import { BoardPage } from "./routes/board.tsx";
-import { ForgotPasswordPage } from "./routes/forgot-password.tsx";
 import { HomePage } from "./routes/home.tsx";
 import { InboxAddressPage } from "./routes/inbox-address.tsx";
 import { InboxThreadPage } from "./routes/inbox-thread.tsx";
@@ -15,7 +14,6 @@ import { OnboardingResumePage } from "./routes/onboarding-resume.tsx";
 import { OnboardingTargetsPage } from "./routes/onboarding-targets.tsx";
 import { ProfilePage } from "./routes/profile.tsx";
 import { ReadyPage } from "./routes/ready.tsx";
-import { ResetPasswordPage } from "./routes/reset-password.tsx";
 import { ReviewPage } from "./routes/review.tsx";
 import { SearchPage } from "./routes/search.tsx";
 import { SettingsDeletePage } from "./routes/settings-delete.tsx";
@@ -71,8 +69,6 @@ const publicRoutes: RouteObject[] = [
   { path: "/consent", element: <ConsentPage /> },
   { path: "/onboarding", element: <OnboardingPage /> },
   { path: "/onboarding/resume", element: <OnboardingResumePage /> },
-  { path: "/forgot-password", element: <ForgotPasswordPage /> },
-  { path: "/reset-password", element: <ResetPasswordPage /> },
   { path: "/onboarding/facts", element: <OnboardingFactsPage /> },
   { path: "/onboarding/targets", element: <OnboardingTargetsPage /> },
   { path: "/onboarding/forward", element: <OnboardingForwardPage /> },

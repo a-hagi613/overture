@@ -1,29 +1,22 @@
 import { copy } from "../../shared/copy.ts";
 
 import { BusyIndicator } from "./busy-indicator.tsx";
-import { PasswordField } from "./password-field.tsx";
-import { BTN_PRIMARY, INPUT_CLASS, LABEL_CLASS } from "./signin-styles.ts";
+import { BTN_PRIMARY, INPUT_CLASS, INPUT_ERROR_CLASS, LABEL_CLASS } from "./signin-styles.ts";
 
 export function SignInForm({
   email,
   onEmail,
-  onPassword,
   onSubmit,
-  password,
   pending,
   busy,
-  showPassword,
-  togglePassword,
+  refused = false,
 }: {
   email: string;
   onEmail: (value: string) => void;
-  onPassword: (value: string) => void;
   onSubmit: () => void;
-  password: string;
   pending: boolean;
   busy: boolean;
-  showPassword: boolean;
-  togglePassword: () => void;
+  refused?: boolean;
 }) {
   return (
     <form
@@ -38,8 +31,10 @@ export function SignInForm({
           {copy.signIn.emailLabel}
         </label>
         <input
+          aria-describedby={refused ? "signin-email-error" : undefined}
+          aria-invalid={refused || undefined}
           autoComplete="email"
-          className={INPUT_CLASS}
+          className={refused ? INPUT_ERROR_CLASS : INPUT_CLASS}
           id="signin-email"
           onInput={(event) => {
             onEmail(event.currentTarget.value);
@@ -49,29 +44,14 @@ export function SignInForm({
           value={email}
         />
       </div>
-      <div>
-        <div className="mb-[6px] flex items-center justify-between gap-3">
-          <label
-            className="text-[12.5px] font-semibold [line-height:normal]"
-            htmlFor="signin-password"
-          >
-            {copy.signIn.passwordLabel}
-          </label>
-          <a
-            className="inline-flex min-h-[32px] items-center text-[12.5px] font-semibold text-foreground underline underline-offset-[3px]"
-            href="/forgot-password"
-          >
-            {copy.signIn.forgotPassword}
-          </a>
-        </div>
-        <PasswordField
-          id="signin-password"
-          onInput={onPassword}
-          show={showPassword}
-          toggle={togglePassword}
-          value={password}
-        />
-      </div>
+      {refused ? (
+        <p
+          className="text-left text-[12.5px] font-semibold leading-[1.5] text-need"
+          id="signin-email-error"
+        >
+          {copy.signIn.refusedField}
+        </p>
+      ) : null}
       <button
         aria-busy={busy || undefined}
         className={`${BTN_PRIMARY} mt-1`}
@@ -79,7 +59,7 @@ export function SignInForm({
         type="submit"
       >
         {busy ? <BusyIndicator /> : null}
-        {copy.signIn.signInSubmit}
+        {copy.signIn.magicSubmit}
       </button>
     </form>
   );
