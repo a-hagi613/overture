@@ -1,6 +1,7 @@
 # Overture
 
-A job-search agent that applies to jobs for one person, automatically, and shows its work. These are the words for
+A job-search agent that finds jobs for one person, prepares every application and sends it when you approve, and
+shows its work. These are the words for
 what it does, used exactly in code, copy, issues and commits.
 
 ## The search
@@ -27,8 +28,23 @@ One effort to apply to one Posting on the user's behalf, from preparation to the
 _Avoid_: submission, job (as the object)
 
 **Status**:
-Where an Application stands inside Overture: preparing, needs review, ready, sending, confirming, sent, couldn't apply, skipped or withdrawn.
+Where an Application stands inside Overture: preparing, needs review, ready, approved, sending, confirming, sent, couldn't apply, skipped or withdrawn.
 _Avoid_: state, progress
+
+**Ready**:
+An Application Overture has fully prepared that waits for the user's Approval before anything is sent. Also the
+destination that lists them ("Ready to send") and the Board column that holds an Application from Ready until it is
+confirmed sent.
+_Avoid_: pending, draft, awaiting approval
+
+**Approval**:
+The user pressing Send on a Ready Application. It freezes the exact job, resume file, answers and letter that will be
+sent, and is the user's consent for that one application. It can be undone until sending starts.
+_Avoid_: confirmation, sign-off, go-ahead
+
+**Approved**:
+The Status after Approval and before sending: the Application waits for its time to send within the daily limits.
+_Avoid_: scheduled, queued
 
 **Confirming**:
 The Status after the employer may have received the Application and before its confirmation was seen. Shown as "Checking with the employer".
@@ -48,11 +64,11 @@ _Avoid_: receipt, log
 ## The Board
 
 **Stage**:
-Where an Application stands with the employer, shown as a Board column: Queued, Applied, Screening, Interviewing, Offer, Closed.
+Where an Application stands with the employer, shown as a Board column: Queued, Ready, Applied, Screening, Interviewing, Offer, Closed.
 _Avoid_: column, phase, Hold
 
 **Queued**:
-The first Stage: the Application is being prepared, waiting on a Review, waiting for its time to send, or being confirmed.
+The first Stage: the Application is being prepared or waiting on a Review.
 _Avoid_: Hold, pending
 
 **Check-in**:
@@ -66,7 +82,8 @@ A factual question Overture will not guess at and needs the user to answer befor
 _Avoid_: Hold, review item, question (as the object)
 
 **Needs you**:
-The label on anything waiting for the user: an open Review, or a Queued card blocked by one.
+The label on anything blocked on the user's answer: an open Review, or a Queued card blocked by one. A Ready card
+waits for Approval and is labelled Ready, not Needs you.
 _Avoid_: action required, blocked
 
 ## The user's facts

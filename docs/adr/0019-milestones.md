@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted (amended by ADR 0029: the M1 gate is 25 real applications)
 ---
 
 # Three milestones, gated on measured cloud submission

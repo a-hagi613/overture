@@ -1,9 +1,9 @@
 # Overture
 
-A job-search agent that applies to jobs for one person, automatically, and shows its work. It finds
-postings from ATS job feeds, scores them against the user's resume, prepares each application from the
-user's own facts, writes the cover letter, and submits it through the employer's real ATS form in a
-managed cloud browser.
+A job-search agent that finds jobs for one person, prepares every application and sends it when you approve,
+and shows its work. It finds postings from ATS job feeds, scores them against the user's resume, prepares each
+application from the user's own facts, writes the cover letter, and, once the user approves it, submits it
+through the employer's real ATS form in a managed cloud browser.
 
 The walking skeleton exists: Bun and Hono serve the Vite, React 19 and Tailwind SPA shell, SQLite runs
 through Drizzle with migrations applied at boot, and the health route answers at `/api/health`.

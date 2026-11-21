@@ -1,6 +1,6 @@
 # Agent instructions
 
-Overture applies to jobs for one person, automatically, and shows its work.
+Overture finds jobs for one person, prepares every application and sends it when you approve, and shows its work.
 
 ## The tools are the rules
 
