@@ -42,13 +42,13 @@ import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 import { parseSendWindow, planningWindow } from "./planning.ts";
 import { APPLICATION_SEND_JOB_KIND } from "./executor.ts";
+import { maxConcurrentSessionsFromSetting } from "./browser/session-slots.ts";
 
 export const DISPATCH_TICK_JOB_KIND = "dispatch.tick";
 
 export const TICK_INTERVAL_MS = 15_000;
 const HOUR_MS = 3_600_000;
 const WEEK_MS = 7 * 86_400_000;
-const DEFAULT_CONCURRENCY = 10;
 
 export interface DispatchSummary {
   claimed: number;
@@ -356,7 +356,7 @@ export function createDispatcherTick(deps: DispatchDeps) {
       switches.filter((entry) => entry.scope === "employer").map((entry) => entry.key),
     );
 
-    const concurrency = Math.max(1, settingNumber(db, "browser.concurrency", DEFAULT_CONCURRENCY));
+    const concurrency = maxConcurrentSessionsFromSetting(db);
 
     const sending = db
       .select({ total: count() })

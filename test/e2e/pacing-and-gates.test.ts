@@ -159,6 +159,17 @@ const questionsSchema = z.object({
 const jobEventSchema = z.object({ id: z.string() });
 
 const SEND_JOB = "application.send";
+
+const captureFormPage = `<!doctype html>
+<html><body>
+<h1>Senior Backend Engineer</h1>
+<form method="post" action="/apply">
+  <label>First name <input type="text" name="first_name" /></label>
+  <label>Email <input type="email" name="email" /></label>
+  <button type="submit">Submit application</button>
+</form>
+</body></html>`;
+
 const MINUTE_MS = 60_000;
 
 async function ownerFor(server: AppServer) {
@@ -664,4 +675,179 @@ test("an approval that cannot fit today's remaining slots rolls to the next wind
 
   expect(firstNext).toBeGreaterThan(0);
   expect(secondNext).toBeGreaterThan(firstNext);
+});
+
+async function putSetting(owner: APIRequestContext, key: string, value: string) {
+  const response = await owner.put(`/__test__/settings/${encodeURIComponent(key)}`, {
+    data: { value },
+  });
+
+  expect(response.ok()).toBe(true);
+}
+
+async function enqueueSendJob(owner: APIRequestContext, applicationId: string, runAt: number) {
+  const response = await owner.post("/__test__/jobs/enqueue", {
+    data: { kind: SEND_JOB, payload: JSON.stringify({ applicationId }), runAt },
+  });
+
+  expect(response.ok()).toBe(true);
+}
+
+async function runSend(owner: APIRequestContext, applicationId: string) {
+  const response = await owner.post("/__test__/jobs/run-now", {
+    data: { kind: SEND_JOB, payload: JSON.stringify({ applicationId }) },
+  });
+
+  if (!response.ok()) {
+    throw new Error(`send ${applicationId} failed: ${await response.text()}`);
+  }
+
+  return response;
+}
+
+async function runCapture(owner: APIRequestContext, applyUrl: string) {
+  return owner.post("/__test__/jobs/run-now", {
+    data: {
+      kind: "fixtures.capture",
+      payload: JSON.stringify({ applyUrls: [applyUrl], ats: "greenhouse" }),
+    },
+  });
+}
+
+async function statusOf(owner: APIRequestContext, userId: string, applicationId: string) {
+  return (await applicationsFor(owner, userId)).find((row) => row.id === applicationId)?.status;
+}
+
+test("dispatch queues no more sends than the browser session cap holds", async ({ pacing }) => {
+  const { owner, userId } = await ownerFor(pacing.server);
+
+  await moveClockTo(owner, "2026-03-10T12:00:00.000Z");
+  await uploadResume(owner);
+  await saveFacts(owner);
+  await ensureMailbox(owner);
+  await grantApplications(owner, 3);
+
+  const postingId = await seedPostingFor(owner, pacing.fixture.url, "us");
+
+  const applicationId = await seedApplication(owner, { postingId, status: "ready", userId });
+
+  await approveApplication(owner, applicationId);
+
+  await runJob(owner, "planner.day", JSON.stringify({ userId }));
+
+  const planned = (await applicationsFor(owner, userId)).find((row) => row.id === applicationId);
+
+  if (planned?.scheduledFor === null || planned?.scheduledFor === undefined) {
+    throw new Error("the planner gave no slot");
+  }
+
+  const slot = new Date(planned.scheduledFor).toISOString();
+
+  await moveClockTo(owner, slot);
+  await enqueueSendJob(owner, crypto.randomUUID(), Date.parse(slot) + MINUTE_MS);
+
+  const before = new Set(await sendJobIds(owner));
+
+  expect(before.size).toBe(1);
+
+  await putSetting(owner, "browser.max_concurrent_sessions", "1");
+  await runJob(owner, "dispatch.tick", "{}");
+
+  expect(await newSendJobs(owner, before)).toEqual([]);
+
+  await putSetting(owner, "browser.max_concurrent_sessions", "2");
+  await runJob(owner, "dispatch.tick", "{}");
+
+  expect((await newSendJobs(owner, before)).length).toBe(1);
+});
+
+test("a send waits for a browser session before it marks the Application sending", async ({
+  pacing,
+}) => {
+  test.setTimeout(180_000);
+
+  const { owner, userId } = await ownerFor(pacing.server);
+
+  await moveClockTo(owner, "2026-03-10T12:00:00.000Z");
+  await uploadResume(owner);
+  await saveFacts(owner);
+  await ensureMailbox(owner);
+  await grantApplications(owner, 5);
+
+  const postingId = await seedPostingFor(owner, pacing.fixture.url, "us");
+
+  const applicationId = await seedApplication(owner, { postingId, status: "ready", userId });
+
+  await approveApplication(owner, applicationId);
+
+  const pageGate = Promise.withResolvers<undefined>();
+
+  let pageHits = 0;
+
+  const page = Bun.serve({
+    port: 0,
+    async fetch() {
+      pageHits += 1;
+      await pageGate.promise;
+
+      return new Response(captureFormPage, { headers: { "content-type": "text/html" } });
+    },
+  });
+
+  try {
+    await putSetting(owner, "browser.max_concurrent_sessions", "1");
+
+    let captureFinished = false;
+
+    const capture = runCapture(owner, `http://127.0.0.1:${String(page.port)}/form`);
+
+    void (async () => {
+      await capture;
+      captureFinished = true;
+    })();
+
+    await expect.poll(() => pageHits, { timeout: 30_000 }).toBeGreaterThan(0);
+
+    const send = runSend(owner, applicationId);
+
+    let winner = "waiting";
+    let sendingSamples = 0;
+
+    await expect
+      .poll(
+        async () => {
+          if (captureFinished) {
+            winner = "capture-finished";
+
+            return winner;
+          }
+
+          if ((await statusOf(owner, userId, applicationId)) === "sending") {
+            sendingSamples += 1;
+
+            if (sendingSamples >= 2) {
+              winner = "sending";
+            }
+
+            return winner;
+          }
+
+          return winner;
+        },
+        { intervals: [25], timeout: 90_000 },
+      )
+      .not.toBe("waiting");
+
+    expect(winner).toBe("capture-finished");
+
+    pageGate.resolve(undefined);
+
+    await capture;
+    await send;
+
+    expect(await statusOf(owner, userId, applicationId)).toBe("sent");
+  } finally {
+    pageGate.resolve(undefined);
+    await page.stop(true);
+  }
 });
