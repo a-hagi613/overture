@@ -65,9 +65,8 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
 
 - **No disable directives.** Any `oxlint-disable`, `eslint-disable` or `@ts-ignore` comment is an error. `no-comments`
   runs with an empty `allow` list, so `// WARNING:` notes are errors too.
-- **Nine unit test files only.** A unit test file is allowed only beside the nine invariants in ADR 0013 (ledger,
-  crypto, planner, address, tag rules, question normalisation, answer derivations, the fixture sanitiser, the v1
-  answer-bank mapping), by an explicit path allowlist. Any other unit test file is an error. Every other test is a
+- **Unit test files only beside the ADR 0013 invariants.** A unit test file is allowed only for an invariant ADR 0013
+  lists, by an explicit path allowlist in `.oxlintrc.json`. Any other unit test file is an error. Every other test is a
   Playwright end-to-end test.
 - **Catalog writes belong to the sweep worker.** A write to `company_boards`, `postings` or `posting_tags` outside the
   Bun Worker is an error. The narrow non-sweep paths that keep a single-row write on the main thread (dispatch closing
@@ -79,7 +78,10 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
   `bun run db:seed-demo`.
 - **The off-list and every scoped override are checked.** CI fails if the rules turned off in the configuration
   differ from the table below, if an override turns a rule down or changes its options without appearing in the
-  "Rules off in one folder only" table, or if that table lists an override that does not exist.
+  "Rules off in one folder only" table, or if that table lists an override that does not exist. The same
+  `bun run lint:config` gate fails when a file in `src/` or `test/` opens a `new DatabaseSync` without a
+  `PRAGMA busy_timeout` and without a documented opt-out, the ADR 0013 invariant that keeps the `SQLITE_BUSY` stall
+  from returning.
 
 ## Rules turned off, and why
 

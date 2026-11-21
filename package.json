@@ -19,7 +19,7 @@
     "lint:config": "bun run scripts/check-lint-config.ts",
     "format": "bun fmt",
     "format:check": "bun fmt --check",
-    "test:unit": "bun test src",
+    "test:unit": "bun test src scripts",
     "test:e2e": "bun node_modules/playwright/cli.js test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/server/platform/db/migrate.ts",

@@ -4,7 +4,7 @@ const checks = [
   ["lint", ["bun", "run", "lint"]],
   ["format", ["bun", "fmt", "--check"]],
   ["typecheck", ["bun", "check"]],
-  ["unit", ["bun", "test", "src"]],
+  ["unit", ["bun", "test", "src", "scripts"]],
   ["build", ["bun", "run", "build:checked"]],
   ["lint-config", ["bun", "run", "lint:config"]],
   ["db", ["bun", "run", "db:verify"]],
