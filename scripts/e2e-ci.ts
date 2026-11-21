@@ -864,6 +864,8 @@ function visitedUiRoutes(
       routes.add(rawPath);
     } else if (rawPath.startsWith("/admin/users/")) {
       routes.add("/admin/users/:id");
+    } else if (rawPath.startsWith("/inbox/")) {
+      routes.add("/inbox/:id");
     } else if (rawPath === "/missing-route" && knownPaths.has("*")) {
       routes.add("*");
     }

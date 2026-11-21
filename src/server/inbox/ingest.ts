@@ -72,8 +72,9 @@ export function createMailIngest(deps: {
   resolver: DNSResolver;
   mailboxes: ReturnType<typeof createMailboxService>;
   onAuthenticatedMessage?: (input: { userId: string; messageId: string }) => Promise<void>;
+  onStoredMessage?: (input: { userId: string; messageId: string }) => Promise<void>;
 }) {
-  const { db, clock, objects, personal, resolver, onAuthenticatedMessage } = deps;
+  const { db, clock, objects, personal, resolver, onAuthenticatedMessage, onStoredMessage } = deps;
   const { mailboxes: mailboxService } = deps;
 
   async function sealObject(userId: string, key: string, bytes: Uint8Array<ArrayBuffer>) {
@@ -302,6 +303,10 @@ export function createMailIngest(deps: {
       }),
       mailbox.userId,
     );
+
+    if (onStoredMessage !== undefined) {
+      await onStoredMessage({ messageId: id, userId: mailbox.userId }).catch(() => undefined);
+    }
 
     if (onAuthenticatedMessage !== undefined && auth === "pass") {
       await onAuthenticatedMessage({ messageId: id, userId: mailbox.userId }).catch(

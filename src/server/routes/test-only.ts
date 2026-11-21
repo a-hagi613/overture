@@ -4,9 +4,12 @@ import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { z } from "zod";
 
+import { Buffer } from "node:buffer";
+
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { JobHandlers } from "../platform/jobs/run-due.ts";
 import type { AdjustableClock } from "../platform/ports/clock.ts";
+import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
 import type { CatalogSweepWorker } from "../catalog/sweep-worker-runner.ts";
 
@@ -229,6 +232,17 @@ const seedMailBody = z.object({
   classification: z
     .enum(["ack", "code", "rejection", "screening", "interview", "offer", "other"])
     .default("other"),
+  localPart: z.string().min(1).max(64).optional(),
+  readAt: z.number().int().nullish(),
+  attachments: z
+    .array(
+      z.object({
+        filename: z.string().min(1),
+        mime: z.string().min(1),
+        base64: z.string(),
+      }),
+    )
+    .default([]),
   at: z.number().int().nullish(),
 });
 
@@ -616,6 +630,7 @@ export function createTestRoutes(
   singletonJobKinds: readonly string[],
   preparation: PreparationService | null = null,
   catalogWorker: CatalogSweepWorker | null = null,
+  objects: ObjectStore | null = null,
 ) {
   const routes = new Hono();
 
@@ -731,7 +746,7 @@ export function createTestRoutes(
 
   async function insertMailRow(body: z.infer<typeof seedMailBody>) {
     const at = body.at ?? clock.now();
-    const localPart = `owner-${body.userId.slice(0, 8)}`;
+    const localPart = body.localPart ?? `owner-${body.userId.slice(0, 8)}`;
 
     const existingMailbox = db
       .select({ id: mailboxes.id })
@@ -751,6 +766,8 @@ export function createTestRoutes(
           userId: body.userId,
         })
         .run();
+    } else if (body.localPart !== undefined) {
+      db.update(mailboxes).set({ localPart }).where(eq(mailboxes.id, mailboxId)).run();
     }
 
     const threadId = crypto.randomUUID();
@@ -786,6 +803,7 @@ export function createTestRoutes(
         id: messageId,
         mailboxId,
         outStatus: body.outStatus ?? null,
+        readAt: body.readAt === null || body.readAt === undefined ? null : new Date(body.readAt),
         rfcMessageId: `<${messageId}@${body.senderDomain}>`,
         senderDomain: body.senderDomain,
         snippetEnc: await personal.sealFor(body.userId, scope("snippet_enc"), snippet),
@@ -800,6 +818,44 @@ export function createTestRoutes(
         userId: body.userId,
       })
       .run();
+
+    if (objects !== null) {
+      await Promise.all(
+        body.attachments.map(async (attachment) => {
+          const attachmentId = crypto.randomUUID();
+          const objectKey = `mail/${body.userId}/attachments/${attachmentId}`;
+          const bytes = Buffer.from(attachment.base64, "base64");
+
+          await objects.put(
+            objectKey,
+            new Uint8Array(
+              new TextEncoder().encode(
+                await personal.sealFor(
+                  body.userId,
+                  { column: "body", rowId: objectKey, table: "mail_objects" },
+                  bytes.toString("base64"),
+                ),
+              ),
+            ),
+          );
+
+          db.insert(messageAttachments)
+            .values({
+              bytes: bytes.byteLength,
+              filenameEnc: await personal.sealFor(
+                body.userId,
+                { column: "filename_enc", rowId: attachmentId, table: "message_attachments" },
+                attachment.filename,
+              ),
+              id: attachmentId,
+              messageId,
+              mime: attachment.mime,
+              objectKey,
+            })
+            .run();
+        }),
+      );
+    }
 
     return { messageId, threadId };
   }
@@ -2562,6 +2618,7 @@ export function createTestRoutes(
       feed.map(async (entry) =>
         insertMailRow({
           applicationId: entry.applicationId,
+          attachments: [],
           at: entry.at,
           auth: "pass",
           classification: entry.classification,
@@ -2583,6 +2640,7 @@ export function createTestRoutes(
       olderMessages.map(async (message, index) =>
         insertMailRow({
           applicationId: null,
+          attachments: [],
           at: message.at,
           auth: "pass",
           classification: "other",
