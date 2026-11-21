@@ -51,6 +51,7 @@ import {
 } from "./pipeline/prepare-jobs.ts";
 import { createMailDnsResolver } from "./inbox/dns.ts";
 import { createMailIngest, MAIL_INGEST_JOB_KIND } from "./inbox/ingest.ts";
+import { createMailboxService } from "./inbox/mailboxes.ts";
 
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 
@@ -214,6 +215,8 @@ const mailPersonal = createPersonalCrypto(
   env.MASTER_KEY_CURRENT,
 );
 
+const mailboxes = createMailboxService(db, clock, env.INBOUND_HMAC_SECRET ?? "", env.MAIL_DOMAIN);
+
 const mailIngest = createMailIngest({
   db,
   clock,
@@ -238,6 +241,7 @@ dispatcher =
     : createDispatcher({
         db,
         clock,
+        mailboxes,
         personal,
         preparation,
         provider: browserProvider,
@@ -305,6 +309,7 @@ const app = createApp({
   auth,
   objects,
   llm: anthropicLlmPort,
+  mailboxes,
   preparation,
   reviews,
   singletonJobKinds: SINGLETON_JOB_KINDS,

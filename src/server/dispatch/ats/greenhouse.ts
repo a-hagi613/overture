@@ -3,11 +3,13 @@ import type { Page } from "playwright-core";
 import type { SendPlanField } from "../../pipeline/send-plan.ts";
 
 import {
+  codeStepVisible,
   fillField,
   formLocator,
   norm,
   readConfirmation,
   submitButton,
+  typeCode,
   uploadFile,
   watchApplicationResponse,
 } from "../forms/engine.ts";
@@ -16,6 +18,8 @@ import { checkPostingIdentity } from "../posting-identity.ts";
 import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identity.ts";
 
 const FORM_APPEAR_MS = 15_000;
+
+const CODE_REQUIRED_STATUS = 428;
 
 export interface PlannedResume {
   fieldName: string | null;
@@ -32,12 +36,15 @@ export interface GreenhouseRunPlan {
 export interface GreenhouseHooks {
   onWillSubmit: () => void;
   onResponse: (status: number | null) => void;
+  requestCode: () => Promise<string | null>;
+  onCodeTyped: () => void;
 }
 
 export type GreenhouseOutcome =
   | "sent"
   | "unconfirmed"
   | "captcha_blocked"
+  | "code_timeout"
   | "blocked"
   | "form_missing"
   | "fill_failed"
@@ -112,6 +119,24 @@ export async function runGreenhouseAttempt(
     };
   }
 
+  const confirmationPath = `${new URL(plan.identity.url).pathname.replace(/\/+$/u, "")}/confirmation`;
+
+  const submitAndWatch = async () => {
+    hooks.onWillSubmit();
+
+    const settled = await Promise.allSettled([
+      submitButton(page).click(),
+      watchApplicationResponse(page),
+    ]);
+
+    const [, response] = settled;
+    const status = response.status === "fulfilled" ? response.value.status() : null;
+
+    hooks.onResponse(status);
+
+    return status;
+  };
+
   try {
     await formLocator(page).waitFor({ state: "visible", timeout: FORM_APPEAR_MS });
   } catch {
@@ -182,28 +207,43 @@ export async function runGreenhouseAttempt(
     }
   }
 
-  hooks.onWillSubmit();
+  let status = await submitAndWatch();
 
-  const settled = await Promise.allSettled([
-    submitButton(page).click(),
-    watchApplicationResponse(page),
-  ]);
+  if (status === CODE_REQUIRED_STATUS) {
+    if (!(await codeStepVisible(page))) {
+      return {
+        confirmationSeen: false,
+        outcome: "captcha_blocked",
+        submitMayHaveLanded: false,
+        submitResponseStatus: status,
+      };
+    }
 
-  const [, response] = settled;
-  const status = response.status === "fulfilled" ? response.value.status() : null;
+    const code = await hooks.requestCode();
 
-  hooks.onResponse(status);
+    if (code === null) {
+      return {
+        confirmationSeen: false,
+        outcome: "code_timeout",
+        submitMayHaveLanded: false,
+        submitResponseStatus: status,
+      };
+    }
+
+    await typeCode(page, code);
+    hooks.onCodeTyped();
+
+    status = await submitAndWatch();
+  }
 
   if (status !== null && status >= 400 && status < 500) {
     return {
       confirmationSeen: false,
-      outcome: status === 428 ? "captcha_blocked" : "blocked",
+      outcome: status === CODE_REQUIRED_STATUS ? "code_timeout" : "blocked",
       submitMayHaveLanded: false,
       submitResponseStatus: status,
     };
   }
-
-  const confirmationPath = `${new URL(plan.identity.url).pathname.replace(/\/+$/u, "")}/confirmation`;
 
   const confirmationSeen =
     status !== null && status < 400 ? await readConfirmation(page, confirmationPath) : false;

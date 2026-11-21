@@ -41,7 +41,8 @@ risk that one shared `mail.tryoverture.com` domain is blocklisted for every user
   Forwarding breaks SPF but leaves the original DKIM signature intact, so `auth='pass'` means the original From
   domain's DKIM passes aligned.
 - Ingest, threading, linking and "automate only on `auth='pass'`" are unchanged (SPEC §11.1, ADR 0006). Codes are
-  read by deterministic patterns. If no code arrives within 10 minutes, the user is asked to paste it.
+  read by deterministic patterns. If no code arrives within five minutes, the user is asked to paste it; the wait and
+  the browser session stay open to the ten-minute expiry, so the paste resumes the same attempt.
 - No AWS for inbound: no SES receiving, S3 or SNS, and no `mail.sweep`; Email Routing retries on a non-2xx.
 
 This supersedes ADR 0024.

@@ -575,6 +575,23 @@ export const codeWaits = sqliteTable(
   (t) => [index("code_waits_mailbox_open").on(t.mailboxId, t.resolvedAt, t.startedAt)],
 );
 
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    url: text("url").notNull(),
+    createdAt: integer("created_at").notNull(),
+    readAt: timestamp("read_at"),
+    pushedAt: timestamp("pushed_at"),
+    emailedAt: timestamp("emailed_at"),
+  },
+  (t) => [index("notifications_user_created").on(t.userId, t.createdAt)],
+);
+
 export const grants = sqliteTable(
   "grants",
   {

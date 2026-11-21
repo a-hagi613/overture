@@ -10,6 +10,7 @@ import type { LlmPort } from "./platform/ports/llm.ts";
 import type { ObjectStore } from "./platform/ports/object-store.ts";
 import type { PreparationService } from "./pipeline/prepare.ts";
 import type { ReviewService } from "./pipeline/reviews.ts";
+import type { createMailboxService } from "./inbox/mailboxes.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
 import { createMeRoutes } from "./routes/me.ts";
@@ -25,7 +26,6 @@ import { createProfileRoutes } from "./routes/profile.ts";
 import { createMatchingService } from "./matching/score.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
-import { createMailboxService } from "./inbox/mailboxes.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
 
@@ -39,6 +39,7 @@ export interface AppDependencies {
   auth: Auth;
   objects: ObjectStore;
   llm: LlmPort;
+  mailboxes: ReturnType<typeof createMailboxService>;
   preparation: PreparationService;
   reviews: ReviewService;
   singletonJobKinds: readonly string[];
@@ -86,12 +87,7 @@ export function createApp(deps: AppDependencies) {
 
   const app = new Hono();
 
-  const mailboxes = createMailboxService(
-    deps.db,
-    deps.clock,
-    env.INBOUND_HMAC_SECRET ?? "",
-    env.MAIL_DOMAIN,
-  );
+  const { mailboxes } = deps;
 
   app.all("/api/auth/*", async (context) => deps.auth.handler(context.req.raw));
   app.route("/api", createHealthRoutes(deps.db, deps.backups));

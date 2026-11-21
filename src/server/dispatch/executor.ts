@@ -10,6 +10,7 @@ import type { PreparationService } from "../pipeline/prepare.ts";
 import type { SendPlan } from "../pipeline/send-plan.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { BrowserProvider, BrowserUsage, RemoteBrowser } from "./browser/provider.ts";
+import type { createMailboxService } from "../inbox/mailboxes.ts";
 
 import {
   applications,
@@ -24,6 +25,14 @@ import {
   reserveForApplication,
 } from "../billing/ledger.ts";
 import { runGreenhouseAttempt } from "./ats/greenhouse.ts";
+import {
+  CODE_WAIT_TIMEOUT_MS,
+  createCodeWait,
+  markCodeConsumed,
+  waitForCode,
+} from "../inbox/waits.ts";
+import { createNotification } from "../notify/notifications.ts";
+import { copy } from "../../shared/copy.ts";
 
 export const APPLICATION_SEND_JOB_KIND = "application.send";
 
@@ -42,6 +51,7 @@ export interface DispatcherDeps {
   preparation: PreparationService;
   resumes: ResumeService;
   personal: PersonalCrypto;
+  mailboxes: ReturnType<typeof createMailboxService>;
   proxyCountry: string;
 }
 
@@ -52,6 +62,7 @@ const zeroUsage: BrowserUsage = { browserMs: 0, costMicros: 0, proxyBytes: 0 };
 const ATTEMPT_OUTCOMES = [
   ["blocked", "blocked"],
   ["captcha_blocked", "captcha_blocked"],
+  ["code_timeout", "code_timeout"],
   ["fill_failed", "form_changed"],
   ["form_missing", "form_changed"],
   ["sent", "sent"],
@@ -88,7 +99,7 @@ function recordEvent(
 }
 
 export function createDispatcher(deps: DispatcherDeps) {
-  const { db, clock, provider, preparation, resumes, personal, proxyCountry } = deps;
+  const { db, clock, provider, preparation, resumes, personal, mailboxes, proxyCountry } = deps;
 
   const activeAttempts = new Set<string>();
 
@@ -344,6 +355,9 @@ export function createDispatcher(deps: DispatcherDeps) {
           },
         },
         {
+          onCodeTyped: () => {
+            updateAttempt(attemptId, { codeUsed: true });
+          },
           onResponse: (status) => {
             if (status !== null && status >= 400 && status < 500) {
               updateAttempt(attemptId, { submitClickedAt: null, submitResponseStatus: status });
@@ -353,6 +367,45 @@ export function createDispatcher(deps: DispatcherDeps) {
           },
           onWillSubmit: () => {
             updateAttempt(attemptId, { submitClickedAt: clock.now() });
+          },
+          requestCode: async () => {
+            const mailbox = await mailboxes.ensureFor(claimed.userId);
+
+            const wait = createCodeWait(db, clock, {
+              attemptId,
+              mailboxId: mailbox.id,
+              userId: claimed.userId,
+            });
+
+            if (wait === undefined) {
+              return null;
+            }
+
+            const resolved = await waitForCode(
+              { db, clock, personal },
+              {
+                onAskToPaste: () => {
+                  createNotification(db, clock, {
+                    body: copy.notifications.codeWait.body(CODE_WAIT_TIMEOUT_MS / 60_000),
+                    kind: copy.notifications.codeWait.kind,
+                    title: copy.notifications.codeWait.title(plan.companyName),
+                    url: copy.notifications.codeWait.url,
+                    userId: claimed.userId,
+                  });
+                },
+                waitId: wait.id,
+              },
+            );
+
+            if (resolved === null) {
+              return null;
+            }
+
+            if (resolved.messageId !== null) {
+              markCodeConsumed(db, clock, resolved.messageId);
+            }
+
+            return resolved.code;
           },
         },
       );

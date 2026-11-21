@@ -517,6 +517,15 @@ export const copy = {
       other: "Other",
     },
   },
+  notifications: {
+    codeWait: {
+      title: (company: string) => `${company} needs a code`,
+      body: (minutes: number) =>
+        `The form asked for a code sent to your email. Paste it in Overture within ${countWord(minutes)} minutes, or the Application ends and can be tried again later.`,
+      url: "/",
+      kind: "code_wait",
+    },
+  },
   placeholder: {
     lead: "Coming in a later slice",
     board: "Board",

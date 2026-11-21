@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { and, asc, eq, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Auth } from "../auth/index.ts";
@@ -10,6 +11,7 @@ import type { createMailboxService } from "../inbox/mailboxes.ts";
 
 import { codePatterns } from "../inbox/codes.ts";
 import { resolveCodeWaitWithPaste } from "../inbox/waits.ts";
+import { applications, attempts, codeWaits, companies, postings } from "../platform/db/schema.ts";
 
 const codeBodySchema = z.object({
   code: z.string().regex(codePatterns.greenhouse, "Enter the 8-character code."),
@@ -46,6 +48,51 @@ export function createMailRoutes(deps: {
     const mailbox = await mailboxes.ensureFor(user.id);
 
     return context.json({ address: mailbox.address });
+  });
+
+  routes.get("/mail/code-waits", async (context) => {
+    const user = await sessionUser(context.req.raw);
+
+    if (user === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    const rows = db
+      .select({
+        id: codeWaits.id,
+        attemptId: codeWaits.attemptId,
+        startedAt: codeWaits.startedAt,
+        expiresAt: codeWaits.expiresAt,
+        applicationId: applications.id,
+        company: companies.name,
+        title: postings.title,
+      })
+      .from(codeWaits)
+      .innerJoin(attempts, eq(attempts.id, codeWaits.attemptId))
+      .innerJoin(applications, eq(applications.id, attempts.applicationId))
+      .innerJoin(companies, eq(companies.id, applications.companyId))
+      .innerJoin(postings, eq(postings.id, applications.postingId))
+      .where(
+        and(
+          eq(codeWaits.userId, user.id),
+          isNull(codeWaits.resolvedAt),
+          gt(codeWaits.expiresAt, new Date(clock.now())),
+        ),
+      )
+      .orderBy(asc(codeWaits.startedAt))
+      .all();
+
+    return context.json({
+      waits: rows.map((row) => ({
+        id: row.id,
+        attemptId: row.attemptId,
+        applicationId: row.applicationId,
+        company: row.company,
+        title: row.title,
+        startedAt: row.startedAt.getTime(),
+        expiresAt: row.expiresAt.getTime(),
+      })),
+    });
   });
 
   routes.post("/mail/code-waits/:id", zValidator("json", codeBodySchema), async (context) => {
