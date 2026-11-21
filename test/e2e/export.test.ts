@@ -65,6 +65,13 @@ const sinkMailSchema = z.object({
   messages: z.array(z.object({ body: z.string(), subject: z.string(), to: z.string() })),
 });
 
+async function exportRowsFor(owner: APIRequestContext, userId: string) {
+  const path = `/__test__/account/exports?userId=${encodeURIComponent(userId)}`;
+  const rows = exportRowsSchema.parse(await (await owner.get(path)).json());
+
+  return { path, rows };
+}
+
 async function moveClock(request: APIRequestContext, target: number) {
   const clock = z
     .object({ now: z.number(), offsetMs: z.number() })
@@ -533,8 +540,7 @@ test("an erase racing an export build leaves no export objects behind", async ({
 
   expect(requested.status()).toBe(202);
 
-  const rowsPath = `/__test__/account/exports?userId=${encodeURIComponent(userId)}`;
-  const rows = exportRowsSchema.parse(await (await owner.get(rowsPath)).json());
+  const { path: rowsPath, rows } = await exportRowsFor(owner, userId);
   const exportId = rows.exports.find((row) => row.status === "preparing")?.id;
 
   expect(exportId).toBeDefined();
@@ -577,8 +583,7 @@ test("a suspended account never builds an export", async ({ exportServer }) => {
 
   expect(requested.status()).toBe(202);
 
-  const rowsPath = `/__test__/account/exports?userId=${encodeURIComponent(userId)}`;
-  const rows = exportRowsSchema.parse(await (await owner.get(rowsPath)).json());
+  const { path: rowsPath, rows } = await exportRowsFor(owner, userId);
   const exportId = rows.exports.find((row) => row.status === "preparing")?.id;
 
   expect(exportId).toBeDefined();

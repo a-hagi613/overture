@@ -90,7 +90,13 @@ function guardSize(name: string, value: number) {
 async function* deflate(bytes: AsyncIterable<Uint8Array>) {
   const deflator = createDeflateRaw({ level: 6 });
 
-  Readable.from(bytes).pipe(deflator);
+  const source = Readable.from(bytes);
+
+  source.on("error", (error: Error) => {
+    deflator.destroy(error);
+  });
+
+  source.pipe(deflator);
 
   for await (const chunk of deflator) {
     yield new Uint8Array(z.instanceof(Uint8Array).parse(chunk));
