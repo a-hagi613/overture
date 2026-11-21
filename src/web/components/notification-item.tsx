@@ -147,7 +147,7 @@ export function NotificationItem({
           <div className="mt-2.5 flex gap-2">
             {undoId === null ? (
               <Link
-                className="flex h-[34px] items-center justify-center rounded-md border border-input bg-card px-3 text-[12.5px] font-semibold hover:bg-muted"
+                className="flex h-[34px] items-center justify-center rounded-md border border-input bg-card px-3 text-[12.5px] max-md:h-11 font-semibold hover:bg-muted"
                 onClick={() => {
                   onRead(row.id);
                 }}
@@ -157,7 +157,7 @@ export function NotificationItem({
               </Link>
             ) : (
               <button
-                className="flex h-[34px] items-center justify-center rounded-md border border-input bg-card px-3 text-[12.5px] font-semibold hover:bg-muted"
+                className="flex h-[34px] items-center justify-center rounded-md border border-input bg-card px-3 text-[12.5px] max-md:h-11 font-semibold hover:bg-muted"
                 onClick={() => {
                   onAction(row);
                 }}

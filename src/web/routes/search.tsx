@@ -104,7 +104,7 @@ export function SearchPage() {
   }
 
   return (
-    <main>
+    <div>
       <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         {copy.search.eyebrow}
       </p>
@@ -132,7 +132,7 @@ export function SearchPage() {
         />
         <button
           type="submit"
-          className="h-10 shrink-0 rounded-[6px] bg-foreground px-4 text-sm font-medium text-card"
+          className="h-10 shrink-0 rounded-[6px] bg-foreground px-4 text-sm font-medium text-card hover:opacity-90"
         >
           {copy.search.submit}
         </button>
@@ -243,6 +243,6 @@ export function SearchPage() {
           ))}
         </ul>
       </section>
-    </main>
+    </div>
   );
 }

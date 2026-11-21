@@ -15,7 +15,11 @@ export function ConsentPage() {
       <Backdrop />
       <div className="relative z-[1] flex min-h-screen flex-col">
         <LegalTopBar />
-        <main className="mx-auto w-full max-w-[574px] px-[18px] pb-[40px] pt-[24px]">
+        <main
+          id="main"
+          tabIndex={-1}
+          className="outline-none mx-auto w-full max-w-[574px] px-[18px] pb-[40px] pt-[24px]"
+        >
           {consent.isPending ? <div className="h-[382px]" /> : null}
           {consent.isError ? (
             <p className="text-sm text-muted-foreground">{copy.consent.unavailable}</p>

@@ -69,7 +69,7 @@ export function HeaderControls({ running }: { running: boolean }) {
           name === null ? copy.shell.settings : `${initialsOf(name)}, ${copy.shell.settings}`
         }
         aria-current={pathname === "/settings" ? "page" : undefined}
-        className="hidden h-10 w-10 items-center justify-center rounded-full border border-input bg-muted font-serif text-[17px] italic max-[767px]:flex max-[767px]:h-11 max-[767px]:w-11"
+        className="hidden h-10 w-10 items-center justify-center rounded-full border border-input bg-muted font-serif text-[17px] italic hover:border-foreground max-[767px]:flex max-[767px]:h-11 max-[767px]:w-11"
         to="/settings"
       >
         <span aria-hidden="true">{name === null ? "" : initialsOf(name)}</span>

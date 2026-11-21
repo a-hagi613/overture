@@ -143,7 +143,10 @@ export function InboxPage() {
       </div>
       <p className="mt-1 max-w-[620px] text-[14.5px] text-muted-foreground">
         {copy.inbox.addressLead}{" "}
-        <Link className="text-signal-text underline underline-offset-[3px]" to="/inbox/address">
+        <Link
+          className="text-signal-text underline underline-offset-[3px] hover:no-underline"
+          to="/inbox/address"
+        >
           {copy.inbox.addressHowLink}
         </Link>
       </p>

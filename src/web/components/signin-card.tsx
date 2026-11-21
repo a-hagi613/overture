@@ -553,7 +553,7 @@ export function SignInCard() {
         </section>
         <p className={SWITCH_CLASS}>
           <button
-            className="inline-flex min-h-[44px] items-center gap-2 px-1 font-semibold text-foreground underline underline-offset-[3px]"
+            className="inline-flex min-h-[44px] items-center gap-2 px-1 font-semibold text-foreground underline underline-offset-[3px] hover:no-underline"
             onClick={() => {
               setPhase("form");
               setActionError(null);
@@ -638,7 +638,7 @@ export function SignInCard() {
           <p className={SWITCH_CLASS}>
             {copy.signIn.verifyAlready}{" "}
             <button
-              className="inline min-h-[44px] border-0 bg-transparent px-1 text-[13px] font-semibold text-foreground underline underline-offset-[3px] disabled:cursor-not-allowed disabled:opacity-[.45]"
+              className="inline min-h-[44px] border-0 bg-transparent px-1 text-[13px] font-semibold text-foreground underline underline-offset-[3px] hover:no-underline disabled:cursor-not-allowed disabled:opacity-[.45]"
               disabled={pending !== null}
               onClick={() => {
                 switchMode("sign-in");
@@ -827,7 +827,7 @@ export function SignInCard() {
         {switchPrompt}{" "}
         <button
           aria-busy={pending !== null || undefined}
-          className="inline min-h-[44px] border-0 bg-transparent px-1 text-[13px] font-semibold text-foreground underline underline-offset-[3px] disabled:cursor-not-allowed disabled:opacity-[.45]"
+          className="inline min-h-[44px] border-0 bg-transparent px-1 text-[13px] font-semibold text-foreground underline underline-offset-[3px] hover:no-underline disabled:cursor-not-allowed disabled:opacity-[.45]"
           disabled={pending !== null}
           onClick={() => {
             switchMode(switchToSignUp ? "sign-up" : "sign-in");

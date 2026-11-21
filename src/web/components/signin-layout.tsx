@@ -16,10 +16,14 @@ export function SignInLayout({ children }: { children: ReactNode }) {
     <div className="signin-surface relative flex min-h-screen overflow-x-clip bg-background text-foreground min-[961px]:grid min-[961px]:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
       <Backdrop />
       <SignInStory />
-      <main className="relative flex min-h-screen w-full flex-1 flex-col justify-between gap-5 px-[clamp(18px,4vw,52px)] pb-7 pt-[18px] min-[961px]:pb-8 min-[961px]:pt-7">
+      <main
+        id="main"
+        tabIndex={-1}
+        className="outline-none relative flex min-h-screen w-full flex-1 flex-col justify-between gap-5 px-[clamp(18px,4vw,52px)] pb-7 pt-[18px] min-[961px]:pb-8 min-[961px]:pt-7"
+      >
         <div className="mx-auto flex w-full max-w-[560px] items-center justify-between gap-3">
           <Link
-            className="-ml-2.5 inline-flex items-center gap-[7px] rounded-md px-2.5 py-1.5 text-[13px] font-medium hover:bg-muted hover:text-foreground"
+            className="-ml-2.5 inline-flex min-h-11 items-center gap-[7px] rounded-md px-2.5 py-1.5 text-[13px] font-medium hover:bg-muted hover:text-foreground"
             to="/"
           >
             <NavGlyph name="back" size={15} />
@@ -39,7 +43,7 @@ export function SignInLayout({ children }: { children: ReactNode }) {
           <div className="mb-[4px] flex flex-col items-center gap-2 text-center min-[961px]:mb-0 min-[961px]:hidden">
             <Link
               aria-label={copy.brand.homeAria}
-              className="inline-flex items-center gap-[10px]"
+              className="inline-flex min-h-11 items-center gap-[10px] hover:opacity-80"
               to="/"
             >
               <BrandMark size={34} />
@@ -57,11 +61,17 @@ export function SignInLayout({ children }: { children: ReactNode }) {
             </span>
             <p>
               {copy.signIn.legalIntro}{" "}
-              <a className="decoration-input underline underline-offset-[3px]" href="/terms">
+              <a
+                className="decoration-input underline underline-offset-[3px] hover:decoration-foreground"
+                href="/terms"
+              >
                 {copy.signIn.legalTerms}
               </a>{" "}
               {copy.signIn.legalJoin}{" "}
-              <a className="decoration-input underline underline-offset-[3px]" href="/privacy">
+              <a
+                className="decoration-input underline underline-offset-[3px] hover:decoration-foreground"
+                href="/privacy"
+              >
                 {copy.signIn.legalPrivacy}
               </a>
               {copy.signIn.legalEnd}

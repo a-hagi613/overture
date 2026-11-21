@@ -144,7 +144,7 @@ export function ForgotPasswordPage() {
       </section>
       <p className={SWITCH_CLASS}>
         <Link
-          className="inline-flex min-h-[44px] items-center gap-2 px-1 font-semibold text-foreground underline underline-offset-[3px]"
+          className="inline-flex min-h-[44px] items-center gap-2 px-1 font-semibold text-foreground underline underline-offset-[3px] hover:no-underline"
           to="/signin"
         >
           <NavGlyph name="back" size={15} />

@@ -1,59 +1,11 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
-import type { Browser, BrowserContext, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import { test, expect } from "./admin.fixture.ts";
+import { navigate, openContext, targets } from "./route-sweep.ts";
+import type { Storage, Target } from "./route-sweep.ts";
 
 const widths = [390, 768, 1280, 1440, 1920, 2560] as const;
 const themes = ["light", "dark"] as const;
-
-const routeSource = readFileSync(join(process.cwd(), "src/web/route-table.tsx"), "utf8");
-
-const routerPaths = [...routeSource.matchAll(/path: "(?<path>[^"]+)"/gu)].map(
-  (match) => match.groups?.path ?? "",
-);
-
-type Storage = "app" | "admin" | "anonymous";
-
-interface Target {
-  path: string;
-  url: string;
-  storage: Storage;
-}
-
-function storageFor(path: string) {
-  if (path.startsWith("/admin")) {
-    return "admin" as const;
-  }
-
-  if (
-    path === "/signin" ||
-    path === "/terms" ||
-    path === "/privacy" ||
-    path === "/consent" ||
-    path === "/forgot-password" ||
-    path === "/reset-password"
-  ) {
-    return "anonymous" as const;
-  }
-
-  return "app" as const;
-}
-
-function urlFor(path: string) {
-  if (path === "*") {
-    return "/__missing__";
-  }
-
-  return path.replace(":id", "unknown-user");
-}
-
-const targets: Target[] = routerPaths.map((path) => ({
-  path,
-  storage: storageFor(path),
-  url: urlFor(path),
-}));
 
 const shellPaths = new Set([
   "/",
@@ -220,19 +172,6 @@ async function expectSidebarFixed(page: Page, path: string, width: number) {
   }
 }
 
-async function navigate(page: Page, path: string) {
-  await page.evaluate(async (next) => {
-    globalThis.history.pushState({}, "", next);
-    globalThis.dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise((resolve) => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(resolve);
-      });
-    });
-  }, path);
-  await page.waitForFunction((next) => globalThis.location.pathname === next, path);
-}
-
 async function checkTarget(page: Page, target: Target, url: string, width: number) {
   const expectedPath = new URL(url).pathname;
 
@@ -277,35 +216,6 @@ async function runTargets(
 
   await checkTarget(page, target, urlOf(target), width);
   await runTargets(rest, pageFor, urlOf, width);
-}
-
-async function openContext(
-  browser: Browser,
-  storage: Storage,
-  width: number,
-  theme: string,
-  storageStates: {
-    admin: Awaited<ReturnType<BrowserContext["storageState"]>>;
-    app: Awaited<ReturnType<BrowserContext["storageState"]>>;
-  },
-) {
-  const viewport = { height: 900, width };
-
-  const context =
-    storage === "anonymous"
-      ? await browser.newContext({ viewport })
-      : await browser.newContext({
-          storageState: storage === "app" ? storageStates.app : storageStates.admin,
-          viewport,
-        });
-
-  if (theme === "dark") {
-    await context.addInitScript(() => {
-      globalThis.localStorage.setItem("overture.theme", "dark");
-    });
-  }
-
-  return context;
 }
 
 test.describe.configure({ timeout: 120_000 });

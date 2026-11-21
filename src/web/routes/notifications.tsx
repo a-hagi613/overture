@@ -171,7 +171,10 @@ export function NotificationsPage() {
       ) : null}
       <p className="mt-4 text-[12.5px] leading-[1.55] text-muted-foreground">
         {copy.notifications.page.footer}
-        <Link className="underline decoration-border underline-offset-2" to="/settings">
+        <Link
+          className="underline decoration-border underline-offset-2 hover:decoration-foreground"
+          to="/settings"
+        >
           {copy.notifications.page.settings}
         </Link>
         {PERIOD}

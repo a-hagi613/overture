@@ -54,7 +54,7 @@ export function PasskeyGate({ onDone }: { onDone: () => void }) {
 
   return (
     <section className="mt-10 rounded-lg border border-border bg-card p-6 shadow-sh">
-      <h2 className="font-serif text-[26px] leading-[1.1]">{copy.admin.gatePasskeyTitle}</h2>
+      <h1 className="font-serif text-[26px] leading-[1.1]">{copy.admin.gatePasskeyTitle}</h1>
       <p className="mt-2 max-w-[60ch] text-sm leading-[1.55] text-muted-foreground">
         {copy.admin.gatePasskeyBody}
       </p>

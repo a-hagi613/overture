@@ -31,7 +31,7 @@ export function HomeInbox(props: { now: number; rows: readonly HomeInboxRow[]; z
           {copy.home.inbox.title}
         </h2>
         <Link
-          className="inline-flex min-h-[34px] items-center justify-center rounded-md border border-input bg-card px-3 text-[12.5px] leading-[normal] font-semibold hover:bg-muted"
+          className="inline-flex min-h-[34px] items-center justify-center max-md:min-h-11 rounded-md border border-input bg-card px-3 text-[12.5px] leading-[normal] font-semibold hover:bg-muted"
           to="/inbox"
         >
           {copy.home.inbox.open}

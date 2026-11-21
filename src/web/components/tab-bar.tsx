@@ -20,7 +20,7 @@ export function TabBar({ counts }: { counts: NavCounts }) {
             key={destination.to}
             to={destination.to}
             end={destination.to === "/"}
-            className="relative flex min-w-0 flex-1 flex-col items-center justify-center gap-[3px] text-[10.5px] font-semibold text-foreground"
+            className="relative flex min-w-0 flex-1 flex-col items-center justify-center gap-[3px] text-[10.5px] font-semibold text-foreground hover:bg-muted"
           >
             {({ isActive }) => (
               <>

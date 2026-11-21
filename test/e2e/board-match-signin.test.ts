@@ -6,7 +6,7 @@ import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, test as appTest } from "./app.fixture.ts";
 import { latestMailLink, setTurnstileScenario } from "./sign-in.ts";
 
-const widths = [390, 1280];
+const widths = [390, 1280, 1440];
 const themes = ["light", "dark"];
 
 const statelessStates = ["sign-in", "sign-up", "forgot-password", "suspended"] as const;
@@ -14,6 +14,12 @@ const statelessStates = ["sign-in", "sign-up", "forgot-password", "suspended"] a
 const statefulStates = ["magic-sent", "verify-sent", "reset-password", "refused"] as const;
 
 type State = (typeof statelessStates)[number] | (typeof statefulStates)[number];
+
+const statesAt1440 = new Set<State>(["sign-in", "sign-up", "magic-sent"]);
+
+function drawn(width: number, state: State) {
+  return width !== 1440 || statesAt1440.has(state);
+}
 
 const referenceDir = new URL("../../design/reference/signin/", import.meta.url);
 
@@ -172,7 +178,7 @@ async function assertMatchesBoard(
 
 for (const width of widths) {
   for (const theme of themes) {
-    for (const state of statelessStates) {
+    for (const state of statelessStates.filter((entry) => drawn(width, entry))) {
       appTest(
         `the ${String(width)} ${theme} sign-in screen matches the board in ${state} mode`,
         async ({ appServer, browser }) => {
@@ -181,7 +187,7 @@ for (const width of widths) {
       );
     }
 
-    for (const state of statefulStates) {
+    for (const state of statefulStates.filter((entry) => drawn(width, entry))) {
       appTest(
         `the ${String(width)} ${theme} sign-in screen matches the board in ${state} mode`,
         async ({ isolatedAppServer, browser }) => {

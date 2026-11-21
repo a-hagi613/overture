@@ -9,7 +9,7 @@ export function LegalTopBar() {
     <header className="mx-auto flex w-full max-w-[836px] items-center justify-between px-[18px] pt-[20px]">
       <Link
         aria-label={copy.brand.homeAria}
-        className="inline-flex items-center gap-[10px] rounded-md"
+        className="inline-flex min-h-11 items-center gap-[10px] rounded-md hover:opacity-80"
         to="/"
       >
         <BrandMark size={32} />

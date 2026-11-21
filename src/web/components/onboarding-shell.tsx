@@ -31,7 +31,7 @@ export function OnboardingShell({
       <Backdrop />
       <div className="relative z-[1]">
         <OnboardingStepHeader />
-        <main className="ob">
+        <main className="ob outline-none" id="main" tabIndex={-1}>
           <div className="text-center">
             <h1 className="serif hd2">
               {copy.onboarding.setupTitlePlain}{" "}

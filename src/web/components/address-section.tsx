@@ -35,7 +35,7 @@ export function AddressSection() {
             {address.repliesTo}
           </dt>
           <dd className="mt-1 text-sm leading-[1.5] font-semibold">
-            <Link className="border-b border-input" to="/inbox">
+            <Link className="border-b border-input hover:border-foreground" to="/inbox">
               {address.repliesToValue}
             </Link>
           </dd>

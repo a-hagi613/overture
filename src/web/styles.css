@@ -123,6 +123,14 @@ canvas {
   opacity: 0.45;
 }
 
+/* DESIGN §7: 44px touch targets on phones. Unlayered, so it outranks utility heights. */
+@media (max-width: 767px) {
+  :where(button, [role="button"], [role="tab"], summary) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
@@ -523,6 +531,10 @@ canvas {
   gap: 8px;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.board .stg:hover {
+  background: var(--well);
 }
 
 .board .stg.on {
@@ -1094,6 +1106,10 @@ canvas {
   transition:
     transform 0.18s cubic-bezier(0.2, 0.7, 0.2, 1),
     background 0.18s;
+}
+
+.onb .sw2:not(.on):hover .trk {
+  background: var(--line2);
 }
 
 .onb .sw2.on .trk {

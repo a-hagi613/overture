@@ -34,7 +34,7 @@ export function SignInStory() {
         <div className="flex items-center gap-4">
           <Link
             aria-label={copy.brand.homeAria}
-            className="inline-flex items-center gap-[11px]"
+            className="inline-flex items-center gap-[11px] hover:opacity-80"
             to="/"
           >
             <BrandMark size={34} />
@@ -46,11 +46,11 @@ export function SignInStory() {
             <span className="h-[7px] w-[7px] flex-none rounded-full bg-signal" />
             {v.pill}
           </span>
-          <h1 className="font-serif font-serif-display text-[clamp(52px,5vw,76px)] leading-[0.96]">
+          <p className="font-serif font-serif-display text-[clamp(52px,5vw,76px)] leading-[0.96]">
             {v.heading}
             <br />
             <span className="italic">{v.headingItalic}</span>
-          </h1>
+          </p>
           <p className="max-w-[45ch] text-[15.5px] leading-[1.62] text-muted-foreground">
             {v.deck}
           </p>
