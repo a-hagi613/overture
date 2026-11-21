@@ -7,23 +7,15 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ResumeService } from "../profile/resume.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
-import type { SendPlan } from "../pipeline/send-plan.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { BrowserProviderRegistry, BrowserUsage, RemoteBrowser } from "./browser/provider.ts";
 import type { createMailboxService } from "../inbox/mailboxes.ts";
+import type { Outcomes } from "./outcomes.ts";
 
-import {
-  applications,
-  applicationEvents,
-  applicationSnapshots,
-  attempts,
-} from "../platform/db/schema.ts";
+import { applications, attempts, postings, profiles } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
-import {
-  commitForApplication,
-  releaseForApplication,
-  reserveForApplication,
-} from "../billing/ledger.ts";
+import { releaseForApplication, reserveForApplication } from "../billing/ledger.ts";
+import { getSetting, isKillSwitchEnabled } from "../platform/settings/index.ts";
 import { runGreenhouseAttempt } from "./ats/greenhouse.ts";
 import {
   CODE_WAIT_TIMEOUT_MS,
@@ -33,6 +25,7 @@ import {
 } from "../inbox/waits.ts";
 import { createNotification } from "../notify/notifications.ts";
 import { copy } from "../../shared/copy.ts";
+import { recordApplicationEvent } from "./outcomes.ts";
 
 export const APPLICATION_SEND_JOB_KIND = "application.send";
 
@@ -41,6 +34,8 @@ export const DISPATCH_RECOVER_JOB_KIND = "dispatch.recover";
 const ATTEMPT_LEASE_MS = 15 * 60_000;
 const SESSION_TIMEOUT_MINUTES = 15;
 const RECOVER_INTERVAL_MS = 60_000;
+const RETRY_DELAY_MS = 6 * 60 * 60_000;
+const DAY_MS = 24 * 60 * 60_000;
 
 const sendPayloadSchema = z.object({ applicationId: z.string().min(1) });
 
@@ -53,7 +48,9 @@ export interface DispatcherDeps {
   resumes: ResumeService;
   personal: PersonalCrypto;
   mailboxes: ReturnType<typeof createMailboxService>;
+  outcomes: Outcomes;
   proxyCountry: string;
+  signal?: AbortSignal;
 }
 
 type AttemptRow = typeof attempts.$inferSelect;
@@ -95,27 +92,88 @@ function outcomeOf(outcome: string) {
   return ATTEMPT_OUTCOMES.find(([name]) => name === outcome)?.[1] ?? "provider_error";
 }
 
-function recordEvent(
-  db: AppDatabase,
-  clock: Clock,
-  applicationId: string,
-  userId: string,
-  kind: "status" | "stage",
-  fromValue: string | null,
-  toValue: string | null,
-) {
-  db.insert(applicationEvents)
-    .values({
-      applicationId,
-      at: clock.now(),
-      fromValue,
-      id: crypto.randomUUID(),
-      kind,
-      source: "system",
-      toValue,
-      userId,
-    })
-    .run();
+function settingNumber(db: AppDatabase, key: string, fallback: number) {
+  const parsed = Number(getSetting(db, key));
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function minutesOf(value: string) {
+  const [hours, mins] = value.split(":").map(Number);
+
+  return (hours ?? 0) * 60 + (mins ?? 0);
+}
+
+function sendWindow(db: AppDatabase) {
+  const raw = getSetting(db, "limits.send_window");
+
+  try {
+    const parsed = z.object({ start: z.string(), end: z.string() }).parse(JSON.parse(raw ?? "{}"));
+
+    return { end: minutesOf(parsed.end), start: minutesOf(parsed.start) };
+  } catch {
+    return { end: 20 * 60, start: 8 * 60 };
+  }
+}
+
+function offsetOf(at: number, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+    minute: "2-digit",
+    month: "2-digit",
+    second: "2-digit",
+    timeZone,
+    year: "numeric",
+  }).formatToParts(new Date(at));
+
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+
+  const asUtc = Date.UTC(
+    Number(values.get("year")),
+    Number(values.get("month")) - 1,
+    Number(values.get("day")),
+    Number(values.get("hour")),
+    Number(values.get("minute")),
+    Number(values.get("second")),
+  );
+
+  return asUtc - Math.floor(at / 1000) * 1000;
+}
+
+function nextSendSlot(db: AppDatabase, userId: string, earliest: number) {
+  const timezone =
+    db
+      .select({ timezone: profiles.timezone })
+      .from(profiles)
+      .where(eq(profiles.userId, userId))
+      .get()?.timezone ?? "UTC";
+
+  let offset: number;
+
+  try {
+    offset = offsetOf(earliest, timezone);
+  } catch {
+    offset = 0;
+  }
+
+  const window = sendWindow(db);
+  const local = earliest + offset;
+  const minuteOfDay = (((local % DAY_MS) + DAY_MS) % DAY_MS) / 60_000;
+
+  if (minuteOfDay >= window.start && minuteOfDay < window.end) {
+    return earliest;
+  }
+
+  const dayStart = local - (((local % DAY_MS) + DAY_MS) % DAY_MS);
+
+  const target =
+    minuteOfDay < window.start
+      ? dayStart + window.start * 60_000
+      : dayStart + DAY_MS + window.start * 60_000;
+
+  return target - offset;
 }
 
 export function createDispatcher(deps: DispatcherDeps) {
@@ -128,7 +186,9 @@ export function createDispatcher(deps: DispatcherDeps) {
     resumes,
     personal,
     mailboxes,
+    outcomes,
     proxyCountry,
+    signal,
   } = deps;
 
   const activeAttempts = new Set<string>();
@@ -147,122 +207,132 @@ export function createDispatcher(deps: DispatcherDeps) {
       .get();
   }
 
-  function releaseAttempt(applicationId: string, userId: string, attemptId: string, at: number) {
+  function releaseAttempt(applicationId: string, userId: string, attemptId: string) {
     releaseForApplication(db, clock, {
       applicationId,
       idempotencyKey: `release:${attemptId}`,
       userId,
     });
-
-    db.update(applications)
-      .set({ status: "ready", statusReason: null, updatedAt: at })
-      .where(eq(applications.id, applicationId))
-      .run();
   }
 
-  async function writeSnapshot(input: {
-    applicationId: string;
-    attempt: AttemptRow;
-    consentVersion: string;
-    costMicros: number;
-    plan: SendPlan;
-  }) {
-    const { plan } = input;
+  function scheduleRetry(applicationId: string, userId: string, at: number) {
+    const slot = nextSendSlot(db, userId, at + RETRY_DELAY_MS);
 
-    const answers = plan.fields.map((field) => ({
-      answer: field.fieldType === "file" ? (plan.resume?.filename ?? null) : field.answer,
-      fact_key: field.factKey,
-      fact_revision: field.factRevision,
-      kind: field.fieldType === "file" ? "file" : field.answerKind,
-      label: field.label,
-      question_id: field.questionId,
-      resume_line_ids: field.sentences.flatMap((sentence) => sentence.resumeLineIds),
-    }));
+    db.update(applications)
+      .set({ scheduledFor: slot, status: "ready", statusReason: null, updatedAt: clock.now() })
+      .where(eq(applications.id, applicationId))
+      .run();
 
-    const answersEnc = await personal.sealFor(
-      plan.userId,
-      { column: "answers_enc", rowId: input.applicationId, table: "application_snapshots" },
-      JSON.stringify(answers),
-    );
-
-    const coverLetterEnc =
-      plan.coverLetter === null
-        ? null
-        : await personal.sealFor(
-            plan.userId,
-            {
-              column: "cover_letter_enc",
-              rowId: input.applicationId,
-              table: "application_snapshots",
-            },
-            JSON.stringify(
-              plan.coverLetter.map((sentence) => ({
-                resume_line_ids: sentence.resumeLineIds,
-                sentence: sentence.sentence,
-              })),
-            ),
-          );
-
-    const { resume } = plan;
-
-    if (resume === null) {
-      throw new Error("an application cannot be sent without a resume");
-    }
-
-    const at = clock.now();
-    const submittedAt = input.attempt.submitClickedAt ?? at;
-
-    db.transaction((tx) => {
-      commitForApplication(tx, clock, {
-        applicationId: input.applicationId,
-        idempotencyKey: `commit:${input.applicationId}`,
-        userId: plan.userId,
-      });
-
-      tx.insert(applicationSnapshots)
-        .values({
-          answersEnc,
-          applicationId: input.applicationId,
-          confirmedBy: "page",
-          consentVersion: input.consentVersion,
-          costMicros: input.costMicros,
-          coverLetterEnc,
-          descriptionHash: plan.descriptionHash,
-          postingTitle: plan.postingTitle,
-          postingUrl: plan.postingUrl,
-          provider: input.attempt.provider,
-          providerSessionId: input.attempt.providerSessionId,
-          resumeId: resume.id,
-          resumeSha256: resume.sha256,
-          submittedAt,
-          userId: plan.userId,
-        })
-        .run();
-
-      tx.update(applications)
-        .set({
-          sentAt: submittedAt,
-          stage: "applied",
-          stageLocked: false,
-          status: "sent",
-          statusReason: null,
-          updatedAt: at,
-        })
-        .where(eq(applications.id, input.applicationId))
-        .run();
-
-      tx.update(attempts)
-        .set({ endedAt: at, outcome: "sent" })
-        .where(eq(attempts.id, input.attempt.id))
-        .run();
+    recordApplicationEvent(db, clock, {
+      applicationId,
+      userId,
+      kind: "status",
+      fromValue: "sending",
+      toValue: "ready",
+      source: "system",
     });
 
-    recordEvent(db, clock, input.applicationId, plan.userId, "status", "sending", "sent");
-    recordEvent(db, clock, input.applicationId, plan.userId, "stage", "queued", "applied");
+    return slot;
+  }
+
+  function requestInterrupt(applicationId: string, userId: string, at: number) {
+    const slot = nextSendSlot(db, userId, at);
+
+    db.update(applications)
+      .set({
+        attempts: sql`max(${applications.attempts} - 1, 0)`,
+        scheduledFor: slot,
+        status: "ready",
+        statusReason: null,
+        updatedAt: clock.now(),
+      })
+      .where(eq(applications.id, applicationId))
+      .run();
+
+    recordApplicationEvent(db, clock, {
+      applicationId,
+      userId,
+      kind: "status",
+      fromValue: "sending",
+      toValue: "ready",
+      source: "system",
+    });
+
+    return slot;
+  }
+
+  function finishBeforeSubmit(input: {
+    applicationId: string;
+    userId: string;
+    attemptId: string;
+    attempts: number;
+    outcome: AttemptRow["outcome"];
+    at: number;
+  }) {
+    const { applicationId, userId, attemptId, attempts: used, outcome, at } = input;
+
+    releaseAttempt(applicationId, userId, attemptId);
+
+    const maxAttempts = settingNumber(db, "limits.max_attempts", 2);
+
+    if (used < maxAttempts) {
+      scheduleRetry(applicationId, userId, at);
+
+      return "retry" as const;
+    }
+
+    db.update(applications)
+      .set({ stage: null, status: "failed", statusReason: outcome, updatedAt: at })
+      .where(eq(applications.id, applicationId))
+      .run();
+
+    recordApplicationEvent(db, clock, {
+      applicationId,
+      userId,
+      kind: "status",
+      fromValue: "sending",
+      toValue: "failed",
+      source: "system",
+    });
+    recordApplicationEvent(db, clock, {
+      applicationId,
+      userId,
+      kind: "stage",
+      fromValue: "queued",
+      toValue: null,
+      source: "system",
+    });
+
+    return "failed" as const;
+  }
+
+  function switchedOffAtSend(applicationId: string, providerId: string) {
+    const row = db
+      .select({ ats: postings.ats, companyId: applications.companyId })
+      .from(applications)
+      .innerJoin(postings, eq(postings.id, applications.postingId))
+      .where(eq(applications.id, applicationId))
+      .get();
+
+    if (row === undefined) {
+      return true;
+    }
+
+    return (
+      isKillSwitchEnabled(db, "global", "all") ||
+      isKillSwitchEnabled(db, "ats", row.ats) ||
+      isKillSwitchEnabled(db, "employer", row.companyId) ||
+      isKillSwitchEnabled(db, "provider", providerId)
+    );
   }
 
   async function runAttempt(applicationId: string) {
     const provider = providers.pick();
+
+    if (switchedOffAtSend(applicationId, provider.id)) {
+      return false;
+    }
+
     const at = clock.now();
 
     const claimed = db
@@ -330,6 +400,31 @@ export function createDispatcher(deps: DispatcherDeps) {
     let browser: RemoteBrowser | null = null;
     let usage = zeroUsage;
     let outcome: AttemptRow["outcome"] = "provider_error";
+    let shutdownActive = false;
+
+    const isShuttingDown = () => shutdownActive;
+
+    const closeOnAbort = () => {
+      shutdownActive = true;
+
+      if (browser === null) {
+        return;
+      }
+
+      const target = browser;
+
+      void (async () => {
+        try {
+          await target.close();
+        } catch {
+          usage = zeroUsage;
+        }
+
+        await provider.stop(target.sessionId).catch(() => undefined);
+      })();
+    };
+
+    signal?.addEventListener("abort", closeOnAbort, { once: true });
 
     try {
       const plan = await preparation.sendPlanFor(applicationId);
@@ -344,6 +439,10 @@ export function createDispatcher(deps: DispatcherDeps) {
         throw new Error("the resume file could not be read");
       }
 
+      if (isShuttingDown()) {
+        throw new Error("shutting down before the browser opened");
+      }
+
       browser = await provider.open({
         attemptId,
         country: proxyCountry,
@@ -353,9 +452,17 @@ export function createDispatcher(deps: DispatcherDeps) {
 
       updateAttempt(attemptId, { providerSessionId: browser.sessionId });
 
+      if (isShuttingDown()) {
+        throw new Error("shutting down after the browser opened");
+      }
+
       const cdp = await chromium.connectOverCDP(browser.cdpUrl);
       const context = cdp.contexts()[0] ?? (await cdp.newContext());
       const page: Page = context.pages()[0] ?? (await context.newPage());
+
+      if (isShuttingDown()) {
+        throw new Error("shutting down before the form loaded");
+      }
 
       await context.route("**/*", async (route) => {
         const type = route.request().resourceType();
@@ -457,38 +564,19 @@ export function createDispatcher(deps: DispatcherDeps) {
         const attempt = db.select().from(attempts).where(eq(attempts.id, attemptId)).get();
 
         if (attempt !== undefined) {
-          await writeSnapshot({
+          await outcomes.recordSent({
             applicationId,
             attempt,
-            consentVersion: plan.consentVersion,
+            confirmedBy: "page",
             costMicros: usage.costMicros,
+            markAttemptSent: true,
             plan,
           });
         }
-      } else if (run.outcome === "timeout") {
-        const timedOut = db.select().from(attempts).where(eq(attempts.id, attemptId)).get();
-
-        if (timedOut?.submitClickedAt === null || timedOut?.submitClickedAt === undefined) {
-          releaseAttempt(applicationId, claimed.userId, attemptId, clock.now());
-        } else {
-          db.update(applications)
-            .set({ status: "confirming", statusReason: null, updatedAt: clock.now() })
-            .where(eq(applications.id, applicationId))
-            .run();
-        }
-
-        updateAttempt(attemptId, { endedAt: clock.now(), outcome: "timeout" });
-      } else if (run.outcome === "unconfirmed") {
-        db.update(applications)
-          .set({ status: "confirming", statusReason: null, updatedAt: clock.now() })
-          .where(eq(applications.id, applicationId))
-          .run();
-
-        updateAttempt(attemptId, { endedAt: clock.now(), outcome: "unconfirmed" });
       } else if (run.outcome === "identity_mismatch") {
         const reason = run.identityReason ?? "unreadable";
 
-        releaseAttempt(applicationId, claimed.userId, attemptId, clock.now());
+        releaseAttempt(applicationId, claimed.userId, attemptId);
 
         db.update(applications)
           .set({
@@ -499,7 +587,14 @@ export function createDispatcher(deps: DispatcherDeps) {
           .where(eq(applications.id, applicationId))
           .run();
 
-        recordEvent(db, clock, applicationId, claimed.userId, "status", "sending", "skipped");
+        recordApplicationEvent(db, clock, {
+          applicationId,
+          userId: claimed.userId,
+          kind: "status",
+          fromValue: "sending",
+          toValue: "skipped",
+          source: "system",
+        });
 
         updateAttempt(attemptId, {
           endedAt: clock.now(),
@@ -507,28 +602,64 @@ export function createDispatcher(deps: DispatcherDeps) {
           outcome: "identity_mismatch",
         });
       } else {
-        releaseAttempt(applicationId, claimed.userId, attemptId, clock.now());
-        updateAttempt(attemptId, {
-          captchaSeen: run.outcome === "captcha_blocked",
-          endedAt: clock.now(),
-          outcome: outcomeOf(run.outcome),
-        });
+        const current = db.select().from(attempts).where(eq(attempts.id, attemptId)).get();
+        const submitted = current?.submitClickedAt ?? null;
+
+        if (run.outcome === "unconfirmed" || submitted !== null) {
+          db.update(applications)
+            .set({ status: "confirming", statusReason: null, updatedAt: clock.now() })
+            .where(eq(applications.id, applicationId))
+            .run();
+
+          updateAttempt(attemptId, { endedAt: clock.now(), outcome: outcomeOf(run.outcome) });
+        } else {
+          finishBeforeSubmit({
+            applicationId,
+            attempts: claimed.attempts,
+            at: clock.now(),
+            attemptId,
+            outcome: outcomeOf(run.outcome),
+            userId: claimed.userId,
+          });
+
+          updateAttempt(attemptId, {
+            captchaSeen: run.outcome === "captcha_blocked",
+            endedAt: clock.now(),
+            outcome: outcomeOf(run.outcome),
+          });
+        }
       }
     } catch {
       const attempt = db.select().from(attempts).where(eq(attempts.id, attemptId)).get();
+      const submitted = attempt?.submitClickedAt ?? null;
 
-      if (attempt?.submitClickedAt !== null && attempt?.submitClickedAt !== undefined) {
+      if (submitted !== null) {
         db.update(applications)
           .set({ status: "confirming", statusReason: null, updatedAt: clock.now() })
           .where(eq(applications.id, applicationId))
           .run();
 
-        updateAttempt(attemptId, { endedAt: clock.now(), outcome: "crash" });
+        updateAttempt(attemptId, {
+          endedAt: clock.now(),
+          outcome: isShuttingDown() ? "unconfirmed" : "crash",
+        });
+      } else if (isShuttingDown()) {
+        requestInterrupt(applicationId, claimed.userId, clock.now());
+        updateAttempt(attemptId, { endedAt: clock.now(), outcome: "interrupted" });
       } else {
-        releaseAttempt(applicationId, claimed.userId, attemptId, clock.now());
+        finishBeforeSubmit({
+          applicationId,
+          attempts: claimed.attempts,
+          at: clock.now(),
+          attemptId,
+          outcome,
+          userId: claimed.userId,
+        });
+
         updateAttempt(attemptId, { endedAt: clock.now(), outcome });
       }
     } finally {
+      signal?.removeEventListener("abort", closeOnAbort);
       activeAttempts.delete(attemptId);
 
       if (browser !== null) {
@@ -556,9 +687,11 @@ export function createDispatcher(deps: DispatcherDeps) {
   }
 
   async function recover() {
+    const confirming = await outcomes.expireConfirming();
     const sending = db.select().from(applications).where(eq(applications.status, "sending")).all();
 
-    let confirming = 0;
+    let confirmingCount = confirming.confirmed;
+    const { expired } = confirming;
     let released = 0;
 
     for (const application of sending) {
@@ -582,17 +715,13 @@ export function createDispatcher(deps: DispatcherDeps) {
           proxyBytes: attempt.proxyBytes ?? 0,
         });
 
-        confirming += 1;
+        confirmingCount += 1;
 
         continue;
       }
 
       if (attempt !== undefined) {
-        releaseForApplication(db, clock, {
-          applicationId: application.id,
-          idempotencyKey: `release:${attempt.id}`,
-          userId: application.userId,
-        });
+        releaseAttempt(application.id, application.userId, attempt.id);
 
         updateAttempt(attempt.id, {
           browserMs: attempt.browserMs ?? Math.max(0, clock.now() - attempt.startedAt),
@@ -603,15 +732,7 @@ export function createDispatcher(deps: DispatcherDeps) {
         });
       }
 
-      db.update(applications)
-        .set({
-          attempts: sql`max(${applications.attempts} - 1, 0)`,
-          status: "ready",
-          statusReason: null,
-          updatedAt: clock.now(),
-        })
-        .where(eq(applications.id, application.id))
-        .run();
+      requestInterrupt(application.id, application.userId, clock.now());
 
       released += 1;
     }
@@ -657,7 +778,8 @@ export function createDispatcher(deps: DispatcherDeps) {
     );
 
     return {
-      confirming,
+      confirming: confirmingCount,
+      expired,
       released,
       sessionsStopped: stopped.filter((count) => count === 1).length,
     };
@@ -690,8 +812,8 @@ export function createDispatcher(deps: DispatcherDeps) {
   }
 
   return {
-    enqueueSend,
     ensureRecoveryQueued,
+    enqueueSend,
     recover,
     runAttempt,
     sendNow: async (applicationId: string) => {

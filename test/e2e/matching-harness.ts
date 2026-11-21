@@ -214,7 +214,7 @@ export async function seedApplication(
   input: {
     userId: string;
     postingId: string;
-    status: "preparing" | "needs_review" | "ready" | "sending" | "confirming" | "sent";
+    status: "preparing" | "needs_review" | "ready" | "sending" | "confirming" | "sent" | "failed";
     sentAt?: number | null;
     createdAt?: number | null;
   },

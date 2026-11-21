@@ -59,6 +59,12 @@ import {
 } from "./dispatch/dispatch.ts";
 import { createPostingLiveness } from "./dispatch/liveness.ts";
 import {
+  DISPATCH_WATCH_JOB_KIND,
+  ensureWatchQueued,
+  runKillSwitchWatch,
+} from "./dispatch/kill-switches.ts";
+import { createOutcomes } from "./dispatch/outcomes.ts";
+import {
   APPLICATION_PREPARE_JOB_KIND,
   parseApplicationPreparePayload,
 } from "./pipeline/prepare-jobs.ts";
@@ -234,12 +240,19 @@ const mailPersonal = createPersonalCrypto(
 
 const mailboxes = createMailboxService(db, clock, env.INBOUND_HMAC_SECRET ?? "", env.MAIL_DOMAIN);
 
+const resumes = createResumeService({ db, clock, llm: anthropicLlmPort, objects, personal });
+
+const outcomes = createOutcomes({ db, clock, personal, preparation });
+
 const mailIngest = createMailIngest({
   db,
   clock,
   objects,
   personal: mailPersonal,
   resolver: createMailDnsResolver(env.INBOUND_DNS_SERVER),
+  onAuthenticatedMessage: async (input) => {
+    await outcomes.confirmMessage(input);
+  },
 });
 
 const mailJobHandlers: JobHandlers = {
@@ -250,8 +263,6 @@ const mailJobHandlers: JobHandlers = {
 
 const browserProviders = createBrowserProvider(env, clock, db);
 
-const resumes = createResumeService({ db, clock, llm: anthropicLlmPort, objects, personal });
-
 const activeDispatcher =
   browserProviders === null
     ? null
@@ -260,11 +271,13 @@ const activeDispatcher =
         clock,
         hardTimeoutMs: env.SEND_HARD_TIMEOUT_MS,
         mailboxes,
+        outcomes,
         personal,
         preparation,
         providers: browserProviders,
         proxyCountry: env.BROWSER_PROXY_COUNTRY,
         resumes,
+        signal: shutdownController.signal,
       });
 
 const dispatchTick =
@@ -325,6 +338,12 @@ const fixtureJobHandlers: JobHandlers =
         },
       };
 
+const watchJobHandlers: JobHandlers = {
+  [DISPATCH_WATCH_JOB_KIND]: async () => {
+    await Promise.resolve(runKillSwitchWatch({ db, clock }));
+  },
+};
+
 const allJobHandlers: JobHandlers = {
   ...catalogJobHandlers,
   ...preparationJobHandlers,
@@ -333,6 +352,7 @@ const allJobHandlers: JobHandlers = {
   ...mailJobHandlers,
   ...dispatchJobHandlers,
   ...fixtureJobHandlers,
+  ...watchJobHandlers,
   ...testJobHandlers,
 };
 
@@ -350,6 +370,7 @@ const worker = startJobWorker(
 if (activeDispatcher !== null) {
   await activeDispatcher.recover();
   activeDispatcher.ensureRecoveryQueued();
+  ensureWatchQueued(db, clock);
 }
 
 if (dispatchTick !== null) {

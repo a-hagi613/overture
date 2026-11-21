@@ -512,14 +512,20 @@ export function createCandidateService(deps: CandidateDeps) {
         activeCompanies.add(row.companyId);
       }
 
-      if (row.status === "sent" && row.sentAt !== null) {
-        if (row.sentAt >= at - cooldownDays * DAY_MS) {
-          recentCompanies.add(row.companyId);
-        }
+      if (
+        row.status === "sent" &&
+        row.sentAt !== null &&
+        row.sentAt >= at - cooldownDays * DAY_MS
+      ) {
+        recentCompanies.add(row.companyId);
+      }
 
-        if (row.sentAt >= at - repostDays * DAY_MS) {
-          repostKeys.add(row.dedupeKey);
-        }
+      if (
+        (row.status === "sent" || row.status === "failed") &&
+        row.sentAt !== null &&
+        row.sentAt >= at - repostDays * DAY_MS
+      ) {
+        repostKeys.add(row.dedupeKey);
       }
     }
 

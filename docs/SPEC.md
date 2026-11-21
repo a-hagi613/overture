@@ -665,14 +665,16 @@ the employer may have the application, and a retry could send it twice.
 
 **Confirming.** An application in `confirming` waits up to `limits.confirm_wait_hours` (24) for an acknowledgement:
 forwarded mail to the user's forwarding address with `auth='pass'`, from the company's or the ATS's sender domains, naming the company
-or the posting title, received after `submit_clicked_at`. Found → commit, `sent`, snapshot (`confirmed_by='email'`).
+or the posting title, received after `submit_clicked_at`. Ingest checks each authenticated message as it arrives, and the
+recovery sweep rechecks stored mail, so a message that arrives while the process is down still counts. Found → commit, `sent`, snapshot (`confirmed_by='email'`).
 Not found → release, `failed` with reason `unconfirmed`, never retried, and the posting's `dedupe_key` is treated as
 sent for the 60-day guard so Overture cannot apply to it again. Shown as `Couldn't apply` with the line "Overture
 couldn't confirm this one reached the employer, so it won't send it again. Nothing was charged." `confirming` does not occupy
 the one-in-flight slot (the partial unique index covers `sending` only) and counts toward the company rule (§8.1).
 
 **Recovery sweep** (every minute, and once on boot): an attempt whose `lease_until` has passed with no outcome is
-closed as `unconfirmed` if `submit_clicked_at` is set, else as `crash`, and the table above applies. The same sweep
+closed as `unconfirmed` if `submit_clicked_at` is set, else as `crash`, and the table above applies. A `confirming`
+application past `limits.confirm_wait_hours` without an acknowledgement is released and failed as above. The same sweep
 lists the provider's open sessions and stops any whose attempt is closed or unknown (a crashed process never runs
 `finally`).
 

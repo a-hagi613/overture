@@ -169,13 +169,30 @@ const attemptsQuery = z.object({ applicationId: z.string().min(1) });
 
 const seedAttemptBody = z.object({
   applicationId: z.string().min(1),
-  userId: z.string().min(1),
-  provider: z.enum(["browser_use", "kernel", "local"]).default("browser_use"),
+  userId: z.string().min(1).optional(),
+  provider: z.enum(["browser_use", "kernel", "local"]).default("local"),
   providerSessionId: z.string().min(1).nullish(),
-  n: z.number().int().min(1).default(1),
+  n: z.number().int().min(1).optional(),
   outcome: z
-    .enum(["sent", "unconfirmed", "provider_error", "timeout", "blocked", "posting_closed"])
+    .enum([
+      "sent",
+      "unconfirmed",
+      "captcha_blocked",
+      "code_timeout",
+      "posting_closed",
+      "form_changed",
+      "blocked",
+      "upload_failed",
+      "duplicate",
+      "needs_review",
+      "provider_error",
+      "timeout",
+      "crash",
+      "interrupted",
+      "identity_mismatch",
+    ])
     .default("sent"),
+  at: z.number().int().nullish(),
   startedAt: z.number().int().optional(),
   browserMs: z.number().int().nonnegative().default(0),
   proxyBytes: z.number().int().nonnegative().default(0),
@@ -183,6 +200,8 @@ const seedAttemptBody = z.object({
   captchaSeen: z.boolean().default(false),
   codeUsed: z.boolean().default(false),
 });
+
+const seedAttemptsBody = z.object({ attempts: z.array(seedAttemptBody).min(1).max(200) });
 
 const seedAnswerBody = z.object({
   applicationId: z.string().min(1),
@@ -1106,6 +1125,19 @@ export function createTestRoutes(
     const startedAt = rest.startedAt ?? clock.now();
     const id = crypto.randomUUID();
 
+    const application =
+      userId === undefined
+        ? db
+            .select({ userId: applications.userId })
+            .from(applications)
+            .where(eq(applications.id, applicationId))
+            .get()
+        : { userId };
+
+    if (application === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
     db.insert(attempts)
       .values({
         applicationId,
@@ -1116,19 +1148,63 @@ export function createTestRoutes(
         endedAt: startedAt + rest.browserMs,
         id,
         leaseUntil: startedAt + 15 * 60_000,
-        n: rest.n,
+        n: rest.n ?? 1,
         outcome: rest.outcome,
         provider: rest.provider,
         providerSessionId: rest.providerSessionId ?? null,
         proxyBytes: rest.proxyBytes,
         startedAt,
-        submitClickedAt: null,
-        submitResponseStatus: null,
-        userId,
+        submitClickedAt:
+          rest.outcome === "sent" || rest.outcome === "unconfirmed" ? startedAt : null,
+        submitResponseStatus: rest.outcome === "sent" ? 200 : null,
+        userId: application.userId,
       })
       .run();
 
     return context.json({ id });
+  });
+
+  routes.post("/attempts", zValidator("json", seedAttemptsBody), (context) => {
+    const { attempts: rows } = context.req.valid("json");
+    const now = clock.now();
+
+    for (const [index, row] of rows.entries()) {
+      const at = row.startedAt ?? row.at ?? now - index;
+
+      const application = db
+        .select({ userId: applications.userId })
+        .from(applications)
+        .where(eq(applications.id, row.applicationId))
+        .get();
+
+      if (application === undefined) {
+        return context.json({ error: "not found" }, 404);
+      }
+
+      db.insert(attempts)
+        .values({
+          applicationId: row.applicationId,
+          browserMs: row.browserMs,
+          captchaSeen: row.captchaSeen || row.outcome === "captcha_blocked",
+          codeUsed: row.codeUsed,
+          costMicros: row.costMicros,
+          endedAt: at + row.browserMs,
+          id: crypto.randomUUID(),
+          leaseUntil: at + 15 * 60_000,
+          n: row.n ?? index + 1,
+          outcome: row.outcome,
+          provider: row.provider,
+          providerSessionId: row.providerSessionId ?? null,
+          proxyBytes: row.proxyBytes,
+          startedAt: at,
+          submitClickedAt: row.outcome === "sent" || row.outcome === "unconfirmed" ? at : null,
+          submitResponseStatus: row.outcome === "sent" ? 200 : null,
+          userId: application.userId,
+        })
+        .run();
+    }
+
+    return context.json({ seeded: rows.length });
   });
 
   routes.post("/snapshots/tamper", zValidator("json", tamperSnapshotBody), (context) => {
