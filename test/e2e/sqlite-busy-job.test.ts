@@ -79,7 +79,7 @@ test("a write lock held past busy_timeout is logged and retried, and the worker 
     lock.close();
   }
 
-  lock.exec("PRAGMA busy_timeout = 0");
+  lock.exec("PRAGMA busy_timeout = 5000");
   lock.exec("BEGIN IMMEDIATE");
 
   try {

@@ -338,7 +338,7 @@ test("a skip list saved while the sweep holds the write lock still takes effect"
 
   const blocker = new Database(databasePath);
 
-  blocker.run("PRAGMA busy_timeout = 0;");
+  blocker.run("PRAGMA busy_timeout = 5000;");
   blocker.run("BEGIN IMMEDIATE;");
 
   const release = setTimeout(() => {

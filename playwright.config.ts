@@ -105,6 +105,16 @@ export default defineConfig({
       },
     },
     {
+      name: "code-wait-boards",
+      testMatch: /board-match-code-wait\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/../../design/reference/code-wait/{arg}{ext}",
+        },
+      },
+    },
+    {
       name: "onboarding-boards",
       testMatch: /board-match-onboarding-facts\.test\.ts/u,
       expect: {

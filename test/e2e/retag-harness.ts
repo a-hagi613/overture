@@ -125,6 +125,7 @@ function count(database: DatabaseSync, query: string) {
 
 export function readRetagState(databasePath: string) {
   const database = new DatabaseSync(databasePath, { readOnly: true });
+  database.exec("PRAGMA busy_timeout = 5000;");
 
   try {
     return {
