@@ -23,7 +23,7 @@ import {
   profiles,
   resumes,
 } from "../platform/db/schema.ts";
-import type { SendPlan, SendPlanField } from "./send-plan.ts";
+import type { FormQuestion, SendPlan, SendPlanField } from "./send-plan.ts";
 import { createFactService } from "../profile/facts.ts";
 import { guardPosting } from "./guard/posting-guard.ts";
 import { createOpenTextService, isCoverLetterQuestion } from "./open-text.ts";
@@ -395,6 +395,7 @@ export function createPreparationService(deps: {
   function syncReviews(input: {
     userId: string;
     applicationId: string;
+    attemptId?: string;
     blocked: readonly {
       questionId: string;
       factKey: string | null;
@@ -418,6 +419,7 @@ export function createPreparationService(deps: {
 
     for (const entry of input.blocked) {
       const reviewId = ensureOpenReview(db, clock, {
+        attemptId: input.attemptId ?? null,
         userId: input.userId,
         questionId: entry.questionId,
         factKey: entry.factKey,
@@ -500,6 +502,83 @@ export function createPreparationService(deps: {
     }
 
     return reviewIds;
+  }
+
+  async function recordBrowserQuestions(input: {
+    applicationId: string;
+    attemptId: string;
+    questions: readonly FormQuestion[];
+  }) {
+    const row = db
+      .select({
+        userId: applications.userId,
+        postingId: applications.postingId,
+        companyName: companies.name,
+      })
+      .from(applications)
+      .innerJoin(postings, eq(postings.id, applications.postingId))
+      .innerJoin(companies, eq(companies.id, postings.companyId))
+      .where(eq(applications.id, input.applicationId))
+      .get();
+
+    if (row === undefined) {
+      return { blocked: 0 };
+    }
+
+    const entries = input.questions.map((question, position) => {
+      const record = catalog.findOrCreate({
+        text: question.label,
+        fieldType: question.fieldType,
+        options: question.options,
+        companyNames: [row.companyName],
+      });
+
+      return {
+        fieldName: question.fieldName,
+        options: question.options,
+        position,
+        questionId: record.id,
+        required: question.required,
+      };
+    });
+
+    catalog.savePostingQuestions(row.postingId, entries);
+
+    const prepared = await answersFor(input.applicationId);
+    const blocked: BlockedQuestion[] = [];
+
+    for (const answer of prepared) {
+      if (!answer.required || answer.resolved) {
+        continue;
+      }
+
+      if (
+        answer.block === "open_text_ungrounded" ||
+        isUnsupportedBlock(answer.block) ||
+        answer.reason === null
+      ) {
+        continue;
+      }
+
+      blocked.push({
+        factKey: answer.answerKind === "fact" ? answer.factKey : null,
+        fieldType: answer.fieldType,
+        options: answer.options,
+        prompt: answer.text,
+        questionId: answer.questionId,
+        reason: answer.reason,
+        scope: answer.scope,
+      });
+    }
+
+    syncReviews({
+      applicationId: input.applicationId,
+      attemptId: input.attemptId,
+      blocked,
+      userId: row.userId,
+    });
+
+    return { blocked: blocked.length };
   }
 
   async function prepare(applicationId: string) {
@@ -977,7 +1056,14 @@ export function createPreparationService(deps: {
     );
   }
 
-  return { answersFor, openAttemptReviews, prepare, prepareMany, sendPlanFor };
+  return {
+    answersFor,
+    openAttemptReviews,
+    prepare,
+    prepareMany,
+    recordBrowserQuestions,
+    sendPlanFor,
+  };
 }
 
 export type PreparationService = ReturnType<typeof createPreparationService>;

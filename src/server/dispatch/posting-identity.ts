@@ -1,6 +1,7 @@
 import type { Page } from "playwright-core";
 
 export interface PostingIdentity {
+  ats: "greenhouse" | "lever" | "ashby";
   url: string;
   boardToken: string;
   jobId: string;
@@ -17,32 +18,56 @@ const GREENHOUSE_BOARD_HOSTS: ReadonlySet<string> = new Set([
   "job-boards.eu.greenhouse.io",
 ]);
 
-const sameHost = (expected: string, live: string) =>
-  expected === live || (GREENHOUSE_BOARD_HOSTS.has(expected) && GREENHOUSE_BOARD_HOSTS.has(live));
+const LEVER_BOARD_HOSTS: ReadonlySet<string> = new Set(["jobs.lever.co", "jobs.eu.lever.co"]);
 
-const postingPath = (url: URL) => {
-  if (url.pathname === "/embed/job_app") {
+const ASHBY_BOARD_HOSTS: ReadonlySet<string> = new Set(["jobs.ashbyhq.com"]);
+
+const sameHost = (ats: PostingIdentity["ats"], expected: string, live: string) => {
+  if (expected === live) {
+    return true;
+  }
+
+  if (ats === "greenhouse") {
+    return GREENHOUSE_BOARD_HOSTS.has(expected) && GREENHOUSE_BOARD_HOSTS.has(live);
+  }
+
+  if (ats === "lever") {
+    return LEVER_BOARD_HOSTS.has(expected) && LEVER_BOARD_HOSTS.has(live);
+  }
+
+  return ASHBY_BOARD_HOSTS.has(expected) && ASHBY_BOARD_HOSTS.has(live);
+};
+
+const pathSegments = (pathname: string) =>
+  pathname
+    .split("/")
+    .filter((segment) => segment !== "")
+    .map((segment) => decodeURIComponent(segment));
+
+function postingPath(ats: PostingIdentity["ats"], url: URL) {
+  if (ats === "greenhouse" && url.pathname === "/embed/job_app") {
     const boardToken = url.searchParams.get("for");
     const jobId = url.searchParams.get("token");
 
     return boardToken === null || jobId === null ? null : { boardToken, jobId };
   }
 
-  const segments = url.pathname
-    .split("/")
-    .filter((segment) => segment !== "")
-    .map((segment) => decodeURIComponent(segment));
+  const segments = pathSegments(url.pathname);
 
-  const jobsIndex = segments.indexOf("jobs");
-  const boardToken = segments[jobsIndex - 1];
-  const jobId = segments[jobsIndex + 1];
+  if (ats === "greenhouse") {
+    const jobsIndex = segments.indexOf("jobs");
+    const boardToken = segments[jobsIndex - 1];
+    const jobId = segments[jobsIndex + 1];
 
-  if (jobsIndex < 1 || boardToken === undefined || jobId === undefined) {
-    return null;
+    return jobsIndex < 1 || boardToken === undefined || jobId === undefined
+      ? null
+      : { boardToken, jobId };
   }
 
-  return { boardToken, jobId };
-};
+  const [boardToken, jobId] = segments;
+
+  return boardToken === undefined || jobId === undefined ? null : { boardToken, jobId };
+}
 
 const normalizedCompany = (value: string) =>
   value
@@ -50,7 +75,23 @@ const normalizedCompany = (value: string) =>
     .toLowerCase()
     .replaceAll(/[^\p{L}\p{N}]+/gu, "");
 
-const companyFromTitle = (title: string) => {
+const companyFromTitle = (ats: PostingIdentity["ats"], title: string) => {
+  if (ats === "lever") {
+    const index = title.lastIndexOf(" - ");
+    const company = index === -1 ? "" : title.slice(0, index).trim();
+
+    return company === "" ? null : company;
+  }
+
+  if (ats === "ashby") {
+    const index = title.lastIndexOf(" @ ");
+    const company = index === -1 ? "" : title.slice(index + 3).trim();
+
+    if (company !== "") {
+      return company;
+    }
+  }
+
   const index = title.toLowerCase().lastIndexOf(" at ");
   const company = index === -1 ? "" : title.slice(index + 4).trim();
 
@@ -75,11 +116,11 @@ export async function checkPostingIdentity(page: Page, expected: PostingIdentity
     return mismatch("unreadable");
   }
 
-  if (!sameHost(posting.host.toLowerCase(), live.host.toLowerCase())) {
+  if (!sameHost(expected.ats, posting.host.toLowerCase(), live.host.toLowerCase())) {
     return mismatch("host");
   }
 
-  const livePosting = postingPath(live);
+  const livePosting = postingPath(expected.ats, live);
 
   if (livePosting === null) {
     return mismatch("unreadable");
@@ -93,7 +134,7 @@ export async function checkPostingIdentity(page: Page, expected: PostingIdentity
     return mismatch("job_id");
   }
 
-  const liveCompany = companyFromTitle(await page.title());
+  const liveCompany = companyFromTitle(expected.ats, await page.title());
 
   if (
     liveCompany === null ||
