@@ -97,7 +97,16 @@ async function expectPhoneBoardMatches(browser: Browser, appServerUrl: string, t
     page.getByText("Twenty-nine applications across six stages").filter({ visible: true }),
   ).toBeVisible();
   await expect(page.getByText("63 left").filter({ visible: true })).toBeVisible();
-  await page.evaluate(async () => document.fonts.ready);
+  await page.evaluate(async () => {
+    await Promise.all([
+      document.fonts.load('400 16px "Plus Jakarta Sans"'),
+      document.fonts.load('600 16px "Plus Jakarta Sans"'),
+      document.fonts.load('400 16px "Instrument Serif"'),
+      document.fonts.load('400 12px "IBM Plex Mono"'),
+    ]);
+    await document.fonts.ready;
+  });
+  await page.waitForLoadState("networkidle");
 
   const results = await new AxeBuilder({ page }).analyze();
 
