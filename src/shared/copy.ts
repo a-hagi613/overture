@@ -304,6 +304,22 @@ export const copy = {
     resetPasswordSubject: "Choose a new Overture password",
     resetPasswordBody: (url: string) =>
       `Open this link to choose a new Overture password. It works once and expires in one hour. If you did not ask for this, ignore this email.\n\n${url}\n`,
+    accountDeletedSubject: "Your Overture account has been deleted",
+    accountDeletedBody: (name: string) => {
+      const first = name.trim().split(/\s+/u)[0] ?? "";
+      const greeting = first === "" ? "Hi," : `Hi ${first},`;
+
+      return [
+        greeting,
+        "",
+        "Your Overture account and its data have been erased. Your forwarding address is retired and will not be used again.",
+        "",
+        "If you didn’t ask for this, write to admin@tryoverture.com as soon as you can.",
+        "",
+        "Overture",
+        "",
+      ].join("\n");
+    },
     recapSubject: (ready: number, needAnswer: number) => {
       const readyPart = `${String(ready)} ready to approve`;
 
@@ -809,6 +825,88 @@ export const copy = {
     legalConsentRead: "Read the consent",
     legalOpen: "Open",
     legalSeparator: " · ",
+    dangerHeading: "Danger zone",
+    deleteTitle: "Delete account",
+    deleteDetail: "Permanently deletes your facts, letters and applications. This can’t be undone.",
+    deleteButton: "Delete account",
+  },
+  settingsAccount: {
+    tabsLabel: "Settings pages",
+    tabs: {
+      notifications: "Notifications",
+      export: "Export",
+      delete: "Delete account",
+      supportAccess: "Support access",
+      legal: "Terms and privacy",
+    },
+    unavailable: "This page arrives with its own ticket.",
+  },
+  deleteAccount: {
+    titlePlain: "Delete your",
+    titleItalic: "account",
+    lead: "Permanent, and it cannot be undone",
+    steps: {
+      warning: "Before you start",
+      reauth: "Confirm it’s you",
+      confirm: "Confirm",
+      erasing: "Erasing",
+      email: "Confirmation email",
+    },
+    warningHeading: "This erases everything",
+    cannotUndo: "Deleting your account can’t be undone.",
+    erasedIntro: "These are erased:",
+    erasedItems: [
+      "Your facts, resume and cover letters",
+      "Every Application, its history and its messages",
+      "Stored files and attachments",
+      "Your saved preferences and push subscriptions",
+    ],
+    addressBold: "Your forwarding address is retired forever.",
+    addressSample: "in-…@tryoverture.com",
+    addressRest: "will never be given to anyone else, and it is never reused.",
+    completes: "Erasing completes within 24 hours. You get a confirmation email when it is done.",
+    continueToDelete: "Continue to delete",
+    keepAccount: "Keep my account",
+    reauthHeading: "Enter your password",
+    reauthBody: "Deleting needs a fresh check. Enter the password you sign in with.",
+    passwordLabel: "Password",
+    passwordPlaceholder: "Your password",
+    confirmIdentity: "Confirm",
+    sendLink: "Send a sign-in link instead",
+    linkSent: "A sign-in link is on its way. Open it on this device, then come back here.",
+    reauthenticated: "Confirmed. You can delete your account now.",
+    passwordNotSet: "This account signs in with an emailed link. Send one instead.",
+    wrongPassword: "That password did not match. Try again.",
+    confirmHeading: "Delete account",
+    confirmCheckbox:
+      "I understand my data is erased, and my forwarding address is retired forever.",
+    deleteButton: "Delete my account",
+    cancel: "Cancel",
+    erasingHeading: "Erasing your account",
+    erasingPill: "Erasing within 24 hours",
+    erasingBody:
+      "Your data is being erased now. It will be gone within 24 hours and this can’t be undone. You don’t need to do anything else.",
+    emailHeading: "What arrives when it is done",
+    emailFromLabel: "From",
+    emailSubjectLabel: "Subject",
+    emailFrom: "Overture <no-reply@tryoverture.com>",
+    emailSubject: "Your Overture account has been deleted",
+    emailHi: (name: string) => (name.trim() === "" ? "Hi," : `Hi ${name.trim()},`),
+    emailBody:
+      "Your Overture account and its data have been erased. Your forwarding address is retired and will not be used again.",
+    emailContact: "If you didn’t ask for this, write to admin@tryoverture.com as soon as you can.",
+    emailSignoff: "Overture",
+    errors: {
+      unauthorised: "Sign in again, then come back to this page.",
+      reauthRequired: "Confirm it’s you before deleting the account.",
+      passwordRequired: "Enter your password to confirm it’s you.",
+      wrongPassword: "That password did not match. Try again.",
+      passwordNotSet: "This account signs in with an emailed link. Send one instead.",
+      linkFailed: "The sign-in link did not go out. Try again.",
+      deleteFailed: "The account could not be deleted. Try again.",
+      tooMany: "Too many tries. Wait a few minutes and try again.",
+      confirmRequired: "Tick the box to confirm you understand what is erased.",
+    },
   },
   profile: {
     sectionsLabel: "Profile sections",
@@ -1355,7 +1453,14 @@ export const copy = {
     continue: "Continue",
     signOut: "Sign out",
     saveFailed: "That did not save. Try again.",
-    loadFailed: "That did not load. Reload the page.",
+    loading: "Loading…",
+    loadFailedTitle: "That did not load",
+    loadFailedBody: "Overture could not load this step. Try again; your answers so far are saved.",
+    retry: "Try again",
+    retrying: "Trying again…",
+    emptyTargetsTitle: "Nothing to choose from yet",
+    emptyTargets:
+      "Overture has no open postings to match against yet. Try again in a few minutes; your answers so far are saved.",
   },
   notifications: {
     page: {

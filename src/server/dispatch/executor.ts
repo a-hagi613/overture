@@ -12,6 +12,7 @@ import type { PreparationService } from "../pipeline/prepare.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { LiveFormProblem } from "./forms/engine.ts";
 import type {
+  BrowserProvider,
   BrowserProviderRegistry,
   BrowserUsage,
   ProviderUnavailableReason,
@@ -433,6 +434,20 @@ export function createDispatcher(deps: DispatcherDeps) {
       return false;
     }
 
+    const releaseSessionSlot = await acquireBrowserSession(signal);
+
+    try {
+      if (switchedOffAtSend(applicationId, provider.id)) {
+        return false;
+      }
+
+      return await attemptWithSlot(applicationId, provider);
+    } finally {
+      releaseSessionSlot();
+    }
+  }
+
+  async function attemptWithSlot(applicationId: string, provider: BrowserProvider) {
     const at = clock.now();
 
     const claimed = db
@@ -498,7 +513,6 @@ export function createDispatcher(deps: DispatcherDeps) {
     activeAttempts.add(attemptId);
 
     let browser: RemoteBrowser | null = null;
-    let releaseSessionSlot: (() => void) | null = null;
     let usage = zeroUsage;
     let outcome: AttemptRow["outcome"] = "provider_error";
     let shutdownActive = false;
@@ -570,8 +584,6 @@ export function createDispatcher(deps: DispatcherDeps) {
       if (isShuttingDown()) {
         throw new Error("shutting down before the browser opened");
       }
-
-      releaseSessionSlot = await acquireBrowserSession(signal);
 
       browser = await provider.open({
         attemptId,
@@ -897,10 +909,6 @@ export function createDispatcher(deps: DispatcherDeps) {
 
           usage = zeroUsage;
         }
-      }
-
-      if (releaseSessionSlot !== null) {
-        releaseSessionSlot();
       }
 
       const finished = db.select().from(attempts).where(eq(attempts.id, attemptId)).get();

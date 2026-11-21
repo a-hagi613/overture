@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
 import { AccountRow } from "../components/account-row.tsx";
@@ -98,6 +99,26 @@ export function SettingsPage() {
                 {copy.settings.signOutAllButton}
               </button>
             </div>
+          </div>
+        </section>
+        <section
+          aria-labelledby="settings-danger"
+          className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh min-[900px]:col-span-2"
+        >
+          <h2 id="settings-danger" className="font-serif text-[26px] leading-[1.1]">
+            {copy.settings.dangerHeading}
+          </h2>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-3.5">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">{copy.settings.deleteTitle}</p>
+              <p className="text-[12.5px] text-muted-foreground">{copy.settings.deleteDetail}</p>
+            </div>
+            <Link
+              className="inline-flex h-11 flex-none items-center justify-center rounded-md border border-need bg-card px-[18px] text-[13.5px] font-semibold text-need hover:bg-need-soft"
+              to="/settings/delete"
+            >
+              {copy.settings.deleteButton}
+            </Link>
           </div>
         </section>
       </div>

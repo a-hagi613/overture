@@ -1,15 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
-export const STAGE_KEYS = [
-  "queued",
-  "ready",
-  "applied",
-  "screening",
-  "interviewing",
-  "offer",
-  "closed",
-] as const;
+import { BOARD_STAGES } from "../../shared/board.ts";
+
+export const STAGE_KEYS = BOARD_STAGES;
 
 export type StageKey = (typeof STAGE_KEYS)[number];
 

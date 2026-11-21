@@ -14,6 +14,7 @@ import type { ReviewService } from "./pipeline/reviews.ts";
 import type { createMailboxService } from "./inbox/mailboxes.ts";
 import type { BrowserProviderRegistry } from "./dispatch/browser/provider.ts";
 import type { CatalogSweepWorker } from "./catalog/sweep-worker-runner.ts";
+import type { AccountEraser } from "./account/erase.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
 import { createMeRoutes } from "./routes/me.ts";
@@ -39,6 +40,7 @@ import { createMatchingService } from "./matching/score.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
 import { createPasswordResetRoutes } from "./routes/password-reset.ts";
+import { createAccountRoutes } from "./routes/account.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { securityHeaders } from "./security-headers.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
@@ -61,6 +63,7 @@ export interface AppDependencies {
   singletonJobKinds: readonly string[];
   providers: BrowserProviderRegistry | null;
   catalogWorker: CatalogSweepWorker;
+  eraser: AccountEraser;
 }
 
 async function staticResponseFrom(root: string, url: string) {
@@ -142,6 +145,15 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createApiRoutes(deps.db, deps.clock, deps.auth));
   app.route("/api", createNotificationRoutes(deps.db, deps.clock, deps.auth));
   app.route("/api", createProfileRoutes(deps));
+  app.route(
+    "/api",
+    createAccountRoutes({
+      auth: deps.auth,
+      clock: deps.clock,
+      db: deps.db,
+      eraser: deps.eraser,
+    }),
+  );
   app.route(
     "/api",
     createOnboardingRoutes({
