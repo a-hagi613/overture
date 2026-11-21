@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-const SCRIPT_BLOCK = /<script\b[^>]*>[\s\S]*?<\/script>/giu;
+const SCRIPT_BLOCK = /<script\b[^>]*>[\s\S]*?<\/script\s*>/giu;
 
 const EVENT_ATTRIBUTE = /\son[a-z]+(?:=(?:"[^"]*"|'[^']*'|[^\s>]+))?/giu;
 
@@ -71,6 +71,14 @@ export function assetExtension(contentType: string, url: string) {
   return fromUrl?.toLowerCase() ?? "bin";
 }
 
+function escapeAttribute(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
 function sanitisedUrl(raw: string) {
   try {
     const url = new URL(raw, "https://fixture.invalid");
@@ -112,7 +120,7 @@ export function sanitiseFormHtml(html: string) {
   return stripped.replaceAll(
     URL_ATTRIBUTE,
     (_match, prefix: string, double?: string, single?: string, bare?: string) =>
-      `${prefix}"${sanitisedUrl(double ?? single ?? bare ?? "")}"`,
+      `${prefix}"${escapeAttribute(sanitisedUrl(double ?? single ?? bare ?? ""))}"`,
   );
 }
 
