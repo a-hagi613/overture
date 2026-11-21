@@ -2979,6 +2979,22 @@ export function createTestRoutes(
   );
 
   routes.post(
+    "/mailboxes/first-forwarded",
+    zValidator("json", z.object({ userId: z.string().min(1) })),
+    async (context) => {
+      if (testMailboxes === null) {
+        return context.json({ error: "inbound_not_configured" }, 503);
+      }
+
+      const mailbox = await testMailboxes.ensureFor(context.req.valid("json").userId);
+
+      testMailboxes.markFirstForwarded(mailbox.id, clock.now());
+
+      return context.json({ ok: true });
+    },
+  );
+
+  routes.post(
     "/mailboxes/:id/status",
     zValidator("json", z.object({ status: z.enum(["active", "receive_only", "closed"]) })),
     (context) => {

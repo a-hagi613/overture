@@ -74,7 +74,7 @@ export function OnboardingTargetsPage() {
         backTo="/onboarding/facts"
         onContinue={async () => {
           await finish.mutateAsync(4);
-          await navigate("/profile#profile-targets");
+          await navigate("/onboarding/forward");
         }}
         save={async (next) => save.mutateAsync(next)}
         saveSkip={saveSkipCompanies}

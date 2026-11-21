@@ -205,6 +205,25 @@ body {
   border-color: var(--btnh);
 }
 
+.board .btn:disabled {
+  background: var(--mut);
+  border-color: var(--mut);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.board .btn:focus-visible,
+.board .btn2:focus-visible,
+.onb .btng:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.board .btn2:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .board .btn2 {
   line-height: normal;
   display: inline-flex;

@@ -149,6 +149,25 @@ export function ensurePrepDailyQueued(db: AppDatabase, clock: Clock, userId: str
   enqueueRun(db, clock, userId, tomorrowAt, dedupeKeyFor(userId, tomorrowAt, timeZone), tomorrowAt);
 }
 
+/**
+ * Schedule only the next run at `prep.run_local_time`, never a catch-up for
+ * today. Onboarding's Start uses it: pressing Start must not launch a run.
+ * @param db The application database.
+ * @param clock The clock the schedule is read from.
+ * @param userId The user to schedule.
+ * @returns When the run is due.
+ */
+export function ensurePrepNextQueued(db: AppDatabase, clock: Clock, userId: string) {
+  const now = clock.now();
+  const timeZone = effectiveTimeZone(db, userId, now);
+  const runMinutes = parsePrepRunMinutes(getSetting(db, "prep.run_local_time"));
+  const runAt = nextPrepRunAt(now, timeZone, runMinutes);
+
+  enqueueRun(db, clock, userId, runAt, dedupeKeyFor(userId, runAt, timeZone), runAt);
+
+  return runAt;
+}
+
 export function ensurePrepQueuedForRunningUsers(db: AppDatabase, clock: Clock) {
   const running = db
     .select({ userId: profiles.userId })

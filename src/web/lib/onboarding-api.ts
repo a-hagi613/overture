@@ -229,3 +229,44 @@ export function useSaveOnboardingTargets() {
 export function useSaveOnboardingTimezone() {
   return useMutation({ mutationFn: saveOnboardingTimezone });
 }
+
+const mailboxSchema = z.object({
+  address: z.string(),
+  firstForwardedAt: z.number().nullable(),
+  forwardingWorks: z.boolean(),
+});
+
+export const mailboxKey = ["onboarding-mailbox"] as const;
+
+export async function fetchOnboardingMailbox() {
+  return mailboxSchema.parse(await jsonFrom(await fetch("/api/profile/mailbox")));
+}
+
+export async function startOnboarding() {
+  return onboardingStateSchema.parse(
+    await jsonFrom(await fetch("/api/onboarding/start", { method: "POST" })),
+  );
+}
+
+/**
+ * The forwarding address, re-read every few seconds until the first mail arrives.
+ * @returns The mailbox query.
+ */
+export function useOnboardingMailbox() {
+  return useQuery({
+    queryFn: fetchOnboardingMailbox,
+    queryKey: mailboxKey,
+    refetchInterval: (query) => (query.state.data?.forwardingWorks === true ? false : 4000),
+  });
+}
+
+export function useStartOnboarding() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: startOnboarding,
+    onSuccess: (state) => {
+      client.setQueryData(stateKey, state);
+    },
+  });
+}

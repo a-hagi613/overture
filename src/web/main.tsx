@@ -18,6 +18,7 @@ import { ReadyPage } from "./routes/ready.tsx";
 import { OnboardingPage } from "./routes/onboarding.tsx";
 import { OnboardingResumePage } from "./routes/onboarding-resume.tsx";
 import { OnboardingFactsPage } from "./routes/onboarding-facts.tsx";
+import { OnboardingForwardPage } from "./routes/onboarding-forward.tsx";
 import { OnboardingTargetsPage } from "./routes/onboarding-targets.tsx";
 import { PrivacyPage } from "./routes/privacy.tsx";
 import { ReviewPage } from "./routes/review.tsx";
@@ -81,6 +82,7 @@ const router = createBrowserRouter([
   { path: "/reset-password", element: <ResetPasswordPage /> },
   { path: "/onboarding/facts", element: <OnboardingFactsPage /> },
   { path: "/onboarding/targets", element: <OnboardingTargetsPage /> },
+  { path: "/onboarding/forward", element: <OnboardingForwardPage /> },
 ]);
 
 const queryClient = new QueryClient();
