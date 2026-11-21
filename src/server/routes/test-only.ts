@@ -1,4 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
+import { Buffer } from "node:buffer";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { Hono } from "hono";
@@ -9,8 +10,10 @@ import type { JobHandlers } from "../platform/jobs/run-due.ts";
 import type { AdjustableClock } from "../platform/ports/clock.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
 import type { CatalogSweepWorker } from "../catalog/sweep-worker-runner.ts";
+import type { ObjectStore } from "../platform/ports/object-store.ts";
 
 import {
+  accountExports,
   accounts,
   applications,
   applicationAnswers,
@@ -42,6 +45,7 @@ import {
   questions,
   reviewApplications,
   reviews,
+  resumes,
   sessions,
   tagImports,
   users,
@@ -79,8 +83,10 @@ import { normalizeFieldType, questionVariantHash } from "../catalog/question-nor
 import { mapQuestionByRules } from "../catalog/question-rules.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
+import { newExportKey } from "../../shared/export-crypto.ts";
 import { createCodeWait, wakeCodeWaits } from "../inbox/waits.ts";
 import { createMailboxService } from "../inbox/mailboxes.ts";
+import { listExportsOf } from "../export/service.ts";
 import { readLiveCheckResults } from "../live-checks/store.ts";
 import { runAlertDrill } from "../live-checks/alerts.ts";
 import { env } from "../config/env.ts";
@@ -201,6 +207,12 @@ const homePauseBody = z.object({
   ]),
 });
 
+const seedAttachmentBody = z.object({
+  filename: z.string().min(1),
+  mime: z.string().min(1),
+  text: z.string().min(1),
+});
+
 const seedMailBody = z.object({
   userId: z.string().min(1),
   applicationId: z.string().min(1).nullish(),
@@ -212,11 +224,44 @@ const seedMailBody = z.object({
     .enum(["ack", "code", "rejection", "screening", "interview", "offer", "other"])
     .default("other"),
   at: z.number().int().nullish(),
+  attachments: z.array(seedAttachmentBody).optional(),
 });
 
-const tamperLedgerBody = z.object({
-  action: z.enum(["delete", "delete-owner", "update"]),
+const seedSnapshotBody = z.object({
+  applicationId: z.string().min(1),
+  answers: z.array(
+    z.object({
+      label: z.string(),
+      answer: z.string().nullable(),
+      by_user: z.boolean().optional(),
+      fact_key: z.string().nullable().optional(),
+      fact_revision: z.number().nullable().optional(),
+      kind: z.string().optional(),
+      question_id: z.string().nullable().optional(),
+      resume_line_ids: z.array(z.string()).optional(),
+    }),
+  ),
+  coverLetter: z
+    .array(z.object({ sentence: z.string(), by_user: z.boolean().optional() }))
+    .nullable()
+    .default(null),
 });
+
+const bulkMailBody = z.object({
+  userId: z.string().min(1),
+  count: z.number().int().min(1).max(2000),
+  bodyBytes: z
+    .number()
+    .int()
+    .min(1)
+    .max(2 * 1024 * 1024),
+  at: z.number().int().nullish(),
+  senderDomain: z.string().min(1).default("us.greenhouse-mail.io"),
+});
+
+const exportsQuery = z.object({ userId: z.string().min(1) });
+
+const tamperLedgerBody = z.object({ action: z.enum(["delete", "delete-owner", "update"]) });
 
 const tamperSnapshotBody = z.object({
   applicationId: z.string().min(1),
@@ -598,6 +643,7 @@ export function createTestRoutes(
   singletonJobKinds: readonly string[],
   preparation: PreparationService | null = null,
   catalogWorker: CatalogSweepWorker | null = null,
+  objects: ObjectStore | null = null,
 ) {
   const routes = new Hono();
 
@@ -758,6 +804,34 @@ export function createTestRoutes(
       })
       .run();
 
+    const attachmentRows = await Promise.all(
+      (body.attachments ?? []).map(async (attachment) => {
+        const attachmentId = crypto.randomUUID();
+        const objectKey = `mail/${body.userId}/attachments/${attachmentId}`;
+
+        const sealed = await personal.sealFor(
+          body.userId,
+          { column: "body", rowId: objectKey, table: "mail_objects" },
+          Buffer.from(attachment.text).toString("base64"),
+        );
+
+        await objects?.put(objectKey, new TextEncoder().encode(sealed));
+
+        return {
+          bytes: new TextEncoder().encode(attachment.text).byteLength,
+          filenameEnc: await personal.sealFor(
+            body.userId,
+            { column: "filename_enc", rowId: attachmentId, table: "message_attachments" },
+            attachment.filename,
+          ),
+          id: attachmentId,
+          messageId,
+          mime: attachment.mime,
+          objectKey,
+        };
+      }),
+    );
+
     db.insert(messages)
       .values({
         auth: "pass",
@@ -781,6 +855,10 @@ export function createTestRoutes(
         userId: body.userId,
       })
       .run();
+
+    if (attachmentRows.length > 0) {
+      db.insert(messageAttachments).values(attachmentRows).run();
+    }
 
     return { messageId, threadId };
   }
@@ -1850,6 +1928,229 @@ export function createTestRoutes(
   routes.post("/mail/seed", zValidator("json", seedMailBody), async (context) =>
     context.json(await insertMailRow(context.req.valid("json"))),
   );
+
+  routes.post("/snapshots/seed", zValidator("json", seedSnapshotBody), async (context) => {
+    const body = context.req.valid("json");
+
+    const application = db
+      .select()
+      .from(applications)
+      .where(eq(applications.id, body.applicationId))
+      .get();
+
+    if (application === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    const resume = db
+      .select()
+      .from(resumes)
+      .where(and(eq(resumes.userId, application.userId), eq(resumes.isCurrent, true)))
+      .get();
+
+    if (resume === undefined) {
+      return context.json({ error: "no resume" }, 409);
+    }
+
+    const answersEnc = await personal.sealFor(
+      application.userId,
+      { column: "answers_enc", rowId: body.applicationId, table: "application_snapshots" },
+      JSON.stringify(body.answers),
+    );
+
+    const coverLetterEnc =
+      body.coverLetter === null
+        ? null
+        : await personal.sealFor(
+            application.userId,
+            {
+              column: "cover_letter_enc",
+              rowId: body.applicationId,
+              table: "application_snapshots",
+            },
+            JSON.stringify(body.coverLetter),
+          );
+
+    db.insert(applicationSnapshots)
+      .values({
+        answersEnc,
+        applicationId: body.applicationId,
+        approvedAt: clock.now(),
+        approvedPlanSha256: null,
+        confirmedBy: "page",
+        consentVersion: "m1",
+        costMicros: 0,
+        coverLetterEnc,
+        descriptionHash: null,
+        postingTitle: "Senior Backend Engineer",
+        postingUrl: "https://export.example/jobs/1",
+        provider: "local",
+        providerSessionId: null,
+        resumeId: resume.id,
+        resumeSha256: resume.sha256,
+        submittedAt: clock.now(),
+        userId: application.userId,
+      })
+      .onConflictDoUpdate({
+        target: applicationSnapshots.applicationId,
+        set: { answersEnc, coverLetterEnc, submittedAt: clock.now() },
+      })
+      .run();
+
+    return context.json({ applicationId: body.applicationId });
+  });
+
+  routes.post("/mail/bulk", zValidator("json", bulkMailBody), async (context) => {
+    const body = context.req.valid("json");
+    const at = body.at ?? clock.now();
+    const localPart = `owner-${body.userId.slice(0, 8)}`;
+
+    const existingMailbox = db
+      .select({ id: mailboxes.id })
+      .from(mailboxes)
+      .where(eq(mailboxes.userId, body.userId))
+      .get();
+
+    const mailboxId = existingMailbox?.id ?? crypto.randomUUID();
+
+    if (existingMailbox === undefined) {
+      db.insert(mailboxes)
+        .values({
+          createdAt: new Date(at),
+          id: mailboxId,
+          localPart,
+          status: "active",
+          userId: body.userId,
+        })
+        .run();
+    }
+
+    const filler = "x".repeat(body.bodyBytes);
+
+    const rows = await Promise.all(
+      Array.from({ length: body.count }, async (_unused, index) => {
+        const messageId = crypto.randomUUID();
+        const threadId = crypto.randomUUID();
+        const scope = (column: string) => ({ column, rowId: messageId, table: "messages" });
+        const text = `Message ${String(index)} from an employer.\n${filler}`;
+
+        db.insert(mailThreads)
+          .values({
+            applicationId: null,
+            employerStarted: true,
+            id: threadId,
+            lastMessageAt: new Date(at + index),
+            subjectEnc: await personal.sealFor(
+              body.userId,
+              { column: "subject_enc", rowId: threadId, table: "mail_threads" },
+              `Bulk thread ${String(index)}`,
+            ),
+            userId: body.userId,
+          })
+          .run();
+
+        return {
+          auth: "pass" as const,
+          classification: "ack" as const,
+          createdAt: new Date(at + index),
+          direction: "in" as const,
+          fromEnc: await personal.sealFor(
+            body.userId,
+            scope("from_enc"),
+            "Greenhouse <no-reply@us.greenhouse-mail.io>",
+          ),
+          id: messageId,
+          mailboxId,
+          rfcMessageId: `<${messageId}@${body.senderDomain}>`,
+          senderDomain: body.senderDomain,
+          snippetEnc: await personal.sealFor(body.userId, scope("snippet_enc"), text.slice(0, 200)),
+          subjectEnc: await personal.sealFor(
+            body.userId,
+            scope("subject_enc"),
+            `Bulk message ${String(index)}`,
+          ),
+          textEnc: await personal.sealFor(body.userId, scope("text_enc"), text),
+          threadId,
+          toEnc: await personal.sealFor(
+            body.userId,
+            scope("to_enc"),
+            `in-${localPart}@tryoverture.com`,
+          ),
+          userId: body.userId,
+        };
+      }),
+    );
+
+    db.transaction((tx) => {
+      for (const row of rows) {
+        tx.insert(messages).values(row).run();
+      }
+    });
+
+    return context.json({ count: body.count, threads: body.count });
+  });
+
+  routes.post(
+    "/account-exports/seed",
+    zValidator("json", exportsQuery.pick({ userId: true })),
+    async (context) => {
+      if (objects === null) {
+        return context.json({ error: "no object store" }, 503);
+      }
+
+      const { userId } = context.req.valid("json");
+      const id = crypto.randomUUID();
+      const now = clock.now();
+
+      const keyEnc = await personal.sealFor(
+        userId,
+        { column: "key_enc", rowId: id, table: "account_exports" },
+        newExportKey(),
+      );
+
+      const objectKey = `files/${userId}/exports/${id}.ovex`;
+      const bytes = new TextEncoder().encode("seeded export");
+
+      await objects.put(objectKey, bytes);
+
+      db.insert(accountExports)
+        .values({
+          bytes: bytes.length,
+          error: null,
+          expiresAt: new Date(now + 24 * 60 * 60_000),
+          id,
+          keyEnc,
+          notifiedAt: null,
+          objectKey,
+          readyAt: new Date(now),
+          requestedAt: new Date(now),
+          status: "ready",
+          updatedAt: new Date(now),
+          userId,
+        })
+        .run();
+
+      return context.json({ id });
+    },
+  );
+
+  routes.get("/account/exports", zValidator("query", exportsQuery), (context) => {
+    const { userId } = context.req.valid("query");
+
+    return context.json({
+      exports: listExportsOf(db, userId).map((row) => ({
+        bytes: row.bytes,
+        error: row.error,
+        expiresAt: row.expiresAt?.getTime() ?? null,
+        id: row.id,
+        notifiedAt: row.notifiedAt?.getTime() ?? null,
+        objectKey: row.objectKey,
+        readyAt: row.readyAt?.getTime() ?? null,
+        requestedAt: row.requestedAt.getTime(),
+        status: row.status,
+      })),
+    });
+  });
 
   routes.post("/user/name", zValidator("json", userNameBody), (context) => {
     const { email, name } = context.req.valid("json");

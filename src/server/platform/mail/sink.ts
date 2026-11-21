@@ -80,6 +80,20 @@ export function createSinkMailSender(clock: Clock) {
 
       await Promise.resolve();
     },
+    sendExportReady: async (mail) => {
+      const sent = {
+        id: randomUUID(),
+        to: mail.to,
+        from: env.MAIL_FROM,
+        subject: mail.subject,
+        body: mail.body,
+        sentAt: clock.now(),
+      };
+
+      captured.push(sent);
+
+      await Promise.resolve();
+    },
   };
 
   return sender;

@@ -360,6 +360,9 @@ export const copy = {
 
       return `${lines.join("\n")}\n`;
     },
+    exportReadySubject: "Your Overture export is ready",
+    exportReadyBody: (url: string) =>
+      `Your Overture export is ready to download.\n\nOpen Settings in Overture and choose Download export. The link is valid for 24 hours, then the archive is deleted.\n\n${url}\n\nIf you didn't ask for this, write to admin@tryoverture.com.\n`,
   },
   stages: {
     queued: "Queued",
@@ -576,11 +579,72 @@ export const copy = {
     addressDetail: "Created with your mailbox in a later milestone. Read-only then.",
     magicLinkTitle: "Magic link",
     magicLinkDetail: "Always available. We email a one-time link, good for 15 minutes.",
+    exportRow: "Export your data",
+    exportRowDetail:
+      "A zip of your profile, facts, Applications, messages, resume and attachments.",
+    exportRowButton: "Export data",
     signOutAll: "Sign out all devices",
     signOutAllDetail: "Ends every session except this one.",
     signOutAllButton: "Sign out everywhere",
     signedOutMessage: "You are signed out on your other devices.",
     signedOutToasts: "Signed out everywhere",
+    accountTabs: {
+      label: "Settings sections",
+      notifications: "Notifications",
+      export: "Export",
+      delete: "Delete account",
+      support: "Support access",
+      legal: "Terms and privacy",
+    },
+    exportPage: {
+      eyebrow: "— Settings",
+      titlePlain: "Export your ",
+      titleItalic: "data",
+      lead: "A copy of what Overture holds about you",
+      requestHeading: "Request",
+      requestBody:
+        "A zip of your profile, facts, Applications, messages, resume and attachments. The download link is valid for 24 hours.",
+      requestButton: "Request export",
+      preparingHeading: "Preparing",
+      preparingPill: "Preparing",
+      preparingBody: (requested: string) =>
+        `Requested ${requested}. This can take a few minutes. We'll email you when it's ready to download.`,
+      preparingButton: "Preparing your export",
+      readyHeading: "Ready to download",
+      readyPill: "Ready",
+      readyBody: (expires: string) =>
+        `The link is valid until ${expires}. After that, request a new export.`,
+      readyButton: "Download export",
+      expiredHeading: "Expired",
+      expiredPill: "Expired",
+      expiredBody: (expired: string) =>
+        `The link expired on ${expired}. Nothing was lost: request a new export to get a fresh link.`,
+      expiredButton: "Request export",
+      failedHeading: "Request",
+      failedBody:
+        "This export could not be prepared. Nothing was lost: request a new export to try again.",
+      replacedNote: "The earlier export was replaced, so its link no longer works.",
+      downloading: "Preparing the download",
+      downloadReady: "Export downloaded",
+      downloadFailed: "The download did not finish. Please try again.",
+      readme: (email: string, at: string) =>
+        [
+          "Overture export",
+          "",
+          `Account: ${email}`,
+          `Made: ${at}`,
+          "",
+          "This zip holds your profile, facts, Applications, snapshots, messages,",
+          "resume files and attachments. Files under files/ are the original",
+          "documents; the JSON files describe them.",
+          "",
+          "The download was encrypted with the key in its link. Once it expires,",
+          "the encrypted archive is deleted from Overture and a new request is needed.",
+          "",
+          "Questions or a problem: write to admin@tryoverture.com.",
+          "",
+        ].join("\n"),
+    },
   },
   profile: {
     sectionsLabel: "Profile sections",

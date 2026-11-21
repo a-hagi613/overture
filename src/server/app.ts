@@ -14,6 +14,7 @@ import type { ReviewService } from "./pipeline/reviews.ts";
 import type { createMailboxService } from "./inbox/mailboxes.ts";
 import type { BrowserProviderRegistry } from "./dispatch/browser/provider.ts";
 import type { CatalogSweepWorker } from "./catalog/sweep-worker-runner.ts";
+import type { ExportService } from "./export/service.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
 import { createMeRoutes } from "./routes/me.ts";
@@ -34,6 +35,7 @@ import { createMatchingService } from "./matching/score.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
 import { createPasswordResetRoutes } from "./routes/password-reset.ts";
+import { createAccountRoutes } from "./routes/account.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
 
@@ -55,6 +57,7 @@ export interface AppDependencies {
   singletonJobKinds: readonly string[];
   providers: BrowserProviderRegistry | null;
   catalogWorker: CatalogSweepWorker;
+  exports: ExportService;
 }
 
 async function staticResponseFrom(root: string, url: string) {
@@ -173,6 +176,7 @@ export function createApp(deps: AppDependencies) {
       secretSet: env.INBOUND_HMAC_SECRET !== undefined,
     }),
   );
+  app.route("/api", createAccountRoutes({ auth: deps.auth, exports: deps.exports }));
   app.route(
     "/",
     createInboundRoutes({
@@ -197,6 +201,7 @@ export function createApp(deps: AppDependencies) {
         deps.singletonJobKinds,
         deps.preparation,
         deps.catalogWorker,
+        deps.objects,
       ),
     );
   }
