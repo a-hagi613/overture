@@ -10,6 +10,7 @@ import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
 
 import { env } from "../config/env.ts";
+import { demoLocked } from "../demo/guard.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
 import { createFactService } from "../profile/facts.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
@@ -96,6 +97,12 @@ export function createProfileRoutes(deps: {
       return context.json({ error: "unauthorised" }, 401);
     }
 
+    const locked = demoLocked(account.role);
+
+    if (locked !== null) {
+      return locked;
+    }
+
     const form = uploadSchema.parse({
       file: (await context.req.formData()).get("file"),
     });
@@ -136,6 +143,12 @@ export function createProfileRoutes(deps: {
 
     if (account === null) {
       return context.json({ error: "unauthorised" }, 401);
+    }
+
+    const locked = demoLocked(account.role);
+
+    if (locked !== null) {
+      return locked;
     }
 
     const file = await resumesService.currentFileBytes(account.id);

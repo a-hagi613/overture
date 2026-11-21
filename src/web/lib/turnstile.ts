@@ -25,6 +25,25 @@ declare global {
 }
 
 const readyEvent = "overture:turnstile-ready";
+const scriptUrl = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+
+function loadTurnstileScript() {
+  if (document.querySelector("script[data-turnstile]") !== null) {
+    return;
+  }
+
+  const script = document.createElement("script");
+
+  script.src = scriptUrl;
+  script.async = true;
+  script.dataset["turnstile"] = "";
+
+  script.addEventListener("load", () => {
+    globalThis.dispatchEvent(new Event(readyEvent));
+  });
+
+  document.head.append(script);
+}
 
 export function useTurnstile(siteKey: string | null | undefined, action: TurnstileAction) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -103,6 +122,8 @@ export function useTurnstile(siteKey: string | null | undefined, action: Turnsti
     };
 
     if (globalThis.turnstile === undefined) {
+      loadTurnstileScript();
+
       globalThis.addEventListener(
         readyEvent,
         () => {

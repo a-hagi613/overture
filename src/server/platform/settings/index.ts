@@ -43,11 +43,45 @@ const SETTING_DEFAULTS = {
 
 export { SETTING_DEFAULTS };
 
+const DEFAULT_LOOKUP = new Map<string, string>(Object.entries(SETTING_DEFAULTS));
+
 export function getSetting(db: AppDatabase, key: string) {
   const row = db.select().from(settings).where(eq(settings.key, key)).get();
-  const defaults = new Map<string, string>(Object.entries(SETTING_DEFAULTS));
 
-  return row?.value ?? defaults.get(key) ?? null;
+  return row?.value ?? DEFAULT_LOOKUP.get(key) ?? null;
+}
+
+export interface SettingNumberOptions {
+  /** Returned when the stored value is missing, not finite, or below `minimum`. */
+  fallback?: number;
+  /** The smallest accepted value; defaults to 0. */
+  minimum?: number;
+  /** Truncate the accepted value, for counts that must be whole. */
+  integer?: boolean;
+}
+
+/**
+ * Reads a setting as a number with one contract everywhere: a missing,
+ * non-numeric or below-minimum value reads as the default, never as zero.
+ * @param db The application database.
+ * @param key A key with a default.
+ * @param options The fallback, the minimum and whether the value must be whole.
+ * @returns The configured number.
+ */
+export function getSettingNumber(
+  db: AppDatabase,
+  key: keyof typeof SETTING_DEFAULTS,
+  options: SettingNumberOptions = {},
+) {
+  const raw = getSetting(db, key);
+  const parsed = raw === null ? Number.NaN : Number(raw);
+  const minimum = options.minimum ?? 0;
+
+  if (!Number.isFinite(parsed) || parsed < minimum) {
+    return options.fallback ?? Number(SETTING_DEFAULTS[key]);
+  }
+
+  return options.integer === true ? Math.trunc(parsed) : parsed;
 }
 
 export function setSetting(

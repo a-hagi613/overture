@@ -1,4 +1,4 @@
-import { and, eq, exists, inArray, isNull, sql } from "drizzle-orm";
+import { and, count, eq, exists, gte, inArray, isNull, notInArray, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -13,12 +13,12 @@ import {
   postingUserState,
   skipCompanies,
 } from "../platform/db/schema.ts";
-import { SETTING_DEFAULTS, getSetting, getAllKillSwitches } from "../platform/settings/index.ts";
+import { getSettingNumber, getAllKillSwitches } from "../platform/settings/index.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { createFactService } from "../profile/facts.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createTargetsService, matchedRoleTags, roleTargetMatches } from "../profile/targets.ts";
-import { resolveLocation } from "../catalog/geo.ts";
+import { resolveLocation, sameRegion } from "../catalog/geo.ts";
 import { ACTIVE_APPLICATION_STATUSES } from "./applications.ts";
 import { salaryMeetsFloor } from "./fx.ts";
 import { countryInRegion, remoteRegionOf } from "./regions.ts";
@@ -27,6 +27,8 @@ import { skipMatches } from "./skip-match.ts";
 import type { SkipTarget } from "./skip-match.ts";
 
 const DAY_MS = 86_400_000;
+const POOL_TTL_MS = 30_000;
+const POOL_CACHE_MAX_ENTRIES = 50;
 
 const SENIORITY_ORDER: readonly string[] = [
   "intern",
@@ -144,11 +146,7 @@ function locationMatch(
       continue;
     }
 
-    if (
-      place.region !== null &&
-      posting.region !== null &&
-      posting.region.toLowerCase() === place.region.toLowerCase()
-    ) {
+    if (place.region !== null && sameRegion(posting.countryCode, posting.region, place.region)) {
       best = Math.max(best, 10);
     }
   }
@@ -206,14 +204,6 @@ function recencyScore(postedAt: number | null, at: number) {
   }
 
   return 0;
-}
-
-function settingNumber(db: AppDatabase, key: keyof typeof SETTING_DEFAULTS) {
-  const raw = getSetting(db, key);
-  const parsed = raw === null ? Number.NaN : Number(raw);
-  const fallback = Number(SETTING_DEFAULTS[key]);
-
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 function workAuthorisation(records: { key: string; scope: string; value: string }[]) {
@@ -365,7 +355,7 @@ export function createCandidateService(deps: CandidateDeps) {
     dedupeKey: postings.dedupeKey,
   };
 
-  function pool(userId: string, targets: TargetsInput, languages: readonly string[]) {
+  function loadPool(targets: TargetsInput, languages: readonly string[]) {
     const roleTags = matchedRoleTags(db, targets.roles);
 
     if (
@@ -430,6 +420,52 @@ export function createCandidateService(deps: CandidateDeps) {
     return candidates;
   }
 
+  const poolCache = new Map<
+    string,
+    { loadedAt: number; version: string; rows: readonly CandidatePosting[] }
+  >();
+
+  function catalogVersion() {
+    const [row] = db.all<{ lastRow: number | null; lastClosed: number | null }>(
+      sql`SELECT max(rowid) AS lastRow, max(closed_at) AS lastClosed FROM postings`,
+    );
+
+    return `${String(row?.lastRow)}:${String(row?.lastClosed)}`;
+  }
+
+  function pool(targets: TargetsInput, languages: readonly string[]) {
+    const key = JSON.stringify([
+      targets.roles.toSorted(),
+      targets.seniorities.toSorted(),
+      targets.workplaces.toSorted(),
+      targets.employmentTypes.toSorted(),
+      languages.map((language) => language.toLowerCase()).toSorted(),
+    ]);
+
+    const now = clock.now();
+    const version = catalogVersion();
+    const cached = poolCache.get(key);
+
+    if (cached?.version === version && now - cached.loadedAt < POOL_TTL_MS) {
+      return cached.rows;
+    }
+
+    const rows = loadPool(targets, languages);
+
+    poolCache.delete(key);
+    poolCache.set(key, { loadedAt: now, version, rows });
+
+    if (poolCache.size > POOL_CACHE_MAX_ENTRIES) {
+      const oldest = poolCache.keys().next();
+
+      if (oldest.done !== true) {
+        poolCache.delete(oldest.value);
+      }
+    }
+
+    return rows;
+  }
+
   function singlePosting(postingId: string) {
     const row = db
       .select(postingColumns)
@@ -478,25 +514,27 @@ export function createCandidateService(deps: CandidateDeps) {
       .where(eq(applications.userId, userId))
       .all();
 
-    const crowdRows = db
-      .select({
-        postingId: applications.postingId,
-        companyId: applications.companyId,
-        status: applications.status,
-        sentAt: applications.sentAt,
-      })
+    const crowdPostingRows = db
+      .select({ postingId: applications.postingId, total: count() })
       .from(applications)
+      .where(notInArray(applications.status, ["failed", "skipped", "withdrawn"]))
+      .groupBy(applications.postingId)
       .all();
 
-    const cooldownDays = settingNumber(db, "limits.company_cooldown_days");
-    const repostDays = settingNumber(db, "limits.repost_guard_days");
+    const crowdCompanyRows = db
+      .select({ companyId: applications.companyId, total: count() })
+      .from(applications)
+      .where(and(eq(applications.status, "sent"), gte(applications.sentAt, at - 7 * DAY_MS)))
+      .groupBy(applications.companyId)
+      .all();
+
+    const cooldownDays = getSettingNumber(db, "limits.company_cooldown_days");
+    const repostDays = getSettingNumber(db, "limits.repost_guard_days");
 
     const activeCompanies = new Set<string>();
     const recentCompanies = new Set<string>();
     const repostKeys = new Set<string>();
     const appliedPostings = new Set<string>();
-    const crowdByPosting = new Map<string, number>();
-    const crowdByCompany = new Map<string, number>();
 
     for (const row of applicantRows) {
       appliedPostings.add(row.postingId);
@@ -522,17 +560,8 @@ export function createCandidateService(deps: CandidateDeps) {
       }
     }
 
-    for (const row of crowdRows) {
-      if (row.status === "failed" || row.status === "skipped" || row.status === "withdrawn") {
-        continue;
-      }
-
-      crowdByPosting.set(row.postingId, (crowdByPosting.get(row.postingId) ?? 0) + 1);
-
-      if (row.status === "sent" && row.sentAt !== null && row.sentAt >= at - 7 * DAY_MS) {
-        crowdByCompany.set(row.companyId, (crowdByCompany.get(row.companyId) ?? 0) + 1);
-      }
-    }
+    const crowdByPosting = new Map(crowdPostingRows.map((row) => [row.postingId, row.total]));
+    const crowdByCompany = new Map(crowdCompanyRows.map((row) => [row.companyId, row.total]));
 
     const hidden = new Set(
       db
@@ -569,8 +598,8 @@ export function createCandidateService(deps: CandidateDeps) {
       atsOff,
       crowdByCompany,
       crowdByPosting,
-      crowdEmployer: settingNumber(db, "limits.crowd_per_employer_week"),
-      crowdPosting: settingNumber(db, "limits.crowd_per_posting"),
+      crowdEmployer: getSettingNumber(db, "limits.crowd_per_employer_week"),
+      crowdPosting: getSettingNumber(db, "limits.crowd_per_posting"),
       employerOff,
       globalOff,
       hidden,
@@ -764,7 +793,7 @@ export function createCandidateService(deps: CandidateDeps) {
 
     const rankedRows: RankedCandidate[] = [];
 
-    for (const posting of pool(userId, targets, languages)) {
+    for (const posting of pool(targets, languages)) {
       const verdict = evaluatePosting(posting, context, true);
 
       if (verdict.reason !== null) {

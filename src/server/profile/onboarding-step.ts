@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, count, desc, eq, isNull, isNotNull } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -15,7 +15,7 @@ import type {
 } from "../../shared/onboarding.ts";
 
 import { applications, postings, reviewApplications, reviews } from "../platform/db/schema.ts";
-import { countryNameFor, resolveLocation } from "../catalog/geo.ts";
+import { countryCodesNamedIn, countryNameFor, resolveLocation } from "../catalog/geo.ts";
 import { currencyNamedIn, parseSalaryExpectation } from "../pipeline/answer-value.ts";
 import { createFactService } from "./facts.ts";
 import { EEO_PREFER_NOT_TO_SAY, WORK_AUTH_OPTIONS } from "../../shared/onboarding.ts";
@@ -137,6 +137,80 @@ function reviewsAnsweredBy(
   );
 }
 
+const CURRENCY_BY_COUNTRY = {
+  AT: "EUR",
+  AU: "AUD",
+  BE: "EUR",
+  CA: "CAD",
+  CH: "CHF",
+  DE: "EUR",
+  DK: "DKK",
+  ES: "EUR",
+  FI: "EUR",
+  FR: "EUR",
+  GB: "GBP",
+  IE: "EUR",
+  IN: "INR",
+  IT: "EUR",
+  NL: "EUR",
+  NO: "NOK",
+  NZ: "NZD",
+  PT: "EUR",
+  SE: "SEK",
+  SG: "SGD",
+  US: "USD",
+} as const satisfies Record<string, string>;
+
+function currencyForCountry(code: string) {
+  return Object.entries(CURRENCY_BY_COUNTRY).find(([country]) => country === code)?.[1];
+}
+
+export function currenciesFor(input: {
+  queued: readonly string[];
+  salaryCurrencies: readonly string[];
+  targetCurrency: string | null;
+  countryCodes: readonly string[];
+  inferCountries: boolean;
+}) {
+  const currencies = [...input.queued];
+
+  for (const currency of input.salaryCurrencies) {
+    if (!currencies.includes(currency)) {
+      currencies.push(currency);
+    }
+  }
+
+  if (
+    input.targetCurrency !== null &&
+    isCurrencyCode(input.targetCurrency) &&
+    !currencies.includes(input.targetCurrency)
+  ) {
+    currencies.push(input.targetCurrency);
+  }
+
+  if (currencies.length === 0 && input.inferCountries) {
+    for (const code of input.countryCodes) {
+      const currency = currencyForCountry(code);
+
+      if (currency !== undefined && !currencies.includes(currency)) {
+        currencies.push(currency);
+      }
+    }
+  }
+
+  return currencies;
+}
+
+export function homeCountryCode(facts: readonly FactRecord[]) {
+  const value = factValue(facts, "current_country").trim();
+
+  if (value === "") {
+    return null;
+  }
+
+  return resolveLocation(value).countryCode ?? countryCodesNamedIn(value).at(0) ?? null;
+}
+
 function targetCountryCodes(targets: Targets) {
   const codes: string[] = [];
 
@@ -228,7 +302,19 @@ export function createOnboardingStepService(deps: {
       .map(([currency]) => currency);
   }
 
-  async function read(userId: string) {
+  function openPostingCountries() {
+    return db
+      .select({ code: postings.countryCode, total: count() })
+      .from(postings)
+      .where(and(isNull(postings.closedAt), isNotNull(postings.countryCode)))
+      .groupBy(postings.countryCode)
+      .orderBy(desc(count()), postings.countryCode)
+      .limit(3)
+      .all()
+      .flatMap((row) => (row.code === null ? [] : [row.code]));
+  }
+
+  async function read(userId: string, options: { inferCountries?: boolean } = {}) {
     const facts = await factsService.list(userId);
     const { targets } = await readTargets(userId);
     const open = openReviews(userId);
@@ -255,22 +341,21 @@ export function createOnboardingStepService(deps: {
       }
     }
 
-    const currencies = queuedCurrencies(userId);
+    if (countryCodes.length === 0 && options.inferCountries !== false) {
+      const home = homeCountryCode(facts);
+
+      countryCodes.push(...(home === null ? openPostingCountries() : [home]));
+    }
+
     const salaryAnswers = salaryAnswersFrom(facts);
 
-    for (const saved of salaryAnswers) {
-      if (!currencies.includes(saved.currency)) {
-        currencies.push(saved.currency);
-      }
-    }
-
-    if (
-      targets.salaryCurrency !== null &&
-      isCurrencyCode(targets.salaryCurrency) &&
-      !currencies.includes(targets.salaryCurrency)
-    ) {
-      currencies.push(targets.salaryCurrency);
-    }
+    const currencies = currenciesFor({
+      countryCodes,
+      inferCountries: options.inferCountries !== false,
+      queued: queuedCurrencies(userId),
+      salaryCurrencies: salaryAnswers.map((answer) => answer.currency),
+      targetCurrency: targets.salaryCurrency,
+    });
 
     const stepAnswers = {
       eeo: eeoAnswersFrom(facts),
