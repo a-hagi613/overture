@@ -368,11 +368,16 @@ straight to tagging; Ashby's `isRemote` is ignored because Ashby sets it on hybr
    skipped with `posting_closed`.
 6. **Dedupe**: `dedupe_key = company_id + title_norm + country_code + city`; duplicates across boards keep the
    earliest posting; users never see two cards for one role.
-7. **Responsiveness**: writing one feed never blocks the process. A board's postings are written in transactions of
-   50 with the event loop yielded between them, the comparison against stored postings reads only `id`,
-   `ats_job_id`, `source_updated_at` and `closed_at` rather than whole rows with their descriptions, and the
-   twice-missing close is two statements rather than one per posting. A sweep over multi-megabyte feeds therefore
-   leaves `/api/health` answering in milliseconds; the per-ATS limiter and its pacing are untouched.
+7. **Responsiveness**: writes never block the process. `catalog.sweep` (fetch, parse, tag and the writes of
+   `company_boards`, `postings` and `posting_tags`) runs in a Bun Worker with its own SQLite connection (WAL, the same
+   `busy_timeout` and `SQLITE_BUSY` retries); the main thread keeps its read-write connection for sign-in, settings,
+   the ledger and dispatch and only schedules the sweep and receives results and metrics over `postMessage`. A board's
+   postings are written in transactions of 50 with the event loop yielded between them, at most 500 rows per
+   transaction, the comparison against stored postings reads only `id`, `ats_job_id`, `source_updated_at` and
+   `closed_at` rather than whole rows with their descriptions, and the twice-missing close is two statements rather
+   than one per posting. A crashed worker restarts with backoff, raises `catalog.worker` and never takes the server
+   down; its board claim lapses so the next sweep retries it. A sweep over multi-megabyte feeds therefore leaves
+   `/api/health` answering in milliseconds; the per-ATS limiter and its pacing are untouched.
 8. **One-time re-tag**: `scripts/retag-feed-workplace.ts --db <overture.db>` clears the board and posting
    `content_hash`/`feed_content_hash` for Lever and Ashby once, so the next sweep rewrites every open posting from
    its feed and tags the feed's structured workplace. It clears at most 500 rows per transaction and yields between
@@ -1079,8 +1084,8 @@ OTel traces for every request and job; metrics: `attempt_outcome_total{provider,
 `attempt_cost_micros`, `queue_depth{kind}`, `llm_cost_micros{purpose}`, `mail_inbound_total{auth}`,
 `discovery_poll_total{ats,status}`. Alerts to the owner: ATS success < 70 % over the last hour (at least five
 attempts), provider success < 60 %, code or CAPTCHA rate > 20 %, queue age > 30 min, LLM spend > 80 % of the global
-or tagging cap, Litestream lag > 5 min, backup failure, health check failing, disk > 80 %, and an unhandled rejection
-in a background loop or timer (logged to stderr, alerted at most once a minute). The alert path is the
+or tagging cap, Litestream lag > 5 min, backup failure, health check failing, disk > 80 %, a catalog sweep worker crash, and an
+unhandled rejection in a background loop or timer (logged to stderr, alerted at most once a minute). The alert path is the
 in-app `alert.raised` event plus a notification for every owner; with `ALERT_NTFY_URL` set, the same alert is pushed
 to the owner's phone. No Grafana is provisioned by this repository; dashboards stay with the owner's Grafana account
 and read the OTLP endpoint. `live.check` computes the same thresholds from the app database and machine and records

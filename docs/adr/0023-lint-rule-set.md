@@ -69,6 +69,11 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
   crypto, planner, address, tag rules, question normalisation, answer derivations, the fixture sanitiser, the v1
   answer-bank mapping), by an explicit path allowlist. Any other unit test file is an error. Every other test is a
   Playwright end-to-end test.
+- **Catalog writes belong to the sweep worker.** A write to `company_boards`, `postings` or `posting_tags` outside the
+  Bun Worker is an error. The narrow non-sweep paths that keep a single-row write on the main thread (dispatch closing
+  a posting, preparation marking the question cache, tag import, the retag and seed scripts, the test routes) are
+  listed in `.oxlintrc.json`; adding one needs a written reason here. A new sweep write goes into
+  `src/server/catalog/sweep-worker.ts` and its worker-only modules.
 - **The off-list and every scoped override are checked.** CI fails if the rules turned off in the configuration
   differ from the table below, if an override turns a rule down or changes its options without appearing in the
   "Rules off in one folder only" table, or if that table lists an override that does not exist.

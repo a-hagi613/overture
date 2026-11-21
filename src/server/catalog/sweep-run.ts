@@ -1,0 +1,81 @@
+import { inArray, sql } from "drizzle-orm";
+
+import type { AppDatabase } from "../platform/db/client.ts";
+import type { Clock } from "../platform/ports/clock.ts";
+
+import { retryWhenBusy } from "../platform/db/busy.ts";
+import { companyBoards } from "../platform/db/schema.ts";
+import { M1_ATS_NAMES } from "./discovered-boards.ts";
+import { pollBoard } from "./poll-board.ts";
+import { SWEEP_CLAIM_MS, sweepBatchPerAts } from "./sweep-config.ts";
+
+import type { BoardFeeds } from "./board-feed.ts";
+import type { PollBoardReport } from "./poll-board.ts";
+import type { SweepRunKind } from "./sweep-worker-protocol.ts";
+
+export async function pollDueBoards(db: AppDatabase, clock: Clock, feeds: BoardFeeds) {
+  const now = clock.now();
+  const batches = sweepBatchPerAts(db);
+
+  const claimed = await retryWhenBusy(
+    () =>
+      M1_ATS_NAMES.flatMap((ats) =>
+        db
+          .update(companyBoards)
+          .set({ nextPollAt: now + SWEEP_CLAIM_MS })
+          .where(
+            sql`${companyBoards.id} IN (
+              SELECT id FROM company_boards
+              WHERE ats = ${ats}
+                AND status IN ('active', 'empty')
+                AND next_poll_at <= ${now}
+              ORDER BY next_poll_at
+              LIMIT ${batches[ats]}
+            )`,
+          )
+          .returning()
+          .all(),
+      ),
+    "catalog.sweep.claim",
+  );
+
+  return Promise.all(
+    claimed.map(async (board) =>
+      retryWhenBusy(
+        async () => pollBoard(db, clock, feeds[board.ats], board),
+        `catalog.sweep.${board.ats}`,
+      ),
+    ),
+  );
+}
+
+export async function runBackfillPass(db: AppDatabase, clock: Clock, feeds: BoardFeeds) {
+  const now = clock.now();
+
+  await retryWhenBusy(
+    () =>
+      db
+        .update(companyBoards)
+        .set({ nextPollAt: now })
+        .where(inArray(companyBoards.status, ["active", "empty"]))
+        .run(),
+    "catalog.backfill",
+  );
+
+  return pollDueBoards(db, clock, feeds);
+}
+
+export function summarizeRun(kind: SweepRunKind, reports: PollBoardReport[], durationMs: number) {
+  return {
+    kind,
+    boards: reports.length,
+    polled: reports.filter((report) => report.outcome === "polled").length,
+    notModified: reports.filter((report) => report.outcome === "not_modified").length,
+    gone: reports.filter((report) => report.outcome === "gone").length,
+    errors: reports.filter((report) => report.outcome === "error").length,
+    added: reports.reduce((total, report) => total + report.added, 0),
+    updated: reports.reduce((total, report) => total + report.updated, 0),
+    closed: reports.reduce((total, report) => total + report.closed, 0),
+    durationMs: Math.round(durationMs),
+  };
+}

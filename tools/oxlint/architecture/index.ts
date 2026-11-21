@@ -155,6 +155,78 @@ const noMathRandom = defineRule({
   },
 });
 
+const catalogWriteSchema = z.tuple([
+  z.object({
+    allow: z.array(z.string().min(1)).optional(),
+    allowRoots: z.array(z.string().min(1)).optional(),
+  }),
+]);
+
+const CATALOG_TABLE_NAMES = new Set(["companyBoards", "postings", "postingTags"]);
+const WRITE_METHOD_NAMES = new Set(["insert", "update", "delete"]);
+
+function matchesAnyRoot(filename: string, roots: string[]) {
+  const normalized = filename.replaceAll("\\", "/");
+
+  return roots.some((root) => normalized.includes(`/${root}/`));
+}
+
+const noMainThreadCatalogWrites = defineRule({
+  meta: {
+    type: "problem",
+    schema: [
+      {
+        type: "object",
+        properties: {
+          allow: { type: "array", items: { type: "string", minLength: 1 } },
+          allowRoots: { type: "array", items: { type: "string", minLength: 1 } },
+        },
+        additionalProperties: false,
+      },
+    ],
+    docs: {
+      description:
+        "Allow catalog table writes only inside the catalog sweep worker and the narrow non-sweep paths.",
+    },
+    messages: {
+      forbidden:
+        "Catalog table {{table}} must be written by the catalog sweep worker. Move this write into sweep-worker.ts, or add a documented exception to ADR 0023.",
+    },
+  },
+  create(context) {
+    const [options] = catalogWriteSchema.parse(context.options);
+    const allow = options.allow ?? [];
+    const allowRoots = options.allowRoots ?? [];
+    const filename = context.physicalFilename.replaceAll("\\", "/");
+
+    if (matchesAnyPath(filename, allow) || matchesAnyRoot(filename, allowRoots)) {
+      return {};
+    }
+
+    return {
+      CallExpression(node) {
+        if (node.callee.type !== "MemberExpression" || node.callee.computed) {
+          return;
+        }
+
+        const method = node.callee.property;
+
+        if (method.type !== "Identifier" || !WRITE_METHOD_NAMES.has(method.name)) {
+          return;
+        }
+
+        const table = node.arguments.at(0);
+
+        if (table?.type !== "Identifier" || !CATALOG_TABLE_NAMES.has(table.name)) {
+          return;
+        }
+
+        context.report({ node, messageId: "forbidden", data: { table: table.name } });
+      },
+    };
+  },
+});
+
 const noUnlistedUnitTest = defineRule({
   meta: {
     type: "problem",
@@ -208,6 +280,7 @@ export default definePlugin({
   rules: {
     "no-disable-directives": noDisableDirectives,
     "no-date-now": noDateNow,
+    "no-main-thread-catalog-writes": noMainThreadCatalogWrites,
     "no-math-random": noMathRandom,
     "no-unlisted-unit-test": noUnlistedUnitTest,
   },
