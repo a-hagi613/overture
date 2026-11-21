@@ -242,6 +242,27 @@ const seedGrantBody = z.object({
   idempotencyKey: z.string().min(1),
 });
 
+const applicationStatusBody = z.object({
+  applicationId: z.string().min(1),
+  status: z.enum([
+    "preparing",
+    "needs_review",
+    "ready",
+    "sending",
+    "confirming",
+    "sent",
+    "failed",
+    "skipped",
+    "withdrawn",
+  ]),
+  statusReason: z.string().nullable().default(null),
+});
+
+const userSuspendBody = z.object({
+  userId: z.string().min(1),
+  suspended: z.boolean(),
+});
+
 const fxRateBody = z.object({
   date: z.string().min(10).max(10),
   currency: z.string().length(3),
@@ -807,6 +828,58 @@ export function createTestRoutes(
       .run();
 
     return context.json({ id });
+  });
+
+  routes.post("/applications/status", zValidator("json", applicationStatusBody), (context) => {
+    const { applicationId, status, statusReason } = context.req.valid("json");
+
+    let stage: "queued" | "applied" | null = null;
+
+    if (status === "sent") {
+      stage = "applied";
+    }
+
+    if (status === "ready") {
+      stage = "queued";
+    }
+
+    const updated = db
+      .update(applications)
+      .set({
+        status,
+        statusReason,
+        stage,
+        updatedAt: clock.now(),
+      })
+      .where(eq(applications.id, applicationId))
+      .returning({ id: applications.id })
+      .all();
+
+    if (updated.length === 0) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    return context.json({ id: applicationId, status });
+  });
+
+  routes.post("/user/suspend", zValidator("json", userSuspendBody), (context) => {
+    const { userId, suspended } = context.req.valid("json");
+
+    const updated = db
+      .update(users)
+      .set({
+        suspendedAt: suspended ? new Date(clock.now()) : null,
+        updatedAt: new Date(clock.now()),
+      })
+      .where(eq(users.id, userId))
+      .returning({ id: users.id })
+      .all();
+
+    if (updated.length === 0) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    return context.json({ id: userId, suspended });
   });
 
   routes.post("/reviews/seed", zValidator("json", seedReviewBody), (context) => {

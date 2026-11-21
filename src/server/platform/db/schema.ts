@@ -410,6 +410,18 @@ export const facts = sqliteTable(
 
 export const profiles = sqliteTable("profiles", {
   userId: cascadeUserId().primaryKey(),
+  running: integer("running", { mode: "boolean" }).notNull().default(false),
+  pauseReason: text("pause_reason", {
+    enum: [
+      "user",
+      "onboarding",
+      "no_resume",
+      "plan_ended",
+      "payment_failed",
+      "suspended",
+      "no_mailbox",
+    ],
+  }).default("onboarding"),
   languages: text("languages").notNull().default("[]"),
   timezone: text("timezone"),
   pendingTimezone: text("pending_timezone"),

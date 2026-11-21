@@ -8,6 +8,7 @@ import { killSwitches, settings } from "../db/schema.ts";
 const SETTING_DEFAULTS = {
   "limits.daily_cap": "10",
   "limits.send_window": '{"start":"08:00","end":"20:00"}',
+  "limits.send_spacing_minutes": "20",
   "limits.company_cooldown_days": "30",
   "limits.repost_guard_days": "60",
   "limits.crowd_per_posting": "20",

@@ -25,6 +25,7 @@ import { recordLlmUsage } from "../platform/llm/usage.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
+import { localDayStart } from "../platform/local-time.ts";
 import { SETTING_DEFAULTS, getSetting } from "../platform/settings/index.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createTargetsService } from "../profile/targets.ts";
@@ -84,33 +85,6 @@ function settingNumber(db: AppDatabase, key: keyof typeof SETTING_DEFAULTS) {
   const fallback = Number(SETTING_DEFAULTS[key]);
 
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
-}
-
-function localDayStart(at: number, timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    hour: "2-digit",
-    hourCycle: "h23",
-    minute: "2-digit",
-    month: "2-digit",
-    second: "2-digit",
-    timeZone,
-    year: "numeric",
-  }).formatToParts(new Date(at));
-
-  const values = new Map(parts.map((part) => [part.type, part.value]));
-
-  const year = Number(values.get("year"));
-  const month = Number(values.get("month"));
-  const day = Number(values.get("day"));
-  const hour = Number(values.get("hour"));
-  const minute = Number(values.get("minute"));
-  const second = Number(values.get("second"));
-
-  const asUtc = Date.UTC(year, month - 1, day, hour, minute, second);
-  const offset = asUtc - Math.floor(at / 1000) * 1000;
-
-  return Date.UTC(year, month - 1, day) - offset;
 }
 
 function truncateReason(reason: string) {

@@ -7,6 +7,7 @@ import { createMailSender } from "./platform/mail/index.ts";
 import { openDatabase } from "./platform/db/client.ts";
 import { migrateDatabase } from "./platform/db/migrate.ts";
 import { createClock } from "./platform/ports/clock.ts";
+import { createRandom } from "./platform/ports/random.ts";
 import { createBackupMonitor } from "./platform/ports/backup.ts";
 import { recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
 import { startJobWorker } from "./platform/jobs/scheduler.ts";
@@ -44,7 +45,19 @@ import {
   DISPATCH_RECOVER_JOB_KIND,
   createDispatcher,
 } from "./dispatch/executor.ts";
-import type { Dispatcher } from "./dispatch/executor.ts";
+import {
+  PLANNER_DAY_JOB_KIND,
+  createPlanner,
+  ensurePlannerQueuedForRunningUsers,
+  enqueuePlannerDay,
+  parsePlannerDayPayload,
+} from "./dispatch/planner.ts";
+import {
+  DISPATCH_TICK_JOB_KIND,
+  TICK_INTERVAL_MS,
+  createDispatcherTick,
+} from "./dispatch/dispatch.ts";
+import { createPostingLiveness } from "./dispatch/liveness.ts";
 import {
   APPLICATION_PREPARE_JOB_KIND,
   parseApplicationPreparePayload,
@@ -78,6 +91,7 @@ if (env.ENABLE_TEST_ROUTES) {
 }
 
 const clock = createClock();
+const random = createRandom();
 const shutdownController = new AbortController();
 const backups = createBackupMonitor(db, clock);
 
@@ -86,7 +100,9 @@ void backups.run(shutdownController.signal);
 const mailSender = createMailSender(clock);
 const auth = createAuth(db, clock, mailSender);
 
-recoverStaleLocks(db, clock, SINGLETON_JOB_KINDS);
+const jobSingletons = [...SINGLETON_JOB_KINDS, DISPATCH_TICK_JOB_KIND];
+
+recoverStaleLocks(db, clock, jobSingletons);
 
 const tracer = trace.getTracer("overture");
 
@@ -127,6 +143,8 @@ const personal = createPersonalCrypto(
   env.MASTER_KEY_CURRENT,
 );
 
+const planner = createPlanner({ clock, db, random });
+
 const matchDeps = {
   db,
   clock,
@@ -134,16 +152,14 @@ const matchDeps = {
   personal,
 };
 
-let dispatcher: Dispatcher | null = null;
-
 const preparation = createPreparationService({
   db,
   clock,
   llm: anthropicLlmPort,
   personal,
   source: createGreenhouseQuestionSource(env.GREENHOUSE_FEED_BASE_URL),
-  onReady: (applicationId) => {
-    dispatcher?.enqueueSend(applicationId);
+  onReady: (_applicationId, userId) => {
+    enqueuePlannerDay(db, clock, userId);
   },
 });
 
@@ -235,7 +251,7 @@ const browserProvider = createBrowserProvider(env, clock);
 
 const resumes = createResumeService({ db, clock, llm: anthropicLlmPort, objects, personal });
 
-dispatcher =
+const activeDispatcher =
   browserProvider === null
     ? null
     : createDispatcher({
@@ -249,10 +265,19 @@ dispatcher =
         resumes,
       });
 
-const activeDispatcher = dispatcher;
+const dispatchTick =
+  activeDispatcher === null
+    ? null
+    : createDispatcherTick({
+        clock,
+        db,
+        enqueueSend: (applicationId) => activeDispatcher.enqueueSend(applicationId),
+        liveness: createPostingLiveness(env),
+        providerId: browserProvider === null ? "local" : browserProvider.id,
+      });
 
 const dispatchJobHandlers: JobHandlers =
-  activeDispatcher === null
+  activeDispatcher === null || dispatchTick === null
     ? {}
     : {
         [APPLICATION_SEND_JOB_KIND]: async (payload) => {
@@ -266,11 +291,33 @@ const dispatchJobHandlers: JobHandlers =
           await activeDispatcher.recover();
           activeDispatcher.ensureRecoveryQueued();
         },
+        [DISPATCH_TICK_JOB_KIND]: async () => {
+          try {
+            await dispatchTick.run();
+          } finally {
+            dispatchTick.ensureQueued(clock.now() + TICK_INTERVAL_MS);
+          }
+        },
       };
+
+const planningJobHandlers: JobHandlers = {
+  [PLANNER_DAY_JOB_KIND]: async (payload) => {
+    const { userId } = parsePlannerDayPayload(payload);
+
+    try {
+      planner.plan(userId);
+    } finally {
+      planner.ensureMidnightQueued(userId);
+    }
+
+    await Promise.resolve();
+  },
+};
 
 const allJobHandlers: JobHandlers = {
   ...catalogJobHandlers,
   ...preparationJobHandlers,
+  ...planningJobHandlers,
   ...llmJobHandlers,
   ...mailJobHandlers,
   ...dispatchJobHandlers,
@@ -285,13 +332,19 @@ const worker = startJobWorker(
   (notify) => {
     registerEnqueueNotify(notify);
   },
-  SINGLETON_JOB_KINDS,
+  jobSingletons,
 );
 
-if (dispatcher !== null) {
-  await dispatcher.recover();
-  dispatcher.ensureRecoveryQueued();
+if (activeDispatcher !== null) {
+  await activeDispatcher.recover();
+  activeDispatcher.ensureRecoveryQueued();
 }
+
+if (dispatchTick !== null) {
+  dispatchTick.ensureQueued();
+}
+
+ensurePlannerQueuedForRunningUsers(db, clock);
 
 ensureSweepQueued(catalogDeps);
 
@@ -312,7 +365,7 @@ const app = createApp({
   mailboxes,
   preparation,
   reviews,
-  singletonJobKinds: SINGLETON_JOB_KINDS,
+  singletonJobKinds: jobSingletons,
   backups,
 });
 

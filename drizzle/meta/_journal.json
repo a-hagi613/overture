@@ -169,6 +169,13 @@
       "when": 1795230000022,
       "tag": "0023_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1795230000023,
+      "tag": "0024_pacing_send_gates",
+      "breakpoints": true
     }
   ]
 }
