@@ -190,6 +190,13 @@ Applications stay sent and Inbox mail keeps arriving, and the typed reason is wr
 clears the suspension and leaves running paused until the person starts it.
 _Avoid_: ban, block, lockout
 
+**Mail health**:
+The admin view of forwarded ATS mail per employer: Applications sent, messages in, authentication results and the
+reply rate over the last 7 or 30 days, with no message content. The reply-rate alert warns the owner when an
+employer's rate is under 5 percent after 10 sends, and when the domain-wide rate is under 5 percent after 20 sends;
+it never stops sends by itself.
+_Avoid_: inbox analytics, mail report
+
 **Live check**:
 The daily `live.check` job on `overture-web` that exercises a real form capture, real Haiku calls, the mail loop and R2, records pass/fail and timing, and alerts the owner on failure. It never submits an application or touches a user.
 _Avoid_: smoke test, canary, health probe

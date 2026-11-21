@@ -53,6 +53,7 @@ import {
   INVITE_GRANT_QUANTITY_KEY,
 } from "../auth/invites.ts";
 import { isSameMailbox } from "../auth/email.ts";
+import { readMailHealth } from "../inbox/health.ts";
 
 const settingBody = z.object({ value: z.string().min(1) });
 
@@ -105,6 +106,14 @@ const attemptsQuery = z.object({
 });
 
 const captureBody = fixtureCapturePayloadSchema;
+
+const mailHealthQuery = z.object({
+  days: z.coerce
+    .number()
+    .int()
+    .refine((value) => value === 7 || value === 30)
+    .default(30),
+});
 
 export interface AdminDeps {
   providers: BrowserProviderRegistry | null;
@@ -753,6 +762,12 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
 
     return context.json({ discoveredAt: null, ats });
+  });
+
+  routes.get("/mail-health", zValidator("query", mailHealthQuery), (context) => {
+    const { days } = context.req.valid("query");
+
+    return context.json(readMailHealth(db, clock, days));
   });
 
   routes.get("/audit", (context) => {
