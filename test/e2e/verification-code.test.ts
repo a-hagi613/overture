@@ -49,6 +49,8 @@ const test = appTest.extend<{ codes: CodeHarness }>({
       const directory = mkdtempSync(join(tmpdir(), "overture-code-wait-"));
       const fixture = startGreenhouseFixture({ code });
 
+      fixture.state.codePrompt = true;
+
       if (dns === undefined) {
         throw new Error("The DNS fixture is not running.");
       }
@@ -56,6 +58,7 @@ const test = appTest.extend<{ codes: CodeHarness }>({
       const server = await startFreshAppServer(identityServer, {
         BROWSER_PROVIDER: "local",
         BROWSER_SESSION_DIR: join(directory, "browsers"),
+        GREENHOUSE_BOARD_BASE_URL: fixture.url,
         INBOUND_DNS_SERVER: dns.server,
         INBOUND_HMAC_SECRET: secret,
         MAIL_DOMAIN: mailDomain,
@@ -326,7 +329,7 @@ async function seedBlankStreetPosting(owner: APIRequestContext, fixtureUrl: stri
     questions: blankStreetQuestions,
     tags: [{ dimension: "subrole", value: "Operations" }],
     title: "Assistant General Manager | Durham",
-    url: `${fixtureUrl}/blankstreet/jobs/8004209003?verify=1`,
+    url: `${fixtureUrl}/blankstreet/jobs/8004209003`,
   });
 }
 

@@ -307,12 +307,24 @@ export async function typeCode(page: Page, code: string) {
   await fillRest(0);
 }
 
-export const isApplicationResponse = (candidate: Response) =>
-  candidate.request().method() === "POST" &&
-  new URL(candidate.url()).pathname.endsWith(APPLICATION_URL_PATH);
+const isApplicationPath = (actual: string, submitPathname: string | null) =>
+  submitPathname === null ? actual.endsWith(APPLICATION_URL_PATH) : actual === submitPathname;
 
-export async function watchApplicationResponse(page: Page) {
-  return page.waitForResponse(isApplicationResponse, { timeout: APPLICATION_RESPONSE_MS });
+export const isApplicationResponse = (submitPathname: string | null) => (candidate: Response) =>
+  candidate.request().method() === "POST" &&
+  isApplicationPath(new URL(candidate.url()).pathname, submitPathname);
+
+export async function submitPathnameOf(page: Page, fallbackPathname: string | null) {
+  const declared = /"?submitPath"?\s*:\s*"(?<path>[^"]+)"/u.exec(await page.content())?.groups
+    ?.path;
+
+  return declared === undefined ? fallbackPathname : new URL(declared, page.url()).pathname;
+}
+
+export async function watchApplicationResponse(page: Page, submitPathname: string | null = null) {
+  return page.waitForResponse(isApplicationResponse(submitPathname), {
+    timeout: APPLICATION_RESPONSE_MS,
+  });
 }
 
 export async function readConfirmation(

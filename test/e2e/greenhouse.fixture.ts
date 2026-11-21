@@ -16,6 +16,9 @@ export interface GreenhouseFixturesState {
   lastForm: Record<string, string>;
   lastChoices: Record<string, string>;
   lastResumeBytes: Uint8Array | null;
+  redirect: "none" | "board" | "company";
+  codePrompt: boolean;
+  refuse: boolean;
 }
 
 export interface GreenhouseFixture {
@@ -55,6 +58,9 @@ export function startGreenhouseFixture(options: GreenhouseFixtureOptions = {}) {
     lastForm: {},
     lastChoices: {},
     lastResumeBytes: null,
+    redirect: "none",
+    codePrompt: false,
+    refuse: false,
   };
 
   let holdForm = false;
@@ -172,8 +178,13 @@ export function startGreenhouseFixture(options: GreenhouseFixtureOptions = {}) {
         return Response.json({ released: true });
       }
 
+      const routePath =
+        path === "/embed/job_app"
+          ? `/${url.searchParams.get("for") ?? ""}/jobs/${url.searchParams.get("token") ?? ""}`
+          : path;
+
       const match =
-        /\/(?<board>[a-z]+)\/jobs\/(?<job>[0-9]+)(?<confirmation>\/confirmation)?/u.exec(path);
+        /\/(?<board>[a-z]+)\/jobs\/(?<job>[0-9]+)(?<confirmation>\/confirmation)?/u.exec(routePath);
 
       if (match?.groups === undefined) {
         return new Response(NO_FORM_PAGE, { status: 404 });
@@ -181,13 +192,11 @@ export function startGreenhouseFixture(options: GreenhouseFixtureOptions = {}) {
 
       const { board, job, confirmation } = match.groups;
 
-      const redirect = url.searchParams.get("redirect");
-
-      if (request.method !== "POST" && redirect === "board") {
+      if (path === "/embed/job_app" && request.method !== "POST" && state.redirect === "board") {
         return new Response(null, { status: 302, headers: { location: REDIRECT_TO_BOARD } });
       }
 
-      if (request.method !== "POST" && redirect === "company") {
+      if (path === "/embed/job_app" && request.method !== "POST" && state.redirect === "company") {
         return new Response(new Uint8Array(readFileSync(OTHER_EMPLOYER_FORM)), {
           headers: { "content-type": "text/html" },
         });
@@ -240,11 +249,11 @@ export function startGreenhouseFixture(options: GreenhouseFixtureOptions = {}) {
       state.submissions += 1;
       state.applicationRequests += 1;
 
-      if (url.searchParams.get("refuse") === "1") {
+      if (state.refuse) {
         return new Response("The application was refused.", { status: 403 });
       }
 
-      const wantsCode = url.searchParams.get("verify") === "1";
+      const wantsCode = state.codePrompt;
 
       if (wantsCode && !state.codeAsked) {
         state.codeAsked = true;
@@ -252,26 +261,26 @@ export function startGreenhouseFixture(options: GreenhouseFixtureOptions = {}) {
         return Response.json({ errors: ["captcha-failed"] }, { status: 428 });
       }
 
-      const form = await request.formData();
+      if (request.headers.get("content-type")?.startsWith("multipart/form-data") === true) {
+        const form = await request.formData();
 
-      const upload = [form.get("resume"), form.get("cover_letter")].find(
-        (value) => value instanceof File,
-      );
+        const upload = [form.get("resume"), form.get("cover_letter")].find(
+          (value) => value instanceof File,
+        );
 
-      if (upload instanceof File) {
-        state.lastResumeBytes = new Uint8Array(await upload.arrayBuffer());
-      }
-
-      const keys = [...form.keys()];
-
-      for (const key of keys) {
-        const value = form.get(key);
-
-        if (value === null || value instanceof File) {
-          continue;
+        if (upload instanceof File) {
+          state.lastResumeBytes = new Uint8Array(await upload.arrayBuffer());
         }
 
-        state.lastForm[key] = value;
+        for (const key of form.keys()) {
+          const value = form.get(key);
+
+          if (value === null || value instanceof File) {
+            continue;
+          }
+
+          state.lastForm[key] = value;
+        }
       }
 
       if (wantsCode && typedCode() !== state.code) {

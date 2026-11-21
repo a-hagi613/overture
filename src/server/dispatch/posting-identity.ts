@@ -20,8 +20,15 @@ const GREENHOUSE_BOARD_HOSTS: ReadonlySet<string> = new Set([
 const sameHost = (expected: string, live: string) =>
   expected === live || (GREENHOUSE_BOARD_HOSTS.has(expected) && GREENHOUSE_BOARD_HOSTS.has(live));
 
-const postingPath = (pathname: string) => {
-  const segments = pathname
+const postingPath = (url: URL) => {
+  if (url.pathname === "/embed/job_app") {
+    const boardToken = url.searchParams.get("for");
+    const jobId = url.searchParams.get("token");
+
+    return boardToken === null || jobId === null ? null : { boardToken, jobId };
+  }
+
+  const segments = url.pathname
     .split("/")
     .filter((segment) => segment !== "")
     .map((segment) => decodeURIComponent(segment));
@@ -72,7 +79,7 @@ export async function checkPostingIdentity(page: Page, expected: PostingIdentity
     return mismatch("host");
   }
 
-  const livePosting = postingPath(live.pathname);
+  const livePosting = postingPath(live);
 
   if (livePosting === null) {
     return mismatch("unreadable");

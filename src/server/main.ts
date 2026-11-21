@@ -165,6 +165,7 @@ const preparation = createPreparationService({
   llm: anthropicLlmPort,
   personal,
   source: createGreenhouseQuestionSource(env.GREENHOUSE_FEED_BASE_URL),
+  greenhouseBoardOrigin: env.GREENHOUSE_BOARD_BASE_URL,
   onReady: (_applicationId, userId) => {
     enqueuePlannerDay(db, clock, userId);
   },

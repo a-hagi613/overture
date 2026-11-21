@@ -367,15 +367,14 @@ test("the code path prompts on the console, records the 428 and the confirmation
   await withHarness(async (harness) => {
     const output = outputProperties(harness.output);
     const record = posting("blankstreet", "8004209003");
+    harness.fixture.state.codePrompt = true;
 
     const runPromise = runProbe(
       command(harness, true, {
         runFile: {
           country: runFileTemplate.country,
           resumePath: harness.resumePath,
-          postings: [
-            { ...record, url: `${harness.fixture.url}/blankstreet/jobs/8004209003?verify=1` },
-          ],
+          postings: [{ ...record, url: `${harness.fixture.url}/blankstreet/jobs/8004209003` }],
         },
       }),
     );

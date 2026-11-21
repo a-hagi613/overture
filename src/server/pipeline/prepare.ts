@@ -28,6 +28,7 @@ import { createFactService } from "../profile/facts.ts";
 import { guardPosting } from "./guard/posting-guard.ts";
 import { createOpenTextService, isCoverLetterQuestion } from "./open-text.ts";
 import { createTargetsService } from "../profile/targets.ts";
+import { greenhouseBoardUrl } from "./greenhouse-board-url.ts";
 import { mapQuestionsWithLlm } from "../catalog/question-mapping.ts";
 import { createQuestionCatalog, questionInputsFromAts } from "../catalog/questions.ts";
 import { indexFacts, isUnsupportedBlock, resolveQuestion } from "./answer-plan.ts";
@@ -218,9 +219,10 @@ export function createPreparationService(deps: {
   llm: LlmPort;
   personal: PersonalCrypto;
   source: QuestionSource | null;
+  greenhouseBoardOrigin?: string | undefined;
   onReady?: (applicationId: string, userId: string) => void;
 }) {
-  const { db, clock, llm, personal, source, onReady } = deps;
+  const { db, clock, llm, personal, source, greenhouseBoardOrigin, onReady } = deps;
 
   const catalog = createQuestionCatalog({ db, clock });
   const factsService = createFactService({ db, clock, personal });
@@ -675,6 +677,7 @@ export function createPreparationService(deps: {
         descriptionHash: postings.descriptionHash,
         companyName: companies.name,
         boardToken: companyBoards.boardToken,
+        boardRegion: companyBoards.region,
         atsJobId: postings.atsJobId,
         countryCode: postings.countryCode,
         city: postings.city,
@@ -804,7 +807,15 @@ export function createPreparationService(deps: {
       descriptionHash: row.descriptionHash ?? null,
       fields,
       postingTitle: row.title,
-      postingUrl: row.applyUrl ?? row.url,
+      postingUrl:
+        row.ats === "greenhouse"
+          ? greenhouseBoardUrl({
+              atsJobId: row.atsJobId,
+              boardToken: row.boardToken,
+              origin: greenhouseBoardOrigin,
+              region: row.boardRegion,
+            })
+          : (row.applyUrl ?? row.url),
       resume:
         resume === undefined
           ? null

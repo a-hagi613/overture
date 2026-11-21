@@ -35,6 +35,7 @@ const test = appTest.extend<{ pacing: PacingHarness }>({
       const server = await startFreshAppServer(identityServer, {
         BROWSER_PROVIDER: "local",
         BROWSER_SESSION_DIR: sessionDirectory,
+        GREENHOUSE_BOARD_BASE_URL: fixture.url,
         GREENHOUSE_FEED_BASE_URL: fixture.url,
         INBOUND_HMAC_SECRET: "inbound-test-secret",
       });
