@@ -124,6 +124,7 @@
           "src/server/catalog/sweep-worker.ts",
           "src/server/catalog/sweep-run.ts",
           "src/server/catalog/poll-board.ts",
+          "src/server/catalog/workable-ingest.ts",
           "src/server/catalog/tag-store.ts",
           "src/server/catalog/feed-retag.ts",
           "src/server/catalog/discovered-boards.ts",

@@ -214,7 +214,7 @@ export const companyBoards = sqliteTable(
     companyId: text("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
-    ats: text("ats", { enum: ["greenhouse", "lever", "ashby", "personio"] }).notNull(),
+    ats: text("ats", { enum: ["greenhouse", "lever", "ashby", "workable", "personio"] }).notNull(),
     boardToken: text("board_token").notNull(),
     region: text("region", { enum: ["us", "eu"] })
       .notNull()
@@ -248,7 +248,7 @@ export const postings = sqliteTable(
     companyId: text("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
-    ats: text("ats", { enum: ["greenhouse", "lever", "ashby", "personio"] }).notNull(),
+    ats: text("ats", { enum: ["greenhouse", "lever", "ashby", "workable", "personio"] }).notNull(),
     atsJobId: text("ats_job_id").notNull(),
     url: text("url").notNull(),
     applyUrl: text("apply_url"),
@@ -292,6 +292,27 @@ export const postings = sqliteTable(
     index("postings_dedupe_key").on(t.dedupeKey),
     index("postings_apply_url_norm").on(t.applyUrlNorm),
     index("postings_closed_at").on(t.closedAt),
+    index("postings_ats_closed_last_seen").on(t.ats, t.closedAt, t.lastSeenAt),
+  ],
+);
+
+export const workableIngests = sqliteTable(
+  "workable_ingests",
+  {
+    id: text("id").primaryKey(),
+    snapshotKey: text("snapshot_key").notNull(),
+    fetchedAt: integer("fetched_at").notNull(),
+    sourceLastModified: text("source_last_modified"),
+    rows: integer("rows").notNull(),
+    contentHash: text("content_hash").notNull(),
+    added: integer("added").notNull(),
+    updated: integer("updated").notNull(),
+    closed: integer("closed").notNull(),
+    ingestedAt: integer("ingested_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("workable_ingests_snapshot_unique").on(t.snapshotKey),
+    index("workable_ingests_ingested_at").on(t.ingestedAt),
   ],
 );
 
@@ -967,7 +988,7 @@ export const reviewAuditEvents = sqliteTable(
     }),
     reviewId: text("review_id").references(() => reviews.id, { onDelete: "cascade" }),
     questionId: text("question_id").references(() => questions.id, { onDelete: "cascade" }),
-    ats: text("ats", { enum: ["greenhouse", "lever", "ashby", "personio"] }),
+    ats: text("ats", { enum: ["greenhouse", "lever", "ashby", "workable", "personio"] }),
     source: text("source", {
       enum: ["fact", "target", "derived", "consent", "file", "open_text"],
     }),

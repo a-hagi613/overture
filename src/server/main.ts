@@ -23,6 +23,11 @@ import {
   runBackfillJob,
   runSweepJob,
 } from "./catalog/discovery.ts";
+import {
+  WORKABLE_INGEST_JOB_KIND,
+  ensureWorkableIngestQueued,
+  runWorkableIngestJob,
+} from "./catalog/workable-job.ts";
 import { createCatalogSweepWorker } from "./catalog/sweep-worker-runner.ts";
 import {
   TAG_FALLBACK_JOB_KIND,
@@ -169,6 +174,7 @@ const jobSingletons = [
   CHECKIN_SWEEP_JOB_KIND,
   DISPATCH_TICK_JOB_KIND,
   LIVE_CHECK_JOB_KIND,
+  WORKABLE_INGEST_JOB_KIND,
 ];
 
 recoverStaleLocks(db, clock, jobSingletons);
@@ -189,6 +195,9 @@ const catalogJobHandlers: JobHandlers = {
   },
   [SWEEP_JOB_KIND]: async () => {
     await runSweepJob(catalogWorker, catalogDeps);
+  },
+  [WORKABLE_INGEST_JOB_KIND]: async () => {
+    await runWorkableIngestJob(catalogWorker, catalogDeps);
   },
 };
 
@@ -566,6 +575,7 @@ ensureSweepQueued(catalogDeps);
 
 if (env.NODE_ENV === "production") {
   ensureLiveCheckQueued(db, clock);
+  ensureWorkableIngestQueued(db, clock);
 }
 
 if (env.ANTHROPIC_API_KEY !== undefined) {

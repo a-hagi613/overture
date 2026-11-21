@@ -145,8 +145,8 @@ M2 promises sub-day Workable freshness; the other feeds keep their 30-minute to 
 - **Use `<experience>` when the title has no seniority, `<jobtype>` for employment and `<category>` as the
   department.** Without the first, most Workable postings are invisible to matching (10.5 % vs 23.3 % tagged).
 - **#234's budget**: peak RSS at most 200 MB above the process baseline, ingest at most 5 minutes a day, `/api/health`
-  p99 under 300 ms (the existing sweep budget). The recorded trim (5,426 jobs) should become the e2e fixture; keep
-  its real structure and a `</job>` boundary.
+  p99 under 300 ms (the existing sweep budget). The e2e fixture is a later 300-job production recording (the 5,426-job
+trim was deleted with the spike worktree); it keeps the real structure and ends on a `</source>` boundary.
 
 ### Considered and rejected
 

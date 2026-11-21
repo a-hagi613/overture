@@ -1,8 +1,28 @@
 import { z } from "zod";
 
-export const SWEEP_RUN_KINDS = ["sweep", "backfill"] as const;
+export const SWEEP_RUN_KINDS = ["sweep", "backfill", "workable"] as const;
 
 export type SweepRunKind = (typeof SWEEP_RUN_KINDS)[number];
+
+export const workableIngestReportSchema = z.object({
+  outcome: z.enum([
+    "ingested",
+    "unchanged",
+    "already_ingested",
+    "kill_switch",
+    "missing_manifest",
+    "missing_snapshot",
+    "stale",
+  ]),
+  snapshot: z.string().nullable(),
+  rows: z.number(),
+  added: z.number(),
+  updated: z.number(),
+  closed: z.number(),
+  ageMs: z.number().nullable(),
+  previousRows: z.number().nullable(),
+  dropped: z.boolean(),
+});
 
 export const sweepRunSummarySchema = z.object({
   kind: z.enum(SWEEP_RUN_KINDS),
@@ -15,6 +35,7 @@ export const sweepRunSummarySchema = z.object({
   updated: z.number(),
   closed: z.number(),
   durationMs: z.number(),
+  workable: workableIngestReportSchema.nullish(),
 });
 
 export type SweepRunSummary = z.infer<typeof sweepRunSummarySchema>;

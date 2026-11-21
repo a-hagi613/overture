@@ -84,6 +84,10 @@ _Avoid_: credit, allowance, quota
 The permanent record of exactly what one sent Application said: answers with their sources, the letter, the resume file and the consent.
 _Avoid_: receipt, log
 
+**Workable snapshot**:
+The gzipped JSONL of target-relevant Workable Postings that the daily off-box pass writes to R2, with a manifest of its fetched-at, source `Last-Modified`, row count and content hash. The app ingests it and never fetches Workable.
+_Avoid_: feed download, Workable cache
+
 ## The Board
 
 **Stage**:

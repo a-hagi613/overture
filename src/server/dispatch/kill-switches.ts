@@ -34,7 +34,7 @@ const SAMPLE_OUTCOMES = new Set<string>([
 ]);
 
 interface AttemptScope {
-  ats: "greenhouse" | "lever" | "ashby" | "personio";
+  ats: "greenhouse" | "lever" | "ashby" | "workable" | "personio";
   provider: "browser_use" | "kernel" | "local";
   companyId: string;
   companyName: string;
