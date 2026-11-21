@@ -232,7 +232,6 @@ const seedMailBody = z.object({
   classification: z
     .enum(["ack", "code", "rejection", "screening", "interview", "offer", "other"])
     .default("other"),
-  auth: z.enum(["pass", "fail", "none"]).default("pass"),
   localPart: z.string().min(1).max(64).optional(),
   readAt: z.number().int().nullish(),
   attachments: z
