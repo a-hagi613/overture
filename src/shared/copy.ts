@@ -1402,6 +1402,14 @@ export const copy = {
     signOut: "Sign out",
     saveFailed: "That did not save. Try again.",
     loadFailed: "That did not load. Reload the page.",
+    loading: "Loading…",
+    loadFailedTitle: "That did not load",
+    loadFailedBody:
+      "Overture could not fetch your choices. Try again; your answers so far are saved.",
+    retry: "Try again",
+    emptyTargetsTitle: "Nothing to choose from yet",
+    emptyTargets:
+      "Overture has no open postings to match against yet. Try again in a few minutes; your answers so far are saved.",
   },
   notifications: {
     page: {

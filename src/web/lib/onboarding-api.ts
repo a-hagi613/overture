@@ -183,7 +183,7 @@ export function useFinishOnboardingStep() {
 }
 
 export function useOnboardingFacts() {
-  return useQuery({ queryFn: fetchOnboardingFacts, queryKey: factsKey });
+  return useQuery({ queryFn: fetchOnboardingFacts, queryKey: factsKey, retry: 1 });
 }
 
 export function useUploadOnboardingResume() {
@@ -212,7 +212,7 @@ export function useSaveOnboardingFacts() {
 }
 
 export function useOnboardingTargets() {
-  return useQuery({ queryFn: fetchOnboardingTargets, queryKey: targetsKey });
+  return useQuery({ queryFn: fetchOnboardingTargets, queryKey: targetsKey, retry: 1 });
 }
 
 export function useSaveOnboardingTargets() {

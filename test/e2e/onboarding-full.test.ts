@@ -127,3 +127,73 @@ test("a brand-new user answers every onboarding step through the UI", async ({
   await context.close();
   await request.dispose();
 });
+
+const emptyChoices = {
+  choices: { employmentTypes: [], locations: [], roles: [], seniorities: [], workplaces: [] },
+  currencies: [],
+  matchedCount: 0,
+  targets: {
+    employmentTypes: [],
+    locations: [],
+    roles: [],
+    salaryCurrency: null,
+    salaryFloorMinor: null,
+    salaryPeriod: "year",
+    seniorities: [],
+    workplaces: [],
+  },
+};
+
+test("the What you want step shows a loading, error or empty state, never nothing", async ({
+  browser,
+  onboardingServer,
+}) => {
+  const request = await apiRequest.newContext({ baseURL: onboardingServer.url });
+
+  await seedOnboardingTargetsFlow(request, onboardingServer.url);
+
+  const context = await browser.newContext({
+    storageState: await request.storageState(),
+    viewport: { height: 1400, width: 1280 },
+  });
+
+  const page = await context.newPage();
+  const heading = page.getByRole("heading", { level: 2, name: /What do you want/u });
+
+  const gate = Promise.withResolvers<undefined>();
+
+  await page.route("**/api/onboarding/targets", async (route) => {
+    await gate.promise;
+    await route.fallback();
+  });
+
+  await page.goto(`${onboardingServer.url}/onboarding/targets`);
+  await expect(page.getByRole("status").filter({ hasText: "Loading" })).toBeVisible();
+  await expect(page.getByRole("main")).not.toHaveText(/^\s*$/u);
+
+  gate.resolve(undefined);
+  await expect(heading).toBeVisible();
+  await page.unroute("**/api/onboarding/targets");
+
+  await page.route("**/api/onboarding/targets", async (route) => {
+    await route.fulfill({ body: "{}", status: 500 });
+  });
+
+  await page.reload();
+  await expect(page.getByRole("alert")).toContainText("That did not load");
+
+  await page.unroute("**/api/onboarding/targets");
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(heading).toBeVisible();
+
+  await page.route("**/api/onboarding/targets", async (route) => {
+    await route.fulfill({ json: emptyChoices });
+  });
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Nothing to choose from yet" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+
+  await context.close();
+  await request.dispose();
+});
