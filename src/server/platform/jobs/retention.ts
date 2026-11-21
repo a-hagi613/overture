@@ -9,12 +9,12 @@ import { enqueueJob } from "./queue.ts";
 
 const HOUR_MS = 3_600_000;
 
-export const DAY_MS = 24 * HOUR_MS;
+const DAY_MS = 24 * HOUR_MS;
 export const RETENTION_JOB_KIND = "maintenance.retention";
-export const RETENTION_INTERVAL_MS = HOUR_MS;
-export const EVENT_RETENTION_MS = DAY_MS;
-export const DONE_JOB_RETENTION_MS = 7 * DAY_MS;
-export const DEAD_JOB_RETENTION_MS = 30 * DAY_MS;
+const RETENTION_INTERVAL_MS = HOUR_MS;
+const EVENT_RETENTION_MS = DAY_MS;
+const DONE_JOB_RETENTION_MS = 7 * DAY_MS;
+const DEAD_JOB_RETENTION_MS = 30 * DAY_MS;
 
 type Table = "events" | "bg_jobs";
 
