@@ -233,6 +233,7 @@ export async function seedApplication(
       | "withdrawn";
     sentAt?: number | null;
     createdAt?: number | null;
+    readyAt?: number | null;
     scheduledFor?: number | null;
   },
 ) {
@@ -240,6 +241,7 @@ export async function seedApplication(
     data: {
       createdAt: input.createdAt ?? null,
       origin: "auto",
+      readyAt: input.readyAt ?? null,
       scheduledFor: input.scheduledFor ?? null,
       sentAt: input.sentAt ?? null,
       status: input.status,

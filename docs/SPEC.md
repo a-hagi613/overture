@@ -547,7 +547,7 @@ for candidate in candidates ordered by code_rank desc, unscored-or-stale first:
     score = cached if valid else Haiku score (§8.6)
     if score ≥ auto_threshold: create application(origin='auto', status='preparing'); free -= 1
 prepare every new Application in the run (§8.3)
-send the one Recap email (§8.7) when the run produced anything
+queue `ready.notify`, the one Recap email (§8.7), which sends only when the run produced anything
 ```
 
 - The Ready list never holds more than one day's work: `free` subtracts every Application already waiting for the
@@ -747,13 +747,15 @@ stateDiagram-v2
   `changes` and approves again.
 - **At send** the executor fills only the approved plan and the preflight compares the live form with it (§9.4,
   §10.3).
-- **The Recap email** (M1). The daily run (§8.2) finishes by sending one email, and only when it produced something:
-  at least one new Ready Application or at least one new open Review. It comes from `no-reply@tryoverture.com`
-  through Cloudflare Email Sending (§11.2) to the user's verified email, lists each new Ready Application by
-  employer and job title (no answers) and how many Reviews are open ("10 ready to approve, 2 need an answer"), and
-  carries one link to `{APP_ORIGIN}/ready`. Opening that link only shows the page, because mail scanners open links;
-  nothing is ever approved or sent by a GET. It is recorded as a `notifications` row (`kind='ready'`,
-  `emailed_at`). There is no per-application email and no second recap that day. M2 adds push.
+- **The Recap email** (M1). The daily run (§8.2) finishes by queueing `ready.notify`, which sends one email, and
+  only when the run produced something: at least one new Ready Application or at least one new open Review. It comes
+  from `no-reply@tryoverture.com` through Cloudflare Email Sending (§11.2) to the user's verified email, lists each
+  new Ready Application by employer and job title (no answers) and how many Reviews are open ("10 ready to approve,
+  2 need an answer"), and carries one link to `{APP_ORIGIN}/ready`. At most one is sent to a user per local day, a
+  retried run sends no second one, and the job retries a failed send without failing the run. Opening that link only
+  shows the page, because mail scanners open links; nothing is ever approved or sent by a GET. It is recorded as a
+  `notifications` row (`kind='ready'`, `emailed_at`). There is no per-application email and no second recap that day.
+  M2 adds push.
 
 > Considered for later, out of scope: an opt-in "send without asking" switch per user, off by default and
 > admin-gated (ADR 0029). Nothing is built for it.
@@ -1155,9 +1157,9 @@ User-facing copy never uses the banned words (see the Words rule at the top; ADR
 
 ### 15.1 Notifications
 
-M1: the Recap email, sent once by the daily preparation run (#198, #196, §8.7) and only when the run produced
-something, listing the new Ready Applications and open Reviews (§8.2). It links to the Ready page, which never sends
-from the link.
+M1: `ready.notify`, the Recap email queued as the daily preparation run finishes (#198, #196, §8.7), sent once a
+local day and only when the run produced something, listing the new Ready Applications and open Reviews (§8.2). It
+links to the Ready page, which never sends from the link.
 
 M2 adds **push** (PWA, Web Push with VAPID) and an in-app list that mirrors it. Push: the daily recap ("10 ready to approve,
 2 need an answer"), a new Review, an employer reply, an interview or offer detected, a card moved automatically (with

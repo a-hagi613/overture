@@ -4,7 +4,6 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
-import type { MailSender } from "../platform/mail/port.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { PreparationService } from "./prepare.ts";
 
@@ -13,7 +12,7 @@ import { applications, bgJobs, profiles } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { getSetting } from "../platform/settings/index.ts";
 import { effectiveTimeZone } from "../profile/time-zone.ts";
-import { sendReadyRecap } from "../notify/ready-recap.ts";
+import { enqueueReadyNotify } from "../notify/ready-recap.ts";
 
 export const PREP_DAILY_JOB_KIND = "prep.daily";
 export const DEFAULT_PREP_RUN_MINUTES = 7 * 60;
@@ -31,14 +30,12 @@ export interface PrepDailyDeps {
   llm: LlmPort;
   personal: PersonalCrypto;
   preparation: PreparationService;
-  mail: MailSender;
-  appOrigin: string;
 }
 
 export interface PrepDailyRun {
   applicationsCreated: number;
   candidates: number;
-  recap: { openReviews: number; ready: number } | null;
+  notifyQueued: boolean;
   scored: number;
   skipped: boolean;
 }
@@ -166,11 +163,12 @@ export function ensurePrepQueuedForRunningUsers(db: AppDatabase, clock: Clock) {
 
 /**
  * The daily run: match, prepare and stop at the free Ready slots. It never
- * schedules or sends anything; only an Approval does that (ADR 0029).
+ * schedules or sends anything; only an Approval does that (ADR 0029). It ends
+ * by queuing the Recap email job, which sends at most one email a day.
  * @param deps The services the run needs.
  * @param userId The running user to prepare for.
  * @param since When this run's window opened; a retry keeps the same window.
- * @returns What the run created and what its recap said.
+ * @returns What the run created and whether its Recap is queued.
  */
 export async function runPrepDailyJob(deps: PrepDailyDeps, userId: string, since: number) {
   const profile = deps.db
@@ -183,7 +181,7 @@ export async function runPrepDailyJob(deps: PrepDailyDeps, userId: string, since
     return {
       applicationsCreated: 0,
       candidates: 0,
-      recap: null,
+      notifyQueued: false,
       scored: 0,
       skipped: true,
     } satisfies PrepDailyRun;
@@ -210,16 +208,12 @@ export async function runPrepDailyJob(deps: PrepDailyDeps, userId: string, since
     ...new Set([...preparing.map((application) => application.id), ...run.createdIds]),
   ]);
 
-  const recap = await sendReadyRecap(
-    { appOrigin: deps.appOrigin, clock: deps.clock, db: deps.db, mail: deps.mail },
-    userId,
-    since,
-  );
+  const notify = enqueueReadyNotify(deps.db, deps.clock, userId, since);
 
   return {
     applicationsCreated: run.applicationsCreated,
     candidates: run.candidates,
-    recap,
+    notifyQueued: notify.inserted,
     scored: run.scored,
     skipped: false,
   } satisfies PrepDailyRun;

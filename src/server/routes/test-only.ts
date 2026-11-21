@@ -329,6 +329,7 @@ const seedApplicationBody = z.object({
   ]),
   sentAt: z.number().int().nullable().default(null),
   createdAt: z.number().int().nullable().default(null),
+  readyAt: z.number().int().nullable().default(null),
   origin: z.enum(["auto", "manual"]).default("auto"),
   stage: z
     .enum(["queued", "ready", "applied", "screening", "interviewing", "offer", "closed"])
@@ -757,6 +758,7 @@ export function createTestRoutes(
           url: row.url,
           createdAt: row.createdAt,
           readAt: row.readAt?.getTime() ?? null,
+          emailedAt: row.emailedAt?.getTime() ?? null,
         })),
       });
     },
@@ -1132,6 +1134,7 @@ export function createTestRoutes(
       status,
       sentAt,
       createdAt,
+      readyAt,
       origin,
       stage,
       stageLocked,
@@ -1168,6 +1171,7 @@ export function createTestRoutes(
         stage: seededStage,
         stageLocked,
         sentAt,
+        readyAt,
         createdAt: now,
         updatedAt: now,
       })
