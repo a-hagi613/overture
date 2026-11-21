@@ -533,6 +533,250 @@ export const copy = {
       empty: "No employer mail yet.",
     },
   },
+  legal: {
+    back: "Back to Overture",
+    eyebrow: "Legal",
+    lastUpdated: "Last updated 21 November 2026",
+    metaSeparator: " · ",
+    effective: "Effective when the beta opens",
+    footerName: "Overture",
+    footerContact: "admin@tryoverture.com",
+    footerAddress: "[POSTAL ADDRESS]",
+    footerSeparator: " · ",
+    footerLinksLabel: "Legal pages",
+    termsLink: "Terms of Service",
+    privacyLink: "Privacy Policy",
+    contactHref: "mailto:admin@tryoverture.com",
+    dateLocale: "en-GB",
+    terms: {
+      title: "Terms of Service",
+      sections: [
+        {
+          heading: "Who we are",
+          blocks: [
+            {
+              kind: "paragraphWithLink",
+              before: "Overture is a job-search service run by Overture. You can reach us at ",
+              after: ". Our postal address is [POSTAL ADDRESS].",
+              href: "mailto:admin@tryoverture.com",
+              link: "admin@tryoverture.com",
+            },
+          ],
+        },
+        {
+          heading: "What Overture does",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Overture finds jobs that fit what you want, prepares each application from the resume and facts you save, and sends an application only after you approve it. You can skip or edit an application before you send it.",
+            },
+          ],
+        },
+        {
+          heading: "Your account",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "You sign in with Google, LinkedIn, a password or an emailed link, using the email your invitation was sent to. Keep your sign-in details to yourself, and tell us if you think someone else has used your account.",
+            },
+          ],
+        },
+        {
+          heading: "Your resume and facts",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "You own what you give Overture. We use it to prepare the applications you approve and for nothing else. The Privacy Policy explains how we keep it safe.",
+            },
+          ],
+        },
+        {
+          heading: "The beta",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Overture is invite-only during the beta. An accepted invite comes with 300 applications over 30 days. The beta has no charge and asks for no card.",
+            },
+          ],
+        },
+        {
+          heading: "What you agree to on each application",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Each application you approve records the version of the consent text you agreed to. You can read every version in your Settings.",
+            },
+          ],
+        },
+        {
+          heading: "What we cannot promise",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Overture cannot make an employer reply, and it does not decide who is hired. Each employer's form and rules still apply to your application.",
+            },
+          ],
+        },
+        {
+          heading: "Suspension and ending",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "We may suspend an account that breaks these terms or puts other people at risk. You can stop using Overture at any time and delete your account from Settings.",
+            },
+          ],
+        },
+        {
+          heading: "Changes",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "If we change these terms, we will tell you by email before the change takes effect.",
+            },
+          ],
+        },
+        {
+          heading: "Contact",
+          blocks: [
+            {
+              kind: "paragraphWithLink",
+              before: "Questions about these terms: ",
+              after: ".",
+              href: "mailto:admin@tryoverture.com",
+              link: "admin@tryoverture.com",
+            },
+          ],
+        },
+      ],
+    },
+    privacy: {
+      title: "Privacy Policy",
+      sections: [
+        {
+          heading: "Who we are",
+          blocks: [
+            {
+              kind: "paragraphWithLink",
+              before: "Overture is run by Overture. Contact us at ",
+              after: ". Our postal address is [POSTAL ADDRESS].",
+              href: "mailto:admin@tryoverture.com",
+              link: "admin@tryoverture.com",
+            },
+          ],
+        },
+        {
+          heading: "What we collect",
+          blocks: [
+            {
+              kind: "bullets",
+              items: [
+                "Your account: your email and, if you sign in with Google or LinkedIn, the name and photo that Google or LinkedIn shares.",
+                "Your resume, the facts you save, your targets and your skip list.",
+                "Your forwarding address, and the job emails you forward to it.",
+                "Application records: what was filled in, what you approved, what was sent and when.",
+                "The consent versions you agreed to, and the records needed to keep the service running and secure.",
+              ],
+            },
+          ],
+        },
+        {
+          heading: "Why we use it",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "To find jobs for you, prepare and send the applications you approve, email you what you asked for (sign-in and verification links, the daily recap), and keep Overture safe.",
+            },
+          ],
+        },
+        {
+          heading: "Who processes it for us",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "These companies process data on our behalf. We update this list when it changes.",
+            },
+            {
+              kind: "processors",
+              companyLabel: "Company",
+              doesLabel: "What it does for Overture",
+              rows: [
+                { does: "Hosts the Overture app and its database.", name: "Fly" },
+                {
+                  does: "Domain name service, email, file storage and background workers.",
+                  name: "Cloudflare",
+                },
+                {
+                  does: "Cloud browsers that fill in job application forms for you.",
+                  name: "Browser Use",
+                },
+                {
+                  does: "A backup cloud browser, used only when the main one cannot be used.",
+                  name: "Kernel",
+                },
+                {
+                  does: "The language model that matches jobs and drafts answers from your facts.",
+                  name: "Anthropic",
+                },
+                { does: "Service logs and health monitoring.", name: "Grafana Cloud" },
+              ],
+            },
+          ],
+        },
+        {
+          heading: "How we keep it safe",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Your files and answers are encrypted, and passwords are stored only as hashes. Access to your data is limited to what the service needs, and every time staff open a user's data it is recorded.",
+            },
+          ],
+        },
+        {
+          heading: "Your rights",
+          blocks: [
+            {
+              kind: "paragraphWithLink",
+              before:
+                "You can export your data and delete your account from Settings. For anything else, write to ",
+              after: ".",
+              href: "mailto:admin@tryoverture.com",
+              link: "admin@tryoverture.com",
+            },
+          ],
+        },
+        {
+          heading: "Changes and contact",
+          blocks: [
+            {
+              kind: "paragraphWithLink",
+              before:
+                "If we change this policy, we will tell you by email before the change takes effect. Questions: ",
+              after: ".",
+              href: "mailto:admin@tryoverture.com",
+              link: "admin@tryoverture.com",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  consent: {
+    eyebrow: "Consent",
+    versionLabel: (version: string) => `Version ${version}`,
+    title: "What you agree to",
+    readNoticeBefore: "I have read the ",
+    readNoticeBetween: " and the ",
+    readNoticeEnd: ".",
+    agree: "I agree to this.",
+    footnote:
+      "Overture records the version you agreed to with each application you approve. Earlier versions stay on record, unchanged.",
+    accepted: (version: string, date: string) => `Version ${version} agreed ${date}.`,
+    acceptFailed: "That did not save. Do not start yet; try again in a moment.",
+    unavailable: "The consent text could not be loaded.",
+    earlierHeading: "Earlier versions",
+    earlierNote: "Every version stays on record exactly as it was published.",
+    publishedOn: (date: string) => `Published ${date}`,
+  },
   settings: {
     title: "Settings",
     lead: "Your account, and how Overture works for you",
@@ -581,6 +825,18 @@ export const copy = {
     signOutAllButton: "Sign out everywhere",
     signedOutMessage: "You are signed out on your other devices.",
     signedOutToasts: "Signed out everywhere",
+    legalHeading: "Terms and privacy",
+    legalTerms: "Terms of Service",
+    legalTermsDetail: "What Overture promises, and what you agree to.",
+    legalPrivacy: "Privacy Policy",
+    legalPrivacyDetail: "What Overture collects, who processes it and your rights.",
+    legalConsent: "Consent",
+    legalConsentVersion: (version: string) => `The version you agreed to: ${version}`,
+    legalConsentAccepted: (date: string) => `Agreed ${date}`,
+    legalConsentNotAgreed: "Not agreed yet.",
+    legalConsentRead: "Read the consent",
+    legalOpen: "Open",
+    legalSeparator: " · ",
   },
   profile: {
     sectionsLabel: "Profile sections",
