@@ -148,7 +148,7 @@ M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 obj
 | Mail | `mailparser`, `mailauth` (SPF/DKIM/DMARC verification), AWS SDK v3 SES |
 | Telemetry | OpenTelemetry SDK (traces, metrics, logs) → OTLP |
 | Lint/format | oxlint, every category at error + type-aware (`oxlint-tsgolint`), from Landmines' own configuration, plus `@interfere/landmines`, vendored anti-slop, React / `jsx-a11y` / Vitest plugins and architecture rules (ADR 0023), with the Cloudflare preset rules; `bun lint` runs Oxlint with `--deny-warnings`; `bun fmt` formats |
-| Tests | Playwright e2e (sharded), `bun test` for the six invariant files, MSW at the network edge, daily live checks on Fly (ADR 0013) |
+| Tests | Playwright e2e (sharded), `bun test` for the ADR 0013 invariant files, MSW at the network edge, daily live checks on Fly (ADR 0013) |
 
 ```
 src/
@@ -170,7 +170,7 @@ src/
 drizzle/             generated migrations
 scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, pull-forms.ts, restore-drill.ts
 test/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
-                     (the six unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
+                     (the seven unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
 ```
 

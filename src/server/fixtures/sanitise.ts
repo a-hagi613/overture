@@ -1,44 +1,26 @@
 import { createHash } from "node:crypto";
 
-const SCRIPT_BLOCK = /<script\b[^>]*>[\s\S]*?<\/script\s*>/giu;
-
-const EVENT_ATTRIBUTE = /\son[a-z]+(?:=(?:"[^"]*"|'[^']*'|[^\s>]+))?/giu;
-
-const DATA_ATTRIBUTE = /\sdata-[a-z0-9-]+(?:=(?:"[^"]*"|'[^']*'|[^\s>]+))?/giu;
-
-const NONCE_ATTRIBUTE = /\snonce(?:=(?:"[^"]*"|'[^']*'|[^\s>]+))?/giu;
-
-const INTEGRITY_ATTRIBUTE = /\sintegrity(?:=(?:"[^"]*"|'[^']*'|[^\s>]+))?/giu;
-
-const CROSSORIGIN_ATTRIBUTE = /\scrossorigin(?:=(?:"[^"]*"|'[^']*'|[^\s>]+))?/giu;
-
-const SRCSET_ATTRIBUTE = /\ssrcset(?:=(?:"[^"]*"|'[^']*'|[^\s>]+))?/giu;
-
 const EMAIL = /\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/gu;
-
-const URL_ATTRIBUTE =
-  /(?<prefix>\s(?:href|src|action)\s*=\s*)(?:"(?<double>[^"]*)"|'(?<single>[^']*)'|(?<bare>[^\s>]+))/giu;
 
 const TRACKING_PARAMETER =
   /^(?:utm_[a-z]+|gclid|fbclid|msclkid|mc_cid|mc_eid|gh_src|lever-source|ashby_source|ref|referrer|source|_ga|_gl)$/iu;
 
-const TOKEN_INPUT =
-  /<input\b[^>]*\bname\s*=\s*["']?(?:authenticity_token|csrf(?:token)?|_token|token)["']?[^>]*>/giu;
+const TOKEN_NAME = /^(?:authenticity_token|csrf(?:token)?|_token|token)$/iu;
 
-const VALUE_ATTRIBUTE = /\svalue\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/giu;
+const FILLED_INPUT_TYPES = new Set([
+  "date",
+  "email",
+  "number",
+  "password",
+  "search",
+  "tel",
+  "text",
+  "url",
+]);
 
-const AUTOCOMPLETE_ATTRIBUTE = /\sautocomplete\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/giu;
+const URL_ATTRIBUTES = new Set(["action", "href", "src"]);
 
-const FILLED_INPUT =
-  /<input\b(?![^>]*\btype\s*=\s*["']?(?:hidden|submit|button|checkbox|radio|file)["']?)[^>]*>/giu;
-
-const TEXTAREA = /<textarea\b(?<open>[^>]*)>[\s\S]*?<\/textarea>/giu;
-
-const CSRF_META = /<meta\b[^>]*\bname\s*=\s*["']csrf-token["'][^>]*>/giu;
-
-const FIELD_NAME = /\bname\s*=\s*(?:"(?<double>[^"]*)"|'(?<single>[^']*)'|(?<bare>[^\s>]+))/giu;
-
-const FORM_ACTION = /\baction\s*=\s*(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/iu;
+const DROPPED_PREFIXES = ["data-", "on"];
 
 const ASSET_EXTENSIONS = {
   "application/font-woff": "woff",
@@ -58,6 +40,10 @@ const ASSET_EXTENSIONS = {
   "text/javascript": "js",
 } as const satisfies Record<string, string>;
 
+const FIELD_NAME = /\bname\s*=\s*(?:"(?<double>[^"]*)"|'(?<single>[^']*)'|(?<bare>[^\s>]+))/giu;
+
+const FORM_ACTION = /\baction\s*=\s*(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/iu;
+
 export function assetExtension(contentType: string, url: string) {
   const type = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
   const fromType = Object.entries(ASSET_EXTENSIONS).find(([mime]) => mime === type)?.[1];
@@ -69,14 +55,6 @@ export function assetExtension(contentType: string, url: string) {
   const fromUrl = /\.(?<extension>[a-z0-9]{1,8})(?:$|[?#])/iu.exec(url)?.groups?.extension;
 
   return fromUrl?.toLowerCase() ?? "bin";
-}
-
-function escapeAttribute(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
 }
 
 function sanitisedUrl(raw: string) {
@@ -100,28 +78,83 @@ function sanitisedUrl(raw: string) {
   }
 }
 
-export function sanitiseFormHtml(html: string) {
-  const stripped = html
-    .replaceAll(SCRIPT_BLOCK, "")
-    .replaceAll(TOKEN_INPUT, "")
-    .replaceAll(EVENT_ATTRIBUTE, "")
-    .replaceAll(DATA_ATTRIBUTE, "")
-    .replaceAll(NONCE_ATTRIBUTE, "")
-    .replaceAll(INTEGRITY_ATTRIBUTE, "")
-    .replaceAll(CROSSORIGIN_ATTRIBUTE, "")
-    .replaceAll(SRCSET_ATTRIBUTE, "")
-    .replaceAll(FILLED_INPUT, (tag) =>
-      tag.replaceAll(VALUE_ATTRIBUTE, ' value=""').replaceAll(AUTOCOMPLETE_ATTRIBUTE, ""),
-    )
-    .replaceAll(TEXTAREA, "<textarea$<open>></textarea>")
-    .replaceAll(EMAIL, "applicant@example.invalid")
-    .replaceAll(CSRF_META, '<meta name="csrf-token" content="" />');
+function isDroppedAttribute(name: string) {
+  const lower = name.toLowerCase();
 
-  return stripped.replaceAll(
-    URL_ATTRIBUTE,
-    (_match, prefix: string, double?: string, single?: string, bare?: string) =>
-      `${prefix}"${escapeAttribute(sanitisedUrl(double ?? single ?? bare ?? ""))}"`,
+  return (
+    lower === "nonce" ||
+    lower === "integrity" ||
+    lower === "crossorigin" ||
+    DROPPED_PREFIXES.some((prefix) => lower.startsWith(prefix))
   );
+}
+
+export function sanitiseFormHtml(html: string) {
+  const rewriter = new HTMLRewriter()
+    .on("script", {
+      element(element) {
+        element.remove();
+      },
+    })
+    .on("textarea", {
+      element(element) {
+        element.setInnerContent("");
+      },
+    })
+    .on("meta[name=csrf-token]", {
+      element(element) {
+        element.setAttribute("content", "");
+      },
+    })
+    .on("input", {
+      element(element) {
+        const name = element.getAttribute("name") ?? "";
+
+        if (TOKEN_NAME.test(name)) {
+          element.remove();
+
+          return;
+        }
+
+        const type = (element.getAttribute("type") ?? "text").toLowerCase();
+
+        if (FILLED_INPUT_TYPES.has(type)) {
+          element.setAttribute("value", "");
+        }
+
+        element.removeAttribute("autocomplete");
+      },
+    })
+    .onDocument({
+      text(text) {
+        text.replace(text.text.replaceAll("<", "&lt;"), { html: true });
+      },
+    })
+    .on("*", {
+      element(element) {
+        if (element.tagName.includes("<")) {
+          element.remove();
+
+          return;
+        }
+
+        const names: string[] = [];
+
+        for (const [name] of element.attributes) {
+          names.push(name);
+        }
+
+        for (const name of names) {
+          if (isDroppedAttribute(name)) {
+            element.removeAttribute(name);
+          } else if (URL_ATTRIBUTES.has(name.toLowerCase())) {
+            element.setAttribute(name, sanitisedUrl(element.getAttribute(name) ?? ""));
+          }
+        }
+      },
+    });
+
+  return rewriter.transform(html).replaceAll(EMAIL, "applicant@example.invalid");
 }
 
 export function formSignature(html: string) {
