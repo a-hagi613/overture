@@ -5,6 +5,7 @@ import { installOutboundGuard } from "../platform/outbound-guard.ts";
 import { createAshbyFeed } from "./ashby-feed.ts";
 import { createGreenhouseFeed } from "./greenhouse-feed.ts";
 import { createLeverFeed } from "./lever-feed.ts";
+import { createPersonioFeed, PERSONIO_DEFAULT_BASE_URL } from "./personio-feed.ts";
 import { pollDueBoards, runBackfillPass, summarizeRun } from "./sweep-run.ts";
 import { sweepRunRequestSchema } from "./sweep-worker-protocol.ts";
 
@@ -23,6 +24,7 @@ const feeds: BoardFeeds = {
   greenhouse: createGreenhouseFeed(env.GREENHOUSE_FEED_BASE_URL),
   lever: createLeverFeed(env.LEVER_FEED_BASE_URL, undefined, env.LEVER_EU_FEED_BASE_URL),
   ashby: createAshbyFeed(env.ASHBY_FEED_BASE_URL),
+  personio: createPersonioFeed(env.PERSONIO_FEED_BASE_URL ?? PERSONIO_DEFAULT_BASE_URL),
 };
 
 function send(message: SweepWorkerResponse) {

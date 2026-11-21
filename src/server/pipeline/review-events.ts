@@ -9,7 +9,7 @@ import { reviewAuditEvents, reviews } from "../platform/db/schema.ts";
 
 export type ReviewAuditWriter = Pick<AppDatabase, "insert" | "select">;
 
-export type ReviewAuditAts = "greenhouse" | "lever" | "ashby";
+export type ReviewAuditAts = "greenhouse" | "lever" | "ashby" | "personio";
 
 export type ReviewResolution = "answered" | "dismissed" | "auto_dismissed";
 

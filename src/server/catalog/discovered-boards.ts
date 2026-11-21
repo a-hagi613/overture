@@ -8,9 +8,9 @@ import { greenhouseBoardTokenFromUrl } from "./greenhouse-feed.ts";
 
 import type { BoardRegion } from "./board-feed.ts";
 
-export const M1_ATS_NAMES = ["greenhouse", "lever", "ashby"] as const;
+export const CATALOG_ATS_NAMES = ["greenhouse", "lever", "ashby", "personio"] as const;
 
-export type M1AtsName = (typeof M1_ATS_NAMES)[number];
+export type CatalogAtsName = (typeof CATALOG_ATS_NAMES)[number];
 
 export interface DiscoveredScraperRow {
   ats: string;
@@ -20,7 +20,7 @@ export interface DiscoveredScraperRow {
 }
 
 export interface DiscoveredBoard {
-  ats: M1AtsName;
+  ats: CatalogAtsName;
   boardToken: string;
   region: BoardRegion;
   companyName: string;
@@ -40,8 +40,8 @@ export interface DiscoveredBoardsLoadReport extends DiscoveredBoardsStats {
   reusedCompanies: number;
 }
 
-export function isM1Ats(ats: string): ats is M1AtsName {
-  return M1_ATS_NAMES.some((candidate) => candidate === ats);
+export function isCatalogAts(ats: string): ats is CatalogAtsName {
+  return CATALOG_ATS_NAMES.some((candidate) => candidate === ats);
 }
 
 function lastPathSegment(value: string) {
@@ -56,6 +56,12 @@ function lastPathSegment(value: string) {
 }
 
 const LEVER_EU_HOSTS: ReadonlySet<string> = new Set(["jobs.eu.lever.co", "api.eu.lever.co"]);
+
+const PERSONIO_HOST_RE = /^(?<token>[a-z0-9][a-z0-9-]*)\.jobs\.personio\.(?:de|com)$/u;
+
+export function personioBoardTokenFromUrl(value: string) {
+  return PERSONIO_HOST_RE.exec(hostOf(value) ?? "")?.groups?.token ?? null;
+}
 
 function hostOf(value: string) {
   try {
@@ -76,6 +82,14 @@ export function boardRegionFromScraperRow(row: DiscoveredScraperRow) {
 export function boardTokenFromScraperRow(row: DiscoveredScraperRow) {
   if (row.ats === "greenhouse") {
     const parsed = greenhouseBoardTokenFromUrl(row.url);
+
+    if (parsed !== null) {
+      return parsed;
+    }
+  }
+
+  if (row.ats === "personio") {
+    const parsed = personioBoardTokenFromUrl(row.url);
 
     if (parsed !== null) {
       return parsed;
@@ -103,7 +117,7 @@ export function normalizeDiscoveredBoards(rows: DiscoveredScraperRow[]) {
   };
 
   for (const row of rows) {
-    if (!isM1Ats(row.ats)) {
+    if (!isCatalogAts(row.ats)) {
       stats.unsupportedAts += 1;
 
       continue;

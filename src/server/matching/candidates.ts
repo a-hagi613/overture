@@ -46,7 +46,7 @@ export interface CandidatePosting {
   companyId: string;
   companyName: string;
   companyDomain: string | null;
-  ats: "greenhouse" | "lever" | "ashby";
+  ats: "greenhouse" | "lever" | "ashby" | "personio";
   title: string;
   locationRaw: string | null;
   countryCode: string | null;

@@ -355,7 +355,7 @@ export function createPreparationService(deps: {
 
   async function loadQuestions(posting: {
     postingId: string;
-    ats: "greenhouse" | "lever" | "ashby";
+    ats: "greenhouse" | "lever" | "ashby" | "personio";
     atsJobId: string;
     boardToken: string;
     boardRegion: "us" | "eu";
@@ -364,7 +364,7 @@ export function createPreparationService(deps: {
     url: string;
     questionsFetchedAt: number | null;
   }) {
-    if (posting.questionsFetchedAt !== null) {
+    if (posting.questionsFetchedAt !== null || posting.ats === "personio") {
       return;
     }
 
@@ -537,7 +537,7 @@ export function createPreparationService(deps: {
     userId: string;
     applicationId: string;
     attemptId?: string;
-    ats: "greenhouse" | "lever" | "ashby";
+    ats: "greenhouse" | "lever" | "ashby" | "personio";
     blocked: readonly {
       questionId: string;
       factKey: string | null;
@@ -1058,7 +1058,7 @@ export function createPreparationService(deps: {
       .where(eq(applications.id, applicationId))
       .get();
 
-    if (row === undefined) {
+    if (row === undefined || row.ats === "personio") {
       return null;
     }
 

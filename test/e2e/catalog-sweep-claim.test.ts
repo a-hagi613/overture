@@ -18,6 +18,7 @@ const batchesResponseSchema = z.object({
     greenhouse: z.number(),
     lever: z.number(),
     ashby: z.number(),
+    personio: z.number(),
   }),
 });
 
@@ -225,21 +226,37 @@ test("one sweep's batch is spread across the ATSes in proportion to their limits
       greenhouse: BOARD_PASS_BATCH,
       lever: BOARD_PASS_BATCH,
       ashby: BOARD_PASS_BATCH,
+      personio: 0,
     });
 
     await putSetting(harness, "catalog.sweep_interval_ms", "1000");
 
-    expect(await sweepBatches(harness)).toEqual({ greenhouse: 2, lever: 2, ashby: 2 });
+    expect(await sweepBatches(harness)).toEqual({
+      greenhouse: 2,
+      lever: 2,
+      ashby: 2,
+      personio: 0,
+    });
 
     await putSetting(harness, "catalog.sweep_interval_ms", "60000");
     await putSetting(harness, "catalog.sweep_max_boards", "1");
 
-    expect(await sweepBatches(harness)).toEqual({ greenhouse: 1, lever: 1, ashby: 1 });
+    expect(await sweepBatches(harness)).toEqual({
+      greenhouse: 1,
+      lever: 1,
+      ashby: 1,
+      personio: 0,
+    });
 
     await putSetting(harness, "catalog.sweep_max_boards", "20");
     await putSetting(harness, "catalog.sweep_batch", "6");
 
-    expect(await sweepBatches(harness)).toEqual({ greenhouse: 2, lever: 2, ashby: 2 });
+    expect(await sweepBatches(harness)).toEqual({
+      greenhouse: 2,
+      lever: 2,
+      ashby: 2,
+      personio: 0,
+    });
 
     await putSetting(harness, "catalog.sweep_batch", "3");
     await putSetting(harness, "catalog.sweep_interval_ms", "60000");

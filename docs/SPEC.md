@@ -245,7 +245,7 @@ updated_at) · `session` · `account` (provider: google, linkedin, credential) �
 |---|---|
 | `companies` | id, name, name_norm, domain NULL, industry NULL, created_at; INDEX(name_norm) |
 | `company_boards` | id, company_id, ats CHECK IN ('greenhouse','lever','ashby','smartrecruiters','recruitee','workable','personio'), board_token, region CHECK IN ('us','eu') DEFAULT 'us' (Lever's US and EU instances are separate boards; Greenhouse has one API), status CHECK IN ('active','empty','gone','disabled'), source CHECK IN ('v1_seed','discovered','import'), etag, last_modified, content_hash, last_polled_at, next_poll_at, backoff_level, consecutive_errors, created_at; UNIQUE(ats,region,board_token) |
-| `postings` | id, board_id, company_id, ats, ats_job_id, url, apply_url, apply_url_norm, title, title_norm, department, location_raw, country_code, region, city, workplace CHECK IN ('remote','hybrid','onsite','unknown'), employment_type CHECK IN ('full_time','part_time','contract','internship','temporary','unknown'), language, salary_min_minor, salary_max_minor, salary_currency, salary_period, posted_at, source_updated_at, first_seen_at, last_seen_at, missing_polls, closed_at, description_gz BLOB NULL, description_hash, feed_content_hash NULL (sha256 of the normalized feed posting; set only for ATSs whose list feed carries the description, Lever and Ashby; a poll rewrites a posting only when this hash or `source_updated_at` changes), dedupe_key, tag_source CHECK IN ('rules','model','llm','import'), tagged_at, questions_fetched_at; UNIQUE(board_id, ats_job_id); INDEX(apply_url_norm); INDEX(closed_at); INDEX(dedupe_key) |
+| `postings` | id, board_id, company_id, ats, ats_job_id, url, apply_url, apply_url_norm, title, title_norm, department, location_raw, country_code, region, city, workplace CHECK IN ('remote','hybrid','onsite','unknown'), employment_type CHECK IN ('full_time','part_time','contract','internship','temporary','unknown'), language, salary_min_minor, salary_max_minor, salary_currency, salary_period, posted_at, source_updated_at, first_seen_at, last_seen_at, missing_polls, closed_at, description_gz BLOB NULL, description_hash, feed_content_hash NULL (sha256 of the normalized feed posting; set only for ATSs whose list feed carries the description, Lever, Ashby and Personio; a poll rewrites a posting only when this hash or `source_updated_at` changes), dedupe_key, tag_source CHECK IN ('rules','model','llm','import'), tagged_at, questions_fetched_at; UNIQUE(board_id, ats_job_id); INDEX(apply_url_norm); INDEX(closed_at); INDEX(dedupe_key) |
 | `posting_tags` | posting_id, dimension CHECK IN ('role','subrole','seniority'), value, source; PK(posting_id,dimension,value) |
 | `postings_fts` | FTS5(title, company, location, department) (short fields only): self-contained, kept in step with `postings` and `companies` by SQLite triggers (insert, update, delete, company rename); closed Postings leave the index |
 | `questions` | id, text_display, text_norm_hash UNIQUE, field_type CHECK IN ('text','textarea','select','multiselect','radio','checkbox','file','date','number','email','phone','url'), options_hash NULL, fact_key NULL (a fact key, or a derivation key for `target`/`derived`), answer_kind CHECK IN ('fact','target','derived','open_text','consent','skip','unknown'), mapped_by CHECK IN ('rules','llm','owner'), seen_count, created_at |
@@ -337,7 +337,7 @@ board row's URL decides `eu` at seed time). Discovery runs from `overture-web` d
 | Lever | `us` | `api.lever.co/v0/postings/{token}?mode=json&limit=100&skip=N`, paging until a page returns fewer than 100 | content hash | 4 concurrent, 2 req/s |
 | Lever | `eu` | `api.eu.lever.co/v0/postings/{token}?mode=json&limit=100&skip=N`, same paging; the same slug on each instance is a separate board | content hash | 4 concurrent, 2 req/s |
 | Ashby | one API | `api.ashbyhq.com/posting-api/job-board/{token}` (slug lowercased) `?includeCompensation=true`; skips `isListed === false` | content hash | 4 concurrent, 2 req/s |
-| Personio (M2) | one API | `{token}.jobs.personio.de/xml?language=en` (German as the fallback when English is empty); no credentials; a missing board answers 404, and 3xx and 404 both mean `gone` | content hash | 2 concurrent, 1 req/s |
+| Personio (M2) | one API | `{token}.jobs.personio.de/xml?language=en`; when an English description block is empty, the same board is read with `language=de` and the missing blocks are filled from it; no credentials; a missing board answers 404, and 3xx and 404 both mean `gone`; a posting's page is `{token}.jobs.personio.de/job/{id}` and its apply URL stays null until the apply flow lands (#232) | content hash | 2 concurrent, 1 req/s |
 | Workable (M2) | one feed for every customer | `www.workable.com/boards/workable.xml`, gzip required, refreshed hourly, about 831 MiB uncompressed; carries a company display name and an apply shortcode, not a board slug, so it is ingested as a feed keyed by `<referencenumber>`, not as `company_boards`. **Stream-parsed, never held in memory.** A daily GitHub Action at 04:00 UTC streams it, tags it and writes the target-relevant postings as one gzipped JSONL snapshot to R2 (`workable/`); the app ingests that snapshot and never fetches the feed (ADR 0032, `docs/research/workable-feed-ingest.md`) | `If-Modified-Since` from the previous manifest (the feed returns no `ETag` and no `Content-Length`) | one off-box pass a day |
 
 SmartRecruiters and Recruitee are not built: the SAP API Policy forbids systematic extraction by AI agents, and Recruitee's Careers API needs a per-company token from 2027-02-10 (ADR 0028). Their values stay in the `company_boards.ats` check only so a later decision needs no table rebuild; no client, sender list or probe exists for them. Pinpoint and Gem are the deferred replacements.
@@ -352,7 +352,7 @@ straight to tagging; Ashby's `isRemote` is ignored because Ashby sets it on hybr
 
 1. **Seed**: `scripts/fetch-seed.ts --dir <seed-dir>` downloads the pinned ats-scrapers manifest and
    `companies.parquet` (both sha256-pinned in `src/server/catalog/companies-parquet.ts`), then
-   `scripts/load-discovered-boards.ts` loads the dataset's greenhouse, lever and ashby rows as
+   `scripts/load-discovered-boards.ts` loads the dataset's greenhouse, lever, ashby and personio rows as
    `source='discovered'` — 13,911 boards, in transactions of at most 500 boards with the event loop yielded
    between them, idempotent. v1 boards are not imported (the measured comparison is
    `docs/research/seed-comparison.md`; the runbook is `docs/research/m1-09-runbook.md`).
@@ -369,7 +369,7 @@ straight to tagging; Ashby's `isRemote` is ignored because Ashby sets it on hybr
    `catalog.sweep_max_boards` (default 20) so a claimed batch finishes well inside the 15-minute claim; no ATS
    starves another. `catalog.sweep_batch` sets the total per-sweep batch instead (split across ATSes in proportion
    to their rates, and still capped per ATS by `catalog.sweep_max_boards`) and `catalog.sweep_interval_ms` sets the
-   sweep chain interval.
+   sweep chain interval. An ATS whose kill switch is engaged is not claimed and receives no batch.
 4. **One sweep at a time**: the next sweep is enqueued when the current one *finishes*, not when it starts, so a
    sweep that outlasts the interval delays the next one instead of overlapping it. Its `dedupe_key` is
    `catalog.sweep` and `bg_jobs` is unique on a dedupe key among queued rows, so at most one is ever queued, and
@@ -859,6 +859,8 @@ Evaluated every 10 minutes over the last 50 attempts per scope: ATS success rate
 with ≥ 3 consecutive `blocked`/`captcha_blocked` → employer switch on; provider success < 50 % over 20 attempts →
 provider switch on and traffic moves to the fallback provider. Every switch alerts the owner; only the owner turns
 switches off. A provider that answers 402 or 403 sets its own switch immediately, outside this window (§10.1).
+An ATS switch also stops that ATS's catalog polling and excludes its Postings from matching; Personio's ships engaged
+until #232 releases it after the 20-form probe.
 
 ---
 
@@ -1091,8 +1093,9 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
 - Every admin action on `admin_audit`: `at`, `actor_id`, `action`, `target_user_id` (null), `reason`, `detail`
   JSON; an OTel span carries the action.
 - `/admin/api/catalog` returns `{ discoveredAt, ats }`, where `ats` holds one entry per source
-  (`greenhouse`, `lever`, `ashby`) with `hourlyLimit` (from `limits.ats_hourly.<ats>`) and `killSwitchEnabled`
-  (null until a kill switch for that ATS is set). Before discovery exists, `discoveredAt` is null. Later slices
+  (`greenhouse`, `lever`, `ashby`, `personio`) with `hourlyLimit` (from `limits.ats_hourly.<ats>`) and
+  `killSwitchEnabled` (null until a kill switch for that ATS is set; Personio ships engaged until #232 releases it
+  after its 20-form probe, so its catalog polling and matching stay off). Before discovery exists, `discoveredAt` is null. Later slices
   (M1-07) add optional per-ATS fields (`boardCount`, `lastPollAt`, `errorRate`) without changing this contract.
 - `POST /admin/api/tag-imports` mounts the hiring.cafe import seam (§6.3.6) behind the same gate;
   `PUT /admin/api/settings/:key` and `PUT /admin/api/kill-switches/:scope/:key` are the admin's other write
