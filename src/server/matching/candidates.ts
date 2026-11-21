@@ -1,4 +1,4 @@
-import { and, eq, exists, inArray, isNull, sql } from "drizzle-orm";
+import { and, count, eq, exists, gte, inArray, isNull, notInArray, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -478,14 +478,18 @@ export function createCandidateService(deps: CandidateDeps) {
       .where(eq(applications.userId, userId))
       .all();
 
-    const crowdRows = db
-      .select({
-        postingId: applications.postingId,
-        companyId: applications.companyId,
-        status: applications.status,
-        sentAt: applications.sentAt,
-      })
+    const crowdPostingRows = db
+      .select({ postingId: applications.postingId, total: count() })
       .from(applications)
+      .where(notInArray(applications.status, ["failed", "skipped", "withdrawn"]))
+      .groupBy(applications.postingId)
+      .all();
+
+    const crowdCompanyRows = db
+      .select({ companyId: applications.companyId, total: count() })
+      .from(applications)
+      .where(and(eq(applications.status, "sent"), gte(applications.sentAt, at - 7 * DAY_MS)))
+      .groupBy(applications.companyId)
       .all();
 
     const cooldownDays = settingNumber(db, "limits.company_cooldown_days");
@@ -495,8 +499,6 @@ export function createCandidateService(deps: CandidateDeps) {
     const recentCompanies = new Set<string>();
     const repostKeys = new Set<string>();
     const appliedPostings = new Set<string>();
-    const crowdByPosting = new Map<string, number>();
-    const crowdByCompany = new Map<string, number>();
 
     for (const row of applicantRows) {
       appliedPostings.add(row.postingId);
@@ -522,17 +524,8 @@ export function createCandidateService(deps: CandidateDeps) {
       }
     }
 
-    for (const row of crowdRows) {
-      if (row.status === "failed" || row.status === "skipped" || row.status === "withdrawn") {
-        continue;
-      }
-
-      crowdByPosting.set(row.postingId, (crowdByPosting.get(row.postingId) ?? 0) + 1);
-
-      if (row.status === "sent" && row.sentAt !== null && row.sentAt >= at - 7 * DAY_MS) {
-        crowdByCompany.set(row.companyId, (crowdByCompany.get(row.companyId) ?? 0) + 1);
-      }
-    }
+    const crowdByPosting = new Map(crowdPostingRows.map((row) => [row.postingId, row.total]));
+    const crowdByCompany = new Map(crowdCompanyRows.map((row) => [row.companyId, row.total]));
 
     const hidden = new Set(
       db
