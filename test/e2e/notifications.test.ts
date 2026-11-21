@@ -395,13 +395,15 @@ test("a push subscription must name a known push service over HTTPS", async ({ p
   const keys = subscriptionKeys();
   const refused = ["http://fcm.googleapis.com/fcm/send/abc", "https://overture-web.internal/x"];
 
-  for (const endpoint of refused) {
-    const response = await request.post("/api/push/subscribe", {
-      data: { endpoint, keys: { auth: keys.auth, p256dh: keys.p256dh } },
-    });
+  const responses = await Promise.all(
+    refused.map(async (endpoint) =>
+      request.post("/api/push/subscribe", {
+        data: { endpoint, keys: { auth: keys.auth, p256dh: keys.p256dh } },
+      }),
+    ),
+  );
 
-    expect(response.status()).toBe(400);
-  }
+  expect(responses.map((response) => response.status())).toEqual([400, 400]);
 
   await request.dispose();
 });
