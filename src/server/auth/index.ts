@@ -2,8 +2,9 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { genericOAuth, haveIBeenPwned, magicLink } from "better-auth/plugins";
+import type { GenericOAuthUserInfo } from "better-auth/plugins/generic-oauth";
 import { passkey } from "@better-auth/passkey";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -20,6 +21,7 @@ import {
   users,
   verifications,
 } from "../platform/db/schema.ts";
+import { retryWhenBusy } from "../platform/db/busy.ts";
 import { recordPasskeyAssertion } from "../platform/passkey/index.ts";
 import { isSameMailbox } from "./email.ts";
 import {
@@ -80,6 +82,29 @@ const linkedinProviderConfig =
 const providerConfigs = [googleProviderConfig, linkedinProviderConfig].filter(
   (config) => config !== null,
 );
+
+const providerProfileSchema = z.looseObject({
+  email: z.string().min(1),
+  emailVerified: z.union([z.literal(true), z.literal("true")]),
+});
+
+function withPreHijackGuard<T>(
+  config: T,
+  discardUnverifiedAccount: (email: string) => Promise<void>,
+) {
+  return {
+    ...config,
+    mapProfileToUser: async (profile: GenericOAuthUserInfo) => {
+      const verified = providerProfileSchema.safeParse(profile);
+
+      if (verified.success) {
+        await discardUnverifiedAccount(verified.data.email);
+      }
+
+      return {};
+    },
+  };
+}
 
 export const enabledSocialProviders = providerConfigs.map((config) => config.providerId);
 
@@ -156,6 +181,52 @@ export function createAuth(
 
   const mayJoin = (email: string) =>
     isAllowedEmail(email) || liveInviteFor(db, inviteHashSecret, email) !== null;
+
+  const discardUnverifiedAccount = async (email: string) => {
+    const address = email.trim().toLowerCase();
+
+    await retryWhenBusy(
+      () =>
+        db.transaction((tx) => {
+          const user = tx
+            .select({ id: users.id })
+            .from(users)
+            .where(
+              and(
+                eq(users.email, address),
+                eq(users.emailVerified, false),
+                isNull(users.suspendedAt),
+              ),
+            )
+            .get();
+
+          if (user === undefined) {
+            return;
+          }
+
+          const linked = tx
+            .select({ providerId: accounts.providerId })
+            .from(accounts)
+            .where(eq(accounts.userId, user.id))
+            .all();
+
+          const signedIn =
+            tx
+              .select({ id: sessions.id })
+              .from(sessions)
+              .where(eq(sessions.userId, user.id))
+              .get() !== undefined;
+
+          if (signedIn || linked.some((account) => account.providerId !== "credential")) {
+            return;
+          }
+
+          tx.delete(users).where(eq(users.id, user.id)).run();
+          tx.delete(verifications).where(eq(verifications.identifier, address)).run();
+        }),
+      "auth.discard-unverified",
+    );
+  };
 
   const trustedOrigins = [
     ...(env.APP_ORIGIN === undefined ? [] : [env.APP_ORIGIN]),
@@ -426,7 +497,9 @@ export function createAuth(
         },
       },
       genericOAuth({
-        config: providerConfigs,
+        config: providerConfigs.map((config) =>
+          withPreHijackGuard(config, discardUnverifiedAccount),
+        ),
       }),
       magicLink({
         expiresIn: 15 * 60,

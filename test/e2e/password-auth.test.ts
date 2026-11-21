@@ -237,7 +237,7 @@ test("sign-up, sign-in and reset ask limits hold", async ({ request, isolatedApp
   expect(state.users[0]?.emailVerified).toBe(false);
 });
 
-test("linking a provider to an unverified password email is refused", async ({
+test("a provider never links to an unverified password email; it replaces the unproven registration", async ({
   page,
   request,
   identityServer,
@@ -249,21 +249,34 @@ test("linking a provider to an unverified password email is refused", async ({
     await setTurnstileScenario(request, url, { action: "signup" });
     await signUpWithPassword(url, request, {
       email: authTestIdentity.ownerEmail,
-      password: "overture-pass-813",
+      password: "attacker-password-1",
     });
     await setTurnstileScenario(request, url, { action: "signin" });
     await identityServer.setPersona(personas.owner("google-unverified-link"));
     await page.goto(`${url}/signin`);
     await page.getByRole("button", { name: "Continue with Google" }).click();
-    await expect(page.getByRole("alert")).toContainText(
-      "That provider has not verified your email, so this app cannot let it in.",
-    );
+    await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
 
     const state = await verifyAuthState(url, request);
-    const owner = state.users.find((user) => user.email === authTestIdentity.ownerEmail);
+    const owner = state.users.filter((user) => user.email === authTestIdentity.ownerEmail);
 
-    expect(state.sessions.filter((session) => session.userId === owner?.id)).toEqual([]);
-    expect(state.accounts.map((account) => account.providerId)).toEqual(["credential"]);
+    expect(owner).toHaveLength(1);
+    expect(owner[0]?.emailVerified).toBe(true);
+    expect(
+      state.accounts
+        .filter((account) => account.userId === owner[0]?.id)
+        .map((account) => account.providerId),
+    ).toEqual(["google"]);
+    expect(state.sessions.filter((session) => session.userId === owner[0]?.id)).toHaveLength(1);
+
+    await setTurnstileScenario(request, url, { action: "signin" });
+
+    const attacker = await signInWithPassword(url, request, {
+      email: authTestIdentity.ownerEmail,
+      password: "attacker-password-1",
+    });
+
+    expect(attacker.ok()).toBe(false);
   } finally {
     await appServer.stop();
   }
