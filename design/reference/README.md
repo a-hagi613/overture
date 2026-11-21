@@ -6,7 +6,7 @@ changes; never edit it by hand.
 
 ## What is here
 
-One folder per screen: `home`, `home-paused` (adds `reasons-1280-light`, all seven pause banners), `ready`, `ready-email`,
+One folder per screen: `landing` and `pricing` (the public-facing pages, redrawn in #239), `home`, `home-paused` (adds `reasons-1280-light`, all seven pause banners), `ready`, `ready-email`,
 `board`, `review`, `profile`, `settings`, `settings-delete` (its five signed states), `notifications` (adds `empty-<width>-<theme>`), `inbox` (four boards: list,
 thread, empty and address), `signin`,
 `onboarding-welcome`, `onboarding-resume`, `onboarding-questions`, `onboarding-targets`, `users`, `invites`, `user`, `billing/users`, `billing/refund`, `billing/reconciliation`, `billing/margin` (admin billing, #241; sources in `source/billing/`), `terms`, `privacy`, `consent`,
