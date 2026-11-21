@@ -637,7 +637,7 @@ the employer may have the application, and a retry could send it twice.
 | `sent` (confirmation page seen) | commit | `sent`, stage `applied`, snapshot written (`confirmed_by='page'`) | — |
 | `unconfirmed` (any failure **after** `submit_clicked_at`: no confirmation signal, timeout, crash, browser lost) | stays reserved | `confirming` | **never** |
 | `needs_review` (unknown required question found on the form) | release | `needs_review` | after Review |
-| `posting_closed`, `duplicate` | release | `skipped` | no |
+| `posting_closed`, `duplicate`, `identity_mismatch` | release | `skipped`; a mismatch sets `status_reason` to `posting_identity:<field>` | no |
 | `interrupted` (deploy or shutdown **before** `submit_clicked_at`) | release | back to `ready`, next free slot; does not count toward `limits.max_attempts` | yes |
 | `captcha_blocked`, `code_timeout`, `blocked`, `form_changed`, `upload_failed`, `provider_error`, `timeout`, `crash` (all **before** `submit_clicked_at`) | release | back to `ready`, earliest retry ≥ 6 h later (§9.2), if `attempts < 2`, else `failed` | once, fresh browser session |
 
@@ -687,7 +687,9 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 ### 10.3 Attempt steps (`submit.run`)
 
 1. Open provider browser (15-minute vendor timeout, attempt id as metadata); `page.route` aborts `image`, `font`, `media` and known analytics hosts.
-2. Navigate to `apply_url`; if the page says the job is closed → `posting_closed`.
+2. Navigate to `apply_url`; if the page says the job is closed → `posting_closed`. Check that the live page's
+   host, board token, job id and company name match the Posting; a redirect or any other mismatch → `identity_mismatch`
+   (release, `skipped` with `status_reason` `posting_identity:<field>`, never submit).
 3. Compute the form signature; load the cached plan or build one.
 4. Fill answers; upload the resume with `setInputFiles({name, mimeType, buffer})` from the decrypted file.
 5. Any required field the prepared answers do not cover: map it (§8.3 step 2); if it is factual and unknown →

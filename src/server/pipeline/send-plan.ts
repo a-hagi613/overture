@@ -31,6 +31,8 @@ export interface SendPlan {
   userId: string;
   ats: "greenhouse" | "lever" | "ashby";
   companyName: string;
+  boardToken: string;
+  atsJobId: string;
   postingUrl: string;
   postingTitle: string;
   descriptionHash: string | null;

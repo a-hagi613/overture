@@ -11,6 +11,9 @@ import {
   uploadFile,
   watchApplicationResponse,
 } from "../forms/engine.ts";
+import { checkPostingIdentity } from "../posting-identity.ts";
+
+import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identity.ts";
 
 const FORM_APPEAR_MS = 15_000;
 
@@ -21,7 +24,7 @@ export interface PlannedResume {
 }
 
 export interface GreenhouseRunPlan {
-  url: string;
+  identity: PostingIdentity;
   fields: readonly SendPlanField[];
   resume: PlannedResume | null;
 }
@@ -38,13 +41,15 @@ export type GreenhouseOutcome =
   | "blocked"
   | "form_missing"
   | "fill_failed"
-  | "upload_failed";
+  | "upload_failed"
+  | "identity_mismatch";
 
 export interface GreenhouseRun {
   outcome: GreenhouseOutcome;
   submitResponseStatus: number | null;
   confirmationSeen: boolean;
   submitMayHaveLanded: boolean;
+  identityReason?: PostingIdentityMismatch;
 }
 
 const RESUME_LABEL = /\b(?:resume|cv|curriculum vitae)\b/u;
@@ -93,7 +98,19 @@ export async function runGreenhouseAttempt(
   plan: GreenhouseRunPlan,
   hooks: GreenhouseHooks,
 ) {
-  await page.goto(plan.url, { waitUntil: "domcontentloaded" });
+  await page.goto(plan.identity.url, { waitUntil: "domcontentloaded" });
+
+  const identity = await checkPostingIdentity(page, plan.identity);
+
+  if (!identity.ok) {
+    return {
+      confirmationSeen: false,
+      identityReason: identity.reason,
+      outcome: "identity_mismatch",
+      submitMayHaveLanded: false,
+      submitResponseStatus: null,
+    };
+  }
 
   try {
     await formLocator(page).waitFor({ state: "visible", timeout: FORM_APPEAR_MS });
@@ -186,7 +203,7 @@ export async function runGreenhouseAttempt(
     };
   }
 
-  const confirmationPath = `${new URL(plan.url).pathname.replace(/\/+$/u, "")}/confirmation`;
+  const confirmationPath = `${new URL(plan.identity.url).pathname.replace(/\/+$/u, "")}/confirmation`;
 
   const confirmationSeen =
     status !== null && status < 400 ? await readConfirmation(page, confirmationPath) : false;

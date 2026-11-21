@@ -741,6 +741,7 @@ export const attempts = sqliteTable(
         "blocked",
         "upload_failed",
         "duplicate",
+        "identity_mismatch",
         "needs_review",
         "provider_error",
         "timeout",

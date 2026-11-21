@@ -904,9 +904,12 @@ export function createPreparationService(deps: {
         title: postings.title,
         descriptionHash: postings.descriptionHash,
         companyName: companies.name,
+        boardToken: companyBoards.boardToken,
+        atsJobId: postings.atsJobId,
       })
       .from(applications)
       .innerJoin(postings, eq(postings.id, applications.postingId))
+      .innerJoin(companyBoards, eq(companyBoards.id, postings.boardId))
       .innerJoin(companies, eq(companies.id, postings.companyId))
       .where(eq(applications.id, applicationId))
       .get();
@@ -995,6 +998,8 @@ export function createPreparationService(deps: {
     return {
       applicationId,
       ats: row.ats,
+      atsJobId: row.atsJobId,
+      boardToken: row.boardToken,
       companyName: row.companyName,
       consentVersion: profile?.consentVersion ?? "m1",
       coverLetter:

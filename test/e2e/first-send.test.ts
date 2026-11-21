@@ -62,6 +62,7 @@ const attemptSchema = z.object({
   outcome: z.string().nullable(),
   submitClickedAt: z.number().nullable(),
   submitResponseStatus: z.number().nullable(),
+  errorCode: z.string().nullable(),
   browserMs: z.number().nullable(),
   proxyBytes: z.number().nullable(),
   costMicros: z.number().nullable(),
@@ -621,4 +622,118 @@ test("a kill after submit_clicked_at goes to Confirming, is never resent, and ke
 
   expect(detail.application.status).toBe("confirming");
   expect(detail.snapshot).toBeNull();
+});
+
+test("a redirect to another board skips the Application with a reason and never submits", async ({
+  send,
+}) => {
+  const { owner, userId } = await ownerFor(send.server);
+
+  await uploadResume(owner);
+  await saveFacts(owner);
+
+  const companyId = await seedCompany(owner, "Blank Street", "blankstreet.example");
+  const boardId = await seedBoard(owner, companyId, "greenhouse", "blankstreet");
+
+  const postingId = await seedPosting(owner, {
+    atsJobId: "8004209003",
+    boardId,
+    companyId,
+    questions: blankStreetQuestions,
+    tags: [{ dimension: "subrole", value: "Operations" }],
+    title: "Assistant General Manager | Durham",
+    url: `${send.fixture.url}/blankstreet/jobs/8004209003?redirect=board`,
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "ready",
+    userId,
+  });
+
+  await grantApplications(owner, 3);
+
+  const response = await runSend(owner, applicationId);
+
+  expect(response.ok()).toBe(true);
+
+  const detail = await applicationOf(owner, applicationId);
+
+  expect(detail.application.status).toBe("skipped");
+  expect(detail.application.statusReason).toBe("posting_identity:board_token");
+  expect(detail.snapshot).toBeNull();
+
+  const attempts = await attemptsOf(owner, applicationId);
+
+  expect(attempts.length).toBe(1);
+  expect(attempts[0]?.outcome).toBe("identity_mismatch");
+  expect(attempts[0]?.errorCode).toBe("board_token");
+  expect(attempts[0]?.submitClickedAt).toBeNull();
+  expect(attempts[0]?.submitResponseStatus).toBeNull();
+
+  const state = await fixtureState(send.fixture);
+
+  expect(state.applicationRequests).toBe(0);
+  expect(state.submissions).toBe(0);
+
+  const home = homeSchema.parse(await (await owner.get("/api/home")).json());
+
+  expect(home.applicationsLeft).toBe(3);
+});
+
+test("a page showing another company skips the Application with a reason and never submits", async ({
+  send,
+}) => {
+  const { owner, userId } = await ownerFor(send.server);
+
+  await uploadResume(owner);
+  await saveFacts(owner);
+
+  const companyId = await seedCompany(owner, "Blank Street", "blankstreet.example");
+  const boardId = await seedBoard(owner, companyId, "greenhouse", "blankstreet");
+
+  const postingId = await seedPosting(owner, {
+    atsJobId: "8004209003",
+    boardId,
+    companyId,
+    questions: blankStreetQuestions,
+    tags: [{ dimension: "subrole", value: "Operations" }],
+    title: "Assistant General Manager | Durham",
+    url: `${send.fixture.url}/blankstreet/jobs/8004209003?redirect=company`,
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "ready",
+    userId,
+  });
+
+  await grantApplications(owner, 3);
+
+  const response = await runSend(owner, applicationId);
+
+  expect(response.ok()).toBe(true);
+
+  const detail = await applicationOf(owner, applicationId);
+
+  expect(detail.application.status).toBe("skipped");
+  expect(detail.application.statusReason).toBe("posting_identity:company");
+  expect(detail.snapshot).toBeNull();
+
+  const attempts = await attemptsOf(owner, applicationId);
+
+  expect(attempts.length).toBe(1);
+  expect(attempts[0]?.outcome).toBe("identity_mismatch");
+  expect(attempts[0]?.errorCode).toBe("company");
+  expect(attempts[0]?.submitClickedAt).toBeNull();
+  expect(attempts[0]?.submitResponseStatus).toBeNull();
+
+  const state = await fixtureState(send.fixture);
+
+  expect(state.applicationRequests).toBe(0);
+  expect(state.submissions).toBe(0);
+
+  const home = homeSchema.parse(await (await owner.get("/api/home")).json());
+
+  expect(home.applicationsLeft).toBe(3);
 });
