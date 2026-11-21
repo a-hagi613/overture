@@ -1025,6 +1025,26 @@ candidates") → `rejection`; scheduling links (Calendly, GoodTime, Greenhouse s
 "phone screen", "recruiter call" → `screening`; offer phrases → `offer`. Not confident → `email_classify` (§8.6).
 Stage effect: rejection → closed (`rejected`); screening → screening; interview → interviewing; offer → offer.
 
+### 11.4 Mail health (admin)
+
+`GET /admin/api/mail-health?days=7|30` (default 30) groups forwarded ATS mail by employer and counts only:
+Applications sent in the window, messages in, their authentication verdicts and bounces. It reads no subject,
+body, sender or attachment, so the admin never sees message content.
+
+- **Reply rate** = messages in ÷ Applications sent in the window. An employer with at least 10 sends and a rate
+  under 5% shows "Reply alert"; one with at least one bounce and a rate at or above 5% shows "Watch, N bounces";
+  fewer than 10 sends and no replies shows "Too few sends" (a low volume with a reply is judged on its rate);
+  otherwise "Healthy".
+- The alert is **alert-only**: it raises `mail.reply_rate` for the worst employer in the window and
+  `mail.domain_reply_rate` when every employer together has at least 20 sends and a rate under 5%, and notifies
+  the owner. Sends continue until the owner pauses the employer from the card, which sets the employer kill switch
+  (`kill_switches` scope `employer`, key the company id) and writes the admin audit.
+- **Bounces** are messages with `direction='out'` and `out_status='bounced'`. No path sends mail to an employer in
+  M2 (ADR 0028), so the column reads 0 until one does; the alert does not depend on it.
+- "Open employer" expands the employer's row with its ATS, its Application count in the window, its inbound
+  authentication counts and its kill-switch state. Authentication totals for the window are shown under the table;
+  a message that failed DKIM or was unsigned is counted and never acted on (§11.1).
+
 ---
 
 ## 12. Limits and settings (admin-tunable defaults)
@@ -1291,7 +1311,9 @@ OTel traces for every request and job; metrics: `attempt_outcome_total{provider,
 `attempt_cost_micros`, `queue_depth{kind}`, `llm_cost_micros{purpose}`, `mail_inbound_total{auth}`,
 `discovery_poll_total{ats,status}`. Alerts to the owner: ATS success < 70 % over the last hour (at least five
 attempts), provider success < 60 %, code or CAPTCHA rate > 20 %, queue age > 30 min, LLM spend > 80 % of the global
-or tagging cap, Litestream lag > 5 min, backup failure, health check failing, disk > 80 %, a catalog sweep worker crash, and an
+or tagging cap, Litestream lag > 5 min, backup failure, health check failing, disk > 80 %, a catalog sweep worker crash,
+an employer reply rate under 5 % after 10 sends in the last 30 days, the domain-wide reply rate under 5 % after 20
+sends (§11.4), and an
 unhandled rejection in a background loop or timer (logged to stderr, alerted at most once a minute). The alert path is the
 in-app `alert.raised` event plus a notification for every owner; with `ALERT_NTFY_URL` set, the same alert is pushed
 to the owner's phone. No Grafana is provisioned by this repository; dashboards stay with the owner's Grafana account

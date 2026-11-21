@@ -206,6 +206,59 @@ export const catalogResponseSchema = z.object({
   ),
 });
 
+export const mailAuthCountsSchema = z.object({
+  fail: z.number(),
+  none: z.number(),
+  pass: z.number(),
+});
+
+export const mailHealthStatusSchema = z.enum(["healthy", "reply_alert", "too_few_sends", "watch"]);
+
+export const mailHealthEmployerSchema = z.object({
+  applications: z.number(),
+  ats: z.array(z.string()),
+  auth: mailAuthCountsSchema,
+  bounces: z.number(),
+  companyId: z.string(),
+  employer: z.string(),
+  killSwitch: z
+    .object({
+      enabled: z.boolean(),
+      reason: z.string(),
+    })
+    .nullable(),
+  replies: z.number(),
+  replyRate: z.number().nullable(),
+  sent: z.number(),
+  status: mailHealthStatusSchema,
+});
+
+export const mailHealthSchema = z.object({
+  alerts: z.array(
+    z.object({
+      companyId: z.string(),
+      employer: z.string(),
+      replies: z.number(),
+      sent: z.number(),
+    }),
+  ),
+  days: z.number(),
+  domainAlert: z.object({
+    active: z.boolean(),
+    replies: z.number(),
+    replyRate: z.number().nullable(),
+    sent: z.number(),
+  }),
+  employers: z.array(mailHealthEmployerSchema),
+  since: z.number(),
+  totals: z.object({
+    auth: mailAuthCountsSchema,
+    bounces: z.number(),
+    replies: z.number(),
+    sent: z.number(),
+  }),
+});
+
 export type AdminRefusalCode = z.infer<typeof adminRefusalCodeSchema>;
 
 export type AdminStatus = z.infer<typeof adminStatusSchema>;
@@ -227,6 +280,10 @@ export type AuditRow = z.infer<typeof auditRowSchema>;
 export type KillSwitchRow = z.infer<typeof killSwitchRowSchema>;
 
 export type GrantRow = z.infer<typeof grantRowSchema>;
+
+export type MailHealth = z.infer<typeof mailHealthSchema>;
+
+export type MailHealthEmployer = z.infer<typeof mailHealthEmployerSchema>;
 
 export type AdminResult<T> = { ok: true; data: T } | { ok: false; refusal: AdminRefusalCode };
 
@@ -312,6 +369,9 @@ export const loadKillSwitches = async () =>
   adminGet("/admin/api/kill-switches", killSwitchesResponseSchema);
 
 export const loadCatalog = async () => adminGet("/admin/api/catalog", catalogResponseSchema);
+
+export const loadMailHealth = async (days: number) =>
+  adminGet(`/admin/api/mail-health?days=${String(days)}`, mailHealthSchema);
 
 export const saveSetting = async (settingKey: string, value: string) =>
   adminPut(`/admin/api/settings/${settingKey}`, { value }, settingResponseSchema);
