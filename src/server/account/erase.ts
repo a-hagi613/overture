@@ -123,15 +123,13 @@ export function createAccountEraser(deps: AccountEraserDeps) {
             return deleted.length > 0;
           });
 
-    await removeObjects(userId);
-
-    if (account === undefined || !erased) {
-      return;
+    if (account !== undefined && erased) {
+      await enqueueNotice({ name: account.name, to: account.email }).catch(() => {
+        logError("account.erase.confirmation", "the confirmation notice could not be queued");
+      });
     }
 
-    await enqueueNotice({ name: account.name, to: account.email }).catch(() => {
-      logError("account.erase.confirmation", "the confirmation notice could not be queued");
-    });
+    await removeObjects(userId);
   }
 
   function request(userId: string) {
