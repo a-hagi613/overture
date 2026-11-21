@@ -22,6 +22,7 @@ import { createNotificationRoutes } from "./routes/notifications.ts";
 import { createApplicationRoutes } from "./routes/applications.ts";
 import { createHomeRoutes } from "./routes/home.ts";
 import { createCheckinRoutes } from "./routes/checkins.ts";
+import { createCalendarRoutes } from "./routes/calendar.ts";
 import { createReadyRoutes } from "./routes/ready.ts";
 import { createMatchingRoutes } from "./routes/matching.ts";
 import { createReviewRoutes } from "./routes/reviews.ts";
@@ -38,6 +39,7 @@ import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
 import { createPasswordResetRoutes } from "./routes/password-reset.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
+import { securityHeaders } from "./security-headers.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
 
 export interface AppDependencies {
@@ -106,6 +108,8 @@ export function createApp(deps: AppDependencies) {
 
   const app = new Hono();
 
+  app.use("*", securityHeaders(env.NODE_ENV === "production"));
+
   const { mailboxes } = deps;
 
   app.use("/api/*", async (context, next) => {
@@ -168,6 +172,7 @@ export function createApp(deps: AppDependencies) {
   );
   app.route("/api", createApplicationRoutes(deps.db, deps.clock, deps.auth, personal));
   app.route("/api", createCheckinRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
+  app.route("/api", createCalendarRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
   app.route(
     "/api",
     createReadyRoutes({
