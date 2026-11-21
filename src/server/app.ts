@@ -43,6 +43,7 @@ import { createMatchingService } from "./matching/score.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
 import { createPasswordResetRoutes } from "./routes/password-reset.ts";
+import { createSupportAccessRoutes } from "./routes/support-access.ts";
 import { createAccountRoutes } from "./routes/account.ts";
 import { createInboxRoutes } from "./routes/inbox.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
@@ -156,6 +157,7 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createHealthRoutes(deps.db, deps.backups));
   app.route("/api", createMeRoutes(deps.auth));
   app.route("/api", createPasswordResetRoutes(deps.db, deps.clock));
+  app.route("/api", createSupportAccessRoutes(deps.db, deps.auth));
   app.route("/api", createApiRoutes(deps.db, deps.clock, deps.auth));
   app.route("/api", createNotificationRoutes(deps.db, deps.clock, deps.auth));
   app.route("/api", createProfileRoutes(deps));

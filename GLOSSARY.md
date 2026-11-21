@@ -208,6 +208,11 @@ _Avoid_: reauth, 2FA, step-up
 The append-only record in `admin_audit` of every action taken in the admin: who, what, when, why.
 _Avoid_: log entry, change history
 
+**Reveal**:
+The owner's passkey re-assertion and typed reason opening a 15-minute read-only view of one person's data, scoped to
+that person, written to the admin audit and shipped off the machine. EEO answers stay aggregate-only inside it.
+_Avoid_: impersonation, login as, shadow session
+
 **Suspension**:
 The owner stopping one account at once: sign-in is refused and live sessions end, running pauses with the `suspended` reason, sent
 Applications stay sent and Inbox mail keeps arriving, and the typed reason is written to the admin audit. Reinstating
