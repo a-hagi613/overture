@@ -6,12 +6,15 @@ import { Buffer } from "node:buffer";
 import { simpleParser } from "mailparser";
 
 import {
+  INBOUND_DEAD_LETTER_MAX_BYTES,
+  INBOUND_DEAD_LETTER_PATH,
   INBOUND_HEADERS,
   INBOUND_MAX_BYTES,
   INBOUND_PATH,
   isLiveCheckAddress,
   verifyInbound,
 } from "../../shared/inbound-mail.ts";
+import { parseInboundDeadLetter } from "../../shared/inbound-queue.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
@@ -19,6 +22,7 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { createMailboxService } from "../inbox/mailboxes.ts";
 
 import { enqueueJob } from "../platform/jobs/queue.ts";
+import { raiseAlert } from "../platform/alerts.ts";
 import { MAIL_INGEST_JOB_KIND } from "../inbox/ingest.ts";
 import { inboundAuth } from "../inbox/auth.ts";
 import { openCodeWaits } from "../inbox/waits.ts";
@@ -147,6 +151,64 @@ export function createInboundRoutes(deps: {
     }
 
     return context.body(null, 204);
+  });
+
+  routes.post(INBOUND_DEAD_LETTER_PATH, async (context) => {
+    if (secret === undefined) {
+      return context.json({ error: "inbound_not_configured" }, 503);
+    }
+
+    const declaredBytes = Number(context.req.header("content-length") ?? "0");
+
+    if (Number.isFinite(declaredBytes) && declaredBytes > INBOUND_DEAD_LETTER_MAX_BYTES) {
+      return context.body(null, 413);
+    }
+
+    const body = new Uint8Array(await context.req.arrayBuffer());
+
+    if (body.byteLength > INBOUND_DEAD_LETTER_MAX_BYTES) {
+      return context.body(null, 413);
+    }
+
+    const rcptTo = context.req.header(INBOUND_HEADERS.rcptTo) ?? null;
+
+    const verified = await verifyInbound(secret, {
+      timestamp: context.req.header(INBOUND_HEADERS.timestamp) ?? null,
+      signature: context.req.header(INBOUND_HEADERS.signature) ?? null,
+      rcptTo,
+      body,
+      nowSeconds: Math.trunc(clock.now() / 1000),
+    });
+
+    if (!verified.ok || rcptTo === null) {
+      return context.body(null, 401);
+    }
+
+    const decoded = parseInboundDeadLetter(body);
+
+    if (!decoded.success) {
+      return context.body(null, 400);
+    }
+
+    if (
+      decoded.data.rcptTo !== null &&
+      decoded.data.rcptTo.toLowerCase() !== rcptTo.toLowerCase()
+    ) {
+      return context.body(null, 401);
+    }
+
+    const mailbox = await mailboxes.byForwardingAddress(rcptTo);
+
+    raiseAlert(db, clock, "mail.dead_letter", {
+      mailboxId: mailbox?.id ?? null,
+      reason: decoded.data.reason,
+      attempts: decoded.data.attempts,
+      status: decoded.data.status,
+      reference: decoded.data.reference,
+      spillKey: decoded.data.spillKey,
+    });
+
+    return context.json({ raised: true }, 202);
   });
 
   routes.get("/internal/mail/code-waits", async (context) => {

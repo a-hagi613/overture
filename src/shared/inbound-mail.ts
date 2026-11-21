@@ -1,4 +1,7 @@
 export const INBOUND_PATH = "/internal/mail/inbound";
+export const INBOUND_DEAD_LETTER_PATH = "/internal/mail/dead-letter";
+
+export const INBOUND_DEAD_LETTER_MAX_BYTES = 8 * 1024;
 
 export const INBOUND_HEADERS = {
   timestamp: "x-overture-timestamp",
