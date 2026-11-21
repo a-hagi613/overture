@@ -1,5 +1,6 @@
 import { enableVirtualAuthenticator, signInOwnerOnAdmin } from "./admin-sign-in.ts";
 import { expect, test } from "./admin.fixture.ts";
+import { authTestIdentity } from "./auth.fixture.ts";
 import type { Browser, BrowserContext } from "@playwright/test";
 
 import { AxeBuilder } from "@axe-core/playwright";
@@ -74,7 +75,7 @@ test("the admin pages are axe clean at 390 and 1280 in light and dark", async ({
   await enableVirtualAuthenticator(page);
   await signInOwnerOnAdmin(page, adminIsolatedAppUrl);
 
-  const token = await accessServer.issueToken({ email: "owner@example.com" });
+  const token = await accessServer.issueToken({ email: authTestIdentity.ownerEmail });
 
   await page.context().addCookies([
     {
