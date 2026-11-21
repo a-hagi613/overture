@@ -1284,6 +1284,13 @@ export const copy = {
     overviewOwners: "Owners",
     overviewSessions: "Sessions",
     overviewSwitches: "Kill switches switched off",
+    overviewMail: "Email sending",
+    overviewMailSent: "Sent this month",
+    overviewMailCap: "Monthly cap",
+    overviewMailReserve: "Kept for sign-in mail",
+    overviewMailNote: (cap: number, reserve: number) =>
+      `Sends stop at ${cap.toLocaleString("en-US")}; the last ${reserve.toLocaleString("en-US")} are kept for sign-in mail and the live check, so notices stop first.`,
+    overviewMailRefused: "Sending is stopped for this month.",
     overviewJobs: "Background jobs",
     overviewJobsEmpty: "No background jobs yet.",
     overviewAudit: "Recent admin actions",

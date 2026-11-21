@@ -16,6 +16,7 @@ import {
 } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { localDayStart } from "../platform/local-time.ts";
+import { MailCapExceededError } from "../platform/mail/metered.ts";
 import { effectiveTimeZone } from "../profile/time-zone.ts";
 
 export const READY_NOTIFY_JOB_KIND = "ready.notify";
@@ -66,7 +67,7 @@ export function enqueueReadyNotify(db: AppDatabase, clock: Clock, userId: string
  * @param deps The database, clock, mail port and app origin.
  * @param userId The user the run prepared for.
  * @param since When the run started, so only its new Ready Applications count.
- * @returns The counts sent, or null when there is nothing to email.
+ * @returns The counts, whether the email went, or null when there is nothing to email.
  */
 export async function runReadyNotifyJob(deps: ReadyNotifyDeps, userId: string, since: number) {
   const now = deps.clock.now();
@@ -138,7 +139,17 @@ export async function runReadyNotifyJob(deps: ReadyNotifyDeps, userId: string, s
   const subject = copy.mail.recapSubject(ready.length, openReviews);
   const body = copy.mail.recapBody({ needAnswer: openReviews, ready, url });
 
-  await deps.mail.sendReadyRecap({ body, subject, to: to.email });
+  let emailed = true;
+
+  try {
+    await deps.mail.sendReadyRecap({ body, subject, to: to.email });
+  } catch (error) {
+    if (!(error instanceof MailCapExceededError)) {
+      throw error;
+    }
+
+    emailed = false;
+  }
 
   deps.db
     .insert(notifications)
@@ -150,9 +161,9 @@ export async function runReadyNotifyJob(deps: ReadyNotifyDeps, userId: string, s
       body: `${String(ready.length)} ready to approve, ${String(openReviews)} need an answer`,
       url,
       createdAt: now,
-      emailedAt: new Date(now),
+      emailedAt: emailed ? new Date(now) : null,
     })
     .run();
 
-  return { openReviews, ready: ready.length };
+  return { emailed, openReviews, ready: ready.length };
 }

@@ -150,7 +150,7 @@ const backups = createBackupMonitor(db, clock);
 
 void backups.run(shutdownController.signal);
 
-const mailSender = createMailSender(clock);
+const mailSender = createMailSender(db, clock);
 const pushSender = createPushSender(env, clock);
 const mailboxes = createMailboxService(db, clock, env.INBOUND_HMAC_SECRET ?? "", env.MAIL_DOMAIN);
 
