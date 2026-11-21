@@ -75,7 +75,7 @@ const batchCreateRequestSchema = z.object({
   }),
 });
 
-const titleFromPrompt = /(?:^|\n)title: (?<title>.+)$/mu;
+const titleFromPrompt = /(?:^|\n)(?:title|subject): (?<title>.+)$/mu;
 const questionFromPrompt = /(?:^|\n)question: (?<question>.+)$/mu;
 const kindFromPrompt = /(?:^|\n)kind: (?<kind>[a-z_]+)$/mu;
 
@@ -177,6 +177,23 @@ export function loadScoreRecordingsSync() {
   return byTitle;
 }
 
+export function loadEmailClassifyRecordingsSync() {
+  const path = join(process.cwd(), "test/e2e/fixtures/anthropic/email-classify-recording.jsonl");
+  const bySubject = new Map<string, Recording>();
+
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    if (line.trim() === "") {
+      continue;
+    }
+
+    const parsed = recordingSchema.parse(JSON.parse(line));
+
+    bySubject.set(parsed.title, parsed);
+  }
+
+  return bySubject;
+}
+
 function loadTextRecordingsSync(file: string) {
   const path = join(process.cwd(), file);
   const byQuestion = new Map<string, Recording>();
@@ -257,6 +274,7 @@ export async function startAnthropicFixtureServer() {
   const questionRecordings = loadQuestionMappingRecordingsSync();
   const openTextRecordings = loadOpenTextRecordingsSync();
   const coverLetterRecordings = loadCoverLetterRecordingsSync();
+  const emailClassifyRecordings = loadEmailClassifyRecordingsSync();
   const resumeFallback = loadResumePdfFallbackRecordingSync();
   const batches = new Map<string, TrackedBatch>();
   const seenRequests: RecordedBatchRequest[] = [];
@@ -361,7 +379,13 @@ export async function startAnthropicFixtureServer() {
 
       const textRecording = textRecordingFor(kind, question);
 
+      const classRecording =
+        kind === "email_classify" && title !== null
+          ? emailClassifyRecordings.get(title)
+          : undefined;
+
       const recording =
+        classRecording ??
         textRecording ??
         (question === null ? undefined : questionRecordings.get(question)) ??
         (title === null ? undefined : (recordings.get(title) ?? scoreRecordings.get(title)));

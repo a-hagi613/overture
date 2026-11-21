@@ -1,12 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { PointerEvent } from "react";
 
 import { copy } from "../../shared/copy.ts";
-import { useBoard, useApplication, useMoveStage, useWithdraw } from "../lib/board-api.ts";
+import {
+  useBoard,
+  useApplication,
+  useMoveStage,
+  useUndoStage,
+  useWithdraw,
+} from "../lib/board-api.ts";
 import type { BoardCard, StageKey } from "../lib/board-api.ts";
 import { stageOf } from "../lib/board-format.ts";
 import { useHomeData, useRunning } from "../lib/home-api.ts";
+import { onBoardMoved } from "../lib/live-events.ts";
 import { BoardColumn } from "../components/board-column.tsx";
 import { BoardMobileHeader } from "../components/board-mobile-header.tsx";
 import { BoardPageHeader } from "../components/board-page-header.tsx";
@@ -28,6 +35,7 @@ function nextStage(current: StageKey, direction: -1 | 1) {
 export function BoardPage() {
   const { data: board } = useBoard();
   const moveStage = useMoveStage();
+  const undoStage = useUndoStage();
   const withdraw = useWithdraw();
   const { data: home } = useHomeData();
   const running = useRunning();
@@ -36,7 +44,7 @@ export function BoardPage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [holdingId, setHoldingId] = useState<string | null>(null);
   const [hoverStage, setHoverStage] = useState<StageKey | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; undoId: string | null } | null>(null);
   const holdTimer = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const toastTimer = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const holdStart = useRef<{ x: number; y: number } | null>(null);
@@ -79,8 +87,8 @@ export function BoardPage() {
     };
   }, []);
 
-  const showToast = (message: string) => {
-    setToast(message);
+  const showToast = useCallback((message: string, undoId: string | null = null) => {
+    setToast({ message, undoId });
 
     if (toastTimer.current !== null) {
       globalThis.clearTimeout(toastTimer.current);
@@ -89,6 +97,32 @@ export function BoardPage() {
     toastTimer.current = globalThis.setTimeout(() => {
       setToast(null);
     }, 4000);
+  }, []);
+
+  useEffect(
+    () =>
+      onBoardMoved((event) => {
+        if (event.source !== "email") {
+          return;
+        }
+
+        const stage = stageOf(event.stage ?? undefined);
+
+        if (stage === null) {
+          return;
+        }
+
+        showToast(copy.board.moved(copy.board.columns[stage]), event.applicationId);
+      }),
+    [showToast],
+  );
+
+  const undoMove = (id: string) => {
+    undoStage.mutate(id, {
+      onSuccess: () => {
+        setToast(null);
+      },
+    });
   };
 
   const moveTo = (id: string, stage: StageKey) => {
@@ -397,9 +431,22 @@ export function BoardPage() {
       {toast === null ? null : (
         <div
           aria-live="polite"
-          className="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 rounded-md border border-input bg-card px-4 py-2 text-[13px] font-semibold shadow-lift md:bottom-6"
+          className="fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-md border border-input bg-card py-1 pr-1 pl-4 text-[13px] font-semibold shadow-lift md:bottom-6"
         >
-          {toast}
+          <span>{toast.message}</span>
+          {toast.undoId === null ? null : (
+            <button
+              className="toast-act"
+              onClick={() => {
+                if (toast.undoId !== null) {
+                  undoMove(toast.undoId);
+                }
+              }}
+              type="button"
+            >
+              {copy.board.undo}
+            </button>
+          )}
         </div>
       )}
     </div>

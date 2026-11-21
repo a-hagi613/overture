@@ -12,7 +12,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { simpleParser } from "mailparser";
 import { z } from "zod";
 
-import { isAtsMailDomain } from "../../shared/ats-mail-domains.ts";
+import { atsForMailDomain, isAtsMailDomain } from "../../shared/ats-mail-domains.ts";
 import { mailboxes, mailThreads, messageAttachments, messages } from "../platform/db/schema.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { inboundAuth } from "./auth.ts";
@@ -233,7 +233,12 @@ export function createMailIngest(deps: {
     );
 
     const code = codeFromText(`${subject}\n${text}`);
-    const classification = code === null ? classifyMail(`${subject}\n${text}`) : "code";
+
+    const classification =
+      code === null
+        ? classifyMail(`${subject}\n${text}`, { ats: atsForMailDomain(senderDomain) })
+        : "code";
+
     const createdAt = new Date(clock.now());
 
     await db.transaction(async (tx) => {
