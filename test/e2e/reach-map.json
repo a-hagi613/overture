@@ -341,6 +341,7 @@
         "/__test__/ledger/sample",
         "/__test__/mail",
         "/__test__/mail/clear",
+        "/__test__/prepared-answers",
         "/__test__/settings/jobs.poll_interval_ms",
         "/__test__/turnstile",
         "/__test__/user/name",
