@@ -46,3 +46,13 @@ test("tracking parameters leave URLs and benign parameters stay", () => {
   expect(html).toContain("/jobs/1?page=2");
   expect(html).toContain('action="/apply"');
 });
+
+test("meta tokens such as a CSP nonce are emptied and other meta content stays", () => {
+  const html = sanitiseFormHtml(
+    '<meta name="csp-nonce" content="n0nceValue"><meta name="csrf-token" content="csrfValue"><meta name="description" content="keep me">',
+  );
+
+  expect(html).not.toContain("n0nceValue");
+  expect(html).not.toContain("csrfValue");
+  expect(html).toContain("keep me");
+});

@@ -32,12 +32,21 @@ distinct Reviews covering 12 of 12 recorded postings** (35 blocked question inst
 current code path, not a production rate: it excludes open-text generation, which M1-18 will add, and it inherits the
 branch's "resolved without a value" behaviour for consent, skip and file fields.
 
+**The per-ATS measurement is now in.** Repeating the simulation on today's planner, with Lever and Ashby forms recorded
+on production, gives **7 distinct Reviews over 12 Greenhouse postings, 50 over 12 Lever postings and 24 over 11 Ashby
+postings** (§3.2b–§3.2c); every recorded posting at every ATS still blocks on at least one required question. The
+Greenhouse improvement is the §3.3 work landing; the Lever and Ashby numbers are dominated by employer-written screening
+batteries and two form-reader gaps, not by a shortage of Facts. These are rules-only upper bounds, not production rates.
+
 **Fix the common cases before tuning confidence.** Country-scope work authorisation and sponsorship, derive
 location/workplace answers from Targets, add current job title, work-authorisation type and "how did you hear" in
 onboarding, and fix the deterministic cases (legal name, employed-by-this-company, US state list). On the recorded
-set those changes remove all 13 in the same simulation. Expect roughly **3–8 Reviews in week 1** for a user sending
-about 70 applications across ~20 companies, then **0–2 a week**, with a target below **1 per 10 sent applications**
-after week 2. These are estimates, not measurements; only Greenhouse fixtures exist in the repo.
+Greenhouse set those changes removed all 13 in the old simulation; today's planner already gives 7, and the two
+sponsorship families need either an unscoped sponsorship Fact or a fallback to the posting's country when the question
+names the company. Expect roughly **3–8 Reviews in week 1** for a user sending about 70 applications across ~20
+companies, then **0–2 a week**, with a target below **1 per 10 sent applications** after week 2. These are estimates,
+not measurements of live traffic; Lever and Ashby fixtures now exist (§3.2b–§3.2c), but most of their postings sit
+outside a Canadian profile's Targets and would be skipped before preparation.
 
 **The Review card already shows the question, the jobs it unlocks and the closest Fact.** Adding a "proposed answer
 and why" row is a new visual element: the owner must redraw the Review board first (ADR 0021). Do not build it before
@@ -218,8 +227,144 @@ The 13 families are:
 - "This role requires that you live in one of the following hubs…" (1) — mapped to `current_city` but the options are
   relocation choices, so it is an option/mapping mismatch.
 
-This is the current code path, not a production sample. It already treats `consent`, `skip` and `file` as resolved
-(see §1 row 4), so the real number could be worse once the executor fills the blanks.
+This is the current code path on the pre-merge M1-17 branch, not a production sample. Re-measured with today's
+planner the same postings give 7 Reviews (§3.2c, "Greenhouse control"), because the §3.3 fixes have since landed.
+
+### 3.2b Measured baseline from the recorded Lever forms
+
+Inputs: the 12 Lever postings captured on production on 2026-11-20 from three boards (LevelUp 4, Offchain Labs 4,
+Hive 4; the Hive form says "Deploy"), which rendered **9 distinct form signatures** — postings that share a form share
+one file. Fixtures: `test/e2e/fixtures/forms/lever/*.fixture.html`, named `<board>-<job id>` after the posting each was
+captured from; the capture job's sanitiser had already removed scripts, handlers, filled values and emails, and the
+committed copy drops CSS, third-party frames and asset links.
+
+Method: `bun run scripts/measure-form-questions.ts` loads each committed fixture into a local Chromium page (no
+network) and reads the questions with the **Lever adapter's own browser-first reader** (`readLeverQuestions`, #158), so
+labels, required flags and option lists are exactly what a send sees. Each question is mapped with
+`mapQuestionByRules` and planned with `resolveQuestion` against the same Canadian Tier-1 profile and one representative
+value per Fact as §3.2: CA citizen, US/DE not authorised; sponsorship CA no, US/DE yes; Toronto, Vancouver and Berlin as
+Targets; the posting country comes from the form's own header. A question is **blocking** when it is required and the
+planner blocks; a **Review** is a blocking question that is durable (not an open-text, consent or file hard stop).
+
+| Measure | Result |
+|---|---|
+| Recorded postings | 12 |
+| Recorded forms | 9 |
+| Required questions (distinct normalised) | 135 (70) |
+| Postings with at least one required question that blocks | **12 of 12 (100 %)** |
+| Blocked question instances | **92** |
+| Distinct Reviews if every block were a question (one Review per distinct question) | **50** |
+| Reviews per posting | 4.2 |
+
+The 61 blocking families (50 Reviews plus 11 hard-stop families), grouped by why they block:
+
+| Why it blocks | Families | Instances | Examples |
+|---|---|---|---|
+| **missing Fact** — pay in a local currency | 4 | 9 | "What's your expected monthly gross salary in Php?" (4 forms); current/previous basic salary in PHP (1) and gross salary (3); "What other monetary benefits…?" (1) |
+| **missing Fact** — how you heard, referral, why you applied | 4 | 13 | "Where did you first encounter this job opportunity?" (4), "For a referral, please indicate the name…" (4), "What was the final step…?" (4), "Where did you hear about us?" (1) |
+| **missing Fact** — country-scoped work authorisation and sponsorship in the Philippines | 4 | 11 | "…legally authorized to work in the Philippines?" (4 forms), "Do you require a visa…in the Philippines?" (4), "Will you now or in the future require sponsorship…?" (3, no country named, so the CA/US/DE Facts disagree) |
+| **missing Fact** — GPA, workspace, schedule and contract confirmations | 8 | 12 | GPA (3), dedicated workspace (3), preferred schedule (1), fixed-term contract (2), shift schedule (2), 6-month commitment (1) |
+| **option mismatch** | 2 | 2 | "Do you have at least 1 to 2 years…?" and "…2 to 3 years…?" against `years_total = 8` with Yes/No options |
+| **rule gap** — long-form or experience screening left `unknown` | 23 | 23 | SSH/CLI, MySQL, Salesforce, NetSuite, Zendesk, Webflow, AI tools, "walk us through…", "describe a time…" |
+| **rule gap** — one word in the question claims it | 4 | 4 | an essay about a customer's website read as `website_url` (2); two essays containing "accurate" read as consent |
+| **rule gap** — a label the plan cannot classify | 4 | 7 | "Applicant Acknowledgment" (a standard consent, 2 forms); "Please check all that apply:" — the "How did you hear about us?" card, whose inner label replaces the heading (3 forms); two essays with "Salesforce Marketing Cloud" read as a marketing opt-in |
+| website_url is a Tier-2 Fact the profile did not set | 1 | 1 | "Please provide a link to your portfolio…" |
+| hard stop, correctly not a Review | 7 | 10 | required open-text essays (`open_text_ungrounded`) |
+| **Targets** / **derivable** | 0 | 0 | no Lever family is blocked by a missing Target or a missing derivation |
+
+Two thirds of the blocked instances are rule gaps, not missing knowledge: the rules answer the standard identity
+fields, but an employer's own screening battery is unmapped, so a long-form question arrives as `unknown` and the
+planner treats it as a missing Fact. M1-18's open-text path turns most of those from a Review into a hard stop (a
+one-off essay is a skip, §4); the 23 unmapped families are therefore an **upper bound**, not a Week-1 forecast.
+
+The form reader matters as much as the mapper. Lever's card questions lose their section heading: the "How did you hear
+about us?" card reaches the planner as "Please check all that apply:", which no rule can classify. The substring rules
+are also unsafe on long text: "website", "accurate" and "Marketing Cloud" are enough to claim a whole essay as a
+`website_url`, a consent or a marketing opt-in, which is a false hard stop rather than an honest Review.
+
+The profile does not fit most of the sample: eight of the twelve postings are outside a Canada-based user's Targets
+(four Manila, four US), and the candidate filter would drop them before preparation (§3.3). Measured as if prepared,
+four onboarding Facts — a PHP salary, work authorisation in the Philippines, sponsorship (Philippines or unscoped), and
+"how did you hear" — would clear 12 of the 50 Review families and 33 of the 92 blocked instances without guessing.
+
+### 3.2c Measured baseline from the recorded Ashby forms
+
+Inputs: the 12 Ashby postings captured on production on 2026-11-20 from three boards (Clera 4, HighlightTA 4, livingHR
+4), which rendered **8 distinct form signatures**. Fixtures: `test/e2e/fixtures/forms/ashby/*.fixture.html`, named
+`<board>-<job id>` the same way.
+
+One capture **looks partial and is excluded**: `livinghr-3921744c…` rendered only Name, Email and Resume — no phone, no
+location and no custom questions — while every other Ashby form in this set has them. It is still committed and parsed
+by the e2e test, but left out of the numbers below: 7 forms and 11 postings are measured. If it is a genuinely minimal
+form rather than a capture taken before the question sections rendered, including it changes only the denominator: 12
+postings, 8 forms, and 11 of 12 postings blocked.
+
+Method: the same script and profile as §3.2b, reading with `readAshbyQuestions` (#158) instead of the Lever reader.
+
+| Measure | Result |
+|---|---|
+| Recorded postings | 12 |
+| Postings measured (one partial capture excluded) | 11 |
+| Recorded forms | 7 |
+| Required questions (distinct normalised) | 69 (37) |
+| Postings with at least one required question that blocks | **11 of 11 (100 %)** |
+| Blocked question instances | **38** |
+| Distinct Reviews if every block were a question (one Review per distinct question) | **24** |
+| Reviews per posting | 2.2 |
+
+The 25 blocking families (24 Reviews and 1 hard-stop family), grouped by why they block:
+
+| Why it blocks | Families | Instances | Examples |
+|---|---|---|---|
+| **missing Fact** — no Fact the question can use | 3 | 6 | "How would you rate your current Ai Ability?" (4 forms); "What are your top 1-3 areas of speciality?" (1); "Do you have work authorization to work in that country?" with no country named and no German Fact (1) |
+| **option mismatch** | 3 | 8 | "Are you legally authorized to work in Canada?" (4), "Do you hold a college or university degree…?" (2), and an employer-agreements affirmation mapped to `current_employer` (2) — all because of the reader gap below |
+| **rule gap** — yes/no or location screening left `unknown` | 18 | 22 | "Would you be able to commute on-site daily?", "Have you worked in a service-focused role…?", SaaS/sales experience, the 18-month contract, "Location" (2 forms), "Applicant Location", the Tampa commute |
+| hard stop, correctly not a Review | 1 | 2 | "Why are you interested in this opportunity at Certn?" (`open_text_ungrounded`) |
+| **Targets** / **derivable** | 0 | 0 | no Ashby family is blocked by a missing Target or derivation |
+
+**The dominant Ashby gap is the form reader, not the question.** Ashby renders a yes/no question as two `<button>`s
+plus a hidden checkbox with no value; `readAshbyQuestions` therefore reports field type `multiselect` with the single
+option `"on"`. 16 of the 25 families (24 of the 38 instances) come from such a question. Where a Fact exists the plan
+then fails option matching: the Canadian work-authorisation family (4 postings) would resolve to "Yes" from the CA
+Citizen Fact as soon as the reader returns `Yes`/`No`; the degree family would still block, because
+"Bachelor's degree" has no Yes/No synonym. The remaining yes/no questions are genuinely unmapped.
+
+The second gap is the system location field, labelled just "Location" on two forms; the rules only match "current
+location", "currently located", "city" and "where do you live", so a required field with a known answer opens a Review.
+
+**Across all three ATSes.** Same method, same profile, same planner:
+
+| Measure | Greenhouse | Lever | Ashby |
+|---|---:|---:|---:|
+| Recorded postings | 12 | 12 | 12 |
+| Postings measured | 12 | 12 | 11 (1 partial capture excluded) |
+| Recorded forms | 12 | 9 | 7 |
+| Required questions (distinct normalised) | 134 (31) | 135 (70) | 69 (37) |
+| Postings with at least one blocking required question | **12/12** | **12/12** | **11/11** |
+| Blocked question instances | **27** | **92** | **38** |
+| Distinct Reviews | **7** | **50** | **24** |
+| Reviews per posting | 0.6 | 4.2 | 2.2 |
+| Blocked instances that are hard stops, not Reviews | 2 | 14 | 2 |
+
+The ATS is not the driver; the employer's question battery is. Greenhouse and Lever carry almost the same number of
+required questions per posting (134 and 135 over 12 postings), but Greenhouse blocks 20 % of them and Lever 68 %,
+because Greenhouse's load is standard identity fields and platform questions while Lever's is an employer's own
+screening set. Ashby sits between the two: fewer custom questions, but more than half of its blocking instances come from
+one reader gap.
+
+**The Greenhouse control moved.** §3.2's 13 Reviews and 35 blocked instances were measured on the pre-merge M1-17
+branch. Re-running the same 12 Greenhouse postings with today's planner and the same profile gives **27 blocked
+instances and 7 Reviews**, with a different family list: the five-option work-authorisation select, the US-state list,
+the remote/office questions, "employed by Stripe" and "Legal Name" now resolve through country-scoped Facts, the Targets
+derivations and the complete AnswerPlan, so those families are gone. The country question is still blocked, now as a
+Targets mismatch, and two sponsorship families appear that the branch did not block: scoping the Fact to a country is
+more correct (an unscoped "No" used to answer a US question), but a question that names the company rather than the
+country now needs either an unscoped sponsorship Fact or a fallback to the posting's country. That is the §3.3 work
+landing, not a change to the forms.
+
+What this does not measure: model mapping (the rules only), open-text generation (M1-18), the candidate filter, and the
+retry/attempt path. All three numbers are upper bounds on what a user would see, and the Greenhouse set is the only one
+whose postings fit the profile.
 
 ### 3.3 What removes the Reviews (and what only hides them)
 
@@ -251,6 +396,13 @@ This is the current code path, not a production sample. It already treats `conse
   not the US, the question is not applicable.
 - "Please indicate your current city, state, and country" → format a composite answer from city + region + country,
   not just the city.
+- Ashby yes/no questions → read the two option buttons, not the hidden checkbox, which the browser reader sees as a
+  single option `"on"`; the Canadian work-authorisation family then answers from the CA Fact (§3.2c).
+- The Ashby system field labelled just "Location" → add the label to the `current_city` rule; do not ask.
+- A Lever card whose inner label is generic ("Please check all that apply:") → read the section heading ("How did you
+  hear about us?") as part of the question; without it no rule or model can tell what is being asked.
+- A country-scoped question that names the company but not the country ("…sponsorship to work at Cloudflare?") → use
+  the posting's country, or ask once for an unscoped Fact; do not let the scoped Facts disagree into a Review.
 
 **Do not hide Reviews by guessing.** A default value for "how did you hear" or EEO is a false statement if the user
 never said it. A default "No" for marketing opt-in is a preference the user can set once; a default "No" for
@@ -265,8 +417,10 @@ shipped. Reviews are counted as distinct questions, not per Application.
 
 | Period | Estimate | Why |
 |---|---|---|
-| Today, rules only, recorded set | 13 Reviews to cover 12 postings | §3.2 |
-| After the fixes, recorded set | 0 Reviews | every family is answered by a Fact, a Target or a derivation |
+| Today, rules only, recorded Greenhouse set | 7 Reviews to cover 12 postings | §3.2c control, same method as §3.2 |
+| Today, rules only, recorded Lever / Ashby sets | 50 / 24 Reviews to cover 12 / 11 postings | §3.2b–§3.2c; upper bounds, since long-form questions are not yet separated as open text |
+| After the §3.3 fixes, recorded Greenhouse set | 0 Reviews | every family is answered by a Fact, a Target or a derivation |
+| After the fixes, recorded Lever / Ashby sets | not zero | employer-written screening batteries ask for facts nobody keeps (GPA, local salary, self-ratings); those are skips or one-off questions, not onboarding Facts |
 | Week 1, live | 3–8 Reviews | new companies ask new variants; one Review per new durable family; duplicates collapse |
 | Week 2–4 | 0–2 a week | Tier-3 Facts and the shared catalog absorb repeats; new ATS/company forms still introduce families |
 | Steady state | < 1 per 10 sent Applications | target, not a measurement; monitor per ATS |
@@ -277,9 +431,19 @@ zero.** New companies, new ATSes and new question wordings are the long tail. Th
 
 ### 3.5 Measure per ATS
 
-There are no recorded Lever or Ashby question fixtures in the repo, so the 13/12 number is Greenhouse-only. Add a
-per-ATS review-rate query and capture Lever/Ashby forms with the existing fixture job before quoting a cross-ATS
-number. Do not generalise the Greenhouse result to Lever or Ashby.
+Twenty-four Lever and Ashby postings are now recorded in `test/e2e/fixtures/forms/{lever,ashby}/` and measured by
+`scripts/measure-form-questions.ts`, so the cross-ATS table exists (§3.2c). Three things are still missing:
+
+- the **per-ATS Review rate query** against `events`/`applications` (§5.6); the script measures a fixed profile against
+  fixtures, not live Applications;
+- fixtures from more employers per ATS: 12 postings per ATS over 3 boards each is a small sample, and the Lever sample
+  is almost entirely one board's screening battery;
+- the **posting metadata** (title, company, location) next to each form fixture. The script reads the location from the
+  form header where the ATS renders one, and from the Greenhouse job fixture for Greenhouse; the rest of the posting is
+  not in the fixture, so the candidate-fit filter cannot run offline.
+
+Do not generalise one ATS's number to another, and do not read "100 % of postings block" as a product rate: it is a
+rules-only measurement against a fixed profile.
 
 ---
 
@@ -504,10 +668,13 @@ All read 2026-11-20.
 - Geifman & El-Yaniv, *Selective Classification for Deep Neural Networks*: <https://arxiv.org/abs/1705.08500>.
 
 Project sources read: `GLOSSARY.md` ("Review", "Needs you", "Status"); `docs/SPEC.md` §1, §7.1, §8.1–§8.6, §9.3–§9.4,
-§10.3; `docs/adr/0007-facts-only-answers.md`, `0009`, `0020`, `0025`; `docs/SALVAGE.md`; `DESIGN.md` §13; branch
-`a-hagi613/m1-24-questions` commit `1566257` (`prepare.ts`, `reviews.ts`, `review-store.ts`, `questions.ts`,
-`question-rules.ts`, `question-normalize.ts`, `question-mapping.ts`, `schema.ts`, `drizzle/0016_question_catalog_reviews.sql`,
-`review-detail.tsx`); `test/e2e/fixtures/greenhouse/*/*.questions.json` on that branch.
+§10.3, §10.5; `docs/adr/0007-facts-only-answers.md`, `0009`, `0013`, `0016`, `0020`, `0021`, `0023`, `0025`, `0028`;
+`docs/SALVAGE.md`; `DESIGN.md` §13; branch `a-hagi613/m1-24-questions` commit `1566257` (`prepare.ts`, `reviews.ts`,
+`review-store.ts`, `questions.ts`, `question-rules.ts`, `question-normalize.ts`, `question-mapping.ts`, `schema.ts`,
+`drizzle/0016_question_catalog_reviews.sql`, `review-detail.tsx`); `test/e2e/fixtures/greenhouse/*/jobs/*.questions.json`;
+`test/e2e/fixtures/forms/{lever,ashby}/*.fixture.html` (recorded 2026-11-20); `scripts/measure-form-questions.ts`;
+`src/server/pipeline/answer-plan.ts`, `src/server/catalog/{question-rules,question-normalize,answer-derivations}.ts`;
+`src/server/dispatch/ats/{lever,ashby}.ts`.
 
 ---
 
@@ -549,11 +716,20 @@ These are proposals for the owner to file or reject; they are not implemented he
    Before Submit, verify the live host, board token, job id and company against the Posting; mismatch skips with a
    reason and never submits. Delivers the zero-wrong-company gate for M1. Blocked by #28.
 
-8. **M1-17h — Lever and Ashby question capture and a per-ATS Review baseline.**
-   Record Lever/Ashby question fixtures with the existing capture job, then repeat the §3.2 measurement per ATS.
-   Without this, the Greenhouse number must not be generalised. Blocked by #32.
+8. **M1-17h — Lever and Ashby question capture and a per-ATS Review baseline.** *(Delivered by #131: 24 postings over
+   17 form signatures are recorded, measured and in §3.2b–§3.2c.)*
 
 9. **M1-17i — Fix the option matcher for rich selects.**
    Add explicit synonym tables for work-authorisation types, countries, degrees, notice periods and salary periods;
    return a typed `option_missing` review reason instead of a generic unknown. This turns several "we don't know"
    Reviews into exact answers. Blocked by #24.
+
+10. **M1-17j — Read Ashby's yes/no questions.** `readAshbyQuestions` reports a yes/no question as a `multiselect` with
+    the single option `"on"`, because Ashby renders two buttons around a hidden checkbox. Read the option buttons (and
+    their pressed state) so the plan can match a Fact; 16 of the 25 recorded Ashby families depend on it. Needs a send
+    e2e against the recorded forms, so it is a behaviour change, not a fixture change.
+
+11. **M1-17k — Read the question, not just the input.** Use a Lever card's section heading when the inner field label
+    is generic ("Please check all that apply:"), accept "Location" as the Ashby system location field, and fall back to
+    the posting's country for a country-scoped Fact when the question names the company but not the country. All three
+    are deterministic and remove Reviews without asking the user anything.

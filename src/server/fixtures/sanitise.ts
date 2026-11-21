@@ -101,9 +101,13 @@ export function sanitiseFormHtml(html: string) {
         element.setInnerContent("");
       },
     })
-    .on("meta[name=csrf-token]", {
+    .on("meta", {
       element(element) {
-        element.setAttribute("content", "");
+        const name = element.getAttribute("name") ?? "";
+
+        if (/nonce|token/iu.test(name)) {
+          element.setAttribute("content", "");
+        }
       },
     })
     .on("input", {

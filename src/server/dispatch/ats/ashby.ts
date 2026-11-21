@@ -75,7 +75,7 @@ export interface AshbyRun {
   unexpectedRequired?: LiveFormProblem[];
 }
 
-async function readFormQuestions(page: Page) {
+export async function readAshbyQuestions(page: Page) {
   return page.evaluate(
     (input: { fieldTypes: [string, QuestionFieldType][] }) => {
       const fieldTypes = new Map(input.fieldTypes);
@@ -397,7 +397,7 @@ export const runAshbyAttempt: (
     };
   }
 
-  const questions = await readFormQuestions(page);
+  const questions = await readAshbyQuestions(page);
   const discovered = await hooks.onFormQuestions(questions);
 
   if (discovered.kind === "needs_review") {

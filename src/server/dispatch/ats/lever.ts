@@ -78,7 +78,7 @@ const FIELD_TYPES = new Map<string, QuestionFieldType>([
   ["date", "date"],
 ]);
 
-async function readFormQuestions(page: Page) {
+export async function readLeverQuestions(page: Page) {
   return page.evaluate(
     (input: { skip: string[]; fieldTypes: [string, QuestionFieldType][] }) => {
       const form = document.querySelector("form#application-form");
@@ -277,7 +277,7 @@ export const runLeverAttempt: (
     };
   }
 
-  const questions = await readFormQuestions(page);
+  const questions = await readLeverQuestions(page);
   const discovered = await hooks.onFormQuestions(questions);
 
   if (discovered.kind === "needs_review") {
