@@ -246,7 +246,7 @@ export function createPreparationService(deps: {
   onReady?: (applicationId: string, userId: string) => void;
   plainFormReader?: PlainFormReader;
   captureForm?: (input: {
-    ats: "lever" | "ashby" | "workable";
+    ats: "lever" | "ashby" | "workable" | "personio";
     region: "us" | "eu";
     boardToken: string;
     atsJobId: string;
@@ -366,7 +366,7 @@ export function createPreparationService(deps: {
     url: string;
     questionsFetchedAt: number | null;
   }) {
-    if (posting.questionsFetchedAt !== null || posting.ats === "personio") {
+    if (posting.questionsFetchedAt !== null) {
       return;
     }
 
@@ -685,7 +685,10 @@ export function createPreparationService(deps: {
       return null;
     }
 
-    if (row.ats === "workable" && isKillSwitchEnabled(db, "ats", "workable")) {
+    if (
+      (row.ats === "workable" || row.ats === "personio") &&
+      isKillSwitchEnabled(db, "ats", row.ats)
+    ) {
       db.update(applications)
         .set({
           status: "skipped",
@@ -1074,7 +1077,7 @@ export function createPreparationService(deps: {
       .where(eq(applications.id, applicationId))
       .get();
 
-    if (row === undefined || row.ats === "personio") {
+    if (row === undefined) {
       return null;
     }
 

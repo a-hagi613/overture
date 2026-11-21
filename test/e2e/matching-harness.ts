@@ -96,7 +96,7 @@ export async function seedCompany(request: APIRequestContext, name: string, doma
 export async function seedBoard(
   request: APIRequestContext,
   companyId: string,
-  ats: "greenhouse" | "lever" | "ashby" | "workable",
+  ats: "greenhouse" | "lever" | "ashby" | "workable" | "personio",
   boardToken: string,
 ) {
   const response = await request.post("/__test__/catalog/boards", {
@@ -114,7 +114,7 @@ export async function seedPosting(
     atsJobId: string;
     url: string;
     title?: string;
-    ats?: "greenhouse" | "lever" | "ashby" | "workable";
+    ats?: "greenhouse" | "lever" | "ashby" | "workable" | "personio";
     workplace?: "remote" | "hybrid" | "onsite" | "unknown";
     employmentType?: string;
     language?: string;

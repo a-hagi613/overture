@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="__LANGUAGE__">
+  <head>
+    <meta charset="utf-8" />
+    <title>__TITLE__ - __COMPANY__</title>
+  </head>
+  <body data-job-id="__JOB_ID__" data-language="__LANGUAGE__">
+    <header>
+      <p>__COMPANY__</p>
+      <h1>__TITLE__</h1>
+    </header>
+    <main>
+      <h2>__APPLY_HEADING__</h2>
+      <form>
+        <fieldset>
+          <div role="group" aria-labelledby="name-group-label">
+            <span id="name-group-label"
+              >__NAME_HEADING__<span aria-hidden="true">*</span
+              ><span class="sr-only"> (required)</span></span
+            >
+            <label for="field-first_name">__FIRST_NAME__</label>
+            <input id="field-first_name" name="first_name" type="text" maxlength="255" />
+            <label for="field-last_name">__LAST_NAME__</label>
+            <input id="field-last_name" name="last_name" type="text" maxlength="255" />
+          </div>
+          <label for="field-email"
+            >__EMAIL_LABEL__<span aria-hidden="true">*</span
+            ><span class="sr-only"> (required)</span></label
+          >
+          <input id="field-email" name="email" type="email" maxlength="255" />
+          <label for="field-phone">__PHONE_LABEL__</label>
+          <input id="field-phone" name="phone" type="text" maxlength="255" />
+          <label for="field-available_from"
+            >__AVAILABLE_LABEL__<span aria-hidden="true">*</span
+            ><span class="sr-only"> (required)</span></label
+          >
+          <input id="field-available_from" name="available_from" type="text" maxlength="255" />
+          <label for="field-gender">__GENDER_LABEL__</label>
+          <select id="field-gender" name="gender">
+            <option value="" selected>__SELECT_PLACEHOLDER__</option>
+            <option value="female">__GENDER_FEMALE__</option>
+            <option value="male">__GENDER_MALE__</option>
+            <option value="diverse">__GENDER_DIVERSE__</option>
+          </select>
+          <label for="field-birthday">__BIRTHDAY_LABEL__</label>
+          <input id="field-birthday" name="birthday" type="date" />
+          __CUSTOM_FIELDS__
+
+          <h3>__DOCUMENTS_HEADING__</h3>
+          <div role="group" aria-labelledby="doc-label-cv">
+            <div id="doc-label-cv">__CV_LABEL__<span aria-hidden="true">*</span></div>
+            <div class="document-input-wrapper">
+              <button type="button">__ADD_FILE__</button>
+              <input
+                id="doc-input-cv"
+                name="documents.cv"
+                type="file"
+                multiple
+                hidden
+                accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.txt,.odt,.rtf"
+              />
+            </div>
+          </div>
+          __DOCUMENT_CATEGORIES__
+          <button type="submit" disabled>__SUBMIT_LABEL__</button>
+        </fieldset>
+      </form>
+    </main>
+    <script>
+      const jobId = document.body.dataset.jobId;
+      const confirmation =
+        document.body.dataset.language === "de"
+          ? "<h2>Vielen Dank für Ihre Bewerbung!</h2><p>Ihre Bewerbung wurde erfolgreich gesendet.</p>"
+          : "<h2>Thank you for your application!</h2><p>Your application has been successfully submitted.</p>";
+
+      for (const input of document.querySelectorAll("input[type=file]")) {
+        input.addEventListener("change", async () => {
+          const files = [...input.files];
+
+          for (const file of files) {
+            const body = new FormData();
+            body.append("file", file);
+
+            await fetch("/api/v1/documents", { method: "POST", body });
+
+            const wrapper = input.closest(".document-input-wrapper");
+            let list = wrapper.querySelector("[role=list]");
+
+            if (!list) {
+              list = document.createElement("div");
+              list.setAttribute("role", "list");
+              wrapper.prepend(list);
+            }
+
+            const pill = document.createElement("div");
+            pill.setAttribute("role", "listitem");
+            const name = document.createElement("span");
+            name.textContent = file.name;
+            pill.append(name);
+            list.append(pill);
+          }
+
+          input.value = "";
+        });
+      }
+
+      setTimeout(() => {
+        document.querySelector("button[type=submit]").disabled = false;
+      }, 100);
+
+      document.querySelector("form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const body = {};
+        for (const element of document.querySelectorAll("input, select, textarea")) {
+          if (element.name) {
+            body[element.name] = element.value;
+          }
+        }
+
+        const response = await fetch(`/api/v1/jobs/${jobId}/application`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        if (response.ok) {
+          document.querySelector("main").innerHTML = confirmation;
+          return;
+        }
+
+        document.querySelector("form").prepend("The application was refused.");
+      });
+    </script>
+  </body>
+</html>

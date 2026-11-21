@@ -260,6 +260,35 @@ export const catalogResponseSchema = z.object({
   ),
 });
 
+export const personioProbeFormSchema = z.object({
+  index: z.number(),
+  postingId: z.string(),
+  url: z.string(),
+  outcome: z.string(),
+  questions: z.number(),
+  required: z.number(),
+  custom: z.number(),
+  documents: z.number(),
+  unhandled: z.string(),
+});
+
+export const personioProbeSummarySchema = z.object({
+  total: z.number(),
+  readable: z.number(),
+  needsReview: z.number(),
+  unreadable: z.number(),
+  unsupported: z.number(),
+  passed: z.boolean(),
+});
+
+export const personioProbeSchema = z.object({
+  ranAt: z.number().nullable(),
+  summary: personioProbeSummarySchema.nullable(),
+  forms: z.array(personioProbeFormSchema),
+});
+
+export const probeQueuedSchema = z.object({ jobId: z.string() });
+
 export const mailAuthCountsSchema = z.object({
   fail: z.number(),
   none: z.number(),
@@ -436,6 +465,12 @@ export const loadKillSwitches = async () =>
   adminGet("/admin/api/kill-switches", killSwitchesResponseSchema);
 
 export const loadCatalog = async () => adminGet("/admin/api/catalog", catalogResponseSchema);
+
+export const loadPersonioProbe = async () =>
+  adminGet("/admin/api/probes/personio", personioProbeSchema);
+
+export const runPersonioProbe = async () =>
+  adminPost("/admin/api/probes/personio", null, probeQueuedSchema);
 
 export const loadMailHealth = async (days: number) =>
   adminGet(`/admin/api/mail-health?days=${String(days)}`, mailHealthSchema);

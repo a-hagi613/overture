@@ -1,7 +1,9 @@
 import type { Page } from "playwright-core";
 
+import { isFixtureHost } from "../../shared/live-service-hosts.ts";
+
 export interface PostingIdentity {
-  ats: "greenhouse" | "lever" | "ashby" | "workable";
+  ats: "greenhouse" | "lever" | "ashby" | "workable" | "personio";
   url: string;
   boardToken: string;
   jobId: string;
@@ -24,7 +26,31 @@ const ASHBY_BOARD_HOSTS: ReadonlySet<string> = new Set(["jobs.ashbyhq.com"]);
 
 const WORKABLE_BOARD_HOSTS: ReadonlySet<string> = new Set(["apply.workable.com"]);
 
+const PERSONIO_HOST = /^(?<token>[a-z0-9-]+)\.jobs\.personio\.(?:com|de)$/iu;
+
+const personioToken = (host: string) =>
+  PERSONIO_HOST.exec(host)?.groups?.["token"]?.toLowerCase() ?? null;
+
+const hostnameOf = (host: string) => {
+  try {
+    return new URL(`http://${host}`).hostname;
+  } catch {
+    return host;
+  }
+};
+
 const sameHost = (ats: PostingIdentity["ats"], expected: string, live: string) => {
+  if (ats === "personio") {
+    if (expected === live && isFixtureHost(hostnameOf(expected))) {
+      return true;
+    }
+
+    const expectedToken = personioToken(expected);
+    const liveToken = personioToken(live);
+
+    return expectedToken !== null && liveToken !== null && expectedToken === liveToken;
+  }
+
   if (expected === live) {
     return true;
   }
@@ -51,6 +77,13 @@ const pathSegments = (pathname: string) =>
     .map((segment) => decodeURIComponent(segment));
 
 function postingPath(ats: PostingIdentity["ats"], url: URL) {
+  if (ats === "personio") {
+    const boardToken = personioToken(url.host.toLowerCase()) ?? "";
+    const jobId = /^\/job\/(?<id>\d+)(?:\/apply)?\/?$/u.exec(url.pathname)?.groups?.["id"];
+
+    return jobId === undefined ? null : { boardToken, jobId };
+  }
+
   if (ats === "greenhouse" && url.pathname === "/embed/job_app") {
     const boardToken = url.searchParams.get("for");
     const jobId = url.searchParams.get("token");
@@ -145,12 +178,19 @@ export async function checkPostingIdentity(page: Page, expected: PostingIdentity
     return livePosting.jobId === expected.jobId ? matched : mismatch("job_id");
   }
 
-  if (livePosting.boardToken.toLowerCase() !== expected.boardToken.toLowerCase()) {
+  if (
+    livePosting.boardToken !== "" &&
+    livePosting.boardToken.toLowerCase() !== expected.boardToken.toLowerCase()
+  ) {
     return mismatch("board_token");
   }
 
   if (livePosting.jobId !== expected.jobId) {
     return mismatch("job_id");
+  }
+
+  if (expected.ats === "personio") {
+    return matched;
   }
 
   const liveCompany = companyFromTitle(expected.ats, await page.title());

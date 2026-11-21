@@ -21,6 +21,10 @@ const CONSENT_PATTERN =
 
 const RULES: readonly { pattern: RegExp; mapping: RuleMapping }[] = [
   {
+    pattern: /\b(?:birthday|date of birth|geburtsdatum)\b/u,
+    mapping: SKIP_MAPPING,
+  },
+  {
     pattern: /\bcountry or countries you anticipate (?:working|to work)\b/u,
     mapping: { answerKind: "target", factKey: "target_countries" },
   },

@@ -45,6 +45,7 @@ import { enqueueLiveCheckNow } from "../live-checks/job.ts";
 import { readLiveCheckResults } from "../live-checks/store.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { readMailSummary } from "../platform/mail/budget.ts";
+import { PERSONIO_PROBE_JOB_KIND } from "../probe/personio.ts";
 import {
   getAllKillSwitches,
   getAllSettings,
@@ -119,6 +120,27 @@ const mailHealthQuery = z.object({
     .int()
     .refine((value) => value === 7 || value === 30)
     .default(30),
+});
+
+const personioProbeDetailSchema = z.object({
+  index: z.number(),
+  postingId: z.string(),
+  url: z.string(),
+  outcome: z.string(),
+  questions: z.number(),
+  required: z.number(),
+  custom: z.number(),
+  documents: z.number(),
+  unhandled: z.string(),
+});
+
+const personioProbeSummarySchema = z.object({
+  total: z.number(),
+  readable: z.number(),
+  needsReview: z.number(),
+  unreadable: z.number(),
+  unsupported: z.number(),
+  passed: z.boolean(),
 });
 
 export interface AdminDeps {
@@ -776,6 +798,44 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     const { days } = context.req.valid("query");
 
     return context.json(readMailHealth(db, clock, days));
+  });
+
+  routes.get("/probes/personio", (context) => {
+    const results = readLiveCheckResults(db, 500);
+    const summary = results.find((result) => result.check === "probe.personio.summary") ?? null;
+
+    const forms = results
+      .filter((result) => result.check === "probe.personio")
+      .flatMap((result) => {
+        const parsed = personioProbeDetailSchema.safeParse(result.detail);
+
+        return parsed.success ? [parsed.data] : [];
+      })
+      .slice(0, 20);
+
+    const parsedSummary =
+      summary === null ? null : personioProbeSummarySchema.safeParse(summary.detail);
+
+    return context.json({
+      forms,
+      ranAt: summary?.startedAt ?? null,
+      summary: parsedSummary?.success === true ? parsedSummary.data : null,
+    });
+  });
+
+  routes.post("/probes/personio", async (context) => {
+    const owner = context.get("owner");
+
+    const job = enqueueJob(db, clock, PERSONIO_PROBE_JOB_KIND, "{}", { maxAttempts: 1 });
+
+    await recordAdminAudit(db, clock, {
+      actorId: owner.userId,
+      action: "probes.personio",
+      reason: "Probed the open Personio forms before enabling the ATS",
+      detail: { jobId: job.id },
+    });
+
+    return context.json({ jobId: job.id });
   });
 
   routes.get("/audit", (context) => {
