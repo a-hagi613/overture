@@ -86,7 +86,7 @@ export function createOnboardingRoutes(deps: {
 
     return {
       choices,
-      currencies: (await step.read(userId)).currencies,
+      currencies: (await step.read(userId, { inferCountries: false })).currencies,
       matchedCount: countMatchingPostings(db, saved.targets, languages),
       targets: saved.targets,
     };
