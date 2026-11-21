@@ -1,5 +1,5 @@
 import type { Page } from "playwright-core";
-import { chromium } from "playwright-core";
+import { chromium, errors } from "playwright-core";
 
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
@@ -10,6 +10,25 @@ import { assetExtension, formSignature, sanitiseFormHtml } from "./sanitise.ts";
 export const ATS_NAMES = ["greenhouse", "lever", "ashby"] as const;
 
 export type FixtureAts = (typeof ATS_NAMES)[number];
+
+export const FORM_FIELD_SELECTORS = {
+  ashby: "#_systemfield_email, form.ashby-application-form input:not([type='hidden'])",
+  greenhouse: "form input:not([type='hidden'])",
+  lever: "form input:not([type='hidden'])",
+} as const satisfies Record<FixtureAts, string>;
+
+export const FORM_RENDER_TIMEOUT_MS = 20_000;
+
+export class FormNotRenderedError extends Error {
+  readonly code = "no_form_rendered";
+
+  constructor(ats: FixtureAts) {
+    super(
+      `no_form_rendered: no ${ats} application form field appeared within ${String(FORM_RENDER_TIMEOUT_MS / 1000)}s; nothing was saved`,
+    );
+    this.name = "FormNotRenderedError";
+  }
+}
 
 const MAX_ASSETS = 40;
 const MAX_ASSET_BYTES = 5_000_000;
@@ -93,6 +112,21 @@ function rewriteAssetLinks(html: string, base: string, assets: Map<string, strin
   });
 }
 
+async function waitForForm(page: Page, ats: FixtureAts) {
+  try {
+    await page.waitForSelector(FORM_FIELD_SELECTORS[ats], {
+      state: "attached",
+      timeout: FORM_RENDER_TIMEOUT_MS,
+    });
+  } catch (error) {
+    if (error instanceof errors.TimeoutError) {
+      throw new FormNotRenderedError(ats);
+    }
+
+    throw error;
+  }
+}
+
 async function captureOne(deps: FixtureCaptureDeps, ats: FixtureAts, applyUrl: string) {
   const provider = deps.providers.pick();
   const attemptId = `capture-${crypto.randomUUID()}`;
@@ -112,6 +146,7 @@ async function captureOne(deps: FixtureCaptureDeps, ats: FixtureAts, applyUrl: s
       const page = context.pages()[0] ?? (await context.newPage());
 
       await page.goto(applyUrl, { waitUntil: "load" });
+      await waitForForm(page, ats);
 
       const raw = await page.content();
       const sanitised = sanitiseFormHtml(raw);
