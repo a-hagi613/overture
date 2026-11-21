@@ -160,6 +160,12 @@ _Avoid_: reauth, 2FA, step-up
 The append-only record in `admin_audit` of every action taken in the admin: who, what, when, why.
 _Avoid_: log entry, change history
 
+**Suspension**:
+The owner stopping one account at once: sign-in is refused, running pauses with the `suspended` reason, sent
+Applications stay sent and Inbox mail keeps arriving, and the typed reason is written to the admin audit. Reinstating
+clears the suspension and leaves running paused until the person starts it.
+_Avoid_: ban, block, lockout
+
 **Live check**:
 The daily `live.check` job on `overture-web` that exercises a real form capture, real Haiku calls, the mail loop and R2, records pass/fail and timing, and alerts the owner on failure. It never submits an application or touches a user.
 _Avoid_: smoke test, canary, health probe
