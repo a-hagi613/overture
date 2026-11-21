@@ -4,6 +4,7 @@ type GlyphName =
   | "board"
   | "check"
   | "chevron"
+  | "copy"
   | "dash"
   | "forward"
   | "home"
@@ -50,6 +51,13 @@ const glyphs: Record<GlyphName, GlyphPaths> = {
   },
   check: { paths: ["M5 12.5l4.5 4.5L19 7.5"], strokeWidth: 2 },
   chevron: { paths: ["M6 9l6 6 6-6"], strokeWidth: 1.8 },
+  copy: {
+    paths: [
+      "M9 9h9a2 2 0 012 2v9a2 2 0 01-2 2h-9a2 2 0 01-2-2v-9a2 2 0 012-2z",
+      "M5 15V6a2 2 0 012-2h9",
+    ],
+    strokeWidth: 1.8,
+  },
   forward: { paths: ["M5 12h14", "M13 6l6 6-6 6"], strokeWidth: 1.8 },
   signout: {
     paths: ["M9 4H5a1 1 0 00-1 1v14a1 1 0 001 1h4", "M16 8l4 4-4 4", "M20 12H9"],

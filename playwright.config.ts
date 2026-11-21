@@ -135,6 +135,16 @@ export default defineConfig({
       },
     },
     {
+      name: "inbox-boards",
+      testMatch: /board-match-inbox\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/../../design/reference/inbox/main/{arg}{ext}",
+        },
+      },
+    },
+    {
       name: "onboarding-targets-boards",
       testMatch: /board-match-onboarding-targets\.test\.ts/u,
       expect: {

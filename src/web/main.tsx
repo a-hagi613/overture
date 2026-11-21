@@ -9,6 +9,8 @@ import { BoardPage } from "./routes/board.tsx";
 import { HomePage } from "./routes/home.tsx";
 import { InboxPage } from "./routes/inbox.tsx";
 import { NotificationsPage } from "./routes/notifications.tsx";
+import { InboxThreadPage } from "./routes/inbox-thread.tsx";
+import { InboxAddressPage } from "./routes/inbox-address.tsx";
 import { NotFoundPage } from "./routes/not-found.tsx";
 import { ProfilePage } from "./routes/profile.tsx";
 import { ReadyPage } from "./routes/ready.tsx";
@@ -42,6 +44,8 @@ const router = createBrowserRouter([
       { path: "/review", element: <ReviewPage /> },
       { path: "/inbox", element: <InboxPage /> },
       { path: "/notifications", element: <NotificationsPage /> },
+      { path: "/inbox/address", element: <InboxAddressPage /> },
+      { path: "/inbox/:id", element: <InboxThreadPage /> },
       { path: "/profile", element: <ProfilePage /> },
       { path: "/search", element: <SearchPage /> },
       { path: "/settings", element: <SettingsPage /> },

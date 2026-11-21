@@ -287,6 +287,30 @@ export function createMailMoves(deps: {
     return { fromStage, stage: target.stage };
   }
 
+  async function linkMessage(input: { userId: string; messageId: string }) {
+    const message = db.select().from(messages).where(eq(messages.id, input.messageId)).get();
+
+    if (message === undefined || message.userId !== input.userId) {
+      return null;
+    }
+
+    const thread = applicationForThread(message.threadId);
+
+    if (thread !== undefined && thread.applicationId !== null) {
+      return thread.applicationId;
+    }
+
+    const contents = await contentsOf(message);
+
+    return linkThread({
+      senderDomain: message.senderDomain,
+      subject: contents.subject,
+      text: contents.text,
+      threadId: message.threadId,
+      userId: message.userId,
+    });
+  }
+
   async function handleAuthenticatedMessage(input: { userId: string; messageId: string }) {
     const message = db.select().from(messages).where(eq(messages.id, input.messageId)).get();
 
@@ -294,27 +318,14 @@ export function createMailMoves(deps: {
       return;
     }
 
-    if (
-      message.userId !== input.userId ||
-      message.auth !== "pass" ||
-      message.classification === "code"
-    ) {
+    if (message.userId !== input.userId || message.auth !== "pass") {
       return;
     }
 
-    const thread = applicationForThread(message.threadId);
-    let applicationId = thread?.applicationId ?? null;
+    const applicationId = await linkMessage(input);
 
-    if (applicationId === null) {
-      const contents = await contentsOf(message);
-
-      applicationId = linkThread({
-        senderDomain: message.senderDomain,
-        subject: contents.subject,
-        text: contents.text,
-        threadId: message.threadId,
-        userId: message.userId,
-      });
+    if (message.classification === "code") {
+      return;
     }
 
     if (message.classification === "other" || message.classification === null) {
@@ -394,7 +405,7 @@ export function createMailMoves(deps: {
     );
   }
 
-  return { handleAuthenticatedMessage, runClassification };
+  return { handleAuthenticatedMessage, linkMessage, runClassification };
 }
 
 export type MailMoves = ReturnType<typeof createMailMoves>;
