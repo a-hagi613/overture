@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted (amended by ADR 0029: the user approves every send)
 ---
 
 # Users never see a browser or solve a challenge

@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted (amended by ADR 0029: Ready and Approved statuses, the Ready Stage)
 ---
 
 # Status and Stage are separate; email moves cards forward only

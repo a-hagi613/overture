@@ -20,9 +20,9 @@ no enterprise process.
 
 ## 1. Product truth
 
-Overture finds job postings from ATS job feeds, scores them against the user's resume, prepares each application
-from the user's own facts, and submits it through the employer's real ATS form in a managed cloud browser. Users
-never see a browser or a CAPTCHA.
+Overture finds job postings from ATS job feeds, scores them against the user's resume, prepares every application
+from the user's own facts, and sends it when you approve, through the employer's real ATS form in a managed cloud
+browser (ADR 0029). Users never see a browser or a CAPTCHA.
 
 Promises, in priority order:
 
@@ -31,15 +31,16 @@ Promises, in priority order:
 2. **Never embarrass.** Never apply to the current employer or a skipped company, never twice to the same role, never
    in bursts, never below the user's threshold.
 3. **Never charge for failure.** An application uses one of "Applications left" only when it is actually sent.
-4. **Fully automatic.** The only thing a user is ever asked mid-pipeline is a factual question Overture cannot answer.
-  
+4. **You approve every send.** No Application is submitted without the user's explicit approval of its exact plan
+   (ADR 0029). Everything before that is automatic: the only other thing a user is asked is a factual question
+   Overture cannot answer.
 5. **Auditable.** Every sent application keeps an immutable record of the exact answers, letter, resume file and
    consent.
 
-Who it is for: one person running a serious job search, ten roles a day, who will not hand-fill forms and will not
-let a tool invent an answer. Primary persona on the boards: a senior backend/platform engineer in Canada searching
-globally. Platform: a web app installable as a PWA, phone-first for triage (answering a Review between meetings),
-desktop for reviewing proof.
+Who it is for: one person running a serious job search, ten roles a day, who will not hand-fill forms, will not
+let a tool invent an answer, and wants to see each application before it goes. Primary persona on the boards: a
+senior backend/platform engineer in Canada searching globally. Platform: a web app installable as a PWA,
+phone-first for triage (answering a Review between meetings), desktop for reviewing proof.
 
 Non-goals: native apps, Telegram/SMS, user-facing live browser, real-email mode, Workday/iCIMS/Taleo, teams/workspaces,
 per-user AI keys, resume generation or restyling, annual plans.
@@ -50,7 +51,7 @@ per-user AI keys, resume generation or restyling, annual plans.
 
 | Milestone | Who | Scope | Exit gate |
 |---|---|---|---|
-| **M1 — Owner applies from the cloud** | owner only (allowlist) | catalog (Greenhouse, Lever, Ashby), tagging, profile via importer, matching, preparation, Reviews, owner's forwarded ATS mail (inbound, ADR 0028), Browser Use provider (Kernel adapter behind the same port, synthetic lab only), dispatch, ledger with admin grants, Board, Home, Review, minimal Profile, minimal admin, synthetic lab, fixture capture job, observability | ≥ 60 real owner applications on Browser Use; **≥ 85 % of attempted applications reach `sent`**; cost ≤ **$0.03 per completed application**; zero wrong-company or duplicate sends. *Attempted* and *cost* are defined in ADR 0026 |
+| **M1 — Owner applies from the cloud** | owner only (allowlist) | catalog (Greenhouse, Lever, Ashby), tagging, profile via importer, matching, preparation, Reviews, Ready and approval (ADR 0029), owner's forwarded ATS mail (inbound, ADR 0028), Browser Use provider (Kernel adapter behind the same port, synthetic lab only), dispatch, ledger with admin grants, Board, Home, Review, minimal Profile, minimal admin, synthetic lab, fixture capture job, observability | ≥ 25 real owner applications on Browser Use, each approved by the owner (ADR 0029); **≥ 85 % of attempted applications reach `sent`**; cost ≤ **$0.03 per completed application**; zero wrong-company or duplicate sends. *Attempted* and *cost* are defined in ADR 0026; an Application never approved is never attempted. Testing phase: keep spend minimal |
 | **M2 — Invite-only beta** | invited users | onboarding wizard (including the forwarding-filter step, once it is on the canvas), forwarding addresses for all, Inbox of forwarded ATS mail, notifications (PWA push + digest), check-ins, email-driven stage moves, full admin (users, Reveal, audit, support access log), export/delete, legal pages + consent, Workable and Personio after a 20-form probe each; Recruitee and SmartRecruiters only after the checks listed in ADR 0028. Each accepted invite gets an admin grant of 300 applications over 30 days (no card) | 10 beta users for 14 days; submit rate holds ≥ 85 %; no P1 privacy/security finding |
 | **M3 — Public** | anyone | Stripe Managed Payments, trial/week/month plans, card fingerprints, grants/expiry, payment-failure pause, admin refunds, public landing + pricing (prerendered), public signup | first 20 paying users; Stripe reconciliation matches the ledger for 30 days |
 
@@ -254,8 +255,8 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 |---|---|
 | `matches` | user_id, posting_id, code_rank REAL, score NULL, reason NULL, resume_id NULL, targets_version NULL, scored_at NULL; PK(user_id,posting_id). A score is valid only while `resume_id` and `targets_version` equal the user's current ones |
 | `posting_user_state` | user_id, posting_id, state CHECK IN ('saved','hidden'), updated_at; PK(user_id,posting_id) |
-| `applications` | id, user_id, posting_id, company_id, origin CHECK IN ('auto','manual'), status CHECK IN ('preparing','needs_review','ready','sending','confirming','sent','failed','skipped','withdrawn'), status_reason NULL (§11), stage CHECK IN ('queued','applied','screening','interviewing','offer','closed') NULL, stage_locked INTEGER DEFAULT 0, board_position REAL, score_at_queue, scheduled_for NULL, attempts INTEGER DEFAULT 0, sent_at NULL, closed_reason CHECK IN ('rejected','no_response','withdrawn','offer_declined','offer_accepted','other') NULL, created_at, updated_at; UNIQUE(user_id,posting_id); partial UNIQUE(user_id) WHERE status='sending'. `withdrawn` applies only before `sent` (the user stops a queued application); a sent application cannot be un-sent, so the user moves it to Closed with `closed_reason='withdrawn'` |
-| `application_snapshots` | application_id PK, user_id, posting_url, posting_title, description_hash, answers_enc (JSON array `{question_id, label, answer, fact_key, fact_revision, kind, resume_line_ids}`), cover_letter_enc NULL (JSON `[{sentence, resume_line_ids}]`), resume_id, resume_sha256, consent_version, provider, provider_session_id, submitted_at, confirmed_by CHECK IN ('page','email'), cost_micros. **Immutable**: a `BEFORE UPDATE` trigger always raises; a `BEFORE DELETE` trigger raises `WHEN EXISTS (SELECT 1 FROM user WHERE id = OLD.user_id)`, so rows go only when the user row is gone (account deletion cascade). Flow 29 proves both |
+| `applications` | id, user_id, posting_id, company_id, origin CHECK IN ('auto','manual'), status CHECK IN ('preparing','needs_review','ready','approved','sending','confirming','sent','failed','skipped','withdrawn'), status_reason NULL (§11), stage CHECK IN ('queued','ready','applied','screening','interviewing','offer','closed') NULL, stage_locked INTEGER DEFAULT 0, board_position REAL, score_at_queue, scheduled_for NULL, attempts INTEGER DEFAULT 0, ready_at NULL, approved_at NULL, approved_plan_sha256 NULL, approved_plan_enc NULL (the frozen send plan, sealed; §8.7), changes JSON NULL (what changed since the last approval, shown on the card), sent_at NULL, closed_reason CHECK IN ('rejected','no_response','withdrawn','offer_declined','offer_accepted','other') NULL, created_at, updated_at; UNIQUE(user_id,posting_id); partial UNIQUE(user_id) WHERE status='sending'. `withdrawn` applies only before `sent` (the user stops a queued application, or presses Skip on a Ready card); a sent application cannot be un-sent, so the user moves it to Closed with `closed_reason='withdrawn'` |
+| `application_snapshots` | application_id PK, user_id, posting_url, posting_title, description_hash, answers_enc (JSON array `{question_id, label, answer, fact_key, fact_revision, kind, resume_line_ids}`), cover_letter_enc NULL (JSON `[{sentence, resume_line_ids}]`), resume_id, resume_sha256, consent_version, approved_at, approved_plan_sha256, provider, provider_session_id, submitted_at, confirmed_by CHECK IN ('page','email'), cost_micros. **Immutable**: a `BEFORE UPDATE` trigger always raises; a `BEFORE DELETE` trigger raises `WHEN EXISTS (SELECT 1 FROM user WHERE id = OLD.user_id)`, so rows go only when the user row is gone (account deletion cascade). Flow 29 proves both |
 | `application_answers` | id, application_id, question_id, user_id, kind CHECK IN ('open_text','cover_letter'), sentences_enc (JSON `[{sentence, resumeLineIds}]`, sealed), word_count, created_at, updated_at; UNIQUE(application_id,question_id). The generated, grounded open text and letter kept from preparation until the Snapshot takes them |
 | `application_events` | id, application_id, user_id, at, kind CHECK IN ('status','stage','email','checkin','note'), from_value, to_value, source CHECK IN ('system','user','email','checkin','admin'), detail JSON; the card timeline and stage history |
 | `attempts` | id, application_id, user_id, n, provider, provider_session_id, started_at, lease_until, ended_at NULL, submit_clicked_at NULL, submit_response_status INTEGER NULL, outcome CHECK IN ('sent','unconfirmed','captcha_blocked','code_timeout','posting_closed','form_changed','blocked','upload_failed','duplicate','needs_review','provider_error','timeout','crash','interrupted') NULL, browser_ms, proxy_bytes, captcha_seen, code_used, cost_micros, error_code NULL |
@@ -495,7 +496,7 @@ answer is never used for a posting that names no country); a
 remote posting restricted to a region, e.g. "Remote, EU", matches only target countries in that region); employment type ∈ targets; posting language ∈ `languages`;
 salary ≥ floor when the posting lists salary (converted with `fx_rates`; postings without salary are never excluded);
 company not skipped (below); no other application by this user to this company in status preparing, needs_review,
-ready, sending or confirming, and none sent to it in the last 30 days (failed, skipped and withdrawn do not count);
+ready, approved, sending or confirming, and none sent to it in the last 30 days (failed, skipped and withdrawn do not count);
 no sent application to the same `dedupe_key` in the last 60 days; crowd limits not reached (§12); not `hidden`; no kill
 switch on its ATS/employer.
 
@@ -521,7 +522,7 @@ are refreshed by job `match.refresh` when a posting is created/changed or a user
 Job `match.fill` runs per running user every hour and after any event that frees a slot:
 
 ```
-need = remaining_today + buffer − ready_or_preparing     (buffer = max(2, ceil(remaining_today × 0.5)))
+need = remaining_today + buffer − waiting     (buffer = max(2, ceil(remaining_today × 0.5)))
 for candidate in candidates ordered by code_rank desc, unscored-or-stale first:
     stop when need ≤ 0 or LLM caps hit
     score = cached if valid else Haiku score (§8.6)
@@ -529,6 +530,9 @@ for candidate in candidates ordered by code_rank desc, unscored-or-stale first:
 ```
 
 - `remaining_today` = min(daily cap, applications left) − today's used/reserved.
+- `waiting` = the user's Applications in `preparing`, `ready` or `approved`. A `ready` Application waits for
+  approval until its Posting closes or the user skips it, and it keeps counting here, so Overture never prepares
+  more than `remaining_today + buffer` while the user is away (ADR 0029).
 - Scores are cached per (posting, resume_id, targets_version); a job is never scored twice for the same inputs.
 - Browsing: Home "Up next" and Search show code-ranked candidates; opening a card scores it if unscored
   (`match.score_on_open`). Manual Apply is allowed below threshold (`origin='manual'`).
@@ -539,7 +543,9 @@ for candidate in candidates ordered by code_rank desc, unscored-or-stale first:
 Job `application.prepare`:
 
 1. Load questions: Greenhouse pre-flight via the questions endpoint; Lever/Ashby from `plan_cache` if the form
-   signature is known; otherwise questions are read during the first attempt (§10.3 step 5).
+   signature is known; otherwise one read-only form read in a browser session (the `fixtures.capture` path: no
+   fill, no Submit) records the form and its signature in `plan_cache` first. An Application never reaches `ready`
+   with questions still unknown, because the user approves every answer (ADR 0029).
 2. Map each question to the catalog: normalise text (lowercase, strip punctuation/numbers/company names) → hash →
    `question_variants`; unknown → rules (regex set for common facts) → else Haiku mapping call returning
    `{fact_key | 'open_text' | 'consent' | 'skip' | 'unknown'}` from the fixed fact list. Rules alone may also map a
@@ -584,7 +590,8 @@ Job `application.prepare`:
    never become a Review: the Application is `skipped` with `status_reason='form_unsupported'`. The same applies to a
    required cover-letter slot while no cover-letter file exists. A required resume slot resolves only when a current
    resume exists. Optional marketing opt-ins stay unchecked.
-6. All answered → status `ready`, `scheduled_for` assigned by the planner (§9.2).
+6. All answered → status `ready`, `ready_at` = now: prepared and waiting for the user's approval (§8.7). Nothing is
+   scheduled until it is approved.
 
 ### 8.4 Reviews
 
@@ -615,8 +622,8 @@ Job `application.prepare`:
 
 ### 8.5 Stages and check-ins
 
-- `stage` is `queued` while status ∈ {preparing, needs_review, ready, sending, confirming}; becomes `applied` on
-  `sent`; `NULL` (off-Board) for failed/skipped/withdrawn. A card in `confirming` shows "Checking with the employer".
+- `stage` is `queued` while status ∈ {preparing, needs_review}; `ready` while status ∈ {ready, approved, sending,
+  confirming}; becomes `applied` on `sent`; `NULL` (off-Board) for failed/skipped/withdrawn. A card in `confirming` shows "Checking with the employer".
 - Users drag between Applied…Closed freely; a manual drag sets `stage_locked=1`.
 - Email classification (§11.3) may move a card **forward only** (applied→screening→interviewing→offer, or →closed
   on rejection) when `stage_locked=0`; each auto move creates an event and an "Undo" notification.
@@ -645,27 +652,108 @@ scoring pauses until the next UTC day, preparation waits, the owner is alerted.
 
 > `email_classify` is the one LLM use beyond scoring, answers, letters, PDF fallback and question mapping; it runs only when the rules in §11.3 are not confident.
 
+### 8.7 Approval and Ready (ADR 0029)
+
+No Application is submitted without the user's explicit approval. The user approves the plan, not a filled browser
+form: one browser session per Application, opened only after approval.
+
+```mermaid
+stateDiagram-v2
+    [*] --> preparing
+    preparing --> needs_review: required question unknown
+    needs_review --> preparing: Review answered
+    preparing --> ready: every answer built
+    ready --> approved: Send (the plan is frozen)
+    approved --> ready: Undo, or the plan changed
+    approved --> sending: dispatch claims it
+    sending --> approved: failed before Submit, plan unchanged (retry)
+    sending --> ready: form_changed
+    sending --> needs_review: new required factual question
+    sending --> confirming: Submit may have reached the employer
+    sending --> sent: confirmation seen
+    confirming --> sent: acknowledgement mail
+    confirming --> failed: no acknowledgement in 24 h
+    sending --> failed: retries used up
+    preparing --> skipped: form unsupported or ungrounded
+    ready --> skipped: Posting closed
+    approved --> skipped: Posting closed
+    sending --> skipped: closed, duplicate or identity mismatch
+    needs_review --> skipped: Review dismissed
+    preparing --> withdrawn: user stops it
+    needs_review --> withdrawn: user stops it
+    ready --> withdrawn: Skip
+    approved --> withdrawn: Skip
+```
+
+- **Ready.** An Application in `ready` is prepared and waiting for approval (UI "Ready"). It waits until its Posting
+  closes (→ `skipped`, `status_reason='posting_closed'`, found by the catalog sweep or a liveness check) or the user
+  skips it; it never expires on a timer and counts toward the preparation buffer (§8.2).
+- **The approval card** shows the job title and employer with a link to the Posting, the Match score, the exact
+  resume file (name and upload date of the revision the plan uses), every answer exactly as it will be typed with
+  its source, the cover letter when the form has one, and the consent line. When the Application came back from an
+  approval, `changes` says what changed ("A new required question", "The options for Country changed", "Your resume
+  changed").
+- **Send** (`POST /api/applications/:id/approve` `{planSha256}`) is allowed only in `ready`. The request carries the
+  hash of the plan the card showed; if the plan changed since the page loaded, it is refused with 409
+  `plan_changed` and the card reloads. In one transaction: the send plan the executor will fill (posting identity,
+  resume id and sha256, every field with its value, Fact key and revision, the letter, the consent version) is
+  serialised canonically, its SHA-256 stored in `approved_plan_sha256` and the plan sealed in `approved_plan_enc`;
+  `approved_at` = now; status `approved`; `changes` cleared; a `status` event with `source='user'`. Pressing Send is
+  the per-application consent. The planner then gives it a slot (§9.2).
+- **Send all** (`POST /api/ready/approve` `{items: [{id, planSha256}]}`) approves the listed cards in the order
+  shown, each by the rule above; a refused card is reported and the rest proceed. Cards beyond today's remaining
+  sends wait for the next send window in approval order.
+- **Undo** (`POST /api/applications/:id/unapprove`) returns an `approved` Application to `ready`, clears the approval
+  and its slot. It is refused once `sending` has started (a conditional update on `status='approved'`).
+- **Skip** is the existing withdraw (`POST /api/applications/:id/withdraw`), allowed in `ready` and `approved`:
+  status `withdrawn`. It never adds the company to the Skip list.
+- **Edit an answer** (`PUT /api/applications/:id/answers/:questionId`). A factual answer is a Fact (ADR 0007), so
+  editing it saves the Fact (a new revision, `source='user'`) as Profile would, and every unsent Application whose
+  plan uses that Fact key and scope is prepared again; any that were `approved` go back to `ready` with `changes`
+  set. The value is validated against the field type and options like any planned value. Editing open text or the
+  cover letter changes that Application only: the user's text replaces the generated sentences, marked
+  `by_user: true` in `sentences_enc` and in the Snapshot, checked against the field type and length but not against
+  the resume (they are the user's own words).
+- **Anything that changes the plan clears the approval**: a Fact or resume change the plan used, an answered
+  Review, a form difference found at send. Overture never re-plans an approved Application silently; the user sees
+  `changes` and approves again.
+- **At send** the executor fills only the approved plan and the preflight compares the live form with it (§9.4,
+  §10.3).
+- **The Ready email** (M1). Job `ready.notify` runs every 15 minutes per running user and sends at most one email per
+  local day: when an Application became `ready` since the last Ready email, the user's local time is within
+  08:00–20:00 and 30 minutes have passed since the first such Application (so a batch gathers in one email). It
+  comes from `no-reply@tryoverture.com` through Cloudflare Email Sending (§11.2) to the user's verified email, lists
+  each new Ready Application by employer and job title (no answers), and carries one link to `{APP_ORIGIN}/ready`.
+  Opening that link only shows the page, because mail scanners open links; nothing is ever approved by a GET. It is
+  recorded as a `notifications` row (`kind='ready'`, `emailed_at`). There is no per-application email. M2 adds push.
+
+> Considered for later, out of scope: an opt-in "send without asking" switch per user, off by default and
+> admin-gated (ADR 0029). Nothing is built for it.
+
 ---
 
 ## 9. Dispatch: scheduling and limits
 
-### 9.1 Ready queue
+### 9.1 Send queue
 
-Applications in `ready` with `scheduled_for ≤ now`, ordered by user round-robin, then `score_at_queue` desc. Home
-shows queue position and an ETA computed from the planner's slots.
+Applications in `approved` with `scheduled_for ≤ now`, ordered by user round-robin, then `approved_at` ascending:
+approved Applications are sent in approval order (ADR 0029). A `ready` Application is never in this queue. Home and
+the Ready page show each approved Application's queue position and an ETA computed from the planner's slots.
 
 ### 9.2 Planner (pacing)
 
-Job `planner.day` runs at each user's local midnight and whenever new `ready` applications appear: picks
-`k = min(remaining_today, ready count)` random times in the remaining part of the user's local 08:00–20:00 window,
-at least 20 minutes apart, and assigns them in score order. Outside the window nothing is sent; leftovers roll to
+Job `planner.day` runs at each user's local midnight and whenever an Application is approved or its approval is
+undone: picks `k = min(remaining_today, approved count)` random times in the remaining part of the user's local
+08:00–20:00 window, at least 20 minutes apart, and assigns them in approval order. Undoing an approval frees its
+slot. Approval never bypasses pacing, the company cooldown, the crowd limits or the caps; the daily cap counts
+sends, not approvals. Outside the window nothing is sent; leftovers roll to
 tomorrow's planning. A retry's earliest time (§9.4) is a lower bound: the planner gives it the first free slot at or
 after that time inside a window.
 
 ### 9.3 Dispatcher
 
 Job `dispatch.tick` every 15 s claims at most `free_slots = provider_concurrency − sending_count` applications
-that pass every gate below, in order:
+in `approved` (never `ready`) that pass every gate below, in order:
 
 1. Global and provider kill switches off; ATS and employer kill switches off.
 2. User `running=1`, not suspended, has a current resume and an active mailbox.
@@ -674,9 +762,12 @@ that pass every gate below, in order:
 5. Per-ATS global hourly cap not exceeded; crowd limits (20 Overture applicants per posting, 50 per employer per
    7 days) not exceeded.
 6. **Liveness re-check**: fetch the posting from its ATS API; closed → `skipped/posting_closed`.
+7. **The approval still holds**: the approved plan's resume is the current resume and every Fact revision it used is
+   current, so a change made since approval is found before a browser opens; otherwise the Application is prepared
+   again and goes back to `ready` with `changes` set (§8.7). Nothing has been reserved yet.
 
 Then, in one transaction: ledger `reserve` (idempotency key `reserve:<application_id>:<attempt n>`), status
-`sending`, create `attempts` row with `lease_until = now + 12 min`, enqueue `submit.run`.
+`approved` → `sending` (a conditional update, so it and an undo of the approval can never both win), create `attempts` row with `lease_until = now + 12 min`, enqueue `submit.run`.
 
 ### 9.4 Outcomes
 
@@ -691,13 +782,14 @@ the employer may have the application, and a retry could send it twice.
 |---|---|---|---|
 | `sent` (confirmation page seen) | commit | `sent`, stage `applied`, snapshot written (`confirmed_by='page'`) | — |
 | `unconfirmed` (any failure **after** `submit_clicked_at`: no confirmation signal, timeout, crash, browser lost) | stays reserved | `confirming` | **never** |
-| `needs_review` (unknown required question found on the form) | release | `needs_review`; the Review records the attempt id | after Review; does not count toward `limits.max_attempts` |
+| `needs_review` (unknown required question found on the form) | release | `needs_review`, approval cleared; the Review records the attempt id; answering it prepares the Application again and returns it to `ready` | after Review and a new approval; does not count toward `limits.max_attempts` |
 | `ats_flagged` (Ashby "flagged as possible spam") | release | `failed`, `status_reason='ats_flagged'`; the repost guard still applies | no |
 | `posting_closed`, `duplicate`, `identity_mismatch` | release | `skipped`; a mismatch sets `status_reason` to `posting_identity:<field>` | no |
-| `interrupted` (deploy or shutdown **before** `submit_clicked_at`) | release | back to `ready`, next free slot; does not count toward `limits.max_attempts` | yes |
-| `captcha_blocked`, `code_timeout`, `blocked`, `form_changed`, `upload_failed`, `provider_error`, `timeout`, `crash` (all **before** `submit_clicked_at`) | release | back to `ready`, earliest retry ≥ 6 h later (§9.2), if `attempts < 2`, else `failed` | once, fresh browser session |
+| `interrupted` (deploy or shutdown **before** `submit_clicked_at`) | release | back to `approved` (the plan did not change, so the approval stands), next free slot; does not count toward `limits.max_attempts` | yes |
+| `form_changed` (the live form differs from the approved plan, **before** `submit_clicked_at`) | release | prepared again from what the live form showed, back to `ready` with `changes` set and the approval cleared, if `attempts < 2`, else `failed` | only after the user approves again |
+| `captcha_blocked`, `code_timeout`, `blocked`, `upload_failed`, `provider_error`, `timeout`, `crash` (all **before** `submit_clicked_at`) | release | back to `approved` (the approval stands), earliest retry ≥ 6 h later (§9.2), if `attempts < 2`, else `failed` | once, fresh browser session |
 
-**Live-form check (the preflight).** After filling and uploading, and before the final Submit, every flow runs the shared forms engine's preflight: it reads the live DOM and compares it with the prepared plan. Every planned answer must be set, every planned option present and selected, every checkbox (including consent) in the planned state, every required field covered, and the uploaded file input's name and byte size must equal the planned resume. A missing field, value, option or required field means **no submit request is made**. An unexpected required field the plan never covered is mapped from its label and type: a durable factual field with no Fact stops the attempt as `needs_review` (release, status `needs_review`, one Review per question with `reviews.attempt_id` recorded, no `max_attempts` charge, no retry); a one-off essay, non-standard consent, file that is not the resume, or any other structural difference ends `form_changed` (release, retry once per the table above). A preflight failure records its kinds and field names on `attempts.error_code` (for example `preflight:option_missing:country`). The check is shared so Greenhouse, Lever and Ashby all use the same rule.
+**Live-form check (the preflight).** After filling and uploading, and before the final Submit, every flow runs the shared forms engine's preflight: it reads the live DOM and compares it with the **approved** plan (§8.7), the one the user saw, never a plan rebuilt at send time. Any difference stops before Submit; Overture never sends on a difference. Every planned answer must be set, every planned option present and selected, every checkbox (including consent) in the planned state, every required field covered, and the uploaded file input's name and byte size must equal the planned resume. A missing field, value, option or required field means **no submit request is made**. An unexpected required field the plan never covered is mapped from its label and type: a durable factual field with no Fact stops the attempt as `needs_review` (release, status `needs_review`, one Review per question with `reviews.attempt_id` recorded, no `max_attempts` charge, no retry); a one-off essay, non-standard consent, file that is not the resume, a changed option list, a removed field or any other structural difference ends `form_changed` (release, back to `ready` with what changed, per the table above). A preflight failure records its kinds and field names on `attempts.error_code` (for example `preflight:option_missing:country`). The check is shared so Greenhouse, Lever and Ashby all use the same rule.
 
 **Ashby.** The sanitised Ashby recording strips the SPA bundle, so the submit request cannot be observed offline.
 Until the first real Ashby send confirms it from its attempt log, the flow treats a POST to
@@ -759,8 +851,9 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 2. Navigate to the apply link: for Greenhouse the embed form `https://job-boards.greenhouse.io/embed/job_app?for={board_token}&token={ats_job_id}` (`job-boards.eu.greenhouse.io` when the board's `region` is `eu`), never the employer's `absolute_url` and never the plain `/{board_token}/jobs/{id}` board page, which redirects to the employer's own site on boards with a custom careers domain; otherwise `apply_url`. The identity check reads `for` and `token` from that path. If the page says the job is closed → `posting_closed`. Check that the live page's
    host, board token, job id and company name match the Posting; a redirect or any other mismatch → `identity_mismatch`
    (release, `skipped` with `status_reason` `posting_identity:<field>`, never submit).
-3. Compute the form signature; load the cached plan or build one.
-4. Fill answers; upload the resume with `setInputFiles({name, mimeType, buffer})` from the decrypted file. Read the
+3. Decrypt the approved plan and check it against `approved_plan_sha256` (a mismatch ends the attempt as `crash`
+   before anything is filled); compute the form signature and record it. A plan is never built at send time.
+4. Fill the approved answers; upload the resume with `setInputFiles({name, mimeType, buffer})` from the decrypted file. Read the
    file input back and check its name and byte size against the planned resume.
 5. Run the live-form preflight (§9.4): compare every planned answer, option, consent and required field with the DOM.
    An unexpected required field the plan does not cover is mapped (§8.3 step 2); if it is factual and durable → stop,
@@ -786,7 +879,8 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 
 - Synthetic: `https://tryoverture.com/lab/*` pages with reCAPTCHA v3 (score logged server-side), hCaptcha, Turnstile
   and recorded ATS fixture forms; 200 sessions per provider (Browser Use and Kernel); no employer involved.
-- Live: the owner's real applications, on Browser Use only; ≥ 60 for the M1 gate.
+- Live: the owner's real applications, each approved by the owner, on Browser Use only; ≥ 25 for the M1 gate
+  (ADR 0029).
 - Admin report: completion rate, code rate, challenge rate, p50/p95 duration, proxy MB and cost per completed
   application, per provider × ATS. Overview shows proxy MB and cost per completed application against the $0.03 gate.
   The report raises `browser.proxy_trend` when the latest 20 completed applications use more than 1.2× the proxy bytes
@@ -960,8 +1054,9 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 |---|---|
 | Session | `GET /api/me` |
 | Events | `GET /api/events` (SSE; `Last-Event-ID` replay from `events`; heartbeat 25 s) |
-| Home | `GET /api/home` (running and pause reason, applications left, today's sent/remaining, queued count + next send time, sent/replies/interviews and a per-day or per-week series for 7D/30D/90D, open Reviews grouped by jobs unlocked, recent authenticated Inbox items, up next, activity, check-ins) · `POST /api/running` `{running}` |
-| Board | `GET /api/board` · `PATCH /api/applications/:id/stage` `{stage, position}` · `POST /api/applications/:id/undo-stage` · `POST /api/applications/:id/withdraw` (queued only) |
+| Home | `GET /api/home` (running and pause reason, applications left, today's sent/remaining, ready-to-send count, queued count + next send time, sent/replies/interviews and a per-day or per-week series for 7D/30D/90D, open Reviews grouped by jobs unlocked, recent authenticated Inbox items, up next, activity, check-ins) · `POST /api/running` `{running}` |
+| Board | `GET /api/board` · `PATCH /api/applications/:id/stage` `{stage, position}` · `POST /api/applications/:id/undo-stage` · `POST /api/applications/:id/withdraw` (before `sending`: Queued, or Skip on a Ready card) |
+| Ready | `GET /api/ready` (Ready and approved cards with their plans, `planSha256`, `changes`, queue position and ETA) · `POST /api/applications/:id/approve` `{planSha256}` · `POST /api/applications/:id/unapprove` · `POST /api/ready/approve` `{items}` (Send all) · `PUT /api/applications/:id/answers/:questionId` (§8.7) |
 | Application | `GET /api/applications/:id` (card + timeline + snapshot "proof": answers with sources, letter with mapped lines, resume hash) |
 | Jobs | `GET /api/search?q&filters` (FTS ≤ 50 ms; filters: `role`, `seniority`, `workplace`, `location` = resolved city, `employmentType`) · `GET /api/postings/:id` (scores on open) · `POST /api/postings/:id/apply` · `PUT /api/postings/:id/state` `{saved|hidden|null}` |
 | Review | `GET /api/reviews` · `POST /api/reviews/:id/answer` · `POST /api/reviews/:id/dismiss` |
@@ -983,13 +1078,14 @@ SSE topics: `application.updated`, `board.moved`, `review.created`, `review.reso
 
 Visual design: the canvas artifact `P3aiZsEXkoUKBrknvvBNJJ`, Section A, is the wireframe and the build matches it
 pixel for pixel; `DESIGN.md` is its written contract. Boards that contradict this spec are redrawn before the slice
-that builds them (`DESIGN.md` §13). Five destinations: **Home, Board, Review, Inbox, Profile**; Settings from
-the avatar; desktop hover submenus; phone bottom tab bar; sub-sections are list pages on phone.
+that builds them (`DESIGN.md` §13). Six destinations, in this order: **Home, Ready, Board, Review, Inbox,
+Profile** (Ready added by ADR 0029); Settings from the avatar; desktop hover submenus; phone bottom tab bar; sub-sections are list pages on phone.
 
 | Surface | Content | Key states |
 |---|---|---|
-| Home | Start/Pause switch with pause reason; applications left; today sent / remaining; queue position + ETA; Up next (code-ranked, score on open, Apply/Save/Hide); activity incl. "Couldn't apply" with reason; check-ins; strengthen-profile prompt | paused (each reason has its own copy and fix), nothing matching, waiting for Review, out of applications |
-| Board | Columns Queued, Applied, Screening, Interviewing, Offer, Closed; cards with company, title, score, Strong match badge, "why this match"; card sheet: timeline, proof (answers + source, letter, resume file), linked mail, stage buttons; desktop dnd-kit + keyboard; phone one column per screen, swipe, 250 ms hold to drag, stage buttons in sheet | empty board, auto-move undo toast |
+| Home | Start/Pause switch with pause reason; applications left; today sent / remaining; the Ready card ("3 ready to send", opens Ready); queue position + ETA; Up next (code-ranked, score on open, Apply/Save/Hide); activity incl. "Couldn't apply" with reason; check-ins; strengthen-profile prompt | paused (each reason has its own copy and fix), nothing matching, waiting for Review, out of applications |
+| Ready | Heading "Ready to send". Approval cards (§8.7): job, employer, resume file, every answer as it will be typed with its source, cover letter, what changed; Send, Skip, Edit an answer; approved cards show "Sends around 14:20" and Undo; "Send all" for everything listed. Never sends from a link | none ready, all approved, a card that came back with changes |
+| Board | Columns Queued, Ready, Applied, Screening, Interviewing, Offer, Closed (Ready holds an Application from Ready until it is confirmed sent); cards with company, title, score, Strong match badge, "why this match"; card sheet: timeline, proof (answers + source, letter, resume file), linked mail, stage buttons; desktop dnd-kit + keyboard; phone one column per screen, swipe, 250 ms hold to drag, stage buttons in sheet | empty board, auto-move undo toast |
 | Review | Open questions grouped by jobs unlocked; answer input matches field type; dismiss | none open |
 | Inbox | Threads list (linked company/card), message view, attachments, "Couldn't verify sender" label, reply (M2, employer-started threads only) | empty, address explainer |
 | Profile | Resume, facts by tier, targets with live job count, skip list, forwarding address, "Strengthen your profile" | missing Tier 1 facts |
@@ -1002,8 +1098,11 @@ User-facing copy never uses the banned words (see the Words rule at the top; ADR
 
 ### 15.1 Notifications
 
-Push: new Review, employer reply, interview/offer detected, card auto-moved (with Undo), paused (with reason),
-"Couldn't apply" summaries (batched hourly). Daily digest email (opt-out) at 08:00 local: yesterday's sends, replies, open
+M1: the Ready email, at most one a day, when new Applications are Ready (§8.7). It links to the Ready page and never
+sends from the link.
+
+Push (M2): new Applications Ready, new Review, employer reply, interview/offer detected, card auto-moved (with Undo),
+paused (with reason), "Couldn't apply" summaries (batched hourly). Daily digest email (opt-out) at 08:00 local: yesterday's sends, replies, open
 Reviews, check-ins. In-app notification list mirrors pushes.
 
 ---
@@ -1018,18 +1117,21 @@ Reviews, check-ins. In-app notification list mirrors pushes.
 crash recovery) ·
 10. tagging precedence incl. tag import · 11. candidate filters (skip list incl. near-match names and domains, one open
 application per company, cooldown, repost guard, language, remote country rules, salary/FX) · 12. lazy scoring stops at need · 13. score on open + manual apply · 14. preparation with factual,
-open-text, optional blank · 15. Review unlocks N applications · 16. planner window + spacing · 17. dispatcher gates
-(cap, applications left, kill switch, one-in-flight) · 18. submit success on Greenhouse/Lever/Ashby fixtures ·
+open-text, optional blank · 15. Review unlocks N applications · 16. planner window + spacing, in approval order · 17. dispatcher gates
+(cap, applications left, kill switch, one-in-flight, only `approved`, approval still current) · 18. submit success on Greenhouse/Lever/Ashby fixtures ·
 19. verification code read from mailbox · 20. challenge blocked before Submit → release + retry once → failed ·
 21. crash or missing confirmation after Submit → `confirming`, never retried; acknowledgement mail → sent; none in
 24 h → failed, not charged, repost guard set · 22. Board drag, lock, keyboard DnD, phone hold-drag · 23. email moves card forward + undo ·
 24. check-in at 21 days, close at 45 · 25. inbound mail with failed auth stored, not automated · 26. reply limits
 (M2) · 27. onboarding wizard + address generation collision (M2) · 28. push + digest (M2) · 29. export + delete
 crypto-shred (M2) · 30. admin Reveal + audit + support access log (M2) · 31. Stripe checkout, renewal, expiry,
-payment-failure pause (M3) · 32. admin fixture capture job writes sanitised forms to R2 and never submits.
+payment-failure pause (M3) · 32. admin fixture capture job writes sanitised forms to R2 and never submits ·
+33. approval: Send freezes the plan, a stale `planSha256` is refused, Undo before `sending`, Skip withdraws, Send all,
+Edit an answer clears the approvals that used the Fact, the Ready email's link never sends · 34. a live form that
+differs from the approved plan stops before Submit and returns the Application to Ready with what changed.
 
 Plus: route reachability for every page, axe on every page, 30 visual snapshots (Home, Board, Review, Inbox, Profile
-× 390 / 1280 px × light/dark) in pinned Docker.
+× 390 / 1280 px × light/dark; Ready joins them once it is drawn) in pinned Docker.
 
 ### 16.2 Unit tests (nine files, Vitest, beside their code)
 
@@ -1158,3 +1260,4 @@ v1 runs on Fly app `ai-auto-apply` (volume `data`, yyz). In order:
 | Single-machine SQLite outage | Litestream + tested restore; Postgres path via Drizzle when > ~200 paying users |
 | Lever/Ashby questions only visible in-browser → late Reviews | plan cache; pre-flight read session if Review rate is high |
 | Email-classification mistakes move cards wrongly | forward-only, undo, never over manual drags, confidence threshold |
+| Approval slows sending: Ready cards pile up while the user is away and fewer applications go out | the preparation buffer bounds unapproved work (§8.2); one Ready email a day; Send all; measured against the 25-application M1 gate (ADR 0029) |

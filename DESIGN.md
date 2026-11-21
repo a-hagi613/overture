@@ -99,8 +99,9 @@ Section B of that artifact — the later restatement with neutral paper, Newsrea
 experiment that has been **removed**. There is one design, and this is it.
 
 Product vocabulary, screens and behaviour come from `docs/SPEC.md`. This file governs how the
-product looks. Until §13's redraws land, boards that still say `Hold`, show six nav items or a Live Tab are
-read as `Queued`/`Review` and five destinations; their *visual treatment* is what is fixed here.
+product looks. Until §13's redraws land, boards that still say `Hold`, show the old nav (Job Board, Holds, Answer Bank) or a Live Tab are
+read as `Queued`/`Review` and the destinations in `docs/SPEC.md` §15 (six since ADR 0029: Home, Ready, Board,
+Review, Inbox, Profile); their *visual treatment* is what is fixed here.
 
 ---
 
@@ -528,16 +529,18 @@ screen, then built to match. Visual treatment stays; words, structure and behavi
 
 | Board | Change |
 |---|---|
-| Every app board | **Redrawn on Home, Board, Review, Profile and Settings; the other app boards (Inbox, card detail, notifications) are still to do.** Five destinations (Home, Board, Review, Inbox, Profile), Settings from the avatar; no "Job Board", "Holds", "Answer Bank", "Activity", "Personal workspace"; one "Applications left" figure, no "Match Scores" counter; `--hold` tokens renamed `--need` |
-| Job Board | **Redrawn as Board.** Queued replaces Hold as the first column, ink rule; red "Needs you" pill on cards waiting on a Review |
+| Every app board | **Redrawn on Home, Board, Review, Profile and Settings; the other app boards (Inbox, card detail, notifications) are still to do.** Six destinations in this order: Home, Ready, Board, Review, Inbox, Profile (Ready added by ADR 0029; the boards drawn so far show five and gain Ready in the nav, rail and tab bar), Settings from the avatar; no "Job Board", "Holds", "Answer Bank", "Activity", "Personal workspace"; one "Applications left" figure, no "Match Scores" counter; `--hold` tokens renamed `--need` |
+| Job Board | **Redrawn as Board.** Queued replaces Hold as the first column, ink rule; red "Needs you" pill on cards waiting on a Review. **Still to draw (ADR 0029):** a Ready column between Queued and Applied, holding cards from Ready until confirmed sent (Ready, approved with its send time, Sending, Checking with the employer); its column rule is chosen on the canvas |
+| Ready | **New, still to draw (ADR 0029).** The Ready destination, heading "Ready to send": approval cards with the job, employer, resume file, every answer as it will be typed with its source, the cover letter and what changed; Send, Skip, Edit an answer; approved cards with their send time and Undo; "Send all"; empty and all-approved states; phone and desktop |
 | Holds | **Redrawn as Review (file `w5-holds`).** Becomes Review: open questions grouped by jobs unlocked |
 | Answer Bank, Resume | **Redrawn: folded into Profile.** Fold into Profile: resume, facts by tier, targets with live count, skip list, job-search address |
-| Settings | **Redrawn.** No approval mode, no "Overnight window", no user-set company limit or daily caps, no UTC reset; the fixed limits explained (10 a day, 08:00–20:00 local, one company per 30 days, reset at local midnight) |
+| Settings | **Redrawn.** No approval mode (approval is not a setting: every send is approved, ADR 0029), no "Overnight window", no user-set company limit or daily caps, no UTC reset; the fixed limits explained (10 a day, 08:00–20:00 local, one company per 30 days, reset at local midnight) |
 | Onboarding 1–4 | **Your facts step drawn (`w5-onb-questions`, #128); the other steps are still to redraw.** Five steps: Sign in · Resume · Your facts · What you want · Your job-search address + consent + trial + Start; no "Connect inbox", no Gmail, no "Memory Base" |
 | Sign In | **Redrawn (modes sign-in, sign-up, magic-sent).** Google, LinkedIn, magic link (M1); email + password joins in M2 (ADR 0026). Dark uses the sign-in dark ground (§2, ADR 0027) |
 | Product states | **Pause reasons drawn on Home (`w5-home-paused`, #157).** No Gmail connect states; add `confirming` ("Checking with the employer"), each pause reason, out of applications |
+| Ready email | **New, still to draw (ADR 0029).** At most one a day: the new Ready Applications by employer and job title, one link to the Ready page, no answers and no send button |
 | Daily digest | Morning summary of **yesterday** (sends between 08:00 and 20:00); "Needs you", not "Hold" |
 | Landing | Daytime timestamps; card required for the trial (no "No credit card"); Workday removed from Where it applies; plan prices per the spec; no glow on the travelling-dot tiles |
 | Live Tab (3 boards) | Deleted: users never see a browser |
 | Mobile reference | Deleted, already marked to retire |
-| New | Review; **drawn on Home (`w5-home-paused`, #157): check-in, strengthen-profile prompt, queue position, activity and the `Couldn't apply` card.** **Admin — still to draw.** The M1 admin (overview, kill switches & settings, catalog health; M1-12) is built from the Settings board's components and this document's tokens, with no pixel check of its own until a board exists; pricing and billing (M3) |
+| New | Review; **drawn on Home (`w5-home-paused`, #157): check-in, strengthen-profile prompt, queue position, activity and the `Couldn't apply` card.** **Home's Ready card ("3 ready to send", opens Ready) — still to draw (ADR 0029).** **Admin — still to draw.** The M1 admin (overview, kill switches & settings, catalog health; M1-12) is built from the Settings board's components and this document's tokens, with no pixel check of its own until a board exists; pricing and billing (M3) |
