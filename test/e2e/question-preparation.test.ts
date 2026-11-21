@@ -1144,6 +1144,56 @@ test("a question naming no country opens a Review when scoped Facts disagree", a
   expect(review?.scope).toBe("");
 });
 
+test("a question that names the company but no country uses the posting's country", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await uploadResume(owner);
+
+  await saveFacts(owner, [
+    { key: "legal_name", value: "Maya Okafor" },
+    { key: "email", value: "maya.okafor@mail.overture.test" },
+    { key: "phone", value: "+1 416 555 0199" },
+    { key: "current_country", value: "Canada" },
+    { key: "sponsorship_required", scope: "CA", value: "No" },
+    { key: "sponsorship_required", scope: "US", value: "Yes" },
+  ]);
+
+  const postingId = await seedRecordedPosting(owner, {
+    atsJobId: "8097321",
+    boardToken: "cloudflare",
+    companyName: "Cloudflare",
+    countryCode: "US",
+    domain: "cloudflare.example",
+    locationRaw: "Austin, TX",
+    title: "AI Security Research & Red Team Engineer",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const question =
+    "Do you now or will you in the future require immigration sponsorship to work at Cloudflare?";
+
+  const answer = (await answersFor(owner, applicationId)).find(
+    (candidate) => candidate.text === question,
+  );
+
+  expect(answer).toMatchObject({ answer: "Yes", resolved: true, scope: "US" });
+
+  const review = (await reviewsFor(owner, userId)).reviews.find((candidate) =>
+    candidate.prompt.startsWith(question),
+  );
+
+  expect(review).toBeUndefined();
+});
+
 test("a recorded five-option work-authorisation select resolves from the scoped Fact", async ({
   preparation,
 }) => {

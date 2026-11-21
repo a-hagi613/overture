@@ -720,6 +720,42 @@ async function readLiveForm(page: Page, formSelector: string) {
           continue;
         }
 
+        const pressedButtons = [
+          ...(element.parentElement?.querySelectorAll<HTMLButtonElement>("button[aria-pressed]") ??
+            []),
+        ];
+
+        if (pressedButtons.length > 0) {
+          const titleId = element.getAttribute("name") ?? element.getAttribute("id") ?? "";
+
+          const title =
+            titleId === "" ? null : document.querySelector(`label[for="${CSS.escape(titleId)}"]`);
+
+          const pressed =
+            pressedButtons.find((button) => button.getAttribute("aria-pressed") === "true") ?? null;
+
+          controls.push({
+            checked: pressed !== null,
+            disabled: pressedButtons.every((button) => dom.disabledOf(button)),
+            fieldType: "radio",
+            file: null,
+            hidden: pressedButtons.every((button) => dom.hiddenOf(button)),
+            key: dom.nameOf(element),
+            label: title === null ? dom.labelFor(element) : dom.textOf(title),
+            name: dom.nameOf(element),
+            options: pressedButtons.map((button) => ({
+              label: dom.textOf(button),
+              value: dom.textOf(button),
+            })),
+            required:
+              dom.requiredOf(element) ||
+              (title instanceof HTMLElement && /(?:^|\s)_required_/u.test(title.className)),
+            value: pressed === null ? null : dom.textOf(pressed),
+          });
+
+          continue;
+        }
+
         if (fieldType === "radio" && element instanceof HTMLInputElement) {
           if (seenRadios.has(element.name)) {
             continue;

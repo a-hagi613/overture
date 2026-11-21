@@ -32,9 +32,14 @@ const submitSchema = z.object({
 const NO_FORM_PAGE =
   "<!doctype html><html><body><p>This position is no longer accepting applications.</p></body></html>";
 
-export function startAshbyFixture() {
-  const boardToken = "volta";
-  const jobId = "123e02c6-445b-42bb-893c-addb1f6d4752";
+interface AshbyFixtureOptions {
+  boardToken?: string;
+  jobId?: string;
+}
+
+export function startAshbyFixture(options: AshbyFixtureOptions = {}) {
+  const boardToken = options.boardToken ?? "volta";
+  const jobId = options.jobId ?? "123e02c6-445b-42bb-893c-addb1f6d4752";
   const transpiler = new Bun.Transpiler({ loader: "ts" });
   const runtime = transpiler.transformSync(readFileSync(RUNTIME_SOURCE, "utf8"));
 

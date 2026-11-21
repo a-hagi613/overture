@@ -110,6 +110,26 @@ const attachResumeEcho = () => {
   });
 };
 
+const attachYesNoOptions = () => {
+  for (const group of document.querySelectorAll("[class*='ashby-application-form-input-yesno']")) {
+    const checkbox = group.querySelector<HTMLInputElement>("input[type='checkbox']");
+    const buttons = [...group.querySelectorAll<HTMLButtonElement>("button[aria-pressed]")];
+
+    for (const button of buttons) {
+      button.addEventListener("click", () => {
+        for (const option of buttons) {
+          option.setAttribute("aria-pressed", option === button ? "true" : "false");
+        }
+
+        if (checkbox !== null) {
+          checkbox.checked = true;
+          checkbox.value = clean(button.textContent);
+        }
+      });
+    }
+  }
+};
+
 const attachSubmit = (meta: AshbyFixtureMeta) => {
   const button = document.querySelector<HTMLButtonElement>(".ashby-application-form-submit-button");
 
@@ -172,6 +192,7 @@ const run = () => {
   }
 
   attachResumeEcho();
+  attachYesNoOptions();
   attachSubmit(meta);
 };
 

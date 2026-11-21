@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
 import type { AshbyFixture } from "./ashby.fixture.ts";
+import type { IdentityServer } from "./identity-server-test.fixture.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { startAshbyFixture } from "./ashby.fixture.ts";
@@ -23,10 +24,81 @@ interface AshbyHarness {
   fixture: AshbyFixture;
   server: AppServer;
   sessionDirectory: string;
+  site: AshbySite;
 }
 
-const JOB_ID = "123e02c6-445b-42bb-893c-addb1f6d4752";
-const BOARD_TOKEN = "volta";
+interface AshbySite {
+  boardToken: string;
+  jobId: string;
+  companyName: string;
+  title: string;
+}
+
+const VOLTA: AshbySite = {
+  boardToken: "volta",
+  companyName: "Volta",
+  jobId: "123e02c6-445b-42bb-893c-addb1f6d4752",
+  title: "Senior Project Manager - CTO Support",
+};
+
+const CLERA: AshbySite = {
+  boardToken: "clera",
+  companyName: "Clera",
+  jobId: "0a278229-474e-4534-82d0-ebfafe18ad9d",
+  title: "Werkstudent Content & Brand (m/w/d)",
+};
+
+const HIGHLIGHTTA: AshbySite = {
+  boardToken: "highlightta",
+  companyName: "HighlightTA",
+  jobId: "1e4f70e2-9d0a-455e-9b08-e84b301e37e6",
+  title: "Client Success Specialist",
+};
+
+const startAshbyHarness = async (identityServer: IdentityServer, site: AshbySite) => {
+  const directory = mkdtempSync(join(tmpdir(), "overture-ashby-send-"));
+  const fixture = startAshbyFixture(site);
+  const sessionDirectory = join(directory, "browsers");
+
+  const server = await startFreshAppServer(identityServer, {
+    BROWSER_PROVIDER: "local",
+    BROWSER_SESSION_DIR: sessionDirectory,
+  });
+
+  return { fixture, server, sessionDirectory, site };
+};
+
+async function provideAshbyHarness(
+  identityServer: IdentityServer,
+  site: AshbySite,
+  provide: (harness: AshbyHarness) => Promise<void>,
+) {
+  const harness = await startAshbyHarness(identityServer, site);
+
+  await provide(harness);
+  await harness.server.stop();
+  harness.fixture.close();
+}
+
+const test = appTest.extend<{
+  ashby: AshbyHarness;
+  ashbyLocation: AshbyHarness;
+  ashbyYesNo: AshbyHarness;
+}>({
+  ashby: [
+    async ({ identityServer }, provide) => provideAshbyHarness(identityServer, VOLTA, provide),
+    { scope: "test" },
+  ],
+  ashbyLocation: [
+    async ({ identityServer }, provide) =>
+      provideAshbyHarness(identityServer, HIGHLIGHTTA, provide),
+    { scope: "test" },
+  ],
+  ashbyYesNo: [
+    async ({ identityServer }, provide) => provideAshbyHarness(identityServer, CLERA, provide),
+    { scope: "test" },
+  ],
+});
 
 const SPONSORSHIP_PROMPT =
   "Will you now, or in the future, require visa sponsorship to legally work in the country where this role is based?";
@@ -36,26 +108,6 @@ const SPONSORSHIP_NO =
 
 const SPONSORSHIP_GROUP =
   "aff810b3-1f77-4e76-950f-6c5dfb53f847_d2dcc981-709b-4026-ae4f-d6f6d613e982";
-
-const test = appTest.extend<{ ashby: AshbyHarness }>({
-  ashby: [
-    async ({ identityServer }, provide) => {
-      const directory = mkdtempSync(join(tmpdir(), "overture-ashby-send-"));
-      const fixture = startAshbyFixture();
-      const sessionDirectory = join(directory, "browsers");
-
-      const server = await startFreshAppServer(identityServer, {
-        BROWSER_PROVIDER: "local",
-        BROWSER_SESSION_DIR: sessionDirectory,
-      });
-
-      await provide({ fixture, server, sessionDirectory });
-      await server.stop();
-      fixture.close();
-    },
-    { scope: "test" },
-  ],
-});
 
 const applicationRowSchema = z.object({
   id: z.string(),
@@ -152,16 +204,19 @@ async function seededApplication(harness: AshbyHarness, facts: typeof baseFacts,
 
   await prepareProfile(owner, facts);
 
-  const companyId = await seedCompany(owner, "Volta", "volta.example");
-  const boardId = await seedBoard(owner, companyId, "ashby", BOARD_TOKEN);
+  const { boardToken, companyName, jobId, title } = harness.site;
+  const domain = `${boardToken}.example`;
+
+  const companyId = await seedCompany(owner, companyName, domain);
+  const boardId = await seedBoard(owner, companyId, "ashby", boardToken);
 
   const postingId = await seedPosting(owner, {
     ats: "ashby",
-    atsJobId: JOB_ID,
+    atsJobId: jobId,
     boardId,
     companyId,
-    title: "Senior Project Manager - CTO Support",
-    url: `${harness.fixture.url}/${BOARD_TOKEN}/${JOB_ID}/application${query}`,
+    title,
+    url: `${harness.fixture.url}/${boardToken}/${jobId}/application${query}`,
   });
 
   const applicationId = await seedApplication(owner, {
@@ -326,4 +381,87 @@ test("an Ashby 2xx without the success page stays Confirming and is never called
   const home = homeSchema.parse(await (await owner.get("/api/home")).json());
 
   expect(home.applicationsLeft).toBe(2);
+});
+
+const answersSchema = z.object({
+  answers: z.array(
+    z.object({
+      text: z.string(),
+      required: z.boolean(),
+      resolved: z.boolean(),
+      answer: z.string().nullable(),
+    }),
+  ),
+});
+
+async function preparedAnswers(owner: APIRequestContext, applicationId: string) {
+  const response = await owner.get(
+    `/__test__/prepared-answers?applicationId=${encodeURIComponent(applicationId)}`,
+  );
+
+  return answersSchema.parse(await response.json()).answers;
+}
+
+test("an Ashby send answers a yes/no question from a Fact and presses its option", async ({
+  ashbyYesNo,
+}) => {
+  const { applicationId, owner } = await seededApplication(ashbyYesNo, [
+    ...baseFacts,
+    { key: "work_auth", value: "Citizen", scope: "" },
+  ]);
+
+  const response = await runSend(owner, applicationId);
+
+  expect(response.ok()).toBe(true);
+
+  const detail = await applicationOf(owner, applicationId);
+
+  expect(detail.application.status).toBe("sent");
+  expect(detail.application.stage).toBe("applied");
+  expect(detail.snapshot?.confirmedBy).toBe("page");
+
+  const answers = new Map(detail.snapshot?.answers.map((answer) => [answer.label, answer.answer]));
+
+  expect(answers.get("Do you have work authorization to work in that country?")).toBe("Yes");
+
+  const state = await fixtureState(ashbyYesNo.fixture);
+
+  expect(state.submissions).toBe(1);
+  expect(ashbyYesNo.fixture.state.lastForm["1323b323-1e0c-45e7-bcf7-b49e37897e1d"]).toBe("Yes");
+
+  const attempts = await attemptsOf(owner, applicationId);
+
+  expect(attempts).toHaveLength(1);
+  expect(attempts[0]?.outcome).toBe("sent");
+});
+
+test("an Ashby send reads a yes/no question as its options and a bare Location as the city", async ({
+  ashbyLocation,
+}) => {
+  const { applicationId, owner } = await seededApplication(ashbyLocation, baseFacts);
+
+  const response = await runSend(owner, applicationId);
+
+  expect(response.ok()).toBe(true);
+
+  const detail = await applicationOf(owner, applicationId);
+
+  expect(detail.application.status).toBe("needs_review");
+
+  const reviews = await reviewsOf(owner);
+
+  const canada = reviews.find((review) =>
+    review.prompt.startsWith("Are you legally authorized to work in Canada?"),
+  );
+
+  expect(canada).toMatchObject({ fieldType: "radio", options: ["Yes", "No"] });
+  expect(reviews.some((review) => review.prompt === "Location")).toBe(false);
+
+  const location = (await preparedAnswers(owner, applicationId)).find(
+    (answer) => answer.text === "Location",
+  );
+
+  expect(location).toMatchObject({ resolved: true, answer: "London" });
+
+  expect((await fixtureState(ashbyLocation.fixture)).submissions).toBe(0);
 });

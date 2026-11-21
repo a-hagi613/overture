@@ -170,7 +170,7 @@ test("the recorded forms carry the questions the measurement names", async ({ pa
 
   expect(
     ashby.find((question) => question.label.startsWith("Are you legally authorized")),
-  ).toMatchObject({ required: true });
+  ).toMatchObject({ fieldType: "radio", options: ["Yes", "No"], required: true });
   expect(
     ashby.find((question) =>
       question.label.startsWith("How would you rate your current Ai Ability"),
@@ -188,5 +188,26 @@ test("the recorded forms carry the questions the measurement names", async ({ pa
   ).toMatchObject({ fieldType: "text", required: true });
   expect(questions.some((question) => question.label.includes("legally authorized to work"))).toBe(
     true,
+  );
+});
+
+test("a Lever card with a generic field prompt is read by its section heading", async ({
+  page,
+}) => {
+  const hive = "lever/hive-ac502675-09a8-4169-8061-8d49fd4e2c4f.fixture.html";
+
+  await page.setContent(readFileSync(join(FORMS, hive), "utf8"), { waitUntil: "load" });
+
+  const questions = await readLeverQuestions(page);
+
+  expect(
+    questions.find((question) => question.label === "How did you hear about us?"),
+  ).toMatchObject({
+    fieldType: "multiselect",
+    options: expect.arrayContaining(["Friend", "LinkedIn", "Other"]),
+    required: true,
+  });
+  expect(questions.some((question) => question.label === "Please check all that apply:")).toBe(
+    false,
   );
 });

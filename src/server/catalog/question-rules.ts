@@ -123,6 +123,10 @@ const RULES: readonly { pattern: RegExp; mapping: RuleMapping }[] = [
     mapping: { answerKind: "fact", factKey: "website_url" },
   },
   {
+    pattern: /^location$/u,
+    mapping: { answerKind: "fact", factKey: "current_city" },
+  },
+  {
     pattern: /\b(?:city|town|where do you live|current location|currently located)\b/u,
     mapping: { answerKind: "fact", factKey: "current_city" },
   },

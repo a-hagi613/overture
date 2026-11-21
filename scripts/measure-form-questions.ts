@@ -10,6 +10,7 @@ import type { FactRecord } from "../src/server/profile/facts.ts";
 import type { FormQuestion } from "../src/server/pipeline/send-plan.ts";
 import type { Targets } from "../src/shared/targets.ts";
 
+import { resolveLocation } from "../src/server/catalog/geo.ts";
 import {
   normalizeFieldType,
   normalizeQuestionText,
@@ -329,7 +330,7 @@ function measure(question: Extracted, board: string, place: string) {
     posting: {
       city: null,
       companyName: board,
-      countryCode: null,
+      countryCode: resolveLocation(place).countryCode,
       locationRaw: place === "" ? null : place,
       region: null,
     },
