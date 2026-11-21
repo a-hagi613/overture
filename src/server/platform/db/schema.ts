@@ -427,6 +427,8 @@ export const profiles = sqliteTable("profiles", {
     ],
   }).default("onboarding"),
   languages: text("languages").notNull().default("[]"),
+  onboardingStep: integer("onboarding_step").notNull().default(1),
+  onboardedAt: timestamp("onboarded_at"),
   timezone: text("timezone"),
   pendingTimezone: text("pending_timezone"),
   pendingTimezoneAt: timestamp("pending_timezone_at"),

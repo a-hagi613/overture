@@ -96,11 +96,31 @@ export default defineConfig({
     },
     {
       name: "onboarding-boards",
-      testMatch: /board-match-onboarding.*\.test\.ts/u,
+      testMatch: /board-match-onboarding-facts\.test\.ts/u,
       expect: {
         toHaveScreenshot: {
           maxDiffPixelRatio: 0.01,
           pathTemplate: "{testDir}/../../design/reference/onboarding-questions/{arg}{ext}",
+        },
+      },
+    },
+    {
+      name: "onboarding-resume-boards",
+      testMatch: /board-match-onboarding-resume\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/../../design/reference/onboarding-resume/{arg}{ext}",
+        },
+      },
+    },
+    {
+      name: "onboarding-welcome-boards",
+      testMatch: /board-match-onboarding-welcome\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/../../design/reference/onboarding-welcome/{arg}{ext}",
         },
       },
     },

@@ -1,25 +1,31 @@
 import { copy } from "../../shared/copy.ts";
 import { OnboardingStepDot } from "./onboarding-step-dot.tsx";
 
-const CURRENT_STEP = 3;
+export function OnboardingStepRail({
+  labels = copy.onboarding.steps,
+  step,
+}: {
+  labels?: readonly string[];
+  step: number;
+}) {
+  const current = Math.min(Math.max(step, 1), labels.length);
 
-function stateOf(position: number) {
-  if (position < CURRENT_STEP) {
-    return "done";
-  }
+  const stateOf = (position: number) => {
+    if (position < current) {
+      return "done";
+    }
 
-  if (position === CURRENT_STEP) {
-    return "on";
-  }
+    if (position === current) {
+      return "on";
+    }
 
-  return "next";
-}
+    return "next";
+  };
 
-export function OnboardingStepRail() {
   return (
     <>
       <ol aria-label={copy.onboarding.stepsLabel} className="rail-d">
-        {copy.onboarding.steps.map((name, index) => {
+        {labels.map((name, index) => {
           const position = index + 1;
           const state = stateOf(position);
 
@@ -35,13 +41,13 @@ export function OnboardingStepRail() {
       </ol>
       <div className="rail-m">
         <p className="num text-[13px] font-semibold">
-          {copy.onboarding.stepPosition(CURRENT_STEP, copy.onboarding.steps.length)}{" "}
+          {copy.onboarding.stepPosition(current, labels.length)}{" "}
           <span className="font-medium text-muted-foreground">
-            {copy.onboarding.stepSeparator} {copy.onboarding.stepName}
+            {copy.onboarding.stepSeparator} {labels[current - 1]}
           </span>
         </p>
         <div aria-hidden="true" className="mt-0.5 flex gap-1.5">
-          {copy.onboarding.steps.map((name, index) => {
+          {labels.map((name, index) => {
             const state = stateOf(index + 1);
 
             return (

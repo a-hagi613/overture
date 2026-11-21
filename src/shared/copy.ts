@@ -883,10 +883,51 @@ export const copy = {
     setupTitlePlain: "Set up your",
     setupTitleItalic: "workspace",
     setupIntro: "Five short steps. Each one saves as you go, so you can stop and come back.",
-    steps: ["Sign in", "Resume", "Your facts", "What you want", "Address & start"],
+    steps: ["Sign in", "Resume", "Your facts", "What you want", "Forwarding & start"],
+    factsStepLabels: ["Sign in", "Resume", "Your facts", "What you want", "Address & start"],
     stepPosition: (step: number, total: number) => `Step ${String(step)} of ${String(total)}`,
     stepSeparator: "·",
-    stepName: "Your facts",
+    welcomeTitlePlain: "Welcome to",
+    welcomeTitleItalic: "Overture",
+    welcomeIntro: "Here is what happens next, in three steps.",
+    welcomePoints: [
+      {
+        body: "It reads new postings every day and keeps the ones that fit what you are looking for.",
+        title: "Overture finds jobs",
+      },
+      {
+        body: "Answers come only from your own facts. Anything it cannot answer waits for you in Review.",
+        title: "It prepares every application",
+      },
+      {
+        body: "Nothing is sent until you have read it and said yes.",
+        title: "You approve, then it goes",
+      },
+    ],
+    resumeTitlePlain: "Upload your",
+    resumeTitleItalic: "resume",
+    resumeIntro:
+      "Upload one PDF. Overture sends it byte-for-byte, never rewritten, reformatted or re-typed.",
+    resumeLabel: "Resume",
+    resumeRequired: "Required to continue",
+    resumeChoose: "Upload a PDF",
+    resumeDropHint: "Drag it here. One PDF, up to 10 MB.",
+    resumeReplace: "Replace file",
+    resumeKept: "Kept exactly as you sent it. The copy Overture stores is this file, unchanged.",
+    resumeReads:
+      "Overture reads contact details, roles, dates and skills from it. You check them on the next step.",
+    resumeUnreadable:
+      "Overture couldn't read this PDF. Replace it, or continue and type your facts yourself on the next step.",
+    resumeUploadFailed: "That upload did not work. Try a PDF under 10 MB.",
+    resumeMeta: (pages: number, size: string) =>
+      `PDF · ${String(pages)} ${plural(pages, "page", "pages")} · ${size}`,
+    resumeSize: (bytes: number) =>
+      bytes < 1024 * 1024
+        ? `${String(Math.max(1, Math.round(bytes / 1024)))} KB`
+        : `${(bytes / (1024 * 1024)).toFixed(1)} MB`,
+    uploadedToday: "Uploaded today",
+    uploadedYesterday: "Uploaded yesterday",
+    uploadedOn: (date: string) => `Uploaded ${date}`,
     cardTitlePlain: "Your",
     cardTitleItalic: "facts",
     cardIntro:

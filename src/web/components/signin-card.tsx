@@ -7,6 +7,7 @@ import { turnstileActionHeader, turnstileTokenHeader } from "../../shared/turnst
 import { GoogleMark } from "./google-mark.tsx";
 import { NavGlyph } from "./nav-glyph.tsx";
 import { authClient } from "../lib/auth-client.ts";
+import { fetchOnboardingState } from "../lib/onboarding-api.ts";
 import { useTurnstile } from "../lib/turnstile.ts";
 
 type Mode = "sign-in" | "sign-up";
@@ -95,7 +96,11 @@ export function SignInCard() {
       const { data } = await authClient.getSession();
 
       if (data !== null) {
-        void navigate("/", { replace: true });
+        const onboarding = await fetchOnboardingState().catch(() => null);
+
+        void navigate(onboarding?.needsOnboarding === true ? "/onboarding" : "/", {
+          replace: true,
+        });
       }
     };
 

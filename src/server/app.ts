@@ -113,6 +113,8 @@ export function createApp(deps: AppDependencies) {
       auth: deps.auth,
       clock: deps.clock,
       db: deps.db,
+      llm: deps.llm,
+      objects: deps.objects,
       reviews: deps.reviews,
     }),
   );

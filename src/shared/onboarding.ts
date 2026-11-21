@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const ONBOARDING_STEP_COUNT = 5;
+
 export const WORK_AUTH_OPTIONS = [
   "Citizen",
   "Permanent resident",

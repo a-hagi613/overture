@@ -37,7 +37,7 @@ const pauseReasons = [
   {
     action: "Finish setup",
     copy: "Sending starts once your facts, forwarding and consent are in.",
-    href: "/profile#profile-facts",
+    href: "/onboarding",
     reason: "onboarding",
     title: "Setup isn't finished.",
   },
