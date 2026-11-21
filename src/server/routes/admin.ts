@@ -81,7 +81,7 @@ export interface AdminDeps {
   personal: PersonalCrypto;
 }
 
-const ATS_NAMES = ["greenhouse", "lever", "ashby", "personio"] as const;
+const ATS_NAMES = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
 
 export const ADMIN_REFUSAL_CODES = {
   accessRequired: "access_required",

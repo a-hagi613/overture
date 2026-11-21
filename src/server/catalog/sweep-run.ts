@@ -13,6 +13,12 @@ import type { BoardFeeds } from "./board-feed.ts";
 import type { PollBoardReport } from "./poll-board.ts";
 import type { SweepRunKind } from "./sweep-worker-protocol.ts";
 
+type CatalogAts = (typeof CATALOG_ATS_NAMES)[number];
+
+function isCatalogAts(ats: string): ats is CatalogAts {
+  return CATALOG_ATS_NAMES.some((name) => name === ats);
+}
+
 export async function pollDueBoards(db: AppDatabase, clock: Clock, feeds: BoardFeeds) {
   const now = clock.now();
   const batches = sweepBatchPerAts(db);
@@ -42,12 +48,17 @@ export async function pollDueBoards(db: AppDatabase, clock: Clock, feeds: BoardF
   );
 
   return Promise.all(
-    claimed.map(async (board) =>
-      retryWhenBusy(
-        async () => pollBoard(db, clock, feeds[board.ats], board),
-        `catalog.sweep.${board.ats}`,
-      ),
-    ),
+    claimed.flatMap((board) => {
+      const { ats } = board;
+
+      if (!isCatalogAts(ats)) {
+        return [];
+      }
+
+      return [
+        retryWhenBusy(async () => pollBoard(db, clock, feeds[ats], board), `catalog.sweep.${ats}`),
+      ];
+    }),
   );
 }
 
@@ -87,5 +98,6 @@ export function summarizeRun(kind: SweepRunKind, reports: PollBoardReport[], dur
     updated: reports.reduce((total, report) => total + report.updated, 0),
     closed: reports.reduce((total, report) => total + report.closed, 0),
     durationMs: Math.round(durationMs),
+    workable: null,
   };
 }
