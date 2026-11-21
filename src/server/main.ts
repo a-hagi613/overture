@@ -11,6 +11,11 @@ import { createRandom } from "./platform/ports/random.ts";
 import { createBackupMonitor } from "./platform/ports/backup.ts";
 import { installProcessGuards } from "./platform/process-guard.ts";
 import { recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
+import {
+  ensureRetentionQueued,
+  RETENTION_JOB_KIND,
+  retentionJobHandler,
+} from "./platform/jobs/retention.ts";
 import { startJobWorker } from "./platform/jobs/scheduler.ts";
 import { startTelemetry, trace } from "./platform/telemetry/otel.ts";
 import { createDiskObjectStore } from "./platform/ports/object-store.ts";
@@ -175,11 +180,14 @@ const jobSingletons = [
   DISPATCH_TICK_JOB_KIND,
   LIVE_CHECK_JOB_KIND,
   WORKABLE_INGEST_JOB_KIND,
+  RETENTION_JOB_KIND,
 ];
 
 recoverStaleLocks(db, clock, jobSingletons);
 
 ensureCheckinSweepQueued(db, clock);
+
+ensureRetentionQueued(db, clock);
 
 const tracer = trace.getTracer("overture");
 
@@ -531,7 +539,14 @@ const liveCheckJobHandlers: JobHandlers = {
   },
 };
 
+const retentionJobHandlers: JobHandlers = {
+  [RETENTION_JOB_KIND]: async () => {
+    await retentionJobHandler(db, clock);
+  },
+};
+
 const allJobHandlers: JobHandlers = {
+  ...retentionJobHandlers,
   ...catalogJobHandlers,
   ...preparationJobHandlers,
   ...planningJobHandlers,

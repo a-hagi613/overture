@@ -5,50 +5,46 @@ import type { Clock } from "../ports/clock.ts";
 
 import { WRITE_BATCH_ROWS, yieldToEventLoop } from "../db/batches.ts";
 import { retryWhenBusy } from "../db/busy.ts";
+import { enqueueJob } from "./queue.ts";
 
 const HOUR_MS = 3_600_000;
-export const DAY_MS = 24 * HOUR_MS;
 
+export const DAY_MS = 24 * HOUR_MS;
+export const RETENTION_JOB_KIND = "maintenance.retention";
 export const RETENTION_INTERVAL_MS = HOUR_MS;
 export const EVENT_RETENTION_MS = DAY_MS;
 export const DONE_JOB_RETENTION_MS = 7 * DAY_MS;
 export const DEAD_JOB_RETENTION_MS = 30 * DAY_MS;
 
-/**
- * Deletes in chunks so one pass never holds the write lock for long: the catalog sweep and user
- * requests share this SQLite file.
- */
-async function deleteInChunks(
-  db: AppDatabase,
-  table: "events" | "bg_jobs",
-  where: ReturnType<typeof sql>,
-) {
-  const key = table === "events" ? sql.raw("seq") : sql.raw("id");
-  const name = sql.raw(table);
-  let total = 0;
+type Table = "events" | "bg_jobs";
 
-  for (;;) {
+async function deleteInChunks(db: AppDatabase, table: Table, where: ReturnType<typeof sql>) {
+  const key = sql.raw(table === "events" ? "seq" : "id");
+  const name = sql.raw(table);
+
+  const removeChunk: (total: number) => Promise<number> = async (total) => {
     const removed = await retryWhenBusy(
       () =>
-        db.all<{ n: number }>(
+        db.all(
           sql`DELETE FROM ${name} WHERE ${key} IN (
             SELECT ${key} FROM ${name} WHERE ${where} LIMIT ${WRITE_BATCH_ROWS}
-          ) RETURNING 1 AS n`,
+          ) RETURNING 1 AS removed`,
         ).length,
       `retention.${table}`,
     );
 
-    total += removed;
-
     if (removed < WRITE_BATCH_ROWS) {
-      return total;
+      return total + removed;
     }
 
     await yieldToEventLoop();
-  }
+
+    return removeChunk(total + removed);
+  };
+
+  return removeChunk(0);
 }
 
-/** Drops delivered events and finished jobs past their retention window. */
 export async function runRetention(db: AppDatabase, clock: Clock) {
   const now = clock.now();
 
@@ -67,4 +63,20 @@ export async function runRetention(db: AppDatabase, clock: Clock) {
   );
 
   return { events, doneJobs, deadJobs };
+}
+
+export function ensureRetentionQueued(db: AppDatabase, clock: Clock) {
+  return enqueueJob(db, clock, RETENTION_JOB_KIND, "{}", {
+    dedupeKey: RETENTION_JOB_KIND,
+    maxAttempts: 1,
+    runAt: clock.now() + RETENTION_INTERVAL_MS,
+  }).inserted;
+}
+
+export async function retentionJobHandler(db: AppDatabase, clock: Clock) {
+  try {
+    await runRetention(db, clock);
+  } finally {
+    ensureRetentionQueued(db, clock);
+  }
 }
