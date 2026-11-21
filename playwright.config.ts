@@ -55,6 +55,16 @@ export default defineConfig({
       },
     },
     {
+      name: "ready-boards",
+      testMatch: /board-match-ready\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/../../design/reference/ready/{arg}{ext}",
+        },
+      },
+    },
+    {
       name: "board-phone-boards",
       testMatch: /board-match-board-phone\.test\.ts/u,
       expect: {

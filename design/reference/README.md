@@ -6,7 +6,9 @@ changes; never edit it by hand.
 
 ## What is here
 
-One folder per screen: `home`, `home-paused` (adds `reasons-1280-light`, all seven pause banners), `board`, `review`, `profile`, `settings`, `notifications` (adds `empty-<width>-<theme>`), `signin`, `onboarding-welcome`, `onboarding-resume`, `onboarding-questions`, `onboarding-targets`. Each variant is named
+One folder per screen: `home`, `home-paused` (adds `reasons-1280-light`, all seven pause banners), `ready`, `ready-email`,
+`board`, `review`, `profile`, `settings`, `notifications` (adds `empty-<width>-<theme>`), `signin`,
+`onboarding-welcome`, `onboarding-resume`, `onboarding-questions`, `onboarding-targets`. Each variant is named
 `<width>-<theme>` (Sign in adds the mode: `sign-in`, `sign-up`, `magic-sent`), and comes as three files:
 
 | File | What it is | Use it for |
@@ -15,7 +17,8 @@ One folder per screen: `home`, `home-paused` (adds `reasons-1280-light`, all sev
 | `<variant>.json` | Every visible element: DOM path, text, aria label, box (`x`, `y`, `w`, `h` in CSS px at that width) and computed styles (type, colour, spacing, borders, radius, shadow, layout), plus the CSS custom properties in use | Exact values to build from, and to assert in tests |
 | `<variant>.png` | Full-page screenshot at device scale 1 | The baseline the "matches the board" end-to-end check compares the app against |
 
-`source/` holds the board sources (`w5-*.dc.html`; `w5-holds` is the Review screen) and the design-system boards
+`source/` holds the board sources (`w5-*.dc.html`; `w5-holds` is the Review screen, `w5-ready-email` the Recap email)
+and the design-system boards
 (`ds-2`, `ds-3`), for reading the intent behind a value.
 
 ## Rules for building a screen

@@ -11,6 +11,7 @@ import { InboxPage } from "./routes/inbox.tsx";
 import { NotificationsPage } from "./routes/notifications.tsx";
 import { NotFoundPage } from "./routes/not-found.tsx";
 import { ProfilePage } from "./routes/profile.tsx";
+import { ReadyPage } from "./routes/ready.tsx";
 import { OnboardingPage } from "./routes/onboarding.tsx";
 import { OnboardingResumePage } from "./routes/onboarding-resume.tsx";
 import { OnboardingFactsPage } from "./routes/onboarding-facts.tsx";
@@ -31,6 +32,7 @@ const router = createBrowserRouter([
     element: <AppShell />,
     children: [
       { path: "/", element: <HomePage /> },
+      { path: "/ready", element: <ReadyPage /> },
       { path: "/board", element: <BoardPage /> },
       { path: "/review", element: <ReviewPage /> },
       { path: "/inbox", element: <InboxPage /> },

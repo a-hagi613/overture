@@ -12,6 +12,7 @@ type GlyphName =
   | "mail"
   | "profile"
   | "rail"
+  | "ready"
   | "review"
   | "search"
   | "signout"
@@ -51,6 +52,7 @@ const glyphs: Record<GlyphName, GlyphPaths> = {
     strokeWidth: 1.7,
   },
   dash: { paths: ["M5 12h14"], strokeWidth: 1.8 },
+  ready: { paths: ["M3 11l18-8-8 18-2-8-8-2z"], strokeWidth: 1.6 },
   review: {
     paths: [
       "M12 3a9 9 0 100 18 9 9 0 000-18z",

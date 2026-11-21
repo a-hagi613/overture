@@ -20,8 +20,8 @@ interface CardSeed {
   location: string;
   ageDays: number;
   score: number;
-  stage: "queued" | "applied" | "screening" | "interviewing" | "offer" | "closed";
-  status: "needs_review" | "confirming" | "ready" | "sent";
+  stage: "queued" | "ready" | "applied" | "screening" | "interviewing" | "offer" | "closed";
+  status: "needs_review" | "confirming" | "ready" | "approved" | "sent";
   note?: string;
   closedReason?: "rejected" | "no_response" | "withdrawn" | "offer_declined";
   salary?: { min: number; max: number };
@@ -249,7 +249,37 @@ const filler: CardSeed[] = [
   ),
 ];
 
-const cards = [...queuedVisible, ...appliedVisible, ...rest, ...filler];
+const readyVisible: CardSeed[] = [
+  {
+    ageDays: 1,
+    company: "Northwind Labs",
+    location: "Remote, London",
+    score: 86,
+    stage: "ready",
+    status: "ready",
+    title: "Platform Engineer",
+  },
+  {
+    ageDays: 2,
+    company: "Halden Systems",
+    location: "Manchester, hybrid",
+    score: 81,
+    stage: "ready",
+    status: "ready",
+    title: "Site Reliability Engineer",
+  },
+  {
+    ageDays: 3,
+    company: "Larkspur Health",
+    location: "Remote, UK",
+    score: 78,
+    stage: "ready",
+    status: "approved",
+    title: "Senior Backend Engineer",
+  },
+];
+
+const cards = [...queuedVisible, ...appliedVisible, ...rest, ...filler, ...readyVisible];
 
 export async function seedBoardOwner(request: APIRequestContext, appServerUrl: string) {
   await requestMagicLink(appServerUrl, request, authTestIdentity.ownerEmail);
@@ -350,6 +380,14 @@ async function seedCard(request: APIRequestContext, userId: string, card: CardSe
 
   const createdAt = card.createdAt ?? referenceNow - card.ageDays * DAY_MS - 2 * 60 * 60_000;
 
+  let scheduledFor: number | null = null;
+
+  if (card.stage === "ready" && card.status === "approved") {
+    scheduledFor = zonedTimeToEpoch({ day: 17, month: 11, year: 2026 }, 14, 20, TIME_ZONE);
+  } else if (card.stage === "queued" && card.status === "ready") {
+    scheduledFor = zonedTimeToEpoch({ day: 17, month: 11, year: 2026 }, 13, 10, TIME_ZONE);
+  }
+
   const applicationId = createdSchema.parse(
     await (
       await request.post("/__test__/applications/seed", {
@@ -359,11 +397,8 @@ async function seedCard(request: APIRequestContext, userId: string, card: CardSe
           createdAt,
           origin: "auto",
           postingId,
-          scheduledFor:
-            card.stage === "queued" && card.status === "ready"
-              ? zonedTimeToEpoch({ day: 17, month: 11, year: 2026 }, 13, 10, TIME_ZONE)
-              : null,
-          sentAt: card.stage === "queued" ? null : createdAt,
+          scheduledFor,
+          sentAt: card.stage === "queued" || card.stage === "ready" ? null : createdAt,
           stage: card.stage,
           status: card.status,
           userId,
@@ -505,6 +540,9 @@ export async function openBoard(
 
   if (width === 390) {
     await page.getByRole("tab", { name: /Screening/u }).click();
+    await page.getByRole("tablist", { name: "Stages" }).evaluate((element) => {
+      element.scrollLeft = 0;
+    });
   }
 
   if (width === 390) {

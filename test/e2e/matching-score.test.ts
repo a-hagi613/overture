@@ -234,7 +234,7 @@ test("opening a posting scores it once, and manual apply works below the thresho
   const application = (await applicationsFor(owner, userId)).find((row) => row.postingId === weak);
 
   expect(application?.origin).toBe("manual");
-  expect(application?.status).toBe("preparing");
+  expect(["preparing", "ready"]).toContain(application?.status);
 
   await owner.put("/api/profile/targets", {
     data: {

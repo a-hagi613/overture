@@ -5,6 +5,12 @@ import { NavGlyph } from "./nav-glyph.tsx";
 
 const destinations = [
   { glyph: "home", to: "/" },
+  {
+    badge: copy.sample.readyToSend,
+    badgeTone: "ok",
+    glyph: "ready",
+    to: "/ready",
+  },
   { glyph: "board", to: "/board" },
   {
     badge: copy.sample.reviewWaiting,
@@ -20,6 +26,14 @@ const destinations = [
   },
   { glyph: "profile", to: "/profile" },
 ] as const;
+
+function badgeClass(tone: "ok" | "need" | "well") {
+  if (tone === "need") {
+    return "bg-need-soft text-need";
+  }
+
+  return tone === "ok" ? "bg-ok-soft text-ok" : "bg-muted text-foreground";
+}
 
 export function SideNav({ showLabels }: { showLabels: boolean }) {
   return (
@@ -47,11 +61,9 @@ export function SideNav({ showLabels }: { showLabels: boolean }) {
                     showLabels
                       ? "ml-auto inline-flex min-w-[20px] px-1.5"
                       : "absolute right-1 top-[2px] inline-flex min-w-4 px-1"
-                  } ${
-                    destination.badgeTone === "need"
-                      ? "bg-need-soft text-need"
-                      : "bg-muted text-foreground"
-                  } ${showLabels ? "h-5 text-[11.5px]" : "h-4 text-[10px]"} items-center justify-center rounded-full font-bold`}
+                  } ${badgeClass(
+                    destination.badgeTone,
+                  )} ${showLabels ? "h-5 text-[11.5px]" : "h-4 text-[10px]"} items-center justify-center rounded-full font-bold`}
                 >
                   {destination.badge}
                 </span>
