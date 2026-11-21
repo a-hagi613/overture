@@ -22,7 +22,8 @@ must exercise: standard text and email fields, a resume upload, a boolean screen
 consent question.
 
 A `group` control (education, experience) is not in the fixture: the reader skips it whole, because it is a
-repeatable compound rather than one answerable control, and a required group stops the send as a form change.
+repeatable compound rather than one answerable control, and a required group the plan cannot cover stops the
+attempt before Submit — a Review when the group's fields are durable facts, otherwise a form change.
 
 The e2e fixture server renders its page from that same JSON, so the plain read and the page cannot drift apart in a
 test; the form-change test omits one field from the rendered page only. When the real recordings arrive, replace this

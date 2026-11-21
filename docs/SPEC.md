@@ -873,8 +873,8 @@ title. The form is read before any browser session from `GET /api/v1/jobs/{short
 are the endpoint's field ids (`firstname`, `email`, `QA_…`), its choice text is each option's `value` (Workable names
 the submitted identifier `name`, the reverse of the other ATSes), and a `boolean` question is offered as Yes/No. A
 `group` control (education, experience) is skipped rather than flattened into its children, because a group is a
-repeatable compound and not one answerable control; a required group the plan cannot cover stops the attempt as a
-form change before Submit. The send watches the apply host's POST
+repeatable compound and not one answerable control; a required group the plan cannot cover stops the attempt before
+Submit — a Review when the group's fields are durable facts, otherwise a form change. The send watches the apply host's POST
 (the submit request), and `sent` requires the confirmation page: a 2xx alone stays `confirming`. A 4xx that is a
 CAPTCHA answer is `captcha_blocked`, any other 4xx `blocked`, and a page that says the application was flagged as
 spam ends `failed` with reason `ats_flagged`. Workable has no per-posting liveness request: the daily snapshot is
