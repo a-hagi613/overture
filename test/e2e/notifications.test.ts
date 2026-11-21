@@ -386,3 +386,22 @@ test("a subscription receives a push, a gone endpoint is deleted, and unsubscrib
 
   await request.dispose();
 });
+
+test("a push subscription must name a known push service over HTTPS", async ({ pushServerUrl }) => {
+  const request = await apiRequest.newContext({ baseURL: pushServerUrl });
+
+  await seedOwner(request, pushServerUrl);
+
+  const keys = subscriptionKeys();
+  const refused = ["http://fcm.googleapis.com/fcm/send/abc", "https://overture-web.internal/x"];
+
+  for (const endpoint of refused) {
+    const response = await request.post("/api/push/subscribe", {
+      data: { endpoint, keys: { auth: keys.auth, p256dh: keys.p256dh } },
+    });
+
+    expect(response.status()).toBe(400);
+  }
+
+  await request.dispose();
+});
