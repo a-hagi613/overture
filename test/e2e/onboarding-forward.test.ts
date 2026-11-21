@@ -6,10 +6,20 @@ import type { APIRequestContext, Page } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
+import { authTestIdentity } from "./auth.fixture.ts";
 import { seedOnboardingTargetsFlow } from "./onboarding-targets-harness.ts";
 import { walkOnboardingSteps1To4 } from "./onboarding-walk.ts";
 
-const test = appTest.extend<{ onboardingServer: AppServer }>({
+const test = appTest.extend<{ demoServer: AppServer; onboardingServer: AppServer }>({
+  demoServer: [
+    async ({ identityServer }, provide) => {
+      const server = await startFreshAppServer(identityServer, { DEMO_LOGIN_ENABLED: "true" });
+
+      await provide(server);
+      await server.stop();
+    },
+    { scope: "test" },
+  ],
   onboardingServer: [
     async ({ identityServer }, provide) => {
       const server = await startFreshAppServer(identityServer, {
@@ -41,6 +51,8 @@ const jobsSchema = z.object({
 });
 
 const errorSchema = z.object({ error: z.string() });
+
+const demoLockedSchema = z.object({ error: z.literal("demo_locked") });
 
 const clockSchema = z.object({ now: z.number(), offsetMs: z.number() });
 
@@ -176,6 +188,29 @@ test("a restart after Start past 07:00 queues no same-day catch-up run", async (
   expect((await request.post("/__test__/jobs/ensure-prep")).ok()).toBe(true);
 
   await expectStartedWithoutRunning(request, session.user.id);
+  await request.dispose();
+});
+
+test("the demo account cannot Start onboarding", async ({ demoServer }) => {
+  const request = await apiRequest.newContext({ baseURL: demoServer.url });
+
+  const headers = {
+    "x-captcha-response": authTestIdentity.turnstilePassToken,
+    "x-turnstile-action": "magiclink",
+    origin: demoServer.url,
+  };
+
+  const signedIn = await request.post("/api/auth/demo/sign-in", {
+    data: { email: "test@email.com" },
+    headers,
+  });
+
+  expect(signedIn.ok()).toBe(true);
+
+  const response = await request.post("/api/onboarding/start", { headers });
+
+  expect(response.status()).toBe(403);
+  expect(demoLockedSchema.parse(await response.json()).error).toBe("demo_locked");
   await request.dispose();
 });
 

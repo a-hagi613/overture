@@ -151,6 +151,12 @@ export function createOnboardingRoutes(deps: {
       return context.json({ error: "email_unverified" }, 403);
     }
 
+    const locked = demoLocked(account.role);
+
+    if (locked !== null) {
+      return locked;
+    }
+
     const state = consent.read(account.id);
 
     if (state.accepted?.version !== state.current.version) {
