@@ -107,11 +107,13 @@ async function loadTurnstileScript(url: string) {
     const script = document.createElement("script");
 
     script.async = true;
+    script.dataset["turnstile"] = "";
     script.src = url;
     script.addEventListener(
       "load",
       () => {
         if (globalThis.turnstile === undefined) {
+          script.remove();
           scriptLoads.delete(url);
         }
 
@@ -122,6 +124,7 @@ async function loadTurnstileScript(url: string) {
     script.addEventListener(
       "error",
       () => {
+        script.remove();
         scriptLoads.delete(url);
         resolve(false);
       },
