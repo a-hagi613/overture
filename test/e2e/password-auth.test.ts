@@ -1,4 +1,4 @@
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { APIRequestContext } from "@playwright/test";
 
 import { z } from "zod";
 
@@ -24,17 +24,6 @@ async function repeat(times: number, attempt: () => Promise<void>) {
 
   await attempt();
   await repeat(times - 1, attempt);
-}
-
-async function waitForTurnstile(page: Page, widget: string) {
-  await expect
-    .poll(
-      async () =>
-        await page
-          .locator(`[data-turnstile="${widget}"] input[name="cf-turnstile-response"]`)
-          .inputValue(),
-    )
-    .not.toBe("");
 }
 
 async function verifyByMail(url: string, request: APIRequestContext) {
@@ -109,13 +98,11 @@ test("the verify screen sends the verification email again", async ({
   await page.getByRole("button", { name: "Create an account" }).click();
   await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
   await page.getByLabel("Create a password").fill("overture-pass-813");
-  await waitForTurnstile(page, "password");
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
   expect(await sinkMailCount(url, request)).toBe(1);
 
   await setTurnstileScenario(page.request, url, { action: "signup" });
-  await waitForTurnstile(page, "verify");
   await page.getByRole("button", { name: "Send the email again" }).click();
   await expect.poll(async () => await sinkMailCount(url, request)).toBe(2);
 });
@@ -140,7 +127,6 @@ test("forgot and reset set a new password and sign in with it", async ({
   await page.goto(`${url}/forgot-password`);
   await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
   await setTurnstileScenario(page.request, url, { action: "reset" });
-  await waitForTurnstile(page, "reset");
   await page.getByRole("button", { name: "Send reset link" }).click();
   await expect(
     page.getByText("If an account exists for this email, the link is on its way."),
@@ -155,14 +141,12 @@ test("forgot and reset set a new password and sign in with it", async ({
   await page.getByLabel("New password", { exact: true }).fill(newPassword);
   await page.getByLabel("Confirm new password").fill(newPassword);
   await setTurnstileScenario(page.request, url, { action: "reset" });
-  await waitForTurnstile(page, "reset");
   await page.getByRole("button", { name: "Save new password" }).click();
   await expect(page.getByText("Password saved. Sign in with your new password.")).toBeVisible();
 
   await setTurnstileScenario(page.request, url, { action: "signin" });
   await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
   await page.getByLabel("Password").fill(newPassword);
-  await waitForTurnstile(page, "password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
 

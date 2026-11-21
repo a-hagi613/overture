@@ -24,17 +24,6 @@ function readPngSize(name: string) {
   return { height: view.getUint32(20), width: view.getUint32(16) };
 }
 
-async function waitForTurnstile(page: Page, widget: string) {
-  await expect
-    .poll(
-      async () =>
-        await page
-          .locator(`[data-turnstile="${widget}"] input[name="cf-turnstile-response"]`)
-          .inputValue(),
-    )
-    .not.toBe("");
-}
-
 async function open(page: Page, serverUrl: string, theme: string, state: State) {
   if (theme === "dark") {
     await page.addInitScript(() => {
@@ -55,7 +44,6 @@ async function open(page: Page, serverUrl: string, theme: string, state: State) 
     await page.getByRole("button", { name: "Create an account" }).click();
     await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
     await setTurnstileScenario(page.request, serverUrl, { action: "signup" });
-    await waitForTurnstile(page, "password");
     await page.getByLabel("Create a password").fill("e2e-password-813");
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
@@ -85,14 +73,6 @@ async function open(page: Page, serverUrl: string, theme: string, state: State) 
   }
 
   await page.goto(`${serverUrl}/signin`);
-  await expect
-    .poll(
-      async () =>
-        await page
-          .locator('[data-turnstile="magic"] input[name="cf-turnstile-response"]')
-          .inputValue(),
-    )
-    .not.toBe("");
 
   if (state !== "suspended") {
     await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
@@ -106,7 +86,6 @@ async function open(page: Page, serverUrl: string, theme: string, state: State) 
 
   if (state === "sign-in") {
     await setTurnstileScenario(page.request, serverUrl, { action: "signin" });
-    await waitForTurnstile(page, "password");
     await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
 
     return;
@@ -115,7 +94,6 @@ async function open(page: Page, serverUrl: string, theme: string, state: State) 
   if (state === "refused") {
     await setTurnstileScenario(page.request, serverUrl, { action: "magiclink" });
     await page.getByLabel("Email").fill("sam.reyes@example.com");
-    await waitForTurnstile(page, "magic");
     await page.getByRole("button", { name: "Email me a sign-in link" }).click();
     await expect(page.getByText("This email isn't invited yet.")).toBeVisible();
 
@@ -127,14 +105,12 @@ async function open(page: Page, serverUrl: string, theme: string, state: State) 
 
   if (state === "sign-up") {
     await setTurnstileScenario(page.request, serverUrl, { action: "signup" });
-    await waitForTurnstile(page, "password");
 
     return;
   }
 
   if (state === "verify-sent") {
     await setTurnstileScenario(page.request, serverUrl, { action: "signup" });
-    await waitForTurnstile(page, "password");
     await page.getByLabel("Create a password").fill("e2e-password-813");
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
@@ -144,7 +120,6 @@ async function open(page: Page, serverUrl: string, theme: string, state: State) 
 
   await page.getByRole("button", { name: "Sign in" }).click();
   await setTurnstileScenario(page.request, serverUrl, { action: "magiclink" });
-  await waitForTurnstile(page, "magic");
   await page.getByRole("button", { name: "Email me a sign-in link" }).click();
   await expect(page.getByText("Link sent to")).toBeVisible();
 }

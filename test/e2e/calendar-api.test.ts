@@ -210,7 +210,7 @@ async function runJob(owner: APIRequestContext, kind: string) {
 async function seededApplication(
   owner: APIRequestContext,
   userId: string,
-  input: { atsJobId: string; sentAt: number | null; status: "ready" | "sent" },
+  input: { atsJobId: string; sentAt: number | null; status: "preparing" | "sent" },
 ) {
   const companyId = await seedCompany(owner, "Acme", "acme.example");
   const boardId = await seedBoard(owner, companyId, "greenhouse", input.atsJobId);
@@ -257,7 +257,7 @@ test("the Calendar shows a sent Application and the Stage moves its recorded mai
   const queuedApplicationId = await seededApplication(owner, userId, {
     atsJobId: "calendar-queued",
     sentAt: null,
-    status: "ready",
+    status: "preparing",
   });
 
   const queued = await owner.patch(
