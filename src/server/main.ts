@@ -173,6 +173,8 @@ const jobSingletons = [
 
 recoverStaleLocks(db, clock, jobSingletons);
 
+ensureCheckinSweepQueued(db, clock);
+
 const tracer = trace.getTracer("overture");
 
 const otelPayloadSchema = z.record(z.string(), z.string());
@@ -561,8 +563,6 @@ if (dispatchTick !== null) {
 ensurePlannerQueuedForRunningUsers(db, clock);
 
 ensureSweepQueued(catalogDeps);
-
-ensureCheckinSweepQueued(db, clock);
 
 if (env.NODE_ENV === "production") {
   ensureLiveCheckQueued(db, clock);

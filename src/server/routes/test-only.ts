@@ -2124,17 +2124,19 @@ export function createTestRoutes(
       status: "sent",
     });
 
-    db.insert(checkins)
-      .values({
-        answer: null,
-        applicationId: checkInApplication,
-        createdAt: checkInSentAt + 21 * day,
-        dueAt: checkInSentAt + 21 * day,
-        id: crypto.randomUUID(),
-        status: "open",
-        userId,
-      })
-      .run();
+    if (paused) {
+      db.insert(checkins)
+        .values({
+          answer: null,
+          applicationId: checkInApplication,
+          createdAt: checkInSentAt + 21 * day,
+          dueAt: checkInSentAt + 21 * day,
+          id: crypto.randomUUID(),
+          status: "open",
+          userId,
+        })
+        .run();
+    }
 
     const seedFacts: { key: string; value: string }[] = [
       { key: "legal_name", value: "Maya Okafor" },
