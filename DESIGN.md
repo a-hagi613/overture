@@ -186,10 +186,7 @@ Chart colours: `--chart-1` signal, `--chart-2` ink, `--chart-3` ok, `--chart-4` 
 
 ### Sign-in dark ground
 
-The sign-in surfaces (`/signin`: sign-in, sign-up, magic-sent) in dark mode use the ground of the redrawn
-sign-in boards (`design/reference/source/w5-signin.dc.html`, the `.ov.dark` block), not the Ember dark above
-(ADR 0027). They are a scoped token set, `.dark .signin-surface` in `src/web/styles.css`; every other screen keeps
-the dark column of the table. Light mode is unchanged.
+The sign-in surfaces (`/signin`: sign-in, sign-up, magic-sent, verify-sent, refused and suspended; `/forgot-password`; `/reset-password`) in dark mode use the ground of the redrawn sign-in boards (`design/reference/source/w5-signin.dc.html`, the `.ov.dark` block, and the #203 sign-in states), not the Ember dark above (ADR 0027). They are a scoped token set, `.dark .signin-surface` in `src/web/styles.css`; every other screen keeps the dark column of the table. Light mode is unchanged. The reference pack for the new states is `design/reference/signin/` at 390 and 1280, with `sign-in` and `sign-up` redrawn to the password card.
 
 | CSS variable | Sign-in dark (canvas) | Ember dark (other screens) |
 |---|---|---|

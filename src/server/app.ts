@@ -33,6 +33,7 @@ import { createOnboardingRoutes } from "./routes/onboarding.ts";
 import { createMatchingService } from "./matching/score.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
+import { createPasswordResetRoutes } from "./routes/password-reset.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
 
@@ -107,6 +108,7 @@ export function createApp(deps: AppDependencies) {
   app.all("/api/auth/*", async (context) => deps.auth.handler(context.req.raw));
   app.route("/api", createHealthRoutes(deps.db, deps.backups));
   app.route("/api", createMeRoutes(deps.auth));
+  app.route("/api", createPasswordResetRoutes(deps.db, deps.clock));
   app.route("/api", createApiRoutes(deps.db, deps.clock, deps.auth));
   app.route("/api", createNotificationRoutes(deps.db, deps.clock, deps.auth));
   app.route("/api", createProfileRoutes(deps));

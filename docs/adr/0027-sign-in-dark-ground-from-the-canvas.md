@@ -16,6 +16,10 @@ at `#191714`. The owner ruled (2026-11-20) that the canvas wins for the sign-in 
 - **Source of truth.** The canvas. DESIGN.md records the scoped tokens so the document and the boards agree, and the
   six dark sign-in board-match tests compare against the redrawn PNGs at `maxDiffPixelRatio` 0.01.
 
+Amended by #213: the same scoped tokens and board-match rule cover the password sign-in states (sign-in, sign-up,
+verify-sent, refused, suspended) and the two new routes, `/forgot-password` and `/reset-password`. The #203 boards
+add the missing states; `magic-sent` keeps its shell with no redrawn board of its own.
+
 ## Considered Options
 
 - Change DESIGN.md's Ember dark to `#12110F`: changes every dark screen to fix one surface, and the Ember dark was

@@ -153,9 +153,7 @@ test("an email outside the allowlist is refused at the sign-in screen", async ({
 
   await expect(googleButton).toBeEnabled();
   await googleButton.click();
-  await expect(
-    page.getByText("That email has no invite to Overture yet. Ask the owner for one."),
-  ).toBeVisible();
+  await expect(page.getByText("This email isn't invited yet.")).toBeVisible();
 
   expect(await verifyAuthState(appServerUrl, request)).toMatchObject({
     users: [],
