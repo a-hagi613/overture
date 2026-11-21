@@ -259,10 +259,6 @@ export function createReadyRoutes(deps: {
       return { error: "plan_changed" as const, planSha256: currentSha256 };
     }
 
-    if (plan.fields.some((field) => field.required && field.block !== null)) {
-      return { error: "plan_incomplete" as const };
-    }
-
     const problem = approvalProblem(db, input.userId, plan);
 
     if (problem !== null) {
