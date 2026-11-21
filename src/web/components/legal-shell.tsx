@@ -24,7 +24,10 @@ export function LegalShell({ children }: { children: ReactNode }) {
         </main>
         <footer className="mx-auto mt-[98px] w-full max-w-[716px] px-[18px] pb-[34px]">
           <div className="border-t border-border pt-[16px]">
-            <p className="font-serif text-[14px] leading-[1.6] text-muted-foreground">
+            <p className="font-serif text-[13px] leading-[1.6] text-muted-foreground">
+              {copy.legal.draftNotice}
+            </p>
+            <p className="mt-1 font-serif text-[14px] leading-[1.6] text-muted-foreground">
               {copy.legal.footerName}
               {copy.legal.footerSeparator}
               {copy.legal.footerContact}
