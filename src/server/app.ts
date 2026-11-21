@@ -31,6 +31,8 @@ import { env } from "./config/env.ts";
 import { demoLocked } from "./demo/guard.ts";
 import { createProfileRoutes } from "./routes/profile.ts";
 import { createOnboardingRoutes } from "./routes/onboarding.ts";
+import { createConsentRoutes } from "./routes/consent.ts";
+import { createConsentService } from "./profile/consent.ts";
 import { createMatchingService } from "./matching/score.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
@@ -144,6 +146,13 @@ export function createApp(deps: AppDependencies) {
       llm: deps.llm,
       objects: deps.objects,
       reviews: deps.reviews,
+    }),
+  );
+  app.route(
+    "/api",
+    createConsentRoutes({
+      auth: deps.auth,
+      consent: createConsentService({ clock: deps.clock, db: deps.db }),
     }),
   );
   app.route(

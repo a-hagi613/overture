@@ -22,7 +22,7 @@ import { checkLlmCaps } from "../platform/llm/caps.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
-import { SETTING_DEFAULTS, getSetting } from "../platform/settings/index.ts";
+import { getSettingNumber } from "../platform/settings/index.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createTargetsService } from "../profile/targets.ts";
 import { activeApplicationCompanies, applicationFor, createApplication } from "./applications.ts";
@@ -74,14 +74,6 @@ interface ScoreContext {
   resumeDigest: string;
   targetsVersion: number;
   threshold: number;
-}
-
-function settingNumber(db: AppDatabase, key: keyof typeof SETTING_DEFAULTS) {
-  const raw = getSetting(db, key);
-  const parsed = raw === null ? Number.NaN : Number(raw);
-  const fallback = Number(SETTING_DEFAULTS[key]);
-
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 function truncateReason(reason: string) {
@@ -164,7 +156,7 @@ export function createMatchingService(deps: MatchDeps) {
       resumeDigest,
       resumeId: resume?.id ?? null,
       targetsVersion: targets.version,
-      threshold: settingNumber(db, "match.auto_threshold_default"),
+      threshold: getSettingNumber(db, "match.auto_threshold_default"),
     };
   }
 
@@ -447,7 +439,7 @@ export function createMatchingService(deps: MatchDeps) {
       };
     }
 
-    const dailyCap = settingNumber(db, "limits.daily_cap");
+    const dailyCap = getSettingNumber(db, "limits.daily_cap");
     const limit = Math.max(0, Math.min(dailyCap, applicationsLeft(db, userId, at)));
 
     const waiting =
@@ -629,7 +621,7 @@ export function createMatchingService(deps: MatchDeps) {
         codeRank: candidate.codeRank,
         score: matched?.score ?? null,
         reason: matched?.reason ?? null,
-        strong: (matched?.score ?? 0) >= settingNumber(db, "match.strong"),
+        strong: (matched?.score ?? 0) >= getSettingNumber(db, "match.strong"),
         saved: states.get(candidate.id) === "saved",
       };
     });

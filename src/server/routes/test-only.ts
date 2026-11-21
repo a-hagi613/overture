@@ -32,6 +32,7 @@ import {
   mailThreads,
   messageAttachments,
   messages,
+  consentVersions,
   notifications,
   planCache,
   postingTags,
@@ -51,6 +52,7 @@ import { retryWhenBusy } from "../platform/db/busy.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
+import { createConsentService } from "../profile/consent.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { clearSinkMail, listSinkMail } from "../platform/mail/sink.ts";
 import {
@@ -117,6 +119,13 @@ const publishBody = z.object({
   payload: z.record(z.string(), z.string().or(z.number()).or(z.boolean()).or(z.null())),
   userId: z.string().optional(),
 });
+
+const consentPublishBody = z.object({
+  publishedAt: z.number().int().positive().optional(),
+  text: z.string().trim().min(1).max(10_000),
+});
+
+const consentTamperBody = z.object({ action: z.enum(["update", "delete"]) });
 
 const createCompanyBody = z.object({
   name: z.string().min(1),
@@ -786,6 +795,40 @@ export function createTestRoutes(
   }
 
   routes.get("/clock", (context) => context.json({ now: clock.now(), offsetMs: clock.offset() }));
+
+  routes.post("/consent/publish", zValidator("json", consentPublishBody), (context) => {
+    const { publishedAt, text } = context.req.valid("json");
+
+    const published = createConsentService({ clock, db }).publish(
+      text,
+      publishedAt === undefined ? undefined : new Date(publishedAt),
+    );
+
+    return context.json({
+      publishedAt: published.publishedAt.toISOString(),
+      text: published.text,
+      version: published.version,
+    });
+  });
+
+  routes.post("/consent/tamper", zValidator("json", consentTamperBody), (context) => {
+    const { action } = context.req.valid("json");
+
+    try {
+      if (action === "update") {
+        db.update(consentVersions).set({ text: "tampered" }).run();
+      } else {
+        db.delete(consentVersions).run();
+      }
+
+      return context.json({ refused: false, refusal: null });
+    } catch (error) {
+      return context.json({
+        refused: true,
+        refusal: error instanceof Error ? error.message : "refused",
+      });
+    }
+  });
 
   routes.post("/clock/offset", zValidator("json", offsetBody), (context) => {
     const { offsetMs } = context.req.valid("json");

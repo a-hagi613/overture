@@ -93,7 +93,12 @@ test("Ready sends only on approval, and Skip, Undo, Send all and Edit work", asy
 
   await halden.getByRole("button", { name: "Save" }).click();
   await saved;
-  await expect(halden.getByText(edited)).toBeVisible();
+  await expect(
+    halden.getByRole("textbox", {
+      name: "Your answer to Are you comfortable with a weekly on-call rotation?",
+    }),
+  ).toHaveCount(0);
+  await expect(halden.getByText(edited, { exact: true })).toBeVisible();
   await expect(page.getByText("Answer saved.")).toBeVisible();
 
   const afterEdit = await readyOf(request);
