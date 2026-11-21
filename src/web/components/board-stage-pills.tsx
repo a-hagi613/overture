@@ -12,6 +12,7 @@ export function BoardStagePills(props: {
     <div
       aria-label={copy.board.stagesLabel}
       className="hs mt-[21px] flex gap-2 overflow-x-auto px-5 py-1"
+      data-scroll-region
       role="tablist"
     >
       {STAGE_KEYS.map((stage) => (

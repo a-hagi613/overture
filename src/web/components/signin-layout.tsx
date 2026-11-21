@@ -13,7 +13,7 @@ export function SignInLayout({ children }: { children: ReactNode }) {
   const { theme, toggleTheme, label } = useTheme();
 
   return (
-    <div className="signin-surface relative flex min-h-screen overflow-hidden bg-background text-foreground min-[961px]:grid min-[961px]:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+    <div className="signin-surface relative flex min-h-screen overflow-x-clip bg-background text-foreground min-[961px]:grid min-[961px]:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
       <Backdrop />
       <SignInStory />
       <main className="relative flex min-h-screen w-full flex-1 flex-col justify-between gap-5 px-[clamp(18px,4vw,52px)] pb-7 pt-[18px] min-[961px]:pb-8 min-[961px]:pt-7">

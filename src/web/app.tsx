@@ -12,6 +12,7 @@ import { TabBar } from "./components/tab-bar.tsx";
 import { UsageCard } from "./components/usage.tsx";
 import { authClient } from "./lib/auth-client.ts";
 import { useLiveUpdates } from "./lib/live-events.ts";
+import { useMediaQuery } from "./lib/media-query.ts";
 
 const collapsedStorageKey = "overture.rail";
 
@@ -20,6 +21,7 @@ export function AppShell() {
   const { pathname } = useLocation();
   const { data: session, isPending } = authClient.useSession();
   const name = session?.user.name ?? null;
+  const desktop = useMediaQuery("(min-width: 1280px)");
 
   const [railCollapsed, setRailCollapsed] = useState(() => {
     const stored = globalThis.localStorage.getItem(collapsedStorageKey);
@@ -43,8 +45,7 @@ export function AppShell() {
     return null;
   }
 
-  const wide = !railCollapsed;
-  const columnWidths = wide ? "md:w-[76px] lg:w-[268px]" : "md:w-[76px] lg:w-[76px]";
+  const wide = desktop && !railCollapsed;
 
   const toggleRail = () => {
     setRailCollapsed((current) => {
@@ -55,12 +56,13 @@ export function AppShell() {
   };
 
   return (
-    <div className="relative overflow-hidden bg-background text-foreground">
+    <div className="relative overflow-x-clip bg-background text-foreground">
       <Backdrop />
       <div className="relative z-[1] flex min-h-screen flex-col md:flex-row">
         {wide ? (
           <aside
-            className={`hidden border-r border-border bg-sidebar px-4 pb-[18px] pt-[22px] md:flex md:flex-col md:items-center md:gap-[18px] lg:items-stretch ${columnWidths}`}
+            className="fixed left-0 top-0 z-20 flex h-dvh w-[268px] flex-col gap-[18px] border-r border-border bg-sidebar px-4 pb-[18px] pt-[22px] min-[1700px]:w-[300px]"
+            data-shell-sidebar
           >
             <div className="flex items-center justify-between px-1.5">
               <Link aria-label={copy.brand.homeAria} className="flex items-center gap-2.5" to="/">
@@ -79,8 +81,13 @@ export function AppShell() {
               </button>
             </div>
             <hr className="m-0 border-border shadow-[0_1px_0_var(--color-bloom)]" />
-            <SideNav showLabels />
-            <div className="mt-auto flex flex-col gap-3.5">
+            <div
+              className="-mx-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-1"
+              data-scroll-region
+            >
+              <SideNav showLabels />
+            </div>
+            <div className="flex flex-col gap-3.5">
               <UsageCard />
               <AvatarLink name={name} wide />
             </div>
@@ -88,14 +95,24 @@ export function AppShell() {
         ) : (
           <BoardRail name={name} onExpand={toggleRail} />
         )}
+        <div
+          aria-hidden="true"
+          className={
+            wide
+              ? "hidden w-[268px] flex-none min-[1700px]:w-[300px] xl:block"
+              : "hidden w-[76px] flex-none md:block"
+          }
+        />
         <main
           className={
             pathname === "/board"
               ? "min-w-0 flex-1"
-              : "min-w-0 flex-1 px-4 pb-7 pt-[18px] md:px-9 md:pb-10 md:pt-[26px]"
+              : "min-w-0 flex-1 px-4 pb-7 pt-[18px] md:px-9 md:pb-10 md:pt-[26px] min-[1700px]:px-16 min-[1700px]:pt-8"
           }
         >
-          <Outlet />
+          <div className={pathname === "/board" ? undefined : "mx-auto w-full max-w-[1440px]"}>
+            <Outlet />
+          </div>
         </main>
         <TabBar />
       </div>

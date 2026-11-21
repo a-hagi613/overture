@@ -25,6 +25,7 @@ export function ReviewFilters({
     <fieldset
       aria-label={copy.review.filters}
       className="m-0 flex min-h-9 min-w-0 flex-nowrap gap-2 overflow-x-auto border-0 p-0 max-md:-mx-4 max-md:px-4 max-md:py-0.5 md:flex-wrap md:overflow-visible"
+      data-scroll-region
     >
       {FILTER_ORDER.flatMap((category) => {
         const count = counts.get(category) ?? 0;
