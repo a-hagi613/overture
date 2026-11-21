@@ -41,9 +41,11 @@ import {
   parsePrepDailyPayload,
   runPrepDailyJob,
 } from "./pipeline/daily-prep.ts";
+import { createPlainFormReader } from "./pipeline/form-read.ts";
 import { createReviewService } from "./pipeline/reviews.ts";
 import { createResumeService } from "./profile/resume.ts";
 import { createBrowserProvider } from "./dispatch/browser/index.ts";
+import { captureFixtures } from "./fixtures/capture.ts";
 import {
   APPLICATION_SEND_JOB_KIND,
   DISPATCH_RECOVER_JOB_KIND,
@@ -172,6 +174,32 @@ const preparation = createPreparationService({
   personal,
   source: createGreenhouseQuestionSource(env.GREENHOUSE_FEED_BASE_URL),
   greenhouseBoardOrigin: env.GREENHOUSE_BOARD_BASE_URL,
+  plainFormReader: createPlainFormReader({
+    ashbyBaseUrl: env.ASHBY_JOBS_BASE_URL,
+    leverBaseUrl: env.LEVER_JOBS_BASE_URL,
+    leverEuBaseUrl: env.LEVER_EU_JOBS_BASE_URL,
+  }),
+  captureForm: async (input) => {
+    if (browserProviders === null) {
+      return null;
+    }
+
+    try {
+      const [captured] = await captureFixtures(
+        {
+          clock,
+          gotoTimeoutMs: env.BROWSER_NAVIGATION_TIMEOUT_MS,
+          objects,
+          providers: browserProviders,
+        },
+        { applyUrls: [input.applyUrl ?? input.url], ats: input.ats },
+      );
+
+      return captured ?? null;
+    } catch {
+      return null;
+    }
+  },
   onReady: (_applicationId, userId) => {
     enqueuePlannerDay(db, clock, userId);
   },

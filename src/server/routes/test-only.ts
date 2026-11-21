@@ -32,6 +32,7 @@ import {
   messageAttachments,
   messages,
   notifications,
+  planCache,
   postingTags,
   postings,
   profiles,
@@ -421,6 +422,22 @@ const questionsQuery = z.object({
 });
 
 const applicationQuery = z.object({ applicationId: z.string().min(1) });
+
+const planCachePlanSchema = z
+  .object({ readPath: z.string().nullish(), questions: z.array(z.unknown()).nullish() })
+  .loose();
+
+function planCacheDetail(plan: string) {
+  try {
+    const parsed = planCachePlanSchema.safeParse(JSON.parse(plan));
+
+    return parsed.success
+      ? { questions: parsed.data.questions?.length ?? 0, readPath: parsed.data.readPath ?? null }
+      : { questions: 0, readPath: null };
+  } catch {
+    return { questions: 0, readPath: null };
+  }
+}
 
 const createUserBody = z.object({ email: z.email(), name: z.string().min(1) });
 
@@ -1295,6 +1312,29 @@ export function createTestRoutes(
         .orderBy(postingQuestions.position)
         .all(),
     });
+  });
+
+  routes.get("/plan-cache", (context) => {
+    const plans = db
+      .select()
+      .from(planCache)
+      .orderBy(asc(planCache.ats), asc(planCache.formSignature))
+      .all()
+      .map((row) => {
+        const detail = planCacheDetail(row.plan);
+
+        return {
+          ats: row.ats,
+          failures: row.failures,
+          formSignature: row.formSignature,
+          hits: row.hits,
+          questions: detail.questions,
+          readPath: detail.readPath,
+          updatedAt: row.updatedAt,
+        };
+      });
+
+    return context.json({ plans });
   });
 
   routes.get("/prepared-answers", zValidator("query", applicationQuery), async (context) => {

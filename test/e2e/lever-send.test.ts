@@ -10,7 +10,7 @@ import type { IdentityServer } from "./identity-server-test.fixture.ts";
 import type { LeverFixture } from "./lever.fixture.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
-import { startLeverFixture } from "./lever.fixture.ts";
+import { recordedLeverFormQuestions, startLeverFixture } from "./lever.fixture.ts";
 import {
   grantApplications,
   ownerContextFor,
@@ -57,6 +57,7 @@ const startLeverHarness = async (identityServer: IdentityServer, site: LeverSite
   const server = await startFreshAppServer(identityServer, {
     BROWSER_PROVIDER: "local",
     BROWSER_SESSION_DIR: sessionDirectory,
+    LEVER_JOBS_BASE_URL: fixture.url,
   });
 
   return { fixture, jobId: site.jobId, server, sessionDirectory, site };
@@ -222,12 +223,20 @@ async function seededApplication(harness: LeverHarness) {
 
   const companyId = await seedCompany(owner, companyName, domain);
   const boardId = await seedBoard(owner, companyId, "lever", boardToken);
+  const questions = await recordedLeverFormQuestions(boardToken, jobId);
 
   const postingId = await seedPosting(owner, {
     ats: "lever",
     atsJobId: jobId,
     boardId,
     companyId,
+    questions: questions.map((question) => ({
+      fieldName: question.fieldName,
+      fieldType: question.fieldType,
+      options: question.options,
+      required: question.required,
+      text: question.label,
+    })),
     title,
     url: `${harness.fixture.url}/${boardToken}/${jobId}/apply`,
   });
@@ -282,22 +291,31 @@ async function learnReview(
     value: string;
   },
 ) {
-  const seeded = seededReviewSchema.parse(
-    await (
-      await owner.post("/__test__/reviews/seed", {
-        data: {
-          applicationIds: [input.applicationId],
-          fieldType: "select",
-          options: input.options,
-          prompt: input.prompt,
-          reason: "unknown_required",
-          userId: input.userId,
-        },
-      })
-    ).json(),
-  );
+  const open = (await reviewsOf(owner)).find((review) => review.prompt === input.prompt);
+  let reviewId = open?.id;
 
-  const answered = await owner.post(`/api/reviews/${encodeURIComponent(seeded.reviewId)}/answer`, {
+  if (reviewId === undefined) {
+    const seeded = seededReviewSchema.parse(
+      await (
+        await owner.post("/__test__/reviews/seed", {
+          data: {
+            applicationIds: [input.applicationId],
+            fieldType: "select",
+            options: input.options,
+            prompt: input.prompt,
+            reason: "unknown_required",
+            userId: input.userId,
+          },
+        })
+      ).json(),
+    );
+
+    const { reviewId: seededReviewId } = seeded;
+
+    reviewId = seededReviewId;
+  }
+
+  const answered = await owner.post(`/api/reviews/${encodeURIComponent(reviewId)}/answer`, {
     data: { value: input.value },
   });
 

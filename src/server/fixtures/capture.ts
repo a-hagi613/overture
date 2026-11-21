@@ -3,9 +3,12 @@ import { chromium, errors } from "playwright-core";
 
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
+import type { FormQuestion } from "../pipeline/send-plan.ts";
 import type { BrowserProviderRegistry, RemoteBrowser } from "../dispatch/browser/provider.ts";
 
 import { acquireBrowserSession } from "../dispatch/browser/session-slots.ts";
+import { readAshbyQuestions } from "../dispatch/ats/ashby.ts";
+import { readLeverQuestions } from "../dispatch/ats/lever.ts";
 import { assetExtension, formSignature, sanitiseFormHtml } from "./sanitise.ts";
 
 export const ATS_NAMES = ["greenhouse", "lever", "ashby"] as const;
@@ -47,6 +50,7 @@ export interface CapturedFixture {
   formSignature: string;
   objectKey: string;
   assets: number;
+  questions: FormQuestion[];
   sourceUrl: string;
   capturedAt: number;
 }
@@ -144,7 +148,12 @@ async function loadPage(page: Page, applyUrl: string, timeout: number, attempt =
   }
 }
 
-async function captureOne(deps: FixtureCaptureDeps, ats: FixtureAts, applyUrl: string) {
+async function withFormPage<T>(
+  deps: FixtureCaptureDeps,
+  ats: FixtureAts,
+  applyUrl: string,
+  capture: (input: { page: Page; html: string; signature: string }) => Promise<T>,
+) {
   const provider = deps.providers.pick();
   const attemptId = `capture-${crypto.randomUUID()}`;
   const releaseSlot = await acquireBrowserSession();
@@ -168,39 +177,10 @@ async function captureOne(deps: FixtureCaptureDeps, ats: FixtureAts, applyUrl: s
       await waitForForm(page, ats);
 
       const raw = await page.content();
-      const sanitised = sanitiseFormHtml(raw);
-      const signature = formSignature(sanitised);
-      const prefix = `fixtures/${ats}/${signature}`;
-      const assets = await captureAssets(page, deps.objects, prefix);
-      const html = rewriteAssetLinks(sanitised, applyUrl, assets);
-      const capturedAt = deps.clock.now();
+      const html = sanitiseFormHtml(raw);
+      const signature = formSignature(html);
 
-      await deps.objects.put(`${prefix}/form.html`, new TextEncoder().encode(html));
-      await deps.objects.put(
-        `${prefix}/meta.json`,
-        new TextEncoder().encode(
-          JSON.stringify(
-            {
-              assets: [...assets.values()],
-              ats,
-              capturedAt,
-              formSignature: signature,
-              sourceUrl: applyUrl,
-            },
-            null,
-            2,
-          ),
-        ),
-      );
-
-      return {
-        assets: assets.size,
-        ats,
-        capturedAt,
-        formSignature: signature,
-        objectKey: `${prefix}/form.html`,
-        sourceUrl: applyUrl,
-      } satisfies CapturedFixture;
+      return await capture({ html, page, signature });
     } finally {
       await cdp.close().catch(() => undefined);
     }
@@ -212,6 +192,43 @@ async function captureOne(deps: FixtureCaptureDeps, ats: FixtureAts, applyUrl: s
 
     releaseSlot();
   }
+}
+
+async function captureOne(deps: FixtureCaptureDeps, ats: FixtureAts, applyUrl: string) {
+  return withFormPage(deps, ats, applyUrl, async ({ page, html, signature }) => {
+    const prefix = `fixtures/${ats}/${signature}`;
+    const assets = await captureAssets(page, deps.objects, prefix);
+    const rewritten = rewriteAssetLinks(html, applyUrl, assets);
+    const capturedAt = deps.clock.now();
+
+    await deps.objects.put(`${prefix}/form.html`, new TextEncoder().encode(rewritten));
+    await deps.objects.put(
+      `${prefix}/meta.json`,
+      new TextEncoder().encode(
+        JSON.stringify(
+          {
+            assets: [...assets.values()],
+            ats,
+            capturedAt,
+            formSignature: signature,
+            sourceUrl: applyUrl,
+          },
+          null,
+          2,
+        ),
+      ),
+    );
+
+    return {
+      assets: assets.size,
+      ats,
+      capturedAt,
+      formSignature: signature,
+      objectKey: `${prefix}/form.html`,
+      questions: ats === "lever" ? await readLeverQuestions(page) : await readAshbyQuestions(page),
+      sourceUrl: applyUrl,
+    } satisfies CapturedFixture;
+  });
 }
 
 export async function captureFixtures(deps: FixtureCaptureDeps, input: CaptureFixturesInput) {

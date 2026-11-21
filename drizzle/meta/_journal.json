@@ -211,6 +211,13 @@
       "when": 1795230000028,
       "tag": "0029_nebulous_iron_patriot",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1795242870969,
+      "tag": "0030_aromatic_iceman",
+      "breakpoints": true
     }
   ]
 }

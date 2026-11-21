@@ -79,9 +79,10 @@ attempted. The testing phase keeps spend minimal.
 - SPEC §1's promise "Fully automatic" becomes "You approve every send"; ADR 0004's "fully automatic" is read as
   "automatic up to approval". Users still never see a browser or solve a challenge.
 - The form must be known before the card can be complete. Greenhouse questions come from its API. A Lever or Ashby
-  form with no cached plan is read once during preparation by the same read-only path as fixture capture (no fill,
-  no Submit), and the plan cache serves later postings with the same form signature. That read costs a short browser
-  session per new form, never per send.
+  form with no cached plan is read once during preparation, first with a plain HTTP read from `overture-web`
+  (Lever's apply page, Ashby's public GraphQL), falling back to the read-only `fixtures.capture` browser path only
+  when the plain read cannot see the form; that read never fills or Submits, and the plan cache serves later
+  postings with the same form signature (#193).
 - Pre-submit failures that leave the plan unchanged (`interrupted`, a challenge, a code timeout, a provider error, a
   timeout or crash before Submit) keep the approval and go back to `approved` for their retry slot. `form_changed`
   now returns the Application to Ready instead of retrying on its own, and still counts toward

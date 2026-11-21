@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { z } from "zod";
 
+import { readLeverFormHtml } from "../../src/server/pipeline/form-read.ts";
+
 const FIXTURE_FORMS_DIR = join(process.cwd(), "test/e2e/fixtures/forms/lever");
 const RUNTIME_SOURCE = join(process.cwd(), "test/e2e/fixtures/forms/fixture-runtime.ts");
 
@@ -31,6 +33,14 @@ const valuesSchema = z.record(z.string(), z.string());
 
 const NO_FORM_PAGE =
   "<!doctype html><html><body><p>This position is no longer accepting applications.</p></body></html>";
+
+export async function recordedLeverFormQuestions(boardToken: string, jobId: string) {
+  const form = await readLeverFormHtml(
+    readFileSync(join(FIXTURE_FORMS_DIR, `${boardToken}-${jobId}.fixture.html`), "utf8"),
+  );
+
+  return form.questions;
+}
 
 export function startLeverFixture(options: LeverFixtureOptions = {}) {
   const boardToken = options.boardToken ?? "pyka";
