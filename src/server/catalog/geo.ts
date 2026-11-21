@@ -179,7 +179,7 @@ export function isRemoteLocationText(text: string | null | undefined) {
 
 export function resolveLocation(locationRaw: string | null | undefined) {
   if (locationRaw === undefined || locationRaw === null) {
-    return { countryCode: null, region: null, city: null };
+    return { countryCode: null, region: null, regionCode: null, city: null };
   }
 
   const flattened = locationRaw.replaceAll(/\[|\]/gu, " ");
@@ -200,11 +200,11 @@ export function resolveLocation(locationRaw: string | null | undefined) {
   const countryCode = usCity?.country ?? findCountry(segments);
   const city = usCity ?? findCity(segments, countryCode);
 
+  const cityRegionCode =
+    city === null || city.admin1 === "" ? null : `${city.country}.${city.admin1}`;
+
   const regionCode =
-    usCity === null
-      ? (findRegion(segments, countryCode) ??
-        (city === null ? null : `${city.country}.${city.admin1}`))
-      : `${usCity.country}.${usCity.admin1}`;
+    usCity === null ? (findRegion(segments, countryCode) ?? cityRegionCode) : cityRegionCode;
 
   return {
     countryCode:

@@ -191,6 +191,32 @@ describe("location", () => {
     expect(regionNameFor("CA", "08")).toBe("Ontario");
   });
 
+  test("a city with no admin1 has no region", () => {
+    expect(resolveLocation("Singapore")).toEqual({
+      city: "Singapore",
+      countryCode: "SG",
+      region: null,
+      regionCode: null,
+    });
+    expect(resolveLocation("Hong Kong")).toEqual({
+      city: "Hong Kong",
+      countryCode: "HK",
+      region: null,
+      regionCode: null,
+    });
+  });
+
+  test("an empty location resolves to the same shape", () => {
+    for (const location of [null, undefined, "", "   "]) {
+      expect(resolveLocation(location)).toEqual({
+        city: null,
+        countryCode: null,
+        region: null,
+        regionCode: null,
+      });
+    }
+  });
+
   test("remote posting keeps the country and drops city", () => {
     const tags = postingOf({
       title: "Software Engineer",
