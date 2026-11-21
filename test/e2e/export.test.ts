@@ -11,6 +11,7 @@ import type { AppServer } from "./app-server.ts";
 
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
+import { downloadArchive } from "./export-archive.ts";
 import {
   ownerContextFor,
   seedApplication,
@@ -57,6 +58,8 @@ const exportRowsSchema = z.object({
 });
 
 const createdSchema = z.object({ id: z.string() });
+
+const objectKeysSchema = z.object({ keys: z.array(z.string()) });
 
 const sinkMailSchema = z.object({
   messages: z.array(z.object({ body: z.string(), subject: z.string(), to: z.string() })),
@@ -455,6 +458,158 @@ test("an export holds only its user's data and downloads from its page", async (
   await owner.dispose();
 });
 
+test("a plain-text event detail is exported as text without breaking the build", async ({
+  exportServer,
+}) => {
+  const { owner, userId } = await ownerContextFor(exportServer.url);
+
+  await seedOwner(owner);
+  const { applicationId } = await seedSentApplication(owner, userId);
+
+  const plainDetail = "This posting closed before Overture could send.";
+
+  const seeded = await owner.post("/__test__/applications/events/seed", {
+    data: {
+      applicationId,
+      events: [
+        {
+          at: referenceNow + 1000,
+          detail: plainDetail,
+          fromValue: "ready",
+          kind: "status",
+          source: "system",
+          toValue: "skipped",
+        },
+      ],
+    },
+  });
+
+  expect(seeded.ok()).toBe(true);
+
+  const requested = await owner.post("/api/account/export");
+
+  expect(requested.status()).toBe(202);
+
+  await waitForReady(owner);
+
+  const state = exportStateSchema.parse(await (await owner.get("/api/account/export")).json());
+
+  expect(state.downloadUrl).not.toBeNull();
+
+  const archive = await downloadArchive(owner, state.downloadUrl ?? "");
+
+  const applications = unzipJson(
+    archive,
+    "applications.json",
+    z.array(
+      z.object({
+        events: z.array(z.object({ detail: z.unknown(), kind: z.string() })),
+        id: z.string(),
+      }),
+    ),
+  );
+
+  const application = applications.find((row) => row.id === applicationId);
+
+  expect(application?.events.some((event) => event.detail === plainDetail)).toBe(true);
+
+  await owner.dispose();
+});
+
+test("an erase racing an export build leaves no export objects behind", async ({
+  exportServer,
+}) => {
+  const { owner, userId } = await ownerContextFor(exportServer.url);
+
+  await seedOwner(owner);
+
+  const bulk = await owner.post("/__test__/mail/bulk", {
+    data: { bodyBytes: 256 * 1024, count: 120, userId },
+  });
+
+  expect(bulk.ok()).toBe(true);
+
+  const requested = await owner.post("/api/account/export");
+
+  expect(requested.status()).toBe(202);
+
+  const rowsPath = `/__test__/account/exports?userId=${encodeURIComponent(userId)}`;
+  const rows = exportRowsSchema.parse(await (await owner.get(rowsPath)).json());
+  const exportId = rows.exports.find((row) => row.status === "preparing")?.id;
+
+  expect(exportId).toBeDefined();
+
+  const [build, erase] = await Promise.all([
+    owner.post("/__test__/jobs/run-now", {
+      data: { kind: "export.build", payload: JSON.stringify({ exportId }) },
+    }),
+    owner.post("/__test__/jobs/run-now", {
+      data: { kind: "account.erase", payload: JSON.stringify({ userId }) },
+    }),
+  ]);
+
+  expect(build.ok()).toBe(true);
+  expect(erase.ok()).toBe(true);
+
+  const keyLists = await Promise.all(
+    [`files/${userId}/`, `exports/${userId}/`].map(async (prefix) => {
+      const response = await owner.get(`/__test__/objects?prefix=${encodeURIComponent(prefix)}`);
+
+      return objectKeysSchema.parse(await response.json()).keys;
+    }),
+  );
+
+  expect(keyLists).toEqual([[], []]);
+
+  const remaining = exportRowsSchema.parse(await (await owner.get(rowsPath)).json());
+
+  expect(remaining.exports).toEqual([]);
+
+  await owner.dispose();
+});
+
+test("a suspended account never builds an export", async ({ exportServer }) => {
+  const { owner, userId } = await ownerContextFor(exportServer.url);
+
+  await seedOwner(owner);
+
+  const requested = await owner.post("/api/account/export");
+
+  expect(requested.status()).toBe(202);
+
+  const rowsPath = `/__test__/account/exports?userId=${encodeURIComponent(userId)}`;
+  const rows = exportRowsSchema.parse(await (await owner.get(rowsPath)).json());
+  const exportId = rows.exports.find((row) => row.status === "preparing")?.id;
+
+  expect(exportId).toBeDefined();
+
+  const suspended = await owner.post("/__test__/user/suspend", {
+    data: { suspended: true, userId },
+  });
+
+  expect(suspended.ok()).toBe(true);
+
+  const build = await owner.post("/__test__/jobs/run-now", {
+    data: { kind: "export.build", payload: JSON.stringify({ exportId }) },
+  });
+
+  expect(build.ok()).toBe(true);
+
+  const after = exportRowsSchema.parse(await (await owner.get(rowsPath)).json());
+
+  expect(after.exports[0]?.status).toBe("failed");
+
+  const { keys } = objectKeysSchema.parse(
+    await (
+      await owner.get(`/__test__/objects?prefix=${encodeURIComponent(`files/${userId}/exports/`)}`)
+    ).json(),
+  );
+
+  expect(keys).toEqual([]);
+
+  await owner.dispose();
+});
+
 test("the link expires after 24 hours and the archive is deleted", async ({ exportServer }) => {
   const { owner, userId } = await ownerContextFor(exportServer.url);
 
@@ -549,7 +704,7 @@ test("a new request replaces a ready export, with a note", async ({ exportServer
 test("the export page fits its phone and desktop viewports without annotation text", async ({
   browser,
   exportServer,
-}) => {
+}, testInfo) => {
   const { owner, userId } = await ownerContextFor(exportServer.url);
 
   await seedOwner(owner);
@@ -576,7 +731,7 @@ test("the export page fits its phone and desktop viewports without annotation te
         await openExportPage(page, exportServer.url);
         await page.evaluate(async () => document.fonts.ready);
         await page.screenshot({
-          path: `design/reference/settings-export/app-${String(width)}-${theme}.png`,
+          path: testInfo.outputPath(`export-app-${String(width)}-${theme}.png`),
           fullPage: true,
         });
 

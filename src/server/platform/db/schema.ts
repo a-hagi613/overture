@@ -718,7 +718,12 @@ export const accountExports = sqliteTable(
     expiresAt: timestamp("expires_at"),
     updatedAt: timestamp("updated_at").notNull(),
   },
-  (t) => [index("account_exports_user_requested").on(t.userId, t.requestedAt)],
+  (t) => [
+    index("account_exports_user_requested").on(t.userId, t.requestedAt),
+    uniqueIndex("account_exports_one_preparing")
+      .on(t.userId)
+      .where(sql`status = 'preparing'`),
+  ],
 );
 
 export const grants = sqliteTable(

@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { copy } from "../../shared/copy.ts";
 import { ExportCard } from "../components/export-card.tsx";
 import { SettingsHeader } from "../components/settings-header.tsx";
-import { SettingsTabs } from "../components/settings-tabs.tsx";
+import { SettingsAccountTabs } from "../components/settings-account-tabs.tsx";
 import { downloadExport, fetchExportState, requestExport } from "../lib/export-api.ts";
 import { fetchProfileSettings } from "../lib/profile-api.ts";
 
@@ -182,7 +182,7 @@ export function SettingsExportPage() {
           </>
         }
       />
-      <SettingsTabs />
+      <SettingsAccountTabs active="export" />
       <div className="mt-[29px] grid grid-cols-1 items-start gap-[22px] min-[900px]:grid-cols-2">
         {card}
       </div>

@@ -15,3 +15,5 @@ CREATE TABLE `account_exports` (
 ) STRICT;
 --> statement-breakpoint
 CREATE INDEX `account_exports_user_requested` ON `account_exports` (`user_id`,`requested_at`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `account_exports_one_preparing` ON `account_exports` (`user_id`) WHERE "status" = 'preparing';

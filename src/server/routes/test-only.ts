@@ -290,6 +290,8 @@ const bulkMailBody = z.object({
 
 const exportsQuery = z.object({ userId: z.string().min(1) });
 
+const objectsQuery = z.object({ prefix: z.string().min(1) });
+
 const tamperLedgerBody = z.object({ action: z.enum(["delete", "delete-owner", "update"]) });
 
 const tamperSnapshotBody = z.object({
@@ -2311,6 +2313,21 @@ export function createTestRoutes(
         status: row.status,
       })),
     });
+  });
+
+  routes.get("/objects", zValidator("query", objectsQuery), async (context) => {
+    if (objects === null) {
+      return context.json({ error: "no object store" }, 503);
+    }
+
+    const { prefix } = context.req.valid("query");
+    const keys: string[] = [];
+
+    for await (const key of objects.list(prefix)) {
+      keys.push(key);
+    }
+
+    return context.json({ keys });
   });
 
   routes.post("/user/name", zValidator("json", userNameBody), (context) => {

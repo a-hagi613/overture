@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -8,7 +8,7 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { MailSender } from "../platform/mail/port.ts";
 import type { ZipEntry } from "./zip.ts";
 
-import { accountExports, users } from "../platform/db/schema.ts";
+import { accountExports, bgJobs, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { logError } from "../platform/log.ts";
 import { copy } from "../../shared/copy.ts";
@@ -49,10 +49,13 @@ export interface ExportServiceDeps {
   mail: MailSender;
 }
 
-const payloadSchema = z.object({ exportId: z.string().min(1) });
+const payloadSchema = z.object({
+  exportId: z.string().min(1),
+  objectKey: z.string().min(1).optional(),
+});
 
-function payloadOf(exportId: string) {
-  return JSON.stringify({ exportId });
+function payloadOf(exportId: string, objectKey?: string) {
+  return JSON.stringify(objectKey === undefined ? { exportId } : { exportId, objectKey });
 }
 
 function objectKeyFor(userId: string, exportId: string) {
@@ -84,24 +87,24 @@ async function* sealArchive(entries: Iterable<ZipEntry> | AsyncIterable<ZipEntry
       at += part.length;
     }
 
-    const chunk = joined.subarray(0, EXPORT_CHUNK_BYTES);
-    const rest = joined.subarray(EXPORT_CHUNK_BYTES);
+    yield await writer.encrypt(joined);
 
-    yield await writer.encrypt(new Uint8Array(chunk));
-
-    pending = rest.length === 0 ? [] : [new Uint8Array(rest)];
-    pendingBytes = rest.length;
+    pending = [];
+    pendingBytes = 0;
   }
 
   for await (const part of zipStream(entries)) {
-    if (part.length > EXPORT_CHUNK_BYTES) {
-      throw new Error("The zip compressor produced a chunk too large to encrypt.");
+    let offset = 0;
+
+    while (offset < part.length) {
+      const take = Math.min(EXPORT_CHUNK_BYTES - pendingBytes, part.length - offset);
+
+      pending.push(part.subarray(offset, offset + take));
+      pendingBytes += take;
+      offset += take;
+
+      yield* flush();
     }
-
-    pending.push(part);
-    pendingBytes += part.length;
-
-    yield* flush();
   }
 
   if (pendingBytes > 0) {
@@ -124,9 +127,9 @@ async function* sealArchive(entries: Iterable<ZipEntry> | AsyncIterable<ZipEntry
  * @returns The current state, with a download link only while it is ready.
  */
 export async function readExportState(deps: ExportServiceDeps, userId: string) {
-  const row = latestExportOf(deps.db, userId);
+  const found = latestExportOf(deps.db, userId);
 
-  if (row === undefined) {
+  if (found === undefined) {
     return {
       downloadUrl: null,
       expiresAt: null,
@@ -136,6 +139,8 @@ export async function readExportState(deps: ExportServiceDeps, userId: string) {
       status: "none",
     };
   }
+
+  const row = recoverStalePreparing(deps, found);
 
   if (
     row.status === "ready" &&
@@ -166,6 +171,39 @@ function latestExportOf(db: AppDatabase, userId: string) {
     .get();
 }
 
+function recoverStalePreparing(deps: ExportServiceDeps, row: AccountExportRow) {
+  if (row.status !== "preparing") {
+    return row;
+  }
+
+  const live = deps.db
+    .select({ id: bgJobs.id })
+    .from(bgJobs)
+    .where(
+      and(
+        eq(bgJobs.dedupeKey, `${EXPORT_BUILD_JOB_KIND}:${row.id}`),
+        inArray(bgJobs.status, ["queued", "running"]),
+      ),
+    )
+    .get();
+
+  if (live !== undefined) {
+    return row;
+  }
+
+  deps.db
+    .update(accountExports)
+    .set({
+      error: "The export build stopped before it finished.",
+      status: "failed",
+      updatedAt: new Date(deps.clock.now()),
+    })
+    .where(and(eq(accountExports.id, row.id), eq(accountExports.status, "preparing")))
+    .run();
+
+  return deps.db.select().from(accountExports).where(eq(accountExports.id, row.id)).get() ?? row;
+}
+
 async function stateOf(deps: ExportServiceDeps, row: AccountExportRow) {
   const key =
     row.status === "ready"
@@ -186,9 +224,11 @@ async function stateOf(deps: ExportServiceDeps, row: AccountExportRow) {
   };
 }
 
-async function expireExport(deps: ExportServiceDeps, row: AccountExportRow) {
-  if (row.objectKey !== null) {
-    await deps.objects.delete(row.objectKey);
+async function expireExport(deps: ExportServiceDeps, row: AccountExportRow, objectKey?: string) {
+  const leftover = objectKey ?? row.objectKey;
+
+  if (leftover !== null) {
+    await deps.objects.delete(leftover);
   }
 
   deps.db
@@ -211,7 +251,8 @@ async function expireExport(deps: ExportServiceDeps, row: AccountExportRow) {
  * @returns The export's state, and whether a ready one was replaced.
  */
 export async function requestExport(deps: ExportServiceDeps, userId: string) {
-  const latest = latestExportOf(deps.db, userId);
+  const found = latestExportOf(deps.db, userId);
+  const latest = found === undefined ? undefined : recoverStalePreparing(deps, found);
 
   if (latest?.status === "preparing") {
     return { replaced: false, state: await stateOf(deps, latest) };
@@ -250,7 +291,17 @@ export async function requestExport(deps: ExportServiceDeps, userId: string) {
     userId,
   };
 
-  deps.db.insert(accountExports).values(row).run();
+  try {
+    deps.db.insert(accountExports).values(row).run();
+  } catch (error) {
+    const current = latestExportOf(deps.db, userId);
+
+    if (current?.status === "preparing") {
+      return { replaced: false, state: await stateOf(deps, current) };
+    }
+
+    throw error;
+  }
 
   enqueueJob(deps.db, deps.clock, EXPORT_BUILD_JOB_KIND, payloadOf(id), {
     dedupeKey: `${EXPORT_BUILD_JOB_KIND}:${id}`,
@@ -283,13 +334,36 @@ export async function runExportBuildJob(deps: ExportServiceDeps, exportId: strin
     return;
   }
 
+  const objectKey = objectKeyFor(row.userId, row.id);
+
+  const user = deps.db
+    .select({ id: users.id, suspendedAt: users.suspendedAt })
+    .from(users)
+    .where(eq(users.id, row.userId))
+    .get();
+
+  if (user === undefined || user.suspendedAt !== null) {
+    deps.db
+      .update(accountExports)
+      .set({
+        error: "The account cannot receive an export.",
+        objectKey: null,
+        status: "failed",
+        updatedAt: new Date(deps.clock.now()),
+      })
+      .where(and(eq(accountExports.id, exportId), eq(accountExports.status, "preparing")))
+      .run();
+
+    await deps.objects.delete(objectKey);
+
+    return;
+  }
+
   const key = await deps.personal.openFor(
     row.userId,
     { column: "key_enc", rowId: row.id, table: "account_exports" },
     row.keyEnc,
   );
-
-  const objectKey = objectKeyFor(row.userId, row.id);
 
   try {
     const entries = exportEntries(
@@ -306,7 +380,7 @@ export async function runExportBuildJob(deps: ExportServiceDeps, exportId: strin
     const bytes = await deps.objects.putStream(objectKey, sealArchive(entries, key));
     const now = deps.clock.now();
 
-    deps.db
+    const updated = deps.db
       .update(accountExports)
       .set({
         bytes,
@@ -316,15 +390,22 @@ export async function runExportBuildJob(deps: ExportServiceDeps, exportId: strin
         status: "ready",
         updatedAt: new Date(now),
       })
-      .where(eq(accountExports.id, exportId))
-      .run();
+      .where(and(eq(accountExports.id, exportId), eq(accountExports.status, "preparing")))
+      .returning({ id: accountExports.id })
+      .all();
+
+    if (updated.length === 0) {
+      await deps.objects.delete(objectKey);
+
+      return;
+    }
 
     enqueueJob(deps.db, deps.clock, EXPORT_NOTIFY_JOB_KIND, payloadOf(exportId), {
       dedupeKey: `${EXPORT_NOTIFY_JOB_KIND}:${exportId}`,
       maxAttempts: 3,
     });
 
-    enqueueJob(deps.db, deps.clock, EXPORT_EXPIRE_JOB_KIND, payloadOf(exportId), {
+    enqueueJob(deps.db, deps.clock, EXPORT_EXPIRE_JOB_KIND, payloadOf(exportId, objectKey), {
       dedupeKey: `${EXPORT_EXPIRE_JOB_KIND}:${exportId}`,
       maxAttempts: 2,
       runAt: now + EXPORT_VALID_MS,
@@ -394,20 +475,39 @@ export async function runExportNotifyJob(deps: ExportServiceDeps, exportId: stri
  * Delete a ready export's encrypted archive once its 24 hours are over.
  * @param deps The export service's dependencies.
  * @param exportId The export to expire.
+ * @param objectKey The archive key when the job payload carries it.
  * @returns Nothing; the archive is deleted and the row marked expired.
  */
-export async function runExportExpireJob(deps: ExportServiceDeps, exportId: string) {
+export async function runExportExpireJob(
+  deps: ExportServiceDeps,
+  exportId: string,
+  objectKey?: string,
+) {
   const row = deps.db.select().from(accountExports).where(eq(accountExports.id, exportId)).get();
 
   if (row === undefined) {
+    if (objectKey !== undefined) {
+      await deps.objects.delete(objectKey);
+    }
+
     return;
   }
 
-  if (row.status !== "ready" || deps.clock.now() < (row.expiresAt?.getTime() ?? 0)) {
+  if (row.status !== "ready") {
+    const leftover = objectKey ?? row.objectKey;
+
+    if (leftover !== null) {
+      await deps.objects.delete(leftover);
+    }
+
     return;
   }
 
-  await expireExport(deps, row);
+  if (deps.clock.now() < (row.expiresAt?.getTime() ?? 0)) {
+    return;
+  }
+
+  await expireExport(deps, row, objectKey);
 }
 
 export interface ExportDownload {
@@ -496,7 +596,8 @@ export function createExportService(deps: ExportServiceDeps) {
     build: async (exportId: string) => runExportBuildJob(deps, exportId),
     download: async (userId: string, exportId: string) =>
       readExportDownload(deps, userId, exportId),
-    expire: async (exportId: string) => runExportExpireJob(deps, exportId),
+    expire: async (exportId: string, objectKey?: string) =>
+      runExportExpireJob(deps, exportId, objectKey),
     notify: async (exportId: string) => runExportNotifyJob(deps, exportId),
     request: async (userId: string) => requestExport(deps, userId),
     state: async (userId: string) => readExportState(deps, userId),

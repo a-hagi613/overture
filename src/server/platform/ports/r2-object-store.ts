@@ -46,7 +46,6 @@ export function createR2ObjectStore(config: R2ObjectStoreConfig) {
           bytes += chunk.length;
 
           await writer.write(chunk);
-          await writer.flush();
         }
 
         await writer.end();

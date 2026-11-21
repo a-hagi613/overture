@@ -46,7 +46,15 @@ function iso(value: Date | number | null) {
 }
 
 function parsed(value: string) {
-  const result = jsonValueSchema.safeParse(JSON.parse(value));
+  let decoded: unknown;
+
+  try {
+    decoded = JSON.parse(value);
+  } catch {
+    return value;
+  }
+
+  const result = jsonValueSchema.safeParse(decoded);
 
   return result.success ? result.data : value;
 }

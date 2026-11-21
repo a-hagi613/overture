@@ -1,7 +1,12 @@
 import { expect, test } from "bun:test";
 
 import { createUserKey, openValue, parseMasterKey, sealValue } from "./crypto.ts";
-import { createExportWriter, decryptExport, newExportKey } from "../../shared/export-crypto.ts";
+import {
+  EXPORT_CHUNK_BYTES,
+  createExportWriter,
+  decryptExport,
+  newExportKey,
+} from "../../shared/export-crypto.ts";
 
 const scope = { table: "facts", column: "value_enc", rowId: "fact-1" };
 
@@ -127,6 +132,20 @@ test("the plaintext does not appear in the encrypted archive", async () => {
 
   expect(new TextDecoder("latin1").decode(sealed)).not.toContain("the resume");
   expect(new TextDecoder().decode(await open(sealed, linkKey))).toContain("the resume");
+});
+
+test("an archive with more than sixteen chunks round-trips", async () => {
+  const linkKey = newExportKey();
+  const parts = Array.from({ length: 17 }, () => new Uint8Array(EXPORT_CHUNK_BYTES).fill(7));
+  const sealed = await seal(parts, linkKey);
+
+  expect(sealed.length).toBeGreaterThan(16 * EXPORT_CHUNK_BYTES);
+
+  const plain = await open(sealed, linkKey, 64 * 1024);
+
+  expect(plain.length).toBe(17 * EXPORT_CHUNK_BYTES);
+  expect(plain[0]).toBe(7);
+  expect(plain.at(-1)).toBe(7);
 });
 
 test("a different key cannot decrypt the archive", async () => {

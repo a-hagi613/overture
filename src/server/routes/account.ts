@@ -44,6 +44,12 @@ export function createAccountRoutes(deps: {
     return auth.api.getSession({ headers: raw.headers }).catch(() => null);
   }
 
+  async function sessionUser(raw: Request) {
+    const result = await sessionOf(raw);
+
+    return result?.user ?? null;
+  }
+
   function passwordHashFor(userId: string) {
     const row = db
       .select({ password: accounts.password })
@@ -225,6 +231,8 @@ export function createAccountRoutes(deps: {
       },
       202,
     );
+  });
+
   routes.get("/account/export", async (context) => {
     const user = await sessionUser(context.req.raw);
 

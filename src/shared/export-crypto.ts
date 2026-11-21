@@ -4,7 +4,7 @@ const TAG_BYTES = 16;
 const NONCE_BYTES = 12;
 const COUNTER_BYTES = 4;
 const LENGTH_BYTES = 4;
-const MAX_CHUNKS = 2 ** COUNTER_BYTES;
+const MAX_CHUNKS = 2 ** (COUNTER_BYTES * 8);
 
 /**
  * The plaintext chunk size of an export archive. Both the writer and the

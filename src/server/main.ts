@@ -431,7 +431,9 @@ const exportJobHandlers: JobHandlers = {
     await exports.build(parseExportPayload(payload).exportId);
   },
   [EXPORT_EXPIRE_JOB_KIND]: async (payload) => {
-    await exports.expire(parseExportPayload(payload).exportId);
+    const parsed = parseExportPayload(payload);
+
+    await exports.expire(parsed.exportId, parsed.objectKey);
   },
   [EXPORT_NOTIFY_JOB_KIND]: async (payload) => {
     await exports.notify(parseExportPayload(payload).exportId);
