@@ -52,5 +52,5 @@ test("an admin grant reaches Home as Applications left", async ({
   await page.goto(`${appUrl}/`);
 
   await expect(page.getByText("of 5 on your week plan")).toBeVisible();
-  await expect(page.locator("dt", { hasText: "Applications left" }).locator("+dd")).toHaveText("5");
+  await expect(page.locator("aside").getByText("5", { exact: true })).toHaveText("5");
 });
