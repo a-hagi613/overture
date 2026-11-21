@@ -4,12 +4,11 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 
+import { CODE_WAIT_ASK_MS, CODE_WAIT_TIMEOUT_MS } from "../../shared/code-wait.ts";
 import { codeWaits, messages } from "../platform/db/schema.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 
-export const CODE_WAIT_TIMEOUT_MS = 10 * 60_000;
-
-export const CODE_PASTE_ASK_MS = 5 * 60_000;
+export { CODE_WAIT_ASK_MS, CODE_WAIT_TIMEOUT_MS } from "../../shared/code-wait.ts";
 
 const CODE_WAIT_POLL_MS = 5000;
 
@@ -73,7 +72,7 @@ export async function waitForCode(
   }
 
   const waitId = wait.id;
-  const askAt = wait.startedAt.getTime() + CODE_PASTE_ASK_MS;
+  const askAt = wait.startedAt.getTime() + CODE_WAIT_ASK_MS;
   const expiresAt = wait.expiresAt.getTime();
 
   return new Promise<CodeWaitResolution | null>((resolve) => {

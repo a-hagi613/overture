@@ -386,6 +386,19 @@ export const copy = {
       title: (ready: number, approved: number) =>
         `${String(ready)} ready to send · ${String(approved)} approved`,
     },
+    codeWait: {
+      eyebrow: "Needs you",
+      expires: (time: string) => `Expires in ${time}`,
+      titlePlain: (company: string) => company,
+      titleItalic: "needs a code.",
+      body:
+        "The form asked for a code sent to your email. Paste it in Overture within ten minutes, or the " +
+        "Application ends and can be tried again later.",
+      asked:
+        "Five minutes have passed with no forwarded mail. The form stays open until the timer ends.",
+      paste: "Paste the code",
+      noCode: "No code yet",
+    },
     rangeLabel: "Date range",
     ranges: { d7: "7D", d30: "30D", d90: "90D" },
     running: "Auto-apply running",
@@ -1643,6 +1656,59 @@ export const copy = {
         `${input.title} at ${input.company} had no reply after 45 days, so it moved to Closed. Open the Board to undo it.`,
       url: "/board",
       kind: "stage_move",
+    },
+  },
+  codePaste: {
+    sheetLabel: "Paste a code",
+    grabHandle: "Close the code-paste sheet",
+    close: "Close",
+    eyebrow: "Code paste",
+    waiting: {
+      titlePlain: "Paste the",
+      titleItalic: "code.",
+      body: "The email with the code can take a minute. Paste it here, and Overture submits the form again.",
+      primary: "Submit code",
+      secondary: "No code yet",
+    },
+    noCode: {
+      titlePlain: "Still",
+      titleItalic: "waiting.",
+      body:
+        "No code has arrived in your forwarded mail yet. Overture keeps checking until the timer ends. " +
+        "Look in spam, and check the filter if mail has not come through at all.",
+      primary: "Submit code",
+      secondary: "Check the filter guide",
+    },
+    expired: {
+      titlePlain: "The code",
+      titleItalic: "never arrived.",
+      body:
+        "The verification code never arrived, so nothing was sent. The Application ends here and can be " +
+        "tried again later from Board.",
+      pill: "Window closed",
+      primary: "Back to Home",
+      secondary: "Open Board",
+    },
+    accepted: {
+      titlePlain: "Submitted",
+      titleItalic: "with your code.",
+      body: (company: string) =>
+        `Overture submitted the form with your code. ${company} has not confirmed receipt yet, so the ` +
+        "Application stays in Checking with the employer until it does.",
+      pill: "Code accepted",
+      checking: "Checking with the employer",
+      primary: "Back to Home",
+      secondary: "Open Board",
+    },
+    label: "Verification code",
+    placeholder: "8 characters",
+    timeLeft: "Time left",
+    invalid: "Enter the 8-character code from the email.",
+    errors: {
+      expired: "That wait has closed, so nothing was sent. Try the Application again from Board.",
+      resolved: "That code was already handled.",
+      notFound: "That wait is no longer open.",
+      failed: "The code did not go through. Try again.",
     },
   },
   placeholder: {
