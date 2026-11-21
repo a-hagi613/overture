@@ -8,6 +8,40 @@ import { getSetting } from "../platform/settings/index.ts";
 
 const DAY_MS = 24 * 60 * 60_000;
 
+/**
+ * The timezone a schedule should use right now: a pending change applies once
+ * its delay has passed.
+ * @param db The application database.
+ * @param userId The user whose profile is read.
+ * @param now The current time.
+ * @returns The effective IANA timezone, UTC when the profile has none.
+ */
+export function effectiveTimeZone(db: AppDatabase, userId: string, now: number) {
+  const row = db
+    .select({
+      pendingTimezone: profiles.pendingTimezone,
+      pendingTimezoneAt: profiles.pendingTimezoneAt,
+      timezone: profiles.timezone,
+    })
+    .from(profiles)
+    .where(eq(profiles.userId, userId))
+    .get();
+
+  if (row === undefined) {
+    return "UTC";
+  }
+
+  if (
+    row.pendingTimezone !== null &&
+    row.pendingTimezoneAt !== null &&
+    row.pendingTimezoneAt.getTime() <= now
+  ) {
+    return row.pendingTimezone;
+  }
+
+  return row.timezone ?? "UTC";
+}
+
 export function createTimeZoneService(deps: { db: AppDatabase; clock: Clock }) {
   const { db, clock } = deps;
 

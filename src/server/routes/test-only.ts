@@ -173,6 +173,11 @@ const homeSampleBody = z.object({
   variant: z.enum(["running", "paused"]).default("running"),
 });
 
+const profileRunningBody = z.object({
+  running: z.boolean(),
+  userId: z.string().min(1),
+});
+
 const homePauseBody = z.object({
   email: z.email(),
   pauseReason: z.enum([
@@ -2181,6 +2186,29 @@ export function createTestRoutes(
     );
 
     return context.json({ ok: true });
+  });
+
+  routes.post("/profile/running", zValidator("json", profileRunningBody), (context) => {
+    const { running, userId } = context.req.valid("json");
+    const now = clock.now();
+
+    db.insert(profiles)
+      .values({
+        createdAt: new Date(now),
+        languages: "[]",
+        pauseReason: running ? null : "user",
+        running,
+        timezone: "UTC",
+        updatedAt: new Date(now),
+        userId,
+      })
+      .onConflictDoUpdate({
+        target: profiles.userId,
+        set: { pauseReason: running ? null : "user", running, updatedAt: new Date(now) },
+      })
+      .run();
+
+    return context.json({ running });
   });
 
   routes.post("/home/pause", zValidator("json", homePauseBody), (context) => {

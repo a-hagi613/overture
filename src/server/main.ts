@@ -32,9 +32,15 @@ import {
 import { createAnthropicLlmPort } from "./platform/llm/anthropic-batches.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
-import { MATCH_FILL_JOB_KIND, ensureMatchFillQueued, runMatchFillJob } from "./matching/score.ts";
 import { createGreenhouseQuestionSource } from "./catalog/greenhouse-questions.ts";
 import { createPreparationService } from "./pipeline/prepare.ts";
+import {
+  PREP_DAILY_JOB_KIND,
+  ensurePrepDailyQueued,
+  ensurePrepQueuedForRunningUsers,
+  parsePrepDailyPayload,
+  runPrepDailyJob,
+} from "./pipeline/daily-prep.ts";
 import { createReviewService } from "./pipeline/reviews.ts";
 import { createResumeService } from "./profile/resume.ts";
 import { createBrowserProvider } from "./dispatch/browser/index.ts";
@@ -116,6 +122,7 @@ void backups.run(shutdownController.signal);
 
 const mailSender = createMailSender(clock);
 const auth = createAuth(db, clock, mailSender);
+const appOrigin = env.APP_ORIGIN ?? "http://localhost:3000";
 
 const jobSingletons = [...SINGLETON_JOB_KINDS, DISPATCH_TICK_JOB_KIND, LIVE_CHECK_JOB_KIND];
 
@@ -158,13 +165,6 @@ const personal = createPersonalCrypto(
 
 const planner = createPlanner({ clock, db, random });
 
-const matchDeps = {
-  db,
-  clock,
-  llm: anthropicLlmPort,
-  personal,
-};
-
 const preparation = createPreparationService({
   db,
   clock,
@@ -192,11 +192,35 @@ const llmJobHandlers: JobHandlers =
         [TAG_FALLBACK_JOB_KIND]: async () => {
           await runTagFallbackJob(tagDeps);
         },
-        [MATCH_FILL_JOB_KIND]: async () => {
-          await runMatchFillJob(matchDeps);
-          ensureMatchFillQueued(db, clock);
-        },
       };
+
+const prepDailyJobHandlers: JobHandlers = {
+  [PREP_DAILY_JOB_KIND]: async (payload) => {
+    const { since, userId } = parsePrepDailyPayload(payload);
+
+    try {
+      if (env.ANTHROPIC_API_KEY === undefined) {
+        return;
+      }
+
+      await runPrepDailyJob(
+        {
+          appOrigin,
+          clock,
+          db,
+          llm: anthropicLlmPort,
+          mail: mailSender,
+          personal,
+          preparation,
+        },
+        userId,
+        since ?? clock.now(),
+      );
+    } finally {
+      ensurePrepDailyQueued(db, clock, userId);
+    }
+  },
+};
 
 const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
   ? {
@@ -393,6 +417,7 @@ const allJobHandlers: JobHandlers = {
   ...preparationJobHandlers,
   ...planningJobHandlers,
   ...llmJobHandlers,
+  ...prepDailyJobHandlers,
   ...mailJobHandlers,
   ...dispatchJobHandlers,
   ...fixtureJobHandlers,
@@ -432,7 +457,7 @@ if (env.NODE_ENV === "production") {
 
 if (env.ANTHROPIC_API_KEY !== undefined) {
   ensureTagFallbackQueued(db, clock);
-  ensureMatchFillQueued(db, clock);
+  ensurePrepQueuedForRunningUsers(db, clock);
 }
 
 const app = createApp({

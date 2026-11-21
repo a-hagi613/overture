@@ -1,0 +1,267 @@
+import { z } from "zod";
+
+import type { APIRequestContext } from "@playwright/test";
+import type { AppServer } from "./app-server.ts";
+import type { AnthropicFixtureServer } from "./anthropic-fixture-server.ts";
+
+import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
+import { startAnthropicFixtureServer } from "./anthropic-fixture-server.ts";
+import { authTestIdentity } from "./auth.fixture.ts";
+import {
+  basePosting,
+  clearCatalog,
+  configureMatching,
+  grantApplications,
+  ownerContextFor,
+  seedApplication,
+} from "./matching-harness.ts";
+
+const test = appTest.extend<{ prep: { anthropic: AnthropicFixtureServer; server: AppServer } }>({
+  prep: [
+    async ({ identityServer }, provide) => {
+      const anthropic = await startAnthropicFixtureServer();
+
+      const server = await startFreshAppServer(identityServer, {
+        ANTHROPIC_API_KEY: "test-anthropic-key",
+        ANTHROPIC_BASE_URL: anthropic.url,
+      });
+
+      await provide({ anthropic, server });
+      await server.stop();
+      anthropic.stop();
+    },
+    { scope: "test" },
+  ],
+});
+
+const clockSchema = z.object({ now: z.number(), offsetMs: z.number() });
+const createdSchema = z.object({ id: z.string() });
+
+const applicationsSchema = z.object({
+  applications: z.array(z.object({ id: z.string(), status: z.string(), postingId: z.string() })),
+});
+
+const mailSchema = z.object({
+  messages: z.array(z.object({ body: z.string(), subject: z.string(), to: z.string() })),
+});
+
+const jobsSchema = z.object({
+  jobs: z.array(
+    z.object({
+      id: z.string(),
+      kind: z.string(),
+      runAt: z.number(),
+      status: z.string(),
+    }),
+  ),
+});
+
+async function clockNow(owner: APIRequestContext) {
+  return clockSchema.parse(await (await owner.get("/__test__/clock")).json()).now;
+}
+
+async function moveClockTo(owner: APIRequestContext, at: number) {
+  const { now, offsetMs } = clockSchema.parse(await (await owner.get("/__test__/clock")).json());
+
+  await owner.post("/__test__/clock/offset", { data: { offsetMs: at - (now - offsetMs) } });
+}
+
+async function applicationsFor(owner: APIRequestContext, userId: string) {
+  const body: unknown = await (
+    await owner.get(`/__test__/applications?userId=${encodeURIComponent(userId)}`)
+  ).json();
+
+  return applicationsSchema.parse(body).applications;
+}
+
+async function mailFor(owner: APIRequestContext) {
+  return mailSchema.parse(await (await owner.get("/__test__/mail")).json()).messages;
+}
+
+async function jobsFor(owner: APIRequestContext) {
+  return jobsSchema.parse(await (await owner.get("/__test__/jobs")).json()).jobs;
+}
+
+async function seedCandidates(owner: APIRequestContext, count: number) {
+  return Promise.all(
+    Array.from({ length: count }, async (_, index) => {
+      const name = `Recap ${String(index)}`;
+
+      const company = createdSchema.parse(
+        await (
+          await owner.post("/__test__/catalog/companies", {
+            data: { domain: `recap-${String(index)}.example`, name },
+          })
+        ).json(),
+      );
+
+      const board = createdSchema.parse(
+        await (
+          await owner.post("/__test__/catalog/boards", {
+            data: {
+              ats: "greenhouse",
+              boardToken: `recap-${String(index)}`,
+              companyId: company.id,
+            },
+          })
+        ).json(),
+      );
+
+      const posting = createdSchema.parse(
+        await (
+          await owner.post("/__test__/catalog/postings", {
+            data: {
+              ...basePosting,
+              atsJobId: `recap-${String(index)}`,
+              boardId: board.id,
+              companyId: company.id,
+              title: "Senior Backend Engineer",
+              url: `https://recap-${String(index)}.example/1`,
+            },
+          })
+        ).json(),
+      );
+
+      return posting.id;
+    }),
+  );
+}
+
+async function nextRunTarget(owner: APIRequestContext) {
+  const now = await clockNow(owner);
+  const at = new Date(now);
+
+  let target = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate(), 6, 59, 0);
+
+  if (target <= now) {
+    target += 86_400_000;
+  }
+
+  return target;
+}
+
+test("a 07:00 run fills exactly the free Ready slots, sends one recap, and does nothing before 07:00", async ({
+  prep,
+}) => {
+  const { owner, userId } = await ownerContextFor(prep.server.url);
+
+  await owner.post("/__test__/mail/clear", { data: {} });
+  await clearCatalog(owner);
+  await grantApplications(owner, 70);
+  await owner.put("/api/profile/settings", { data: { languages: ["en"], timezone: "UTC" } });
+  await configureMatching(owner);
+
+  const postings = await seedCandidates(owner, 12);
+
+  const existing = await seedApplication(owner, {
+    postingId: postings[0] ?? "",
+    status: "ready",
+    userId,
+  });
+
+  await owner.post("/__test__/reviews/seed", {
+    data: {
+      answerKind: "fact",
+      applicationIds: [existing],
+      factKey: "work_auth_ca",
+      fieldType: "select",
+      options: ["Yes", "No"],
+      prompt: "Are you authorised to work in Canada?",
+      reason: "unknown_required",
+      scope: "CA",
+      userId,
+    },
+  });
+
+  const before = await nextRunTarget(owner);
+  const after = before + 60_000;
+
+  await moveClockTo(owner, before);
+  await owner.post("/api/running", { data: { running: true } });
+
+  await owner.post("/__test__/jobs/run-due", { data: {} });
+
+  expect(await applicationsFor(owner, userId)).toHaveLength(1);
+  expect(await mailFor(owner)).toHaveLength(0);
+
+  await moveClockTo(owner, after);
+
+  await expect
+    .poll(
+      async () =>
+        (await applicationsFor(owner, userId)).filter(
+          (application) => application.status === "ready",
+        ).length,
+      { timeout: 30_000 },
+    )
+    .toBe(10);
+
+  expect(await applicationsFor(owner, userId)).toHaveLength(10);
+
+  await expect.poll(async () => (await mailFor(owner)).length, { timeout: 30_000 }).toBe(1);
+
+  const [recap] = await mailFor(owner);
+
+  expect(recap?.to).toBe(authTestIdentity.ownerEmail);
+  expect(recap?.subject).toBe("Overture recap: 9 ready to approve, 1 need an answer");
+  expect(recap?.body).toContain("9 applications are ready to approve");
+  expect(recap?.body).toContain("Senior Backend Engineer at Recap 1");
+  expect(recap?.body).toContain("1 question needs an answer.");
+  expect(recap?.body).toContain("/ready");
+
+  const notifications: unknown = await (
+    await owner.get(`/__test__/notifications?userId=${encodeURIComponent(userId)}`)
+  ).json();
+
+  expect(JSON.stringify(notifications)).toContain('"kind":"ready"');
+
+  await owner.dispose();
+});
+
+test("the next day's run stops at the unapproved Ready Applications and sends no second recap", async ({
+  prep,
+}) => {
+  const { owner, userId } = await ownerContextFor(prep.server.url);
+
+  await owner.post("/__test__/mail/clear", { data: {} });
+  await clearCatalog(owner);
+  await grantApplications(owner, 70);
+  await owner.put("/api/profile/settings", { data: { languages: ["en"], timezone: "UTC" } });
+  await configureMatching(owner);
+
+  await seedCandidates(owner, 12);
+
+  const firstRun = await nextRunTarget(owner);
+  const secondRun = firstRun + 86_400_000 + 60_000;
+
+  await moveClockTo(owner, firstRun);
+  await owner.post("/api/running", { data: { running: true } });
+  await moveClockTo(owner, firstRun + 60_000);
+  await owner.post("/__test__/jobs/run-due", { data: {} });
+
+  await expect
+    .poll(async () => (await applicationsFor(owner, userId)).length, { timeout: 30_000 })
+    .toBe(10);
+  await expect.poll(async () => (await mailFor(owner)).length, { timeout: 30_000 }).toBe(1);
+
+  const scheduled = (await jobsFor(owner)).find(
+    (job) => job.kind === "prep.daily" && job.runAt === secondRun,
+  );
+
+  expect(scheduled).toBeDefined();
+
+  await moveClockTo(owner, secondRun);
+
+  await expect
+    .poll(
+      async () =>
+        (await jobsFor(owner)).find((job) => job.id === scheduled?.id)?.status ?? "missing",
+      { timeout: 30_000 },
+    )
+    .toBe("done");
+
+  expect(await applicationsFor(owner, userId)).toHaveLength(10);
+  expect(await mailFor(owner)).toHaveLength(1);
+
+  await owner.dispose();
+});

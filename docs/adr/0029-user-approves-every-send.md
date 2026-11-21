@@ -41,9 +41,9 @@ clicks would bill for idle time, and filling it once for the user and again for 
 `approved` ("approved, waiting for its send slot") sits between `ready` and `sending`, and dispatch only ever picks
 `approved`. Approval can be undone (back to `ready`) until `sending` starts. A `ready` or `approved` Application
 whose Posting closes becomes `skipped` (`posting_closed`). A `ready` Application waits until its Posting closes or
-the user skips it; it counts toward the preparation buffer, so Overture never prepares more than the buffer allows
-while the user is away. Skip on a Ready card withdraws the Application (`withdrawn`), the same as withdrawing a
-queued card from the Board.
+the user skips it; it counts toward the free slots the next daily run may fill, so Overture never prepares more than
+one day's worth while the user is away (see the amendment below). Skip on a Ready card withdraws the Application
+(`withdrawn`), the same as withdrawing a queued card from the Board.
 
 **The Ready destination.** A sixth destination, **Ready** (heading "Ready to send"), lists the approval cards with
 Send, Skip and Edit an answer, and "Send all" for everything listed. The nav order is Home, Ready, Board, Review,
@@ -51,13 +51,23 @@ Inbox, Profile. The Board gets a **Ready** column between Queued and Applied (a 
 Application from Ready until it is confirmed sent), and Home a card ("3 ready to send").
 None of it is built until it is drawn on the canvas (ADR 0021, `DESIGN.md` §13).
 
-**Notifications.** In M1, at most one email per user per local day when new Applications become Ready, from
-`no-reply@tryoverture.com` through the Cloudflare sender, listing them with one link to the Ready page. Opening the
-link never sends, because mail scanners open links; the user presses Send in the app. M2 adds push. There is no
-per-application email.
+**Notifications.** In M1, at most one email per user per local day when that day's preparation run produced new
+Ready Applications or Reviews, from `no-reply@tryoverture.com` through the Cloudflare sender, listing them with one
+link to the Ready page (see the amendment below). Opening the link never sends, because mail scanners open links;
+the user presses Send in the app. M2 adds push. There is no per-application email.
 
 **Limits.** The daily cap counts sends, not approvals. Approval never bypasses pacing, the company cooldown, the
 crowd limits or the caps; approved Applications are sent in approval order within the send window.
+
+**Amendment of 2026-11-21: one daily preparation run.** Preparation stops trickling through the day. One run per
+running user per local day, at the admin setting `prep.run_local_time` (default 07:00), matches, prepares and stops
+at the free Ready slots: the daily cap minus the Applications already preparing, ready or approved (so a retried run
+cannot overfill the day). The Ready list therefore never holds more than one day's work, and unapproved cards reduce
+the next day's run instead of piling up. Lever and
+Ashby forms are read in that run when their signature is not cached. The run ends with one Recap email listing the
+new Ready Applications and the open Reviews ("10 ready to approve, 2 need an answer") with one link to Ready, and
+sends nothing when it produced nothing. Sending is unchanged: only an Approval queues an Application, and sends stay
+paced by `limits.send_spacing_minutes` inside 08:00–20:00, in approval order.
 
 **The M1 exit gate** becomes: at least **25** real owner applications on Browser Use (was 60); at least 85 % of
 attempted applications reach `sent`; cost at most $0.03 per completed application; zero wrong-company or duplicate
