@@ -7,8 +7,9 @@ status: accepted
 From the research in `docs/research/cloudflare-paid-plan.md`. The owner accepted the decision and the stated trade
 on 2026-11-21; the first layer is live: the Workers and Durable Objects spending limits at 1¢ and the $0.50
 account-wide budget alert exist on the account, and their commands, reading and lifting are in
-`docs/research/cloudflare-spend-guard-runbook.md`. The sentinel, the Queue, the app-side counters and the R2 bounds
-are separate tickets (#281–#287).
+`docs/research/cloudflare-spend-guard-runbook.md`. The sentinel is built (#283, `workers/sentinel`): it probes
+health from outside Fly, watches the Workable snapshot's age and Cloudflare usage, and writes the degraded flag the app
+reads. The Queue, the app-side counters and the R2 bounds are separate tickets (#281–#287).
 
 ## Context
 
@@ -25,6 +26,7 @@ The owner pays $5 a month for Workers Paid and wants no spend above $5 a month i
   instead of ten, a five-minute L0 retention check, lifecycle rules and a size alert. The measured list floor is about
   104k Class A a month before writes (#281, `docs/research/cloudflare-paid-plan.md` §2).
 - **The owner accepts the stated trade:** if the Workers limit trips, the Email Worker stops and inbound mail is lost until the period resets or the limit is lifted.
+- **The sentinel reports through R2, not logs.** A Worker has no `process.stderr` and the lint rule set bans `console`, so the sentinel cannot log like the app. Instead each run records itself as `lastRun` in `ops/sentinel-state.json` — the object it already writes for alert de-duplication — with the instant, what it saw, the alerts it sent and anything it could not do; a failed state write throws so Cloudflare marks the invocation as an error. One `wrangler r2 object get` answers "is the cron alive and what did it find?". The degraded flag at `ops/degraded.json` is written only when its content changes, so a degraded period does not add a Class A write every ten minutes.
 
 ## Considered Options
 
@@ -32,3 +34,13 @@ The owner pays $5 a month for Workers Paid and wants no spend above $5 a month i
 - **A watchdog that revokes the R2 token at a threshold.** Rejected: it would stop the backups.
 - **Browser Run for sending.** Rejected for the reasons above; cheaper per application but not a like-for-like browser.
 - **Workable ingest on a Worker.** Rejected: about 3.6 M CPU-ms a day for the full pass against 30 M a month included, and no gain over the free Action.
+
+## Consequences
+
+- The sentinel is 4,320 invocations a month against the 10 M included, with `limits.cpu_ms` at 500 as a runaway
+  guard; it deploys separately (`workers/sentinel`) with its own secrets and no public route. Until it is deployed, the
+  80% email from the spending limit is the first signal, as before.
+- The app gains one read path (`ops/degraded.json`, cached for a minute) and two behaviours it sheds while degraded;
+  both log when they change, with the metrics that caused it.
+- The degraded flag is compared before it is written, so a long degraded period costs Class B reads, not a Class A write
+  every ten minutes.

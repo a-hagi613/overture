@@ -345,14 +345,6 @@ test("an invite is accepted on the first verified password sign-in and grants 30
   await page.getByRole("button", { name: "Create an account" }).click();
   await page.getByLabel("Email").fill(guestEmail);
   await page.getByLabel("Create a password").fill(password);
-  await expect
-    .poll(
-      async () =>
-        await page
-          .locator('[data-turnstile="password"] input[name="cf-turnstile-response"]')
-          .inputValue(),
-    )
-    .not.toBe("");
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
 

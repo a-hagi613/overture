@@ -7,6 +7,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { AlertKind } from "../platform/alerts.ts";
 import type { LiveCheckResult } from "./types.ts";
+import type { MailReplyCounts } from "../inbox/health.ts";
 
 import { raiseAlert } from "../platform/alerts.ts";
 import { llmSpendTodayMicros } from "../platform/llm/usage.ts";
@@ -14,6 +15,12 @@ import { unhandledRejectionCount } from "../platform/process-guard.ts";
 import { catalogWorkerCrashCount } from "../catalog/worker-restarts.ts";
 import { getSetting } from "../platform/settings/index.ts";
 import { applications, attempts, bgJobs, postings } from "../platform/db/schema.ts";
+import {
+  MAIL_DOMAIN_MIN_SENDS,
+  MAIL_REPLY_FLOOR,
+  MAIL_REPLY_MIN_SENDS,
+  readMailReplyCounts,
+} from "../inbox/health.ts";
 
 export const ALERT_WINDOW_MS = 60 * 60_000;
 export const ATS_SUCCESS_FLOOR = 0.7;
@@ -45,6 +52,7 @@ export interface AlertMetrics {
   disk: { usedRatio: number; mount: string };
   unhandledRejections: number;
   catalogWorkerCrashes: number;
+  mailHealth: MailReplyCounts;
 }
 
 function capMicros(db: AppDatabase, key: string) {
@@ -173,6 +181,7 @@ export async function collectAlertMetrics(deps: {
     disk: { usedRatio, mount },
     unhandledRejections: unhandledRejectionCount(),
     catalogWorkerCrashes: catalogWorkerCrashCount(),
+    mailHealth: readMailReplyCounts(db, clock),
   };
 }
 
@@ -294,6 +303,42 @@ export function evaluateAlerts(db: AppDatabase, clock: Clock, metrics: AlertMetr
     count: metrics.catalogWorkerCrashes,
   });
 
+  const judgedEmployers = metrics.mailHealth.employers.filter(
+    (entry) => entry.sent >= MAIL_REPLY_MIN_SENDS,
+  );
+
+  const breachingEmployers = judgedEmployers
+    .filter((entry) => entry.replies / entry.sent < MAIL_REPLY_FLOOR)
+    .toSorted((left, right) => left.replies / left.sent - right.replies / right.sent);
+
+  const [worstEmployer] = breachingEmployers;
+
+  judge("alert.mail.reply_rate", worstEmployer !== undefined, "mail.reply_rate", {
+    companyId: worstEmployer?.key ?? null,
+    employer: worstEmployer?.employer ?? null,
+    employers: breachingEmployers.length,
+    floor: MAIL_REPLY_FLOOR,
+    minSends: MAIL_REPLY_MIN_SENDS,
+    replies: worstEmployer?.replies ?? 0,
+    sent: worstEmployer?.sent ?? 0,
+  });
+
+  const { domain } = metrics.mailHealth;
+  const domainRate = domain.sent === 0 ? 1 : domain.replies / domain.sent;
+
+  judge(
+    "alert.mail.domain_reply_rate",
+    domain.sent >= MAIL_DOMAIN_MIN_SENDS && domainRate < MAIL_REPLY_FLOOR,
+    "mail.domain_reply_rate",
+    {
+      floor: MAIL_REPLY_FLOOR,
+      minSends: MAIL_DOMAIN_MIN_SENDS,
+      rate: domain.sent === 0 ? null : domainRate,
+      replies: domain.replies,
+      sent: domain.sent,
+    },
+  );
+
   return { results, raised };
 }
 
@@ -310,6 +355,12 @@ export function drillAlertMetrics() {
     disk: { usedRatio: 0.95, mount: "/" },
     unhandledRejections: 3,
     catalogWorkerCrashes: 2,
+    mailHealth: {
+      domain: { replies: 0, sent: 24 },
+      employers: [
+        { employer: "Fixture Dynamics", key: "company-mail-drill", replies: 0, sent: 12 },
+      ],
+    },
   } satisfies AlertMetrics;
 }
 

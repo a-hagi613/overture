@@ -195,8 +195,12 @@ Inbound mail resumes by itself once the limit is lifted or the period resets; th
 change beyond §4. What was lost in the window stays lost, so the order matters: read usage, fix the Worker that
 overspent, lift the limit, re-arm it, then tell affected users to re-forward anything they are waiting on.
 
-The owner accepted this trade in ADR 0033. The sentinel that warns at 70% before the trip is #283 and is not built
-yet, so today the first signal is the 80% email from the limit itself.
+The owner accepted this trade in ADR 0033. The sentinel that warns at 70% before the trip is #283
+(`workers/sentinel`): it probes health from outside Fly, watches the Workable snapshot's age and reads R2, Queues and
+Workers usage from GraphQL Analytics every ten minutes. Once it is deployed with its secrets it pushes to ntfy at 70%
+and, at 90%, writes `ops/degraded.json`; until then the first signal is the 80% email from the limit itself. The app
+reads that flag through `src/server/platform/degraded.ts` and logs each change (rules-only `email_classify`, no
+live-check R2 round trip).
 
 ## 6. What these guards do not cover
 
@@ -205,7 +209,7 @@ Cloudflare Email Sending, Workflows, Containers and Images have no native limit;
 Overture the plausible ones are R2 (Litestream's write rate, #281), Email Sending (3,000 a month, app-side counter
 #282) and, if adopted, Workers AI neurons. R2 cannot be blocked natively: revoking its token would stop the backups,
 so it stays bounded by design, lifecycle rules and a size alert. The budget alert at $0.50 is the only account-wide
-signal until the sentinel (#283) and the app-side counters land.
+signal until the sentinel (#283, built) is deployed and the app-side counters land.
 
 ## 7. R2: lifecycle rules and the 8 GB size alert
 

@@ -1,5 +1,6 @@
 import { copy } from "../../shared/copy.ts";
 
+import { BusyIndicator } from "./busy-indicator.tsx";
 import { PasswordField } from "./password-field.tsx";
 import { BTN_PRIMARY, FIELD_HINT, INPUT_CLASS, LABEL_CLASS } from "./signin-styles.ts";
 
@@ -9,6 +10,8 @@ export function SignUpForm({
   onPassword,
   onSubmit,
   password,
+  pending,
+  busy,
   showPassword,
   togglePassword,
 }: {
@@ -17,6 +20,8 @@ export function SignUpForm({
   onPassword: (value: string) => void;
   onSubmit: () => void;
   password: string;
+  pending: boolean;
+  busy: boolean;
   showPassword: boolean;
   togglePassword: () => void;
 }) {
@@ -59,7 +64,13 @@ export function SignUpForm({
         />
         <p className={FIELD_HINT}>{copy.signIn.passwordHint}</p>
       </div>
-      <button className={`${BTN_PRIMARY} mt-1`} type="submit">
+      <button
+        aria-busy={busy || undefined}
+        className={`${BTN_PRIMARY} mt-1`}
+        disabled={pending}
+        type="submit"
+      >
+        {busy ? <BusyIndicator /> : null}
         {copy.signIn.signUpSubmit}
       </button>
     </form>

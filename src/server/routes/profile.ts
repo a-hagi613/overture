@@ -182,7 +182,21 @@ export function createProfileRoutes(deps: {
       return context.json({ error: "unauthorised" }, 401);
     }
 
-    const body = factsSchema.parse(await context.req.json());
+    let raw: unknown;
+
+    try {
+      raw = await context.req.json();
+    } catch {
+      return context.json({ error: "invalid_json" }, 400);
+    }
+
+    const parsed = factsSchema.safeParse(raw);
+
+    if (!parsed.success) {
+      return context.json({ error: "invalid_request", issues: parsed.error.issues }, 400);
+    }
+
+    const body = parsed.data;
 
     const saved = (
       await Promise.all(
