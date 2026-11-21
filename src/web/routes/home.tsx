@@ -6,10 +6,15 @@ import { copy } from "../../shared/copy.ts";
 import { authClient } from "../lib/auth-client.ts";
 import { firstNameOf } from "../lib/identity.ts";
 import { useHomeData } from "../lib/home-api.ts";
+import { HomeActivity } from "../components/home-activity.tsx";
 import { HomeChart } from "../components/home-chart.tsx";
+import { HomeCheckIn } from "../components/home-checkin.tsx";
 import { HomeInbox } from "../components/home-inbox.tsx";
 import { HomeKpis } from "../components/home-kpis.tsx";
 import { HomeNeedsYou } from "../components/home-needs-you.tsx";
+import { HomePauseBanner } from "../components/home-pause-banner.tsx";
+import { HomeQueue } from "../components/home-queue.tsx";
+import { HomeStrengthen } from "../components/home-strengthen.tsx";
 import { PageHeader } from "../components/page-header.tsx";
 
 const RANGE_KEYS: readonly HomeRangeKey[] = ["7D", "30D", "90D"];
@@ -49,6 +54,7 @@ export function HomePage() {
   const [rangeKey, setRangeKey] = useState<HomeRangeKey>("7D");
 
   const range = home?.ranges[rangeKey] ?? null;
+  const paused = home?.pauseReason !== null && home?.pauseReason !== undefined;
 
   return (
     <div>
@@ -61,6 +67,9 @@ export function HomePage() {
           </>
         }
       />
+      {home?.pauseReason === null || home?.pauseReason === undefined ? null : (
+        <HomePauseBanner reason={home.pauseReason} />
+      )}
       <div className="mt-[30px] flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-3.5">
           <h2 className="font-serif text-[26px] leading-[1.5]">{copy.home.daySoFar}</h2>
@@ -91,7 +100,7 @@ export function HomePage() {
       </div>
       {home === undefined || range === null ? null : (
         <>
-          <HomeKpis days={DAYS[rangeKey]} home={home} range={range} />
+          <HomeKpis days={DAYS[rangeKey]} home={home} paused={paused} range={range} />
           <div className="mt-5 flex flex-wrap items-stretch gap-5">
             <HomeChart range={range} rangeKey={rangeKey} />
             <HomeNeedsYou
@@ -100,7 +109,33 @@ export function HomePage() {
               total={home.reviews.total}
             />
           </div>
-          <HomeInbox now={home.now} rows={home.recentInbox} zone={home.timeZone} />
+          {paused ? (
+            <>
+              <div className="mt-5 flex flex-wrap items-stretch gap-5">
+                <HomeQueue
+                  position={home.queue.position}
+                  sendAt={home.queue.sendAt}
+                  zone={home.timeZone}
+                />
+                {home.checkInDue > 0 ? <HomeCheckIn /> : null}
+              </div>
+              <HomeActivity
+                failed={home.activity.failed}
+                now={home.now}
+                sent={home.activity.sent}
+                zone={home.timeZone}
+              />
+              {home.strengthen === null ? null : (
+                <HomeStrengthen missing={home.strengthen.missing} />
+              )}
+            </>
+          ) : null}
+          <HomeInbox
+            fig={paused ? copy.home.inbox.figPaused : copy.home.inbox.fig}
+            now={home.now}
+            rows={home.recentInbox}
+            zone={home.timeZone}
+          />
         </>
       )}
     </div>

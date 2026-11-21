@@ -84,5 +84,15 @@ export default defineConfig({
         },
       },
     },
+    {
+      name: "home-paused-boards",
+      testMatch: /board-match-paused\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/../../design/reference/home-paused/{arg}{ext}",
+        },
+      },
+    },
   ],
 });

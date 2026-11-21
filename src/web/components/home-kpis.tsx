@@ -11,8 +11,13 @@ function timeText(at: number, zone: string) {
   }).format(new Date(at));
 }
 
-export function HomeKpis(props: { days: number; home: HomeResponse; range: HomeRange }) {
-  const { days, home, range } = props;
+export function HomeKpis(props: {
+  days: number;
+  home: HomeResponse;
+  paused: boolean;
+  range: HomeRange;
+}) {
+  const { days, home, paused, range } = props;
 
   const nextSend =
     home.nextSendAt === null
@@ -29,7 +34,7 @@ export function HomeKpis(props: { days: number; home: HomeResponse; range: HomeR
     },
     {
       arrow: "·",
-      delta: nextSend,
+      delta: paused ? copy.home.heldWhilePaused : nextSend,
       label: copy.home.kpi.queued,
       tone: "text-muted-foreground",
       value: home.queued,

@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
+import { PAUSE_REASONS } from "../../shared/copy.ts";
+
 const chartSchema = z.object({
   labels: z.array(z.string()),
   per: z.enum(["day", "week"]),
@@ -33,12 +35,34 @@ const inboxRowSchema = z.object({
 });
 
 const homeResponseSchema = z.object({
+  activity: z.object({
+    failed: z.array(
+      z.object({
+        at: z.number(),
+        company: z.string(),
+        id: z.string(),
+        reason: z.string(),
+        title: z.string(),
+      }),
+    ),
+    sent: z.array(
+      z.object({
+        at: z.number(),
+        company: z.string(),
+        id: z.string(),
+        status: z.enum(["sent", "confirming"]),
+        title: z.string(),
+      }),
+    ),
+  }),
   applicationsLeft: z.number(),
+  checkInDue: z.number(),
   dailyCap: z.number(),
   nextSendAt: z.number().nullable(),
   now: z.number(),
-  pauseReason: z.string().nullable(),
+  pauseReason: z.enum(PAUSE_REASONS).nullable(),
   planApplications: z.number(),
+  queue: z.object({ position: z.number().nullable(), sendAt: z.number().nullable() }),
   queued: z.number(),
   ranges: z.object({ "7D": rangeSchema, "30D": rangeSchema, "90D": rangeSchema }),
   recentInbox: z.array(inboxRowSchema),
@@ -50,6 +74,7 @@ const homeResponseSchema = z.object({
   }),
   running: z.boolean(),
   sentToday: z.number(),
+  strengthen: z.object({ missing: z.number() }).nullable(),
   timeZone: z.string(),
 });
 
@@ -62,6 +87,12 @@ export type HomeRangeKey = keyof HomeResponse["ranges"];
 export type HomeReviewRow = z.infer<typeof reviewRowSchema>;
 
 export type HomeInboxRow = z.infer<typeof inboxRowSchema>;
+
+export type HomeActivitySentRow = HomeResponse["activity"]["sent"][number];
+
+export type HomeActivityFailedRow = HomeResponse["activity"]["failed"][number];
+
+export type HomePauseReason = z.infer<typeof homeResponseSchema>["pauseReason"];
 
 async function loadHome() {
   const response = await fetch("/api/home");
