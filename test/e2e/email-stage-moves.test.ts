@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { generateKeyPairSync } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 import type { APIRequestContext, Browser } from "@playwright/test";
 import { dkimSign } from "mailauth";
@@ -447,6 +447,56 @@ test("Haiku classifies unsure mail and its cost is recorded", async ({ moves }) 
 
   expect(usage.totals.calls).toBe(1);
   expect(usage.totals.costMicros).toBeGreaterThan(0);
+
+  await owner.dispose();
+});
+
+test("a degraded flag makes mail classification rules-only and logs it", async ({ moves }) => {
+  const { owner, userId } = await ownerContextFor(moves.server.url);
+  const applicationId = await seed(owner, userId);
+  const address = await mailboxAddress(owner);
+
+  const objects = join(dirname(moves.server.databasePath), "objects");
+
+  mkdirSync(join(objects, "ops"), { recursive: true });
+  writeFileSync(
+    join(objects, "ops/degraded.json"),
+    JSON.stringify({
+      version: 1,
+      degraded: true,
+      since: "2026-11-21T15:00:00.000Z",
+      metrics: [
+        {
+          metric: "r2.class_a_operations",
+          used: 950_000,
+          allowance: 1_000_000,
+          share: 0.95,
+        },
+      ],
+    }),
+  );
+
+  await forward(
+    moves,
+    owner,
+    fresh(fixture("greenhouse-unclear.eml")),
+    address,
+    "us.greenhouse-mail.io",
+  );
+  await runMailJobs(owner);
+
+  expect(moves.anthropic.batchesCreated()).toBe(0);
+  expect((await applicationDetail(owner, applicationId)).stage).toBe("applied");
+
+  const enabled = await moves.server.waitForStderr(/^overture degraded: enabled since/u);
+
+  expect(enabled).toContain("r2.class_a_operations at 95%");
+
+  const skipped = await moves.server.waitForStderr(
+    /^overture degraded: email_classify skipped while degraded/u,
+  );
+
+  expect(skipped).toContain("rules only");
 
   await owner.dispose();
 });

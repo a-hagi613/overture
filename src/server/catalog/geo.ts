@@ -94,27 +94,44 @@ for (const [code, name] of Object.entries(dataset.regions)) {
 const citiesByName = new Map<string, CityRow>();
 const citiesByUsState = new Map<string, CityRow>();
 
-for (const row of dataset.cities) {
+const nonCityNames = new Set<string>([
+  ...countries.keys(),
+  ...countryNameLookup.keys(),
+  ...nonCountryNames,
+  ...remoteKeywords,
+]);
+
+const cities = dataset.cities.flatMap((row) => {
   const [name, country, admin1, ...aliases] = row;
 
   if (name === undefined || country === undefined || admin1 === undefined) {
-    continue;
+    return [];
   }
 
-  const city: CityRow = { name, country, admin1 };
+  return [{ aliases, city: { name, country, admin1 } }];
+});
 
-  if (country === "US" && /^[A-Z]{2}$/u.test(admin1)) {
-    const stateKey = `${normalizePlaceName(name)}|${admin1}`;
+for (const { city } of cities) {
+  const normalized = normalizePlaceName(city.name);
+
+  if (normalized !== "" && !citiesByName.has(normalized)) {
+    citiesByName.set(normalized, city);
+  }
+
+  if (city.country === "US" && /^[A-Z]{2}$/u.test(city.admin1)) {
+    const stateKey = `${normalizePlaceName(city.name)}|${city.admin1}`;
 
     if (!citiesByUsState.has(stateKey)) {
       citiesByUsState.set(stateKey, city);
     }
   }
+}
 
-  for (const candidate of [name, ...aliases]) {
-    const normalized = normalizePlaceName(candidate);
+for (const { aliases, city } of cities) {
+  for (const alias of aliases) {
+    const normalized = normalizePlaceName(alias);
 
-    if (normalized === "" || citiesByName.has(normalized)) {
+    if (normalized === "" || nonCityNames.has(normalized) || citiesByName.has(normalized)) {
       continue;
     }
 
@@ -162,7 +179,7 @@ export function isRemoteLocationText(text: string | null | undefined) {
 
 export function resolveLocation(locationRaw: string | null | undefined) {
   if (locationRaw === undefined || locationRaw === null) {
-    return { countryCode: null, region: null, city: null };
+    return { countryCode: null, region: null, regionCode: null, city: null };
   }
 
   const flattened = locationRaw.replaceAll(/\[|\]/gu, " ");
@@ -181,18 +198,19 @@ export function resolveLocation(locationRaw: string | null | undefined) {
 
   const usCity = findUsCityWithState(segments);
   const countryCode = usCity?.country ?? findCountry(segments);
+  const city = usCity ?? findCity(segments, countryCode);
+
+  const cityRegionCode =
+    city === null || city.admin1 === "" ? null : `${city.country}.${city.admin1}`;
 
   const regionCode =
-    usCity === null
-      ? (findRegion(segments, countryCode) ?? findCity(segments, countryCode)?.admin1 ?? null)
-      : `${usCity.country}.${usCity.admin1}`;
-
-  const city = usCity ?? findCity(segments, countryCode);
+    usCity === null ? (findRegion(segments, countryCode) ?? cityRegionCode) : cityRegionCode;
 
   return {
     countryCode:
       city?.country ?? countryCode ?? (regionCode === null ? null : regionCode.slice(0, 2)),
     region: regionCode === null ? null : (regionNames.get(regionCode) ?? regionCode),
+    regionCode,
     city: city?.name ?? null,
   };
 }
@@ -300,6 +318,24 @@ export function regionNameFor(countryCode: string | null, region: string | null)
   }
 
   return regionNames.get(`${countryCode}.${region}`) ?? region;
+}
+
+/**
+ * Whether two region values name the same region. A posting tagged before the
+ * region name was stored keeps the bare admin1 code ("08"), so compare the
+ * resolved names rather than the raw values.
+ * @param countryCode The country both values belong to.
+ * @param left One region value, a name or an admin1 code.
+ * @param right The other region value.
+ * @returns True when both resolve to the same region name.
+ */
+export function sameRegion(countryCode: string | null, left: string | null, right: string | null) {
+  const leftName = regionNameFor(countryCode, left);
+  const rightName = regionNameFor(countryCode, right);
+
+  return (
+    leftName !== null && rightName !== null && leftName.toLowerCase() === rightName.toLowerCase()
+  );
 }
 
 export function usStateNames() {

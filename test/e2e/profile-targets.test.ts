@@ -441,3 +441,45 @@ test("languages and the cover-letter template are saved", async ({
 
   await owner.dispose();
 });
+
+test("a malformed facts save is a 400, not a 500", async ({ isolatedAppServer: { url } }) => {
+  const owner = await ownerContextFor(url);
+  const anonymous = await apiRequest.newContext({ baseURL: url });
+
+  const anonymousMalformed = await anonymous.put("/api/profile/facts", {
+    data: { facts: "not-an-array" },
+  });
+
+  expect(anonymousMalformed.status()).toBe(401);
+
+  await anonymous.dispose();
+
+  const nonJson = await owner.put("/api/profile/facts", {
+    data: "{not-json",
+    headers: { "content-type": "application/json" },
+  });
+
+  expect(nonJson.status()).toBe(400);
+
+  const tooManyFacts = await owner.put("/api/profile/facts", {
+    data: {
+      facts: Array.from({ length: 65 }, (_, index) => ({ key: `fact_${index}`, value: "x" })),
+    },
+  });
+
+  expect(tooManyFacts.status()).toBe(400);
+
+  const invalidScope = await owner.put("/api/profile/facts", {
+    data: { facts: [{ key: "work_auth", scope: "Canada", value: "yes" }] },
+  });
+
+  expect(invalidScope.status()).toBe(400);
+
+  const valid = await owner.put("/api/profile/facts", {
+    data: { facts: [{ key: "legal_name", value: "Maya Okafor" }] },
+  });
+
+  expect(valid.status()).toBe(200);
+
+  await owner.dispose();
+});

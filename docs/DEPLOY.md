@@ -382,6 +382,47 @@ ingests the manifest at 05:00 UTC in `catalog.workable`, behind the `ats`/`worka
 the 20-form probe (#235). The alerts are `workable.feed` for a missing snapshot, one older than 26 hours, a row drop
 or a failed ingest, and the GitHub job itself fails loudly.
 
+## The sentinel Worker (#283)
+
+`workers/sentinel` is a cron Worker that watches Overture from outside Fly (ADR 0033). Every ten minutes it probes
+`https://tryoverture.com/api/health`, reads `workable/manifest.json` from the `overture-files` bucket, and reads
+month-to-date R2, Queues and Workers usage from the Cloudflare GraphQL Analytics API. It pushes to
+`ALERT_NTFY_URL` at 70 % of an allowance and at 90 % writes `ops/degraded.json`, which the app reads and logs: mail
+classification goes rules-only and the live-check R2 round trip is skipped. It never revokes an R2 token — that would
+stop Litestream.
+
+```sh
+cd workers/sentinel
+bunx wrangler secret put ALERT_NTFY_URL          # the owner's ntfy topic
+bunx wrangler secret put CLOUDFLARE_ACCOUNT_TAG  # the 32-character account tag
+bunx wrangler secret put CLOUDFLARE_ANALYTICS_TOKEN # token with Account Analytics: Read
+bunx wrangler deploy
+```
+
+`workers/sentinel/README.md` has the thresholds, the alert keys and the monthly invocation budget. The Worker has no
+public route (`workers_dev` is false) and writes no console output: each run records itself as `lastRun` inside
+`ops/sentinel-state.json`, so one command shows the last run, its alerts and any error:
+
+```sh
+bunx wrangler r2 object get overture-files/ops/sentinel-state.json --pipe
+```
+
+Cloudflare's dashboard still shows the crons' invocation and error counts; a run whose state write fails throws, so it
+appears there as an errored invocation.
+
+What each push means and what to check first:
+
+| Alert | Meaning | First check |
+|---|---|---|
+| `health` | `/api/health` failed or answered a body that is not `"status":"ok"` from outside Fly | the URL from the owner's machine, then `fly status -a overture-web` and `fly logs -a overture-web` |
+| `health.recovered` | the probe passes again | nothing; the app's own health alerts record the incident |
+| `workable` | `workable/manifest.json` is older than 26 h, missing or unparseable | the last `workable-feed` GitHub Action run, then `bunx wrangler r2 object get overture-files/workable/manifest.json --pipe` |
+| `workable.recovered` | the manifest is young again | nothing |
+| `usage.<metric>.warn` | one allowance passed 70 % | §3–§5 of `docs/research/cloudflare-spend-guard-runbook.md` |
+| `usage.degraded` | one or more allowances passed 90 %; `ops/degraded.json` is set and the app runs rules-only | the same runbook; the flag clears itself when usage drops below 90 % |
+| `usage.error` | the GraphQL analytics answer could not be read; the flag, if set, stands | `CLOUDFLARE_ANALYTICS_TOKEN` expiry and Cloudflare's status page |
+| `usage.unconfigured` | `CLOUDFLARE_ACCOUNT_TAG` or `CLOUDFLARE_ANALYTICS_TOKEN` is missing | set both secrets and redeploy |
+
 ## Capturing fixtures
 
 After a deploy, queue one capture for each M1 ATS on `overture-web` (it never clicks Submit):
