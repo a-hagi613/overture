@@ -19,3 +19,24 @@ test("the sign-in screen and the health route are reachable, and the screen is a
 
   expect(results.violations).toEqual([]);
 });
+
+test("the forgot and reset screens are reachable and axe clean", async ({ page, appServerUrl }) => {
+  await page.goto(`${appServerUrl}/forgot-password`);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Forgot your password?" }),
+  ).toBeVisible();
+
+  const forgot = await new AxeBuilder({ page }).analyze();
+
+  expect(forgot.violations).toEqual([]);
+
+  await page.goto(`${appServerUrl}/reset-password?token=not-a-token`);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Choose a new password" }),
+  ).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText("That reset link is used or expired.");
+
+  const reset = await new AxeBuilder({ page }).analyze();
+
+  expect(reset.violations).toEqual([]);
+});
