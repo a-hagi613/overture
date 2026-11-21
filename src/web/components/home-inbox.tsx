@@ -3,38 +3,8 @@ import { Link } from "react-router";
 import type { HomeInboxRow } from "../lib/home-api.ts";
 
 import { copy } from "../../shared/copy.ts";
+import { stampText } from "../lib/home-time.ts";
 import { NavGlyph } from "./nav-glyph.tsx";
-
-function dateKey(at: number, zone: string) {
-  return new Intl.DateTimeFormat(copy.home.dateLocale, {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: zone,
-    year: "numeric",
-  }).format(new Date(at));
-}
-
-function timeText(at: number, zone: string) {
-  return new Intl.DateTimeFormat(copy.home.dateLocale, {
-    hour: "2-digit",
-    hourCycle: "h23",
-    minute: "2-digit",
-    timeZone: zone,
-  }).format(new Date(at));
-}
-
-function stampText(at: number, now: number, zone: string) {
-  if (dateKey(at, zone) === dateKey(now, zone)) {
-    return timeText(at, zone);
-  }
-
-  const weekday = new Intl.DateTimeFormat(copy.home.dateLocale, {
-    timeZone: zone,
-    weekday: "short",
-  }).format(new Date(at));
-
-  return `${weekday} ${timeText(at, zone)}`;
-}
 
 function toneFor(kind: string) {
   if (kind === "ack") {
@@ -48,8 +18,13 @@ function toneFor(kind: string) {
   return { icon: "mail", tone: "bg-ok-soft text-ok" } as const;
 }
 
-export function HomeInbox(props: { now: number; rows: readonly HomeInboxRow[]; zone: string }) {
-  const { now, rows, zone } = props;
+export function HomeInbox(props: {
+  fig?: string;
+  now: number;
+  rows: readonly HomeInboxRow[];
+  zone: string;
+}) {
+  const { fig = copy.home.inbox.fig, now, rows, zone } = props;
 
   return (
     <section
@@ -61,12 +36,10 @@ export function HomeInbox(props: { now: number; rows: readonly HomeInboxRow[]; z
           <h2 className="font-serif text-[26px] leading-[1.5]" id="home-inbox">
             {copy.home.inbox.title}
           </h2>
-          <span className="font-serif text-sm italic text-muted-foreground">
-            {copy.home.inbox.fig}
-          </span>
+          <span className="font-serif text-sm italic text-muted-foreground">{fig}</span>
         </div>
         <Link
-          className="inline-flex min-h-[34px] items-center justify-center rounded-md border border-input bg-card px-3 text-[12.5px] font-semibold hover:bg-muted"
+          className="inline-flex min-h-[34px] items-center justify-center rounded-md border border-input bg-card px-3 text-[12.5px] leading-[normal] font-semibold hover:bg-muted"
           to="/inbox"
         >
           {copy.home.inbox.open}

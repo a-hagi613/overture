@@ -57,6 +57,61 @@ function plural(count: number, one: string, many: string) {
   return count === 1 ? one : many;
 }
 
+function ordinal(count: number) {
+  const remainder = count % 100;
+
+  if (remainder >= 11 && remainder <= 13) {
+    return `${String(count)}th`;
+  }
+
+  if (count % 10 === 1) {
+    return `${String(count)}st`;
+  }
+
+  if (count % 10 === 2) {
+    return `${String(count)}nd`;
+  }
+
+  if (count % 10 === 3) {
+    return `${String(count)}rd`;
+  }
+
+  return `${String(count)}th`;
+}
+
+export const PAUSE_REASONS = [
+  "user",
+  "onboarding",
+  "no_resume",
+  "plan_ended",
+  "payment_failed",
+  "suspended",
+  "no_mailbox",
+] as const;
+
+export type PauseReason = (typeof PAUSE_REASONS)[number];
+
+const FAILED_REASON_TEXT = new Map<string, string>([
+  ["ats_flagged", "The employer's site flagged the application, so nothing was sent."],
+  ["blocked", "The employer's site blocked the attempt before anything was sent."],
+  ["captcha_blocked", "A challenge stopped the attempt, so nothing was sent."],
+  ["code_timeout", "The verification code never arrived, so nothing was sent."],
+  ["crash", "The browser session stopped before anything was sent."],
+  ["form_changed", "The form changed after we had filled it in, so we stopped before sending."],
+  ["posting_closed", "The role closed before Overture could send."],
+  ["provider_error", "The browser session failed before anything was sent."],
+  ["timeout", "The employer's site took too long to answer, so nothing was sent."],
+  [
+    "unconfirmed",
+    "Overture couldn't confirm this one reached the employer, so it won't send it again.",
+  ],
+  ["upload_failed", "The resume upload failed, so nothing was sent."],
+]);
+
+export function failedReasonText(reason: string | null) {
+  return FAILED_REASON_TEXT.get(reason ?? "");
+}
+
 export const copy = {
   app: {
     name: "Overture",
@@ -244,6 +299,76 @@ export const copy = {
       `${delta < 0 ? "−" : "+"}${String(Math.abs(delta))} vs the previous ${String(days)} days`,
     nextSends: (time: string) => `Next one sends about ${time}`,
     nextSendValue: "None yet",
+    heldWhilePaused: "Held while sending is paused",
+    pauseReasons: {
+      user: {
+        copy: "Nothing new is sent until you resume.",
+        fix: "Resume",
+        title: "Paused by you.",
+      },
+      onboarding: {
+        copy: "Sending starts once your facts, forwarding and consent are in.",
+        fix: "Finish setup",
+        title: "Setup isn't finished.",
+      },
+      no_resume: {
+        copy: "Overture sends only the exact file you upload, so it needs one first.",
+        fix: "Upload resume",
+        title: "No resume on file.",
+      },
+      plan_ended: {
+        copy: "Sending stopped when it ran out. Your queue and history are kept.",
+        fix: "Choose a plan",
+        title: "Your plan has ended.",
+      },
+      payment_failed: {
+        copy: "Sending stays paused until the card is updated.",
+        fix: "Update payment",
+        title: "Payment didn't go through.",
+      },
+      suspended: {
+        copy: "Sending is paused while we check it. Support can tell you more.",
+        fix: "Contact support",
+        title: "Your account is under review.",
+      },
+      no_mailbox: {
+        copy: "We need your ATS mail forwarded to see replies and confirmations.",
+        fix: "Set up forwarding",
+        title: "Forwarding isn't set up.",
+      },
+    } satisfies Record<PauseReason, { copy: string; fix: string; title: string }>,
+    queue: {
+      eyebrow: "Queue",
+      inLine: ordinal,
+      inLineTail: "in line",
+      noPosition: "In line",
+      nextAt: (time: string) => `Next send around ${time} once sending resumes.`,
+      waiting: "Next send once sending resumes.",
+    },
+    checkIn: {
+      action: "Start check-in",
+      eyebrow: "Weekly check-in",
+      note: "Three quick questions about this week. It takes about a minute.",
+      title: "How is the search going?",
+    },
+    activity: {
+      couldNotApply: "Couldn't apply",
+      couldNotApplyAria: (company: string, title: string) => `Couldn't apply: ${company}, ${title}`,
+      confirming: "Confirming",
+      failedDefault: "Overture stopped before sending.",
+      fig: "fig. 3",
+      latest: "Latest first",
+      nothingCharged: "Nothing was charged.",
+      sent: "Sent · confirmed",
+      title: "Activity",
+    },
+    strengthen: {
+      action: "Add facts",
+      eyebrow: "Tier 2 · Strengthen your profile",
+      note: "Saved facts answer common questions, so each one means fewer Reviews for you.",
+      title: (missing: number) =>
+        `Add ${countWord(missing)} ${plural(missing, "fact", "facts")} from your last role`,
+    },
     interviewsBooked: (count: number) =>
       `${String(count)} ${plural(count, "interview", "interviews")} booked`,
     applicationsWait: (count: number) =>
@@ -273,6 +398,7 @@ export const copy = {
     },
     inbox: {
       fig: "fig. 3",
+      figPaused: "fig. 4",
       title: "Recent in your Inbox",
       open: "Open Inbox",
       ack: "confirmed they received your application",

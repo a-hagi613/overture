@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -15,6 +15,7 @@ import {
   applicationEvents,
   applications,
   companies,
+  facts,
   mailThreads,
   messages,
   postings,
@@ -26,12 +27,16 @@ import { addLocalDays, localDateAt, localDayStartFor } from "../platform/local-t
 import { enqueuePlannerDay } from "../dispatch/planner.ts";
 import { nextSendSlot, parseSendWindow } from "../dispatch/planning.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
-import { copy } from "../../shared/copy.ts";
+import { copy, failedReasonText } from "../../shared/copy.ts";
+import { TIER_1_FACT_KEYS, TIER_2_FACT_KEYS } from "../../shared/facts.ts";
 
 const UP_NEXT_LIMIT = 6;
 const MAX_REVIEW_ROWS = 4;
 const MAX_INBOX_ROWS = 4;
 const REVIEW_HIDDEN_COMPANIES = 2;
+const ACTIVITY_SENT_LIMIT = 3;
+const ACTIVITY_FAILED_LIMIT = 1;
+const DAY_MS = 24 * 60 * 60_000;
 
 const runningBody = z.object({ running: z.boolean() });
 
@@ -94,6 +99,22 @@ interface HomeInboxView {
   detail: string | null;
   at: number;
   kind: string;
+}
+
+interface HomeActivitySentView {
+  id: string;
+  company: string;
+  title: string;
+  at: number;
+  status: "sent" | "confirming";
+}
+
+interface HomeActivityFailedView {
+  id: string;
+  company: string;
+  title: string;
+  at: number;
+  reason: string;
 }
 
 function dailyCapOf(db: AppDatabase) {
@@ -230,6 +251,10 @@ function rangeView(
   } satisfies HomeRangeView;
 }
 
+function failedReasonFor(reason: string | null) {
+  return failedReasonText(reason) ?? copy.home.activity.failedDefault;
+}
+
 export function createHomeRoutes(deps: {
   db: AppDatabase;
   clock: Clock;
@@ -257,6 +282,178 @@ export function createHomeRoutes(deps: {
       .get();
 
     return row ?? { pauseReason: "onboarding" as const, running: false };
+  }
+
+  function activityOf(userId: string, now: number) {
+    const candidateRows = db
+      .select({
+        at: sql<number>`coalesce(${applications.sentAt}, ${applications.updatedAt})`,
+        company: companies.name,
+        id: applications.id,
+        status: applications.status,
+        title: postings.title,
+      })
+      .from(applications)
+      .leftJoin(postings, eq(postings.id, applications.postingId))
+      .leftJoin(companies, eq(companies.id, applications.companyId))
+      .where(
+        and(eq(applications.userId, userId), inArray(applications.status, ["sent", "confirming"])),
+      )
+      .orderBy(desc(sql`coalesce(${applications.sentAt}, ${applications.updatedAt})`))
+      .limit(ACTIVITY_SENT_LIMIT * 8)
+      .all();
+
+    const sentIds = candidateRows.filter((row) => row.status === "sent").map((row) => row.id);
+
+    const confirmed =
+      sentIds.length === 0
+        ? []
+        : db
+            .select({ applicationId: mailThreads.applicationId })
+            .from(mailThreads)
+            .innerJoin(messages, eq(messages.threadId, mailThreads.id))
+            .where(
+              and(
+                eq(mailThreads.userId, userId),
+                eq(messages.direction, "in"),
+                eq(messages.auth, "pass"),
+                inArray(mailThreads.applicationId, sentIds),
+              ),
+            )
+            .all();
+
+    const confirmedIds = new Set(
+      confirmed.flatMap((row) => (row.applicationId === null ? [] : [row.applicationId])),
+    );
+
+    const sentRows = candidateRows
+      .filter((row) => row.status === "confirming" || confirmedIds.has(row.id))
+      .slice(0, ACTIVITY_SENT_LIMIT);
+
+    const failedRows = db
+      .select({
+        at: sql<number>`coalesce(${applications.sentAt}, ${applications.updatedAt})`,
+        company: companies.name,
+        id: applications.id,
+        reason: applications.statusReason,
+        title: postings.title,
+      })
+      .from(applications)
+      .leftJoin(postings, eq(postings.id, applications.postingId))
+      .leftJoin(companies, eq(companies.id, applications.companyId))
+      .where(and(eq(applications.userId, userId), eq(applications.status, "failed")))
+      .orderBy(desc(sql`coalesce(${applications.sentAt}, ${applications.updatedAt})`))
+      .limit(ACTIVITY_FAILED_LIMIT)
+      .all();
+
+    return {
+      failed: failedRows.map(
+        (row) =>
+          ({
+            at: row.at,
+            company: row.company ?? "",
+            id: row.id,
+            reason: failedReasonFor(row.reason),
+            title: row.title ?? "",
+          }) satisfies HomeActivityFailedView,
+      ),
+      sent: sentRows.map(
+        (row) =>
+          ({
+            at: row.at > now ? now : row.at,
+            company: row.company ?? "",
+            id: row.id,
+            status: row.status === "confirming" ? "confirming" : "sent",
+            title: row.title ?? "",
+          }) satisfies HomeActivitySentView,
+      ),
+    };
+  }
+
+  function queueOf(userId: string, now: number) {
+    const scheduled = db
+      .select({ at: applications.scheduledFor })
+      .from(applications)
+      .where(and(eq(applications.userId, userId), eq(applications.status, "ready")))
+      .orderBy(asc(applications.scheduledFor))
+      .all()
+      .flatMap((row) => (row.at === null ? [] : [row.at]));
+
+    const nextIndex = scheduled.findIndex((at) => at >= now);
+
+    if (nextIndex === -1) {
+      return { position: null, sendAt: null };
+    }
+
+    return { position: nextIndex + 1, sendAt: scheduled[nextIndex] ?? null };
+  }
+
+  function checkInDue(userId: string, now: number) {
+    const configured = Number(getSetting(db, "checkin.after_days"));
+    const afterDays = Number.isFinite(configured) && configured > 0 ? configured : 21;
+    const cutoff = now - afterDays * DAY_MS;
+
+    const candidates = db
+      .select({ id: applications.id })
+      .from(applications)
+      .where(
+        and(
+          eq(applications.userId, userId),
+          eq(applications.stage, "applied"),
+          isNotNull(applications.sentAt),
+          lte(applications.sentAt, cutoff),
+        ),
+      )
+      .all();
+
+    if (candidates.length === 0) {
+      return 0;
+    }
+
+    const linked = db
+      .select({ applicationId: mailThreads.applicationId })
+      .from(mailThreads)
+      .innerJoin(messages, eq(messages.threadId, mailThreads.id))
+      .where(
+        and(
+          eq(mailThreads.userId, userId),
+          eq(messages.direction, "in"),
+          eq(messages.auth, "pass"),
+          inArray(
+            mailThreads.applicationId,
+            candidates.map((candidate) => candidate.id),
+          ),
+        ),
+      )
+      .all();
+
+    const withMail = new Set(
+      linked.flatMap((row) => (row.applicationId === null ? [] : [row.applicationId])),
+    );
+
+    return candidates.filter((candidate) => !withMail.has(candidate.id)).length;
+  }
+
+  function strengthenOf(userId: string) {
+    const rows = db
+      .select({ confirmed: facts.confirmed, key: facts.key })
+      .from(facts)
+      .where(eq(facts.userId, userId))
+      .all();
+
+    const tier1 = new Set<string>(TIER_1_FACT_KEYS);
+    const tier2 = new Set<string>(TIER_2_FACT_KEYS);
+
+    const confirmedOf = (keys: Set<string>) =>
+      rows.filter((row) => row.confirmed && keys.has(row.key)).length;
+
+    if (confirmedOf(tier1) === 0) {
+      return null;
+    }
+
+    const missing = 2 - Math.min(2, confirmedOf(tier2));
+
+    return missing > 0 ? { missing } : null;
   }
 
   async function inboxViews(userId: string) {
@@ -477,12 +674,15 @@ export function createHomeRoutes(deps: {
     const inbox = await inboxViews(userId);
 
     return context.json({
+      activity: activityOf(userId, now),
       applicationsLeft: left,
+      checkInDue: checkInDue(userId, now),
       dailyCap,
       nextSendAt,
       now,
       pauseReason: profile.pauseReason,
       planApplications: planApplications(db, userId, now),
+      queue: queueOf(userId, now),
       queued: readyRows.length,
       ranges,
       recentInbox: inbox,
@@ -505,6 +705,7 @@ export function createHomeRoutes(deps: {
       },
       running: profile.running,
       sentToday,
+      strengthen: strengthenOf(userId),
       timeZone: zone,
       upNext: await matching.upNext(userId, UP_NEXT_LIMIT),
     });

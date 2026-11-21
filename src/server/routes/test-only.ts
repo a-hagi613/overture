@@ -21,6 +21,7 @@ import {
   codeWaits,
   companies,
   companyBoards,
+  facts,
   fxRates,
   ledger,
   liveCheckMail,
@@ -166,7 +167,23 @@ const seedPostingQuestionBody = z.object({
 
 const sampleLedgerBody = z.object({ email: z.email() });
 
-const homeSampleBody = z.object({ email: z.email() });
+const homeSampleBody = z.object({
+  email: z.email(),
+  variant: z.enum(["running", "paused"]).default("running"),
+});
+
+const homePauseBody = z.object({
+  email: z.email(),
+  pauseReason: z.enum([
+    "user",
+    "onboarding",
+    "no_resume",
+    "plan_ended",
+    "payment_failed",
+    "suspended",
+    "no_mailbox",
+  ]),
+});
 
 const seedMailBody = z.object({
   userId: z.string().min(1),
@@ -239,7 +256,7 @@ const seedAnswerBody = z.object({
 
 const SAMPLE_GRANT_QUANTITY = 70;
 
-function defaultStageFor(status: "needs_review" | "ready" | "sent") {
+function defaultStageFor(status: "failed" | "needs_review" | "ready" | "sent") {
   return status === "sent" ? "applied" : "queued";
 }
 
@@ -1613,7 +1630,7 @@ export function createTestRoutes(
   });
 
   routes.post("/home/sample", zValidator("json", homeSampleBody), async (context) => {
-    const { email } = context.req.valid("json");
+    const { email, variant } = context.req.valid("json");
 
     const user = db
       .select()
@@ -1657,19 +1674,26 @@ export function createTestRoutes(
       });
     }
 
+    const paused = variant === "paused";
+
     db.insert(profiles)
       .values({
         createdAt: new Date(now),
         languages: "[]",
-        pauseReason: null,
-        running: true,
+        pauseReason: paused ? "user" : null,
+        running: !paused,
         timezone: "UTC",
         updatedAt: new Date(now),
         userId,
       })
       .onConflictDoUpdate({
         target: profiles.userId,
-        set: { pauseReason: null, running: true, timezone: "UTC", updatedAt: new Date(now) },
+        set: {
+          pauseReason: paused ? "user" : null,
+          running: !paused,
+          timezone: "UTC",
+          updatedAt: new Date(now),
+        },
       })
       .run();
 
@@ -1730,11 +1754,13 @@ export function createTestRoutes(
     function addApplication(input: {
       companyId: string;
       postingId: string;
-      status: "ready" | "needs_review" | "sent";
+      status: "ready" | "needs_review" | "sent" | "failed";
       createdAt?: number;
       scheduledFor?: number;
       sentAt?: number;
-      stage?: "applied" | "screening" | "interviewing" | "closed" | "queued";
+      stage?: "applied" | "screening" | "interviewing" | "closed" | "queued" | null;
+      statusReason?: string | null;
+      updatedAt?: number;
     }) {
       const id = crypto.randomUUID();
 
@@ -1750,11 +1776,11 @@ export function createTestRoutes(
           scheduledFor: input.scheduledFor ?? null,
           scoreAtQueue: null,
           sentAt: input.sentAt ?? null,
-          stage: input.stage ?? defaultStageFor(input.status),
+          stage: input.stage === undefined ? defaultStageFor(input.status) : input.stage,
           stageLocked: false,
           status: input.status,
-          statusReason: null,
-          updatedAt: now,
+          statusReason: input.statusReason ?? null,
+          updatedAt: input.updatedAt ?? now,
           userId,
         })
         .run();
@@ -1794,7 +1820,7 @@ export function createTestRoutes(
         domain: "halden.example",
         eventAt: dayStart(0) + 9 * hour + 12 * minute,
         from: "screening",
-        sentAt: dayStart(0) + 8 * hour + 5 * minute,
+        sentAt: dayStart(0) + 7 * hour + 58 * minute,
         stage: "interviewing" as const,
         subject: "can you do Thursday at 2 pm?",
         text: "Thursday at 2 pm works for us. Can you make it?",
@@ -1810,11 +1836,11 @@ export function createTestRoutes(
         domain: "northwind.example",
         eventAt: null,
         from: null,
-        sentAt: dayStart(0) + 8 * hour + 10 * minute,
+        sentAt: dayStart(0) + 8 * hour + 47 * minute,
         stage: "applied" as const,
         subject: "Your application to Northwind Labs",
         text: "Thank you for applying to Northwind Labs. We received your application.",
-        title: "Staff Platform Engineer",
+        title: "Site Reliability Engineer",
         token: "home-northwind",
         to: null,
       },
@@ -1826,11 +1852,11 @@ export function createTestRoutes(
         domain: "larkspur.example",
         eventAt: dayStart(-1) + 16 * hour + 30 * minute,
         from: "applied",
-        sentAt: dayStart(-1) + 9 * hour,
+        sentAt: dayStart(-1) + 16 * hour + 30 * minute,
         stage: "screening" as const,
         subject: "Phone screen invitation",
         text: "We would like to invite you to a phone screen with our team.",
-        title: "Platform Engineer",
+        title: "Backend Engineer",
         token: "home-larkspur",
         to: "screening",
       },
@@ -1885,7 +1911,7 @@ export function createTestRoutes(
         addApplication({
           companyId: sample.companyId,
           postingId,
-          sentAt: dayStart(offset) + 9 * hour + extra * 6 * minute + 15 * minute,
+          sentAt: dayStart(offset) + 6 * hour + extra * 6 * minute,
           status: "sent",
         });
       }
@@ -1911,14 +1937,79 @@ export function createTestRoutes(
     for (let index = 0; index < 12; index += 1) {
       const postingId = addPosting(sample, "Backend Engineer", `home-ready-${String(index)}`);
 
+      let scheduledFor: number;
+
+      if (!paused) {
+        scheduledFor = dayStart(0) + (11 * 60 + 40 + index * 20) * minute;
+      } else if (index < 2) {
+        scheduledFor = dayStart(0) + (10 * 60 + 40 + index * 15) * minute;
+      } else {
+        scheduledFor = dayStart(0) + (14 * 60 + 20 + (index - 2) * 20) * minute;
+      }
+
       addApplication({
         companyId: sample.companyId,
         postingId,
-        scheduledFor: dayStart(0) + 11 * hour + 40 * minute + index * 20 * minute,
+        scheduledFor,
         stage: "queued",
         status: "ready",
       });
     }
+
+    const failedOwner = addCompany("Ferro Cloud", "ferro-failed.example", "home-ferro-failed");
+    const failedPosting = addPosting(failedOwner, "DevOps Engineer", "home-ferro-failed-1");
+
+    addApplication({
+      companyId: failedOwner.companyId,
+      postingId: failedPosting,
+      stage: null,
+      status: "failed",
+      statusReason: "form_changed",
+      updatedAt: dayStart(-1) + 11 * hour + 5 * minute,
+    });
+
+    const checkInPosting = addPosting(sample, "Backend Engineer", "home-checkin-1");
+
+    addApplication({
+      companyId: sample.companyId,
+      postingId: checkInPosting,
+      sentAt: dayStart(-25) + 10 * hour,
+      stage: "applied",
+      status: "sent",
+    });
+
+    const seedFacts: { key: string; value: string }[] = [
+      { key: "legal_name", value: "Maya Okafor" },
+      { key: "email", value: "maya.okafor@example.com" },
+      { key: "phone", value: "+1 416 555 0100" },
+      { key: "current_city", value: "Toronto" },
+      { key: "current_country", value: "CA" },
+      { key: "linkedin_url", value: "https://www.linkedin.com/in/maya-okafor" },
+    ];
+
+    await Promise.all(
+      seedFacts.map(async (fact) => {
+        const rowId = crypto.randomUUID();
+
+        db.insert(facts)
+          .values({
+            confirmed: true,
+            id: rowId,
+            key: fact.key,
+            revision: 1,
+            scope: "",
+            source: "user",
+            updatedAt: new Date(now),
+            userId,
+            valueEnc: await personal.sealFor(
+              userId,
+              { column: "value_enc", rowId, table: "facts" },
+              fact.value,
+            ),
+          })
+          .run();
+      }),
+    );
 
     const interviewExtras = [
       { offset: -2, at: dayStart(-2) + 15 * hour },
@@ -2099,6 +2190,27 @@ export function createTestRoutes(
     );
 
     return context.json({ ok: true });
+  });
+
+  routes.post("/home/pause", zValidator("json", homePauseBody), (context) => {
+    const { email, pauseReason } = context.req.valid("json");
+
+    const user = db
+      .select()
+      .from(users)
+      .where(eq(users.email, lowercased(email)))
+      .get();
+
+    if (user === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    db.update(profiles)
+      .set({ pauseReason, running: false, updatedAt: new Date(clock.now()) })
+      .where(eq(profiles.userId, user.id))
+      .run();
+
+    return context.json({ pauseReason });
   });
 
   routes.post("/ledger/tamper", zValidator("json", tamperLedgerBody), (context) => {

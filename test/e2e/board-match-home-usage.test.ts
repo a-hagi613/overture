@@ -65,6 +65,8 @@ for (const theme of ["light", "dark"] as const) {
 
     await page.clock.setFixedTime(new Date(2026, 10, 17, 3, 0, 0));
 
+    await page.request.post(`${appServerUrl}/api/running`, { data: { running: true } });
+
     if (theme === "dark") {
       await page.addInitScript(() => {
         globalThis.localStorage.setItem("overture.theme", "dark");

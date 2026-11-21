@@ -160,19 +160,21 @@ test("the Start/Pause switch flips running and the page updates over SSE", async
   await page.getByRole("button", { name: "Pause auto-apply" }).click();
 
   await expect(page.getByText("Auto-apply paused")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start auto-apply" })).toBeVisible();
+  await expect(page.getByText("Paused by you.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
 
   const paused = await request.get("/api/home");
 
   expect(z.object({ running: z.boolean() }).parse(await paused.json()).running).toBe(false);
 
-  await page.getByRole("button", { name: "Start auto-apply" }).click();
+  await page.getByRole("button", { name: "Resume" }).click();
 
   await expect(page.getByText("Auto-apply running")).toBeVisible();
 
   await request.post("/api/running", { data: { running: false } });
 
   await expect(page.getByText("Auto-apply paused")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
 
   await context.close();
   await request.dispose();
@@ -214,6 +216,53 @@ test("Queue position and next send time match the planner", async ({ homeServer 
 
   expect(home.queued).toBe(5);
   expect(home.nextSendAt).toBe(Math.min(...slots));
+
+  await owner.dispose();
+});
+
+test("the paused Home reports its activity, queue place, check-in and strengthen prompt", async ({
+  homeServer,
+}) => {
+  const { owner } = await ownerContextFor(homeServer.url);
+
+  await moveClockTo(owner, serverNow);
+  await owner.post("/__test__/home/sample", {
+    data: { email: authTestIdentity.ownerEmail, variant: "paused" },
+  });
+
+  const paused = z
+    .object({
+      activity: z.object({
+        failed: z.array(z.object({ company: z.string(), reason: z.string(), title: z.string() })),
+        sent: z.array(z.object({ company: z.string(), status: z.string(), title: z.string() })),
+      }),
+      applicationsLeft: z.number(),
+      checkInDue: z.number(),
+      pauseReason: z.string().nullable(),
+      queue: z.object({ position: z.number().nullable(), sendAt: z.number().nullable() }),
+      strengthen: z.object({ missing: z.number() }).nullable(),
+    })
+    .parse(await (await owner.get("/api/home")).json());
+
+  expect(paused.pauseReason).toBe("user");
+  expect(paused.queue).toEqual({ position: 3, sendAt: Date.UTC(2026, 10, 17, 14, 20, 0) });
+  expect(paused.checkInDue).toBe(1);
+  expect(paused.strengthen).toEqual({ missing: 2 });
+
+  expect(paused.activity.sent).toEqual([
+    { company: "Northwind Labs", status: "sent", title: "Site Reliability Engineer" },
+    { company: "Halden Systems", status: "sent", title: "Platform Engineer" },
+    { company: "Larkspur Health", status: "sent", title: "Backend Engineer" },
+  ]);
+  expect(paused.activity.failed).toEqual([
+    {
+      company: "Ferro Cloud",
+      reason: "The form changed after we had filled it in, so we stopped before sending.",
+      title: "DevOps Engineer",
+    },
+  ]);
+
+  expect(paused.applicationsLeft).toBe(63);
 
   await owner.dispose();
 });
