@@ -102,7 +102,7 @@ export function BoardPage() {
   useEffect(
     () =>
       onBoardMoved((event) => {
-        if (event.source !== "email") {
+        if (event.source !== "email" && event.source !== "system") {
           return;
         }
 

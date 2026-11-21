@@ -11,6 +11,8 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+import { CHECKIN_ANSWERS } from "../../../shared/checkins.ts";
+
 const timestamp = (name: string) => integer(name, { mode: "timestamp" });
 
 const cascadeUserId = () =>
@@ -978,6 +980,25 @@ export const reviewAuditEvents = sqliteTable(
     index("review_audit_events_user_at").on(t.userId, t.at),
     index("review_audit_events_kind_at").on(t.kind, t.at),
     index("review_audit_events_application").on(t.applicationId),
+  ],
+);
+
+export const checkins = sqliteTable(
+  "checkins",
+  {
+    id: text("id").primaryKey(),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    userId: cascadeUserId(),
+    dueAt: integer("due_at").notNull(),
+    status: text("status", { enum: ["open", "answered", "expired"] }).notNull(),
+    answer: text("answer", { enum: CHECKIN_ANSWERS }),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("checkins_application_unique").on(t.applicationId),
+    index("checkins_user_status_due").on(t.userId, t.status, t.dueAt),
   ],
 );
 
