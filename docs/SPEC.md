@@ -1048,9 +1048,10 @@ Main deploys only when every job passes.
 
 ### 16.4 Daily live checks (ADR 0013)
 
-Job `live.check` runs daily on `overture-web` and on demand from admin (`POST /admin/api/live-checks`). It runs
-serially while the browser session cap (#160) is unmerged. Each check records pass/fail and its duration in
-`live_check_results`; a failure raises the owner's alert path and none submits an application or touches a user:
+Job `live.check` runs daily on `overture-web` and on demand from admin (`POST /admin/api/live-checks`). Its form
+captures go through the same `acquireBrowserSession` cap as applications (`browser.max_concurrent_sessions`, default
+3). Each check records pass/fail and its duration in `live_check_results`; a failure raises the owner's alert path
+and none submits an application or touches a user:
 
 | Check | What is real | Also refreshes |
 |---|---|---|
