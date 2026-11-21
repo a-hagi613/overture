@@ -22,7 +22,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for fifteen invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
+exist only for sixteen invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
 derivations, the answer planner (a salary Fact kept per currency is chosen only for the currency a question names),
 the facts model (a Fact's scope is validated against its key), the onboarding step's salary and EEO reading, the
 fixture sanitiser (recorded pages must carry no script, event handler, personal data or token), the v1
