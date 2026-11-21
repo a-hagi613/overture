@@ -35,14 +35,11 @@ export function SettingsPage() {
           aria-labelledby="settings-limits"
           className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
         >
-          <div className="flex items-baseline justify-between gap-3">
+          <div>
             <h2 id="settings-limits" className="font-serif text-[26px] leading-[1.1]">
               {copy.settings.limitsHeadingPlain}{" "}
               <span className="italic">{copy.settings.limitsHeadingItalic}</span>
             </h2>
-            <span className="font-serif text-sm italic text-muted-foreground">
-              {copy.settings.folio2}
-            </span>
           </div>
           <p className="mt-1 text-[12.5px] text-muted-foreground">{copy.settings.limitsIntro}</p>
           <div className="mt-4">
@@ -63,13 +60,10 @@ export function SettingsPage() {
           aria-labelledby="settings-account"
           className="rounded-lg border border-border bg-card p-[22px_24px_10px] shadow-sh min-[900px]:col-span-2"
         >
-          <div className="flex items-baseline justify-between gap-3">
+          <div>
             <h2 id="settings-account" className="font-serif text-[26px] leading-[1.1]">
               {copy.settings.accountHeading}
             </h2>
-            <span className="font-serif text-sm italic text-muted-foreground">
-              {copy.settings.folio1}
-            </span>
           </div>
           <p className="mt-1 text-[12.5px] text-muted-foreground">{email}</p>
           <div className="mt-2.5">

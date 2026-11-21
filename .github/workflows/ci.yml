@@ -118,6 +118,7 @@ jobs:
           bun-version: 1.4.5
       - run: bun install --frozen-lockfile
       - run: bun run build
+      - run: bun run copy:check:dist
       - run: bun run db:verify
       - name: Build the inbound mail Worker
         run: cd workers/inbound-mail && bun run dry-run

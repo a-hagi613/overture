@@ -73,10 +73,7 @@ export function HomePage() {
       )}
       {paused || home === undefined ? null : <HomeReadyCard ready={home.ready} />}
       <div className="mt-[30px] flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-baseline gap-3.5">
-          <h2 className="font-serif text-[26px] leading-[1.5]">{copy.home.daySoFar}</h2>
-          <span className="font-serif text-sm italic text-muted-foreground">{copy.home.folio}</span>
-        </div>
+        <h2 className="font-serif text-[26px] leading-[1.5]">{copy.home.daySoFar}</h2>
         <fieldset
           aria-label={copy.home.rangeLabel}
           className="m-0 inline-flex min-w-0 gap-0.5 rounded-lg border border-border bg-muted p-[3px]"
@@ -136,12 +133,7 @@ export function HomePage() {
               )}
             </>
           ) : null}
-          <HomeInbox
-            fig={paused ? copy.home.inbox.figPaused : copy.home.inbox.fig}
-            now={home.now}
-            rows={home.recentInbox}
-            zone={home.timeZone}
-          />
+          <HomeInbox now={home.now} rows={home.recentInbox} zone={home.timeZone} />
         </>
       )}
     </div>

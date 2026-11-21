@@ -49,6 +49,7 @@ export function useLiveUpdates() {
 
     const refresh = (event: MessageEvent) => {
       void queryClient.invalidateQueries({ queryKey: ["home"] });
+      void queryClient.invalidateQueries({ queryKey: ["nav"] });
 
       if (event.type === "notification") {
         void queryClient.invalidateQueries({ queryKey: ["notifications"] });

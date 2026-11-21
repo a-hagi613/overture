@@ -51,16 +51,11 @@ export function HomeChart(props: { range: HomeRange; rangeKey: HomeRangeKey }) {
       aria-labelledby="home-chart"
       className="min-w-0 flex-[999_1_480px] rounded-lg border border-border bg-card px-4 pb-[18px] pt-[22px] shadow-sh min-[768px]:px-6"
     >
-      <div className="flex items-baseline justify-between gap-3">
-        <div>
-          <h2 className="font-serif text-[26px] leading-[1.5]" id="home-chart">
-            {copy.home.chart.title}
-          </h2>
-          <p className="mt-0.5 text-[12.5px] leading-[1.5] text-muted-foreground">{subtitle}</p>
-        </div>
-        <span className="font-serif text-sm italic text-muted-foreground">
-          {copy.home.chart.fig}
-        </span>
+      <div>
+        <h2 className="font-serif text-[26px] leading-[1.5]" id="home-chart">
+          {copy.home.chart.title}
+        </h2>
+        <p className="mt-0.5 text-[12.5px] leading-[1.5] text-muted-foreground">{subtitle}</p>
       </div>
       <div className="mt-4 flex gap-2.5">
         <div className="flex h-[200px] w-[26px] flex-none flex-col items-end justify-between text-[11.5px] tabular-nums text-muted-foreground">

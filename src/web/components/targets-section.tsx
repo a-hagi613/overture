@@ -131,7 +131,6 @@ export function TargetsSection() {
   return (
     <Section id="profile-targets" labelledBy="profile-targets-heading">
       <SectionHead
-        folio={targets.folio}
         headingId="profile-targets-heading"
         intro={targets.intro}
         title={

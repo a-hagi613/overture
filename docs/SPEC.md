@@ -1124,6 +1124,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Area | Routes |
 |---|---|
 | Session | `GET /api/me` |
+| Shell | `GET /api/nav` (the counts behind the nav badges: Applications in Ready, open Reviews, unread employer mail; a zero hides its badge) |
 | Events | `GET /api/events` (SSE; `Last-Event-ID` replay from `events`; heartbeat 25 s) |
 | Home | `GET /api/home` (running and pause reason, applications left, today's sent/remaining, ready-to-send count, queued count + next send time, sent/replies/interviews and a per-day or per-week series for 7D/30D/90D, open Reviews grouped by jobs unlocked, recent authenticated Inbox items, up next, activity, check-ins) · `POST /api/running` `{running}` |
 | Board | `GET /api/board` · `PATCH /api/applications/:id/stage` `{stage, position}` · `POST /api/applications/:id/undo-stage` · `POST /api/applications/:id/withdraw` (before `sending`: Queued, or Skip on a Ready card) |
@@ -1150,7 +1151,7 @@ SSE topics: `application.updated`, `board.moved`, `review.created`, `review.reso
 Visual design: the canvas artifact `P3aiZsEXkoUKBrknvvBNJJ`, Section A, is the wireframe and the build matches it
 pixel for pixel; `DESIGN.md` is its written contract. Boards that contradict this spec are redrawn before the slice
 that builds them (`DESIGN.md` §13). Six destinations, in this order: **Home, Ready, Board, Review, Inbox,
-Profile** (Ready added by ADR 0029); Settings from the avatar; desktop hover submenus; phone bottom tab bar; sub-sections are list pages on phone.
+Profile** (Ready added by ADR 0029); Settings from the avatar; desktop hover submenus; phone bottom tab bar; sub-sections are list pages on phone. Nav badges are live counts — Ready, open Reviews, unread Inbox mail — hidden at zero, and the link's accessible name carries the count.
 
 | Surface | Content | Key states |
 |---|---|---|
