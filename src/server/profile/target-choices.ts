@@ -3,12 +3,13 @@ import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { EmploymentType, Seniority, Workplace } from "../../shared/tag-taxonomy.ts";
 
+import { retryWhenBusy } from "../platform/db/busy.ts";
 import { postings, postingTags } from "../platform/db/schema.ts";
+import { logError } from "../platform/log.ts";
 import { countryNameFor } from "../catalog/geo.ts";
 import { EMPLOYMENT_TYPES, SENIORITIES } from "../../shared/tag-taxonomy.ts";
 
 const MAX_ROLE_CHOICES = 12;
-const MAX_ROLE_CANDIDATES = 80;
 const MAX_LOCATION_CHOICES = 8;
 
 const shownWorkplaces = ["remote", "hybrid", "onsite"] as const satisfies readonly Workplace[];
@@ -38,18 +39,19 @@ export function targetChoices(db: AppDatabase) {
   const roleCandidates = db
     .select({ total: count(), value: postingTags.value })
     .from(postingTags)
-    .where(inArray(postingTags.dimension, ["role", "subrole"]))
+    .innerJoin(postings, eq(postings.id, postingTags.postingId))
+    .where(and(open, inArray(postingTags.dimension, ["role", "subrole"])))
     .groupBy(postingTags.value)
     .orderBy(desc(count()), postingTags.value)
-    .limit(MAX_ROLE_CANDIDATES)
+    .limit(MAX_ROLE_CHOICES)
     .all();
 
-  const hasOpenPosting = (dimensions: ("role" | "subrole" | "seniority")[], value: string) =>
+  const hasOpenSeniority = (value: string) =>
     db
       .select({ one: sql`1` })
       .from(postingTags)
       .innerJoin(postings, eq(postings.id, postingTags.postingId))
-      .where(and(open, inArray(postingTags.dimension, dimensions), eq(postingTags.value, value)))
+      .where(and(open, eq(postingTags.dimension, "seniority"), eq(postingTags.value, value)))
       .limit(1)
       .get() !== undefined;
 
@@ -81,12 +83,9 @@ export function targetChoices(db: AppDatabase) {
   return {
     employmentTypes: shownEmploymentTypes.filter((value) => hasEmploymentType(value)),
     locations: locationChoices(db),
-    roles: roleCandidates
-      .filter((row) => hasOpenPosting(["role", "subrole"], row.value))
-      .slice(0, MAX_ROLE_CHOICES)
-      .map((row) => row.value),
+    roles: roleCandidates.map((row) => row.value),
     seniorities: SENIORITIES.filter(
-      (value) => seniorityPresent.has(value) && hasOpenPosting(["seniority"], value),
+      (value) => seniorityPresent.has(value) && hasOpenSeniority(value),
     ),
     workplaces: shownWorkplaces.filter((value) => hasWorkplace(value)),
   } satisfies TargetChoices;
@@ -96,15 +95,22 @@ export function targetChoices(db: AppDatabase) {
  * Serves the onboarding choices from memory. After `staleMs` the stamp (open Posting count and the
  * newest Posting row) is compared; a change refreshes the choices, in the background unless
  * `staleMs` is 0.
- * @param deps The database, a clock reading in milliseconds and how long a copy is trusted.
+ * @param deps The database, a clock reading in milliseconds, how long a copy is trusted and where a failed refresh is reported (the log by default).
  * @returns `read` for the current choices and `warm` to fill the cache without waiting.
  */
 export function createTargetChoicesCache(deps: {
   db: AppDatabase;
   now: () => number;
+  onError?: (cause: unknown) => void;
   staleMs: number;
 }) {
-  const { db, now, staleMs } = deps;
+  const {
+    db,
+    now,
+    onError = (cause) => logError("onboarding choices refresh", cause),
+    staleMs,
+  } = deps;
+
   let cached: { at: number; stamp: string; value: TargetChoices } | null = null;
   let refreshing = false;
 
@@ -135,14 +141,18 @@ export function createTargetChoicesCache(deps: {
     refreshing = true;
 
     setTimeout(() => {
-      try {
-        compute();
-      } catch {
-        refreshing = false;
-      } finally {
-        refreshing = false;
-      }
+      void refresh();
     }, 0);
+  }
+
+  async function refresh() {
+    try {
+      await retryWhenBusy(compute, "onboarding choices refresh");
+    } catch (error) {
+      onError(error);
+    } finally {
+      refreshing = false;
+    }
   }
 
   function read() {
