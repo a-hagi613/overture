@@ -132,10 +132,11 @@ test("a new user uploads a resume, confirms Facts and returns to the step they l
   await page.getByLabel("Period for CAD").selectOption("a year");
 
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page).toHaveURL(/\/profile#profile-facts$/u);
+  await expect(page).toHaveURL(/\/onboarding\/targets$/u);
 
   await page.goto(`${onboardingServer.url}/onboarding`);
-  await expect(page).toHaveURL(/\/onboarding\/facts$/u);
+  await expect(page).toHaveURL(/\/onboarding\/targets$/u);
+  await page.goto(`${onboardingServer.url}/onboarding/facts`);
   await expect(page.getByLabel("Current job title")).toHaveValue("Staff Platform Engineer");
   await expect(page.getByLabel("Work authorisation in Canada")).toHaveValue("Citizen");
   await expect(page.getByLabel("Salary expectation in CAD")).toHaveValue("140,000");
@@ -211,7 +212,7 @@ test("an unreadable PDF leads to manual entry on the Facts step", async ({
   await page.getByLabel("Period for CAD").selectOption("a year");
 
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page).toHaveURL(/\/profile#profile-facts$/u);
+  await expect(page).toHaveURL(/\/onboarding\/targets$/u);
 
   const facts = factsSchema
     .parse(await (await request.get("/api/profile/facts")).json())
