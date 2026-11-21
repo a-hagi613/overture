@@ -23,6 +23,7 @@
     "db:migrate": "bun run src/server/platform/db/migrate.ts",
     "db:template": "bun run scripts/create-template-db.ts test/e2e/.tmp/template.db",
     "db:backfill-mailboxes": "bun run scripts/backfill-mailboxes.ts",
+    "db:seed-demo": "bun run scripts/seed-demo.ts",
     "db:verify": "bun run scripts/verify-db.ts",
     "lint:parity": "bun run scripts/lint-parity.ts",
     "verify": "bun run scripts/verify.ts",

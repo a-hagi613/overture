@@ -1066,6 +1066,19 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
   applications over 30 days (no card). A sign-in with any other email is refused with the same copy for every method; an
   invite can be revoked until accepted; a suspended user cannot sign in. An accepted invite lands in onboarding after
   sign-in until its steps are finished; the owner and legacy accounts go to Home, whose setup banner opens onboarding. M3 public.
+- **Demo account** (`DEMO_LOGIN_ENABLED=true`, off by default): entering `test@email.com` on the sign-in page signs in
+  as the demo user with one click and sends no mail; with the flag off the same email is refused like any other. The
+  demo is seeded idempotently (`bun run db:seed-demo`, or on its first sign-in) with fictional facts, a resume,
+  targets, ~4 months of Applications across every status and Stage, Ready cards, Reviews, Inbox mail, notifications,
+  Check-ins and an admin grant with its ledger. Role `demo` never sends: the dispatcher, the executor, preparation,
+  push, every outbound mail and the Check-in sweep skip it, no ATS or Browser Use call is made for it, it reads only
+  its own rows, and it is left out of admin counts and the M1 provider report. Its sessions expire after 24 h, and up
+  to 20 visitors may hold one at once (the oldest is evicted). The demo is read-only: every non-GET `/api` call except
+  sign-in and sign-out returns a 403 that points at a real account, so shared demo data cannot be changed, and the
+  cost-bearing posting read is refused the same way; better-auth account mutations (email, password, linked accounts,
+  session revocation and deletion) are refused too. In production a startup check logs the enablement and the
+  guarantees, and refuses to start if `test@email.com` belongs to a non-demo role; the seed runs once at boot and only
+  completes on sign-in when it is missing. Turnstile still applies to its sign-in endpoint.
 
 ### 13.2 Encryption and deletion
 

@@ -33,6 +33,12 @@ A single-use link (one hour) that lets a user choose a new password. Saving it s
 and then signs them in on the device that opened it.
 _Avoid_: forgot-password flow, credential recovery
 
+**Demo account**:
+The `role = demo` account (`test@email.com`) that the owner opens from the sign-in page with one click to see
+Overture as a long-time user would. It is seeded with fictional data, receives no mail, sends no Application, makes
+no ATS or Browser Use call and is left out of admin counts and the M1 provider report.
+_Avoid_: sample account, test user, guest login
+
 ## Applying
 
 **Application**:

@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { genericOAuth, haveIBeenPwned, magicLink } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { eq } from "drizzle-orm";
@@ -32,6 +32,8 @@ import {
 import { consumeEmailRateLimit } from "./rate-limit.ts";
 import type { EmailRateLimitBucket } from "./rate-limit.ts";
 import { verifyTurnstile } from "./turnstile-gate.ts";
+import { demoLoginPlugin, DEMO_SESSION_MS } from "./demo-login.ts";
+import { isDemoUser } from "../demo/role.ts";
 
 const GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration";
 const LINKEDIN_DISCOVERY_URL = "https://www.linkedin.com/oauth/.well-known/openid-configuration";
@@ -97,6 +99,19 @@ const emailRateLimits = new Map<
   ["/request-password-reset", { bucket: "reset", max: 3, windowMs: HOUR_MS }],
 ]);
 
+const demoLockedAuthPaths = new Set([
+  "/change-email",
+  "/change-password",
+  "/delete-user",
+  "/delete-user/callback",
+  "/link-social",
+  "/revoke-other-sessions",
+  "/revoke-sessions",
+  "/set-password",
+  "/unlink-account",
+  "/update-user",
+]);
+
 const emailBodySchema = z.object({ email: z.string().min(1) });
 
 function refuseRateLimit() {
@@ -128,6 +143,7 @@ export type Auth = ReturnType<typeof createAuth>;
 
 export interface AuthOptions {
   onUserCreated?: (user: { id: string; email: string }) => Promise<void> | void;
+  ensureDemoUser?: () => Promise<string>;
 }
 
 export function createAuth(
@@ -218,6 +234,18 @@ export function createAuth(
         await Promise.resolve();
 
         const { path } = context;
+
+        if (demoLockedAuthPaths.has(path)) {
+          const session = await getSessionFromCtx(context).catch(() => null);
+
+          if (session !== null && isDemoUser(db, session.user.id)) {
+            throw new APIError("FORBIDDEN", {
+              code: "demo_locked",
+              message: copy.demo.locked,
+            });
+          }
+        }
+
         const rule = emailRateLimits.get(path);
 
         if (rule === undefined) {
@@ -256,6 +284,38 @@ export function createAuth(
           }
         }
       }),
+      after: createAuthMiddleware(async (context) => {
+        await Promise.resolve();
+
+        if (context.path !== "/get-session") {
+          return;
+        }
+
+        const current = context.context.newSession;
+
+        if (current === null) {
+          return;
+        }
+
+        if (!isDemoUser(db, current.session.userId)) {
+          return;
+        }
+
+        const limit = current.session.createdAt.getTime() + DEMO_SESSION_MS;
+
+        if (current.session.expiresAt.getTime() <= limit) {
+          return;
+        }
+
+        const expiresAt = new Date(limit);
+
+        context.context.setNewSession({
+          session: { ...current.session, expiresAt },
+          user: current.user,
+        });
+
+        db.update(sessions).set({ expiresAt }).where(eq(sessions.id, current.session.id)).run();
+      }),
     },
     rateLimit: {
       enabled: true,
@@ -264,6 +324,7 @@ export function createAuth(
       max: 100,
       customRules: {
         "/sign-in/magic-link": { window: 15 * 60, max: 3 },
+        "/demo/sign-in": { window: 15 * 60, max: 3 },
         "/sign-in/social": { window: 15 * 60, max: 10 },
         "/sign-in/email": { window: 15 * 60, max: 10 },
         "/sign-up/email": { window: 60 * 60, max: 5 },
@@ -394,6 +455,15 @@ export function createAuth(
       haveIBeenPwned({
         customPasswordCompromisedMessage: copy.signIn.passwordCompromised,
       }),
+      ...(env.DEMO_LOGIN_ENABLED && options.ensureDemoUser !== undefined
+        ? [
+            demoLoginPlugin({
+              clock,
+              db,
+              ensureDemoUser: options.ensureDemoUser,
+            }),
+          ]
+        : []),
       passkey({
         rpID: adminOrigin.hostname,
         rpName: copy.app.name,

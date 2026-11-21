@@ -9,6 +9,7 @@ import type { Auth } from "../auth/index.ts";
 import type { MatchingService } from "../matching/score.ts";
 
 import { postingUserState, postings } from "../platform/db/schema.ts";
+import { demoLocked } from "../demo/guard.ts";
 
 const stateBody = z.object({ state: z.enum(["saved", "hidden"]).nullable() });
 
@@ -27,6 +28,12 @@ export function createMatchingRoutes(deps: {
 
     if (account === null) {
       return context.json({ error: "unauthorised" }, 401);
+    }
+
+    const locked = demoLocked(account.role);
+
+    if (locked !== null) {
+      return locked;
     }
 
     const { id } = context.req.param();
@@ -70,6 +77,12 @@ export function createMatchingRoutes(deps: {
 
     if (account === null) {
       return context.json({ error: "unauthorised" }, 401);
+    }
+
+    const locked = demoLocked(account.role);
+
+    if (locked !== null) {
+      return locked;
     }
 
     const { id } = context.req.param();

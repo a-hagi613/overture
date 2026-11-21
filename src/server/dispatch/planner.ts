@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -198,7 +198,9 @@ export function ensurePlannerQueuedForRunningUsers(db: AppDatabase, clock: Clock
     .select({ userId: profiles.userId })
     .from(profiles)
     .innerJoin(users, eq(users.id, profiles.userId))
-    .where(and(eq(profiles.running, true), eq(users.emailVerified, true)))
+    .where(
+      and(eq(profiles.running, true), eq(users.emailVerified, true), sql`${users.role} <> 'demo'`),
+    )
     .all();
 
   for (const row of running) {

@@ -118,6 +118,10 @@ export const copy = {
     description: "A job-search agent that applies to roles for you, and shows its work.",
     rootMissing: "The application root element is missing from the document.",
   },
+  demo: {
+    locked:
+      "The demo account is view-only for this, so nobody can spend money or remove the demo data. Sign in with your own account to upload a file, score a posting, change an answer, export or delete.",
+  },
   nav: {
     label: "Main",
     tabBarLabel: "Quick sections",

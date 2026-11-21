@@ -17,6 +17,7 @@ import { createSkipCompanyService } from "../profile/skip-companies.ts";
 import { targetChoices } from "../profile/target-choices.ts";
 import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
 import { env } from "../config/env.ts";
+import { demoLocked } from "../demo/guard.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
 import {
   ONBOARDING_STEP_COUNT,
@@ -206,6 +207,12 @@ export function createOnboardingRoutes(deps: {
 
       if (account === null) {
         return context.json({ error: "unauthorised" }, 401);
+      }
+
+      const locked = demoLocked(account.role);
+
+      if (locked !== null) {
+        return locked;
       }
 
       return context.json(await step.save(account.id, context.req.valid("json")));
