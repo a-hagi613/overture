@@ -191,6 +191,13 @@ from it, and the 21-day Check-in is the fallback that still asks. Sign-in mail a
 Cloudflare Email Sending from the Fly app, which the Workers limit does not block; the app on `overture-web` is not a
 Worker either, so the product keeps working while inbound mail does not.
 
+The queue consumer stops with everything else, and that is intended (#286): the delivery path is a Worker, so there is
+no way around the limit. Mail that was already on `overture-inbound-mail` before the trip is not lost — the consumer is
+simply not invoked, no retry is spent, and the message is delivered after the limit is lifted or the period resets,
+inside the 14-day retention. Check `wrangler queues info overture-inbound-mail` for the backlog after a trip; a message
+that stayed queued past retention is gone and only the dead-letter alert (if it reached the DLQ) remains. A message
+over 128 KB that was spilled to `overture-inbound-mail-spill` stays there until delivery or the 30-day lifecycle rule.
+
 Inbound mail resumes by itself once the limit is lifted or the period resets; there is no redeploy and no Cloudflare
 change beyond §4. What was lost in the window stays lost, so the order matters: read usage, fix the Worker that
 overspent, lift the limit, re-arm it, then tell affected users to re-forward anything they are waiting on.
