@@ -12,12 +12,7 @@
         "/api/kill-switches",
         "/api/settings/limits.daily_cap"
       ],
-      "routes": [
-        "/admin",
-        "/admin/catalog",
-        "/admin/settings",
-        "/signin"
-      ],
+      "routes": ["/admin", "/admin/catalog", "/admin/settings", "/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -228,11 +223,7 @@
         "/__test__/user/name",
         "/:param"
       ],
-      "routes": [
-        "/admin",
-        "/admin/settings",
-        "/signin"
-      ],
+      "routes": ["/admin", "/admin/settings", "/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -572,13 +563,7 @@
         "/__test__/user/name",
         "/:param"
       ],
-      "routes": [
-        "/",
-        "/admin",
-        "/admin/grants",
-        "/admin/settings",
-        "/signin"
-      ],
+      "routes": ["/", "/admin", "/admin/grants", "/admin/settings", "/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -835,12 +820,7 @@
         "/__test__/user/name",
         "/:param"
       ],
-      "routes": [
-        "/admin",
-        "/admin/mail-health",
-        "/admin/settings",
-        "/signin"
-      ],
+      "routes": ["/admin", "/admin/mail-health", "/admin/settings", "/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -1069,11 +1049,7 @@
         "/__test__/user/name",
         "/:param"
       ],
-      "routes": [
-        "/admin",
-        "/admin/settings",
-        "/signin"
-      ],
+      "routes": ["/admin", "/admin/settings", "/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -1282,11 +1258,7 @@
         "/__test__/user/name",
         "/:param"
       ],
-      "routes": [
-        "/admin",
-        "/admin/settings",
-        "/signin"
-      ],
+      "routes": ["/admin", "/admin/settings", "/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -1739,10 +1711,7 @@
         "/__test__/user/name",
         "/:param"
       ],
-      "routes": [
-        "/admin",
-        "/signin"
-      ],
+      "routes": ["/admin", "/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -2512,11 +2481,7 @@
     },
     "test/e2e/backup-health-cache.test.ts": {
       "full": false,
-      "paths": [
-        "/__test__/clock/offset",
-        "/__test__/turnstile-api.js",
-        "/api/health"
-      ],
+      "paths": ["/__test__/clock/offset", "/__test__/turnstile-api.js", "/api/health"],
       "routes": [],
       "designs": [],
       "modules": [
@@ -2768,9 +2733,7 @@
         "/api/profile/settings",
         "/api/running"
       ],
-      "routes": [
-        "/board"
-      ],
+      "routes": ["/board"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -2991,12 +2954,8 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": [
-        "/consent"
-      ],
-      "designs": [
-        "design/reference/consent/"
-      ],
+      "routes": ["/consent"],
+      "designs": ["design/reference/consent/"],
       "modules": [
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3110,12 +3069,8 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": [
-        "/privacy"
-      ],
-      "designs": [
-        "design/reference/privacy/"
-      ],
+      "routes": ["/privacy"],
+      "designs": ["design/reference/privacy/"],
       "modules": [
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3228,12 +3183,8 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": [
-        "/terms"
-      ],
-      "designs": [
-        "design/reference/terms/"
-      ],
+      "routes": ["/terms"],
+      "designs": ["design/reference/terms/"],
       "modules": [
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3360,13 +3311,8 @@
         "/api/profile/settings",
         "/api/running"
       ],
-      "routes": [
-        "/board"
-      ],
-      "designs": [
-        "design/reference/board/",
-        "design/reference/review/"
-      ],
+      "routes": ["/board"],
+      "designs": ["design/reference/board/", "design/reference/review/"],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -3600,9 +3546,7 @@
         "/api/profile/settings",
         "/api/running"
       ],
-      "routes": [
-        "/board"
-      ],
+      "routes": ["/board"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -3832,12 +3776,8 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": [
-        "/"
-      ],
-      "designs": [
-        "design/reference/code-wait/"
-      ],
+      "routes": ["/"],
+      "designs": ["design/reference/code-wait/"],
       "modules": [
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -3990,12 +3930,8 @@
         "/__test__/user/name",
         "/api/running"
       ],
-      "routes": [
-        "/"
-      ],
-      "designs": [
-        "design/reference/home/"
-      ],
+      "routes": ["/"],
+      "designs": ["design/reference/home/"],
       "modules": [
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -4149,12 +4085,8 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": [
-        "/"
-      ],
-      "designs": [
-        "design/reference/home/"
-      ],
+      "routes": ["/"],
+      "designs": ["design/reference/home/"],
       "modules": [
         "src/server/billing/ledger.ts",
         "src/server/catalog/answer-derivations.ts",
@@ -4325,13 +4257,8 @@
         "/:param.example/:param",
         "/api/profile/settings"
       ],
-      "routes": [
-        "/inbox",
-        "/inbox/address"
-      ],
-      "designs": [
-        "design/reference/inbox/"
-      ],
+      "routes": ["/inbox", "/inbox/address"],
+      "designs": ["design/reference/inbox/"],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -4547,12 +4474,8 @@
         "/__test__/user/name",
         "/settings"
       ],
-      "routes": [
-        "/notifications"
-      ],
-      "designs": [
-        "design/reference/notifications/"
-      ],
+      "routes": ["/notifications"],
+      "designs": ["design/reference/notifications/"],
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/invites.ts",
@@ -4725,12 +4648,8 @@
         "/api/profile/targets",
         "/api/running"
       ],
-      "routes": [
-        "/onboarding/facts"
-      ],
-      "designs": [
-        "design/reference/onboarding-questions/"
-      ],
+      "routes": ["/onboarding/facts"],
+      "designs": ["design/reference/onboarding-questions/"],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -4885,9 +4804,7 @@
         "/api/profile/resume"
       ],
       "routes": [],
-      "designs": [
-        "design/reference/onboarding-resume/"
-      ],
+      "designs": ["design/reference/onboarding-resume/"],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -5014,12 +4931,8 @@
         "/api/profile/languages",
         "/api/profile/targets"
       ],
-      "routes": [
-        "/onboarding/targets"
-      ],
-      "designs": [
-        "design/reference/onboarding-targets/"
-      ],
+      "routes": ["/onboarding/targets"],
+      "designs": ["design/reference/onboarding-targets/"],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -5163,12 +5076,8 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": [
-        "/onboarding"
-      ],
-      "designs": [
-        "design/reference/onboarding-welcome/"
-      ],
+      "routes": ["/onboarding"],
+      "designs": ["design/reference/onboarding-welcome/"],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -5311,12 +5220,8 @@
         "/__test__/user/name",
         "/settings"
       ],
-      "routes": [
-        "/"
-      ],
-      "designs": [
-        "design/reference/home-paused/"
-      ],
+      "routes": ["/"],
+      "designs": ["design/reference/home-paused/"],
       "modules": [
         "src/server/auth/email.ts",
         "src/server/auth/invites.ts",
@@ -5509,12 +5414,8 @@
         "/api/profile/targets",
         "/api/running"
       ],
-      "routes": [
-        "/profile"
-      ],
-      "designs": [
-        "design/reference/profile/"
-      ],
+      "routes": ["/profile"],
+      "designs": ["design/reference/profile/"],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -5699,12 +5600,8 @@
         "/api/ready",
         "/api/running"
       ],
-      "routes": [
-        "/ready"
-      ],
-      "designs": [
-        "design/reference/ready/"
-      ],
+      "routes": ["/ready"],
+      "designs": ["design/reference/ready/"],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -5901,9 +5798,7 @@
         "/api/profile/targets",
         "/api/running"
       ],
-      "routes": [
-        "/review"
-      ],
+      "routes": ["/review"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -6113,12 +6008,8 @@
         "/__test__/user/name",
         "/settings/delete"
       ],
-      "routes": [
-        "/settings/delete"
-      ],
-      "designs": [
-        "design/reference/settings-delete/"
-      ],
+      "routes": ["/settings/delete"],
+      "designs": ["design/reference/settings-delete/"],
       "modules": [
         "src/server/account/erase.ts",
         "src/server/auth/email.ts",
@@ -6265,13 +6156,8 @@
         "/__test__/user/name",
         "/api/running"
       ],
-      "routes": [
-        "/"
-      ],
-      "designs": [
-        "design/reference/board/",
-        "design/reference/home/"
-      ],
+      "routes": ["/"],
+      "designs": ["design/reference/board/", "design/reference/home/"],
       "modules": [
         "src/server/billing/ledger.ts",
         "src/server/catalog/ashby-feed.ts",
@@ -6421,13 +6307,8 @@
         "/__test__/turnstile",
         "/__test__/user/name"
       ],
-      "routes": [
-        "/forgot-password",
-        "/signin"
-      ],
-      "designs": [
-        "design/reference/signin/"
-      ],
+      "routes": ["/forgot-password", "/signin"],
+      "designs": ["design/reference/signin/"],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -8752,9 +8633,7 @@
         "/api/events",
         "/api/search"
       ],
-      "routes": [
-        "/search"
-      ],
+      "routes": ["/search"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -8993,9 +8872,7 @@
         "/__test__/user/name",
         "/api/search"
       ],
-      "routes": [
-        "/search"
-      ],
+      "routes": ["/search"],
       "designs": [],
       "modules": [
         "src/server/billing/ledger.ts",
@@ -10571,9 +10448,7 @@
         "/api/checkins/:param",
         "/api/home"
       ],
-      "routes": [
-        "/"
-      ],
+      "routes": ["/"],
       "designs": [],
       "modules": [
         "src/server/billing/ledger.ts",
@@ -11114,9 +10989,7 @@
     },
     "test/e2e/cloud-probe.test.ts": {
       "full": false,
-      "paths": [
-        "/:param/jobs/:param"
-      ],
+      "paths": ["/:param/jobs/:param"],
       "routes": [],
       "designs": [],
       "modules": [
@@ -11374,10 +11247,7 @@
         "/settings",
         "/settings/delete"
       ],
-      "routes": [
-        "/settings",
-        "/settings/delete"
-      ],
+      "routes": ["/settings", "/settings/delete"],
       "designs": [],
       "modules": [
         "src/server/account/erase.ts",
@@ -11628,14 +11498,7 @@
         "/api/reviews/demo-review-01/answer",
         "/api/running"
       ],
-      "routes": [
-        "/board",
-        "/inbox",
-        "/profile",
-        "/ready",
-        "/review",
-        "/signin"
-      ],
+      "routes": ["/board", "/inbox", "/profile", "/ready", "/review", "/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -12248,9 +12111,7 @@
         "/api/board",
         "/api/profile/mailbox"
       ],
-      "routes": [
-        "/board"
-      ],
+      "routes": ["/board"],
       "designs": [],
       "modules": [
         "src/server/billing/ledger.ts",
@@ -12466,9 +12327,7 @@
         "/api/profile/targets",
         "/settings/export"
       ],
-      "routes": [
-        "/settings/export"
-      ],
+      "routes": ["/settings/export"],
       "designs": [],
       "modules": [
         "src/server/account/erase.ts",
@@ -13510,9 +13369,7 @@
         "/api/ready",
         "/api/running"
       ],
-      "routes": [
-        "/"
-      ],
+      "routes": ["/"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -14037,12 +13894,7 @@
         "/api/threads",
         "/api/threads/:param"
       ],
-      "routes": [
-        "/board",
-        "/inbox",
-        "/inbox/:id",
-        "/inbox/address"
-      ],
+      "routes": ["/board", "/inbox", "/inbox/:id", "/inbox/address"],
       "designs": [],
       "modules": [
         "src/server/billing/ledger.ts",
@@ -14249,12 +14101,7 @@
         "/__test__/user/suspend",
         "/:param"
       ],
-      "routes": [
-        "/",
-        "/admin",
-        "/admin/settings",
-        "/signin"
-      ],
+      "routes": ["/", "/admin", "/admin/settings", "/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -15004,14 +14851,7 @@
         "/api/consent/versions",
         "/settings"
       ],
-      "routes": [
-        "/",
-        "/consent",
-        "/privacy",
-        "/settings",
-        "/signin",
-        "/terms"
-      ],
+      "routes": ["/", "/consent", "/privacy", "/settings", "/signin", "/terms"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -16333,9 +16173,7 @@
         "/api/home",
         "/api/nav"
       ],
-      "routes": [
-        "/"
-      ],
+      "routes": ["/"],
       "designs": [],
       "modules": [
         "src/server/billing/ledger.ts",
@@ -16509,9 +16347,7 @@
         "/api/push/subscribe",
         "/api/push/unsubscribe"
       ],
-      "routes": [
-        "/notifications"
-      ],
+      "routes": ["/notifications"],
       "designs": [],
       "modules": [
         "src/server/billing/ledger.ts",
@@ -16678,9 +16514,7 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": [
-        "/signin"
-      ],
+      "routes": ["/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -16841,10 +16675,7 @@
         "/api/profile/targets",
         "/api/running"
       ],
-      "routes": [
-        "/",
-        "/onboarding/facts"
-      ],
+      "routes": ["/", "/onboarding/facts"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -17045,12 +16876,7 @@
         "/api/profile/skip-companies",
         "/api/profile/targets"
       ],
-      "routes": [
-        "/",
-        "/onboarding",
-        "/onboarding/facts",
-        "/onboarding/resume"
-      ],
+      "routes": ["/", "/onboarding", "/onboarding/facts", "/onboarding/resume"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -17262,11 +17088,7 @@
         "/api/onboarding/start",
         "/api/onboarding/timezone"
       ],
-      "routes": [
-        "/",
-        "/onboarding",
-        "/onboarding/forward"
-      ],
+      "routes": ["/", "/onboarding", "/onboarding/forward"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -17513,12 +17335,7 @@
         "/api/profile/facts",
         "/api/profile/targets"
       ],
-      "routes": [
-        "/",
-        "/onboarding",
-        "/onboarding/resume",
-        "/onboarding/targets"
-      ],
+      "routes": ["/", "/onboarding", "/onboarding/resume", "/onboarding/targets"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -17723,10 +17540,7 @@
         "/api/profile/settings",
         "/api/profile/targets"
       ],
-      "routes": [
-        "/",
-        "/onboarding/targets"
-      ],
+      "routes": ["/", "/onboarding/targets"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -18543,11 +18357,7 @@
         "/__test__/user/name",
         "/api/running"
       ],
-      "routes": [
-        "/",
-        "/forgot-password",
-        "/signin"
-      ],
+      "routes": ["/", "/forgot-password", "/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -19242,9 +19052,7 @@
         "/api/profile/targets",
         "/api/running"
       ],
-      "routes": [
-        "/profile"
-      ],
+      "routes": ["/profile"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -19499,10 +19307,7 @@
         "/api/profile/targets/match-count",
         "/settings"
       ],
-      "routes": [
-        "/profile",
-        "/settings"
-      ],
+      "routes": ["/profile", "/settings"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -20065,10 +19870,7 @@
     },
     "test/e2e/reach-map.test.ts": {
       "full": false,
-      "paths": [
-        "/api/applications",
-        "/api/applications/:param/approve"
-      ],
+      "paths": ["/api/applications", "/api/applications/:param/approve"],
       "routes": [],
       "designs": [],
       "modules": [
@@ -20150,11 +19952,7 @@
         "/__test__/user/name",
         "/api/health"
       ],
-      "routes": [
-        "/",
-        "/forgot-password",
-        "/reset-password"
-      ],
+      "routes": ["/", "/forgot-password", "/reset-password"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -20368,9 +20166,7 @@
         "/api/ready/approve",
         "/api/running"
       ],
-      "routes": [
-        "/ready"
-      ],
+      "routes": ["/ready"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -21002,9 +20798,7 @@
         "/__test__/user/name",
         "/api/health"
       ],
-      "routes": [
-        "/signin"
-      ],
+      "routes": ["/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -21157,9 +20951,7 @@
         "/__test__/user/name",
         "/__test__/user/suspend"
       ],
-      "routes": [
-        "/signin"
-      ],
+      "routes": ["/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -21648,12 +21440,8 @@
         "/api/profile/settings",
         "/settings"
       ],
-      "routes": [
-        "/settings"
-      ],
-      "designs": [
-        "design/reference/settings/"
-      ],
+      "routes": ["/settings"],
+      "designs": ["design/reference/settings/"],
       "modules": [
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -21835,11 +21623,7 @@
         "/__test__/user/name",
         "/settings"
       ],
-      "routes": [
-        "*",
-        "/",
-        "/inbox"
-      ],
+      "routes": ["*", "/", "/inbox"],
       "designs": [],
       "modules": [
         "src/server/auth/email.ts",
@@ -22131,9 +21915,7 @@
         "/__test__/turnstile/browser",
         "/__test__/user/name"
       ],
-      "routes": [
-        "/signin"
-      ],
+      "routes": ["/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -22287,11 +22069,7 @@
         "/__test__/user/name",
         "/settings"
       ],
-      "routes": [
-        "/",
-        "/settings",
-        "/signin"
-      ],
+      "routes": ["/", "/settings", "/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -22519,9 +22297,7 @@
         "/__test__/turnstile-api.js",
         "/__test__/user/name"
       ],
-      "routes": [
-        "/signin"
-      ],
+      "routes": ["/signin"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
@@ -24196,9 +23972,7 @@
         "/api/profile/resume",
         "/api/ready"
       ],
-      "routes": [
-        "/"
-      ],
+      "routes": ["/"],
       "designs": [],
       "modules": [
         "src/server/auth/client-ip.ts",
