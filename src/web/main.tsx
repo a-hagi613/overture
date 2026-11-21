@@ -23,6 +23,7 @@ import { SearchPage } from "./routes/search.tsx";
 import { SettingsPage } from "./routes/settings.tsx";
 import { ForgotPasswordPage } from "./routes/forgot-password.tsx";
 import { ResetPasswordPage } from "./routes/reset-password.tsx";
+import { SettingsDeletePage } from "./routes/settings-delete.tsx";
 import { SignInPage } from "./routes/signin.tsx";
 import { TermsPage } from "./routes/terms.tsx";
 import { ThemeProvider } from "./lib/theme.tsx";
@@ -48,6 +49,7 @@ const router = createBrowserRouter([
       { path: "/profile", element: <ProfilePage /> },
       { path: "/search", element: <SearchPage /> },
       { path: "/settings", element: <SettingsPage /> },
+      { path: "/settings/delete", element: <SettingsDeletePage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

@@ -10,7 +10,17 @@ import { NavGlyph } from "./nav-glyph.tsx";
 import { RunningSwitch } from "./running-switch.tsx";
 import { useTheme } from "../lib/theme-context.ts";
 
-export function PageHeader({ lead, titleNode }: { lead: string; titleNode: ReactNode }) {
+export function PageHeader({
+  backLink,
+  lead,
+  showRunningSwitch = true,
+  titleNode,
+}: {
+  backLink?: { href: string; label: string };
+  lead: string;
+  showRunningSwitch?: boolean;
+  titleNode: ReactNode;
+}) {
   const { pathname } = useLocation();
   const { theme, toggleTheme, label } = useTheme();
   const { data: session } = authClient.useSession();
@@ -20,8 +30,27 @@ export function PageHeader({ lead, titleNode }: { lead: string; titleNode: React
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
       <div>
-        <p className="font-serif text-[15px] italic text-muted-foreground">{lead}</p>
-        <h1 className="mt-0.5 font-serif text-[32px] leading-[1.05] md:text-[42px]">{titleNode}</h1>
+        {backLink === undefined ? (
+          <p className="font-serif text-[15px] italic text-muted-foreground">{lead}</p>
+        ) : (
+          <Link
+            className="inline-block text-[11px] font-semibold uppercase tracking-[1.65px] leading-[normal] text-foreground"
+            to={backLink.href}
+          >
+            {"← "}
+            {backLink.label}
+          </Link>
+        )}
+        <h1
+          className={`${backLink === undefined ? "mt-0.5" : "mt-2"} font-serif text-[32px] leading-[1.05] md:text-[42px]`}
+        >
+          {titleNode}
+        </h1>
+        {backLink === undefined ? null : (
+          <p className="mt-1 font-serif text-[15px] italic leading-[1.5] text-muted-foreground">
+            {lead}
+          </p>
+        )}
       </div>
       <div className="flex min-w-0 flex-[1_1_420px] flex-wrap items-center justify-end gap-3">
         <label className="flex h-10 min-w-[200px] max-w-[380px] flex-[1_1_260px] items-center gap-2.5 rounded-md border border-input bg-card px-3 max-[767px]:h-11 max-[767px]:max-w-full">
@@ -81,7 +110,7 @@ export function PageHeader({ lead, titleNode }: { lead: string; titleNode: React
         >
           <span aria-hidden="true">{name === null ? "" : initialsOf(name)}</span>
         </Link>
-        <RunningSwitch />
+        {showRunningSwitch ? <RunningSwitch /> : null}
       </div>
     </header>
   );

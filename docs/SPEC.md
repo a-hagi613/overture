@@ -1089,9 +1089,16 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
   (`docs/SALVAGE.md`). Ciphertext format `v1:{key_version}:{iv}:{tag}:{data}`; associated data =
   `table:column:row_id`.
 - Encrypted: all `_enc` columns, resume files, mail HTML and attachments, exports.
-- **Delete account** (Settings, re-auth): delete Browser Use/Kernel profiles via API, delete `user_keys` (shred),
-  cascade-delete rows, delete R2 prefixes `files/{user_id}/`, move mailbox local part to `retired_addresses`, keep
-  only `card_fingerprints` (unlinked HMAC) and admin audit rows. Completes within 24 h; user gets a confirmation email.
+- **Delete account** (Settings → Delete account, re-auth): a signed-in session must re-authenticate first, with the
+  password for a password account or a session created by a fresh sign-in link (or provider sign-in) for any account.
+  The request queues one `account.erase` job.
+  The job deletes `user_keys` first (crypto-shredding), deletes Browser Use/Kernel profiles through the provider API,
+  retires the mailbox local part into `retired_addresses`, deletes R2 prefixes `files/{user_id}/`, `mail/{user_id}/`
+  and `exports/{user_id}/`, then cascade-deletes the user row (all remaining personal rows and the session). It keeps
+  only unlinked card fingerprints (M3) and admin audit rows. It completes within 24 h, sends the confirmation email,
+  and is idempotent across retries. The confirmation mail is queued as its own `account.deleted.notice`
+  job after the transaction, so a mail failure never leaves a keyless account behind. Backups and Litestream replicas keep only the shredded ciphertext
+  until normal rotation; without the wrapped key no copy is readable.
 - **Export**: JSON (profile, facts, applications, snapshots, messages metadata + text) + resume + attachments, zipped,
   encrypted link valid 24 h.
 - Logs/traces never contain names, emails, phone numbers, answers, letters or mail content; a redaction processor in
@@ -1155,7 +1162,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/mailbox` (read-only address, `forwardingWorks`, `firstForwardedAt`) · `GET/PUT /api/profile/strengthen` (the Tier 2 Facts that would unlock queued Applications, each with its count; answering saves the Fact and resolves the Reviews it answers) |
 | Consent | `GET /api/consent` (public current version and text; the signed-in user's accepted version and date) · `GET /api/consent/versions` (every published version, newest first) · `POST /api/consent/accept` `{version}` (refuses `version_changed` when a newer version is published) |
 | Onboarding | `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET/PUT /api/onboarding/targets` (the "What you want" step: the saved Targets, the choices that have open Postings, and the live count) · `PUT /api/onboarding/timezone` (the browser's zone through the seven-day rule) · `GET /api/onboarding` (the step, `onboarded_at`, pause reason, current resume, skip list and whether an invited user must onboard) · `POST /api/onboarding/:step` (records a finished step and returns the state; step 2 refuses without a resume) · `POST /api/onboarding/address/accept` (M2) |
-| Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `POST /api/account/delete` · `GET /api/support-access` |
+| Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `GET /api/account/deletion` (has a password, re-authenticated) · `POST /api/account/reauth` `{password}` · `POST /api/account/reauth/link` (a fresh sign-in link) · `POST /api/account/delete` `{confirm: true}` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `GET /internal/mailboxes/:local` |
 | Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
@@ -1180,7 +1187,7 @@ Profile** (Ready added by ADR 0029); Settings from the avatar; desktop hover sub
 | Review | Open questions grouped by jobs unlocked; answer input matches field type; dismiss | none open |
 | Inbox | Threads list (linked company/card), message view, attachments, "Couldn't verify sender" label; read-only (no reply, §11.2); the code-paste prompt | empty, address explainer |
 | Profile | Resume, facts by tier, targets with live job count, skip list, forwarding address, "Strengthen your profile" | missing Tier 1 facts |
-| Settings | Threshold (60/50), digest, notifications, timezone, languages, forwarding address (read-only), the fixed limits explained (10 a day, 08:00–20:00, one company per 30 days; not editable), Terms, Privacy and the consent version you agreed to, plan & billing (M3), sign out all devices, export, delete, support access log | |
+| Settings | Threshold (60/50), digest, notifications, timezone, languages, forwarding address (read-only), the fixed limits explained (10 a day, 08:00–20:00, one company per 30 days; not editable), Terms, Privacy and the consent version you agreed to, plan & billing (M3), sign out all devices, export, delete, support access log. Account pages share the five tabs: Notifications, Export, Delete account, Support access, Terms and privacy; Delete shows the warning, re-authentication, confirmation, erasing and confirmation-email states | |
 | Onboarding (M2) | 1 Sign in (invite) · 2 Resume · 3 Your facts (Tier 1, prefilled) · 4 What you want (roles, locations, workplace, seniority and a salary floor from choices that have open Postings, live count, browser timezone saved without asking; posting languages start as English and employment type as full-time until Settings) · 5 Forward ATS mail (the Gmail and Outlook filter guide, forwarding detected, or skip to the paste fallback) + consent + trial card (M3) + Start; PWA install + push prompt after Start; each step saved as it is finished | resume unreadable → manual entry, filter skipped → codes by paste |
 | Admin | Same design system: Overview (success per provider × ATS, cost per completed application, queue, spend), Users, Applications/Attempts (live view/replay embed), Reviews, Kill switches & Settings, Catalog health, Mail health, Provider report, Fixture capture, Grants/Refunds, Audit | |
 | Public (M3) | Landing, pricing, privacy, terms; prerendered static HTML; the landing says Overture prepares every application and sends it when you approve | |
