@@ -48,15 +48,7 @@ export function createMeteredMailSender(db: AppDatabase, clock: Clock, adapter: 
       raiseAlert(db, clock, "mail.cap", { ...detail, stage: "warning" });
     }
 
-    if (decision.firstReserveRefusal) {
-      raiseAlert(db, clock, "mail.cap", {
-        ...detail,
-        reason: decision.reason,
-        stage: "refused",
-      });
-    }
-
-    if (decision.firstCapRefusal) {
+    if (decision.firstReserveRefusal || decision.firstCapRefusal) {
       raiseAlert(db, clock, "mail.cap", {
         ...detail,
         reason: decision.reason,

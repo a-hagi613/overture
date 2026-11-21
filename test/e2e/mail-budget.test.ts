@@ -248,6 +248,7 @@ test("a Recap is refused at the reserve while sign-in mail still goes, and the c
     expect(full.refusedAt).not.toBeNull();
 
     const alerts = await alertsFor(request, userId);
+
     const refusalBodies = alerts
       .map((alert) => alert.body)
       .filter((body) => body.includes('"stage":"refused"'));

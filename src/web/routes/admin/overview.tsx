@@ -18,6 +18,14 @@ function gateState(cost: Overview["cost"]) {
   return copy.admin.overviewCostGateMet;
 }
 
+function mailStopNote(mail: Overview["mail"]) {
+  if (mail.refusedAt !== null) {
+    return copy.admin.overviewMailRefused;
+  }
+
+  return mail.reserveRefusedAt === null ? null : copy.admin.overviewMailReservePaused;
+}
+
 export function OverviewPage() {
   const { data, refusal, refresh } = useAdminResource(loadOverview);
 
@@ -38,6 +46,7 @@ export function OverviewPage() {
 
   const view: Overview = data;
   const jobs = Object.entries(view.jobs);
+  const mailStop = mailStopNote(view.mail);
 
   return (
     <>
@@ -183,15 +192,8 @@ export function OverviewPage() {
           <p className="mt-4 text-[12.5px] text-muted-foreground">
             {copy.admin.overviewMailNote(view.mail.cap, view.mail.reserve)}
           </p>
-          {view.mail.refusedAt === null ? null : (
-            <p className="mt-1 text-[12.5px] font-semibold text-foreground">
-              {copy.admin.overviewMailRefused}
-            </p>
-          )}
-          {view.mail.refusedAt !== null || view.mail.reserveRefusedAt === null ? null : (
-            <p className="mt-1 text-[12.5px] font-semibold text-foreground">
-              {copy.admin.overviewMailReservePaused}
-            </p>
+          {mailStop === null ? null : (
+            <p className="mt-1 text-[12.5px] font-semibold text-foreground">{mailStop}</p>
           )}
         </section>
         <section
