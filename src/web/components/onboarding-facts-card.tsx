@@ -63,11 +63,13 @@ function toPayload(draft: Draft) {
 }
 
 export function OnboardingFactsCard({
+  backTo = "/profile#profile-facts",
   onContinue,
   save,
   view,
 }: {
-  onContinue: () => void;
+  backTo?: string;
+  onContinue: () => Promise<void> | void;
   save: (input: OnboardingFactsInput) => Promise<OnboardingFactsView>;
   view: OnboardingFactsView;
 }) {
@@ -104,7 +106,7 @@ export function OnboardingFactsCard({
 
   const continueOn = async () => {
     if (await commit(draft)) {
-      onContinue();
+      await onContinue();
     }
   };
 
@@ -336,7 +338,7 @@ export function OnboardingFactsCard({
       ) : null}
 
       <div className="ftr mt-7 flex items-center justify-between gap-3 border-t border-border pt-5">
-        <Link className="btng" style={{ minHeight: 44 }} to="/profile#profile-facts">
+        <Link className="btng" style={{ minHeight: 44 }} to={backTo}>
           <NavGlyph name="back" size={16} />
           {copy.onboarding.back}
         </Link>

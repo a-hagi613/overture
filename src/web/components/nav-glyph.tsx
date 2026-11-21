@@ -13,8 +13,10 @@ type GlyphName =
   | "profile"
   | "rail"
   | "review"
+  | "search"
   | "signout"
   | "sun"
+  | "doc"
   | "moon";
 
 interface GlyphPaths {
@@ -67,6 +69,11 @@ const glyphs: Record<GlyphName, GlyphPaths> = {
     strokeWidth: 1.6,
   },
   moon: { paths: ["M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"], strokeWidth: 1.7 },
+  search: {
+    paths: ["M11 4.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13z", "M16 16l4.5 4.5"],
+    strokeWidth: 1.7,
+  },
+  doc: { paths: ["M5 4h10l4 4v12H5z", "M9 13h6M9 17h4"], strokeWidth: 1.7 },
   sun: {
     paths: [
       "M12 8a4 4 0 100 8 4 4 0 000-8z",

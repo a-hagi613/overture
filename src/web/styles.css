@@ -694,6 +694,28 @@ body {
   padding: 32px 36px 28px;
 }
 
+.onb .okbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--okbg);
+  color: var(--ok);
+}
+
+.onb .dz {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 36px 24px;
+  border: 1.5px dashed var(--line2);
+  border-radius: 10px;
+  background: var(--well);
+  text-align: center;
+}
+
 .onb .btng {
   line-height: normal;
   display: inline-flex;

@@ -1052,7 +1052,8 @@ Stage effect: rejection → closed (`rejected`); screening → screening; interv
 - M1 allowlist = owner; **M2 invites**: the admin creates an invite for an email; the first verified sign-in with that email by any
   method (magic link, Google, LinkedIn, password) accepts it, creates the account and issues one admin grant of 300
   applications over 30 days (no card). A sign-in with any other email is refused with the same copy for every method; an
-  invite can be revoked until accepted; a suspended user cannot sign in. M3 public.
+  invite can be revoked until accepted; a suspended user cannot sign in. An accepted invite lands in onboarding after
+  sign-in until its steps are finished; the owner and legacy accounts go to Home, whose setup banner opens onboarding. M3 public.
 
 ### 13.2 Encryption and deletion
 
@@ -1120,7 +1121,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Check-ins | `POST /api/checkins/:id` `{answer}` |
 | Inbox | `GET /api/threads` · `GET /api/threads/:id` · `GET /api/attachments/:id` · `POST /api/messages/:id/read` · `GET /api/mail/code-waits` · `POST /api/mail/code-waits/:id` (paste a code) |
 | Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/mailbox` (read-only address, `forwardingWorks`, `firstForwardedAt`) · `GET /api/profile/strengthen` |
-| Onboarding | `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET /api/onboarding` · `POST /api/onboarding/:step` · `POST /api/onboarding/address/accept` (M2) |
+| Onboarding | `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET /api/onboarding` (the step, `onboarded_at`, pause reason, current resume, skip list and whether an invited user must onboard) · `POST /api/onboarding/:step` (records a finished step and returns the state; step 2 refuses without a resume) · `POST /api/onboarding/address/accept` (M2) |
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `POST /api/account/export` · `POST /api/account/delete` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `GET /internal/mailboxes/:local` |

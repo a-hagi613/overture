@@ -10,6 +10,8 @@ import { HomePage } from "./routes/home.tsx";
 import { InboxPage } from "./routes/inbox.tsx";
 import { NotFoundPage } from "./routes/not-found.tsx";
 import { ProfilePage } from "./routes/profile.tsx";
+import { OnboardingPage } from "./routes/onboarding.tsx";
+import { OnboardingResumePage } from "./routes/onboarding-resume.tsx";
 import { OnboardingFactsPage } from "./routes/onboarding-facts.tsx";
 import { ReviewPage } from "./routes/review.tsx";
 import { SearchPage } from "./routes/search.tsx";
@@ -46,6 +48,8 @@ const router = createBrowserRouter([
     ],
   },
   { path: "/signin", element: <SignInPage /> },
+  { path: "/onboarding", element: <OnboardingPage /> },
+  { path: "/onboarding/resume", element: <OnboardingResumePage /> },
   { path: "/onboarding/facts", element: <OnboardingFactsPage /> },
 ]);
 
