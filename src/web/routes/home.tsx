@@ -1,14 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { HomeRangeKey } from "../lib/home-api.ts";
+import type { CodeWait } from "../lib/code-wait-api.ts";
 
 import { copy } from "../../shared/copy.ts";
 import { authClient } from "../lib/auth-client.ts";
+import { CodePasteError, isAtAskTime, useCodeWaits, usePasteCode } from "../lib/code-wait-api.ts";
 import { firstNameOf } from "../lib/identity.ts";
 import { useHomeData } from "../lib/home-api.ts";
+import { CodePasteSheet } from "../components/code-paste-sheet.tsx";
+import type { CodePasteMode } from "../components/code-paste-sheet.tsx";
 import { HomeActivity } from "../components/home-activity.tsx";
 import { HomeChart } from "../components/home-chart.tsx";
 import { HomeCheckIn } from "../components/home-checkin.tsx";
+import { HomeCodeWait } from "../components/home-code-wait.tsx";
 import { HomeInbox } from "../components/home-inbox.tsx";
 import { HomeKpis } from "../components/home-kpis.tsx";
 import { HomeNeedsYou } from "../components/home-needs-you.tsx";
@@ -17,6 +22,12 @@ import { HomeQueue } from "../components/home-queue.tsx";
 import { HomeReadyCard } from "../components/home-ready-card.tsx";
 import { HomeStrengthen } from "../components/home-strengthen.tsx";
 import { PageHeader } from "../components/page-header.tsx";
+
+interface OpenSheet {
+  error: string | null;
+  mode: CodePasteMode;
+  wait: CodeWait;
+}
 
 const RANGE_KEYS: readonly HomeRangeKey[] = ["7D", "30D", "90D"];
 
@@ -52,10 +63,83 @@ export function HomePage() {
   const name = session === null ? "" : session.user.name;
   const firstName = name === "" ? "" : firstNameOf(name);
   const { data: home } = useHomeData();
+  const { data: codeWaits } = useCodeWaits();
+  const paste = usePasteCode();
   const [rangeKey, setRangeKey] = useState<HomeRangeKey>("7D");
+  const [sheet, setSheet] = useState<OpenSheet | null>(null);
 
   const range = home?.ranges[rangeKey] ?? null;
   const paused = home?.pauseReason !== null && home?.pauseReason !== undefined;
+  const waits = codeWaits?.waits ?? [];
+  const wait = waits[0] ?? null;
+  const asked = wait !== null && isAtAskTime(wait, codeWaits?.now ?? 0);
+
+  function liveMode(open: OpenSheet) {
+    if (open.mode === "accepted" || open.mode === "expired") {
+      return open.mode;
+    }
+
+    if (waits.some((entry) => entry.id === open.wait.id)) {
+      return open.mode;
+    }
+
+    return open.wait.expiresAt <= (codeWaits?.now ?? 0) ? "expired" : "accepted";
+  }
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSheet(null);
+      }
+    };
+
+    globalThis.addEventListener("keydown", onKey);
+
+    return () => {
+      globalThis.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
+  function updateSheet(patch: Partial<OpenSheet>) {
+    setSheet((current) => (current === null ? current : { ...current, ...patch }));
+  }
+
+  function openSheet(entry: CodeWait, mode: CodePasteMode) {
+    setSheet({ error: null, mode, wait: entry });
+  }
+
+  function submitCode(code: string) {
+    if (sheet === null) {
+      return;
+    }
+
+    updateSheet({ error: null });
+
+    paste.mutate(
+      { code, waitId: sheet.wait.id },
+      {
+        onError: (failure) => {
+          const outcome = failure instanceof CodePasteError ? failure.outcome : "failed";
+
+          if (outcome === "expired") {
+            updateSheet({ error: copy.codePaste.errors.expired, mode: "expired" });
+          } else if (outcome === "resolved") {
+            updateSheet({ error: null, mode: "accepted" });
+          } else {
+            updateSheet({
+              error:
+                outcome === "not_found"
+                  ? copy.codePaste.errors.notFound
+                  : copy.codePaste.errors.failed,
+            });
+          }
+        },
+        onSuccess: () => {
+          updateSheet({ error: null, mode: "accepted" });
+        },
+      },
+    );
+  }
 
   return (
     <div>
@@ -70,6 +154,18 @@ export function HomePage() {
       />
       {home?.pauseReason === null || home?.pauseReason === undefined ? null : (
         <HomePauseBanner reason={home.pauseReason} />
+      )}
+      {wait === null || !asked ? null : (
+        <HomeCodeWait
+          onNoCode={() => {
+            openSheet(wait, "no_code");
+          }}
+          onPaste={() => {
+            openSheet(wait, "waiting");
+          }}
+          serverNow={codeWaits?.now}
+          wait={wait}
+        />
       )}
       {paused || home === undefined ? null : <HomeReadyCard ready={home.ready} />}
       <div className="mt-[30px] flex flex-wrap items-center justify-between gap-3">
@@ -135,6 +231,22 @@ export function HomePage() {
           ) : null}
           <HomeInbox now={home.now} rows={home.recentInbox} zone={home.timeZone} />
         </>
+      )}
+      {sheet === null ? null : (
+        <CodePasteSheet
+          error={sheet.error}
+          mode={liveMode(sheet)}
+          onClose={() => {
+            setSheet(null);
+          }}
+          onNoCode={() => {
+            updateSheet({ error: null, mode: "no_code" });
+          }}
+          onSubmit={submitCode}
+          pending={paste.isPending}
+          serverNow={codeWaits?.now}
+          wait={sheet.wait}
+        />
       )}
     </div>
   );

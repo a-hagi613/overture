@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { expect } from "@playwright/test";
-import type { APIRequestContext } from "@playwright/test";
+import type { APIRequestContext, Browser } from "@playwright/test";
 import { dkimSign } from "mailauth";
 import { z } from "zod";
 
@@ -685,4 +685,160 @@ test("no code within the limit ends the try before Submit, asks for a paste at f
   expect(expired.status()).toBe(409);
   expect(await openWaits(owner)).toHaveLength(0);
   expect((await homeFor(owner)).applicationsLeft).toBe(3);
+});
+
+async function openHome(
+  browser: Browser,
+  codes: CodeHarness,
+  storageState: Awaited<ReturnType<APIRequestContext["storageState"]>>,
+) {
+  const context = await browser.newContext({ baseURL: codes.server.url, storageState });
+  const page = await context.newPage();
+
+  await page.goto(`${codes.server.url}/`);
+
+  return { context, page };
+}
+
+test("Home asks for the code at five minutes and the sheet's paste resumes the same attempt", async ({
+  browser,
+  codes,
+}) => {
+  const { applicationId, owner, userId } = await readyApplication(codes);
+  const storageState = await owner.storageState();
+  const sending = startSend(owner, applicationId);
+
+  await waitForOpenWait(owner);
+
+  const early = await openHome(browser, codes, storageState);
+
+  await expect(early.page.getByTestId("home-code-wait")).toHaveCount(0);
+  await early.context.close();
+
+  await setClockOffset(owner, 6 * 60_000);
+
+  await expect.poll(async () => (await notificationsOf(owner, userId)).length).toBe(1);
+
+  const [notification] = await notificationsOf(owner, userId);
+
+  expect(notification?.kind).toBe("code_wait");
+
+  const { context, page } = await openHome(browser, codes, storageState);
+
+  await expect(page.getByRole("heading", { name: "Blank Street needs a code." })).toBeVisible();
+  await expect(page.getByText(/^Expires in \d+:\d\d$/u)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Paste the code" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Paste the code" }).click();
+
+  const sheet = page.getByTestId("code-paste-sheet");
+
+  await expect(sheet.getByRole("heading", { name: "Paste the code." })).toBeVisible();
+
+  await sheet.getByLabel("Verification code").fill(code);
+  await sheet.getByRole("button", { name: "Submit code" }).click();
+
+  await expect(sheet.getByRole("heading", { name: "Submitted with your code." })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(sheet.getByText("Code accepted")).toBeVisible();
+  await expect(page.getByTestId("home-code-wait")).toHaveCount(0);
+
+  const response = await sending;
+
+  expect(response.ok()).toBe(true);
+
+  const detail = await applicationOf(owner, applicationId);
+
+  expect(detail.application.status).toBe("sent");
+  expect(detail.application.stage).toBe("applied");
+  expect(typedCode(codes.fixture)).toBe(code);
+
+  const attempts = await attemptsOf(owner, applicationId);
+
+  expect(attempts.length).toBe(1);
+  expect(attempts[0]?.outcome).toBe("sent");
+  expect(attempts[0]?.codeUsed).toBe(true);
+
+  await context.close();
+});
+
+test("a forwarded code arriving first resolves the wait and the Home card goes away", async ({
+  browser,
+  codes,
+}) => {
+  const { applicationId, owner } = await readyApplication(codes);
+  const mailbox = await mailboxAddress(owner);
+  const storageState = await owner.storageState();
+  const sending = startSend(owner, applicationId);
+
+  const wait = await waitForOpenWait(owner);
+
+  await setClockOffset(owner, 6 * 60_000);
+
+  const { context, page } = await openHome(browser, codes, storageState);
+
+  const card = page.getByTestId("home-code-wait");
+
+  await expect(card).toBeVisible();
+
+  const messageId = crypto.randomUUID();
+  const raw = fixtureFile("greenhouse-code.eml").replaceAll("__MESSAGE_ID__", messageId);
+
+  expect((await postInbound(codes.server, await sign(raw), mailbox.address)).status).toBe(204);
+
+  await runDueJobs(owner);
+  await expect.poll(async () => (await storedMessages(owner, mailbox.id)).length).toBe(1);
+  await expect(card).toHaveCount(0);
+
+  const response = await sending;
+
+  expect(response.ok()).toBe(true);
+  expect((await applicationOf(owner, applicationId)).application.status).toBe("sent");
+  expect((await readWait(owner, wait.id)).resolvedBy).toBe("mail");
+
+  await context.close();
+});
+
+test("an expired wait is refused with a clear message and the sheet closes its window", async ({
+  browser,
+  codes,
+}) => {
+  const { applicationId, owner } = await readyApplication(codes);
+  const storageState = await owner.storageState();
+  const sending = startSend(owner, applicationId);
+
+  await waitForOpenWait(owner);
+  await setClockOffset(owner, 6 * 60_000);
+
+  const { context, page } = await openHome(browser, codes, storageState);
+
+  await page.getByRole("button", { name: "Paste the code" }).click();
+
+  const sheet = page.getByTestId("code-paste-sheet");
+
+  await sheet.getByLabel("Verification code").fill(code);
+
+  await setClockOffset(owner, 11 * 60_000);
+  await sheet.getByRole("button", { name: "Submit code" }).click();
+
+  await expect(sheet.getByRole("heading", { name: "The code never arrived." })).toBeVisible();
+  await expect(sheet.getByText("Window closed")).toBeVisible();
+  await expect(sheet.getByRole("alert")).toContainText("That wait has closed");
+
+  const response = await sending;
+
+  expect(response.ok()).toBe(true);
+
+  const detail = await applicationOf(owner, applicationId);
+
+  expect(detail.application.status).toBe("approved");
+  expect(detail.snapshot).toBeNull();
+
+  const attempts = await attemptsOf(owner, applicationId);
+
+  expect(attempts[0]?.outcome).toBe("code_timeout");
+  expect(attempts[0]?.codeUsed).toBe(false);
+
+  await context.close();
 });

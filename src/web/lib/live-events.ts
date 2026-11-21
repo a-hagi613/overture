@@ -10,6 +10,7 @@ const LIVE_TOPICS = [
   "review.resolved",
   "message.received",
   "notification",
+  "code.wait_resolved",
 ] as const;
 
 const boardMovedSchema = z.object({
@@ -51,8 +52,9 @@ export function useLiveUpdates() {
       void queryClient.invalidateQueries({ queryKey: ["home"] });
       void queryClient.invalidateQueries({ queryKey: ["nav"] });
 
-      if (event.type === "notification") {
+      if (event.type === "notification" || event.type === "code.wait_resolved") {
         void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+        void queryClient.invalidateQueries({ queryKey: ["code-waits"] });
       }
 
       if (event.type === "review.created" || event.type === "review.resolved") {
