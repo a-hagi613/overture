@@ -137,7 +137,7 @@ test("every recorded Lever and Ashby form parses into questions", async ({ brows
 test("the recorded forms carry no captured script, handler, asset or real email", () => {
   for (const form of RECORDED_FORMS) {
     const html = readFileSync(join(FORMS, form.file), "utf8");
-    const tags = [...html.matchAll(/<script\b[^>]*>/gu)].map((match) => match[0]);
+    const tags = [...html.matchAll(/<script\b[^>]*>/giu)].map((match) => match[0]);
 
     expect(
       tags.filter((tag) => tag.includes("/__fixture__/runtime.js")),
