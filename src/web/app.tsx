@@ -12,6 +12,7 @@ import { TabBar } from "./components/tab-bar.tsx";
 import { UsageCard } from "./components/usage.tsx";
 import { authClient } from "./lib/auth-client.ts";
 import { useLiveUpdates } from "./lib/live-events.ts";
+import { useNavCounts } from "./lib/nav-api.ts";
 
 const collapsedStorageKey = "overture.rail";
 
@@ -20,6 +21,7 @@ export function AppShell() {
   const { pathname } = useLocation();
   const { data: session, isPending } = authClient.useSession();
   const name = session?.user.name ?? null;
+  const navCounts = useNavCounts();
 
   const [railCollapsed, setRailCollapsed] = useState(() => {
     const stored = globalThis.localStorage.getItem(collapsedStorageKey);
@@ -79,14 +81,14 @@ export function AppShell() {
               </button>
             </div>
             <hr className="m-0 border-border shadow-[0_1px_0_var(--color-bloom)]" />
-            <SideNav showLabels />
+            <SideNav counts={navCounts} showLabels />
             <div className="mt-auto flex flex-col gap-3.5">
               <UsageCard />
               <AvatarLink name={name} wide />
             </div>
           </aside>
         ) : (
-          <BoardRail name={name} onExpand={toggleRail} />
+          <BoardRail counts={navCounts} name={name} onExpand={toggleRail} />
         )}
         <main
           className={
@@ -97,7 +99,7 @@ export function AppShell() {
         >
           <Outlet />
         </main>
-        <TabBar />
+        <TabBar counts={navCounts} />
       </div>
     </div>
   );

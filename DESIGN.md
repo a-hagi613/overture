@@ -46,7 +46,7 @@ typography:
     family: "IBM Plex Mono"
     weights: [400]
     fallback: "ui-monospace"
-    use: "timestamps, folio marks, 'via Greenhouse' — never paragraphs"
+    use: "timestamps, counts, file names, 'via Greenhouse' — never paragraphs"
 rounded:
   xs: "2px"
   sm: "5px"
@@ -220,7 +220,7 @@ Three families, each with one job. Sizes are px at desktop; the phone column is 
 |---|---|---|---|
 | Instrument Serif | 400, italic | Display, headings, big numerals, scores. High-contrast editorial serif carrying the human, written-by-hand side | Newsreader, Georgia |
 | Plus Jakarta Sans | 400 500 600 700 | All UI: body, buttons, labels, tables. Clean and round, reads at 12px. The precise, automated side | system-ui |
-| IBM Plex Mono | 400 | Timestamps, folio marks, "via Greenhouse" only. A typewriter note, used sparingly, never for paragraphs | ui-monospace |
+| IBM Plex Mono | 400 | Timestamps, counts, "via Greenhouse" only. A typewriter note, used sparingly, never for paragraphs | ui-monospace |
 
 **The rule that makes provenance legible without a tooltip:** serif is what a person said, mono is what
 the machine recorded, sans is the interface around it. Serif also sets display type — page and card titles,
@@ -244,7 +244,7 @@ Inline numbers in tables and metadata are mono and tabular. `Yes` in serif besid
 | Label (caps) | 10.5 | 10.5 | 1.2 | .14em |
 
 Uppercase labels are 10.5–11px at `.14–.15em` tracking, and always sit with a larger line that carries
-the meaning — a folio mark or a column header, never a lone instruction. Display type is set tight
+the meaning — a column header or a card title, never a lone instruction. Display type is set tight
 (1.02–1.15); body never is.
 
 ## 4. Space and layout
@@ -415,6 +415,11 @@ button carries `aria-expanded` and a label that changes between Open menu and Cl
 Sidebar items: active = card surface, hairline, 3px orange marker on the left edge (top edge in the tab
 bar). Under 1280 the sidebar becomes a 76px icon rail; under 768 a 64px tab bar.
 
+A nav count badge is live product data, never a drawn sample: Ready counts the Applications waiting for
+approval, Review the open Reviews, Inbox the unread employer mail. No badge shows at zero, and the link's
+accessible name carries the count ("Review, 4 waiting"). The board's 2 / 4 / 3 are sample counts for the
+drawn example, not copy.
+
 **Toasts.** Card surface, `line2` border, lift shadow, radius 8, 340 wide, bottom right (top on phone).
 A toast reports something that happened: the orange check only when Overture acted, `need` colours when it
 needs you, neutral otherwise. One ghost action at most. Enters with a 6px rise over .5s, leaves in 4s.
@@ -484,8 +489,8 @@ them here removes the qualities that make this look authored rather than assembl
 | `overused-font` | 50 | A face is not slop because other people use it; slop is using it with no rule. Ours is semantic and written down: serif is a person's words, mono is a machine's fact, sans is the interface. A distinctive face with a weak rule reads worse than a common face with a strong one |
 | `cream-palette` | 18 | The paper *is* the metaphor. A job hunt is paperwork, applications, letters. A cool grey ground turns this into a dashboard |
 | `italic-serif-display` | 13 | Italic marks the owner's own voice — a signal, not a gradient. It appears where a person is speaking and nowhere else |
-| `undersized-ui-text` | 7 | 10.5–11px tracked caps are a print convention for folio marks and column headers, always paired with a larger line, always at 4.5:1. The remaining hits are a PDF mock rendered at page scale |
-| `numbered-section-labels` | 6 | `fig. 1`, `01 ·` are the editorial device that makes the canvas read as a plate book rather than a set of screenshots |
+| `undersized-ui-text` | 7 | 10.5–11px tracked caps are a print convention for column headers and status pills, always paired with a larger line, always at 4.5:1. The remaining hits are a PDF mock rendered at page scale |
+| `numbered-section-labels` | 6 | `fig. 1`, `01 ·` are a canvas device only: the boards read as a plate book, while the app ships no fig, folio or section-number labels (#307) |
 | `tight-leading` | 4 | Display type is set at 1.02–1.15 by design; body stays at 1.55 and is never flagged |
 | `pulsing-dot` | 3 | The one live mark in the system, with a static state under `prefers-reduced-motion` |
 | `hero-eyebrow-chip` | 3 | A tracked-caps kicker above an `h1` is a masthead convention and carries real categorisation |

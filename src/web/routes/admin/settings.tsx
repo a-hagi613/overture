@@ -59,14 +59,9 @@ export function AdminSettingsPage() {
           aria-labelledby="admin-settings-limits"
           className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
         >
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 id="admin-settings-limits" className="font-serif text-[26px] leading-[1.1]">
-              {copy.admin.settingsHeading}
-            </h2>
-            <span className="font-serif text-sm italic text-muted-foreground">
-              {copy.admin.folio1}
-            </span>
-          </div>
+          <h2 id="admin-settings-limits" className="font-serif text-[26px] leading-[1.1]">
+            {copy.admin.settingsHeading}
+          </h2>
           <p className="mt-1 text-[12.5px] text-muted-foreground">{copy.admin.settingsIntro}</p>
           <div className="mt-4">
             {Object.entries(settingsView).map(([settingKey, value]) => (
@@ -83,14 +78,9 @@ export function AdminSettingsPage() {
           aria-labelledby="admin-kill-switches"
           className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
         >
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 id="admin-kill-switches" className="font-serif text-[26px] leading-[1.1]">
-              {copy.admin.switchesHeading}
-            </h2>
-            <span className="font-serif text-sm italic text-muted-foreground">
-              {copy.admin.folio2}
-            </span>
-          </div>
+          <h2 id="admin-kill-switches" className="font-serif text-[26px] leading-[1.1]">
+            {copy.admin.switchesHeading}
+          </h2>
           <p className="mt-1 text-[12.5px] text-muted-foreground">{copy.admin.switchesIntro}</p>
           <div className="mt-4">
             {switchRows.length === 0 ? (

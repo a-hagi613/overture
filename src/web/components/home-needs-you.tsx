@@ -23,18 +23,13 @@ export function HomeNeedsYou(props: {
       aria-labelledby="home-needs-you"
       className="min-w-0 flex-[1_1_380px] rounded-lg border border-border bg-card px-4 pb-2 pt-[22px] shadow-sh min-[768px]:px-6"
     >
-      <div className="flex items-baseline justify-between gap-3">
-        <div>
-          <h2 className="font-serif text-[26px] leading-[1.5]" id="home-needs-you">
-            {copy.home.needsYou.title}
-          </h2>
-          <p className="mt-0.5 text-[12.5px] leading-[1.5] text-muted-foreground">
-            {copy.home.needsYou.note}
-          </p>
-        </div>
-        <span className="font-serif text-sm italic text-muted-foreground">
-          {copy.home.needsYou.fig}
-        </span>
+      <div>
+        <h2 className="font-serif text-[26px] leading-[1.5]" id="home-needs-you">
+          {copy.home.needsYou.title}
+        </h2>
+        <p className="mt-0.5 text-[12.5px] leading-[1.5] text-muted-foreground">
+          {copy.home.needsYou.note}
+        </p>
       </div>
       <div className="mt-3">
         {reviews.map((review, index) => (

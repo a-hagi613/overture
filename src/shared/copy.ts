@@ -131,6 +131,9 @@ export const copy = {
     review: "Review",
     inbox: "Inbox",
     profile: "Profile",
+    readyCount: (count: number) => `Ready, ${String(count)} to send`,
+    reviewCount: (count: number) => `Review, ${String(count)} waiting`,
+    inboxCount: (count: number) => `Inbox, ${String(count)} unread`,
   },
   brand: {
     homeAria: "Overture, Home",
@@ -146,31 +149,6 @@ export const copy = {
     themeToLight: "Switch to light mode",
     notifications: (count: number) => `Notifications, ${String(count)} unread`,
     notificationsEmpty: "Notifications",
-    notificationsCount: "3",
-    autoApplyRunning: "Auto-apply running",
-    pause: "Pause",
-    usage: {
-      label: "Applications left",
-      left: "63",
-      leftAria: "63 applications left",
-      weekPlan: "of 70 on your week plan",
-      today: "7 of 10 sent today · resets at midnight",
-    },
-    counters: {
-      review: "4",
-      reviewAria: "Review, 4 waiting",
-      inbox: "3",
-      inboxAria: "Inbox, 3 unread",
-    },
-  },
-  sample: {
-    reviewWaiting: "4",
-    readyToSend: "2",
-    readyAria: "Ready, 2 to send",
-    inboxUnread: "3",
-    bellAria: "Notifications, 3 unread",
-    autoApplyLabel: "Auto-apply running",
-    pause: "Pause",
   },
   signIn: {
     brandTagline: "The job hunt, handled.",
@@ -294,11 +272,7 @@ export const copy = {
         "Distributed Go & Kubernetes",
         "Target base compensation",
       ],
-      facts: [
-        "Authorized · no sponsorship",
-        "Resume §2 · 6 yrs production",
-        "CAD 195k · Saved fact",
-      ],
+      facts: ["Authorized · no sponsorship", "Resume · 6 yrs production", "CAD 195k · Saved fact"],
       receiptStamp: "10:42 · Maya_Okafor_Resume.pdf",
       stamp: "Submitted",
       pillar01: "01",
@@ -406,7 +380,6 @@ export const copy = {
       `${String(sent)} of ${String(cap)} sent today · resets at midnight`,
     usageAria: (count: number) => `${String(count)} applications left`,
     daySoFar: "The day so far",
-    folio: "folio 01",
     ready: {
       action: "Review and send",
       eyebrow: "Ready to send",
@@ -494,7 +467,6 @@ export const copy = {
       couldNotApplyAria: (company: string, title: string) => `Couldn't apply: ${company}, ${title}`,
       confirming: "Confirming",
       failedDefault: "Overture stopped before sending.",
-      fig: "fig. 3",
       latest: "Latest first",
       nothingCharged: "Nothing was charged.",
       sent: "Sent · confirmed",
@@ -512,7 +484,6 @@ export const copy = {
     applicationsWait: (count: number) =>
       `${capitalize(countWord(count))} ${plural(count, "application waits", "applications wait")} on these`,
     chart: {
-      fig: "fig. 1",
       title: "Applications sent",
       today: (count: number) => `Today ${String(count)}`,
       thisWeek: (count: number) => `This week ${String(count)}`,
@@ -523,7 +494,6 @@ export const copy = {
       perWeek90: "Per week, last 90 days",
     },
     needsYou: {
-      fig: "fig. 2",
       title: "Needs you",
       note: "Open questions, grouped by jobs unlocked",
       jobsUnlocked: (count: number) =>
@@ -535,8 +505,6 @@ export const copy = {
       empty: "Nothing needs you right now.",
     },
     inbox: {
-      fig: "fig. 3",
-      figPaused: "fig. 4",
       title: "Recent in your Inbox",
       open: "Open Inbox",
       ack: "confirmed they received your application",
@@ -805,8 +773,6 @@ export const copy = {
     lead: "Your account, and how Overture works for you",
     titlePlain: "Your",
     titleItalic: "Settings",
-    folio1: "fig. 1",
-    folio2: "fig. 2",
     limitsHeadingPlain: "How Overture",
     limitsHeadingItalic: "paces itself",
     limitsIntro:
@@ -824,7 +790,6 @@ export const copy = {
     limitRepostDetail: "A role that is reposted is skipped for 60 days after you applied to it.",
     limitsFixed: "These limits are fixed. Nothing here can be turned up, down or off.",
     timeLanguageHeading: "Time and language",
-    timeLanguageFolio: "fig. 5",
     timeZoneLabel: "Time zone",
     timeZoneHint:
       "Your day, the 08:00 to 20:00 window and the midnight reset all follow this. A change takes effect after 7 days.",
@@ -954,17 +919,9 @@ export const copy = {
       targets: "Targets",
       skipList: "Skip list",
       address: "Job-search address",
-      ordinals: {
-        resume: "1",
-        facts: "2",
-        targets: "3",
-        skipList: "4",
-        address: "5",
-      },
     },
     resume: {
       sub: "One resume, sent exactly as you uploaded it.",
-      folio: "fig. 1",
       previewLabel: "Preview of the first page of Maya_Okafor_Resume.pdf",
       pageOf: "Page 1 of 2",
       chip: "PDF",
@@ -984,7 +941,6 @@ export const copy = {
     facts: {
       intro:
         "What Overture answers forms with, word for word. A question it cannot answer from these becomes a Review.",
-      folio: "fig. 2",
       titlePlain: "Your",
       titleItalic: "facts",
       tiersLabel: "Facts by tier",
@@ -1089,7 +1045,6 @@ export const copy = {
     },
     targets: {
       intro: "Overture only scores postings that fit these.",
-      folio: "fig. 3",
       titlePlain: "Your",
       titleItalic: "targets",
       matchedValue: "213",
@@ -1145,7 +1100,6 @@ export const copy = {
     skipList: {
       intro:
         "Companies Overture never applies to. Your current employer is on it from the start, read from your resume.",
-      folio: "fig. 4",
       titlePlain: "Skip",
       titleItalic: "list",
       company1: "Brightwave Analytics",
@@ -1159,7 +1113,6 @@ export const copy = {
     address: {
       intro:
         "The email on every application form. Employers reply to it, and the replies appear in your Inbox.",
-      folio: "fig. 5",
       titlePlain: "Job-search",
       titleItalic: "address",
       alias: "maya.okafor@mail.tryoverture.com",
@@ -1256,7 +1209,7 @@ export const copy = {
     previousCard: "Previous card",
     nextCard: "Next card",
     grabHandle: "Drag to resize or close detail",
-    folio: (reference: string) => `Application · no. ${reference}`,
+    reference: (reference: string) => `Application ${reference}`,
     openPosting: "Open original posting",
     moveStage: "Move stage",
     archive: "Archive",
@@ -1338,13 +1291,11 @@ export const copy = {
     groupFew: "Unlocks 1 or 2 jobs",
     listTitle: "Waiting for you",
     listNote: "Answer once, and every application waiting on it moves forward",
-    figList: "fig. 1",
-    figDetail: "fig. 2",
     groupedBy: "Grouped by jobs unlocked",
     unlocked: (count: number) => (count === 1 ? "job unlocked" : "jobs unlocked"),
     needsYou: "Needs you",
     questionOf: (position: number, total: number) =>
-      `Question ${String(position)} of ${String(total)} · fig. 2`,
+      `Question ${String(position)} of ${String(total)}`,
     detailNote: (count: number) =>
       `${capitalize(countWord(count))} postings ask this. Nothing on your resume or in your saved facts says either way, so Overture will not guess.`,
     unlocks: "Unlocks",
@@ -1516,7 +1467,6 @@ export const copy = {
       title: "Notifications",
       today: "Today",
       earlier: "Earlier",
-      folio: "folio 01",
       markAll: "Mark all as read",
       emptyTitle: "Nothing yet.",
       emptyBody:
@@ -1637,8 +1587,6 @@ export const copy = {
   },
   admin: {
     area: "Overture admin",
-    folio1: "fig. 1",
-    folio2: "fig. 2",
     brandAria: "Overture admin",
     navLabel: "Admin sections",
     navOverview: "Overview",
