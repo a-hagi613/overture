@@ -174,7 +174,7 @@ export function ReviewDetail({
         <p className="block text-[12.5px] font-semibold leading-[16px]" id="rev-lbl">
           {copy.review.yourAnswer}
         </p>
-        <ReviewAnswer onChange={setValue} review={review} value={value} />
+        <ReviewAnswer field={review} onChange={setValue} value={value} />
         <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
           {copy.review.answerNote}
         </p>

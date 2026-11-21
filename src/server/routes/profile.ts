@@ -7,6 +7,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
+import type { ReviewService } from "../pipeline/reviews.ts";
 
 import { env } from "../config/env.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
@@ -15,14 +16,21 @@ import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { createResumeService, MAX_RESUME_BYTES } from "../profile/resume.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createSkipCompanyService } from "../profile/skip-companies.ts";
+import { createStrengthenService } from "../profile/strengthen.ts";
 import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
 import { returnStaleApprovals } from "../pipeline/approval-invalidation.ts";
+import { TIER_2_FACT_KEYS } from "../../shared/facts.ts";
 import {
   languagesInputSchema,
   profileSettingsInputSchema,
   skipCompaniesInputSchema,
   targetsInputSchema,
 } from "../../shared/targets.ts";
+
+const strengthenSchema = z.object({
+  key: z.enum(TIER_2_FACT_KEYS),
+  value: z.string().trim().min(1).max(2000),
+});
 
 const uploadSchema = z.object({
   file: z
@@ -52,6 +60,7 @@ export function createProfileRoutes(deps: {
   auth: Auth;
   objects: ObjectStore;
   llm: LlmPort;
+  reviews: ReviewService;
 }) {
   const { db, clock, auth, objects, llm } = deps;
 
@@ -64,6 +73,13 @@ export function createProfileRoutes(deps: {
   const resumesService = createResumeService({ db, clock, objects, personal, llm });
 
   const factsService = createFactService({ db, clock, personal });
+
+  const strengthenService = createStrengthenService({
+    db,
+    clock,
+    personal,
+    reviewService: deps.reviews,
+  });
 
   const targetsService = createTargetsService({ db, clock });
 
@@ -166,6 +182,28 @@ export function createProfileRoutes(deps: {
     await returnStaleApprovals({ clock, db, personal, userId: account.id });
 
     return context.json({ facts: saved });
+  });
+
+  routes.get("/profile/strengthen", async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
+
+    if (account === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    return context.json(await strengthenService.read(account.id));
+  });
+
+  routes.put("/profile/strengthen", zValidator("json", strengthenSchema), async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
+
+    if (account === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    const { key, value } = context.req.valid("json");
+
+    return context.json(await strengthenService.save(account.id, key, value));
   });
 
   routes.get("/profile/languages", async (context) => {
