@@ -60,6 +60,7 @@ export function useLiveUpdates() {
 
       if (event.type === "application.updated" || event.type === "board.moved") {
         void queryClient.invalidateQueries({ queryKey: ["board"] });
+        void queryClient.invalidateQueries({ queryKey: ["calendar"] });
       }
 
       if (event.type === "board.moved") {

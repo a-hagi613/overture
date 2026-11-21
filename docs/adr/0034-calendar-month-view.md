@@ -4,7 +4,9 @@ status: proposed
 
 # A Calendar destination: our own month grid over existing events
 
-Draft from `docs/research/calendar.md`. The owner decides; nothing here is built yet.
+Draft from `docs/research/calendar.md`. The owner drew and published the boards (#292) and opened the build tickets
+(#293–#297); it is built in slices: the boards and `GET /api/calendar` are done, the page, phone agenda and interview
+dates from mail follow.
 
 ## Context
 
