@@ -52,7 +52,7 @@ jobs:
           set -euo pipefail
           required="R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET_BACKUPS R2_BUCKET_FILES BETTER_AUTH_SECRET OWNER_EMAIL TURNSTILE_SITE_KEY TURNSTILE_SECRET MASTER_KEY_V1"
           if [ "${REQUIRE_CLOUDFLARE_EMAIL_SECRETS:-}" = "true" ]; then
-            required="$required CLOUDFLARE_EMAIL_API_TOKEN CLOUDFLARE_ACCOUNT_ID"
+            required="$required CLOUDFLARE_EMAIL_API_TOKEN CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_ZONE_ID"
           fi
           present="$(flyctl secrets list -a overture-web --json | jq -r '.[].name')"
           missing=""
@@ -73,6 +73,37 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
+      - name: Cloudflare Email Sending guard (docs/DEPLOY.md, M2-02)
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          REQUIRE_EMAIL_SENDING: ${{ vars.REQUIRE_EMAIL_SENDING }}
+        run: |
+          set -uo pipefail
+          output="$(flyctl ssh console -a overture-web -C "bun run /app/scripts/onboard-email-sending.ts --check" 2>&1)" || true
+          printf '%s\n' "$output"
+          if grep -q "verdict: ready" <<<"$output"; then
+            echo "Cloudflare Email Sending verified."
+            exit 0
+          fi
+          if [ "${REQUIRE_EMAIL_SENDING:-}" = "true" ]; then
+            echo "::error::Cloudflare Email Sending is not ready; refusing to deploy. Run scripts/onboard-email-sending.ts (docs/DEPLOY.md, M2-02)."
+            {
+              echo "### Deploy refused"
+              echo ""
+              echo "The sending-domain check failed, so a send to anyone but the owner would be refused."
+              echo "Pay Workers Paid, then run \`bun run /app/scripts/onboard-email-sending.ts\` on \`overture-web\`"
+              echo "(docs/DEPLOY.md, M2-02). Production stays on its current release."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "::warning::Cloudflare Email Sending is not ready yet; not blocking this deploy because REQUIRE_EMAIL_SENDING is not set (M2 owner setup #236)."
+          {
+            echo "### Cloudflare Email Sending pending"
+            echo ""
+            echo "The sending-domain check failed, but \`REQUIRE_EMAIL_SENDING\` is not set, so this deploy continues."
+            echo "M2 owner setup #236 pays for Workers Paid and runs the onboarding script."
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Deploy to Fly
         if: steps.guard.outputs.skip != 'true'
         run: flyctl deploy --remote-only

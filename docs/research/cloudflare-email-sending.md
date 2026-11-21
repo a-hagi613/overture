@@ -236,6 +236,34 @@ Beta terms for production sign-in as of 2026-11-21; the decision is recorded in 
 - Tests run the real adapter against MSW, which intercepts the send endpoint and asserts method, URL, bearer token and
   body; no request reaches Cloudflare (ADR 0013).
 
+## 9. Sending-domain onboarding and the guards (#211)
+
+The sending domain is managed by a different, **zone-scoped** API from the send endpoint:
+
+| Operation | Endpoint | Permission |
+|---|---|---|
+| List sending subdomains | `GET /zones/{zone_id}/email/sending/subdomains` | `Email Sending Write` or `Email Sending Read` |
+| Create or re-enable one | `POST /zones/{zone_id}/email/sending/subdomains` with `{"name": "tryoverture.com"}` | `Email Sending Write` |
+| Read its expected records | `GET /zones/{zone_id}/email/sending/subdomains/{tag}/dns` | `Email Sending Write` or `Email Sending Read` |
+
+So the operator needs `CLOUDFLARE_ZONE_ID` in addition to the account id and token. If it is unset, the script tries
+`GET /zones?name=tryoverture.com`, which also needs **Zone: Read**; setting the zone id avoids that permission. The
+create response carries `enabled`, `dkim_selector` and `return_path_domain`; the DNS response carries the expected MX,
+SPF, DKIM and DMARC records (shapes in `test/e2e/recordings/cloudflare-email/`).
+
+`scripts/onboard-email-sending.ts` lists first, creates only when the subdomain is absent or disabled, and reads the
+records back; a second run reports `action: none`. `--dry-run` sends no write request, and `--check` is read-only. The
+DMARC record is required to exist with `p=reject`; Cloudflare adds one only when the zone has none, so Overture's
+existing `p=reject; rua=…` record is kept.
+
+The deploy workflow runs `--check` on the running release before deploying, and the daily `mail.sending` check runs the
+same readiness read in-process. Both are gated by `REQUIRE_EMAIL_SENDING`: while it is unset they warn or record
+`status: "gated"` and the deploy continues; once the owner sets it they refuse the deploy or alert the owner. The
+fixtures beside the test are the response examples published in Cloudflare's API reference (read 2026-11-21): there is
+no paid account to record the endpoints live until M2 owner setup (#236) turns the plan on, after which the owner can
+refresh them.
+
+
 ## Sources
 
 | Page | Updated | Read |
