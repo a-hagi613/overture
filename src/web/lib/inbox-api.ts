@@ -51,7 +51,6 @@ const messageSchema = z.object({
   readAt: z.number().nullable(),
   subject: z.string(),
   text: z.string(),
-  to: z.string(),
 });
 
 export type InboxMessage = z.infer<typeof messageSchema>;

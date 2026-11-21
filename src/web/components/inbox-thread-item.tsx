@@ -2,23 +2,8 @@ import { Link } from "react-router";
 
 import type { InboxThreadRow } from "../lib/inbox-api.ts";
 
-import { copy } from "../../shared/copy.ts";
+import { pillOf } from "../lib/inbox-pill.ts";
 import { threadStamp } from "../lib/inbox-time.ts";
-
-function pillOf(row: InboxThreadRow) {
-  if (row.needsChecking) {
-    return {
-      label: copy.inbox.unverifiedLabel,
-      tone: "bg-need-soft text-need",
-    };
-  }
-
-  if (row.classification === "code") {
-    return { label: copy.inbox.codeUsed, tone: "bg-muted text-foreground" };
-  }
-
-  return null;
-}
 
 export function InboxThreadItem(props: {
   active: boolean;

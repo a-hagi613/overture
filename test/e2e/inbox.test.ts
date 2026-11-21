@@ -117,7 +117,6 @@ const messageSchema = z.object({
   readAt: z.number().nullable(),
   subject: z.string(),
   text: z.string(),
-  to: z.string(),
 });
 
 const threadDetailSchema = z.object({
@@ -288,11 +287,104 @@ test("signed ATS mail appears for its user, linked to its application, and opens
   expect(download.status()).toBe(200);
   expect(download.headers()["content-type"]).toBe("application/pdf");
   expect(download.headers()["content-disposition"]).toContain("Interview_Brief.pdf");
+  expect(download.headers()["x-content-type-options"]).toBe("nosniff");
+  expect(download.headers()["cache-control"]).toBe("private, no-store");
+  expect((await owner.get("/api/threads")).headers()["cache-control"]).toBe("no-store");
 
   const bytes = await download.body();
 
   expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
 
+  await owner.dispose();
+});
+
+test("a fresh user walks the Inbox through the real UI, from empty to the Board card", async ({
+  browser,
+  inbox,
+}) => {
+  const { owner, userId } = await ownerContextFor(inbox.server.url);
+  const applicationId = await seedApplicationForOwner(owner, userId);
+  const address = await addressOf(owner);
+
+  const context = await browser.newContext({ storageState: await owner.storageState() });
+  const page = await context.newPage();
+
+  await page.goto(`${inbox.server.url}/inbox`);
+  await expect(page.getByRole("heading", { name: /Nothing forwarded/u })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^All 0$/u })).toBeVisible();
+
+  await forward(owner, await inbox.sign(fresh(fixture("greenhouse-ack.eml"))), address);
+  await forward(owner, await inbox.sign(fresh(fixture("greenhouse-interview-brief.eml"))), address);
+  await runMailJobs(owner);
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: /^All 2$/u })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Unread 2$/u })).toBeVisible();
+
+  await page.getByRole("button", { name: /^Needs checking 0$/u }).click();
+  await expect(page.getByText("No threads match this filter.")).toBeVisible();
+
+  await page.getByRole("button", { name: /^Unread 2$/u }).click();
+
+  const briefRow = page.getByRole("article").filter({ hasText: "Interview with Acme: the brief" });
+
+  await briefRow.getByRole("link", { name: "Acme", exact: true }).click();
+  await expect(page).toHaveURL(/\/inbox\/[^/]+$/u);
+
+  const attachmentLink = page.getByRole("link", { name: "Download" });
+
+  await expect(page.getByText("Interview_Brief.pdf")).toBeVisible();
+  await expect.poll(async () => (await threadsOf(owner)).counts.unread).toBe(1);
+
+  const downloading = page.waitForEvent("download");
+
+  await attachmentLink.click();
+
+  const download = await downloading;
+
+  expect(download.suggestedFilename()).toBe("Interview_Brief.pdf");
+
+  const saved = await download.path();
+
+  expect(readFileSync(saved).subarray(0, 5).toString()).toBe("%PDF-");
+
+  await page.getByRole("link", { name: /on the Board/u }).click();
+  await expect(page).toHaveURL(new RegExp(`/board\\?application=${applicationId}`, "u"));
+  await expect(page.getByRole("complementary", { name: "Application detail" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Application detail" })).toContainText(
+    "Senior Backend Engineer",
+  );
+
+  await context.close();
+  await owner.dispose();
+});
+
+test("the Inbox shows an error with retry, never the empty state, and copy waits for the address", async ({
+  browser,
+  inbox,
+}) => {
+  const { owner } = await ownerContextFor(inbox.server.url);
+  const context = await browser.newContext({ storageState: await owner.storageState() });
+  const page = await context.newPage();
+
+  await page.route("**/api/threads", async (route) => route.fulfill({ status: 500 }));
+  await page.goto(`${inbox.server.url}/inbox`);
+  await expect(page.getByRole("alert")).toContainText("The Inbox could not be loaded.");
+  await expect(page.getByRole("heading", { name: /Nothing forwarded/u })).toHaveCount(0);
+
+  await page.unroute("**/api/threads");
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByRole("heading", { name: /Nothing forwarded/u })).toBeVisible();
+
+  await page.route("**/api/profile/mailbox", async (route) => route.fulfill({ status: 500 }));
+  await page.goto(`${inbox.server.url}/inbox/address`);
+  await expect(page.getByRole("button", { name: "Copy address" })).toBeDisabled();
+
+  await page.unroute("**/api/profile/mailbox");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Copy address" })).toBeEnabled();
+
+  await context.close();
   await owner.dispose();
 });
 

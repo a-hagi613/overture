@@ -4,24 +4,31 @@ import { copy } from "../../shared/copy.ts";
 import { useMailbox } from "../lib/inbox-api.ts";
 import { InboxSteps } from "../components/inbox-steps.tsx";
 import { PageHeader } from "../components/page-header.tsx";
+import { dateLine } from "../lib/inbox-time.ts";
 import { NavGlyph } from "../components/nav-glyph.tsx";
 
-function dateLine() {
-  const now = new Date();
-  const weekday = now.toLocaleDateString(copy.home.dateLocale, { weekday: "long" });
-  const month = now.toLocaleDateString(copy.home.dateLocale, { month: "long" });
-
-  return `${weekday}, ${String(now.getDate())} ${month}`;
-}
-
 export function InboxAddressPage() {
-  const { data } = useMailbox();
+  const { data, isError, isPending, refetch } = useMailbox();
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const address = data?.address ?? "";
+  let addressText = address;
+
+  if (isPending) {
+    addressText = copy.inbox.loading;
+  } else if (isError) {
+    addressText = copy.inbox.loadFailed;
+  }
 
   const copyAddress = async () => {
-    await navigator.clipboard.writeText(address);
-    setCopied(true);
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopyFailed(false);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+      setCopyFailed(true);
+    }
   };
 
   return (
@@ -50,9 +57,21 @@ export function InboxAddressPage() {
           </h2>
           <p className="text-[14.5px] text-muted-foreground">{copy.inbox.addressBody}</p>
           <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-md border border-input bg-background px-3.5 py-3">
-            <span className="break-words font-mono text-sm leading-[1.5]">{address}</span>
+            <span className="break-words font-mono text-sm leading-[1.5]">{addressText}</span>
+            {isError ? (
+              <button
+                className="inline-flex min-h-9 items-center justify-center rounded-md border border-input bg-card px-3 text-[12.5px] font-semibold hover:bg-muted"
+                onClick={() => {
+                  void refetch();
+                }}
+                type="button"
+              >
+                {copy.inbox.retry}
+              </button>
+            ) : null}
             <button
-              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-input bg-card px-3 text-[12.5px] font-semibold hover:bg-muted"
+              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-input bg-card px-3 text-[12.5px] font-semibold hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={address === ""}
               onClick={() => {
                 void copyAddress();
               }}
@@ -62,6 +81,9 @@ export function InboxAddressPage() {
               {copied ? copy.inbox.addressCopied : copy.inbox.addressCopy}
             </button>
           </div>
+          {copyFailed ? (
+            <output className="block text-[13px] text-need">{copy.inbox.addressCopyFailed}</output>
+          ) : null}
           <p className="text-sm leading-[1.5]">
             <strong className="font-bold">{copy.inbox.addressNeverType}</strong>{" "}
             {copy.inbox.addressNeverTypeDetail}

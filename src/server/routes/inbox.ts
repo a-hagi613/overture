@@ -4,6 +4,7 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 
 import type { Auth } from "../auth/index.ts";
+import { retryWhenBusy } from "../platform/db/busy.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
@@ -135,7 +136,7 @@ export function createInboxRoutes(deps: {
   }
 
   async function messageView(message: typeof messages.$inferSelect) {
-    const [subject, from, to, text] = await Promise.all([
+    const [subject, from, text] = await Promise.all([
       personal.openFor(
         message.userId,
         { column: "subject_enc", rowId: message.id, table: "messages" },
@@ -145,11 +146,6 @@ export function createInboxRoutes(deps: {
         message.userId,
         { column: "from_enc", rowId: message.id, table: "messages" },
         message.fromEnc,
-      ),
-      personal.openFor(
-        message.userId,
-        { column: "to_enc", rowId: message.id, table: "messages" },
-        message.toEnc,
       ),
       personal.openFor(
         message.userId,
@@ -187,9 +183,13 @@ export function createInboxRoutes(deps: {
       readAt: message.readAt?.getTime() ?? null,
       subject,
       text,
-      to,
     };
   }
+
+  routes.use("/threads/*", async (context, next) => {
+    await next();
+    context.header("Cache-Control", "no-store");
+  });
 
   routes.get("/threads", async (context) => {
     const user = await sessionUser(context.req.raw);
@@ -260,7 +260,9 @@ export function createInboxRoutes(deps: {
     if (row.readAt === null) {
       const readAt = new Date(clock.now());
 
-      db.update(messages).set({ readAt }).where(eq(messages.id, row.id)).run();
+      await retryWhenBusy(() => {
+        db.update(messages).set({ readAt }).where(eq(messages.id, row.id)).run();
+      }, "inbox.markRead");
 
       return context.json({ id: row.id, readAt: readAt.getTime() });
     }
@@ -316,8 +318,10 @@ export function createInboxRoutes(deps: {
 
     return new Response(bytes, {
       headers: {
+        "cache-control": "private, no-store",
         "content-disposition": `attachment; filename="${safeFilename(filename)}"`,
         "content-type": safeMime(attachment.message_attachments.mime),
+        "x-content-type-options": "nosniff",
       },
     });
   });

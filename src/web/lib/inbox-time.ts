@@ -57,3 +57,11 @@ export function messageStamp(at: number, now: number, zone: string) {
 
   return `${monthDayOf(at, zone)} · ${timeText(at, zone)}`;
 }
+
+export function dateLine() {
+  const now = new Date();
+  const weekday = now.toLocaleDateString(copy.home.dateLocale, { weekday: "long" });
+  const month = now.toLocaleDateString(copy.home.dateLocale, { month: "long" });
+
+  return `${weekday}, ${String(now.getDate())} ${month}`;
+}

@@ -3,22 +3,16 @@ import { Link, useParams } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
 import { useMarkRead, useThread, useThreads } from "../lib/inbox-api.ts";
-import { browserZone, currentTime } from "../lib/inbox-time.ts";
+import { browserZone, currentTime, dateLine } from "../lib/inbox-time.ts";
 import { InboxMessageBlock } from "../components/inbox-message-block.tsx";
+import { InboxError } from "../components/inbox-error.tsx";
+import { InboxLoading } from "../components/inbox-status.tsx";
 import { InboxThreadItem } from "../components/inbox-thread-item.tsx";
 import { PageHeader } from "../components/page-header.tsx";
 
-function dateLine() {
-  const now = new Date();
-  const weekday = now.toLocaleDateString(copy.home.dateLocale, { weekday: "long" });
-  const month = now.toLocaleDateString(copy.home.dateLocale, { month: "long" });
-
-  return `${weekday}, ${String(now.getDate())} ${month}`;
-}
-
 export function InboxThreadPage() {
   const { id = null } = useParams();
-  const { data } = useThread(id);
+  const { data, isError, isPending, refetch } = useThread(id);
   const { data: list } = useThreads();
   const markRead = useMarkRead();
   const marked = useRef(new Set<string>());
@@ -94,6 +88,14 @@ export function InboxThreadPage() {
               ) : null}
             </div>
           )}
+          {isPending ? <InboxLoading /> : null}
+          {isError ? (
+            <InboxError
+              onRetry={() => {
+                void refetch();
+              }}
+            />
+          ) : null}
           <div className="mt-[18px]">
             {(data?.messages ?? []).map((message, index) => (
               <InboxMessageBlock

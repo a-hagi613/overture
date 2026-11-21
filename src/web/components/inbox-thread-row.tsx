@@ -3,22 +3,8 @@ import { Link } from "react-router";
 import type { InboxThreadRow } from "../lib/inbox-api.ts";
 
 import { copy } from "../../shared/copy.ts";
+import { pillOf } from "../lib/inbox-pill.ts";
 import { threadStamp } from "../lib/inbox-time.ts";
-
-function pillOf(row: InboxThreadRow) {
-  if (row.needsChecking) {
-    return {
-      label: copy.inbox.unverifiedLabel,
-      tone: "bg-need-soft text-need",
-    };
-  }
-
-  if (row.classification === "code") {
-    return { label: copy.inbox.codeUsed, tone: "bg-muted text-foreground" };
-  }
-
-  return null;
-}
 
 export function InboxThreadRowView(props: { now: number; row: InboxThreadRow; zone: string }) {
   const { now, row, zone } = props;
@@ -36,12 +22,15 @@ export function InboxThreadRowView(props: { now: number; row: InboxThreadRow; zo
       )}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-          <Link className="text-[14.5px] font-bold" to={`/inbox/${row.id}`}>
+          <Link
+            className="text-[14.5px] font-bold hover:underline underline-offset-[3px]"
+            to={`/inbox/${row.id}`}
+          >
             {row.company}
           </Link>
           {row.title === null || row.applicationId === null ? null : (
             <Link
-              className="font-serif text-sm leading-[1.5] italic text-muted-foreground underline underline-offset-[3px]"
+              className="font-serif text-sm leading-[1.5] italic text-muted-foreground underline underline-offset-[3px] hover:text-foreground"
               to={`/board?application=${row.applicationId}`}
             >
               {`${row.title} →`}
