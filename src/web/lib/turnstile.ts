@@ -26,11 +26,14 @@ declare global {
 
 const readyEvent = "overture:turnstile-ready";
 
-export function useTurnstile(siteKey: string | null, action: TurnstileAction) {
+export function useTurnstile(siteKey: string | null | undefined, action: TurnstileAction) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
   const tokenRef = useRef<string | null>(null);
   const waiterRef = useRef<((token: string | null) => void) | null>(null);
+  const siteKeyRef = useRef<string | null | undefined>(siteKey);
+  const configWaiterRef = useRef<(() => void) | null>(null);
+  const configReadyRef = useRef<Promise<void> | null>(null);
 
   const settle = useCallback((token: string | null) => {
     const waiter = waiterRef.current;
@@ -59,6 +62,21 @@ export function useTurnstile(siteKey: string | null, action: TurnstileAction) {
       widgetIdRef.current = null;
       tokenRef.current = null;
     };
+
+    if (siteKey === undefined) {
+      return () => {
+        clear();
+        configWaiterRef.current?.();
+        configWaiterRef.current = null;
+      };
+    }
+
+    siteKeyRef.current = siteKey;
+
+    const configWaiter = configWaiterRef.current;
+
+    configWaiterRef.current = null;
+    configWaiter?.();
 
     if (siteKey === null || containerRef.current === null) {
       settle(null);
@@ -102,7 +120,15 @@ export function useTurnstile(siteKey: string | null, action: TurnstileAction) {
   }, [action, settle, siteKey]);
 
   const obtainToken = useCallback(async () => {
-    if (siteKey === null) {
+    if (siteKeyRef.current === undefined) {
+      configReadyRef.current ??= new Promise<void>((resolve) => {
+        configWaiterRef.current = resolve;
+      });
+
+      await configReadyRef.current;
+    }
+
+    if (siteKeyRef.current === null || siteKeyRef.current === undefined) {
       return null;
     }
 
@@ -119,7 +145,7 @@ export function useTurnstile(siteKey: string | null, action: TurnstileAction) {
     }
 
     return token;
-  }, [siteKey]);
+  }, []);
 
   return { containerRef, obtainToken };
 }

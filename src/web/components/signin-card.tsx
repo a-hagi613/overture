@@ -58,7 +58,7 @@ export function SignInCard() {
   const [email, setEmail] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [siteKey, setSiteKey] = useState<string | null>(null);
+  const [siteKey, setSiteKey] = useState<string | null | undefined>(undefined);
   const [socialProviders, setSocialProviders] = useState<SocialProvider[]>([]);
   const socialAction = mode === "sign-up" ? "signup" : "signin";
 
@@ -74,14 +74,22 @@ export function SignInCard() {
 
   useEffect(() => {
     const load = async () => {
-      const response = await fetch("/api/me");
+      let key: string | null = null;
 
-      if (response.ok) {
-        const parsed = meSchema.parse(await response.json());
+      try {
+        const response = await fetch("/api/me");
 
-        setSiteKey(parsed.turnstileSiteKey ?? null);
-        setSocialProviders(parsed.socialProviders);
+        if (response.ok) {
+          const parsed = meSchema.parse(await response.json());
+
+          key = parsed.turnstileSiteKey ?? null;
+          setSocialProviders(parsed.socialProviders);
+        }
+      } catch {
+        key = null;
       }
+
+      setSiteKey(key);
     };
 
     void load();
