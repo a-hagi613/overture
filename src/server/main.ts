@@ -95,6 +95,11 @@ import {
   runLiveChecks,
   scheduleDailyLiveCheck,
 } from "./live-checks/job.ts";
+import {
+  CHECKIN_SWEEP_JOB_KIND,
+  ensureCheckinSweepQueued,
+  runCheckinSweep,
+} from "./pipeline/checkins.ts";
 import { createMailIngest, MAIL_INGEST_JOB_KIND } from "./inbox/ingest.ts";
 import { createMailMoves, MAIL_CLASSIFY_JOB_KIND } from "./inbox/moves.ts";
 import { createMailboxService } from "./inbox/mailboxes.ts";
@@ -159,7 +164,12 @@ const auth = createAuth(
 
 const appOrigin = env.APP_ORIGIN ?? "http://localhost:3000";
 
-const jobSingletons = [...SINGLETON_JOB_KINDS, DISPATCH_TICK_JOB_KIND, LIVE_CHECK_JOB_KIND];
+const jobSingletons = [
+  ...SINGLETON_JOB_KINDS,
+  CHECKIN_SWEEP_JOB_KIND,
+  DISPATCH_TICK_JOB_KIND,
+  LIVE_CHECK_JOB_KIND,
+];
 
 recoverStaleLocks(db, clock, jobSingletons);
 
@@ -472,6 +482,16 @@ const watchJobHandlers: JobHandlers = {
   },
 };
 
+const checkinJobHandlers: JobHandlers = {
+  [CHECKIN_SWEEP_JOB_KIND]: async () => {
+    try {
+      await Promise.resolve(runCheckinSweep({ clock, db }));
+    } finally {
+      ensureCheckinSweepQueued(db, clock);
+    }
+  },
+};
+
 const liveCheckAddressValue = liveCheckAddress(env.MAIL_DOMAIN);
 
 const liveCheckDeps = {
@@ -512,6 +532,7 @@ const allJobHandlers: JobHandlers = {
   ...dispatchJobHandlers,
   ...fixtureJobHandlers,
   ...watchJobHandlers,
+  ...checkinJobHandlers,
   ...liveCheckJobHandlers,
   ...testJobHandlers,
 };
@@ -540,6 +561,8 @@ if (dispatchTick !== null) {
 ensurePlannerQueuedForRunningUsers(db, clock);
 
 ensureSweepQueued(catalogDeps);
+
+ensureCheckinSweepQueued(db, clock);
 
 if (env.NODE_ENV === "production") {
   ensureLiveCheckQueued(db, clock);

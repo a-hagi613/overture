@@ -18,6 +18,7 @@ import {
   applicationSnapshots,
   attempts,
   bgJobs,
+  checkins,
   codeWaits,
   companies,
   companyBoards,
@@ -2113,13 +2114,27 @@ export function createTestRoutes(
 
     const checkInPosting = addPosting(sample, "Backend Engineer", "home-checkin-1");
 
-    addApplication({
+    const checkInSentAt = dayStart(-25) + 10 * hour;
+
+    const checkInApplication = addApplication({
       companyId: sample.companyId,
       postingId: checkInPosting,
-      sentAt: dayStart(-25) + 10 * hour,
+      sentAt: checkInSentAt,
       stage: "applied",
       status: "sent",
     });
+
+    db.insert(checkins)
+      .values({
+        answer: null,
+        applicationId: checkInApplication,
+        createdAt: checkInSentAt + 21 * day,
+        dueAt: checkInSentAt + 21 * day,
+        id: crypto.randomUUID(),
+        status: "open",
+        userId,
+      })
+      .run();
 
     const seedFacts: { key: string; value: string }[] = [
       { key: "legal_name", value: "Maya Okafor" },

@@ -22,6 +22,7 @@ import {
   reviews,
 } from "../platform/db/schema.ts";
 import { localDayStart, localPartsAt } from "../platform/local-time.ts";
+import { restartCheckinAfterUndo } from "../pipeline/checkins.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { createTimeZoneService } from "../profile/time-zone.ts";
 import { resumeLines as splitResumeLines } from "../pipeline/grounding.ts";
@@ -467,6 +468,10 @@ export function createApplicationRoutes(
         })
         .run();
     });
+
+    if (restored === "applied") {
+      restartCheckinAfterUndo({ clock, db }, id);
+    }
 
     publishEvent(
       db,

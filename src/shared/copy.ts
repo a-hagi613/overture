@@ -385,9 +385,16 @@ export const copy = {
       waiting: "Next send once sending resumes.",
     },
     checkIn: {
-      action: "Start check-in",
+      answerAria: (answer: string, company: string, title: string) =>
+        `${answer}: ${title} at ${company}`,
       eyebrow: "Weekly check-in",
+      failed: "The check-in did not go through. Try again.",
+      interviewing: "Interviewing",
       note: "Three quick questions about this week. It takes about a minute.",
+      rejected: "Rejected",
+      row: (days: number) => `${countWord(days)} days in Applied`,
+      start: "Start check-in",
+      stillWaiting: "Still waiting",
       title: "How is the search going?",
     },
     activity: {
@@ -1052,6 +1059,13 @@ export const copy = {
       title: (stage: string) => `Moved to ${stage}`,
       body: (input: { company: string; title: string; stage: string }) =>
         `${input.title} at ${input.company} is now in ${input.stage}. Open the Board to undo it.`,
+      url: "/board",
+      kind: "stage_move",
+    },
+    noResponse: {
+      title: "Closed as No response",
+      body: (input: { company: string; title: string }) =>
+        `${input.title} at ${input.company} had no reply after 45 days, so it moved to Closed. Open the Board to undo it.`,
       url: "/board",
       kind: "stage_move",
     },

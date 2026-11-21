@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
+import type { CheckinAnswer } from "../../shared/checkins.ts";
+
 import { PAUSE_REASONS } from "../../shared/copy.ts";
 
 const chartSchema = z.object({
@@ -34,6 +36,16 @@ const inboxRowSchema = z.object({
   text: z.string(),
 });
 
+const checkinSchema = z.object({
+  applicationId: z.string(),
+  company: z.string(),
+  days: z.number(),
+  dueAt: z.number(),
+  id: z.string(),
+  sentAt: z.number(),
+  title: z.string(),
+});
+
 const homeResponseSchema = z.object({
   activity: z.object({
     failed: z.array(
@@ -57,6 +69,7 @@ const homeResponseSchema = z.object({
   }),
   applicationsLeft: z.number(),
   checkInDue: z.number(),
+  checkIns: z.array(checkinSchema),
   dailyCap: z.number(),
   nextSendAt: z.number().nullable(),
   now: z.number(),
@@ -79,6 +92,8 @@ const homeResponseSchema = z.object({
 });
 
 export type HomeResponse = z.infer<typeof homeResponseSchema>;
+
+export type HomeCheckin = z.infer<typeof checkinSchema>;
 
 export type HomeRange = z.infer<typeof rangeSchema>;
 
@@ -124,6 +139,34 @@ async function saveRunning(running: boolean) {
   const body: unknown = await response.json();
 
   return runningSchema.parse(body);
+}
+
+const checkinResultSchema = z.object({ answer: z.string(), stage: z.string() });
+
+async function answerCheckin(input: { id: string; answer: CheckinAnswer }) {
+  const response = await fetch(`/api/checkins/${encodeURIComponent(input.id)}`, {
+    body: JSON.stringify({ answer: input.answer }),
+    headers: { "content-type": "application/json" },
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error(`The check-in did not go through (${String(response.status)}).`);
+  }
+
+  return checkinResultSchema.parse(await response.json());
+}
+
+export function useAnswerCheckIn() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: answerCheckin,
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["home"] });
+      await client.invalidateQueries({ queryKey: ["board"] });
+    },
+  });
 }
 
 export function useRunning() {
