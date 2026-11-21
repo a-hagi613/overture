@@ -342,7 +342,9 @@ export function createHomeRoutes(deps: {
       .from(applications)
       .leftJoin(postings, eq(postings.id, applications.postingId))
       .leftJoin(companies, eq(companies.id, applications.companyId))
-      .where(and(eq(applications.userId, userId), eq(applications.status, "failed")))
+      .where(
+        and(eq(applications.userId, userId), inArray(applications.status, ["failed", "skipped"])),
+      )
       .orderBy(desc(sql`coalesce(${applications.sentAt}, ${applications.updatedAt})`))
       .limit(ACTIVITY_FAILED_LIMIT)
       .all();

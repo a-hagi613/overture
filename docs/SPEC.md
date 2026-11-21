@@ -371,8 +371,9 @@ straight to tagging; Ashby's `isRemote` is ignored because Ashby sets it on hybr
    the worker never runs two jobs of a singleton kind (`catalog.sweep`) at once. A sweep killed mid-flight leaves
    its row running; the claim takes the row over once its lease expires, and only one process polls its boards
    because the board claim has not lapsed.
-5. **Closed**: a posting absent from two consecutive successful polls gets `closed_at`; its queued applications are
-   skipped with `posting_closed`.
+5. **Closed**: a posting absent from two consecutive successful polls gets `closed_at`; its `ready` and `approved`
+   Applications are skipped with `status_reason='posting_closed'` and appear on Home as Couldn't apply. The liveness
+   re-check at dispatch (§9.3) does the same for a Posting it finds closed.
 6. **Dedupe**: `dedupe_key = company_id + title_norm + country_code + city`; duplicates across boards keep the
    earliest posting; users never see two cards for one role.
 7. **Responsiveness**: writes never block the process. `catalog.sweep` (fetch, parse, tag and the writes of

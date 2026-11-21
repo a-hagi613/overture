@@ -3,9 +3,11 @@ import { and, count, eq, gte, isNull, notInArray, sql } from "drizzle-orm";
 import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import { companyBoards, postings } from "../platform/db/schema.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
 import { normalizeApplyUrl, normalizeTitle } from "./normalize.ts";
 import { contentHash } from "./content-hash.ts";
 import { dedupeKeyFor } from "./dedupe-key.ts";
+import { skipClosedPostingApplications } from "./posting-close.ts";
 import { storePostingTags, salaryPeriodForColumn } from "./tag-store.ts";
 import { tagPosting } from "./tag-rules.ts";
 
@@ -236,20 +238,50 @@ function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow, now:
 }
 
 function closeMissingPostings(db: AppDatabase, clock: Clock, boardId: string) {
-  const closed = db
-    .update(postings)
-    .set({ closedAt: clock.now() })
-    .where(
-      and(
-        eq(postings.boardId, boardId),
-        isNull(postings.closedAt),
-        gte(postings.missingPolls, MISSING_POLLS_TO_CLOSE),
-      ),
-    )
-    .returning({ id: postings.id })
-    .all();
+  const now = clock.now();
 
-  return closed.length;
+  const run = db.transaction((tx) => {
+    const closed = tx
+      .update(postings)
+      .set({ closedAt: now })
+      .where(
+        and(
+          eq(postings.boardId, boardId),
+          isNull(postings.closedAt),
+          gte(postings.missingPolls, MISSING_POLLS_TO_CLOSE),
+        ),
+      )
+      .returning({ id: postings.id })
+      .all();
+
+    return {
+      closed,
+      skipped: skipClosedPostingApplications(
+        tx,
+        now,
+        closed.map((row) => row.id),
+      ),
+    };
+  });
+
+  for (const application of run.skipped) {
+    publishEvent(
+      db,
+      clock,
+      "application.updated",
+      JSON.stringify({ applicationId: application.applicationId, status: "skipped" }),
+      application.userId,
+    );
+    publishEvent(
+      db,
+      clock,
+      "home.updated",
+      JSON.stringify({ applicationId: application.applicationId }),
+      application.userId,
+    );
+  }
+
+  return run.closed.length;
 }
 
 function postingValues(

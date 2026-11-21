@@ -128,6 +128,20 @@ const applicationSchema = z.object({
 
 const applicationsSchema = z.object({ applications: z.array(applicationSchema) });
 
+const applicationDetailSchema = z.object({
+  application: z.object({
+    status: z.string(),
+    statusReason: z.string().nullable(),
+  }),
+  timeline: z.array(
+    z.object({
+      detail: z.string().nullable(),
+      kind: z.string(),
+      toValue: z.string().nullable(),
+    }),
+  ),
+});
+
 const jobSchema = z.object({
   id: z.string(),
   kind: z.string(),
@@ -495,6 +509,16 @@ test("a Posting closed since preparation is skipped, not sent", async ({ pacing 
   expect(after?.status).toBe("skipped");
   expect(after?.statusReason).toBe("posting_closed");
   expect(await newSendJobs(owner, before)).toEqual([]);
+
+  const detail = applicationDetailSchema.parse(
+    await (await owner.get(`/api/applications/${encodeURIComponent(applicationId)}`)).json(),
+  );
+
+  const reason = detail.timeline.find(
+    (event) => event.kind === "status" && event.toValue === "skipped",
+  );
+
+  expect(reason?.detail).toBe("The role closed before Overture could send.");
 });
 
 test("the clock moves sends only into the window, spaced at least twenty minutes apart", async ({
