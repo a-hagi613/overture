@@ -22,7 +22,7 @@ The owner pays $5 a month for Workers Paid and wants no spend above $5 a month i
   100%; a $0.50 account-wide budget alert; a sentinel Worker that watches usage and sets a degraded flag; and
   app-side counters for Email Sending and, if adopted, Workers AI. R2 cannot be blocked natively, so it is bounded by
   design: a Litestream sync interval chosen from measured Class A operations, lifecycle rules and a size alert.
-- **The owner accepts the stated trade:** if the Workers limit trips, the Email Worker stops and inbound mail is lost until the period resets or the limit is lifted.
+- **The owner accepts the stated trade:** if the Workers limit trips, the Email Worker stops and inbound mail is lost until the period resets or the limit is lifted. The Queue (#286) narrows this: a tripped limit also stops the queue consumer, but mail already queued waits inside its 14-day retention and is delivered when the limit is lifted; only mail that arrives while the Email Worker itself cannot run is lost. There is no non-Worker delivery path.
 
 ## Considered Options
 
