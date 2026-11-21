@@ -341,7 +341,10 @@ export function BoardPage() {
             <p className="text-sm text-muted-foreground">{copy.board.emptyColumn}</p>
           </div>
         ) : (
-          <div className="cols mt-[26px] flex flex-1 items-start gap-4 overflow-x-auto pr-8 pt-1 pb-3.5">
+          <div
+            className="cols mt-[26px] flex flex-1 items-start gap-4 overflow-x-auto pr-8 pt-1 pb-3.5"
+            data-scroll-region
+          >
             {STAGE_ORDER.map((stage) => (
               <BoardColumn
                 cards={columns.find((column) => column.stage === stage)?.cards ?? []}

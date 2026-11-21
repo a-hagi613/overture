@@ -19,20 +19,27 @@ export function BoardRail({
   onExpand: () => void;
 }) {
   return (
-    <aside className="board hidden bg-sidebar px-0 pb-[18px] pt-5 shadow-[1px_0_0_var(--color-hl)] md:flex md:w-[76px] md:flex-col md:items-center md:border-r md:border-border">
+    <aside
+      className="board hidden bg-sidebar px-0 pb-[18px] pt-5 shadow-[1px_0_0_var(--color-hl)] md:fixed md:left-0 md:top-0 md:z-20 md:flex md:h-dvh md:w-[76px] md:flex-none md:flex-col md:items-center md:self-start md:border-r md:border-border"
+      data-shell-sidebar
+    >
       <NavLink aria-label={copy.brand.homeAria} className="flex" to="/">
         <BrandMark size={34} />
       </NavLink>
       <button
         aria-label={copy.shell.expandSidebar}
-        className="mt-[21px] flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="mt-[21px] hidden h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground xl:flex"
         onClick={onExpand}
         type="button"
       >
         <NavGlyph name="rail" size={18} />
       </button>
       <hr className="rule mt-4 w-9" />
-      <nav aria-label={copy.nav.label} className="mt-4 flex flex-col items-center gap-1.5">
+      <nav
+        aria-label={copy.nav.label}
+        className="mt-4 flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-y-auto"
+        data-scroll-region
+      >
         {NAV_DESTINATIONS.map((destination) => {
           const count = navBadgeCount(counts, destination.glyph);
 
