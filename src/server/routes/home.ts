@@ -66,7 +66,7 @@ export function createHomeRoutes(
     return context.json({
       applicationsLeft: left,
       planApplications: planApplications(db, userId, at),
-      running: profile?.running ?? true,
+      running: profile?.running ?? false,
       sentToday,
       dailyCap,
       remainingToday: Math.max(0, Math.min(dailyCap, left) - sentToday),
