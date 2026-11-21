@@ -5,6 +5,7 @@ import { createAuth } from "./auth/index.ts";
 import type { AuthOptions } from "./auth/index.ts";
 import { databasePath, env } from "./config/env.ts";
 import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
+import { MailCapExceededError } from "./platform/mail/metered.ts";
 import { seedDemoAccount } from "./demo/seed.ts";
 import { createDemoSafeMailSender } from "./demo/mail-guard.ts";
 import { isDemoUser } from "./demo/role.ts";
@@ -171,7 +172,7 @@ const backups = createBackupMonitor(db, clock);
 
 void backups.run(shutdownController.signal);
 
-const mailSender = createDemoSafeMailSender(db, createMailSender(clock));
+const mailSender = createDemoSafeMailSender(db, createMailSender(db, clock));
 const pushSender = createPushSender(env, clock);
 const mailboxes = createMailboxService(db, clock, env.INBOUND_HMAC_SECRET ?? "", env.MAIL_DOMAIN);
 
@@ -503,7 +504,15 @@ const accountJobHandlers: JobHandlers = {
   [ACCOUNT_DELETED_NOTICE_JOB_KIND]: async (payload) => {
     const notice = await noticeCrypto.open(payload);
 
-    await mailSender.sendAccountDeleted(notice);
+    try {
+      await mailSender.sendAccountDeleted(notice);
+    } catch (error) {
+      if (!(error instanceof MailCapExceededError)) {
+        throw error;
+      }
+
+      logInfo("account.notice", `deleted-account notice refused: ${error.message}`);
+    }
   },
 };
 

@@ -33,6 +33,12 @@ import {
 
 const mailboxSchema = z.object({ address: z.string(), forwardingWorks: z.boolean() });
 
+const mailUsageSchema = z.object({ system: z.number(), total: z.number() });
+
+async function mailUsage(request: APIRequestContext) {
+  return mailUsageSchema.parse(await (await request.get("/__test__/mail/usage")).json());
+}
+
 async function repeat(times: number, attempt: () => Promise<void>) {
   if (times === 0) {
     return;
@@ -380,6 +386,7 @@ test("a fresh signed-in session still needs a recent sign-in, then deletes every
 
     expect(confirmation?.body).toContain("Hi Maya,");
     expect(confirmation?.body).toContain("write to admin@tryoverture.com");
+    expect((await mailUsage(owner)).system).toBe(1);
 
     const secondRun = await owner.post(`${harness.server.url}/__test__/jobs/run-now`, {
       data: { kind: "account.erase", payload: JSON.stringify({ userId }) },

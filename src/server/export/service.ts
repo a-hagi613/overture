@@ -10,7 +10,8 @@ import type { ZipEntry } from "./zip.ts";
 
 import { accountExports, bgJobs, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
-import { logError } from "../platform/log.ts";
+import { logError, logInfo } from "../platform/log.ts";
+import { MailCapExceededError } from "../platform/mail/metered.ts";
 import { copy } from "../../shared/copy.ts";
 import {
   EXPORT_CHUNK_BYTES,
@@ -432,7 +433,9 @@ export async function runExportBuildJob(deps: ExportServiceDeps, exportId: strin
 
 /**
  * Email the one user whose export is ready, with a link to the page that holds
- * the download. A second delivery of the same job sends nothing new.
+ * the download. A second delivery of the same job sends nothing new, and a
+ * month that has failed closed leaves the export unannounced instead of
+ * retrying into the same closed month; the owner already has the cap alert.
  * @param deps The export service's dependencies.
  * @param exportId The export to announce.
  * @returns Nothing; a sent email is recorded on the row.
@@ -458,11 +461,21 @@ export async function runExportNotifyJob(deps: ExportServiceDeps, exportId: stri
     return;
   }
 
-  await deps.mail.sendExportReady({
-    body: copy.mail.exportReadyBody(`${deps.appOrigin.replace(/\/+$/u, "")}/settings/export`),
-    subject: copy.mail.exportReadySubject,
-    to: user.email,
-  });
+  try {
+    await deps.mail.sendExportReady({
+      body: copy.mail.exportReadyBody(`${deps.appOrigin.replace(/\/+$/u, "")}/settings/export`),
+      subject: copy.mail.exportReadySubject,
+      to: user.email,
+    });
+  } catch (error) {
+    if (!(error instanceof MailCapExceededError)) {
+      throw error;
+    }
+
+    logInfo("export.notify", `export ${exportId} not announced: ${error.message}`);
+
+    return;
+  }
 
   deps.db
     .update(accountExports)

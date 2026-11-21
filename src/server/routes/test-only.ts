@@ -29,6 +29,7 @@ import {
   fxRates,
   ledger,
   liveCheckMail,
+  mailUsage,
   matches,
   postingQuestions,
   mailboxes,
@@ -90,6 +91,7 @@ import { resetFeedContentHashes } from "../catalog/feed-retag.ts";
 import { normalizeApplyUrl, normalizeTitle } from "../catalog/normalize.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags } from "../catalog/tag-import.ts";
 import { readLlmUsage, recordLlmUsage } from "../platform/llm/usage.ts";
+import { monthKey, readMailSummary, readMailUsage } from "../platform/mail/budget.ts";
 import { ANSWER_KINDS, QUESTION_FIELD_TYPES, REVIEW_REASONS } from "../../shared/questions.ts";
 import { normalizeFieldType, questionVariantHash } from "../catalog/question-normalize.ts";
 import { mapQuestionByRules } from "../catalog/question-rules.ts";
@@ -495,6 +497,15 @@ const fxRateBody = z.object({
   date: z.string().min(10).max(10),
   currency: z.string().length(3),
   perUsd: z.number().positive(),
+});
+
+const mailUsageBody = z.object({
+  auth: z.number().int().min(0),
+  system: z.number().int().min(0),
+  notice: z.number().int().min(0),
+  warnedAt: z.number().int().nullable().optional(),
+  reserveRefusedAt: z.number().int().nullable().optional(),
+  refusedAt: z.number().int().nullable().optional(),
 });
 
 const seedReviewBody = z.object({
@@ -1453,6 +1464,42 @@ export function createTestRoutes(
     });
 
     return context.json({ ok: true });
+  });
+
+  routes.get("/mail/usage", (context) => context.json(readMailSummary(db, clock.now())));
+
+  routes.post("/mail/usage", zValidator("json", mailUsageBody), (context) => {
+    const body = context.req.valid("json");
+    const month = monthKey(clock.now());
+    const current = readMailUsage(db, month);
+
+    const seed = {
+      authSends: body.auth,
+      month,
+      noticeSends: body.notice,
+      refusedAt: body.refusedAt === undefined ? current.refusedAt : body.refusedAt,
+      reserveRefusedAt:
+        body.reserveRefusedAt === undefined ? current.reserveRefusedAt : body.reserveRefusedAt,
+      systemSends: body.system,
+      warnedAt: body.warnedAt === undefined ? current.warnedAt : body.warnedAt,
+    };
+
+    db.insert(mailUsage)
+      .values(seed)
+      .onConflictDoUpdate({
+        set: {
+          authSends: seed.authSends,
+          noticeSends: seed.noticeSends,
+          refusedAt: seed.refusedAt,
+          reserveRefusedAt: seed.reserveRefusedAt,
+          systemSends: seed.systemSends,
+          warnedAt: seed.warnedAt,
+        },
+        target: mailUsage.month,
+      })
+      .run();
+
+    return context.json(readMailSummary(db, clock.now()));
   });
 
   routes.post("/fx-rates", zValidator("json", fxRateBody), (context) => {

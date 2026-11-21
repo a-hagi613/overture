@@ -65,6 +65,12 @@ const sinkMailSchema = z.object({
   messages: z.array(z.object({ body: z.string(), subject: z.string(), to: z.string() })),
 });
 
+const mailUsageSchema = z.object({ notice: z.number() });
+
+async function noticeSends(owner: APIRequestContext) {
+  return mailUsageSchema.parse(await (await owner.get("/__test__/mail/usage")).json()).notice;
+}
+
 async function exportRowsFor(owner: APIRequestContext, userId: string) {
   const path = `/__test__/account/exports?userId=${encodeURIComponent(userId)}`;
   const rows = exportRowsSchema.parse(await (await owner.get(path)).json());
@@ -297,6 +303,8 @@ test("an export holds only its user's data and downloads from its page", async (
 }) => {
   const { owner, userId } = await ownerContextFor(exportServer.url);
 
+  const noticesBefore = await noticeSends(owner);
+
   await seedOwner(owner);
   const { applicationId, postingId } = await seedSentApplication(owner, userId);
   await seedMail(owner, userId, "Your interview is on Tuesday.", "northwind");
@@ -460,6 +468,7 @@ test("an export holds only its user's data and downloads from its page", async (
 
   expect(readyMail?.to).toBe(authTestIdentity.ownerEmail);
   expect(readyMail?.body).toContain("/settings/export");
+  expect((await noticeSends(owner)) - noticesBefore).toBe(1);
 
   await context.close();
   await owner.dispose();
