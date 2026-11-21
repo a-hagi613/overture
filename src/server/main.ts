@@ -42,6 +42,11 @@ import {
   runPrepDailyJob,
 } from "./pipeline/daily-prep.ts";
 import { createPlainFormReader } from "./pipeline/form-read.ts";
+import {
+  READY_NOTIFY_JOB_KIND,
+  parseReadyNotifyPayload,
+  runReadyNotifyJob,
+} from "./notify/ready-recap.ts";
 import { createReviewService } from "./pipeline/reviews.ts";
 import { createResumeService } from "./profile/resume.ts";
 import { createBrowserProvider } from "./dispatch/browser/index.ts";
@@ -254,11 +259,9 @@ const prepDailyJobHandlers: JobHandlers = {
 
       await runPrepDailyJob(
         {
-          appOrigin,
           clock,
           db,
           llm: anthropicLlmPort,
-          mail: mailSender,
           personal,
           preparation,
         },
@@ -268,6 +271,14 @@ const prepDailyJobHandlers: JobHandlers = {
     } finally {
       ensurePrepDailyQueued(db, clock, userId);
     }
+  },
+};
+
+const readyNotifyJobHandlers: JobHandlers = {
+  [READY_NOTIFY_JOB_KIND]: async (payload) => {
+    const { since, userId } = parseReadyNotifyPayload(payload);
+
+    await runReadyNotifyJob({ appOrigin, clock, db, mail: mailSender }, userId, since);
   },
 };
 
@@ -468,6 +479,7 @@ const allJobHandlers: JobHandlers = {
   ...planningJobHandlers,
   ...llmJobHandlers,
   ...prepDailyJobHandlers,
+  ...readyNotifyJobHandlers,
   ...mailJobHandlers,
   ...dispatchJobHandlers,
   ...fixtureJobHandlers,

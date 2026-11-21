@@ -15,6 +15,9 @@ import {
   grantApplications,
   ownerContextFor,
   seedApplication,
+  seedBoard,
+  seedCompany,
+  seedPosting,
 } from "./matching-harness.ts";
 
 const test = appTest.extend<{
@@ -55,6 +58,26 @@ const mailSchema = z.object({
   messages: z.array(z.object({ body: z.string(), subject: z.string(), to: z.string() })),
 });
 
+const notificationsSchema = z.object({
+  notifications: z.array(
+    z.object({
+      id: z.string(),
+      kind: z.string(),
+      title: z.string(),
+      body: z.string(),
+      url: z.string(),
+      createdAt: z.number(),
+      emailedAt: z.number().nullable(),
+    }),
+  ),
+});
+
+const readySchema = z.object({
+  approved: z.number(),
+  cards: z.array(z.object({ id: z.string(), status: z.string() })),
+  ready: z.number(),
+});
+
 const jobsSchema = z.object({
   jobs: z.array(
     z.object({
@@ -90,6 +113,18 @@ async function mailFor(owner: APIRequestContext) {
 
 async function jobsFor(owner: APIRequestContext) {
   return jobsSchema.parse(await (await owner.get("/__test__/jobs")).json()).jobs;
+}
+
+async function notificationsFor(owner: APIRequestContext, userId: string) {
+  const body: unknown = await (
+    await owner.get(`/__test__/notifications?userId=${encodeURIComponent(userId)}`)
+  ).json();
+
+  return notificationsSchema.parse(body).notifications;
+}
+
+async function readyFor(owner: APIRequestContext) {
+  return readySchema.parse(await (await owner.get("/api/ready")).json());
 }
 
 async function seedCandidates(owner: APIRequestContext, count: number) {
@@ -219,11 +254,112 @@ test("a 07:00 run fills exactly the free Ready slots, sends one recap, and does 
   expect(recap?.body).toContain("1 question needs an answer.");
   expect(recap?.body).toContain("/ready");
 
-  const notifications: unknown = await (
-    await owner.get(`/__test__/notifications?userId=${encodeURIComponent(userId)}`)
-  ).json();
+  await expect
+    .poll(
+      async () =>
+        (await jobsFor(owner)).find((job) => job.kind === "ready.notify")?.status ?? "missing",
+      { timeout: 30_000 },
+    )
+    .toBe("done");
 
-  expect(JSON.stringify(notifications)).toContain('"kind":"ready"');
+  const notifications = await notificationsFor(owner, userId);
+  const recapNotification = notifications.find((notification) => notification.kind === "ready");
+
+  expect(recapNotification?.url).toContain("/ready");
+  expect(recapNotification?.emailedAt).not.toBeNull();
+
+  const link = new URL(recap?.body.match(/https?:\/\/\S+/u)?.[0] ?? "");
+
+  expect(link.pathname).toBe("/ready");
+
+  const page = await owner.get(`${prep.server.url}/ready`);
+
+  expect(page.status()).toBe(200);
+  expect(await page.text()).toContain('id="root"');
+
+  const afterOpen = await readyFor(owner);
+
+  expect(afterOpen.approved).toBe(0);
+  expect(afterOpen.ready).toBe(10);
+  expect(afterOpen.cards.every((card) => card.status === "ready")).toBe(true);
+  expect(await mailFor(owner)).toHaveLength(1);
+  expect(
+    (await applicationsFor(owner, userId)).every((application) => application.status === "ready"),
+  ).toBe(true);
+  expect((await jobsFor(owner)).some((job) => job.kind === "application.send")).toBe(false);
+
+  await owner.dispose();
+});
+
+test("ready.notify lists the run's work, sends once a local day, and sends nothing when the run produced nothing", async ({
+  prep,
+}) => {
+  const { owner, userId } = await ownerContextFor(prep.server.url);
+
+  await owner.post("/__test__/mail/clear", { data: {} });
+  await clearCatalog(owner);
+
+  const companyId = await seedCompany(owner, "Recap Direct", "recap-direct.example");
+  const boardId = await seedBoard(owner, companyId, "greenhouse", "recap-direct");
+
+  const postingId = await seedPosting(owner, {
+    ats: "greenhouse",
+    atsJobId: "recap-direct-1",
+    boardId,
+    companyId,
+    title: "Staff Platform Engineer",
+    url: "https://recap-direct.example/1",
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    readyAt: await clockNow(owner),
+    status: "ready",
+    userId,
+  });
+
+  await owner.post("/__test__/reviews/seed", {
+    data: {
+      answerKind: "fact",
+      applicationIds: [applicationId],
+      factKey: "work_auth_ca",
+      fieldType: "select",
+      options: ["Yes", "No"],
+      prompt: "Are you authorised to work in Canada?",
+      reason: "unknown_required",
+      scope: "CA",
+      userId,
+    },
+  });
+
+  const now = await clockNow(owner);
+  const settled = JSON.stringify({ since: now - 60_000, userId });
+
+  await owner.post("/__test__/jobs/run-now", {
+    data: { kind: "ready.notify", payload: JSON.stringify({ since: now + 60_000, userId }) },
+  });
+
+  expect(await mailFor(owner)).toHaveLength(0);
+
+  await owner.post("/__test__/jobs/run-now", { data: { kind: "ready.notify", payload: settled } });
+
+  const [recap] = await mailFor(owner);
+
+  expect(recap?.subject).toBe("Overture recap: 1 ready to approve, 1 need an answer");
+  expect(recap?.body).toContain("Staff Platform Engineer at Recap Direct");
+  expect(recap?.body).toContain("1 question needs an answer.");
+  expect(recap?.body.match(/\/ready/gu)).toHaveLength(1);
+
+  await owner.post("/__test__/jobs/run-now", { data: { kind: "ready.notify", payload: settled } });
+
+  expect(await mailFor(owner)).toHaveLength(1);
+
+  const recapNotifications = (await notificationsFor(owner, userId)).filter(
+    (notification) => notification.kind === "ready",
+  );
+
+  expect(recapNotifications).toHaveLength(1);
+  expect(recapNotifications[0]?.emailedAt).not.toBeNull();
 
   await owner.dispose();
 });
@@ -272,6 +408,10 @@ test("the next day's run stops at the unapproved Ready Applications and sends no
 
   expect(await applicationsFor(owner, userId)).toHaveLength(10);
   expect(await mailFor(owner)).toHaveLength(1);
+
+  const notifications = await notificationsFor(owner, userId);
+
+  expect(notifications.filter((notification) => notification.kind === "ready")).toHaveLength(1);
 
   await owner.dispose();
 });
