@@ -393,7 +393,7 @@ test("one open application per company, and none for thirty days after a send", 
   await owner.dispose();
 });
 
-test("a reposted role is skipped for sixty days after a send", async ({
+test("a reposted role is skipped for sixty days after a send or an unconfirmed failure", async ({
   isolatedAppServer: { url },
 }) => {
   const { owner, userId } = await ownerContextFor(url);
@@ -402,6 +402,7 @@ test("a reposted role is skipped for sixty days after a send", async ({
 
   const echo = await catalog(owner, "Echo Labs", "echo.example");
   const foxtrot = await catalog(owner, "Foxtrot Labs", "foxtrot.example");
+  const golf = await catalog(owner, "Golf Labs", "golf.example");
 
   const echoOriginal = await seedPosting(owner, {
     atsJobId: "echo-1",
@@ -456,12 +457,40 @@ test("a reposted role is skipped for sixty days after a send", async ({
     userId,
   });
 
+  const golfOriginal = await seedPosting(owner, {
+    atsJobId: "golf-1",
+    boardId: golf.boardId,
+    city: "Toronto",
+    companyId: golf.companyId,
+    countryCode: "CA",
+    title: "Backend Engineer",
+    url: "https://golf.example/1",
+  });
+
+  const golfRepost = await seedPosting(owner, {
+    atsJobId: "golf-2",
+    boardId: golf.boardId,
+    city: "Toronto",
+    companyId: golf.companyId,
+    countryCode: "CA",
+    title: "Backend Engineer",
+    url: "https://golf.example/2",
+  });
+
+  await seedApplication(owner, {
+    postingId: golfOriginal,
+    sentAt: now - 3 * 86_400_000,
+    status: "failed",
+    userId,
+  });
+
   await configureMatching(owner);
 
   const ids = idsOf(await homeFor(owner));
 
   expect(ids).toContain(foxtrotRepost);
   expect(ids).not.toContain(echoOriginal);
+  expect(ids).not.toContain(golfRepost);
 
   await owner.dispose();
 });
