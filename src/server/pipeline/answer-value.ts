@@ -71,10 +71,13 @@ const NEGATIVE_FACT_VALUES = new Set([
 
 const NUMBER_TOKEN = String.raw`\d{1,3}(?:[ ,]\d{3})+|\d+(?:[.,]\d+)?`;
 
+const CURRENCY_TOKEN = String.raw`(?:[€£$]|c\$|ca\$|a\$|nz\$|[a-z]{3})?`;
+
 const SALARY_RANGE = new RegExp(
-  String.raw`(?<left>` +
+  String.raw`${CURRENCY_TOKEN}\s*(?<left>` +
     NUMBER_TOKEN +
-    String.raw`)(?<leftSuffix>[km]\b)?\s*(?:-|–|—|to|through)\s*(?<right>` +
+    String.raw`)(?<leftSuffix>[km]\b)?\s*(?:-|–|—|to|through)\s*` +
+    String.raw`${CURRENCY_TOKEN}\s*(?<right>` +
     NUMBER_TOKEN +
     String.raw`)(?<rightSuffix>[km]\b)?`,
   "iu",
