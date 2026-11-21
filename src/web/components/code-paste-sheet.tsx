@@ -143,7 +143,7 @@ export function CodePasteSheet({
       >
         <button
           aria-label={copy.codePaste.grabHandle}
-          className="flex h-6 w-full flex-none cursor-pointer items-center justify-center border-0 bg-transparent md:hidden"
+          className="flex h-11 w-full flex-none cursor-pointer items-center justify-center border-0 bg-transparent md:hidden"
           onClick={onClose}
           type="button"
         >
@@ -236,13 +236,13 @@ export function CodePasteSheet({
               <button className={PRIMARY} disabled={pending} onClick={submit} type="button">
                 {copy.codePaste.waiting.primary}
               </button>
-              {mode === "waiting" ? (
+              {shown === "waiting" ? (
                 <button className={SECONDARY} onClick={onNoCode} type="button">
                   {copy.codePaste.waiting.secondary}
                 </button>
               ) : (
                 <Link
-                  className="text-[13px] font-semibold underline decoration-input underline-offset-4 hover:decoration-foreground"
+                  className="inline-flex min-h-11 items-center text-[13px] font-semibold underline decoration-input underline-offset-4 hover:decoration-foreground md:min-h-10"
                   to="/profile#profile-address"
                 >
                   {copy.codePaste.noCode.secondary}
