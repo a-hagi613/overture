@@ -6,10 +6,12 @@ import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
 import type { AnthropicFixtureServer } from "./anthropic-fixture-server.ts";
 import type { FeedFixtureServer } from "./feed-fixture-server.ts";
+import type { SeedQuestion } from "./recorded-questions.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { startAnthropicFixtureServer } from "./anthropic-fixture-server.ts";
 import { startFeedFixtureServer } from "./feed-fixture-server.ts";
+import { recordedQuestions } from "./recorded-questions.ts";
 import {
   ownerContextFor,
   seedApplication,
@@ -203,48 +205,6 @@ async function seedRecordedPosting(
     workplace: input.workplace ?? "remote",
   });
 }
-
-const recordedQuestionsSchema = z.object({
-  questions: z.array(
-    z.object({
-      label: z.string(),
-      required: z.boolean(),
-      fields: z.array(
-        z.object({
-          name: z.string(),
-          type: z.string(),
-          values: z.array(z.object({ label: z.string() })).default([]),
-        }),
-      ),
-    }),
-  ),
-});
-
-function recordedQuestions(company: string, atsJobId: string) {
-  const path = `test/e2e/fixtures/greenhouse/${company}/jobs/${atsJobId}.questions.json`;
-
-  return recordedQuestionsSchema
-    .parse(JSON.parse(readFileSync(path, "utf8")))
-    .questions.flatMap((question) => {
-      const field = question.fields.at(0);
-
-      if (field === undefined) {
-        return [];
-      }
-
-      return [
-        {
-          atsFieldType: field.type,
-          fieldName: field.name,
-          options: field.values.map((value) => value.label),
-          required: question.required,
-          text: question.label,
-        },
-      ];
-    });
-}
-
-type SeedQuestion = ReturnType<typeof recordedQuestions>[number];
 
 async function runJob(owner: APIRequestContext, kind: string, payload: string) {
   const response = await owner.post("/__test__/jobs/run-now", { data: { kind, payload } });
