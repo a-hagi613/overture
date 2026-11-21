@@ -2,7 +2,7 @@ import type { AppDatabase } from "./db/client.ts";
 import type { Clock } from "./ports/clock.ts";
 import { publishEvent } from "./sse/stream.ts";
 
-export const ALERT_KINDS = ["llm.cap"] as const;
+export const ALERT_KINDS = ["llm.cap", "browser.proxy_trend"] as const;
 
 export type AlertKind = (typeof ALERT_KINDS)[number];
 

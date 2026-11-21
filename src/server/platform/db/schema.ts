@@ -432,6 +432,19 @@ export const profiles = sqliteTable("profiles", {
   updatedAt: timestamp("updated_at").notNull(),
 });
 
+export const browserProfiles = sqliteTable(
+  "browser_profiles",
+  {
+    userId: cascadeUserId(),
+    provider: text("provider", { enum: ["browser_use", "kernel", "local"] }).notNull(),
+    providerProfileId: text("provider_profile_id").notNull(),
+    countryCode: text("country_code").notNull(),
+    createdAt: timestamp("created_at").notNull(),
+    lastUsedAt: timestamp("last_used_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.provider] })],
+);
+
 export const targets = sqliteTable("targets", {
   userId: cascadeUserId().primaryKey(),
   roles: text("roles").notNull(),

@@ -11,16 +11,41 @@ export const browserSessionSchema = z.object({
   proxyUsedMb: z.string().optional(),
   proxyCost: z.string().optional(),
   browserCost: z.string().optional(),
+  recordingUrl: z.string().nullable().optional(),
   metadata: z.record(z.string(), z.string()).optional(),
 });
 
 export type BrowserSession = z.infer<typeof browserSessionSchema>;
+
+export const browserProfileSchema = z.object({
+  id: z.string().min(1),
+  userId: z.string().nullable().optional(),
+  name: z.string().nullable().optional(),
+  lastUsedAt: z.string().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type BrowserProfile = z.infer<typeof browserProfileSchema>;
+
+const browserSessionListSchema = z.object({
+  items: z.array(browserSessionSchema),
+  totalItems: z.number().int().nonnegative(),
+  pageNumber: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+});
 
 export interface CreateSessionInput {
   proxyCountryCode: string;
   timeoutMinutes: number;
   solveCaptchas: boolean;
   metadata: Record<string, string>;
+  profileId: string | null;
+}
+
+export interface ListSessionsInput {
+  filterBy?: "active" | "stopped";
+  pageSize?: number;
 }
 
 const apiBase = "https://api.browser-use.com";
@@ -62,6 +87,7 @@ export function BrowserUseClient(apiKey: string, baseUrl: string | undefined) {
         method: "POST",
         headers: headers(),
         body: JSON.stringify({
+          profileId: input.profileId,
           proxyCountryCode: input.proxyCountryCode,
           timeout: input.timeoutMinutes,
           solveCaptchas: input.solveCaptchas,
@@ -70,6 +96,21 @@ export function BrowserUseClient(apiKey: string, baseUrl: string | undefined) {
       }),
     getSession: async (sessionId: string) =>
       parsedSession(`/api/v4/browsers/${sessionId}`, { headers: headers() }),
+    listSessions: async (input: ListSessionsInput = {}) => {
+      const parameters = new URLSearchParams();
+
+      if (input.filterBy !== undefined) {
+        parameters.set("filterBy", input.filterBy);
+      }
+
+      parameters.set("pageSize", String(input.pageSize ?? 100));
+
+      const response = await call(`/api/v4/browsers?${parameters.toString()}`, {
+        headers: headers(),
+      });
+
+      return browserSessionListSchema.parse(await response.json());
+    },
     stopSession: async (sessionId: string) => {
       const response = await call(`/api/v4/browsers/${sessionId}`, {
         method: "PATCH",
@@ -77,9 +118,23 @@ export function BrowserUseClient(apiKey: string, baseUrl: string | undefined) {
         body: JSON.stringify({ action: "stop" }),
       });
 
-      if (response.status !== 204) {
-        browserSessionSchema.parse(await response.json());
+      if (response.status === 204) {
+        return null;
       }
+
+      return browserSessionSchema.parse(await response.json());
+    },
+    createProfile: async (input: { name: string; userId: string }) => {
+      const response = await call("/api/v4/profiles", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ name: input.name, userId: input.userId }),
+      });
+
+      return browserProfileSchema.parse(await response.json());
+    },
+    deleteProfile: async (profileId: string) => {
+      await call(`/api/v4/profiles/${profileId}`, { method: "DELETE", headers: headers() });
     },
   };
 }

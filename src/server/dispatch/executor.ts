@@ -9,7 +9,7 @@ import type { ResumeService } from "../profile/resume.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
 import type { SendPlan } from "../pipeline/send-plan.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
-import type { BrowserProvider, BrowserUsage, RemoteBrowser } from "./browser/provider.ts";
+import type { BrowserProviderRegistry, BrowserUsage, RemoteBrowser } from "./browser/provider.ts";
 import type { createMailboxService } from "../inbox/mailboxes.ts";
 
 import {
@@ -47,7 +47,8 @@ const sendPayloadSchema = z.object({ applicationId: z.string().min(1) });
 export interface DispatcherDeps {
   db: AppDatabase;
   clock: Clock;
-  provider: BrowserProvider;
+  providers: BrowserProviderRegistry;
+  hardTimeoutMs: number;
   preparation: PreparationService;
   resumes: ResumeService;
   personal: PersonalCrypto;
@@ -59,6 +60,24 @@ type AttemptRow = typeof attempts.$inferSelect;
 
 const zeroUsage: BrowserUsage = { browserMs: 0, costMicros: 0, proxyBytes: 0 };
 
+async function withDeadline<T extends { outcome: string }>(run: Promise<T>, timeoutMs: number) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const deadline = new Promise<{ outcome: "timeout" }>((resolve) => {
+    timer = setTimeout(() => {
+      resolve({ outcome: "timeout" });
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([run, deadline]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
+}
+
 const ATTEMPT_OUTCOMES = [
   ["blocked", "blocked"],
   ["captcha_blocked", "captcha_blocked"],
@@ -66,6 +85,7 @@ const ATTEMPT_OUTCOMES = [
   ["fill_failed", "form_changed"],
   ["form_missing", "form_changed"],
   ["sent", "sent"],
+  ["timeout", "timeout"],
   ["unconfirmed", "unconfirmed"],
   ["upload_failed", "upload_failed"],
   ["identity_mismatch", "identity_mismatch"],
@@ -99,7 +119,17 @@ function recordEvent(
 }
 
 export function createDispatcher(deps: DispatcherDeps) {
-  const { db, clock, provider, preparation, resumes, personal, mailboxes, proxyCountry } = deps;
+  const {
+    db,
+    clock,
+    providers,
+    hardTimeoutMs,
+    preparation,
+    resumes,
+    personal,
+    mailboxes,
+    proxyCountry,
+  } = deps;
 
   const activeAttempts = new Set<string>();
 
@@ -200,7 +230,7 @@ export function createDispatcher(deps: DispatcherDeps) {
           descriptionHash: plan.descriptionHash,
           postingTitle: plan.postingTitle,
           postingUrl: plan.postingUrl,
-          provider: provider.id,
+          provider: input.attempt.provider,
           providerSessionId: input.attempt.providerSessionId,
           resumeId: resume.id,
           resumeSha256: resume.sha256,
@@ -232,6 +262,7 @@ export function createDispatcher(deps: DispatcherDeps) {
   }
 
   async function runAttempt(applicationId: string) {
+    const provider = providers.pick();
     const at = clock.now();
 
     const claimed = db
@@ -316,7 +347,7 @@ export function createDispatcher(deps: DispatcherDeps) {
       browser = await provider.open({
         attemptId,
         country: proxyCountry,
-        profileId: plan.userId,
+        profileId: await provider.ensureProfile(plan.userId, proxyCountry),
         timeoutMinutes: SESSION_TIMEOUT_MINUTES,
       });
 
@@ -338,7 +369,7 @@ export function createDispatcher(deps: DispatcherDeps) {
         await route.fallback();
       });
 
-      const run = await runGreenhouseAttempt(
+      const runPromise = runGreenhouseAttempt(
         page,
         {
           fields: plan.fields,
@@ -410,6 +441,10 @@ export function createDispatcher(deps: DispatcherDeps) {
         },
       );
 
+      void Promise.allSettled([runPromise]);
+
+      const run = await withDeadline(runPromise, hardTimeoutMs);
+
       outcome = outcomeOf(run.outcome);
 
       await cdp.close().catch(() => undefined);
@@ -430,6 +465,19 @@ export function createDispatcher(deps: DispatcherDeps) {
             plan,
           });
         }
+      } else if (run.outcome === "timeout") {
+        const timedOut = db.select().from(attempts).where(eq(attempts.id, attemptId)).get();
+
+        if (timedOut?.submitClickedAt === null || timedOut?.submitClickedAt === undefined) {
+          releaseAttempt(applicationId, claimed.userId, attemptId, clock.now());
+        } else {
+          db.update(applications)
+            .set({ status: "confirming", statusReason: null, updatedAt: clock.now() })
+            .where(eq(applications.id, applicationId))
+            .run();
+        }
+
+        updateAttempt(attemptId, { endedAt: clock.now(), outcome: "timeout" });
       } else if (run.outcome === "unconfirmed") {
         db.update(applications)
           .set({ status: "confirming", statusReason: null, updatedAt: clock.now() })
@@ -568,10 +616,18 @@ export function createDispatcher(deps: DispatcherDeps) {
       released += 1;
     }
 
-    const open = await provider.listOpen();
+    const open = (
+      await Promise.all(
+        providers.all().map(async (provider) => {
+          const sessions = await provider.listOpen().catch(() => []);
+
+          return sessions.map((session) => ({ provider, session }));
+        }),
+      )
+    ).flat();
 
     const stopped = await Promise.all(
-      open.map(async (session) => {
+      open.map(async ({ provider, session }) => {
         if (activeAttempts.has(session.attemptId ?? "")) {
           return 0;
         }

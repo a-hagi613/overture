@@ -5,6 +5,17 @@ export interface ObjectStore {
   put: (key: string, data: Uint8Array<ArrayBuffer>) => Promise<void>;
   get: (key: string) => Promise<Uint8Array<ArrayBuffer> | null>;
   delete: (key: string) => Promise<void>;
+  list: (prefix: string) => AsyncIterable<string>;
+}
+
+async function keysUnder(root: string) {
+  const keys: string[] = [];
+
+  for await (const key of new Bun.Glob("**/*").scan({ cwd: root, onlyFiles: true })) {
+    keys.push(key.replaceAll("\\", "/"));
+  }
+
+  return keys;
 }
 
 export function createDiskObjectStore(root: string) {
@@ -43,6 +54,15 @@ export function createDiskObjectStore(root: string) {
     },
     delete: async (key: string) => {
       await rm(pathFor(key), { force: true });
+    },
+    async *list(prefix: string) {
+      const found = await keysUnder(resolve(root));
+
+      for (const key of found) {
+        if (key.startsWith(prefix)) {
+          yield key;
+        }
+      }
     },
   } satisfies ObjectStore;
 }

@@ -23,6 +23,14 @@ export const overviewSchema = z.object({
   users: z.object({ total: z.number(), owners: z.number() }),
   sessions: z.number(),
   killSwitches: z.object({ total: z.number(), enabled: z.number() }),
+  cost: z.object({
+    completed: z.number(),
+    costGateMicros: z.number(),
+    costGateMet: z.boolean().nullable(),
+    costMicrosPerCompleted: z.number().nullable(),
+    proxyMbPerCompleted: z.number().nullable(),
+    proxyTrend: z.boolean(),
+  }),
   audit: z.array(auditRowSchema),
 });
 

@@ -106,8 +106,8 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Cloudflare Turnstile | bot check on auth forms | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES` (optional, defaults to the `APP_ORIGIN` hostname; production must not list localhost or 127.0.0.1) | Cloudflare's published always-pass test keys; siteverify intercepted with recorded-shape responses (`test/e2e/turnstile-gate.test.ts`) |
 | Cloudflare Access | admin host gate | `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_JWKS_URL` (tests override the certs URL) | real verification against a test signing key |
 | Cloudflare Email Routing + Email Worker | inbound mail (ADR 0028) | `INBOUND_HMAC_SECRET` (shared by the Worker and `overture-web`) | the Worker's handler run against recorded `.eml` fixtures; signed requests to the real `POST /internal/mail/inbound`; DKIM checked by `mailauth` against recorded keys |
-| Browser Use Cloud | primary browser | `BROWSER_USE_API_KEY` | `local` provider: real local Chrome filling saved forms from the fixture server (§10.5); control API via MSW |
-| Kernel | fallback browser | `KERNEL_API_KEY` | control API via MSW; lab only |
+| Browser Use Cloud | primary browser | `BROWSER_USE_API_KEY`, `BROWSER_USE_API_BASE_URL` (test-only override) | `local` provider: real local Chrome filling saved forms from the fixture server (§10.5); control API from recorded responses, through MSW in-process or a local recorded fixture server for the app |
+| Kernel | fallback browser | `KERNEL_API_KEY`, `KERNEL_API_BASE_URL` (test-only override) | local recorded control-API server with real local Chrome behind it; lab only |
 | Anthropic | LLM (prod) | `ANTHROPIC_API_KEY` | real adapter; API intercepted by MSW with responses recorded by the daily live check |
 | OpenCode Go | LLM (local dev only) | `OPENCODE_API_KEY` | — |
 | Amazon SES + SNS | outbound mail, bounces | `AWS_REGION=ca-central-1`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `SES_CONFIG_SET` | real adapter; SES API intercepted by MSW, request bodies asserted |
@@ -168,7 +168,7 @@ src/
     main.ts          process entry: http + workers + scheduler, graceful shutdown
   web/               React app (routes/, features/, components/ui = shadcn)
 drizzle/             generated migrations
-scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, restore-drill.ts
+scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, pull-forms.ts, restore-drill.ts
 test/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
                      (the six unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
@@ -180,7 +180,7 @@ No comments in source (Landmines `no-comments`; TSDoc on exported port interface
 
 ```ts
 interface LlmPort { complete<T>(req: LlmRequest<T>): Promise<LlmResult<T>>; batch<T>(reqs: LlmRequest<T>[]): Promise<BatchHandle> }
-interface BrowserProvider { id: "browser_use" | "kernel" | "local"; open(o: { profileId: string | null; country: string; timeoutMinutes: number; attemptId: string }): Promise<RemoteBrowser>; listOpen(): Promise<{ sessionId: string; attemptId: string | null }[]>; stop(sessionId: string): Promise<void>; ensureProfile(userId: string): Promise<string>; deleteProfile(profileId: string): Promise<void> }
+interface BrowserProvider { id: "browser_use" | "kernel" | "local"; open(o: { profileId: string | null; country: string; timeoutMinutes: number; attemptId: string }): Promise<RemoteBrowser>; listOpen(): Promise<{ sessionId: string; attemptId: string | null }[]>; stop(sessionId: string): Promise<void>; ensureProfile(userId: string, country: string): Promise<string>; deleteProfile(profileId: string): Promise<void>; view(sessionId: string): Promise<{ liveViewUrl: string | null; recordingUrl: string | null; status: "active" | "stopped" } | null> }
 interface RemoteBrowser { cdpUrl: string; sessionId: string; liveViewUrl: string | null; close(): Promise<UsageReport> }
 interface MailSender { sendRaw(m: OutboundMime): Promise<{ providerMessageId: string }> }
 interface ObjectStore { put(k: string, b: Uint8Array, meta?): Promise<void>; get(k: string): Promise<Uint8Array | null>; delete(k: string): Promise<void>; list(prefix: string): AsyncIterable<string> }
@@ -730,15 +730,18 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
    (URL/heading/text per ATS). No signal within 30 s → `unconfirmed` (§9.4). A missing or changed field found
    **before** the click → `form_changed`.
 9. Close the browser; record `browser_ms`, `proxy_bytes`, `cost_micros` from the provider usage report.
-10. Hard timeout 15 min (the browser session and the attempt lease) → `timeout` before the click, `unconfirmed` after it.
+10. Hard timeout 15 min (the browser session and the attempt lease) → `timeout` before the click, `unconfirmed` after it. The limit is fixed in production; `SEND_HARD_TIMEOUT_MS` exists only so the e2e suite can reach the deadline without a fifteen-minute wait.
 
 ### 10.4 Synthetic lab and provider report (M1)
 
 - Synthetic: `https://tryoverture.com/lab/*` pages with reCAPTCHA v3 (score logged server-side), hCaptcha, Turnstile
   and recorded ATS fixture forms; 200 sessions per provider (Browser Use and Kernel); no employer involved.
 - Live: the owner's real applications, on Browser Use only; ≥ 60 for the M1 gate.
-- Admin report: completion rate, code rate, challenge rate, p50/p95 duration, cost per completed application, per
-  provider × ATS. Kernel stays the fallback unless the lab shows it clearly ahead and the owner decides otherwise.
+- Admin report: completion rate, code rate, challenge rate, p50/p95 duration, proxy MB and cost per completed
+  application, per provider × ATS. Overview shows proxy MB and cost per completed application against the $0.03 gate.
+  The report raises `browser.proxy_trend` when the latest 20 completed applications use more than 1.2× the proxy bytes
+  per completed application of the 20 before them. Kernel stays the fallback unless the lab shows it clearly ahead
+  and the owner decides otherwise.
 
 ### 10.5 Fixtures
 
@@ -746,8 +749,9 @@ Fixture capture is an admin-started job (`fixtures.capture`, `POST /admin/api/fi
 that runs on `overture-web` and drives a Browser Use session, the same path as a real application, and never clicks
 Submit. It saves sanitised HTML + assets (names, emails, tokens and employer tracking stripped) to R2
 `fixtures/{ats}/{form_signature}/`. A developer pulls them into `test/e2e/fixtures/forms/` with
-`scripts/record-feeds.ts` (R2 read only, no ATS traffic); the local fixture server replays them, including fake
-confirmation pages, a fake code prompt and a fake visible challenge. Live smoke checks are the same kind of admin job,
+`scripts/pull-forms.ts` (R2 read only, no ATS traffic); the local fixture server replays them, including fake
+confirmation pages, a fake code prompt and a fake visible challenge. The capture job opens at most ten URLs per run,
+with no user profile attached, and writes `fixtures/{ats}/{form_signature}/form.html`, its assets and `meta.json`. Live smoke checks are the same kind of admin job,
 stopping before Submit. The developer machine never drives a browser against a real form.
 
 ---
@@ -1008,7 +1012,7 @@ none submits an application or touches a user:
 | Mail | a DKIM-signed message to an Overture-owned forwarding address on `tryoverture.com`, through Email Routing and the Worker, ingested with `auth='pass'` and its code extracted | recorded `.eml` fixtures |
 | Storage | an R2 put, get, list and delete | — |
 
-`scripts/record-feeds.ts` brings refreshed fixtures and recordings into `test/e2e/` through a pull request, so a test
+`scripts/pull-forms.ts` brings refreshed fixtures and recordings into `test/e2e/` through a pull request, so a test
 replays only what a real service actually returned.
 
 ### 16.5 Observability

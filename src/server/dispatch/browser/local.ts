@@ -90,6 +90,16 @@ function launchArguments(profileDirectory: string) {
   ];
 }
 
+async function ensureProfile(userId: string) {
+  await Promise.resolve();
+
+  return userId;
+}
+
+async function deleteProfile() {
+  await Promise.resolve();
+}
+
 export function createLocalBrowserProvider(deps: { clock: Clock; sessionDirectory: string }) {
   const { clock, sessionDirectory } = deps;
 
@@ -208,7 +218,29 @@ export function createLocalBrowserProvider(deps: { clock: Clock; sessionDirector
     }
   }
 
-  return { id: "local", listOpen, open, stop } satisfies BrowserProvider;
+  async function view(sessionId: string) {
+    const record = await readRecord(sessionDirectory, sessionId);
+
+    if (record === null) {
+      return null;
+    }
+
+    return {
+      liveViewUrl: null,
+      recordingUrl: null,
+      status: alive(record.pid) ? ("active" as const) : ("stopped" as const),
+    };
+  }
+
+  return {
+    id: "local",
+    deleteProfile,
+    ensureProfile,
+    listOpen,
+    open,
+    stop,
+    view,
+  } satisfies BrowserProvider;
 }
 
 export type LocalBrowserProvider = ReturnType<typeof createLocalBrowserProvider>;

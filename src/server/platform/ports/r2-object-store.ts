@@ -16,6 +16,22 @@ export function createR2ObjectStore(config: R2ObjectStoreConfig) {
     region: "auto",
   });
 
+  type Collect = (prefix: string, continuationToken?: string) => Promise<string[]>;
+
+  const collect: Collect = async (prefix, continuationToken) => {
+    const page = await client.list(
+      continuationToken === undefined ? { prefix } : { continuationToken, prefix },
+    );
+
+    const keys = (page.contents ?? []).map((entry) => entry.key);
+
+    if (page.isTruncated !== true) {
+      return keys;
+    }
+
+    return [...keys, ...(await collect(prefix, page.nextContinuationToken))];
+  };
+
   return {
     put: async (key: string, data: Uint8Array<ArrayBuffer>) => {
       await client.write(key, data);
@@ -31,6 +47,11 @@ export function createR2ObjectStore(config: R2ObjectStoreConfig) {
     },
     delete: async (key: string) => {
       await client.delete(key);
+    },
+    async *list(prefix: string) {
+      for (const key of await collect(prefix)) {
+        yield key;
+      }
     },
   } satisfies ObjectStore;
 }

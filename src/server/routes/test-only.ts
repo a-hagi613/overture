@@ -167,6 +167,23 @@ const tamperSnapshotBody = z.object({
 
 const attemptsQuery = z.object({ applicationId: z.string().min(1) });
 
+const seedAttemptBody = z.object({
+  applicationId: z.string().min(1),
+  userId: z.string().min(1),
+  provider: z.enum(["browser_use", "kernel", "local"]).default("browser_use"),
+  providerSessionId: z.string().min(1).nullish(),
+  n: z.number().int().min(1).default(1),
+  outcome: z
+    .enum(["sent", "unconfirmed", "provider_error", "timeout", "blocked", "posting_closed"])
+    .default("sent"),
+  startedAt: z.number().int().optional(),
+  browserMs: z.number().int().nonnegative().default(0),
+  proxyBytes: z.number().int().nonnegative().default(0),
+  costMicros: z.number().int().nonnegative().default(0),
+  captchaSeen: z.boolean().default(false),
+  codeUsed: z.boolean().default(false),
+});
+
 const seedAnswerBody = z.object({
   applicationId: z.string().min(1),
   questionId: z.string().min(1),
@@ -1082,6 +1099,36 @@ export function createTestRoutes(
         .orderBy(attempts.startedAt)
         .all(),
     });
+  });
+
+  routes.post("/attempts/seed", zValidator("json", seedAttemptBody), (context) => {
+    const { applicationId, userId, ...rest } = context.req.valid("json");
+    const startedAt = rest.startedAt ?? clock.now();
+    const id = crypto.randomUUID();
+
+    db.insert(attempts)
+      .values({
+        applicationId,
+        browserMs: rest.browserMs,
+        captchaSeen: rest.captchaSeen,
+        codeUsed: rest.codeUsed,
+        costMicros: rest.costMicros,
+        endedAt: startedAt + rest.browserMs,
+        id,
+        leaseUntil: startedAt + 15 * 60_000,
+        n: rest.n,
+        outcome: rest.outcome,
+        provider: rest.provider,
+        providerSessionId: rest.providerSessionId ?? null,
+        proxyBytes: rest.proxyBytes,
+        startedAt,
+        submitClickedAt: null,
+        submitResponseStatus: null,
+        userId,
+      })
+      .run();
+
+    return context.json({ id });
   });
 
   routes.post("/snapshots/tamper", zValidator("json", tamperSnapshotBody), (context) => {

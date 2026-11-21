@@ -176,6 +176,13 @@
       "when": 1795230000023,
       "tag": "0024_pacing_send_gates",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1795230000024,
+      "tag": "0025_browser_profiles",
+      "breakpoints": true
     }
   ]
 }

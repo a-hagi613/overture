@@ -65,6 +65,7 @@ import {
 import { createMailDnsResolver } from "./inbox/dns.ts";
 import { createMailIngest, MAIL_INGEST_JOB_KIND } from "./inbox/ingest.ts";
 import { createMailboxService } from "./inbox/mailboxes.ts";
+import { FIXTURE_CAPTURE_JOB_KIND, runFixtureCaptureJob } from "./fixtures/job.ts";
 
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 
@@ -247,20 +248,21 @@ const mailJobHandlers: JobHandlers = {
   },
 };
 
-const browserProvider = createBrowserProvider(env, clock);
+const browserProviders = createBrowserProvider(env, clock, db);
 
 const resumes = createResumeService({ db, clock, llm: anthropicLlmPort, objects, personal });
 
 const activeDispatcher =
-  browserProvider === null
+  browserProviders === null
     ? null
     : createDispatcher({
         db,
         clock,
+        hardTimeoutMs: env.SEND_HARD_TIMEOUT_MS,
         mailboxes,
         personal,
         preparation,
-        provider: browserProvider,
+        providers: browserProviders,
         proxyCountry: env.BROWSER_PROXY_COUNTRY,
         resumes,
       });
@@ -273,7 +275,7 @@ const dispatchTick =
         db,
         enqueueSend: (applicationId) => activeDispatcher.enqueueSend(applicationId),
         liveness: createPostingLiveness(env),
-        providerId: browserProvider === null ? "local" : browserProvider.id,
+        providerId: browserProviders === null ? "local" : browserProviders.pick().id,
       });
 
 const dispatchJobHandlers: JobHandlers =
@@ -314,6 +316,15 @@ const planningJobHandlers: JobHandlers = {
   },
 };
 
+const fixtureJobHandlers: JobHandlers =
+  browserProviders === null
+    ? {}
+    : {
+        [FIXTURE_CAPTURE_JOB_KIND]: async (payload) => {
+          await runFixtureCaptureJob({ clock, objects, providers: browserProviders }, payload);
+        },
+      };
+
 const allJobHandlers: JobHandlers = {
   ...catalogJobHandlers,
   ...preparationJobHandlers,
@@ -321,6 +332,7 @@ const allJobHandlers: JobHandlers = {
   ...llmJobHandlers,
   ...mailJobHandlers,
   ...dispatchJobHandlers,
+  ...fixtureJobHandlers,
   ...testJobHandlers,
 };
 
@@ -367,6 +379,7 @@ const app = createApp({
   reviews,
   singletonJobKinds: jobSingletons,
   backups,
+  providers: browserProviders,
 });
 
 const server = Bun.serve({ port: env.PORT, fetch: app.fetch });
