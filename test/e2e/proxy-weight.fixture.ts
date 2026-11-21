@@ -27,9 +27,14 @@ export const allowedWeightBytes = weights.app + weights.data + weights.image + w
 
 export const trimmedWeightBytes = weights.analytics + weights.font + weights.media + weights.pixel;
 
+export interface ProxyWeightRequest {
+  host: string;
+  path: string;
+}
+
 export interface ProxyWeightFixture {
   url: string;
-  requests: () => string[];
+  requests: () => ProxyWeightRequest[];
   bytesServed: () => number;
   reset: () => void;
   close: () => void;
@@ -51,7 +56,7 @@ body { font-family: Weight, sans-serif; }
 </body></html>`;
 
 export function startProxyWeightFixture() {
-  let requests: string[] = [];
+  let requests: ProxyWeightRequest[] = [];
   let served = 0;
 
   const server = Bun.serve({
@@ -60,7 +65,7 @@ export function startProxyWeightFixture() {
       const url = new URL(request.url);
       const host = request.headers.get("host") ?? "";
 
-      requests.push(`${host}${url.pathname}`);
+      requests.push({ host: host.split(":")[0] ?? "", path: url.pathname });
 
       if (url.pathname === "/") {
         const html = page(server.port ?? 0);

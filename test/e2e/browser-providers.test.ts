@@ -299,23 +299,25 @@ test("a send session trims fonts, media and tracker hosts and keeps images, scri
     await page.goto(weight.url);
 
     await expect
-      .poll(() => weight.requests().filter((hit) => hit.endsWith("/data.json")).length)
+      .poll(() => weight.requests().filter((request) => request.path === "/data.json").length)
       .toBe(1);
 
     const reached = weight.requests();
+    const reachedPaths = reached.map((request) => request.path);
+    const reachedHosts = reached.map((request) => request.host);
 
-    expect(reached.some((hit) => hit.endsWith("/"))).toBe(true);
+    expect(reachedPaths).toContain("/");
 
     for (const path of ALLOWED_WEIGHT_PATHS.filter((entry) => entry !== "/")) {
-      expect(reached.some((hit) => hit.endsWith(path))).toBe(true);
+      expect(reachedPaths).toContain(path);
     }
 
-    expect(reached.some((hit) => hit.includes("hcaptcha.com"))).toBe(true);
-    expect(reached.some((hit) => hit.includes("www.doubleclick.net"))).toBe(false);
-    expect(reached.some((hit) => hit.includes("clarity.ms"))).toBe(false);
+    expect(reachedHosts).toContain("hcaptcha.com");
+    expect(reachedHosts).not.toContain("www.doubleclick.net");
+    expect(reachedHosts).not.toContain("clarity.ms");
 
     for (const path of TRIMMED_WEIGHT_PATHS) {
-      expect(reached.some((hit) => hit.endsWith(path))).toBe(false);
+      expect(reachedPaths).not.toContain(path);
     }
 
     expect(weight.bytesServed()).toBeGreaterThanOrEqual(allowedWeightBytes);
@@ -340,21 +342,23 @@ test("a send session trims fonts, media and tracker hosts and keeps images, scri
     await controlPage.goto(weight.url);
 
     await expect
-      .poll(() => weight.requests().filter((hit) => hit.endsWith("/data.json")).length)
+      .poll(() => weight.requests().filter((request) => request.path === "/data.json").length)
       .toBe(1);
 
     const untrimmed = weight.requests();
+    const untrimmedPaths = untrimmed.map((request) => request.path);
+    const untrimmedHosts = untrimmed.map((request) => request.host);
 
-    expect(untrimmed.some((hit) => hit.endsWith("/"))).toBe(true);
+    expect(untrimmedPaths).toContain("/");
 
     for (const path of [...ALLOWED_WEIGHT_PATHS, ...TRIMMED_WEIGHT_PATHS].filter(
       (entry) => entry !== "/",
     )) {
-      expect(untrimmed.some((hit) => hit.endsWith(path))).toBe(true);
+      expect(untrimmedPaths).toContain(path);
     }
 
-    expect(untrimmed.some((hit) => hit.includes("www.doubleclick.net"))).toBe(true);
-    expect(untrimmed.some((hit) => hit.includes("clarity.ms"))).toBe(true);
+    expect(untrimmedHosts).toContain("www.doubleclick.net");
+    expect(untrimmedHosts).toContain("clarity.ms");
 
     await controlBrowser.close();
     await control.close();
