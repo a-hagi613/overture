@@ -12,7 +12,15 @@ interface AdminGateCheck {
 
 const widths = [390, 1280];
 const themes = ["light", "dark"];
-const adminPaths = ["/admin", "/admin/settings", "/admin/catalog", "/admin/grants"];
+
+const adminPaths = [
+  "/admin",
+  "/admin/settings",
+  "/admin/catalog",
+  "/admin/grants",
+  "/admin/users",
+  "/admin/invites",
+];
 
 function combinations() {
   return widths.flatMap((width) =>
@@ -41,6 +49,8 @@ async function checkPage(
       .or(page.getByRole("heading", { name: "Kill switches" }))
       .or(page.getByRole("heading", { name: "Job board sources" }))
       .or(page.getByRole("heading", { name: "Recent grants" }))
+      .or(page.getByRole("heading", { name: "Users and access" }))
+      .or(page.getByRole("heading", { name: "Invites", exact: true }))
       .first(),
   ).toBeVisible();
 
@@ -57,6 +67,8 @@ test("the admin pages are axe clean at 390 and 1280 in light and dark", async ({
   adminIsolatedAppUrl,
   accessServer,
 }) => {
+  test.setTimeout(120_000);
+
   await enableVirtualAuthenticator(page);
   await signInOwnerOnAdmin(page, adminIsolatedAppUrl);
 

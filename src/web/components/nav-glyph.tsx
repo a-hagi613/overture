@@ -22,7 +22,11 @@ type GlyphName =
   | "send"
   | "hash"
   | "pause"
-  | "clock";
+  | "clock"
+  | "users"
+  | "tag"
+  | "link"
+  | "grid";
 
 interface GlyphPaths {
   readonly paths: string[];
@@ -110,6 +114,33 @@ const glyphs: Record<GlyphName, GlyphPaths> = {
   pause: { paths: ["M9 5v14", "M15 5v14"], strokeWidth: 2.2 },
   clock: {
     paths: ["M12 3a9 9 0 100 18 9 9 0 000-18z", "M12 7v5l3 2"],
+    strokeWidth: 1.6,
+  },
+  users: {
+    paths: [
+      "M9 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7z",
+      "M2.5 20c0-3.5 3-5.5 6.5-5.5s6.5 2 6.5 5.5",
+      "M16.5 4.6a3 3 0 010 5.8",
+      "M18 14.7c2.1.6 3.5 2.2 3.5 4.8",
+    ],
+    strokeWidth: 1.6,
+  },
+  tag: {
+    paths: [
+      "M3 5a2 2 0 012-2h6.2a2 2 0 011.4.6l7.8 7.8a2 2 0 010 2.8l-6.2 6.2a2 2 0 01-2.8 0L3.6 12.6A2 2 0 013 11.2z",
+      "M8 8h.01",
+    ],
+    strokeWidth: 1.6,
+  },
+  link: {
+    paths: [
+      "M10 13.5a4 4 0 005.7 0l3-3a4 4 0 10-5.7-5.7l-1.5 1.5",
+      "M14 10.5a4 4 0 00-5.7 0l-3 3a4 4 0 105.7 5.7l1.5-1.5",
+    ],
+    strokeWidth: 1.7,
+  },
+  grid: {
+    paths: ["M4 4h6v6H4z", "M14 4h6v6h-6z", "M4 14h6v6H4z", "M14 14h6v6h-6z"],
     strokeWidth: 1.6,
   },
 };
