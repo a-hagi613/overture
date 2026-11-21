@@ -99,6 +99,9 @@ export function createCloudflareMailSender(config: CloudflareMailConfig) {
         copy.mail.accountDeletedBody(mail.name),
       );
     },
+    sendExportReady: async (mail) => {
+      await sendEmail(config, mail.to, mail.subject, mail.body);
+    },
   };
 
   return sender;

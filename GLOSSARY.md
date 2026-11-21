@@ -145,6 +145,14 @@ Every application question Overture has seen, shared across users without their 
 Companies Overture never applies to for this user, starting with the current employer.
 _Avoid_: blocklist, never-apply list
 
+## My data
+
+**Export**:
+The one encrypted zip of a user's profile, Facts, Applications, Snapshots, messages, resume and attachments. Its link
+works for 24 hours and opens with the key the server generated and wrapped for that export, delivered only with the
+link and never stored in plaintext or logged; after that the archive is deleted, and a new request replaces a ready one.
+_Avoid_: download, data dump, archive
+
 ## Mail
 
 **Inbox**:

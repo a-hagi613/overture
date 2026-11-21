@@ -123,6 +123,13 @@ import { createMailboxService } from "./inbox/mailboxes.ts";
 import { FIXTURE_CAPTURE_JOB_KIND, runFixtureCaptureJob } from "./fixtures/job.ts";
 import { ACCOUNT_ERASE_JOB_KIND, createAccountEraser } from "./account/erase.ts";
 import { ACCOUNT_DELETED_NOTICE_JOB_KIND, createDeletionNoticeCrypto } from "./account/notice.ts";
+import {
+  EXPORT_BUILD_JOB_KIND,
+  EXPORT_EXPIRE_JOB_KIND,
+  EXPORT_NOTIFY_JOB_KIND,
+  createExportService,
+  parseExportPayload,
+} from "./export/service.ts";
 
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 
@@ -215,6 +222,7 @@ const jobSingletons = [
   LIVE_CHECK_JOB_KIND,
   WORKABLE_INGEST_JOB_KIND,
   RETENTION_JOB_KIND,
+  EXPORT_BUILD_JOB_KIND,
 ];
 
 recoverStaleLocks(db, clock, jobSingletons);
@@ -407,6 +415,30 @@ const mailPersonal = createPersonalCrypto(
 );
 
 const resumes = createResumeService({ db, clock, llm: anthropicLlmPort, objects, personal });
+
+const exports = createExportService({
+  appOrigin,
+  clock,
+  db,
+  mail: mailSender,
+  mailDomain: env.MAIL_DOMAIN,
+  objects,
+  personal,
+});
+
+const exportJobHandlers: JobHandlers = {
+  [EXPORT_BUILD_JOB_KIND]: async (payload) => {
+    await exports.build(parseExportPayload(payload).exportId);
+  },
+  [EXPORT_EXPIRE_JOB_KIND]: async (payload) => {
+    const parsed = parseExportPayload(payload);
+
+    await exports.expire(parsed.exportId, parsed.objectKey);
+  },
+  [EXPORT_NOTIFY_JOB_KIND]: async (payload) => {
+    await exports.notify(parseExportPayload(payload).exportId);
+  },
+};
 
 const outcomes = createOutcomes({ db, clock, personal });
 
@@ -630,6 +662,7 @@ const allJobHandlers: JobHandlers = {
   ...checkinJobHandlers,
   ...liveCheckJobHandlers,
   ...accountJobHandlers,
+  ...exportJobHandlers,
   ...testJobHandlers,
 };
 
@@ -687,6 +720,7 @@ const app = createApp({
   providers: browserProviders,
   catalogWorker,
   eraser,
+  exports,
 });
 
 const SERVER_IDLE_TIMEOUT_ABOVE_SSE_HEARTBEAT_SECONDS = 60;

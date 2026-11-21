@@ -40,6 +40,11 @@ export function createDemoSafeMailSender(db: AppDatabase, sender: MailSender) {
         await sender.sendAccountDeleted(mail);
       }
     },
+    sendExportReady: async (mail) => {
+      if (allowed(mail.to)) {
+        await sender.sendExportReady(mail);
+      }
+    },
     sendReadyRecap: async (mail) => {
       if (allowed(mail.to)) {
         await sender.sendReadyRecap(mail);
