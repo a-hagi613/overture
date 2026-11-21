@@ -22,12 +22,12 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for thirteen invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
+exist only for fourteen invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
 derivations, the answer planner (a salary Fact kept per currency is chosen only for the currency a question names),
 the facts model (a Fact's scope is validated against its key), the onboarding step's salary and EEO reading, the
 fixture sanitiser (recorded pages must carry no script, event handler, personal data or token), the v1
-answer-bank mapping, and the live-traffic guard (in test and development, an outbound request to an ATS or
-paid-service host is refused). They import
+answer-bank mapping, the live-traffic guard (in test and development, an outbound request to an ATS or
+paid-service host is refused), and the job worker's wait (a completed wait retains no abort listener). They import
 `bun:test`, run with `bun test src`, and keep the Vitest lint plugin, whose test-shape rules do not depend on the
 runner. CI stays under two minutes on pull requests: six shards balanced by per-file time, and a pull request runs
 only the e2e files its committed reach map says its diff can reach, with everything unclassified running the full
