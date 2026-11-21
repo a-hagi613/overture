@@ -268,7 +268,7 @@ export function createOnboardingStepService(deps: {
       .flatMap((row) => (row.code === null ? [] : [row.code]));
   }
 
-  async function read(userId: string) {
+  async function read(userId: string, options: { inferCountries?: boolean } = {}) {
     const facts = await factsService.list(userId);
     const { targets } = await readTargets(userId);
     const open = openReviews(userId);
@@ -295,7 +295,7 @@ export function createOnboardingStepService(deps: {
       }
     }
 
-    if (countryCodes.length === 0) {
+    if (countryCodes.length === 0 && options.inferCountries !== false) {
       const home = countryCodesNamedIn(factValue(facts, "current_country")).at(0);
 
       countryCodes.push(...(home === undefined ? openPostingCountries() : [home]));
@@ -310,7 +310,7 @@ export function createOnboardingStepService(deps: {
       }
     }
 
-    if (currencies.length === 0) {
+    if (currencies.length === 0 && options.inferCountries !== false) {
       for (const code of countryCodes) {
         const currency = currencyForCountry(code);
 
