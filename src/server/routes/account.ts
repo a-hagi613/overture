@@ -4,6 +4,7 @@ import { verifyPassword } from "better-auth/crypto";
 import { z } from "zod";
 
 import type { AccountEraser } from "../account/erase.ts";
+import type { ExportService } from "../export/service.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Auth } from "../auth/index.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -12,6 +13,7 @@ import { copy } from "../../shared/copy.ts";
 import { env } from "../config/env.ts";
 import { accounts, rateLimits, sessions } from "../platform/db/schema.ts";
 import { ERASURE_COMPLETES_WITHIN_MS, REAUTH_WINDOW_MS } from "../account/erase.ts";
+import { EXPORT_VALID_MS } from "../export/service.ts";
 
 const passwordSchema = z.object({ password: z.string().min(1).max(1024) });
 const deleteSchema = z.object({ confirm: z.literal(true) });
@@ -32,8 +34,9 @@ export function createAccountRoutes(deps: {
   clock: Clock;
   auth: Auth;
   eraser: AccountEraser;
+  exports: ExportService;
 }) {
-  const { db, clock, auth, eraser } = deps;
+  const { db, clock, auth, eraser, exports } = deps;
 
   const routes = new Hono();
 
@@ -222,6 +225,57 @@ export function createAccountRoutes(deps: {
       },
       202,
     );
+  routes.get("/account/export", async (context) => {
+    const user = await sessionUser(context.req.raw);
+
+    if (user === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    return context.json(await exports.state(user.id));
+  });
+
+  routes.post("/account/export", async (context) => {
+    const user = await sessionUser(context.req.raw);
+
+    if (user === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    const result = await exports.request(user.id);
+
+    return context.json({ ...result.state, replaced: result.replaced }, 202);
+  });
+
+  routes.get("/account/export/:id/download", async (context) => {
+    const user = await sessionUser(context.req.raw);
+
+    if (user === null) {
+      return context.json({ error: "unauthorised" }, 401);
+    }
+
+    const result = await exports.download(user.id, context.req.param("id"));
+
+    if (result === "not_found") {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    if (result === "expired") {
+      return context.json({ error: "export_expired" }, 410);
+    }
+
+    const headers = new Headers({
+      "cache-control": "no-store",
+      "content-disposition": 'attachment; filename="overture-export.ovex"',
+      "content-type": "application/octet-stream",
+      "x-export-valid-for-seconds": String(Math.floor(EXPORT_VALID_MS / 1000)),
+    });
+
+    if (result.bytes > 0) {
+      headers.set("content-length", String(result.bytes));
+    }
+
+    return new Response(result.stream, { headers });
   });
 
   return routes;

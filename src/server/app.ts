@@ -16,6 +16,7 @@ import type { createMailboxService } from "./inbox/mailboxes.ts";
 import type { BrowserProviderRegistry } from "./dispatch/browser/provider.ts";
 import type { CatalogSweepWorker } from "./catalog/sweep-worker-runner.ts";
 import type { AccountEraser } from "./account/erase.ts";
+import type { ExportService } from "./export/service.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
 import { createMeRoutes } from "./routes/me.ts";
@@ -67,6 +68,7 @@ export interface AppDependencies {
   providers: BrowserProviderRegistry | null;
   catalogWorker: CatalogSweepWorker;
   eraser: AccountEraser;
+  exports: ExportService;
 }
 
 async function staticResponseFrom(root: string, url: string) {
@@ -164,6 +166,7 @@ export function createApp(deps: AppDependencies) {
       clock: deps.clock,
       db: deps.db,
       eraser: deps.eraser,
+      exports: deps.exports,
     }),
   );
   app.route(
