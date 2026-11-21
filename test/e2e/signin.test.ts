@@ -58,6 +58,30 @@ test("the owner signs in with Google through the local identity server", async (
   expect(state.accounts.map((account) => account.providerId)).toContain("google");
 });
 
+test("the owner signs in with the dotless Gmail form of a dotted OWNER_EMAIL", async ({
+  page,
+  request,
+  isolatedAppServer,
+  identityServer,
+}) => {
+  const appServerUrl = isolatedAppServer.url;
+
+  await setTurnstileScenario(request, appServerUrl, { action: "signin" });
+  await identityServer.setPersona(personas.ownerDotless("google-owner-dotless"));
+  await page.goto(`${appServerUrl}/signin`);
+  const googleButton = page.getByRole("button", { name: "Continue with Google" });
+
+  await expect(googleButton).toBeEnabled();
+  await googleButton.click();
+  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+
+  const state = await verifyAuthState(appServerUrl, page.request);
+  const owner = state.users.at(-1);
+
+  expect(owner?.role).toBe("owner");
+  expect(state.accounts.map((account) => account.providerId)).toContain("google");
+});
+
 test("the owner signs in with LinkedIn through the local identity server", async ({
   page,
   request,
