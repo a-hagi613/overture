@@ -407,3 +407,65 @@ test("a push subscription must name a known push service over HTTPS", async ({ p
 
   await request.dispose();
 });
+
+test("an unauthenticated caller is refused before the body is validated", async ({
+  pushServerUrl,
+}) => {
+  const request = await apiRequest.newContext({ baseURL: pushServerUrl });
+  const keys = subscriptionKeys();
+
+  const responses = [
+    await request.get("/api/notifications"),
+    await request.post("/api/notifications/read", { data: { id: 42 } }),
+    await request.post("/api/notifications/read-all", {
+      data: "{",
+      headers: { "content-type": "application/json" },
+    }),
+    await request.get("/api/push"),
+    await request.post("/api/push/subscribe", {
+      data: { endpoint: "http://fcm.googleapis.com/fcm/send/abc", keys },
+    }),
+    await request.post("/api/push/subscribe", {
+      data: { endpoint: "https://overture-web.internal/x", keys },
+    }),
+    await request.post("/api/push/unsubscribe", { data: { endpoint: "not a url" } }),
+  ];
+
+  for (const response of responses) {
+    expect(response.status()).toBe(401);
+    expect(response.headers()["cache-control"]).toContain("no-store");
+  }
+
+  const bodies = await Promise.all(responses.map(async (response) => json(response)));
+
+  expect(bodies).toEqual(responses.map(() => ({ error: "sign_in_required" })));
+
+  await request.dispose();
+});
+
+test("every authenticated notification response is marked no-store", async ({ pushServerUrl }) => {
+  const request = await apiRequest.newContext({ baseURL: pushServerUrl });
+
+  await seedOwner(request, pushServerUrl);
+
+  const keys = subscriptionKeys();
+  const endpoint = "https://push.example.test/send/no-store";
+
+  const responses = [
+    await request.get("/api/notifications"),
+    await request.get("/api/push"),
+    await request.post("/api/push/subscribe", {
+      data: { endpoint, keys: { auth: keys.auth, p256dh: keys.p256dh } },
+    }),
+    await request.post("/api/notifications/read", { data: { id: "unknown-notification" } }),
+    await request.post("/api/notifications/read-all"),
+    await request.post("/api/push/unsubscribe", { data: { endpoint } }),
+  ];
+
+  for (const response of responses) {
+    expect(response.ok()).toBe(true);
+    expect(response.headers()["cache-control"]).toContain("no-store");
+  }
+
+  await request.dispose();
+});

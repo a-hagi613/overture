@@ -1298,6 +1298,13 @@ to the owner's phone. No Grafana is provisioned by this repository; dashboards s
 and read the OTLP endpoint. `live.check` computes the same thresholds from the app database and machine and records
 each one, and the test-only drill route fires every alert kind.
 
+Two of those alerts do not depend on the app being up, because they come from the sentinel Worker
+(`workers/sentinel`, ADR 0033): the health probe calls `/api/health` from outside Fly, and the Workable snapshot's
+age is judged from `workable/manifest.json` in R2. The same Worker compares month-to-date R2, Queues and Workers
+usage with each allowance, pushes at 70 % and, at 90 %, writes `ops/degraded.json`; the app reads it through
+`src/server/platform/degraded.ts`, runs `email_classify` rules-only, skips the live-check R2 round trip, and logs
+each change of state with the metrics that caused it.
+
 ---
 
 ## 17. Slices (tickets)

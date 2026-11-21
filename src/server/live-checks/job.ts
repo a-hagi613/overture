@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { BackupMonitor } from "../platform/ports/backup.ts";
 import type { Clock } from "../platform/ports/clock.ts";
+import type { DegradedFlagReader } from "../platform/degraded.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { MailSender } from "../platform/mail/port.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
@@ -22,7 +23,8 @@ import { resolveDueLiveCheckMail, resolveLiveCheckMail, sendLiveCheckMail } from
 import { runEmailSendingGuard } from "./sending-domain.ts";
 import { runStorageCheck } from "./r2.ts";
 import { latestLiveCheckAt, recordLiveCheckResult } from "./store.ts";
-import { LIVE_CHECK_GROUPS, failedResult } from "./types.ts";
+import { logInfo } from "../platform/log.ts";
+import { LIVE_CHECK_GROUPS, failedResult, skippedResult } from "./types.ts";
 
 export const LIVE_CHECK_JOB_KIND = "live.check";
 
@@ -48,6 +50,7 @@ export interface LiveCheckDeps {
   providers: BrowserProviderRegistry | null;
   backups: BackupMonitor;
   databasePath: string;
+  degraded?: DegradedFlagReader;
 }
 
 async function runGroup(
@@ -111,9 +114,15 @@ export async function runLiveChecks(deps: LiveCheckDeps, payload: string) {
 
     if (group === "r2") {
       results.push(
-        ...(await runGroup(deps, group, async () => [
-          await runStorageCheck({ clock: deps.clock, objects: deps.objects }),
-        ])),
+        ...(await runGroup(deps, group, async () => {
+          if (deps.degraded !== undefined && (await deps.degraded.isDegraded())) {
+            logInfo("degraded", "r2 live check skipped while degraded: non-essential write");
+
+            return [skippedResult("r2", deps.clock.now(), "degraded")];
+          }
+
+          return [await runStorageCheck({ clock: deps.clock, objects: deps.objects })];
+        })),
       );
     }
 

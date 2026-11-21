@@ -3,6 +3,8 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
+import type { MiddlewareHandler } from "hono";
+
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
@@ -27,6 +29,10 @@ const unsubscribeBody = z.object({ endpoint: z.url() });
 
 const readBody = z.object({ id: z.string().min(1) });
 
+interface NotificationEnv {
+  Variables: { user: { id: string } };
+}
+
 function view(row: typeof notifications.$inferSelect) {
   return {
     at: row.createdAt,
@@ -41,7 +47,7 @@ function view(row: typeof notifications.$inferSelect) {
 }
 
 export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Auth) {
-  const routes = new Hono();
+  const routes = new Hono<NotificationEnv>();
 
   async function sessionUser(headers: Headers) {
     const result = await auth.api.getSession({ headers }).catch(() => null);
@@ -49,12 +55,23 @@ export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Au
     return result?.user ?? null;
   }
 
-  routes.get("/notifications", async (context) => {
+  const requireUser: MiddlewareHandler<NotificationEnv> = async (context, next) => {
+    context.header("Cache-Control", "no-store");
+
     const user = await sessionUser(context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: "sign_in_required" }, 401);
     }
+
+    context.set("user", { id: user.id });
+    await next();
+
+    return context.res;
+  };
+
+  routes.get("/notifications", requireUser, (context) => {
+    const user = context.get("user");
 
     const rows = db
       .select()
@@ -74,13 +91,8 @@ export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Au
     return context.json({ notifications: rows.map((row) => view(row)), now: clock.now(), unread });
   });
 
-  routes.post("/notifications/read", zValidator("json", readBody), async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
-
-    if (user === null) {
-      return context.json({ error: "sign_in_required" }, 401);
-    }
-
+  routes.post("/notifications/read", requireUser, zValidator("json", readBody), (context) => {
+    const user = context.get("user");
     const { id } = context.req.valid("json");
     const now = clock.now();
 
@@ -98,12 +110,8 @@ export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Au
     return context.json({ ok: true });
   });
 
-  routes.post("/notifications/read-all", async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
-
-    if (user === null) {
-      return context.json({ error: "sign_in_required" }, 401);
-    }
+  routes.post("/notifications/read-all", requireUser, (context) => {
+    const user = context.get("user");
 
     db.update(notifications)
       .set({ readAt: new Date(clock.now()) })
@@ -113,23 +121,12 @@ export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Au
     return context.json({ ok: true });
   });
 
-  routes.get("/push", async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
+  routes.get("/push", requireUser, (context) =>
+    context.json({ publicKey: env.VAPID_PUBLIC_KEY ?? null }),
+  );
 
-    if (user === null) {
-      return context.json({ error: "sign_in_required" }, 401);
-    }
-
-    return context.json({ publicKey: env.VAPID_PUBLIC_KEY ?? null });
-  });
-
-  routes.post("/push/subscribe", zValidator("json", subscriptionBody), async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
-
-    if (user === null) {
-      return context.json({ error: "sign_in_required" }, 401);
-    }
-
+  routes.post("/push/subscribe", requireUser, zValidator("json", subscriptionBody), (context) => {
+    const user = context.get("user");
     const { endpoint, keys } = context.req.valid("json");
     const now = clock.now();
 
@@ -151,13 +148,8 @@ export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Au
     return context.json({ ok: true });
   });
 
-  routes.post("/push/unsubscribe", zValidator("json", unsubscribeBody), async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
-
-    if (user === null) {
-      return context.json({ error: "sign_in_required" }, 401);
-    }
-
+  routes.post("/push/unsubscribe", requireUser, zValidator("json", unsubscribeBody), (context) => {
+    const user = context.get("user");
     const { endpoint } = context.req.valid("json");
 
     db.delete(pushSubscriptions)
