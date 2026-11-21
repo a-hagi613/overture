@@ -112,7 +112,7 @@ type ScopedLookup =
   | { kind: "answer"; value: string; scope: string; revision: number | null }
   | { kind: "review"; scope: string };
 
-function questionScope(questionText: string, facts: FactIndex) {
+function questionScope(questionText: string, facts: FactIndex, posting: PostingPlace) {
   const named = countriesNamedIn(questionText);
 
   if (named.length > 1) {
@@ -134,11 +134,30 @@ function questionScope(questionText: string, facts: FactIndex) {
     }
   }
 
+  if (posting.countryCode !== null && mentionsCompany(questionText, posting.companyName)) {
+    return { kind: "country", code: posting.countryCode } satisfies QuestionScope;
+  }
+
   return { kind: "generic" } satisfies QuestionScope;
 }
 
-function lookupScopedFact(key: string, questionText: string, facts: FactIndex) {
-  const scope = questionScope(questionText, facts);
+function mentionsCompany(questionText: string, companyName: string) {
+  const company = normalizeQuestionText(companyName);
+
+  if (company.length < 3) {
+    return false;
+  }
+
+  return ` ${normalizeQuestionText(questionText)} `.includes(` ${company} `);
+}
+
+function lookupScopedFact(
+  key: string,
+  questionText: string,
+  facts: FactIndex,
+  posting: PostingPlace,
+) {
+  const scope = questionScope(questionText, facts, posting);
 
   if (scope.kind === "country") {
     const value = facts.scoped.get(key)?.get(scope.code);
@@ -337,7 +356,7 @@ function resolveFact(input: ResolveInput) {
   }
 
   const scoped = isCountryScopedFactKey(input.factKey)
-    ? lookupScopedFact(input.factKey, input.questionText, input.facts)
+    ? lookupScopedFact(input.factKey, input.questionText, input.facts, input.posting)
     : null;
 
   if (scoped?.kind === "review") {

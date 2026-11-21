@@ -690,7 +690,9 @@ Until the first real Ashby send confirms it from its attempt log, the flow treat
 `jobs.ashbyhq.com/api/non-user-graphql` whose `op` names Submit as the application request. A 2xx alone is never
 success on Ashby: `sent` requires the success page state (the application form gone and a thank-you message),
 "flagged as possible spam" fails the Application without a retry, and inline required-field errors stay before
-Submit. Ashby's Yes/No answers are `type=submit` buttons and are never pressed; only the named submit button is.
+Submit. Ashby's Yes/No answers are `<button>`s around a hidden checkbox: the flow presses the option button inside
+that question's own group (never a button looked up by name, so Submit can never be pressed as an answer), and the
+preflight reads the group's pressed option as the answer.
 
 **Confirming.** An application in `confirming` waits up to `limits.confirm_wait_hours` (24) for an acknowledgement:
 forwarded mail to the user's forwarding address with `auth='pass'`, from the company's or the ATS's sender domains, naming the company

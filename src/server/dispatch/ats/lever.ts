@@ -114,6 +114,8 @@ export async function readLeverQuestions(page: Page) {
 
       const questions: FormQuestion[] = [];
 
+      const GENERIC_LABEL = /^please (?:check|select) all that apply:?$/iu;
+
       for (const [fieldName, elements] of groups) {
         const [first] = elements;
 
@@ -124,7 +126,7 @@ export async function readLeverQuestions(page: Page) {
         const box = first.closest(".application-question");
         const labelElement = box?.querySelector(".application-label");
 
-        const label = (
+        const innerLabel = (
           labelElement?.querySelector(".text")?.textContent ??
           labelElement?.textContent ??
           ""
@@ -132,6 +134,14 @@ export async function readLeverQuestions(page: Page) {
           .replaceAll(/[✱*]/gu, "")
           .replaceAll(/\s+/gu, " ")
           .trim();
+
+        const heading = box
+          ?.closest(".section")
+          ?.querySelector(":scope > h1, :scope > h2, :scope > h3, :scope > h4");
+
+        const label = GENERIC_LABEL.test(innerLabel)
+          ? (heading?.textContent ?? "").replaceAll(/\s+/gu, " ").trim() || innerLabel
+          : innerLabel;
 
         if (label === "") {
           continue;

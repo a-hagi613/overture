@@ -25,6 +25,9 @@ const RESUME_FIELD = "_systemfield_resume";
 
 const FORM_SELECTOR = ".ashby-application-form-container";
 
+const YES_NO_GROUP = "[class*='ashby-application-form-input-yesno']";
+const YES_NO_OPTION = "button.ashby-application-form-input-yesno-option";
+
 const FIELD_TYPES = new Map<string, QuestionFieldType>([
   ["email", "email"],
   ["tel", "phone"],
@@ -77,7 +80,10 @@ export interface AshbyRun {
 
 export async function readAshbyQuestions(page: Page) {
   return page.evaluate(
-    (input: { fieldTypes: [string, QuestionFieldType][] }) => {
+    (input: {
+      fieldTypes: [string, QuestionFieldType][];
+      yesNo: { group: string; option: string };
+    }) => {
       const fieldTypes = new Map(input.fieldTypes);
       const questions: FormQuestion[] = [];
 
@@ -106,6 +112,30 @@ export async function readAshbyQuestions(page: Page) {
         const radios = [...entry.querySelectorAll<HTMLInputElement>("input[type='radio']")];
 
         const boxes = [...entry.querySelectorAll<HTMLInputElement>("input[type='checkbox']")];
+
+        const yesNoOptions = [
+          ...entry.querySelectorAll<HTMLButtonElement>(
+            `${input.yesNo.group} ${input.yesNo.option}`,
+          ),
+        ];
+
+        if (yesNoOptions.length > 0) {
+          const box = entry.querySelector<HTMLInputElement>(
+            `${input.yesNo.group} input[type='checkbox']`,
+          );
+
+          questions.push({
+            fieldName: box?.name ?? "",
+            fieldType: "radio",
+            label,
+            options: yesNoOptions.map((button) =>
+              button.textContent.replaceAll(/\s+/gu, " ").trim(),
+            ),
+            required,
+          });
+
+          continue;
+        }
 
         if (radios.length > 0) {
           const [first] = radios;
@@ -211,7 +241,7 @@ export async function readAshbyQuestions(page: Page) {
 
       return questions;
     },
-    { fieldTypes: [...FIELD_TYPES] },
+    { fieldTypes: [...FIELD_TYPES], yesNo: { group: YES_NO_GROUP, option: YES_NO_OPTION } },
   );
 }
 
@@ -273,9 +303,39 @@ async function fillRadio(page: Page, fieldName: string, value: string) {
   return group.nth(index).isChecked();
 }
 
+async function pressYesNoOption(page: Page, fieldName: string, value: string) {
+  const group = page
+    .locator(YES_NO_GROUP)
+    .filter({ has: page.locator(`input[name="${cssValue(fieldName)}"]`) })
+    .first();
+
+  if ((await group.count()) === 0) {
+    return false;
+  }
+
+  const options = group.locator(YES_NO_OPTION);
+  const labels = await options.allInnerTexts();
+  const index = labels.findIndex((label) => normText(label) === normText(value));
+
+  if (index === -1) {
+    return false;
+  }
+
+  const option = options.nth(index);
+
+  if ((await option.getAttribute("aria-pressed")) !== "true") {
+    await option.click();
+  }
+
+  return (await option.getAttribute("aria-pressed")) === "true";
+}
+
 async function fillAshbyField(page: Page, field: SendPlanField, value: string) {
   if (field.fieldType === "radio") {
-    return fillRadio(page, field.fieldName ?? "", value);
+    return (
+      (await pressYesNoOption(page, field.fieldName ?? "", value)) ||
+      fillRadio(page, field.fieldName ?? "", value)
+    );
   }
 
   if (field.fieldType === "select") {

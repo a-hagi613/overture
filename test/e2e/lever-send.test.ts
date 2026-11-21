@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
+import type { IdentityServer } from "./identity-server-test.fixture.ts";
 import type { LeverFixture } from "./lever.fixture.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
@@ -24,27 +25,62 @@ interface LeverHarness {
   jobId: string;
   server: AppServer;
   sessionDirectory: string;
+  site: LeverSite;
 }
 
-const JOB_ID = "2c7db323-e4e8-4c07-8ec6-ad351b0f24eb";
-const BOARD_TOKEN = "pyka";
+interface LeverSite {
+  boardToken: string;
+  jobId: string;
+  companyName: string;
+  title: string;
+}
 
-const test = appTest.extend<{ lever: LeverHarness }>({
+const PYKA: LeverSite = {
+  boardToken: "pyka",
+  companyName: "Pyka",
+  jobId: "2c7db323-e4e8-4c07-8ec6-ad351b0f24eb",
+  title: "Chief Of Staff",
+};
+
+const HIVE: LeverSite = {
+  boardToken: "hive",
+  companyName: "Deploy",
+  jobId: "ac502675-09a8-4169-8061-8d49fd4e2c4f",
+  title: "Account Executive",
+};
+
+const startLeverHarness = async (identityServer: IdentityServer, site: LeverSite) => {
+  const directory = mkdtempSync(join(tmpdir(), "overture-lever-send-"));
+  const fixture = startLeverFixture({ boardToken: site.boardToken, jobId: site.jobId });
+  const sessionDirectory = join(directory, "browsers");
+
+  const server = await startFreshAppServer(identityServer, {
+    BROWSER_PROVIDER: "local",
+    BROWSER_SESSION_DIR: sessionDirectory,
+  });
+
+  return { fixture, jobId: site.jobId, server, sessionDirectory, site };
+};
+
+async function provideLeverHarness(
+  identityServer: IdentityServer,
+  site: LeverSite,
+  provide: (harness: LeverHarness) => Promise<void>,
+) {
+  const harness = await startLeverHarness(identityServer, site);
+
+  await provide(harness);
+  await harness.server.stop();
+  harness.fixture.close();
+}
+
+const test = appTest.extend<{ lever: LeverHarness; leverHive: LeverHarness }>({
   lever: [
-    async ({ identityServer }, provide) => {
-      const directory = mkdtempSync(join(tmpdir(), "overture-lever-send-"));
-      const fixture = startLeverFixture({ boardToken: BOARD_TOKEN, jobId: JOB_ID });
-      const sessionDirectory = join(directory, "browsers");
-
-      const server = await startFreshAppServer(identityServer, {
-        BROWSER_PROVIDER: "local",
-        BROWSER_SESSION_DIR: sessionDirectory,
-      });
-
-      await provide({ fixture, jobId: JOB_ID, server, sessionDirectory });
-      await server.stop();
-      fixture.close();
-    },
+    async ({ identityServer }, provide) => provideLeverHarness(identityServer, PYKA, provide),
+    { scope: "test" },
+  ],
+  leverHive: [
+    async ({ identityServer }, provide) => provideLeverHarness(identityServer, HIVE, provide),
     { scope: "test" },
   ],
 });
@@ -181,16 +217,19 @@ async function seededApplication(harness: LeverHarness) {
 
   await prepareProfile(owner);
 
-  const companyId = await seedCompany(owner, "Pyka", "pyka.example");
-  const boardId = await seedBoard(owner, companyId, "lever", BOARD_TOKEN);
+  const { boardToken, companyName, jobId, title } = harness.site;
+  const domain = `${boardToken}.example`;
+
+  const companyId = await seedCompany(owner, companyName, domain);
+  const boardId = await seedBoard(owner, companyId, "lever", boardToken);
 
   const postingId = await seedPosting(owner, {
     ats: "lever",
-    atsJobId: harness.jobId,
+    atsJobId: jobId,
     boardId,
     companyId,
-    title: "Chief Of Staff",
-    url: `${harness.fixture.url}/${BOARD_TOKEN}/${harness.jobId}/apply`,
+    title,
+    url: `${harness.fixture.url}/${boardToken}/${jobId}/apply`,
   });
 
   const applicationId = await seedApplication(owner, {
@@ -395,4 +434,26 @@ test("a Lever send fills the recorded form and ends sent after its questions are
   const home = homeSchema.parse(await (await owner.get("/api/home")).json());
 
   expect(home.applicationsLeft).toBe(2);
+});
+
+test("a Lever card is read by its section heading, not its generic field prompt", async ({
+  leverHive,
+}) => {
+  const { applicationId, owner } = await seededApplication(leverHive);
+
+  const response = await runSend(owner, applicationId);
+
+  expect(response.ok()).toBe(true);
+
+  const detail = await applicationOf(owner, applicationId);
+
+  expect(detail.application.status).toBe("needs_review");
+  expect(detail.application.statusReason).toBe("unknown_question");
+
+  const prompts = (await reviewsOf(owner)).map((review) => review.prompt);
+
+  expect(prompts).toContain("How did you hear about us?");
+  expect(prompts).not.toContain("Please check all that apply:");
+
+  expect((await fixtureState(leverHive.fixture)).submissions).toBe(0);
 });
