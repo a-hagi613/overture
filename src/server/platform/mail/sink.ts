@@ -24,6 +24,34 @@ export function createSinkMailSender(clock: Clock) {
 
       await Promise.resolve();
     },
+    sendEmailVerification: async (mail) => {
+      const sent = {
+        id: randomUUID(),
+        to: mail.to,
+        from: env.MAIL_FROM,
+        subject: copy.mail.verifyEmailSubject,
+        body: copy.mail.verifyEmailBody(mail.url),
+        sentAt: clock.now(),
+      };
+
+      captured.push(sent);
+
+      await Promise.resolve();
+    },
+    sendPasswordReset: async (mail) => {
+      const sent = {
+        id: randomUUID(),
+        to: mail.to,
+        from: env.MAIL_FROM,
+        subject: copy.mail.resetPasswordSubject,
+        body: copy.mail.resetPasswordBody(mail.url),
+        sentAt: clock.now(),
+      };
+
+      captured.push(sent);
+
+      await Promise.resolve();
+    },
     sendCheck: async (mail) => {
       const sent = {
         id: randomUUID(),

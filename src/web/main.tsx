@@ -19,6 +19,8 @@ import { OnboardingTargetsPage } from "./routes/onboarding-targets.tsx";
 import { ReviewPage } from "./routes/review.tsx";
 import { SearchPage } from "./routes/search.tsx";
 import { SettingsPage } from "./routes/settings.tsx";
+import { ForgotPasswordPage } from "./routes/forgot-password.tsx";
+import { ResetPasswordPage } from "./routes/reset-password.tsx";
 import { SignInPage } from "./routes/signin.tsx";
 import { ThemeProvider } from "./lib/theme.tsx";
 import { AdminShell } from "./routes/admin/shell.tsx";
@@ -55,6 +57,8 @@ const router = createBrowserRouter([
   { path: "/signin", element: <SignInPage /> },
   { path: "/onboarding", element: <OnboardingPage /> },
   { path: "/onboarding/resume", element: <OnboardingResumePage /> },
+  { path: "/forgot-password", element: <ForgotPasswordPage /> },
+  { path: "/reset-password", element: <ResetPasswordPage /> },
   { path: "/onboarding/facts", element: <OnboardingFactsPage /> },
   { path: "/onboarding/targets", element: <OnboardingTargetsPage /> },
 ]);
