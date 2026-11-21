@@ -61,17 +61,19 @@ async function seedOwner(request: APIRequestContext, appServerUrl: string) {
 
 const MAX_TEXT_ANTIALIAS_DRIFT = 0.12;
 
+async function parkAtViewportTop(section: Locator) {
+  await section.evaluate((element) => {
+    element.scrollIntoView({ behavior: "instant", block: "start" });
+  });
+}
+
 async function compareRegion(
   page: Page,
   section: Locator,
   expectedPath: string,
   region: z.infer<typeof boxSchema>,
 ) {
-  // The phone tab bar is sticky: park the region at the top of the viewport so the bar never
-  // overlays it in the full-page capture.
-  await section.evaluate((element) => {
-    element.scrollIntoView({ behavior: "instant", block: "start" });
-  });
+  await parkAtViewportTop(section);
 
   const actualBox = await section.evaluate((element) => {
     const rect = element.getBoundingClientRect();
