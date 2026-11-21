@@ -101,6 +101,9 @@ function undoApplicationId(url: string) {
   }
 }
 
+const compactControlClass =
+  "flex h-[34px] items-center justify-center rounded-md border border-input bg-card px-3 group-hover:bg-muted";
+
 export function NotificationItem({
   now,
   onAction,
@@ -147,23 +150,23 @@ export function NotificationItem({
           <div className="mt-2.5 flex gap-2">
             {undoId === null ? (
               <Link
-                className="flex h-[34px] items-center justify-center rounded-md border border-input bg-card px-3 text-[12.5px] max-md:h-11 font-semibold hover:bg-muted"
+                className="group flex items-center justify-center text-[12.5px] font-semibold max-md:-mt-[5px] max-md:-mb-[5px] max-md:h-11"
                 onClick={() => {
                   onRead(row.id);
                 }}
                 to={row.url}
               >
-                {label}
+                <span className={compactControlClass}>{label}</span>
               </Link>
             ) : (
               <button
-                className="flex h-[34px] items-center justify-center rounded-md border border-input bg-card px-3 text-[12.5px] max-md:h-11 font-semibold hover:bg-muted"
+                className="group flex items-center justify-center text-[12.5px] font-semibold max-md:-mt-[5px] max-md:-mb-[5px] max-md:h-11"
                 onClick={() => {
                   onAction(row);
                 }}
                 type="button"
               >
-                {label}
+                <span className={compactControlClass}>{label}</span>
               </button>
             )}
           </div>
