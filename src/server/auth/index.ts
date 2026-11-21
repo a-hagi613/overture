@@ -2,8 +2,9 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { genericOAuth, haveIBeenPwned, magicLink } from "better-auth/plugins";
+import type { GenericOAuthUserInfo } from "better-auth/plugins/generic-oauth";
 import { passkey } from "@better-auth/passkey";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -81,6 +82,26 @@ const providerConfigs = [googleProviderConfig, linkedinProviderConfig].filter(
   (config) => config !== null,
 );
 
+const providerProfileSchema = z.looseObject({
+  email: z.string().min(1),
+  emailVerified: z.union([z.literal(true), z.literal("true")]),
+});
+
+function withPreHijackGuard<T>(config: T, discardUnverifiedAccount: (email: string) => void) {
+  return {
+    ...config,
+    mapProfileToUser: (profile: GenericOAuthUserInfo) => {
+      const verified = providerProfileSchema.safeParse(profile);
+
+      if (verified.success) {
+        discardUnverifiedAccount(verified.data.email);
+      }
+
+      return {};
+    },
+  };
+}
+
 export const enabledSocialProviders = providerConfigs.map((config) => config.providerId);
 
 const ownerEmail = env.OWNER_EMAIL;
@@ -156,6 +177,12 @@ export function createAuth(
 
   const mayJoin = (email: string) =>
     isAllowedEmail(email) || liveInviteFor(db, inviteHashSecret, email) !== null;
+
+  const discardUnverifiedAccount = (email: string) => {
+    db.delete(users)
+      .where(and(eq(users.email, email.trim().toLowerCase()), eq(users.emailVerified, false)))
+      .run();
+  };
 
   const trustedOrigins = [
     ...(env.APP_ORIGIN === undefined ? [] : [env.APP_ORIGIN]),
@@ -426,7 +453,9 @@ export function createAuth(
         },
       },
       genericOAuth({
-        config: providerConfigs,
+        config: providerConfigs.map((config) =>
+          withPreHijackGuard(config, discardUnverifiedAccount),
+        ),
       }),
       magicLink({
         expiresIn: 15 * 60,
