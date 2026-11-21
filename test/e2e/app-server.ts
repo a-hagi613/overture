@@ -9,6 +9,8 @@ const listeningPattern = /^overture listening on (?<port>\d+)$/u;
 export interface AppServer {
   url: string;
   databasePath: string;
+  objectsRoot: string;
+  pid: number;
   stop: () => Promise<void>;
   restart: () => Promise<void>;
   crash: () => Promise<void>;
@@ -157,7 +159,11 @@ export async function startAppServer(
     get url() {
       return url;
     },
+    get pid() {
+      return child.pid ?? 0;
+    },
     databasePath,
+    objectsRoot: extraEnvironment.OBJECT_STORE_ROOT ?? "",
     waitForStderr: stderr.waitFor,
     stop: async () => {
       child.kill("SIGTERM");

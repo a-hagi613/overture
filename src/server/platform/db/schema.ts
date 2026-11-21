@@ -702,6 +702,30 @@ export const pushSubscriptions = sqliteTable(
   (t) => [index("push_subscriptions_user").on(t.userId)],
 );
 
+export const accountExports = sqliteTable(
+  "account_exports",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    status: text("status", { enum: ["preparing", "ready", "expired", "failed"] }).notNull(),
+    objectKey: text("object_key"),
+    keyEnc: text("key_enc").notNull(),
+    bytes: integer("bytes"),
+    error: text("error"),
+    notifiedAt: timestamp("notified_at"),
+    requestedAt: timestamp("requested_at").notNull(),
+    readyAt: timestamp("ready_at"),
+    expiresAt: timestamp("expires_at"),
+    updatedAt: timestamp("updated_at").notNull(),
+  },
+  (t) => [
+    index("account_exports_user_requested").on(t.userId, t.requestedAt),
+    uniqueIndex("account_exports_one_preparing")
+      .on(t.userId)
+      .where(sql`status = 'preparing'`),
+  ],
+);
+
 export const grants = sqliteTable(
   "grants",
   {

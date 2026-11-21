@@ -19,6 +19,7 @@ import { ResetPasswordPage } from "./routes/reset-password.tsx";
 import { ReviewPage } from "./routes/review.tsx";
 import { SearchPage } from "./routes/search.tsx";
 import { SettingsDeletePage } from "./routes/settings-delete.tsx";
+import { SettingsExportPage } from "./routes/settings-export.tsx";
 import { SettingsPage } from "./routes/settings.tsx";
 import { SignInPage } from "./routes/signin.tsx";
 import { ConsentPage } from "./routes/consent.tsx";
@@ -48,6 +49,7 @@ const appShellChildren: RouteObject[] = [
   { path: "/search", element: <SearchPage /> },
   { path: "/settings", element: <SettingsPage /> },
   { path: "/settings/delete", element: <SettingsDeletePage /> },
+  { path: "/settings/export", element: <SettingsExportPage /> },
   { path: "*", element: <NotFoundPage /> },
 ];
 

@@ -3,7 +3,9 @@ import { dirname, resolve } from "node:path";
 
 export interface ObjectStore {
   put: (key: string, data: Uint8Array<ArrayBuffer>) => Promise<void>;
+  putStream: (key: string, data: AsyncIterable<Uint8Array>) => Promise<number>;
   get: (key: string) => Promise<Uint8Array<ArrayBuffer> | null>;
+  getStream: (key: string) => Promise<ReadableStream<Uint8Array> | null>;
   delete: (key: string) => Promise<void>;
   list: (prefix: string) => AsyncIterable<string>;
 }
@@ -39,6 +41,40 @@ export function createDiskObjectStore(root: string) {
 
       await mkdir(dirname(path), { recursive: true });
       await writeFile(path, data);
+    },
+    putStream: async (key: string, data: AsyncIterable<Uint8Array>) => {
+      const path = pathFor(key);
+
+      await mkdir(dirname(path), { recursive: true });
+
+      const writer = Bun.file(path).writer();
+
+      let bytes = 0;
+
+      try {
+        for await (const chunk of data) {
+          bytes += chunk.length;
+
+          await writer.write(chunk);
+        }
+
+        await writer.end();
+      } catch (error) {
+        await writer.end(error instanceof Error ? error : new Error(String(error)));
+
+        throw error;
+      }
+
+      return bytes;
+    },
+    getStream: async (key: string) => {
+      const file = Bun.file(pathFor(key));
+
+      if (!(await file.exists())) {
+        return null;
+      }
+
+      return file.stream();
     },
     get: async (key: string) => {
       try {
