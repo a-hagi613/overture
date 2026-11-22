@@ -11,7 +11,7 @@ import { isDemoRole } from "../../shared/demo.ts";
 import { notifications, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { insertNotification } from "./notifications.ts";
-import { mailLogoUrl, renderMailHtml } from "./mail-html.ts";
+import { mailLogoUrl, renderMailHtml } from "../../shared/mail-html.ts";
 
 export const BILLING_NOTICE_JOB_KIND = "billing.notice";
 

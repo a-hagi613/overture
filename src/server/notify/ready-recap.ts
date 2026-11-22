@@ -17,7 +17,7 @@ import {
 } from "../platform/db/schema.ts";
 import { MailCapExceededError } from "../platform/mail/errors.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
-import { mailLogoUrl } from "./mail-html.ts";
+import { mailLogoUrl } from "../../shared/mail-html.ts";
 import { renderRecapHtml } from "./recap-html.ts";
 import {
   addLocalDays,
