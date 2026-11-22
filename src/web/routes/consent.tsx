@@ -11,11 +11,11 @@ export function ConsentPage() {
   const earlier = versions.data?.slice(1) ?? [];
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
+    <div className="legal-surface relative min-h-screen overflow-hidden bg-background text-foreground">
       <Backdrop />
       <div className="relative z-[1] flex min-h-screen flex-col">
         <LegalTopBar />
-        <main className="mx-auto w-full max-w-[574px] px-[18px] pb-[40px] pt-[24px]">
+        <main className="mx-auto w-full max-w-[620px] px-[clamp(18px,4vw,40px)] pt-[8px] pb-[56px]">
           {consent.isPending ? <div className="h-[382px]" /> : null}
           {consent.isError ? (
             <p className="text-sm text-muted-foreground">{copy.consent.unavailable}</p>

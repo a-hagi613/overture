@@ -13,13 +13,13 @@ export function LegalPage({
 }) {
   return (
     <LegalShell>
-      <p className="mt-[12px] font-mono md:mt-[21px] text-[10.5px] uppercase tracking-[0.16em] text-muted-foreground">
+      <p className="mt-[22px] font-sans text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
         {copy.legal.eyebrow}
       </p>
-      <h1 className="mt-[24px] font-serif text-[39px] md:mt-[13px] leading-[1.02] tracking-tight md:text-[56px]">
+      <h1 className="mt-[18px] font-serif text-[40px] leading-[1.02] tracking-[-0.018em] md:text-[58px]">
         {title}
       </h1>
-      <p className="mt-[14px] text-[12.5px] leading-[1.6] text-muted-foreground md:mt-[27px]">
+      <p className="mt-[20px] text-[13px] leading-[1.5] text-muted-foreground md:mt-[19px]">
         {copy.legal.lastUpdated}
         {copy.legal.metaSeparator}
         {copy.legal.effective}

@@ -6,7 +6,7 @@ import { longDate } from "../lib/consent-format.ts";
 export function ConsentEarlierVersions({ versions }: { versions: readonly ConsentVersion[] }) {
   return (
     <section aria-labelledby="earlier-versions" className="mt-[30px]">
-      <h2 className="font-serif text-[24px] leading-[1.15]" id="earlier-versions">
+      <h2 className="font-serif text-[26px] leading-[1.15]" id="earlier-versions">
         {copy.consent.earlierHeading}
       </h2>
       <p className="mt-1 text-[12.5px] text-muted-foreground">{copy.consent.earlierNote}</p>

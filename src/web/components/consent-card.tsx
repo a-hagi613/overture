@@ -7,6 +7,9 @@ import { copy } from "../../shared/copy.ts";
 import { longDate } from "../lib/consent-format.ts";
 import { useAcceptConsent } from "../lib/consent-api.ts";
 
+const linkClass =
+  "underline decoration-input underline-offset-[3px] transition-colors hover:decoration-foreground";
+
 export function ConsentCard({ state }: { state: ConsentState }) {
   const accept = useAcceptConsent();
   const agreed = state.accepted?.version === state.current.version;
@@ -32,47 +35,45 @@ export function ConsentCard({ state }: { state: ConsentState }) {
   return (
     <section
       aria-labelledby="consent-title"
-      className="rounded-lg border border-border bg-card px-[20px] py-[24px] shadow-sh md:px-[28px] md:py-[28px]"
+      className="flex flex-col gap-[18px] rounded-[10px] border border-border bg-card px-[18px] py-[20px] shadow-lift md:px-[28px] md:pb-[24px] md:pt-[28px]"
     >
-      <div className="flex items-center justify-between gap-4">
-        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px]">
+        <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
           {copy.consent.eyebrow}
         </p>
-        <span className="rounded-full border border-border px-[13px] py-[3px] font-mono text-[10px] uppercase tracking-[0.12em]">
-          {copy.consent.versionLabel(state.current.version)}
+        <span className="inline-flex items-center gap-[8px] self-start rounded-full border border-input bg-card px-[11px] py-[3px] font-sans text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          {copy.consent.versionWord}{" "}
+          <span className="font-mono text-[11.5px] font-normal normal-case tracking-normal text-foreground">
+            {state.current.version}
+          </span>
         </span>
       </div>
-      <h1
-        className="mt-[22px] font-serif text-[31px] leading-[1.06] tracking-tight md:mt-[14px] md:text-[36px]"
-        id="consent-title"
-      >
-        {copy.consent.title}
+      <h1 className="font-serif text-[34px] leading-[1.08] tracking-[-0.012em]" id="consent-title">
+        {copy.consent.titleBefore}
+        <em className="italic">{copy.consent.titleItalic}</em>
+        {copy.consent.titleAfter}
       </h1>
-      <p className="mt-[14px] text-[14px] leading-[1.6] md:text-[14.5px]">{state.current.text}</p>
-      <p className="mt-[14px] text-[14px] leading-[1.6] md:text-[14.5px]">
-        {copy.consent.readNoticeBefore}
-        <Link
-          className="underline decoration-input underline-offset-[3px] transition-colors hover:decoration-foreground"
-          to="/terms"
-        >
-          {copy.legal.termsLink}
-        </Link>
-        {copy.consent.readNoticeBetween}
-        <Link
-          className="underline decoration-input underline-offset-[3px] transition-colors hover:decoration-foreground"
-          to="/privacy"
-        >
-          {copy.legal.privacyLink}
-        </Link>
-        {copy.consent.readNoticeEnd}
-      </p>
+      <div className="max-w-[62ch] space-y-[10px] text-[14.5px] leading-[1.66]">
+        <p>{state.current.text}</p>
+        <p>
+          {copy.consent.readNoticeBefore}
+          <Link className={linkClass} to="/terms">
+            {copy.legal.termsLink}
+          </Link>
+          {copy.consent.readNoticeBetween}
+          <Link className={linkClass} to="/privacy">
+            {copy.legal.privacyLink}
+          </Link>
+          {copy.consent.readNoticeEnd}
+        </p>
+      </div>
       <label
-        className="mt-[22px] flex cursor-pointer md:mt-[18px] items-center gap-[14px] rounded-md border border-input px-[18px] py-[14px]"
+        className="flex cursor-pointer items-start gap-[12px] rounded-[8px] border border-input bg-card px-[14px] py-[14px] text-[14px] leading-[1.5]"
         htmlFor="consent-agree"
       >
         <input
           checked={checked}
-          className="size-[17px] flex-none rounded-sm accent-[var(--color-foreground)]"
+          className="mt-[1px] size-[20px] flex-none cursor-pointer rounded-sm accent-[var(--color-foreground)]"
           disabled={accept.isPending}
           id="consent-agree"
           onChange={() => {
@@ -80,18 +81,18 @@ export function ConsentCard({ state }: { state: ConsentState }) {
           }}
           type="checkbox"
         />
-        <span className="text-[13px] font-semibold md:text-[13.5px]">{copy.consent.agree}</span>
+        <span className="font-semibold text-foreground">{copy.consent.agree}</span>
       </label>
-      <p className="mt-[20px] text-[12px] leading-[1.6] text-muted-foreground md:mt-[16px] md:text-[12.5px]">
+      <p className="max-w-[60ch] text-[12.5px] leading-[1.55] text-muted-foreground">
         {copy.consent.footnote}
       </p>
       {state.accepted === null ? null : (
-        <output className="mt-1 block text-[12px] leading-[1.6] text-muted-foreground md:text-[12.5px]">
+        <output className="block text-[12.5px] leading-[1.55] text-muted-foreground">
           {copy.consent.accepted(state.accepted.version, longDate(state.accepted.at))}
         </output>
       )}
       {failed ? (
-        <p className="mt-1 text-[12px] leading-[1.6] text-need md:text-[12.5px]" role="alert">
+        <p className="text-[12.5px] leading-[1.55] text-need" role="alert">
           {copy.consent.acceptFailed}
         </p>
       ) : null}

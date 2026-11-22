@@ -139,7 +139,8 @@ canvas {
   outline-offset: 2px;
 }
 
-.dark .signin-surface {
+.dark .signin-surface,
+.dark .legal-surface {
   --color-background: #12110f;
   --color-sidebar: #181614;
   --color-card: #1b1916;
