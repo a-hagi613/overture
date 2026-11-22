@@ -831,17 +831,19 @@ const allJobHandlers: JobHandlers = {
   ...testJobHandlers,
 };
 
-const worker = startJobWorker(
-  db,
-  clock,
-  allJobHandlers,
-  shutdownController.signal,
-  (notify) => {
-    registerEnqueueNotify(notify);
-  },
-  jobSingletons,
-  { startupSettleMs: env.JOBS_STARTUP_SETTLE_MS },
-);
+const worker = env.JOBS_AUTORUN
+  ? startJobWorker(
+      db,
+      clock,
+      allJobHandlers,
+      shutdownController.signal,
+      (notify) => {
+        registerEnqueueNotify(notify);
+      },
+      jobSingletons,
+      { startupSettleMs: env.JOBS_STARTUP_SETTLE_MS },
+    )
+  : null;
 
 if (activeDispatcher !== null) {
   await activeDispatcher.recover();
@@ -947,7 +949,7 @@ function handleShutdown(signal: string) {
     try {
       await Promise.race([server.stop(false), quietGrace(budgetMs)]);
       await server.stop(true);
-      await worker.drain(Math.max(0, budgetMs - (performance.now() - startedAt)));
+      await worker?.drain(Math.max(0, budgetMs - (performance.now() - startedAt)));
       catalogWorker.stop();
     } catch (error) {
       logError("shutdown", error);

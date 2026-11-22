@@ -96,7 +96,9 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
   by lease expiry (§9.4).
 - After a restart the job worker stays quiet for `JOBS_STARTUP_SETTLE_MS` (5 s): the startup enqueues otherwise wake
   it in the same second the port opens and the new machine's first health checks compete with a full batch of jobs.
-  Nothing is dropped; the queued work starts a few seconds later.
+  Nothing is dropped; the queued work starts a few seconds later. `JOBS_AUTORUN=false` (test-only; refused in
+  production) starts the process without the worker, so an e2e test can drive each job through `/__test__/jobs/*`
+  without a live scheduler claiming it first.
 - The prerendered marketing pages (`/` and `/pricing`) are deployed as Workers Static Assets
   (`workers/marketing`, ADR 0033) on explicit routes for those paths only, so they stay up through those deploys.
   Every app and API path matches no Worker route and goes straight to `overture-web`; the app's HTML and assets are

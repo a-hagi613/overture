@@ -23,7 +23,7 @@ import {
 const test = appTest.extend<{ exportServer: AppServer }>({
   exportServer: [
     async ({ identityServer }, provide) => {
-      const server = await startFreshAppServer(identityServer);
+      const server = await startFreshAppServer(identityServer, { JOBS_AUTORUN: "false" });
 
       await provide(server);
       await server.stop();
