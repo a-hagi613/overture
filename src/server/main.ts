@@ -164,6 +164,12 @@ import {
 
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 
+if (env.LITESTREAM_RESTORE_ONLY) {
+  throw new Error(
+    "LITESTREAM_RESTORE_ONLY restores a database for a restore drill; the app server must never run in that mode (issue #412). Run scripts/check-restored-db.ts against the restored file instead.",
+  );
+}
+
 const sdk = startTelemetry({
   serviceName: "overture",
   ...(env.OTEL_EXPORTER_OTLP_ENDPOINT !== undefined && {

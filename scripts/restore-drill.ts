@@ -1,4 +1,3 @@
-import type { Database } from "bun:sqlite";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
@@ -6,6 +5,7 @@ import { z } from "zod";
 
 import { openDatabase } from "../src/server/platform/db/client.ts";
 import { migrateDatabase } from "../src/server/platform/db/migrate.ts";
+import { countTableRows, verifyRestoredDatabase } from "../src/server/platform/db/restore-check.ts";
 import { createClock } from "../src/server/platform/ports/clock.ts";
 
 const clock = createClock();
@@ -15,9 +15,8 @@ const [drillTargetArgument, flyAppNameArgument] = process.argv.slice(2);
 const drillTarget = z.enum(["local", "fly"]).default("local").parse(drillTargetArgument);
 const flyAppName = z.string().min(1).default("overture-web").parse(flyAppNameArgument);
 
-const countSchema = z.object({ n: z.number() });
-const tableNamesSchema = z.array(z.object({ name: z.string() }));
-const integritySchema = z.object({ integrity_check: z.string() });
+const drillSecretNames = ["R2_DRILL_ACCESS_KEY_ID", "R2_DRILL_SECRET_ACCESS_KEY"] as const;
+
 const ltxListingSchema = z.array(z.object({ max_txid: z.string(), timestamp: z.string() }));
 
 const machineSchema = z.looseObject({
@@ -55,89 +54,35 @@ function runOrThrow(command: string[]) {
   return result;
 }
 
-function rowCounts(sqlite: Database) {
-  const names = tableNamesSchema
-    .parse(
-      sqlite
-        .query(
-          "select name from sqlite_master where type = 'table' and name not like 'sqlite_%' and name not like '__drizzle_%'",
-        )
-        .all(),
-    )
-    .map((table) => table.name);
-
-  return Object.fromEntries(
-    names.map((name) => [
-      name,
-      countSchema.parse(sqlite.query(`select count(*) as n from "${name}"`).get()).n,
-    ]),
-  );
-}
-
 function seedLiveDatabase(livePath: string) {
   const { db, sqlite } = openDatabase(livePath);
 
   migrateDatabase(db, "drizzle");
 
   const timestamp = clock.now();
+  const stamp = Math.trunc(timestamp / 1000);
+  const dueAt = timestamp - 60_000;
 
   sqlite
     .prepare("insert into users (id, name, email, created_at, updated_at) values (?, ?, ?, ?, ?)")
-    .run("drill-user-1", "Drill One", "drill-1@example.com", timestamp, timestamp);
+    .run("drill-user-1", "Drill One", "drill-1@example.com", stamp, stamp);
   sqlite
     .prepare("insert into users (id, name, email, created_at, updated_at) values (?, ?, ?, ?, ?)")
-    .run("drill-user-2", "Drill Two", "drill-2@example.com", timestamp, timestamp);
-  sqlite
-    .prepare(
-      "insert into bg_jobs (id, kind, payload, run_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?)",
-    )
-    .run("drill-job-1", "drill", "{}", timestamp, timestamp, timestamp);
+    .run("drill-user-2", "Drill Two", "drill-2@example.com", stamp, stamp);
 
-  const counts = rowCounts(sqlite);
+  const dueJob = sqlite.prepare(
+    "insert into bg_jobs (id, kind, payload, run_at, status, attempts, max_attempts, created_at, updated_at) values (?, ?, '{}', ?, 'queued', 0, 2, ?, ?)",
+  );
+
+  dueJob.run("drill-send", "application.send", dueAt, timestamp, timestamp);
+  dueJob.run("drill-ready", "ready.notify", dueAt, timestamp, timestamp);
+  dueJob.run("drill-billing", "billing.notice", dueAt, timestamp, timestamp);
+
+  const counts = countTableRows(sqlite);
 
   sqlite.close();
 
   return counts;
-}
-
-function checkRestoredDatabase(restoredPath: string, expectedCounts: Record<string, number>) {
-  const { sqlite } = openDatabase(restoredPath);
-
-  try {
-    const integrity = integritySchema.parse(
-      sqlite.query("pragma integrity_check").get(),
-    ).integrity_check;
-
-    const migrations = countSchema.parse(
-      sqlite.query("select count(*) as n from __drizzle_migrations").get(),
-    ).n;
-
-    const counts = rowCounts(sqlite);
-
-    if (integrity !== "ok") {
-      throw new Error(`restored database integrity_check returned ${integrity}`);
-    }
-
-    if (migrations === 0) {
-      throw new Error("restored database has no applied migrations");
-    }
-
-    for (const [name, expected] of Object.entries(expectedCounts)) {
-      const actual = counts[name];
-
-      if (actual === undefined || actual !== expected) {
-        throw new Error(
-          `table ${name} has ${String(actual ?? "no")} restored rows, expected ${String(expected)}`,
-        );
-      }
-    }
-
-    process.stdout.write(
-      `restored database checks passed: integrity ok, ${String(migrations)} migrations, ${String(Object.keys(counts).length)} tables match\n`,
-    );
-  } finally {
-    sqlite.close();
-  }
 }
 
 async function drillLocal() {
@@ -173,7 +118,20 @@ async function drillLocal() {
 
   runOrThrow(["litestream", "restore", "-config", configPath, "-o", restoredPath, livePath]);
 
-  checkRestoredDatabase(restoredPath, expectedCounts);
+  const report = verifyRestoredDatabase(restoredPath, {
+    now: clock.now(),
+    expectedRowCounts: expectedCounts,
+  });
+
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+
+  if (!report.ok) {
+    throw new Error(`restored database checks failed: ${report.failures.join("; ")}`);
+  }
+
+  process.stdout.write(
+    "restore drill passed: replica restored and checked read-only, with every due job left queued\n",
+  );
 }
 
 function listMachines() {
@@ -184,9 +142,71 @@ function listMachines() {
     );
 }
 
+function assertDrillCredential() {
+  const listed = runOrThrow(["flyctl", "secrets", "list", "-a", flyAppName]).output;
+  const missing = drillSecretNames.filter((name) => !listed.includes(name));
+
+  if (missing.length > 0) {
+    throw new Error(
+      `the restore drill needs the read-only R2 backup credential (docs/DEPLOY.md, "Restore drill safety"): set ${missing.join(" and ")} as Fly secrets on ${flyAppName}`,
+    );
+  }
+}
+
+function assertDeployedDrillSupport(machineId: string) {
+  const probe = run([
+    "flyctl",
+    "ssh",
+    "console",
+    "-a",
+    flyAppName,
+    "--machine",
+    machineId,
+    "--command",
+    "sh -c 'grep -q RESTORE_DRILL_READY_FILE /app/scripts/docker-entrypoint.sh && test -f /etc/litestream-drill.yml'",
+  ]);
+
+  if (probe.exitCode !== 0) {
+    throw new Error(
+      `the release running on ${flyAppName} predates the isolated restore drill (issue #412) and would start the app server; deploy the current main before drilling:\n${probe.output}`,
+    );
+  }
+}
+
+function machineLogs(machineId: string) {
+  return run(["flyctl", "logs", "-a", flyAppName, "--machine", machineId, "--no-tail"]).output;
+}
+
+function machineGone(machineId: string) {
+  return !listMachines().some((machine) => machine.id === machineId);
+}
+
+async function checkDrillMachine(drillId: string, command: string[], deadline: number) {
+  const attempt = run(command);
+
+  if (attempt.exitCode === 0) {
+    process.stdout.write(attempt.output);
+
+    return;
+  }
+
+  if (machineGone(drillId) || clock.now() >= deadline) {
+    process.stderr.write(machineLogs(drillId));
+
+    throw new Error(`the restored database check did not pass:\n${attempt.output}`);
+  }
+
+  process.stdout.write("the drill machine is not reachable yet, retrying the read-only check\n");
+  await Bun.sleep(5000);
+  await checkDrillMachine(drillId, command, deadline);
+}
+
 async function drillFly() {
+  assertDrillCredential();
+
   const machines = listMachines().map((machine) => ({
     name: machine.name,
+    id: machine.id,
     state: machine.state,
     image: machine.config?.image,
     processGroup: machine.config?.metadata?.fly_process_group,
@@ -204,7 +224,10 @@ async function drillFly() {
     throw new Error(`no started production machine found on ${flyAppName}`);
   }
 
+  assertDeployedDrillSupport(production.id);
+
   const drillName = `restore-drill-${new Date(clock.now()).toISOString().replaceAll(/[-:.]/gu, "").toLowerCase()}`;
+  const readyFile = "/tmp/restore-drill-checked";
   let drillId: string | undefined;
 
   try {
@@ -226,7 +249,11 @@ async function drillFly() {
       "--env",
       "LITESTREAM_RESTORE_ONLY=true",
       "--env",
+      "LITESTREAM_CONFIG_PATH=/etc/litestream-drill.yml",
+      "--env",
       "DATABASE_PATH=/data/app.sqlite",
+      "--env",
+      `RESTORE_DRILL_READY_FILE=${readyFile}`,
       "--detach",
     ]);
 
@@ -238,7 +265,7 @@ async function drillFly() {
 
     drillId = drill.id;
 
-    runOrThrow([
+    const started = run([
       "flyctl",
       "machines",
       "wait",
@@ -251,6 +278,12 @@ async function drillFly() {
       "10m",
     ]);
 
+    if (started.exitCode !== 0) {
+      process.stderr.write(machineLogs(drill.id));
+
+      throw new Error(`the drill machine ${drillName} did not start:\n${started.output}`);
+    }
+
     const check = [
       "flyctl",
       "ssh",
@@ -260,41 +293,21 @@ async function drillFly() {
       "--machine",
       drill.id,
       "--command",
-      "bun run scripts/check-restored-db.ts /data/app.sqlite http://127.0.0.1:3000/api/health",
+      `sh -c 'i=0; while [ ! -f ${readyFile} ]; do i=$((i+1)); [ "$i" -ge 120 ] && exit 3; sleep 5; done; exec bun run /app/scripts/check-restored-db.ts /data/app.sqlite'`,
     ];
 
-    const deadline = clock.now() + 180_000;
+    const deadline = clock.now() + 1_200_000;
 
-    const attemptCheck = async () => {
-      const attempt = run(check);
-
-      if (attempt.exitCode === 0) {
-        process.stdout.write(attempt.output);
-
-        return;
-      }
-
-      if (clock.now() >= deadline) {
-        throw new Error(
-          `the restored database check did not pass within 3 minutes:\n${attempt.output}`,
-        );
-      }
-
-      process.stdout.write(
-        "the drill app is not serving yet, retrying the restored database check\n",
-      );
-      await Bun.sleep(5000);
-      await attemptCheck();
-    };
-
-    await attemptCheck();
+    await checkDrillMachine(drill.id, check, deadline);
   } finally {
     if (drillId !== undefined) {
       run(["flyctl", "machines", "destroy", drillId, "-a", flyAppName, "--force"]);
     }
   }
 
-  process.stdout.write("restore drill passed: throwaway machine restored, checked and destroyed\n");
+  process.stdout.write(
+    "restore drill passed: throwaway machine restored and checked read-only, then destroyed; the app server never started\n",
+  );
 }
 
 if (drillTarget === "local") {
