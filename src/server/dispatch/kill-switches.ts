@@ -5,7 +5,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 
 import { raiseAlert } from "../platform/alerts.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
-import { applications, attempts, companies, postings } from "../platform/db/schema.ts";
+import { applications, attempts } from "../platform/db/schema.ts";
 import { isKillSwitchEnabled, setKillSwitch } from "../platform/settings/index.ts";
 
 export const DISPATCH_WATCH_JOB_KIND = "dispatch.watch";
@@ -68,21 +68,19 @@ export function evaluateKillSwitches(deps: { db: AppDatabase; clock: Clock }) {
 
   const rows = db
     .select({
-      ats: postings.ats,
+      ats: applications.ats,
       companyId: applications.companyId,
-      companyName: companies.name,
+      companyName: applications.companyName,
       outcome: attempts.outcome,
       provider: attempts.provider,
     })
     .from(attempts)
     .innerJoin(applications, eq(applications.id, attempts.applicationId))
-    .innerJoin(postings, eq(postings.id, applications.postingId))
-    .innerJoin(companies, eq(companies.id, applications.companyId))
     .where(and(isNotNull(attempts.outcome), isNotNull(attempts.endedAt)))
     .orderBy(desc(attempts.startedAt))
     .all()
     .flatMap((row) =>
-      row.outcome === null
+      row.outcome === null || row.ats === null
         ? []
         : [
             {

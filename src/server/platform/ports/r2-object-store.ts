@@ -16,23 +16,38 @@ export function createR2ObjectStore(config: R2ObjectStoreConfig) {
     region: "auto",
   });
 
-  type Collect = (prefix: string, continuationToken?: string) => Promise<string[]>;
+  type CollectSized = (
+    prefix: string,
+    continuationToken?: string,
+  ) => Promise<{ key: string; bytes: number }[]>;
 
-  const collect: Collect = async (prefix, continuationToken) => {
+  const collectSized: CollectSized = async (prefix, continuationToken) => {
     const page = await client.list(
       continuationToken === undefined ? { prefix } : { continuationToken, prefix },
     );
 
-    const keys = (page.contents ?? []).map((entry) => entry.key);
+    const entries = (page.contents ?? []).map((entry) => ({
+      bytes: entry.size ?? 0,
+      key: entry.key,
+    }));
 
     if (page.isTruncated !== true) {
-      return keys;
+      return entries;
     }
 
-    return [...keys, ...(await collect(prefix, page.nextContinuationToken))];
+    return [...entries, ...(await collectSized(prefix, page.nextContinuationToken))];
   };
 
+  const collect = async (prefix: string) => (await collectSized(prefix)).map((entry) => entry.key);
+
+  async function* sizedObjects(prefix: string) {
+    for (const entry of await collectSized(prefix)) {
+      yield entry;
+    }
+  }
+
   return {
+    kind: "r2",
     put: async (key: string, data: Uint8Array<ArrayBuffer>) => {
       await client.write(key, data);
     },
@@ -82,6 +97,9 @@ export function createR2ObjectStore(config: R2ObjectStoreConfig) {
       for (const key of await collect(prefix)) {
         yield key;
       }
+    },
+    async *listWithSizes(prefix: string) {
+      yield* sizedObjects(prefix);
     },
   } satisfies ObjectStore;
 }

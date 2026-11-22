@@ -172,7 +172,7 @@ test("the daily run fills the free Ready slots in rank order and never scores tw
     salaryMinMinor: null,
   });
 
-  await runPrepDaily(owner, matching.server.url, userId);
+  await runPrepDaily(owner, userId);
 
   const applications = await applicationsFor(owner, userId);
   const matches = await matchesFor(owner, userId);
@@ -194,7 +194,7 @@ test("the daily run fills the free Ready slots in rank order and never scores tw
 
   expect(reasons.every((reason) => reason !== null && reason.length <= 140)).toBe(true);
 
-  await runPrepDaily(owner, matching.server.url, userId);
+  await runPrepDaily(owner, userId);
 
   expect(await applicationsFor(owner, userId)).toHaveLength(10);
   expect((await matchesFor(owner, userId)).filter((row) => row.score !== null)).toHaveLength(10);
@@ -223,7 +223,7 @@ test("a strict threshold over a large pool stops at the scoring bound, alerts on
 
   await seedCompanies(owner, "bound", 40, { salaryMinMinor: 15_000_000 });
 
-  await runPrepDaily(owner, matching.server.url, userId);
+  await runPrepDaily(owner, userId);
 
   const scored = (await matchesFor(owner, userId)).filter((row) => row.score !== null);
   const alerts = await alertsFor(owner, userId);
@@ -275,7 +275,7 @@ test("a run after the daily time schedules only tomorrow, never a second run tod
 
   await seedCompanies(owner, "late", 40, { salaryMinMinor: 15_000_000 });
 
-  await runPrepDaily(owner, matching.server.url, userId);
+  await runPrepDaily(owner, userId);
 
   const now = await clockNow(owner);
   const tomorrowRunAt = todayStart + dayMs + 7 * 3_600_000;
@@ -370,9 +370,10 @@ test("opening a posting scores it once, and manual apply works below the thresho
     },
   });
 
-  await owner.get(`/api/postings/${strong}`);
+  const rescored = postingSchema.parse(await (await owner.get(`/api/postings/${strong}`)).json());
 
-  expect(matching.anthropic.requests()).toHaveLength(3);
+  expect(rescored.score).toBe(87);
+  expect(matching.anthropic.requests()).toHaveLength(2);
 
   await owner.dispose();
 });
@@ -408,7 +409,7 @@ test("an application is created only for a score at or above the threshold", asy
     ),
   );
 
-  await runPrepDaily(owner, matching.server.url, userId);
+  await runPrepDaily(owner, userId);
 
   const applications = await applicationsFor(owner, userId);
   const matches = await matchesFor(owner, userId);
@@ -584,7 +585,7 @@ test("ready and approved Applications reduce the daily run", async ({ matching }
     }),
   );
 
-  await runPrepDaily(owner, matching.server.url, userId);
+  await runPrepDaily(owner, userId);
 
   const applications = await applicationsFor(owner, userId);
   const approvedIds = new Set(approved);

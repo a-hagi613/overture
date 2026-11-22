@@ -14,6 +14,7 @@ No secret value ever appears in this repository: secrets are set with `fly secre
 | `Dockerfile` | Multi-stage build on Bun 1.4: installs, builds the SPA (`dist/`), ships a slim runtime with Litestream 0.5.18 (checksum-verified) |
 | `scripts/docker-entrypoint.sh` | On start: Litestream restores `/data/app.sqlite` from the replica if it does not exist, then runs `litestream replicate -exec "bun run /app/src/server/main.ts"`; migrations run inside `main.ts`. With `LITESTREAM_RESTORE_ONLY=true` it restores, runs the read-only restored-database check and never starts `main.ts` |
 | `litestream.yml` | Continuous replication (1 s sync) to R2 `overture-backups`, nightly snapshot (`interval: 24h`) kept 30 days (`retention: 720h`); the L0 retention check runs every 5 minutes so its ListObjects cost stays bounded (#281) |
+| Deleted accounts in backups | The 35-day lifecycle on `overture-backups` (`app.sqlite/`) and the 30-day snapshot retention are the replay window for an erased account: only keyless ciphertext can come back, because `user_keys` is destroyed first (SPEC §13.2). R2 object deletes are not part of a replay |
 | `fly.toml` | App `overture-web`, region `yyz`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health` |
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`) and a `restore-drill` job (Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations) |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
@@ -521,6 +522,32 @@ more than 20 % from the previous run; `workflow_dispatch` with `--allow-row-drop
 ingests the manifest at 05:00 UTC in `catalog.workable`, behind the `ats`/`workable` kill switch, which stays on until
 the 20-form probe (#235). The alerts are `workable.feed` for a missing snapshot, one older than 26 hours, a row drop
 or a failed ingest, and the GitHub job itself fails loudly.
+
+## The Stapply seed refresh (Wave 3.5)
+
+`.github/workflows/stapply-seed.yml` runs weekly (Monday 05:23 UTC) and on `workflow_dispatch`; it never runs on a pull
+request or a push. It downloads the ats-scrapers `manifest.json` and `companies.parquet` through
+`scripts/refresh-stapply-seed.ts` and **stages** them, it never touches the production pins by itself. Three guards run
+before anything is written:
+
+- **Schema:** the manifest is parsed against a Zod schema (`version`, `generated_at`, `companies.parquet_sha256`,
+  `companies.rows`) and the parquet columns must be exactly `[ats, name, slug, url]` with the row count the manifest
+  declares.
+- **SHA-256:** the manifest's `companies.parquet_sha256` must equal the hash of the downloaded bytes (and the declared
+  `parquet_size_bytes`, when present, the byte length), so a truncated or swapped file is refused.
+- **Row-drop:** a snapshot more than 20 % smaller than the prior staged one is refused; `workflow_dispatch` with
+  `allow_row_drop` is the deliberate override after checking upstream.
+
+The prior staged snapshot is restored from the Actions cache and the new one is saved only when the run succeeds, so an
+upstream outage, a schema change, a checksum mismatch or a shrunken input leaves the last good snapshot in place. Each
+run uploads the staged `manifest.json`, `companies.parquet` and `stapply-refresh.json` summary as an artifact and writes
+the same summary to the step summary. Run it once with `workflow_dispatch` before relying on the schedule; nothing
+leaves the runner except the cache, the artifact and the summary. A staged snapshot is a candidate: review the
+checksums and row delta, re-pin `PINNED_MANIFEST_SHA256` and `PINNED_COMPANIES_PARQUET_SHA256` in
+`src/server/catalog/companies-parquet.ts`, then rerun `docs/research/m1-09-runbook.md` §1–2 to load it.
+`STAPPLY_MANIFEST_URL` and `STAPPLY_COMPANIES_URL` are optional repository variables; the defaults are the pinned
+`https://storage.stapply.ai/jobs/v1/…` URLs. `STAPPLY_ALERT_NTFY_URL` is optional and only pushes an aborted run to the
+owner's phone; without it the failing job and its step summary are the alert.
 
 ## The sentinel Worker (#283)
 

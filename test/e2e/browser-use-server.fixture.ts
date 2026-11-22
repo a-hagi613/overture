@@ -15,7 +15,35 @@ const createSchema = z.object({
   timeout: z.number().int().positive(),
   solveCaptchas: z.boolean(),
   metadata: z.record(z.string(), z.string()).optional(),
+  networkPolicyId: z.string().min(1).optional(),
 });
+
+const networkPolicyInputSchema = z.object({
+  name: z.string().min(1).max(100),
+  defaultAction: z.enum(["allow", "block"]).optional(),
+  allow: z.object({ domains: z.array(z.string().min(1)) }).optional(),
+  block: z.object({ domains: z.array(z.string().min(1)) }).optional(),
+});
+
+export interface FixtureNetworkPolicy {
+  id: string;
+  name: string;
+  defaultAction: "allow" | "block";
+  allow: { domains: string[] };
+  block: { domains: string[] };
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const policyView = (policy: FixtureNetworkPolicy) => ({
+  ...policy,
+  allow: { domains: [...policy.allow.domains] },
+  block: { domains: [...policy.block.domains] },
+});
+
+const policyListsConflict = (policy: FixtureNetworkPolicy) =>
+  policy.allow.domains.some((domain) => policy.block.domains.includes(domain));
 
 const profileSchema = z.object({
   name: z.string().min(1),
@@ -26,6 +54,7 @@ interface SessionState {
   id: string;
   profileId: string | null;
   attemptId: string | null;
+  networkPolicyId: string | null;
   stopped: boolean;
   chromium: LocalChromium;
   startedAt: string;
@@ -38,6 +67,7 @@ export interface BrowserUseFixture {
   stoppedAttemptIds: string[];
   profiles: { id: string; name: string; userId: string }[];
   deletedProfileIds: string[];
+  networkPolicies: FixtureNetworkPolicy[];
   peakActiveSessions: number;
   rateLimitResponses: number;
   settleUsage: () => void;
@@ -83,6 +113,7 @@ export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
   const stoppedAttemptIds: string[] = [];
   const profiles: { id: string; name: string; userId: string }[] = [];
   const deletedProfileIds: string[] = [];
+  const networkPolicies: FixtureNetworkPolicy[] = [];
   let peakActiveSessions = 0;
   let rateLimitResponses = 0;
   let usageSettled = !options.holdUsage;
@@ -98,6 +129,77 @@ export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
         usageSettled = true;
 
         return Response.json({ settled: true });
+      }
+
+      if (request.method === "GET" && path === "/api/v4/network-policies") {
+        return Response.json({
+          items: networkPolicies.toReversed().map((policy) => policyView(policy)),
+          pageNumber: 1,
+          pageSize: 100,
+          totalItems: networkPolicies.length,
+        });
+      }
+
+      if (request.method === "POST" && path === "/api/v4/network-policies") {
+        const parsed = networkPolicyInputSchema.safeParse(await request.json());
+
+        if (!parsed.success) {
+          return Response.json({ detail: "invalid network policy" }, { status: 422 });
+        }
+
+        const now = new Date().toISOString();
+
+        const policy: FixtureNetworkPolicy = {
+          allow: parsed.data.allow ?? { domains: [] },
+          block: parsed.data.block ?? { domains: [] },
+          createdAt: now,
+          defaultAction: parsed.data.defaultAction ?? "allow",
+          id: crypto.randomUUID(),
+          name: parsed.data.name,
+          updatedAt: now,
+          version: 1,
+        };
+
+        if (policyListsConflict(policy)) {
+          return Response.json({ detail: "a domain is in both allow and block" }, { status: 422 });
+        }
+
+        networkPolicies.push(policy);
+
+        return Response.json(policyView(policy), { status: 201 });
+      }
+
+      if (path.startsWith("/api/v4/network-policies/") && request.method === "PATCH") {
+        const id = path.slice("/api/v4/network-policies/".length);
+        const policy = networkPolicies.find((candidate) => candidate.id === id);
+
+        if (policy === undefined) {
+          return Response.json({ detail: "not found" }, { status: 404 });
+        }
+
+        const parsed = networkPolicyInputSchema.partial().safeParse(await request.json());
+
+        if (!parsed.success) {
+          return Response.json({ detail: "invalid network policy" }, { status: 422 });
+        }
+
+        const updated: FixtureNetworkPolicy = {
+          ...policy,
+          allow: parsed.data.allow ?? policy.allow,
+          block: parsed.data.block ?? policy.block,
+          defaultAction: parsed.data.defaultAction ?? policy.defaultAction,
+          name: parsed.data.name ?? policy.name,
+          updatedAt: new Date().toISOString(),
+          version: policy.version + 1,
+        };
+
+        if (policyListsConflict(updated)) {
+          return Response.json({ detail: "a domain is in both allow and block" }, { status: 422 });
+        }
+
+        networkPolicies.splice(networkPolicies.indexOf(policy), 1, updated);
+
+        return Response.json(policyView(updated));
       }
 
       if (request.method === "POST" && path === "/api/v4/profiles") {
@@ -138,6 +240,15 @@ export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
           });
         }
 
+        const networkPolicyId = parsed.data.networkPolicyId ?? null;
+
+        if (
+          networkPolicyId !== null &&
+          !networkPolicies.some((policy) => policy.id === networkPolicyId)
+        ) {
+          return Response.json({ detail: "network policy not found" }, { status: 404 });
+        }
+
         const active = sessions.filter((session) => !session.stopped).length;
         const limit = options.maxConcurrentSessions;
         const overLimit = limit !== undefined && active >= limit;
@@ -168,6 +279,7 @@ export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
           attemptId: parsed.data.metadata?.attemptId ?? null,
           chromium,
           id: crypto.randomUUID(),
+          networkPolicyId,
           profileId: parsed.data.profileId ?? null,
           startedAt: new Date().toISOString(),
           stopped: false,
@@ -247,6 +359,7 @@ export function startBrowserUseFixture(options: BrowserUseFixtureOptions = {}) {
     get peakActiveSessions() {
       return peakActiveSessions;
     },
+    networkPolicies,
     profiles,
     get rateLimitResponses() {
       return rateLimitResponses;

@@ -6,6 +6,7 @@ import type { BrowserUseFixture, BrowserUseFixtureOptions } from "./browser-use-
 
 import { BrowserUseClient } from "../../src/server/dispatch/browser/browser-use.ts";
 import { createBrowserUseBrowserProvider } from "../../src/server/dispatch/browser/browser-use-provider.ts";
+import { createNetworkPolicyResolver } from "../../src/server/dispatch/browser/network-policy.ts";
 import { KernelClient } from "../../src/server/dispatch/browser/kernel.ts";
 import { createKernelBrowserProvider } from "../../src/server/dispatch/browser/kernel-provider.ts";
 import { createBrowserProfileStore } from "../../src/server/dispatch/browser/profiles.ts";
@@ -68,12 +69,16 @@ function startHarness(fixtureOptions: BrowserUseFixtureOptions = {}) {
   const clock = createClock();
   const profiles = createBrowserProfileStore(db, clock);
 
-  const buildUse = () =>
-    createBrowserUseBrowserProvider({
-      client: BrowserUseClient("test-key", browserUse.url, clock),
+  const buildUse = () => {
+    const client = BrowserUseClient("test-key", browserUse.url, clock);
+
+    return createBrowserUseBrowserProvider({
+      client,
       clock,
+      resolveNetworkPolicyId: createNetworkPolicyResolver(client),
       profiles,
     });
+  };
 
   const buildKernel = () =>
     createKernelBrowserProvider({
@@ -162,6 +167,17 @@ test("a Browser Use session opens, is used, is stopped through the API and repor
     });
 
     await expect(usesCdp(remote.cdpUrl)).resolves.toBe("provider test");
+
+    const [policy] = harness.browserUse.networkPolicies;
+
+    expect(policy?.name).toBe("overture-proxy-trim");
+    expect(policy?.block.domains).toContain("doubleclick.net");
+    expect(policy?.allow.domains).toContain("challenges.cloudflare.com");
+    expect(harness.browserUse.networkPolicies).toHaveLength(1);
+
+    const [session] = harness.browserUse.sessions;
+
+    expect(session?.networkPolicyId).toBe(policy?.id);
 
     const live = await provider.view(remote.sessionId);
 
@@ -419,7 +435,7 @@ test("the sweep lists an orphaned Browser Use session by attempt id and stops it
   }
 });
 
-test("a Kernel session runs the same port, keeps its own profile and reports uptime and cost", async () => {
+test("a Kernel session reports uptime and cost, and its unmeasured proxy stays unknown", async () => {
   const harness = startHarness();
 
   try {
@@ -443,19 +459,42 @@ test("a Kernel session runs the same port, keeps its own profile and reports upt
 
     expect(usage.browserMs).toBe(556_000);
     expect(usage.costMicros).toBe(28_800);
-    expect(usage.proxyBytes).toBe(0);
+    expect(usage.proxyBytes).toBeNull();
     expect(harness.kernel.deletedSessionIds).toContain(remote.sessionId);
     expect(harness.kernel.deletedAttemptIds).toContain("attempt-kernel-1");
 
     await expect(provider.sessionUsage(remote.sessionId)).resolves.toEqual({
       status: "stopped",
-      usage: { browserMs: 556_000, costMicros: 28_800, proxyBytes: 0 },
+      usage: { browserMs: 556_000, costMicros: 28_800, proxyBytes: null },
     });
 
     const replay = await provider.view(remote.sessionId);
 
     expect(replay?.recordingUrl).toContain(remote.sessionId);
     await expect(provider.listOpen()).resolves.toEqual([]);
+  } finally {
+    harness.close();
+  }
+});
+
+test("a Kernel profile is deleted through the API, forgotten and replaced on the next need", async () => {
+  const harness = startHarness();
+
+  try {
+    const provider = harness.buildKernel();
+    const first = await provider.ensureProfile("user-one", "ca");
+
+    expect(harness.kernel.profiles.map((profile) => profile.id)).toContain(first);
+
+    await provider.deleteProfile(first);
+
+    expect(harness.kernel.deletedProfileIds).toContain(first);
+    expect(harness.kernel.profiles.map((profile) => profile.id)).not.toContain(first);
+
+    const second = await provider.ensureProfile("user-one", "ca");
+
+    expect(second).not.toBe(first);
+    expect(harness.kernel.profiles.map((profile) => profile.id)).toContain(second);
   } finally {
     harness.close();
   }

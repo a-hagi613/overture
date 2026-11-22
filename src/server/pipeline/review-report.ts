@@ -9,8 +9,6 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import {
   applicationSnapshots,
   applications,
-  companies,
-  postings,
   questions,
   reviewAuditEvents,
 } from "../platform/db/schema.ts";
@@ -155,11 +153,10 @@ function reviewReportRows(db: AppDatabase, since: number | null) {
 
 function preparedApplications(db: AppDatabase, since: number | null) {
   return db
-    .select({ ats: postings.ats, total: count() })
+    .select({ ats: applications.ats, total: count() })
     .from(applications)
-    .innerJoin(postings, eq(postings.id, applications.postingId))
     .where(since === null ? undefined : gte(applications.createdAt, since))
-    .groupBy(postings.ats)
+    .groupBy(applications.ats)
     .all();
 }
 
@@ -230,7 +227,7 @@ export function buildReviewReport(db: AppDatabase, options: { since: number | nu
   const preparedByAts = new Map<string, number>();
 
   for (const row of prepared) {
-    preparedByAts.set(row.ats, row.total);
+    preparedByAts.set(row.ats ?? "unknown", row.total);
   }
 
   const reviewsByAts = groupCount(
@@ -363,8 +360,8 @@ export async function sampleSnapshotAudit(
     .select({
       answersEnc: applicationSnapshots.answersEnc,
       applicationId: applicationSnapshots.applicationId,
-      ats: postings.ats,
-      company: companies.name,
+      ats: applications.ats,
+      company: applications.companyName,
       confirmedBy: applicationSnapshots.confirmedBy,
       postingTitle: applicationSnapshots.postingTitle,
       submittedAt: applicationSnapshots.submittedAt,
@@ -372,8 +369,6 @@ export async function sampleSnapshotAudit(
     })
     .from(applicationSnapshots)
     .innerJoin(applications, eq(applications.id, applicationSnapshots.applicationId))
-    .innerJoin(postings, eq(postings.id, applications.postingId))
-    .innerJoin(companies, eq(companies.id, postings.companyId))
     .where(
       options.since === null ? undefined : gte(applicationSnapshots.submittedAt, options.since),
     )
@@ -415,7 +410,7 @@ export async function sampleSnapshotAudit(
           ];
         }),
         applicationId: row.applicationId,
-        ats: row.ats,
+        ats: row.ats ?? "unknown",
         company: row.company,
         confirmedBy: row.confirmedBy,
         postingTitle: row.postingTitle,

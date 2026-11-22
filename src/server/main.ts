@@ -5,7 +5,7 @@ import { createAuth } from "./auth/index.ts";
 import type { AuthOptions } from "./auth/index.ts";
 import { databasePath, env, labBaseUrl } from "./config/env.ts";
 import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
-import { MailCapExceededError } from "./platform/mail/metered.ts";
+import { MailCapExceededError } from "./platform/mail/errors.ts";
 import { createPayments } from "./billing/index.ts";
 import {
   ensureGrantExpiryQueued,
@@ -30,7 +30,8 @@ import { createRandom } from "./platform/ports/random.ts";
 import { createEventLoopLagMonitor } from "./platform/event-loop-lag.ts";
 import { createBackupMonitor } from "./platform/ports/backup.ts";
 import { installProcessGuards } from "./platform/process-guard.ts";
-import { enqueueJob, recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
+import { recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
+import { RetryLaterError } from "./platform/jobs/retry.ts";
 import {
   ensureRetentionQueued,
   RETENTION_JOB_KIND,
@@ -59,7 +60,15 @@ import {
   ensureTagFallbackQueued,
   runTagFallbackJob,
 } from "./catalog/llm-tagging.ts";
-import { createAnthropicLlmPort } from "./platform/llm/anthropic-batches.ts";
+import {
+  createAnthropicLlmPort,
+  createAnthropicBatchProvider,
+} from "./platform/llm/anthropic-batches.ts";
+import {
+  LLM_BATCH_POLL_JOB_KIND,
+  createDurableBatches,
+  parseLlmBatchPollPayload,
+} from "./platform/llm/durable-batches.ts";
 import { createDegradedFlag } from "./platform/degraded.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
@@ -325,11 +334,27 @@ const catalogJobHandlers: JobHandlers = {
   },
 };
 
-const anthropicLlmPort = createAnthropicLlmPort({
-  baseUrl: env.ANTHROPIC_BASE_URL,
-  apiKey: env.ANTHROPIC_API_KEY,
+const anthropicBatches = createDurableBatches({
+  db,
+  clock,
   model: env.ANTHROPIC_MODEL,
+  provider: createAnthropicBatchProvider({
+    baseUrl: env.ANTHROPIC_BASE_URL,
+    apiKey: env.ANTHROPIC_API_KEY,
+    model: env.ANTHROPIC_MODEL,
+  }),
+  pollIntervalMs: env.ANTHROPIC_BATCH_POLL_INTERVAL_MS,
+  maxWaitMs: env.ANTHROPIC_BATCH_WAIT_MS,
 });
+
+const anthropicLlmPort = createAnthropicLlmPort(
+  {
+    baseUrl: env.ANTHROPIC_BASE_URL,
+    apiKey: env.ANTHROPIC_API_KEY,
+    model: env.ANTHROPIC_MODEL,
+  },
+  anthropicBatches,
+);
 
 const tagDeps = {
   db,
@@ -407,6 +432,14 @@ const llmJobHandlers: JobHandlers =
     : {
         [TAG_FALLBACK_JOB_KIND]: async () => {
           await runTagFallbackJob(tagDeps);
+        },
+        [LLM_BATCH_POLL_JOB_KIND]: async (payload) => {
+          const { batchRecordId } = parseLlmBatchPollPayload(payload);
+          const outcome = await anthropicBatches.pollOnce(batchRecordId);
+
+          if (outcome.kind === "wait") {
+            throw new RetryLaterError("the Anthropic batch is still processing", outcome.delayMs);
+          }
         },
       };
 
@@ -600,14 +633,14 @@ const noticeCrypto = createDeletionNoticeCrypto(
 const eraser = createAccountEraser({
   clock,
   db,
-  enqueueNotice: async (notice) => {
-    const payload = await noticeCrypto.seal(notice);
-
-    enqueueJob(db, clock, ACCOUNT_DELETED_NOTICE_JOB_KIND, payload, { maxAttempts: 5 });
-  },
   mailboxes,
   objects,
   providers: browserProviders,
+  sealNotice: async (notice) => {
+    const payload = await noticeCrypto.seal(notice);
+
+    return payload;
+  },
 });
 
 const accountJobHandlers: JobHandlers = {
@@ -872,6 +905,7 @@ if (env.ANTHROPIC_API_KEY !== undefined) {
 const app = createApp({
   db,
   clock,
+  databasePath,
   staticRoot: env.STATIC_ROOT,
   testRoutes: env.ENABLE_TEST_ROUTES,
   jobHandlers: allJobHandlers,

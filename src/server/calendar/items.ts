@@ -10,9 +10,7 @@ import {
   applicationEvents,
   applicationSnapshots,
   checkins,
-  companies,
   interviewEvents,
-  postings,
 } from "../platform/db/schema.ts";
 
 const CALENDAR_STAGES = ["applied", "screening", "interviewing", "offer", "closed"] as const;
@@ -86,13 +84,11 @@ export function calendarItemsOf(db: AppDatabase, userId: string, start: number, 
       .select({
         applicationId: applications.id,
         at: applications.sentAt,
-        company: companies.name,
+        company: applications.companyName,
         snapshotTitle: applicationSnapshots.postingTitle,
-        title: postings.title,
+        title: applications.postingTitle,
       })
       .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
-      .innerJoin(companies, eq(companies.id, applications.companyId))
       .leftJoin(applicationSnapshots, eq(applicationSnapshots.applicationId, applications.id))
       .where(
         and(
@@ -132,17 +128,15 @@ export function calendarItemsOf(db: AppDatabase, userId: string, start: number, 
         applicationId: applications.id,
         at: applicationEvents.at,
         closedReason: applications.closedReason,
-        company: companies.name,
+        company: applications.companyName,
         eventId: applicationEvents.id,
         snapshotTitle: applicationSnapshots.postingTitle,
         source: applicationEvents.source,
-        title: postings.title,
+        title: applications.postingTitle,
         toValue: applicationEvents.toValue,
       })
       .from(applicationEvents)
       .innerJoin(applications, eq(applications.id, applicationEvents.applicationId))
-      .innerJoin(postings, eq(postings.id, applications.postingId))
-      .innerJoin(companies, eq(companies.id, applications.companyId))
       .leftJoin(applicationSnapshots, eq(applicationSnapshots.applicationId, applications.id))
       .where(
         and(
@@ -185,15 +179,13 @@ export function calendarItemsOf(db: AppDatabase, userId: string, start: number, 
       .select({
         applicationId: applications.id,
         at: checkins.dueAt,
-        company: companies.name,
+        company: applications.companyName,
         id: checkins.id,
         snapshotTitle: applicationSnapshots.postingTitle,
-        title: postings.title,
+        title: applications.postingTitle,
       })
       .from(checkins)
       .innerJoin(applications, eq(applications.id, checkins.applicationId))
-      .innerJoin(postings, eq(postings.id, applications.postingId))
-      .innerJoin(companies, eq(companies.id, applications.companyId))
       .leftJoin(applicationSnapshots, eq(applicationSnapshots.applicationId, applications.id))
       .where(
         and(
@@ -228,16 +220,14 @@ export function calendarItemsOf(db: AppDatabase, userId: string, start: number, 
         applicationId: applications.id,
         answer: applicationEvents.toValue,
         at: applicationEvents.at,
-        company: companies.name,
+        company: applications.companyName,
         eventId: applicationEvents.id,
         snapshotTitle: applicationSnapshots.postingTitle,
         source: applicationEvents.source,
-        title: postings.title,
+        title: applications.postingTitle,
       })
       .from(applicationEvents)
       .innerJoin(applications, eq(applications.id, applicationEvents.applicationId))
-      .innerJoin(postings, eq(postings.id, applications.postingId))
-      .innerJoin(companies, eq(companies.id, applications.companyId))
       .leftJoin(applicationSnapshots, eq(applicationSnapshots.applicationId, applications.id))
       .where(
         and(
@@ -280,15 +270,13 @@ export function calendarItemsOf(db: AppDatabase, userId: string, start: number, 
       .select({
         applicationId: applications.id,
         at: interviewEvents.startsAt,
-        company: companies.name,
+        company: applications.companyName,
         eventId: interviewEvents.id,
         snapshotTitle: applicationSnapshots.postingTitle,
-        title: postings.title,
+        title: applications.postingTitle,
       })
       .from(interviewEvents)
       .innerJoin(applications, eq(applications.id, interviewEvents.applicationId))
-      .innerJoin(postings, eq(postings.id, applications.postingId))
-      .innerJoin(companies, eq(companies.id, applications.companyId))
       .leftJoin(applicationSnapshots, eq(applicationSnapshots.applicationId, applications.id))
       .where(
         and(

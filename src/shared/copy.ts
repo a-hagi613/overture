@@ -159,6 +159,7 @@ export const copy = {
     settings: "Settings",
     collapseSidebar: "Collapse sidebar",
     expandSidebar: "Expand sidebar",
+    skipToContent: "Skip to content",
     searchLabel: "Search",
     searchPlaceholder: "Search applications, reviews, emails",
     searchShortcut: "⌘K",

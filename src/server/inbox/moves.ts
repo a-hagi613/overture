@@ -8,14 +8,7 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { SpendGate } from "../billing/spend.ts";
 
 import { isAtsMailDomain } from "../../shared/ats-mail-domains.ts";
-import {
-  applications,
-  applicationEvents,
-  companies,
-  mailThreads,
-  messages,
-  postings,
-} from "../platform/db/schema.ts";
+import { applications, applicationEvents, mailThreads, messages } from "../platform/db/schema.ts";
 import {
   notifyCardMoved,
   notifyEmployerReply,
@@ -115,14 +108,12 @@ export function createMailMoves(deps: {
   }) {
     const rows = db
       .select({
-        companyDomain: companies.domain,
-        companyName: companies.name,
+        companyDomain: applications.companyDomain,
+        companyName: applications.companyName,
         id: applications.id,
-        title: postings.title,
+        title: applications.postingTitle,
       })
       .from(applications)
-      .innerJoin(companies, eq(companies.id, applications.companyId))
-      .innerJoin(postings, eq(postings.id, applications.postingId))
       .where(
         and(
           eq(applications.userId, input.userId),
@@ -243,10 +234,8 @@ export function createMailMoves(deps: {
     });
 
     const context = db
-      .select({ company: companies.name, title: postings.title })
+      .select({ company: applications.companyName, title: applications.postingTitle })
       .from(applications)
-      .innerJoin(companies, eq(companies.id, applications.companyId))
-      .innerJoin(postings, eq(postings.id, applications.postingId))
       .where(eq(applications.id, input.applicationId))
       .get();
 
@@ -323,10 +312,12 @@ export function createMailMoves(deps: {
 
   function applicationContextOf(applicationId: string) {
     return db
-      .select({ company: companies.name, title: postings.title, userId: applications.userId })
+      .select({
+        company: applications.companyName,
+        title: applications.postingTitle,
+        userId: applications.userId,
+      })
       .from(applications)
-      .innerJoin(companies, eq(companies.id, applications.companyId))
-      .innerJoin(postings, eq(postings.id, applications.postingId))
       .where(eq(applications.id, applicationId))
       .get();
   }

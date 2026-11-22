@@ -12,11 +12,9 @@ import {
   applications,
   applicationEvents,
   applicationSnapshots,
-  companies,
   mailThreads,
   matches,
   messages,
-  postings,
   resumes,
   reviewApplications,
   reviews,
@@ -254,26 +252,24 @@ export function createApplicationRoutes(
       .select({
         boardPosition: applications.boardPosition,
         closedReason: applications.closedReason,
-        company: companies.name,
+        company: applications.companyName,
         createdAt: applications.createdAt,
         id: applications.id,
-        location: postings.locationRaw,
-        salaryCurrency: postings.salaryCurrency,
-        salaryMaxMinor: postings.salaryMaxMinor,
-        salaryMinMinor: postings.salaryMinMinor,
-        salaryPeriod: postings.salaryPeriod,
+        location: applications.locationRaw,
+        salaryCurrency: applications.salaryCurrency,
+        salaryMaxMinor: applications.salaryMaxMinor,
+        salaryMinMinor: applications.salaryMinMinor,
+        salaryPeriod: applications.salaryPeriod,
         scheduledFor: applications.scheduledFor,
         score: matches.score,
         sentAt: applications.sentAt,
         stage: applications.stage,
         stageLocked: applications.stageLocked,
         status: applications.status,
-        title: postings.title,
+        title: applications.postingTitle,
         updatedAt: applications.updatedAt,
       })
       .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
-      .innerJoin(companies, eq(companies.id, applications.companyId))
       .leftJoin(
         matches,
         and(eq(matches.userId, applications.userId), eq(matches.postingId, applications.postingId)),
@@ -586,19 +582,13 @@ export function createApplicationRoutes(
     const { id } = context.req.param();
     const userId = session.user.id;
 
-    const row = db
-      .select({
-        application: applications,
-        company: companies.name,
-        posting: postings,
-      })
+    const application = db
+      .select()
       .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
-      .innerJoin(companies, eq(companies.id, applications.companyId))
       .where(and(eq(applications.id, id), eq(applications.userId, userId)))
       .get();
 
-    if (row === undefined) {
+    if (application === undefined) {
       return context.json({ error: "not_found" }, 404);
     }
 
@@ -647,7 +637,7 @@ export function createApplicationRoutes(
     const match = db
       .select()
       .from(matches)
-      .where(and(eq(matches.userId, userId), eq(matches.postingId, row.posting.id)))
+      .where(and(eq(matches.userId, userId), eq(matches.postingId, application.postingId)))
       .get();
 
     const now = clock.now();
@@ -657,24 +647,24 @@ export function createApplicationRoutes(
 
     const note = noteFor(
       {
-        boardPosition: row.application.boardPosition,
-        closedReason: row.application.closedReason,
-        company: row.company,
-        createdAt: row.application.createdAt,
-        id: row.application.id,
-        location: row.posting.locationRaw,
-        salaryCurrency: row.posting.salaryCurrency,
-        salaryMaxMinor: row.posting.salaryMaxMinor,
-        salaryMinMinor: row.posting.salaryMinMinor,
-        salaryPeriod: row.posting.salaryPeriod,
-        scheduledFor: row.application.scheduledFor,
+        boardPosition: application.boardPosition,
+        closedReason: application.closedReason,
+        company: application.companyName,
+        createdAt: application.createdAt,
+        id: application.id,
+        location: application.locationRaw,
+        salaryCurrency: application.salaryCurrency,
+        salaryMaxMinor: application.salaryMaxMinor,
+        salaryMinMinor: application.salaryMinMinor,
+        salaryPeriod: application.salaryPeriod,
+        scheduledFor: application.scheduledFor,
         score: match?.score ?? null,
-        sentAt: row.application.sentAt,
-        stage: row.application.stage,
-        stageLocked: row.application.stageLocked,
-        status: row.application.status,
-        title: row.posting.title,
-        updatedAt: row.application.updatedAt,
+        sentAt: application.sentAt,
+        stage: application.stage,
+        stageLocked: application.stageLocked,
+        status: application.status,
+        title: application.postingTitle,
+        updatedAt: application.updatedAt,
       },
       {
         dayStart,
@@ -692,9 +682,9 @@ export function createApplicationRoutes(
       .all();
 
     return context.json({
-      ageDays: Math.max(0, Math.floor((now - row.application.createdAt) / DAY_MS)),
-      application: row.application,
-      company: row.company,
+      ageDays: Math.max(0, Math.floor((now - application.createdAt) / DAY_MS)),
+      application,
+      company: application.companyName,
       mail: await linkedMail(userId, id),
       match:
         match === undefined
@@ -706,15 +696,15 @@ export function createApplicationRoutes(
             },
       note,
       posting: {
-        ats: row.posting.ats,
-        id: row.posting.id,
-        location: row.posting.locationRaw,
-        salaryCurrency: row.posting.salaryCurrency,
-        salaryMaxMinor: row.posting.salaryMaxMinor,
-        salaryMinMinor: row.posting.salaryMinMinor,
-        salaryPeriod: row.posting.salaryPeriod,
-        title: row.posting.title,
-        url: row.posting.url,
+        ats: application.ats,
+        id: application.postingId,
+        location: application.locationRaw,
+        salaryCurrency: application.salaryCurrency,
+        salaryMaxMinor: application.salaryMaxMinor,
+        salaryMinMinor: application.salaryMinMinor,
+        salaryPeriod: application.salaryPeriod,
+        title: application.postingTitle,
+        url: application.postingUrl,
       },
       snapshot:
         snapshotView === null

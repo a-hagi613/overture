@@ -10,14 +10,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 
-import {
-  applications,
-  companies,
-  mailThreads,
-  messageAttachments,
-  messages,
-  postings,
-} from "../platform/db/schema.ts";
+import { applications, mailThreads, messageAttachments, messages } from "../platform/db/schema.ts";
 
 const MIME_PATTERN = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/iu;
 
@@ -68,10 +61,8 @@ export function createInboxRoutes(deps: {
     return applicationId === null
       ? undefined
       : db
-          .select({ company: companies.name, title: postings.title })
+          .select({ company: applications.companyName, title: applications.postingTitle })
           .from(applications)
-          .innerJoin(companies, eq(companies.id, applications.companyId))
-          .innerJoin(postings, eq(postings.id, applications.postingId))
           .where(and(eq(applications.id, applicationId), eq(applications.userId, userId)))
           .get();
   }
