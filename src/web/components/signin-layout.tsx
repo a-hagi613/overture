@@ -16,7 +16,7 @@ export function SignInLayout({ children }: { children: ReactNode }) {
     <div className="signin-surface relative flex min-h-screen overflow-x-clip bg-background text-foreground min-[961px]:grid min-[961px]:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
       <Backdrop />
       <SignInStory />
-      <main className="relative flex min-h-screen w-full flex-1 flex-col justify-between gap-5 px-[clamp(18px,4vw,52px)] pb-7 pt-[18px] min-[961px]:pb-8 min-[961px]:pt-7">
+      <main className="relative flex min-h-screen w-full flex-1 flex-col justify-start gap-5 min-[961px]:justify-between px-[clamp(18px,4vw,52px)] pb-7 pt-[18px] min-[961px]:pb-8 min-[961px]:pt-7">
         <div className="mx-auto flex w-full max-w-[560px] items-center justify-between gap-3">
           <Link
             className="-ml-2.5 inline-flex items-center gap-[7px] rounded-md px-2.5 py-1.5 text-[13px] font-medium hover:bg-muted hover:text-foreground"
@@ -35,7 +35,7 @@ export function SignInLayout({ children }: { children: ReactNode }) {
             <NavGlyph name={theme === "dark" ? "sun" : "moon"} />
           </button>
         </div>
-        <div className="mx-auto my-auto flex w-full max-w-[418px] flex-col gap-[18px]">
+        <div className="mx-auto my-0 flex w-full max-w-[418px] flex-col gap-[18px] pt-[14px] min-[961px]:my-auto min-[961px]:pt-0">
           <div className="mb-[4px] flex flex-col items-center gap-2 text-center min-[961px]:mb-0 min-[961px]:hidden">
             <Link
               aria-label={copy.brand.homeAria}
