@@ -22,6 +22,7 @@ const envSchema = z
     PORT: z.coerce.number().int().min(0).max(65_535).default(3000),
     KILL_TIMEOUT_MS: z.coerce.number().int().min(1).default(20_000),
     JOBS_STARTUP_SETTLE_MS: z.coerce.number().int().min(0).default(5000),
+    JOBS_AUTORUN: booleanFromString.default(true),
     DATABASE_URL: z.string().min(1).default("data/overture.db"),
     DATABASE_PATH: z.string().min(1).optional(),
     STATIC_ROOT: z.string().min(1).default("dist"),
@@ -172,6 +173,14 @@ const envSchema = z
         code: "custom",
         message: "ENABLE_TEST_ROUTES must not be true in production or on Fly.",
         path: ["ENABLE_TEST_ROUTES"],
+      });
+    }
+
+    if (!value.JOBS_AUTORUN && (value.NODE_ENV === "production" || value.FLY_APP_NAME)) {
+      context.addIssue({
+        code: "custom",
+        message: "JOBS_AUTORUN must not be false in production or on Fly.",
+        path: ["JOBS_AUTORUN"],
       });
     }
 
