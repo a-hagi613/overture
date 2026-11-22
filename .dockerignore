@@ -6,6 +6,7 @@
 .vscode
 node_modules
 dist
+dist-marketing
 coverage
 test-results
 playwright-report

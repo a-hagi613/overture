@@ -53,6 +53,8 @@ jobs:
         run: cd workers/inbound-mail && bun run dry-run
       - name: Build the sentinel Worker
         run: cd workers/sentinel && bun run dry-run
+      - name: Build the marketing Worker
+        run: cd workers/marketing && bun run dry-run
       - uses: actions/upload-artifact@v7
         with:
           name: e2e-plan
@@ -62,6 +64,11 @@ jobs:
         with:
           name: dist
           path: dist
+          retention-days: 1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: marketing-dist
+          path: dist-marketing
           retention-days: 1
   security-and-restore:
     runs-on: ubuntu-latest
@@ -136,6 +143,11 @@ jobs:
         with:
           name: dist
           path: dist
+      - name: Take the marketing build from the gate job
+        uses: actions/download-artifact@v8
+        with:
+          name: marketing-dist
+          path: dist-marketing
       - name: Take the shard plan from the gate job
         uses: actions/download-artifact@v8
         with:
