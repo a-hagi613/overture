@@ -211,7 +211,7 @@ test("a scanned resume falls back to the LLM port and a usage row is recorded", 
     const singles = anthropic.singleMessages();
 
     expect(singles).toHaveLength(1);
-    expect(singles[0]?.model).toBe("claude-haiku-4-5");
+    expect(singles[0]?.model).toBe("claude-haiku-5-5");
     expect(singles[0]?.hasDocument).toBe(true);
     expect(singles[0]?.pdfBytes).toBeGreaterThan(0);
 
