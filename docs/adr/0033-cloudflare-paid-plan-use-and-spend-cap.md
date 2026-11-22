@@ -21,6 +21,11 @@ The owner pays $5 a month for Workers Paid and wants no spend above $5 a month i
 
 - **Use Cloudflare for what it does free at Overture's volume:** the inbound-mail Email Worker, a cron sentinel Worker, Workers Static Assets for the marketing pages, a Queue under the inbound mail path, and R2 as today.
 - **Do not adopt** Browser Run for sending (no residential proxy or CAPTCHA solving, and a non-removable bot signature; ADR 0003 and 0016 stand), D1, KV, Durable Objects, Workflows, Vectorize, Hyperdrive, Containers or Images. The Workable pass stays on the GitHub Action (ADR 0032).
+- **Browser Run is dropped on evidence (#288).** The lab probe recorded in `docs/research/cloudflare-paid-plan.md` §6 drove every
+  recorded form under Browser Run's unremovable request identity: completion parity on a lab with no bot filter, $0.0164 per
+  completed application without a proxy and $0.0319 with one at $5/GB (over the $0.03 gate), no documented proxy or
+  egress control, no solver, and a vendor statement that its traffic is always identified as bot traffic. The M1 gate had not
+  missed on cost ($0.0265 recorded), so the trigger for reversing this never fired.
 - **Workers AI is not adopted for `email_classify` (#287).** The fallback stays rules plus Haiku (SPEC §8.6, §11.3).
   The cost review (#184) prices a classification at 24 µUSD, or about 1.4 cents a user-month at the Month plan's full
   allowance, and no local Workers AI response exists to prove equal accuracy, so the issue's own rule skips the trial
@@ -39,7 +44,7 @@ The owner pays $5 a month for Workers Paid and wants no spend above $5 a month i
 
 - **Treat the Workers limit as the cap.** Rejected: it covers Workers and Durable Objects only, and Cloudflare says it does not guarantee a maximum.
 - **A watchdog that revokes the R2 token at a threshold.** Rejected: it would stop the backups.
-- **Browser Run for sending.** Rejected for the reasons above; cheaper per application but not a like-for-like browser.
+- **Browser Run for sending.** Rejected for the reasons above; cheaper per application but not a like-for-like browser. Measured and dropped in #288 (`docs/research/cloudflare-paid-plan.md` §6): the price is $0.0164 per completed application only from Cloudflare egress with the bot headers attached, and $0.0319 with a proxy at Browser Use's rate; the product documents neither a proxy nor an egress-IP option.
 - **Workable ingest on a Worker.** Rejected: about 3.6 M CPU-ms a day for the full pass against 30 M a month included, and no gain over the free Action.
 - **Workers AI for the `email_classify` fallback.** Rejected (#287): the cost review puts the line at 24 µUSD a call and cents a user-month, and no Workers AI response is recorded, so equal accuracy cannot be shown. The rule that decides it is #287's own (`docs/research/cloudflare-paid-plan.md` §5).
 
@@ -52,3 +57,6 @@ The owner pays $5 a month for Workers Paid and wants no spend above $5 a month i
   both log when they change, with the metrics that caused it.
 - The degraded flag is compared before it is written, so a long degraded period costs Class B reads, not a Class A write
   every ten minutes.
+- The synthetic lab's Browser Run probe (`scripts/measure-browser-run-lab.ts`) drives the production lab driver under
+  Browser Run's request identity and prints the table and the price arithmetic quoted in
+  `docs/research/cloudflare-paid-plan.md` §6, so the measurement can be rerun rather than trusted.

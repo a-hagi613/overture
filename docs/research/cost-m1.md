@@ -269,7 +269,7 @@ path. There is no cheaper token left to buy except a cheaper model, which is lev
 | Cache pages through the per-user profile | Not available | Profiles persist cookies and login state, not an HTTP cache; `POST /browsers` has no cache knob (#180 §9). |
 | Headless browsers | Not available | Every Browser Use cloud browser is the stealth build; Kernel is the only headless path and its policy bans bulk submission (ADR 0003). |
 | A cheaper proxy *type* | Not available | The only managed choice is a country code; a cheaper tier means BYO egress (lever 1). |
-| Move sending to Cloudflare Browser Run | Not recommended | No residential proxy, no challenge solving, and a non-removable bot signature (ADR 0033, #288 keeps it as a lab-only fallback if the gate fails). |
+| Move sending to Cloudflare Browser Run | Not recommended | No residential proxy or egress-IP option, no challenge solving, and a non-removable bot signature (ADR 0033). Measured in #288: $0.0164 per completed application with Cloudflare egress, $0.0319 with a proxy at $5/GB (over the gate), no documented way to attach one (`docs/research/cloudflare-paid-plan.md` §6). |
 | Drop the per-user profile | Rejected | It is what makes a returning applicant look like the same person; the profile costs nothing per send. |
 | Retune the trim on guesses instead of per-ATS data | Rejected | The mechanism is banked (#179); only the host list is missing, and that needs real sends (#180 §10). |
 
