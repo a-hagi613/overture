@@ -13210,6 +13210,13 @@
         "test/e2e/notification-seed.ts"
       ]
     },
+    "test/e2e/catalog-stapply-seed-refresh.test.ts": {
+      "full": false,
+      "paths": [],
+      "routes": [],
+      "designs": [],
+      "modules": []
+    },
     "test/e2e/catalog-sweep-claim.test.ts": {
       "full": false,
       "paths": [
