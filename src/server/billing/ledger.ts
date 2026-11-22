@@ -5,7 +5,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 
 import { grants, ledger } from "../platform/db/schema.ts";
 
-type BillingDb = BaseSQLiteDatabase<"sync", void>;
+export type BillingDb = BaseSQLiteDatabase<"sync", void>;
 
 type LedgerRow = typeof ledger.$inferSelect;
 
@@ -43,6 +43,7 @@ export interface GrantInput {
   quantity: number;
   startsAt?: number | null;
   expiresAt?: number | null;
+  stripeInvoiceId?: string | null;
   idempotencyKey: string;
 }
 
@@ -114,7 +115,7 @@ export function grantApplications(db: BillingDb, clock: Clock, input: GrantInput
         quantity: input.quantity,
         startsAt: input.startsAt ?? at,
         expiresAt: input.expiresAt ?? null,
-        stripeInvoiceId: null,
+        stripeInvoiceId: input.stripeInvoiceId ?? null,
         createdAt: at,
       })
       .run();
@@ -346,13 +347,20 @@ export function expireDueGrants(db: BillingDb, clock: Clock, userId: string) {
     .all();
 
   const expired: string[] = [];
+  const before = balancesPerGrant(db, userId);
 
   for (const grant of due) {
-    db.transaction((tx) => {
-      const per = balancesPerGrant(tx, userId);
-      const availableBefore = per.get(grant.id)?.available ?? 0;
+    const per = before.get(grant.id);
 
-      if (availableBefore <= 0 && (per.get(grant.id)?.reserved ?? 0) <= 0) {
+    if ((per?.available ?? 0) <= 0 && (per?.reserved ?? 0) <= 0) {
+      continue;
+    }
+
+    db.transaction((tx) => {
+      const current = balancesPerGrant(tx, userId);
+      const availableBefore = current.get(grant.id)?.available ?? 0;
+
+      if (availableBefore <= 0 && (current.get(grant.id)?.reserved ?? 0) <= 0) {
         return;
       }
 
