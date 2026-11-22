@@ -527,8 +527,7 @@ export const copy = {
     needsYou: {
       title: "Needs you",
       note: "Open questions, grouped by jobs unlocked",
-      jobsUnlocked: (count: number) =>
-        `${String(count)} ${plural(count, "job unlocked", "jobs unlocked")}`,
+      jobsUnlocked: (count: number) => plural(count, "job unlocked", "jobs unlocked"),
       footer: (questions: number, applications: number) =>
         `${capitalize(countWord(questions))} ${plural(questions, "question", "questions")}, ` +
         `${countWord(applications)} ${plural(applications, "application", "applications")} waiting`,

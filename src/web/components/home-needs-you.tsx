@@ -21,7 +21,7 @@ export function HomeNeedsYou(props: {
   return (
     <section
       aria-labelledby="home-needs-you"
-      className="min-w-0 flex-[1_1_380px] rounded-lg border border-border bg-card px-4 pb-2 pt-[22px] shadow-sh min-[768px]:px-6"
+      className="min-w-0 flex-[1_1_380px] rounded-lg border border-border bg-card px-4 pb-5 pt-[22px] shadow-sh min-[768px]:px-6 min-[768px]:pb-2"
     >
       <div>
         <h2 className="font-serif text-[26px] leading-[1.5]" id="home-needs-you">
@@ -69,7 +69,7 @@ export function HomeNeedsYou(props: {
             {copy.home.needsYou.footer(total, applications)}
           </span>
           <Link
-            className="inline-flex min-h-9 flex-none items-center justify-center rounded-md border border-foreground bg-foreground px-3.5 text-[13.5px] font-semibold text-primary-ink hover:bg-btn-hover"
+            className="inline-flex min-h-9 max-[767px]:min-h-11 flex-none items-center justify-center rounded-md border border-foreground bg-foreground px-3.5 text-[13.5px] font-semibold text-primary-ink hover:bg-btn-hover"
             to="/review"
           >
             {copy.home.needsYou.open}
