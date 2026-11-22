@@ -41,6 +41,7 @@ export interface BrowserUseProviderConfig {
   profiles: BrowserProfileStore;
   client: ReturnType<typeof BrowserUseClient>;
   usageSettleDeadlineMs?: number;
+  resolveNetworkPolicyId?: () => Promise<string | null>;
 }
 
 export function createBrowserUseBrowserProvider(config: BrowserUseProviderConfig) {
@@ -95,8 +96,12 @@ export function createBrowserUseBrowserProvider(config: BrowserUseProviderConfig
   }
 
   async function open(input: OpenBrowserInput) {
+    const networkPolicyId =
+      config.resolveNetworkPolicyId === undefined ? null : await config.resolveNetworkPolicyId();
+
     const created = await client.createSession({
       metadata: { attemptId: input.attemptId, purpose: BROWSER_USE_METADATA_PURPOSE },
+      networkPolicyId,
       profileId: input.profileId,
       proxyCountryCode: input.country,
       solveCaptchas: true,
