@@ -5,6 +5,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import type { SpendGate } from "../billing/spend.ts";
 
 import { isAtsMailDomain } from "../../shared/ats-mail-domains.ts";
 import {
@@ -79,8 +80,9 @@ export function createMailMoves(deps: {
   personal: PersonalCrypto;
   llm: LlmPort;
   degraded?: DegradedFlagReader;
+  spendGate?: SpendGate | undefined;
 }) {
-  const { db, clock, personal, llm, degraded } = deps;
+  const { db, clock, personal, llm, degraded, spendGate } = deps;
 
   async function contentsOf(message: typeof messages.$inferSelect) {
     return {
@@ -402,7 +404,7 @@ export function createMailMoves(deps: {
     const contents = await contentsOf(message);
 
     const classification = await classifyWithLlm(
-      { clock, db, degraded, llm },
+      { clock, db, degraded, llm, spendGate },
       {
         messageId: message.id,
         subject: contents.subject,
