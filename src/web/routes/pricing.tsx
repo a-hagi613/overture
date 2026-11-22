@@ -26,7 +26,7 @@ const ctaWrapClass = "mt-auto pt-0";
  */
 export function PricingPage() {
   return (
-    <MarketingPage>
+    <MarketingPage className="marketing-flat-type">
       <div className="leading-[1.55]">
         <section className="mx-auto max-w-[1200px] px-4 pt-8 md:px-10 md:pt-16">
           <p className={`${eyebrowClass} md:text-[13px]`}>{copy.eyebrow}</p>

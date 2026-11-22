@@ -79,6 +79,11 @@ body {
   letter-spacing: -0.022em;
 }
 
+/* The marketing boards set the serif with no tracking; the app default above adds -0.005em. */
+.marketing-flat-type .font-serif {
+  letter-spacing: normal;
+}
+
 body {
   margin: 0;
   background: var(--color-background);

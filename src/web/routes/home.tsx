@@ -187,22 +187,18 @@ export function HomePage() {
           {RANGE_KEYS.map((key) => (
             <button
               aria-pressed={key === rangeKey}
-              className="group inline-flex max-md:min-h-11 max-md:-my-[5px] items-center"
+              className={`inline-flex min-h-[34px] items-center rounded-[5px] px-[15px] text-[12.5px] font-semibold max-[767px]:min-h-11 ${
+                key === rangeKey
+                  ? "bg-card text-foreground shadow-sh"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
               key={key}
               onClick={() => {
                 setRangeKey(key);
               }}
               type="button"
             >
-              <span
-                className={`inline-flex min-h-[34px] items-center rounded-[5px] px-[15px] text-[12.5px] font-semibold ${
-                  key === rangeKey
-                    ? "bg-card text-foreground shadow-sh"
-                    : "text-muted-foreground group-hover:text-foreground"
-                }`}
-              >
-                {RANGE_LABELS[key]}
-              </span>
+              {RANGE_LABELS[key]}
             </button>
           ))}
         </fieldset>
