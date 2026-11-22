@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { eq } from "drizzle-orm";
+
 import { openCountingDatabase } from "../testing/query-counter.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import {
@@ -251,5 +253,19 @@ describe("the Inbox thread list", () => {
     const second = views.find((view) => view.id === "thread-1");
 
     expect(second).toMatchObject({ company: "Hiring Team 1", title: null, unread: false });
+  });
+
+  test("keeps the employer and title after the catalog drops the Posting and Company", async () => {
+    const { db, personal } = seeded();
+
+    await addThread(db, personal, { application: true, index: 0, unread: false });
+
+    db.delete(companies).where(eq(companies.id, "co-1")).run();
+
+    expect(db.select().from(postings).all()).toHaveLength(0);
+
+    const views = await threadViewsOf({ db, personal, threads: threadsOf(db), userId: USER });
+
+    expect(views[0]).toMatchObject({ company: "Northwind", title: "Platform Engineer" });
   });
 });
