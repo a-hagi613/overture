@@ -33,14 +33,25 @@ function failureDetail(body: z.infer<typeof sendEmailResponseSchema>) {
   return messages.length > 0 ? messages.join("; ") : "no error detail";
 }
 
-async function sendEmail(config: CloudflareMailConfig, to: string, subject: string, body: string) {
+async function sendEmail(
+  config: CloudflareMailConfig,
+  to: string,
+  subject: string,
+  body: string,
+  html?: string,
+) {
+  const payload =
+    html === undefined
+      ? { from: config.from, subject, text: body, to: [to] }
+      : { from: config.from, html, subject, text: body, to: [to] };
+
   const response = await fetch(cloudflareSendEmailUrl(config.baseUrl, config.accountId), {
     method: "POST",
     headers: {
       authorization: `Bearer ${config.apiToken}`,
       "content-type": "application/json",
     },
-    body: JSON.stringify({ from: config.from, to: [to], subject, text: body }),
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
   });
 
@@ -73,7 +84,7 @@ export function createCloudflareMailSender(config: CloudflareMailConfig) {
       await sendEmail(config, mail.to, mail.subject, mail.body);
     },
     sendReadyRecap: async (mail) => {
-      await sendEmail(config, mail.to, mail.subject, mail.body);
+      await sendEmail(config, mail.to, mail.subject, mail.body, mail.html);
     },
     sendAccountDeleted: async (mail) => {
       await sendEmail(
@@ -87,7 +98,7 @@ export function createCloudflareMailSender(config: CloudflareMailConfig) {
       await sendEmail(config, mail.to, mail.subject, mail.body);
     },
     sendBillingNotice: async (mail) => {
-      await sendEmail(config, mail.to, mail.subject, mail.body);
+      await sendEmail(config, mail.to, mail.subject, mail.body, mail.html);
     },
   };
 

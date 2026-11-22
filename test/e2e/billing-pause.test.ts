@@ -61,7 +61,14 @@ const notificationSchema = z.object({
 const notificationsSchema = z.object({ notifications: z.array(notificationSchema) });
 
 const mailSchema = z.object({
-  messages: z.array(z.object({ body: z.string(), subject: z.string(), to: z.string() })),
+  messages: z.array(
+    z.object({
+      body: z.string(),
+      html: z.string().optional(),
+      subject: z.string(),
+      to: z.string(),
+    }),
+  ),
 });
 
 const pushRequestsSchema = z.object({
@@ -327,6 +334,8 @@ test("a failed payment pauses with its own copy, a push and an email, and a paid
     expect(emails[0]?.body).toContain("Update payment");
     expect(emails[0]?.body).toContain(`${BILLING_APP_ORIGIN}/settings`);
     expect(emails[0]?.body).not.toContain("failed");
+    expect(emails[0]?.html).toContain(`href="${BILLING_APP_ORIGIN}/settings/billing"`);
+    expect(emails[0]?.html).toContain("Update payment");
 
     const pushes = pushRequestsSchema.parse(
       await (await request.get(`${server.url}/__test__/push/requests`)).json(),
@@ -530,6 +539,8 @@ test("the end of a plan pauses and lets an in-flight send finish, charged only i
     expect(emails[0]?.subject).toBe("Your Overture plan has ended");
     expect(emails[0]?.body).toContain("Your plan has ended.");
     expect(emails[0]?.body).toContain("Choose a plan");
+    expect(emails[0]?.html).toContain(`href="${BILLING_APP_ORIGIN}/settings/billing/plans"`);
+    expect(emails[0]?.html).toContain("Choose a plan");
     expect(emails[0]?.body).toContain(`${BILLING_APP_ORIGIN}/settings`);
 
     const afterExpiry = await billingState(request, server.url, ownerId);

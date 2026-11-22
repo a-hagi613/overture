@@ -102,7 +102,14 @@ const pushRequestsSchema = z.object({
 });
 
 const mailSchema = z.object({
-  messages: z.array(z.object({ body: z.string(), subject: z.string(), to: z.string() })),
+  messages: z.array(
+    z.object({
+      body: z.string(),
+      html: z.string().optional(),
+      subject: z.string(),
+      to: z.string(),
+    }),
+  ),
 });
 
 const preferencesSchema = z.object({
@@ -783,6 +790,11 @@ test("the recap sends one push and one email per run, lists yesterday's sends an
   expect(recap?.body).toContain("1 employer replied yesterday:");
   expect(recap?.body).toContain("- Northwind Labs");
   expect(recap?.body).not.toContain("- Halden Systems");
+  expect(recap?.html).toContain("<!doctype html>");
+  expect(recap?.html).toContain("Staff Platform Engineer at Recap Direct");
+  expect(recap?.html).toContain("1 employer replied yesterday");
+  expect(recap?.html).toMatch(/href="[^"]+\/ready"/u);
+  expect(recap?.html).toContain("@media (prefers-color-scheme: dark)");
   expect(recap?.body).toContain("Site Reliability Engineer at Halden Systems");
   expect(recap?.body.match(/\/ready/gu)).toHaveLength(1);
 

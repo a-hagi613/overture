@@ -2340,6 +2340,7 @@ export function createTestRoutes(
       from: sent.from,
       subject: sent.subject,
       body: sent.body,
+      html: sent.html,
       sentAt: sent.sentAt,
     }));
 
