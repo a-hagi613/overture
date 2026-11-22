@@ -5,7 +5,7 @@ import { createAuth } from "./auth/index.ts";
 import type { AuthOptions } from "./auth/index.ts";
 import { databasePath, env, labBaseUrl } from "./config/env.ts";
 import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
-import { MailCapExceededError } from "./platform/mail/metered.ts";
+import { MailCapExceededError } from "./platform/mail/errors.ts";
 import { createPayments } from "./billing/index.ts";
 import {
   ensureGrantExpiryQueued,
