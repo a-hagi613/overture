@@ -168,6 +168,59 @@ test("Ready keeps the cached cards and warns when a background refresh fails", a
   await context.close();
 });
 
+test("keyboard Enter on Try again returns focus to the Ready heading after the error recovers", async ({
+  browser,
+  seededReady,
+}) => {
+  const { context, page } = await openReady(browser, seededReady.storageState, 1280, "light");
+
+  await page.route(readyApi, async (route) => route.fulfill({ status: 500 }));
+  await page.goto(`${seededReady.server.url}/ready`);
+
+  const alert = errorAlert(page);
+
+  await expect(alert).toBeVisible({ timeout: 20_000 });
+  await page.unroute(readyApi);
+
+  const retry = alert.getByRole("button", { name: retryLabel });
+
+  await retry.focus();
+  await page.keyboard.press("Enter");
+
+  await expect(alert).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "Ready to send" })).toBeFocused();
+
+  await context.close();
+});
+
+test("keyboard Enter on Try again in the stale warning returns focus to the Ready heading", async ({
+  browser,
+  seededReady,
+}) => {
+  const { context, page } = await openReady(browser, seededReady.storageState, 1280, "light");
+
+  await page.goto(`${seededReady.server.url}/ready`);
+  await expect(northwind(page)).toBeVisible();
+
+  await page.route(readyApi, async (route) => route.fulfill({ status: 500 }));
+  await refetchInBackground(page);
+
+  const warning = staleAlert(page);
+
+  await expect(warning).toBeVisible({ timeout: 20_000 });
+  await page.unroute(readyApi);
+
+  const retry = warning.getByRole("button", { name: retryLabel });
+
+  await retry.focus();
+  await page.keyboard.press("Enter");
+
+  await expect(warning).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "Ready to send" })).toBeFocused();
+
+  await context.close();
+});
+
 test("Ready shows the empty state only after a clean, empty fetch", async ({
   browser,
   seededEmpty,
@@ -230,6 +283,9 @@ for (const theme of themes) {
 
         if (screenshotDirectory !== undefined && (width === 390 || width === 1280)) {
           mkdirSync(screenshotDirectory, { recursive: true });
+          const fullHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+
+          await page.setViewportSize({ height: fullHeight, width });
           await page.screenshot({
             fullPage: true,
             path: join(screenshotDirectory, `${state}-${String(width)}-${theme}.png`),

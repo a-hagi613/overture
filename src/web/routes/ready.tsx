@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { copy } from "../../shared/copy.ts";
 import { useHomeData } from "../lib/home-api.ts";
@@ -51,9 +51,20 @@ export function ReadyPage() {
   const failedToLoad = isError && ready === undefined;
   const confirmedEmpty = isSuccess && cards.length === 0;
 
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const recoveringRef = useRef(false);
+
   const retry = () => {
+    recoveringRef.current = true;
     void refetch();
   };
+
+  useEffect(() => {
+    if (recoveringRef.current && isSuccess && !isFetching) {
+      recoveringRef.current = false;
+      headingRef.current?.focus();
+    }
+  }, [isSuccess, isFetching]);
 
   const readyCards = cards.filter((card) => card.status === "ready" && card.plan !== null);
 
@@ -146,7 +157,11 @@ export function ReadyPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="font-serif text-[15px] italic text-muted-foreground">{dateLine()}</p>
-          <h1 className="mt-0.5 font-serif text-[32px] leading-[1.05] md:text-[42px]">
+          <h1
+            className="mt-0.5 font-serif text-[32px] leading-[1.05] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-signal md:text-[42px]"
+            ref={headingRef}
+            tabIndex={-1}
+          >
             {copy.ready.titlePlain} <span className="italic">{copy.ready.titleItalic}</span>
           </h1>
           <p className="mt-2 text-[14px] leading-[1.5] text-muted-foreground">{copy.ready.lead}</p>
@@ -195,7 +210,7 @@ export function ReadyPage() {
         </section>
       )}
 
-      {isPending ? <ReadyStatus busy={false} onRetry={retry} variant="loading" /> : null}
+      {isPending ? <ReadyStatus variant="loading" /> : null}
 
       {failedToLoad ? <ReadyStatus busy={isFetching} onRetry={retry} variant="failed" /> : null}
 

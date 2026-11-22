@@ -1,10 +1,8 @@
 import { copy } from "../../shared/copy.ts";
 
-interface ReadyStatusProps {
-  busy: boolean;
-  onRetry: () => void;
-  variant: "loading" | "stale" | "failed";
-}
+type ReadyStatusProps =
+  | { variant: "loading" }
+  | { busy: boolean; onRetry: () => void; variant: "stale" | "failed" };
 
 const skeletonRows = [0, 1];
 
