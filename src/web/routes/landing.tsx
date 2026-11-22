@@ -1,11 +1,258 @@
-import { ButtonLink } from "../components/button-link.tsx";
-import { MarketingEyebrow } from "../components/marketing-eyebrow.tsx";
-import { MarketingPage } from "../components/marketing-page.tsx";
-import { PUBLIC_ATS } from "../../shared/plans.ts";
 import { marketingCopy } from "../../shared/marketing-copy.ts";
+import { NavGlyph } from "../components/nav-glyph.tsx";
+import type { GlyphName } from "../components/nav-glyph.tsx";
+import { MarketingLandingBand } from "../components/marketing-landing-band.tsx";
+import { MarketingLandingFlow } from "../components/marketing-landing-flow.tsx";
+import { MarketingLandingHero } from "../components/marketing-landing-hero.tsx";
+import { MarketingLandingReplies } from "../components/marketing-landing-replies.tsx";
+import { MarketingPage } from "../components/marketing-page.tsx";
 
-const copy = marketingCopy.landing;
-const pricingLink = "/pricing";
+const { landing: copy } = marketingCopy;
+const { pricing } = marketingCopy;
+
+interface PlanCardProps {
+  allowance: string;
+  allowanceNote: string;
+  bullets: readonly string[];
+  cta: string;
+  eyebrow: string;
+  href: string;
+  name: string;
+  price: string;
+  priceNote?: string;
+  primary?: boolean;
+}
+
+function planCard({
+  allowance,
+  allowanceNote,
+  bullets,
+  cta,
+  eyebrow,
+  href,
+  name,
+  price,
+  priceNote,
+  primary,
+}: PlanCardProps) {
+  return (
+    <article className={primary === true ? "card plan primary" : "card plan"}>
+      <p className="lbl plan-eyebrow">{eyebrow}</p>
+      <h3 className="serif plan-name">{name}</h3>
+      <p className="plan-price">
+        <span className="serif it">{price}</span>
+        {priceNote === undefined ? null : <span className="plan-price-note">{priceNote}</span>}
+      </p>
+      <hr className="rule" />
+      <p className="plan-allowance">{allowance}</p>
+      <p className="plan-allowance-note">{allowanceNote}</p>
+      <ul className="plan-bullets">
+        {bullets.map((bullet) => (
+          <li key={bullet}>
+            <NavGlyph name="check" size={16} />
+            {bullet}
+          </li>
+        ))}
+      </ul>
+      <a className={primary === true ? "btn plan-cta" : "btn2 plan-cta"} href={href}>
+        {cta}
+      </a>
+    </article>
+  );
+}
+
+const proofIcons = {
+  "01": "doc",
+  "02": "review",
+  "03": "clock",
+} satisfies Record<string, GlyphName>;
+
+function controlSection() {
+  return (
+    <section className="wrap landing-control" id="control">
+      <div className="section-head">
+        <div>
+          <p className="eyebrow">{copy.controlEyebrow}</p>
+          <h2 className="t display control-title">
+            {copy.controlTitleLead} <span className="it">{copy.controlTitleItalic}</span>
+          </h2>
+        </div>
+        <p className="section-lede">{copy.controlLede}</p>
+      </div>
+      <div className="cgrid">
+        {copy.control.map((card) => (
+          <article className="card ccard" key={card.number}>
+            <span className="cnm">{card.number}</span>
+            <h3>{card.title}</h3>
+            <p>{card.body}</p>
+            <div className="cproof">
+              <NavGlyph name={proofIcons[card.number]} size={15} />
+              <span>{card.proof}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function boardStages() {
+  return (
+    <section aria-labelledby="board-stages-title" className="wrap board-stages">
+      <h2 className="display" id="board-stages-title">
+        {copy.boardTitle}
+      </h2>
+      <p className="board-lede">{copy.boardLede}</p>
+      <div className="stages">
+        <span aria-hidden="true" className="stages-rule" />
+        <ol className="stage-cards">
+          {copy.stages.map((stage, index) => (
+            <li className="stage-card" key={stage.title}>
+              {index === 1 ? <span aria-hidden="true" className="stage-live" /> : null}
+              <p className="serif stage-name">{stage.title}</p>
+              <p className="stage-body">{stage.body}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+function failureSection() {
+  return (
+    <section className="wrap landing-failure">
+      <div className="failure">
+        <h2 className="display">{copy.failureTitle}</h2>
+        <p>{copy.failureBody}</p>
+      </div>
+    </section>
+  );
+}
+
+function pricingSection() {
+  return (
+    <section className="pricing" id="pricing">
+      <div className="wrap pricing-inner">
+        <div className="pricing-head">
+          <p className="eyebrow">{copy.pricingEyebrow}</p>
+          <h2 className="t display">{copy.pricingTitle}</h2>
+          <p>{copy.pricingLede}</p>
+        </div>
+        <div className="pricing-grid">
+          {planCard({
+            allowance: pricing.trial.allowance,
+            allowanceNote: pricing.trial.allowanceNote,
+            bullets: pricing.trial.bullets,
+            cta: marketingCopy.cta.startTrial,
+            eyebrow: pricing.trial.eyebrow,
+            href: "/signin",
+            name: pricing.trial.name,
+            price: pricing.trial.price,
+          })}
+          {planCard({
+            allowance: pricing.week.allowance,
+            allowanceNote: pricing.week.allowanceNote,
+            bullets: pricing.week.bullets,
+            cta: marketingCopy.cta.chooseWeek,
+            eyebrow: pricing.week.eyebrow,
+            href: "/pricing",
+            name: pricing.week.name,
+            price: pricing.week.price,
+            priceNote: pricing.week.priceNote,
+          })}
+          {planCard({
+            allowance: pricing.month.allowance,
+            allowanceNote: pricing.month.allowanceNote,
+            bullets: pricing.month.bullets,
+            cta: marketingCopy.cta.chooseMonth,
+            eyebrow: pricing.month.eyebrow,
+            href: "/pricing",
+            name: pricing.month.name,
+            price: pricing.month.price,
+            priceNote: pricing.month.priceNote,
+            primary: true,
+          })}
+        </div>
+        <div className="pricing-foot">
+          <h3 className="display">{copy.pricingIncludesTitle}</h3>
+          <ul className="pricing-includes">
+            {copy.pricingIncludes.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <div className="pricing-actions">
+            <a className="btn" href="/signin">
+              {marketingCopy.cta.startTrial}
+            </a>
+            <a className="btn2" href="/pricing">
+              {copy.pricingSeeAll}
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function faqSection() {
+  return (
+    <section className="wrap faq" id="faq">
+      <div className="faq-grid">
+        <div>
+          <p className="eyebrow">{copy.faqEyebrow}</p>
+          <h2 className="t display">
+            {copy.faqTitleLead} <span className="it">{copy.faqTitleItalic}</span>
+          </h2>
+        </div>
+        <div>
+          {copy.faq.map((item, index) => (
+            <details className="q" key={item.question} open={index === 0}>
+              <summary>
+                <span className="serif">{item.question}</span>
+                <svg
+                  aria-hidden="true"
+                  className="pl"
+                  fill="none"
+                  height="20"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeWidth="1.6"
+                  viewBox="0 0 24 24"
+                  width="20"
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </summary>
+              <p>{item.answer}</p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function closingSection() {
+  return (
+    <section className="close">
+      <div className="wrap close-wrap">
+        <h2 className="serif close-h2">
+          {copy.closingTitleLead} <span className="it">{copy.closingTitleItalic}</span>
+        </h2>
+        <p>{copy.closingLede}</p>
+        <div className="close-actions">
+          <a className="btn" href="/signin">
+            {marketingCopy.cta.startTrial}
+          </a>
+          <a className="btn2" href="/signin">
+            {copy.closingSignIn}
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 /**
  * The public landing at `/`, prerendered to static HTML by `scripts/prerender.tsx`.
@@ -14,142 +261,17 @@ const pricingLink = "/pricing";
  */
 export function LandingPage() {
   return (
-    <MarketingPage>
-      <section className="mx-auto grid max-w-[1200px] gap-10 px-4 pb-16 pt-10 lg:grid-cols-[1fr_480px] lg:gap-16 md:px-10 md:pb-24 md:pt-[72px]">
-        <div className="flex flex-col gap-6">
-          <MarketingEyebrow>{copy.eyebrow}</MarketingEyebrow>
-          <h1 className="font-serif text-[44px] leading-[1.02] tracking-tight lg:text-[76px] md:text-[64px]">
-            {copy.headline}
-          </h1>
-          <p className="max-w-[560px] text-[16px] leading-[1.6] text-muted-foreground md:text-[18px]">
-            {copy.lede}
-          </p>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <ButtonLink href="/signin" variant="primary">
-              {marketingCopy.cta.startTrial}
-            </ButtonLink>
-            <ButtonLink href={pricingLink} variant="secondary">
-              {marketingCopy.cta.seePlans}
-            </ButtonLink>
-          </div>
-          <p className="text-[14px] text-muted-foreground">{copy.trialNote}</p>
-        </div>
-
-        <aside
-          aria-label={copy.previewStatus}
-          className="relative self-start rounded-xl border border-border border-l-[3px] border-l-[var(--color-ok)] bg-card p-5 md:p-6"
-        >
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="font-mono text-[12px] uppercase tracking-[0.12em] text-ok">
-              {copy.previewStatus}
-            </span>
-            <span className="font-mono text-[12px] text-muted-foreground">{copy.previewVia}</span>
-          </div>
-          <p className="mt-3 font-serif text-[30px] leading-tight">{copy.previewRole}</p>
-          <p className="text-[15px] text-muted-foreground">{copy.previewCompany}</p>
-          <dl className="mt-4 divide-y divide-border border-y border-border text-[14px]">
-            {copy.previewRows.map(([label, value]) => (
-              <div className="flex justify-between gap-4 py-2.5" key={label}>
-                <dt className="text-muted-foreground">{label}</dt>
-                <dd className="text-right">{value}</dd>
-              </div>
-            ))}
-          </dl>
-          <div className="mt-5 flex gap-2">
-            <span className="inline-flex min-h-[46px] items-center rounded-lg bg-foreground px-5 text-[15px] font-semibold text-background">
-              {copy.previewSend}
-            </span>
-            <span className="inline-flex min-h-[46px] items-center rounded-lg border border-input bg-card px-5 text-[15px] font-semibold">
-              {copy.previewSkip}
-            </span>
-          </div>
-        </aside>
-      </section>
-
-      <section
-        aria-labelledby="where-it-applies-title"
-        className="mx-auto max-w-[1200px] px-4 py-12 md:px-10 md:py-20"
-        id="where-it-applies"
-      >
-        <MarketingEyebrow>{copy.atsEyebrow}</MarketingEyebrow>
-        <div className="mt-3 grid gap-6 lg:grid-cols-2 lg:items-end">
-          <h2
-            className="font-serif text-[34px] leading-tight md:text-[40px]"
-            id="where-it-applies-title"
-          >
-            {copy.atsTitle}
-          </h2>
-          <p className="text-[15px] text-muted-foreground">{copy.atsNote}</p>
-        </div>
-        <ul className="mt-6 flex flex-wrap gap-2.5">
-          {PUBLIC_ATS.map((ats) => (
-            <li
-              className="inline-flex min-h-[42px] items-center rounded-full border border-input bg-card px-4 text-[15px]"
-              key={ats}
-            >
-              {ats}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section
-        aria-labelledby="how-it-works-title"
-        className="mx-auto max-w-[1200px] px-4 py-12 md:px-10 md:py-20"
-        id="how-it-works"
-      >
-        <MarketingEyebrow>{copy.howEyebrow}</MarketingEyebrow>
-        <h2 className="sr-only" id="how-it-works-title">
-          {copy.howEyebrow}
-        </h2>
-        <ol className="mt-6 grid gap-8 lg:grid-cols-3 lg:gap-10">
-          {copy.steps.map((step) => (
-            <li className="border-t border-border pt-5" key={step.label}>
-              <p className="font-mono text-[13px] text-muted-foreground">{step.label}</p>
-              <h3 className="mt-2 font-serif text-[28px] leading-tight md:text-[30px]">
-                {step.title}
-              </h3>
-              <p className="mt-3 text-[15px] leading-[1.6] text-muted-foreground">{step.body}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section className="mx-auto max-w-[1200px] px-4 py-12 md:px-10 md:py-16">
-        <h2 className="font-serif text-[34px] leading-tight md:text-[40px]">{copy.boardTitle}</h2>
-        <p className="mt-2 text-[16px] text-muted-foreground">{copy.boardLede}</p>
-        <ol className="mt-8 grid gap-4 lg:grid-cols-3">
-          {copy.stages.map((stage) => (
-            <li className="rounded-xl border border-border bg-card p-5" key={stage.title}>
-              <p className="font-serif text-[26px] leading-tight">{stage.title}</p>
-              <p className="mt-2 text-[14px] text-muted-foreground">{stage.body}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section className="mx-auto max-w-[1200px] px-4 md:px-10">
-        <div className="rounded-xl bg-muted p-6 md:p-12">
-          <h2 className="font-serif text-[34px] leading-tight md:text-[40px]">
-            {copy.failureTitle}
-          </h2>
-          <p className="mt-3 max-w-[760px] text-[16px] leading-[1.6] text-muted-foreground">
-            {copy.failureBody}
-          </p>
-        </div>
-      </section>
-
-      <section className="mx-auto flex max-w-[1200px] flex-col gap-6 px-4 py-14 md:flex-row md:items-center md:justify-between md:px-10 md:py-20">
-        <h2 className="font-serif text-[36px] leading-tight md:text-[44px]">{copy.closingTitle}</h2>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <ButtonLink href="/signin" variant="primary">
-            {marketingCopy.cta.startTrial}
-          </ButtonLink>
-          <ButtonLink href={pricingLink} variant="secondary">
-            {marketingCopy.cta.seePlans}
-          </ButtonLink>
-        </div>
-      </section>
+    <MarketingPage scope="landing">
+      <MarketingLandingHero />
+      <MarketingLandingFlow />
+      <MarketingLandingReplies />
+      <MarketingLandingBand />
+      {controlSection()}
+      {boardStages()}
+      {failureSection()}
+      {pricingSection()}
+      {faqSection()}
+      {closingSection()}
     </MarketingPage>
   );
 }
