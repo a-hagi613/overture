@@ -761,7 +761,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
   });
 
-  routes.get("/storage-report", zValidator("query", storageReportQuery), async (context) =>
+  routes.get("/storage-report", validQuery(storageReportQuery), async (context) =>
     context.json(
       await buildStorageReport({
         backups: deps.backupObjects,

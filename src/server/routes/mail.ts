@@ -11,7 +11,7 @@ import type { createMailboxService } from "../inbox/mailboxes.ts";
 
 import { codePatterns } from "../inbox/codes.ts";
 import { resolveCodeWaitWithPaste } from "../inbox/waits.ts";
-import { applications, attempts, codeWaits, companies, postings } from "../platform/db/schema.ts";
+import { applications, attempts, codeWaits } from "../platform/db/schema.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 import { CODE_WAIT_ERRORS } from "../../shared/code-wait.ts";
 
