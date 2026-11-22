@@ -333,7 +333,7 @@ async function runTargets(
   await runTargets(rest, pageFor, urlOf, width);
 }
 
-export const CHUNK_SIZE = 5;
+const CHUNK_SIZE = 5;
 
 export function chunksFor(storage: Storage) {
   const count = targets.filter((target) => target.storage === storage).length;
