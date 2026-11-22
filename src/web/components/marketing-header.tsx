@@ -23,7 +23,9 @@ const desktopOnlyClass = `hidden md:inline-flex ${linkBase}`;
  * @param props `landing` when the page is the landing board.
  * @returns The marketing header element.
  */
-export function MarketingHeader({ landing = false }: { landing?: boolean }) {
+export function MarketingHeader(props: { landing?: boolean }) {
+  const { landing = false } = props;
+
   if (!landing) {
     return (
       <header className="h-16 border-b border-border md:h-[76px]">

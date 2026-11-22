@@ -18,7 +18,9 @@ const linkClass =
  * @param props `landing` when the page is the landing board.
  * @returns The marketing footer element.
  */
-export function MarketingFooter({ landing = false }: { landing?: boolean }) {
+export function MarketingFooter(props: { landing?: boolean }) {
+  const { landing = false } = props;
+
   if (!landing) {
     return (
       <footer className="border-t border-border text-muted-foreground">

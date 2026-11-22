@@ -143,35 +143,32 @@ test.describe("the pricing page keeps the product's facts", () => {
     expect(text).not.toMatch(annotationPattern);
   });
 
-  test("the pricing banner matches the landing banner", async ({ page, appServerUrl }) => {
-    const banner = async (path: string) => {
-      await page.goto(`${appServerUrl}${path}`);
+  test("the pricing banner shows the pricing board's links and sign in", async ({
+    page,
+    appServerUrl,
+  }) => {
+    await page.goto(`${appServerUrl}/pricing`);
 
-      const header = page.getByRole("banner");
-      const footer = page.getByRole("contentinfo");
+    const header = page.getByRole("banner");
+    const footer = page.getByRole("contentinfo");
 
-      await expect(header).toBeVisible();
-      await expect(footer).toBeVisible();
+    await expect(header).toBeVisible();
+    await expect(footer).toBeVisible();
 
-      return {
-        footerHrefs: await footer
-          .locator("a")
-          .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
-        footerText: await footer.textContent(),
-        headerHrefs: await header
-          .locator("a")
-          .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
-        headerText: await header.textContent(),
-      };
-    };
+    expect(
+      await header
+        .locator("a")
+        .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
+    ).toEqual(["/", "/#how", "/#boards", "/pricing", "/signin"]);
+    expect(await header.textContent()).toContain("Sign in");
+    expect(await header.textContent()).not.toContain("Questions");
 
-    const landing = await banner("/");
-    const pricing = await banner("/pricing");
-
-    expect(pricing.headerText).toBe(landing.headerText);
-    expect(pricing.headerHrefs).toEqual(landing.headerHrefs);
-    expect(pricing.footerText).toBe(landing.footerText);
-    expect(pricing.footerHrefs).toEqual(landing.footerHrefs);
+    expect(
+      await footer
+        .locator("a")
+        .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
+    ).toEqual(["/terms", "/privacy", "/pricing"]);
+    expect(await footer.textContent()).toContain("Prepares every application.");
   });
 });
 
