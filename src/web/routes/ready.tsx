@@ -60,16 +60,11 @@ export function ReadyPage() {
   };
 
   useEffect(() => {
-    if (!recoveringRef.current || isFetching) {
-      return;
-    }
-
-    recoveringRef.current = false;
-
-    if (isSuccess) {
+    if (recoveringRef.current && !isFetching) {
+      recoveringRef.current = false;
       headingRef.current?.focus();
     }
-  }, [isSuccess, isFetching]);
+  }, [isFetching]);
 
   const readyCards = cards.filter((card) => card.status === "ready" && card.plan !== null);
 
