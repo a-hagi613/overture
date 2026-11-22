@@ -27,7 +27,13 @@ function storageFor(path: string) {
     return "admin" as const;
   }
 
-  if (path === "/signin" || path === "/terms" || path === "/privacy" || path === "/consent") {
+  if (
+    path === "/signin" ||
+    path === "/terms" ||
+    path === "/privacy" ||
+    path === "/pricing" ||
+    path === "/consent"
+  ) {
     return "anonymous" as const;
   }
 
