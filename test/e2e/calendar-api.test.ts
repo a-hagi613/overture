@@ -468,6 +468,22 @@ test("the Calendar refuses a window over 42 days and never shows another user's 
 
   expect(reversed.status()).toBe(400);
 
+  const grid = `from=${encodeURIComponent(iso(Date.UTC(2026, 9, 26, 7)))}&to=${encodeURIComponent(iso(Date.UTC(2026, 11, 7, 8)))}`;
+
+  const gridInUtc = await owner.get(`/api/calendar?${grid}`);
+
+  expect(gridInUtc.status()).toBe(400);
+
+  const gridInLosAngeles = await owner.get(
+    `/api/calendar?${grid}&timezone=${encodeURIComponent("America/Los_Angeles")}`,
+  );
+
+  expect(gridInLosAngeles.status()).toBe(200);
+
+  const unknownZone = await owner.get(`/api/calendar?${grid}&timezone=Mars%2FOlympus`);
+
+  expect(unknownZone.status()).toBe(400);
+
   const missing = await owner.get("/api/calendar");
 
   expect(missing.status()).toBe(400);
