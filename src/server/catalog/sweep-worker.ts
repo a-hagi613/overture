@@ -29,7 +29,7 @@ const deps: SweepDeps = { db, catalogDb, clock };
 
 const feeds: BoardFeeds = {
   greenhouse: createGreenhouseFeed(env.GREENHOUSE_FEED_BASE_URL),
-  lever: createLeverFeed(env.LEVER_FEED_BASE_URL, undefined, env.LEVER_FEED_BASE_URL),
+  lever: createLeverFeed(env.LEVER_FEED_BASE_URL, undefined, env.LEVER_EU_FEED_BASE_URL),
   ashby: createAshbyFeed(env.ASHBY_FEED_BASE_URL),
   personio: createPersonioFeed(env.PERSONIO_FEED_BASE_URL ?? PERSONIO_DEFAULT_BASE_URL),
 };

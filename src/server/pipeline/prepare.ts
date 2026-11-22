@@ -1098,11 +1098,22 @@ export function createPreparationService(deps: {
   }
 
   async function sendPlanFor(applicationId: string) {
-    const row = db
+    const application = db
       .select({
         id: applications.id,
         userId: applications.userId,
         postingId: applications.postingId,
+      })
+      .from(applications)
+      .where(eq(applications.id, applicationId))
+      .get();
+
+    if (application === undefined) {
+      return null;
+    }
+
+    const postingRow = catalogDb
+      .select({
         ats: postings.ats,
         url: postings.url,
         applyUrl: postings.applyUrl,
@@ -1117,16 +1128,17 @@ export function createPreparationService(deps: {
         region: postings.region,
         locationRaw: postings.locationRaw,
       })
-      .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
+      .from(postings)
       .innerJoin(companyBoards, eq(companyBoards.id, postings.boardId))
       .innerJoin(companies, eq(companies.id, postings.companyId))
-      .where(eq(applications.id, applicationId))
+      .where(eq(postings.id, application.postingId))
       .get();
 
-    if (row === undefined) {
+    if (postingRow === undefined) {
       return null;
     }
+
+    const row = { ...application, ...postingRow };
 
     const factRows = await factsService.list(row.userId);
     const factIndex = indexFacts(factRows);
@@ -1267,25 +1279,37 @@ export function createPreparationService(deps: {
   }
 
   async function answersFor(applicationId: string) {
-    const row = db
+    const application = db
       .select({
         userId: applications.userId,
         postingId: applications.postingId,
+      })
+      .from(applications)
+      .where(eq(applications.id, applicationId))
+      .get();
+
+    if (application === undefined) {
+      return [];
+    }
+
+    const postingRow = catalogDb
+      .select({
         companyName: companies.name,
         countryCode: postings.countryCode,
         city: postings.city,
         region: postings.region,
         locationRaw: postings.locationRaw,
       })
-      .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
+      .from(postings)
       .innerJoin(companies, eq(companies.id, postings.companyId))
-      .where(eq(applications.id, applicationId))
+      .where(eq(postings.id, application.postingId))
       .get();
 
-    if (row === undefined) {
+    if (postingRow === undefined) {
       return [];
     }
+
+    const row = { ...application, ...postingRow };
 
     const factRows = await factsService.list(row.userId);
     const factValues = indexFacts(factRows);

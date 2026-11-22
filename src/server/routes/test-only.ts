@@ -1,6 +1,6 @@
 import { validJson, validQuery } from "./validators.ts";
 import { Buffer } from "node:buffer";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -1919,24 +1919,44 @@ export function createTestRoutes(
       return context.json({ questions: [] });
     }
 
+    const linked = catalogDb
+      .select({
+        questionId: postingQuestions.questionId,
+        required: postingQuestions.required,
+        position: postingQuestions.position,
+        options: postingQuestions.options,
+      })
+      .from(postingQuestions)
+      .where(eq(postingQuestions.postingId, application.postingId))
+      .orderBy(postingQuestions.position)
+      .all();
+
+    const questionRows = db
+      .select({
+        id: questions.id,
+        text: questions.textDisplay,
+        fieldType: questions.fieldType,
+        factKey: questions.factKey,
+        answerKind: questions.answerKind,
+        mappedBy: questions.mappedBy,
+      })
+      .from(questions)
+      .where(
+        inArray(
+          questions.id,
+          linked.map((row) => row.questionId),
+        ),
+      )
+      .all();
+
+    const questionsById = new Map(questionRows.map((row) => [row.id, row]));
+
     return context.json({
-      questions: db
-        .select({
-          questionId: postingQuestions.questionId,
-          required: postingQuestions.required,
-          position: postingQuestions.position,
-          options: postingQuestions.options,
-          text: questions.textDisplay,
-          fieldType: questions.fieldType,
-          factKey: questions.factKey,
-          answerKind: questions.answerKind,
-          mappedBy: questions.mappedBy,
-        })
-        .from(postingQuestions)
-        .innerJoin(questions, eq(questions.id, postingQuestions.questionId))
-        .where(eq(postingQuestions.postingId, application.postingId))
-        .orderBy(postingQuestions.position)
-        .all(),
+      questions: linked.flatMap((row) => {
+        const question = questionsById.get(row.questionId);
+
+        return question === undefined ? [] : [{ ...row, ...question }];
+      }),
     });
   });
 
