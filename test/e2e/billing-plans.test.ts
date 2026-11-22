@@ -181,7 +181,7 @@ test("a paid month grants 250, a replay grants once, expiry releases then expire
       email: ownerEmail,
     });
 
-    expect(held).toStrictEqual({ applicationsLeft: 299, reserved: true });
+    expect(held).toStrictEqual({ applicationsLeft: 249, reserved: true });
 
     const sent = await reserveApplication(request, server.url, {
       applicationId: "app-sent",
@@ -189,7 +189,7 @@ test("a paid month grants 250, a replay grants once, expiry releases then expire
       email: ownerEmail,
     });
 
-    expect(sent).toStrictEqual({ applicationsLeft: 298, reserved: true });
+    expect(sent).toStrictEqual({ applicationsLeft: 248, reserved: true });
 
     const clock = z
       .object({ now: z.number() })
@@ -224,7 +224,7 @@ test("a paid month grants 250, a replay grants once, expiry releases then expire
     expect(releaseRow?.applicationId).toBe("app-expiring");
     expect(releaseRow?.idempotencyKey).toBe(`expire-release:${reserveRow?.id ?? ""}`);
     expect(expireRow).toMatchObject({
-      amount: 299,
+      amount: 249,
       applicationId: null,
       creditAccount: "expired",
       debitAccount: "available",
