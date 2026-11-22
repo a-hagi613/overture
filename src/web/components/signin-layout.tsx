@@ -84,10 +84,12 @@ export function SignInLayout({ children }: { children: ReactNode }) {
 >>>>>>> 4beed867 (Design parity (Sign In): match the canvas layout and refresh the signin snapshots)
         </div>
         <footer className="flex flex-col items-center gap-1.5 text-center text-xs leading-[1.55] text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5 font-mono text-[11px] [line-height:normal]">
-            <NavGlyph name="lock" size={12} />
-            <span>{copy.signIn.trust}</span>
-          </span>
+          <p className="font-mono text-[11px] [line-height:normal]">
+            <span aria-hidden="true" className="mr-1.5 inline-block align-[-2px]">
+              <NavGlyph name="lock" size={12} />
+            </span>
+            {copy.signIn.trust}
+          </p>
           <p>
             {copy.signIn.legalIntro}{" "}
             <a className="decoration-input underline underline-offset-[3px]" href="/terms">

@@ -328,7 +328,7 @@ export function SignInCard() {
         {socialProviders.includes("google") ? (
           <button
             aria-busy={pending === "google" || undefined}
-            className={BTN_PRIMARY}
+            className={phase === "refused" ? BTN_SECONDARY : BTN_PRIMARY}
             disabled={pending !== null}
             onClick={() => {
               void onSocial("google");
