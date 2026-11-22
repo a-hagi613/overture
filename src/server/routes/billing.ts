@@ -12,6 +12,7 @@ import {
   claimTrialCard,
   TRIAL_APPLICATIONS,
 } from "../billing/card-fingerprint.ts";
+import { applicationsLeft, planApplications } from "../billing/ledger.ts";
 import { planForPriceId, stripePriceId } from "../billing/index.ts";
 import { stripeCustomerIdFor } from "../billing/customers.ts";
 import { currentSubscriptionOf } from "../billing/subscriptions.ts";
@@ -74,7 +75,9 @@ export function createBillingRoutes(deps: {
 }) {
   const { auth, clock, db, payments, cardFingerprintSecret, appOrigin } = deps;
   const routes = new Hono();
-  const settingsUrl = `${appOrigin.replace(/\/+$/u, "")}/settings`;
+  const baseUrl = appOrigin.replace(/\/+$/u, "");
+  const billingUrl = `${baseUrl}/settings/billing`;
+  const plansUrl = `${billingUrl}/plans`;
 
   async function accountOrRefusal(raw: Request) {
     const account = await sessionUser(auth, raw);
@@ -102,13 +105,16 @@ export function createBillingRoutes(deps: {
     context.header("Cache-Control", "no-store");
 
     const subscription = currentSubscriptionOf(db, access.account.id);
+    const now = clock.now();
 
     return context.json({
+      applicationsLeft: applicationsLeft(db, access.account.id, now),
       cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd ?? false,
       currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
       customer: stripeCustomerIdFor(db, access.account.id) !== null,
       enabled: payments !== null,
       plan: subscription?.plan ?? null,
+      planApplications: planApplications(db, access.account.id, now),
       status: subscription?.status ?? null,
     });
   });
@@ -132,12 +138,12 @@ export function createBillingRoutes(deps: {
 
     try {
       const session = await payments.createCheckoutSession({
-        cancelUrl: `${settingsUrl}?billing=cancelled`,
+        cancelUrl: `${plansUrl}?billing=cancelled`,
         customerId: stripeCustomerIdFor(db, access.account.id),
         email: access.account.email,
         plan: context.req.valid("json").plan,
         priceId,
-        successUrl: `${settingsUrl}?billing=success`,
+        successUrl: `${plansUrl}?billing=success`,
         userId: access.account.id,
       });
 
@@ -244,7 +250,7 @@ export function createBillingRoutes(deps: {
     }
 
     try {
-      const session = await payments.createPortalSession({ customerId, returnUrl: settingsUrl });
+      const session = await payments.createPortalSession({ customerId, returnUrl: billingUrl });
 
       context.header("Cache-Control", "no-store");
 

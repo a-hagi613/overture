@@ -187,6 +187,33 @@ export function planApplications(db: BillingDb, userId: string, at: number) {
   return activeGrantsOf(db, userId, at).reduce((sum, grant) => sum + grant.quantity, 0);
 }
 
+/**
+ * The invite grant that is running out: the soonest-ending admin grant that has
+ * an end date and still holds Applications. Home shows its count and end date
+ * so an invited user can choose a plan before the grant ends.
+ * @param db The database to read.
+ * @param userId The user whose grant to check.
+ * @param at The instant the grant is checked at.
+ * @returns The Applications left on that grant and when it ends, or null.
+ */
+export function endingGrantOf(db: BillingDb, userId: string, at: number) {
+  const per = balancesPerGrant(db, userId);
+
+  const grant = activeGrantsOf(db, userId, at).find(
+    (row) => row.source === "admin" && row.expiresAt !== null,
+  );
+
+  const expiresAt = grant?.expiresAt ?? null;
+
+  if (grant === undefined || expiresAt === null) {
+    return null;
+  }
+
+  const left = per.get(grant.id)?.available ?? 0;
+
+  return left > 0 ? { applicationsLeft: left, expiresAt } : null;
+}
+
 interface ReservationPair {
   reserve: LedgerRow;
   closedBy: LedgerRow | null;
