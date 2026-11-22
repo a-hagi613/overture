@@ -294,6 +294,34 @@ test("the legal pages and the consent fit every width without sideways scroll", 
   );
 });
 
+test("the legal page links are at least 44 CSS px tall at 390", async ({
+  browser,
+  appServerUrl,
+}) => {
+  const context = await browser.newContext({ viewport: { height: 900, width: 390 } });
+  const page = await context.newPage();
+
+  await page.goto(`${appServerUrl}/terms`);
+
+  const legalLinks = page.getByRole("navigation", { name: "Legal pages" });
+
+  const controls = [
+    page.getByRole("link", { name: "Back to Overture" }),
+    legalLinks.getByRole("link", { name: "Terms of Service" }),
+    legalLinks.getByRole("link", { name: "Privacy Policy" }),
+  ];
+
+  const heights = await Promise.all(
+    controls.map(async (control) => (await control.boundingBox())?.height ?? 0),
+  );
+
+  for (const height of heights) {
+    expect(height).toBeGreaterThanOrEqual(44);
+  }
+
+  await context.close();
+});
+
 test("Settings fits every width without sideways scroll", async ({
   browser,
   ownerStorageState,
