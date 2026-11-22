@@ -80,16 +80,33 @@ async function staticResponseFrom(root: string, url: string) {
   const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/u, "");
   const resolvedRoot = resolve(root);
   const requested = resolve(resolvedRoot, relativePath);
-  const file = Bun.file(requested);
 
-  if (requested.startsWith(`${resolvedRoot}/`) && (await file.exists())) {
-    return new Response(file);
+  const candidates = requested.startsWith(`${resolvedRoot}/`)
+    ? [requested, join(requested, "index.html")]
+    : [];
+
+  const found = await Promise.all(
+    candidates.map(async (candidate) => ((await Bun.file(candidate).exists()) ? candidate : null)),
+  );
+
+  const match = found.find((candidate) => candidate !== null);
+
+  if (match !== undefined) {
+    return new Response(Bun.file(match));
   }
 
-  const fallback = Bun.file(join(resolvedRoot, "index.html"));
+  const shells = await Promise.all(
+    ["app-shell.html", "index.html"].map(async (name) => {
+      const shell = Bun.file(join(resolvedRoot, name));
 
-  if (await fallback.exists()) {
-    return new Response(fallback, { headers: { "content-type": "text/html; charset=utf-8" } });
+      return (await shell.exists()) ? shell : null;
+    }),
+  );
+
+  const shell = shells.find((candidate) => candidate !== null);
+
+  if (shell !== undefined) {
+    return new Response(shell, { headers: { "content-type": "text/html; charset=utf-8" } });
   }
 
   return null;
