@@ -74,7 +74,7 @@ test("the shell lists the five destinations on desktop and opens settings from t
     }),
   ).toBeHidden();
 
-  await shellPage.locator("aside").locator('a[href="/settings"]').click();
+  await sideNav.getByRole("link", { name: "Settings" }).click();
   await expect(shellPage).toHaveURL(/\/settings/u);
   await expect(shellPage.getByRole("heading", { name: "Account and sign-in" })).toBeVisible();
   await expect(shellPage.getByText(authTestIdentity.ownerEmail).first()).toBeVisible();

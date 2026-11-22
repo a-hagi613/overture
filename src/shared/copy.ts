@@ -143,6 +143,15 @@ export const copy = {
     reviewCount: (count: number) => `Review, ${String(count)} waiting`,
     inboxCount: (count: number) => `Inbox, ${String(count)} unread`,
   },
+  settingsMenu: {
+    label: "Settings",
+    pagesLabel: "Show settings pages",
+    profileData: "Profile data",
+    export: "Export",
+    supportAccess: "Support access",
+    delete: "Delete account",
+    legal: "Terms and privacy",
+  },
   brand: {
     homeAria: "Overture, Home",
   },
