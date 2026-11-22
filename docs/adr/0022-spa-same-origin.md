@@ -4,7 +4,7 @@ status: accepted
 
 # A same-origin SPA; marketing pages prerendered
 
-The app is a Vite + React 19 single-page app with React Router 7 in library mode, served same-origin by the Hono server, with TanStack Query and a typed Hono RPC client; one SSE stream per tab carries updates. Public marketing and pricing pages are prerendered to static HTML.
+The app is a Vite + React 19 single-page app with React Router 8 in library mode, served same-origin by the Hono server, with TanStack Query and `fetch` clients that parse each response with a Zod schema; one SSE stream per tab carries updates. Public marketing and pricing pages are prerendered to static HTML.
 
 ## Considered Options
 

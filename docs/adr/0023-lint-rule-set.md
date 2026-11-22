@@ -67,7 +67,8 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
   runs with an empty `allow` list, so `// WARNING:` notes are errors too.
 - **Unit test files only beside the ADR 0013 invariants.** A unit test file is allowed only for an invariant ADR 0013
   lists, by an explicit path allowlist in `.oxlintrc.json`. Any other unit test file is an error. Every other test is a
-  Playwright end-to-end test.
+  Playwright end-to-end test. The allowlist has to match the files on disk: `bun run lint:config` fails when it names a
+  path that does not exist or leaves a unit test file in `src/` or `scripts/` unnamed (`scripts/lint-config-guard.ts`).
 - **Catalog writes belong to the sweep worker.** A write to `company_boards`, `postings` or `posting_tags` outside the
   Bun Worker is an error. The narrow non-sweep paths that keep a single-row write on the main thread (dispatch closing
   a posting, preparation marking the question cache, tag import, the retag and seed scripts, the test routes) are
@@ -182,5 +183,5 @@ same rule as the lint rules above: they are on, and an allowlist entry needs a w
 
 | Check | Where | What it does | Why |
 |---|---|---|---|
-| gitleaks | `secrets` job in `.github/workflows/ci.yml` | Pinned gitleaks 8.30.1, sha256 verified in the step. Scans the full history of `main` on push (`--log-opts=HEAD`) and the pull request's commit range on pull_request. Fails on any finding; `ci-ok` requires it. | A secret in history stays public after a later commit removes it. Allowlist: `.gitleaks.toml` (default rules plus three narrow allowlists). |
-| private-files guard | `secrets` job, `scripts/check-private-files.ts` | Fails when git tracks anything under `profile/` other than `profile/README.md`, any `.env*` file other than `.env.example`, or any `*.pdf`, `*.docx`, `*.tex` outside `test/e2e/fixtures/`. Reads `git ls-files`. | Owner profile files and env files hold personal data and secrets; the guard catches them before a commit reaches main. `profile/*` is ignored in `.gitignore`. |
+| gitleaks | `security-and-restore` job in `.github/workflows/ci.yml` | Pinned gitleaks 8.30.1, sha256 verified in the step. Scans the full history of `main` on push (`--log-opts=HEAD`) and the pull request's commit range on pull_request. Fails on any finding; `ci-ok` requires it. | A secret in history stays public after a later commit removes it. Allowlist: `.gitleaks.toml` (default rules plus three narrow allowlists). |
+| private-files guard | `security-and-restore` job, `scripts/check-private-files.ts` | Fails when git tracks anything under `profile/` other than `profile/README.md`, any `.env*` file other than `.env.example`, or any `*.pdf`, `*.docx`, `*.tex` outside `test/e2e/fixtures/`. Reads `git ls-files`. | Owner profile files and env files hold personal data and secrets; the guard catches them before a commit reaches main. `profile/*` is ignored in `.gitignore`. |

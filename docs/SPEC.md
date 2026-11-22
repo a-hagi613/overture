@@ -135,7 +135,6 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Kernel | fallback browser | `KERNEL_API_KEY`, `KERNEL_API_BASE_URL` (test-only override) | local recorded control-API server with real local Chrome behind it; lab only |
 | reCAPTCHA v3, hCaptcha, Turnstile | synthetic lab challenge pages (§10.4) | `LAB_RECAPTCHA_SCRIPT_URL`, `LAB_HCAPTCHA_SCRIPT_URL`, `LAB_TURNSTILE_SCRIPT_URL`, `LAB_RECAPTCHA_SITE_KEY`, `LAB_HCAPTCHA_SITE_KEY`, `LAB_TURNSTILE_SITE_KEY`, `LAB_RECAPTCHA_VERIFY_URL`, `LAB_RECAPTCHA_SECRET` (all optional; the script and verify URLs default to the vendors') | same-origin `/__test__/lab-*.js` stubs and a local recorded siteverify; no challenge host is contacted (ADR 0016) |
 | Anthropic | LLM (prod) | `ANTHROPIC_API_KEY` | real adapter; API intercepted by MSW with responses recorded by the daily live check |
-| OpenCode Go | LLM (local dev only) | `OPENCODE_API_KEY` | — |
 | Cloudflare Email Sending | outbound mail (magic links, live check, later notices) | `CLOUDFLARE_EMAIL_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (both or neither); `CLOUDFLARE_EMAIL_API_BASE_URL` (test-only override of the real API host) | real adapter; the send endpoint is intercepted by MSW and the request body asserted (`test/e2e/cloudflare-email.test.ts`) |
 | Stripe (M3) | Managed Payments | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_WEEK`, `STRIPE_PRICE_MONTH`; `STRIPE_API_BASE_URL` (test-only override of the real API host) | stripe-mock (Stripe's own local server) + signed webhook fixtures |
 | Public sign-up (M3) | whether an unknown email may sign up without an invite; on from M3 | `PUBLIC_SIGNUP_ENABLED` (default `true`; `false` restores the M2 invite-only gate) | public-sign-up e2e with the Turnstile stub; the invite-only suites set it `false` |
@@ -193,7 +192,7 @@ Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both
 | HTTP | Hono + `@hono/zod-validator`; Zod on every input, webhook and env var |
 | DB | `bun:sqlite`, WAL, `synchronous=FULL`, `foreign_keys=ON`, STRICT tables; Drizzle ORM + drizzle-kit migrations; no SQLite-only SQL outside `server/platform/search` |
 | Auth | better-auth (Google, LinkedIn OIDC and magic link; no passwords, ADR 0035; passkey for admin) with Drizzle adapter |
-| Web | Vite 8, React 19, React Router 7 (library mode, Zod-typed search params), TanStack Query, Hono RPC client, Tailwind v4, shadcn/ui, 21st.dev, dnd-kit, lucide |
+| Web | Vite 8, React 19, React Router 8 (library mode, Zod-typed search params), TanStack Query, `fetch` + Zod response schemas, Tailwind v4, shadcn/ui, 21st.dev, dnd-kit, lucide |
 | Browser control | `playwright-core` `chromium.connectOverCDP` |
 | PDF | `unpdf`; Haiku 5.5 PDF fallback |
 | Mail | `mailparser`, `mailauth` (SPF/DKIM/DMARC verification), Cloudflare Email Sending over a small `fetch` to its REST endpoint |
@@ -219,9 +218,9 @@ src/
     main.ts          process entry: http + workers + scheduler, graceful shutdown
   web/               React app (routes/, features/, components/ui = shadcn)
 drizzle/             generated migrations
-scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, capture-fixtures.ts, pull-forms.ts, restore-drill.ts
+scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, capture-forms.ts, pull-forms.ts, restore-drill.ts
 test/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
-                     (the eight unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
+                     (the forty-eight unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
 ```
 
@@ -253,7 +252,7 @@ mounted in production, can move; a second test-only route runs every job that is
 
 Conventions: ids are ULID `TEXT`; timestamps are `INTEGER` ms since epoch UTC; booleans `INTEGER 0/1`; money in
 minor units `INTEGER`; enums are `TEXT` with `CHECK`; every table `STRICT`; every user-owned row has
-`user_id … REFERENCES user(id) ON DELETE CASCADE`. Columns ending `_enc` are AES-256-GCM ciphertext under the user's
+`user_id … REFERENCES users(id) ON DELETE CASCADE`. Columns ending `_enc` are AES-256-GCM ciphertext under the user's
 data key (§13.2). Drizzle schema in `src/server/**/schema.ts` is the source of truth; this section is its contract.
 
 User data never depends on the catalog: `applications`, `matches`, `posting_user_state` and `skip_companies` keep
@@ -769,7 +768,8 @@ Job `application.prepare`:
 
 ### 8.6 LLM usage
 
-Model `claude-haiku-5-5` in production through `LlmPort`; local dev adapter uses OpenCode Go DeepSeek. All calls:
+Model `claude-haiku-5-5` through `LlmPort`; the Anthropic adapter is the only one, and tests intercept its API with
+MSW. All calls:
 structured outputs (`output_config.format`), thinking disabled with `effort: "low"` except cover letters
 (`effort: "medium"`), prompt caching on the system prompt + the user's resume digest, no PII in telemetry.
 
@@ -1259,6 +1259,7 @@ body, sender or attachment, so the admin never sees message content.
 |---|---|---|
 | `limits.daily_cap` | 10, resetting at the user's local midnight | 0010 |
 | `limits.send_window` | 08:00–20:00 user local, ≥ 20 min apart | 0010 |
+| `limits.send_spacing_minutes` | 20 (the minimum gap between two sends inside the window) | 0010 |
 | `limits.company_cooldown_days` | 30 | 0010, 0028 |
 | `limits.repost_guard_days` | 60 | 0010 |
 | `limits.crowd_per_posting` | 20 | 0010 |
@@ -1276,6 +1277,10 @@ body, sender or attachment, so the admin never sees message content.
 | `browser.provider` | `browser_use` | 0003 |
 | `browser.max_concurrent_sessions` | 3 (the browser semaphore and the dispatcher's in-flight send cap) | 0003 |
 | `checkin.after_days` / `checkin.close_after_days` | 21 / 45 | 0012 |
+| `jobs.poll_interval_ms` / `jobs.batch_size` | 15000 / 10 (how often the job worker looks, and how many due jobs it claims) | — |
+| `catalog.sweep_max_boards` | 20 (boards claimed per ATS in one sweep, so a batch finishes inside its claim) | — |
+| `backups.replica_read_interval_ms` | 30000 (how often the background reader refreshes the replica lag `/api/health` serves from cache) | — |
+| `live_checks.mail_wait_minutes` | 5 (how long `live.check.mail` waits for the check message to come back) | 0013 |
 | Plans (M3) | trial 3 one-time; week $12 → 70 / 7 days; month $35 → 300 / 30 days; renewals; no rollover | 0018 |
 
 ---
@@ -1436,6 +1441,7 @@ hand-written typed clients under `src/web/lib/`; there is no Hono RPC client. A 
 | Area | Routes |
 |---|---|
 | Session | `GET /api/me` |
+| Health | `GET /api/health` (public, no session: `select 1` plus the cached Litestream replica reading from `backups.status()`, so Fly's check and the sentinel Worker probe answer in milliseconds and never run Litestream) |
 | Shell | `GET /api/nav` (the counts behind the nav badges: Applications in Ready, open Reviews, unread employer mail; a zero hides its badge) |
 | Events | `GET /api/events` (SSE; `Last-Event-ID` replay from `events`; heartbeat 25 s) |
 | Home | `GET /api/home` (running and pause reason, applications left, today's sent/remaining, ready-to-send count, queued count + next send time, sent/replies/interviews and a per-day or per-week series for 7D/30D/90D, open Reviews grouped by jobs unlocked, recent authenticated Inbox items, up next, activity, check-ins) · `POST /api/running` `{running}` |
@@ -1448,14 +1454,14 @@ hand-written typed clients under `src/web/lib/`; there is no Hono RPC client. A 
 | Inbox | `GET /api/threads` · `GET /api/threads/:id` · `GET /api/attachments/:id` · `POST /api/messages/:id/read` · `GET /api/mail/code-waits` · `POST /api/mail/code-waits/:id` (paste a code) |
 | Calendar | `GET /api/calendar?from&to&timezone` (signed in only, `Cache-Control: no-store`; at most 42 days, counted in the `timezone` the browser draws the grid in, which defaults to the user's saved timezone: every Sent Application, Stage move, Check-in and interview date with its job, employer and Stage, ordered by time; the response carries the user's `timeZone` so the client buckets days the same way; no mail body and no answers) |
 | Calendar feed (M4) | `GET /calendar/<token>.ics` (no session: the token in the path is the credential; `text/calendar; charset=utf-8`, `Cache-Control: private, no-store`; 404 for any unknown, rotated or turned-off token, with no other difference) · `GET /api/calendar/feed` (signed in: `{enabled, createdAt, rotatedAt}`, never the token) · `POST /api/calendar/feed/token` (signed in: turns the feed on or rotates it; returns `{path}` once, and the previous token stops working at once) · `DELETE /api/calendar/feed` (signed in: turns it off) |
-| Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/mailbox` (read-only address, `forwardingWorks`, `firstForwardedAt`) · `GET/PUT /api/profile/strengthen` (the Tier 2 Facts that would unlock queued Applications, each with its count; answering saves the Fact and resolves the Reviews it answers) |
+| Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET /api/profile/resume` (the current resume and its history) · `GET /api/profile/resume/:id/file` (streams the resume PDF) · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/mailbox` (read-only address, `forwardingWorks`, `firstForwardedAt`) · `GET/PUT /api/profile/strengthen` (the Tier 2 Facts that would unlock queued Applications, each with its count; answering saves the Fact and resolves the Reviews it answers) |
 | Consent | `GET /api/consent` (public current version and text; the signed-in user's accepted version and date) · `GET /api/consent/versions` (every published version, newest first) · `POST /api/consent/accept` `{version}` (refuses `version_changed` when a newer version is published) |
 | Onboarding | `POST /api/onboarding/start` (step 5 Start: 409 `consent_required` unless the user has accepted the current consent version through `POST /api/consent/accept`; then marks onboarding finished, clears the `onboarding` pause reason, sets `running`, and queues only the next `prep.run_local_time` run, never a catch-up, so the first run is the next 07:00 local time; `POST /api/onboarding/5` is refused with 409 `start_required`), `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET/PUT /api/onboarding/targets` (the "What you want" step: the saved Targets, the choices that have open Postings, and the live count) · `PUT /api/onboarding/timezone` (the browser's zone through the seven-day rule) · `GET /api/onboarding` (the step, `onboarded_at`, pause reason, current resume, skip list and whether an invited user must onboard) · `POST /api/onboarding/:step` (records a finished step and returns the state; step 2 refuses without a resume) · `POST /api/onboarding/address/accept` (M2) |
-| Notifications | `GET /api/notifications` (the newest 100 rows in reading order, with `unread` and the server's `now`) · `POST /api/notifications/read` `{id}` · `POST /api/notifications/read-all` · `GET/PUT /api/notifications/preferences` · `GET /api/push` · `POST /api/push/subscribe` · `POST /api/push/unsubscribe` `{endpoint}` |
+| Notifications | `GET /api/notifications` (the newest 100 rows in reading order, with `unread` and the server's `now`) · `POST /api/notifications/read` `{id}` · `POST /api/notifications/read-all` · `GET/PUT /api/notifications/preferences` · `GET /api/push` (the VAPID public key, or null when push is off) · `POST /api/push/subscribe` · `POST /api/push/unsubscribe` `{endpoint}` |
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `GET /api/account/export` · `POST /api/account/export` · `GET /api/account/export/:id/download` · `GET /api/account/deletion` (email, re-authenticated) · `POST /api/account/reauth/link` (a fresh sign-in link) · `POST /api/account/delete` `{confirm: true}` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` (`enabled`, `customer`, the subscription's `plan`, `status`, `currentPeriodEnd`, `cancelAtPeriodEnd`, `applicationsLeft` and `planApplications`) · `POST /api/billing/checkout` `{plan}` (Checkout returns to `/settings/billing/plans?billing=success|cancelled`) · `POST /api/billing/portal` (returns to `/settings/billing`; plan switches, cancel at period end, payment method and invoices happen there, in Stripe) |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `POST /internal/mail/dead-letter` · `GET /internal/mailboxes/:local` |
-| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/probes/personio`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds`, `/billing/reconciliation` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/storage-report`, `/audit`, `/provider-report` |
+| Admin | `/admin/api/session`, `/overview`, `/users` (filtered list), `/users/:id`, `/users/:id/reveal` (POST open, GET current, DELETE close), `/users/:id/suspend`, `/users/:id/reinstate`, `/act-as/:userId`, `/attempts`, `/attempts/:id/live`, `/attempts/:id/replay`, `/fixtures/capture`, `/probes/personio`, `/lab/runs`, `/kill-switches` (`PUT /kill-switches/:scope/:key`), `/settings` (`PUT /settings/:key`), `/grants`, `/billing/users`, `/billing/users/:id`, `/billing/refunds`, `/billing/reconciliation` (M3), `/margin`, `/catalog`, `/tag-imports`, `/llm-usage`, `/invites` (`POST /invites/:id/revoke`), `/mail-health`, `/storage-report`, `/audit`, `/provider-report`, `/live-checks` (GET the recorded results, POST run now) |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
 `home.updated`, `notification`, `calendar.updated`. TanStack Query invalidates by topic. The Calendar invalidates on
@@ -1543,14 +1549,58 @@ Plus: route reachability for every page, axe on every page, and the visual snaps
 Review, Inbox, Profile, Settings and the legal and consent boards × 390 / 1280 px × light/dark; Ready joins them once it is
 drawn) in pinned Docker.
 
-### 16.2 Unit tests (ten files, Vitest, beside their code)
+### 16.2 Unit tests (forty-eight files, `bun:test`, beside their code)
 
-`ledger.test.ts` (balances, idempotency, FIFO expiry), `crypto.test.ts` (wrap/unwrap, AAD, shred), `planner.test.ts`
-(window, spacing, DST), `address.test.ts` (slug, transliteration, collisions), `tag-rules.test.ts`,
-`question-normalize.test.ts`, `answer-derivations.test.ts`, `sanitise.test.ts` (recorded pages must carry no script,
-event handler, personal data or token), `v1-import.test.ts` (the v1 answer-bank and learned-answer mapping), and
-`personio-form.test.ts` (a Personio form's fields, required stars, documents and unsupported controls are read from
-its server-rendered HTML).
+| File | Invariant |
+|---|---|
+| `scripts/database-sync-guard.test.ts` | every `new DatabaseSync` in `src/` or `test/` configures `PRAGMA busy_timeout` or is a documented opt-out |
+| `scripts/lint-config-guard.test.ts` | the `no-unlisted-unit-test` allowlist names every unit test file and no path that does not exist |
+| `scripts/workflow-config-guard.test.ts` | every `oven-sh/setup-bun` step pins the version `package.json` requires, so a runner release cannot break a scheduled job |
+| `src/server/account/erase.test.ts` | the erasure plan is written before the user row goes, the confirmation is queued only after both external deletes confirm clean, and a restart resumes the cleanup from the plan (#415) |
+| `src/server/auth/client-ip.test.ts` | only the header Fly's proxy stamps is believed; a forged `x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key |
+| `src/server/billing/ledger.test.ts` | balances, idempotency, FIFO expiry |
+| `src/server/billing/pause.test.ts` | a plan end pauses once; a successful payment resumes only a billing pause; an in-flight send keeps its reservation across the period end |
+| `src/server/billing/summary.test.ts` | the three counters Home shows are answered in two reads rather than six, and a reservation counts against what is left exactly as the separate reads do (#430) |
+| `src/server/billing/webhooks.test.ts` | a pause notice and the jobs a resume queues commit with the Stripe event and roll back with it; a stale out-of-order failure cannot pause a paid user, and a price Overture does not sell grants nothing |
+| `src/server/catalog/answer-derivations.test.ts` | answer derivations |
+| `src/server/catalog/question-normalize.test.ts` | question normalisation |
+| `src/server/catalog/tag-rules.test.ts` | tag rules |
+| `src/server/dispatch/browser/session-slots.test.ts` | the dispatcher's free-send count comes from the same process-wide semaphore every browser user holds a slot from, so a capture holding the last session offers a send no slot (#425) |
+| `src/server/dispatch/outcomes.test.ts` | a Confirming Application is charged only by the one unambiguous receipt; a replayed message never commits a second credit (#413) |
+| `src/server/dispatch/planner.test.ts` | window, spacing, DST |
+| `src/server/dispatch/report.test.ts` | completion and cost divide distinct attempted Applications, so a retry counts once (#417) |
+| `src/server/fixtures/sanitise.test.ts` | a recorded page carries no script, event handler, personal data or token |
+| `src/server/inbox/linked-mail.test.ts` | an Application's linked mail is read in one query rather than one per message (#430) |
+| `src/server/inbox/threads.test.ts` | the Inbox Thread list reads its messages in one query rather than one per Thread (#430) |
+| `src/server/matching/applications.test.ts` | an Application copies the Posting's and Company's display fields onto its own row when it is created, keeps them after the catalog rows are deleted, and is not created for a Posting that has already left the catalog (#422) |
+| `src/server/pipeline/answer-plan.test.ts` | a salary Fact kept per currency is chosen only for the currency a question names |
+| `src/server/pipeline/approved-plan.test.ts` | the Ready cards open every approved plan in one query rather than one per card (#430) |
+| `src/server/pipeline/email-notes.test.ts` | a Board's email notes are read in one query rather than one per Application (#430) |
+| `src/server/pipeline/personio-form.test.ts` | a Personio form's fields, required stars, documents and unsupported controls are read from its HTML |
+| `src/server/pipeline/reviews.test.ts` | the open Review list reads its rows in one query rather than one per Review (#430) |
+| `src/server/pipeline/send-queue.test.ts` | the next scheduled send is positioned from the earliest send time, ignoring approved Applications that hold no send time, and the sends before it are counted (#430) |
+| `src/server/platform/access/access.test.ts` | a malformed Access cookie or a missing team domain answers 401, never a 500 or an invented issuer |
+| `src/server/platform/alert-detail.test.ts` | a public alert carries the error type and count only, never the arbitrary message that can hold personal data or a token |
+| `src/server/platform/crypto.test.ts` | wrap/unwrap, AAD, shred |
+| `src/server/platform/db/migration-snapshot.test.ts` | migration `0056_snapshot_decouple` backfills the copied display fields onto every existing Application, including readable placeholders when the catalog row is already gone, and leaves `applications`, `matches`, `posting_user_state` and `skip_companies` with no foreign key into `postings` or `companies` (#422) |
+| `src/server/platform/db/restore-check.test.ts` | the restored-database check reads only, refuses outbound calls and leaves `bg_jobs` untouched (#412) |
+| `src/server/platform/event-loop-lag.test.ts` | a late timer tick reports how long the loop was blocked, once per cooldown |
+| `src/server/platform/http-body.test.ts` | an unauthenticated webhook body stops at its byte cap and is never buffered whole, so a sender cannot choose how much memory it costs |
+| `src/server/platform/jobs/queue.test.ts` | a browser or LLM lane already at its limit is left out of the claim, the total in-flight cap bounds one claim, and the claim is planned through `bg_jobs_claim_due` (#425) |
+| `src/server/platform/jobs/scheduler.test.ts` | a completed job-worker wait retains no abort listener |
+| `src/server/platform/llm/anthropic-batches.test.ts` | the api key is sent only to the configured api origin, never to another origin named by a provider response (#418) |
+| `src/server/platform/llm/batch-store.test.ts` | one request set is recorded once, its results are claimed by one conditional update so every later caller reads them back, and a failed record reopens for one resubmission (#418) |
+| `src/server/platform/llm/models.test.ts` | `ANTHROPIC_MODEL` defaults to the model SPEC §8.6 names, and a dated 5.5 id is priced from the exact 5.5 row (#387) |
+| `src/server/platform/mail/budget.test.ts` | one row per UTC month counts every send by kind and fails closed at each stop (#282) |
+| `src/server/platform/outbound-guard.test.ts` | in test and development, an outbound request to an ATS or paid-service host is refused |
+| `src/server/platform/ports/replica-listing.test.ts` | the newest replica transaction is read from the first non-empty Litestream level (#281) |
+| `src/server/profile/facts.test.ts` | a Fact's scope is validated against its key |
+| `src/server/profile/onboarding-step.test.ts` | the onboarding step's salary and EEO reading |
+| `src/server/profile/personal-crypto.test.ts` | the personal key is read once however many values one request opens and seals, each person's key stays apart, a race creates it once, and a read in flight when a person is forgotten does not cache their key again (#430) |
+| `src/server/profile/target-choices.test.ts` | the onboarding location plan uses the covering `postings_open_location` index (#337) |
+| `src/server/profile/time-zone.test.ts` | an empty timezone change takes no write (#430) |
+| `src/server/profile/v1-import.test.ts` | the v1 answer-bank and learned-answer mapping |
+| `src/shared/copy.test.ts` | no canvas annotation is a copy string or key |
 
 ### 16.3 CI
 
@@ -1597,15 +1647,20 @@ returned.
 
 ### 16.5 Observability
 
-OTel traces for every request and job; metrics: `attempt_outcome_total{provider,ats,outcome}`,
-`attempt_cost_micros`, `queue_depth{kind}`, `llm_cost_micros{purpose}`, `mail_inbound_total{auth}`,
-`discovery_poll_total{ats,status}`. Alerts to the owner: ATS success < 70 % over the last hour (at least five
+OTel is started at boot with the `overture` service resource and OTLP trace, log and metric exporters; the endpoint and
+headers come from `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS`, and exported spans, log records and
+metric attributes pass through a fixed attribute allowlist (`platform/telemetry/otel.ts`) so an email, token or message
+body never leaves the process. Manual spans cover the admin audit write (`admin.audit`) and the test-only OTel route.
+The app does not emit request, job or business metric series, and registers no auto-instrumentation: dashboard
+numbers come from the database, and the `live.check` job computes them there (§16.4). Alerts to the owner: ATS success < 70 % over the last hour (at least five
 attempts), provider success < 60 %, code or CAPTCHA rate > 20 %, queue age > 30 min, LLM spend > 80 % of the global
 or tagging cap, a daily scoring run that stops at its bound (3 × the daily cap, §8.2), Litestream lag > 5 min, backup failure, health check failing, disk > 80 %, a catalog sweep worker crash,
 an employer reply rate under 5 % after 10 sends in the last 30 days, the domain-wide reply rate under 5 % after 20
 sends (§11.4), an inbound message dead-lettered by the mail Worker, a daily billing reconciliation with any mismatch
 (§5.6), and an
-unhandled rejection in a background loop or timer (logged to stderr, alerted at most once a minute). The alert path is the
+unhandled rejection in a background loop or timer (logged to stderr, alerted at most once a minute). The complete set is
+`ALERT_KINDS` in `platform/alerts.ts`; it also names the browser proxy, network-policy and minutes-trend alerts, the
+dispatch kill switch, a monthly mail-budget stop, an LLM spend stop and a failed live check. The alert path is the
 in-app `alert.raised` event plus a notification for every owner; with `ALERT_NTFY_URL` set, the same alert is pushed
 to the owner's phone. No Grafana is provisioned by this repository; dashboards stay with the owner's Grafana account
 and read the OTLP endpoint. `live.check` computes the same thresholds from the app database and machine and records
@@ -1674,7 +1729,7 @@ v1 runs on Fly app `ai-auto-apply` (volume `data`, yyz). In order:
 | Browser Use objects to our use case | handled if they raise it; Kernel adapter wired behind `BrowserProvider`, but its policy bans bulk form submission, so Browserbase or Anchor would be the real fallback |
 | ATS vendors build against mass applying (Greenhouse Real Talent checks IP, email, phone and location and lets employers blocklist email domains; Ashby flags device and contact signals) | M1 stays at 10 a day, owner only, true answers; applications use each user's real email (ADR 0028), so no shared Overture domain appears on forms |
 | Proxy traffic per form decides the cost gate (each extra MB ≈ $0.005; 5 MB fails it) | measured by the early cloud probe (ADR 0026); resource blocking (§10.3) |
-| ATSes rate-limit or block `overture-web`'s IP on the public feed APIs | per-ATS limits and conditional requests (§6.1); `discovery_poll_total` alert; feeds can move behind Browser Use's proxy if it happens |
+| ATSes rate-limit or block `overture-web`'s IP on the public feed APIs | per-ATS limits and conditional requests (§6.1); a stalled sweep or a stale Workable snapshot raises `catalog.worker` or `workable.feed`; feeds can move behind Browser Use's proxy if it happens |
 | An acknowledgement email never comes for a sent application | `confirming` resolves as Couldn't apply, not charged, never resent; measured per ATS |
 | Invisible reCAPTCHA scores too low → code/CAPTCHA rate high | M1 lab and live numbers; Anchor sticky-IP or self-hosted as later options |
 | Browser Use profile encryption at rest undocumented | profiles hold cookies/storage only (no resume or facts); deleted via API on account deletion |
