@@ -6,7 +6,7 @@ import type { RunFilePosting } from "./run-file.ts";
 import {
   codeStepVisible,
   fillField,
-  formLocator,
+  openForm,
   readConfirmation,
   submitButton,
   typeCode,
@@ -14,6 +14,7 @@ import {
   submitPathnameOf,
   watchApplicationResponse,
 } from "../dispatch/forms/engine.ts";
+import type { FormScope } from "../dispatch/forms/engine.ts";
 
 export interface GreenhouseAttempt {
   outcome:
@@ -51,7 +52,7 @@ const attemptStructure = {
   }),
 };
 
-const fillQuestionsInOrder = async (page: Page, questions: RunFilePosting["questions"]) => {
+const fillQuestionsInOrder = async (scope: FormScope, questions: RunFilePosting["questions"]) => {
   const filledIds: string[] = [];
   const failedIds: string[] = [];
 
@@ -68,7 +69,7 @@ const fillQuestionsInOrder = async (page: Page, questions: RunFilePosting["quest
       return;
     }
 
-    const filled = await fillField(page, question.id, question.value);
+    const filled = await fillField(scope, question.id, question.value);
 
     (filled ? filledIds : failedIds).push(question.id);
 
@@ -90,19 +91,19 @@ export async function probeGreenhouse(
 ) {
   await page.goto(applicationUrl, { waitUntil: "domcontentloaded" });
 
-  try {
-    await formLocator(page).waitFor({ state: "visible", timeout: 15_000 });
-  } catch {
+  const scope = await openForm(page, "form#application-form", 15_000);
+
+  if (scope === null) {
     return attemptStructure.empty("form_missing", []);
   }
 
-  const { filledIds, failedIds } = await fillQuestionsInOrder(page, posting.questions);
+  const { filledIds, failedIds } = await fillQuestionsInOrder(scope, posting.questions);
 
   if (failedIds.length > 0) {
     return { ...attemptStructure.empty("fill_failed", filledIds), failedIds };
   }
 
-  const resumeUploaded = await uploadFile(page, posting.resumeFieldId, {
+  const resumeUploaded = await uploadFile(scope, posting.resumeFieldId, {
     bytes: new Uint8Array(await Bun.file(resumePath).arrayBuffer()),
     mimeType: "application/pdf",
     name: resumePath.split("/").at(-1) ?? "resume.pdf",
@@ -119,7 +120,7 @@ export async function probeGreenhouse(
   const submitPathname = await submitPathnameOf(page, null);
 
   const response = await Promise.allSettled([
-    submitButton(page).click(),
+    submitButton(scope).click(),
     watchApplicationResponse(page, submitPathname),
   ]).then((settled) => settled[1]);
 
@@ -149,7 +150,7 @@ export async function probeGreenhouse(
   await typeCode(page, typed);
 
   const second = await Promise.allSettled([
-    submitButton(page).click(),
+    submitButton(scope).click(),
     watchApplicationResponse(page, submitPathname),
   ]).then((settled) => settled[1]);
 

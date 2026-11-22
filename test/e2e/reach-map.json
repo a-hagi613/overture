@@ -18489,6 +18489,19 @@
         "test/e2e/workable.fixture.ts"
       ]
     },
+    "test/e2e/form-safety.test.ts": {
+      "full": false,
+      "paths": [],
+      "routes": [],
+      "designs": [],
+      "modules": [
+        "src/server/catalog/question-rules.ts",
+        "src/server/dispatch/ats/workable.ts",
+        "src/server/dispatch/forms/engine.ts",
+        "src/server/dispatch/posting-identity.ts",
+        "src/shared/live-service-hosts.ts"
+      ]
+    },
     "test/e2e/graceful-stop-requeue.test.ts": {
       "full": false,
       "paths": [
