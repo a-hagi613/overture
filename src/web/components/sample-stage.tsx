@@ -19,7 +19,7 @@ export function SampleStage() {
             {v.backdropRole}
           </span>
         </div>
-        <span className="font-mono text-[11px] text-muted-foreground [line-height:normal]">
+        <span className="font-mono text-[11px] leading-normal text-muted-foreground">
           {v.backdropQueue}
         </span>
       </div>

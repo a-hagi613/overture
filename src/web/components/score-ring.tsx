@@ -20,12 +20,13 @@ export function ScoreRing() {
           stroke="var(--color-foreground)"
           strokeDasharray="114 126"
           strokeLinecap="round"
+          strokeWidth="2"
           style={{ fill: "none" }}
           transform="rotate(-90 24 24)"
         />
         <circle cx="24" cy="4" r="2.6" fill="var(--color-signal)" />
       </svg>
-      <span className="relative font-serif text-xl leading-none tabular-nums">
+      <span className="relative font-serif text-xl italic leading-none tabular-nums">
         {copy.signIn.story.score}
       </span>
     </div>

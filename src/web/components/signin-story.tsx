@@ -30,6 +30,7 @@ export function SignInStory() {
       aria-label={copy.signIn.sampleLabel}
       className="relative hidden overflow-hidden border-r border-border bg-sidebar px-[clamp(32px,4.5vw,64px)] pb-9 pt-[34px] shadow-[1px_0_0_var(--color-hl)] min-[961px]:flex min-[961px]:flex-col"
     >
+      <div aria-hidden="true" className="signin-archgrid" />
       <div className="relative z-[1] mx-auto flex h-full w-full max-w-[610px] flex-col justify-between gap-7">
         <div className="flex items-center gap-4">
           <Link

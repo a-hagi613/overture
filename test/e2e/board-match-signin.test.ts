@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 
+import { AxeBuilder } from "@axe-core/playwright";
+
 import type { Browser, Page } from "@playwright/test";
 
 import { authTestIdentity } from "./auth.fixture.ts";
@@ -8,6 +10,7 @@ import { setTurnstileScenario } from "./sign-in.ts";
 
 const widths = [390, 1280];
 const themes = ["light", "dark"];
+const sweepWidths = [390, 768, 1280, 1440, 1920, 2560] as const;
 
 const statelessStates = ["sign-in", "suspended"] as const;
 
@@ -133,3 +136,79 @@ for (const width of widths) {
     }
   }
 }
+
+async function assertFits(page: Page, width: number, theme: string) {
+  const overflow = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+
+  expect(overflow.scrollWidth, `${String(width)}px ${theme}`).toBeLessThanOrEqual(
+    overflow.clientWidth,
+  );
+
+  const results = await new AxeBuilder({ page }).analyze();
+
+  expect(results.violations, `${String(width)}px ${theme}`).toEqual([]);
+}
+
+appTest.describe("the sign-in screen at every width", () => {
+  for (const width of sweepWidths) {
+    for (const theme of themes) {
+      appTest(
+        `${String(width)} ${theme} has no horizontal overflow and is axe clean`,
+        async ({ page, appServerUrl }) => {
+          await page.setViewportSize({ width, height: 900 });
+          await open(page, appServerUrl, theme, "sign-in");
+          await assertFits(page, width, theme);
+        },
+      );
+    }
+  }
+});
+
+appTest.describe("the sign-in states at 390 and 1280", () => {
+  for (const state of ["magic-sent", "refused", "suspended"] as const) {
+    for (const theme of themes) {
+      appTest(
+        `${state} in ${theme} stays inside the viewport and is axe clean at 390 and 1280`,
+        async ({ browser, isolatedAppServer }) => {
+          await Promise.all(
+            widths.map(async (width) => {
+              const context = await browser.newContext({
+                deviceScaleFactor: 1,
+                viewport: { width, height: 900 },
+              });
+
+              const page = await context.newPage();
+
+              await open(page, isolatedAppServer.url, theme, state);
+              await assertFits(page, width, theme);
+              await context.close();
+            }),
+          );
+        },
+      );
+    }
+  }
+});
+
+appTest(
+  "the sign-in screen ships product copy, not canvas annotations",
+  async ({ page, appServerUrl }) => {
+    await page.goto(`${appServerUrl}/signin`);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Sign in to Overture" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Email me a sign-in link" })).toBeVisible();
+    await expect(page.getByText("Invitation only for now.")).toBeVisible();
+    await expect(page.getByText("Google, LinkedIn or an emailed link")).toBeVisible();
+
+    const text = await page.locator("body").textContent();
+
+    expect(text).not.toMatch(/\bfig(?:ure)?\.?\s*\d|\bfolio\b|§|artboard|sample data/iu);
+    expect(text).not.toMatch(/password/iu);
+    expect(text).not.toMatch(/create an account|sign up/iu);
+  },
+);

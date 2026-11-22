@@ -17,7 +17,7 @@ export function ReceiptHead({
         </span>
         <div className="min-w-0">
           <h2 className="truncate font-serif text-2xl leading-[1.08]">{title}</h2>
-          <p className="mt-0.5 truncate text-[12.5px] text-muted-foreground">{meta}</p>
+          <p className="truncate text-[12.5px] text-muted-foreground">{meta}</p>
         </div>
       </div>
       <ScoreRing />
