@@ -50,8 +50,10 @@ export const overviewSchema = z.object({
 export const providerReportRowSchema = z.object({
   ats: z.string(),
   attempted: z.number(),
+  attemptCount: z.number(),
   challengeRate: z.number().nullable(),
   codeRate: z.number().nullable(),
+  completed: z.number(),
   completionRate: z.number().nullable(),
   costGateMet: z.boolean().nullable(),
   costGateMicros: z.number(),
@@ -61,7 +63,7 @@ export const providerReportRowSchema = z.object({
   provider: z.string(),
   proxyMbPerCompleted: z.number().nullable(),
   proxyTrend: z.boolean(),
-  sent: z.number(),
+  sentAttemptCount: z.number(),
 });
 
 export const labReportRowSchema = z.object({

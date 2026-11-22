@@ -30,8 +30,10 @@ const labReportRowSchema = z.object({
 const sendRowSchema = z.object({
   ats: z.string(),
   attempted: z.number(),
+  attemptCount: z.number(),
   challengeRate: z.number().nullable(),
   codeRate: z.number().nullable(),
+  completed: z.number(),
   completionRate: z.number().nullable(),
   costGateMet: z.boolean().nullable(),
   costGateMicros: z.number(),
@@ -41,7 +43,7 @@ const sendRowSchema = z.object({
   provider: z.string(),
   proxyMbPerCompleted: z.number().nullable(),
   proxyTrend: z.boolean(),
-  sent: z.number(),
+  sentAttemptCount: z.number(),
 });
 
 const reportSchema = z.object({
@@ -356,18 +358,22 @@ test("the provider report shows completion, code, challenge, duration, proxy and
 
         const boardId = await seedBoard(owner, companyId, ats, `report-${ats}`);
 
-        const postingId = await seedPosting(owner, {
-          ats,
-          atsJobId: `${ats}-report-1`,
-          boardId,
-          companyId,
-          title: "Platform engineer",
-          url: `https://example.test/${ats}/report/1`,
-        });
+        const applicationIds = await Promise.all(
+          Array.from({ length: 4 }, async (_, index) => {
+            const postingId = await seedPosting(owner, {
+              ats,
+              atsJobId: `${ats}-report-${String(index)}`,
+              boardId,
+              companyId,
+              title: `Platform engineer ${String(index)}`,
+              url: `https://example.test/${ats}/report/${String(index)}`,
+            });
 
-        const applicationId = await seedApplication(owner, { postingId, status: "ready", userId });
+            return seedApplication(owner, { postingId, status: "sent", userId });
+          }),
+        );
 
-        return [ats, applicationId] as const;
+        return [ats, applicationIds] as const;
       }),
     ),
   );
@@ -392,18 +398,18 @@ test("the provider report shows completion, code, challenge, duration, proxy and
   ];
 
   const attempts = (["greenhouse", "lever"] as const).flatMap((ats) => {
-    const applicationId = applications.get(ats) ?? "";
+    const applicationIds = applications.get(ats) ?? [];
 
     return (["browser_use", "kernel"] as const).flatMap((provider) =>
       specs.map(
         ({ browserMs, captchaSeen, codeUsed, costMicros, outcome }, index) =>
           ({
-            applicationId,
+            applicationId: applicationIds[index] ?? "",
             browserMs,
             captchaSeen,
             codeUsed,
             costMicros,
-            n: index + 1,
+            n: 1,
             outcome,
             provider,
             proxyBytes: 1_000_000,
@@ -427,7 +433,9 @@ test("the provider report shows completion, code, challenge, duration, proxy and
       );
 
       expect(row?.attempted).toBe(4);
-      expect(row?.sent).toBe(3);
+      expect(row?.attemptCount).toBe(4);
+      expect(row?.completed).toBe(3);
+      expect(row?.sentAttemptCount).toBe(3);
       expect(row?.completionRate).toBeCloseTo(0.75, 5);
       expect(row?.codeRate).toBeCloseTo(0.25, 5);
       expect(row?.challengeRate).toBeCloseTo(0.25, 5);
