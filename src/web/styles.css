@@ -673,6 +673,11 @@ canvas {
   padding: 8px 20px 72px;
 }
 
+.onb .ob.ob-trial {
+  max-width: 760px;
+  padding-top: 40px;
+}
+
 .onb .rail-d {
   display: flex;
   list-style: none;

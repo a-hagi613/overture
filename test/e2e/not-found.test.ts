@@ -3,17 +3,26 @@ import { join } from "node:path";
 
 import { AxeBuilder } from "@axe-core/playwright";
 
-import type { Browser, Page } from "@playwright/test";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
 
 import { expect, test } from "./app.fixture.ts";
 
-const screenshotDir = join("test-results", "parity", "not-found");
+type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
+
+const screenshotDir = join("parity-captures", "not-found");
 const boardWidths = [390, 1440] as const;
 const sweepWidths = [390, 768, 1024, 1280, 1440, 1920, 2560] as const;
 
-async function openNotFound(browser: Browser, appServerUrl: string, width: number, theme: string) {
+async function openNotFound(
+  browser: Browser,
+  appServerUrl: string,
+  storageState: StorageState,
+  width: number,
+  theme: string,
+) {
   const context = await browser.newContext({
     deviceScaleFactor: 1,
+    storageState,
     viewport: { height: width === 390 ? 844 : 900, width },
   });
 
@@ -38,8 +47,15 @@ for (const width of boardWidths) {
     test(`the 404 page renders the board content at ${String(width)} ${theme}`, async ({
       browser,
       appServerUrl,
+      ownerStorageState,
     }) => {
-      const { context, page } = await openNotFound(browser, appServerUrl, width, theme);
+      const { context, page } = await openNotFound(
+        browser,
+        appServerUrl,
+        ownerStorageState,
+        width,
+        theme,
+      );
 
       await expect(page.getByRole("heading", { level: 1, name: "Page not found." })).toBeVisible();
       await expect(page.getByText("This page has moved on, or never existed.")).toBeVisible();
@@ -72,8 +88,15 @@ for (const width of sweepWidths) {
   test(`the 404 page has no horizontal overflow at ${String(width)}`, async ({
     browser,
     appServerUrl,
+    ownerStorageState,
   }) => {
-    const { context, page } = await openNotFound(browser, appServerUrl, width, "light");
+    const { context, page } = await openNotFound(
+      browser,
+      appServerUrl,
+      ownerStorageState,
+      width,
+      "light",
+    );
 
     await expect(page.getByRole("heading", { level: 1, name: "Page not found." })).toBeVisible();
     expect(await horizontalOverflow(page), `${String(width)}px overflow`).toBe(0);
