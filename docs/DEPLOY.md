@@ -16,7 +16,7 @@ No secret value ever appears in this repository: secrets are set with `fly secre
 | `litestream.yml` | Continuous replication (1 s sync) to R2 `overture-backups`, nightly snapshot (`interval: 24h`) kept 30 days (`retention: 720h`); the L0 retention check runs every 5 minutes so its ListObjects cost stays bounded (#281) |
 | `fly.toml` | App `overture-web`, region `yyz`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health` |
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`) and a `restore-drill` job (Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations) |
-| `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: `flyctl deploy --remote-only` with `FLY_API_TOKEN`, then polls the production health route |
+| `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks it, destroys the machine |
 | `scripts/check-restored-db.ts` | Restored-database checks: PRAGMA `integrity_check`, applied-migration count, per-table row counts, optional health-route probe |
 | `scripts/restore-drill.ts` | `DRILL_TARGET=local` (CI round-trip) or `DRILL_TARGET=fly` (throwaway machine drill) |
@@ -199,7 +199,9 @@ gh variable set REQUIRE_EMAIL_SENDING -b true -R a-hagi613/overture
 - The **deploy guard** in `.github/workflows/deploy.yml` runs `onboard-email-sending.ts --check` on the running
   release before every deploy. While the switch is off it prints a warning and the deploy continues; with the switch
   on it refuses the deploy with a clear message when the sending domain is missing, disabled or its records do not
-  verify.
+  verify. The SSH check is bounded by `timeout 45s`, so a down or unresponsive machine counts as "not ready" instead
+  of holding the `deploy-main` concurrency group open; the failure step then prints `flyctl status` and the last 120
+  log lines of `overture-web` so the container boot or health failure is visible without opening the dashboard.
 - The **live-check guard** is the `mail.sending` result in the daily `mail` check group. While the switch is off it
   records `status: "gated"` and does not alert. With the switch on it verifies the domain and all four records and
   fails (with the owner's alert path) when they do not pass. The same group then sends the check message to the
@@ -292,7 +294,9 @@ No migration, secret or DNS record is part of this deployment.
   The Deploy workflow (`.github/workflows/deploy.yml`) runs only after the CI workflow succeeds on
   `main`, deploys with `flyctl deploy --remote-only`, and fails if `https://overture-web.fly.dev/api/health`
   does not answer. Verify: green Deploy run, and in a terminal
-  `curl -fsS https://overture-web.fly.dev/api/health` → `{"status":"ok","database":"ok",...}`.
+  `curl -fsS https://overture-web.fly.dev/api/health` → `{"status":"ok","database":"ok",...}`. A failed run ends with
+  the `Show Fly status and logs after a failed deploy` step, so the machine status and last 120 log lines are in the
+  job log; the Email Sending SSH guard is capped at 45 s so a down machine cannot stall the run.
 - **Litestream lag is visible and a restore drill has passed once**
   Lag: `curl -fsS https://overture-web.fly.dev/api/health | jq .backups` →
   `{"replication":"ok","lagSeconds":<n>,"replicaTxid":"…","readAgeSeconds":<n>}`. `lagSeconds` measures how
@@ -498,7 +502,7 @@ What each push means and what to check first:
 
 | Alert | Meaning | First check |
 |---|---|---|
-| `health` | `/api/health` failed or answered a body that is not `"status":"ok"` from outside Fly | the URL from the owner's machine, then `fly status -a overture-web` and `fly logs -a overture-web` |
+| `health` | `/api/health` failed or answered a body that is not `"status":"ok"` from outside Fly | the URL from the owner's machine, then `fly status -a overture-web` and `fly logs -a overture-web` (a failed Deploy run already prints both) |
 | `health.recovered` | the probe passes again | nothing; the app's own health alerts record the incident |
 | `workable` | `workable/manifest.json` is older than 26 h, missing or unparseable | the last `workable-feed` GitHub Action run, then `bunx wrangler r2 object get overture-files/workable/manifest.json --pipe` |
 | `workable.recovered` | the manifest is young again | nothing |
