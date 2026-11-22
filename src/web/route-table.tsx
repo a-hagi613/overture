@@ -13,6 +13,7 @@ import { OnboardingFactsPage } from "./routes/onboarding-facts.tsx";
 import { OnboardingForwardPage } from "./routes/onboarding-forward.tsx";
 import { OnboardingResumePage } from "./routes/onboarding-resume.tsx";
 import { OnboardingTargetsPage } from "./routes/onboarding-targets.tsx";
+import { OnboardingTrialPage } from "./routes/onboarding-trial.tsx";
 import { ProfilePage } from "./routes/profile.tsx";
 import { ReadyPage } from "./routes/ready.tsx";
 import { ReviewPage } from "./routes/review.tsx";
@@ -80,6 +81,7 @@ const publicRoutes: RouteObject[] = [
   { path: "/onboarding/facts", element: <OnboardingFactsPage /> },
   { path: "/onboarding/targets", element: <OnboardingTargetsPage /> },
   { path: "/onboarding/forward", element: <OnboardingForwardPage /> },
+  { path: "/onboarding/trial", element: <OnboardingTrialPage /> },
 ];
 
 export const appRoutes: RouteObject[] = [

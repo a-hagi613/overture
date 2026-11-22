@@ -777,6 +777,17 @@ export const customers = sqliteTable("customers", {
   updatedAt: integer("updated_at").notNull(),
 });
 
+/**
+ * One row per card, keyed by HMAC of the Stripe card fingerprint (ADR 0018).
+ * Deliberately has no foreign key to users: the row must survive account
+ * deletion so the same card cannot take a second trial.
+ */
+export const cardFingerprints = sqliteTable("card_fingerprints", {
+  hmac: text("hmac").primaryKey(),
+  trialUsedAt: integer("trial_used_at"),
+  createdAt: integer("created_at").notNull(),
+});
+
 export const stripeEvents = sqliteTable("stripe_events", {
   id: text("id").primaryKey(),
   type: text("type").notNull(),

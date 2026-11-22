@@ -8,6 +8,7 @@ import type {
   PaymentEvent,
   Payments,
   PortalSessionRequest,
+  SetupSessionRequest,
 } from "../platform/ports/payments.ts";
 
 import { InvalidWebhookSignatureError } from "../platform/ports/payments.ts";
@@ -22,6 +23,29 @@ const hexPattern = /^[0-9a-f]+$/u;
 const checkoutSessionSchema = z.object({
   id: z.string().min(1),
   url: z.url(),
+});
+
+const setupSessionSchema = z.object({
+  id: z.string().min(1),
+  url: z.url(),
+});
+
+const verifiedSetupSessionSchema = z.object({
+  status: z.string().nullable(),
+  client_reference_id: z.string().nullable().optional(),
+  customer: z.string().nullable().optional(),
+  setup_intent: z
+    .object({
+      status: z.string(),
+      payment_method: z
+        .object({
+          card: z.object({ fingerprint: z.string().nullable() }).nullable().optional(),
+        })
+        .nullable()
+        .optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 const portalSessionSchema = z.object({
@@ -218,6 +242,25 @@ export function createStripePayments(config: StripePaymentsConfig) {
     return payload;
   }
 
+  async function getJson(path: string) {
+    const response = await fetch(`${apiBaseUrl}${path}`, {
+      headers: { authorization: `Bearer ${config.secretKey}` },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      const requestId = response.headers.get("request-id") ?? "unknown";
+
+      throw new Error(
+        `Stripe ${path} failed with ${String(response.status)} (request ${requestId})`,
+      );
+    }
+
+    const payload: unknown = await response.json();
+
+    return payload;
+  }
+
   async function verifyWebhook(payload: string, signature: string | null) {
     if (signature === null) {
       throw new InvalidWebhookSignatureError("The Stripe webhook carried no signature.");
@@ -283,6 +326,46 @@ export function createStripePayments(config: StripePaymentsConfig) {
       const session = checkoutSessionSchema.parse(await postForm("/v1/checkout/sessions", form));
 
       return { id: session.id, url: session.url };
+    },
+    createSetupSession: async (request: SetupSessionRequest) => {
+      const form = new URLSearchParams({
+        client_reference_id: request.userId,
+        mode: "setup",
+        "metadata[user_id]": request.userId,
+        "setup_intent_data[metadata][user_id]": request.userId,
+        success_url: request.successUrl,
+        cancel_url: request.cancelUrl,
+      });
+
+      if (request.customerId === null) {
+        form.set("customer_creation", "always");
+        form.set("customer_email", request.email);
+      } else {
+        form.set("customer", request.customerId);
+      }
+
+      const session = setupSessionSchema.parse(await postForm("/v1/checkout/sessions", form));
+
+      return { id: session.id, url: session.url };
+    },
+    retrieveVerifiedCard: async (setupSessionId: string) => {
+      const path = `/v1/checkout/sessions/${encodeURIComponent(setupSessionId)}?expand[]=setup_intent.payment_method`;
+      const session = verifiedSetupSessionSchema.parse(await getJson(path));
+      const fingerprint = session.setup_intent?.payment_method?.card?.fingerprint ?? null;
+
+      if (
+        session.status !== "complete" ||
+        session.setup_intent?.status !== "succeeded" ||
+        fingerprint === null
+      ) {
+        return null;
+      }
+
+      return {
+        customerId: session.customer ?? null,
+        fingerprint,
+        userId: session.client_reference_id ?? null,
+      };
     },
     createPortalSession: async (request: PortalSessionRequest) => {
       const form = new URLSearchParams({

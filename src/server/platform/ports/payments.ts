@@ -25,6 +25,29 @@ export interface CheckoutSession {
 }
 
 /**
+ * What Overture asks Stripe for to verify a card: a setup-only Checkout
+ * session. Nothing is charged (M3 free trial).
+ */
+export interface SetupSessionRequest {
+  userId: string;
+  email: string;
+  customerId: string | null;
+  successUrl: string;
+  cancelUrl: string;
+}
+
+/**
+ * The card a completed setup session verified. `fingerprint` is Stripe's raw
+ * card fingerprint; the caller keys it with HMAC before storing anything.
+ */
+export interface VerifiedCard {
+  fingerprint: string;
+  customerId: string | null;
+  /** The account the setup session was created for (its client_reference_id). */
+  userId: string | null;
+}
+
+/**
  * A hosted Stripe customer portal page the user is sent to.
  */
 export interface PortalSessionRequest {
@@ -67,6 +90,9 @@ export interface PaymentEvent {
  */
 export interface Payments {
   createCheckoutSession: (request: CheckoutSessionRequest) => Promise<CheckoutSession>;
+  createSetupSession: (request: SetupSessionRequest) => Promise<CheckoutSession>;
+  /** `null` until the setup session is complete and its card is attached. */
+  retrieveVerifiedCard: (setupSessionId: string) => Promise<VerifiedCard | null>;
   createPortalSession: (request: PortalSessionRequest) => Promise<PortalSession>;
   verifyWebhook: (payload: string, signature: string | null) => Promise<PaymentEvent>;
 }
