@@ -209,6 +209,83 @@ Run the daily check once from the owner's terminal (`POST https://admin.tryovert
 confirm `mail.sending` and `mail` pass. If the records were just created, Cloudflare usually propagates in 5–15
 minutes; re-run `--check` until it prints `verdict: ready`.
 
+## M3-10: landing and pricing on Workers Static Assets (owner runbook)
+
+The redrawn landing (`/`) and pricing (`/pricing`) pages are prerendered by the main build and deployed as
+Workers Static Assets (`workers/marketing`, [#284](https://github.com/a-hagi613/overture/issues/284), ADR 0033).
+Cloudflare attaches the Worker to two explicit routes on `tryoverture.com` and no others:
+
+| Route | Serves |
+|---|---|
+| `tryoverture.com/` | `dist-marketing/index.html` |
+| `tryoverture.com/pricing*` | `dist-marketing/pricing/index.html`; the `*` covers the query string and `/pricing/` |
+
+Everything else — the app routes in `src/web/route-table.tsx` (`/board`, `/inbox`, `/settings`, …), `/api/*`,
+`/webhooks/*`, `/assets/*`, `/sw.js`, the manifest and the icons — matches no route and goes straight to
+`overture-web` on Fly. ADR 0022 still holds: the marketing pages are on the app's origin, and the app's own HTML and
+assets are still served by Fly.
+
+The deployment has no Worker script (`main` is absent in `wrangler.jsonc`), so serving a static page never invokes a
+Worker: asset requests are free and unlimited, do not count as Workers requests, and keep serving while a tripped
+Workers spending limit blocks script invocations (ADR 0033, `docs/research/cloudflare-paid-plan.md` §3).
+
+`scripts/prerender.tsx` writes `dist-marketing` after `vite build`: one self-contained HTML file per page (the built
+stylesheet is inlined, so the page is styled with the origin down) plus a `_headers` file carrying the app's CSP and
+security headers. The app's `/assets/*.js` bundle is still referenced for hydration, so a signed-in visitor at `/`
+gets the home screen when Fly is up. Terms and Privacy stay on Fly until they are prerendered; they are linked from
+both pages but are not part of this deployment.
+
+### Deploy
+
+`dist-marketing` must exist (the build writes it):
+
+```sh
+bun run build
+cd workers/marketing
+bunx wrangler deploy
+```
+
+Wrangler needs a Cloudflare API token (or `wrangler login`) with **Workers Scripts: Edit** and **Workers Routes:
+Edit** on the `tryoverture.com` zone, plus **Zone: Read** for `zone_name`. Put the token in `CLOUDFLARE_API_TOKEN`
+and the account id in `CLOUDFLARE_ACCOUNT_ID` in the operator's environment only, never in the repository. `bun run
+dry-run` builds the same Worker without deploying, and CI runs it after `bun run verify` (which produces
+`dist-marketing`).
+
+Deploy the Worker after the Fly release: until the matching release is live, the page can reference the previous
+release's `/assets/` bundle. The page still renders; its hydration waits for the new release.
+
+### Verify
+
+- **Both pages answer with the origin down.** Stop the machine on purpose (`fly scale count 0 -a overture-web`), then
+  `curl -sS -o /dev/null -w '%{http_code}\n' https://tryoverture.com/` and `…/pricing` return `200`; start it again
+  with `fly scale count 1 -a overture-web`. The same check during a normal deploy shows the pages up through the
+  10–30 s restart (SPEC §3.1).
+- **No Worker invocation for app traffic.** Cloudflare dashboard → **Workers & Pages → overture-marketing → Metrics**:
+  Worker requests stay at zero for a day of ordinary traffic while static asset requests show in the zone's asset
+  metrics. Request `/board`, `/api/health` and an `/assets/*.js` file, then confirm the Worker's request count is
+  still zero; those requests answer from Fly and appear in `fly logs -a overture-web`.
+- **In the repository.**
+  `bun node_modules/playwright/cli.js test test/e2e/marketing-worker.test.ts --workers=1` proves every route in
+  `src/web/route-table.tsx` and every API/webhook/asset prefix matches no Worker route, that the config is
+  assets-only, and that both pages serve from `dist-marketing` while a stand-in origin answers 503.
+
+A route pattern without a wildcard matches the entire URL, query string included, so the pricing route ends in `*`.
+The root is matched exactly (`tryoverture.com/`): a landing URL with a query string (`/?utm_source=…`) matches no
+Worker route and goes to Fly. That keeps arbitrary paths away from the Worker at the cost of falling back to the
+origin for tagged landing links.
+
+### Rollback
+
+- **A bad page, same routes:** `cd workers/marketing && bunx wrangler rollback` reverts to the previous deployment;
+  `bunx wrangler deployments list` shows the versions.
+- **Send everything back to Fly:** `cd workers/marketing && bunx wrangler delete` removes the Worker and its
+  routes (or delete the two routes under **Settings → Domains & Routes**). `/` and `/pricing` are then proxied to
+  `overture-web` exactly as before #284; DNS does not change.
+- **The routes are missing or the Worker is unavailable:** the zone serves both paths from Fly, with the usual
+  10–30 s deploy downtime.
+
+No migration, secret or DNS record is part of this deployment.
+
 ## Verifying the acceptance criteria
 
 - **A merge to `main` deploys `overture-web` and the health route answers in production**

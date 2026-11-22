@@ -1,22 +1,10 @@
 import type { MiddlewareHandler } from "hono";
 
-const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "script-src 'self' https://challenges.cloudflare.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com",
-  "img-src 'self' data: blob:",
-  "connect-src 'self'",
-  "frame-src https://challenges.cloudflare.com",
-  "worker-src 'self'",
-  "manifest-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-].join("; ");
-
-const HSTS_SECONDS = 15_552_000;
+import {
+  BASE_SECURITY_HEADERS,
+  CONTENT_SECURITY_POLICY,
+  STRICT_TRANSPORT_SECURITY,
+} from "../shared/security-headers.ts";
 
 /**
  * Sets the browser security headers on every response of the app and the admin host.
@@ -27,21 +15,16 @@ export function securityHeaders(production: boolean) {
   const handler: MiddlewareHandler = async (context, next) => {
     await next();
 
-    if (!context.res.headers.has("content-security-policy")) {
-      context.res.headers.set("content-security-policy", CONTENT_SECURITY_POLICY);
+    if (!context.res.headers.has("Content-Security-Policy")) {
+      context.res.headers.set("Content-Security-Policy", CONTENT_SECURITY_POLICY);
     }
 
-    context.res.headers.set("x-content-type-options", "nosniff");
-    context.res.headers.set("referrer-policy", "strict-origin-when-cross-origin");
-    context.res.headers.set("x-frame-options", "DENY");
-
-    context.res.headers.set(
-      "permissions-policy",
-      "camera=(), microphone=(), geolocation=(), payment=()",
-    );
+    for (const [name, value] of Object.entries(BASE_SECURITY_HEADERS)) {
+      context.res.headers.set(name, value);
+    }
 
     if (production) {
-      context.res.headers.set("strict-transport-security", `max-age=${String(HSTS_SECONDS)}`);
+      context.res.headers.set("Strict-Transport-Security", STRICT_TRANSPORT_SECURITY);
     }
   };
 
