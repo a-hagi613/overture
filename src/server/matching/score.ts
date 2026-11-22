@@ -33,6 +33,7 @@ export const SCORE_PURPOSE = "score";
 const WAITING_STATUSES = ["preparing", "ready", "approved"] as const;
 
 const CHUNK_SIZE = 5;
+const SCORE_ATTEMPT_MULTIPLE = 3;
 const RESUME_DIGEST_CHARS = 1500;
 const SUMMARY_WORDS = 200;
 const SUMMARY_CHARS = 2000;
@@ -464,6 +465,8 @@ export function createMatchingService(deps: MatchDeps) {
     const companiesUsed = activeApplicationCompanies(db, userId);
     let scored = 0;
     let applicationsCreated = 0;
+    const scoreAttemptBound = dailyCap * SCORE_ATTEMPT_MULTIPLE;
+    let scoreAttempts = 0;
 
     function offerApplication(candidate: RankedCandidate, score: number) {
       if (need <= 0 || score < context.threshold || companiesUsed.has(candidate.companyId)) {
@@ -516,7 +519,13 @@ export function createMatchingService(deps: MatchDeps) {
         return;
       }
 
-      const chunk = unscored.slice(start, start + Math.min(CHUNK_SIZE, need));
+      const budget = scoreAttemptBound - scoreAttempts;
+
+      if (budget <= 0) {
+        return;
+      }
+
+      const chunk = unscored.slice(start, start + Math.min(CHUNK_SIZE, need, budget));
 
       const requests = chunk.map((candidate, index) =>
         scoreRequest({
@@ -544,6 +553,8 @@ export function createMatchingService(deps: MatchDeps) {
         return;
       }
 
+      scoreAttempts += chunk.length;
+
       let scoredThisChunk = 0;
 
       for (const [index, candidate] of chunk.entries()) {
@@ -567,6 +578,19 @@ export function createMatchingService(deps: MatchDeps) {
     }
 
     await scoreNextChunk(0);
+
+    const boundHit =
+      need > 0 && scoreAttempts >= scoreAttemptBound && scoreAttempts < unscored.length;
+
+    if (boundHit) {
+      raiseAlert(db, clock, "match.score_bound", {
+        attempts: scoreAttempts,
+        bound: scoreAttemptBound,
+        candidates: unscored.length,
+        need,
+        threshold: context.threshold,
+      });
+    }
 
     return {
       applicationsCreated,
