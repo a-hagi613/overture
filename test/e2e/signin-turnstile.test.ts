@@ -73,6 +73,7 @@ test("repeated clicks never render extra widgets or reset the challenge", async 
   await clearSinkMail(url, request);
 
   await page.goto(`${url}/signin`);
+  await waitForTurnstileStub(page);
   await page.getByLabel(labels.email).fill(authTestIdentity.ownerEmail);
 
   expect((await turnstileStubCounts(page)).renders).toBe(0);
