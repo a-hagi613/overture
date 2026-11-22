@@ -1,18 +1,7 @@
 import { copy } from "../../../shared/copy.ts";
 import type { ProviderReportRow } from "../../lib/admin-api.ts";
+import { dollars, megabytes, percent, seconds } from "./report-format.ts";
 import { ReportMetric } from "./report-metric.tsx";
-
-const percent = (rate: number | null) =>
-  rate === null ? copy.admin.reportNone : copy.admin.reportRate(rate);
-
-const seconds = (millis: number | null) =>
-  millis === null ? copy.admin.reportNone : copy.admin.reportSeconds(millis);
-
-const megabytes = (value: number | null) =>
-  value === null ? copy.admin.reportNone : copy.admin.reportMegabytes(value);
-
-const dollars = (micros: number | null) =>
-  micros === null ? copy.admin.reportNone : copy.admin.reportDollars(micros);
 
 function gateLabel(met: boolean | null) {
   if (met === null) {
