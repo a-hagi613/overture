@@ -3,7 +3,7 @@ import type { BillingReconciliation } from "../../lib/admin-api.ts";
 
 const tones = {
   clean: "bg-ok-soft text-ok",
-  mismatch: "bg-need-soft text-need",
+  mismatch: "bg-card text-need",
 } as const;
 
 function summaryOf(reconciliation: BillingReconciliation) {
@@ -26,7 +26,7 @@ export function BillingReconcile({
   return (
     <section
       aria-labelledby="billing-reconcile"
-      className="mt-4 rounded-lg border border-border bg-card p-4 shadow-sh"
+      className={`mt-4 rounded-lg border p-4 shadow-sh ${reconciliation?.status === "mismatch" ? "border-need bg-need-soft" : "border-border bg-card"}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="billing-reconcile" className="text-[13px] font-semibold">
