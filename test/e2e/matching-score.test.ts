@@ -370,9 +370,10 @@ test("opening a posting scores it once, and manual apply works below the thresho
     },
   });
 
-  await owner.get(`/api/postings/${strong}`);
+  const rescored = postingSchema.parse(await (await owner.get(`/api/postings/${strong}`)).json());
 
-  expect(matching.anthropic.requests()).toHaveLength(3);
+  expect(rescored.score).toBe(87);
+  expect(matching.anthropic.requests()).toHaveLength(2);
 
   await owner.dispose();
 });
