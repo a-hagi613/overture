@@ -172,5 +172,9 @@ export default defineConfig({
       name: "settings-delete-boards",
       testMatch: /board-match-settings-delete\.test\.ts/u,
     },
+    {
+      name: "landing-boards",
+      testMatch: /board-match-landing\.test\.ts/u,
+    },
   ],
 });
