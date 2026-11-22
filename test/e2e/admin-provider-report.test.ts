@@ -36,6 +36,8 @@ const reportSchema = z.object({
     z.object({
       ats: z.string(),
       costMicrosPerCompleted: z.number().nullable(),
+      p50BrowserMs: z.number().nullable(),
+      p95BrowserMs: z.number().nullable(),
       proxyMbPerCompleted: z.number().nullable(),
       proxyTrend: z.boolean(),
       sent: z.number(),
@@ -457,11 +459,11 @@ test("attempts older than the 30-day cost window are left out of the Overview an
     .object({ now: z.number() })
     .parse(await (await owner.get("/__test__/clock")).json());
 
-  const seedAttempt = async (daysAgo: number, proxyBytes: number) => {
+  const seedAttempt = async (daysAgo: number, browserMs: number, proxyBytes: number) => {
     const seeded = await owner.post("/__test__/attempts/seed", {
       data: {
         applicationId,
-        browserMs: 60_000,
+        browserMs,
         costMicros: 20_000,
         n: 1,
         outcome: "sent",
@@ -475,9 +477,11 @@ test("attempts older than the 30-day cost window are left out of the Overview an
     expect(seeded.ok()).toBe(true);
   };
 
-  await seedAttempt(31, 9_000_000);
-  await seedAttempt(2, 1_000_000);
-  await seedAttempt(3, 1_000_000);
+  await seedAttempt(31, 999_000, 9_000_000);
+  await seedAttempt(2, 10_000, 1_000_000);
+  await seedAttempt(3, 20_000, 1_000_000);
+  await seedAttempt(4, 30_000, 1_000_000);
+  await seedAttempt(5, 40_000, 1_000_000);
 
   await openAdminAsOwner(page, captureAppUrl, accessServer.issueToken);
 
@@ -485,7 +489,7 @@ test("attempts older than the 30-day cost window are left out of the Overview an
     await (await page.request.get(`${captureAppUrl}/admin/api/overview`)).json(),
   );
 
-  expect(overview.cost.completed).toBe(2);
+  expect(overview.cost.completed).toBe(4);
   expect(overview.cost.proxyMbPerCompleted).toBe(1);
   expect(overview.cost.costMicrosPerCompleted).toBe(20_000);
 
@@ -497,8 +501,10 @@ test("attempts older than the 30-day cost window are left out of the Overview an
   expect(report.providers[0]).toMatchObject({
     ats: "greenhouse",
     costMicrosPerCompleted: 20_000,
+    p50BrowserMs: 20_000,
+    p95BrowserMs: 30_000,
     proxyMbPerCompleted: 1,
-    sent: 2,
+    sent: 4,
   });
 });
 

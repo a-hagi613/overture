@@ -224,7 +224,7 @@ const summarise = (
 
   return groups
     .map((group) => {
-      const durations = percentiles.get(group.key);
+      const groupRanks = percentiles.get(group.key);
 
       const costPerCompleted = ratio(
         group.browserMicros +
@@ -245,8 +245,8 @@ const summarise = (
         costGateMet: costPerCompleted === null ? null : costPerCompleted <= COST_GATE_MICROS,
         costGateMicros: COST_GATE_MICROS,
         costMicrosPerCompleted: costPerCompleted,
-        p50BrowserMs: durations?.p50 ?? null,
-        p95BrowserMs: durations?.p95 ?? null,
+        p50BrowserMs: groupRanks?.p50 ?? null,
+        p95BrowserMs: groupRanks?.p95 ?? null,
         provider: group.provider,
         proxyMbPerCompleted: ratio(group.proxyBytes, group.sent * 1_000_000),
         proxyTrend: trend,

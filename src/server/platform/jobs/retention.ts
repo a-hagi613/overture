@@ -16,8 +16,7 @@ const EVENT_RETENTION_MS = DAY_MS;
 const DONE_JOB_RETENTION_MS = 7 * DAY_MS;
 const DEAD_JOB_RETENTION_MS = 30 * DAY_MS;
 
-/** SPEC §5.7 keeps `attempts` 180 days, as the cost report wants its history. */
-export const ATTEMPT_RETENTION_MS = 180 * DAY_MS;
+const ATTEMPT_RETENTION_MS = 180 * DAY_MS;
 
 const TABLE_KEYS = {
   attempts: "id",
