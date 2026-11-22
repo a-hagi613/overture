@@ -475,7 +475,7 @@ test("a trial upgrade applies at once, a Week switch lands at renewal from its p
     const portalParams = new URLSearchParams(portalRequest?.body ?? "");
 
     expect(portalParams.get("customer")).toBe(CUSTOMER_ID);
-    expect(portalParams.get("return_url")).toBe("http://localhost:3000/settings");
+    expect(portalParams.get("return_url")).toBe("http://localhost:3000/settings/billing");
   } finally {
     await server.stop();
     await stripe.stop();

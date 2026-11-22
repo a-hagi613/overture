@@ -19,6 +19,8 @@ import { ProfilePage } from "./routes/profile.tsx";
 import { ReadyPage } from "./routes/ready.tsx";
 import { ReviewPage } from "./routes/review.tsx";
 import { SearchPage } from "./routes/search.tsx";
+import { SettingsBillingPage } from "./routes/settings-billing.tsx";
+import { SettingsBillingPlansPage } from "./routes/settings-billing-plans.tsx";
 import { SettingsDeletePage } from "./routes/settings-delete.tsx";
 import { SettingsExportPage } from "./routes/settings-export.tsx";
 import { SettingsSupportAccessPage } from "./routes/settings-support-access.tsx";
@@ -58,6 +60,8 @@ const appShellChildren: RouteObject[] = [
   { path: "/profile", element: <ProfilePage /> },
   { path: "/search", element: <SearchPage /> },
   { path: "/settings", element: <SettingsPage /> },
+  { path: "/settings/billing", element: <SettingsBillingPage /> },
+  { path: "/settings/billing/plans", element: <SettingsBillingPlansPage /> },
   { path: "/settings/delete", element: <SettingsDeletePage /> },
   { path: "/settings/export", element: <SettingsExportPage /> },
   { path: "/settings/support-access", element: <SettingsSupportAccessPage /> },
