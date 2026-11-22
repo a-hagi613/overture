@@ -81,6 +81,11 @@ import {
   ensureApplyFailuresQueued,
   runApplyFailures,
 } from "./notify/failure-digest.ts";
+import {
+  BILLING_NOTICE_JOB_KIND,
+  parseBillingNoticePayload,
+  runBillingNoticeJob,
+} from "./notify/billing-notice.ts";
 import { createPushSender } from "./platform/push/index.ts";
 import { createReviewService } from "./pipeline/reviews.ts";
 import { createResumeService } from "./profile/resume.ts";
@@ -408,6 +413,15 @@ const pushNotifyJobHandlers: JobHandlers = {
   },
 };
 
+const billingNoticeJobHandlers: JobHandlers = {
+  [BILLING_NOTICE_JOB_KIND]: async (payload) => {
+    await runBillingNoticeJob(
+      { appOrigin, clock, db, mail: mailSender },
+      parseBillingNoticePayload(payload),
+    );
+  },
+};
+
 const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
   ? {
       "test.ping": async (payload) => {
@@ -715,6 +729,7 @@ const allJobHandlers: JobHandlers = {
   ...prepDailyJobHandlers,
   ...readyNotifyJobHandlers,
   ...pushNotifyJobHandlers,
+  ...billingNoticeJobHandlers,
   ...mailJobHandlers,
   ...dispatchJobHandlers,
   ...fixtureJobHandlers,
