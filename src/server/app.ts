@@ -127,6 +127,7 @@ export function createApp(deps: AppDependencies) {
   );
 
   const adminApi = createAdminApi(deps.db, deps.clock, deps.auth, {
+    payments: deps.payments,
     providers: deps.providers,
     personal,
   });

@@ -103,6 +103,26 @@ export interface PaymentEvent {
 }
 
 /**
+ * A refund of the payment behind a paid invoice. The key makes a retry return
+ * the same refund at the provider instead of refunding twice.
+ */
+export interface RefundRequest {
+  invoiceId: string;
+  /** Cents to return, or null to return the whole payment. */
+  amountCents: number | null;
+  idempotencyKey: string;
+}
+
+/**
+ * The refund the provider accepted, in cents.
+ */
+export interface Refund {
+  id: string;
+  status: string;
+  amountCents: number;
+}
+
+/**
  * The one payment provider Overture bills through (ADR 0018, ADR 0031).
  */
 export interface Payments {
@@ -111,6 +131,7 @@ export interface Payments {
   /** `null` until the setup session is complete and its card is attached. */
   retrieveVerifiedCard: (setupSessionId: string) => Promise<VerifiedCard | null>;
   createPortalSession: (request: PortalSessionRequest) => Promise<PortalSession>;
+  refundInvoice: (request: RefundRequest) => Promise<Refund>;
   verifyWebhook: (payload: string, signature: string | null) => Promise<PaymentEvent>;
 }
 
@@ -122,5 +143,15 @@ export class InvalidWebhookSignatureError extends Error {
   constructor(message = "The Stripe webhook signature is invalid.") {
     super(message);
     this.name = "InvalidWebhookSignatureError";
+  }
+}
+
+/**
+ * An invoice with no card payment behind it, so there is nothing to refund.
+ */
+export class NoRefundablePaymentError extends Error {
+  constructor(message = "This payment has no Stripe payment to refund.") {
+    super(message);
+    this.name = "NoRefundablePaymentError";
   }
 }

@@ -158,6 +158,10 @@ const glyphs: Record<GlyphName, GlyphPaths> = {
     ],
     strokeWidth: 1.6,
   },
+  card: {
+    paths: ["M3 6h18v12H3z", "M3 10h18", "M7 15h4"],
+    strokeWidth: 1.6,
+  },
   link: {
     paths: [
       "M10 13.5a4 4 0 005.7 0l3-3a4 4 0 10-5.7-5.7l-1.5 1.5",
@@ -167,10 +171,6 @@ const glyphs: Record<GlyphName, GlyphPaths> = {
   },
   grid: {
     paths: ["M4 4h6v6H4z", "M14 4h6v6h-6z", "M4 14h6v6H4z", "M14 14h6v6h-6z"],
-    strokeWidth: 1.6,
-  },
-  card: {
-    paths: ["M3 6h18v12H3z", "M3 10h18", "M6.5 15h3"],
     strokeWidth: 1.6,
   },
 };

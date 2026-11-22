@@ -8,10 +8,14 @@ import type {
   PaymentEvent,
   Payments,
   PortalSessionRequest,
+  RefundRequest,
   SetupSessionRequest,
 } from "../platform/ports/payments.ts";
 
-import { InvalidWebhookSignatureError } from "../platform/ports/payments.ts";
+import {
+  InvalidWebhookSignatureError,
+  NoRefundablePaymentError,
+} from "../platform/ports/payments.ts";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const WEBHOOK_TOLERANCE_SECONDS = 300;
@@ -52,6 +56,29 @@ const verifiedSetupSessionSchema = z.object({
 const portalSessionSchema = z.object({
   id: z.string().min(1),
   url: z.url(),
+});
+
+const invoicePaymentsSchema = z.object({
+  data: z.array(
+    z.object({
+      payment: z
+        .object({
+          payment_intent: z
+            .object({ id: z.string().min(1) })
+            .nullable()
+            .optional(),
+          type: z.string(),
+        })
+        .nullable()
+        .optional(),
+    }),
+  ),
+});
+
+const refundSchema = z.object({
+  id: z.string().min(1),
+  status: z.string().nullable(),
+  amount: z.number().int().nonnegative(),
 });
 
 const metadataSchema = z.object({
@@ -262,13 +289,19 @@ export function createStripePayments(config: StripePaymentsConfig) {
   const apiBaseUrl = config.apiBaseUrl.replace(/\/+$/u, "");
   const toleranceSeconds = config.toleranceSeconds ?? WEBHOOK_TOLERANCE_SECONDS;
 
-  async function postForm(path: string, form: URLSearchParams) {
+  async function postForm(path: string, form: URLSearchParams, idempotencyKey?: string) {
+    const headers = new Headers({
+      authorization: `Bearer ${config.secretKey}`,
+      "content-type": "application/x-www-form-urlencoded",
+    });
+
+    if (idempotencyKey !== undefined) {
+      headers.set("idempotency-key", idempotencyKey);
+    }
+
     const response = await fetch(`${apiBaseUrl}${path}`, {
       method: "POST",
-      headers: {
-        authorization: `Bearer ${config.secretKey}`,
-        "content-type": "application/x-www-form-urlencoded",
-      },
+      headers,
       body: form.toString(),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
@@ -423,6 +456,36 @@ export function createStripePayments(config: StripePaymentsConfig) {
       );
 
       return { id: session.id, url: session.url };
+    },
+    refundInvoice: async (request: RefundRequest) => {
+      const invoicePayments = invoicePaymentsSchema.parse(
+        await getJson(
+          `/v1/invoice_payments?${new URLSearchParams({
+            invoice: request.invoiceId,
+            "expand[]": "data.payment.payment_intent",
+          }).toString()}`,
+        ),
+      );
+
+      const paymentIntent = invoicePayments.data
+        .map((row) => row.payment)
+        .find((payment) => payment?.type === "payment_intent")?.payment_intent;
+
+      if (paymentIntent === null || paymentIntent === undefined) {
+        throw new NoRefundablePaymentError();
+      }
+
+      const form = new URLSearchParams({ payment_intent: paymentIntent.id });
+
+      if (request.amountCents !== null) {
+        form.set("amount", String(request.amountCents));
+      }
+
+      const refund = refundSchema.parse(
+        await postForm("/v1/refunds", form, request.idempotencyKey),
+      );
+
+      return { amountCents: refund.amount, id: refund.id, status: refund.status ?? "unknown" };
     },
     verifyWebhook,
   };

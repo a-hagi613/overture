@@ -9,7 +9,7 @@ export type BillingDb = BaseSQLiteDatabase<"sync", void>;
 
 type LedgerRow = typeof ledger.$inferSelect;
 
-type LedgerKindPostable = Exclude<LedgerRow["kind"], "refund" | "adjust">;
+type LedgerKindPostable = Exclude<LedgerRow["kind"], "adjust">;
 
 type LedgerAccount = LedgerRow["debitAccount"];
 
@@ -24,6 +24,7 @@ export const LEDGER_TRANSFERS: Record<
   commit: { credit: "used", debit: "reserved" },
   expire: { credit: "expired", debit: "available" },
   grant: { credit: "available", debit: "issued" },
+  refund: { credit: "expired", debit: "available" },
   release: { credit: "available", debit: "reserved" },
   reserve: { credit: "reserved", debit: "available" },
 };
@@ -358,6 +359,35 @@ export function releaseForApplication(db: BillingDb, clock: Clock, input: Reserv
   });
 
   return { released: true as const, row };
+}
+
+/**
+ * Stops the unused Applications on a refunded grant, so the refunded period
+ * can no longer spend them. Callers record the refund itself in the audit log.
+ * @param db The database, inside the caller's transaction.
+ * @param clock The clock the ledger row is dated with.
+ * @param input The user, the grant and the idempotency key of the refund row.
+ * @returns The ledger row, or null when the grant had no unused Applications left.
+ */
+export function refundGrantApplications(
+  db: BillingDb,
+  clock: Clock,
+  input: { userId: string; grantId: string; idempotencyKey: string },
+) {
+  const available = balancesPerGrant(db, input.userId).get(input.grantId)?.available ?? 0;
+
+  if (available <= 0) {
+    return null;
+  }
+
+  return postLedgerEntry(db, clock.now(), {
+    userId: input.userId,
+    kind: "refund",
+    amount: available,
+    grantId: input.grantId,
+    applicationId: null,
+    idempotencyKey: input.idempotencyKey,
+  });
 }
 
 /**
