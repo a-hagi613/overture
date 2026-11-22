@@ -10,7 +10,7 @@
 <x-dc>
 <helmet>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
 <style>
 body{margin:0}
 
@@ -211,6 +211,33 @@ body{margin:0}
 }
 @media (max-width:960px){ .lg-top{padding-top:18px} .ov{min-height:100vh} .si-grid{min-height:100vh} }
 
+
+/* hover and pointer affordances */
+.ov a.who{border-radius:8px}
+.ov a.who:hover{background:var(--well)}
+.ov a[aria-label^="Overture"]:hover{opacity:.72}
+.ov .btn2:hover{background:var(--well)!important;border-color:var(--ink)}
+.ov .ibtn:hover{background:var(--well)!important}
+.ov select{cursor:pointer}
+.ov select:hover{border-color:var(--ink)}
+.ov .lk{cursor:pointer}
+.ov .lk:hover{text-decoration:underline}
+.ov .kc:hover{border-color:var(--line2);box-shadow:var(--sh)}
+.ov .os:hover,.ov .tab:hover{color:var(--ink)}
+.ov .os:hover{background:var(--well)}
+
+.ov .btn,.ov .btn2{white-space:nowrap}
+@media (max-width:767px){
+.ov .field{flex:1 1 0}
+.ov .apill{flex:1 1 100%;justify-content:space-between;height:auto!important;padding-top:4px;padding-bottom:4px}
+.ov .apill .btn2{min-height:44px!important}
+}
+
+@media (max-width:767px){
+.ov .btn,.ov .btn2,.ov .seg,.ov .lk,.ov .tab,.ov .flt,.ov .os,.ov .stg{min-height:44px!important}
+.ov .seg,.ov .lk{min-width:44px}
+.ov button[aria-label^="Remove"],.ov button[aria-label^="Edit"]{min-width:44px;min-height:44px}
+}
 </style>
 </helmet>
 <div class="{{t.cls}}">
@@ -232,7 +259,7 @@ body{margin:0}
 <rect width="100%" height="100%" filter="url(#si-gd)"></rect>
 </svg>
 </div>
-<div style="z-index:0;position:absolute;top:-260px;right:-220px;width:720px;height:720px;border-radius:50%;background:radial-gradient(closest-side,var(--bloom),transparent);pointer-events:none" aria-hidden="true"></div>
+<div style="z-index:0;position:absolute;top:-260px;right:0;width:min(720px,100%);height:720px;border-radius:50%;background:radial-gradient(closest-side,var(--bloom),transparent);pointer-events:none" aria-hidden="true"></div>
 
 <div class="si-grid">
 <!-- LEFT HALF: EDITORIAL BRAND STORY -->
@@ -295,7 +322,7 @@ body{margin:0}
 <div class="si-ev">
 <span class="si-ask">Distributed Go &amp; Kubernetes</span>
 <span class="si-evc" aria-hidden="true"></span>
-<span class="si-fact">Resume §2 · 6 yrs production</span>
+<span class="si-fact">Resume · 6 yrs production</span>
 </div>
 <div class="si-ev">
 <span class="si-ask">Target base compensation</span>
@@ -357,7 +384,7 @@ body{margin:0}
 <p class="si-cd">If you expected an invite, check that you are using the email it was sent to.</p>
 </div>
 <div class="si-stack">
-<div class="si-alert" role="alert"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 018 0v3"></path></svg><div class="si-alert-body"><strong>This email isn't invited yet.</strong><p>Overture is invite-only during the beta. Google, LinkedIn and an emailed link all need an invite for the same email.</p></div></div>
+<div class="si-alert" role="alert"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 018 0v3"></path></svg><div class="si-alert-body"><strong>This email isn't invited yet.</strong><p>Overture is invite-only during the beta. Google, LinkedIn, a password and an emailed link all need an invite for the same email.</p></div></div>
 <button type="button" class="btn2" style="width:100%"><span class="si-gbadge" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.3h6.44a5.5 5.5 0 01-2.39 3.61v3h3.87c2.26-2.08 3.57-5.15 3.57-8.64z"></path><path fill="#34A853" d="M12 24c3.24 0 5.95-1.07 7.93-2.91l-3.87-3c-1.07.72-2.44 1.15-4.06 1.15-3.12 0-5.77-2.11-6.72-4.95H1.28v3.1A12 12 0 0012 24z"></path><path fill="#FBBC05" d="M5.28 14.29A7.22 7.22 0 014.9 12c0-.79.14-1.56.38-2.29V6.61H1.28A12 12 0 000 12c0 1.94.46 3.77 1.28 5.39l4-3.1z"></path><path fill="#EA4335" d="M12 4.76c1.76 0 3.34.61 4.58 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 001.28 6.61l4 3.1C6.23 6.87 8.88 4.76 12 4.76z"></path></svg></span><span>Continue with Google</span></button>
 <button type="button" class="btn2" style="width:100%"><span class="si-lnb" aria-hidden="true">in</span><span>Continue with LinkedIn</span></button>
 <div class="si-or" aria-hidden="true"><hr><span>or use your email</span><hr></div>
@@ -371,8 +398,9 @@ body{margin:0}
 </form>
 </div>
 </section>
+<p class="si-sw">New to Overture? <button type="button">Create an account</button></p>
 <footer class="si-legal">
-<span class="si-trust"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 018 0v3"></path></svg><span>Google, LinkedIn or an emailed link</span></span>
+<span class="si-trust"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 018 0v3"></path></svg><span>Google, LinkedIn, a password or an emailed link</span></span>
 <p>By continuing, you agree to Overture's <a href="w5-terms.dc.html">Terms</a> and <a href="w5-privacy.dc.html">Privacy Policy</a>.</p>
 </footer>
 </div>

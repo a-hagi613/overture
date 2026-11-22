@@ -24,9 +24,7 @@ ended and payment didn't go through) and `out-of-applications` (out of Applicati
 `code-wait` and `code-paste` ship the rendered PNG only: the canvas exported those two component boards without an
 element dump, so the tests read the card's box from the board and compare that region.
 
-`source/` holds the board sources (`w5-*.dc.html`; `w5-holds` is the Review screen, `w5-ready-email` the Recap email)
-and the design-system boards
-(`ds-2`, `ds-3`), for reading the intent behind a value. The Inbox boards ship as the captured PNGs only;
+`source/` holds the exported canvas (`canvas.json` and all 373 `.dc.html` boards, including `Main`, `ds-2`, `ds-3`, and `billing/`), for reading exact structure, tokens, and intent behind every value. The Inbox boards ship as the captured PNGs only;
 `inbox/main/` holds them cropped to the content area, without the sidebar or the phone tab bar, and the Inbox check
 compares those crops so it does not assert shell destinations owned by other tickets.
 

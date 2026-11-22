@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overture Terms of Service</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+
+body{margin:0}
+.ov{--bg:#F3EEE4;--bg2:#ECE6DA;--card:#FBF8F2;--well:#E9E3D8;--ink:#151311;--mut:#5E5850;--line:rgba(21,19,17,.14);--line2:rgba(21,19,17,.28);--hl:rgba(255,255,255,.55);--acc:#D2561F;--acct:#A9431A;--accbg:rgba(210,86,31,.10);--need:#8E3A2C;--needbg:#EFD9D3;--ok:#3F6B52;--okbg:#DDE7DE;--btn:var(--ink);--btnink:#FBF8F2;--btnh:#3A3631;--scrim:rgba(21,19,17,.16);--sh:0 1px 0 rgba(21,19,17,.10),0 12px 24px -18px rgba(21,19,17,.38);--lift:0 1px 0 rgba(21,19,17,.10),0 28px 56px -26px rgba(21,19,17,.42);--bloom:rgba(255,255,255,.52);--focus:var(--ink);--ez:cubic-bezier(.2,.7,.2,1);--gridln:rgba(21,19,17,.055)}
+.ov.dark{--bg:#12110F;--bg2:#181614;--card:#1B1916;--well:#24211D;--ink:#F2EDE4;--mut:#A39C92;--line:rgba(242,237,228,.12);--line2:rgba(242,237,228,.24);--hl:rgba(255,255,255,.035);--acc:#F0743A;--acct:#F0743A;--accbg:rgba(240,116,58,.16);--need:#E58A78;--needbg:#3A211C;--ok:#8DBFA2;--okbg:#1F2E26;--btn:var(--ink);--btnink:#12110F;--btnh:#FFFBF2;--scrim:rgba(0,0,0,.42);--sh:0 1px 0 rgba(0,0,0,.45),0 12px 26px -20px rgba(0,0,0,.9);--lift:0 1px 0 rgba(0,0,0,.5),0 30px 60px -26px rgba(0,0,0,.92);--bloom:rgba(255,255,255,.04);--focus:var(--ink);--gridln:rgba(242,237,228,.045)}
+.ov{background:var(--bg);color:var(--ink);font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:14px;line-height:1.5;position:relative;overflow:hidden;min-height:100vh;-webkit-font-smoothing:antialiased}
+.ov *{box-sizing:border-box}
+.ov a{color:inherit;text-decoration:none}
+.ov h1,.ov h2,.ov h3,.ov p{margin:0}
+.ov :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.serif{font-family:'Instrument Serif','Newsreader',Georgia,serif;font-weight:400;letter-spacing:-.005em}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-weight:400}
+.num{font-variant-numeric:tabular-nums}
+.it{font-style:italic}
+.tx-d{display:none}
+.dark .tx-l{display:none}
+.dark .tx-d{display:block}
+.ic-sun{display:none}
+.dark .ic-sun{display:block}
+.dark .ic-moon{display:none}
+
+/* Core Overture components */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:46px;padding:0 20px;border-radius:7px;background:var(--btn);color:var(--btnink)!important;font:600 14px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--btn);cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(0,0,0,.08);transition:background .18s var(--ez),border-color .18s var(--ez),transform .18s var(--ez)}
+.btn:hover{background:var(--btnh);border-color:var(--btnh)}
+.btn:active{transform:translateY(.5px)}
+.btn2{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:7px;background:var(--card);color:var(--ink);font:600 13.5px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--line2);cursor:pointer;box-shadow:0 1px 0 rgba(21,19,17,.04);transition:background .18s var(--ez),border-color .18s var(--ez)}
+.btn2:hover{background:var(--well);border-color:var(--ink)}
+.btng{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 14px;border-radius:7px;background:transparent;color:var(--mut);font:600 13.5px 'Plus Jakarta Sans',sans-serif;border:1px solid transparent;cursor:pointer;transition:background .18s var(--ez),color .18s var(--ez)}
+.btng:hover{background:var(--well);color:var(--ink)}
+.ibtn{width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--line2);background:var(--card);color:var(--ink);cursor:pointer;transition:background .18s var(--ez)}
+.ibtn:hover{background:var(--well)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--sh)}
+.rule{border:0;border-top:1px solid var(--line);box-shadow:0 1px 0 var(--hl);margin:0}
+.eyebrow{font:600 11px 'Plus Jakarta Sans',sans-serif;letter-spacing:.15em;text-transform:uppercase;color:var(--mut)}
+.mk{flex:none;display:flex;align-items:center;justify-content:center;background:var(--ink);color:var(--bg);font-family:'Instrument Serif',Georgia,serif;font-style:italic;border-radius:6px;width:30px;height:30px;font-size:18px}
+.dotn{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--acc);flex:none}
+.stamp{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border:1.5px solid var(--acc);border-radius:4px;color:var(--acct);font:700 10.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.16em;text-transform:uppercase;transform:rotate(-2.5deg)}
+
+/* Split-screen architecture */
+.si-grid{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);min-height:100vh}
+
+/* Left half: editorial brand story */
+.si-story{position:relative;background:var(--bg2);border-right:1px solid var(--line);box-shadow:1px 0 0 var(--hl);padding:34px clamp(32px,4.5vw,64px) 36px;display:flex;flex-direction:column;justify-content:space-between;gap:28px;overflow:hidden}
+.si-archgrid{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(to right,var(--gridln) 1px,transparent 1px),linear-gradient(to bottom,var(--gridln) 1px,transparent 1px);background-size:48px 48px;-webkit-mask-image:radial-gradient(ellipse 85% 75% at 45% 45%,#000 35%,transparent 100%);mask-image:radial-gradient(ellipse 85% 75% at 45% 45%,#000 35%,transparent 100%)}
+.si-story-in{position:relative;z-index:1;display:flex;flex-direction:column;justify-content:space-between;gap:28px;height:100%;max-width:610px;width:100%;margin:0 auto}
+.si-top{display:flex;align-items:center;justify-content:space-between;gap:16px}
+
+.si-hero{display:flex;flex-direction:column;gap:16px}
+.si-pill{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;padding:4px 11px;border-radius:999px;border:1px solid var(--line2);background:var(--card);font:600 11px 'Plus Jakarta Sans',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+.si-h1{font-size:clamp(52px,5vw,76px);line-height:.96;letter-spacing:-.022em;color:var(--ink)}
+.si-deck{font-size:15.5px;line-height:1.62;color:var(--mut);max-width:45ch}
+
+/* Layered product glimpse: Overnight Dispatch card stack */
+.si-stage{position:relative;margin-top:6px;padding-top:42px}
+.si-backcard{position:absolute;left:16px;right:16px;top:0;height:86px;padding:12px 16px;background:var(--well);border:1px solid var(--line);border-radius:11px;transform:rotate(-1.2deg);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;opacity:.92}
+.si-receipt{position:relative;z-index:2;background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:22px 24px 18px;box-shadow:var(--lift)}
+.si-rh{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.si-rjob{display:flex;align-items:center;gap:12px;min-width:0}
+.si-rtitle{font-size:24px;line-height:1.08;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-rmeta{font-size:12.5px;color:var(--mut);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-ring{position:relative;width:48px;height:48px;flex:none}
+.si-ring svg{position:absolute;inset:0;width:100%;height:100%}
+.si-ring span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;line-height:1;color:var(--ink)}
+.si-evh{display:grid;grid-template-columns:1fr 22px 1.12fr;gap:0 8px;margin-top:16px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.si-evh span{font:600 10px 'Plus Jakarta Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+.si-evs{display:flex;flex-direction:column;gap:9px;margin-top:10px}
+.si-ev{display:grid;grid-template-columns:1fr 22px 1.12fr;gap:0 8px;align-items:center}
+.si-ask{font-size:12.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-fact{font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-evc{position:relative;height:0;border-top:1px dotted var(--line2)}
+.si-evc::after{content:'';position:absolute;right:-2px;top:-3px;width:5px;height:5px;border-radius:50%;background:var(--ink)}
+.si-rftr{margin-top:16px;padding-top:13px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+/* Editorial proof pillars */
+.si-pillars{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding-top:20px;border-top:1px solid var(--line);box-shadow:0 -1px 0 var(--hl)}
+.si-pil{display:flex;flex-direction:column;gap:3px}
+.si-pil-n{font:400 11px 'IBM Plex Mono',monospace;color:var(--acct)}
+.si-pil-t{font-size:13px;font-weight:600;color:var(--ink)}
+.si-pil-d{font-size:12px;color:var(--mut);line-height:1.45}
+
+/* Right half: clean auth surface */
+.si-auth{position:relative;padding:28px clamp(20px,4vw,52px) 32px;display:flex;flex-direction:column;justify-content:space-between;gap:20px}
+.si-util{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;max-width:560px;margin:0 auto}
+.si-back{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:500;color:var(--mut);padding:6px 10px;margin-left:-10px;border-radius:6px;transition:background .16s var(--ez),color .16s var(--ez)}
+.si-back:hover{background:var(--well);color:var(--ink)}
+
+.si-center{width:100%;max-width:418px;margin:auto;display:flex;flex-direction:column;gap:18px}
+.si-mob-brand{display:none;flex-direction:column;align-items:center;text-align:center;gap:8px;margin-bottom:4px}
+
+.si-card{padding:32px 30px 26px;box-shadow:var(--lift);border:1px solid var(--line);position:relative}
+.si-card::before{content:'';position:absolute;inset:0;border-radius:10px;box-shadow:inset 0 1px 0 var(--hl);pointer-events:none}
+.si-ch{display:flex;flex-direction:column;gap:6px;margin-bottom:22px}
+.si-ct{font-size:34px;line-height:1.05;letter-spacing:-.012em}
+.si-cd{font-size:13.5px;color:var(--mut);line-height:1.5}
+
+.si-gbadge{width:22px;height:22px;border-radius:50%;background:#FFFFFF;display:inline-flex;align-items:center;justify-content:center;flex:none;box-shadow:0 0 0 1px rgba(21,19,17,.08)}
+
+.si-allow{display:flex;align-items:flex-start;gap:9px;margin-top:14px;font-size:12.5px;line-height:1.52;color:var(--mut);text-wrap:pretty}
+.si-allow strong{font-weight:600;color:var(--ink)}
+.si-okbox{display:flex;align-items:flex-start;gap:12px;padding:15px 16px;border-radius:8px;background:var(--okbg);color:var(--ok);font-size:13.5px;line-height:1.5}
+
+.inp{width:100%;height:46px;padding:0 14px;border:1px solid var(--line2);border-radius:7px;background:var(--card);color:var(--ink);font:500 14px 'Plus Jakarta Sans',sans-serif}
+.inp::placeholder{color:var(--mut);opacity:1}
+.inp:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.lbl{display:block;font:600 12.5px 'Plus Jakarta Sans',sans-serif;color:var(--ink);margin-bottom:6px}
+.si-or{display:flex;align-items:center;gap:12px;margin:18px 0;font-size:12px;color:var(--mut)}
+.si-or hr{flex:1;border:0;border-top:1px solid var(--line);margin:0}
+.si-sw{margin-top:18px;text-align:center;font-size:13px;color:var(--mut)}
+.si-sw button{display:inline;min-height:44px;padding:0 4px;border:0;background:transparent;color:var(--ink);font:600 13px 'Plus Jakarta Sans',sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.si-lnb{width:22px;height:22px;border-radius:4px;background:var(--well);border:1px solid var(--line2);display:inline-flex;align-items:center;justify-content:center;flex:none;font:700 11px 'Plus Jakarta Sans',sans-serif;color:var(--ink)}
+.si-legal{text-align:center;font-size:12px;color:var(--mut);line-height:1.55;display:flex;flex-direction:column;gap:6px;align-items:center}
+.si-legal a{text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line2)}
+.si-legal a:hover{color:var(--ink)}
+.si-trust{display:inline-flex;align-items:center;gap:6px;font:400 11px 'IBM Plex Mono',monospace;color:var(--mut)}
+
+/* Responsive: tablet & phone (390px) */
+@media (max-width:960px){
+.ov{min-height:844px}
+.si-grid{grid-template-columns:1fr;min-height:844px}
+.si-story{display:none}
+.si-auth{padding:18px 18px 28px}
+.si-mob-brand{display:flex}
+.si-card{padding:24px 20px 22px}
+.si-ct{font-size:30px}
+.btn,.btn2{min-height:46px}
+.field{height:46px}
+}
+@media (prefers-reduced-motion:reduce){.btn,.btn2,.btng,.ibtn{transition:none}}
+
+.si-alert{display:flex;align-items:flex-start;gap:12px;padding:15px 16px;border-radius:8px;background:var(--needbg);color:var(--need);font-size:13.5px;line-height:1.5}
+.si-alert strong{display:block;font-weight:700;color:var(--need);font-size:14.5px;margin-bottom:3px}
+.si-alert p{color:var(--ink)}
+.si-alert svg{flex:none;margin-top:2px}
+.si-alert .si-alert-body{color:var(--ink)}
+.inp-err{border-color:var(--need)!important;box-shadow:0 0 0 1px var(--need)}
+.fld-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.fld-row .lbl{margin:0}
+.si-link{font:600 12.5px 'Plus Jakarta Sans',sans-serif;color:var(--ink);text-decoration:underline;text-underline-offset:3px;min-height:32px;display:inline-flex;align-items:center}
+.pw-wrap{position:relative}
+.pw-wrap .inp{padding-right:84px}
+.pw-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);min-height:34px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--ink);font:600 12.5px 'Plus Jakarta Sans',sans-serif;cursor:pointer}
+.pw-btn:hover{background:var(--well)}
+.fhint{font-size:12px;color:var(--mut);line-height:1.45;margin-top:6px}
+.si-note{font-size:12.5px;color:var(--mut);line-height:1.5;text-align:center}
+.si-okbox .si-okb{display:block;font-weight:600;color:var(--ink)}
+.si-stack{display:flex;flex-direction:column;gap:12px}
+.si-stack .btn,.si-stack .btn2,.si-stack .btng{width:100%}
+.si-or-plain{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--mut);margin:4px 0}
+.si-or-plain hr{flex:1;border:0;border-top:1px solid var(--line);margin:0}
+.si-mail{overflow-wrap:anywhere}
+.si-cd-left{text-align:left}
+.ck-row{display:flex;align-items:flex-start;gap:12px;padding:14px 14px;border:1px solid var(--line2);border-radius:8px;background:var(--card);font-size:14px;line-height:1.5;cursor:pointer}
+.ck-row input{width:20px;height:20px;margin:1px 0 0;flex:none;accent-color:var(--ink);cursor:pointer}
+.ck-row span{color:var(--ink);font-weight:600}
+.consent-text{font-size:14.5px;line-height:1.66;color:var(--ink);max-width:62ch}
+.consent-text p+p{margin-top:10px}
+.ver{display:inline-flex;align-items:center;gap:8px;padding:3px 11px;border-radius:999px;border:1px solid var(--line2);background:var(--card);font:600 11px 'Plus Jakarta Sans',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);align-self:flex-start}
+.ver .mono{letter-spacing:0;text-transform:none;font-size:11.5px;color:var(--ink)}
+/* Reading pages (Terms, Privacy, consent) */
+.lg-top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:22px clamp(18px,4vw,40px) 18px;max-width:880px;margin:0 auto;width:100%}
+.lg-brand{display:inline-flex;align-items:center;gap:10px}
+.lg-wrap{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column}
+.lg-main{width:100%;max-width:680px;margin:0 auto;padding:clamp(20px,4vw,48px) clamp(18px,4vw,40px) 56px;display:flex;flex-direction:column;gap:20px}
+.lg-h1{font-size:clamp(40px,6vw,58px);line-height:1.02;letter-spacing:-.018em}
+.lg-meta{font-size:13px;color:var(--mut);line-height:1.5}
+.lg-draft{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:8px;background:var(--okbg);color:var(--ink);font-size:13.5px;line-height:1.5;border:1px solid var(--line)}
+.lg-draft strong{font-weight:700}
+.lg-doc{display:flex;flex-direction:column;gap:0;margin-top:8px}
+.lg-doc section{padding:22px 0;border-top:1px solid var(--line)}
+.lg-doc section:first-child{border-top:0;padding-top:4px}
+.lg-doc h2{font-family:'Instrument Serif','Newsreader',Georgia,serif;font-weight:400;font-size:26px;line-height:1.15;letter-spacing:-.005em;margin-bottom:10px}
+.lg-doc p{font-size:15px;line-height:1.66;color:var(--ink);max-width:66ch}
+.lg-doc p+p{margin-top:10px}
+.lg-doc ul{margin:10px 0 0;padding-left:20px;font-size:15px;line-height:1.66;color:var(--ink);max-width:66ch}
+.lg-doc li+li{margin-top:6px}
+.lg-doc a{text-decoration:underline;text-underline-offset:3px}
+.lg-doc .k{font-weight:600}
+.lg-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:14px;line-height:1.5}
+.lg-table th{text-align:left;font:600 11px 'Plus Jakarta Sans',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);padding:0 14px 10px 0;border-bottom:1px solid var(--line2)}
+.lg-table td{padding:12px 14px 12px 0;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink)}
+.lg-table td:first-child{font-weight:600;white-space:nowrap}
+.lg-foot{max-width:680px;width:100%;margin:0 auto;padding:0 clamp(18px,4vw,40px) 40px;font-size:12.5px;color:var(--mut);line-height:1.6;border-top:1px solid var(--line);padding-top:20px}
+.lg-foot a{text-decoration:underline;text-underline-offset:3px}
+.lg-consent-card{padding:28px 28px 24px;box-shadow:var(--lift);border:1px solid var(--line);position:relative;display:flex;flex-direction:column;gap:18px}
+.lg-consent-card::before{content:'';position:absolute;inset:0;border-radius:10px;box-shadow:inset 0 1px 0 var(--hl);pointer-events:none}
+.lg-consent-row{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.lg-consent-note{font-size:12.5px;color:var(--mut);line-height:1.55;max-width:60ch}
+@media (max-width:600px){
+.lg-table thead{display:none}
+.lg-table,.lg-table tbody,.lg-table tr,.lg-table td{display:block;width:100%}
+.lg-table tr{padding:12px 0;border-bottom:1px solid var(--line)}
+.lg-table td{border:0;padding:2px 0}
+.lg-table td:first-child{margin-bottom:2px}
+.lg-table td:nth-child(2)::before{content:none}
+.lg-consent-card{padding:22px 18px 20px}
+.lg-h1{font-size:40px}
+}
+@media (max-width:960px){ .lg-top{padding-top:18px} .ov{min-height:100vh} .si-grid{min-height:100vh} }
+
+
+/* hover and pointer affordances */
+.ov a.who{border-radius:8px}
+.ov a.who:hover{background:var(--well)}
+.ov a[aria-label^="Overture"]:hover{opacity:.72}
+.ov .btn2:hover{background:var(--well)!important;border-color:var(--ink)}
+.ov .ibtn:hover{background:var(--well)!important}
+.ov select{cursor:pointer}
+.ov select:hover{border-color:var(--ink)}
+.ov .lk{cursor:pointer}
+.ov .lk:hover{text-decoration:underline}
+.ov .kc:hover{border-color:var(--line2);box-shadow:var(--sh)}
+.ov .os:hover,.ov .tab:hover{color:var(--ink)}
+.ov .os:hover{background:var(--well)}
+
+.ov .btn,.ov .btn2{white-space:nowrap}
+@media (max-width:767px){
+.ov .field{flex:1 1 0}
+.ov .apill{flex:1 1 100%;justify-content:space-between;height:auto!important;padding-top:4px;padding-bottom:4px}
+.ov .apill .btn2{min-height:44px!important}
+}
+
+@media (max-width:767px){
+.ov .btn,.ov .btn2,.ov .seg,.ov .lk,.ov .tab,.ov .flt,.ov .os,.ov .stg{min-height:44px!important}
+.ov .seg,.ov .lk{min-width:44px}
+.ov button[aria-label^="Remove"],.ov button[aria-label^="Edit"]{min-width:44px;min-height:44px}
+}
+</style>
+</helmet>
+<div class="{{t.cls}}">
+
+<!-- Paper grain & radial bloom -->
+<div style="position:absolute;inset:0;z-index:0;pointer-events:none;opacity:{{t.grainOpacity}}" aria-hidden="true">
+<svg class="tx-l" width="100%" height="100%" aria-hidden="true" style="position:absolute;inset:0">
+<filter id="si-gl" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+<feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="7" stitchTiles="stitch"></feTurbulence>
+<feColorMatrix type="matrix" values="0 0 0 0 0.28  0 0 0 0 0.26  0 0 0 0 0.23  0 0 0 1.3 -0.2"></feColorMatrix>
+</filter>
+<rect width="100%" height="100%" filter="url(#si-gl)"></rect>
+</svg>
+<svg class="tx-d" width="100%" height="100%" aria-hidden="true" style="position:absolute;inset:0">
+<filter id="si-gd" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+<feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="7" stitchTiles="stitch"></feTurbulence>
+<feColorMatrix type="matrix" values="0 0 0 0 0.95  0 0 0 0 0.92  0 0 0 0 0.86  0 0 0 1.3 -0.2"></feColorMatrix>
+</filter>
+<rect width="100%" height="100%" filter="url(#si-gd)"></rect>
+</svg>
+</div>
+<div style="z-index:0;position:absolute;top:-260px;right:0;width:min(720px,100%);height:720px;border-radius:50%;background:radial-gradient(closest-side,var(--bloom),transparent);pointer-events:none" aria-hidden="true"></div>
+
+<div class="lg-wrap">
+<header class="lg-top">
+<a class="lg-brand" href="w5-landing.dc.html" aria-label="Overture home"><svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" style="fill:var(--ink)"></rect><circle cx="16" cy="16" r="8.5" fill="none" style="stroke:var(--bg)" stroke-width="1.5"></circle><path d="M16 5.5v21" style="stroke:var(--acc)" stroke-width="1.5" stroke-linecap="round"></path></svg><span class="serif" style="font-size:27px;line-height:1">Overture</span></a>
+<div style="display:flex;align-items:center;gap:8px">
+<button type="button" class="ibtn tgl" aria-label="{{t.toggleLabel}}" onClick="{{toggle}}">
+<svg class="ic-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"></path></svg>
+<svg class="ic-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+</button>
+</div>
+</header>
+<main class="lg-main">
+<a class="si-back" href="w5-landing.dc.html" style="align-self:flex-start;margin-left:-10px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg><span>Back to Overture</span></a>
+<p class="eyebrow">Legal</p>
+<h1 class="serif lg-h1">Terms of Service</h1>
+<p class="lg-meta">Last updated 21 November 2026 · Effective when the beta opens</p>
+<article class="lg-doc">
+
+<section><h2>Who we are</h2>
+<p>Overture is a job-search service run by Overture. You can reach us at <a href="mailto:admin@tryoverture.com">admin@tryoverture.com</a>. Our postal address is [POSTAL ADDRESS].</p></section>
+<section><h2>What Overture does</h2>
+<p>Overture finds jobs that fit what you want, prepares each application from the resume and facts you save, and sends an application only after you approve it. You can skip or edit an application before you send it.</p></section>
+<section><h2>Your account</h2>
+<p>You sign in with Google, LinkedIn, a password or an emailed link, using the email your invitation was sent to. Keep your sign-in details to yourself, and tell us if you think someone else has used your account.</p></section>
+<section><h2>Your resume and facts</h2>
+<p>You own what you give Overture. We use it to prepare the applications you approve and for nothing else. The Privacy Policy explains how we keep it safe.</p></section>
+<section><h2>The beta</h2>
+<p>Overture is invite-only during the beta. An accepted invite comes with 300 applications over 30 days. The beta has no charge and asks for no card.</p></section>
+<section><h2>What you agree to on each application</h2>
+<p>Each application you approve records the version of the consent text you agreed to. You can read every version in your Settings.</p></section>
+<section><h2>What we cannot promise</h2>
+<p>Overture cannot make an employer reply, and it does not decide who is hired. Each employer's form and rules still apply to your application.</p></section>
+<section><h2>Suspension and ending</h2>
+<p>We may suspend an account that breaks these terms or puts other people at risk. You can stop using Overture at any time and delete your account from Settings.</p></section>
+<section><h2>Changes</h2>
+<p>If we change these terms, we will tell you by email before the change takes effect.</p></section>
+<section><h2>Contact</h2>
+<p>Questions about these terms: <a href="mailto:admin@tryoverture.com">admin@tryoverture.com</a>.</p></section>
+
+</article>
+</main>
+<footer class="lg-foot">
+<p>Overture · <a href="mailto:admin@tryoverture.com">admin@tryoverture.com</a> · [POSTAL ADDRESS]</p>
+<p style="margin-top:6px"><a href="w5-terms.dc.html">Terms of Service</a> · <a href="w5-privacy.dc.html">Privacy Policy</a></p>
+</footer>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"grain":{"editor":"range","default":0.5,"min":0,"max":1,"step":0.05,"unit":""},"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  componentDidUpdate(prev) {
+    if (prev && prev.dark !== this.props.dark) { this.setState({ dark: !!this.props.dark }); }
+  }
+  renderVals() {
+    const st = this.state || {};
+    const dark = typeof st.dark === 'boolean' ? st.dark : !!this.props.dark;
+    const raw = this.props.grain;
+    const g = Math.max(0, Math.min(1, typeof raw === 'number' ? raw : 0.5));
+    const t = {
+      cls: dark ? 'ov dark' : 'ov',
+      grainOpacity: +(g * (dark ? 0.15 : 0.24)).toFixed(3),
+      toggleLabel: dark ? 'Switch to light mode' : 'Switch to dark mode'
+    };
+    return { t, toggle: () => this.setState({ dark: !dark }) };
+  }
+}
+</script>

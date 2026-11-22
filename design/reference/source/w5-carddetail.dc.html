@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overture Card Detail Sheet</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400&amp;display=swap">
+<style>
+body{margin:0}
+.ov{--bg:#F3EEE4;--bg2:#ECE6DA;--card:#FBF8F2;--well:#E9E3D8;--ink:#151311;--mut:#5E5850;--line:rgba(21,19,17,.14);--line2:rgba(21,19,17,.28);--hl:rgba(255,255,255,.55);--acc:#D2561F;--acct:#A9431A;--accbg:rgba(210,86,31,.10);--hold:#8E3A2C;--holdbg:#EFD9D3;--ok:#3F6B52;--okbg:#DDE7DE;--btn:var(--ink);--btnink:#FBF8F2;--btnh:#3A3631;--scrim:rgba(21,19,17,.16);--sh:0 1px 0 rgba(21,19,17,.10),0 12px 24px -18px rgba(21,19,17,.38);--lift:0 1px 0 rgba(21,19,17,.10),0 28px 56px -26px rgba(21,19,17,.46);--shc:rgba(21,19,17,.5);--bloom:rgba(255,255,255,.5);--emph:var(--ink);--eyebrow:var(--mut);--inbg:var(--well);--inink:var(--ink);--focus:var(--ink);--sel:var(--ink);--done:var(--ink);--donering:var(--well)}
+.ov.dark{--bg:#191714;--bg2:#1E1C19;--card:#221F1C;--well:#2A2723;--ink:#F2EDE4;--mut:#ADA69B;--line:rgba(242,237,228,.14);--line2:rgba(242,237,228,.26);--hl:rgba(255,255,255,.04);--acc:#F0743A;--acct:#F37D44;--accbg:rgba(240,116,58,.16);--hold:#E58A78;--holdbg:#40261F;--ok:#8DBFA2;--okbg:#25352B;--btn:var(--ink);--btnink:#191714;--btnh:#FFFBF2;--scrim:rgba(0,0,0,.38);--sh:0 1px 0 rgba(0,0,0,.4),0 12px 26px -20px rgba(0,0,0,.8);--lift:0 1px 0 rgba(0,0,0,.45),0 30px 60px -26px rgba(0,0,0,.8);--shc:rgba(0,0,0,.7);--bloom:rgba(255,255,255,.04);--emph:var(--ink);--eyebrow:var(--mut);--inbg:var(--well);--inink:var(--ink);--focus:var(--ink);--sel:var(--ink);--done:var(--ink);--donering:var(--well)}
+.ov{background:var(--bg);color:var(--ink);font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:14px;line-height:1.5;position:relative;overflow:hidden;-webkit-font-smoothing:antialiased}
+.ov *{box-sizing:border-box}
+.ov a{color:inherit;text-decoration:none}
+.ov h1,.ov h2,.ov h3,.ov p{margin:0}
+.ov :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.serif{font-family:'Instrument Serif','Newsreader',Georgia,serif;font-weight:400;letter-spacing:-.005em}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-weight:400}
+.num{font-variant-numeric:tabular-nums}
+.it{font-style:italic;color:var(--emph)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 16px;border-radius:6px;background:var(--btn);color:var(--btnink)!important;font:600 13.5px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--btn);cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.14)}
+.btn:hover{background:var(--btnh);border-color:var(--btnh)}
+.btn2{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 14px;border-radius:6px;background:var(--card);color:var(--ink);font:600 13.5px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--line2);cursor:pointer}
+.btn2:hover{background:var(--well)}
+.btng{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 12px;border-radius:6px;background:transparent;color:var(--mut);font:600 13px 'Plus Jakarta Sans',sans-serif;border:1px solid transparent;cursor:pointer}
+.btng:hover{background:var(--well);color:var(--ink)}
+.ibtn{width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--line2);background:transparent;color:var(--ink);cursor:pointer;position:relative}
+.ibtn:hover{background:var(--well)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:var(--sh)}
+.eyebrow{font:600 11px 'Plus Jakarta Sans',sans-serif;letter-spacing:.15em;text-transform:uppercase;color:var(--eyebrow)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:999px;font:600 12px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--line2);background:var(--bg);color:var(--ink);white-space:nowrap}
+.src{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font:600 11px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--ink);color:var(--ink);background:var(--card);white-space:nowrap}
+.src.sv{border-style:dashed;border-color:var(--line2);color:var(--mut)}
+.tab{min-height:44px;padding:0 2px;margin-right:20px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--mut);font:600 13.5px 'Plus Jakarta Sans',sans-serif;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink);border-bottom-color:var(--sel)}
+.hint{font-size:12.5px;color:var(--mut);line-height:1.5}
+.tx-d{display:none}
+.dark .tx-l{display:none}
+.dark .tx-d{display:block}
+.ic-sun{display:none}.dark .ic-sun{display:block}.dark .ic-moon{display:none}
+.stage{position:relative;padding:36px 28px 56px;overflow:hidden;border-bottom:1px solid var(--line)}
+.backdrop{position:absolute;inset:0;padding:24px 36px;display:flex;gap:16px;pointer-events:none;opacity:.46;filter:blur(1.2px)}
+.bcol{flex:1 1 0;min-width:210px}
+.bkc{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:10px;box-shadow:var(--sh)}
+.scrim{position:absolute;inset:0;background:var(--scrim);pointer-events:none}
+.sheet{position:relative;z-index:2;width:min(480px,100%);margin:12px auto 0;background:var(--card);border:1px solid var(--line2);border-radius:10px;box-shadow:var(--lift);overflow:visible}
+.menu{position:absolute;top:calc(100% + 6px);left:0;width:210px;background:var(--card);border:1px solid var(--line2);border-radius:8px;box-shadow:var(--lift);padding:4px;z-index:10}
+.opt{width:100%;display:flex;align-items:center;justify-content:space-between;min-height:36px;padding:0 10px;border:0;border-radius:5px;background:transparent;color:var(--ink);font:500 13.5px 'Plus Jakarta Sans',sans-serif;cursor:pointer;text-align:left}
+.opt:hover{background:var(--well)}
+.opt.sl{font-weight:600;background:var(--well)}
+.ans-list{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.ans-list li{padding:12px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
+.ans-list li:first-child{border-top:0}
+.paper{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:20px 22px;font:400 17px/1.6 'Instrument Serif',Georgia,serif;color:var(--ink)}
+.paper p+p{margin-top:12px}
+.mail-card{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.spec-wrap{max-width:1080px;margin:0 auto;padding:52px 32px 64px;position:relative;z-index:1}
+.spec-grid{margin-top:28px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;align-items:start}
+.spec-card{background:var(--card);border:1px solid var(--line2);border-radius:10px;box-shadow:var(--sh);overflow:hidden}
+.spec-hd{padding:14px 20px;border-bottom:1px solid var(--line);background:var(--bg2);display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.spec-bd{padding:20px 22px 22px}
+@media (max-width:960px){
+.spec-grid{grid-template-columns:1fr}
+}
+@media (max-width:767px){
+.stage{padding:20px 14px 36px}
+.spec-wrap{padding:36px 16px 48px}
+.btn,.btn2,.btng{min-height:44px}
+.ibtn{width:44px;height:44px}
+}
+</style>
+</helmet>
+<div class="{{t.cls}}">
+
+<div style="position:absolute;inset:0;z-index:0;pointer-events:none;opacity:{{t.grainOpacity}}" aria-hidden="true">
+<svg class="tx-l" width="100%" height="100%" aria-hidden="true" style="position:absolute;inset:0">
+<filter id="w5-cd-gl" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+<feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="7" stitchTiles="stitch"></feTurbulence>
+<feColorMatrix type="matrix" values="0 0 0 0 0.28  0 0 0 0 0.26  0 0 0 0 0.23  0 0 0 1.3 -0.2"></feColorMatrix>
+</filter>
+<rect width="100%" height="100%" filter="url(#w5-cd-gl)"></rect>
+</svg>
+<svg class="tx-d" width="100%" height="100%" aria-hidden="true" style="position:absolute;inset:0">
+<filter id="w5-cd-gd" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+<feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="7" stitchTiles="stitch"></feTurbulence>
+<feColorMatrix type="matrix" values="0 0 0 0 0.95  0 0 0 0 0.92  0 0 0 0 0.86  0 0 0 1.3 -0.2"></feColorMatrix>
+</filter>
+<rect width="100%" height="100%" filter="url(#w5-cd-gd)"></rect>
+</svg>
+</div>
+
+<!-- HERO CLOSE-UP STAGE WITH BOARD BEHIND -->
+<section class="stage" aria-label="Application dossier close-up">
+
+<!-- Partially visible Job Board behind the sheet -->
+<div class="backdrop" aria-hidden="true">
+<div class="bcol">
+<div style="border-top:3px solid var(--hold);padding-top:10px;display:flex;justify-content:space-between;align-items:baseline"><span class="serif" style="font-size:24px">Hold</span><span class="num" style="font-size:12px;color:var(--mut)">4</span></div>
+<div class="bkc"><p style="font-size:12px;font-weight:600">Ferro Cloud</p><p class="serif" style="font-size:20px;margin-top:4px">Staff SRE</p><p style="font-size:12px;color:var(--mut)">Remote, Canada</p></div>
+<div class="bkc"><p style="font-size:12px;font-weight:600">Larkspur Health</p><p class="serif" style="font-size:20px;margin-top:4px">Backend Engineer</p><p style="font-size:12px;color:var(--mut)">Vancouver, BC</p></div>
+<div class="bkc"><p style="font-size:12px;font-weight:600">Meridian Freight</p><p class="serif" style="font-size:20px;margin-top:4px">Platform Engineer</p><p style="font-size:12px;color:var(--mut)">Chicago, IL</p></div>
+</div>
+<div class="bcol">
+<div style="border-top:3px solid var(--acc);padding-top:10px;display:flex;justify-content:space-between;align-items:baseline"><span class="serif" style="font-size:24px">Applied</span><span class="num" style="font-size:12px;color:var(--mut)">12</span></div>
+<div class="bkc"><p style="font-size:12px;font-weight:600">Halden Systems</p><p class="serif" style="font-size:20px;margin-top:4px">Distributed Systems</p><p style="font-size:12px;color:var(--mut)">Ottawa, ON</p></div>
+<div class="bkc"><p style="font-size:12px;font-weight:600">Ferro Cloud</p><p class="serif" style="font-size:20px;margin-top:4px">DevOps Engineer</p><p style="font-size:12px;color:var(--mut)">Remote, Canada</p></div>
+<div class="bkc"><p style="font-size:12px;font-weight:600">Larkspur Health</p><p class="serif" style="font-size:20px;margin-top:4px">Data Platform</p><p style="font-size:12px;color:var(--mut)">Toronto, ON</p></div>
+</div>
+<div class="bcol">
+<div style="border-top:3px solid var(--ok);padding-top:10px;display:flex;justify-content:space-between;align-items:baseline"><span class="serif" style="font-size:24px">Screening</span><span class="num" style="font-size:12px;color:var(--mut)">2</span></div>
+<div class="bkc" style="border-color:var(--ink)"><p style="font-size:12px;font-weight:600">Northwind Labs</p><p class="serif" style="font-size:20px;margin-top:4px">Platform Engineer</p><p style="font-size:12px;color:var(--mut)">Toronto, ON</p></div>
+<div class="bkc"><p style="font-size:12px;font-weight:600">Halden Systems</p><p class="serif" style="font-size:20px;margin-top:4px">Senior Backend</p><p style="font-size:12px;color:var(--mut)">Toronto, ON</p></div>
+</div>
+<div class="bcol">
+<div style="border-top:3px solid var(--ok);padding-top:10px;display:flex;justify-content:space-between;align-items:baseline"><span class="serif" style="font-size:24px">Interviewing</span><span class="num" style="font-size:12px;color:var(--mut)">2</span></div>
+<div class="bkc"><p style="font-size:12px;font-weight:600">Halden Systems</p><p class="serif" style="font-size:20px;margin-top:4px">Principal Platform</p><p style="font-size:12px;color:var(--mut)">Toronto, ON</p></div>
+<div class="bkc"><p style="font-size:12px;font-weight:600">Larkspur Health</p><p class="serif" style="font-size:20px;margin-top:4px">Infrastructure Eng</p><p style="font-size:12px;color:var(--mut)">Remote, Canada</p></div>
+</div>
+<div class="bcol">
+<div style="border-top:3px solid var(--ok);padding-top:10px;display:flex;justify-content:space-between;align-items:baseline"><span class="serif" style="font-size:24px">Offer</span><span class="num" style="font-size:12px;color:var(--mut)">1</span></div>
+<div class="bkc"><p style="font-size:12px;font-weight:600">Ferro Cloud</p><p class="serif" style="font-size:20px;margin-top:4px">Backend Lead</p><p style="font-size:12px;color:var(--mut)">Toronto, ON</p></div>
+</div>
+</div>
+<div class="scrim" aria-hidden="true"></div>
+
+<!-- Top specimen header bar -->
+<div style="position:relative;z-index:2;max-width:1360px;margin:0 auto 14px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px">
+<div style="display:inline-flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:8px 14px;box-shadow:var(--sh)">
+<a href="w5-board.dc.html" aria-label="Back to Job Board" style="display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:13px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Job Board</a>
+<span style="color:var(--line2)" aria-hidden="true">|</span>
+<span class="eyebrow">Specimen · Application Detail Sheet · 480 px</span>
+</div>
+<button type="button" class="btn2" aria-label="{{t.toggleLabel}}" onClick="{{toggle}}">
+<svg class="ic-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/></svg>
+<svg class="ic-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+<span>{{t.modeBtn}}</span>
+</button>
+</div>
+
+<!-- CENTERED 480PX INTERACTIVE DETAIL SHEET -->
+<aside class="sheet" aria-label="Application detail for Platform Engineer at Northwind Labs">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:15px 20px 14px 24px;border-bottom:1px solid var(--line);border-radius:10px 10px 0 0">
+<span class="eyebrow">Application · no. 0418</span>
+<span style="display:flex;gap:6px">
+<button type="button" class="ibtn" aria-label="Previous card"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<button type="button" class="ibtn" aria-label="Next card"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+<a href="w5-board.dc.html" class="ibtn" aria-label="Close detail"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></a>
+</span>
+</div>
+
+<div style="padding:22px 24px 24px">
+<!-- Header -->
+<div style="display:flex;gap:15px;align-items:flex-start">
+<div class="serif" style="flex:none;width:52px;height:52px;border-radius:8px;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:30px;font-style:italic" aria-hidden="true">N</div>
+<div style="min-width:0">
+<p style="font-size:13px;color:var(--mut);font-weight:500">Northwind Labs · Greenhouse</p>
+<h1 class="serif" style="font-size:36px;line-height:1.04;margin-top:1px">Platform Engineer</h1>
+</div>
+</div>
+
+<!-- Pills -->
+<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:8px">
+<span class="pill"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Toronto, ON</span>
+<span class="pill num">CAD 145–170k</span>
+<span class="pill num" style="background:var(--inbg);border-color:transparent;color:var(--inink)">Match 86</span>
+<span class="pill" style="background:{{stageBg}};border-color:transparent;color:{{stageInk}}">{{stage}}</span>
+</div>
+
+<!-- Actions row -->
+<div style="margin-top:18px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+<a class="btn" href="#"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg>Open original posting</a>
+<div style="position:relative">
+<button type="button" class="btn2" aria-expanded="{{stageOpen}}" aria-haspopup="menu" onClick="{{toggleStage}}">Move stage<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+<sc-if value="{{stageOpen}}" hint-placeholder-val="{{ false }}">
+<div class="menu" role="menu" aria-label="Move application stage">
+<sc-for list="{{stageOpts}}" as="so" hint-placeholder-count="6">
+<button type="button" role="menuitem" class="{{so.cls}}" onClick="{{so.pick}}"><span>{{so.name}}</span><sc-if value="{{so.on}}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></sc-if></button>
+</sc-for>
+</div>
+</sc-if>
+</div>
+<button type="button" class="btn2" onClick="{{toggleArchive}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10h14V9M10 13h4"/></svg>{{archiveLabel}}</button>
+</div>
+
+<!-- Tabs -->
+<div role="tablist" aria-label="Application sections" style="margin-top:20px;display:flex;border-bottom:1px solid var(--line);overflow-x:auto">
+<button type="button" role="tab" class="{{tabCls.timeline}}" aria-selected="{{isTimeline}}" onClick="{{pickTimeline}}">Overview</button>
+<button type="button" role="tab" class="{{tabCls.answers}}" aria-selected="{{isAnswers}}" onClick="{{pickAnswers}}">Questions</button>
+<button type="button" role="tab" class="{{tabCls.letter}}" aria-selected="{{isLetter}}" onClick="{{pickLetter}}">Cover letter &amp; resume</button>
+<button type="button" role="tab" class="{{tabCls.emails}}" aria-selected="{{isEmails}}" onClick="{{pickEmails}}" style="margin-right:0">Emails</button>
+</div>
+
+<!-- Active Tab Content: Overview (default) -->
+<sc-if value="{{isTimeline}}" hint-placeholder-val="{{ true }}">
+<ol role="tabpanel" aria-label="Overview" style="list-style:none;margin:0;padding:22px 0 4px;display:flex;flex-direction:column">
+<sc-for list="{{events}}" as="e" hint-placeholder-count="6">
+<li style="display:flex;gap:14px">
+<div style="display:flex;flex-direction:column;align-items:center;flex:none;width:14px">
+<span style="width:12px;height:12px;border-radius:50%;margin-top:5px;background:{{e.dot}};border:2px solid {{e.ring}}"></span>
+<sc-if value="{{e.more}}" hint-placeholder-val="{{ true }}"><span style="flex:1;width:1px;background:var(--line2);margin-top:4px"></span></sc-if>
+</div>
+<div style="padding-bottom:16px;flex:1;min-width:0">
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+<h2 class="serif" style="font-size:21px;line-height:1.18;color:{{e.titleTone}}">{{e.title}}</h2>
+<span class="mono num" style="font-size:11px;color:var(--mut);flex:none">{{e.when}}</span>
+</div>
+<p style="font-size:13px;color:var(--mut);margin-top:2px">{{e.detail}}</p>
+</div>
+</li>
+</sc-for>
+</ol>
+</sc-if>
+
+<!-- Active Tab Content: Questions -->
+<sc-if value="{{isAnswers}}" hint-placeholder-val="{{ false }}">
+<div role="tabpanel" aria-label="Questions" style="padding-top:18px">
+<ul class="ans-list">
+<sc-for list="{{answers}}" as="a" hint-placeholder-count="6">
+<li>
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
+<span style="font-size:12.5px;color:var(--mut)">{{a.q}}</span>
+<span style="font-size:13.5px;font-weight:600;text-align:right">{{a.v}}</span>
+</div>
+<div><span class="{{a.srcCls}}">{{a.src}}</span></div>
+</li>
+</sc-for>
+</ul>
+</div>
+</sc-if>
+
+<!-- Active Tab Content: Cover letter & resume -->
+<sc-if value="{{isLetter}}" hint-placeholder-val="{{ false }}">
+<div role="tabpanel" aria-label="Cover letter and resume" style="padding-top:18px;display:flex;flex-direction:column;gap:16px">
+<div class="paper">
+<p>Dear Northwind Labs hiring team,</p>
+<p>Over the past six years I have built Go and PostgreSQL infrastructure supporting high-throughput intake pipelines, including multi-region read-replica routing and deterministic Kubernetes deployments across three availability zones.</p>
+<p>Northwind Labs' focus on predictable latency and observable platform tooling matches the work I do best. I would welcome the chance to discuss how that background fits your Platform team.</p>
+<p>Maya Okafor</p>
+</div>
+<div style="padding:14px 16px;border:1px solid var(--line);border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:space-between;gap:12px">
+<div style="min-width:0">
+<p class="mono" style="font-size:13px;overflow-wrap:anywhere">Maya_Okafor_Resume.pdf</p>
+<p class="hint num" style="margin-top:2px">2 pages · 184 KB · Sent unchanged</p>
+</div>
+<a href="w5-resume.dc.html" class="btn2" style="min-height:36px;padding:0 12px;font-size:12.5px">View PDF</a>
+</div>
+</div>
+</sc-if>
+
+<!-- Active Tab Content: Emails -->
+<sc-if value="{{isEmails}}" hint-placeholder-val="{{ false }}">
+<div role="tabpanel" aria-label="Emails" style="padding-top:18px;display:flex;flex-direction:column;gap:12px">
+<article class="mail-card">
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+<p style="font-weight:600;font-size:13.5px">Priya Nair · Northwind Labs</p>
+<span class="mono num" style="font-size:11px;color:var(--mut)">Nov 16 · 15:10</span>
+</div>
+<p style="font-size:13px;font-weight:600;margin-top:4px">Platform Engineer — 20-minute phone screen</p>
+<p style="font-size:13px;color:var(--mut);margin-top:6px">Hi Maya, thanks for applying to our Platform Engineer role. Our engineering manager reviewed your background with Go and PostgreSQL failover systems and would like to schedule a 20-minute phone screen. Are you free Tuesday or Thursday afternoon?</p>
+<div style="margin-top:10px"><span class="pill" style="background:var(--okbg);border-color:transparent;color:var(--ok)">Moved to Screening</span></div>
+</article>
+<article class="mail-card">
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+<p style="font-weight:600;font-size:13.5px">Northwind Labs Recruiting</p>
+<span class="mono num" style="font-size:11px;color:var(--mut)">Nov 11 · 08:24</span>
+</div>
+<p style="font-size:13px;font-weight:600;margin-top:4px">Application received — Platform Engineer</p>
+<p style="font-size:13px;color:var(--mut);margin-top:6px">We have received your application for Platform Engineer in Toronto, ON. Our team reviews applications in the order received.</p>
+</article>
+</div>
+</sc-if>
+
+</div>
+</aside>
+</section>
+
+<!-- ALL FOUR TABS SIDE-BY-SIDE SPECIMEN -->
+<section class="spec-wrap" aria-label="All four tabs in the detail sheet">
+<div style="display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:12px">
+<div>
+<p class="eyebrow">Complete dossier anatomy</p>
+<h2 class="serif" style="font-size:38px;line-height:1.05;margin-top:6px">All four <span class="it">tabs</span></h2>
+<p class="hint" style="margin-top:6px;max-width:64ch">Every tab inside the 480 px detail sheet for Northwind Labs · Platform Engineer, laid out together for review.</p>
+</div>
+<span class="mono" style="font-size:12px;color:var(--mut)">480 px sheet interior · Match 86 · Screening</span>
+</div>
+
+<div class="spec-grid">
+
+<!-- 01 Timeline -->
+<article class="spec-card" aria-label="Tab 1: Timeline">
+<div class="spec-hd">
+<span class="serif" style="font-size:24px;line-height:1"><span class="it" style="color:var(--mut);margin-right:8px">01</span>Overview</span>
+<span class="mono" style="font-size:11.5px;color:var(--mut)">Default tab · 6 events</span>
+</div>
+<div class="spec-bd">
+<ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column">
+<sc-for list="{{events}}" as="e" hint-placeholder-count="6">
+<li style="display:flex;gap:14px">
+<div style="display:flex;flex-direction:column;align-items:center;flex:none;width:14px">
+<span style="width:12px;height:12px;border-radius:50%;margin-top:5px;background:{{e.dot}};border:2px solid {{e.ring}}"></span>
+<sc-if value="{{e.more}}" hint-placeholder-val="{{ true }}"><span style="flex:1;width:1px;background:var(--line2);margin-top:4px"></span></sc-if>
+</div>
+<div style="padding-bottom:15px;flex:1;min-width:0">
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+<h3 class="serif" style="font-size:20px;line-height:1.18;color:{{e.titleTone}}">{{e.title}}</h3>
+<span class="mono num" style="font-size:11px;color:var(--mut);flex:none">{{e.when}}</span>
+</div>
+<p style="font-size:13px;color:var(--mut);margin-top:2px">{{e.detail}}</p>
+</div>
+</li>
+</sc-for>
+</ol>
+</div>
+</article>
+
+<!-- 02 Answers -->
+<article class="spec-card" aria-label="Tab 2: Answers">
+<div class="spec-hd">
+<span class="serif" style="font-size:24px;line-height:1"><span class="it" style="color:var(--mut);margin-right:8px">02</span>Questions</span>
+<span class="mono" style="font-size:11.5px;color:var(--mut)">6 form answers submitted</span>
+</div>
+<div class="spec-bd">
+<ul class="ans-list">
+<sc-for list="{{answers}}" as="a" hint-placeholder-count="6">
+<li>
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
+<span style="font-size:12.5px;color:var(--mut)">{{a.q}}</span>
+<span style="font-size:13.5px;font-weight:600;text-align:right">{{a.v}}</span>
+</div>
+<div><span class="{{a.srcCls}}">{{a.src}}</span></div>
+</li>
+</sc-for>
+</ul>
+<p class="hint" style="margin-top:12px">Every field traces back to your <a href="w5-answerbank.dc.html" style="border-bottom:1px solid var(--line2);color:var(--ink)">Answer Bank</a> or resume.</p>
+</div>
+</article>
+
+<!-- 03 Cover letter & resume -->
+<article class="spec-card" aria-label="Tab 3: Cover letter and resume">
+<div class="spec-hd">
+<span class="serif" style="font-size:24px;line-height:1"><span class="it" style="color:var(--mut);margin-right:8px">03</span>Cover letter &amp; resume</span>
+<span class="mono" style="font-size:11.5px;color:var(--mut)">Tailored letter · PDF unchanged</span>
+</div>
+<div class="spec-bd" style="display:flex;flex-direction:column;gap:16px">
+<div class="paper">
+<p>Dear Northwind Labs hiring team,</p>
+<p>Over the past six years I have built Go and PostgreSQL infrastructure supporting high-throughput intake pipelines, including multi-region read-replica routing and deterministic Kubernetes deployments across three availability zones.</p>
+<p>Northwind Labs' focus on predictable latency and observable platform tooling matches the work I do best. I would welcome the chance to discuss how that background fits your Platform team.</p>
+<p>Maya Okafor</p>
+</div>
+<div style="padding:14px 16px;border:1px solid var(--line);border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:space-between;gap:12px">
+<div style="display:flex;align-items:center;gap:12px;min-width:0">
+<span style="flex:none;width:36px;height:42px;border:1.5px solid var(--ink);border-radius:4px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px;font:600 9.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.08em" aria-hidden="true">PDF</span>
+<div style="min-width:0">
+<p class="mono" style="font-size:13px;overflow-wrap:anywhere">Maya_Okafor_Resume.pdf</p>
+<p class="hint num" style="margin-top:2px">2 pages · 184 KB · Sent unchanged</p>
+</div>
+</div>
+<a href="w5-resume.dc.html" class="btn2" style="min-height:36px;padding:0 12px;font-size:12.5px">View PDF</a>
+</div>
+</div>
+</article>
+
+<!-- 04 Emails -->
+<article class="spec-card" aria-label="Tab 4: Emails">
+<div class="spec-hd">
+<span class="serif" style="font-size:24px;line-height:1"><span class="it" style="color:var(--mut);margin-right:8px">04</span>Emails</span>
+<span class="mono" style="font-size:11.5px;color:var(--mut)">2 messages synced from Gmail</span>
+</div>
+<div class="spec-bd" style="display:flex;flex-direction:column;gap:12px">
+<div class="mail-card">
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+<p style="font-weight:600;font-size:13.5px">Priya Nair · Northwind Labs</p>
+<span class="mono num" style="font-size:11px;color:var(--mut)">Nov 16 · 15:10</span>
+</div>
+<p style="font-size:13px;font-weight:600;margin-top:4px">Platform Engineer — 20-minute phone screen</p>
+<p style="font-size:13px;color:var(--mut);margin-top:6px">Hi Maya, thanks for applying to our Platform Engineer role. Our engineering manager reviewed your background with Go and PostgreSQL failover systems and would like to schedule a 20-minute phone screen. Are you free Tuesday or Thursday afternoon?</p>
+<div style="margin-top:10px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px">
+<span class="pill" style="background:var(--okbg);border-color:transparent;color:var(--ok)">Moved to Screening</span>
+<a href="w5-inbox.dc.html" style="font-size:12.5px;font-weight:600;border-bottom:1px solid var(--line2)">Open in Inbox</a>
+</div>
+</div>
+<div class="mail-card">
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+<p style="font-weight:600;font-size:13.5px">Northwind Labs Recruiting</p>
+<span class="mono num" style="font-size:11px;color:var(--mut)">Nov 11 · 08:24</span>
+</div>
+<p style="font-size:13px;font-weight:600;margin-top:4px">Application received — Platform Engineer</p>
+<p style="font-size:13px;color:var(--mut);margin-top:6px">We have received your application for Platform Engineer in Toronto, ON. Our team reviews applications in the order received.</p>
+<div style="margin-top:10px"><span class="pill" style="background:var(--accbg);border-color:transparent;color:var(--acct)">Confirmed receipt</span></div>
+</div>
+</div>
+</article>
+
+</div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"grain":{"editor":"range","default":0.5,"min":0,"max":1,"step":0.05,"unit":""},"$preview":{"width":1440,"height":2220}}'>
+const EVENTS = [
+  { title: 'Found on Greenhouse', detail: 'Posting matched on the Northwind Labs career board.', when: 'Nov 11 · 08:02', dot: 'var(--done)', ring: 'var(--donering)', titleTone: 'var(--ink)', more: true },
+  { title: 'Scored: 86 match', detail: 'Strong match against your resume and role preferences.', when: 'Nov 11 · 08:03', dot: 'var(--done)', ring: 'var(--donering)', titleTone: 'var(--ink)', more: true },
+  { title: 'Prepared application', detail: 'Six answers drawn from your Answer Bank and a tailored cover letter drafted.', when: 'Nov 11 · 08:20', dot: 'var(--done)', ring: 'var(--donering)', titleTone: 'var(--ink)', more: true },
+  { title: 'AI review passed', detail: 'Every field verified against your saved facts. No Holds needed.', when: 'Nov 11 · 08:21', dot: 'var(--done)', ring: 'var(--donering)', titleTone: 'var(--ink)', more: true },
+  { title: 'Submitted via Greenhouse', detail: 'Sent with Maya_Okafor_Resume.pdf unchanged and the cover letter.', when: 'Nov 11 · 08:24', dot: 'var(--acc)', ring: 'var(--accbg)', titleTone: 'var(--acct)', more: true },
+  { title: 'Recruiter replied: Phone screen', detail: 'Priya Nair asked for Tuesday or Thursday availability. Moved to Screening.', when: 'Nov 16 · 15:10', dot: 'var(--ok)', ring: 'var(--okbg)', titleTone: 'var(--ok)', more: false },
+];
+
+const ANSWERS = [
+  { q: 'Legally authorized to work in Canada?', v: 'Yes', src: 'Saved answer', srcCls: 'src sv' },
+  { q: 'Require visa sponsorship?', v: 'No', src: 'Saved answer', srcCls: 'src sv' },
+  { q: 'Notice period', v: '2 weeks', src: 'Saved answer', srcCls: 'src sv' },
+  { q: 'Expected compensation', v: 'CAD 155,000', src: 'Saved answer', srcCls: 'src sv' },
+  { q: 'GitHub or portfolio URL', v: 'github.com/mayaokafor', src: 'From resume', srcCls: 'src' },
+  { q: 'Years running production Go & PostgreSQL', v: '6 years', src: 'From resume', srcCls: 'src' },
+];
+
+const STAGES = ['Hold', 'Applied', 'Screening', 'Interviewing', 'Offer', 'Closed'];
+
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.state = { dark: null, tab: 'timeline', stage: 'Screening', stageOpen: false, archived: false };
+  }
+  renderVals() {
+    const dark = this.state.dark === null ? (this.props.dark ?? false) : this.state.dark;
+    const g = Math.max(0, Math.min(1, Number(this.props.grain ?? 0.5)));
+    const grainOpacity = (dark ? g * 0.15 : g * 0.24).toFixed(3);
+    const tab = this.state.tab;
+    const stage = this.state.stage;
+    const stageStyle =
+      stage === 'Hold' ? ['var(--holdbg)', 'var(--hold)']
+      : stage === 'Applied' ? ['var(--accbg)', 'var(--acct)']
+      : stage === 'Closed' ? ['var(--well)', 'var(--mut)']
+      : ['var(--okbg)', 'var(--ok)'];
+
+    return {
+      t: {
+        cls: dark ? 'ov dark' : 'ov',
+        grainOpacity,
+        toggleLabel: dark ? 'Switch to light mode' : 'Switch to dark mode',
+        modeBtn: dark ? 'Light mode' : 'Dark mode',
+      },
+      toggle: () => this.setState({ dark: !dark }),
+      stage,
+      stageBg: stageStyle[0],
+      stageInk: stageStyle[1],
+      stageOpen: this.state.stageOpen,
+      toggleStage: () => this.setState({ stageOpen: !this.state.stageOpen }),
+      stageOpts: STAGES.map((name) => ({
+        name,
+        on: name === stage,
+        cls: name === stage ? 'opt sl' : 'opt',
+        pick: () => this.setState({ stage: name, stageOpen: false }),
+      })),
+      archiveLabel: this.state.archived ? 'Archived' : 'Archive',
+      toggleArchive: () => this.setState({ archived: !this.state.archived }),
+      isTimeline: tab === 'timeline',
+      isAnswers: tab === 'answers',
+      isLetter: tab === 'letter',
+      isEmails: tab === 'emails',
+      tabCls: {
+        timeline: tab === 'timeline' ? 'tab on' : 'tab',
+        answers: tab === 'answers' ? 'tab on' : 'tab',
+        letter: tab === 'letter' ? 'tab on' : 'tab',
+        emails: tab === 'emails' ? 'tab on' : 'tab',
+      },
+      pickTimeline: () => this.setState({ tab: 'timeline' }),
+      pickAnswers: () => this.setState({ tab: 'answers' }),
+      pickLetter: () => this.setState({ tab: 'letter' }),
+      pickEmails: () => this.setState({ tab: 'emails' }),
+      events: EVENTS,
+      answers: ANSWERS,
+    };
+  }
+}
+</script>
+</body>
+</html>
