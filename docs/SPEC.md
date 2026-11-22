@@ -162,7 +162,7 @@ refusal is stamped in `reserve_refused_at` and the cap refusal in `refused_at`, 
 The admin overview shows the month's count and says which of the two stops is in force. Tests reach Cloudflare only
 through MSW (ADR 0013, 0016).
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
-Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set; a half-set pair stops the server at boot and with neither the app boots and runs as in M2. `POST /webhooks/stripe` verifies the `Stripe-Signature` header (HMAC-SHA256 over the timestamped raw body, five-minute window) before it reads or writes any billing row, and a bad or stale signature is refused with 400. `STRIPE_PRICE_WEEK` and `STRIPE_PRICE_MONTH` name the Stripe prices a Checkout session sells; a missing one answers 503 `billing_not_configured` without a Stripe call. What each plan buys is configuration in `src/server/billing/plans.ts`: Week 70 Applications over 7 days, Month 300 over 30 days (ADR 0018); the price itself lives in Stripe and reaches Overture only as a price id. `invoice.paid` grants its period and clears a `plan_ended` or `payment_failed` pause; `invoice.payment_failed` sets `payment_failed` at once. Each transition writes one `paused` notification (pushed to the user's devices) and one email naming the fix in Settings (`Choose a plan` links to `/settings/billing/plans`, `Update payment` to `/settings/billing`, never the word `failed`), and a repeated event writes nothing twice. A grant's period end is the plan end: after the expiry sweep leaves the user with no unexpired grant, sending pauses with `plan_ended`. The demo account is never paused, granted or notified, and its billing mutations answer `403 demo_locked` before any Stripe call.
+Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set; a half-set pair stops the server at boot and with neither the app boots and runs as in M2. `POST /webhooks/stripe` verifies the `Stripe-Signature` header (HMAC-SHA256 over the timestamped raw body, five-minute window) before it reads or writes any billing row, and a bad or stale signature is refused with 400. `STRIPE_PRICE_WEEK` and `STRIPE_PRICE_MONTH` name the Stripe prices a Checkout session sells; a missing one answers 503 `billing_not_configured` without a Stripe call. What each plan buys is configuration in `src/server/billing/plans.ts`: Week 70 Applications over 7 days, Month 300 over 30 days (ADR 0018); the price itself lives in Stripe and reaches Overture only as a price id. `invoice.paid` grants its period and clears a `plan_ended` or `payment_failed` pause; `invoice.payment_failed` sets `payment_failed` at once, unless the failed invoice's period is older than the subscription's current period, so a stale out-of-order delivery cannot pause a paid user. Each transition writes one `paused` notification (pushed to the user's devices) and one email naming the fix in Settings (`Choose a plan` links to `/settings/billing/plans`, `Update payment` to `/settings/billing`, never the word `failed`), and a repeated event writes nothing twice. A grant's period end is the plan end: after the expiry sweep leaves the user with no unexpired grant, sending pauses with `plan_ended`. The demo account is never paused, granted or notified, and its billing mutations answer `403 demo_locked` before any Stripe call.
 
 ### 3.3 Domains and DNS
 
@@ -341,20 +341,23 @@ exception is a send already in flight (`sending` or `confirming`): its reservati
 so a confirmed send commits and is charged for what was sent, and a failed or unconfirmed one releases and is
 expired by the next sweep. When the last unexpired grant ends, sending pauses with `plan_ended`.
 `stripe_events` holds each signed Stripe event id once: the row is inserted, its effect applied and `processed_at`
-set in one transaction, so a replay finds the row and does nothing; a bad signature never reaches the table. A signed
+set in one transaction, so a replay finds the row and does nothing; a bad signature never reaches the table. The
+pause notice, its push and email jobs, and the planner/prep jobs a resume queues are written in that same
+transaction, so a crash cannot commit the event without them and a redelivery cannot skip them. A signed
 `checkout.session.completed` links `customers.stripe_customer_id` to the user named by `client_reference_id` (or
 `metadata.user_id`), and `customer.created`/`customer.updated` link the same way from `metadata.user_id`.
 `invoice.paid` issues the period grant: `source='period'`, the plan's quantity, `starts_at` at the invoice line's
 period start and `expires_at` at its end (or at receipt and the plan's own period from receipt when the invoice names
 none), and `stripe_invoice_id` the invoice id, which is also the grant's ledger idempotency key, so a replay grants
 once and a renewal's new invoice issues the next period's grant starting where the old one ends. The plan comes from
-the price the invoice line names, falling back to the subscription metadata the Checkout session set, so a Week/Month
-switch Stripe applies at the renewal grants the new plan's quota even while the subscription metadata still names the
-old one. A paid period is never cut short: an upgrade from the trial grants the paid plan's Applications at once
+the price the invoice line names, so a Week/Month switch Stripe applies at the renewal grants the new plan's quota
+even while the subscription metadata still names the old one; a price Overture does not sell grants nothing instead
+of borrowing that metadata, and only an event that names no price at all falls back to it. A paid period is never cut short: an upgrade from the trial grants the paid plan's Applications at once
 beside the trial's, and cancelling at the period end only sets the flag below. A demo account never receives a period
 grant. A signed `customer.subscription.created`, `customer.subscription.updated` or `customer.subscription.deleted`
 stores the subscription in `subscriptions`: its `user_id` from the event metadata, the stored row or the event's Stripe
-customer; its `plan` from the price item first, then the metadata; its `status` verbatim; the period the event names;
+customer; its `plan` from the price item (a price Overture does not sell records no new plan, and only an event with no
+price falls back to the metadata); its `status` verbatim; the period the event names;
 and `cancel_at_period_end`. `invoice.paid` refreshes that row's plan and period too, so the state follows the invoice
 when the subscription update lags. An hourly `billing.grant-expiry` pass releases a reservation still held on a grant past its period end
 and then expires its available balance, so it never returns to spendable (ADR 0008); until that pass runs,

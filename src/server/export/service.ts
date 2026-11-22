@@ -11,7 +11,7 @@ import type { ZipEntry } from "./zip.ts";
 import { accountExports, bgJobs, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { logError, logInfo } from "../platform/log.ts";
-import { MailCapExceededError } from "../platform/mail/metered.ts";
+import { MailCapExceededError } from "../platform/mail/errors.ts";
 import { copy } from "../../shared/copy.ts";
 import {
   EXPORT_CHUNK_BYTES,

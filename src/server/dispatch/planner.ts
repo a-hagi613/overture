@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Random } from "../platform/ports/random.ts";
 
@@ -228,7 +228,7 @@ export function createPlanner(deps: PlannerDeps) {
   return { ensureMidnightQueued, plan } satisfies PlannerService;
 }
 
-export function enqueuePlannerDay(db: AppDatabase, clock: Clock, userId: string) {
+export function enqueuePlannerDay(db: DatabaseWriter, clock: Clock, userId: string) {
   return enqueueJob(db, clock, PLANNER_DAY_JOB_KIND, plannerDayPayload(userId), {
     dedupeKey: `${PLANNER_DAY_JOB_KIND}:${userId}`,
     maxAttempts: 2,

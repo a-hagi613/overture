@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gte, ne } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { BillingDb } from "./ledger.ts";
@@ -16,7 +16,8 @@ import { grantPaidPeriod } from "./periods.ts";
 import { pauseForBilling, resumeAfterPayment } from "./pause.ts";
 import { periodEndFor } from "./plans.ts";
 import { recordSubscription, storedSubscription } from "./subscriptions.ts";
-import { stripeEvents, users } from "../platform/db/schema.ts";
+import { grants, stripeEvents, users } from "../platform/db/schema.ts";
+import { wakeEventHub } from "../platform/sse/hub.ts";
 
 /** A verified trial card, keyed by HMAC, read from Stripe before the transaction. */
 export interface VerifiedTrialCard {
@@ -46,7 +47,43 @@ const SUBSCRIPTION_EVENTS = new Set([
 type StoredSubscription = ReturnType<typeof storedSubscription>;
 
 function planFor(event: PaymentEvent, planForPrice: (priceId: string) => BillingPlan | null) {
-  return (event.priceId === null ? null : planForPrice(event.priceId)) ?? event.plan;
+  if (event.priceId !== null) {
+    return planForPrice(event.priceId);
+  }
+
+  return event.plan;
+}
+
+function failureIsStale(tx: BillingDb, event: PaymentEvent, userId: string) {
+  const failedPeriodEnd = event.periodEndMs ?? event.periodStartMs;
+
+  if (failedPeriodEnd === null) {
+    return false;
+  }
+
+  const stored = storedFor(tx, event);
+
+  if (stored !== null && stored.currentPeriodEnd > failedPeriodEnd) {
+    return true;
+  }
+
+  const conditions = [
+    eq(grants.userId, userId),
+    eq(grants.source, "period"),
+    gte(grants.expiresAt, failedPeriodEnd),
+  ];
+
+  if (event.invoiceId !== null) {
+    conditions.push(ne(grants.stripeInvoiceId, event.invoiceId));
+  }
+
+  return (
+    tx
+      .select({ id: grants.id })
+      .from(grants)
+      .where(and(...conditions))
+      .get() !== undefined
+  );
 }
 
 function userIdFor(db: BillingDb, event: PaymentEvent, stored: StoredSubscription) {
@@ -97,19 +134,25 @@ export function createPaymentsWebhookService(deps: {
       });
     }
 
-    return userId;
+    return { plan, userId };
   }
 
   function failPayment(tx: BillingDb, event: PaymentEvent) {
     const userId = userIdFor(tx, event, storedFor(tx, event));
 
-    if (userId === null) {
+    if (userId === null || failureIsStale(tx, event, userId)) {
       return null;
     }
 
     const state = pauseForBilling(tx, clock, { reason: "payment_failed", userId });
 
-    return state.changed ? { reason: state.reason, userId } : null;
+    if (!state.changed) {
+      return null;
+    }
+
+    createBillingPauseNotice(tx, clock, { reason: state.reason, userId });
+
+    return { reason: state.reason, userId };
   }
 
   function record(
@@ -183,10 +226,17 @@ export function createPaymentsWebhookService(deps: {
         let resumed: string | null = null;
 
         if (event.type === GRANTING_EVENT) {
-          const userId = grant(tx, event);
+          const granted = grant(tx, event);
 
-          if (userId !== null && resumeAfterPayment(tx, clock, { userId }).resumed) {
-            resumed = userId;
+          if (
+            granted !== null &&
+            granted.plan !== null &&
+            resumeAfterPayment(tx, clock, { userId: granted.userId }).resumed
+          ) {
+            resumed = granted.userId;
+
+            enqueuePlannerDay(tx, clock, granted.userId);
+            ensurePrepDailyQueued(tx, clock, granted.userId);
           }
 
           record(tx, event, now, {
@@ -217,13 +267,12 @@ export function createPaymentsWebhookService(deps: {
       }
 
       if (result.notice !== null) {
-        createBillingPauseNotice(db, clock, result.notice);
         logInfo("billing.pause", `${result.notice.reason} for ${result.notice.userId}`);
+
+        wakeEventHub(db);
       }
 
       if (result.resumed !== null) {
-        enqueuePlannerDay(db, clock, result.resumed);
-        ensurePrepDailyQueued(db, clock, result.resumed);
         logInfo("billing.resume", result.resumed);
       }
 

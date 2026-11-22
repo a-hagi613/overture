@@ -24,7 +24,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for twenty-six invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
+exist only for twenty-seven invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
 derivations, the answer planner (a salary Fact kept per currency is chosen only for the currency a question names),
 the facts model (a Fact's scope is validated against its key), the onboarding step's salary and EEO reading, the
 fixture sanitiser (recorded pages must carry no script, event handler, personal data or token), the v1
@@ -44,7 +44,9 @@ at the sign-in reserve while sign-in mail and the live check may spend it, each 
 so the reserve alert never hides the cap alert, and the count survives reopening the database, #282), the billing
 pause (a plan end or a failed payment pauses once with its own reason, a successful payment resumes only a billing
 pause, and an in-flight send keeps its reservation across the period end so only a sent Application is charged), the
-Anthropic model and its batch prices (`models.test.ts`: `ANTHROPIC_MODEL` defaults to the model SPEC §8.6 names,
+billing webhook's transaction (a pause notice and the planner/prep jobs a resume queues commit with the Stripe event
+and roll back with it, a stale out-of-order failure cannot pause a paid user, and a price Overture does not sell
+grants nothing), the Anthropic model and its batch prices (`models.test.ts`: `ANTHROPIC_MODEL` defaults to the model SPEC §8.6 names,
 a dated 5.5 model id is priced from the exact 5.5 row rather than the 4.5 haiku prefix, and a model with no price row
 is refused, #387), the Personio form reader (a server-rendered form's fields, required star, documents and
 unsupported controls are read without a browser), the provider and cost report (completion and cost divide
