@@ -6,7 +6,9 @@ import { copy } from "../../shared/copy.ts";
 import { NavGlyph } from "./nav-glyph.tsx";
 import { OnboardingFilterStep } from "./onboarding-filter-step.tsx";
 
-const filterDomains = Object.values(ATS_MAIL_DOMAINS).flat().join(" OR ");
+const FILTER_ATS = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
+
+const filterDomains = FILTER_ATS.flatMap((ats) => ATS_MAIL_DOMAINS[ats]).join(" OR ");
 
 const text = copy.onboarding.forward;
 
