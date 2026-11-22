@@ -7,6 +7,11 @@ import { databasePath, env } from "./config/env.ts";
 import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
 import { MailCapExceededError } from "./platform/mail/metered.ts";
 import { createPayments } from "./billing/index.ts";
+import {
+  ensureGrantExpiryQueued,
+  GRANT_EXPIRY_JOB_KIND,
+  runGrantExpirySweep,
+} from "./billing/expiry.ts";
 import { seedDemoAccount } from "./demo/seed.ts";
 import { createDemoSafeMailSender } from "./demo/mail-guard.ts";
 import { isDemoUser } from "./demo/role.ts";
@@ -227,6 +232,7 @@ const jobSingletons = [
   ...SINGLETON_JOB_KINDS,
   CHECKIN_SWEEP_JOB_KIND,
   DISPATCH_TICK_JOB_KIND,
+  GRANT_EXPIRY_JOB_KIND,
   LIVE_CHECK_JOB_KIND,
   WORKABLE_INGEST_JOB_KIND,
   RETENTION_JOB_KIND,
@@ -237,6 +243,8 @@ const jobSingletons = [
 recoverStaleLocks(db, clock, jobSingletons);
 
 ensureCheckinSweepQueued(db, clock);
+
+ensureGrantExpiryQueued(db, clock);
 
 ensureRetentionQueued(db, clock);
 
@@ -673,8 +681,19 @@ const retentionJobHandlers: JobHandlers = {
   },
 };
 
+const billingJobHandlers: JobHandlers = {
+  [GRANT_EXPIRY_JOB_KIND]: async () => {
+    try {
+      await Promise.resolve(runGrantExpirySweep({ clock, db }));
+    } finally {
+      ensureGrantExpiryQueued(db, clock);
+    }
+  },
+};
+
 const allJobHandlers: JobHandlers = {
   ...retentionJobHandlers,
+  ...billingJobHandlers,
   ...catalogJobHandlers,
   ...preparationJobHandlers,
   ...planningJobHandlers,

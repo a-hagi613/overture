@@ -10,6 +10,7 @@ export interface CheckoutSessionRequest {
   userId: string;
   email: string;
   customerId: string | null;
+  plan: BillingPlan;
   priceId: string;
   successUrl: string;
   cancelUrl: string;
@@ -49,6 +50,16 @@ export interface PaymentEvent {
   type: string;
   customerId: string | null;
   userId: string | null;
+  /** The invoice a paid subscription event names, or null for other events. */
+  invoiceId: string | null;
+  /** The plan the subscription metadata names, when the event carries it. */
+  plan: BillingPlan | null;
+  /** The Stripe price the paid line item names, when the event carries one. */
+  priceId: string | null;
+  /** The end of the paid period in epoch milliseconds, or null when unknown. */
+  periodEndMs: number | null;
+  /** The start of the paid period in epoch milliseconds, or null when unknown. */
+  periodStartMs: number | null;
 }
 
 /**

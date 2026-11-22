@@ -4,7 +4,7 @@ import type { NavCounts } from "../lib/nav-api.ts";
 
 import { copy } from "../../shared/copy.ts";
 import { NavGlyph } from "./nav-glyph.tsx";
-import { NAV_DESTINATIONS, navBadgeClass, navBadgeCount, navLabel } from "../lib/nav-api.ts";
+import { TAB_DESTINATIONS, navBadgeClass, navBadgeCount, navLabel } from "../lib/nav-api.ts";
 
 export function TabBar({ counts }: { counts: NavCounts }) {
   return (
@@ -12,7 +12,7 @@ export function TabBar({ counts }: { counts: NavCounts }) {
       aria-label={copy.nav.tabBarLabel}
       className="sticky bottom-0 z-10 flex h-16 w-full flex-none items-stretch border-t border-border bg-sidebar shadow-[0_-1px_0_var(--color-bloom)] md:hidden"
     >
-      {NAV_DESTINATIONS.map((destination) => {
+      {TAB_DESTINATIONS.map((destination) => {
         const count = navBadgeCount(counts, destination.glyph);
 
         return (

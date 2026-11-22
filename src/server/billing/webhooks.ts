@@ -1,10 +1,14 @@
 import { eq } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
+import type { BillingDb } from "./ledger.ts";
 import type { Clock } from "../platform/ports/clock.ts";
-import type { PaymentEvent } from "../platform/ports/payments.ts";
+import type { BillingPlan, PaymentEvent } from "../platform/ports/payments.ts";
 
+import { isDemoRole } from "../../shared/demo.ts";
 import { linkStripeCustomer } from "./customers.ts";
+import { grantPaidPeriod } from "./periods.ts";
+import { periodEndFor } from "./plans.ts";
 import { stripeEvents, users } from "../platform/db/schema.ts";
 
 const LINKING_EVENTS = new Set([
@@ -12,10 +16,47 @@ const LINKING_EVENTS = new Set([
   "checkout.session.completed",
   "customer.created",
   "customer.updated",
+  "invoice.paid",
 ]);
 
-export function createPaymentsWebhookService(deps: { db: AppDatabase; clock: Clock }) {
-  const { db, clock } = deps;
+const GRANTING_EVENT = "invoice.paid";
+
+export function createPaymentsWebhookService(deps: {
+  db: AppDatabase;
+  clock: Clock;
+  planForPrice: (priceId: string) => BillingPlan | null;
+}) {
+  const { db, clock, planForPrice } = deps;
+
+  function grant(tx: BillingDb, event: PaymentEvent) {
+    if (event.userId === null || event.invoiceId === null) {
+      return;
+    }
+
+    const plan = event.plan ?? (event.priceId === null ? null : planForPrice(event.priceId));
+
+    if (plan === null) {
+      return;
+    }
+
+    const account = tx
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, event.userId))
+      .get();
+
+    if (account === undefined || isDemoRole(account.role)) {
+      return;
+    }
+
+    grantPaidPeriod(tx, clock, {
+      invoiceId: event.invoiceId,
+      periodEndMs: event.periodEndMs ?? periodEndFor(plan, clock.now()),
+      periodStartMs: event.periodStartMs ?? clock.now(),
+      plan,
+      userId: event.userId,
+    });
+  }
 
   return {
     handle(event: PaymentEvent) {
@@ -47,6 +88,10 @@ export function createPaymentsWebhookService(deps: { db: AppDatabase; clock: Clo
               userId: event.userId,
             });
           }
+        }
+
+        if (event.type === GRANTING_EVENT) {
+          grant(tx, event);
         }
 
         tx.update(stripeEvents)

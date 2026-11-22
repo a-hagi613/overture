@@ -302,6 +302,13 @@
       "when": 1795304010267,
       "tag": "0042_billing_stripe",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "6",
+      "when": 1795306617261,
+      "tag": "0043_postings_open_location",
+      "breakpoints": true
     }
   ]
 }

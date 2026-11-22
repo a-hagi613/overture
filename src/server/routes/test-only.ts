@@ -27,6 +27,7 @@ import {
   companyBoards,
   facts,
   fxRates,
+  grants,
   ledger,
   liveCheckMail,
   mailUsage,
@@ -456,6 +457,12 @@ const seedGrantBody = z.object({
   email: z.email(),
   quantity: z.number().int().min(1).max(10_000),
   idempotencyKey: z.string().min(1),
+});
+
+const ledgerApplicationBody = z.object({
+  email: z.email(),
+  applicationId: z.string().min(1),
+  commit: z.boolean().default(false),
 });
 
 const seedFactsBody = z.object({
@@ -2120,6 +2127,67 @@ export function createTestRoutes(
     );
 
     return context.json({ applicationsLeft: applicationsLeft(db, user.id, clock.now()) });
+  });
+
+  routes.post("/ledger/application", zValidator("json", ledgerApplicationBody), async (context) => {
+    const { email, applicationId, commit } = context.req.valid("json");
+
+    const user = db
+      .select()
+      .from(users)
+      .where(eq(users.email, lowercased(email)))
+      .get();
+
+    if (user === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    const reserved = await retryWhenBusy(
+      () =>
+        reserveForApplication(db, clock, {
+          applicationId,
+          idempotencyKey: `test-reserve:${user.id}:${applicationId}`,
+          userId: user.id,
+        }),
+      "test.ledger.reserve",
+    );
+
+    if (commit) {
+      await retryWhenBusy(
+        () =>
+          commitForApplication(db, clock, {
+            applicationId,
+            idempotencyKey: `test-commit:${user.id}:${applicationId}`,
+            userId: user.id,
+          }),
+        "test.ledger.commit",
+      );
+    }
+
+    return context.json({
+      applicationsLeft: applicationsLeft(db, user.id, clock.now()),
+      reserved: reserved.reserved,
+    });
+  });
+
+  routes.get("/billing-state", zValidator("query", userQuery), (context) => {
+    const { userId } = context.req.valid("query");
+
+    return context.json({
+      applicationsLeft: applicationsLeft(db, userId, clock.now()),
+      grants: db
+        .select()
+        .from(grants)
+        .where(eq(grants.userId, userId))
+        .orderBy(asc(grants.createdAt))
+        .all(),
+      ledger: db
+        .select()
+        .from(ledger)
+        .where(eq(ledger.userId, userId))
+        .orderBy(asc(ledger.createdAt), asc(ledger.id))
+        .all(),
+    });
   });
 
   routes.get("/mail", (context) => {

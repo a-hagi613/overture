@@ -11,7 +11,7 @@ const navCountsSchema = z.object({
 
 export type NavCounts = z.infer<typeof navCountsSchema>;
 
-export type NavKey = "home" | "ready" | "board" | "review" | "inbox" | "profile";
+export type NavKey = "home" | "ready" | "board" | "review" | "inbox" | "calendar" | "profile";
 
 export const NAV_DESTINATIONS = [
   { glyph: "home", to: "/" },
@@ -19,8 +19,14 @@ export const NAV_DESTINATIONS = [
   { glyph: "board", to: "/board" },
   { glyph: "review", to: "/review" },
   { glyph: "inbox", to: "/inbox" },
+  { glyph: "calendar", to: "/calendar" },
   { glyph: "profile", to: "/profile" },
 ] as const satisfies readonly { glyph: NavKey; to: string }[];
+
+/** The phone tab bar keeps six; Calendar is reached from the Home and Board headers (ADR 0034). */
+export const TAB_DESTINATIONS = NAV_DESTINATIONS.filter(
+  (destination) => destination.glyph !== "calendar",
+);
 
 export const NO_NAV_COUNTS: NavCounts = { inboxUnread: 0, ready: 0, review: 0 };
 

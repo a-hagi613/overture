@@ -300,6 +300,9 @@ export const postings = sqliteTable(
     index("postings_apply_url_norm").on(t.applyUrlNorm),
     index("postings_closed_at").on(t.closedAt),
     index("postings_ats_closed_last_seen").on(t.ats, t.closedAt, t.lastSeenAt),
+    index("postings_open_location")
+      .on(t.city, t.countryCode, t.locationRaw, t.workplace, t.closedAt)
+      .where(sql`closed_at is null`),
   ],
 );
 

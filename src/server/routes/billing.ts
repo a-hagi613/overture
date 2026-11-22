@@ -7,7 +7,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PaymentEvent, Payments } from "../platform/ports/payments.ts";
 
-import { stripePriceId } from "../billing/index.ts";
+import { planForPriceId, stripePriceId } from "../billing/index.ts";
 import { stripeCustomerIdFor } from "../billing/customers.ts";
 import { createPaymentsWebhookService } from "../billing/webhooks.ts";
 import { demoLocked } from "../demo/guard.ts";
@@ -118,6 +118,7 @@ export function createBillingRoutes(deps: {
         cancelUrl: `${settingsUrl}?billing=cancelled`,
         customerId: stripeCustomerIdFor(db, access.account.id),
         email: access.account.email,
+        plan: context.req.valid("json").plan,
         priceId,
         successUrl: `${settingsUrl}?billing=success`,
         userId: access.account.id,
@@ -173,7 +174,7 @@ export function createStripeWebhookRoutes(deps: {
 }) {
   const { clock, db, payments } = deps;
   const routes = new Hono();
-  const webhooks = createPaymentsWebhookService({ clock, db });
+  const webhooks = createPaymentsWebhookService({ clock, db, planForPrice: planForPriceId });
 
   routes.post("/webhooks/stripe", async (context) => {
     if (payments === null) {
