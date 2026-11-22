@@ -39,7 +39,7 @@ Telegram, BYOK; every test file.
 ## Data, not code
 
 From the v1 production database on Fly app `ai-auto-apply` (volume `data`, yyz), exported once by
-`scripts/import-v1.ts` before v1 is stopped:
+`scripts/export-v1-facts.ts` before v1 is stopped:
 
 | v1 table | v2 destination |
 |---|---|

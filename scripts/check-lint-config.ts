@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { z } from "zod";
 
 import { findUnguardedDatabaseSyncHandles } from "./database-sync-guard.ts";
+import { findUnitTestAllowlistProblems } from "./lint-config-guard.ts";
 
 const severitySchema = z.union([z.string(), z.array(z.unknown())]);
 const rulesSchema = z.record(z.string(), severitySchema);
@@ -24,6 +25,11 @@ const projectConfigSchema = z.object({
 
 const globalSections = ["Rules turned off, and why", "Inherited off-list"];
 const scopedSection = "Rules off in one folder only";
+
+const unitTestRuleSchema = z.object({
+  e2eRoot: z.string().min(1),
+  allow: z.array(z.string().min(1)).default([]),
+});
 
 function normalizeRule(name: string) {
   const trimmed = name.replaceAll("`", "").trim();
@@ -204,6 +210,40 @@ function trackedSources() {
     .map((path) => ({ path, source: readFileSync(path, "utf8") }));
 }
 
+function trackedUnitTestFiles() {
+  const listed = spawnSync("git", ["ls-files", "-z", "--", "src", "scripts"], { encoding: "utf8" });
+
+  if (listed.status !== 0) {
+    throw new Error(`git ls-files failed: ${listed.stderr}`);
+  }
+
+  return listed.stdout.split("\0").filter((path) => /\.test\.tsx?$/u.test(path));
+}
+
+function unitTestAllowlist(project: z.infer<typeof projectConfigSchema>) {
+  const entries = [
+    ...Object.entries(project.rules),
+    ...project.overrides.flatMap((override) => Object.entries(override.rules)),
+  ];
+
+  const entry = entries.find(([name]) => normalizeRule(name) === "overture/no-unlisted-unit-test");
+
+  if (entry === undefined) {
+    return null;
+  }
+
+  const options = Array.isArray(entry[1]) ? entry[1].slice(1) : [];
+  const parsed = unitTestRuleSchema.safeParse(options[0]);
+
+  if (!parsed.success) {
+    throw new Error(
+      `overture/no-unlisted-unit-test options are unreadable: ${parsed.error.message}`,
+    );
+  }
+
+  return parsed.data;
+}
+
 const printed = spawnSync("bunx", ["oxlint", "--print-config"], { encoding: "utf8" });
 
 if (printed.status !== 0) {
@@ -275,8 +315,16 @@ for (const rule of notAtError) {
 }
 
 const appSources = trackedSources();
+const unitTestFiles = trackedUnitTestFiles();
+const unitTestConfig = unitTestAllowlist(project);
 
 failures.push(...findUnguardedDatabaseSyncHandles(appSources));
+
+if (unitTestConfig === null) {
+  failures.push("overture/no-unlisted-unit-test is not configured in .oxlintrc.json");
+} else {
+  failures.push(...findUnitTestAllowlistProblems({ allow: unitTestConfig.allow, unitTestFiles }));
+}
 
 if (failures.length > 0) {
   throw new Error(failures.join("\n"));
@@ -292,4 +340,8 @@ process.stdout.write(
 
 process.stdout.write(
   `sqlite handles verified: ${String(appSources.length)} src/test files, every DatabaseSync sets busy_timeout or opts out\n`,
+);
+
+process.stdout.write(
+  `unit test allowlist verified: ${String(unitTestFiles.length)} unit test files, every one listed and present\n`,
 );
