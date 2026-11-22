@@ -1,8 +1,8 @@
 # Cloudflare Workers Paid plan: what it can do for Overture under a $5 a month cap
 
-The owner bought Workers Paid ($5 a month) and wants it used where it really helps, with no spend above $5 a month in total. This note lists every product the plan covers, ranks the uses that fit Overture, and answers the cap question. It changes no production code; §5 records the measurements behind the one dropped recommendation and the one e2e test that pins them.
+The owner bought Workers Paid ($5 a month) and wants it used where it really helps, with no spend above $5 a month in total. This note lists every product the plan covers, ranks the uses that fit Overture, and answers the cap question. It changes no production code; §5 and §6 record the measurements behind the two dropped recommendations and the e2e tests that pin them.
 
-All facts below come from `developers.cloudflare.com` pages read on 2026-11-21 (each is linked where it is used). `cloudflare.com/plans` is a script-rendered page and was not read; the developer pricing pages are the same rate card and are the source of record. Overture's own figures come from `docs/SPEC.md`, ADR 0007, 0016, 0024, 0026, 0028 and 0032, and `docs/research/managed-browsers.md`.
+All facts below come from `developers.cloudflare.com` pages read on 2026-11-21 (each is linked where it is used), except the Browser Run pages in §6, read again on 2026-11-22. `cloudflare.com/plans` is a script-rendered page and was not read; the developer pricing pages are the same rate card and are the source of record. Overture's own figures come from `docs/SPEC.md`, ADR 0007, 0016, 0024, 0026, 0028 and 0032, and `docs/research/managed-browsers.md`.
 
 ## The short answers
 
@@ -25,7 +25,7 @@ Allowances are monthly on Workers Paid unless stated. Sources: [Workers pricing]
 | [Queues](https://developers.cloudflare.com/queues/platform/pricing/)                                            | 1 M operations (3 per message: write, read, delete)                                                                                                                                                    | $0.40 per M operations                                                                          | **Fits:** durable buffer between the Email Worker and `overture-web` (ranking 5). Message limit 128 KB, so large mail goes to R2 with a pointer.                                                                                                                                                |
 | [Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/)                          | 1 M requests; 400,000 GB-s; SQLite 25 B rows read, 50 M written, 5 GB                                                                                                                                  | $0.15 per M requests; $12.50 per M GB-s; $1.00 per M rows written; $0.20 per GB-month           | **No fit:** pacing and reserve-commit-release already live in SQLite on the one machine (ADR 0008, 0010). A second coordinator would split the truth. Has its own spending limit.                                                                                                               |
 | [Workflows](https://developers.cloudflare.com/workflows/reference/pricing/)                                     | 10 M requests; 30 M CPU-ms; 1 GB-month; 500,000 steps (steps and storage billed from 2026-08-10)                                                                                                       | $0.80 per 100,000 steps; $0.20 per GB-month                                                     | **No fit:** `bg_jobs` leases and recovery sweeps already do this (SPEC §9.4).                                                                                                                                                                                                                   |
-| [Browser Run](https://developers.cloudflare.com/browser-run/pricing/) (formerly Browser Rendering)              | 10 browser-hours; 10 concurrent browsers (monthly average of daily peaks)                                                                                                                              | $0.09 per hour; $2.00 per extra concurrent browser                                              | **No fit for sending**, see ranking 7.                                                                                                                                                                                                                                                          |
+| [Browser Run](https://developers.cloudflare.com/browser-run/pricing/) (formerly Browser Rendering)              | 10 browser-hours; 10 concurrent browsers (monthly average of daily peaks)                                                                                                                              | $0.09 per hour; $2.00 per extra concurrent browser                                              | **No fit for sending**, measured and dropped in §6 (issue #288).                                                                                                                                                                                                                                |
 | [Vectorize](https://developers.cloudflare.com/vectorize/platform/pricing/)                                      | 50 M queried and 10 M stored vector dimensions                                                                                                                                                         | $0.01 per M queried; $0.05 per 100 M stored                                                     | **No fit now:** matching is rules plus a Haiku score on a lazy two-stage path (ADR 0011), with no embedding step. 10 M stored dimensions is about 26,000 vectors at 384 dimensions, far under the catalogue.                                                                                     |
 | [AI Gateway](https://developers.cloudflare.com/ai-gateway/reference/pricing/)                                   | Core features free (analytics, caching, rate limiting); 10 M stored logs per gateway                                                                                                                   | none for core                                                                                   | **Optional for Workers AI only.** Its [spend limits](https://developers.cloudflare.com/ai-gateway/features/spend-limits/) are the only native hard cap for AI calls. Not for Anthropic: gateway logs would hold prompts that contain resumes, against the no-PII-in-telemetry rule (SPEC §8.6). |
 | [Hyperdrive](https://developers.cloudflare.com/hyperdrive/platform/pricing/)                                    | Unlimited queries                                                                                                                                                                                      | none                                                                                            | **No fit:** no Postgres or MySQL to accelerate.                                                                                                                                                                                                                                                 |
@@ -48,15 +48,15 @@ Ranked by value for the owner's goals first, then lower effort, then lower risk.
 | 4   | **Landing and pricing pages on Workers Static Assets**, attached by route patterns for `/` and the marketing paths only                                                              | The marketing pages stay up through Fly deploys (10–30 s of downtime each, SPEC §3.1) and take no load from the 2 GB machine; asset requests are free and unlimited                                                                                                  | M      | Low if routes are explicit patterns, so app traffic never passes through a Worker. ADR 0022 (SPA same origin) is untouched for the app. Needs the M3 landing redraw first.                                                                             |
 | 5   | **A Queue between the Email Worker and `overture-web`**                                                                                                                             | Today `workers/inbound-mail/src/handler.ts` throws if the app answers non-2xx, so mail arriving during a deploy has no retry of its own. A queue retries up to 100 times and keeps messages up to 14 days                                                           | M      | Medium. It touches ADR 0028's signed-MIME path; mail over 128 KB needs an R2 pointer; 3 operations per message (about 333,000 messages a month included).                                                                                              |
 | 6   | **Workers AI for the `email_classify` fallback** — **dropped (#287), see §5**                                                                                                        | About 2.1 Neurons per call at the recorded 412 input and 12 output tokens on `@cf/meta/llama-3.1-8b-instruct-fp8-fast` (4,119 and 34,868 Neurons per M tokens), so about 4,700 calls a day fit in the free 10,000 Neurons. Haiku 5.5 already costs 24 µUSD a call (SPEC §8.6), so the saving at today's volume is about 1.4 cents a user-month | M      | Medium. A weaker model on a path that can move a card forward (SPEC §11.3). Needs its own daily Neuron counter in the app, since free Neurons stop being free at 10,000 a day. Dropped: the cost review (#184) puts the line at cents a month and no local Workers AI evidence exists to prove equal accuracy (§5). |
-| 7   | **Do not use Browser Run for sending applications**                                                                                                                                 | See below                                                                                                                                                                                                                                                            | n/a    | High                                                                                                                                                                                                                                                   |
+| 7   | **Do not use Browser Run for sending applications** — **measured and dropped (#288), see §6**                                                                                        | See below                                                                                                                                                                                                                                                            | n/a    | High                                                                                                                                                                                                                                                   |
 
-**Browser Run versus Browser Use (ranking 7).** On price Browser Run wins: using the typical 3 browser-minutes an application from `managed-browsers.md`, it is about $0.0045 beyond the free 10 hours, and 10 hours cover about 200 typical applications a month. It does not fit the job, for three documented reasons:
+**Browser Run versus Browser Use (ranking 7, measured in §6).** On the rate card Browser Run is cheaper: at the recorded 9 min 16 s a send it is $0.0139 of browser time, or **$0.0164 per completed application** against Browser Use's $0.0265, and the 10 included hours cover about 64 attempts, or 54 completed. It does not fit the job:
 
-1. It adds headers that "cannot be removed or overridden", including a Web Bot Auth signature, so every request announces itself as Cloudflare's bot ([automatic request headers](https://developers.cloudflare.com/browser-run/reference/automatic-request-headers/)).
-2. The pricing and limits pages list no residential proxy and no CAPTCHA solving; Browser Use includes both, and ADR 0003 chose it for success rate over price. ADR 0025's Greenhouse reCAPTCHA path is the case that matters.
+1. It adds headers that "cannot be removed or overridden", including a Web Bot Auth signature, so every request announces itself as Cloudflare's bot ([automatic request headers](https://developers.cloudflare.com/browser-run/reference/automatic-request-headers/)); its own FAQ says Browser Run traffic is always identified as bot traffic.
+2. The pricing and limits pages list no residential proxy, no egress-IP option and no CAPTCHA solving. Browser Use includes a solver, and ADR 0025's Greenhouse reCAPTCHA path is the case that matters. With a proxy at Browser Use's $5/GB the price is $0.0319 per completed application, over the $0.03 gate.
 3. Concurrency billing ($2.00 per extra browser) and a 60-second idle timeout (up to 20 minutes with `keep_alive`) are easy to overrun by accident, and Browser Run has no native limit.
 
-ADR 0016 also names Browser Use as the only browser that reaches real forms. Revisit only if the M1 cost gate fails and a proxy can be bolted on, which this note did not test.
+ADR 0016 also names Browser Use as the only browser that reaches real forms. The lab probe in §6 tested the driver and the request identity on the synthetic lab and dropped Browser Run; the revisit condition is in §6.
 
 **Workable ingest on a Worker instead of the GitHub Action (ADR 0032).** Not recommended. The Action is free, has run on 159 MB of memory, and writes to R2 already. On Workers the measured full tagging pass is about one CPU-hour a day (3.6 M CPU-ms), which is 108 M a month against 30 M included (about $1.56 overage) and over the 5-minute CPU ceiling per invocation. The filtered 3-minute pass fits, but needs the tagging code and O\*NET index ported to a Worker and gains nothing over the Action. Only the freshness watch moves to Cloudflare (ranking 3).
 
@@ -157,7 +157,7 @@ For the orchestrator to cut. Order is the ranking above.
 | 5   | Landing and pricing on Workers Static Assets                                    | Deploy the redrawn marketing pages as static assets with route patterns for the marketing paths only; app traffic never touches the Worker.                        | M3 landing redraw                                                  |
 | 6   | Inbound mail through a Queue                                                    | Email Worker enqueues the signed MIME (R2 pointer above 128 KB); a consumer posts to `/internal/mail/inbound` with retries and a dead-letter queue; update ADR 0028. | 2 (the limit also stops the consumer)                              |
 | 7   | ~~Workers AI `email_classify` trial (optional)~~                                | Dropped in #287 (§5): the cost review puts classification spend at 24 µUSD a call and no local Workers AI response exists to prove equal accuracy.                 | closed                                                             |
-| 8   | Revisit Browser Run only if the M1 cost gate fails                              | Small spike: can Browser Run plus a proxy match Browser Use's success rate on the synthetic lab (never real ATS traffic, ADR 0016).                                | M1 cost gate result                                                |
+| 8   | ~~Revisit Browser Run only if the M1 cost gate fails~~                          | Dropped in #288 (§6): the lab probe under Browser Run's request identity completed every recorded form, but the lab has no bot filter, and Browser Run always identifies as a bot, has no documented proxy and no solver; $0.0164 per completed without a proxy, $0.0319 with one at $5/GB.                                              | closed                                                              |
 
 ## 5. `email_classify` on Workers AI: measured on the recorded fixtures (issue #287)
 
@@ -214,6 +214,154 @@ One call is about **2.1 Neurons** by Cloudflare's rates (412 × 4,119 + 12 × 34
 
 Until then the fallback stays on Haiku: it is 24 µUSD a call, it is measured on the fixtures above, and it is the model ADR 0007 and SPEC §8.6 already chose.
 
+## 6. Browser Run on the synthetic lab: measured, and dropped (issue #288)
+
+**Verdict: do not adopt.** #288 is the "revisit only if the M1 cost gate fails" spike from §4. It ran the lab probe
+recorded below on 2026-11-22 and drops Browser Run: the price is lower only from Cloudflare's own egress with the bot
+signature attached, the proxy that would fix the identity is not a documented option at all, and every documented
+property of the product points the other way on the one thing that decides the business, the completed-application
+rate.
+
+### The trigger had not fired
+
+#288 is blocked by #38 (the owner's live run and the M1 gate), which is still open, so no real send has measured the
+gate. Its stand-in is the recorded session in `docs/research/cost-m1.md` §2: **$0.0265 per completed application**, under
+the $0.03 gate by 12 %. Measured against the gate's own terms, the price case for Browser Run is real (−38 % per
+completed application) but it is not a case the gate asks for. **Drop now; the gate has not missed.** The revisit
+condition is at the end of this section.
+
+### What was measured, and what was not
+
+Measured locally on 2026-11-22, on this machine, with no network call and no Browser Run session (ADR 0016, and no
+Browser Rendering token exists in the repository): the production lab driver (`src/server/lab/runner.ts`, `drivePage`)
+drove the real lab pages (`src/server/lab/pages.ts`) with a headless Chromium whose every request carried the headers
+Browser Run adds and does not let a session remove. One session per page; 5 recorded ATS forms, 3 challenge pages with
+the challenge allowed to pass, and the same 3 with it held visible. The probe is `scripts/measure-browser-run-lab.ts`
+(`bun run scripts/measure-browser-run-lab.ts`, about 2–3 s of driving); it exits non-zero if a form stops completing or a
+header stops reaching the origin, so the table below can be reproduced rather than trusted.
+
+| Browser Run request identity, as sent by the probe | Value |
+| --- | --- |
+| `cf-biso-devtools` | present on every navigation |
+| `cf-brapi-devtools` | present on every navigation (simulated request id) |
+| `Signature-agent`, `Signature`, `Signature-input` | present on every navigation (simulated key, documented shape) |
+| `navigator.webdriver` | `true` |
+| `navigator.userAgent` | `HeadlessChrome/159.0.8154.6` |
+| outbound host | the lab origin only; no vendor host was contacted |
+
+**Not measured: Browser Run itself.** No `wss://api.cloudflare.com/…/browser-run/devtools/browser` session was opened,
+so no Cloudflare IP, no Cloudflare TLS fingerprint, no real Web Bot Auth signature and no Browser Run quota was
+exercised. The lab has no bot filter, so completion parity on it is expected and proves only that Overture's driver can
+fill the five forms from a headless browser that announces itself as a bot. It cannot measure the completed-application
+rate, and nothing below claims it does.
+
+### Lab results
+
+The probe's own output on 2026-11-22 (one drive per row; the durations vary between runs and are the lab's, not a real
+form's):
+
+| page | outcome | challenge seen | score | ms |
+| --- | --- | --- | --- | --- |
+| `form:greenhouse` | completed | no | — | 484 |
+| `form:lever` | completed | no | — | 286 |
+| `form:ashby` | completed | no | — | 657 |
+| `form:workable` | completed | no | — | 705 |
+| `form:personio` | completed | no | — | 317 |
+| `recaptcha_v3` | completed | yes | 0.9 | 97 |
+| `hcaptcha` | completed | yes | — | 91 |
+| `turnstile` | completed | yes | — | 100 |
+| `recaptcha_v3` held | `challenge_blocked` | yes | — | 113 |
+| `hcaptcha` held | `challenge_blocked` | yes | — | 91 |
+| `turnstile` held | `challenge_blocked` | yes | — | 97 |
+
+Browser Use on the same pages, from `test/e2e/lab-synthetic.test.ts` and its recorded fixtures: 5 of 5 forms completed,
+3 of 3 challenge pages completed with the reCAPTCHA page scoring 0.9, and the held pages `challenge_blocked`.
+
+Both are 5 of 5 forms and 3 of 3 clearable challenges because **the lab has no bot filter**: the challenge is a switch,
+not a score, so the lab cannot separate the two providers. The row that does separate them is the last three, and only
+because the two products handle a held challenge differently: Browser Use creates its session with `solveCaptchas: true`
+(SPEC §10.3), while Browser Run has no solver. Overture's send path has no human takeover — a still-visible Turnstile box
+is `captcha_blocked`, one retry, then `failed` (SPEC §9.2, §10.3) — so every held challenge that Browser Use clears is a
+lost application on Browser Run.
+
+The sharpest case is Personio, whose submit button a **Cloudflare Turnstile** box can hold (SPEC §10.3), and
+Greenhouse's invisible reCAPTCHA v3, which scores the exit IP and fingerprint before the script gets to work. Browser
+Run's own documentation says its traffic is *always* identified as bot traffic, its outbound addresses are Cloudflare's
+with no per-request rotation, and allowlisting it on a zone needs an Enterprise WAF skip rule
+([FAQ](https://developers.cloudflare.com/browser-run/faq/), [automatic headers](https://developers.cloudflare.com/browser-run/reference/automatic-request-headers/)).
+There is no documented way to allowlist it past a third-party Turnstile widget at all.
+
+### Cost per application, from the rate card and the recorded session
+
+`cost-m1.md` §2.1's recorded send used **2.71 MB and 556 s (9 min 16 s)** of active browser session. At Browser Run's
+$0.09 a browser-hour after the 10 included hours ([pricing](https://developers.cloudflare.com/browser-run/pricing/))
+that session costs **$0.0139**, against Browser Use's $0.00927 browser line on the same session. The proxy line is what
+decides the comparison:
+
+| Configuration | Per attempt | Per completed (÷ 0.85) | Against the $0.03 gate |
+| --- | --- | --- | --- |
+| Browser Use today (2.71 MB at $5/GB) | $0.02250 | $0.02647 | 12 % under |
+| Browser Run, no proxy (Cloudflare egress) | $0.01390 | $0.01635 | 45 % under |
+| Browser Run + Browser Use's $5/GB proxy | $0.02713 | $0.03192 | **6 % over** |
+| Browser Run + Evomi $0.49/GB | $0.01520 | $0.01788 | 40 % under |
+| Browser Run + DataImpulse $1/GB | $0.01655 | $0.01947 | 35 % under |
+
+The cheap rows are the ones Browser Run cannot deliver: the product has **no proxy or egress-IP option** (no page in
+its documentation index covers proxies; the FAQ says all rendering traffic comes from Cloudflare IP ranges with no
+rotation). "Browser Run behind our own proxy", the configuration #288 asked about, is not a documented configuration:
+a proxy configured inside the browser would still leave through Cloudflare's edge first, and this spike did not test
+that. The one price that is both documented and real is $0.0164 per completed application **from Cloudflare IPs that
+any bot filter can name**, and that price is irrelevant if the form does not complete.
+
+Volume, for the record (the 10 included hours, monthly rounding: the month's total is rounded to the nearest whole hour,
+30 minutes up):
+
+| Volume | Browser-hours | Browser Run | Browser Use (same sessions) |
+| --- | --- | --- | --- |
+| One Month-plan user (353 attempts) | 54.5 h, 10 free → 44.5 h | **$4.01** ($0.0134/completed) | $7.94 |
+| 300 such users (105,900 attempts) | 16,357 h | **$1,471** | $2,383 |
+| 10 included hours alone | 600 min ÷ 9.27 min | 64 attempts, ~54 completed | n/a |
+
+Concurrency is free at Overture's scale: 10 browsers are included, and one process admits at most 3 sessions by
+default (`browser.max_concurrent_sessions`, SPEC §12), so the $2.00 per extra browser never applies on one machine. A
+multi-machine M3 would have to watch the monthly average of daily peaks.
+
+### Why it is dropped
+
+1. **It is always identified as a bot, and that is the product's one hard requirement to avoid.** The success rate is
+   what ADR 0003 chose Browser Use for over price. Non-removable `cf-biso-devtools`/`Signature` headers, Cloudflare
+   egress, no rotation, and the vendor's own FAQ statement make every request attributable, and the product already
+   knows Greenhouse scores the exit IP and fingerprint.
+2. **The lab cannot show parity, and the documented facts point the other way.** The probe proves the driver works and
+   the headers are on the wire; it cannot produce a completed-application rate, and 5 of 5 on a filterless lab is not
+   evidence of one.
+3. **No CAPTCHA solving closes the gap Browser Use's price includes.** Overture's send path already turns a visible
+   challenge into `captcha_blocked` → one retry → `failed`; Browser Run has no solver and no documented allowlist.
+4. **There is no proxy to bolt on.** The cheaper configuration in #288's premise is not documented; the only real
+   price, $0.0164/completed, is 45 % under the gate but buys a browser that announces itself.
+5. **The saving is small beside the risk.** $912 a month at the M3 ceiling (300 Month users sending at the daily cap)
+   against $10,500 of revenue, and about $31 a month for the M2 beta's ten users. ADR 0003 chose Browser Use for success
+   rate over price; trading the one property that decides whether an application is sent for a 38 % unit-cost cut the
+   gate does not ask for is the wrong trade at every volume in SPEC §2.
+6. **Platform shape.** No vendor profile store (one persistent per-user profile would have to be built on R2 from
+   Playwright `storageState`, a new privacy surface), sessions close on 60 s of inactivity unless `keep_alive` is set
+   high enough (up to its 20-minute ceiling) for the 10-minute code wait, a Cloudflare release closes sessions, and
+   Browser Run has no native spend limit (§3). Each is small; together they are a second browser platform for a price
+   the gate does not ask for.
+
+### When to revisit
+
+Only all three together:
+
+- #38's live numbers **miss** the $0.03 gate on cost while holding ≥ 85 % completion on Browser Use, and
+- Cloudflare documents a **proxy or egress-IP option** for a Browser Session (or a WAF/Turnstile allowlist that works
+  without Enterprise), and
+- the price after the proxy still lands under the gate: at Browser Use's $5/GB it does not ($0.0319), so it needs a
+  proxy near Evomi's $0.49/GB and a documented way to attach it.
+
+Until then Browser Use stays the only browser that reaches real forms (ADR 0003, ADR 0016) and the decision in ADR 0033
+stands.
+
 ## Not verified
 
 - The alpha billable-usage API response shape was not called; the sentinel ticket must record a real response first.
@@ -221,3 +369,9 @@ Until then the fallback stays on Haiku: it is 24 µUSD a call, it is measured on
 - Whether Workers AI's free 10,000 Neurons a day counts toward an AI Gateway spend limit is not stated on the pages read.
 - The R2 operation counts are measured (§2). Storage size per bucket was not read; the 8 GB alert is the first reading. Re-measure once M2 users arrive and record Class A per user per month (#281).
 - Cloudflare Registrar renewals and any plan on another Cloudflare product (Access, Turnstile, DNS) are outside the Workers plan and not counted here.
+- **Browser Run was not called** (§6): no session was opened, so its real IP reputation, TLS fingerprint, the 60-second
+  idle close and the 20-minute `keep_alive` ceiling are read from the documentation, not observed. The lab measured the
+  driver and the headers only. The completed-application rate that decides the question is still unknown, and the
+  recommendation does not rest on it: it rests on Browser Run always identifying itself as a bot and on there being no
+  documented proxy.
+
