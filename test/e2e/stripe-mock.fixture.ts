@@ -12,6 +12,11 @@ export interface StripeMock {
   url: string;
   requests: StripeMockRequest[];
   clear: () => void;
+  /**
+   * Answers GET /v1/checkout/sessions/<id> with a verified setup session whose card has
+   * the given fingerprint, the shape Stripe returns after a card check succeeds.
+   */
+  stubVerifiedSetupSession: (session: { id: string; userId: string; fingerprint: string }) => void;
   stop: () => Promise<void>;
 }
 
@@ -85,6 +90,7 @@ export async function startStripeMock() {
 
   const stripeMockUrl = await waitForListening(child);
   const requests: StripeMockRequest[] = [];
+  const setupStubs = new Map<string, { userId: string; fingerprint: string }>();
 
   const proxy = Bun.serve({
     hostname: "127.0.0.1",
@@ -100,6 +106,26 @@ export async function startStripeMock() {
         method: request.method,
         path: url.pathname,
       });
+
+      const sessionId = /^\/v1\/checkout\/sessions\/(?<id>[^/]+)$/u.exec(url.pathname)?.groups?.[
+        "id"
+      ];
+
+      const stub = sessionId === undefined ? undefined : setupStubs.get(sessionId);
+
+      if (request.method === "GET" && stub !== undefined) {
+        return Response.json({
+          client_reference_id: stub.userId,
+          customer: null,
+          id: sessionId,
+          mode: "setup",
+          setup_intent: {
+            payment_method: { card: { fingerprint: stub.fingerprint } },
+            status: "succeeded",
+          },
+          status: "complete",
+        });
+      }
 
       const upstream = await fetch(`${stripeMockUrl}${url.pathname}${url.search}`, {
         body,
@@ -122,6 +148,9 @@ export async function startStripeMock() {
     requests,
     clear: () => {
       requests.length = 0;
+    },
+    stubVerifiedSetupSession: ({ id, userId, fingerprint }) => {
+      setupStubs.set(id, { fingerprint, userId });
     },
     stop: async () => {
       await proxy.stop(true);

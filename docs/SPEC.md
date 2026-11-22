@@ -310,7 +310,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `grants` | id, user_id, source CHECK IN ('trial','period','admin'), quantity, starts_at, expires_at, stripe_invoice_id UNIQUE NULL, created_at |
 | `ledger` | id, user_id, kind CHECK IN ('grant','reserve','commit','release','expire','refund','adjust'), debit_account, credit_account, amount CHECK (amount > 0), grant_id, application_id NULL, idempotency_key UNIQUE, created_at. **Each row is one balanced transfer**, so the ledger is zero-sum by construction. No UPDATE/DELETE (triggers). |
 | `stripe_events` | id PK (Stripe event id), type, received_at, processed_at NULL |
-| `card_fingerprints` | hmac PK, trial_used_at — **not** user-linked; survives account deletion |
+| `card_fingerprints` | hmac PK (HMAC-SHA256 of the Stripe card fingerprint, keyed by `CARD_FINGERPRINT_SECRET`), trial_used_at, created_at — **no foreign key**; survives account deletion |
 
 Accounts: `issued`, `available`, `reserved`, `used`, `expired`. The same no-UPDATE rule and the same user-gone `BEFORE DELETE` condition as snapshots apply. Transfers: grant `issued→available`; reserve
 `available→reserved`; commit `reserved→used`; release `reserved→available`; expire `available→expired`. Balances are

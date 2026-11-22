@@ -310,6 +310,7 @@ if (env.DEMO_LOGIN_ENABLED) {
 const planner = createPlanner({ clock, db, random });
 
 const preparation = createPreparationService({
+  billingEnabled: payments !== null,
   db,
   clock,
   llm: anthropicLlmPort,

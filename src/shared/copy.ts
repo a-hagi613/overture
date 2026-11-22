@@ -1681,6 +1681,33 @@ export const copy = {
     skipNote: "Skip anything. Unanswered questions wait in Review.",
     back: "Back",
     continue: "Continue",
+    trial: {
+      stepLabel: "Trial card",
+      eyebrow: "Overture · Set up",
+      titlePlain: "Verify a card for your",
+      titleItalic: "three",
+      titleRest: "free Applications",
+      kicker: "One free trial per card",
+      stepPill: "Step 6 of 6",
+      verifyTitle: "Verify a card",
+      intro:
+        "Stripe checks the card. Nothing is charged for the trial. Once it is verified, Overture prepares your first 3 free Applications and you approve each one before it is sent. One free trial per card.",
+      verifyButton: "Verify card",
+      verifying: "Checking the card…",
+      backButton: "Back",
+      declinedTitle: "Card declined",
+      declinedBody:
+        "Your bank declined this card. Nothing was charged and no Applications were prepared. Try another card, or choose a plan.",
+      tryAnother: "Try another card",
+      usedHeading: "Card already used",
+      usedTitle: "Trial used",
+      usedBody:
+        "This card has already had its free trial. Choose a plan to prepare Applications with it, or use another card.",
+      choosePlan: "Choose a plan",
+      anotherCard: "Use another card",
+      startButton: "Start",
+      loadFailed: "The card check did not go through. Try again in a moment.",
+    },
     forward: {
       titlePlain: "Forward your",
       titleItalic: "job mail",

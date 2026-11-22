@@ -114,6 +114,10 @@ The label on anything blocked on the user's answer: an open Review, or a Queued 
 waits for Approval and is labelled Ready, not Needs you.
 _Avoid_: action required, blocked
 
+**Free trial**:
+Three Applications, once per card, for a card verified with Stripe. Nothing is charged. The card is kept as an HMAC of its fingerprint, so it cannot start a second trial even after its account is deleted.
+_Avoid_: credit, promo, bonus, free plan
+
 ## The user's facts
 
 **Fact**:
