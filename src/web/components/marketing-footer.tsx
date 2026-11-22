@@ -9,7 +9,7 @@ const footerLinks = [
 ];
 
 const linkClass =
-  "inline-flex min-h-[44px] min-w-11 items-center justify-center text-[14px] text-foreground underline-offset-4 hover:text-muted-foreground hover:underline focus-visible:underline";
+  "inline-flex min-h-[44px] items-center px-1 -mx-1 text-[14px] text-foreground underline-offset-4 hover:text-muted-foreground hover:underline focus-visible:underline";
 
 /**
  * The footer the public marketing pages share. The landing board draws the mark and the

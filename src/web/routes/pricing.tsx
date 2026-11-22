@@ -48,8 +48,9 @@ export function PricingPage() {
             <MarketingPlanEyebrow>{copy.week.eyebrow}</MarketingPlanEyebrow>
             <h2 className="mt-2 font-serif text-[34px] tracking-[0]!">{copy.week.name}</h2>
             <p className="mt-[18px] font-serif text-[56px] leading-none tracking-[0]! md:text-[64px]">
-              {copy.week.price}{" "}
+              {copy.week.price}
               <span className="font-sans text-[16px] text-muted-foreground">
+                {" "}
                 {copy.week.priceNote}
               </span>
             </p>
@@ -71,8 +72,9 @@ export function PricingPage() {
             <MarketingPlanEyebrow>{copy.month.eyebrow}</MarketingPlanEyebrow>
             <h2 className="mt-2 font-serif text-[34px] tracking-[0]!">{copy.month.name}</h2>
             <p className="mt-[18px] font-serif text-[56px] leading-none tracking-[0]! md:text-[64px]">
-              {copy.month.price}{" "}
+              {copy.month.price}
               <span className="font-sans text-[16px] text-muted-foreground">
+                {" "}
                 {copy.month.priceNote}
               </span>
             </p>

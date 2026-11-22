@@ -46,7 +46,7 @@ export function MarketingHeader(props: { landing?: boolean }) {
             <a className={desktopOnlyClass} href="/#boards">
               {marketingCopy.nav.whereItApplies}
             </a>
-            <a className={linkClass} href="/pricing">
+            <a className={desktopOnlyClass} href="/pricing">
               {marketingCopy.nav.pricing}
             </a>
             <a className={`${linkClass} font-semibold`} href="/signin">

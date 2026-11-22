@@ -369,7 +369,7 @@ export const marketingCopy = {
     includesTitle: "Every plan includes",
     includes: [
       "Every application is shown to you as Ready to send before anything is sent.",
-      `Send goes out in daytime hours, ${sendHours} your local time, at least ${String(SEND_WINDOW.minGapMinutes)} minutes apart, up to ${String(SEND_WINDOW.maxPerDay)} a day.`,
+      `Sends go out ${sendHours} your local time, at least ${String(SEND_WINDOW.minGapMinutes)} minutes apart, up to ${String(SEND_WINDOW.maxPerDay)} a day.`,
       `One company per ${String(PLANS.month.periodDays)} days.`,
       `${atsList}.`,
     ],
