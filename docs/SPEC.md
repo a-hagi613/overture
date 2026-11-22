@@ -96,7 +96,9 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
   by lease expiry (§9.4).
 - After a restart the job worker stays quiet for `JOBS_STARTUP_SETTLE_MS` (5 s): the startup enqueues otherwise wake
   it in the same second the port opens and the new machine's first health checks compete with a full batch of jobs.
-  Nothing is dropped; the queued work starts a few seconds later.
+  Nothing is dropped; the queued work starts a few seconds later. `JOBS_AUTORUN=false` (test-only; refused in
+  production) starts the process without the worker, so an e2e test can drive each job through `/__test__/jobs/*`
+  without a live scheduler claiming it first.
 - The prerendered marketing pages (`/` and `/pricing`) are deployed as Workers Static Assets
   (`workers/marketing`, ADR 0033) on explicit routes for those paths only, so they stay up through those deploys.
   Every app and API path matches no Worker route and goes straight to `overture-web`; the app's HTML and assets are
@@ -162,7 +164,7 @@ refusal is stamped in `reserve_refused_at` and the cap refusal in `refused_at`, 
 The admin overview shows the month's count and says which of the two stops is in force. Tests reach Cloudflare only
 through MSW (ADR 0013, 0016).
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
-Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set; a half-set pair stops the server at boot and with neither the app boots and runs as in M2. `POST /webhooks/stripe` verifies the `Stripe-Signature` header (HMAC-SHA256 over the timestamped raw body, five-minute window) before it reads or writes any billing row, and a bad or stale signature is refused with 400. `STRIPE_PRICE_WEEK` and `STRIPE_PRICE_MONTH` name the Stripe prices a Checkout session sells; a missing one answers 503 `billing_not_configured` without a Stripe call. What each plan buys is configuration in `src/server/billing/plans.ts`: Week 70 Applications over 7 days, Month 300 over 30 days (ADR 0018); the price itself lives in Stripe and reaches Overture only as a price id. `invoice.paid` grants its period and clears a `plan_ended` or `payment_failed` pause; `invoice.payment_failed` sets `payment_failed` at once. Each transition writes one `paused` notification (pushed to the user's devices) and one email naming the fix in Settings (`Choose a plan` links to `/settings/billing/plans`, `Update payment` to `/settings/billing`, never the word `failed`), and a repeated event writes nothing twice. A grant's period end is the plan end: after the expiry sweep leaves the user with no unexpired grant, sending pauses with `plan_ended`. The demo account is never paused, granted or notified, and its billing mutations answer `403 demo_locked` before any Stripe call.
+Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set; a half-set pair stops the server at boot and with neither the app boots and runs as in M2. `POST /webhooks/stripe` verifies the `Stripe-Signature` header (HMAC-SHA256 over the timestamped raw body, five-minute window) before it reads or writes any billing row, and a bad or stale signature is refused with 400. `STRIPE_PRICE_WEEK` and `STRIPE_PRICE_MONTH` name the Stripe prices a Checkout session sells; a missing one answers 503 `billing_not_configured` without a Stripe call. What each plan buys is configuration in `src/server/billing/plans.ts`: Week 70 Applications over 7 days, Month 300 over 30 days (ADR 0018); the price itself lives in Stripe and reaches Overture only as a price id. `invoice.paid` grants its period and clears a `plan_ended` or `payment_failed` pause; `invoice.payment_failed` sets `payment_failed` at once, unless the failed invoice's period is older than the subscription's current period, so a stale out-of-order delivery cannot pause a paid user. Each transition writes one `paused` notification (pushed to the user's devices) and one email naming the fix in Settings (`Choose a plan` links to `/settings/billing/plans`, `Update payment` to `/settings/billing`, never the word `failed`), and a repeated event writes nothing twice. A grant's period end is the plan end: after the expiry sweep leaves the user with no unexpired grant, sending pauses with `plan_ended`. The demo account is never paused, granted or notified, and its billing mutations answer `403 demo_locked` before any Stripe call.
 
 ### 3.3 Domains and DNS
 
@@ -269,6 +271,7 @@ other address only lowered and trimmed) · `session` · `account` (provider: goo
 | `browser_profiles` | user_id, provider, provider_profile_id, country_code, created_at, last_used_at; PK(user_id, provider) |
 | `mailboxes` | id (the forwarding id, `[a-z0-9]{8,32}`), user_id UNIQUE, local_part UNIQUE (the `in-{id}-{mac}` local part), status CHECK IN ('active','receive_only','closed'), receive_until NULL, first_forwarded_at NULL (set once by the first ATS mail that arrives; the API reads it as "forwarding works"), created_at |
 | `retired_addresses` | local_part PK, retired_at — **a local part is never reassigned** |
+| `account_erasures` | user_id PK (**no foreign key**: it outlives the `users` row), vendor_profiles JSON (`[{provider, providerProfileId}]`, shrinks as each is deleted), object_prefixes JSON, notice_name NULL, notice_to NULL, user_deleted_at, vendor_cleaned_at, objects_cleaned_at, notice_queued_at, last_error NULL, created_at, updated_at. The durable plan for one erasure: written in the transaction that deletes the account, so the vendor ids and prefixes survive the `browser_profiles` cascade; `notice_name`/`notice_to` are wiped as soon as the confirmation notice is queued |
 
 ### 5.3 Catalog
 
@@ -297,6 +300,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `application_snapshots` | application_id PK, user_id, posting_url, posting_title, description_hash, answers_enc (JSON array `{question_id, label, answer, fact_key, fact_revision, kind, resume_line_ids, by_user}`), cover_letter_enc NULL (JSON `[{sentence, resume_line_ids, by_user}]`), resume_id, resume_sha256, consent_version, approved_at, approved_plan_sha256, provider, provider_session_id, submitted_at, confirmed_by CHECK IN ('page','email'), cost_micros. **Immutable**: a `BEFORE UPDATE` trigger always raises; a `BEFORE DELETE` trigger raises `WHEN EXISTS (SELECT 1 FROM user WHERE id = OLD.user_id)`, so rows go only when the user row is gone (account deletion cascade). Flow 29 proves both |
 | `application_answers` | id, application_id, question_id, user_id, kind CHECK IN ('open_text','cover_letter'), sentences_enc (JSON `[{sentence, resumeLineIds, byUser?}]`, sealed), word_count, created_at, updated_at; UNIQUE(application_id,question_id). The generated, grounded open text and letter kept from preparation until the Snapshot takes them; `byUser: true` marks text the user edited on the card, which preparation keeps |
 | `application_events` | id, application_id, user_id, at, kind CHECK IN ('status','stage','email','checkin','note'), from_value, to_value, source CHECK IN ('system','user','email','checkin','admin'), detail JSON; the card timeline and stage history |
+| `application_receipts` | application_id PK, message_id, confirmed_at; UNIQUE(message_id). The one authenticated message that confirmed the Application; one message is the receipt for at most one Application, so it can never commit a second credit |
 | `attempts` | id, application_id, user_id, n, provider, provider_session_id, started_at, lease_until, ended_at NULL, submit_clicked_at NULL, submit_response_status INTEGER NULL, outcome CHECK IN ('sent','unconfirmed','captcha_blocked','code_timeout','posting_closed','form_changed','blocked','upload_failed','duplicate','needs_review','provider_error','timeout','crash','interrupted') NULL, browser_ms, proxy_bytes, captcha_seen, code_used, cost_micros, error_code NULL |
 | `reviews` | id, user_id, question_id, fact_key NULL, scope ('' or an ISO 3166-1 alpha-2 country), prompt, field_type, options JSON, reason CHECK IN ('unknown_required','option_missing'), attempt_id NULL (the attempt whose live-form check opened it), status CHECK IN ('open','answered','dismissed'), created_at, resolved_at; UNIQUE(user_id,question_id,scope) WHERE status='open' |
 | `review_applications` | review_id, application_id; PK(review_id,application_id) |
@@ -340,20 +344,23 @@ exception is a send already in flight (`sending` or `confirming`): its reservati
 so a confirmed send commits and is charged for what was sent, and a failed or unconfirmed one releases and is
 expired by the next sweep. When the last unexpired grant ends, sending pauses with `plan_ended`.
 `stripe_events` holds each signed Stripe event id once: the row is inserted, its effect applied and `processed_at`
-set in one transaction, so a replay finds the row and does nothing; a bad signature never reaches the table. A signed
+set in one transaction, so a replay finds the row and does nothing; a bad signature never reaches the table. The
+pause notice, its push and email jobs, and the planner/prep jobs a resume queues are written in that same
+transaction, so a crash cannot commit the event without them and a redelivery cannot skip them. A signed
 `checkout.session.completed` links `customers.stripe_customer_id` to the user named by `client_reference_id` (or
 `metadata.user_id`), and `customer.created`/`customer.updated` link the same way from `metadata.user_id`.
 `invoice.paid` issues the period grant: `source='period'`, the plan's quantity, `starts_at` at the invoice line's
 period start and `expires_at` at its end (or at receipt and the plan's own period from receipt when the invoice names
 none), and `stripe_invoice_id` the invoice id, which is also the grant's ledger idempotency key, so a replay grants
 once and a renewal's new invoice issues the next period's grant starting where the old one ends. The plan comes from
-the price the invoice line names, falling back to the subscription metadata the Checkout session set, so a Week/Month
-switch Stripe applies at the renewal grants the new plan's quota even while the subscription metadata still names the
-old one. A paid period is never cut short: an upgrade from the trial grants the paid plan's Applications at once
+the price the invoice line names, so a Week/Month switch Stripe applies at the renewal grants the new plan's quota
+even while the subscription metadata still names the old one; a price Overture does not sell grants nothing instead
+of borrowing that metadata, and only an event that names no price at all falls back to it. A paid period is never cut short: an upgrade from the trial grants the paid plan's Applications at once
 beside the trial's, and cancelling at the period end only sets the flag below. A demo account never receives a period
 grant. A signed `customer.subscription.created`, `customer.subscription.updated` or `customer.subscription.deleted`
 stores the subscription in `subscriptions`: its `user_id` from the event metadata, the stored row or the event's Stripe
-customer; its `plan` from the price item first, then the metadata; its `status` verbatim; the period the event names;
+customer; its `plan` from the price item (a price Overture does not sell records no new plan, and only an event with no
+price falls back to the metadata); its `status` verbatim; the period the event names;
 and `cancel_at_period_end`. `invoice.paid` refreshes that row's plan and period too, so the state follows the invoice
 when the subscription update lags. An hourly `billing.grant-expiry` pass releases a reservation still held on a grant past its period end
 and then expires its available balance, so it never returns to spendable (ADR 0008); until that pass runs,
@@ -381,10 +388,12 @@ alerts nobody. The admin billing page shows the last result.
 | `settings` | key PK, value JSON, updated_at, updated_by — admin-tunable limits (§12) |
 | `kill_switches` | scope CHECK IN ('global','ats','employer','provider'), key, enabled, reason, set_by CHECK IN ('auto','owner'), set_at; PK(scope,key) |
 | `llm_usage` | id, user_id NULL, purpose, model, input_tokens, cached_tokens, output_tokens, cost_micros, created_at |
+| `llm_batches` | id, input_revision_hash UNIQUE (sha256 of the model and the request set), model, batch_id NULL, status CHECK IN ('creating','in_progress','applied','failed'), results JSON NULL, result_applied_at NULL, expires_at NULL, last_polled_at NULL, last_error NULL, created_at, updated_at |
 | `fx_rates` | date, currency, per_usd REAL; PK(date,currency) |
 | `admin_audit` | id, at, actor_id, action, target_user_id NULL, reason, detail JSON — also shipped to Loki (off-box, append-only) |
 
-Retention: `events` 24 h; `bg_jobs` done 7 days, dead 30 days; `attempts` 180 days; `llm_usage` 400 days;
+Retention: `events` 24 h; `bg_jobs` done 7 days, dead 30 days; `attempts` 180 days; `llm_batches` applied or
+failed 30 days; `llm_usage` 400 days;
 `notifications` 90 days; descriptions 90 days after close; messages for account lifetime; `review_audit_events` and
 Snapshots for account lifetime (the audit is only useful across a search).
 
@@ -763,6 +772,20 @@ scoring pauses until the next UTC day, preparation waits, the owner is alerted. 
 search at three times the daily cap (§8.2) and alerts `match.score_bound` when it stops there, so a strict threshold
 reaches that alert rather than the cap.
 
+An Anthropic batch is recorded in `llm_batches` before its id exists and keyed by the sha256 of the model and its
+request set, so the id, its status and the moment its results were stored survive a deploy or a crash. A producer
+that restarts finds the record and polls the same provider batch instead of submitting a second one, so the same
+requests are never billed twice: a single conditional update claims the stored results, and every later call returns
+them. A `llm.batch_poll` job, queued when the batch is submitted, checks the provider every
+`ANTHROPIC_BATCH_POLL_INTERVAL_MS` (10 s) and requeues itself without holding a worker, so polling continues when the
+producer is gone; it stops once the provider's `expires_at` has passed and records the reason in `last_error`. The
+producing call
+still waits for the results because `LlmPort` returns them, bounded by `ANTHROPIC_BATCH_WAIT_MS` (1 h), and a wait
+that gives up leaves the record resumable. The submission carries `Idempotency-Key: <input_revision_hash>`, and a
+record still in `creating` after two minutes is submitted again with the same key, so a crash between the POST and
+the write is billed once wherever Anthropic honours the key. The results url is fetched with the api key only when it
+points at the configured api origin, so a provider response that names another host cannot take the key with it.
+
 > `email_classify` is the one LLM use beyond scoring, answers, letters, PDF fallback and question mapping; it runs only when the rules in §11.3 are not confident.
 
 ### 8.7 Approval and Ready (ADR 0029)
@@ -959,7 +982,11 @@ passes; preparation skips a Personio Application as `ats_not_enabled` while it i
 
 **Confirming.** An application in `confirming` waits up to `limits.confirm_wait_hours` (24) for an acknowledgement:
 forwarded mail to the user's forwarding address with `auth='pass'`, from the company's or the ATS's sender domains, naming the company
-or the posting title, received after `submit_clicked_at`. Ingest checks each authenticated message as it arrives, and the
+or the posting title, received after `submit_clicked_at`. The match must be unambiguous: when more than one Application is
+`confirming` at the same employer, both the employer and the role must appear; a message that still matches more than one
+Confirming Application is left unresolved, and a message is the receipt for at most one Application
+(`application_receipts.message_id` UNIQUE), so a replayed message never confirms a second Application or commits a second
+credit. Ingest checks each authenticated message as it arrives, and the
 recovery sweep rechecks stored mail, so a message that arrives while the process is down still counts. Found → commit, `sent`, snapshot (`confirmed_by='email'`).
 Not found → release, `failed` with reason `unconfirmed`, never retried, and the posting's `dedupe_key` is treated as
 sent for the 60-day guard so Overture cannot apply to it again. Shown as `Couldn't apply` with the line "Overture
@@ -1018,7 +1045,7 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 
 ### 10.3 Attempt steps (`submit.run`)
 
-1. Open provider browser (15-minute vendor timeout, attempt id as metadata); `page.route` aborts fonts, media (audio and video) and known analytics/tracker hosts. Images, scripts, XHR and CAPTCHA hosts (hCaptcha, reCAPTCHA, Turnstile) are never blocked: at $5/GB proxy is 59 % of Browser Use's bill at the one recorded session usage (2.71 MB, 9 min 16 s) and reaches 80–90 % only on a form of about 10 MB or more, so those requests cost money but they are what the form needs (§10.4, `docs/research/cost-m1.md`).
+1. Open provider browser (15-minute vendor timeout, attempt id as metadata); `page.route` aborts fonts, media (audio and video) and known analytics/tracker hosts, and the project's network policy blocks the same tracker hosts at the Browser Use proxy (`POST /api/v4/network-policies` with `networkPolicyId` on create) so service-worker, prefetch, iframe and CSS loads never cross the proxy either. A policy that cannot be created or updated raises `browser.network_policy` and falls back to the Playwright trim. Images, scripts, XHR and CAPTCHA hosts (hCaptcha, reCAPTCHA, Turnstile) are never blocked: at $5/GB proxy is 59 % of Browser Use's bill at the one recorded session usage (2.71 MB, 9 min 16 s) and reaches 80–90 % only on a form of about 10 MB or more, so those requests cost money but they are what the form needs (§10.4, `docs/research/cost-m1.md`).
 2. Navigate to the apply link: for Greenhouse the embed form `https://job-boards.greenhouse.io/embed/job_app?for={board_token}&token={ats_job_id}` (`job-boards.eu.greenhouse.io` when the board's `region` is `eu`), never the employer's `absolute_url` and never the plain `/{board_token}/jobs/{id}` board page, which redirects to the employer's own site on boards with a custom careers domain; otherwise `apply_url`. The identity check reads `for` and `token` from that path. If the page says the job is closed → `posting_closed`. Check that the live page's
    host, board token, job id and company name match the Posting; a redirect or any other mismatch → `identity_mismatch`
    (release, `skipped` with `status_reason` `posting_identity:<field>`, never submit).
@@ -1077,7 +1104,9 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
   attempt-level diagnostics.
 - Cost per completed application (ADR 0026): Browser Use spend for attempted Applications plus the Anthropic spend of the Application purposes (`score`, `open_text`, `cover_letter`, `question_mapping`) for those users, divided by sent Applications. `llm_usage` has no application id, so that Anthropic spend is attributed per user. `/admin/billing/margin` shows the same measure per plan over 30 days, with revenue per Application and margin, and reports fixed infrastructure, mail and other model calls beside it.
   The report raises `browser.proxy_trend` when the latest 20 completed applications use more than 1.2× the proxy bytes
-  per completed application of the 20 before them. Kernel stays the fallback unless the lab shows it clearly ahead
+  per completed application of the 20 before them, and `browser.minutes_trend` when the same latest 20 take more than
+  1.2× the browser milliseconds of the 20 before them (session duration is the other 41 % of the bill). Kernel stays
+  the fallback unless the lab shows it clearly ahead
   and the owner decides otherwise.
 
 ### 10.5 Fixtures
@@ -1283,14 +1312,26 @@ body, sender or attachment, so the admin never sees message content.
 - Encrypted: all `_enc` columns, resume files, mail HTML and attachments, exports.
 - **Delete account** (Settings → Delete account, re-auth): a signed-in session must have been created by a fresh sign-in (an
   emailed link, or Google or LinkedIn) in the last 15 minutes. The page offers "Email me a sign-in link"; there is no password check (ADR 0035).
-  The request queues one `account.erase` job.
-  The job deletes `user_keys` first (crypto-shredding), deletes Browser Use/Kernel profiles through the provider API,
-  retires the mailbox local part into `retired_addresses`, deletes R2 prefixes `files/{user_id}/`, `mail/{user_id}/`
-  and `exports/{user_id}/`, then cascade-deletes the user row (all remaining personal rows and the session). It keeps
-  only unlinked card fingerprints (M3) and admin audit rows. It completes within 24 h, sends the confirmation email,
-  and is idempotent across retries. The confirmation mail is queued as its own `account.deleted.notice`
-  job after the transaction, so a mail failure never leaves a keyless account behind. Backups and Litestream replicas keep only the shredded ciphertext
-  until normal rotation; without the wrapped key no copy is readable.
+  The request suspends the account, closes the mailbox, drops its sessions and queues one `account.erase` job.
+  In one transaction the job writes the durable `account_erasures` plan (every Browser Use/Kernel vendor profile id,
+  the R2 prefixes `files/{user_id}/`, `mail/{user_id}/` and `exports/{user_id}/`, and the name and address the
+  confirmation needs), deletes `user_keys` first (crypto-shredding), retires the mailbox local part into
+  `retired_addresses`, and cascade-deletes the user row (all remaining personal rows and the session). It then
+  deletes each vendor profile through the provider API and every object under the three prefixes, recording each
+  success on the plan; a profile the vendor already reports gone (404) counts as clean. It re-lists every prefix to
+  confirm nothing is left. If either external delete fails, the job is requeued without consuming an attempt every
+  minute (`RetryLaterError`), so a vendor outage or a restart keeps retrying until both are clean rather than losing
+  the profile ids with the cascade. Only after both are confirmed is the single `account.deleted.notice` job queued
+  (deduplicated per user) and the plan's name and address wiped, so a completed plan keeps only the opaque user id and
+  timestamps and a repeated erase is a no-op. It keeps only unlinked card fingerprints (M3) and admin audit rows. It
+  completes within 24 h when the vendors are reachable, and sends one confirmation email.
+- **Backups and replay window**: the erased account's ciphertext rows can remain in Litestream replicas and R2
+  backups until the normal rotation: the `overture-backups` bucket applies a 35-day lifecycle rule to the
+  `app.sqlite/` prefix and keeps nightly snapshots for 30 days (`retention: 720h`). Point-in-time replay or a restore
+  therefore brings back only keyless rows, because the wrapped key was destroyed first; a replay of a backup older
+  than the erasure cannot make them readable again. Object store deletes are not part of a database replay, so the
+  files, mail and exports stay deleted. The `account_erasures` row is not personal data after the notice is queued
+  and is not restored into anything readable.
 - **Export**: JSON (profile, facts, applications, snapshots, messages metadata + text) + resume + attachments, zipped,
   encrypted under a random per-export key that the server generates and wraps under the user's data key. The key is
   never stored in plaintext or logged; it reaches the page only with the download link (in its fragment), and the page

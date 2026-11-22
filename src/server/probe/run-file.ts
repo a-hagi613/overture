@@ -31,7 +31,10 @@ export const runFilePostingSchema = z
   );
 
 export const runFileSchema = z.object({
-  country: z.string().length(2),
+  country: z
+    .string()
+    .length(2)
+    .transform((country) => country.toLowerCase()),
   resumePath: z.string().min(1),
   postings: z.array(runFilePostingSchema).min(1),
 });

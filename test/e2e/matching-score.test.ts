@@ -12,8 +12,10 @@ import { startGreenhouseQuestionsFixture } from "./greenhouse-questions.fixture.
 import {
   clearCatalog,
   clockNow,
+  clockState,
   configureMatching,
   grantApplications,
+  moveClockTo,
   ownerContextFor,
   runPrepDaily,
   seedApplication,
@@ -262,20 +264,21 @@ test("a run after the daily time schedules only tomorrow, never a second run tod
 
   await owner.put("/__test__/settings/match.auto_threshold_default", { data: { value: "95" } });
 
-  const beforeOffset = await clockNow(owner);
-  const todayStart = Math.floor(beforeOffset / 86_400_000) * 86_400_000;
-  const afterDailyRunAt = todayStart + 9 * 3_600_000;
+  const { now: before } = await clockState(owner);
+  const dayMs = 86_400_000;
+  const todayStart = Math.floor(before / dayMs) * dayMs;
+  const todayRunAt = todayStart + 9 * 3_600_000;
 
-  await owner.post("/__test__/clock/offset", {
-    data: { offsetMs: afterDailyRunAt - beforeOffset },
-  });
+  if (before < todayRunAt) {
+    await moveClockTo(owner, todayRunAt);
+  }
 
   await seedCompanies(owner, "late", 40, { salaryMinMinor: 15_000_000 });
 
   await runPrepDaily(owner, matching.server.url, userId);
 
   const now = await clockNow(owner);
-  const tomorrowRunAt = todayStart + 86_400_000 + 7 * 3_600_000;
+  const tomorrowRunAt = todayStart + dayMs + 7 * 3_600_000;
   const { jobs } = jobsSchema.parse(await (await owner.get("/__test__/jobs")).json());
   const scheduled = jobs.filter((job) => job.kind === "prep.daily" && job.dedupeKey !== null);
 
@@ -367,9 +370,10 @@ test("opening a posting scores it once, and manual apply works below the thresho
     },
   });
 
-  await owner.get(`/api/postings/${strong}`);
+  const rescored = postingSchema.parse(await (await owner.get(`/api/postings/${strong}`)).json());
 
-  expect(matching.anthropic.requests()).toHaveLength(3);
+  expect(rescored.score).toBe(87);
+  expect(matching.anthropic.requests()).toHaveLength(2);
 
   await owner.dispose();
 });

@@ -21,6 +21,22 @@ const runFileTemplate = structuredClone(parsedTemplate);
 
 const CODE = "48211357";
 
+test("the probe run file lowercases an uppercase country before Browser Use v4 sees it", () => {
+  const uppercase = runFileSchema.parse({
+    ...parsedTemplate,
+    country: "CA",
+    resumePath: "/tmp/resume.pdf",
+  });
+
+  expect(uppercase.country).toBe("ca");
+  expect(parsedTemplate.country).toBe("ca");
+});
+
+test("the probe run file still rejects a country that is not two characters", () => {
+  expect(() => runFileSchema.parse({ ...parsedTemplate, country: "CAN" })).toThrow();
+  expect(() => runFileSchema.parse({ ...parsedTemplate, country: "" })).toThrow();
+});
+
 async function withHarness(work: (harness: ProbeHarness) => Promise<void>) {
   const harness = await startProbeHarness();
 
@@ -139,6 +155,14 @@ for (const record of runFileTemplate.postings) {
       expect(harness.fixture.state.submissions).toBe(0);
       expect(harness.browserUse.sessionCount).toBe(1);
       expect(harness.browserUse.stoppedSessionIds.length).toBe(1);
+
+      const [policy] = harness.browserUse.networkPolicies;
+      const [session] = harness.browserUse.createdSessions;
+
+      expect(harness.browserUse.networkPolicies).toHaveLength(1);
+      expect(policy?.name).toBe("overture-proxy-trim");
+      expect(policy?.block.domains).toContain("doubleclick.net");
+      expect(session?.networkPolicyId).toBe(policy?.id);
     });
   });
 }

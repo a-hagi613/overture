@@ -5,16 +5,15 @@ import type { QuestionFieldType } from "../../../shared/questions.ts";
 
 import {
   APPLICATION_RESPONSE_MS,
-  FORM_APPEAR_MS,
   fillField,
-  formLocator,
+  openForm,
   preflightForm,
   readConfirmation,
   submitPathnameOf,
   uploadFile,
   watchApplicationResponse,
 } from "../forms/engine.ts";
-import type { LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
+import type { FormScope, LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
 import { checkPostingIdentity } from "../posting-identity.ts";
 
 import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identity.ts";
@@ -210,7 +209,7 @@ export async function readLeverQuestions(page: Page) {
   );
 }
 
-async function fillPlannedFields(page: Page, fields: readonly SendPlanField[]) {
+async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanField[]) {
   const fillFrom: (index: number) => Promise<boolean> = async (index) => {
     const field = fields[index];
 
@@ -226,7 +225,7 @@ async function fillPlannedFields(page: Page, fields: readonly SendPlanField[]) {
       return fillFrom(index + 1);
     }
 
-    await fillField(page, field.fieldName, field.answer);
+    await fillField(scope, field.fieldName, field.answer);
 
     return fillFrom(index + 1);
   };
@@ -273,9 +272,9 @@ export const runLeverAttempt: (
     };
   }
 
-  try {
-    await formLocator(page).waitFor({ state: "visible", timeout: FORM_APPEAR_MS });
-  } catch {
+  const scope = await openForm(page, "form#application-form");
+
+  if (scope === null) {
     return {
       confirmationSeen: false,
       outcome: "form_missing",
@@ -284,7 +283,7 @@ export const runLeverAttempt: (
     };
   }
 
-  if (!(await fillPlannedFields(page, plan.fields))) {
+  if (!(await fillPlannedFields(scope, plan.fields))) {
     return {
       confirmationSeen: false,
       outcome: "fill_failed",
@@ -299,7 +298,7 @@ export const runLeverAttempt: (
         ? RESUME_FIELD
         : plan.resume.fieldName;
 
-    const uploaded = await uploadFile(page, fieldName, {
+    const uploaded = await uploadFile(scope, fieldName, {
       bytes: plan.resume.bytes,
       mimeType: "application/pdf",
       name: plan.resume.filename,
@@ -339,7 +338,7 @@ export const runLeverAttempt: (
     });
   }
 
-  const verdict = await preflightForm(page, expectations);
+  const verdict = await preflightForm(scope, expectations);
 
   if (verdict.outcome !== "ok") {
     return {
@@ -356,9 +355,9 @@ export const runLeverAttempt: (
     (await submitPathnameOf(page, new URL(plan.identity.url).pathname)) ??
     new URL(plan.identity.url).pathname;
 
-  const submitButton = page
+  const submitButton = scope.root
     .locator(
-      "form#application-form #btn-submit, form#application-form button[data-qa='btn-submit'], form#application-form button[type='submit'], form#application-form input[type='submit']",
+      "#btn-submit, button[data-qa='btn-submit'], button[type='submit'], input[type='submit']",
     )
     .first();
 

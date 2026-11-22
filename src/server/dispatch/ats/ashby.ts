@@ -9,11 +9,11 @@ import {
   APPLICATION_RESPONSE_MS,
   CONFIRMATION_SOURCES,
   CONFIRMATION_WAIT_MS,
-  FORM_APPEAR_MS,
+  openForm,
   preflightForm,
   uploadFile,
 } from "../forms/engine.ts";
-import type { LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
+import type { FormScope, LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
 import { checkPostingIdentity } from "../posting-identity.ts";
 
 import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identity.ts";
@@ -23,7 +23,7 @@ import { cssValue, normText } from "./shared.ts";
 
 const RESUME_FIELD = "_systemfield_resume";
 
-const FORM_SELECTOR = ".ashby-application-form-container";
+const FORM_SELECTOR = ".ashby-job-posting-right-pane";
 
 const YES_NO_GROUP = "[class*='ashby-application-form-input-yesno']";
 const YES_NO_OPTION = "button.ashby-application-form-input-yesno-option";
@@ -81,12 +81,25 @@ export async function readAshbyQuestions(page: Page) {
   return page.evaluate(
     (input: {
       fieldTypes: [string, QuestionFieldType][];
+      selector: string;
       yesNo: { group: string; option: string };
     }) => {
       const fieldTypes = new Map(input.fieldTypes);
       const questions: FormQuestion[] = [];
 
-      for (const entry of document.querySelectorAll(
+      const roots = [...document.querySelectorAll(input.selector)];
+
+      if (roots.length !== 1) {
+        return questions;
+      }
+
+      const [root] = roots;
+
+      if (root === undefined) {
+        return questions;
+      }
+
+      for (const entry of root.querySelectorAll(
         "[class*='ashby-application-form-field-entry'], fieldset[class*='ashby-application-form-input-radio-group'], fieldset[class*='ashby-application-form-input-checkbox-group']",
       )) {
         const labelElement =
@@ -240,12 +253,16 @@ export async function readAshbyQuestions(page: Page) {
 
       return questions;
     },
-    { fieldTypes: [...FIELD_TYPES], yesNo: { group: YES_NO_GROUP, option: YES_NO_OPTION } },
+    {
+      fieldTypes: [...FIELD_TYPES],
+      selector: FORM_SELECTOR,
+      yesNo: { group: YES_NO_GROUP, option: YES_NO_OPTION },
+    },
   );
 }
 
-async function fillNamedText(page: Page, fieldName: string, value: string) {
-  const control = page.locator(`[name="${cssValue(fieldName)}"]`).first();
+async function fillNamedText(scope: FormScope, fieldName: string, value: string) {
+  const control = scope.root.locator(`[name="${cssValue(fieldName)}"]`).first();
 
   if ((await control.count()) > 0) {
     await control.fill(value);
@@ -253,9 +270,9 @@ async function fillNamedText(page: Page, fieldName: string, value: string) {
     return true;
   }
 
-  const entry = page
+  const entry = scope.root
     .locator("[class*='ashby-application-form-field-entry']")
-    .filter({ has: page.locator(`label[for="${cssValue(fieldName)}"]`) })
+    .filter({ has: scope.page.locator(`label[for="${cssValue(fieldName)}"]`) })
     .first();
 
   const fallback = entry.locator("textarea, input:not([type='hidden']):not([type='file'])").first();
@@ -269,8 +286,8 @@ async function fillNamedText(page: Page, fieldName: string, value: string) {
   return true;
 }
 
-async function fillRadio(page: Page, fieldName: string, value: string) {
-  const group = page.locator(`input[name="${cssValue(fieldName)}"][type='radio']`);
+async function fillRadio(scope: FormScope, fieldName: string, value: string) {
+  const group = scope.root.locator(`input[name="${cssValue(fieldName)}"][type='radio']`);
   const count = await group.count();
 
   if (count === 0) {
@@ -281,7 +298,7 @@ async function fillRadio(page: Page, fieldName: string, value: string) {
 
   const labels = await Promise.all(
     ids.map(async (id) =>
-      page
+      scope.root
         .locator(`label[for="${cssValue(id)}"]`)
         .first()
         .textContent()
@@ -295,17 +312,17 @@ async function fillRadio(page: Page, fieldName: string, value: string) {
     return false;
   }
 
-  const label = page.locator(`label[for="${cssValue(ids[index] ?? "")}"]`).first();
+  const label = scope.root.locator(`label[for="${cssValue(ids[index] ?? "")}"]`).first();
 
   await label.click();
 
   return group.nth(index).isChecked();
 }
 
-async function pressYesNoOption(page: Page, fieldName: string, value: string) {
-  const group = page
+async function pressYesNoOption(scope: FormScope, fieldName: string, value: string) {
+  const group = scope.root
     .locator(YES_NO_GROUP)
-    .filter({ has: page.locator(`input[name="${cssValue(fieldName)}"]`) })
+    .filter({ has: scope.page.locator(`input[name="${cssValue(fieldName)}"]`) })
     .first();
 
   if ((await group.count()) === 0) {
@@ -329,16 +346,16 @@ async function pressYesNoOption(page: Page, fieldName: string, value: string) {
   return (await option.getAttribute("aria-pressed")) === "true";
 }
 
-async function fillAshbyField(page: Page, field: SendPlanField, value: string) {
+async function fillAshbyField(scope: FormScope, field: SendPlanField, value: string) {
   if (field.fieldType === "radio") {
     return (
-      (await pressYesNoOption(page, field.fieldName ?? "", value)) ||
-      fillRadio(page, field.fieldName ?? "", value)
+      (await pressYesNoOption(scope, field.fieldName ?? "", value)) ||
+      fillRadio(scope, field.fieldName ?? "", value)
     );
   }
 
   if (field.fieldType === "select") {
-    const control = page.locator(`select[name="${cssValue(field.fieldName ?? "")}"]`).first();
+    const control = scope.root.locator(`select[name="${cssValue(field.fieldName ?? "")}"]`).first();
 
     if ((await control.count()) === 0) {
       return false;
@@ -349,10 +366,10 @@ async function fillAshbyField(page: Page, field: SendPlanField, value: string) {
     return true;
   }
 
-  return fillNamedText(page, field.fieldName ?? "", value);
+  return fillNamedText(scope, field.fieldName ?? "", value);
 }
 
-async function fillPlannedFields(page: Page, fields: readonly SendPlanField[]) {
+async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanField[]) {
   const fillFrom: (index: number) => Promise<boolean> = async (index) => {
     const field = fields[index];
 
@@ -368,7 +385,7 @@ async function fillPlannedFields(page: Page, fields: readonly SendPlanField[]) {
       return fillFrom(index + 1);
     }
 
-    await fillAshbyField(page, field, field.answer);
+    await fillAshbyField(scope, field, field.answer);
 
     return fillFrom(index + 1);
   };
@@ -441,11 +458,9 @@ export const runAshbyAttempt: (
     };
   }
 
-  const form = page.locator(FORM_SELECTOR).first();
+  const scope = await openForm(page, FORM_SELECTOR);
 
-  try {
-    await form.waitFor({ state: "visible", timeout: FORM_APPEAR_MS });
-  } catch {
+  if (scope === null) {
     return {
       confirmationSeen: false,
       outcome: "form_missing",
@@ -454,7 +469,7 @@ export const runAshbyAttempt: (
     };
   }
 
-  if (!(await fillPlannedFields(page, plan.fields))) {
+  if (!(await fillPlannedFields(scope, plan.fields))) {
     return {
       confirmationSeen: false,
       outcome: "fill_failed",
@@ -464,7 +479,7 @@ export const runAshbyAttempt: (
   }
 
   if (plan.resume !== null) {
-    const uploaded = await uploadFile(page, RESUME_FIELD, {
+    const uploaded = await uploadFile(scope, RESUME_FIELD, {
       bytes: plan.resume.bytes,
       mimeType: "application/pdf",
       name: plan.resume.filename,
@@ -502,7 +517,7 @@ export const runAshbyAttempt: (
     });
   }
 
-  const verdict = await preflightForm(page, expectations, ".ashby-application-form-container");
+  const verdict = await preflightForm(scope, expectations);
 
   if (verdict.outcome !== "ok") {
     return {
@@ -515,7 +530,7 @@ export const runAshbyAttempt: (
     };
   }
 
-  const submitButton = page.locator(".ashby-application-form-submit-button").first();
+  const submitButton = scope.root.locator(".ashby-application-form-submit-button").first();
 
   hooks.onWillSubmit();
 
