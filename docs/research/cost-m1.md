@@ -246,6 +246,18 @@ path. There is no cheaper token left to buy except a cheaper model, which is lev
   table to filter it: no index starts at `started_at` (`attempts_application` leads on `application_id`), so a
   `started_at` index is the follow-up when the table is large enough to need one, and it needs a migration.
 
+### 5.6 The product rate divided by attempts, not Applications
+
+- **Evidence:** `buildProviderReport` and `buildCostSummary` counted `attempts` rows with `outcome = 'sent'`. An
+  email-confirmed send keeps its attempt at `unconfirmed` (`outcomes.ts` calls `recordSent` with
+  `markAttemptSent: false`), so that completed Application was missing from the numerator; and a failure-then-success
+  retry put two tries under one denominator Application, lowering its weight.
+- **Impact:** completion rate and cost per completed Application moved with the retry rate instead of with the product,
+  and an email-confirmed send could show as never completed even though the Application reached `sent`.
+- **Fixed in #417:** the product rate and cost denominator count distinct attempted Applications, with a completed
+  Application being one whose Status is `sent` (page- or email-confirmed). Attempts and page-confirmed attempts are
+  reported beside them as diagnostics; the Anthropic share stays split across provider groups by attempted
+  Applications.
 
 ## 6. Considered and rejected
 

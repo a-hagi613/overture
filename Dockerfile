@@ -35,11 +35,12 @@ COPY --from=build /app/src ./src
 COPY --from=build /app/drizzle ./drizzle
 COPY --from=build /app/scripts ./scripts
 COPY litestream.yml /etc/litestream.yml
+COPY litestream-drill.yml /etc/litestream-drill.yml
 
 RUN chmod 0755 /app/scripts/docker-entrypoint.sh \
   && groupadd --system --gid 10001 app \
   && useradd --system --uid 10001 --gid app --home-dir /home/app --shell /usr/sbin/nologin app \
-  && chown -R app:app /app /etc/litestream.yml
+  && chown -R app:app /app /etc/litestream.yml /etc/litestream-drill.yml
 
 # The entrypoint starts as root for exactly one purpose: Fly mounts volumes as
 # root, so it fixes the ownership of the data directory before anything else,

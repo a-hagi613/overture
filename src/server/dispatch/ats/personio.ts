@@ -6,9 +6,10 @@ import {
   APPLICATION_RESPONSE_MS,
   CONFIRMATION_WAIT_MS,
   FORM_APPEAR_MS,
+  openForm,
   preflightForm,
 } from "../forms/engine.ts";
-import type { LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
+import type { FormScope, LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
 import { checkPostingIdentity } from "../posting-identity.ts";
 import { personioApplyUrl, readPersonioFormHtml } from "../../pipeline/personio-form.ts";
 
@@ -66,20 +67,19 @@ export interface PersonioRun {
 }
 
 export async function readPersonioQuestions(page: Page) {
-  const form = page.locator(PERSONIO_FORM_SELECTOR).first();
-  const count = await form.count();
+  const forms = page.locator(PERSONIO_FORM_SELECTOR);
 
-  if (count === 0) {
+  if ((await forms.count()) !== 1) {
     return [];
   }
 
-  const html = await form.evaluate((element) => element.outerHTML);
+  const html = await forms.first().evaluate((element) => element.outerHTML);
 
   return (await readPersonioFormHtml(html)).questions;
 }
 
-async function fillText(page: Page, fieldName: string, value: string) {
-  const control = page.locator(`[name="${cssValue(fieldName)}"]`).first();
+async function fillText(scope: FormScope, fieldName: string, value: string) {
+  const control = scope.root.locator(`[name="${cssValue(fieldName)}"]`).first();
 
   if ((await control.count()) === 0) {
     return false;
@@ -90,8 +90,8 @@ async function fillText(page: Page, fieldName: string, value: string) {
   return true;
 }
 
-async function fillSelect(page: Page, fieldName: string, value: string) {
-  const control = page.locator(`select[name="${cssValue(fieldName)}"]`).first();
+async function fillSelect(scope: FormScope, fieldName: string, value: string) {
+  const control = scope.root.locator(`select[name="${cssValue(fieldName)}"]`).first();
 
   if ((await control.count()) === 0) {
     return false;
@@ -109,8 +109,10 @@ async function fillSelect(page: Page, fieldName: string, value: string) {
   return true;
 }
 
-async function fillCheckbox(page: Page, fieldName: string, value: string) {
-  const control = page.locator(`input[type='checkbox'][name="${cssValue(fieldName)}"]`).first();
+async function fillCheckbox(scope: FormScope, fieldName: string, value: string) {
+  const control = scope.root
+    .locator(`input[type='checkbox'][name="${cssValue(fieldName)}"]`)
+    .first();
 
   if ((await control.count()) === 0) {
     return false;
@@ -121,8 +123,8 @@ async function fillCheckbox(page: Page, fieldName: string, value: string) {
   return true;
 }
 
-async function fillRadio(page: Page, fieldName: string, value: string) {
-  const group = page.locator(`input[type='radio'][name="${cssValue(fieldName)}"]`);
+async function fillRadio(scope: FormScope, fieldName: string, value: string) {
+  const group = scope.root.locator(`input[type='radio'][name="${cssValue(fieldName)}"]`);
   const count = await group.count();
 
   if (count === 0) {
@@ -135,7 +137,7 @@ async function fillRadio(page: Page, fieldName: string, value: string) {
     ids.map(async (id) =>
       id === ""
         ? ""
-        : await page
+        : await scope.root
             .locator(`label[for="${cssValue(id)}"]`)
             .first()
             .textContent()
@@ -170,8 +172,8 @@ async function fillRadio(page: Page, fieldName: string, value: string) {
   return true;
 }
 
-async function fillMultiselect(page: Page, fieldName: string, value: string) {
-  const group = page.locator(`input[type='checkbox'][name="${cssValue(fieldName)}"]`);
+async function fillMultiselect(scope: FormScope, fieldName: string, value: string) {
+  const group = scope.root.locator(`input[type='checkbox'][name="${cssValue(fieldName)}"]`);
   const count = await group.count();
 
   if (count === 0) {
@@ -191,7 +193,7 @@ async function fillMultiselect(page: Page, fieldName: string, value: string) {
     ids.map(async (id) =>
       id === ""
         ? ""
-        : await page
+        : await scope.root
             .locator(`label[for="${cssValue(id)}"]`)
             .first()
             .textContent(),
@@ -234,7 +236,7 @@ async function fillMultiselect(page: Page, fieldName: string, value: string) {
   return true;
 }
 
-async function fillPlannedFields(page: Page, fields: readonly SendPlanField[]) {
+async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanField[]) {
   type Fill = (index: number) => Promise<boolean>;
 
   const fillFrom: Fill = async (index) => {
@@ -256,15 +258,15 @@ async function fillPlannedFields(page: Page, fields: readonly SendPlanField[]) {
     let filled: boolean;
 
     if (field.fieldType === "select") {
-      filled = await fillSelect(page, field.fieldName, field.answer);
+      filled = await fillSelect(scope, field.fieldName, field.answer);
     } else if (field.fieldType === "checkbox") {
-      filled = await fillCheckbox(page, field.fieldName, field.answer);
+      filled = await fillCheckbox(scope, field.fieldName, field.answer);
     } else if (field.fieldType === "radio") {
-      filled = await fillRadio(page, field.fieldName, field.answer);
+      filled = await fillRadio(scope, field.fieldName, field.answer);
     } else if (field.fieldType === "multiselect") {
-      filled = await fillMultiselect(page, field.fieldName, field.answer);
+      filled = await fillMultiselect(scope, field.fieldName, field.answer);
     } else {
-      filled = await fillText(page, field.fieldName, field.answer);
+      filled = await fillText(scope, field.fieldName, field.answer);
     }
 
     return filled ? fillFrom(index + 1) : false;
@@ -274,14 +276,14 @@ async function fillPlannedFields(page: Page, fields: readonly SendPlanField[]) {
 }
 
 async function uploadDocuments(
-  page: Page,
+  scope: FormScope,
   resume: PlannedResume,
   fields: readonly SendPlanField[],
 ) {
   const resumeField = fields.find((field) => field.fieldType === "file" && field.file === "resume");
 
   const fieldName = resumeField?.fieldName ?? resume.fieldName ?? "documents.cv";
-  const input = page.locator(`input[type='file'][name="${cssValue(fieldName)}"]`).first();
+  const input = scope.root.locator(`input[type='file'][name="${cssValue(fieldName)}"]`).first();
 
   if ((await input.count()) === 0) {
     return false;
@@ -297,7 +299,7 @@ async function uploadDocuments(
     return false;
   }
 
-  return waitForDocumentPill(page, resume.filename);
+  return waitForDocumentPill(scope.page, resume.filename);
 }
 
 async function waitForDocumentPill(page: Page, filename: string) {
@@ -318,8 +320,8 @@ async function waitForDocumentPill(page: Page, filename: string) {
   return true;
 }
 
-async function waitForSubmitEnabled(page: Page) {
-  const button = page.locator(`${PERSONIO_FORM_SELECTOR} button[type='submit']`).first();
+async function waitForSubmitEnabled(scope: FormScope) {
+  const button = scope.root.locator("button[type='submit']").first();
 
   if ((await button.count()) === 0) {
     return false;
@@ -327,13 +329,19 @@ async function waitForSubmitEnabled(page: Page) {
 
   try {
     await button.waitFor({ state: "visible", timeout: FORM_APPEAR_MS });
-    await page.waitForFunction(
+    await scope.page.waitForFunction(
       (selector: string) => {
-        const candidate = document.querySelector<HTMLButtonElement>(selector);
+        const roots = [...document.querySelectorAll(selector)];
 
-        return candidate !== null && !candidate.disabled;
+        if (roots.length !== 1) {
+          return false;
+        }
+
+        const candidate = roots[0]?.querySelector<HTMLButtonElement>("button[type='submit']");
+
+        return candidate !== null && candidate !== undefined && !candidate.disabled;
       },
-      `${PERSONIO_FORM_SELECTOR} button[type='submit']`,
+      PERSONIO_FORM_SELECTOR,
       { timeout: SUBMIT_ENABLED_MS },
     );
   } catch {
@@ -418,11 +426,9 @@ export const runPersonioAttempt: (
     };
   }
 
-  const form = page.locator(PERSONIO_FORM_SELECTOR).first();
+  const scope = await openForm(page, PERSONIO_FORM_SELECTOR);
 
-  try {
-    await form.waitFor({ state: "visible", timeout: FORM_APPEAR_MS });
-  } catch {
+  if (scope === null) {
     return {
       confirmationSeen: false,
       outcome: "form_missing",
@@ -432,7 +438,7 @@ export const runPersonioAttempt: (
   }
 
   if (plan.resume !== null) {
-    const uploaded = await uploadDocuments(page, plan.resume, plan.fields);
+    const uploaded = await uploadDocuments(scope, plan.resume, plan.fields);
 
     if (!uploaded) {
       return {
@@ -444,7 +450,7 @@ export const runPersonioAttempt: (
     }
   }
 
-  if (!(await fillPlannedFields(page, plan.fields))) {
+  if (!(await fillPlannedFields(scope, plan.fields))) {
     return {
       confirmationSeen: false,
       outcome: "fill_failed",
@@ -453,7 +459,7 @@ export const runPersonioAttempt: (
     };
   }
 
-  const verdict = await preflightForm(page, expectationsFor(plan), PERSONIO_FORM_SELECTOR);
+  const verdict = await preflightForm(scope, expectationsFor(plan));
 
   if (verdict.outcome !== "ok") {
     return {
@@ -466,7 +472,7 @@ export const runPersonioAttempt: (
     };
   }
 
-  if (!(await waitForSubmitEnabled(page))) {
+  if (!(await waitForSubmitEnabled(scope))) {
     return {
       confirmationSeen: false,
       outcome: "captcha_blocked",
@@ -475,7 +481,7 @@ export const runPersonioAttempt: (
     };
   }
 
-  const submitButton = page.locator(`${PERSONIO_FORM_SELECTOR} button[type='submit']`).first();
+  const submitButton = scope.root.locator("button[type='submit']").first();
 
   hooks.onWillSubmit();
 

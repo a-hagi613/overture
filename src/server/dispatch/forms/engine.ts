@@ -153,7 +153,9 @@ async function chosenComboboxValue(field: Locator) {
 
     const id = element.getAttribute("id") ?? "";
 
-    const hidden = [...document.querySelectorAll("input[type='hidden']")].find(
+    const fieldset = element.closest("form") ?? element.ownerDocument;
+
+    const hidden = [...fieldset.querySelectorAll("input[type='hidden']")].find(
       (candidate) => id !== "" && candidate.getAttribute("name") === id,
     );
 
@@ -274,8 +276,8 @@ async function selectMatchingOption(field: Locator, wanted: string) {
   return true;
 }
 
-async function checkboxGroup(page: Page, id: string) {
-  const fieldset = page
+async function checkboxGroup(root: Locator, id: string) {
+  const fieldset = root
     .locator(`fieldset[id="${cssValue(id)}"], [role='group'][id="${cssValue(id)}"]`)
     .first();
 
@@ -287,7 +289,7 @@ async function checkboxGroup(page: Page, id: string) {
     }
   }
 
-  const boxes = page.locator(
+  const boxes = root.locator(
     `input[type='checkbox'][name="${cssValue(id)}"], input[type='checkbox'][id="${cssValue(id)}"]`,
   );
 
@@ -347,17 +349,46 @@ async function fillCheckboxGroup(boxes: Locator, wanted: string) {
   return wantedParts.length > 0 && matched.every((index) => index >= 0);
 }
 
-export const fieldById = (page: Page, id: string) =>
-  page.locator(`[id="${cssValue(id)}"], [name="${cssValue(id)}"]`).first();
+export interface FormScope {
+  page: Page;
+  root: Locator;
+}
 
-export const formLocator = (page: Page) => page.locator("form#application-form").first();
+const isFormScope = (target: Page | FormScope): target is FormScope => "root" in target;
 
-export const submitButton = (page: Page) =>
-  page
-    .locator(
-      "form#application-form button[type='submit'], form#application-form input[type='submit']",
-    )
-    .first();
+/**
+ * Resolves exactly one visible live form root. A page with no matching form, or with more than one
+ * match, gets `null`: every fill, preflight read and submit click then fails closed instead of
+ * touching a field or form the plan never approved.
+ *
+ * @param page The page that holds the form.
+ * @param selector The one application form selector the ATS owns.
+ * @param timeout How long to wait for the first form to become visible.
+ * @returns The verified root, or `null` when it is missing or ambiguous.
+ */
+export async function openForm(page: Page, selector: string, timeout = FORM_APPEAR_MS) {
+  const matches = page.locator(selector);
+
+  try {
+    await matches.first().waitFor({ state: "visible", timeout });
+  } catch {
+    return null;
+  }
+
+  if ((await matches.count()) !== 1) {
+    return null;
+  }
+
+  return { page, root: matches.first() };
+}
+
+export const fieldById = (scope: FormScope, id: string) =>
+  scope.root.locator(`[id="${cssValue(id)}"], [name="${cssValue(id)}"]`).first();
+
+export const submitButton = (
+  scope: FormScope,
+  selector = "button[type='submit'], input[type='submit']",
+) => scope.root.locator(selector).first();
 
 export const codeInputs = (page: Page) => page.locator("input[id^='security-input-']");
 
@@ -487,8 +518,8 @@ async function menuOpened(page: Page, field: Locator) {
   }
 }
 
-async function openClosedComboboxes(page: Page, formSelector: string) {
-  const fields = page.locator(`${formSelector} input[role='combobox']`);
+async function openClosedComboboxes(scope: FormScope) {
+  const fields = scope.root.locator("input[role='combobox']");
   const count = await fields.count();
   const options = new Map<string, ComboboxOption[]>();
 
@@ -500,15 +531,15 @@ async function openClosedComboboxes(page: Page, formSelector: string) {
     const field = fields.nth(index);
     const key = (await field.getAttribute("id")) ?? (await field.getAttribute("name")) ?? "";
 
-    if (key !== "" && (await renderedOptionCount(page, field)) === 0) {
+    if (key !== "" && (await renderedOptionCount(scope.page, field)) === 0) {
       let opened: ComboboxOption[] = [];
 
       try {
         if ((await field.isVisible()) && (await field.isEnabled())) {
           await field.click({ timeout: COMBOBOX_MENU_MS });
 
-          if (await menuOpened(page, field)) {
-            opened = await optionEntries(await comboboxList(page, field));
+          if (await menuOpened(scope.page, field)) {
+            opened = await optionEntries(await comboboxList(scope.page, field));
           }
         }
       } catch {
@@ -539,16 +570,10 @@ function optionField(fieldType: QuestionFieldType | null) {
   );
 }
 
-async function readLiveForm(page: Page, formSelector: string) {
-  return page.evaluate((selector: string) => {
-    const roots = [...document.querySelectorAll(selector)];
-
-    if (roots.length === 0) {
-      return null;
-    }
-
+async function readLiveForm(scope: FormScope) {
+  return scope.root.evaluate((root) => {
     const dom = {
-      byId: (id: string) => document.querySelector(`[id="${id}"]`),
+      byId: (id: string) => root.querySelector(`[id="${CSS.escape(id)}"]`),
       disabledOf: (element: Element) =>
         element.hasAttribute("disabled") || element.getAttribute("aria-disabled") === "true",
       fieldTypeOf: (element: Element) => {
@@ -688,7 +713,7 @@ async function readLiveForm(page: Page, formSelector: string) {
         const id = element.getAttribute("id");
 
         if (id !== null && id !== "") {
-          for (const label of document.querySelectorAll("label[for]")) {
+          for (const label of root.querySelectorAll("label[for]")) {
             if (label.getAttribute("for") === id) {
               return dom.textOf(label);
             }
@@ -710,7 +735,7 @@ async function readLiveForm(page: Page, formSelector: string) {
         const id = element.getAttribute("id");
 
         if (id !== null && id !== "") {
-          for (const label of document.querySelectorAll("label[for]")) {
+          for (const label of root.querySelectorAll("label[for]")) {
             if (label.getAttribute("for") === id) {
               return dom.textOf(label);
             }
@@ -735,7 +760,7 @@ async function readLiveForm(page: Page, formSelector: string) {
         }
 
         const id = element.getAttribute("id");
-        const own = id === null ? null : document.querySelector(`label[for="${CSS.escape(id)}"]`);
+        const own = id === null ? null : root.querySelector(`label[for="${CSS.escape(id)}"]`);
 
         if (dom.starredMarker(own)) {
           return true;
@@ -756,244 +781,154 @@ async function readLiveForm(page: Page, formSelector: string) {
     const seenRadios = new Set<string>();
     const seenCheckboxGroups = new Set<string>();
 
-    for (const root of roots) {
-      for (const element of root.querySelectorAll("input, select, textarea")) {
-        if (element instanceof HTMLInputElement && element.type === "hidden") {
+    for (const element of root.querySelectorAll("input, select, textarea")) {
+      if (element instanceof HTMLInputElement && element.type === "hidden") {
+        continue;
+      }
+
+      const fieldType = dom.fieldTypeOf(element);
+
+      if (fieldType === null) {
+        continue;
+      }
+
+      const pressedButtons = [
+        ...(element.parentElement?.querySelectorAll<HTMLButtonElement>("button[aria-pressed]") ??
+          []),
+      ];
+
+      if (pressedButtons.length > 0) {
+        const titleId = element.getAttribute("name") ?? element.getAttribute("id") ?? "";
+
+        const title =
+          titleId === "" ? null : root.querySelector(`label[for="${CSS.escape(titleId)}"]`);
+
+        const pressed =
+          pressedButtons.find((button) => button.getAttribute("aria-pressed") === "true") ?? null;
+
+        controls.push({
+          checked: pressed !== null,
+          disabled: pressedButtons.every((button) => dom.disabledOf(button)),
+          fieldType: "radio",
+          file: null,
+          hidden: pressedButtons.every((button) => dom.hiddenOf(button)),
+          key: dom.nameOf(element),
+          label: title === null ? dom.labelFor(element) : dom.textOf(title),
+          name: dom.nameOf(element),
+          options: pressedButtons.map((button) => ({
+            label: dom.textOf(button),
+            value: dom.textOf(button),
+          })),
+          required:
+            dom.requiredOf(element) ||
+            (title instanceof HTMLElement && /(?:^|\s)_required_/u.test(title.className)),
+          value: pressed === null ? null : dom.textOf(pressed),
+        });
+
+        continue;
+      }
+
+      if (fieldType === "radio" && element instanceof HTMLInputElement) {
+        if (seenRadios.has(element.name)) {
           continue;
         }
 
-        const fieldType = dom.fieldTypeOf(element);
+        seenRadios.add(element.name);
 
-        if (fieldType === null) {
-          continue;
-        }
+        const group = [...root.querySelectorAll("input[type='radio']")].filter(
+          (candidate): candidate is HTMLInputElement =>
+            candidate instanceof HTMLInputElement && candidate.name === element.name,
+        );
 
-        const pressedButtons = [
-          ...(element.parentElement?.querySelectorAll<HTMLButtonElement>("button[aria-pressed]") ??
-            []),
-        ];
+        const checked = group.find((candidate) => candidate.checked) ?? null;
 
-        if (pressedButtons.length > 0) {
-          const titleId = element.getAttribute("name") ?? element.getAttribute("id") ?? "";
+        controls.push({
+          checked: checked !== null,
+          disabled: group.every((candidate) => dom.disabledOf(candidate)),
+          fieldType,
+          file: null,
+          hidden: group.every((candidate) => dom.hiddenOf(candidate)),
+          key: element.name,
+          label: dom.labelFor(element),
+          name: element.name,
+          options: group.map((candidate) => ({
+            label: dom.optionLabel(candidate),
+            value: candidate.value,
+          })),
+          required: group.some((candidate) => dom.requiredOf(candidate)),
+          value: checked === null ? null : dom.optionLabel(checked),
+        });
 
-          const title =
-            titleId === "" ? null : document.querySelector(`label[for="${CSS.escape(titleId)}"]`);
+        continue;
+      }
 
-          const pressed =
-            pressedButtons.find((button) => button.getAttribute("aria-pressed") === "true") ?? null;
+      if (element instanceof HTMLSelectElement) {
+        const selected = [...element.selectedOptions];
 
-          controls.push({
-            checked: pressed !== null,
-            disabled: pressedButtons.every((button) => dom.disabledOf(button)),
-            fieldType: "radio",
-            file: null,
-            hidden: pressedButtons.every((button) => dom.hiddenOf(button)),
-            key: dom.nameOf(element),
-            label: title === null ? dom.labelFor(element) : dom.textOf(title),
-            name: dom.nameOf(element),
-            options: pressedButtons.map((button) => ({
-              label: dom.textOf(button),
-              value: dom.textOf(button),
-            })),
-            required:
-              dom.requiredOf(element) ||
-              (title instanceof HTMLElement && /(?:^|\s)_required_/u.test(title.className)),
-            value: pressed === null ? null : dom.textOf(pressed),
-          });
+        const blank = selected.every((option) => option.value === "");
 
-          continue;
-        }
+        controls.push({
+          checked: null,
+          disabled: dom.disabledOf(element),
+          fieldType,
+          file: null,
+          hidden: dom.hiddenOf(element),
+          key: dom.keyOf(element),
+          label: dom.labelFor(element),
+          name: dom.nameOf(element),
+          options: [...element.options].map((option) => ({
+            label: dom.textOf(option),
+            value: option.value,
+          })),
+          required: dom.requiredOf(element),
+          value: blank ? "" : selected.map((option) => dom.textOf(option)).join(", "),
+        });
 
-        if (fieldType === "radio" && element instanceof HTMLInputElement) {
-          if (seenRadios.has(element.name)) {
-            continue;
-          }
+        continue;
+      }
 
-          seenRadios.add(element.name);
-
-          const group = [...document.querySelectorAll("input[type='radio']")].filter(
-            (candidate): candidate is HTMLInputElement =>
-              candidate instanceof HTMLInputElement && candidate.name === element.name,
-          );
-
-          const checked = group.find((candidate) => candidate.checked) ?? null;
-
-          controls.push({
-            checked: checked !== null,
-            disabled: group.every((candidate) => dom.disabledOf(candidate)),
-            fieldType,
-            file: null,
-            hidden: group.every((candidate) => dom.hiddenOf(candidate)),
-            key: element.name,
-            label: dom.labelFor(element),
-            name: element.name,
-            options: group.map((candidate) => ({
-              label: dom.optionLabel(candidate),
-              value: candidate.value,
-            })),
-            required: group.some((candidate) => dom.requiredOf(candidate)),
-            value: checked === null ? null : dom.optionLabel(checked),
-          });
-
-          continue;
-        }
-
-        if (element instanceof HTMLSelectElement) {
-          const selected = [...element.selectedOptions];
-
-          controls.push({
-            checked: null,
-            disabled: dom.disabledOf(element),
-            fieldType,
-            file: null,
-            hidden: dom.hiddenOf(element),
-            key: dom.keyOf(element),
-            label: dom.labelFor(element),
-            name: dom.nameOf(element),
-            options: [...element.options].map((option) => ({
-              label: dom.textOf(option),
-              value: option.value,
-            })),
-            required: dom.requiredOf(element),
-            value: selected.map((option) => dom.textOf(option)).join(", "),
-          });
-
-          continue;
-        }
-
-        if (element instanceof HTMLInputElement) {
-          if (fieldType === "checkbox") {
-            if (element.name !== "") {
-              if (seenCheckboxGroups.has(element.name)) {
-                continue;
-              }
-
-              seenCheckboxGroups.add(element.name);
-
-              const group = [...document.querySelectorAll("input[type='checkbox']")].filter(
-                (candidate): candidate is HTMLInputElement =>
-                  candidate instanceof HTMLInputElement && candidate.name === element.name,
-              );
-
-              const legend = element.closest("fieldset")?.querySelector("legend") ?? null;
-
-              const checkedLabels = group.flatMap((candidate) =>
-                candidate.checked ? [dom.optionLabel(candidate)] : [],
-              );
-
-              controls.push({
-                checked: group.some((candidate) => candidate.checked),
-                disabled: group.every((candidate) => dom.disabledOf(candidate)),
-                fieldType,
-                file: null,
-                hidden: group.every((candidate) => dom.hiddenOf(candidate)),
-                key: dom.keyOf(element),
-                label: legend === null ? dom.labelFor(element) : dom.textOf(legend),
-                name: element.name,
-                options: group.map((candidate) => ({
-                  label: dom.optionLabel(candidate),
-                  value: candidate.value,
-                })),
-                required: group.some((candidate) => dom.requiredOf(candidate)),
-                value: checkedLabels.join(", "),
-              });
-
+      if (element instanceof HTMLInputElement) {
+        if (fieldType === "checkbox") {
+          if (element.name !== "") {
+            if (seenCheckboxGroups.has(element.name)) {
               continue;
             }
 
+            seenCheckboxGroups.add(element.name);
+
+            const group = [...root.querySelectorAll("input[type='checkbox']")].filter(
+              (candidate): candidate is HTMLInputElement =>
+                candidate instanceof HTMLInputElement && candidate.name === element.name,
+            );
+
+            const legend = element.closest("fieldset")?.querySelector("legend") ?? null;
+
+            const checkedLabels = group.flatMap((candidate) =>
+              candidate.checked ? [dom.optionLabel(candidate)] : [],
+            );
+
             controls.push({
-              checked: element.checked,
-              disabled: dom.disabledOf(element),
+              checked: group.some((candidate) => candidate.checked),
+              disabled: group.every((candidate) => dom.disabledOf(candidate)),
               fieldType,
               file: null,
-              hidden: dom.hiddenOf(element),
+              hidden: group.every((candidate) => dom.hiddenOf(candidate)),
               key: dom.keyOf(element),
-              label: dom.labelFor(element),
-              name: dom.nameOf(element),
-              options: [],
-              required: dom.requiredOf(element),
-              value: element.checked ? "true" : "false",
-            });
-
-            continue;
-          }
-
-          if (fieldType === "file") {
-            controls.push({
-              checked: null,
-              disabled: dom.disabledOf(element),
-              fieldType,
-              file: dom.fileOf(element),
-              hidden: dom.hiddenOf(element),
-              key: dom.keyOf(element),
-              label: dom.labelFor(element),
-              name: dom.nameOf(element),
-              options: [],
-              required: dom.requiredOf(element),
-              value: null,
-            });
-
-            continue;
-          }
-
-          if (element.getAttribute("role") === "combobox") {
-            const listboxId = element.getAttribute("aria-controls") ?? "";
-            const listbox = listboxId === "" ? null : dom.byId(listboxId);
-
-            const options =
-              listbox === null
-                ? []
-                : [...listbox.querySelectorAll("[role='option']")].map((option) => ({
-                    label: dom.textOf(option),
-                    value:
-                      (option instanceof HTMLElement ? option.dataset.value : null) ??
-                      option.getAttribute("value") ??
-                      dom.textOf(option),
-                  }));
-
-            const container = element.closest(".select__container");
-            const shown = dom.textOf(container?.querySelector(".select__single-value") ?? null);
-
-            let selected = shown;
-
-            if (selected === "") {
-              const hidden = [...document.querySelectorAll("input[type='hidden']")].find(
-                (candidate) => candidate.getAttribute("name") === element.id,
-              );
-
-              const raw = hidden instanceof HTMLInputElement ? hidden.value : "";
-
-              const matched = options.find(
-                (option) =>
-                  option.value === raw || option.label.toLowerCase() === raw.toLowerCase(),
-              );
-
-              selected = matched?.label ?? raw;
-            }
-
-            if (selected === "" && container === null && element.value.trim() !== "") {
-              selected = element.value;
-            }
-
-            controls.push({
-              checked: null,
-              disabled: dom.disabledOf(element),
-              fieldType,
-              file: null,
-              hidden: dom.hiddenOf(element),
-              key: dom.keyOf(element),
-              label: dom.labelFor(element),
-              name: dom.nameOf(element),
-              options,
-              required: dom.requiredOf(element),
-              value: selected,
+              label: legend === null ? dom.labelFor(element) : dom.textOf(legend),
+              name: element.name,
+              options: group.map((candidate) => ({
+                label: dom.optionLabel(candidate),
+                value: candidate.value,
+              })),
+              required: group.some((candidate) => dom.requiredOf(candidate)),
+              value: checkedLabels.join(", "),
             });
 
             continue;
           }
 
           controls.push({
-            checked: null,
+            checked: element.checked,
             disabled: dom.disabledOf(element),
             fieldType,
             file: null,
@@ -1003,13 +938,68 @@ async function readLiveForm(page: Page, formSelector: string) {
             name: dom.nameOf(element),
             options: [],
             required: dom.requiredOf(element),
-            value: element.value,
+            value: element.checked ? "true" : "false",
           });
 
           continue;
         }
 
-        if (element instanceof HTMLTextAreaElement) {
+        if (fieldType === "file") {
+          controls.push({
+            checked: null,
+            disabled: dom.disabledOf(element),
+            fieldType,
+            file: dom.fileOf(element),
+            hidden: dom.hiddenOf(element),
+            key: dom.keyOf(element),
+            label: dom.labelFor(element),
+            name: dom.nameOf(element),
+            options: [],
+            required: dom.requiredOf(element),
+            value: null,
+          });
+
+          continue;
+        }
+
+        if (element.getAttribute("role") === "combobox") {
+          const listboxId = element.getAttribute("aria-controls") ?? "";
+          const listbox = listboxId === "" ? null : dom.byId(listboxId);
+
+          const options =
+            listbox === null
+              ? []
+              : [...listbox.querySelectorAll("[role='option']")].map((option) => ({
+                  label: dom.textOf(option),
+                  value:
+                    (option instanceof HTMLElement ? option.dataset.value : null) ??
+                    option.getAttribute("value") ??
+                    dom.textOf(option),
+                }));
+
+          const container = element.closest(".select__container");
+          const shown = dom.textOf(container?.querySelector(".select__single-value") ?? null);
+
+          let selected = shown;
+
+          if (selected === "") {
+            const hidden = [...root.querySelectorAll("input[type='hidden']")].find(
+              (candidate) => candidate.getAttribute("name") === element.id,
+            );
+
+            const raw = hidden instanceof HTMLInputElement ? hidden.value : "";
+
+            const matched = options.find(
+              (option) => option.value === raw || option.label.toLowerCase() === raw.toLowerCase(),
+            );
+
+            selected = matched?.label ?? raw;
+          }
+
+          if (selected === "" && container === null && element.value.trim() !== "") {
+            selected = element.value;
+          }
+
           controls.push({
             checked: null,
             disabled: dom.disabledOf(element),
@@ -1019,43 +1009,83 @@ async function readLiveForm(page: Page, formSelector: string) {
             key: dom.keyOf(element),
             label: dom.labelFor(element),
             name: dom.nameOf(element),
-            options: [],
+            options,
             required: dom.requiredOf(element),
-            value: element.value,
+            value: selected,
           });
+
+          continue;
         }
+
+        controls.push({
+          checked: null,
+          disabled: dom.disabledOf(element),
+          fieldType,
+          file: null,
+          hidden: dom.hiddenOf(element),
+          key: dom.keyOf(element),
+          label: dom.labelFor(element),
+          name: dom.nameOf(element),
+          options: [],
+          required: dom.requiredOf(element),
+          value: element.value,
+        });
+
+        continue;
+      }
+
+      if (element instanceof HTMLTextAreaElement) {
+        controls.push({
+          checked: null,
+          disabled: dom.disabledOf(element),
+          fieldType,
+          file: null,
+          hidden: dom.hiddenOf(element),
+          key: dom.keyOf(element),
+          label: dom.labelFor(element),
+          name: dom.nameOf(element),
+          options: [],
+          required: dom.requiredOf(element),
+          value: element.value,
+        });
       }
     }
 
     return { controls };
-  }, formSelector);
+  });
 }
 
+const missingFormProblem = () =>
+  ({
+    answer: null,
+    fieldName: null,
+    fieldType: null,
+    kind: "field_missing",
+    label: "application form",
+    options: [],
+    unexpected: false,
+  }) satisfies LiveFormProblem;
+
+const BLANK_TEXT_FIELD_TYPES = new Set<QuestionFieldType>([
+  "date",
+  "email",
+  "number",
+  "phone",
+  "text",
+  "textarea",
+  "url",
+]);
+
+const isBlankValueField = (fieldType: QuestionFieldType) =>
+  fieldType === "select" || BLANK_TEXT_FIELD_TYPES.has(fieldType);
+
 const checkLiveForm: (
-  page: Page,
+  scope: FormScope,
   expectations: readonly LiveFormExpectation[],
-  formSelector: string,
-) => Promise<LiveFormCheck> = async (page, expectations, formSelector) => {
-  const live = await readLiveForm(page, formSelector);
+) => Promise<LiveFormCheck> = async (scope, expectations) => {
+  const live = await readLiveForm(scope);
 
-  if (live === null) {
-    return {
-      ok: false,
-      problems: [
-        {
-          answer: null,
-          fieldName: null,
-          fieldType: null,
-          kind: "field_missing",
-          label: "application form",
-          options: [],
-          unexpected: false,
-        },
-      ],
-    };
-  }
-
-  const discovered = await openClosedComboboxes(page, formSelector);
+  const discovered = await openClosedComboboxes(scope);
 
   for (const control of live.controls) {
     if (control.fieldType !== "select" || control.options.length > 0) {
@@ -1138,6 +1168,16 @@ const checkLiveForm: (
           fieldName: expectation.fieldName,
           fieldType: expectation.fieldType,
           kind: "checkbox_mismatch",
+          label: expectation.label,
+          options: [...expectation.options],
+          unexpected: false,
+        });
+      } else if (isBlankValueField(expectation.fieldType) && norm(control.value ?? "") !== "") {
+        add({
+          answer,
+          fieldName: expectation.fieldName,
+          fieldType: expectation.fieldType,
+          kind: "value_mismatch",
           label: expectation.label,
           options: [...expectation.options],
           unexpected: false,
@@ -1285,40 +1325,48 @@ const decideLiveFormVerdict: (check: LiveFormCheck) => LiveFormVerdict = (check)
  * before Submit. A form that no longer matches the plan never submits: a
  * missing durable Fact becomes a Review, and anything else is a form change.
  *
- * @param page The live application form.
+ * The reads happen against one verified live form root only. A page with a
+ * second form, or a hidden duplicate control, never contributes an answer to
+ * the plan that was approved.
+ *
+ * @param target The verified form scope, or the page to resolve one from.
  * @param expectations Every planned answer, option, file and consent.
- * @param formSelector The live form roots to read; defaults to Greenhouse's form.
+ * @param formSelector The one live form selector, when a page is passed.
  * @returns The preflight outcome for this attempt.
  */
 export const preflightForm: (
-  page: Page,
+  target: Page | FormScope,
   expectations: readonly LiveFormExpectation[],
   formSelector?: string,
 ) => Promise<LiveFormVerdict> = async (
-  page,
+  target,
   expectations,
   formSelector = "form#application-form",
 ) => {
-  const check = await checkLiveForm(page, expectations, formSelector);
+  const scope = isFormScope(target) ? target : await openForm(target, formSelector);
 
-  return decideLiveFormVerdict(check);
+  if (scope === null) {
+    return decideLiveFormVerdict({ ok: false, problems: [missingFormProblem()] });
+  }
+
+  return decideLiveFormVerdict(await checkLiveForm(scope, expectations));
 };
 
-export async function fillField(page: Page, id: string, value: string) {
-  const field = fieldById(page, id);
+export async function fillField(scope: FormScope, id: string, value: string) {
+  const field = fieldById(scope, id);
 
   if ((await field.count()) === 0) {
     return false;
   }
 
-  const group = await checkboxGroup(page, id);
+  const group = await checkboxGroup(scope.root, id);
 
   if (group !== null) {
     return fillCheckboxGroup(group, value);
   }
 
   if ((await field.getAttribute("role")) === "combobox") {
-    return chooseFromCombobox(page, field, value);
+    return chooseFromCombobox(scope.page, field, value);
   }
 
   const widget = await field.evaluate((element) => ({
@@ -1345,7 +1393,7 @@ export async function fillField(page: Page, id: string, value: string) {
   }
 
   if (widget.type === "radio") {
-    const options = page.locator(`input[name="${cssValue(id)}"]`);
+    const options = scope.root.locator(`input[name="${cssValue(id)}"]`);
 
     const labels = await options.evaluateAll((elements) =>
       elements.map((element) =>
@@ -1377,13 +1425,13 @@ export async function fillField(page: Page, id: string, value: string) {
 }
 
 export async function uploadFile(
-  page: Page,
+  scope: FormScope,
   fieldId: string,
   file: { name: string; mimeType: string; bytes: Uint8Array<ArrayBuffer> },
 ) {
-  const input = fieldById(page, fieldId);
+  const input = fieldById(scope, fieldId);
 
-  if ((await input.count()) === 0) {
+  if ((await input.count()) === 0 || (await input.getAttribute("type")) !== "file") {
     return false;
   }
 

@@ -12,14 +12,16 @@ No secret value ever appears in this repository: secrets are set with `fly secre
 | File | Role |
 |---|---|
 | `Dockerfile` | Multi-stage build on Bun 1.4: installs, builds the SPA (`dist/`), ships a slim runtime with Litestream 0.5.18 (checksum-verified) |
-| `scripts/docker-entrypoint.sh` | On start: Litestream restores `/data/app.sqlite` from the replica if it does not exist, then runs `litestream replicate -exec "bun run /app/src/server/main.ts"`; migrations run inside `main.ts` |
+| `scripts/docker-entrypoint.sh` | On start: Litestream restores `/data/app.sqlite` from the replica if it does not exist, then runs `litestream replicate -exec "bun run /app/src/server/main.ts"`; migrations run inside `main.ts`. With `LITESTREAM_RESTORE_ONLY=true` it restores, runs the read-only restored-database check and never starts `main.ts` |
 | `litestream.yml` | Continuous replication (1 s sync) to R2 `overture-backups`, nightly snapshot (`interval: 24h`) kept 30 days (`retention: 720h`); the L0 retention check runs every 5 minutes so its ListObjects cost stays bounded (#281) |
+| Deleted accounts in backups | The 35-day lifecycle on `overture-backups` (`app.sqlite/`) and the 30-day snapshot retention are the replay window for an erased account: only keyless ciphertext can come back, because `user_keys` is destroyed first (SPEC §13.2). R2 object deletes are not part of a replay |
 | `fly.toml` | App `overture-web`, region `yyz`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health` |
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`) and a `restore-drill` job (Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations) |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
-| `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks it, destroys the machine |
-| `scripts/check-restored-db.ts` | Restored-database checks: PRAGMA `integrity_check`, applied-migration count, per-table row counts, optional health-route probe |
-| `scripts/restore-drill.ts` | `DRILL_TARGET=local` (CI round-trip) or `DRILL_TARGET=fly` (throwaway machine drill) |
+| `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
+| `scripts/check-restored-db.ts` | Restored-database checks, read-only: PRAGMA `integrity_check`, applied-migration count, per-table row counts, untouched `bg_jobs`, zero outbound requests |
+| `scripts/restore-drill.ts` | `DRILL_TARGET=local` (CI round-trip) or `DRILL_TARGET=fly` (throwaway machine drill); never starts the app server |
+| `litestream-drill.yml` | Restore-only Litestream config for drills: same bucket, dedicated read-only `R2_DRILL_*` credential |
 
 ## One-time human steps
 
@@ -69,6 +71,12 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    `gh secret set FLY_API_TOKEN -b <token-in-your-terminal> -R a-hagi613/overture`
 7. Point DNS at the app in Cloudflare: `tryoverture.com` (proxied) → `overture-web.fly.dev`, then
    `fly certs add tryoverture.com -a overture-web`. `tryoverture.com` is already registered.
+8. In Cloudflare, create a second R2 API token for restore drills: **Object Read only**, scoped to the
+   `overture-backups` bucket alone. Set it on the app under drill-only names, never the write pair:
+   `fly secrets set R2_DRILL_ACCESS_KEY_ID=… R2_DRILL_SECRET_ACCESS_KEY=… -a overture-web`
+   The weekly drill uses `litestream-drill.yml`, which reads only these names, so a drill can list and
+   fetch the replica but can never write, delete or replicate into it. `scripts/restore-drill.ts fly`
+   refuses to start a drill machine when either name is missing.
 
 Merge to `main` and watch the first run of the **Deploy** workflow.
 
@@ -314,8 +322,8 @@ No migration, secret or DNS record is part of this deployment.
   last reading could not list the replica or the local transactions. Right after a cold start with no replica
   yet, the first reading can be `"unknown"` or `"unavailable"` for up to one read interval. Drill: run the **Restore drill** workflow once
   (`gh workflow run "Restore drill" -R a-hagi613/overture`); it is scheduled weekly thereafter. A run
-  proves a restore into a throwaway machine passed `integrity_check`, has applied migrations and
-  answers `/api/health`, and the machine was destroyed.
+  proves a restore into a throwaway machine passed `integrity_check`, holds every applied migration, left
+  every `bg_jobs` row untouched and made no outbound request, and the machine was destroyed.
 - **Secrets come only from Fly secrets; none are printed or committed**
   `.env` is git-ignored; the Zod config (`src/server/config/env.ts`) takes values from process env,
   which on Fly is exactly Fly secrets. R2 and deploy credentials exist only as Fly/GitHub secrets.
@@ -401,9 +409,28 @@ background loop or timer is logged and alerted (`process.unhandled`), not fatal.
 
 ## Restore drill safety
 
-The throwaway machine runs the same image with `LITESTREAM_RESTORE_ONLY=true`: it restores from R2 and
-serves the app from an empty ephemeral filesystem. It never mounts the production volume and never
-runs a Litestream replicator, so the drill cannot overwrite or contend with the live backup.
+A restore drill must prove the backup is usable without ever running the application on restored
+production data (issue #412). The throwaway machine runs the same image with
+`LITESTREAM_RESTORE_ONLY=true`, which changes the entrypoint to:
+
+1. restore `/data/app.sqlite` from R2 with `litestream-drill.yml` and the read-only `R2_DRILL_ACCESS_KEY_ID` /
+   `R2_DRILL_SECRET_ACCESS_KEY` pair;
+2. run `scripts/check-restored-db.ts` against the restored file, opened `readonly` with `PRAGMA query_only = on`:
+   `PRAGMA integrity_check`, the applied-migration count (`__drizzle_migrations` and the journal this build
+   ships), per-table row counts, a `bg_jobs` snapshot that must stay identical, and an outbound guard that
+   refuses and reports any request;
+3. print the report and hold the machine open for `RESTORE_DRILL_KEEPALIVE_SECONDS` (default 600) while the drill
+   driver runs the same check over SSH for an exit code, then destroys the machine.
+
+`bun run /app/src/server/main.ts` is never reached in this mode, and `main.ts` itself refuses to start when
+`LITESTREAM_RESTORE_ONLY=true`: no scheduler, job worker, mail sender, billing
+job or outbound client is constructed, so due `application.send`, queued mail and billing jobs in the restored
+database cannot be claimed or run. The machine has no volume mount, so it also cannot touch the production
+database. Fly gives every machine in an app the app's secrets, so the drill machine also holds the write pair;
+only the restore process reads the read-only `R2_DRILL_*` pair, and no application code runs there. The drill
+first checks over SSH that the running release carries this drill mode and `litestream-drill.yml`, and refuses to
+start when it predates this change, so an old image that would start the app server is never drilled. The local CI
+job (`bun run scripts/restore-drill.ts local`) restores into a file replica and runs the same check against it.
 
 ## Runtime security
 
@@ -495,6 +522,32 @@ more than 20 % from the previous run; `workflow_dispatch` with `--allow-row-drop
 ingests the manifest at 05:00 UTC in `catalog.workable`, behind the `ats`/`workable` kill switch, which stays on until
 the 20-form probe (#235). The alerts are `workable.feed` for a missing snapshot, one older than 26 hours, a row drop
 or a failed ingest, and the GitHub job itself fails loudly.
+
+## The Stapply seed refresh (Wave 3.5)
+
+`.github/workflows/stapply-seed.yml` runs weekly (Monday 05:23 UTC) and on `workflow_dispatch`; it never runs on a pull
+request or a push. It downloads the ats-scrapers `manifest.json` and `companies.parquet` through
+`scripts/refresh-stapply-seed.ts` and **stages** them, it never touches the production pins by itself. Three guards run
+before anything is written:
+
+- **Schema:** the manifest is parsed against a Zod schema (`version`, `generated_at`, `companies.parquet_sha256`,
+  `companies.rows`) and the parquet columns must be exactly `[ats, name, slug, url]` with the row count the manifest
+  declares.
+- **SHA-256:** the manifest's `companies.parquet_sha256` must equal the hash of the downloaded bytes (and the declared
+  `parquet_size_bytes`, when present, the byte length), so a truncated or swapped file is refused.
+- **Row-drop:** a snapshot more than 20 % smaller than the prior staged one is refused; `workflow_dispatch` with
+  `allow_row_drop` is the deliberate override after checking upstream.
+
+The prior staged snapshot is restored from the Actions cache and the new one is saved only when the run succeeds, so an
+upstream outage, a schema change, a checksum mismatch or a shrunken input leaves the last good snapshot in place. Each
+run uploads the staged `manifest.json`, `companies.parquet` and `stapply-refresh.json` summary as an artifact and writes
+the same summary to the step summary. Run it once with `workflow_dispatch` before relying on the schedule; nothing
+leaves the runner except the cache, the artifact and the summary. A staged snapshot is a candidate: review the
+checksums and row delta, re-pin `PINNED_MANIFEST_SHA256` and `PINNED_COMPANIES_PARQUET_SHA256` in
+`src/server/catalog/companies-parquet.ts`, then rerun `docs/research/m1-09-runbook.md` §1–2 to load it.
+`STAPPLY_MANIFEST_URL` and `STAPPLY_COMPANIES_URL` are optional repository variables; the defaults are the pinned
+`https://storage.stapply.ai/jobs/v1/…` URLs. `STAPPLY_ALERT_NTFY_URL` is optional and only pushes an aborted run to the
+owner's phone; without it the failing job and its step summary are the alert.
 
 ## The sentinel Worker (#283)
 

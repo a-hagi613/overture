@@ -3,11 +3,12 @@ import { Buffer } from "node:buffer";
 import { z } from "zod";
 
 import type { LlmBatchCall, LlmPort, LlmRequest } from "../ports/llm.ts";
+import type { BatchProvider, DurableBatches, ProviderBatch } from "./durable-batches.ts";
+
 import { batchPricesFor } from "./models.ts";
+import { BatchGoneError } from "./durable-batches.ts";
 
 const API_VERSION = "2023-06-01";
-const POLL_INTERVAL_MS = 10_000;
-const MAX_POLL_ATTEMPTS = 360;
 const MAX_TOKENS = 1024;
 const ESTIMATED_OUTPUT_TOKENS = 200;
 const CHARS_PER_TOKEN = 4;
@@ -28,6 +29,7 @@ const batchSchema = z.object({
   processing_status: z.enum(["in_progress", "canceling", "ended"]),
   request_counts: requestCountsSchema,
   results_url: z.string().nullable(),
+  expires_at: z.string(),
   created_at: z.string(),
 });
 
@@ -99,12 +101,6 @@ function estimatedUsageFor(request: LlmRequest) {
   };
 }
 
-async function waitMs(ms: number) {
-  return new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
 function parseJson(text: string) {
   const value: unknown = JSON.parse(text);
 
@@ -117,7 +113,18 @@ export interface AnthropicLlmConfig {
   model: string;
 }
 
-export function createAnthropicLlmPort(config: AnthropicLlmConfig) {
+function providerBatch(batch: z.infer<typeof batchSchema>) {
+  const expiresAt = Date.parse(batch.expires_at);
+
+  return {
+    id: batch.id,
+    processingStatus: batch.processing_status,
+    resultsUrl: batch.results_url,
+    expiresAt: Number.isNaN(expiresAt) ? null : expiresAt,
+  } satisfies ProviderBatch;
+}
+
+function createClient(config: AnthropicLlmConfig) {
   const root = config.baseUrl.replace(/\/+$/u, "");
 
   const headers = () => ({
@@ -138,73 +145,22 @@ export function createAnthropicLlmPort(config: AnthropicLlmConfig) {
     return response;
   }
 
-  async function callJson(path: string) {
-    const response = await call(path, { headers: headers() });
-    const body: unknown = await response.json();
+  return { root, headers, call };
+}
 
-    return body;
+function sameOrigin(root: string, target: string) {
+  try {
+    return new URL(root).origin === new URL(target).origin;
+  } catch {
+    return false;
   }
+}
 
-  async function createBatch(requests: readonly LlmRequest[]) {
-    const response = await call("/v1/messages/batches", {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify({
-        requests: requests.map((request) => ({
-          custom_id: request.customId,
-          params: {
-            model: config.model,
-            max_tokens: MAX_TOKENS,
-            system: [{ type: "text", text: request.system, cache_control: { type: "ephemeral" } }],
-            messages: [{ role: "user", content: request.user }],
-            output_config: { format: { type: "json_schema", schema: request.schema } },
-          },
-        })),
-      }),
-    });
+export function createAnthropicBatchProvider(config: AnthropicLlmConfig) {
+  const { root, headers, call } = createClient(config);
 
-    const body: unknown = await response.json();
-
-    return batchSchema.parse(body);
-  }
-
-  async function awaitBatchEnded(batchId: string, attemptsLeft: number) {
-    const batch = batchSchema.parse(await callJson(`/v1/messages/batches/${batchId}`));
-
-    if (batch.processing_status === "ended") {
-      return batch;
-    }
-
-    if (batch.processing_status === "canceling") {
-      throw new Error(`batch ${batchId} is canceling and will not complete`);
-    }
-
-    if (attemptsLeft <= 1) {
-      throw new Error(
-        `batch ${batchId} did not end within ${String(MAX_POLL_ATTEMPTS * POLL_INTERVAL_MS)}ms`,
-      );
-    }
-
-    await waitMs(POLL_INTERVAL_MS);
-
-    return awaitBatchEnded(batchId, attemptsLeft - 1);
-  }
-
-  async function fetchResultLines(resultsUrl: string) {
-    const response = await fetch(resultsUrl, { headers: headers() });
-
-    if (!response.ok) {
-      throw new Error(
-        `Anthropic API ${String(response.status)} on the batch results: ${resultsUrl}`,
-      );
-    }
-
-    const body = await response.text();
-
-    return body
-      .split("\n")
-      .filter((line) => line.trim() !== "")
-      .map((line) => resultLineSchema.parse(parseJson(line)));
+  function resultsHeaders(resultsUrl: string) {
+    return sameOrigin(root, resultsUrl) ? headers() : {};
   }
 
   function callFor(line: z.infer<typeof resultLineSchema>) {
@@ -252,6 +208,74 @@ export function createAnthropicLlmPort(config: AnthropicLlmConfig) {
     } satisfies LlmBatchCall;
   }
 
+  return {
+    create: async (requests, idempotencyKey) => {
+      const response = await call("/v1/messages/batches", {
+        method: "POST",
+        headers: { ...headers(), "idempotency-key": idempotencyKey },
+        body: JSON.stringify({
+          requests: requests.map((request) => ({
+            custom_id: request.customId,
+            params: {
+              model: config.model,
+              max_tokens: MAX_TOKENS,
+              system: [
+                { type: "text", text: request.system, cache_control: { type: "ephemeral" } },
+              ],
+              messages: [{ role: "user", content: request.user }],
+              output_config: { format: { type: "json_schema", schema: request.schema } },
+            },
+          })),
+        }),
+      });
+
+      const body: unknown = await response.json();
+
+      return providerBatch(batchSchema.parse(body));
+    },
+    retrieve: async (batchId) => {
+      const response = await fetch(`${root}/v1/messages/batches/${batchId}`, {
+        headers: headers(),
+      });
+
+      if (response.status === 404) {
+        throw new BatchGoneError(`the Anthropic batch ${batchId} is gone`);
+      }
+
+      if (!response.ok) {
+        const body = await response.text();
+
+        throw new Error(
+          `Anthropic API ${String(response.status)} on the batch ${batchId}: ${body.slice(0, 500)}`,
+        );
+      }
+
+      const body: unknown = await response.json();
+
+      return providerBatch(batchSchema.parse(body));
+    },
+    results: async (resultsUrl) => {
+      const response = await fetch(resultsUrl, { headers: resultsHeaders(resultsUrl) });
+
+      if (!response.ok) {
+        throw new Error(
+          `Anthropic API ${String(response.status)} on the batch results: ${resultsUrl}`,
+        );
+      }
+
+      const body = await response.text();
+
+      return body
+        .split("\n")
+        .filter((line) => line.trim() !== "")
+        .map((line) => callFor(resultLineSchema.parse(parseJson(line))));
+    },
+  } satisfies BatchProvider;
+}
+
+export function createAnthropicLlmPort(config: AnthropicLlmConfig, batches: DurableBatches) {
+  const { headers, call } = createClient(config);
+
   const port: LlmPort = {
     estimateBatchCostMicros: (requests) =>
       requests.reduce(
@@ -267,16 +291,7 @@ export function createAnthropicLlmPort(config: AnthropicLlmConfig) {
         return [];
       }
 
-      const created = await createBatch(requests);
-      const ended = await awaitBatchEnded(created.id, MAX_POLL_ATTEMPTS);
-
-      if (ended.results_url === null) {
-        throw new Error(`batch ${ended.id} ended without a results url`);
-      }
-
-      const lines = await fetchResultLines(ended.results_url);
-
-      return lines.map((line) => callFor(line));
+      return batches.run(requests);
     },
     estimateSingleCostMicros: (request) =>
       costMicrosFor(config.model, {

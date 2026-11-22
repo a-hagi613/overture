@@ -17,7 +17,7 @@ import {
   reviews,
   users,
 } from "../platform/db/schema.ts";
-import { MailCapExceededError } from "../platform/mail/metered.ts";
+import { MailCapExceededError } from "../platform/mail/errors.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import {
   addLocalDays,

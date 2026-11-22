@@ -35,12 +35,15 @@ const reportSchema = z.object({
   providers: z.array(
     z.object({
       ats: z.string(),
+      attempted: z.number(),
+      attemptCount: z.number(),
+      completed: z.number(),
       costMicrosPerCompleted: z.number().nullable(),
       p50BrowserMs: z.number().nullable(),
       p95BrowserMs: z.number().nullable(),
       proxyMbPerCompleted: z.number().nullable(),
       proxyTrend: z.boolean(),
-      sent: z.number(),
+      sentAttemptCount: z.number(),
     }),
   ),
 });
@@ -318,23 +321,23 @@ test("the admin Overview and provider report show proxy MB and cost per complete
 
   const boardId = await seedBoard(owner, companyId, "greenhouse", "blankstreet");
 
-  const postingId = await seedPosting(owner, {
-    atsJobId: "8004209003",
-    boardId,
-    companyId,
-    title: "Assistant General Manager | Durham",
-    url: "https://example.test/blankstreet/jobs/8004209003",
-  });
-
-  const applicationId = await seedApplication(owner, {
-    postingId,
-    status: "ready",
-    userId,
-  });
-
   const base = 1_800_000_000_000;
 
   const seedAttempt = async (index: number, proxyBytes: number, browserMs: number) => {
+    const postingId = await seedPosting(owner, {
+      atsJobId: `8004209${String(1000 + index)}`,
+      boardId,
+      companyId,
+      title: `Assistant General Manager | Durham ${String(index)}`,
+      url: `https://example.test/blankstreet/jobs/8004209${String(1000 + index)}`,
+    });
+
+    const applicationId = await seedApplication(owner, {
+      postingId,
+      status: "sent",
+      userId,
+    });
+
     const seeded = await owner.post("/__test__/attempts/seed", {
       data: {
         applicationId,
@@ -390,9 +393,11 @@ test("the admin Overview and provider report show proxy MB and cost per complete
   );
 
   const row = report.providers.find(
-    (candidate) => candidate.ats === "greenhouse" && candidate.sent === 40,
+    (candidate) => candidate.ats === "greenhouse" && candidate.completed === 40,
   );
 
+  expect(row?.attempted).toBe(40);
+  expect(row?.completed).toBe(40);
   expect(row?.costMicrosPerCompleted).toBe(20_000);
   expect(row?.proxyMbPerCompleted).toBeCloseTo(2, 5);
   expect(row?.proxyTrend).toBe(true);
@@ -445,21 +450,26 @@ test("attempts older than the 30-day cost window are left out of the Overview an
 
   const boardId = await seedBoard(owner, companyId, "greenhouse", "windowstreet");
 
-  const postingId = await seedPosting(owner, {
-    atsJobId: "8004209005",
-    boardId,
-    companyId,
-    title: "Assistant General Manager | Raleigh",
-    url: "https://example.test/windowstreet/jobs/8004209005",
-  });
-
-  const applicationId = await seedApplication(owner, { postingId, status: "ready", userId });
-
   const { now } = z
     .object({ now: z.number() })
     .parse(await (await owner.get("/__test__/clock")).json());
 
-  const seedAttempt = async (daysAgo: number, browserMs: number, proxyBytes: number) => {
+  const seedAttempt = async (
+    index: number,
+    daysAgo: number,
+    browserMs: number,
+    proxyBytes: number,
+  ) => {
+    const postingId = await seedPosting(owner, {
+      atsJobId: `8004209005${String(index)}`,
+      boardId,
+      companyId,
+      title: `Assistant General Manager | Raleigh ${String(index)}`,
+      url: `https://example.test/windowstreet/jobs/8004209005${String(index)}`,
+    });
+
+    const applicationId = await seedApplication(owner, { postingId, status: "sent", userId });
+
     const seeded = await owner.post("/__test__/attempts/seed", {
       data: {
         applicationId,
@@ -477,11 +487,13 @@ test("attempts older than the 30-day cost window are left out of the Overview an
     expect(seeded.ok()).toBe(true);
   };
 
-  await seedAttempt(31, 999_000, 9_000_000);
-  await seedAttempt(2, 10_000, 1_000_000);
-  await seedAttempt(3, 20_000, 1_000_000);
-  await seedAttempt(4, 30_000, 1_000_000);
-  await seedAttempt(5, 40_000, 1_000_000);
+  await Promise.all([
+    seedAttempt(0, 31, 999_000, 9_000_000),
+    seedAttempt(1, 2, 10_000, 1_000_000),
+    seedAttempt(2, 3, 20_000, 1_000_000),
+    seedAttempt(3, 4, 30_000, 1_000_000),
+    seedAttempt(4, 5, 40_000, 1_000_000),
+  ]);
 
   await openAdminAsOwner(page, captureAppUrl, accessServer.issueToken);
 
@@ -504,7 +516,7 @@ test("attempts older than the 30-day cost window are left out of the Overview an
     p50BrowserMs: 20_000,
     p95BrowserMs: 30_000,
     proxyMbPerCompleted: 1,
-    sent: 4,
+    completed: 4,
   });
 });
 
@@ -609,7 +621,7 @@ test("Anthropic spend of the Application purposes raises the cost summary and th
     url: "https://example.test/blankstreet/jobs/8004209004",
   });
 
-  const applicationId = await seedApplication(owner, { postingId, status: "ready", userId });
+  const applicationId = await seedApplication(owner, { postingId, status: "sent", userId });
 
   const seeded = await owner.post("/__test__/attempts/seed", {
     data: {
@@ -676,15 +688,94 @@ test("Anthropic spend of the Application purposes raises the cost summary and th
           costGateMet: z.boolean().nullable(),
           costGateMicros: z.number(),
           costMicrosPerCompleted: z.number().nullable(),
-          sent: z.number(),
+          completed: z.number(),
         }),
       ),
     })
     .parse(await (await page.request.get(`${captureAppUrl}/admin/api/provider-report`)).json());
 
-  expect(report.providers.find((row) => row.ats === "greenhouse" && row.sent === 1)).toMatchObject({
+  expect(
+    report.providers.find((row) => row.ats === "greenhouse" && row.completed === 1),
+  ).toMatchObject({
     costGateMet: false,
     costGateMicros: 30_000,
     costMicrosPerCompleted: 35_000,
   });
+});
+
+test("the provider report raises browser.minutes_trend when completed sessions grow longer", async ({
+  page,
+  captureAppServer,
+  captureAppUrl,
+  accessServer,
+}) => {
+  const { owner, userId } = await ownerContextFor(captureAppServer.url);
+  const companyId = await seedCompany(owner, "Long Sessions", "longsessions.example");
+  const boardId = await seedBoard(owner, companyId, "greenhouse", "longsessions");
+
+  const postingId = await seedPosting(owner, {
+    atsJobId: "9001002003",
+    boardId,
+    companyId,
+    title: "Staff Platform Engineer",
+    url: "https://example.test/longsessions/jobs/9001002003",
+  });
+
+  const applicationId = await seedApplication(owner, { postingId, status: "sent", userId });
+  const base = 1_800_000_000_000;
+
+  const seedAttempt = async (index: number, browserMs: number) => {
+    const seeded = await owner.post("/__test__/attempts/seed", {
+      data: {
+        applicationId,
+        browserMs,
+        costMicros: 20_000,
+        n: 1,
+        outcome: "sent",
+        proxyBytes: 2_000_000,
+        provider: "browser_use",
+        startedAt: base + index * 1000,
+        userId,
+      },
+    });
+
+    expect(seeded.ok()).toBe(true);
+  };
+
+  await Promise.all(
+    Array.from({ length: 20 }, async (_, index) => {
+      await seedAttempt(index, 5 * 60_000);
+    }),
+  );
+
+  await Promise.all(
+    Array.from({ length: 20 }, async (_, offset) => {
+      await seedAttempt(offset + 20, 8 * 60_000);
+    }),
+  );
+
+  await openAdminAsOwner(page, captureAppUrl, accessServer.issueToken);
+
+  const report = z
+    .object({ providers: z.array(z.object({ ats: z.string(), completed: z.number() })) })
+    .parse(await (await page.request.get(`${captureAppUrl}/admin/api/provider-report`)).json());
+
+  expect(
+    report.providers.find((row) => row.ats === "greenhouse" && row.completed === 1),
+  ).toBeDefined();
+
+  const notified = z
+    .object({ notifications: z.array(z.object({ body: z.string(), title: z.string() })) })
+    .parse(
+      await (
+        await fetch(
+          `${captureAppServer.url}/__test__/notifications?userId=${encodeURIComponent(userId)}`,
+        )
+      ).json(),
+    );
+
+  const titles = notified.notifications.map((notification) => notification.title);
+
+  expect(titles).toContain("Overture alert: browser.minutes_trend");
+  expect(titles).not.toContain("Overture alert: browser.proxy_trend");
 });

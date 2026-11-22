@@ -5,8 +5,8 @@ import type { SendPlanField } from "../../pipeline/send-plan.ts";
 import {
   codeStepVisible,
   fillField,
-  formLocator,
   norm,
+  openForm,
   preflightForm,
   readConfirmation,
   submitButton,
@@ -17,10 +17,8 @@ import {
 } from "../forms/engine.ts";
 import { checkPostingIdentity } from "../posting-identity.ts";
 
-import type { LiveFormProblem } from "../forms/engine.ts";
+import type { FormScope, LiveFormProblem } from "../forms/engine.ts";
 import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identity.ts";
-
-const FORM_APPEAR_MS = 15_000;
 
 const CODE_REQUIRED_STATUS = 428;
 
@@ -71,21 +69,21 @@ export interface GreenhouseRun {
 const isResumeField = (field: SendPlanField) =>
   field.fieldType === "file" && field.file === "resume";
 
-const labelTexts = async (page: Page) =>
-  page.evaluate(() =>
-    [...document.querySelectorAll("label")].map((label) => ({
+const labelTexts = async (scope: FormScope) =>
+  scope.root.evaluate((root) =>
+    [...root.querySelectorAll("label")].map((label) => ({
       forId: label.getAttribute("for"),
       text: label.textContent.replaceAll(/\s+/gu, " ").trim(),
     })),
   );
 
-async function fieldIdFor(page: Page, field: SendPlanField) {
+async function fieldIdFor(scope: FormScope, field: SendPlanField) {
   if (field.fieldName !== null && field.fieldName !== "") {
     return field.fieldName;
   }
 
   const wanted = norm(field.label);
-  const labels = await labelTexts(page);
+  const labels = await labelTexts(scope);
 
   const exact = labels.find((label) => norm(label.text) === wanted);
   const partial = labels.find((label) => norm(label.text).includes(wanted));
@@ -93,8 +91,8 @@ async function fieldIdFor(page: Page, field: SendPlanField) {
   return (exact ?? partial)?.forId ?? null;
 }
 
-async function fillSendPlanField(page: Page, field: SendPlanField) {
-  const fieldId = await fieldIdFor(page, field);
+async function fillSendPlanField(scope: FormScope, field: SendPlanField) {
+  const fieldId = await fieldIdFor(scope, field);
 
   if (fieldId === null) {
     return false;
@@ -104,7 +102,7 @@ async function fillSendPlanField(page: Page, field: SendPlanField) {
     return !field.required;
   }
 
-  return fillField(page, fieldId, field.answer);
+  return fillField(scope, fieldId, field.answer);
 }
 
 export const runGreenhouseAttempt: (
@@ -128,13 +126,24 @@ export const runGreenhouseAttempt: (
 
   const confirmationPath = `${new URL(plan.identity.url).pathname.replace(/\/+$/u, "")}/confirmation`;
 
+  const scope = await openForm(page, "form#application-form");
+
+  if (scope === null) {
+    return {
+      confirmationSeen: false,
+      outcome: "form_missing",
+      submitMayHaveLanded: false,
+      submitResponseStatus: null,
+    };
+  }
+
   const submitAndWatch = async () => {
     hooks.onWillSubmit();
 
     const submitPathname = await submitPathnameOf(page, null);
 
     const settled = await Promise.allSettled([
-      submitButton(page).click(),
+      submitButton(scope).click(),
       watchApplicationResponse(page, submitPathname),
     ]);
 
@@ -145,17 +154,6 @@ export const runGreenhouseAttempt: (
 
     return status;
   };
-
-  try {
-    await formLocator(page).waitFor({ state: "visible", timeout: FORM_APPEAR_MS });
-  } catch {
-    return {
-      confirmationSeen: false,
-      outcome: "form_missing",
-      submitMayHaveLanded: false,
-      submitResponseStatus: null,
-    };
-  }
 
   const { resume } = plan;
   const resumeField = plan.fields.find((field) => isResumeField(field));
@@ -171,7 +169,7 @@ export const runGreenhouseAttempt: (
       return fillFrom(index + 1);
     }
 
-    const filled = await fillSendPlanField(page, field);
+    const filled = await fillSendPlanField(scope, field);
     const rest = await fillFrom(index + 1);
 
     return filled && rest;
@@ -181,7 +179,7 @@ export const runGreenhouseAttempt: (
 
   if (resume !== null) {
     const resumeFieldId =
-      resume.fieldName ?? (resumeField === undefined ? null : await fieldIdFor(page, resumeField));
+      resume.fieldName ?? (resumeField === undefined ? null : await fieldIdFor(scope, resumeField));
 
     if (resumeFieldId === null) {
       return {
@@ -192,7 +190,7 @@ export const runGreenhouseAttempt: (
       };
     }
 
-    const uploaded = await uploadFile(page, resumeFieldId, {
+    const uploaded = await uploadFile(scope, resumeFieldId, {
       bytes: resume.bytes,
       mimeType: "application/pdf",
       name: resume.filename,
@@ -209,7 +207,7 @@ export const runGreenhouseAttempt: (
   }
 
   const verdict = await preflightForm(
-    page,
+    scope,
     plan.fields.map((field) => ({
       answer: field.answer,
       fieldName: field.fieldName,
