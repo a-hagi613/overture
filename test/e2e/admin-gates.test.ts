@@ -44,6 +44,18 @@ test("the admin API is selected by the Host header and refuses requests without 
   expect(onAppHost.headers()["content-type"]).toContain("text/html");
 });
 
+test("the admin API fails closed on an Access cookie that is not valid encoding", async ({
+  request,
+  adminApiUrl,
+}) => {
+  const refused = await request.get(`${adminApiUrl}/overview`, {
+    headers: { cookie: "CF_Authorization=%E0%A4%A" },
+  });
+
+  expect(refused.status()).toBe(401);
+  expect(await refused.json()).toEqual({ error: "access_required" });
+});
+
 test("the admin API refuses an Access credential it cannot verify", async ({
   request,
   adminApiUrl,

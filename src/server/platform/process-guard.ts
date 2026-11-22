@@ -1,6 +1,7 @@
 import type { AppDatabase } from "./db/client.ts";
 import type { Clock } from "./ports/clock.ts";
 
+import { unhandledRejectionDetail } from "./alert-detail.ts";
 import { raiseAlert } from "./alerts.ts";
 import { logError } from "./log.ts";
 
@@ -27,10 +28,14 @@ export function installProcessGuards(db: AppDatabase, clock: Clock) {
     lastAlertAt = now;
 
     try {
-      raiseAlert(db, clock, "process.unhandled", {
-        count: unhandledRejections,
-        error: reason instanceof Error ? reason.message : String(reason),
-      });
+      const errorName = reason instanceof Error ? reason.name : "NonError";
+
+      raiseAlert(
+        db,
+        clock,
+        "process.unhandled",
+        unhandledRejectionDetail(errorName, unhandledRejections),
+      );
     } catch (error) {
       logError("processGuard.alert", error);
     }

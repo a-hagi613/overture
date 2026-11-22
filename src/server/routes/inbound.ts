@@ -15,6 +15,7 @@ import {
   verifyInbound,
 } from "../../shared/inbound-mail.ts";
 import { parseInboundDeadLetter } from "../../shared/inbound-queue.ts";
+import { readBodyCapped } from "../platform/http-body.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
@@ -27,6 +28,7 @@ import { MAIL_INGEST_JOB_KIND } from "../inbox/ingest.ts";
 import { inboundAuth } from "../inbox/auth.ts";
 import { openCodeWaits } from "../inbox/waits.ts";
 import {
+  hasOpenLiveCheckMailToken,
   liveCheckCodeFromText,
   liveCheckTokenFromText,
   recordLiveCheckMailInbound,
@@ -57,6 +59,10 @@ export function createInboundRoutes(deps: {
       return;
     }
 
+    if (!hasOpenLiveCheckMailToken(db, token)) {
+      return;
+    }
+
     const sender =
       parsed.from?.value.flatMap((entry) => (entry.address ? [entry.address] : []))[0] ?? "";
 
@@ -82,9 +88,9 @@ export function createInboundRoutes(deps: {
       return context.body(null, 413);
     }
 
-    const body = new Uint8Array(await context.req.arrayBuffer());
+    const body = await readBodyCapped(context.req.raw, INBOUND_MAX_BYTES);
 
-    if (body.byteLength > INBOUND_MAX_BYTES) {
+    if (body === null) {
       return context.body(null, 413);
     }
 
@@ -164,9 +170,9 @@ export function createInboundRoutes(deps: {
       return context.body(null, 413);
     }
 
-    const body = new Uint8Array(await context.req.arrayBuffer());
+    const body = await readBodyCapped(context.req.raw, INBOUND_DEAD_LETTER_MAX_BYTES);
 
-    if (body.byteLength > INBOUND_DEAD_LETTER_MAX_BYTES) {
+    if (body === null) {
       return context.body(null, 413);
     }
 
