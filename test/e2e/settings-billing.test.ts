@@ -526,9 +526,21 @@ test.describe("plan and billing in Settings, and the paused and out-of-applicati
       );
 
       const routes = [
-        { name: "home-paused", path: "/" },
-        { name: "settings-billing", path: "/settings/billing" },
-        { name: "billing-plans", path: "/settings/billing/plans" },
+        {
+          name: "home-paused",
+          path: "/",
+          ready: (page: Page) => page.getByText("Payment didn't go through."),
+        },
+        {
+          name: "settings-billing",
+          path: "/settings/billing",
+          ready: (page: Page) => page.getByRole("heading", { name: "Plan and billing" }),
+        },
+        {
+          name: "billing-plans",
+          path: "/settings/billing/plans",
+          ready: (page: Page) => page.getByRole("heading", { name: "Choose a plan" }),
+        },
       ] as const;
 
       const cases = [false, true].flatMap((dark) =>
@@ -541,7 +553,10 @@ test.describe("plan and billing in Settings, and the paused and out-of-applicati
 
         try {
           await page.goto(`${app.server.url}${route.path}`);
-          await page.waitForLoadState("networkidle");
+          await expect(route.ready(page)).toBeVisible();
+          await page.evaluate(async () => {
+            await document.fonts.ready;
+          });
           await expectNoOverflow(page, label);
           await expectAxeClean(page, label);
           await shoot(page, `${route.name}-${String(width)}-${dark ? "dark" : "light"}`);

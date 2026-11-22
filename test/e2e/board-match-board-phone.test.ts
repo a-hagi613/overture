@@ -106,7 +106,6 @@ async function expectPhoneBoardMatches(browser: Browser, appServerUrl: string, t
     ]);
     await document.fonts.ready;
   });
-  await page.waitForLoadState("networkidle");
 
   const results = await new AxeBuilder({ page }).analyze();
 
