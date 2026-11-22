@@ -221,6 +221,31 @@ test("keyboard Enter on Try again in the stale warning returns focus to the Read
   await context.close();
 });
 
+test("a retry that fails again does not move focus when a later refresh recovers", async ({
+  browser,
+  seededReady,
+}) => {
+  const { context, page } = await openReady(browser, seededReady.storageState, 1280, "light");
+
+  await page.route(readyApi, async (route) => route.fulfill({ status: 500 }));
+  await page.goto(`${seededReady.server.url}/ready`);
+
+  const alert = errorAlert(page);
+
+  await expect(alert).toBeVisible({ timeout: 20_000 });
+  await alert.getByRole("button", { name: retryLabel }).click();
+  await expect(alert.getByRole("button", { name: retryLabel })).toBeVisible({ timeout: 20_000 });
+
+  await page.unroute(readyApi);
+  await refetchInBackground(page);
+
+  await expect(alert).toHaveCount(0);
+  await expect(northwind(page)).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Ready to send" })).not.toBeFocused();
+
+  await context.close();
+});
+
 test("Ready shows the empty state only after a clean, empty fetch", async ({
   browser,
   seededEmpty,

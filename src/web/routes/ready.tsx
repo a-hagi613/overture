@@ -60,8 +60,13 @@ export function ReadyPage() {
   };
 
   useEffect(() => {
-    if (recoveringRef.current && isSuccess && !isFetching) {
-      recoveringRef.current = false;
+    if (!recoveringRef.current || isFetching) {
+      return;
+    }
+
+    recoveringRef.current = false;
+
+    if (isSuccess) {
       headingRef.current?.focus();
     }
   }, [isSuccess, isFetching]);
