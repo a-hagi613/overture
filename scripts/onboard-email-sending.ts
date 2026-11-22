@@ -75,6 +75,12 @@ function printReadiness(readiness: EmailSendingReadiness) {
     );
   }
 
+  if (!readiness.ready && readiness.receivedSummary !== undefined) {
+    write(
+      `received records: ${readiness.receivedSummary === "" ? "(none)" : readiness.receivedSummary}`,
+    );
+  }
+
   if (readiness.error !== null) {
     fail(`error: ${readiness.error}`);
   }

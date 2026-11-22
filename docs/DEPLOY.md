@@ -19,7 +19,7 @@ No secret value ever appears in this repository: secrets are set with `fly secre
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`), a `security-and-restore` job (gitleaks over the history, the private-files guard, and the Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations, untouched `bg_jobs`), and the `ci-ok` aggregator every other job feeds |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
-| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets), `live-diagnostics` (runtime names present/missing and integer SQLite counts). Skips with a green notice while `FLY_API_TOKEN` is unset |
+| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets), `live-diagnostics` (runtime names present/missing and integer SQLite counts). Skips with a green notice while `FLY_API_TOKEN` is unset |
 | `scripts/check-restored-db.ts` | Restored-database checks, read-only: PRAGMA `integrity_check`, applied-migration count, per-table row counts, untouched `bg_jobs`, zero outbound requests |
 | `scripts/restore-drill.ts` | `DRILL_TARGET=local` (CI round-trip) or `DRILL_TARGET=fly` (throwaway machine drill); never starts the app server |
 | `litestream-drill.yml` | Restore-only Litestream config for drills: same bucket, dedicated read-only `R2_DRILL_*` credential |
@@ -394,6 +394,60 @@ with the drift message.
 
 Against a test key this creates test-mode products, prices, a webhook and a portal; delete them in the dashboard when
 you are done. `--rotate-webhook` replaces the endpoint and writes the new `STRIPE_WEBHOOK_SECRET` to the env file.
+
+## Push notifications and the catalog seed (owner runbook)
+
+Both actions are `workflow_dispatch` runs of `ops-live.yml`; they read `FLY_API_TOKEN` from the repository
+secrets, print names and counts only, and never write a key or a secret value to the log.
+
+### 1. VAPID keys for Web Push
+
+```sh
+gh workflow run ops-live.yml -f action=setup-vapid -R a-hagi613/overture
+```
+
+`scripts/generate-vapid.ts` creates a P-256 key pair with `node:crypto`, writes
+`VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` to `/tmp/vapid-setup.env` (mode `0600`) and prints only
+`Generated VAPID P-256 keypair (public key written to out-env).` The workflow masks both values with
+`::add-mask::`, imports them in one `flyctl secrets import`, polls `https://tryoverture.com/api/health`
+for up to 120 s, and an `always()` step deletes the temporary env file. The public key is the 65-byte
+uncompressed point `web-push.ts` expects; the private key is the raw 32-byte scalar.
+
+The action is idempotent: it lists the Fly secret names first and, when both are already set, logs
+`VAPID keys are already set on overture-web.` and exits 0. Replace them deliberately with:
+
+```sh
+gh workflow run ops-live.yml -f action=setup-vapid -f rotate_vapid=true -R a-hagi613/overture
+```
+
+Rotating the pair invalidates push subscriptions that browsers registered against the old public key;
+each browser must subscribe again, and `VAPID_SUBJECT` (default `mailto:admin@tryoverture.com`) stays
+untouched. To turn Web Push off, unset both names together — the server boots with push disabled only
+when neither is set — with
+`flyctl secrets unset -a overture-web VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY`.
+To generate a pair locally, run `bun run scripts/generate-vapid.ts --out-env /tmp/vapid.env`,
+copy the values into `fly secrets set`, then delete the file.
+
+### 2. Catalog seed and backfill
+
+```sh
+gh workflow run ops-live.yml -f action=seed-catalog -R a-hagi613/overture
+```
+
+The action runs over `flyctl ssh console` with a 600 s timeout and, as the unprivileged `app` user:
+
+1. `mkdir -p /data/seed && chown app:app /data/seed`, then
+   `fetch-seed.ts --dir /data/seed` downloads the pinned `manifest.json` and `companies.parquet` and
+   verifies their checksums;
+2. `load-discovered-boards.ts --db /data/app.sqlite --manifest /data/seed/manifest.json
+   --companies /data/seed/companies.parquet` inserts the boards in batches of at most 500 (idempotent:
+   a second run loads no duplicate board);
+3. `enqueue-backfill.ts --db /data/app.sqlite` enqueues one `catalog.backfill` job and prints the job id,
+   whether it was newly enqueued and the estimated work; a second run does not queue a duplicate.
+
+The output is appended to the run's step summary and the action finishes by checking
+`https://tryoverture.com/api/health`. The seed files stay in `/data/seed` so a later run reuses the
+verified download; the backfill job itself is picked up by the app's job worker.
 
 ## Verifying the acceptance criteria
 

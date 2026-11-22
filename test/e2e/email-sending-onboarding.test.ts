@@ -48,6 +48,12 @@ const sendEmailSchema = z.object({
 
 type FakeMode = "empty" | "ready" | "not-entitled" | "records-incomplete";
 
+interface FakeDnsRecord {
+  content: string;
+  name: string;
+  type: string;
+}
+
 interface RecordedCall {
   method: string;
   path: string;
@@ -60,7 +66,7 @@ function recording(name: string) {
     .parse(JSON.parse(readFileSync(`test/e2e/recordings/cloudflare-email/${name}.json`, "utf8")));
 }
 
-function startFakeCloudflare(mode: FakeMode) {
+function startFakeCloudflare(mode: FakeMode, dnsRecords?: readonly FakeDnsRecord[]) {
   const calls: RecordedCall[] = [];
   let onboarded = mode === "ready" || mode === "records-incomplete";
 
@@ -87,6 +93,10 @@ function startFakeCloudflare(mode: FakeMode) {
       }
 
       if (url.pathname.endsWith("/dns")) {
+        if (dnsRecords !== undefined) {
+          return Response.json({ errors: [], messages: [], result: dnsRecords, success: true });
+        }
+
         return Response.json(
           recording(
             mode === "records-incomplete" ? "subdomain-dns-incomplete" : "subdomain-dns-ready",
@@ -161,6 +171,61 @@ function sends(requests: z.infer<typeof cloudflareRequestSchema>[]) {
   return requests.filter((entry) => entry.url.endsWith("/email/sending/send"));
 }
 
+const readyRecords = {
+  dmarc: { content: "v=DMARC1; p=reject", name: "_dmarc.tryoverture.com", type: "TXT" },
+  dkim: {
+    content: "v=DKIM1; h=sha256; k=rsa; p=MIIBIjANBgkq",
+    name: "cf-bounce._domainkey.tryoverture.com",
+    type: "TXT",
+  },
+  mx: { content: "route1.mx.cloudflare.net", name: "cf-bounce.tryoverture.com", type: "MX" },
+  spf: {
+    content: "v=spf1 include:_spf.mx.cloudflare.net ~all",
+    name: "cf-bounce.tryoverture.com",
+    type: "TXT",
+  },
+} satisfies Record<string, FakeDnsRecord>;
+
+const recordFormats: readonly { label: string; records: readonly FakeDnsRecord[] }[] = [
+  {
+    label: "quoted SPF and DKIM TXT strings",
+    records: [
+      readyRecords.mx,
+      { ...readyRecords.spf, content: `"${readyRecords.spf.content}"` },
+      { ...readyRecords.dkim, content: `"${readyRecords.dkim.content}"` },
+      { ...readyRecords.dmarc, content: `"${readyRecords.dmarc.content}"` },
+    ],
+  },
+  {
+    label: "multi-segment quoted DKIM TXT strings",
+    records: [
+      readyRecords.mx,
+      readyRecords.spf,
+      { ...readyRecords.dkim, content: '"v=DKIM1; h=sha256; k=rsa;" "p=MIIBIjANBgkq"' },
+      readyRecords.dmarc,
+    ],
+  },
+  {
+    label: "MX targets with a trailing dot and a leading priority",
+    records: [
+      { ...readyRecords.mx, content: "10 route1.mx.cloudflare.net." },
+      { ...readyRecords.mx, content: "20 route2.mx.cloudflare.net." },
+      readyRecords.spf,
+      readyRecords.dkim,
+      readyRecords.dmarc,
+    ],
+  },
+  {
+    label: "relative record names and mixed-case types",
+    records: [
+      { ...readyRecords.mx, name: "cf-bounce", type: " mx " },
+      { ...readyRecords.spf, name: "cf-bounce" },
+      { ...readyRecords.dkim, name: "cf-bounce._domainkey" },
+      { ...readyRecords.dmarc, name: "_dmarc" },
+    ],
+  },
+];
+
 test.describe.configure({ mode: "serial" });
 
 test("the operator script plans without writing, onboards once, is idempotent and verifies every record", async () => {
@@ -209,6 +274,26 @@ test("the operator script plans without writing, onboards once, is idempotent an
   }
 });
 
+for (const format of recordFormats) {
+  test(`the operator script verifies ${format.label}`, async () => {
+    const cloudflare = startFakeCloudflare("ready", format.records);
+
+    try {
+      const check = await runScript(cloudflare.baseUrl, ["--check"]);
+
+      expect(check.exitCode).toBe(0);
+      expect(check.stdout).toContain("verdict: ready");
+      expect(check.stdout).toContain("mx    cf-bounce.tryoverture.com ok");
+      expect(check.stdout).toContain("spf   cf-bounce.tryoverture.com ok");
+      expect(check.stdout).toContain("dkim  cf-bounce._domainkey.tryoverture.com ok");
+      expect(check.stdout).toContain("dmarc _dmarc.tryoverture.com ok");
+      expect(check.stdout).not.toContain("received records");
+    } finally {
+      await cloudflare.stop();
+    }
+  });
+}
+
 test("the guard fails with a clear message before the plan is paid and before DMARC is published", async () => {
   const notEntitled = startFakeCloudflare("not-entitled");
 
@@ -231,6 +316,10 @@ test("the guard fails with a clear message before the plan is paid and before DM
     expect(check.exitCode).toBe(1);
     expect(`${check.stdout}${check.stderr}`).toContain("dmarc");
     expect(check.stdout).toContain("verdict: not ready");
+    expect(check.stdout).toContain(
+      "received records: MX cf-bounce.tryoverture.com; TXT cf-bounce.tryoverture.com; TXT cf-bounce._domainkey.tryoverture.com",
+    );
+    expect(check.stdout).not.toContain("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtest");
   } finally {
     await incomplete.stop();
   }
