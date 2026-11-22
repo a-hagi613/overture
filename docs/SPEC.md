@@ -1040,6 +1040,7 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
   the synthetic lab is reported beside it, aggregated per provider × lab page with the same rates, durations, proxy and
   cost and the average reCAPTCHA score, and is never counted inside the gate. `POST /admin/api/lab/runs` queues a lab
   run (audited). Overview shows proxy MB and cost per completed application against the $0.03 gate.
+- Cost per completed application (ADR 0026): Browser Use spend for attempted Applications plus the Anthropic spend of the Application purposes (`score`, `open_text`, `cover_letter`, `question_mapping`) for those users, divided by sent Applications. `llm_usage` has no application id, so that Anthropic spend is attributed per user. `/admin/billing/margin` shows the same measure per plan over 30 days, with revenue per Application and margin, and reports fixed infrastructure, mail and other model calls beside it.
   The report raises `browser.proxy_trend` when the latest 20 completed applications use more than 1.2× the proxy bytes
   per completed application of the 20 before them. Kernel stays the fallback unless the lab shows it clearly ahead
   and the owner decides otherwise.

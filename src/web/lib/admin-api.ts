@@ -129,6 +129,40 @@ export const grantRowSchema = z.object({
 
 export const grantsResponseSchema = z.object({ grants: z.array(grantRowSchema) });
 
+const marginPlanRowSchema = z.object({
+  plan: z.enum(["trial", "week", "month"]),
+  priceMicros: z.number(),
+  applications: z.number(),
+  users: z.number(),
+  completed: z.number(),
+  costMicrosPerCompleted: z.number().nullable(),
+  revenueMicrosPerApplication: z.number(),
+  marginMicrosPerApplication: z.number().nullable(),
+  marginRatio: z.number().nullable(),
+  costGateMet: z.boolean().nullable(),
+});
+
+export const marginResponseSchema = z.object({
+  windowDays: z.number(),
+  generatedAt: z.number(),
+  costGateMicros: z.number(),
+  completed: z.number(),
+  costMicrosPerCompleted: z.number().nullable(),
+  browserMicrosPerCompleted: z.number().nullable(),
+  anthropicMicrosPerCompleted: z.number().nullable(),
+  plans: z.array(marginPlanRowSchema),
+  beside: z.object({
+    fixedInfraMicrosPerMonth: z.number(),
+    mail: z.object({
+      month: z.string(),
+      sends: z.number(),
+      includedSends: z.number(),
+      overageMicros: z.number(),
+    }),
+    otherAnthropicMicros: z.number(),
+  }),
+});
+
 export const grantCreateResponseSchema = z.object({
   applicationsLeft: z.number(),
   grantId: z.string(),
@@ -487,6 +521,12 @@ export const setKillSwitch = async (scope: string, key: string, enabled: boolean
   );
 
 export const loadGrants = async () => adminGet("/admin/api/grants", grantsResponseSchema);
+
+export type MarginReport = z.infer<typeof marginResponseSchema>;
+
+export type MarginPlanRow = z.infer<typeof marginPlanRowSchema>;
+
+export const loadMargin = async () => adminGet("/admin/api/margin", marginResponseSchema);
 
 export const createGrant = async (
   email: string,

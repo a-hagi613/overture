@@ -40,6 +40,7 @@ import { applicationsLeft, balancesPerGrant, grantApplications } from "../billin
 import { buildCostSummary, buildProviderReport } from "../dispatch/report.ts";
 import { buildLabReport } from "../lab/report.ts";
 import { LAB_JOB_KIND, labRunPayloadSchema } from "../lab/job.ts";
+import { buildMarginReport } from "../billing/margin.ts";
 import { FIXTURE_CAPTURE_JOB_KIND, fixtureCapturePayloadSchema } from "../fixtures/job.ts";
 import { enqueueLiveCheckNow } from "../live-checks/job.ts";
 import { readLiveCheckResults } from "../live-checks/store.ts";
@@ -1199,6 +1200,8 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
     return context.json({ recordingUrl });
   });
+
+  routes.get("/margin", (context) => context.json(buildMarginReport(db, clock)));
 
   routes.get("/provider-report", (context) =>
     context.json({ lab: buildLabReport(db), providers: buildProviderReport(db, clock) }),
