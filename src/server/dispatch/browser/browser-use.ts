@@ -33,6 +33,40 @@ export const browserProfileSchema = z.object({
 
 export type BrowserProfile = z.infer<typeof browserProfileSchema>;
 
+const domainListSchema = z.object({ domains: z.array(z.string().min(1)) });
+
+export const networkPolicySchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  defaultAction: z.enum(["allow", "block"]).optional(),
+  allow: domainListSchema.optional(),
+  block: domainListSchema.optional(),
+  version: z.number().int().positive(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type NetworkPolicy = z.infer<typeof networkPolicySchema>;
+
+const networkPolicyListSchema = z.object({
+  items: z.array(networkPolicySchema),
+  totalItems: z.number().int().nonnegative(),
+  pageNumber: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+});
+
+export interface NetworkPolicyInput {
+  name: string;
+  defaultAction: "allow" | "block";
+  allow?: { domains: string[] };
+  block?: { domains: string[] };
+}
+
+export interface ListNetworkPoliciesInput {
+  pageNumber?: number;
+  pageSize?: number;
+}
+
 const browserSessionListSchema = z.object({
   items: z.array(browserSessionSchema),
   totalItems: z.number().int().nonnegative(),
@@ -46,6 +80,16 @@ export interface CreateSessionInput {
   solveCaptchas: boolean;
   metadata: Record<string, string>;
   profileId: string | null;
+  networkPolicyId?: string | null;
+}
+
+interface CreateSessionBody {
+  metadata: Record<string, string>;
+  networkPolicyId?: string;
+  profileId: string | null;
+  proxyCountryCode: string;
+  solveCaptchas: boolean;
+  timeout: number;
 }
 
 export interface ListSessionsInput {
@@ -143,17 +187,23 @@ export function BrowserUseClient(apiKey: string, baseUrl: string | undefined, cl
   };
 
   const createSession = async (input: CreateSessionInput, attempt = 0) => {
+    const body: CreateSessionBody = {
+      metadata: input.metadata,
+      profileId: input.profileId,
+      proxyCountryCode: input.proxyCountryCode,
+      solveCaptchas: input.solveCaptchas,
+      timeout: input.timeoutMinutes,
+    };
+
+    if (input.networkPolicyId !== undefined && input.networkPolicyId !== null) {
+      body.networkPolicyId = input.networkPolicyId;
+    }
+
     try {
       return await parsedSession("/api/v4/browsers", {
         method: "POST",
         headers: headers(),
-        body: JSON.stringify({
-          profileId: input.profileId,
-          proxyCountryCode: input.proxyCountryCode,
-          timeout: input.timeoutMinutes,
-          solveCaptchas: input.solveCaptchas,
-          metadata: input.metadata,
-        }),
+        body: JSON.stringify(body),
       });
     } catch (error) {
       if (!(error instanceof BrowserUseApiError) || !rateLimited(error)) {
@@ -218,6 +268,36 @@ export function BrowserUseClient(apiKey: string, baseUrl: string | undefined, cl
     },
     deleteProfile: async (profileId: string) => {
       await call(`/api/v4/profiles/${profileId}`, { method: "DELETE", headers: headers() });
+    },
+    createNetworkPolicy: async (input: NetworkPolicyInput) => {
+      const response = await call("/api/v4/network-policies", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify(input),
+      });
+
+      return networkPolicySchema.parse(await response.json());
+    },
+    updateNetworkPolicy: async (policyId: string, input: NetworkPolicyInput) => {
+      const response = await call(`/api/v4/network-policies/${policyId}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify(input),
+      });
+
+      return networkPolicySchema.parse(await response.json());
+    },
+    listNetworkPolicies: async (input: ListNetworkPoliciesInput = {}) => {
+      const parameters = new URLSearchParams({
+        pageNumber: String(input.pageNumber ?? 1),
+        pageSize: String(input.pageSize ?? 100),
+      });
+
+      const response = await call(`/api/v4/network-policies?${parameters.toString()}`, {
+        headers: headers(),
+      });
+
+      return networkPolicyListSchema.parse(await response.json());
     },
   };
 }

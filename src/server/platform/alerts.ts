@@ -9,6 +9,8 @@ import { users } from "./db/schema.ts";
 import { publishEvent } from "./sse/stream.ts";
 
 export const ALERT_KINDS = [
+  "browser.minutes_trend",
+  "browser.network_policy",
   "browser.proxy_trend",
   "dispatch.kill_switch",
   "mail.cap",
