@@ -20,7 +20,8 @@ const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     PORT: z.coerce.number().int().min(0).max(65_535).default(3000),
-    KILL_TIMEOUT_MS: z.coerce.number().int().min(1).default(270_000),
+    KILL_TIMEOUT_MS: z.coerce.number().int().min(1).default(20_000),
+    JOBS_STARTUP_SETTLE_MS: z.coerce.number().int().min(0).default(5000),
     DATABASE_URL: z.string().min(1).default("data/overture.db"),
     DATABASE_PATH: z.string().min(1).optional(),
     STATIC_ROOT: z.string().min(1).default("dist"),

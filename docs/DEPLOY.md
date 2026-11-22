@@ -354,6 +354,32 @@ request, a log or a test fixture. The two scripts print counts and keys only, ne
    idempotent: it updates the same rows and never overwrites a Fact whose source is `user` or `review`.
 4. Delete the decrypted export from both machines.
 
+## Restarts, shutdown and the health check
+
+Two clocks bound a deploy. Fly stops a machine after `kill_timeout = 300`, but the container's main process is
+Litestream, and Litestream's `replicate -exec` gives its child — the Bun server — 30 s after the signal before it logs
+`Error: shutdown timed out after 30s: context deadline exceeded`, SIGKILLs the child and exits 1. The server's own
+graceful budget (`KILL_TIMEOUT_MS`, default 20 s) therefore has to fit inside that window.
+
+On `SIGINT`/`SIGTERM` (`fly logs` shows the three lines in order):
+
+1. `overture shutdown: SIGINT: draining with a 20000 ms budget`
+2. stop accepting, give in-flight requests `SHUTDOWN_QUIET_GRACE_MS` (2 s), then force the long-lived ones shut —
+   `/api/events` also ends on the shutdown signal, so a stream cannot hold the stop until the idle timeout;
+3. drain in-flight jobs with the remaining budget and requeue them (`interrupted` / lease expiry recovers the rest);
+4. `overture shutdown: stopped in <ms>` and exit 0, one second before a SIGKILL backstop. A SIGKILL or exit 1 here
+   means Litestream killed the child: the budget and the Litestream deadline have drifted apart again.
+
+A restart also starts the job worker with a settle window (`JOBS_STARTUP_SETTLE_MS`, 5 s). Without it the startup
+enqueues (catalog sweep, check-ins, grant expiry, retention, prep) woke the worker in the same second the port opened,
+so the new machine's first health checks competed with a full batch of jobs. Queued work is not lost; it starts a few
+seconds later.
+
+`/api/health` runs `select 1` and serves the cached replica reading, so it is a main-thread operation: if health checks
+fail while the process is alive and `fly logs` shows no application line, the event loop was blocked. The server logs
+that directly now — `overture event-loop-lag: Error: the event loop was blocked for <n> ms` — measured on a 1 s timer,
+so the next incident has a duration instead of a gap in the log.
+
 ## Operator scripts against the live database
 
 Operator scripts run against the same `/data/app.sqlite` the server is using, so every one that writes does it in

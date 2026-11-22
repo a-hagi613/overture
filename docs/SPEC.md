@@ -86,10 +86,17 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 - One Fly app, one machine, one volume. `fly scale count` stays 1. Machine: `shared-cpu-2x`, 2 GB; volume 10 GB.
   No runner app: browsers are remote.
 - Same origin for API and SPA. `admin.tryoverture.com` is the same process, routed by host, behind Cloudflare Access.
-- Deploys cause ~10–30 s downtime; `kill_timeout = 300` (Fly's maximum). On `SIGTERM` the process stops claiming
-  jobs and waits for in-flight jobs. A send that has not reached `submit_clicked_at` stops, releases and is
-  rescheduled as `interrupted`, which does not use one of its two tries; a send past it waits for its confirmation
-  signal. Anything still open at exit is recovered by lease expiry (§9.4).
+- Deploys cause ~10–30 s downtime; `kill_timeout = 300` (Fly's maximum) and Litestream's `-exec` wrapper are the
+  two clocks that matter. Litestream gives its child 30 s after the signal before it logs `shutdown timed out after
+  30s` and SIGKILLs it, so the app's own graceful budget (`KILL_TIMEOUT_MS`, 20 s) is deliberately shorter: on
+  `SIGINT`/`SIGTERM` it stops accepting, ends every open `/api/events` stream, waits for in-flight jobs, requeues
+  them, logs `shutdown: stopped in <ms>` and exits 0, with a SIGKILL backstop one second past the budget. A send
+  that has not reached `submit_clicked_at` stops, releases and is rescheduled as `interrupted`, which does not use
+  one of its two tries; a send past it waits for its confirmation signal. Anything still open at exit is recovered
+  by lease expiry (§9.4).
+- After a restart the job worker stays quiet for `JOBS_STARTUP_SETTLE_MS` (5 s): the startup enqueues otherwise wake
+  it in the same second the port opens and the new machine's first health checks compete with a full batch of jobs.
+  Nothing is dropped; the queued work starts a few seconds later.
 - The prerendered marketing pages (`/` and `/pricing`) are deployed as Workers Static Assets
   (`workers/marketing`, ADR 0033) on explicit routes for those paths only, so they stay up through those deploys.
   Every app and API path matches no Worker route and goes straight to `overture-web`; the app's HTML and assets are

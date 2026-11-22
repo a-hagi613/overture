@@ -27,6 +27,7 @@ import { openDatabase } from "./platform/db/client.ts";
 import { migrateDatabase } from "./platform/db/migrate.ts";
 import { createClock } from "./platform/ports/clock.ts";
 import { createRandom } from "./platform/ports/random.ts";
+import { createEventLoopLagMonitor } from "./platform/event-loop-lag.ts";
 import { createBackupMonitor } from "./platform/ports/backup.ts";
 import { installProcessGuards } from "./platform/process-guard.ts";
 import { enqueueJob, recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
@@ -176,6 +177,15 @@ const sdk = startTelemetry({
 });
 
 const { db } = openDatabase(databasePath);
+
+createEventLoopLagMonitor({
+  onLag: (lagMs) => {
+    logError(
+      "event-loop-lag",
+      new Error(`the event loop was blocked for ${String(Math.round(lagMs))} ms`),
+    );
+  },
+}).start();
 
 migrateDatabase(db, "drizzle");
 
@@ -824,6 +834,7 @@ const worker = startJobWorker(
     registerEnqueueNotify(notify);
   },
   jobSingletons,
+  { startupSettleMs: env.JOBS_STARTUP_SETTLE_MS },
 );
 
 if (activeDispatcher !== null) {
@@ -872,9 +883,12 @@ const app = createApp({
   eraser,
   exports,
   payments,
+  shutdown: shutdownController.signal,
 });
 
 const SERVER_IDLE_TIMEOUT_ABOVE_SSE_HEARTBEAT_SECONDS = 60;
+const SHUTDOWN_QUIET_GRACE_MS = 2000;
+const SHUTDOWN_HARD_EXIT_GRACE_MS = 1000;
 
 const server = Bun.serve({
   port: env.PORT,
@@ -884,8 +898,6 @@ const server = Bun.serve({
 
 process.stdout.write(`overture listening on ${String(server.port)}\n`);
 
-const SHUTDOWN_HARD_EXIT_GRACE_MS = 1000;
-
 let shuttingDown = false;
 
 async function stopTelemetry() {
@@ -894,41 +906,54 @@ async function stopTelemetry() {
   } catch {}
 }
 
-function handleShutdown() {
+async function quietGrace(budgetMs: number) {
+  const graceMs = Math.min(SHUTDOWN_QUIET_GRACE_MS, Math.max(50, Math.floor(budgetMs / 4)));
+
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, graceMs).unref();
+  });
+}
+
+function handleShutdown(signal: string) {
   if (shuttingDown) {
+    logInfo("shutdown", `${signal}: already stopping`);
+
     return;
   }
 
   shuttingDown = true;
+
+  const startedAt = performance.now();
+  const budgetMs = env.KILL_TIMEOUT_MS;
+
+  logInfo("shutdown", `${signal}: draining with a ${String(budgetMs)} ms budget`);
+
   shutdownController.abort();
 
-  const killTimer = setTimeout(() => {
-    void server.stop(true);
-    void stopTelemetry();
-  }, env.KILL_TIMEOUT_MS);
-
   const hardExitTimer = setTimeout(() => {
+    logError("shutdown", new Error(`still running after ${String(budgetMs)} ms; forcing exit`));
     process.kill(process.pid, "SIGKILL");
-  }, env.KILL_TIMEOUT_MS + SHUTDOWN_HARD_EXIT_GRACE_MS);
+  }, budgetMs + SHUTDOWN_HARD_EXIT_GRACE_MS);
 
-  killTimer.unref();
   hardExitTimer.unref();
 
   void (async () => {
     try {
-      await server.stop(false);
-      await worker.drain(env.KILL_TIMEOUT_MS);
+      await Promise.race([server.stop(false), quietGrace(budgetMs)]);
+      await server.stop(true);
+      await worker.drain(Math.max(0, budgetMs - (performance.now() - startedAt)));
       catalogWorker.stop();
-
-      clearTimeout(killTimer);
     } catch (error) {
       logError("shutdown", error);
     } finally {
-      await stopTelemetry();
+      await Promise.race([stopTelemetry(), quietGrace(budgetMs)]);
+      logInfo("shutdown", `stopped in ${String(Math.round(performance.now() - startedAt))} ms`);
     }
   })();
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, handleShutdown);
+  process.on(signal, () => {
+    handleShutdown(signal);
+  });
 }

@@ -117,6 +117,7 @@ export function serverEnvironment(extraEnvironment: Record<string, string>) {
     LAB_TURNSTILE_SCRIPT_URL: "/__test__/lab-turnstile.js",
     OTEL_SIMPLE_EXPORT: "true",
     KILL_TIMEOUT_MS: "1000",
+    JOBS_STARTUP_SETTLE_MS: "0",
     ...authDefaults(extraEnvironment),
     ...extraEnvironment,
   };
