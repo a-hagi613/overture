@@ -24,7 +24,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for the fifty files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
+exist only for the fifty-two files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
 as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key,
 and a "did not happen" line appears only when the stored data proves it), ledger, crypto, planner, the
 restored-database check (a restored file is read
@@ -92,7 +92,11 @@ in flight, the Inbox Thread list and an Application's linked mail read their mes
 Thread, the open Review list and a Board's email notes read their rows in one query rather than one per Review or per
 Application, the Ready cards open every approved plan in one query rather than one per card, an empty timezone change
 takes no write, and Home's billing strip is one grants read plus one ledger read; each test counts the statements
-through the real drizzle query logger and grows the row count to prove the count stays flat), the unit-test
+through the real drizzle query logger and grows the row count to prove the count stays flat), the live match count
+(`src/server/profile/targets.test.ts`: a cached count equals a fresh handle across filters that differ only in order,
+case or duplicates, a same-connection write and a sweep-worker connection's WAL write both invalidate it, the store
+stays bounded, the count query probes `posting_tags` by its primary key rather than scanning it, and 25 interleaved
+filter changes stay under 500ms p95 while catalog writes run, #426), the unit-test
 allowlist (`lint-config-guard.test.ts`: every path the allowlist names exists, and every unit test file in `src/` or
 `scripts/` is named, so a deleted test cannot leave a stale entry), and the workflow Bun pin
 (`workflow-config-guard.test.ts`: every `oven-sh/setup-bun` step pins the version `package.json` requires). They
