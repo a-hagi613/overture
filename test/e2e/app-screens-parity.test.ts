@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { AxeBuilder } from "@axe-core/playwright";
 import { request as apiRequest } from "@playwright/test";
 
@@ -83,7 +85,47 @@ test("the card detail uses the card detail board's tab names and reference", asy
   const request = await apiRequest.newContext({ baseURL: detailServer.url });
 
   const userId = await seedBoardOwner(request, detailServer.url);
+
+  await request.post("/api/profile/resume", {
+    multipart: {
+      file: {
+        name: "Maya_Okafor_Resume.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from(readFileSync("test/e2e/fixtures/resume-text.pdf")),
+      },
+    },
+  });
+
   const { selectedId } = await seedBoard(request, userId);
+
+  const seeded = await request.post("/__test__/snapshots/seed", {
+    data: {
+      answers: [
+        {
+          answer: "Yes",
+          by_user: false,
+          fact_key: "work_authorization",
+          fact_revision: 1,
+          kind: "fact",
+          label: "Are you legally authorized to work in Canada?",
+          question_id: "q-fact",
+          resume_line_ids: [],
+        },
+      ],
+      applicationId: selectedId,
+      coverLetter: [
+        { resume_line_ids: [], sentence: "Dear Halden Systems hiring team," },
+        {
+          resume_line_ids: [],
+          sentence:
+            "Halden Systems' focus on dependable platform tooling matches the work I do best.",
+        },
+        { resume_line_ids: [], sentence: "Maya Okafor" },
+      ],
+    },
+  });
+
+  expect(seeded.ok()).toBe(true);
 
   const storageState = await request.storageState();
 
@@ -103,6 +145,10 @@ test("the card detail uses the card detail board's tab names and reference", asy
 
   await expect(tabs).toHaveText(["Overview", "Questions", "Cover letter & resume", "Emails"]);
   await expect(page.getByText(/Application · no\./u)).toBeVisible();
+
+  await page.getByRole("tab", { name: "Cover letter & resume" }).click();
+  await expect(page.getByText("Dear Halden Systems hiring team,")).toBeVisible();
+  await expect(page.getByText("0 resume lines")).toHaveCount(0);
 
   const results = await new AxeBuilder({ page }).analyze();
 

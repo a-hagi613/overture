@@ -293,7 +293,7 @@ const seedSnapshotBody = z.object({
       z.object({
         sentence: z.string(),
         by_user: z.boolean().optional(),
-        resume_line_ids: z.array(z.string()).optional(),
+        resume_line_ids: z.array(z.string()).default([]),
       }),
     )
     .nullable()
