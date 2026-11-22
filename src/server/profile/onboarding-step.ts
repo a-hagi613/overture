@@ -1,6 +1,6 @@
 import { and, count, desc, eq, isNull, isNotNull } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PersonalCrypto } from "./personal-crypto.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
@@ -14,7 +14,8 @@ import type {
   SalaryPeriodWord,
 } from "../../shared/onboarding.ts";
 
-import { applications, postings, reviewApplications, reviews } from "../platform/db/schema.ts";
+import { applications, reviewApplications, reviews } from "../platform/db/schema.ts";
+import { postings } from "../platform/db/catalog-schema.ts";
 import { countryCodesNamedIn, countryNameFor, resolveLocation } from "../catalog/geo.ts";
 import { currencyNamedIn, parseSalaryExpectation } from "../pipeline/answer-value.ts";
 import { createFactService } from "./facts.ts";
@@ -227,12 +228,13 @@ function targetCountryCodes(targets: Targets) {
 
 export function createOnboardingStepService(deps: {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   personal: PersonalCrypto;
   reviewService: ReviewService;
   readTargets: (userId: string) => Promise<{ targets: Targets }>;
 }) {
-  const { db, clock, personal, reviewService, readTargets } = deps;
+  const { db, catalogDb, clock, personal, reviewService, readTargets } = deps;
 
   const factsService = createFactService({ db, clock, personal });
 
@@ -281,9 +283,8 @@ export function createOnboardingStepService(deps: {
 
   function queuedCurrencies(userId: string) {
     const rows = db
-      .select({ currency: postings.salaryCurrency })
+      .select({ currency: applications.salaryCurrency })
       .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
       .where(and(eq(applications.userId, userId), eq(applications.stage, "queued")))
       .all();
 
@@ -303,7 +304,7 @@ export function createOnboardingStepService(deps: {
   }
 
   function openPostingCountries() {
-    return db
+    return catalogDb
       .select({ code: postings.countryCode, total: count() })
       .from(postings)
       .where(and(isNull(postings.closedAt), isNotNull(postings.countryCode)))

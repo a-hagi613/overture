@@ -3,6 +3,9 @@ set -eu
 
 DATABASE="${DATABASE_PATH:-/data/app.sqlite}"
 DATA_DIR="$(dirname "$DATABASE")"
+# The catalog lives beside the application database and is never replicated (ADR 0036). It is rebuilt from the feeds,
+# so a missing or deleted file is ordinary startup work, not a restore.
+CATALOG="${CATALOG_DATABASE_PATH:-${DATA_DIR}/catalog.sqlite}"
 OBJECTS="${OBJECT_STORE_ROOT:-${DATA_DIR}/objects}"
 LITESTREAM_CONFIG="${LITESTREAM_CONFIG_PATH:-/etc/litestream.yml}"
 
@@ -10,12 +13,12 @@ LITESTREAM_CONFIG="${LITESTREAM_CONFIG_PATH:-/etc/litestream.yml}"
 # ownership for the unprivileged `app` user, then drop privileges and never
 # return to root.
 if [ "$(id -u)" = "0" ]; then
-  mkdir -p "$DATA_DIR" "$OBJECTS"
+  mkdir -p "$DATA_DIR" "$OBJECTS" "$(dirname "$CATALOG")"
   chown -R app:app "$DATA_DIR"
   exec gosu app:app "$0" "$@"
 fi
 
-mkdir -p "$DATA_DIR" "$OBJECTS"
+mkdir -p "$DATA_DIR" "$OBJECTS" "$(dirname "$CATALOG")"
 
 if [ "${LITESTREAM_RESTORE_ONLY:-false}" = "true" ]; then
   # Restore drill mode: restore the replica, verify it read-only and exit.

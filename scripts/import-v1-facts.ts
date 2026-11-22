@@ -4,8 +4,12 @@ import { eq } from "drizzle-orm";
 
 import { env } from "../src/server/config/env.ts";
 import { createQuestionCatalog } from "../src/server/catalog/questions.ts";
-import { migrateDatabase } from "../src/server/platform/db/migrate.ts";
-import { openDatabase } from "../src/server/platform/db/client.ts";
+import { migrateCatalogDatabase, migrateDatabase } from "../src/server/platform/db/migrate.ts";
+import {
+  catalogPathFor,
+  openCatalogDatabase,
+  openDatabase,
+} from "../src/server/platform/db/client.ts";
 import { parseMasterKey } from "../src/server/platform/crypto.ts";
 import { createClock } from "../src/server/platform/ports/clock.ts";
 import { users } from "../src/server/platform/db/schema.ts";
@@ -35,8 +39,11 @@ if (databasePath === undefined || email === undefined || exportPath === undefine
 const exported = parseV1Export(readFileSync(exportPath, "utf8"));
 
 const { db } = openDatabase(databasePath);
+const { db: catalogDb } = openCatalogDatabase(catalogPathFor(databasePath));
 
 migrateDatabase(db, "drizzle");
+
+migrateCatalogDatabase(catalogDb, "drizzle-catalog");
 
 const clock = createClock();
 
@@ -52,7 +59,7 @@ const personal = createPersonalCrypto(
   env.MASTER_KEY_CURRENT,
 );
 
-const catalog = createQuestionCatalog({ db, clock });
+const catalog = createQuestionCatalog({ catalogDb, db, clock });
 
 const report = await importV1Facts({
   db,

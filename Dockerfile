@@ -33,6 +33,7 @@ COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/src ./src
 COPY --from=build /app/drizzle ./drizzle
+COPY --from=build /app/drizzle-catalog ./drizzle-catalog
 COPY --from=build /app/scripts ./scripts
 COPY litestream.yml /etc/litestream.yml
 COPY litestream-drill.yml /etc/litestream-drill.yml
@@ -52,6 +53,7 @@ USER root
 
 ENV NODE_ENV=production \
   DATABASE_PATH=/data/app.sqlite \
+  CATALOG_DATABASE_PATH=/data/catalog.sqlite \
   OBJECT_STORE_ROOT=/data/objects \
   LITESTREAM_CONFIG_PATH=/etc/litestream.yml
 

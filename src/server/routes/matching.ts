@@ -3,12 +3,13 @@ import { validJson } from "./validators.ts";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 import type { MatchingService } from "../matching/score.ts";
 
-import { postingUserState, postings } from "../platform/db/schema.ts";
+import { postingUserState } from "../platform/db/schema.ts";
+import { postings } from "../platform/db/catalog-schema.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 
@@ -16,11 +17,12 @@ const stateBody = z.object({ state: z.enum(["saved", "hidden"]).nullable() });
 
 export function createMatchingRoutes(deps: {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   auth: Auth;
   matching: MatchingService;
 }) {
-  const { db, clock, auth, matching } = deps;
+  const { db, catalogDb, clock, auth, matching } = deps;
 
   const routes = new Hono();
 
@@ -38,7 +40,7 @@ export function createMatchingRoutes(deps: {
     }
 
     const { id } = context.req.param();
-    const row = db.select().from(postings).where(eq(postings.id, id)).get();
+    const row = catalogDb.select().from(postings).where(eq(postings.id, id)).get();
 
     if (row === undefined) {
       return context.json({ error: API_ERRORS.notFound }, 404);
@@ -109,7 +111,12 @@ export function createMatchingRoutes(deps: {
 
     const { id } = context.req.param();
     const { state } = context.req.valid("json");
-    const posting = db.select({ id: postings.id }).from(postings).where(eq(postings.id, id)).get();
+
+    const posting = catalogDb
+      .select({ id: postings.id })
+      .from(postings)
+      .where(eq(postings.id, id))
+      .get();
 
     if (posting === undefined) {
       return context.json({ error: API_ERRORS.notFound }, 404);

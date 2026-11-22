@@ -4,15 +4,7 @@ import { migrateDatabase } from "../platform/db/migrate.ts";
 import { openDatabase } from "../platform/db/client.ts";
 import { createClock } from "../platform/ports/clock.ts";
 import { DEFAULT_ANTHROPIC_MODEL, batchPricesFor } from "../platform/llm/models.ts";
-import {
-  applications,
-  attempts,
-  companyBoards,
-  companies,
-  llmUsage,
-  postings,
-  users,
-} from "../platform/db/schema.ts";
+import { applications, attempts, llmUsage, users } from "../platform/db/schema.ts";
 
 import type { ProviderReportRow } from "./report.ts";
 
@@ -69,59 +61,13 @@ function freshReport() {
   addUser("user-b", "user");
   addUser("user-demo", "demo");
 
-  db.insert(companies)
-    .values([
-      { createdAt: at, id: "company-gh", name: "Greenhouse Co", nameNorm: "greenhouse co" },
-      { createdAt: at, id: "company-lever", name: "Lever Co", nameNorm: "lever co" },
-    ])
-    .run();
-
-  db.insert(companyBoards)
-    .values([
-      {
-        ats: "greenhouse",
-        boardToken: "greenhouse-co",
-        companyId: "company-gh",
-        createdAt: at,
-        id: "board-gh",
-        source: "v1_seed",
-      },
-      {
-        ats: "lever",
-        boardToken: "lever-co",
-        companyId: "company-lever",
-        createdAt: at,
-        id: "board-lever",
-        source: "v1_seed",
-      },
-    ])
-    .run();
-
   const addApplication = (input: {
     ats: "greenhouse" | "lever";
     id: string;
     status: "sent" | "failed" | "confirming";
     userId: string;
   }) => {
-    const boardId = input.ats === "greenhouse" ? "board-gh" : "board-lever";
     const companyId = input.ats === "greenhouse" ? "company-gh" : "company-lever";
-
-    db.insert(postings)
-      .values({
-        applyUrlNorm: `https://example.test/jobs/${input.id}`,
-        ats: input.ats,
-        atsJobId: input.id,
-        boardId,
-        companyId,
-        dedupeKey: `${input.ats}:${input.id}`,
-        firstSeenAt: at,
-        id: `posting-${input.id}`,
-        lastSeenAt: at,
-        title: "Engineer",
-        titleNorm: "engineer",
-        url: `https://example.test/jobs/${input.id}`,
-      })
-      .run();
 
     db.insert(applications)
       .values({

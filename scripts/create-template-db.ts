@@ -1,8 +1,9 @@
 import { mkdirSync, rmSync } from "node:fs";
 
-import { openDatabase } from "../src/server/platform/db/client.ts";
-import { migrateDatabase } from "../src/server/platform/db/migrate.ts";
-import { companies, companyBoards, postings } from "../src/server/platform/db/schema.ts";
+import { openCatalogDatabase, openDatabase } from "../src/server/platform/db/client.ts";
+import { migrateCatalogDatabase, migrateDatabase } from "../src/server/platform/db/migrate.ts";
+import { companies, companyBoards, postings } from "../src/server/platform/db/catalog-schema.ts";
+
 import { contentHash } from "../src/server/catalog/content-hash.ts";
 import { salaryPeriodForColumn, storePostingTags } from "../src/server/catalog/tag-store.ts";
 import { tagPosting } from "../src/server/catalog/tag-rules.ts";
@@ -85,7 +86,19 @@ function slugFor(value: string) {
   return value.toLowerCase().replaceAll(/[^a-z0-9]+/gu, "-");
 }
 
-export function seedTemplateCatalog(db: ReturnType<typeof openDatabase>["db"]) {
+/**
+ * The catalog template beside an application template: `template-catalog.db` for `template.db`, so the e2e fixtures
+ * can copy both into a scratch directory and the server derives the same `catalog.sqlite` path it runs with.
+ * @param templatePath The application template path.
+ * @returns The catalog template path.
+ */
+export function templateCatalogPathFor(templatePath: string) {
+  return templatePath.endsWith(".db")
+    ? `${templatePath.slice(0, -".db".length)}-catalog.db`
+    : `${templatePath}-catalog`;
+}
+
+export function seedTemplateCatalog(db: ReturnType<typeof openCatalogDatabase>["db"]) {
   const now = 1_795_000_000_000;
 
   for (const [companyIndex, name] of COMPANY_NAMES.entries()) {
@@ -192,22 +205,28 @@ export function seedTemplateCatalog(db: ReturnType<typeof openDatabase>["db"]) {
 }
 
 export function createTemplateDatabase(path: string) {
+  const catalogPath = templateCatalogPathFor(path);
+
   for (const suffix of ["", "-wal", "-shm"]) {
     rmSync(`${path}${suffix}`, { force: true });
+    rmSync(`${catalogPath}${suffix}`, { force: true });
   }
 
   mkdirSync("test/e2e/.tmp", { recursive: true });
 
   const { db, sqlite } = openDatabase(path);
+  const catalog = openCatalogDatabase(catalogPath);
 
   migrateDatabase(db, "drizzle");
-  seedTemplateCatalog(db);
+  migrateCatalogDatabase(catalog.db, "drizzle-catalog");
+  seedTemplateCatalog(catalog.db);
   sqlite.close();
+  catalog.sqlite.close();
 }
 
 if (import.meta.main) {
   const path = process.argv[2] ?? "test/e2e/.tmp/template.db";
 
   createTemplateDatabase(path);
-  process.stdout.write(`template database ready at ${path}\n`);
+  process.stdout.write(`template databases ready at ${path} and ${templateCatalogPathFor(path)}\n`);
 }

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { validJson } from "./validators.ts";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
@@ -43,6 +43,7 @@ function defaultEmploymentTypes(choices: TargetChoices) {
 
 export function createOnboardingRoutes(deps: {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   auth: Auth;
   llm: LlmPort;
@@ -71,11 +72,11 @@ export function createOnboardingRoutes(deps: {
     spendGate: deps.spendGate,
   });
 
-  const skipCompanies = createSkipCompanyService({ db, clock });
+  const skipCompanies = createSkipCompanyService({ db, catalogDb: deps.catalogDb, clock });
   const consent = createConsentService({ db, clock });
 
   const choicesCache = createTargetChoicesCache({
-    db,
+    catalogDb: deps.catalogDb,
     now: () => clock.now(),
     staleMs: env.ENABLE_TEST_ROUTES ? 0 : CHOICES_STALE_MS,
   });
@@ -86,6 +87,7 @@ export function createOnboardingRoutes(deps: {
 
   const step = createOnboardingStepService({
     db,
+    catalogDb: deps.catalogDb,
     clock,
     personal,
     readTargets: targetsService.read,
@@ -115,7 +117,7 @@ export function createOnboardingRoutes(deps: {
     return {
       choices,
       currencies: (await step.read(userId, { inferCountries: false })).currencies,
-      matchedCount: countMatchingPostings(db, saved.targets, languages),
+      matchedCount: countMatchingPostings(deps.catalogDb, saved.targets, languages),
       targets: saved.targets,
     };
   }

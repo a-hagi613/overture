@@ -72,7 +72,12 @@ Posting's and Company's display fields onto its own row when it is created, keep
 deleted, and is not created for a Posting that has already left the catalog, #422), the catalog split migration
 (`migration-snapshot.test.ts`: migration `0056_snapshot_decouple` backfills that copy onto every existing Application,
 including readable placeholders when the catalog row is already gone, and leaves `applications`, `matches`,
-`posting_user_state` and `skip_companies` with no foreign key into `postings` or `companies`, #422), the admin gate's
+`posting_user_state` and `skip_companies` with no foreign key into `postings` or `companies`, #422), the catalog
+split (`catalog-split.test.ts`: `litestream.yml` replicates only `/data/app.sqlite`, a catalog write transaction never
+holds `app.sqlite`'s write lock, deleting and recreating `catalog.sqlite` leaves every user and Application row intact,
+and a closed Posting a crashed sweep never reported is still reconciled; the browser half is
+`test/e2e/catalog-split.test.ts`, where an approval and `/api/health` answer while a real catalog write lock is held,
+#423), the admin gate's
 fail-closed parsing (a malformed Access cookie or a missing team domain answers 401, never a 500 or an invented
 issuer), the capped request-body reader (an unauthenticated webhook body stops at its byte cap and is never buffered
 whole, so a sender cannot choose how much memory it costs), the unhandled-rejection alert (a public alert carries the

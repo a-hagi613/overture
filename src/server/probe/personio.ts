@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { isFixtureHost } from "../../shared/live-service-hosts.ts";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PlainFormReader } from "../pipeline/form-read.ts";
 
@@ -12,7 +12,8 @@ import { PERSONIO_LIMITS } from "../catalog/personio-feed.ts";
 import { limiterFor } from "../catalog/rate-limiter.ts";
 import { env } from "../config/env.ts";
 import { recordLiveCheckResult } from "../live-checks/store.ts";
-import { postings } from "../platform/db/schema.ts";
+import { postings } from "../platform/db/catalog-schema.ts";
+
 import { createPlainFormReader } from "../pipeline/form-read.ts";
 
 export const PERSONIO_PROBE_JOB_KIND = "probe.personio";
@@ -92,6 +93,7 @@ export interface PersonioProbeReport {
 }
 
 export interface PersonioProbeDeps {
+  catalogDb: CatalogDatabase;
   db: AppDatabase;
   clock: Clock;
   reader?: PlainFormReader;
@@ -159,7 +161,7 @@ export async function runPersonioProbe(deps: PersonioProbeDeps) {
 
   const rows =
     deps.urls === undefined
-      ? deps.db
+      ? deps.catalogDb
           .select({
             id: postings.id,
             url: postings.url,

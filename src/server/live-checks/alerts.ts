@@ -14,7 +14,8 @@ import { llmSpendTodayMicros } from "../platform/llm/usage.ts";
 import { unhandledRejectionCount } from "../platform/process-guard.ts";
 import { catalogWorkerCrashCount } from "../catalog/worker-restarts.ts";
 import { getSetting } from "../platform/settings/index.ts";
-import { applications, attempts, bgJobs, postings } from "../platform/db/schema.ts";
+import { applications, attempts, bgJobs } from "../platform/db/schema.ts";
+
 import {
   MAIL_DOMAIN_MIN_SENDS,
   MAIL_REPLY_FLOOR,
@@ -96,7 +97,7 @@ export async function collectAlertMetrics(deps: {
 
   const attemptRows = db
     .select({
-      ats: postings.ats,
+      ats: applications.ats,
       captchaSeen: attempts.captchaSeen,
       codeUsed: attempts.codeUsed,
       outcome: attempts.outcome,
@@ -104,7 +105,6 @@ export async function collectAlertMetrics(deps: {
     })
     .from(attempts)
     .innerJoin(applications, eq(applications.id, attempts.applicationId))
-    .innerJoin(postings, eq(postings.id, applications.postingId))
     .where(gte(attempts.startedAt, since))
     .all();
 
@@ -147,7 +147,11 @@ export async function collectAlertMetrics(deps: {
   const usedRatio = fs === null || fs.blocks === 0 ? 0 : 1 - fs.bavail / fs.blocks;
 
   return {
-    atsSuccess: rateMetrics(attemptRows.map((row) => ({ key: row.ats, outcome: row.outcome }))),
+    atsSuccess: rateMetrics(
+      attemptRows.flatMap((row) =>
+        row.ats === null ? [] : [{ key: row.ats, outcome: row.outcome }],
+      ),
+    ),
     providerSuccess: rateMetrics(
       attemptRows.map((row) => ({ key: row.provider, outcome: row.outcome })),
     ),

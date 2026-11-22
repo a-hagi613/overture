@@ -4,10 +4,11 @@ import { and, eq, inArray, isNull, or } from "drizzle-orm";
 
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmOutputSchema, LlmPort, LlmRequest } from "../platform/ports/llm.ts";
-import { bgJobs, companies, postings, postingTags } from "../platform/db/schema.ts";
+import { bgJobs } from "../platform/db/schema.ts";
+import { companies, postings, postingTags } from "../platform/db/catalog-schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 import { checkLlmCaps, nextUtcMidnight } from "../platform/llm/caps.ts";
@@ -60,6 +61,7 @@ interface TagWrite {
 
 export interface TagFallbackDeps {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   llm: LlmPort;
 }
@@ -114,7 +116,7 @@ export function fallbackCacheKey(companyId: string, title: string, department: s
   return parts.join("|");
 }
 
-function selectLeftovers(db: AppDatabase) {
+function selectLeftovers(db: CatalogDatabase) {
   return db
     .select({
       id: postings.id,
@@ -153,7 +155,7 @@ function selectLeftovers(db: AppDatabase) {
     }));
 }
 
-function cachedTagsByCacheKey(db: AppDatabase) {
+function cachedTagsByCacheKey(db: CatalogDatabase) {
   const rows = db
     .select({
       companyId: postings.companyId,
@@ -214,11 +216,11 @@ export async function runTagFallbackJob(deps: TagFallbackDeps) {
     blockedCap: null,
   };
 
-  const leftovers = selectLeftovers(deps.db);
+  const leftovers = selectLeftovers(deps.catalogDb);
 
   report.leftovers = leftovers.length;
 
-  const cached = cachedTagsByCacheKey(deps.db);
+  const cached = cachedTagsByCacheKey(deps.catalogDb);
   const groupsByCacheKey = new Map<string, LeftoverGroup>();
 
   for (const posting of leftovers) {
@@ -254,7 +256,7 @@ export async function runTagFallbackJob(deps: TagFallbackDeps) {
     }
 
     for (const postingId of group.postingIds) {
-      writePostingTags(deps.db, postingId, writes, now);
+      writePostingTags(deps.catalogDb, postingId, writes, now);
 
       report.reused += 1;
       report.tagged += 1;
@@ -325,7 +327,7 @@ export async function runTagFallbackJob(deps: TagFallbackDeps) {
           }
 
           for (const postingId of group.postingIds) {
-            writePostingTags(deps.db, postingId, writes, now);
+            writePostingTags(deps.catalogDb, postingId, writes, now);
 
             report.tagged += 1;
           }

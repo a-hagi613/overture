@@ -1,9 +1,9 @@
 import { and, eq } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import { WRITE_BATCH_ROWS, yieldToEventLoop } from "../platform/db/batches.ts";
-import { companies, companyBoards } from "../platform/db/schema.ts";
+import { companies, companyBoards } from "../platform/db/catalog-schema.ts";
 import { greenhouseBoardTokenFromUrl } from "./greenhouse-feed.ts";
 
 import type { BoardRegion } from "./board-feed.ts";
@@ -148,7 +148,7 @@ export function normalizeDiscoveredBoards(rows: DiscoveredScraperRow[]) {
 }
 
 export async function loadDiscoveredBoards(
-  db: AppDatabase,
+  db: CatalogDatabase,
   clock: Clock,
   rows: DiscoveredScraperRow[],
 ) {

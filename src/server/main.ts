@@ -1,9 +1,10 @@
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { createApp } from "./app.ts";
 import { createAuth } from "./auth/index.ts";
 import type { AuthOptions } from "./auth/index.ts";
-import { databasePath, env, labBaseUrl } from "./config/env.ts";
+import { catalogDatabasePath, databasePath, env, labBaseUrl } from "./config/env.ts";
 import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
 import { MailCapExceededError } from "./platform/mail/errors.ts";
 import { createPayments } from "./billing/index.ts";
@@ -23,8 +24,8 @@ import { createDemoSafeMailSender } from "./demo/mail-guard.ts";
 import { isDemoUser } from "./demo/role.ts";
 import { demoStartupNotice } from "./demo/startup.ts";
 import { logError, logInfo } from "./platform/log.ts";
-import { openDatabase } from "./platform/db/client.ts";
-import { migrateDatabase } from "./platform/db/migrate.ts";
+import { openCatalogDatabase, openDatabase } from "./platform/db/client.ts";
+import { migrateCatalogDatabase, migrateDatabase } from "./platform/db/migrate.ts";
 import { createClock } from "./platform/ports/clock.ts";
 import { createRandom } from "./platform/ports/random.ts";
 import { createEventLoopLagMonitor } from "./platform/event-loop-lag.ts";
@@ -55,6 +56,7 @@ import {
   runWorkableIngestJob,
 } from "./catalog/workable-job.ts";
 import { createCatalogSweepWorker } from "./catalog/sweep-worker-runner.ts";
+import { companyBoards } from "./platform/db/catalog-schema.ts";
 import {
   TAG_FALLBACK_JOB_KIND,
   ensureTagFallbackQueued,
@@ -192,6 +194,7 @@ const sdk = startTelemetry({
 });
 
 const { db } = openDatabase(databasePath);
+const { db: catalogDb } = openCatalogDatabase(catalogDatabasePath);
 
 createEventLoopLagMonitor({
   onLag: (lagMs) => {
@@ -203,6 +206,21 @@ createEventLoopLagMonitor({
 }).start();
 
 migrateDatabase(db, "drizzle");
+
+migrateCatalogDatabase(catalogDb, "drizzle-catalog");
+
+const catalogBoards = catalogDb
+  .select({ one: sql`1` })
+  .from(companyBoards)
+  .limit(1)
+  .get();
+
+logInfo(
+  "db",
+  catalogBoards === undefined
+    ? `application database ${databasePath}; catalog database ${catalogDatabasePath} is empty and rebuilds from the seed and feeds`
+    : `application database ${databasePath}; catalog database ${catalogDatabasePath}`,
+);
 
 if (env.NODE_ENV !== "production") {
   const { installOutboundGuard } = await import("./platform/outbound-guard.ts");
@@ -273,6 +291,7 @@ if (env.INBOUND_HMAC_SECRET !== undefined) {
 if (env.DEMO_LOGIN_ENABLED) {
   authOptions.ensureDemoUser = async () => {
     const seeded = await seedDemoAccount({
+      catalogDb,
       clock,
       db,
       objects,
@@ -318,7 +337,7 @@ const tracer = trace.getTracer("overture");
 
 const otelPayloadSchema = z.record(z.string(), z.string());
 
-const catalogDeps = { db, clock };
+const catalogDeps = { db, catalogDb, clock };
 
 const catalogWorker = createCatalogSweepWorker({ db, clock });
 
@@ -358,6 +377,7 @@ const anthropicLlmPort = createAnthropicLlmPort(
 
 const tagDeps = {
   db,
+  catalogDb,
   clock,
   llm: anthropicLlmPort,
 };
@@ -369,7 +389,7 @@ const personal = createPersonalCrypto(
 );
 
 if (env.DEMO_LOGIN_ENABLED) {
-  const demo = await seedDemoAccount({ clock, db, objects, personal });
+  const demo = await seedDemoAccount({ catalogDb, clock, db, objects, personal });
 
   logInfo("demo", demoStartupNotice(db, env.NODE_ENV));
   logInfo("demo", `account ready: ${demo.userId}`);
@@ -379,6 +399,7 @@ const planner = createPlanner({ clock, db, random });
 
 const preparation = createPreparationService({
   db,
+  catalogDb,
   clock,
   llm: anthropicLlmPort,
   personal,
@@ -418,7 +439,7 @@ const preparation = createPreparationService({
   },
 });
 
-const reviews = createReviewService({ db, clock, personal, preparation });
+const reviews = createReviewService({ db, catalogDb, clock, personal, preparation });
 
 const preparationJobHandlers: JobHandlers = {
   [APPLICATION_PREPARE_JOB_KIND]: async (payload) => {
@@ -458,6 +479,7 @@ const prepDailyJobHandlers: JobHandlers = {
 
       await runPrepDailyJob(
         {
+          catalogDb,
           clock,
           db,
           llm: anthropicLlmPort,
@@ -689,6 +711,7 @@ const dispatchTick =
   activeDispatcher === null
     ? null
     : createDispatcherTick({
+        catalogDb,
         clock,
         db,
         enqueueSend: (applicationId) => activeDispatcher.enqueueSend(applicationId),
@@ -777,7 +800,7 @@ const probeJobHandlers: JobHandlers = {
   [PERSONIO_PROBE_JOB_KIND]: async (payload) => {
     const { urls } = personioProbePayloadSchema.parse(JSON.parse(payload));
 
-    await runPersonioProbe({ clock, db, urls });
+    await runPersonioProbe({ catalogDb, clock, db, urls });
   },
 };
 
@@ -795,6 +818,7 @@ const liveCheckAddressValue = liveCheckAddress(env.MAIL_DOMAIN);
 
 const liveCheckDeps = {
   backups,
+  catalogDb,
   clock,
   databasePath,
   db,
@@ -910,6 +934,7 @@ if (env.ANTHROPIC_API_KEY !== undefined) {
 
 const app = createApp({
   db,
+  catalogDb,
   clock,
   databasePath,
   staticRoot: env.STATIC_ROOT,

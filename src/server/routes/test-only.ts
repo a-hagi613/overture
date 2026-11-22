@@ -1,11 +1,11 @@
 import { validJson, validQuery } from "./validators.ts";
 import { Buffer } from "node:buffer";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { JobHandlers } from "../platform/jobs/run-due.ts";
 import type { AdjustableClock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
@@ -24,8 +24,6 @@ import {
   bgJobs,
   checkins,
   codeWaits,
-  companies,
-  companyBoards,
   facts,
   fxRates,
   grants,
@@ -34,7 +32,6 @@ import {
   llmBatches,
   mailUsage,
   matches,
-  postingQuestions,
   mailboxes,
   mailThreads,
   messageAttachments,
@@ -43,8 +40,6 @@ import {
   customers,
   notifications,
   planCache,
-  postingTags,
-  postings,
   profiles,
   pushSubscriptions,
   questionVariants,
@@ -58,6 +53,13 @@ import {
   tagImports,
   users,
 } from "../platform/db/schema.ts";
+import {
+  companies,
+  companyBoards,
+  postingQuestions,
+  postingTags,
+  postings,
+} from "../platform/db/catalog-schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
@@ -583,14 +585,17 @@ function planCacheDetail(plan: string) {
 
 const createUserBody = z.object({ email: z.email(), name: z.string().min(1) });
 
-type PostingWriter = AppDatabase | Parameters<Parameters<AppDatabase["transaction"]>[0]>[0];
-
-function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBody>, now: number) {
+function seedPosting(
+  deps: { db: AppDatabase; catalogDb: CatalogDatabase },
+  row: z.infer<typeof createPostingBody>,
+  now: number,
+) {
+  const { db, catalogDb } = deps;
   const id = crypto.randomUUID();
   const titleNorm = normalizeTitle(row.title);
   const descriptionText = row.descriptionText ?? null;
 
-  writer
+  catalogDb
     .insert(postings)
     .values({
       id,
@@ -633,7 +638,7 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
     .run();
 
   for (const tag of row.tags) {
-    writer
+    catalogDb
       .insert(postingTags)
       .values({ postingId: id, dimension: tag.dimension, value: tag.value, source: "import" })
       .onConflictDoNothing()
@@ -643,7 +648,7 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
   for (const [position, question] of row.questions.entries()) {
     const textNormHash = questionVariantHash(question.text);
 
-    const existing = writer
+    const existing = db
       .select({ id: questions.id })
       .from(questions)
       .where(eq(questions.textNormHash, textNormHash))
@@ -666,8 +671,7 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
         question.fieldType ??
         normalizeFieldType(question.atsFieldType ?? "", question.fieldName ?? "");
 
-      writer
-        .insert(questions)
+      db.insert(questions)
         .values({
           id: questionId,
           textDisplay: question.text,
@@ -682,14 +686,13 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
         })
         .run();
 
-      writer
-        .insert(questionVariants)
+      db.insert(questionVariants)
         .values({ variantHash: textNormHash, questionId })
         .onConflictDoNothing()
         .run();
     }
 
-    writer
+    catalogDb
       .insert(postingQuestions)
       .values({
         postingId: id,
@@ -708,6 +711,7 @@ function seedPosting(writer: PostingWriter, row: z.infer<typeof createPostingBod
 
 export function createTestRoutes(
   db: AppDatabase,
+  catalogDb: CatalogDatabase,
   clock: AdjustableClock,
   handlers: JobHandlers,
   singletonJobKinds: readonly string[],
@@ -1383,7 +1387,8 @@ export function createTestRoutes(
     const { name, domain } = context.req.valid("json");
     const id = crypto.randomUUID();
 
-    db.insert(companies)
+    catalogDb
+      .insert(companies)
       .values({
         id,
         name,
@@ -1400,7 +1405,8 @@ export function createTestRoutes(
     const { companyId, ats, boardToken, region, status, source } = context.req.valid("json");
     const id = crypto.randomUUID();
 
-    db.insert(companyBoards)
+    catalogDb
+      .insert(companyBoards)
       .values({
         id,
         companyId,
@@ -1419,13 +1425,13 @@ export function createTestRoutes(
   });
 
   routes.get("/catalog/boards", (context) => {
-    const rows = db.select().from(companyBoards).all();
+    const rows = catalogDb.select().from(companyBoards).all();
 
     return context.json({ boards: rows });
   });
 
   routes.post("/catalog/retag-open-postings", async (context) => {
-    const report = await resetFeedContentHashes(db);
+    const report = await resetFeedContentHashes(catalogDb);
 
     return context.json(report);
   });
@@ -1443,7 +1449,7 @@ export function createTestRoutes(
   );
 
   routes.get("/catalog/postings", (context) => {
-    const rows = db.select().from(postings).all();
+    const rows = catalogDb.select().from(postings).all();
     const postingRows: ((typeof rows)[number] & { descriptionText: string | null })[] = [];
 
     for (const row of rows) {
@@ -1459,7 +1465,7 @@ export function createTestRoutes(
   });
 
   routes.post("/catalog/postings", validJson(createPostingBody), (context) => {
-    const id = seedPosting(db, context.req.valid("json"), clock.now());
+    const id = seedPosting({ db, catalogDb }, context.req.valid("json"), clock.now());
 
     return context.json({ id });
   });
@@ -1468,11 +1474,9 @@ export function createTestRoutes(
     const { postings: rows } = context.req.valid("json");
     const now = clock.now();
 
-    db.transaction((tx) => {
-      for (const row of rows) {
-        seedPosting(tx, row, now);
-      }
-    });
+    for (const row of rows) {
+      seedPosting({ db, catalogDb }, row, now);
+    }
 
     return context.json({ created: rows.length });
   });
@@ -1480,13 +1484,13 @@ export function createTestRoutes(
   routes.post("/catalog/postings/close", validJson(closePostingBody), (context) => {
     const { id } = context.req.valid("json");
 
-    db.update(postings).set({ closedAt: clock.now() }).where(eq(postings.id, id)).run();
+    catalogDb.update(postings).set({ closedAt: clock.now() }).where(eq(postings.id, id)).run();
 
     return context.json({ id, closed: true });
   });
 
   routes.post("/catalog/postings/close-all", (context) => {
-    const closed = db
+    const closed = catalogDb
       .update(postings)
       .set({ closedAt: clock.now() })
       .where(isNull(postings.closedAt))
@@ -1497,7 +1501,7 @@ export function createTestRoutes(
   });
 
   routes.post("/catalog/prune", (context) => {
-    const removed = db
+    const removed = catalogDb
       .delete(companies)
       .returning({ id: companies.id })
       .all()
@@ -1510,7 +1514,7 @@ export function createTestRoutes(
     const body = context.req.valid("json");
 
     if ("rows" in body) {
-      return context.json(await loadDiscoveredBoards(db, clock, body.rows));
+      return context.json(await loadDiscoveredBoards(catalogDb, clock, body.rows));
     }
 
     const bytes = readFileSync(body.path);
@@ -1519,13 +1523,13 @@ export function createTestRoutes(
     new Uint8Array(file).set(bytes);
 
     const { rows } = await readCompaniesParquet(file);
-    const report = await loadDiscoveredBoards(db, clock, rows);
+    const report = await loadDiscoveredBoards(catalogDb, clock, rows);
 
     return context.json(report);
   });
 
   routes.get("/catalog/posting-tags", (context) => {
-    const rows = db.select().from(postingTags).all();
+    const rows = catalogDb.select().from(postingTags).all();
 
     return context.json({ postingTags: rows });
   });
@@ -1533,7 +1537,7 @@ export function createTestRoutes(
   routes.post("/tag-imports", validJson(tagImportBody), (context) => {
     const { content, source } = context.req.valid("json");
 
-    const report = importTags(db, clock, { content, source, uploadedBy: "owner" });
+    const report = importTags({ db, catalogDb }, clock, { content, source, uploadedBy: "owner" });
 
     return context.json(report);
   });
@@ -1676,7 +1680,7 @@ export function createTestRoutes(
       scheduledFor,
     } = context.req.valid("json");
 
-    const posting = postingDisplayFor(db, postingId);
+    const posting = postingDisplayFor(catalogDb, postingId);
 
     if (posting === undefined) {
       return context.json({ error: API_ERRORS.notFound }, 404);
@@ -1915,24 +1919,44 @@ export function createTestRoutes(
       return context.json({ questions: [] });
     }
 
+    const linked = catalogDb
+      .select({
+        questionId: postingQuestions.questionId,
+        required: postingQuestions.required,
+        position: postingQuestions.position,
+        options: postingQuestions.options,
+      })
+      .from(postingQuestions)
+      .where(eq(postingQuestions.postingId, application.postingId))
+      .orderBy(postingQuestions.position)
+      .all();
+
+    const questionRows = db
+      .select({
+        id: questions.id,
+        text: questions.textDisplay,
+        fieldType: questions.fieldType,
+        factKey: questions.factKey,
+        answerKind: questions.answerKind,
+        mappedBy: questions.mappedBy,
+      })
+      .from(questions)
+      .where(
+        inArray(
+          questions.id,
+          linked.map((row) => row.questionId),
+        ),
+      )
+      .all();
+
+    const questionsById = new Map(questionRows.map((row) => [row.id, row]));
+
     return context.json({
-      questions: db
-        .select({
-          questionId: postingQuestions.questionId,
-          required: postingQuestions.required,
-          position: postingQuestions.position,
-          options: postingQuestions.options,
-          text: questions.textDisplay,
-          fieldType: questions.fieldType,
-          factKey: questions.factKey,
-          answerKind: questions.answerKind,
-          mappedBy: questions.mappedBy,
-        })
-        .from(postingQuestions)
-        .innerJoin(questions, eq(questions.id, postingQuestions.questionId))
-        .where(eq(postingQuestions.postingId, application.postingId))
-        .orderBy(postingQuestions.position)
-        .all(),
+      questions: linked.flatMap((row) => {
+        const question = questionsById.get(row.questionId);
+
+        return question === undefined ? [] : [{ ...row, ...question }];
+      }),
     });
   });
 
@@ -2673,11 +2697,13 @@ export function createTestRoutes(
       const companyId = crypto.randomUUID();
       const boardId = crypto.randomUUID();
 
-      db.insert(companies)
+      catalogDb
+        .insert(companies)
         .values({ createdAt: now, domain, id: companyId, name, nameNorm: name.toLowerCase() })
         .run();
 
-      db.insert(companyBoards)
+      catalogDb
+        .insert(companyBoards)
         .values({
           ats: "greenhouse",
           backoffLevel: 0,
@@ -2706,7 +2732,7 @@ export function createTestRoutes(
       sequence += 1;
 
       return seedPosting(
-        db,
+        { db, catalogDb },
         {
           ats: "greenhouse",
           atsJobId,
@@ -2734,7 +2760,7 @@ export function createTestRoutes(
       updatedAt?: number;
     }) {
       const id = crypto.randomUUID();
-      const display = postingDisplayFor(db, input.postingId);
+      const display = postingDisplayFor(catalogDb, input.postingId);
 
       if (display === undefined) {
         throw new Error(`the seeded posting ${input.postingId} is missing`);

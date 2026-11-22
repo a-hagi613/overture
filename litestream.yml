@@ -8,6 +8,9 @@ retention:
 # database (#281). Five minutes sweeps those files within 5 extra minutes and leaves the 30-day
 # restore untouched: that comes from snapshot.retention above, not from L0 files.
 l0-retention-check-interval: 5m
+# Only the application database is replicated. /data/catalog.sqlite holds the public job catalog, which every feed
+# sweep can rebuild, and streaming 340k+ rows to R2 every second would cost far more than it protects (ADR 0036).
+# Never add it here.
 dbs:
   - path: /data/app.sqlite
     replicas:

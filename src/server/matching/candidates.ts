@@ -1,18 +1,13 @@
 import { and, count, eq, exists, gte, inArray, isNull, notInArray, sql } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { TargetsInput } from "../../shared/targets.ts";
 
-import {
-  applications,
-  companies,
-  postingTags,
-  postings,
-  postingUserState,
-  skipCompanies,
-} from "../platform/db/schema.ts";
+import { applications, postingUserState, skipCompanies } from "../platform/db/schema.ts";
+import { companies, postingTags, postings } from "../platform/db/catalog-schema.ts";
+
 import { getSettingNumber, getAllKillSwitches } from "../platform/settings/index.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { createFactService } from "../profile/facts.ts";
@@ -78,6 +73,7 @@ interface TargetPlace {
 
 interface CandidateDeps {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   personal: PersonalCrypto;
 }
@@ -300,7 +296,7 @@ function targetBasicsMatch(posting: CandidatePosting, targets: TargetsInput) {
 }
 
 export function createCandidateService(deps: CandidateDeps) {
-  const { db, clock, personal } = deps;
+  const { db, catalogDb, clock, personal } = deps;
 
   const facts = createFactService({ db, clock, personal });
   const targetsService = createTargetsService({ db, clock });
@@ -311,7 +307,7 @@ export function createCandidateService(deps: CandidateDeps) {
       return new Map<string, CandidatePosting["tags"]>();
     }
 
-    const tagRows = db
+    const tagRows = catalogDb
       .select({
         postingId: postingTags.postingId,
         dimension: postingTags.dimension,
@@ -356,7 +352,7 @@ export function createCandidateService(deps: CandidateDeps) {
   };
 
   function loadPool(targets: TargetsInput, languages: readonly string[]) {
-    const roleTags = matchedRoleTags(db, targets.roles);
+    const roleTags = matchedRoleTags(catalogDb, targets.roles);
 
     if (
       roleTags.length === 0 ||
@@ -368,7 +364,7 @@ export function createCandidateService(deps: CandidateDeps) {
       return [];
     }
 
-    const rows = db
+    const rows = catalogDb
       .select(postingColumns)
       .from(postings)
       .innerJoin(companies, eq(postings.companyId, companies.id))
@@ -382,7 +378,7 @@ export function createCandidateService(deps: CandidateDeps) {
             languages.map((language) => language.toLowerCase()),
           ),
           exists(
-            db
+            catalogDb
               .select({ one: sql`1` })
               .from(postingTags)
               .where(
@@ -394,7 +390,7 @@ export function createCandidateService(deps: CandidateDeps) {
               ),
           ),
           exists(
-            db
+            catalogDb
               .select({ one: sql`1` })
               .from(postingTags)
               .where(
@@ -426,7 +422,7 @@ export function createCandidateService(deps: CandidateDeps) {
   >();
 
   function catalogVersion() {
-    const [row] = db.all<{ lastRow: number | null; lastClosed: number | null }>(
+    const [row] = catalogDb.all<{ lastRow: number | null; lastClosed: number | null }>(
       sql`SELECT max(rowid) AS lastRow, max(closed_at) AS lastClosed FROM postings`,
     );
 
@@ -467,7 +463,7 @@ export function createCandidateService(deps: CandidateDeps) {
   }
 
   function singlePosting(postingId: string) {
-    const row = db
+    const row = catalogDb
       .select(postingColumns)
       .from(postings)
       .innerJoin(companies, eq(postings.companyId, companies.id))
@@ -501,18 +497,36 @@ export function createCandidateService(deps: CandidateDeps) {
       .where(eq(skipCompanies.userId, userId))
       .all();
 
-    const applicantRows = db
+    const applicationRows = db
       .select({
         postingId: applications.postingId,
         companyId: applications.companyId,
         status: applications.status,
         sentAt: applications.sentAt,
-        dedupeKey: postings.dedupeKey,
       })
       .from(applications)
-      .innerJoin(postings, eq(applications.postingId, postings.id))
       .where(eq(applications.userId, userId))
       .all();
+
+    const dedupeKeys = new Map(
+      catalogDb
+        .select({ id: postings.id, dedupeKey: postings.dedupeKey })
+        .from(postings)
+        .where(
+          inArray(
+            postings.id,
+            applicationRows.map((row) => row.postingId),
+          ),
+        )
+        .all()
+        .map((row) => [row.id, row.dedupeKey]),
+    );
+
+    const applicantRows = applicationRows.flatMap((row) => {
+      const dedupeKey = dedupeKeys.get(row.postingId);
+
+      return dedupeKey === undefined ? [] : [{ ...row, dedupeKey }];
+    });
 
     const crowdPostingRows = db
       .select({ postingId: applications.postingId, total: count() })

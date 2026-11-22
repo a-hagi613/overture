@@ -8,6 +8,7 @@ import { openAdminAsOwner } from "./admin-sign-in.ts";
 import { expect, test } from "./admin.fixture.ts";
 import { authTestIdentity, testAuthEnvironment } from "./auth.fixture.ts";
 import { startS3Server } from "./s3-server.ts";
+import { catalogDatabasePathFor } from "./template-databases.ts";
 
 const createResponseSchema = z.object({ id: z.string() });
 
@@ -117,7 +118,7 @@ async function postJson(appUrl: string, path: string, body: JsonValue) {
 }
 
 function postingsBySource(databasePath: string) {
-  const database = new Database(databasePath, { readonly: true });
+  const database = new Database(catalogDatabasePathFor(databasePath), { readonly: true });
 
   try {
     return postingsOracleSchema.parse(
@@ -288,7 +289,14 @@ test("the admin storage report attributes bytes by database, prefix and table wi
   expect(
     report.databases.app.mainBytes + report.databases.app.walBytes + report.databases.app.shmBytes,
   ).toBe(report.databases.app.totalBytes);
-  expect(report.databases.catalog).toBeNull();
+  expect(report.databases.catalog).not.toBeNull();
+  expect(report.databases.catalog?.file).toBe("catalog.sqlite");
+  expect(report.databases.catalog?.present).toBe(true);
+  expect(
+    (report.databases.catalog?.mainBytes ?? 0) +
+      (report.databases.catalog?.walBytes ?? 0) +
+      (report.databases.catalog?.shmBytes ?? 0),
+  ).toBe(report.databases.catalog?.totalBytes);
 
   expect(report.volume).not.toBeNull();
   expect(report.volume?.totalBytes).toBeGreaterThan(0);

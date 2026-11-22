@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
-import { openDatabase } from "../src/server/platform/db/client.ts";
-import { migrateDatabase } from "../src/server/platform/db/migrate.ts";
+import { catalogPathFor, openCatalogDatabase } from "../src/server/platform/db/client.ts";
+import { migrateCatalogDatabase } from "../src/server/platform/db/migrate.ts";
 import { createClock } from "../src/server/platform/ports/clock.ts";
 import { loadDiscoveredBoards } from "../src/server/catalog/discovered-boards.ts";
 import { readCompaniesParquet, verifySeedFiles } from "../src/server/catalog/companies-parquet.ts";
@@ -43,9 +43,9 @@ if (rows.length !== companiesRows) {
   );
 }
 
-const { db } = openDatabase(databasePath);
+const { db } = openCatalogDatabase(catalogPathFor(databasePath));
 
-migrateDatabase(db, "drizzle");
+migrateCatalogDatabase(db, "drizzle-catalog");
 
 const clock = createClock();
 const report = await loadDiscoveredBoards(db, clock, rows);

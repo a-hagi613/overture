@@ -61,6 +61,16 @@ export function migrateDatabase(db: AppDatabase, migrationsFolder: string) {
   }
 }
 
+/**
+ * Apply the catalog's own migrations (ADR 0036). The catalog is a separate SQLite file with its own migration folder,
+ * so a catalog reset can never touch the user data migrations.
+ * @param db The catalog database to migrate.
+ * @param migrationsFolder The Drizzle catalog migrations folder.
+ */
+export function migrateCatalogDatabase(db: AppDatabase, migrationsFolder: string) {
+  migrateDatabase(db, migrationsFolder);
+}
+
 if (import.meta.main) {
   const { env } = await import("../../config/env.ts");
   const { db } = openDatabase(env.DATABASE_URL);

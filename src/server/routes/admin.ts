@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import type { Auth } from "../auth/index.ts";
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
@@ -23,7 +23,6 @@ import {
   killSwitches,
   mailboxes,
   messages,
-  postings,
   profiles,
   resumes,
   reviews,
@@ -184,6 +183,7 @@ const personioProbeSummarySchema = z.object({
 });
 
 export interface AdminDeps {
+  catalogDb: CatalogDatabase;
   providers: BrowserProviderRegistry | null;
   personal: PersonalCrypto;
   payments: Payments | null;
@@ -765,6 +765,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     context.json(
       await buildStorageReport({
         backups: deps.backupObjects,
+        catalogDb: deps.catalogDb,
         clock,
         databasePath: deps.databasePath,
         db,
@@ -918,7 +919,12 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
   routes.post("/tag-imports", validJson(tagImportBody), async (context) => {
     const owner = context.get("owner");
     const { content, source } = context.req.valid("json");
-    const report = importTags(db, clock, { content, source, uploadedBy: owner.userId });
+
+    const report = importTags({ db, catalogDb: deps.catalogDb }, clock, {
+      content,
+      source,
+      uploadedBy: owner.userId,
+    });
 
     await recordAdminAudit(db, clock, {
       actorId: owner.userId,
@@ -1202,12 +1208,11 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     const rows = db
       .select({
         attempt: attempts,
-        ats: postings.ats,
-        postingTitle: postings.title,
+        ats: applications.ats,
+        postingTitle: applications.postingTitle,
       })
       .from(attempts)
       .innerJoin(applications, eq(attempts.applicationId, applications.id))
-      .innerJoin(postings, eq(applications.postingId, postings.id))
       .where(applicationId === undefined ? undefined : eq(attempts.applicationId, applicationId))
       .orderBy(desc(attempts.startedAt))
       .limit(limit)

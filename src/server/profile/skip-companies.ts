@@ -1,11 +1,12 @@
 import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { retryWhenBusy } from "../platform/db/busy.ts";
-import { companies, skipCompanies } from "../platform/db/schema.ts";
+import { skipCompanies } from "../platform/db/schema.ts";
+import { companies } from "../platform/db/catalog-schema.ts";
 import { skipCompaniesInputSchema } from "../../shared/targets.ts";
 
 const LEGAL_SUFFIXES = new Set([
@@ -49,8 +50,12 @@ export function normalizeCompanyName(raw: string) {
   return words.join(" ");
 }
 
-export function createSkipCompanyService(deps: { db: AppDatabase; clock: Clock }) {
-  const { db, clock } = deps;
+export function createSkipCompanyService(deps: {
+  db: AppDatabase;
+  catalogDb: CatalogDatabase;
+  clock: Clock;
+}) {
+  const { db, catalogDb, clock } = deps;
 
   async function list(userId: string) {
     const rows = await db
@@ -76,8 +81,11 @@ export function createSkipCompanyService(deps: { db: AppDatabase; clock: Clock }
 
   function companyIdFor(nameNorm: string) {
     return (
-      db.select({ id: companies.id }).from(companies).where(eq(companies.nameNorm, nameNorm)).get()
-        ?.id ?? null
+      catalogDb
+        .select({ id: companies.id })
+        .from(companies)
+        .where(eq(companies.nameNorm, nameNorm))
+        .get()?.id ?? null
     );
   }
 

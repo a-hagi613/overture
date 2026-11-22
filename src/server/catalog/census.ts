@@ -1,9 +1,9 @@
 import { and, count, countDistinct, eq, isNotNull, isNull, sql } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { SQL } from "drizzle-orm";
-import { companies, companyBoards, postings, postingTags } from "../platform/db/schema.ts";
+import { companies, companyBoards, postings, postingTags } from "../platform/db/catalog-schema.ts";
 
 const TAG_DIMENSIONS = ["role", "subrole", "seniority"] as const;
 
@@ -52,7 +52,7 @@ export interface CensusData {
   topCompanies: CensusCountRow[];
 }
 
-function countGroupedOpen<K extends string | null>(db: AppDatabase, key: SQL<K>) {
+function countGroupedOpen<K extends string | null>(db: CatalogDatabase, key: SQL<K>) {
   return db
     .select({ key, open: count() })
     .from(postings)
@@ -67,7 +67,7 @@ function percent(share: number) {
   return `${share.toFixed(1)} %`;
 }
 
-export function buildCensus(db: AppDatabase, clock: Clock) {
+export function buildCensus(db: CatalogDatabase, clock: Clock) {
   const totalBoardsRow = db.select({ total: count() }).from(companyBoards).get();
   const totalCompaniesRow = db.select({ total: count() }).from(companies).get();
 

@@ -1,25 +1,17 @@
 import { and, desc, eq, isNull, lt } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { WorkableManifest, WorkableSnapshotRow } from "./workable-feed.ts";
 
-import { publishEvent } from "../platform/sse/stream.ts";
 import { isKillSwitchEnabled } from "../platform/settings/index.ts";
-import {
-  companies,
-  companyBoards,
-  postings,
-  targets,
-  users,
-  workableIngests,
-} from "../platform/db/schema.ts";
+import { targets, users, workableIngests } from "../platform/db/schema.ts";
+import { companies, companyBoards, postings } from "../platform/db/catalog-schema.ts";
 import { contentHash } from "./content-hash.ts";
 import { dedupeKeyFor } from "./dedupe-key.ts";
 import { normalizeApplyUrl, normalizeTitle } from "./normalize.ts";
-import { skipClosedPostingApplications } from "./posting-close.ts";
 import type { workableIngestReportSchema } from "./sweep-worker-protocol.ts";
 import { salaryPeriodForColumn, writePostingTags } from "./tag-store.ts";
 import {
@@ -44,6 +36,7 @@ export type WorkableIngestReport = z.infer<typeof workableIngestReportSchema>;
 
 export interface WorkableIngestDeps {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   objects: ObjectStore;
 }
@@ -56,6 +49,7 @@ function report(partial: Partial<WorkableIngestReport>) {
     added: 0,
     updated: 0,
     closed: 0,
+    closedPostingIds: [],
     ageMs: null,
     previousRows: null,
     dropped: false,
@@ -254,55 +248,30 @@ function postingValues(row: WorkableSnapshotRow, ref: BoardRef, now: number) {
   };
 }
 
-function closeAbsentPostings(db: AppDatabase, clock: Clock, now: number) {
-  const run = db.transaction((tx) => {
-    const closed = tx
-      .update(postings)
-      .set({ closedAt: now })
-      .where(
-        and(eq(postings.ats, "workable"), isNull(postings.closedAt), lt(postings.lastSeenAt, now)),
-      )
-      .returning({ id: postings.id })
-      .all();
-
-    return {
-      closed,
-      skipped: skipClosedPostingApplications(
-        tx,
-        now,
-        closed.map((row) => row.id),
-      ),
-    };
-  });
-
-  for (const application of run.skipped) {
-    publishEvent(
-      db,
-      clock,
-      "application.updated",
-      JSON.stringify({ applicationId: application.applicationId, status: "skipped" }),
-      application.userId,
-    );
-    publishEvent(
-      db,
-      clock,
-      "home.updated",
-      JSON.stringify({ applicationId: application.applicationId }),
-      application.userId,
-    );
-  }
-
-  return run.closed.length;
+function closeAbsentPostings(catalogDb: CatalogDatabase, now: number) {
+  return catalogDb
+    .update(postings)
+    .set({ closedAt: now })
+    .where(
+      and(eq(postings.ats, "workable"), isNull(postings.closedAt), lt(postings.lastSeenAt, now)),
+    )
+    .returning({ id: postings.id })
+    .all()
+    .map((row) => row.id);
 }
 
-async function writeRows(db: AppDatabase, now: number, rows: readonly WorkableSnapshotRow[]) {
+async function writeRows(
+  catalogDb: CatalogDatabase,
+  now: number,
+  rows: readonly WorkableSnapshotRow[],
+) {
   const cache = new Map<string, BoardRef>();
   const counts = { added: 0, updated: 0 };
 
   async function writeChunk(offset: number) {
     const chunk = rows.slice(offset, offset + INGEST_CHUNK);
 
-    db.transaction((tx) => {
+    catalogDb.transaction((tx) => {
       for (const row of chunk) {
         const ref = ensureBoard(tx, now, cache, row);
 
@@ -362,7 +331,7 @@ function parseSnapshot(bytes: Uint8Array<ArrayBuffer>) {
 }
 
 export async function runWorkableIngest(deps: WorkableIngestDeps) {
-  const { db, clock, objects } = deps;
+  const { db, catalogDb, clock, objects } = deps;
   const now = clock.now();
 
   if (isKillSwitchEnabled(db, "ats", "workable")) {
@@ -452,8 +421,8 @@ export async function runWorkableIngest(deps: WorkableIngestDeps) {
   }
 
   const rows = parseSnapshot(snapshotBytes);
-  const counts = await writeRows(db, now, rows);
-  const closed = dropped ? 0 : closeAbsentPostings(db, clock, now);
+  const counts = await writeRows(catalogDb, now, rows);
+  const closedPostingIds = dropped ? [] : closeAbsentPostings(catalogDb, now);
 
   db.insert(workableIngests)
     .values({
@@ -465,7 +434,7 @@ export async function runWorkableIngest(deps: WorkableIngestDeps) {
       contentHash: manifest.contentHash,
       added: counts.added,
       updated: counts.updated,
-      closed,
+      closed: closedPostingIds.length,
       ingestedAt: now,
     })
     .run();
@@ -476,7 +445,8 @@ export async function runWorkableIngest(deps: WorkableIngestDeps) {
     rows: manifest.rows,
     added: counts.added,
     updated: counts.updated,
-    closed,
+    closed: closedPostingIds.length,
+    closedPostingIds,
     ageMs,
     previousRows: previous?.rows ?? null,
     dropped,

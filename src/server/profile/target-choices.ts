@@ -1,10 +1,10 @@
 import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { CatalogDatabase } from "../platform/db/client.ts";
 import type { EmploymentType, Seniority, Workplace } from "../../shared/tag-taxonomy.ts";
 
 import { retryWhenBusy } from "../platform/db/busy.ts";
-import { postings, postingTags } from "../platform/db/schema.ts";
+import { postings, postingTags } from "../platform/db/catalog-schema.ts";
 import { logError } from "../platform/log.ts";
 import { countryNameFor } from "../catalog/geo.ts";
 import { EMPLOYMENT_TYPES, SENIORITIES } from "../../shared/tag-taxonomy.ts";
@@ -33,7 +33,7 @@ export interface TargetChoices {
  * @param db The application database.
  * @returns The choices for roles, locations, seniority, workplace and employment type.
  */
-export function targetChoices(db: AppDatabase) {
+export function targetChoices(db: CatalogDatabase) {
   const open = isNull(postings.closedAt);
 
   const roleCandidates = db
@@ -99,13 +99,13 @@ export function targetChoices(db: AppDatabase) {
  * @returns `read` for the current choices and `warm` to fill the cache without waiting.
  */
 export function createTargetChoicesCache(deps: {
-  db: AppDatabase;
+  catalogDb: CatalogDatabase;
   now: () => number;
   onError?: (cause: unknown) => void;
   staleMs: number;
 }) {
   const {
-    db,
+    catalogDb: db,
     now,
     onError = (cause) => logError("onboarding choices refresh", cause),
     staleMs,
@@ -222,7 +222,7 @@ function locationLabel(row: {
  * @param db The application database.
  * @returns One row per city, country, raw location and workplace, with its open Posting count.
  */
-export function locationChoiceCounts(db: AppDatabase) {
+export function locationChoiceCounts(db: CatalogDatabase) {
   return db
     .select({
       city: postings.city,
@@ -242,7 +242,7 @@ export function locationChoiceCounts(db: AppDatabase) {
  * @param db The application database.
  * @returns The location choices.
  */
-export function locationChoices(db: AppDatabase) {
+export function locationChoices(db: CatalogDatabase) {
   const rows = locationChoiceCounts(db).all();
 
   const totals = new Map<string, number>();

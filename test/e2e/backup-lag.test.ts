@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 
 import type { ChildProcess } from "node:child_process";
 
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -12,6 +12,7 @@ import { expect, test } from "@playwright/test";
 
 import { testAuthEnvironment } from "./auth.fixture.ts";
 import { startAppServer } from "./app-server.ts";
+import { copyTemplateDatabases } from "./template-databases.ts";
 import { waitForReplicaTransactions } from "./replication.fixture.ts";
 
 const replicasCaughtUpSchema = z.object({
@@ -39,7 +40,7 @@ test.beforeAll(async () => {
 
   const databasePath = join(directory, "live.db");
 
-  copyFileSync(join(process.cwd(), "test/e2e/.tmp/template.db"), databasePath);
+  copyTemplateDatabases(databasePath);
 
   const configPath = join(directory, "litestream.yml");
 

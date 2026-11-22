@@ -9,12 +9,9 @@ import {
   applicationReceipts,
   applications,
   attempts,
-  companies,
-  companyBoards,
   mailThreads,
   mailboxes,
   messages,
-  postings,
   users,
 } from "../platform/db/schema.ts";
 import {
@@ -83,25 +80,6 @@ function startInMemoryOutcomes() {
     const companyId = input.id ?? `company-${String(sequence)}`;
     const boardId = `board-${String(sequence)}`;
 
-    db.insert(companies)
-      .values({
-        createdAt: instant,
-        domain: input.domain,
-        id: companyId,
-        name: input.name,
-        nameNorm: input.name.toLowerCase(),
-      })
-      .run();
-    db.insert(companyBoards)
-      .values({
-        ats: "greenhouse",
-        boardToken: `token-${String(sequence)}`,
-        companyId,
-        createdAt: instant,
-        id: boardId,
-        source: "import",
-      })
-      .run();
     seededCompanies.set(key, { boardId, companyId });
 
     return { boardId, companyId };
@@ -112,30 +90,13 @@ function startInMemoryOutcomes() {
     submittedAt?: number;
     title: string;
   }) {
-    const { boardId, companyId } = companyFor(input.company);
+    const { companyId } = companyFor(input.company);
     const submittedAt = input.submittedAt ?? instant;
 
     sequence += 1;
 
     const postingId = `posting-${String(sequence)}`;
     const applicationId = `application-${String(sequence)}`;
-
-    db.insert(postings)
-      .values({
-        applyUrlNorm: `https://example.test/${String(sequence)}`,
-        ats: "greenhouse",
-        atsJobId: `job-${String(sequence)}`,
-        boardId,
-        companyId,
-        dedupeKey: `dedupe-${String(sequence)}`,
-        firstSeenAt: instant,
-        id: postingId,
-        lastSeenAt: instant,
-        title: input.title,
-        titleNorm: input.title.toLowerCase(),
-        url: `https://example.test/${String(sequence)}`,
-      })
-      .run();
 
     const plan = {
       applicationId,

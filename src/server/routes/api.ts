@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { validQuery } from "./validators.ts";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 
@@ -24,6 +24,7 @@ const searchQuerySchema = z.object({
 
 export function createApiRoutes(
   db: AppDatabase,
+  catalogDb: CatalogDatabase,
   clock: Clock,
   auth: Auth,
   options: { shutdown?: AbortSignal } = {},
@@ -36,7 +37,7 @@ export function createApiRoutes(
 
     const startedAt = performance.now();
 
-    const hits = searchPostings(db, {
+    const hits = searchPostings(catalogDb, {
       text: q,
       openOnly: true,
       limit,

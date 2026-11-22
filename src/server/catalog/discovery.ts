@@ -1,11 +1,13 @@
 import { and, eq, inArray } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { CatalogSweepWorker } from "./sweep-worker-runner.ts";
 
 import { enqueueJob } from "../platform/jobs/queue.ts";
-import { bgJobs, companyBoards } from "../platform/db/schema.ts";
+import { bgJobs } from "../platform/db/schema.ts";
+import { companyBoards } from "../platform/db/catalog-schema.ts";
+import { reconcileClosedPostings } from "./closed-postings.ts";
 import { readSweepIntervalMs } from "./sweep-config.ts";
 
 export const SWEEP_JOB_KIND = "catalog.sweep";
@@ -19,6 +21,7 @@ const BACKFILL_DEDUPE_KEY = "catalog.backfill";
 
 export interface CatalogDeps {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
 }
 
@@ -54,21 +57,29 @@ export function ensureBackfillQueued(db: AppDatabase, clock: Clock) {
 }
 
 export async function runBackfillJob(worker: CatalogSweepWorker, deps: CatalogDeps) {
-  await worker.run("backfill");
+  const summary = await worker.run("backfill");
+
+  reconcileClosedPostings(deps, summary.closedPostingIds);
 
   enqueueSweep(deps, deps.clock.now() + readSweepIntervalMs(deps.db));
 }
 
 export async function runSweepJob(worker: CatalogSweepWorker, deps: CatalogDeps) {
   try {
-    await worker.run("sweep");
+    const summary = await worker.run("sweep");
+
+    reconcileClosedPostings(deps, summary.closedPostingIds);
   } finally {
     enqueueSweep(deps, deps.clock.now() + readSweepIntervalMs(deps.db));
   }
 }
 
 export function ensureSweepQueued(deps: CatalogDeps) {
-  const hasBoards = deps.db.select({ one: companyBoards.id }).from(companyBoards).limit(1).get();
+  const hasBoards = deps.catalogDb
+    .select({ one: companyBoards.id })
+    .from(companyBoards)
+    .limit(1)
+    .get();
 
   if (hasBoards === undefined) {
     return false;

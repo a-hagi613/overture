@@ -1,13 +1,11 @@
 import { and, count, eq, gte, inArray, isNull, notInArray, sql } from "drizzle-orm";
 
-import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
+import type { CatalogDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
-import { companyBoards, postings } from "../platform/db/schema.ts";
-import { publishEvent } from "../platform/sse/stream.ts";
+import { companyBoards, postings } from "../platform/db/catalog-schema.ts";
 import { normalizeApplyUrl, normalizeTitle } from "./normalize.ts";
 import { contentHash } from "./content-hash.ts";
 import { dedupeKeyFor } from "./dedupe-key.ts";
-import { skipClosedPostingApplications } from "./posting-close.ts";
 import { WRITE_BATCH_ROWS, yieldToEventLoop } from "../platform/db/batches.ts";
 import { storePostingTags, salaryPeriodForColumn } from "./tag-store.ts";
 import { tagPosting } from "./tag-rules.ts";
@@ -35,6 +33,8 @@ export interface PollBoardReport {
   added: number;
   updated: number;
   closed: number;
+  /** The Postings this poll closed; the application process skips their unsent Applications (ADR 0036). */
+  closedPostingIds: string[];
   error: string | null;
 }
 
@@ -110,7 +110,7 @@ function isUnchanged(posting: FeedPosting, existing: ExistingPosting | undefined
   return feedContentHash !== null && existing.feedContentHash === feedContentHash;
 }
 
-function openPostingCount(db: AppDatabase, boardId: string) {
+function openPostingCount(db: CatalogDatabase, boardId: string) {
   const row = db
     .select({ total: count() })
     .from(postings)
@@ -120,7 +120,7 @@ function openPostingCount(db: AppDatabase, boardId: string) {
   return row?.total ?? 0;
 }
 
-function changedPostingCount(db: AppDatabase, boardId: string, boardPostings: FeedPosting[]) {
+function changedPostingCount(db: CatalogDatabase, boardId: string, boardPostings: FeedPosting[]) {
   const existingRows: ExistingPosting[] = db
     .select({
       atsJobId: postings.atsJobId,
@@ -173,7 +173,7 @@ function gzip(descriptionText: string) {
   return Buffer.from(Bun.gzipSync(descriptionText));
 }
 
-function latestChangeMsForBoard(db: AppDatabase, boardId: string) {
+function latestChangeMsForBoard(db: CatalogDatabase, boardId: string) {
   const row = db
     .select({
       latestSource: sql<number | null>`max(${postings.sourceUpdatedAt})`,
@@ -202,7 +202,7 @@ async function fetchDetailOrNull(feed: BoardFeed, boardToken: string, atsJobId: 
   }
 }
 
-async function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow, now: number) {
+async function touchWithoutChange(db: CatalogDatabase, clock: Clock, board: BoardRow, now: number) {
   const latestChangeMs = latestChangeMsForBoard(db, board.id);
 
   db.update(postings)
@@ -212,7 +212,7 @@ async function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow
     )
     .run();
 
-  const closed = await closeMissingPostings(db, clock, board.id);
+  const closedPostingIds = await closeMissingPostings(db, clock, board.id);
 
   db.update(companyBoards)
     .set({
@@ -230,16 +230,19 @@ async function touchWithoutChange(db: AppDatabase, clock: Clock, board: BoardRow
     outcome: "not_modified" as const,
     added: 0,
     updated: 0,
-    closed,
+    closed: closedPostingIds.length,
+    closedPostingIds,
     error: null,
   } satisfies PollBoardReport;
 }
 
-async function closeMissingPostings(db: AppDatabase, clock: Clock, boardId: string) {
+async function closeMissingPostings(db: CatalogDatabase, clock: Clock, boardId: string) {
   const now = clock.now();
 
-  const closeChunk: () => Promise<number> = async () => {
-    const run = db.transaction((tx) => {
+  const closedIds: string[] = [];
+
+  const closeChunk: () => Promise<void> = async () => {
+    const closed = db.transaction((tx) => {
       const chunk = tx
         .select({ id: postings.id })
         .from(postings)
@@ -252,50 +255,28 @@ async function closeMissingPostings(db: AppDatabase, clock: Clock, boardId: stri
         )
         .limit(WRITE_BATCH_ROWS);
 
-      const closed = tx
+      return tx
         .update(postings)
         .set({ closedAt: now })
         .where(inArray(postings.id, chunk))
         .returning({ id: postings.id })
         .all();
-
-      return {
-        closed,
-        skipped: skipClosedPostingApplications(
-          tx,
-          now,
-          closed.map((row) => row.id),
-        ),
-      };
     });
 
-    for (const application of run.skipped) {
-      publishEvent(
-        db,
-        clock,
-        "application.updated",
-        JSON.stringify({ applicationId: application.applicationId, status: "skipped" }),
-        application.userId,
-      );
-      publishEvent(
-        db,
-        clock,
-        "home.updated",
-        JSON.stringify({ applicationId: application.applicationId }),
-        application.userId,
-      );
-    }
+    closedIds.push(...closed.map((row) => row.id));
 
-    if (run.closed.length < WRITE_BATCH_ROWS) {
-      return run.closed.length;
+    if (closed.length < WRITE_BATCH_ROWS) {
+      return;
     }
 
     await yieldToEventLoop();
 
-    return run.closed.length + (await closeChunk());
+    await closeChunk();
   };
 
-  return closeChunk();
+  await closeChunk();
+
+  return closedIds;
 }
 
 function postingValues(
@@ -362,13 +343,14 @@ function postingValues(
 }
 
 async function syncPostings(
-  db: AppDatabase,
+  db: CatalogDatabase,
   clock: Clock,
   feed: BoardFeed,
   board: BoardRow,
   boardPostings: FeedPosting[],
   now: number,
 ) {
+  const closedPostingIds: string[] = [];
   const report = { added: 0, updated: 0, closed: 0 };
   const seenJobIds = new Set<string>(boardPostings.map((posting) => posting.atsJobId));
 
@@ -483,9 +465,11 @@ async function syncPostings(
     .where(missingFilter)
     .run();
 
-  report.closed += await closeMissingPostings(db, clock, board.id);
+  closedPostingIds.push(...(await closeMissingPostings(db, clock, board.id)));
 
-  return report;
+  report.closed += closedPostingIds.length;
+
+  return { ...report, closedPostingIds };
 }
 
 function touchUnchangedPosting(db: DatabaseWriter, postingId: string, now: number) {
@@ -500,7 +484,7 @@ function conditionMatchesByHash(board: BoardRow, bodyHash: string) {
 }
 
 function markBoardPolled(
-  db: AppDatabase,
+  db: CatalogDatabase,
   clock: Clock,
   board: BoardRow,
   result: { etag: string | null; bodyHash: string; postings: FeedPosting[] },
@@ -523,7 +507,7 @@ function markBoardPolled(
     .run();
 }
 
-function markBoardGone(db: AppDatabase, board: BoardRow, notFoundPolls: number, now: number) {
+function markBoardGone(db: CatalogDatabase, board: BoardRow, notFoundPolls: number, now: number) {
   const isGone = notFoundPolls >= NOT_FOUND_POLLS_TO_GONE;
 
   db.update(companyBoards)
@@ -542,11 +526,12 @@ function markBoardGone(db: AppDatabase, board: BoardRow, notFoundPolls: number, 
     added: 0,
     updated: 0,
     closed: 0,
+    closedPostingIds: [],
     error: null,
   } satisfies PollBoardReport;
 }
 
-function markBoardError(db: AppDatabase, board: BoardRow, now: number, message: string) {
+function markBoardError(db: CatalogDatabase, board: BoardRow, now: number, message: string) {
   const backoffLevel = Math.min(board.backoffLevel + 1, 6);
   const backoffMs = Math.min(ERROR_BACKOFF_BASE_MS * 2 ** (backoffLevel - 1), ERROR_BACKOFF_CAP_MS);
 
@@ -566,12 +551,13 @@ function markBoardError(db: AppDatabase, board: BoardRow, now: number, message: 
     added: 0,
     updated: 0,
     closed: 0,
+    closedPostingIds: [],
     error: message,
   } satisfies PollBoardReport;
 }
 
 export const pollBoard = async (
-  db: AppDatabase,
+  db: CatalogDatabase,
   clock: Clock,
   feed: BoardFeed,
   board: BoardRow,

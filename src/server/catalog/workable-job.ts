@@ -1,5 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 
+import type { CatalogDeps } from "./discovery.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { CatalogSweepWorker } from "./sweep-worker-runner.ts";
@@ -8,6 +9,7 @@ import type { WorkableIngestReport } from "./workable-ingest.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 import { bgJobs } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
+import { reconcileClosedPostings } from "./closed-postings.ts";
 import { STALE_AFTER_MS } from "./workable-ingest.ts";
 
 export const WORKABLE_INGEST_JOB_KIND = "catalog.workable";
@@ -86,13 +88,12 @@ function raiseIngestAlert(db: AppDatabase, clock: Clock, report: WorkableIngestR
   }
 }
 
-export async function runWorkableIngestJob(
-  worker: CatalogSweepWorker,
-  deps: { db: AppDatabase; clock: Clock },
-) {
+export async function runWorkableIngestJob(worker: CatalogSweepWorker, deps: CatalogDeps) {
   try {
     const summary = await worker.run("workable");
     const report = summary.workable ?? null;
+
+    reconcileClosedPostings(deps, summary.closedPostingIds);
 
     if (report !== null) {
       raiseIngestAlert(deps.db, deps.clock, report);

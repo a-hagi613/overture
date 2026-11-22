@@ -1,4 +1,5 @@
 import { expect, test } from "./app.fixture.ts";
+import { catalogDatabasePathFor } from "./template-databases.ts";
 import { Database } from "bun:sqlite";
 import {
   clearCatalog,
@@ -336,7 +337,7 @@ test("a skip list saved while the sweep holds the write lock still takes effect"
 
   await configureMatching(owner);
 
-  const blocker = new Database(databasePath);
+  const blocker = new Database(catalogDatabasePathFor(databasePath));
 
   blocker.run("PRAGMA busy_timeout = 5000;");
   blocker.run("BEGIN IMMEDIATE;");

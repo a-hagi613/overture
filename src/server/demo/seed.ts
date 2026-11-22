@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
@@ -12,8 +12,6 @@ import {
   applicationEvents,
   applicationSnapshots,
   checkins,
-  companies,
-  companyBoards,
   facts,
   ledger,
   mailThreads,
@@ -21,9 +19,6 @@ import {
   matches,
   messages,
   notifications,
-  postingQuestions,
-  postingTags,
-  postings,
   profiles,
   questions,
   questionVariants,
@@ -34,6 +29,13 @@ import {
   targets,
   users,
 } from "../platform/db/schema.ts";
+import {
+  companies,
+  companyBoards,
+  postingQuestions,
+  postingTags,
+  postings,
+} from "../platform/db/catalog-schema.ts";
 import { grantApplications, postLedgerEntry } from "../billing/ledger.ts";
 import { contentHash } from "../catalog/content-hash.ts";
 import { dedupeKeyFor } from "../catalog/dedupe-key.ts";
@@ -70,11 +72,12 @@ const DEMO_RESUME_FILENAME = "sam-rivera-resume.pdf";
  */
 export async function seedDemoAccount(deps: {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   personal: PersonalCrypto;
   objects: ObjectStore;
 }) {
-  const { db, clock, personal, objects } = deps;
+  const { db, catalogDb, clock, personal, objects } = deps;
   const now = clock.now();
 
   const existing = db.select().from(users).where(eq(users.email, demoLoginEmail)).get();
@@ -129,9 +132,9 @@ export async function seedDemoAccount(deps: {
     .onConflictDoNothing()
     .run();
 
-  seedCatalog({ db, now });
+  seedCatalog({ catalogDb, now });
 
-  await seedApplications({ db, now, personal, userId });
+  await seedApplications({ catalogDb, db, now, personal, userId });
   await seedInbox({ db, now, personal, userId });
   seedNotifications({ db, now, userId });
   seedReviews({ db, now, userId });
@@ -281,14 +284,15 @@ function seedTargets(input: { db: AppDatabase; now: number; userId: string }) {
     .run();
 }
 
-function seedCatalog(input: { db: AppDatabase; now: number }) {
-  const { db, now } = input;
+function seedCatalog(input: { catalogDb: CatalogDatabase; now: number }) {
+  const { catalogDb, now } = input;
 
   for (const [index, company] of DEMO_COMPANIES.entries()) {
     const companyId = `demo-company-${String(index).padStart(2, "0")}`;
     const boardId = `demo-board-${String(index).padStart(2, "0")}`;
 
-    db.insert(companies)
+    catalogDb
+      .insert(companies)
       .values({
         createdAt: now - 120 * DAY_MS,
         domain: company.domain,
@@ -300,7 +304,8 @@ function seedCatalog(input: { db: AppDatabase; now: number }) {
       .onConflictDoNothing()
       .run();
 
-    db.insert(companyBoards)
+    catalogDb
+      .insert(companyBoards)
       .values({
         ats: company.ats,
         boardToken: company.boardToken,
@@ -319,11 +324,12 @@ function seedCatalog(input: { db: AppDatabase; now: number }) {
 
 async function seedApplications(input: {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   now: number;
   personal: PersonalCrypto;
   userId: string;
 }) {
-  const { db, now, personal, userId } = input;
+  const { db, catalogDb, now, personal, userId } = input;
 
   const resume = db
     .select({ id: resumes.id, sha256: resumes.sha256 })
@@ -353,7 +359,8 @@ async function seedApplications(input: {
     const url = `https://jobs.example.com/${company.boardToken}/${String(index + 1)}`;
     const titleNorm = normalizeTitle(app.title);
 
-    db.insert(postings)
+    catalogDb
+      .insert(postings)
       .values({
         applyUrl: null,
         applyUrlNorm: normalizeApplyUrl(url),
@@ -394,13 +401,14 @@ async function seedApplications(input: {
       .onConflictDoNothing()
       .run();
 
-    seedPostingTags({ db, companyIndex, postingId });
+    seedPostingTags({ catalogDb, companyIndex, postingId });
 
     if (app.questions === "form") {
       for (const [position, question] of DEMO_FORM_QUESTIONS.entries()) {
         const questionId = ensureQuestion({ db, input: question, now });
 
-        db.insert(postingQuestions)
+        catalogDb
+          .insert(postingQuestions)
           .values({
             fieldName: null,
             options: "[]",
@@ -508,8 +516,12 @@ async function seedApplications(input: {
   await Promise.all(deferred);
 }
 
-function seedPostingTags(input: { db: AppDatabase; companyIndex: number; postingId: string }) {
-  const { db, companyIndex, postingId } = input;
+function seedPostingTags(input: {
+  catalogDb: CatalogDatabase;
+  companyIndex: number;
+  postingId: string;
+}) {
+  const { catalogDb, companyIndex, postingId } = input;
 
   const tags = [
     { dimension: "role" as const, value: companyIndex % 2 === 0 ? "Backend" : "Platform" },
@@ -517,7 +529,8 @@ function seedPostingTags(input: { db: AppDatabase; companyIndex: number; posting
   ];
 
   for (const tag of tags) {
-    db.insert(postingTags)
+    catalogDb
+      .insert(postingTags)
       .values({ dimension: tag.dimension, postingId, source: "rules", value: tag.value })
       .onConflictDoNothing()
       .run();

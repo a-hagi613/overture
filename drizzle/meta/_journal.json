@@ -400,6 +400,13 @@
       "when": 1795492300000,
       "tag": "0056_snapshot_decouple",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "6",
+      "when": 1795492400000,
+      "tag": "0057_catalog_split",
+      "breakpoints": true
     }
   ]
 }

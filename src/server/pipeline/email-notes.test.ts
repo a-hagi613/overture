@@ -1,14 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AppDatabase } from "../platform/db/client.ts";
-import {
-  applicationEvents,
-  applications,
-  companies,
-  companyBoards,
-  postings,
-  users,
-} from "../platform/db/schema.ts";
+import { applicationEvents, applications, users } from "../platform/db/schema.ts";
 import { openCountingDatabase } from "../testing/query-counter.ts";
 import { latestEmailNotesOf } from "./email-notes.ts";
 
@@ -32,23 +25,6 @@ function seeded(applicationCount: number) {
     })
     .run();
 
-  db.insert(companies)
-    .values({ id: "co-1", name: "Northwind", nameNorm: "northwind", createdAt: NOW })
-    .run();
-
-  db.insert(companyBoards)
-    .values({
-      id: "board-1",
-      companyId: "co-1",
-      ats: "greenhouse",
-      boardToken: "board-1",
-      region: "us",
-      source: "v1_seed",
-      lastPolledAt: NOW,
-      createdAt: NOW,
-    })
-    .run();
-
   for (let index = 0; index < applicationCount; index += 1) {
     addApplication(db, index);
   }
@@ -57,23 +33,6 @@ function seeded(applicationCount: number) {
 }
 
 function addApplication(db: AppDatabase, index: number) {
-  db.insert(postings)
-    .values({
-      id: `posting-${String(index)}`,
-      boardId: "board-1",
-      companyId: "co-1",
-      ats: "greenhouse",
-      atsJobId: `job-${String(index)}`,
-      url: `https://example.test/job-${String(index)}`,
-      applyUrlNorm: `https://example.test/job-${String(index)}`,
-      title: `Engineer ${String(index)}`,
-      titleNorm: `engineer ${String(index)}`,
-      firstSeenAt: NOW,
-      lastSeenAt: NOW,
-      dedupeKey: `job-${String(index)}`,
-    })
-    .run();
-
   db.insert(applications)
     .values({
       id: `app-${String(index)}`,

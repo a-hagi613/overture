@@ -5,11 +5,11 @@ import { basename, dirname, join, resolve } from "node:path";
 import { Database } from "bun:sqlite";
 import { sql } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 
-import { postings } from "../platform/db/schema.ts";
+import { postings } from "../platform/db/catalog-schema.ts";
 import { logError } from "../platform/log.ts";
 
 const NAMED_PREFIXES = ["files/", "mail/", "exports/"] as const;
@@ -91,6 +91,7 @@ export interface StorageReport {
 
 export interface StorageReportDeps {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   databasePath: string;
   catalogPath?: string | null;
@@ -152,7 +153,7 @@ async function volumeUsage(databasePath: string) {
   } satisfies VolumeUsage;
 }
 
-function postingsBySource(db: AppDatabase) {
+function postingsBySource(db: CatalogDatabase) {
   const rows = db
     .select({
       source: postings.ats,
@@ -318,6 +319,24 @@ async function tableBreakdown(databasePath: string) {
   return reading;
 }
 
+async function combinedTableBreakdown(paths: readonly string[]) {
+  const parts = await Promise.all(paths.map(async (path) => tableBreakdown(path)));
+
+  if (parts.some((part) => part.status !== "ok")) {
+    return { status: "unavailable", tables: [], totalBytes: 0 } satisfies TableBreakdown;
+  }
+
+  const tables = parts
+    .flatMap((part) => part.tables)
+    .toSorted((left, right) => right.bytes - left.bytes || left.table.localeCompare(right.table));
+
+  return {
+    status: "ok",
+    tables,
+    totalBytes: tables.reduce((total, row) => total + row.bytes, 0),
+  } satisfies TableBreakdown;
+}
+
 export async function buildStorageReport(deps: StorageReportDeps) {
   const catalogPath =
     deps.catalogPath === null
@@ -331,7 +350,7 @@ export async function buildStorageReport(deps: StorageReportDeps) {
     objectUsage(deps.objects, deps.backups),
   ]);
 
-  const bySource = postingsBySource(deps.db);
+  const bySource = postingsBySource(deps.catalogDb);
 
   return {
     databases: { app, catalog: catalog?.present === true ? catalog : null },
@@ -342,7 +361,12 @@ export async function buildStorageReport(deps: StorageReportDeps) {
       closed: bySource.reduce((total, row) => total + row.closed, 0),
       open: bySource.reduce((total, row) => total + row.open, 0),
     },
-    tables: deps.includeTables === true ? await tableBreakdown(deps.databasePath) : null,
+    tables:
+      deps.includeTables === true
+        ? await combinedTableBreakdown(
+            catalog === null ? [deps.databasePath] : [deps.databasePath, catalogPath ?? ""],
+          )
+        : null,
     volume,
   } satisfies StorageReport;
 }

@@ -3,9 +3,10 @@ import { eq } from "drizzle-orm";
 
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
-import { postings, tagImports } from "../platform/db/schema.ts";
+import { tagImports } from "../platform/db/schema.ts";
+import { postings } from "../platform/db/catalog-schema.ts";
 import { salaryPeriodForColumn, writePostingTags } from "./tag-store.ts";
 import { normalizeApplyUrl } from "./normalize.ts";
 
@@ -98,7 +99,7 @@ function tagWritesFor(row: TagImportRow) {
   return writes;
 }
 
-function applyRowToPosting(db: AppDatabase, row: TagImportRow, postingId: string, now: number) {
+function applyRowToPosting(db: CatalogDatabase, row: TagImportRow, postingId: string, now: number) {
   const writes = tagWritesFor(row);
 
   if (writes.length > 0) {
@@ -123,7 +124,12 @@ function applyRowToPosting(db: AppDatabase, row: TagImportRow, postingId: string
   }
 }
 
-export function importTags(db: AppDatabase, clock: Clock, input: ImportTagsInput) {
+export function importTags(
+  deps: { db: AppDatabase; catalogDb: CatalogDatabase },
+  clock: Clock,
+  input: ImportTagsInput,
+) {
+  const { db, catalogDb } = deps;
   const rows = parseTagImportRows(input.content);
   const now = clock.now();
 
@@ -132,7 +138,7 @@ export function importTags(db: AppDatabase, clock: Clock, input: ImportTagsInput
   for (const row of rows) {
     const applyUrlNorm = normalizeApplyUrl(row.apply_url);
 
-    const matchedPostings = db
+    const matchedPostings = catalogDb
       .select({ id: postings.id })
       .from(postings)
       .where(eq(postings.applyUrlNorm, applyUrlNorm))
@@ -145,7 +151,7 @@ export function importTags(db: AppDatabase, clock: Clock, input: ImportTagsInput
     matched += 1;
 
     for (const posting of matchedPostings) {
-      applyRowToPosting(db, row, posting.id, now);
+      applyRowToPosting(catalogDb, row, posting.id, now);
     }
   }
 

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { validJson } from "./validators.ts";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
@@ -59,6 +59,7 @@ const factsSchema = z.object({
 
 export function createProfileRoutes(deps: {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   auth: Auth;
   objects: ObjectStore;
@@ -96,7 +97,7 @@ export function createProfileRoutes(deps: {
 
   const languagesService = createLanguagesService({ db, clock });
 
-  const skipCompanyService = createSkipCompanyService({ db, clock });
+  const skipCompanyService = createSkipCompanyService({ db, catalogDb: deps.catalogDb, clock });
 
   const routes = new Hono();
 
@@ -301,7 +302,7 @@ export function createProfileRoutes(deps: {
 
     return context.json({
       ...saved,
-      matchedCount: countMatchingPostings(db, saved.targets, languages),
+      matchedCount: countMatchingPostings(deps.catalogDb, saved.targets, languages),
     });
   });
 
@@ -317,7 +318,7 @@ export function createProfileRoutes(deps: {
 
     return context.json({
       ...saved,
-      matchedCount: countMatchingPostings(db, saved.targets, languages),
+      matchedCount: countMatchingPostings(deps.catalogDb, saved.targets, languages),
     });
   });
 
@@ -331,7 +332,7 @@ export function createProfileRoutes(deps: {
     const { languages } = await languagesService.read(account.id);
 
     return context.json({
-      matchedCount: countMatchingPostings(db, context.req.valid("json"), languages),
+      matchedCount: countMatchingPostings(deps.catalogDb, context.req.valid("json"), languages),
     });
   });
 

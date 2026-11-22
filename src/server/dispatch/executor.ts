@@ -21,7 +21,7 @@ import type {
 import type { createMailboxService } from "../inbox/mailboxes.ts";
 import type { Outcomes } from "./outcomes.ts";
 
-import { applications, attempts, postings, profiles, users } from "../platform/db/schema.ts";
+import { applications, attempts, profiles, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { releaseForApplication, reserveForApplication } from "../billing/ledger.ts";
 import { getSetting, isKillSwitchEnabled, setKillSwitch } from "../platform/settings/index.ts";
@@ -402,9 +402,8 @@ export function createDispatcher(deps: DispatcherDeps) {
 
   function switchedOffAtSend(applicationId: string, providerId: string) {
     const row = db
-      .select({ ats: postings.ats, companyId: applications.companyId })
+      .select({ ats: applications.ats, companyId: applications.companyId })
       .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
       .where(eq(applications.id, applicationId))
       .get();
 
@@ -414,7 +413,7 @@ export function createDispatcher(deps: DispatcherDeps) {
 
     return (
       isKillSwitchEnabled(db, "global", "all") ||
-      isKillSwitchEnabled(db, "ats", row.ats) ||
+      (row.ats !== null && isKillSwitchEnabled(db, "ats", row.ats)) ||
       isKillSwitchEnabled(db, "employer", row.companyId) ||
       isKillSwitchEnabled(db, "provider", providerId)
     );

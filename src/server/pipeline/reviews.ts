@@ -1,13 +1,14 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { QuestionFieldType, ReviewCategory, ReviewReason } from "../../shared/questions.ts";
 import type { PreparationService } from "./prepare.ts";
 
-import { applications, postings, reviewApplications, reviews } from "../platform/db/schema.ts";
+import { postings } from "../platform/db/catalog-schema.ts";
+import { applications, reviewApplications, reviews } from "../platform/db/schema.ts";
 import { createQuestionCatalog } from "../catalog/questions.ts";
 import { countryNameFor } from "../catalog/geo.ts";
 import { reviewCategory } from "../catalog/question-normalize.ts";
@@ -62,20 +63,43 @@ function openReviewRows(db: AppDatabase, userId: string) {
     .all();
 }
 
-function closedApplicationIds(db: AppDatabase, applicationIds: readonly string[]) {
+function openApplicationIds(
+  db: AppDatabase,
+  catalogDb: CatalogDatabase,
+  applicationIds: readonly string[],
+) {
   if (applicationIds.length === 0) {
     return new Set<string>();
   }
 
-  return new Set(
-    db
-      .select({ id: applications.id })
-      .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
-      .where(and(inArray(applications.id, [...applicationIds]), isNull(postings.closedAt)))
+  const rows = db
+    .select({ id: applications.id, postingId: applications.postingId })
+    .from(applications)
+    .where(inArray(applications.id, [...applicationIds]))
+    .all();
+
+  if (rows.length === 0) {
+    return new Set<string>();
+  }
+
+  const open = new Set(
+    catalogDb
+      .select({ id: postings.id })
+      .from(postings)
+      .where(
+        and(
+          inArray(
+            postings.id,
+            rows.map((row) => row.postingId),
+          ),
+          isNull(postings.closedAt),
+        ),
+      )
       .all()
       .map((row) => row.id),
   );
+
+  return new Set(rows.flatMap((row) => (open.has(row.postingId) ? [row.id] : [])));
 }
 
 interface ReviewAttachment {
@@ -130,11 +154,17 @@ function openReviewsWithAttachments(db: AppDatabase, userId: string) {
   return { attachments, reviews: openReviews };
 }
 
-function sweepClosedAttachments(db: AppDatabase, clock: Clock, userId: string) {
+function sweepClosedAttachments(
+  db: AppDatabase,
+  catalogDb: CatalogDatabase,
+  clock: Clock,
+  userId: string,
+) {
   const loaded = openReviewsWithAttachments(db, userId);
 
-  const open = closedApplicationIds(
+  const open = openApplicationIds(
     db,
+    catalogDb,
     loaded.attachments.map((attachment) => attachment.applicationId),
   );
 
@@ -166,12 +196,24 @@ function sweepClosedAttachments(db: AppDatabase, clock: Clock, userId: string) {
 /**
  * Every open Review with the Applications waiting on it, read in a fixed number
  * of queries rather than one per Review.
- * @param input The database, the clock and the signed-in person.
+ * @param input The application database, catalog database, clock and the signed-in person.
  * @returns The reviews, most Applications first.
  */
-export function listReviews(input: { db: AppDatabase; clock: Clock; userId: string }) {
-  const { db, clock, userId } = input;
-  const { attachments, reviews: openReviews } = sweepClosedAttachments(db, clock, userId);
+export function listReviews(input: {
+  db: AppDatabase;
+  catalogDb: CatalogDatabase;
+  clock: Clock;
+  userId: string;
+}) {
+  const { db, catalogDb, clock, userId } = input;
+
+  const { attachments, reviews: openReviews } = sweepClosedAttachments(
+    db,
+    catalogDb,
+    clock,
+    userId,
+  );
+
   const byReview = attachmentsByReview(attachments);
 
   const views: ReviewView[] = openReviews.map((review) => {
@@ -210,13 +252,14 @@ export function listReviews(input: { db: AppDatabase; clock: Clock; userId: stri
 
 export function createReviewService(deps: {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   personal: PersonalCrypto;
   preparation: PreparationService;
 }) {
-  const { db, clock, personal, preparation } = deps;
+  const { db, catalogDb, clock, personal, preparation } = deps;
 
-  const catalog = createQuestionCatalog({ db, clock });
+  const catalog = createQuestionCatalog({ db, catalogDb, clock });
   const factsService = createFactService({ db, clock, personal });
 
   async function answer(
@@ -326,7 +369,7 @@ export function createReviewService(deps: {
   return {
     answer,
     dismiss,
-    list: (userId: string) => listReviews({ clock, db, userId }),
+    list: (userId: string) => listReviews({ catalogDb, clock, db, userId }),
   };
 }
 

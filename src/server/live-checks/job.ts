@@ -1,7 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { BackupMonitor } from "../platform/ports/backup.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { DegradedFlagReader } from "../platform/degraded.ts";
@@ -40,6 +40,7 @@ const payloadSchema = z.object({
 const mailPayloadSchema = z.object({ mailId: z.string().min(1) });
 
 export interface LiveCheckDeps {
+  catalogDb: CatalogDatabase;
   db: AppDatabase;
   clock: Clock;
   objects: ObjectStore;
@@ -92,6 +93,7 @@ export async function runLiveChecks(deps: LiveCheckDeps, payload: string) {
           group,
           async () =>
             await runFormsCheck({
+              catalogDb: deps.catalogDb,
               db: deps.db,
               clock: deps.clock,
               objects: deps.objects,

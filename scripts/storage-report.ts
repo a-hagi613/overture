@@ -2,7 +2,11 @@ import { parseArgs } from "node:util";
 
 import type { ObjectStore } from "../src/server/platform/ports/object-store.ts";
 
-import { openReadOnlyDatabase } from "../src/server/platform/db/client.ts";
+import {
+  catalogPathFor,
+  openReadOnlyCatalogDatabase,
+  openReadOnlyDatabase,
+} from "../src/server/platform/db/client.ts";
 import { createClock } from "../src/server/platform/ports/clock.ts";
 import { createDiskObjectStore } from "../src/server/platform/ports/object-store.ts";
 import { buildStorageReport } from "../src/server/storage/report.ts";
@@ -39,23 +43,24 @@ if (objectsRoot === undefined) {
   objects = createDiskObjectStore(objectsRoot);
 }
 
+const catalogPath = args.values.catalog ?? catalogPathFor(databasePath);
 const { db, sqlite } = openReadOnlyDatabase(databasePath);
+const { db: catalogDb, sqlite: catalogSqlite } = openReadOnlyCatalogDatabase(catalogPath);
 
 try {
-  const deps = {
+  const report = await buildStorageReport({
     backups,
+    catalogDb,
+    catalogPath,
     clock: createClock(),
     databasePath,
     db,
     includeTables: args.values.tables,
     objects,
-  };
-
-  const report = await buildStorageReport(
-    args.values.catalog === undefined ? deps : { ...deps, catalogPath: args.values.catalog },
-  );
+  });
 
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 } finally {
   sqlite.close();
+  catalogSqlite.close();
 }

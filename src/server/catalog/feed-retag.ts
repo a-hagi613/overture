@@ -1,13 +1,13 @@
 import { and, asc, gt, inArray, isNotNull, isNull } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { CatalogDatabase } from "../platform/db/client.ts";
 
 import { WRITE_BATCH_ROWS, yieldToEventLoop } from "../platform/db/batches.ts";
-import { companyBoards, postings } from "../platform/db/schema.ts";
+import { companyBoards, postings } from "../platform/db/catalog-schema.ts";
 
 const FEED_ATS = ["lever", "ashby"] as const;
 
-export async function resetFeedContentHashes(db: AppDatabase) {
+export async function resetFeedContentHashes(db: CatalogDatabase) {
   let boardsReset = 0;
   let postingsReset = 0;
 

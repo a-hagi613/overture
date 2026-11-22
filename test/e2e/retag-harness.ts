@@ -2,9 +2,10 @@ import { DatabaseSync } from "node:sqlite";
 
 import { z } from "zod";
 
-import { openDatabase } from "../../src/server/platform/db/client.ts";
+import { openCatalogDatabase } from "../../src/server/platform/db/client.ts";
+import { catalogDatabasePathFor } from "./template-databases.ts";
 import { WRITE_BATCH_ROWS } from "../../src/server/platform/db/batches.ts";
-import { companies, companyBoards, postings } from "../../src/server/platform/db/schema.ts";
+import { companies, companyBoards, postings } from "../../src/server/platform/db/catalog-schema.ts";
 
 export const FEED_POSTINGS_PER_BOARD = 12_500;
 export const CLOSED_POSTINGS = 30;
@@ -47,7 +48,7 @@ function postingRow(segment: Segment, index: number) {
 }
 
 export function seedRetagCatalog(databasePath: string) {
-  const { db, sqlite } = openDatabase(databasePath);
+  const { db, sqlite } = openCatalogDatabase(catalogDatabasePathFor(databasePath));
   const companyId = "retag-company";
   const ashbyBoardId = "retag-board-ashby";
   const leverBoardId = "retag-board-lever";
@@ -124,7 +125,7 @@ function count(database: DatabaseSync, query: string) {
 }
 
 export function readRetagState(databasePath: string) {
-  const database = new DatabaseSync(databasePath, { readOnly: true });
+  const database = new DatabaseSync(catalogDatabasePathFor(databasePath), { readOnly: true });
   database.exec("PRAGMA busy_timeout = 5000;");
 
   try {

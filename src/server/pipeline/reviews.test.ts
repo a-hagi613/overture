@@ -1,23 +1,26 @@
 import { describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 
+import { openCatalogDatabase } from "../platform/db/client.ts";
+import { migrateCatalogDatabase } from "../platform/db/migrate.ts";
 import { openCountingDatabase } from "../testing/query-counter.ts";
 import { createClock } from "../platform/ports/clock.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import {
   applications,
-  companies,
-  companyBoards,
-  postings,
   questions,
   reviewApplications,
   reviews,
   users,
 } from "../platform/db/schema.ts";
+import { companies, companyBoards, postings } from "../platform/db/catalog-schema.ts";
 import { listReviews } from "./reviews.ts";
 
 const NOW = 1_795_000_000_000;
 const USER = "review-user";
+const { db: seedCatalogDb } = openCatalogDatabase(":memory:");
+
+migrateCatalogDatabase(seedCatalogDb, "drizzle-catalog");
 
 function seedUser(db: AppDatabase) {
   const at = new Date(NOW);
@@ -34,11 +37,13 @@ function seedUser(db: AppDatabase) {
     })
     .run();
 
-  db.insert(companies)
+  seedCatalogDb
+    .insert(companies)
     .values({ id: "co-1", name: "Northwind", nameNorm: "northwind", createdAt: NOW })
     .run();
 
-  db.insert(companyBoards)
+  seedCatalogDb
+    .insert(companyBoards)
     .values({
       id: "board-1",
       companyId: "co-1",
@@ -53,7 +58,8 @@ function seedUser(db: AppDatabase) {
 }
 
 function addApplication(db: AppDatabase, index: number) {
-  db.insert(postings)
+  seedCatalogDb
+    .insert(postings)
     .values({
       id: `posting-${String(index)}`,
       boardId: "board-1",
@@ -131,6 +137,8 @@ function addReview(db: AppDatabase, input: { applicationIds: readonly string[]; 
 function seeded(reviewCount: number) {
   const { counter, db } = openCountingDatabase();
 
+  seedCatalogDb.delete(companies).run();
+
   seedUser(db);
 
   for (let index = 0; index < reviewCount; index += 1) {
@@ -143,17 +151,17 @@ function seeded(reviewCount: number) {
     addReview(db, { applicationIds, index });
   }
 
-  return { counter, db, clock: createClock() };
+  return { catalogDb: seedCatalogDb, counter, db, clock: createClock() };
 }
 
 describe("the review list", () => {
   test("keeps one set of statements however many Reviews are open", () => {
-    const { counter, db, clock } = seeded(2);
+    const { catalogDb, counter, db, clock } = seeded(2);
 
-    listReviews({ clock, db, userId: USER });
+    listReviews({ catalogDb, clock, db, userId: USER });
     counter.reset();
 
-    const two = listReviews({ clock, db, userId: USER });
+    const two = listReviews({ catalogDb, clock, db, userId: USER });
     const statementsForTwo = counter.count();
 
     for (let index = 2; index < 8; index += 1) {
@@ -168,7 +176,7 @@ describe("the review list", () => {
 
     counter.reset();
 
-    const eight = listReviews({ clock, db, userId: USER });
+    const eight = listReviews({ catalogDb, clock, db, userId: USER });
 
     expect(two).toHaveLength(2);
     expect(eight).toHaveLength(8);
@@ -177,9 +185,9 @@ describe("the review list", () => {
   });
 
   test("lists every open Review once with its company count and attached Applications", () => {
-    const { db, clock } = seeded(2);
+    const { catalogDb, db, clock } = seeded(2);
 
-    const views = listReviews({ clock, db, userId: USER });
+    const views = listReviews({ catalogDb, clock, db, userId: USER });
 
     expect(views).toHaveLength(2);
     expect(views[0]).toMatchObject({
@@ -199,11 +207,11 @@ describe("the review list", () => {
   });
 
   test("detaches an Application whose Posting closed, and dismisses a Review left empty", () => {
-    const { db, clock } = seeded(2);
+    const { catalogDb, db, clock } = seeded(2);
 
-    db.update(postings).set({ closedAt: NOW }).where(eq(postings.id, "posting-0")).run();
+    catalogDb.update(postings).set({ closedAt: NOW }).where(eq(postings.id, "posting-0")).run();
 
-    const views = listReviews({ clock, db, userId: USER });
+    const views = listReviews({ catalogDb, clock, db, userId: USER });
 
     expect(views.map((view) => [view.id, view.unlocked])).toEqual([
       ["review-1", 3],
@@ -211,18 +219,20 @@ describe("the review list", () => {
     ]);
 
     for (const id of ["posting-1", "posting-2"]) {
-      db.update(postings).set({ closedAt: NOW }).where(eq(postings.id, id)).run();
+      catalogDb.update(postings).set({ closedAt: NOW }).where(eq(postings.id, id)).run();
     }
 
-    expect(listReviews({ clock, db, userId: USER }).map((view) => view.id)).toEqual(["review-1"]);
+    expect(listReviews({ catalogDb, clock, db, userId: USER }).map((view) => view.id)).toEqual([
+      "review-1",
+    ]);
   });
 
   test("dismisses a Review that has no attached Application, even with no Posting closed", () => {
-    const { db, clock } = seeded(2);
+    const { catalogDb, db, clock } = seeded(2);
 
     db.delete(reviewApplications).where(eq(reviewApplications.reviewId, "review-0")).run();
 
-    const views = listReviews({ clock, db, userId: USER });
+    const views = listReviews({ catalogDb, clock, db, userId: USER });
 
     expect(views.map((view) => view.id)).toEqual(["review-1"]);
   });

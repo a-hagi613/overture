@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import type { FactRecord } from "./facts.ts";
 
 import { createQuestionCatalog } from "../catalog/questions.ts";
-import { migrateDatabase } from "../platform/db/migrate.ts";
-import { openDatabase } from "../platform/db/client.ts";
+import { migrateCatalogDatabase, migrateDatabase } from "../platform/db/migrate.ts";
+import { openCatalogDatabase, openDatabase } from "../platform/db/client.ts";
 import { createClock } from "../platform/ports/clock.ts";
 import { users } from "../platform/db/schema.ts";
 import { createFactService } from "./facts.ts";
@@ -23,8 +23,10 @@ function exportedFile() {
 
 function freshImport() {
   const { db } = openDatabase(":memory:");
+  const { db: catalogDb } = openCatalogDatabase(":memory:");
 
   migrateDatabase(db, "drizzle");
+  migrateCatalogDatabase(catalogDb, "drizzle-catalog");
 
   const clock = createClock();
   const now = new Date(clock.now());
@@ -42,10 +44,10 @@ function freshImport() {
     .run();
 
   const personal = createPersonalCrypto(db, new Uint8Array(32).fill(7), 1);
-  const catalog = createQuestionCatalog({ db, clock });
+  const catalog = createQuestionCatalog({ catalogDb, db, clock });
   const facts = createFactService({ db, clock, personal });
 
-  return { catalog, clock, db, facts, personal, userId: "user-1" };
+  return { catalog, catalogDb, clock, db, facts, personal, userId: "user-1" };
 }
 
 function factIndex(records: readonly FactRecord[]) {
