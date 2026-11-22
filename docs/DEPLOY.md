@@ -51,6 +51,11 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    Resume and Facts (M1-13) add `MASTER_KEY_V1`, generated with `openssl rand -base64 32`
    (base64 that decodes to exactly 32 bytes), never rotated without the re-wrap step that
    re-wraps every user's data key under the new master key.
+   The synthetic lab (#36) needs nothing new to serve `/lab/*`: `APP_ORIGIN` already names the origin the `lab.run`
+   job drives (`LAB_BASE_URL` overrides it). A real reCAPTCHA v3 score needs `LAB_RECAPTCHA_SITE_KEY` and
+   `LAB_RECAPTCHA_SECRET` from that site key's admin console; without the secret the lab page reports the challenge
+   blocked and records no score. The hCaptcha and Turnstile site keys are optional and only change what the pages
+   render. Tests point the script and siteverify URLs at same-origin stubs and never contact a vendor.
    Outbound mail (M1-90) adds `CLOUDFLARE_EMAIL_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; the pair is set together or
    not at all, and the Cloudflare section below covers them. `CLOUDFLARE_ZONE_ID` joins them for the M2-02 sending-domain
    script and guards. With neither the in-memory sink is used, as in development

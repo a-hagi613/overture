@@ -7,7 +7,7 @@ import { migrateDatabase } from "../platform/db/migrate.ts";
 import { createClock } from "../platform/ports/clock.ts";
 import { setSetting } from "../platform/settings/index.ts";
 import { acceptInvite, INVITE_GRANT_QUANTITY_KEY } from "../auth/invites.ts";
-import { grants, invites, users } from "../platform/db/schema.ts";
+import { grants, invites, ledger, users } from "../platform/db/schema.ts";
 
 import {
   applicationsLeft,
@@ -22,6 +22,10 @@ import {
   releaseForApplication,
   reserveForApplication,
 } from "./ledger.ts";
+import { grantPaidPeriod } from "./periods.ts";
+import { periodEndFor, planForPriceId } from "./plans.ts";
+
+const DAY_MS = 24 * 60 * 60_000;
 
 function freshLedger() {
   const { db, sqlite } = openDatabase(":memory:");
@@ -409,6 +413,183 @@ describe("the ledger", () => {
     expect(dailyUsageSince(db, userId, clock.now() + 1)).toBe(0);
 
     sqlite.close();
+  });
+});
+
+describe("a period grant", () => {
+  test("carries the plan's applications from the paid invoice until its period ends", () => {
+    const { clock, db, sqlite, userId } = freshLedger();
+    const at = clock.now();
+    const periodEnd = at + 7 * DAY_MS;
+
+    const granted = grantPaidPeriod(db, clock, {
+      invoiceId: "in_week_1",
+      periodEndMs: periodEnd,
+      periodStartMs: at,
+      plan: "week",
+      userId,
+    });
+
+    expect(granted.created).toBe(true);
+    expect(applicationsLeft(db, userId, at)).toBe(70);
+    expect(planApplications(db, userId, at)).toBe(70);
+
+    const row = db.select().from(grants).where(eq(grants.id, granted.grantId)).get();
+
+    expect(row).toMatchObject({
+      expiresAt: periodEnd,
+      quantity: 70,
+      source: "period",
+      startsAt: at,
+      stripeInvoiceId: "in_week_1",
+    });
+
+    const next = grantPaidPeriod(db, clock, {
+      invoiceId: "in_week_2",
+      periodEndMs: periodEnd + 7 * DAY_MS,
+      periodStartMs: periodEnd,
+      plan: "week",
+      userId,
+    });
+
+    const replayed = grantPaidPeriod(db, clock, {
+      invoiceId: "in_week_2",
+      periodEndMs: periodEnd + 7 * DAY_MS,
+      periodStartMs: periodEnd,
+      plan: "week",
+      userId,
+    });
+
+    expect(replayed.created).toBe(false);
+    expect(replayed.grantId).toBe(next.grantId);
+    expect(db.select().from(grants).where(eq(grants.userId, userId)).all()).toHaveLength(2);
+    expect(applicationsLeft(db, userId, at)).toBe(70);
+    expect(planApplications(db, userId, at)).toBe(70);
+
+    clock.setOffset(8 * DAY_MS);
+
+    expect(applicationsLeft(db, userId, clock.now())).toBe(70);
+    expect(planApplications(db, userId, clock.now())).toBe(70);
+
+    clock.setOffset(15 * DAY_MS);
+
+    expect(applicationsLeft(db, userId, clock.now())).toBe(0);
+
+    sqlite.close();
+  });
+
+  test("releases a reservation still held when its period ends, then expires it", () => {
+    const { clock, db, sqlite, userId } = freshLedger();
+    const at = clock.now();
+    const periodEnd = at + 30 * DAY_MS;
+
+    const granted = grantPaidPeriod(db, clock, {
+      invoiceId: "in_month_1",
+      periodEndMs: periodEnd,
+      periodStartMs: at,
+      plan: "month",
+      userId,
+    });
+
+    reserveForApplication(db, clock, {
+      applicationId: "app-open",
+      idempotencyKey: "reserve:app-open:1",
+      userId,
+    });
+
+    expect(applicationsLeft(db, userId, at)).toBe(299);
+    expect(balancesPerGrant(db, userId).get(granted.grantId)?.reserved).toBe(1);
+
+    clock.setOffset(30 * DAY_MS + 1);
+
+    const expired = expireDueGrants(db, clock, userId);
+
+    expect(expired).toStrictEqual([granted.grantId]);
+    expect(balancesPerGrant(db, userId).get(granted.grantId)).toStrictEqual({
+      available: 0,
+      expired: 300,
+      issued: -300,
+      reserved: 0,
+      used: 0,
+    });
+    expect(applicationsLeft(db, userId, clock.now())).toBe(0);
+
+    const rows = db.select().from(ledger).where(eq(ledger.userId, userId)).all();
+    const reserveRow = rows.find((row) => row.kind === "reserve");
+    const releaseRow = rows.find((row) => row.kind === "release");
+    const expireRow = rows.find((row) => row.kind === "expire");
+
+    expect(reserveRow).toBeDefined();
+    expect(releaseRow?.idempotencyKey).toBe(`expire-release:${reserveRow?.id ?? ""}`);
+    expect(releaseRow?.applicationId).toBe("app-open");
+    expect(expireRow).toMatchObject({
+      amount: 300,
+      applicationId: null,
+      creditAccount: "expired",
+      debitAccount: "available",
+    });
+
+    const again = expireDueGrants(db, clock, userId);
+
+    expect(again).toStrictEqual([]);
+    expect(db.select().from(ledger).where(eq(ledger.userId, userId)).all()).toHaveLength(
+      rows.length,
+    );
+
+    sqlite.close();
+  });
+
+  test("a renewal grants the next period after the first one expires", () => {
+    const { clock, db, sqlite, userId } = freshLedger();
+    const at = clock.now();
+    const firstEnd = at + 30 * DAY_MS;
+
+    const first = grantPaidPeriod(db, clock, {
+      invoiceId: "in_month_1",
+      periodEndMs: firstEnd,
+      periodStartMs: at,
+      plan: "month",
+      userId,
+    });
+
+    clock.setOffset(30 * DAY_MS + 1);
+
+    expect(expireDueGrants(db, clock, userId)).toStrictEqual([first.grantId]);
+    expect(applicationsLeft(db, userId, clock.now())).toBe(0);
+
+    const second = grantPaidPeriod(db, clock, {
+      invoiceId: "in_month_2",
+      periodEndMs: firstEnd + 30 * DAY_MS,
+      periodStartMs: firstEnd,
+      plan: "month",
+      userId,
+    });
+
+    expect(second.created).toBe(true);
+    expect(applicationsLeft(db, userId, clock.now())).toBe(300);
+    expect(planApplications(db, userId, clock.now())).toBe(300);
+    expect(balancesPerGrant(db, userId).get(first.grantId)?.expired).toBe(300);
+    expect(balancesPerGrant(db, userId).get(second.grantId)?.available).toBe(300);
+
+    sqlite.close();
+  });
+});
+
+describe("plan configuration", () => {
+  test("maps each configured price to its plan and nothing else", () => {
+    const prices = { month: "price_month", week: "price_week" };
+
+    expect(planForPriceId("price_week", prices)).toBe("week");
+    expect(planForPriceId("price_month", prices)).toBe("month");
+    expect(planForPriceId("price_other", prices)).toBeNull();
+    expect(planForPriceId("price_week", { month: "price_month", week: null })).toBeNull();
+  });
+
+  test("falls back to the plan's own period when an invoice names no end", () => {
+    const at = Date.UTC(2026, 10, 21);
+
+    expect(periodEndFor("week", at)).toBe(at + 7 * DAY_MS);
+    expect(periodEndFor("month", at)).toBe(at + 30 * DAY_MS);
   });
 });
 

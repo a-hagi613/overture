@@ -6,7 +6,13 @@ import { expect, test } from "@playwright/test";
 import { QUESTION_FIELD_TYPES } from "../../src/shared/questions.ts";
 import { readAshbyQuestions } from "../../src/server/dispatch/ats/ashby.ts";
 import { readLeverQuestions } from "../../src/server/dispatch/ats/lever.ts";
-import { readLeverFormHtml } from "../../src/server/pipeline/form-read.ts";
+import { readWorkableQuestions } from "../../src/server/dispatch/ats/workable.ts";
+import {
+  createPlainFormReader,
+  readLeverFormHtml,
+  readWorkableFormResponse,
+} from "../../src/server/pipeline/form-read.ts";
+import { startWorkableFixture } from "./workable.fixture.ts";
 
 const FORMS = join(process.cwd(), "test/e2e/fixtures/forms");
 
@@ -239,4 +245,79 @@ test("a Lever card with a generic field prompt is read by its section heading", 
   expect(questions.some((question) => question.label === "Please check all that apply:")).toBe(
     false,
   );
+});
+
+const WORKABLE_FORM = join(process.cwd(), "test/e2e/fixtures/workable/forms/WK-1001.form.json");
+
+test("the Workable plain reader and the rendered fixture form describe the same controls", async ({
+  page,
+}) => {
+  const fixture = startWorkableFixture();
+
+  try {
+    const plain = readWorkableFormResponse(readFileSync(WORKABLE_FORM, "utf8"));
+
+    expect(plain).not.toBeNull();
+
+    await page.goto(`${fixture.url}/j/WK-1001`, { waitUntil: "load" });
+
+    const rendered = await readWorkableQuestions(page);
+
+    const controls = (plain?.questions ?? []).filter((question) => question.fieldType !== "file");
+
+    expect(rendered).toEqual(controls);
+
+    for (const question of rendered) {
+      expect(question.label.trim()).not.toBe("");
+      expect(QUESTION_FIELD_TYPES).toContain(question.fieldType);
+    }
+
+    expect(rendered.find((question) => question.fieldName === "QA_1001")).toMatchObject({
+      fieldType: "radio",
+      options: ["Yes", "No"],
+      required: true,
+    });
+
+    expect(rendered.find((question) => question.fieldName === "QA_1002")).toMatchObject({
+      fieldType: "select",
+      options: ["Job board", "Referral", "Other"],
+    });
+  } finally {
+    fixture.close();
+  }
+});
+
+test("the Workable plain reader fetches the shortcode form endpoint without a browser", async () => {
+  const fixture = startWorkableFixture();
+
+  try {
+    const reader = createPlainFormReader({
+      environment: "test",
+      workableBaseUrl: fixture.url,
+    });
+
+    const parsed = await reader.read({
+      applyUrl: null,
+      ats: "workable",
+      atsJobId: "WK-1001",
+      boardToken: "workable-corp",
+      region: "us",
+      url: `${fixture.url}/j/WK-1001`,
+    });
+
+    expect(parsed?.path).toBe("workable_form");
+    expect(parsed?.questions.map((question) => question.fieldName)).toEqual([
+      "firstname",
+      "lastname",
+      "email",
+      "phone",
+      "resume",
+      "QA_1001",
+      "QA_1002",
+      "QA_1003",
+    ]);
+    expect(fixture.state.formLoads).toBe(1);
+  } finally {
+    fixture.close();
+  }
 });

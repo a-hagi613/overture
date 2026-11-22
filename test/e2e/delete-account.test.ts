@@ -22,14 +22,7 @@ import type { IdentityServer } from "./identity-server-test.fixture.ts";
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, startFreshAppServer, test } from "./app.fixture.ts";
 import { startBrowserUseFixture } from "./browser-use-server.fixture.ts";
-import {
-  latestMailLink,
-  requestMagicLink,
-  setTurnstileScenario,
-  signInWithPassword,
-  signUpWithPassword,
-  verifyAuthState,
-} from "./sign-in.ts";
+import { latestMailLink, requestMagicLink, verifyAuthState } from "./sign-in.ts";
 
 const mailboxSchema = z.object({ address: z.string(), forwardingWorks: z.boolean() });
 
@@ -219,6 +212,10 @@ function counts(server: AppServer, userId: string) {
     facts: n("SELECT COUNT(*) AS n FROM facts WHERE user_id = ?", userId),
     llmUsage: n("SELECT COUNT(*) AS n FROM llm_usage WHERE user_id = ?", userId),
     messages: n("SELECT COUNT(*) AS n FROM messages WHERE user_id = ?", userId),
+    preferences: n(
+      "SELECT COUNT(*) AS n FROM settings WHERE updated_by = ? AND key LIKE 'notify.preferences.%'",
+      userId,
+    ),
     sessions: n("SELECT COUNT(*) AS n FROM session WHERE user_id = ?", userId),
     userKeys: n("SELECT COUNT(*) AS n FROM user_keys WHERE user_id = ?", userId),
     users: n("SELECT COUNT(*) AS n FROM users WHERE id = ?", userId),
@@ -306,6 +303,10 @@ test("a fresh signed-in session still needs a recent sign-in, then deletes every
     const userId = await signInOwner(owner, harness.server.url);
     const profileId = await seedPersonalData(owner, harness, userId);
 
+    await owner.put("/api/notifications/preferences", {
+      data: { enabled: false, kind: "review" },
+    });
+
     const mailboxResponse = await owner.get("/api/profile/mailbox");
 
     expect(mailboxResponse.ok()).toBe(true);
@@ -361,6 +362,7 @@ test("a fresh signed-in session still needs a recent sign-in, then deletes every
       facts: 0,
       llmUsage: 0,
       messages: 0,
+      preferences: 0,
       sessions: 0,
       userKeys: 0,
       users: 0,
@@ -423,7 +425,7 @@ test("unauthenticated account calls are refused before body validation", async (
   try {
     const request = await apiRequest.newContext({ baseURL: harness.server.url });
 
-    expect((await request.post("/api/account/reauth", { data: {} })).status()).toBe(401);
+    expect((await request.post("/api/account/reauth/link")).status()).toBe(401);
     expect((await request.post("/api/account/delete", { data: {} })).status()).toBe(401);
     expect((await request.get("/api/account/deletion")).status()).toBe(401);
 
@@ -433,57 +435,32 @@ test("unauthenticated account calls are refused before body validation", async (
   }
 });
 
-test("a valid password clears the failed re-auth attempts", async ({ identityServer }) => {
+test("there is no password re-auth, and the sign-in link ask is limited to three", async ({
+  identityServer,
+}) => {
   const harness = await startHarness(identityServer);
-  const password = "overture-delete-pass-813";
 
   try {
     const request = await apiRequest.newContext({ baseURL: harness.server.url });
 
-    await setTurnstileScenario(request, harness.server.url, { action: "signup" });
-
-    const created = await signUpWithPassword(harness.server.url, request, {
-      email: authTestIdentity.ownerEmail,
-      name: authTestIdentity.ownerName,
-      password,
-    });
-
-    expect(created.ok()).toBe(true);
-
-    const verify = await latestMailLink(harness.server.url, request, authTestIdentity.ownerEmail);
-
-    await request.get(verify);
-
-    await setTurnstileScenario(request, harness.server.url, { action: "signin" });
-
-    const signedIn = await signInWithPassword(harness.server.url, request, {
-      email: authTestIdentity.ownerEmail,
-      password,
-    });
-
-    expect(signedIn.ok()).toBe(true);
-
+    await signInOwner(request, harness.server.url);
     await moveClockAhead(request, 20 * 60_000);
 
-    const wrong = async () => {
-      const response = await request.post("/api/account/reauth", {
-        data: { password: "not-the-password" },
-      });
+    const password = await request.post("/api/account/reauth", {
+      data: { password: "overture-delete-pass-813" },
+    });
 
-      expect(response.status()).toBe(403);
-    };
+    expect(password.ok()).toBe(false);
+    expect(await (await request.get("/api/account/deletion")).json()).toEqual({
+      email: authTestIdentity.ownerEmail,
+      reauthenticated: false,
+    });
 
-    await repeat(2, wrong);
+    await repeat(3, async () => {
+      expect((await request.post("/api/account/reauth/link")).ok()).toBe(true);
+    });
 
-    const firstGood = await request.post("/api/account/reauth", { data: { password } });
-
-    expect(firstGood.ok()).toBe(true);
-
-    await repeat(4, wrong);
-
-    const secondGood = await request.post("/api/account/reauth", { data: { password } });
-
-    expect(secondGood.ok()).toBe(true);
+    expect((await request.post("/api/account/reauth/link")).status()).toBe(429);
 
     await request.dispose();
   } finally {
@@ -520,6 +497,7 @@ test("a failing confirmation mail never blocks the erase", async ({ identityServ
       facts: 0,
       llmUsage: 0,
       messages: 0,
+      preferences: 0,
       sessions: 0,
       userKeys: 0,
       users: 0,
@@ -582,7 +560,7 @@ test("the delete page needs a check, asks for a sign-in link, and shows the eras
     );
     await expect(page.getByText("Erasing your account")).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Send a sign-in link instead" }).click();
+    await page.getByRole("button", { name: "Email me a sign-in link" }).click();
     await expect(page.getByText("A sign-in link is on its way.")).toBeVisible();
 
     const link = await latestMailLink(harness.server.url, request, authTestIdentity.ownerEmail);

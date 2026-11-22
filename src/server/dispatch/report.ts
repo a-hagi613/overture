@@ -5,6 +5,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 
 import { applications, attempts, postings, users } from "../platform/db/schema.ts";
 import { raiseAlert } from "../platform/alerts.ts";
+import { percentile, ratio } from "../platform/stats.ts";
 
 export const COST_GATE_MICROS = 30_000;
 const TREND_WINDOW = 20;
@@ -43,20 +44,6 @@ export interface ProviderReportRow {
 
 const attemptedRows = (rows: AttemptRow[]) =>
   rows.filter((row) => row.outcome === null || !ATTEMPTED_EXCLUDED.has(row.outcome));
-
-const percentile = (values: number[], fraction: number) => {
-  if (values.length === 0) {
-    return null;
-  }
-
-  const sorted = values.toSorted((left, right) => left - right);
-  const index = Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * fraction));
-
-  return sorted[index] ?? null;
-};
-
-const ratio = (numerator: number, denominator: number) =>
-  denominator === 0 ? null : numerator / denominator;
 
 function summarise(rows: AttemptRow[], trend: boolean) {
   const groups = new Map<string, AttemptRow[]>();

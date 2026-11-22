@@ -12,11 +12,14 @@ import { recordedBrowserUseHandlers } from "./browser-use-records.fixture.ts";
 import type { BrowserUseApiState } from "./browser-use-records.fixture.ts";
 import { startGreenhouseFixture } from "./greenhouse.fixture.ts";
 import type { GreenhouseFixture } from "./greenhouse.fixture.ts";
+import { startWorkableFixture } from "./workable.fixture.ts";
+import type { WorkableFixture } from "./workable.fixture.ts";
 import { launchLocalChromium } from "./local-chromium.fixture.ts";
 import type { LocalChromium } from "./local-chromium.fixture.ts";
 
 export interface ProbeHarness {
   fixture: GreenhouseFixture;
+  workable: WorkableFixture;
   chromium: LocalChromium;
   browserUse: BrowserUseApiState;
   server: ReturnType<typeof setupServer>;
@@ -40,6 +43,7 @@ export async function startProbeHarness() {
   await Bun.write(resumePath, resumeBytes);
 
   const fixture = startGreenhouseFixture();
+  const workable = startWorkableFixture();
   const chromium = await launchLocalChromium();
   const { handlers, state } = recordedBrowserUseHandlers(chromium.cdpUrl);
 
@@ -55,6 +59,7 @@ export async function startProbeHarness() {
 
   return {
     fixture,
+    workable,
     chromium,
     browserUse: state,
     server,
@@ -67,6 +72,7 @@ export async function startProbeHarness() {
     close: () => {
       server.close();
       fixture.close();
+      workable.close();
       chromium.close();
     },
   } satisfies ProbeHarness;

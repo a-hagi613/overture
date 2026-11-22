@@ -144,6 +144,7 @@ export function HomePage() {
   return (
     <div>
       <PageHeader
+        calendar
         lead={dateLine()}
         titleNode={
           <>

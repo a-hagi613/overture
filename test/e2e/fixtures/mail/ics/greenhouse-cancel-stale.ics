@@ -1,0 +1,17 @@
+BEGIN:VCALENDAR
+PRODID:-//Greenhouse//Greenhouse Calendars//EN
+VERSION:2.0
+CALSCALE:GREGORIAN
+METHOD:CANCEL
+BEGIN:VEVENT
+UID:7d3f8a2e-2c4b-4c1e-9a5e-4291d5e0c9a7@us.greenhouse-mail.io
+DTSTAMP:20261120T093000Z
+DTSTART;TZID=America/New_York:20261202T100000
+DTEND;TZID=America/New_York:20261202T110000
+SUMMARY:Interview with Acme - Senior Backend Engineer (cancelled)
+ORGANIZER;CN=Acme Recruiting:mailto:recruiting@acme.example
+SEQUENCE:0
+STATUS:CANCELLED
+TRANSP:OPAQUE
+END:VEVENT
+END:VCALENDAR

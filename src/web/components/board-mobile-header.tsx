@@ -21,7 +21,7 @@ export function BoardMobileHeader() {
     <header className="flex h-[60px] flex-none items-center justify-between pr-2 pl-[18px]">
       <Link
         aria-label={copy.brand.homeAria}
-        className="flex max-md:min-h-11 max-md:-my-[6px] items-center gap-[9px] hover:opacity-80"
+        className="flex min-h-11 items-center gap-[9px] rounded-md hover:bg-muted"
         to="/"
       >
         <BrandMark size={28} />
@@ -35,6 +35,14 @@ export function BoardMobileHeader() {
           <b className="font-semibold text-foreground">{String(left)}</b>
           {" left"}
         </span>
+        <Link
+          aria-label={copy.nav.calendar}
+          className="flex h-11 w-11 items-center justify-center text-foreground hover:bg-muted"
+          title={copy.nav.calendar}
+          to="/calendar"
+        >
+          <NavGlyph name="calendar" />
+        </Link>
         <ThemeToggle className="flex h-11 w-11 items-center justify-center border-0 bg-transparent text-foreground hover:bg-muted" />
         <Link
           aria-label={unread > 0 ? copy.shell.notifications(unread) : copy.shell.notificationsEmpty}

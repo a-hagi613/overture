@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 
 import { copy } from "../shared/copy.ts";
+import { LandingPage } from "./routes/landing.tsx";
 import { NavGlyph } from "./components/nav-glyph.tsx";
 import { AvatarLink } from "./components/avatar-link.tsx";
 import { BoardRail } from "./components/board-rail.tsx";
@@ -34,10 +35,14 @@ export function AppShell() {
   useLiveUpdates();
 
   useEffect(() => {
-    if (!isPending && session === null) {
+    if (!isPending && session === null && pathname !== "/") {
       void navigate("/signin");
     }
-  }, [isPending, navigate, session]);
+  }, [isPending, navigate, pathname, session]);
+
+  if (pathname === "/" && (isPending || session === null)) {
+    return <LandingPage />;
+  }
 
   if (isPending) {
     return <div className="min-h-screen bg-background" />;

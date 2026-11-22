@@ -38,6 +38,8 @@ import { listAdminAudit, recordAdminAudit } from "../platform/audit/index.ts";
 import { readLlmUsage } from "../platform/llm/usage.ts";
 import { applicationsLeft, balancesPerGrant, grantApplications } from "../billing/ledger.ts";
 import { buildCostSummary, buildProviderReport } from "../dispatch/report.ts";
+import { buildLabReport } from "../lab/report.ts";
+import { LAB_JOB_KIND, labRunPayloadSchema } from "../lab/job.ts";
 import { FIXTURE_CAPTURE_JOB_KIND, fixtureCapturePayloadSchema } from "../fixtures/job.ts";
 import { enqueueLiveCheckNow } from "../live-checks/job.ts";
 import { readLiveCheckResults } from "../live-checks/store.ts";
@@ -1127,8 +1129,52 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
   });
 
   routes.get("/provider-report", (context) =>
-    context.json({ providers: buildProviderReport(db, clock) }),
+    context.json({ lab: buildLabReport(db), providers: buildProviderReport(db, clock) }),
   );
+
+  routes.post("/lab/runs", zValidator("json", labRunPayloadSchema), async (context) => {
+    if (deps.providers === null) {
+      return context.json({ error: "browser_provider_unconfigured" }, 503);
+    }
+
+    if (env.LAB_BASE_URL === undefined && env.APP_ORIGIN === undefined) {
+      return context.json({ error: "lab_unconfigured" }, 503);
+    }
+
+    const owner = context.get("owner");
+
+    const input = context.req.valid("json");
+
+    const active = db
+      .select({ id: bgJobs.id })
+      .from(bgJobs)
+      .where(and(eq(bgJobs.kind, LAB_JOB_KIND), inArray(bgJobs.status, ["queued", "running"])))
+      .limit(1)
+      .get();
+
+    if (active !== undefined) {
+      return context.json({ jobId: active.id });
+    }
+
+    const job = enqueueJob(db, clock, LAB_JOB_KIND, JSON.stringify(input), {
+      dedupeKey: "lab.run.queued",
+      maxAttempts: 1,
+    });
+
+    await recordAdminAudit(db, clock, {
+      actorId: owner.userId,
+      action: "lab.run",
+      reason: "Run the synthetic lab sessions",
+      detail: {
+        jobId: job.id,
+        pages: input.pages.length,
+        providers: input.providers.join(","),
+        sessionsPerPage: input.sessionsPerPage,
+      },
+    });
+
+    return context.json({ jobId: job.id });
+  });
 
   routes.get("/live-checks", (context) => context.json({ results: readLiveCheckResults(db, 100) }));
 

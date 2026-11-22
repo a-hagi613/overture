@@ -4,6 +4,7 @@ import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 
 import { killSwitches, settings } from "../db/schema.ts";
+import { NOTIFICATION_PREFERENCES_KEY_PREFIX } from "../../../shared/notifications.ts";
 
 const SETTING_DEFAULTS = {
   "limits.daily_cap": "10",
@@ -47,6 +48,10 @@ export { SETTING_DEFAULTS };
 const DEFAULT_LOOKUP = new Map<string, string>(Object.entries(SETTING_DEFAULTS));
 
 export function getSetting(db: Pick<AppDatabase, "select">, key: string) {
+  if (key.startsWith(NOTIFICATION_PREFERENCES_KEY_PREFIX)) {
+    return DEFAULT_LOOKUP.get(key) ?? null;
+  }
+
   const row = db.select().from(settings).where(eq(settings.key, key)).get();
 
   return row?.value ?? DEFAULT_LOOKUP.get(key) ?? null;
@@ -111,6 +116,10 @@ export function getAllSettings(db: AppDatabase) {
   }
 
   for (const [key, value] of stored) {
+    if (key.startsWith(NOTIFICATION_PREFERENCES_KEY_PREFIX)) {
+      continue;
+    }
+
     result[key] = value;
   }
 

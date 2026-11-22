@@ -20,19 +20,9 @@ export function createDemoSafeMailSender(db: AppDatabase, sender: MailSender) {
         await sender.sendCheck(mail);
       }
     },
-    sendEmailVerification: async (mail) => {
-      if (allowed(mail.to)) {
-        await sender.sendEmailVerification(mail);
-      }
-    },
     sendMagicLink: async (mail) => {
       if (allowed(mail.to)) {
         await sender.sendMagicLink(mail);
-      }
-    },
-    sendPasswordReset: async (mail) => {
-      if (allowed(mail.to)) {
-        await sender.sendPasswordReset(mail);
       }
     },
     sendAccountDeleted: async (mail) => {
@@ -48,6 +38,11 @@ export function createDemoSafeMailSender(db: AppDatabase, sender: MailSender) {
     sendReadyRecap: async (mail) => {
       if (allowed(mail.to)) {
         await sender.sendReadyRecap(mail);
+      }
+    },
+    sendBillingNotice: async (mail) => {
+      if (allowed(mail.to)) {
+        await sender.sendBillingNotice(mail);
       }
     },
   };

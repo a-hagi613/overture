@@ -130,6 +130,7 @@ export const copy = {
     board: "Board",
     review: "Review",
     inbox: "Inbox",
+    calendar: "Calendar",
     profile: "Profile",
     readyCount: (count: number) => `Ready, ${String(count)} to send`,
     reviewCount: (count: number) => `Review, ${String(count)} waiting`,
@@ -155,49 +156,23 @@ export const copy = {
     brandTagline: "The job hunt, handled.",
     back: "Back to Overture",
     title: "Sign in to Overture",
-    signUpTitle: "Create your account",
     sentTitle: "Check your email",
     description: "Continue to your Board and Review.",
-    signUpDescription: "Start with Google, LinkedIn, or an email and password.",
-    sentDescription: "We sent you a link that signs you in. No password needed.",
-    verifyTitle: "Check your email",
-    verifyDescription:
-      "We sent a link to verify your email address. You can sign in once it is verified.",
+    sentDescription: "We sent you a link that signs you in.",
     google: "Continue with Google",
     linkedin: "Continue with LinkedIn",
     linkedinBadge: "in",
     magicLegend: "or with your email",
+    refusedLegend: "or use your email",
     emailLabel: "Email",
     emailPlaceholder: "you@example.com",
     magicSubmit: "Email me a sign-in link",
     orPlain: "or",
-    passwordLabel: "Password",
-    createPasswordLabel: "Create a password",
-    newPasswordLabel: "New password",
-    confirmPasswordLabel: "Confirm new password",
-    forgotPassword: "Forgot password?",
-    showPassword: "Show",
-    hidePassword: "Hide",
-    signInSubmit: "Sign in",
-    signUpSubmit: "Create account",
-    passwordHint:
-      "At least 10 characters. Passwords that appear in known data breaches are not accepted.",
-    resetPasswordHint: "At least 10 characters. Pick one you do not use anywhere else.",
-    signUpEmailHint: "Use the email your invitation was sent to.",
     resend: "Send the link again",
     resendHint: "Nothing there? Check spam, or wait a minute before asking again.",
     changeEmail: "Use a different email",
-    verifyHeading: "Verification link sent to",
-    verifyDetail: "Open it on this device to verify your email and finish creating your account.",
-    verifyResend: "Send the email again",
-    verifyAlready: "Already verified?",
     allowHeading: "Invitation only for now.",
-    allowNote: "Google, LinkedIn, a password and emailed links all work with the same email.",
-    signUpNote: "Use the email your invitation was sent to.",
-    switchPrompt: "New to Overture?",
-    switchToSignUp: "Create an account",
-    switchBackPrompt: "Already have an account?",
-    switchToSignIn: "Sign in",
+    allowNote: "Google, LinkedIn and emailed links all work with the same email.",
     sentHeading: "Link sent to",
     sentDetail: "Open it on this device. It works once and expires in 15 minutes.",
     legalIntro: "By continuing, you agree to Overture's",
@@ -205,10 +180,10 @@ export const copy = {
     legalJoin: "and",
     legalPrivacy: "Privacy Policy",
     legalEnd: ".",
-    trust: "Google, LinkedIn, a password or an emailed link",
+    trust: "Google, LinkedIn or an emailed link",
     refusedHeading: "This email isn't invited yet.",
     refusedBody:
-      "Overture is invite-only during the beta. Google, LinkedIn, a password and an emailed link all need an invite for the same email.",
+      "Overture is invite-only during the beta. Google, LinkedIn and an emailed link all need an invite for the same email.",
     refusedDescription:
       "If you expected an invite, check that you are using the email it was sent to.",
     refusedField:
@@ -224,25 +199,6 @@ export const copy = {
     suspendedEmail: "Email admin@tryoverture.com",
     emailNotVerified:
       "That provider has not verified your email, so this app cannot let it in. Verify the address and try again.",
-    badCredentials: "That email and password do not match.",
-    passwordShort: "Use at least 10 characters for your password.",
-    passwordCompromised: "That password has appeared in a data breach. Choose a different one.",
-    passwordMismatch: "The two passwords do not match.",
-    forgotTitle: "Forgot your password?",
-    forgotDescription:
-      "Enter the email you use for Overture and we will send a link to set a new password.",
-    forgotSubmit: "Send reset link",
-    forgotNote:
-      "If an account exists for this email, we will send a link to choose a new password. The link works once.",
-    forgotSent: "If an account exists for this email, the link is on its way.",
-    backToSignIn: "Back to sign in",
-    resetTitle: "Choose a new password",
-    resetDescription: (email: string) =>
-      `This link is for ${email}. Saving the new password signs you in.`,
-    resetSubmit: "Save new password",
-    resetSignOutNote: "Saving signs you out of other devices.",
-    resetInvalid: "That reset link is used or expired. Ask for a new one.",
-    resetSaved: "Password saved. Sign in with your new password.",
     linkFailed: "The link did not work. It may be used or expired. Ask for a new one.",
     genericError: "Sign-in did not go through. Try again.",
     rateLimited: "Too many tries. Wait a few minutes and ask again.",
@@ -299,12 +255,6 @@ export const copy = {
     magicLinkSubject: "Your Overture sign-in link",
     magicLinkBody: (url: string) =>
       `Open this link to sign in to Overture. It works once and expires in 15 minutes.\n\n${url}\n`,
-    verifyEmailSubject: "Verify your Overture email",
-    verifyEmailBody: (url: string) =>
-      `Open this link to verify your email address and finish creating your Overture account. It works once and expires in one hour.\n\n${url}\n`,
-    resetPasswordSubject: "Choose a new Overture password",
-    resetPasswordBody: (url: string) =>
-      `Open this link to choose a new Overture password. It works once and expires in one hour. If you did not ask for this, ignore this email.\n\n${url}\n`,
     accountDeletedSubject: "Your Overture account has been deleted",
     accountDeletedBody: (name: string) => {
       const first = name.trim().split(/\s+/u)[0] ?? "";
@@ -331,6 +281,8 @@ export const copy = {
     recapBody: (input: {
       ready: { title: string; company: string }[];
       needAnswer: number;
+      sent: { title: string; company: string }[];
+      replied: { company: string }[];
       url: string;
     }) => {
       const lines =
@@ -354,10 +306,45 @@ export const copy = {
         );
       }
 
+      if (input.sent.length > 0) {
+        lines.push(
+          "",
+          "Sent yesterday:",
+          ...input.sent.map((application) => `- ${application.title} at ${application.company}`),
+        );
+      }
+
+      if (input.replied.length > 0) {
+        lines.push(
+          "",
+          input.replied.length === 1
+            ? "1 employer replied yesterday:"
+            : "Employers replied yesterday:",
+          ...input.replied.map((reply) => `- ${reply.company}`),
+        );
+      }
+
       lines.push("", `Review them at ${input.url}`);
 
       return `${lines.join("\n")}\n`;
     },
+    billingPauseSubject: (reason: "plan_ended" | "payment_failed") =>
+      reason === "plan_ended"
+        ? "Your Overture plan has ended"
+        : "Your Overture payment didn't go through",
+    billingPauseBody: (input: { title: string; copy: string; fix: string; url: string }) =>
+      [
+        input.title,
+        "",
+        input.copy,
+        "",
+        `${input.fix}: ${input.url}`,
+        "",
+        "Applications already in flight will finish. Nothing new is sent until this is fixed.",
+        "",
+        "Overture",
+        "",
+      ].join("\n"),
     exportReadySubject: "Your Overture export is ready",
     exportReadyBody: (url: string) =>
       `Your Overture export is ready to download.\n\nOpen Settings in Overture and choose Download export. The link is valid for 24 hours, then the archive is deleted.\n\n${url}\n\nIf you didn't ask for this, write to admin@tryoverture.com.\n`,
@@ -585,7 +572,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "You sign in with Google, LinkedIn, a password or an emailed link, using the email your invitation was sent to. Keep your sign-in details to yourself, and tell us if you think someone else has used your account.",
+              text: "You sign in with Google, LinkedIn or an emailed link, using the email your invitation was sent to. Keep your sign-in details to yourself, and tell us if you think someone else has used your account.",
             },
           ],
         },
@@ -735,7 +722,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "Your files and answers are encrypted, and passwords are stored only as hashes. Access to your data is limited to what the service needs, and every time staff open a user's data it is recorded.",
+              text: "Your files and answers are encrypted. Access to your data is limited to what the service needs, and every time staff open a user's data it is recorded.",
             },
           ],
         },
@@ -784,6 +771,59 @@ export const copy = {
     earlierHeading: "Earlier versions",
     earlierNote: "Every version stays on record exactly as it was published.",
     publishedOn: (date: string) => `Published ${date}`,
+  },
+  calendar: {
+    lead: "Applications, replies and interviews by day",
+    titlePlain: "Your",
+    titleItalic: "Calendar",
+    dateLocale: "en-GB",
+    today: "Today",
+    previousMonth: "Previous month",
+    nextMonth: "Next month",
+    gridLabel: (month: string) => `${month}, one day per cell`,
+    legendLabel: "Colour key",
+    dayPanel: "Day panel",
+    closePanel: "Close day panel",
+    agenda: "Agenda",
+    loading: "Loading the Calendar",
+    emptyMonth: "Nothing yet. Applications you send and replies from employers appear here.",
+    emptyDay: "Nothing on this day.",
+    errorTitle: "The Calendar did not load.",
+    errorBody: "Your Applications are safe. Try again in a moment.",
+    retry: "Try again",
+    nothing: "nothing",
+    kinds: {
+      checkin: "Check-in",
+      closed: "Closed",
+      interview: "Interview",
+      offer: "Offer",
+      sent: "Sent",
+      stage: "Stage move",
+    },
+    countLabels: {
+      checkin: (count: number) => `${String(count)} ${count === 1 ? "check-in" : "check-ins"}`,
+      closed: (count: number) => `${String(count)} closed`,
+      interview: (count: number) => `${String(count)} ${count === 1 ? "interview" : "interviews"}`,
+      offer: (count: number) => `${String(count)} ${count === 1 ? "offer" : "offers"}`,
+      sent: (count: number) => `${String(count)} sent`,
+      stage: (count: number) => `${String(count)} ${count === 1 ? "stage move" : "stage moves"}`,
+    },
+    sentToday: (count: number) => `${String(count)} sent today`,
+    more: (count: number) => `+${String(count)} more`,
+    sentRollup: (count: number) =>
+      `${String(count)} ${count === 1 ? "application" : "applications"} sent`,
+    andMore: (names: string, count: number) => `${names} and ${String(count)} more`,
+    movedTo: (stage: string) => `Moved to ${stage}`,
+    checkinDue: "Check-in due",
+    stages: {
+      applied: "Applied",
+      closed: "Closed",
+      interviewing: "Interviewing",
+      offer: "Offer",
+      screening: "Screening",
+    },
+    closedReason: (reason: string | null) =>
+      reason === null ? "Closed" : `Closed · ${reason.replaceAll("_", " ")}`,
   },
   inbox: {
     accountNote: "Mail from other senders stays in your own mailbox and never reaches Overture.",
@@ -1013,16 +1053,12 @@ export const copy = {
     completes: "Erasing completes within 24 hours. You get a confirmation email when it is done.",
     continueToDelete: "Continue to delete",
     keepAccount: "Keep my account",
-    reauthHeading: "Enter your password",
-    reauthBody: "Deleting needs a fresh check. Enter the password you sign in with.",
-    passwordLabel: "Password",
-    passwordPlaceholder: "Your password",
-    confirmIdentity: "Confirm",
-    sendLink: "Send a sign-in link instead",
+    reauthHeading: "Confirm it’s you",
+    reauthBody:
+      "Deleting needs a fresh sign-in. We email you a link that works once. Open it on this device, then come back here.",
+    sendLink: "Email me a sign-in link",
     linkSent: "A sign-in link is on its way. Open it on this device, then come back here.",
     reauthenticated: "Confirmed. You can delete your account now.",
-    passwordNotSet: "This account signs in with an emailed link. Send one instead.",
-    wrongPassword: "That password did not match. Try again.",
     confirmHeading: "Delete account",
     confirmCheckbox:
       "I understand my data is erased, and my forwarding address is retired forever.",
@@ -1045,9 +1081,6 @@ export const copy = {
     errors: {
       unauthorised: "Sign in again, then come back to this page.",
       reauthRequired: "Confirm it’s you before deleting the account.",
-      passwordRequired: "Enter your password to confirm it’s you.",
-      wrongPassword: "That password did not match. Try again.",
-      passwordNotSet: "This account signs in with an emailed link. Send one instead.",
       linkFailed: "The sign-in link did not go out. Try again.",
       deleteFailed: "The account could not be deleted. Try again.",
       tooMany: "Too many tries. Wait a few minutes and try again.",
@@ -1712,6 +1745,44 @@ export const copy = {
       url: "/board",
       kind: "stage_move",
     },
+    review: {
+      title: "A question for you",
+      body: "Open Review to answer it so these applications can go ahead.",
+      url: "/review",
+      kind: "review",
+    },
+    reply: {
+      title: (company: string) => `${company} replied`,
+      body: (title: string) => `About ${title}. Read it in Inbox.`,
+      url: "/inbox",
+      kind: "reply",
+    },
+    interview: {
+      title: (company: string) => `Interview request: ${company}`,
+      body: (title: string) => `${title}. Open the thread in Inbox to see the details.`,
+      url: "/inbox",
+      kind: "interview",
+    },
+    offer: {
+      title: (company: string) => `Offer from ${company}`,
+      body: (title: string) =>
+        `${title}. Open the thread in Inbox to see the details and what comes next.`,
+      url: "/inbox",
+      kind: "offer",
+    },
+    paused: {
+      url: "/",
+      kind: "paused",
+    },
+    failedSummary: {
+      title: (count: number) =>
+        count === 1
+          ? "Couldn't apply to 1 application"
+          : `Couldn't apply to ${String(count)} applications`,
+      body: (window: string) => `Between ${window}. Open Home to see why each one stopped.`,
+      url: "/",
+      kind: "failed",
+    },
     noResponse: {
       title: "Closed as No response",
       body: (input: { company: string; title: string }) =>
@@ -1873,6 +1944,81 @@ export const copy = {
     overviewCostEmpty: "No completed Applications yet.",
     overviewCostTrend: "Proxy use per completed Application is trending up.",
     overviewCostNoTrend: "Proxy use per completed Application is steady.",
+    navProviderReport: "Provider report",
+    reportTitlePlain: "The provider",
+    reportTitleItalic: "report",
+    reportLead: "How each browser and job board is doing, and what the lab measured",
+    reportSendHeading: "Send results",
+    reportSendIntro:
+      "Every send try, per browser and job board. Cost counts attempted Applications, failed tries included.",
+    reportSendEmpty: "No send has run yet.",
+    reportLabHeading: "The synthetic lab",
+    reportLabIntro:
+      "Sessions against Overture's own challenge pages and recorded forms. No employer is involved, and the lab's cost is reported beside the gate, not inside it.",
+    reportLabEmpty: "The lab has not run yet.",
+    reportColumnBrowser: "Browser",
+    reportColumnJobBoard: "Job board",
+    reportColumnPage: "Lab page",
+    reportColumnAttempted: "Attempted",
+    reportColumnSessions: "Sessions",
+    reportColumnCompleted: "Completed",
+    reportColumnCompletion: "Completion",
+    reportColumnChallenge: "Challenge",
+    reportColumnCode: "Code",
+    reportColumnP50: "p50 duration",
+    reportColumnP95: "p95 duration",
+    reportColumnProxy: "Proxy per completed",
+    reportColumnCost: "Cost per completed",
+    reportColumnGate: "Gate",
+    reportColumnScore: "reCAPTCHA score",
+    reportCostInside: "Inside the gate",
+    reportCostOver: "Over the gate",
+    reportRate: (rate: number) => `${String(Math.round(rate * 100))}%`,
+    reportNone: "—",
+    reportSeconds: (millis: number) => `${(millis / 1000).toFixed(1)} s`,
+    reportMegabytes: (megabytes: number) => `${megabytes.toFixed(2)} MB`,
+    reportDollars: (micros: number) => `$${(micros / 1_000_000).toFixed(4)}`,
+    reportBrowserName: (provider: string) => {
+      if (provider === "browser_use") {
+        return "Browser Use";
+      }
+
+      if (provider === "kernel") {
+        return "Kernel";
+      }
+
+      return provider === "local" ? "Local Chrome" : provider;
+    },
+    reportLabPageName: (page: string) => {
+      if (page === "recaptcha_v3") {
+        return "reCAPTCHA v3";
+      }
+
+      if (page === "hcaptcha") {
+        return "hCaptcha";
+      }
+
+      if (page === "turnstile") {
+        return "Turnstile";
+      }
+
+      if (page === "form:greenhouse") {
+        return "Recorded Greenhouse form";
+      }
+
+      if (page === "form:lever") {
+        return "Recorded Lever form";
+      }
+
+      return page === "form:ashby" ? "Recorded Ashby form" : page;
+    },
+    reportLabRunHeading: "Run the lab",
+    reportLabRunIntro:
+      "Each session opens a browser on the lab pages. Nothing leaves Overture. Up to 200 sessions per page and browser.",
+    reportLabSessionsLabel: "Sessions per page and browser",
+    reportLabRun: "Run the lab",
+    reportLabQueued: "The lab run is queued. Reload this page when it finishes to see its results.",
+    reportLabFailed: "The lab run did not start.",
     switchesTitlePlain: "Kill switches",
     switchesTitleItalic: "and settings",
     switchesLead: "Turn Overture's work off, and tune the limits that pace it",

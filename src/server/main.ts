@@ -3,9 +3,15 @@ import { z } from "zod";
 import { createApp } from "./app.ts";
 import { createAuth } from "./auth/index.ts";
 import type { AuthOptions } from "./auth/index.ts";
-import { databasePath, env } from "./config/env.ts";
+import { databasePath, env, labBaseUrl } from "./config/env.ts";
 import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
 import { MailCapExceededError } from "./platform/mail/metered.ts";
+import { createPayments } from "./billing/index.ts";
+import {
+  ensureGrantExpiryQueued,
+  GRANT_EXPIRY_JOB_KIND,
+  runGrantExpirySweep,
+} from "./billing/expiry.ts";
 import { seedDemoAccount } from "./demo/seed.ts";
 import { createDemoSafeMailSender } from "./demo/mail-guard.ts";
 import { isDemoUser } from "./demo/role.ts";
@@ -70,6 +76,16 @@ import {
   parsePushNotifyPayload,
   runNotificationPushJob,
 } from "./notify/push.ts";
+import {
+  APPLY_FAILURES_JOB_KIND,
+  ensureApplyFailuresQueued,
+  runApplyFailures,
+} from "./notify/failure-digest.ts";
+import {
+  BILLING_NOTICE_JOB_KIND,
+  parseBillingNoticePayload,
+  runBillingNoticeJob,
+} from "./notify/billing-notice.ts";
 import { createPushSender } from "./platform/push/index.ts";
 import { createReviewService } from "./pipeline/reviews.ts";
 import { createResumeService } from "./profile/resume.ts";
@@ -119,9 +135,11 @@ import {
   runCheckinSweep,
 } from "./pipeline/checkins.ts";
 import { createMailIngest, MAIL_INGEST_JOB_KIND } from "./inbox/ingest.ts";
+import { createInterviewCalendar } from "./inbox/interviews.ts";
 import { createMailMoves, MAIL_CLASSIFY_JOB_KIND } from "./inbox/moves.ts";
 import { createMailboxService } from "./inbox/mailboxes.ts";
 import { FIXTURE_CAPTURE_JOB_KIND, runFixtureCaptureJob } from "./fixtures/job.ts";
+import { LAB_JOB_KIND, runLabJob } from "./lab/job.ts";
 import { ACCOUNT_ERASE_JOB_KIND, createAccountEraser } from "./account/erase.ts";
 import { ACCOUNT_DELETED_NOTICE_JOB_KIND, createDeletionNoticeCrypto } from "./account/notice.ts";
 import {
@@ -173,6 +191,7 @@ const backups = createBackupMonitor(db, clock);
 void backups.run(shutdownController.signal);
 
 const mailSender = createDemoSafeMailSender(db, createMailSender(db, clock));
+const payments = createPayments(clock);
 const pushSender = createPushSender(env, clock);
 const mailboxes = createMailboxService(db, clock, env.INBOUND_HMAC_SECRET ?? "", env.MAIL_DOMAIN);
 
@@ -220,17 +239,23 @@ const jobSingletons = [
   ...SINGLETON_JOB_KINDS,
   CHECKIN_SWEEP_JOB_KIND,
   DISPATCH_TICK_JOB_KIND,
+  GRANT_EXPIRY_JOB_KIND,
   LIVE_CHECK_JOB_KIND,
   WORKABLE_INGEST_JOB_KIND,
   RETENTION_JOB_KIND,
   EXPORT_BUILD_JOB_KIND,
+  APPLY_FAILURES_JOB_KIND,
 ];
 
 recoverStaleLocks(db, clock, jobSingletons);
 
 ensureCheckinSweepQueued(db, clock);
 
+ensureGrantExpiryQueued(db, clock);
+
 ensureRetentionQueued(db, clock);
+
+ensureApplyFailuresQueued(db, clock);
 
 const tracer = trace.getTracer("overture");
 
@@ -291,6 +316,7 @@ const preparation = createPreparationService({
     environment: env.NODE_ENV,
     leverBaseUrl: env.LEVER_JOBS_BASE_URL,
     leverEuBaseUrl: env.LEVER_EU_JOBS_BASE_URL,
+    workableBaseUrl: env.WORKABLE_FORM_BASE_URL,
   }),
   captureForm: async (input) => {
     if (browserProviders === null) {
@@ -379,6 +405,22 @@ const pushNotifyJobHandlers: JobHandlers = {
 
     await runNotificationPushJob({ clock, db, push: pushSender }, notificationId);
   },
+  [APPLY_FAILURES_JOB_KIND]: async () => {
+    try {
+      await runApplyFailures({ clock, db });
+    } finally {
+      ensureApplyFailuresQueued(db, clock);
+    }
+  },
+};
+
+const billingNoticeJobHandlers: JobHandlers = {
+  [BILLING_NOTICE_JOB_KIND]: async (payload) => {
+    await runBillingNoticeJob(
+      { appOrigin, clock, db, mail: mailSender },
+      parseBillingNoticePayload(payload),
+    );
+  },
 };
 
 const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
@@ -453,6 +495,13 @@ const mailMoves = createMailMoves({
 
 const resolver = createMailDnsResolver(env.INBOUND_DNS_SERVER);
 
+const interviewCalendar = createInterviewCalendar({
+  clock,
+  db,
+  objects,
+  personal: mailPersonal,
+});
+
 const mailIngest = createMailIngest({
   db,
   clock,
@@ -463,6 +512,12 @@ const mailIngest = createMailIngest({
   onAuthenticatedMessage: async (input) => {
     await outcomes.confirmMessage(input);
     await mailMoves.handleAuthenticatedMessage(input);
+
+    try {
+      await interviewCalendar.recordForMessage(input);
+    } catch (error) {
+      logError("interview_calendar", error);
+    }
   },
   onStoredMessage: async (input) => {
     await mailMoves.linkMessage(input);
@@ -587,6 +642,17 @@ const planningJobHandlers: JobHandlers = {
   },
 };
 
+const labBase = labBaseUrl;
+
+const labJobHandlers: JobHandlers =
+  browserProviders === null || labBase === null
+    ? {}
+    : {
+        [LAB_JOB_KIND]: async (payload) => {
+          await runLabJob({ baseUrl: labBase, clock, db, providers: browserProviders }, payload);
+        },
+      };
+
 const fixtureJobHandlers: JobHandlers =
   browserProviders === null
     ? {}
@@ -655,8 +721,19 @@ const retentionJobHandlers: JobHandlers = {
   },
 };
 
+const billingJobHandlers: JobHandlers = {
+  [GRANT_EXPIRY_JOB_KIND]: async () => {
+    try {
+      await Promise.resolve(runGrantExpirySweep({ clock, db }));
+    } finally {
+      ensureGrantExpiryQueued(db, clock);
+    }
+  },
+};
+
 const allJobHandlers: JobHandlers = {
   ...retentionJobHandlers,
+  ...billingJobHandlers,
   ...catalogJobHandlers,
   ...preparationJobHandlers,
   ...planningJobHandlers,
@@ -664,9 +741,11 @@ const allJobHandlers: JobHandlers = {
   ...prepDailyJobHandlers,
   ...readyNotifyJobHandlers,
   ...pushNotifyJobHandlers,
+  ...billingNoticeJobHandlers,
   ...mailJobHandlers,
   ...dispatchJobHandlers,
   ...fixtureJobHandlers,
+  ...labJobHandlers,
   ...watchJobHandlers,
   ...checkinJobHandlers,
   ...liveCheckJobHandlers,
@@ -730,6 +809,7 @@ const app = createApp({
   catalogWorker,
   eraser,
   exports,
+  payments,
 });
 
 const SERVER_IDLE_TIMEOUT_ABOVE_SSE_HEARTBEAT_SECONDS = 60;

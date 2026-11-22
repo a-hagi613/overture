@@ -35,7 +35,9 @@ const recordedVerificationSchema = z.object({
   messages: z.array(z.string()).optional(),
 });
 
-const loopbackPassthrough = [http.all(/^http:\/\/127\.0\.0\.1:\d+\/.*/u, () => passthrough())];
+const loopbackPassthrough = [
+  http.all(/^http:\/\/(?:127\.0\.0\.1|localhost):\d+\/.*/u, () => passthrough()),
+];
 
 function fixturePassthrough(request: Request) {
   assertNoLiveTraffic(request.url, request.method, env.NODE_ENV);
@@ -187,16 +189,6 @@ export function startInterception() {
       fixturePassthrough(request),
     ),
     http.post(turnstileSiteverifyUrl, async ({ request }) => siteverifyResponse(request)),
-    http.get(/^https:\/\/api\.pwnedpasswords\.com\/range\/[0-9A-F]{5}$/u, ({ request }) => {
-      const prefix = new URL(request.url).pathname.split("/").at(-1) ?? "";
-
-      const range =
-        prefix === "CBFDA"
-          ? "C6008F9CAB4083784CBD1874F76618D2A97:12000\n0000000000000000000000000000000000A:3\n"
-          : "0000000000000000000000000000000000A:3\n";
-
-      return new HttpResponse(range, { headers: { "content-type": "text/plain" } });
-    }),
     http.post(
       cloudflareSendEmailUrl(
         env.CLOUDFLARE_EMAIL_API_BASE_URL,

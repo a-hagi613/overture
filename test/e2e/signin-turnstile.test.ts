@@ -51,7 +51,6 @@ test("a click shows pending feedback at once and runs a single bot check", async
 
   await expect(submit).toBeDisabled();
   await expect(submit).toHaveAttribute("aria-busy", "true");
-  await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeDisabled();
   await expect(page.getByText(labels.sent)).toBeVisible();
 
   const counts = await turnstileStubCounts(page);
@@ -62,7 +61,7 @@ test("a click shows pending feedback at once and runs a single bot check", async
   expect(await sinkMailCount(url, request)).toBe(1);
 });
 
-test("mode switches and repeated clicks never render extra widgets or reset the challenge", async ({
+test("repeated clicks never render extra widgets or reset the challenge", async ({
   page,
   request,
   isolatedAppServer,
@@ -75,8 +74,6 @@ test("mode switches and repeated clicks never render extra widgets or reset the 
 
   await page.goto(`${url}/signin`);
   await page.getByLabel(labels.email).fill(authTestIdentity.ownerEmail);
-  await page.getByRole("button", { name: "Create an account" }).click();
-  await page.getByRole("button", { name: "Sign in" }).click();
 
   expect((await turnstileStubCounts(page)).renders).toBe(0);
 

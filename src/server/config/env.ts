@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { turnstileScriptUrl } from "../../shared/turnstile.ts";
+import { DEFAULT_ANTHROPIC_MODEL } from "../platform/llm/models.ts";
 
 const booleanFromString = z.enum(["true", "false"]).transform((value) => value === "true");
 
@@ -35,6 +36,7 @@ const envSchema = z
     ASHBY_JOBS_BASE_URL: z.string().min(1).optional(),
     PERSONIO_FEED_BASE_URL: z.string().min(1).optional(),
     WORKABLE_FEED_URL: z.url().optional(),
+    WORKABLE_FORM_BASE_URL: z.url().optional(),
     APP_ORIGIN: z.url().optional(),
     ADMIN_ORIGIN: z.url().default("https://admin.tryoverture.com"),
     CF_ACCESS_AUD: z.string().min(1).optional(),
@@ -75,6 +77,18 @@ const envSchema = z
           .filter((host) => host.length > 0),
       )
       .optional(),
+    LAB_BASE_URL: z.url().optional(),
+    LAB_RECAPTCHA_SCRIPT_URL: z.string().min(1).default("https://www.google.com/recaptcha/api.js"),
+    LAB_RECAPTCHA_SITE_KEY: z.string().min(1).default("lab-recaptcha-site-key"),
+    LAB_HCAPTCHA_SCRIPT_URL: z.string().min(1).default("https://js.hcaptcha.com/1/api.js"),
+    LAB_HCAPTCHA_SITE_KEY: z.string().min(1).default("lab-hcaptcha-site-key"),
+    LAB_TURNSTILE_SCRIPT_URL: z
+      .string()
+      .min(1)
+      .default("https://challenges.cloudflare.com/turnstile/v0/api.js"),
+    LAB_TURNSTILE_SITE_KEY: z.string().min(1).default("lab-turnstile-site-key"),
+    LAB_RECAPTCHA_VERIFY_URL: z.url().default("https://www.google.com/recaptcha/api/siteverify"),
+    LAB_RECAPTCHA_SECRET: z.string().min(1).optional(),
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
     LINKEDIN_CLIENT_ID: z.string().min(1).optional(),
@@ -105,6 +119,11 @@ const envSchema = z
     CLOUDFLARE_ZONE_ID: z.string().min(1).optional(),
     CLOUDFLARE_EMAIL_API_BASE_URL: z.url().default("https://api.cloudflare.com/client/v4"),
     REQUIRE_EMAIL_SENDING: booleanFromString.default(false),
+    STRIPE_SECRET_KEY: z.string().min(1).optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+    STRIPE_API_BASE_URL: z.url().default("https://api.stripe.com"),
+    STRIPE_PRICE_WEEK: z.string().min(1).optional(),
+    STRIPE_PRICE_MONTH: z.string().min(1).optional(),
     VAPID_PUBLIC_KEY: z.string().min(1).optional(),
     VAPID_PRIVATE_KEY: z.string().min(1).optional(),
     VAPID_SUBJECT: z.string().min(1).default("mailto:admin@tryoverture.com"),
@@ -140,7 +159,7 @@ const envSchema = z
       .default("ca"),
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     ANTHROPIC_BASE_URL: z.url().default("https://api.anthropic.com"),
-    ANTHROPIC_MODEL: z.string().min(1).default("claude-haiku-4-5"),
+    ANTHROPIC_MODEL: z.string().min(1).default(DEFAULT_ANTHROPIC_MODEL),
     FLY_APP_NAME: z.string().min(1).optional(),
     FLY_MACHINE_ID: z.string().min(1).optional(),
   })
@@ -212,6 +231,17 @@ const envSchema = z
       });
     }
 
+    if ((value.STRIPE_SECRET_KEY === undefined) !== (value.STRIPE_WEBHOOK_SECRET === undefined)) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are set together or not at all: both turn billing on, neither leaves it off.",
+        path: [
+          value.STRIPE_SECRET_KEY === undefined ? "STRIPE_SECRET_KEY" : "STRIPE_WEBHOOK_SECRET",
+        ],
+      });
+    }
+
     const r2Credentials = [value.R2_ACCOUNT_ID, value.R2_ACCESS_KEY_ID, value.R2_SECRET_ACCESS_KEY];
     const r2CredentialsPresent = r2Credentials.filter((entry) => entry !== undefined).length;
 
@@ -247,5 +277,16 @@ export const databasePath = env.DATABASE_PATH ?? env.DATABASE_URL;
 
 export const turnstileHostnames =
   env.TURNSTILE_HOSTNAMES ?? turnstileDefaultHostnames(env.APP_ORIGIN);
+
+export const labBaseUrl = env.LAB_BASE_URL ?? env.APP_ORIGIN ?? null;
+
+export const labEnvironment = {
+  hcaptchaScriptUrl: env.LAB_HCAPTCHA_SCRIPT_URL,
+  hcaptchaSiteKey: env.LAB_HCAPTCHA_SITE_KEY,
+  recaptchaScriptUrl: env.LAB_RECAPTCHA_SCRIPT_URL,
+  recaptchaSiteKey: env.LAB_RECAPTCHA_SITE_KEY,
+  turnstileScriptUrl: env.LAB_TURNSTILE_SCRIPT_URL,
+  turnstileSiteKey: env.LAB_TURNSTILE_SITE_KEY,
+} as const;
 
 export type Env = z.infer<typeof envSchema>;

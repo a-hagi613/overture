@@ -28,11 +28,6 @@ The address a user proved they own by opening the single-use link Overture maile
 or sent for an unverified address, and an invite is accepted on the first verified sign-in.
 _Avoid_: confirmed address, validated account
 
-**Password reset**:
-A single-use link (one hour) that lets a user choose a new password. Saving it signs the user out of other devices
-and then signs them in on the device that opened it.
-_Avoid_: forgot-password flow, credential recovery
-
 **Demo account**:
 The `role = demo` account (`test@email.com`) that the owner opens from the sign-in page with one click to see
 Overture as a long-time user would. It is seeded with fictional data, receives no mail, sends no Application, makes
@@ -153,6 +148,25 @@ works for 24 hours and opens with the key the server generated and wrapped for t
 link and never stored in plaintext or logged; after that the archive is deleted, and a new request replaces a ready one.
 _Avoid_: download, data dump, archive
 
+## Plans and billing
+
+**Plan**:
+What the user pays for: Week gives 70 Applications over 7 days and Month gives 300 over 30 days, both renewing until
+cancelled; the trial gives 3 once (ADR 0018).
+_Avoid_: subscription tier, package, level
+
+**Period grant**:
+The Applications one paid period makes available. It expires at the period's end, so unused ones do not roll over,
+and a reservation still open then is released and expired with it, except a send already in flight, which finishes
+and is charged only if it was sent.
+_Avoid_: credit, allowance, rollover, plan balance
+
+**Billing pause**:
+The pause that stops new sends when a plan ends (`plan_ended`) or a payment does not go through (`payment_failed`).
+It keeps the queue and history, tells the person once by push and email with the one fix (choose a plan or update
+the card), lets sends already in flight finish, and clears by itself when a later payment succeeds.
+_Avoid_: payment failure alert, dunning, lockout
+
 ## Mail
 
 **Inbox**:
@@ -182,8 +196,9 @@ Typing a verification code into Overture when the forwarded email did not arrive
 _Avoid_: manual code entry, OTP
 
 **Recap**:
-The one email after a user's Daily run that lists the new Ready Applications and the open Reviews, with one link to
-Ready. It is never sent when the run produced nothing, and opening it never sends an Application.
+The one email and push after a user's Daily run that lists the new Ready Applications, the open Reviews and
+yesterday's sends and replies, with one link to Ready. It is never sent when the run produced nothing, and opening it
+never sends an Application.
 _Avoid_: Ready email, digest, notification
 
 ## The legal pages
@@ -229,6 +244,19 @@ _Avoid_: inbox analytics, mail report
 **Live check**:
 The daily `live.check` job on `overture-web` that exercises a real form capture, real Haiku calls, the mail loop and R2, records pass/fail and timing, and alerts the owner on failure. It never submits an application or touches a user.
 _Avoid_: smoke test, canary, health probe
+
+**Synthetic lab**:
+The employer-free pages under `/lab/*` (reCAPTCHA v3 with its score checked on the server, hCaptcha, Turnstile and
+recorded ATS-shaped forms) and the `lab.run` job that drives them in each browser provider. A lab run records one row
+per session in `lab_runs`; the admin provider report shows the lab beside the live send report and never inside the
+cost gate.
+_Avoid_: test site, sandbox, benchmark, challenge farm
+
+**Provider report**:
+The admin view of send results per browser provider and ATS — attempted, completed, completion rate, challenge and
+code rates, p50/p95 duration, proxy MB and cost per completed Application against the $0.03 gate — plus the synthetic
+lab's results per provider and lab page.
+_Avoid_: browser stats, vendor dashboard
 
 ## Never in anything a user can read
 
