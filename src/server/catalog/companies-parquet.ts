@@ -10,14 +10,26 @@ export const SEED_MANIFEST_URL = "https://storage.stapply.ai/jobs/v1/manifest.js
 export const SEED_COMPANIES_PARQUET_URL = "https://storage.stapply.ai/jobs/v1/companies.parquet";
 
 export const PINNED_MANIFEST_SHA256 =
-  "cc6bc21396e64f6e93be77ffcdc37dba9b3a70892fcc53f8277559482f502b9b";
+  "07d04361d9edef28803be1cb3b389bea4f364e328dae82340b9e08020c752104";
 
 export const PINNED_COMPANIES_PARQUET_SHA256 =
-  "dabf803a8849e4f07c9ddf38b027d7bdd7b68875d43121825415da08cedf736c";
+  "8936af47841d95c1f8ae55cd527302c64fa592d79f1fe2ee347c7d997635b2fb";
+
+export interface SeedPins {
+  manifestSha256: string;
+  companiesParquetSha256: string;
+}
+
+export const DEFAULT_SEED_PINS: SeedPins = {
+  manifestSha256: PINNED_MANIFEST_SHA256,
+  companiesParquetSha256: PINNED_COMPANIES_PARQUET_SHA256,
+};
 
 const seedManifestSchema = z.object({
   companies: z.object({
-    parquet_sha256: z.string(),
+    parquet_sha256: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/u, "expected a 64-character lowercase hex sha256"),
     rows: z.number().int().nonnegative(),
   }),
 });
@@ -26,28 +38,32 @@ export function sha256Hex(bytes: Uint8Array) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-export function verifySeedFiles(manifestBytes: Uint8Array, parquetBytes: Uint8Array) {
+export function verifySeedFiles(
+  manifestBytes: Uint8Array,
+  parquetBytes: Uint8Array,
+  pins: SeedPins = DEFAULT_SEED_PINS,
+) {
   const manifestHash = sha256Hex(manifestBytes);
 
-  if (manifestHash !== PINNED_MANIFEST_SHA256) {
+  if (manifestHash !== pins.manifestSha256) {
     throw new Error(
-      `manifest sha256 pin mismatch: pinned ${PINNED_MANIFEST_SHA256}, actual ${manifestHash}. Verify the upstream change is legitimate, then re-pin both hashes and rerun.`,
+      `manifest sha256 pin mismatch: pinned ${pins.manifestSha256}, actual ${manifestHash}. Verify the upstream change is legitimate, then re-pin both hashes and rerun.`,
     );
   }
 
   const parquetHash = sha256Hex(parquetBytes);
 
-  if (parquetHash !== PINNED_COMPANIES_PARQUET_SHA256) {
+  if (parquetHash !== pins.companiesParquetSha256) {
     throw new Error(
-      `companies.parquet sha256 pin mismatch: pinned ${PINNED_COMPANIES_PARQUET_SHA256}, actual ${parquetHash}. Verify the upstream change is legitimate, then re-pin both hashes and rerun.`,
+      `companies.parquet sha256 pin mismatch: pinned ${pins.companiesParquetSha256}, actual ${parquetHash}. Verify the upstream change is legitimate, then re-pin both hashes and rerun.`,
     );
   }
 
   const manifest = seedManifestSchema.parse(JSON.parse(new TextDecoder().decode(manifestBytes)));
 
-  if (manifest.companies.parquet_sha256 !== PINNED_COMPANIES_PARQUET_SHA256) {
+  if (manifest.companies.parquet_sha256 !== pins.companiesParquetSha256) {
     throw new Error(
-      `manifest companies.parquet_sha256 ${manifest.companies.parquet_sha256} does not match the pin ${PINNED_COMPANIES_PARQUET_SHA256}`,
+      `manifest companies.parquet_sha256 ${manifest.companies.parquet_sha256} does not match the pin ${pins.companiesParquetSha256}`,
     );
   }
 
