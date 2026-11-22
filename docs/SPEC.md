@@ -1024,7 +1024,7 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 
 ### 10.3 Attempt steps (`submit.run`)
 
-1. Open provider browser (15-minute vendor timeout, attempt id as metadata); `page.route` aborts fonts, media (audio and video) and known analytics/tracker hosts. Images, scripts, XHR and CAPTCHA hosts (hCaptcha, reCAPTCHA, Turnstile) are never blocked: at $5/GB proxy is 59 % of Browser Use's bill at the one recorded session usage (2.71 MB, 9 min 16 s) and reaches 80–90 % only on a form of about 10 MB or more, so those requests cost money but they are what the form needs (§10.4, `docs/research/cost-m1.md`).
+1. Open provider browser (15-minute vendor timeout, attempt id as metadata); `page.route` aborts fonts, media (audio and video) and known analytics/tracker hosts, and the project's network policy blocks the same tracker hosts at the Browser Use proxy (`POST /api/v4/network-policies` with `networkPolicyId` on create) so service-worker, prefetch, iframe and CSS loads never cross the proxy either. A policy that cannot be created or updated raises `browser.network_policy` and falls back to the Playwright trim. Images, scripts, XHR and CAPTCHA hosts (hCaptcha, reCAPTCHA, Turnstile) are never blocked: at $5/GB proxy is 59 % of Browser Use's bill at the one recorded session usage (2.71 MB, 9 min 16 s) and reaches 80–90 % only on a form of about 10 MB or more, so those requests cost money but they are what the form needs (§10.4, `docs/research/cost-m1.md`).
 2. Navigate to the apply link: for Greenhouse the embed form `https://job-boards.greenhouse.io/embed/job_app?for={board_token}&token={ats_job_id}` (`job-boards.eu.greenhouse.io` when the board's `region` is `eu`), never the employer's `absolute_url` and never the plain `/{board_token}/jobs/{id}` board page, which redirects to the employer's own site on boards with a custom careers domain; otherwise `apply_url`. The identity check reads `for` and `token` from that path. If the page says the job is closed → `posting_closed`. Check that the live page's
    host, board token, job id and company name match the Posting; a redirect or any other mismatch → `identity_mismatch`
    (release, `skipped` with `status_reason` `posting_identity:<field>`, never submit).
@@ -1083,7 +1083,9 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
   attempt-level diagnostics.
 - Cost per completed application (ADR 0026): Browser Use spend for attempted Applications plus the Anthropic spend of the Application purposes (`score`, `open_text`, `cover_letter`, `question_mapping`) for those users, divided by sent Applications. `llm_usage` has no application id, so that Anthropic spend is attributed per user. `/admin/billing/margin` shows the same measure per plan over 30 days, with revenue per Application and margin, and reports fixed infrastructure, mail and other model calls beside it.
   The report raises `browser.proxy_trend` when the latest 20 completed applications use more than 1.2× the proxy bytes
-  per completed application of the 20 before them. Kernel stays the fallback unless the lab shows it clearly ahead
+  per completed application of the 20 before them, and `browser.minutes_trend` when the same latest 20 take more than
+  1.2× the browser milliseconds of the 20 before them (session duration is the other 41 % of the bill). Kernel stays
+  the fallback unless the lab shows it clearly ahead
   and the owner decides otherwise.
 
 ### 10.5 Fixtures

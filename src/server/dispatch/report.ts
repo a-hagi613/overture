@@ -257,9 +257,9 @@ const summarise = (groups: GroupSummary[], trend: boolean, population: CostPopul
         left.provider.localeCompare(right.provider) || left.ats.localeCompare(right.ats),
     );
 
-const completedProxyBytes = (db: AppDatabase, sinceMs: number) =>
+const completedUsage = (db: AppDatabase, sinceMs: number) =>
   db
-    .select({ proxyBytes: attempts.proxyBytes })
+    .select({ browserMs: attempts.browserMs, proxyBytes: attempts.proxyBytes })
     .from(attempts)
     .innerJoin(applications, eq(attempts.applicationId, applications.id))
     .innerJoin(users, eq(users.id, applications.userId))
@@ -273,16 +273,20 @@ const completedProxyBytes = (db: AppDatabase, sinceMs: number) =>
     .orderBy(desc(attempts.startedAt))
     .limit(TREND_WINDOW * 2)
     .all()
-    .toReversed()
-    .map((row) => row.proxyBytes ?? 0);
+    .toReversed();
 
-const proxyTrend = (completed: number[]) => {
-  if (completed.length < TREND_WINDOW + TREND_MINIMUM) {
+interface CompletedUsage {
+  browserMs: number | null;
+  proxyBytes: number | null;
+}
+
+const risingTrend = (values: number[]) => {
+  if (values.length < TREND_WINDOW + TREND_MINIMUM) {
     return false;
   }
 
-  const recent = completed.slice(-TREND_WINDOW);
-  const previous = completed.slice(-TREND_WINDOW * 2, -TREND_WINDOW);
+  const recent = values.slice(-TREND_WINDOW);
+  const previous = values.slice(-TREND_WINDOW * 2, -TREND_WINDOW);
   const recentAverage = recent.reduce((total, value) => total + value, 0) / recent.length;
   const previousAverage = previous.reduce((total, value) => total + value, 0) / previous.length;
 
@@ -292,6 +296,12 @@ const proxyTrend = (completed: number[]) => {
     recentAverage > previousAverage * TREND_RATIO
   );
 };
+
+const proxyTrend = (completed: CompletedUsage[]) =>
+  risingTrend(completed.map((usage) => usage.proxyBytes ?? 0));
+
+const minutesTrend = (completed: CompletedUsage[]) =>
+  risingTrend(completed.map((usage) => usage.browserMs ?? 0));
 
 /**
  * The per-provider × ATS report, measured over the last
@@ -308,10 +318,19 @@ const proxyTrend = (completed: number[]) => {
 export function buildProviderReport(db: AppDatabase, clock: Clock) {
   const sinceMs = sinceOf(clock);
   const population = readCostPopulation(db, sinceMs);
-  const trend = proxyTrend(completedProxyBytes(db, sinceMs));
+  const completed = completedUsage(db, sinceMs);
+  const trend = proxyTrend(completed);
+  const minutes = minutesTrend(completed);
 
   if (trend) {
     raiseAlert(db, clock, "browser.proxy_trend", {
+      recentWindow: TREND_WINDOW,
+      ratio: TREND_RATIO,
+    });
+  }
+
+  if (minutes) {
+    raiseAlert(db, clock, "browser.minutes_trend", {
       recentWindow: TREND_WINDOW,
       ratio: TREND_RATIO,
     });
@@ -352,6 +371,6 @@ export function buildCostSummary(db: AppDatabase, clock: Clock) {
     costGateMet: costPerCompleted === null ? null : costPerCompleted <= COST_GATE_MICROS,
     costMicrosPerCompleted: costPerCompleted,
     proxyMbPerCompleted: ratio(proxyBytes, population.completed * 1_000_000),
-    proxyTrend: proxyTrend(completedProxyBytes(db, sinceMs)),
+    proxyTrend: proxyTrend(completedUsage(db, sinceMs)),
   };
 }

@@ -702,3 +702,80 @@ test("Anthropic spend of the Application purposes raises the cost summary and th
     costMicrosPerCompleted: 35_000,
   });
 });
+
+test("the provider report raises browser.minutes_trend when completed sessions grow longer", async ({
+  page,
+  captureAppServer,
+  captureAppUrl,
+  accessServer,
+}) => {
+  const { owner, userId } = await ownerContextFor(captureAppServer.url);
+  const companyId = await seedCompany(owner, "Long Sessions", "longsessions.example");
+  const boardId = await seedBoard(owner, companyId, "greenhouse", "longsessions");
+
+  const postingId = await seedPosting(owner, {
+    atsJobId: "9001002003",
+    boardId,
+    companyId,
+    title: "Staff Platform Engineer",
+    url: "https://example.test/longsessions/jobs/9001002003",
+  });
+
+  const applicationId = await seedApplication(owner, { postingId, status: "sent", userId });
+  const base = 1_800_000_000_000;
+
+  const seedAttempt = async (index: number, browserMs: number) => {
+    const seeded = await owner.post("/__test__/attempts/seed", {
+      data: {
+        applicationId,
+        browserMs,
+        costMicros: 20_000,
+        n: 1,
+        outcome: "sent",
+        proxyBytes: 2_000_000,
+        provider: "browser_use",
+        startedAt: base + index * 1000,
+        userId,
+      },
+    });
+
+    expect(seeded.ok()).toBe(true);
+  };
+
+  await Promise.all(
+    Array.from({ length: 20 }, async (_, index) => {
+      await seedAttempt(index, 5 * 60_000);
+    }),
+  );
+
+  await Promise.all(
+    Array.from({ length: 20 }, async (_, offset) => {
+      await seedAttempt(offset + 20, 8 * 60_000);
+    }),
+  );
+
+  await openAdminAsOwner(page, captureAppUrl, accessServer.issueToken);
+
+  const report = z
+    .object({ providers: z.array(z.object({ ats: z.string(), completed: z.number() })) })
+    .parse(await (await page.request.get(`${captureAppUrl}/admin/api/provider-report`)).json());
+
+  expect(
+    report.providers.find((row) => row.ats === "greenhouse" && row.completed === 1),
+  ).toBeDefined();
+
+  const notified = z
+    .object({ notifications: z.array(z.object({ body: z.string(), title: z.string() })) })
+    .parse(
+      await (
+        await fetch(
+          `${captureAppServer.url}/__test__/notifications?userId=${encodeURIComponent(userId)}`,
+        )
+      ).json(),
+    );
+
+  const titles = notified.notifications.map((notification) => notification.title);
+
+  expect(titles).toContain("Overture alert: browser.minutes_trend");
+  expect(titles).not.toContain("Overture alert: browser.proxy_trend");
+});
