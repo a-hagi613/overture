@@ -295,7 +295,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `checkins` | id, application_id UNIQUE, user_id, due_at, status CHECK IN ('open','answered','expired'), answer CHECK IN ('rejected','interviewing','still_waiting') NULL, created_at |
 | `interview_events` | id, user_id, application_id, message_id, uid, sequence DEFAULT 0, starts_at, ends_at NULL, tz NULL, source CHECK IN ('ics'), created_at; UNIQUE(user_id,uid), INDEX(user_id,starts_at), INDEX(message_id). The interview date parsed from a `text/calendar` attachment on forwarded ATS mail (ADR 0034); `tz` is the IANA `TZID` when `DTSTART` carried one, and a higher `sequence` replaces the row for the same `uid`, while `METHOD:CANCEL`/`STATUS:CANCELLED` deletes it. Mail body text is never parsed |
 | `plan_cache` | id, ats, form_signature, plan JSON (`{readPath, questions}`; each question carries its catalog `question_id`, label, field name, type, options, required and position), hits, failures, updated_at; UNIQUE(ats,form_signature). `hits` counts preparations served from the cache; `failures` counts a cached plan that no longer matched the live form or whose questions no longer exist. It never holds answers: they are rebuilt per user from Facts and Targets |
-| `consent_versions` | version PK (a whole number as text), text, published_at — the exact consent wording each `consent_version` refers to. Rows are never edited: publishing a version appends the next number with its text and date (`scripts/publish-consent-version.ts`), so an accepted version and every Snapshot keep the wording and version they were made under. Version 1 is seeded by migration 0038; version 2 (billing) by migration `0041_consent_v2` |
+| `consent_versions` | version PK (a whole number as text), text, published_at — the exact consent wording each `consent_version` refers to. Rows are never edited: publishing a version appends the next number with its text and date (`scripts/publish-consent-version.ts`), so an accepted version and every Snapshot keep the wording and version they were made under. Version 1 is seeded by migration 0038; version 2 (billing) by migration `0047_consent_v2` |
 
 ### 5.5 Inbox
 
@@ -1319,7 +1319,7 @@ a failed application is never charged and never uses an allowance) and the free 
 one trial through a keyed fingerprint that survives account deletion). The Privacy Policy lists Stripe, explains that
 card details go straight to Stripe, and names the billing records kept and their deletion. Publishing the billing
 consent text is version 2: the migration appends the row, and version 1, every accepted profile and every Snapshot
-stay as they were (migration `0041_consent_v2`).
+stay as they were (migration `0047_consent_v2`).
 
 ---
 

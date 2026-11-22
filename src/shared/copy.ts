@@ -548,7 +548,7 @@ export const copy = {
     eyebrow: "Legal",
     lastUpdated: "Last updated 21 November 2026",
     metaSeparator: " · ",
-    effective: "Effective when the beta opens",
+    effective: "Effective when the plans open to the public",
     footerName: "Overture",
     footerContact: "admin@tryoverture.com",
     footerAddress: "[POSTAL ADDRESS]",
@@ -589,7 +589,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "You sign in with Google, LinkedIn or an emailed link, using the email your invitation was sent to. Keep your sign-in details to yourself, and tell us if you think someone else has used your account.",
+              text: "You sign in with Google, LinkedIn or an emailed link. Keep your sign-in details to yourself, and tell us if you think someone else has used your account.",
             },
           ],
         },
