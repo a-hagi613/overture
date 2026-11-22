@@ -80,8 +80,13 @@ jobs:
           REQUIRE_EMAIL_SENDING: ${{ vars.REQUIRE_EMAIL_SENDING }}
         run: |
           set -uo pipefail
-          output="$(flyctl ssh console -a overture-web -C "bun run /app/scripts/onboard-email-sending.ts --check" 2>&1)" || true
+          # A down or unresponsive machine must not hold the deploy-main concurrency group for six hours.
+          status=0
+          output="$(timeout 45s flyctl ssh console -a overture-web -C "bun run /app/scripts/onboard-email-sending.ts --check" 2>&1)" || status=$?
           printf '%s\n' "$output"
+          if [ "$status" -eq 124 ]; then
+            echo "::warning::The email sending check did not answer within 45s (machine down or unresponsive); treating it as not ready."
+          fi
           if grep -q "verdict: ready" <<<"$output"; then
             echo "Cloudflare Email Sending verified."
             exit 0
@@ -120,3 +125,16 @@ jobs:
           done
           echo "health route never answered: $(cat /tmp/health.json || true)"
           exit 1
+      - name: Show Fly status and logs after a failed deploy (docs/DEPLOY.md)
+        if: failure() && steps.guard.outputs.skip != 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          # Diagnostics only: a failed probe must never change the job result.
+          echo "::group::flyctl status -a overture-web"
+          timeout 30s flyctl status -a overture-web || true
+          echo "::endgroup::"
+          echo "::group::flyctl logs -a overture-web (last 120 lines)"
+          timeout 30s flyctl logs -a overture-web --no-tail | tail -n 120 || true
+          echo "::endgroup::"
