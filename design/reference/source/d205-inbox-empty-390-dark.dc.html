@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overture Inbox, empty, 390 dark</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 100%">
+<dc-import name="w5-inbox-empty" dark="{{dark}}" grain="{{grain}}" hint-size="100%,948px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":true},"grain":{"editor":"range","default":0.5,"min":0,"max":1,"step":0.05,"unit":""},"$preview":{"width":390,"height":948}}'>
+class Component extends DCLogic {
+renderVals() {
+return { dark: this.props.dark ?? true, grain: this.props.grain ?? 0.5 };
+}
+}
+</script>
+</body>
+</html>
