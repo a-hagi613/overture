@@ -37,7 +37,7 @@ export function LandingPage() {
 
         <aside
           aria-label={copy.previewStatus}
-          className="relative self-start rounded-xl border border-border border-l-[3px] border-l-ok bg-card p-5 md:p-6"
+          className="relative self-start rounded-xl border border-border border-l-[3px] border-l-[var(--color-ok)] bg-card p-5 md:p-6"
         >
           <div className="flex items-baseline justify-between gap-3">
             <span className="font-mono text-[12px] uppercase tracking-[0.12em] text-ok">
