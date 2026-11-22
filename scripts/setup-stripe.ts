@@ -34,6 +34,7 @@ export interface StripeSetupOptions {
   secretKey: string;
   appOrigin: string;
   apiBaseUrl: string;
+  reconcilePrices: boolean;
   rotateWebhook: boolean;
   outEnvPath: string | null;
   fetch: StripeFetcher;
@@ -72,7 +73,7 @@ const WEEK_SPEC: PlanSpec = {
   lookupKey: "overture_week_usd",
   plan: "week",
   productName: "Overture Week",
-  unitAmount: 1200,
+  unitAmount: 999,
 };
 
 const MONTH_SPEC: PlanSpec = {
@@ -80,7 +81,7 @@ const MONTH_SPEC: PlanSpec = {
   lookupKey: "overture_month_usd",
   plan: "month",
   productName: "Overture Month",
-  unitAmount: 3500,
+  unitAmount: 2999,
 };
 
 const productReferenceSchema = z.union([
@@ -204,42 +205,18 @@ async function requestJson<T>(
   return schema.parse(payload);
 }
 
-function planForExistingPrice(
-  price: z.infer<typeof priceSchema>,
-  spec: PlanSpec,
-  log: (line: string) => void,
-) {
-  if (!price.active) {
-    return null;
-  }
-
-  if (!price.product.active) {
-    throw new Error(
-      `Stripe price ${price.id} holds lookup key ${spec.lookupKey} on inactive product ${price.product.id}; reactivate that product or archive the price before re-running.`,
-    );
-  }
-
-  const matches =
+function priceMatches(price: z.infer<typeof priceSchema>, spec: PlanSpec) {
+  return (
     price.unit_amount === spec.unitAmount &&
     price.currency === "usd" &&
-    price.recurring?.interval === spec.interval;
-
-  if (!matches) {
-    throw new Error(
-      `Stripe price ${price.id} already holds lookup key ${spec.lookupKey} at ` +
-        `${String(price.unit_amount)} ${price.currency} per ${price.recurring?.interval ?? "one-off"}, ` +
-        `not ${String(spec.unitAmount)} usd per ${spec.interval}; reconcile that price in Stripe before re-running.`,
-    );
-  }
-
-  log(`Reused the active ${spec.plan} price ${price.id} (${spec.lookupKey}).`);
-
-  return { plan: spec.plan, priceId: price.id, productId: price.product.id };
+    price.recurring?.interval === spec.interval
+  );
 }
 
 async function ensurePlan(
   options: StripeClientOptions,
   spec: PlanSpec,
+  reconcilePrices: boolean,
   log: (line: string) => void,
 ) {
   const query = new URLSearchParams({
@@ -258,12 +235,58 @@ async function ensurePlan(
 
   const [existing] = listed.data;
 
-  if (existing !== undefined) {
-    const reused = planForExistingPrice(existing, spec, log);
-
-    if (reused !== null) {
-      return reused;
+  if (existing?.active === true) {
+    if (!existing.product.active) {
+      throw new Error(
+        `Stripe price ${existing.id} holds lookup key ${spec.lookupKey} on inactive product ${existing.product.id}; reactivate that product or archive the price before re-running.`,
+      );
     }
+
+    if (priceMatches(existing, spec)) {
+      log(`Reused the active ${spec.plan} price ${existing.id} (${spec.lookupKey}).`);
+
+      return { plan: spec.plan, priceId: existing.id, productId: existing.product.id };
+    }
+
+    if (!reconcilePrices) {
+      throw new Error(
+        `Stripe price ${existing.id} already holds lookup key ${spec.lookupKey} at ` +
+          `${String(existing.unit_amount)} ${existing.currency} per ${existing.recurring?.interval ?? "one-off"}, ` +
+          `not ${String(spec.unitAmount)} usd per ${spec.interval}; reconcile that price in Stripe before re-running, or pass --reconcile-prices to replace it.`,
+      );
+    }
+
+    const created = await requestJson(
+      options,
+      "POST",
+      "/v1/prices",
+      createdPriceSchema,
+      new URLSearchParams({
+        active: "true",
+        currency: "usd",
+        "metadata[overture_plan]": spec.plan,
+        nickname: spec.productName,
+        product: existing.product.id,
+        "recurring[interval]": spec.interval,
+        transfer_lookup_key: "true",
+        unit_amount: String(spec.unitAmount),
+        lookup_key: spec.lookupKey,
+      }),
+    );
+
+    await requestJson(
+      options,
+      "POST",
+      `/v1/prices/${encodeURIComponent(existing.id)}`,
+      createdPriceSchema,
+      new URLSearchParams({ active: "false" }),
+    );
+
+    log(
+      `Replaced drifted ${spec.plan} price ${existing.id} with ${created.id} (${spec.lookupKey}) and archived ${existing.id}.`,
+    );
+
+    return { plan: spec.plan, priceId: created.id, productId: existing.product.id };
   }
 
   const product = await requestJson(
@@ -536,8 +559,15 @@ export async function runStripeSetup(options: StripeSetupOptions) {
 
   options.log(`Stripe key mode: ${mode}.`);
 
-  const weekPlan = await ensurePlan(clientOptions, WEEK_SPEC, options.log);
-  const monthPlan = await ensurePlan(clientOptions, MONTH_SPEC, options.log);
+  const weekPlan = await ensurePlan(clientOptions, WEEK_SPEC, options.reconcilePrices, options.log);
+
+  const monthPlan = await ensurePlan(
+    clientOptions,
+    MONTH_SPEC,
+    options.reconcilePrices,
+    options.log,
+  );
+
   const plans = [weekPlan, monthPlan];
 
   const priceIds: Record<BillingPlan, string> = {
@@ -596,6 +626,7 @@ async function main() {
     fetch: async (url, request) => fetch(url, request),
     log: (line) => process.stdout.write(`${line}\n`),
     outEnvPath: argumentValue(args, "--out-env"),
+    reconcilePrices: args.includes("--reconcile-prices"),
     rotateWebhook: args.includes("--rotate-webhook"),
     secretKey,
   });

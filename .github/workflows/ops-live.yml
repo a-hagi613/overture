@@ -17,6 +17,11 @@ on:
         required: false
         type: boolean
         default: false
+      reconcile_prices:
+        description: "Replace drifted lookup-key prices on the existing products and archive the old prices"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: ops-live
@@ -167,6 +172,7 @@ jobs:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           APP_ORIGIN: https://tryoverture.com
           ROTATE_WEBHOOK: ${{ inputs.rotate_webhook }}
+          RECONCILE_PRICES: ${{ inputs.reconcile_prices }}
           WEBHOOK_PRESENT: ${{ steps.stripe-secrets.outputs.webhook_present }}
           FINGERPRINT_PRESENT: ${{ steps.stripe-secrets.outputs.fingerprint_present }}
         run: |
@@ -176,11 +182,14 @@ jobs:
             exit 1
           fi
           echo "::add-mask::$STRIPE_SECRET_KEY"
-          rotate_args=()
+          extra_args=(--out-env /tmp/stripe-setup.env)
           if [ "${ROTATE_WEBHOOK}" = "true" ] || [ "${WEBHOOK_PRESENT}" != "true" ]; then
-            rotate_args+=(--rotate-webhook)
+            extra_args+=(--rotate-webhook)
           fi
-          bun run scripts/setup-stripe.ts --out-env /tmp/stripe-setup.env "${rotate_args[@]}"
+          if [ "${RECONCILE_PRICES}" = "true" ]; then
+            extra_args+=(--reconcile-prices)
+          fi
+          bun run scripts/setup-stripe.ts "${extra_args[@]}"
           value() { sed -n "s/^$1=//p" /tmp/stripe-setup.env | head -n 1; }
           week="$(value STRIPE_PRICE_WEEK)"
           month="$(value STRIPE_PRICE_MONTH)"

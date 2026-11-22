@@ -266,17 +266,41 @@ function createRecordedStripe() {
 
       const interval = form.get("recurring[interval]");
 
+      const lookupKey = form.get("lookup_key");
+
+      if (form.get("transfer_lookup_key") === "true" && lookupKey !== null) {
+        for (const entry of prices) {
+          if (entry.lookup_key === lookupKey) {
+            entry.lookup_key = null;
+          }
+        }
+      }
+
       const price: RecordedPrice = {
         active: form.get("active") !== "false",
         currency: form.get("currency") ?? "",
         id: nextId("price"),
-        lookup_key: form.get("lookup_key"),
+        lookup_key: lookupKey,
         product: form.get("product") ?? "",
         recurring: interval === null ? null : { interval },
         unit_amount: Number(form.get("unit_amount")),
       };
 
       prices.push(price);
+
+      return Response.json(price);
+    }
+
+    if (request.method === "POST" && path.startsWith("/v1/prices/")) {
+      const id = decodeURIComponent(path.slice("/v1/prices/".length));
+      const price = prices.find((entry) => entry.id === id);
+      const form = new URLSearchParams(request.body ?? "");
+
+      if (price === undefined) {
+        return errorResponse("missing", 404);
+      }
+
+      price.active = form.get("active") !== "false";
 
       return Response.json(price);
     }
@@ -385,7 +409,11 @@ function createRecordedStripe() {
 function optionsFor(
   fake: ReturnType<typeof createRecordedStripe>,
   sink: LogSink,
-  extra: { outEnvPath?: string | null; rotateWebhook?: boolean } = {},
+  extra: {
+    outEnvPath?: string | null;
+    reconcilePrices?: boolean;
+    rotateWebhook?: boolean;
+  } = {},
 ) {
   return {
     apiBaseUrl: "https://api.stripe.test",
@@ -393,6 +421,7 @@ function optionsFor(
     fetch: fake.fetchStripe,
     log: sink.write,
     outEnvPath: extra.outEnvPath ?? null,
+    reconcilePrices: extra.reconcilePrices ?? false,
     rotateWebhook: extra.rotateWebhook ?? false,
     secretKey: "sk_test_recorded",
   } satisfies StripeSetupOptions;
@@ -409,7 +438,7 @@ test("a first run creates both plans, the webhook and the portal configuration",
     "Overture Week",
     "Overture Month",
   ]);
-  expect(fake.prices.map((price) => price.unit_amount)).toStrictEqual([1200, 3500]);
+  expect(fake.prices.map((price) => price.unit_amount)).toStrictEqual([999, 2999]);
   expect(fake.prices.map((price) => price.recurring?.interval)).toStrictEqual(["week", "month"]);
   expect(fake.prices.map((price) => price.lookup_key)).toStrictEqual([
     "overture_week_usd",
@@ -606,7 +635,7 @@ test("a lookup-key price on an inactive product is refused instead of duplicated
   let failure: Error | null = null;
 
   try {
-    await runStripeSetup(optionsFor(fake, sink));
+    await runStripeSetup(optionsFor(fake, sink, { reconcilePrices: true }));
   } catch (error) {
     failure = z.instanceof(Error).parse(error);
   }
@@ -628,7 +657,7 @@ test("a lookup-key price with a different amount is refused instead of duplicate
     throw new Error("the first run created no price");
   }
 
-  price.unit_amount = 1300;
+  price.unit_amount = 1200;
 
   let failure: Error | null = null;
 
@@ -639,8 +668,61 @@ test("a lookup-key price with a different amount is refused instead of duplicate
   }
 
   expect(failure?.message).toContain("reconcile that price in Stripe before re-running");
+  expect(failure?.message).toContain("--reconcile-prices");
   expect(fake.products).toHaveLength(2);
   expect(fake.prices).toHaveLength(2);
+});
+
+test("--reconcile-prices replaces drifted prices on the existing products and updates the portal", async () => {
+  const fake = createRecordedStripe();
+  const sink = createLogSink();
+
+  await runStripeSetup(optionsFor(fake, sink));
+
+  const [weekPrice, monthPrice] = fake.prices;
+
+  if (weekPrice === undefined || monthPrice === undefined) {
+    throw new Error("the first run created fewer than two prices");
+  }
+
+  weekPrice.unit_amount = 1200;
+  monthPrice.unit_amount = 3500;
+
+  const path = join(tempDirectory(), "stripe-setup.env");
+
+  const result = await runStripeSetup(
+    optionsFor(fake, sink, { outEnvPath: path, reconcilePrices: true }),
+  );
+
+  const replacementCalls = fake.calls.filter(
+    (call) =>
+      call.method === "POST" &&
+      call.url === "https://api.stripe.test/v1/prices" &&
+      new URLSearchParams(call.body ?? "").get("transfer_lookup_key") === "true",
+  );
+
+  const activePrices = fake.prices.filter((price) => price.active);
+  const contents = readFileSync(path, "utf8");
+
+  expect(fake.products).toHaveLength(2);
+  expect(weekPrice.active).toBe(false);
+  expect(monthPrice.active).toBe(false);
+  expect(activePrices).toHaveLength(2);
+  expect(
+    activePrices.map((price) => price.unit_amount).toSorted((left, right) => left - right),
+  ).toStrictEqual([999, 2999]);
+  expect(replacementCalls).toHaveLength(2);
+  expect(result.priceIds.week).not.toBe(weekPrice.id);
+  expect(result.priceIds.month).not.toBe(monthPrice.id);
+  expect(fake.portals[0]?.features.subscription_update.products).toStrictEqual([
+    { prices: [result.priceIds.week], product: weekPrice.product },
+    { prices: [result.priceIds.month], product: monthPrice.product },
+  ]);
+  expect(contents).toContain(`STRIPE_PRICE_WEEK=${result.priceIds.week}`);
+  expect(contents).toContain(`STRIPE_PRICE_MONTH=${result.priceIds.month}`);
+  expect(sink.lines).toContain(
+    `Replaced drifted week price ${weekPrice.id} with ${result.priceIds.week} (overture_week_usd) and archived ${weekPrice.id}.`,
+  );
 });
 
 test("--out-env writes the public ids and the webhook secret to a 0600 file, and no secret reaches the logs", async () => {

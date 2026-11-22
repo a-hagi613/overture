@@ -329,8 +329,8 @@ with `openssl rand -hex 32` only when the app does not have one. The script's `S
 
 | Plan | Product | Price | Lookup key |
 |---|---|---|---|
-| Week | `Overture Week` | $12.00 USD recurring weekly | `overture_week_usd` |
-| Month | `Overture Month` | $35.00 USD recurring monthly | `overture_month_usd` |
+| Week | `Overture Week` | $9.99 USD recurring weekly (50 applications over 7 days) | `overture_week_usd` |
+| Month | `Overture Month` | $29.99 USD recurring monthly (250 applications over 30 days) | `overture_month_usd` |
 
 Both products are created with `tax_code=txcd_10103000` (SaaS, personal use), which Stripe Managed Payments requires.
 
@@ -343,6 +343,17 @@ terms pages.
 A second run reuses the active lookup-key prices, keeps the existing webhook (its secret is not rotated) and verifies
 the portal configuration, so no duplicate product, price or endpoint appears. `rotate_webhook=true` deletes the old
 endpoint after the replacement exists, so the app always has one endpoint receiving events.
+
+When the launch price changes on an existing product, the old price still holds the lookup key, so the default run
+refuses with the drift message instead of guessing. Re-run with `reconcile_prices=true` to create the replacement price
+on the same product with `transfer_lookup_key=true`, archive the old price, update the billing portal configuration to
+the new price ids and set them on `overture-web`:
+
+```sh
+gh workflow run ops-live.yml -f action=setup-stripe -f reconcile_prices=true -R a-hagi613/overture
+```
+
+The same flag exists on the script as `--reconcile-prices`.
 
 ### 3. Verify and diagnose
 
@@ -377,6 +388,9 @@ running release.
 ```sh
 STRIPE_SECRET_KEY=sk_test_… APP_ORIGIN=https://tryoverture.com bun run scripts/setup-stripe.ts --out-env /tmp/stripe-test.env
 ```
+
+Add `--reconcile-prices` to replace a drifted lookup-key price and archive the old one; without it the script stops
+with the drift message.
 
 Against a test key this creates test-mode products, prices, a webhook and a portal; delete them in the dashboard when
 you are done. `--rotate-webhook` replaces the endpoint and writes the new `STRIPE_WEBHOOK_SECRET` to the env file.
