@@ -10,9 +10,10 @@ import { acquireBrowserSession } from "../dispatch/browser/session-slots.ts";
 import { readAshbyQuestions } from "../dispatch/ats/ashby.ts";
 import { readWorkableQuestions } from "../dispatch/ats/workable.ts";
 import { readLeverQuestions } from "../dispatch/ats/lever.ts";
+import { readPersonioQuestions } from "../dispatch/ats/personio.ts";
 import { assetExtension, formSignature, sanitiseFormHtml } from "./sanitise.ts";
 
-export const ATS_NAMES = ["greenhouse", "lever", "ashby", "workable"] as const;
+export const ATS_NAMES = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
 
 export type FixtureAts = (typeof ATS_NAMES)[number];
 
@@ -22,6 +23,7 @@ export const FORM_FIELD_SELECTORS = {
   lever: "form input:not([type='hidden'])",
   workable:
     "form.application-form input:not([type='hidden']), form#application-form input:not([type='hidden']), input[name='firstname'], input[type='file']",
+  personio: "form:has(button[type='submit']) input:not([type='hidden'])",
 } as const satisfies Record<FixtureAts, string>;
 
 export const FORM_RENDER_TIMEOUT_MS = 20_000;
@@ -204,6 +206,10 @@ async function questionsFor(ats: FixtureAts, page: Page) {
 
   if (ats === "workable") {
     return readWorkableQuestions(page);
+  }
+
+  if (ats === "personio") {
+    return readPersonioQuestions(page);
   }
 
   return readAshbyQuestions(page);

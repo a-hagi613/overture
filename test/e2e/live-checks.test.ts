@@ -99,6 +99,23 @@ const workablePage = `<!doctype html>
 </form>
 </body></html>`;
 
+const personioPage = `<!doctype html>
+<html lang="en"><body>
+<form>
+  <label for="field-first_name">First name<span aria-hidden="true">*</span></label>
+  <input id="field-first_name" type="text" name="first_name" />
+  <label for="field-email">Email<span aria-hidden="true">*</span></label>
+  <input id="field-email" type="email" name="email" />
+  <div role="group" aria-labelledby="doc-label-cv">
+    <div id="doc-label-cv">Resume<span aria-hidden="true">*</span></div>
+    <div class="document-input-wrapper">
+      <input id="doc-input-cv" type="file" hidden name="documents.cv" />
+    </div>
+  </div>
+  <button type="submit" disabled>Send application</button>
+</form>
+</body></html>`;
+
 let app: AppServer | undefined;
 let identity: Awaited<ReturnType<typeof startIdentityServer>> | undefined;
 let anthropic: AnthropicFixtureServer | undefined;
@@ -178,6 +195,7 @@ function serveForms() {
         ["/lever", leverPage],
         ["/ashby", ashbyPage],
         ["/workable", workablePage],
+        ["/job/1234567/apply", personioPage],
       ]);
 
       const page = pages.get(pathname);
@@ -205,6 +223,24 @@ async function seedCatalog(context = api) {
       });
     }),
   );
+
+  const personioCompany = await seedCompany(context, "Live Check personio", "personio.example");
+
+  const personioBoard = await seedBoard(
+    context,
+    personioCompany,
+    "personio",
+    "live-check-personio",
+  );
+
+  await seedPosting(context, {
+    ats: "personio",
+    atsJobId: "1234567",
+    boardId: personioBoard,
+    companyId: personioCompany,
+    title: "Live check personio",
+    url: `http://127.0.0.1:${String(formServer?.port)}/job/1234567/apply?language=en`,
+  });
 }
 
 function rawCheckMail(code: string, token: string) {
@@ -304,13 +340,16 @@ test.afterAll(async () => {
 test("the daily job captures one sample per ATS without submitting, calls Haiku and round-trips storage", async () => {
   await api.post("/__test__/catalog/postings/close-all", { data: {} });
   await seedCatalog();
+  await api.put("/__test__/kill-switches/ats/personio", {
+    data: { enabled: false, reason: "live check test", setBy: "owner" },
+  });
 
   await runJob("live.check", JSON.stringify({ groups: ["forms", "llm", "r2", "alerts"] }));
 
   const results = await liveCheckResults();
   const byCheck = new Map(results.map((row) => [row.check, row]));
 
-  for (const ats of ["greenhouse", "lever", "ashby", "workable"]) {
+  for (const ats of ["greenhouse", "lever", "ashby", "workable", "personio"]) {
     expect(byCheck.get(`forms.${ats}`)?.ok).toBe(true);
     expect(byCheck.get(`forms.${ats}`)?.detail["formSignature"]).toMatch(/^[a-f0-9]{16,}$/u);
     expect(byCheck.get(`forms.${ats}`)?.durationMs).toBeGreaterThanOrEqual(0);
@@ -323,6 +362,23 @@ test("the daily job captures one sample per ATS without submitting, calls Haiku 
   expect(byCheck.get("alert.disk")?.ok).toBe(true);
   expect(byCheck.get("alert.backup.lag")?.ok).toBe(true);
   expect(submissions).toBe(0);
+});
+
+test("forms.personio is skipped while its kill switch is engaged", async () => {
+  await api.put("/__test__/kill-switches/ats/personio", {
+    data: { enabled: true, reason: "live check skip test", setBy: "owner" },
+  });
+
+  await runJob("live.check", JSON.stringify({ groups: ["forms"] }));
+
+  const skipped = (await liveCheckResults()).find((row) => row.check === "forms.personio");
+
+  expect(skipped?.ok).toBe(true);
+  expect(skipped?.detail["skipped"]).toContain("kill switch");
+
+  await api.put("/__test__/kill-switches/ats/personio", {
+    data: { enabled: false, reason: "live check test done", setBy: "owner" },
+  });
 });
 
 test("the mail check sends through the MailSender and passes only when it comes back with DKIM verified", async () => {

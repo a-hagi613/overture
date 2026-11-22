@@ -191,10 +191,11 @@ async function expectSidebarFixed(page: Page, path: string, width: number) {
 
   const metrics = await aside.evaluate((element) => {
     const box = element.getBoundingClientRect();
-    const bottomLink = element.querySelector('a[href="/settings"]');
+    const settingsLinks = [...element.querySelectorAll('a[href="/settings"]')];
+    const bottomLink = settingsLinks.at(-1);
 
     return {
-      bottomLinkBottom: bottomLink === null ? null : bottomLink.getBoundingClientRect().bottom,
+      bottomLinkBottom: bottomLink?.getBoundingClientRect().bottom ?? null,
       position: getComputedStyle(element).position,
       top: box.top,
       width: box.width,
@@ -219,7 +220,7 @@ async function expectSidebarFixed(page: Page, path: string, width: number) {
   }
 }
 
-async function navigate(page: Page, path: string) {
+async function navigate(page: Page, path: string, landsOn: string = path) {
   await page.evaluate(async (next) => {
     globalThis.history.pushState({}, "", next);
     globalThis.dispatchEvent(new PopStateEvent("popstate"));
@@ -229,13 +230,20 @@ async function navigate(page: Page, path: string) {
       });
     });
   }, path);
-  await page.waitForFunction((next) => globalThis.location.pathname === next, path);
+  await page.waitForFunction((next) => globalThis.location.pathname === next, landsOn);
 }
 
-async function checkTarget(page: Page, target: Target, url: string, width: number) {
-  const expectedPath = new URL(url).pathname;
+const redirectedPaths = new Map([
+  ["/settings/notifications", "/settings"],
+  ["/settings/support", "/settings/support-access"],
+  ["/settings/terms", "/terms"],
+]);
 
-  await navigate(page, expectedPath);
+async function checkTarget(page: Page, target: Target, url: string, width: number) {
+  const requestedPath = new URL(url).pathname;
+  const expectedPath = redirectedPaths.get(requestedPath) ?? requestedPath;
+
+  await navigate(page, requestedPath, expectedPath);
   await expect(page.locator("main").first()).toBeVisible({ timeout: 15_000 });
   await expect(page).toHaveURL((current) => current.pathname === expectedPath);
   await page.evaluate(async () => {

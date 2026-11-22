@@ -124,6 +124,7 @@ const envSchema = z
     STRIPE_API_BASE_URL: z.url().default("https://api.stripe.com"),
     STRIPE_PRICE_WEEK: z.string().min(1).optional(),
     STRIPE_PRICE_MONTH: z.string().min(1).optional(),
+    CARD_FINGERPRINT_SECRET: z.string().min(32).optional(),
     VAPID_PUBLIC_KEY: z.string().min(1).optional(),
     VAPID_PRIVATE_KEY: z.string().min(1).optional(),
     VAPID_SUBJECT: z.string().min(1).default("mailto:admin@tryoverture.com"),

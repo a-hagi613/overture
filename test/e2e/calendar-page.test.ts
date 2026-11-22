@@ -254,6 +254,7 @@ test("Calendar is the seventh destination after Inbox, and Home and Board header
     /^Inbox/u,
     /^Calendar/u,
     /^Profile/u,
+    /^Settings/u,
   ]);
 
   await nav.getByRole("link", { name: "Calendar" }).click();

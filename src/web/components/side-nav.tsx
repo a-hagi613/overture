@@ -4,6 +4,7 @@ import type { NavCounts } from "../lib/nav-api.ts";
 
 import { copy } from "../../shared/copy.ts";
 import { NavGlyph } from "./nav-glyph.tsx";
+import { SettingsMenu } from "./settings-menu.tsx";
 import { NAV_DESTINATIONS, navBadgeClass, navBadgeCount, navLabel } from "../lib/nav-api.ts";
 
 export function SideNav({ counts, showLabels }: { counts: NavCounts; showLabels: boolean }) {
@@ -55,6 +56,7 @@ export function SideNav({ counts, showLabels }: { counts: NavCounts; showLabels:
           </NavLink>
         );
       })}
+      <SettingsMenu showLabels={showLabels} />
     </nav>
   );
 }

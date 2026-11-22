@@ -609,7 +609,15 @@ async function readLiveForm(page: Page, formSelector: string) {
       fileOf: (element: HTMLInputElement) => {
         const file = element.files?.[0];
 
-        return file === undefined ? null : { name: file.name, size: file.size };
+        if (file !== undefined) {
+          return { name: file.name, size: file.size };
+        }
+
+        const group = element.closest("[role='group']");
+        const pill = group?.querySelector("[role='listitem'] span");
+        const name = (pill?.textContent ?? "").replaceAll(/\s+/gu, " ").trim();
+
+        return name === "" ? null : { name, size: -1 };
       },
       hiddenOf: (element: Element) => {
         if (element.closest("[hidden]") !== null) {
@@ -711,6 +719,10 @@ async function readLiveForm(page: Page, formSelector: string) {
 
         return element.getAttribute("aria-label") ?? element.getAttribute("value") ?? "";
       },
+      starredMarker: (node: Element | null) =>
+        [...(node?.querySelectorAll("[aria-hidden='true']") ?? [])].some(
+          (marker) => marker.textContent.trim() === "*",
+        ),
       requiredOf: (element: Element) => {
         if (element.getAttribute("aria-required") === "true" || element.hasAttribute("required")) {
           return true;
@@ -718,7 +730,24 @@ async function readLiveForm(page: Page, formSelector: string) {
 
         const group = element.closest("[role='group'][aria-required]");
 
-        return group?.getAttribute("aria-required") === "true";
+        if (group?.getAttribute("aria-required") === "true") {
+          return true;
+        }
+
+        const id = element.getAttribute("id");
+        const own = id === null ? null : document.querySelector(`label[for="${CSS.escape(id)}"]`);
+
+        if (dom.starredMarker(own)) {
+          return true;
+        }
+
+        const labelled = element.closest("[role='group'][aria-labelledby]");
+        const ids = labelled?.getAttribute("aria-labelledby") ?? "";
+
+        return ids
+          .split(/\s+/u)
+          .filter((value) => value !== "")
+          .some((value) => dom.starredMarker(dom.byId(value)));
       },
       textOf: (node: Node | null) => (node?.textContent ?? "").replaceAll(/\s+/gu, " ").trim(),
     };
@@ -1070,7 +1099,7 @@ const checkLiveForm: (
         expectation.file !== null &&
         (control.file === null ||
           control.file.name !== expectation.file.name ||
-          control.file.size !== expectation.file.size)
+          (control.file.size !== -1 && control.file.size !== expectation.file.size))
       ) {
         add({
           answer: expectation.file.name,
