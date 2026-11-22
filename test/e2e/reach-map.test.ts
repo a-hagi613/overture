@@ -132,9 +132,14 @@ test("test-only diffs select only the touched test and single-route UI edits sta
     allTests,
   });
 
+  const offBoard = boardCardPlan.selected.filter(
+    (name) => !(map.tests[name]?.routes ?? []).includes("/board"),
+  );
+
   expect(boardCardPlan.full).toBe(false);
   expect(boardCardPlan.selected).toContain("test/e2e/board-match-board.test.ts");
-  expect(boardCardPlan.selected.length).toBeLessThan(10);
+  expect(offBoard).toEqual([]);
+  expect(boardCardPlan.selected.length).toBeLessThan(allTests.length / 3);
 
   const unitTestOnlyPlan = computePlan({
     changed: ["src/server/billing/ledger.test.ts"],
