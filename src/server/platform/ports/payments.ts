@@ -75,9 +75,11 @@ export interface PaymentEvent {
   userId: string | null;
   /** The invoice a paid subscription event names, or null for other events. */
   invoiceId: string | null;
+  /** The subscription the event names, or null when it names none. */
+  subscriptionId: string | null;
   /** The plan the subscription metadata names, when the event carries it. */
   plan: BillingPlan | null;
-  /** The Stripe price the paid line item names, when the event carries one. */
+  /** The Stripe price the paid line item or subscription item names, when the event carries one. */
   priceId: string | null;
   /** The end of the paid period in epoch milliseconds, or null when unknown. */
   periodEndMs: number | null;
@@ -87,6 +89,17 @@ export interface PaymentEvent {
   mode: string | null;
   /** The Checkout session id for session events, or null. */
   sessionId: string | null;
+  /**
+   * Stripe's own subscription status (`trialing`, `active`, `past_due`,
+   * `canceled`, …) for a `customer.subscription.*` event, stored verbatim so a
+   * status Stripe adds tomorrow still lands instead of failing the webhook.
+   */
+  subscriptionStatus: string | null;
+  /**
+   * Whether Stripe will cancel the subscription at the period end the event
+   * names, for a `customer.subscription.*` event, or null for other events.
+   */
+  cancelAtPeriodEnd: boolean | null;
 }
 
 /**
