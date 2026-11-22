@@ -81,7 +81,7 @@ export function SettingsMenu({ showLabels }: { showLabels: boolean }) {
           <span className="whitespace-nowrap">{copy.settingsMenu.label}</span>
         </NavLink>
         <button
-          aria-controls={panelId}
+          aria-controls={open ? panelId : undefined}
           aria-expanded={open}
           aria-label={copy.settingsMenu.pagesLabel}
           className="flex h-11 w-11 flex-none cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground min-[768px]:h-9 min-[768px]:w-9"
@@ -107,27 +107,29 @@ export function SettingsMenu({ showLabels }: { showLabels: boolean }) {
           </span>
         </button>
       </div>
-      <div
-        className={open ? "ml-5 flex flex-col gap-[3px] border-l border-border pl-2" : "hidden"}
-        id={panelId}
-        ref={listRef}
-      >
-        {pages.map((page) => {
-          const current = pathname === page.to;
+      {open ? (
+        <div
+          className="ml-5 flex flex-col gap-[3px] border-l border-border pl-2"
+          id={panelId}
+          ref={listRef}
+        >
+          {pages.map((page) => {
+            const current = pathname === page.to;
 
-          return (
-            <Link
-              aria-current={current ? "page" : undefined}
-              className={`${itemClass} ${page.key === "delete" ? "text-need" : ""} ${current ? "border-border bg-card shadow-sh" : "border-transparent"}`}
-              key={page.key}
-              onKeyDown={onItemKeyDown}
-              to={page.to}
-            >
-              {copy.settingsMenu[page.key]}
-            </Link>
-          );
-        })}
-      </div>
+            return (
+              <Link
+                aria-current={current ? "page" : undefined}
+                className={`${itemClass} ${page.key === "delete" ? "text-need" : ""} ${current ? "border-border bg-card shadow-sh" : "border-transparent"}`}
+                key={page.key}
+                onKeyDown={onItemKeyDown}
+                to={page.to}
+              >
+                {copy.settingsMenu[page.key]}
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
