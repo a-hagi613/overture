@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { Link, NavLink, useLocation } from "react-router";
 
@@ -7,9 +7,11 @@ import { NavGlyph } from "./nav-glyph.tsx";
 
 const pages = [
   { key: "profileData", to: "/profile" },
+  { key: "notifications", to: "/settings#settings-notifications" },
+  { key: "billing", to: "/settings/billing" },
   { key: "export", to: "/settings/export" },
-  { key: "supportAccess", to: "/settings/support-access" },
   { key: "delete", to: "/settings/delete" },
+  { key: "supportAccess", to: "/settings/support-access" },
   { key: "legal", to: "/terms" },
 ] as const;
 
@@ -17,11 +19,10 @@ const itemClass =
   "flex min-h-11 items-center rounded-md border px-3 text-sm font-medium leading-[21px] hover:bg-muted min-[768px]:min-h-9";
 
 export function SettingsMenu({ showLabels }: { showLabels: boolean }) {
-  const { pathname } = useLocation();
+  const { hash, pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const panelId = useId();
 
   if (!showLabels) {
     return (
@@ -82,7 +83,7 @@ export function SettingsMenu({ showLabels }: { showLabels: boolean }) {
           <span className="whitespace-nowrap">{copy.settingsMenu.label}</span>
         </NavLink>
         <button
-          aria-controls={open ? panelId : undefined}
+          aria-controls={open ? "settings-pages" : undefined}
           aria-expanded={open}
           aria-label={copy.settingsMenu.pagesLabel}
           className="flex h-11 w-11 flex-none cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground min-[768px]:h-9 min-[768px]:w-9"
@@ -111,11 +112,14 @@ export function SettingsMenu({ showLabels }: { showLabels: boolean }) {
       {open ? (
         <div
           className="ml-5 flex flex-col gap-[3px] border-l border-border pl-2"
-          id={panelId}
+          id="settings-pages"
           ref={listRef}
         >
           {pages.map((page) => {
-            const current = pathname === page.to;
+            const [pagePath = "", pageHash = ""] = page.to.split("#");
+
+            const current =
+              pathname === pagePath && hash === (pageHash === "" ? "" : `#${pageHash}`);
 
             return (
               <Link

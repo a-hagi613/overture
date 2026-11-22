@@ -143,29 +143,16 @@ export function CalendarPage() {
   } else {
     body = (
       <div className="mt-[18px] flex flex-col gap-5 lg:flex-row lg:items-start">
-        <section
-          aria-busy={isFetching}
-          aria-labelledby="calendar-month"
-          className="min-w-0 flex-1 rounded-lg border border-border bg-card p-4 shadow-sh md:p-5"
-        >
+        <section aria-busy={isFetching} aria-labelledby="calendar-month" className="min-w-0 flex-1">
           <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
             <h2
               aria-live="polite"
-              className="font-serif text-[30px] leading-[1.1]"
+              className="font-serif text-[28px] leading-[1.1]"
               id="calendar-month"
             >
               {monthName(month)} <span className="italic">{year}</span>
             </h2>
             <div className="flex items-center gap-2">
-              <button
-                className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold hover:bg-muted md:min-h-10"
-                onClick={() => {
-                  go(today);
-                }}
-                type="button"
-              >
-                {copy.calendar.today}
-              </button>
               <button
                 aria-label={copy.calendar.previousMonth}
                 className={NAV_BUTTON}
@@ -185,6 +172,15 @@ export function CalendarPage() {
                 type="button"
               >
                 <NavGlyph name="forward" />
+              </button>
+              <button
+                className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold hover:bg-muted md:min-h-10"
+                onClick={() => {
+                  go(today);
+                }}
+                type="button"
+              >
+                {copy.calendar.today}
               </button>
             </div>
           </div>
