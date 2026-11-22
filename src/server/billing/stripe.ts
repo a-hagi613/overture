@@ -86,6 +86,7 @@ const eventSchema = z.object({
       id: z.string().optional(),
       client_reference_id: z.string().nullable().optional(),
       customer: z.string().nullable().optional(),
+      mode: z.string().nullable().optional(),
       lines: z
         .object({ data: z.array(lineSchema).optional() })
         .nullable()
@@ -191,6 +192,8 @@ function eventFrom(parsed: z.infer<typeof eventSchema>) {
     priceId ??= priceIdOf(line);
   }
 
+  const isSession = parsed.type.startsWith("checkout.session.");
+
   const event: PaymentEvent = {
     customerId: customerId ?? null,
     id: parsed.id,
@@ -199,6 +202,8 @@ function eventFrom(parsed: z.infer<typeof eventSchema>) {
     periodStartMs: periodStartSeconds > 0 ? periodStartSeconds * 1000 : null,
     plan: planOf(object.metadata?.plan) ?? planOf(subscriptionMetadata?.plan),
     priceId,
+    mode: object.mode ?? null,
+    sessionId: isSession ? (object.id ?? null) : null,
     type: parsed.type,
     userId,
   };

@@ -33,6 +33,7 @@ import { guardPosting } from "./guard/posting-guard.ts";
 import { createOpenTextService, isCoverLetterQuestion } from "./open-text.ts";
 import { isKillSwitchEnabled } from "../platform/settings/index.ts";
 import { createTargetsService } from "../profile/targets.ts";
+import { applicationsLeft } from "../billing/ledger.ts";
 import { greenhouseBoardUrl } from "./greenhouse-board-url.ts";
 import { countriesNamedIn } from "../catalog/question-normalize.ts";
 import { mapQuestionsWithLlm } from "../catalog/question-mapping.ts";
@@ -244,6 +245,8 @@ export function createPreparationService(deps: {
   source: QuestionSource | null;
   greenhouseBoardOrigin?: string | undefined;
   onReady?: (applicationId: string, userId: string) => void;
+  /** When billing is configured, nothing is prepared without Applications left (trial or plan). */
+  billingEnabled?: boolean;
   plainFormReader?: PlainFormReader;
   captureForm?: (input: {
     ats: "lever" | "ashby" | "workable" | "personio";
@@ -254,7 +257,17 @@ export function createPreparationService(deps: {
     url: string;
   }) => Promise<{ questions: FormQuestion[]; formSignature: string } | null>;
 }) {
-  const { db, clock, llm, personal, source, greenhouseBoardOrigin, onReady, captureForm } = deps;
+  const {
+    db,
+    clock,
+    llm,
+    personal,
+    source,
+    greenhouseBoardOrigin,
+    onReady,
+    captureForm,
+    billingEnabled = false,
+  } = deps;
 
   const catalog = createQuestionCatalog({ db, clock });
   const factsService = createFactService({ db, clock, personal });
@@ -683,6 +696,10 @@ export function createPreparationService(deps: {
 
     if (row === undefined || !PREPARABLE_STATUSES.some((status) => status === row.status)) {
       return null;
+    }
+
+    if (billingEnabled && applicationsLeft(db, row.userId, clock.now()) < 1) {
+      return { status: "skipped" as const, blocked: 0 };
     }
 
     if (

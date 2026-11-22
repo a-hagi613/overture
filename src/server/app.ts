@@ -306,6 +306,7 @@ export function createApp(deps: AppDependencies) {
   app.route(
     "/",
     createStripeWebhookRoutes({
+      cardFingerprintSecret: env.CARD_FINGERPRINT_SECRET ?? null,
       clock: deps.clock,
       db: deps.db,
       payments: deps.payments,

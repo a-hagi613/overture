@@ -83,6 +83,10 @@ export interface PaymentEvent {
   periodEndMs: number | null;
   /** The start of the paid period in epoch milliseconds, or null when unknown. */
   periodStartMs: number | null;
+  /** Checkout mode ("setup" for the free trial card), or null for other events. */
+  mode: string | null;
+  /** The Checkout session id for session events, or null. */
+  sessionId: string | null;
 }
 
 /**

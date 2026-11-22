@@ -252,8 +252,10 @@ export function createStripeWebhookRoutes(deps: {
   db: AppDatabase;
   clock: Clock;
   payments: Payments | null;
+  /** Keys the card fingerprint HMAC; null leaves the free trial off. */
+  cardFingerprintSecret: string | null;
 }) {
-  const { clock, db, payments } = deps;
+  const { clock, db, payments, cardFingerprintSecret } = deps;
   const routes = new Hono();
 
   const webhooks = createPaymentsWebhookService({ clock, db, planForPrice: planForPriceId });
@@ -287,7 +289,32 @@ export function createStripeWebhookRoutes(deps: {
       throw error;
     }
 
-    const result = webhooks.handle(event);
+    let trialCard = null;
+
+    if (
+      cardFingerprintSecret !== null &&
+      event.type === "checkout.session.completed" &&
+      event.mode === "setup" &&
+      event.sessionId !== null &&
+      event.userId !== null
+    ) {
+      try {
+        const card = await payments.retrieveVerifiedCard(event.sessionId);
+
+        if (card !== null && card.userId === event.userId) {
+          trialCard = {
+            hmac: cardFingerprintHmac(cardFingerprintSecret, card.fingerprint),
+            userId: event.userId,
+          };
+        }
+      } catch (error) {
+        logError("billing", error);
+
+        return context.json({ error: "stripe_error" }, 502);
+      }
+    }
+
+    const result = webhooks.handle(event, trialCard);
 
     context.header("Cache-Control", "no-store");
 
