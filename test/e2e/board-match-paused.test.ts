@@ -134,7 +134,7 @@ async function expectPausedHomeMatchesBoard(
   const context = await browser.newContext({
     deviceScaleFactor: 1,
     storageState,
-    viewport: { height: width === 1280 ? 2001 : 3245, width },
+    viewport: { height: width === 1280 ? 2001 : 3244, width },
   });
 
   const page = await context.newPage();
