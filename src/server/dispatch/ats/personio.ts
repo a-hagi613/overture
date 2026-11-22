@@ -121,6 +121,119 @@ async function fillCheckbox(page: Page, fieldName: string, value: string) {
   return true;
 }
 
+async function fillRadio(page: Page, fieldName: string, value: string) {
+  const group = page.locator(`input[type='radio'][name="${cssValue(fieldName)}"]`);
+  const count = await group.count();
+
+  if (count === 0) {
+    return false;
+  }
+
+  const ids = await group.evaluateAll((elements) => elements.map((element) => element.id));
+
+  const labels = await Promise.all(
+    ids.map(async (id) =>
+      id === ""
+        ? ""
+        : await page
+            .locator(`label[for="${cssValue(id)}"]`)
+            .first()
+            .textContent()
+            .catch(() => ""),
+    ),
+  );
+
+  const index = labels.findIndex((label) => normText(label) === normText(value));
+
+  if (index === -1) {
+    return false;
+  }
+
+  await group.evaluateAll((elements, chosen: number) => {
+    for (const [position, element] of elements.entries()) {
+      if (!(element instanceof HTMLInputElement)) {
+        continue;
+      }
+
+      const wanted = position === chosen;
+
+      if (element.checked === wanted) {
+        continue;
+      }
+
+      element.checked = wanted;
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }, index);
+
+  return true;
+}
+
+async function fillMultiselect(page: Page, fieldName: string, value: string) {
+  const group = page.locator(`input[type='checkbox'][name="${cssValue(fieldName)}"]`);
+  const count = await group.count();
+
+  if (count === 0) {
+    return false;
+  }
+
+  const wanted = new Set(
+    value
+      .split(",")
+      .map((part) => normText(part))
+      .filter((part) => part !== ""),
+  );
+
+  const ids = await group.evaluateAll((elements) => elements.map((element) => element.id));
+
+  const labels = await Promise.all(
+    ids.map(async (id) =>
+      id === ""
+        ? ""
+        : await page
+            .locator(`label[for="${cssValue(id)}"]`)
+            .first()
+            .textContent(),
+    ),
+  );
+
+  const matched = new Set<number>();
+
+  for (const [index, label] of labels.entries()) {
+    if (wanted.has(normText(label))) {
+      matched.add(index);
+    }
+  }
+
+  if (matched.size !== wanted.size) {
+    return false;
+  }
+
+  await group.evaluateAll(
+    (elements, chosen: number[]) => {
+      for (const [index, element] of elements.entries()) {
+        if (!(element instanceof HTMLInputElement)) {
+          continue;
+        }
+
+        const selected = chosen.includes(index);
+
+        if (element.checked === selected) {
+          continue;
+        }
+
+        element.checked = selected;
+        element.dispatchEvent(new Event("input", { bubbles: true }));
+        element.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    },
+    [...matched],
+  );
+
+  return true;
+}
+
 async function fillPlannedFields(page: Page, fields: readonly SendPlanField[]) {
   type Fill = (index: number) => Promise<boolean>;
 
@@ -146,6 +259,10 @@ async function fillPlannedFields(page: Page, fields: readonly SendPlanField[]) {
       filled = await fillSelect(page, field.fieldName, field.answer);
     } else if (field.fieldType === "checkbox") {
       filled = await fillCheckbox(page, field.fieldName, field.answer);
+    } else if (field.fieldType === "radio") {
+      filled = await fillRadio(page, field.fieldName, field.answer);
+    } else if (field.fieldType === "multiselect") {
+      filled = await fillMultiselect(page, field.fieldName, field.answer);
     } else {
       filled = await fillText(page, field.fieldName, field.answer);
     }
@@ -386,6 +503,15 @@ export const runPersonioAttempt: (
     };
   }
 
+  if (status !== null && status >= 400 && status < 500) {
+    return {
+      confirmationSeen: false,
+      outcome: "blocked",
+      submitMayHaveLanded: false,
+      submitResponseStatus: status,
+    };
+  }
+
   const confirmed = await waitForPersonioConfirmation(page);
 
   if (confirmed) {
@@ -393,15 +519,6 @@ export const runPersonioAttempt: (
       confirmationSeen: true,
       outcome: "sent",
       submitMayHaveLanded: true,
-      submitResponseStatus: status,
-    };
-  }
-
-  if (status !== null && status >= 400 && status < 500) {
-    return {
-      confirmationSeen: false,
-      outcome: "blocked",
-      submitMayHaveLanded: false,
       submitResponseStatus: status,
     };
   }

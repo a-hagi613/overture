@@ -1257,8 +1257,9 @@ body, sender or attachment, so the admin never sees message content.
   after its 20-form probe, so its catalog polling and matching stay off). Before discovery exists, `discoveredAt` is null. Later slices
   (M1-07) add optional per-ATS fields (`boardCount`, `lastPollAt`, `errorRate`) without changing this contract.
   `POST /admin/api/probes/personio` queues a probe of up to twenty open Personio forms, or of an explicit
-  `{ urls }` list of at most twenty real apply URLs while the kill switch is still engaged; it reads each form over
-  plain HTTP, never submits, and records a result per form. `GET /admin/api/probes/personio` returns the last run's
+  `{ urls }` list of at most twenty real apply URLs while the kill switch is still engaged; every URL must be on
+  `*.jobs.personio.com` or `*.jobs.personio.de` (a loopback fixture host is accepted only outside production). It
+  reads each form over plain HTTP, never submits, and records a result per form. `GET /admin/api/probes/personio` returns the last run's
   summary and one row per form for the Catalog page. A form that reads completely is `readable`, a required custom
   question with no rule is an honest `needs_review`, and a control the flow cannot fill is `unsupported`; the probe
   passes only when all twenty forms read with no unreadable or unsupported form.
@@ -1433,7 +1434,7 @@ and none submits an application or touches a user:
 
 | Check | What is real | Also refreshes |
 |---|---|---|
-| Forms | the `fixtures.capture` path opens one posting per ATS chosen from the open catalog, saves its form and assets, reports a changed form signature, and never fills or submits; Personio is read over plain HTTP instead (no browser minutes) and reports its changed signature the same way | saved forms in R2 `fixtures/` (§10.5) |
+| Forms | the `fixtures.capture` path opens one posting per ATS chosen from the open catalog, saves its form and assets, reports a changed form signature, and never fills or submits; Personio is read over plain HTTP instead (no browser minutes) and reports its changed signature the same way, and is skipped while `ats.personio` is engaged so the check cannot page before the probe enables it | saved forms in R2 `fixtures/` (§10.5) |
 | AI | four fixed, deterministic Haiku calls (score, open text, question mapping, tag fallback) through `LlmPort`, checked against their output schemas and the resume-line rule | MSW recordings in R2 `recordings/anthropic/` |
 | Mail | a DKIM-signed message from `no-reply@tryoverture.com` to the reserved `live-check@tryoverture.com`, through Cloudflare Email Sending, Email Routing and the Worker, ingested with `auth='pass'` and its code matched within `live_checks.mail_wait_minutes` (default 5); first the same group's `mail.sending` guard verifies the sending domain's bounce MX, SPF, DKIM and DMARC records when `REQUIRE_EMAIL_SENDING` is set (gated and non-alerting before that) | recorded `.eml` fixtures in R2 `recordings/mail/` |
 | Storage | an R2 put, get, list and delete | — |

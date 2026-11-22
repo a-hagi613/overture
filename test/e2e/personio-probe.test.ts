@@ -97,6 +97,14 @@ test("an explicit list of real apply URLs is probed without enabling the ATS", a
 
     expect(queued.ok).toBe(true);
 
+    const second = await fetch(`${adminIsolatedAppServer.url}/__test__/jobs/run-now`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "probe.personio", payload: JSON.stringify({ urls }) }),
+    });
+
+    expect(second.ok).toBe(true);
+
     await openAdminAsOwner(page, adminIsolatedAppUrl, accessServer.issueToken);
 
     const response = await page.request.get(`${adminIsolatedAppUrl}/admin/api/probes/personio`);
@@ -108,6 +116,7 @@ test("an explicit list of real apply URLs is probed without enabling the ATS", a
     expect(probe.summary?.total).toBe(2);
     expect(probe.summary?.readable).toBe(2);
     expect(probe.summary?.passed).toBe(false);
+    expect(probe.forms).toHaveLength(2);
     expect(probe.forms.map((form) => form.url).toSorted()).toEqual(urls.toSorted());
   } finally {
     fixture.close();
@@ -181,6 +190,32 @@ test("the admin probes twenty Personio forms over plain HTTP and shows each resu
     await expect(page.getByRole("heading", { name: "Personio probe" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Run the probe" })).toBeVisible();
     await expect(page.getByText("The probe passes.")).toBeVisible();
+  } finally {
+    fixture.close();
+  }
+});
+
+test("the admin accepts loopback fixtures in tests and refuses any other probe host", async ({
+  page,
+  adminIsolatedAppUrl,
+  accessServer,
+}) => {
+  const fixture = startPersonioFixture({ variant: "standard" });
+
+  try {
+    await openAdminAsOwner(page, adminIsolatedAppUrl, accessServer.issueToken);
+
+    const refused = await page.request.post(`${adminIsolatedAppUrl}/admin/api/probes/personio`, {
+      data: { urls: ["https://evil.example/job/1/apply"] },
+    });
+
+    expect(refused.status()).toBe(400);
+
+    const accepted = await page.request.post(`${adminIsolatedAppUrl}/admin/api/probes/personio`, {
+      data: { urls: [fixture.applyUrl("1234567")] },
+    });
+
+    expect(accepted.status()).toBe(200);
   } finally {
     fixture.close();
   }

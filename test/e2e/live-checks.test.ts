@@ -340,6 +340,9 @@ test.afterAll(async () => {
 test("the daily job captures one sample per ATS without submitting, calls Haiku and round-trips storage", async () => {
   await api.post("/__test__/catalog/postings/close-all", { data: {} });
   await seedCatalog();
+  await api.put("/__test__/kill-switches/ats/personio", {
+    data: { enabled: false, reason: "live check test", setBy: "owner" },
+  });
 
   await runJob("live.check", JSON.stringify({ groups: ["forms", "llm", "r2", "alerts"] }));
 
@@ -359,6 +362,23 @@ test("the daily job captures one sample per ATS without submitting, calls Haiku 
   expect(byCheck.get("alert.disk")?.ok).toBe(true);
   expect(byCheck.get("alert.backup.lag")?.ok).toBe(true);
   expect(submissions).toBe(0);
+});
+
+test("forms.personio is skipped while its kill switch is engaged", async () => {
+  await api.put("/__test__/kill-switches/ats/personio", {
+    data: { enabled: true, reason: "live check skip test", setBy: "owner" },
+  });
+
+  await runJob("live.check", JSON.stringify({ groups: ["forms"] }));
+
+  const skipped = (await liveCheckResults()).find((row) => row.check === "forms.personio");
+
+  expect(skipped?.ok).toBe(true);
+  expect(skipped?.detail["skipped"]).toContain("kill switch");
+
+  await api.put("/__test__/kill-switches/ats/personio", {
+    data: { enabled: false, reason: "live check test done", setBy: "owner" },
+  });
 });
 
 test("the mail check sends through the MailSender and passes only when it comes back with DKIM verified", async () => {

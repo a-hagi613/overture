@@ -11,8 +11,9 @@ import { ATS_NAMES, captureFixtures } from "../fixtures/capture.ts";
 import { postings } from "../platform/db/schema.ts";
 import { env } from "../config/env.ts";
 import { createPlainFormReader } from "../pipeline/form-read.ts";
+import { isKillSwitchEnabled } from "../platform/settings/index.ts";
 import { previousCheckDetail } from "./store.ts";
-import { failedResult } from "./types.ts";
+import { failedResult, skippedResult } from "./types.ts";
 
 export interface FormsCheckDeps {
   db: AppDatabase;
@@ -94,6 +95,14 @@ async function runOneAts(deps: FormsCheckDeps, ats: (typeof ATS_NAMES)[number]) 
   }
 
   if (ats === "personio") {
+    if (isKillSwitchEnabled(deps.db, "ats", "personio")) {
+      return skippedResult(
+        "forms.personio",
+        startedAt,
+        "ats.personio kill switch engaged; the probe enables it before the daily check runs",
+      );
+    }
+
     try {
       return await runPersonioCheck(deps, startedAt, posting);
     } catch (error) {

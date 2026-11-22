@@ -37,6 +37,9 @@ const facts = [
   { key: "current_country", value: "Germany", scope: "" },
   { key: "earliest_start", value: "2026-12-01", scope: "" },
   { key: "salary_expectation", value: "90000 per year", scope: "" },
+  { key: "work_auth", value: "Yes", scope: "DE" },
+  { key: "willing_relocate", value: "Yes", scope: "" },
+  { key: "languages", value: "English, German", scope: "" },
 ];
 
 const applicationSchema = z.object({
@@ -80,14 +83,33 @@ const reviewSchema = z.object({
 
 const fixtureStateSchema = z.object({
   applicationRequests: z.number(),
+  checkedValues: z.array(z.string()),
   documents: z.array(z.object({ bytes: z.number(), name: z.string() })),
   formLoads: z.number(),
   submissions: z.number(),
 });
 
-async function startHarness(identityServer: IdentityServer, variant: PersonioVariant) {
+interface PersonioHarnessOptions {
+  showConfirmation?: boolean;
+  submitStatus?: number;
+  redirectToAlternateHost?: boolean;
+  redirectJobId?: string;
+}
+
+async function startHarness(
+  identityServer: IdentityServer,
+  variant: PersonioVariant,
+  options: PersonioHarnessOptions = {},
+) {
   const directory = mkdtempSync(join(tmpdir(), "overture-personio-send-"));
-  const fixture = startPersonioFixture({ variant });
+
+  const fixture = startPersonioFixture({
+    redirectJobId: options.redirectJobId,
+    redirectToAlternateHost: options.redirectToAlternateHost,
+    showConfirmation: options.showConfirmation,
+    submitStatus: options.submitStatus,
+    variant,
+  });
 
   const server = await startFreshAppServer(identityServer, {
     BROWSER_PROVIDER: "local",
@@ -110,8 +132,9 @@ async function withHarness(
   identityServer: IdentityServer,
   variant: PersonioVariant,
   work: (harness: PersonioHarness) => Promise<void>,
+  options: PersonioHarnessOptions = {},
 ) {
-  const harness = await startHarness(identityServer, variant);
+  const harness = await startHarness(identityServer, variant, options);
 
   try {
     await work(harness);
@@ -275,6 +298,11 @@ test("a Personio form is read over plain HTTP and a send fills, uploads the resu
     expect(harness.fixture.state.lastForm["email"]).toBe("maya.okafor@example.com");
     expect(harness.fixture.state.lastForm["first_name"]).toBe("Maya");
     expect(harness.fixture.state.lastForm["last_name"]).toBe("Okafor");
+    expect(harness.fixture.state.lastForm["custom_attribute_2001"]).toBe("yes");
+    expect(state.checkedValues).toContain("custom_attribute_2001=yes");
+    expect(state.checkedValues).toContain("custom_attribute_2002=english");
+    expect(state.checkedValues).toContain("custom_attribute_2002=german");
+    expect(state.checkedValues).not.toContain("custom_attribute_2002=french");
 
     const attempts = await attemptsOf(owner, applicationId);
 
@@ -298,7 +326,7 @@ test("a required custom Personio question opens an honest Review, and its answer
     const reviews = reviewSchema.parse(await (await owner.get("/api/reviews")).json());
 
     const review = reviews.reviews.find((candidate) =>
-      candidate.prompt.includes("authorized to work in Germany"),
+      candidate.prompt.includes("visa sponsorship"),
     );
 
     if (review === undefined) {
@@ -326,4 +354,107 @@ test("a required custom Personio question opens an honest Review, and its answer
     expect(harness.fixture.state.lastForm["custom_attribute_1002"]).toBe("custom_option_2001");
     expect(harness.fixture.state.lastForm["email"]).toBe("maya.okafor@example.com");
   });
+});
+
+test("a bare 2xx without the confirmation page stays confirming and is never called sent", async ({
+  identityServer,
+}) => {
+  await withHarness(
+    identityServer,
+    "standard",
+    async (harness) => {
+      const { applicationId, owner } = await seededApplication(harness);
+
+      await grantApplications(owner, 2);
+      await approveApplication(owner, applicationId);
+      await runJob(owner, "application.send", JSON.stringify({ applicationId }));
+
+      const after = await applicationOf(owner, applicationId);
+
+      expect(after.application.status).toBe("confirming");
+      expect(after.snapshot).toBeNull();
+      expect(harness.fixture.state.submissions).toBe(1);
+
+      const attempts = await attemptsOf(owner, applicationId);
+
+      expect(attempts).toHaveLength(1);
+      expect(attempts[0]?.outcome).toBe("unconfirmed");
+      expect(attempts[0]?.submitResponseStatus).toBe(201);
+    },
+    { showConfirmation: false },
+  );
+});
+
+test("a 4xx answer to the Personio application request is blocked, not sent", async ({
+  identityServer,
+}) => {
+  await withHarness(
+    identityServer,
+    "standard",
+    async (harness) => {
+      const { applicationId, owner } = await seededApplication(harness);
+
+      await grantApplications(owner, 2);
+      await approveApplication(owner, applicationId);
+      await runJob(owner, "application.send", JSON.stringify({ applicationId }));
+
+      const after = await applicationOf(owner, applicationId);
+
+      expect(after.application.status).toBe("approved");
+      expect(after.snapshot).toBeNull();
+
+      const attempts = await attemptsOf(owner, applicationId);
+
+      expect(attempts).toHaveLength(1);
+      expect(attempts[0]?.outcome).toBe("blocked");
+      expect(attempts[0]?.submitResponseStatus).toBe(400);
+    },
+    { submitStatus: 400 },
+  );
+});
+
+test("a Personio page reached on another host skips the Application as a host mismatch", async ({
+  identityServer,
+}) => {
+  await withHarness(
+    identityServer,
+    "standard",
+    async (harness) => {
+      const { applicationId, owner } = await seededApplication(harness);
+
+      await grantApplications(owner, 2);
+      await approveApplication(owner, applicationId);
+      await runJob(owner, "application.send", JSON.stringify({ applicationId }));
+
+      const after = await applicationOf(owner, applicationId);
+
+      expect(after.application.status).toBe("skipped");
+      expect(after.application.statusReason).toBe("posting_identity:host");
+      expect(harness.fixture.state.submissions).toBe(0);
+    },
+    { redirectToAlternateHost: true },
+  );
+});
+
+test("a Personio page for another job id skips the Application as a job_id mismatch", async ({
+  identityServer,
+}) => {
+  await withHarness(
+    identityServer,
+    "standard",
+    async (harness) => {
+      const { applicationId, owner } = await seededApplication(harness);
+
+      await grantApplications(owner, 2);
+      await approveApplication(owner, applicationId);
+      await runJob(owner, "application.send", JSON.stringify({ applicationId }));
+
+      const after = await applicationOf(owner, applicationId);
+
+      expect(after.application.status).toBe("skipped");
+      expect(after.application.statusReason).toBe("posting_identity:job_id");
+      expect(harness.fixture.state.submissions).toBe(0);
+    },
+    { redirectJobId: "9999999" },
+  );
 });

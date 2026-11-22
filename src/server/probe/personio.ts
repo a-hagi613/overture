@@ -1,6 +1,8 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import { isFixtureHost } from "../../shared/live-service-hosts.ts";
+
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PlainFormReader } from "../pipeline/form-read.ts";
@@ -17,8 +19,41 @@ export const PERSONIO_PROBE_JOB_KIND = "probe.personio";
 
 export const PERSONIO_PROBE_LIMIT = 20;
 
+const PERSONIO_APPLY_HOST = /^(?:[a-z0-9-]+\.jobs\.personio\.(?:com|de))$/iu;
+
+/**
+ * A probe URL must point at a Personio career site. Loopback fixture hosts are
+ * accepted only outside production (ADR 0016); anything else is refused before
+ * the job is queued.
+ *
+ * @param raw the owner-supplied apply URL
+ * @param environment the process environment
+ * @returns whether the URL may be probed
+ */
+export function isPersonioProbeUrl(raw: string, environment: string) {
+  try {
+    const parsed = new URL(raw);
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return false;
+    }
+
+    if (isFixtureHost(parsed.hostname)) {
+      return environment !== "production";
+    }
+
+    return parsed.protocol === "https:" && PERSONIO_APPLY_HOST.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export const personioProbePayloadSchema = z.object({
-  urls: z.array(z.url()).min(1).max(20).optional(),
+  urls: z
+    .array(z.url().refine((url) => isPersonioProbeUrl(url, env.NODE_ENV)))
+    .min(1)
+    .max(20)
+    .optional(),
 });
 
 export const PERSONIO_PROBE_OUTCOMES = [

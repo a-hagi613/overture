@@ -45,7 +45,7 @@ import { enqueueLiveCheckNow } from "../live-checks/job.ts";
 import { readLiveCheckResults } from "../live-checks/store.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { readMailSummary } from "../platform/mail/budget.ts";
-import { PERSONIO_PROBE_JOB_KIND } from "../probe/personio.ts";
+import { PERSONIO_PROBE_JOB_KIND, isPersonioProbeUrl } from "../probe/personio.ts";
 import {
   getAllKillSwitches,
   getAllSettings,
@@ -123,7 +123,11 @@ const mailHealthQuery = z.object({
 });
 
 const personioProbeBody = z.object({
-  urls: z.array(z.url()).min(1).max(20).optional(),
+  urls: z
+    .array(z.url().refine((url) => isPersonioProbeUrl(url, env.NODE_ENV)))
+    .min(1)
+    .max(20)
+    .optional(),
 });
 
 const personioProbeDetailSchema = z.object({
@@ -807,9 +811,10 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
   routes.get("/probes/personio", (context) => {
     const results = readLiveCheckResults(db, 500);
     const summary = results.find((result) => result.check === "probe.personio.summary") ?? null;
+    const runId = summary?.runId ?? null;
 
     const forms = results
-      .filter((result) => result.check === "probe.personio")
+      .filter((result) => result.check === "probe.personio" && result.runId === runId)
       .flatMap((result) => {
         const parsed = personioProbeDetailSchema.safeParse(result.detail);
 

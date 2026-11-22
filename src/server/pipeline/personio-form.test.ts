@@ -29,6 +29,16 @@ const PAGE = `<!doctype html>
   </select>
   <label for="field-custom_attribute_1002">Frühester Starttermin</label>
   <input id="field-custom_attribute_1002" type="date" name="custom_attribute_1002" />
+  <div role="group" aria-labelledby="relocate-label">
+    <div id="relocate-label">Are you authorized to work in Germany?<span aria-hidden="true">*</span></div>
+    <label for="field-custom_attribute_2001_yes"><input id="field-custom_attribute_2001_yes" name="custom_attribute_2001" type="radio" value="yes" />Yes</label>
+    <label for="field-custom_attribute_2001_no"><input id="field-custom_attribute_2001_no" name="custom_attribute_2001" type="radio" value="no" />No</label>
+  </div>
+  <div role="group" aria-labelledby="languages-label">
+    <div id="languages-label">Which languages do you speak?</div>
+    <label for="field-custom_attribute_2002_english"><input id="field-custom_attribute_2002_english" name="custom_attribute_2002" type="checkbox" value="english" />English</label>
+    <label for="field-custom_attribute_2002_german"><input id="field-custom_attribute_2002_german" name="custom_attribute_2002" type="checkbox" value="german" />German</label>
+  </div>
   <div role="group" aria-labelledby="doc-label-cv">
     <div id="doc-label-cv">Lebenslauf<span aria-hidden="true">*</span></div>
     <div class="document-input-wrapper">
@@ -60,11 +70,24 @@ describe("readPersonioFormHtml", () => {
       "gender",
       "custom_attribute_1001",
       "custom_attribute_1002",
+      "custom_attribute_2001",
+      "custom_attribute_2002",
       "documents.cv",
       "documents.cover-letter",
     ]);
 
-    const [first, , email, gender, customSelect, customDate, resume, coverLetter] = read.questions;
+    const [
+      first,
+      ,
+      email,
+      gender,
+      customSelect,
+      customDate,
+      customRadio,
+      customChecks,
+      resume,
+      coverLetter,
+    ] = read.questions;
 
     expect(first).toMatchObject({
       fieldName: "first_name",
@@ -90,6 +113,18 @@ describe("readPersonioFormHtml", () => {
       label: "Frühester Starttermin",
       required: false,
     });
+    expect(customRadio).toMatchObject({
+      fieldType: "radio",
+      label: "Are you authorized to work in Germany?",
+      options: ["Yes", "No"],
+      required: true,
+    });
+    expect(customChecks).toMatchObject({
+      fieldType: "multiselect",
+      label: "Which languages do you speak?",
+      options: ["English", "German"],
+      required: false,
+    });
     expect(resume).toMatchObject({ fieldType: "file", label: "Resume", required: true });
     expect(coverLetter).toMatchObject({
       fieldType: "file",
@@ -107,6 +142,7 @@ describe("readPersonioFormHtml", () => {
       "last_name",
       "email",
       "custom_attribute_1001",
+      "custom_attribute_2001",
       "documents.cv",
     ]);
   });

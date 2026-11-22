@@ -44,6 +44,54 @@
           </select>
           <label for="field-birthday">__BIRTHDAY_LABEL__</label>
           <input id="field-birthday" name="birthday" type="date" />
+          <div role="group" aria-labelledby="relocate-label">
+            <div id="relocate-label">
+              Are you legally authorized to work in Germany?<span aria-hidden="true">*</span>
+            </div>
+            <label for="field-custom_attribute_2001_yes"
+              ><input
+                id="field-custom_attribute_2001_yes"
+                name="custom_attribute_2001"
+                type="radio"
+                value="yes"
+              />Yes</label
+            >
+            <label for="field-custom_attribute_2001_no"
+              ><input
+                id="field-custom_attribute_2001_no"
+                name="custom_attribute_2001"
+                type="radio"
+                value="no"
+              />No</label
+            >
+          </div>
+          <div role="group" aria-labelledby="languages-label">
+            <div id="languages-label">Which languages do you speak?</div>
+            <label for="field-custom_attribute_2002_english"
+              ><input
+                id="field-custom_attribute_2002_english"
+                name="custom_attribute_2002"
+                type="checkbox"
+                value="english"
+              />English</label
+            >
+            <label for="field-custom_attribute_2002_german"
+              ><input
+                id="field-custom_attribute_2002_german"
+                name="custom_attribute_2002"
+                type="checkbox"
+                value="german"
+              />German</label
+            >
+            <label for="field-custom_attribute_2002_french"
+              ><input
+                id="field-custom_attribute_2002_french"
+                name="custom_attribute_2002"
+                type="checkbox"
+                value="french"
+              />French</label
+            >
+          </div>
           __CUSTOM_FIELDS__
 
           <h3>__DOCUMENTS_HEADING__</h3>
@@ -112,11 +160,26 @@
         event.preventDefault();
 
         const body = {};
+        const checked = [];
+
         for (const element of document.querySelectorAll("input, select, textarea")) {
-          if (element.name) {
-            body[element.name] = element.value;
+          if (!element.name) {
+            continue;
           }
+
+          if (element.type === "checkbox" || element.type === "radio") {
+            if (element.checked) {
+              body[element.name] = element.value;
+              checked.push(`${element.name}=${element.value}`);
+            }
+
+            continue;
+          }
+
+          body[element.name] = element.value;
         }
+
+        body.__checked__ = checked.join(",");
 
         const response = await fetch(`/api/v1/jobs/${jobId}/application`, {
           method: "POST",
@@ -125,7 +188,10 @@
         });
 
         if (response.ok) {
-          document.querySelector("main").innerHTML = confirmation;
+          if (__SHOW_CONFIRMATION__) {
+            document.querySelector("main").innerHTML = confirmation;
+          }
+
           return;
         }
 

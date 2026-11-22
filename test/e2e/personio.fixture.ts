@@ -18,6 +18,7 @@ export interface PersonioFixtureState {
   formLoads: number;
   documents: { name: string; bytes: Uint8Array }[];
   lastForm: Record<string, string>;
+  checkedValues: string[];
 }
 
 export interface PersonioFixture {
@@ -28,13 +29,17 @@ export interface PersonioFixture {
 }
 
 interface PersonioFixtureOptions {
-  variant?: PersonioVariant;
+  variant?: PersonioVariant | undefined;
+  showConfirmation?: boolean | undefined;
+  submitStatus?: number | undefined;
+  redirectToAlternateHost?: boolean | undefined;
+  redirectJobId?: string | undefined;
 }
 
 const CUSTOM_FIELDS = `
   <label for="field-custom_attribute_1001">LinkedIn profile</label>
   <input id="field-custom_attribute_1001" name="custom_attribute_1001" type="text" maxlength="5000" />
-  <label for="field-custom_attribute_1002">Are you authorized to work in Germany?<span aria-hidden="true">*</span><span class="sr-only"> (required)</span></label>
+  <label for="field-custom_attribute_1002">Do you require visa sponsorship?<span aria-hidden="true">*</span><span class="sr-only"> (required)</span></label>
   <select id="field-custom_attribute_1002" name="custom_attribute_1002">
     <option value="" selected>Please choose</option>
     <option value="custom_option_2001">Yes</option>
@@ -106,7 +111,7 @@ const TEXT = {
   },
 } as const;
 
-function render(jobId: string, variant: PersonioVariant, index: number) {
+function render(jobId: string, variant: PersonioVariant, index: number, showConfirmation: boolean) {
   const language = index % 2 === 0 ? "de" : "en";
   const text = TEXT[language];
 
@@ -132,7 +137,8 @@ function render(jobId: string, variant: PersonioVariant, index: number) {
     .replaceAll("__ADD_FILE__", text.addFile)
     .replaceAll("__SUBMIT_LABEL__", text.submit)
     .replaceAll("__CUSTOM_FIELDS__", variant === "custom" ? CUSTOM_FIELDS : "")
-    .replaceAll("__DOCUMENT_CATEGORIES__", variant === "documents" ? DOCUMENT_CATEGORIES : "");
+    .replaceAll("__DOCUMENT_CATEGORIES__", variant === "documents" ? DOCUMENT_CATEGORIES : "")
+    .replaceAll("__SHOW_CONFIRMATION__", showConfirmation ? "true" : "false");
 }
 
 /**
@@ -144,10 +150,13 @@ function render(jobId: string, variant: PersonioVariant, index: number) {
  */
 export function startPersonioFixture(options: PersonioFixtureOptions = {}) {
   const variant = options.variant ?? "standard";
+  const showConfirmation = options.showConfirmation ?? true;
+  const submitStatus = options.submitStatus ?? 201;
   const indexByJob = new Map<string, number>();
 
   const state: PersonioFixtureState = {
     applicationRequests: 0,
+    checkedValues: [],
     documents: [],
     formLoads: 0,
     lastForm: {},
@@ -163,6 +172,7 @@ export function startPersonioFixture(options: PersonioFixtureOptions = {}) {
       if (path === "/__fixture__/state") {
         return Response.json({
           applicationRequests: state.applicationRequests,
+          checkedValues: state.checkedValues,
           documents: state.documents.map((document) => ({
             bytes: document.bytes.byteLength,
             name: document.name,
@@ -197,11 +207,18 @@ export function startPersonioFixture(options: PersonioFixtureOptions = {}) {
 
         if (body.success) {
           for (const [key, value] of Object.entries(body.data)) {
-            state.lastForm[key] = value;
+            if (key === "__checked__") {
+              state.checkedValues = value === "" ? [] : value.split(",");
+            } else {
+              state.lastForm[key] = value;
+            }
           }
         }
 
-        return Response.json({ ok: true }, { status: 201 });
+        return Response.json(
+          { ok: submitStatus >= 200 && submitStatus < 300 },
+          { status: submitStatus },
+        );
       }
 
       const jobPage = /^\/job\/(?<job>\d+)$/u.exec(path);
@@ -220,12 +237,32 @@ export function startPersonioFixture(options: PersonioFixtureOptions = {}) {
 
       if (applyPage?.groups?.job !== undefined && request.method === "GET") {
         const jobId = applyPage.groups.job;
+
+        if (
+          url.searchParams.get("redirected") !== "1" &&
+          (options.redirectToAlternateHost === true || options.redirectJobId !== undefined)
+        ) {
+          const target = new URL(url);
+
+          if (options.redirectToAlternateHost === true) {
+            target.hostname = target.hostname === "127.0.0.1" ? "localhost" : "127.0.0.1";
+          }
+
+          if (options.redirectJobId !== undefined) {
+            target.pathname = `/job/${options.redirectJobId}/apply`;
+          }
+
+          target.searchParams.set("redirected", "1");
+
+          return Response.redirect(target.toString(), 302);
+        }
+
         const index = indexByJob.get(jobId) ?? indexByJob.size;
 
         indexByJob.set(jobId, index);
         state.formLoads += 1;
 
-        return new Response(render(jobId, variant, index), {
+        return new Response(render(jobId, variant, index, showConfirmation), {
           headers: { "content-type": "text/html; charset=utf-8" },
         });
       }

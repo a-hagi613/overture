@@ -178,8 +178,10 @@ export async function checkPostingIdentity(page: Page, expected: PostingIdentity
     return livePosting.jobId === expected.jobId ? matched : mismatch("job_id");
   }
 
+  const skipEmptyBoardToken = expected.ats === "personio" && livePosting.boardToken === "";
+
   if (
-    livePosting.boardToken !== "" &&
+    !skipEmptyBoardToken &&
     livePosting.boardToken.toLowerCase() !== expected.boardToken.toLowerCase()
   ) {
     return mismatch("board_token");

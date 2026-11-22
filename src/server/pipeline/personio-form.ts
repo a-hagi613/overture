@@ -146,6 +146,18 @@ function canonicalLabel(name: string, ownLabel: string, groupLabel: string) {
   return cleaned === "" ? name : cleaned;
 }
 
+function canonicalGroupLabel(name: string, groupLabel: string) {
+  const standard = PERSONIO_STANDARD_LABELS.get(name) ?? PERSONIO_DOCUMENT_LABELS.get(name);
+
+  if (standard !== undefined) {
+    return standard;
+  }
+
+  const cleaned = cleanLabel(groupLabel);
+
+  return cleaned === "" ? name : cleaned;
+}
+
 function starred(texts: readonly string[]) {
   return texts.some((text) => REQUIRED_MARKER.test(text));
 }
@@ -248,7 +260,7 @@ function groupedQuestions(controls: readonly RawControl[], labelled: ReadonlyMap
       questions.push({
         fieldName: first.name,
         fieldType: control.type === "radio" ? "radio" : "multiselect",
-        label: canonicalLabel(first.name, first.ownLabel, groupLabel),
+        label: canonicalGroupLabel(first.name, groupLabel),
         options: group.map((entry) => cleanLabel(entry.ownLabel) || entry.id),
         required:
           group.some((entry) => entry.required) ||
