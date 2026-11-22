@@ -10,12 +10,7 @@ import type { MatchingService } from "../matching/score.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
 
-import {
-  applicationsLeft,
-  committedSince,
-  endingGrantOf,
-  planApplications,
-} from "../billing/ledger.ts";
+import { billingSummary, committedSince } from "../billing/ledger.ts";
 import {
   applicationEvents,
   applications,
@@ -31,7 +26,8 @@ import { enqueuePlannerDay } from "../dispatch/planner.ts";
 import { ensurePrepDailyQueued } from "../pipeline/daily-prep.ts";
 import { dueCheckins } from "../pipeline/checkins.ts";
 import { notifyPaused } from "../notify/events.ts";
-import { nextSendSlot, parseSendWindow } from "../dispatch/planning.ts";
+import { parseSendWindow } from "../dispatch/planning.ts";
+import { nextSendAtOf, sendQueueOf } from "../pipeline/send-queue.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { copy, failedReasonText } from "../../shared/copy.ts";
 import { TIER_1_FACT_KEYS, TIER_2_FACT_KEYS } from "../../shared/facts.ts";
@@ -373,24 +369,6 @@ export function createHomeRoutes(deps: {
     };
   }
 
-  function queueOf(userId: string, now: number) {
-    const scheduled = db
-      .select({ at: applications.scheduledFor })
-      .from(applications)
-      .where(and(eq(applications.userId, userId), eq(applications.status, "approved")))
-      .orderBy(asc(applications.scheduledFor))
-      .all()
-      .flatMap((row) => (row.at === null ? [] : [row.at]));
-
-    const nextIndex = scheduled.findIndex((at) => at >= now);
-
-    if (nextIndex === -1) {
-      return { position: null, sendAt: null };
-    }
-
-    return { position: nextIndex + 1, sendAt: scheduled[nextIndex] ?? null };
-  }
-
   function strengthenOf(userId: string) {
     const rows = db
       .select({ confirmed: facts.confirmed, key: facts.key })
@@ -531,7 +509,8 @@ export function createHomeRoutes(deps: {
     const dayStart = localDayStartFor(today, zone);
     const sentToday = committedSince(db, userId, dayStart);
     const dailyCap = dailyCapOf(db);
-    const left = applicationsLeft(db, userId, now);
+    const billing = billingSummary(db, userId, now);
+    const left = billing.applicationsLeft;
     const profile = profileOf(userId);
 
     const startFor = (offsetDays: number) =>
@@ -638,19 +617,17 @@ export function createHomeRoutes(deps: {
       .all()
       .map((row) => row.company);
 
-    const scheduled = approvedRows.flatMap((row) =>
-      row.scheduledFor === null ? [] : [row.scheduledFor],
-    );
+    const scheduledFor = approvedRows.map((row) => row.scheduledFor);
 
     const window = parseSendWindow(getSetting(db, "limits.send_window"));
 
-    let nextSendAt: number | null = null;
-
-    if (scheduled.length > 0) {
-      nextSendAt = Math.min(...scheduled);
-    } else if (approvedRows.length > 0) {
-      nextSendAt = nextSendSlot(now, zone, window);
-    }
+    const nextSendAt = nextSendAtOf({
+      approved: approvedRows.length,
+      now,
+      scheduledFor,
+      window,
+      zone,
+    });
 
     const reviewList = reviews.list(userId);
     const inbox = await inboxViews(userId);
@@ -662,12 +639,12 @@ export function createHomeRoutes(deps: {
       checkInDue: checkIns.length,
       checkIns,
       dailyCap,
-      endingGrant: endingGrantOf(db, userId, now),
+      endingGrant: billing.endingGrant,
       nextSendAt,
       now,
       pauseReason: profile.pauseReason,
-      planApplications: planApplications(db, userId, now),
-      queue: queueOf(userId, now),
+      planApplications: billing.planApplications,
+      queue: sendQueueOf(scheduledFor, now),
       queued: approvedRows.length,
       ready: {
         approved: approvedReady?.total ?? 0,

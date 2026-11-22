@@ -635,6 +635,12 @@ const eraser = createAccountEraser({
   db,
   mailboxes,
   objects,
+  personal: {
+    forget: (userId) => {
+      personal.forget(userId);
+      mailPersonal.forget(userId);
+    },
+  },
   providers: browserProviders,
   sealNotice: async (notice) => {
     const payload = await noticeCrypto.seal(notice);

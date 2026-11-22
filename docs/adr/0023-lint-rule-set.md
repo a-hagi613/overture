@@ -83,6 +83,10 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
   board and posting so an Application can be created and then watch its catalog rows be deleted, never a real Posting.
   `src/server/platform/db/migration-snapshot.test.ts` is listed for the same reason: it seeds the pre-`0056` catalog
   shape in a scratch database to prove the backfill and the foreign-key decoupling, never a real Posting.
+  `src/server/pipeline/reviews.test.ts`, `src/server/pipeline/email-notes.test.ts`,
+  `src/server/pipeline/approved-plan.test.ts`, `src/server/inbox/threads.test.ts` and
+  `src/server/inbox/linked-mail.test.ts` are listed for the same reason (#430): each writes one fictional company,
+  board and posting so its query-count invariant has rows to read, never a real Posting.
 - **The off-list and every scoped override are checked.** CI fails if the rules turned off in the configuration
   differ from the table below, if an override turns a rule down or changes its options without appearing in the
   "Rules off in one folder only" table, or if that table lists an override that does not exist. The same

@@ -177,41 +177,47 @@ export function ledgerBalances(db: BillingDb, userId: string) {
 }
 
 export function applicationsLeft(db: BillingDb, userId: string, at: number) {
-  const per = balancesPerGrant(db, userId);
-  const active = activeGrantsOf(db, userId, at);
-
-  return active.reduce((sum, grant) => sum + (per.get(grant.id)?.available ?? 0), 0);
+  return billingSummary(db, userId, at).applicationsLeft;
 }
 
 export function planApplications(db: BillingDb, userId: string, at: number) {
-  return activeGrantsOf(db, userId, at).reduce((sum, grant) => sum + grant.quantity, 0);
+  return billingSummary(db, userId, at).planApplications;
+}
+
+export function endingGrantOf(db: BillingDb, userId: string, at: number) {
+  return billingSummary(db, userId, at).endingGrant;
 }
 
 /**
- * The invite grant that is running out: the soonest-ending admin grant that has
- * an end date and still holds Applications. Home shows its count and end date
- * so an invited user can choose a plan before the grant ends.
+ * The person's billing strip: Applications left, the invite grant that is
+ * running out, and the plan's size. One read of their grants and one of their
+ * ledger serves all three; the soonest-ending admin grant with an end date and
+ * Applications left is the one Home shows, so an invited user can choose a plan
+ * before it ends.
  * @param db The database to read.
- * @param userId The user whose grant to check.
- * @param at The instant the grant is checked at.
- * @returns The Applications left on that grant and when it ends, or null.
+ * @param userId The person whose grants and ledger are read.
+ * @param at The instant the summary is for.
+ * @returns Applications left, the ending grant or null, and the plan's size.
  */
-export function endingGrantOf(db: BillingDb, userId: string, at: number) {
+export function billingSummary(db: BillingDb, userId: string, at: number) {
   const per = balancesPerGrant(db, userId);
+  const active = activeGrantsOf(db, userId, at);
 
-  const grant = activeGrantsOf(db, userId, at).find(
-    (row) => row.source === "admin" && row.expiresAt !== null,
-  );
+  const left = active.reduce((sum, grant) => sum + (per.get(grant.id)?.available ?? 0), 0);
+  const planSize = active.reduce((sum, grant) => sum + grant.quantity, 0);
 
-  const expiresAt = grant?.expiresAt ?? null;
+  const ending = active.find((row) => row.source === "admin" && row.expiresAt !== null);
+  const expiresAt = ending?.expiresAt ?? null;
+  const endingLeft = ending === undefined ? 0 : (per.get(ending.id)?.available ?? 0);
 
-  if (grant === undefined || expiresAt === null) {
-    return null;
-  }
-
-  const left = per.get(grant.id)?.available ?? 0;
-
-  return left > 0 ? { applicationsLeft: left, expiresAt } : null;
+  return {
+    applicationsLeft: left,
+    endingGrant:
+      ending === undefined || expiresAt === null || endingLeft === 0
+        ? null
+        : { applicationsLeft: endingLeft, expiresAt },
+    planApplications: planSize,
+  };
 }
 
 interface ReservationPair {

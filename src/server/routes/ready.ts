@@ -13,10 +13,11 @@ import { applicationEvents, applications, facts, matches, resumes } from "../pla
 import { enqueuePlannerDay } from "../dispatch/planner.ts";
 import {
   approvalProblem,
-  openApprovedPlan,
+  openApprovedPlans,
   sealApprovedPlan,
   sendPlanSha256,
 } from "../pipeline/approved-plan.ts";
+import type { ApprovedPlan } from "../pipeline/approved-plan.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { isCoverLetterQuestion } from "../pipeline/open-text.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
@@ -152,14 +153,10 @@ export function createReadyRoutes(deps: {
     row: ReadyCardRow,
     position: number | null,
     factSources: ReadonlyMap<string, string>,
+    approvedPlans: ReadonlyMap<string, ApprovedPlan>,
   ) {
     if (row.status === "approved") {
-      const approved = await openApprovedPlan({
-        applicationId: row.id,
-        db,
-        personal,
-        userId,
-      }).catch(() => null);
+      const approved = approvedPlans.get(row.id) ?? null;
 
       return {
         approvedAt: row.approvedAt,
@@ -237,6 +234,13 @@ export function createReadyRoutes(deps: {
     const approvedIds = rows.flatMap((row) => (row.status === "approved" ? [row.id] : []));
     const factSources = factSourceMap(db, user.id);
 
+    const approvedPlans = await openApprovedPlans({
+      applicationIds: approvedIds,
+      db,
+      personal,
+      userId: user.id,
+    });
+
     const cards = await Promise.all(
       rows.map(async (row) =>
         cardView(
@@ -244,6 +248,7 @@ export function createReadyRoutes(deps: {
           row,
           row.status === "approved" ? approvedIds.indexOf(row.id) + 1 : null,
           factSources,
+          approvedPlans,
         ),
       ),
     );

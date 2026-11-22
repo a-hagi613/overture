@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 
 import { applications, facts, resumes } from "../platform/db/schema.ts";
+import { logError } from "../platform/log.ts";
 import { sendPlanSchema } from "./send-plan.ts";
 
 import type { PlannedSentence, SendPlan, SendPlanField } from "./send-plan.ts";
@@ -104,38 +105,83 @@ export async function openApprovedPlan(input: {
   personal: PersonalCrypto;
   userId: string;
 }) {
-  const row = input.db
+  const opened = await openApprovedPlans({
+    applicationIds: [input.applicationId],
+    db: input.db,
+    personal: input.personal,
+    userId: input.userId,
+  });
+
+  return opened.get(input.applicationId) ?? null;
+}
+
+/**
+ * Opens the approved plans of several Applications in one read, so a list of
+ * approved cards costs one query rather than one per card. A plan that fails
+ * to open or verify is left out, exactly as the single-plan read returns null.
+ * @param input The Applications, the database and the user's crypto.
+ * @returns The opened plans by Application id.
+ */
+export async function openApprovedPlans(input: {
+  applicationIds: readonly string[];
+  db: AppDatabase;
+  personal: PersonalCrypto;
+  userId: string;
+}) {
+  const opened = new Map<string, ApprovedPlan>();
+
+  if (input.applicationIds.length === 0) {
+    return opened;
+  }
+
+  const rows = input.db
     .select({
       approvedAt: applications.approvedAt,
       approvedPlanEnc: applications.approvedPlanEnc,
       approvedPlanSha256: applications.approvedPlanSha256,
+      id: applications.id,
     })
     .from(applications)
-    .where(and(eq(applications.id, input.applicationId), eq(applications.userId, input.userId)))
-    .get();
+    .where(
+      and(
+        eq(applications.userId, input.userId),
+        inArray(applications.id, [...input.applicationIds]),
+      ),
+    )
+    .all();
 
-  const approvedAt = row?.approvedAt ?? null;
-  const approvedPlanEnc = row?.approvedPlanEnc ?? null;
-  const approvedPlanSha256 = row?.approvedPlanSha256 ?? null;
+  await Promise.all(
+    rows.map(async (row) => {
+      const approvedAt = row.approvedAt ?? null;
+      const approvedPlanEnc = row.approvedPlanEnc ?? null;
+      const approvedPlanSha256 = row.approvedPlanSha256 ?? null;
 
-  if (approvedAt === null || approvedPlanEnc === null) {
-    return null;
-  }
+      if (approvedAt === null || approvedPlanEnc === null) {
+        return;
+      }
 
-  const plaintext = await input.personal.openFor(
-    input.userId,
-    approvedPlanScope(input.applicationId),
-    approvedPlanEnc,
+      try {
+        const plaintext = await input.personal.openFor(
+          input.userId,
+          approvedPlanScope(row.id),
+          approvedPlanEnc,
+        );
+
+        const plan = sendPlanSchema.parse(JSON.parse(plaintext)) satisfies SendPlan;
+        const sha256 = sendPlanSha256(plan);
+
+        if (sha256 !== approvedPlanSha256) {
+          throw new Error("the stored approved plan hash does not match its contents");
+        }
+
+        opened.set(row.id, { approvedAt, plan, sha256 } satisfies ApprovedPlan);
+      } catch (error) {
+        logError(`approved-plan.open ${row.id}`, error);
+      }
+    }),
   );
 
-  const plan = sendPlanSchema.parse(JSON.parse(plaintext)) satisfies SendPlan;
-  const sha256 = sendPlanSha256(plan);
-
-  if (sha256 !== approvedPlanSha256) {
-    throw new Error("the stored approved plan hash does not match its contents");
-  }
-
-  return { approvedAt, plan, sha256 } satisfies ApprovedPlan;
+  return opened;
 }
 
 export function approvalProblem(db: AppDatabase, userId: string, plan: SendPlan) {

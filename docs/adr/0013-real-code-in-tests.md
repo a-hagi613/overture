@@ -24,7 +24,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for thirty-six invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
+exist only for the invariants below: ledger, crypto, planner, address, tag rules, question normalisation, answer
 derivations, the answer planner (a salary Fact kept per currency is chosen only for the currency a question names),
 the facts model (a Fact's scope is validated against its key), the onboarding step's salary and EEO reading, the
 fixture sanitiser (recorded pages must carry no script, event handler, personal data or token), the v1
@@ -74,8 +74,14 @@ including readable placeholders when the catalog row is already gone, and leaves
 `posting_user_state` and `skip_companies` with no foreign key into `postings` or `companies`, #422), the admin gate's
 fail-closed parsing (a malformed Access cookie or a missing team domain answers 401, never a 500 or an invented
 issuer), the capped request-body reader (an unauthenticated webhook body stops at its byte cap and is never buffered
-whole, so a sender cannot choose how much memory it costs), and the unhandled-rejection alert (a public alert carries
-the error type and count only, never the arbitrary message that can hold personal data or a token). They
+whole, so a sender cannot choose how much memory it costs), the unhandled-rejection alert (a public alert carries the
+error type and count only, never the arbitrary message that can hold personal data or a token), and the hot read paths
+(#430: the user key is read once per request however many values it opens and a forget is not undone by a read already
+in flight, the Inbox Thread list and an Application's linked mail read their messages in one query rather than one per
+Thread, the open Review list and a Board's email notes read their rows in one query rather than one per Review or per
+Application, the Ready cards open every approved plan in one query rather than one per card, an empty timezone change
+takes no write, and Home's billing strip is one grants read plus one ledger read; each test counts the statements
+through the real drizzle query logger and grows the row count to prove the count stays flat). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
 depend on the runner. The mail count runs the real SQLite file and the real migrations, so the invariant is exercised
 against the shipped schema rather than a stand-in. CI stays under two minutes on pull requests: six shards balanced by
