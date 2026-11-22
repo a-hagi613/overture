@@ -132,6 +132,9 @@ export const bgJobs = sqliteTable(
     uniqueIndex("bg_jobs_dedupe_key_queued")
       .on(t.dedupeKey)
       .where(sql`status = 'queued'`),
+    index("bg_jobs_claim_due")
+      .on(t.status, t.runAt)
+      .where(sql`status IN ('queued', 'running')`),
   ],
 );
 

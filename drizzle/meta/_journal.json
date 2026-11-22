@@ -386,6 +386,13 @@
       "when": 1795492100000,
       "tag": "0054_llm_batches",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "6",
+      "when": 1795492200000,
+      "tag": "0055_bg_jobs_claim_due",
+      "breakpoints": true
     }
   ]
 }
