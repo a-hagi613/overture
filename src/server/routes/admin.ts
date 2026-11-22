@@ -1132,7 +1132,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     context.json({ lab: buildLabReport(db), providers: buildProviderReport(db, clock) }),
   );
 
-  routes.post("/lab/runs", zValidator("json", labRunPayloadSchema), (context) => {
+  routes.post("/lab/runs", zValidator("json", labRunPayloadSchema), async (context) => {
     if (deps.providers === null) {
       return context.json({ error: "browser_provider_unconfigured" }, 503);
     }
@@ -1161,7 +1161,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
       maxAttempts: 1,
     });
 
-    recordAdminAudit(db, clock, {
+    await recordAdminAudit(db, clock, {
       actorId: owner.userId,
       action: "lab.run",
       reason: "Run the synthetic lab sessions",
