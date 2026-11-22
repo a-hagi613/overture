@@ -1256,3 +1256,22 @@ export const billingReconciliations = sqliteTable(
   },
   (t) => [index("billing_reconciliations_checked").on(t.checkedAt)],
 );
+
+/**
+ * One read-only calendar feed per user (ADR 0034, M4). Only a SHA-256 hash of the URL token is stored: the token is
+ * shown once, when it is issued, and rotating replaces the hash so the old URL stops working at once.
+ */
+export const calendarFeedTokens = sqliteTable(
+  "calendar_feed_tokens",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    tokenHash: text("token_hash").notNull(),
+    createdAt: integer("created_at").notNull(),
+    rotatedAt: integer("rotated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("calendar_feed_tokens_user_unique").on(t.userId),
+    uniqueIndex("calendar_feed_tokens_hash_unique").on(t.tokenHash),
+  ],
+);

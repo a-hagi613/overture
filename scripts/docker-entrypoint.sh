@@ -4,6 +4,7 @@ set -eu
 DATABASE="${DATABASE_PATH:-/data/app.sqlite}"
 DATA_DIR="$(dirname "$DATABASE")"
 OBJECTS="${OBJECT_STORE_ROOT:-${DATA_DIR}/objects}"
+LITESTREAM_CONFIG="${LITESTREAM_CONFIG_PATH:-/etc/litestream.yml}"
 
 # Run as root only for this: the Fly volume mount is root-owned, so fix its
 # ownership for the unprivileged `app` user, then drop privileges and never
@@ -16,13 +17,22 @@ fi
 
 mkdir -p "$DATA_DIR" "$OBJECTS"
 
+if [ "${LITESTREAM_RESTORE_ONLY:-false}" = "true" ]; then
+  # Restore drill mode: restore the replica, verify it read-only and exit.
+  # The app server is never started, so no scheduler, worker, mail sender or
+  # billing job can run against restored production data.
+  DRILL_READY_FILE="${RESTORE_DRILL_READY_FILE:-/tmp/restore-drill-checked}"
+  rm -f "$DRILL_READY_FILE"
+  echo "restore drill mode: restoring the replica and running the read-only checks; the app server stays stopped"
+  litestream restore -config "$LITESTREAM_CONFIG" "$DATABASE"
+  bun run /app/scripts/check-restored-db.ts "$DATABASE"
+  touch "$DRILL_READY_FILE"
+  echo "restore drill mode: checks passed; holding the machine open for the drill driver"
+  exec sleep "${RESTORE_DRILL_KEEPALIVE_SECONDS:-600}"
+fi
+
 if [ "${LITESTREAM_ENABLED:-true}" != "true" ]; then
   exec bun run /app/src/server/main.ts
 fi
 
-if [ "${LITESTREAM_RESTORE_ONLY:-false}" = "true" ]; then
-  litestream restore -config /etc/litestream.yml "$DATABASE"
-  exec bun run /app/src/server/main.ts
-fi
-
-exec litestream replicate -config /etc/litestream.yml -restore-if-db-not-exists -exec "bun run /app/src/server/main.ts"
+exec litestream replicate -config "$LITESTREAM_CONFIG" -restore-if-db-not-exists -exec "bun run /app/src/server/main.ts"
