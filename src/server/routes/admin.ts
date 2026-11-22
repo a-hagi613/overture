@@ -734,7 +734,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
         total: allSwitches.length,
         enabled: allSwitches.filter((row) => row.enabled === 1).length,
       },
-      cost: buildCostSummary(db),
+      cost: buildCostSummary(db, clock),
       mail: readMailSummary(db, clock.now()),
       audit: audit.map((row) => ({
         id: row.id,

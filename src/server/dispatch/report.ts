@@ -1,4 +1,4 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -14,7 +14,26 @@ const TREND_WINDOW = 20;
 const TREND_MINIMUM = 10;
 const TREND_RATIO = 1.2;
 
-const ATTEMPTED_EXCLUDED = new Set(["posting_closed", "duplicate", "needs_review"]);
+const DAY_MS = 86_400_000;
+
+/**
+ * The window the cost report measures over: the current billing period, the
+ * same window the margin page reports (SPEC §5.7). The `since` bound keeps the
+ * report off the whole `attempts` table (`docs/research/cost-m1.md` §5.5); the
+ * retention job prunes that table at 180 days.
+ */
+export const COST_REPORT_WINDOW_DAYS = 30;
+
+const NOT_ATTEMPTED: readonly string[] = ["posting_closed", "duplicate", "needs_review"];
+
+const ATTEMPTED = sql`(${attempts.outcome} IS NULL OR ${attempts.outcome} NOT IN (${sql.join(
+  NOT_ATTEMPTED.map((outcome) => sql`${outcome}`),
+  sql`, `,
+)}))`;
+
+const DURATIONS = sql<
+  string | null
+>`group_concat(${attempts.browserMs}) FILTER (WHERE ${attempts.browserMs} > 0)`;
 
 /**
  * Whether a try with this outcome counts as an attempted Application (ADR 0026).
@@ -22,18 +41,39 @@ const ATTEMPTED_EXCLUDED = new Set(["posting_closed", "duplicate", "needs_review
  * @returns True when the try counts towards the cost denominator.
  */
 export const isAttempted = (outcome: string | null) =>
-  outcome === null || !ATTEMPTED_EXCLUDED.has(outcome);
+  outcome === null || !NOT_ATTEMPTED.includes(outcome);
 
-interface AttemptRow {
-  userId: string;
-  provider: string;
+interface GroupTotals {
   ats: string | null;
-  outcome: string | null;
-  browserMs: number | null;
-  proxyBytes: number | null;
-  costMicros: number | null;
-  captchaSeen: boolean;
-  codeUsed: boolean;
+  provider: string;
+  userId: string;
+  attempted: number;
+  browserMicros: number;
+  captchaSeen: number;
+  codeUsed: number;
+  durations: string | null;
+  proxyBytes: number;
+  sent: number;
+}
+
+interface GroupSummary {
+  key: string;
+  ats: string;
+  provider: string;
+  attempted: number;
+  attemptedByUser: Map<string, number>;
+  browserMicros: number;
+  captchaSeen: number;
+  codeUsed: number;
+  durations: number[];
+  proxyBytes: number;
+  sent: number;
+}
+
+interface CostPopulation {
+  groups: GroupSummary[];
+  attemptedByUser: Map<string, number>;
+  llmByUser: Map<string, number>;
 }
 
 export interface ProviderReportRow {
@@ -53,90 +93,160 @@ export interface ProviderReportRow {
   proxyTrend: boolean;
 }
 
-const attemptedRows = (rows: AttemptRow[]) => rows.filter((row) => isAttempted(row.outcome));
+const groupKey = (provider: string, ats: string | null) => `${provider}\u0000${ats ?? "unknown"}`;
 
-function anthropicMicrosOf(
-  group: AttemptRow[],
-  population: AttemptRow[],
-  llmByUser: Map<string, number>,
-) {
-  const perUser = (rows: AttemptRow[]) => {
-    const counts = new Map<string, number>();
+const durationsOf = (values: string | null) =>
+  values === null || values === "" ? [] : values.split(",").map(Number);
 
-    for (const row of rows) {
-      counts.set(row.userId, (counts.get(row.userId) ?? 0) + 1);
-    }
+const sinceOf = (clock: Clock) => clock.now() - COST_REPORT_WINDOW_DAYS * DAY_MS;
 
-    return counts;
-  };
+const readGroupTotals = (db: AppDatabase, sinceMs: number) =>
+  db
+    .select({
+      ats: postings.ats,
+      provider: attempts.provider,
+      userId: applications.userId,
+      attempted: sql<number>`sum(case when ${ATTEMPTED} then 1 else 0 end)`,
+      browserMicros: sql<number>`sum(case when ${ATTEMPTED} then coalesce(${attempts.costMicros}, 0) else 0 end)`,
+      captchaSeen: sql<number>`sum(case when ${ATTEMPTED} and ${attempts.captchaSeen} then 1 else 0 end)`,
+      codeUsed: sql<number>`sum(case when ${ATTEMPTED} and ${attempts.codeUsed} then 1 else 0 end)`,
+      durations: DURATIONS,
+      proxyBytes: sql<number>`sum(case when ${ATTEMPTED} then coalesce(${attempts.proxyBytes}, 0) else 0 end)`,
+      sent: sql<number>`sum(case when ${attempts.outcome} = 'sent' then 1 else 0 end)`,
+    })
+    .from(attempts)
+    .innerJoin(applications, eq(attempts.applicationId, applications.id))
+    .innerJoin(postings, eq(applications.postingId, postings.id))
+    .innerJoin(users, eq(users.id, applications.userId))
+    .where(and(sql`${users.role} <> 'demo'`, gte(attempts.startedAt, sinceMs)))
+    .groupBy(attempts.provider, postings.ats, applications.userId)
+    .all();
 
-  const totals = perUser(attemptedRows(population));
-  const inGroup = perUser(attemptedRows(group));
+const summariseGroups = (totals: GroupTotals[]) => {
+  const groups = new Map<string, GroupSummary>();
 
-  return [...inGroup].reduce(
-    (total, [userId, count]) =>
-      total + ((llmByUser.get(userId) ?? 0) * count) / (totals.get(userId) ?? count),
-    0,
-  );
-}
+  for (const row of totals) {
+    const key = groupKey(row.provider, row.ats);
 
-function summarise(rows: AttemptRow[], trend: boolean, llmByUser: Map<string, number>) {
-  const groups = new Map<string, AttemptRow[]>();
+    const group = groups.get(key) ?? {
+      ats: row.ats ?? "unknown",
+      attempted: 0,
+      attemptedByUser: new Map<string, number>(),
+      browserMicros: 0,
+      captchaSeen: 0,
+      codeUsed: 0,
+      durations: [],
+      key,
+      provider: row.provider,
+      proxyBytes: 0,
+      sent: 0,
+    };
 
-  for (const row of rows) {
-    const key = `${row.provider}\u0000${row.ats ?? "unknown"}`;
-    const group = groups.get(key) ?? [];
-
-    group.push(row);
+    group.attempted += row.attempted;
+    group.attemptedByUser.set(
+      row.userId,
+      (group.attemptedByUser.get(row.userId) ?? 0) + row.attempted,
+    );
+    group.browserMicros += row.browserMicros;
+    group.captchaSeen += row.captchaSeen;
+    group.codeUsed += row.codeUsed;
+    group.durations.push(...durationsOf(row.durations));
+    group.proxyBytes += row.proxyBytes;
+    group.sent += row.sent;
     groups.set(key, group);
   }
 
-  return [...groups.entries()]
-    .map(([key, group]) => {
-      const [provider = "", ats = "unknown"] = key.split("\u0000");
+  return [...groups.values()];
+};
 
-      const attempted = attemptedRows(group);
+const populationByUser = (groups: GroupSummary[]) => {
+  const totals = new Map<string, number>();
 
-      const sent = group.filter((row) => row.outcome === "sent");
+  for (const group of groups) {
+    for (const [userId, count] of group.attemptedByUser) {
+      totals.set(userId, (totals.get(userId) ?? 0) + count);
+    }
+  }
 
-      const durations = group
-        .map((row) => row.browserMs)
-        .filter((value): value is number => value !== null && value > 0);
+  return totals;
+};
 
-      const proxyBytes = attempted.reduce((total, row) => total + (row.proxyBytes ?? 0), 0);
-      const browserMicros = attempted.reduce((total, row) => total + (row.costMicros ?? 0), 0);
+const readCostPopulation = (db: AppDatabase, sinceMs: number) => {
+  const groups = summariseGroups(readGroupTotals(db, sinceMs));
 
+  return {
+    attemptedByUser: populationByUser(groups),
+    groups,
+    llmByUser: applicationLlmMicrosByUser(db, sinceMs),
+  };
+};
+
+const anthropicMicrosOf = (
+  inGroup: Map<string, number>,
+  population: Map<string, number>,
+  llmByUser: Map<string, number>,
+) =>
+  [...inGroup].reduce(
+    (total, [userId, count]) =>
+      total + ((llmByUser.get(userId) ?? 0) * count) / (population.get(userId) ?? count),
+    0,
+  );
+
+const summarise = (groups: GroupSummary[], trend: boolean, population: CostPopulation) =>
+  groups
+    .map((group) => {
       const costPerCompleted = ratio(
-        browserMicros + anthropicMicrosOf(attempted, rows, llmByUser),
-        sent.length,
+        group.browserMicros +
+          anthropicMicrosOf(
+            group.attemptedByUser,
+            population.attemptedByUser,
+            population.llmByUser,
+          ),
+        group.sent,
       );
 
       return {
-        ats,
-        attempted: attempted.length,
-        challengeRate: ratio(attempted.filter((row) => row.captchaSeen).length, attempted.length),
-        codeRate: ratio(attempted.filter((row) => row.codeUsed).length, attempted.length),
-        completionRate: ratio(sent.length, attempted.length),
+        ats: group.ats,
+        attempted: group.attempted,
+        challengeRate: ratio(group.captchaSeen, group.attempted),
+        codeRate: ratio(group.codeUsed, group.attempted),
+        completionRate: ratio(group.sent, group.attempted),
         costGateMet: costPerCompleted === null ? null : costPerCompleted <= COST_GATE_MICROS,
         costGateMicros: COST_GATE_MICROS,
         costMicrosPerCompleted: costPerCompleted,
-        p50BrowserMs: percentile(durations, 0.5),
-        p95BrowserMs: percentile(durations, 0.95),
-        provider,
-        proxyMbPerCompleted: ratio(proxyBytes, sent.length * 1_000_000),
+        p50BrowserMs: percentile(group.durations, 0.5),
+        p95BrowserMs: percentile(group.durations, 0.95),
+        provider: group.provider,
+        proxyMbPerCompleted: ratio(group.proxyBytes, group.sent * 1_000_000),
         proxyTrend: trend,
-        sent: sent.length,
+        sent: group.sent,
       };
     })
     .toSorted(
       (left, right) =>
         left.provider.localeCompare(right.provider) || left.ats.localeCompare(right.ats),
     );
-}
 
-function proxyTrend(rows: AttemptRow[]) {
-  const completed = rows.flatMap((row) => (row.outcome === "sent" ? [row.proxyBytes ?? 0] : []));
+const completedProxyBytes = (db: AppDatabase, sinceMs: number) =>
+  db
+    .select({ proxyBytes: attempts.proxyBytes })
+    .from(attempts)
+    .innerJoin(applications, eq(attempts.applicationId, applications.id))
+    .innerJoin(users, eq(users.id, applications.userId))
+    .where(
+      and(
+        sql`${users.role} <> 'demo'`,
+        gte(attempts.startedAt, sinceMs),
+        eq(attempts.outcome, "sent"),
+      ),
+    )
+    .orderBy(desc(attempts.startedAt))
+    .limit(TREND_WINDOW * 2)
+    .all()
+    .toReversed()
+    .map((row) => row.proxyBytes ?? 0);
 
+const proxyTrend = (completed: number[]) => {
   if (completed.length < TREND_WINDOW + TREND_MINIMUM) {
     return false;
   }
@@ -151,34 +261,21 @@ function proxyTrend(rows: AttemptRow[]) {
     previousAverage > 0 &&
     recentAverage > previousAverage * TREND_RATIO
   );
-}
+};
 
-function attemptRows(db: AppDatabase) {
-  return db
-    .select({
-      ats: postings.ats,
-      browserMs: attempts.browserMs,
-      userId: attempts.userId,
-      captchaSeen: attempts.captchaSeen,
-      codeUsed: attempts.codeUsed,
-      costMicros: attempts.costMicros,
-      outcome: attempts.outcome,
-      provider: attempts.provider,
-      proxyBytes: attempts.proxyBytes,
-      startedAt: attempts.startedAt,
-    })
-    .from(attempts)
-    .innerJoin(applications, eq(attempts.applicationId, applications.id))
-    .innerJoin(postings, eq(applications.postingId, postings.id))
-    .innerJoin(users, eq(users.id, applications.userId))
-    .where(sql`${users.role} <> 'demo'`)
-    .orderBy(asc(attempts.startedAt))
-    .all();
-}
-
+/**
+ * The per-provider × ATS report, measured over the last
+ * `COST_REPORT_WINDOW_DAYS` days. Every total is summed in SQLite and the
+ * p50/p95 durations are picked by rank there, so a page load reads two rows per
+ * group instead of every attempt.
+ * @param db The database to read.
+ * @param clock The clock that sets the window.
+ * @returns One row per provider and ATS, sorted by provider then ATS.
+ */
 export function buildProviderReport(db: AppDatabase, clock: Clock) {
-  const rows = attemptRows(db);
-  const trend = proxyTrend(rows);
+  const sinceMs = sinceOf(clock);
+  const population = readCostPopulation(db, sinceMs);
+  const trend = proxyTrend(completedProxyBytes(db, sinceMs));
 
   if (trend) {
     raiseAlert(db, clock, "browser.proxy_trend", {
@@ -187,23 +284,30 @@ export function buildProviderReport(db: AppDatabase, clock: Clock) {
     });
   }
 
-  return summarise(rows, trend, applicationLlmMicrosByUser(db, null));
+  return summarise(population.groups, trend, population);
 }
 
 /**
- * Cost per completed Application for the population of attempts (ADR 0026):
- * the attempted Browser Use spend plus the Anthropic spend of the users whose
- * attempts are counted, divided by the sent Applications.
+ * Cost per completed Application over the last `COST_REPORT_WINDOW_DAYS` days
+ * (ADR 0026): the attempted Browser Use spend plus the Anthropic spend of the
+ * users whose attempts are counted, divided by the sent Applications. The
+ * population's share of a user's spend is all of it, by definition.
  * @param db The database to read.
+ * @param clock The clock that sets the window.
  * @returns The completed count, the cost split, the gate verdict and the proxy figures.
  */
-export function buildCostSummary(db: AppDatabase) {
-  const rows = attemptRows(db);
-  const attempted = attemptedRows(rows);
-  const sent = rows.filter((row) => row.outcome === "sent").length;
-  const browserMicros = attempted.reduce((total, row) => total + (row.costMicros ?? 0), 0);
-  const proxyBytes = attempted.reduce((total, row) => total + (row.proxyBytes ?? 0), 0);
-  const anthropicMicros = anthropicMicrosOf(attempted, rows, applicationLlmMicrosByUser(db, null));
+export function buildCostSummary(db: AppDatabase, clock: Clock) {
+  const sinceMs = sinceOf(clock);
+  const population = readCostPopulation(db, sinceMs);
+
+  const browserMicros = population.groups.reduce((total, group) => total + group.browserMicros, 0);
+  const proxyBytes = population.groups.reduce((total, group) => total + group.proxyBytes, 0);
+  const sent = population.groups.reduce((total, group) => total + group.sent, 0);
+
+  const anthropicMicros = [...population.attemptedByUser.keys()].reduce(
+    (total, userId) => total + (population.llmByUser.get(userId) ?? 0),
+    0,
+  );
 
   const costPerCompleted = ratio(browserMicros + anthropicMicros, sent);
 
@@ -215,6 +319,6 @@ export function buildCostSummary(db: AppDatabase) {
     costGateMet: costPerCompleted === null ? null : costPerCompleted <= COST_GATE_MICROS,
     costMicrosPerCompleted: costPerCompleted,
     proxyMbPerCompleted: ratio(proxyBytes, sent * 1_000_000),
-    proxyTrend: proxyTrend(rows),
+    proxyTrend: proxyTrend(completedProxyBytes(db, sinceMs)),
   };
 }
