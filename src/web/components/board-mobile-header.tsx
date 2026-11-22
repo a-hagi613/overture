@@ -35,6 +35,14 @@ export function BoardMobileHeader() {
           <b className="font-semibold text-foreground">{String(left)}</b>
           {" left"}
         </span>
+        <Link
+          aria-label={copy.nav.calendar}
+          className="flex h-11 w-11 items-center justify-center text-foreground"
+          title={copy.nav.calendar}
+          to="/calendar"
+        >
+          <NavGlyph name="calendar" />
+        </Link>
         <ThemeToggle className="flex h-11 w-11 items-center justify-center border-0 bg-transparent text-foreground" />
         <Link
           aria-label={unread > 0 ? copy.shell.notifications(unread) : copy.shell.notificationsEmpty}

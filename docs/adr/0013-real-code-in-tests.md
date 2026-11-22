@@ -24,7 +24,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for nineteen invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
+exist only for twenty invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
 derivations, the answer planner (a salary Fact kept per currency is chosen only for the currency a question names),
 the facts model (a Fact's scope is validated against its key), the onboarding step's salary and EEO reading, the
 fixture sanitiser (recorded pages must carry no script, event handler, personal data or token), the v1
@@ -33,7 +33,9 @@ paid-service host is refused), the replica listing (the newest transaction is re
 Litestream level, so a healthy replica costs one R2 list per read, #281), the job worker's wait (a completed wait
 retains no abort listener), the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
 a copy string or key), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
-`x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the SQLite handle guard (a file
+`x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the onboarding location plan (the
+open-Posting group-by is planned through the covering `postings_open_location` index, never a table scan or a
+temporary b-tree, #337), the SQLite handle guard (a file
 in `src/` or `test/` that opens a `new DatabaseSync` also configures `PRAGMA busy_timeout`, or is a documented opt-out
 in `scripts/database-sync-guard.ts`, so an unconfigured handle cannot stall `main` with `SQLITE_BUSY` again), and the
 monthly mail budget (`budget.test.ts`: one row per UTC month counts every send by kind and fails closed, notices stop
