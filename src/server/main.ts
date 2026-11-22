@@ -846,7 +846,7 @@ const liveCheckJobHandlers: JobHandlers = {
 
 const retentionJobHandlers: JobHandlers = {
   [RETENTION_JOB_KIND]: async () => {
-    await retentionJobHandler(db, clock);
+    await retentionJobHandler(db, catalogDb, clock);
   },
 };
 

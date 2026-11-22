@@ -37,6 +37,12 @@ interval streams far more to R2 than the user data that actually needs a backup,
   moves. The restore drill never restores it.
 - **Writes stay in the sweep worker.** The `no-main-thread-catalog-writes` lint rule still confines catalog table
   writes to `sweep-worker.ts` and its documented non-sweep paths.
+- **Old closed rows are pruned in bounded chunks.** The hourly `maintenance.retention` job owns catalog growth: a
+  Posting closed more than 30 days loses its compressed description, and one closed more than 90 days is deleted with
+  its tags, questions and `postings_fts` entry (the foreign keys cascade and the table's trigger removes the index
+  row). Each phase writes at most 20 chunks of 500 rows per run so no single write lock is held long, and the next
+  run continues. A Posting any unsent Application still points at is left for the next sweep to reconcile, and nothing
+  in `app.sqlite` is written: an Application keeps its own snapshot.
 
 `scripts/verify-db.ts` verifies both files in one run: `app.sqlite` is WAL, `synchronous=FULL`, STRICT, still contains
 no catalog table and no catalog foreign key; `catalog.sqlite` is WAL, `synchronous=NORMAL`, STRICT, has every catalog

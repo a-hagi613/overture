@@ -24,7 +24,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for the fifty files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
+exist only for the fifty-two files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
 as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key,
 and a "did not happen" line appears only when the stored data proves it), ledger, crypto, planner, the
 restored-database check (a restored file is read
@@ -38,7 +38,10 @@ Litestream level, so a healthy replica costs one R2 list per read, #281), the jo
 retains no abort listener), the job worker's class limits (`queue.test.ts`, `scheduler.test.ts`: a browser or LLM
 lane already at its limit is left out of the claim, so a fast control or notification job behind older stalled rows
 still runs, the total in-flight cap bounds one claim, and the `bg_jobs` claim is planned through the partial
-`bg_jobs_claim_due` index rather than scanning the lifetime history, #425), the browser session alignment
+`bg_jobs_claim_due` index rather than scanning the lifetime history, #425), the catalog retention prune
+(`retention.test.ts`: a Posting closed more than 30 days loses its description and one closed more than 90 days is
+deleted with its tags, questions and FTS entry in bounded chunks, while a Posting an Application still waiting to send
+points at is held and no Application row or snapshot changes, #424), the browser session alignment
 (`session-slots.test.ts`: the dispatcher's free-send count comes from the same process-wide semaphore every browser
 user holds a slot from, so a capture holding the last session offers a send no slot and no Application waits in
 `sending`, #425), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
