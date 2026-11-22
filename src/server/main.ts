@@ -5,7 +5,7 @@ import { createAuth } from "./auth/index.ts";
 import type { AuthOptions } from "./auth/index.ts";
 import { databasePath, env, labBaseUrl } from "./config/env.ts";
 import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
-import { MailCapExceededError } from "./platform/mail/metered.ts";
+import { MailCapExceededError } from "./platform/mail/errors.ts";
 import { createPayments } from "./billing/index.ts";
 import {
   ensureGrantExpiryQueued,
@@ -30,7 +30,7 @@ import { createRandom } from "./platform/ports/random.ts";
 import { createEventLoopLagMonitor } from "./platform/event-loop-lag.ts";
 import { createBackupMonitor } from "./platform/ports/backup.ts";
 import { installProcessGuards } from "./platform/process-guard.ts";
-import { enqueueJob, recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
+import { recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
 import {
   ensureRetentionQueued,
   RETENTION_JOB_KIND,
@@ -600,14 +600,14 @@ const noticeCrypto = createDeletionNoticeCrypto(
 const eraser = createAccountEraser({
   clock,
   db,
-  enqueueNotice: async (notice) => {
-    const payload = await noticeCrypto.seal(notice);
-
-    enqueueJob(db, clock, ACCOUNT_DELETED_NOTICE_JOB_KIND, payload, { maxAttempts: 5 });
-  },
   mailboxes,
   objects,
   providers: browserProviders,
+  sealNotice: async (notice) => {
+    const payload = await noticeCrypto.seal(notice);
+
+    return payload;
+  },
 });
 
 const accountJobHandlers: JobHandlers = {
@@ -831,17 +831,19 @@ const allJobHandlers: JobHandlers = {
   ...testJobHandlers,
 };
 
-const worker = startJobWorker(
-  db,
-  clock,
-  allJobHandlers,
-  shutdownController.signal,
-  (notify) => {
-    registerEnqueueNotify(notify);
-  },
-  jobSingletons,
-  { startupSettleMs: env.JOBS_STARTUP_SETTLE_MS },
-);
+const worker = env.JOBS_AUTORUN
+  ? startJobWorker(
+      db,
+      clock,
+      allJobHandlers,
+      shutdownController.signal,
+      (notify) => {
+        registerEnqueueNotify(notify);
+      },
+      jobSingletons,
+      { startupSettleMs: env.JOBS_STARTUP_SETTLE_MS },
+    )
+  : null;
 
 if (activeDispatcher !== null) {
   await activeDispatcher.recover();
@@ -947,7 +949,7 @@ function handleShutdown(signal: string) {
     try {
       await Promise.race([server.stop(false), quietGrace(budgetMs)]);
       await server.stop(true);
-      await worker.drain(Math.max(0, budgetMs - (performance.now() - startedAt)));
+      await worker?.drain(Math.max(0, budgetMs - (performance.now() - startedAt)));
       catalogWorker.stop();
     } catch (error) {
       logError("shutdown", error);

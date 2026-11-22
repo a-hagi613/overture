@@ -1,6 +1,6 @@
 import { and, eq, isNull, lt, lte, ne, notInArray, or, sql } from "drizzle-orm";
 
-import type { AppDatabase } from "../db/client.ts";
+import type { AppDatabase, DatabaseWriter } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 
 import { retryWhenBusy } from "../db/busy.ts";
@@ -333,7 +333,7 @@ function queueAgain(db: AppDatabase, clock: Clock, jobId: string, input: QueueAg
 }
 
 export function enqueueJob(
-  db: AppDatabase,
+  db: DatabaseWriter,
   clock: Clock,
   kind: string,
   payload: string,

@@ -151,8 +151,10 @@
       {
         "e2eRoot": "test/e2e",
         "allow": [
+          "src/server/account/erase.test.ts",
           "src/server/billing/ledger.test.ts",
           "src/server/billing/pause.test.ts",
+          "src/server/billing/webhooks.test.ts",
           "src/server/platform/crypto.test.ts",
           "src/server/platform/event-loop-lag.test.ts",
           "src/server/dispatch/planner.test.ts",

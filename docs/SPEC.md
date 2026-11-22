@@ -96,7 +96,9 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
   by lease expiry (§9.4).
 - After a restart the job worker stays quiet for `JOBS_STARTUP_SETTLE_MS` (5 s): the startup enqueues otherwise wake
   it in the same second the port opens and the new machine's first health checks compete with a full batch of jobs.
-  Nothing is dropped; the queued work starts a few seconds later.
+  Nothing is dropped; the queued work starts a few seconds later. `JOBS_AUTORUN=false` (test-only; refused in
+  production) starts the process without the worker, so an e2e test can drive each job through `/__test__/jobs/*`
+  without a live scheduler claiming it first.
 - The prerendered marketing pages (`/` and `/pricing`) are deployed as Workers Static Assets
   (`workers/marketing`, ADR 0033) on explicit routes for those paths only, so they stay up through those deploys.
   Every app and API path matches no Worker route and goes straight to `overture-web`; the app's HTML and assets are
@@ -162,7 +164,7 @@ refusal is stamped in `reserve_refused_at` and the cap refusal in `refused_at`, 
 The admin overview shows the month's count and says which of the two stops is in force. Tests reach Cloudflare only
 through MSW (ADR 0013, 0016).
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
-Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set; a half-set pair stops the server at boot and with neither the app boots and runs as in M2. `POST /webhooks/stripe` verifies the `Stripe-Signature` header (HMAC-SHA256 over the timestamped raw body, five-minute window) before it reads or writes any billing row, and a bad or stale signature is refused with 400. `STRIPE_PRICE_WEEK` and `STRIPE_PRICE_MONTH` name the Stripe prices a Checkout session sells; a missing one answers 503 `billing_not_configured` without a Stripe call. What each plan buys is configuration in `src/server/billing/plans.ts`: Week 70 Applications over 7 days, Month 300 over 30 days (ADR 0018); the price itself lives in Stripe and reaches Overture only as a price id. `invoice.paid` grants its period and clears a `plan_ended` or `payment_failed` pause; `invoice.payment_failed` sets `payment_failed` at once. Each transition writes one `paused` notification (pushed to the user's devices) and one email naming the fix in Settings (`Choose a plan` links to `/settings/billing/plans`, `Update payment` to `/settings/billing`, never the word `failed`), and a repeated event writes nothing twice. A grant's period end is the plan end: after the expiry sweep leaves the user with no unexpired grant, sending pauses with `plan_ended`. The demo account is never paused, granted or notified, and its billing mutations answer `403 demo_locked` before any Stripe call.
+Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set; a half-set pair stops the server at boot and with neither the app boots and runs as in M2. `POST /webhooks/stripe` verifies the `Stripe-Signature` header (HMAC-SHA256 over the timestamped raw body, five-minute window) before it reads or writes any billing row, and a bad or stale signature is refused with 400. `STRIPE_PRICE_WEEK` and `STRIPE_PRICE_MONTH` name the Stripe prices a Checkout session sells; a missing one answers 503 `billing_not_configured` without a Stripe call. What each plan buys is configuration in `src/server/billing/plans.ts`: Week 70 Applications over 7 days, Month 300 over 30 days (ADR 0018); the price itself lives in Stripe and reaches Overture only as a price id. `invoice.paid` grants its period and clears a `plan_ended` or `payment_failed` pause; `invoice.payment_failed` sets `payment_failed` at once, unless the failed invoice's period is older than the subscription's current period, so a stale out-of-order delivery cannot pause a paid user. Each transition writes one `paused` notification (pushed to the user's devices) and one email naming the fix in Settings (`Choose a plan` links to `/settings/billing/plans`, `Update payment` to `/settings/billing`, never the word `failed`), and a repeated event writes nothing twice. A grant's period end is the plan end: after the expiry sweep leaves the user with no unexpired grant, sending pauses with `plan_ended`. The demo account is never paused, granted or notified, and its billing mutations answer `403 demo_locked` before any Stripe call.
 
 ### 3.3 Domains and DNS
 
@@ -269,6 +271,7 @@ other address only lowered and trimmed) · `session` · `account` (provider: goo
 | `browser_profiles` | user_id, provider, provider_profile_id, country_code, created_at, last_used_at; PK(user_id, provider) |
 | `mailboxes` | id (the forwarding id, `[a-z0-9]{8,32}`), user_id UNIQUE, local_part UNIQUE (the `in-{id}-{mac}` local part), status CHECK IN ('active','receive_only','closed'), receive_until NULL, first_forwarded_at NULL (set once by the first ATS mail that arrives; the API reads it as "forwarding works"), created_at |
 | `retired_addresses` | local_part PK, retired_at — **a local part is never reassigned** |
+| `account_erasures` | user_id PK (**no foreign key**: it outlives the `users` row), vendor_profiles JSON (`[{provider, providerProfileId}]`, shrinks as each is deleted), object_prefixes JSON, notice_name NULL, notice_to NULL, user_deleted_at, vendor_cleaned_at, objects_cleaned_at, notice_queued_at, last_error NULL, created_at, updated_at. The durable plan for one erasure: written in the transaction that deletes the account, so the vendor ids and prefixes survive the `browser_profiles` cascade; `notice_name`/`notice_to` are wiped as soon as the confirmation notice is queued |
 
 ### 5.3 Catalog
 
@@ -341,20 +344,23 @@ exception is a send already in flight (`sending` or `confirming`): its reservati
 so a confirmed send commits and is charged for what was sent, and a failed or unconfirmed one releases and is
 expired by the next sweep. When the last unexpired grant ends, sending pauses with `plan_ended`.
 `stripe_events` holds each signed Stripe event id once: the row is inserted, its effect applied and `processed_at`
-set in one transaction, so a replay finds the row and does nothing; a bad signature never reaches the table. A signed
+set in one transaction, so a replay finds the row and does nothing; a bad signature never reaches the table. The
+pause notice, its push and email jobs, and the planner/prep jobs a resume queues are written in that same
+transaction, so a crash cannot commit the event without them and a redelivery cannot skip them. A signed
 `checkout.session.completed` links `customers.stripe_customer_id` to the user named by `client_reference_id` (or
 `metadata.user_id`), and `customer.created`/`customer.updated` link the same way from `metadata.user_id`.
 `invoice.paid` issues the period grant: `source='period'`, the plan's quantity, `starts_at` at the invoice line's
 period start and `expires_at` at its end (or at receipt and the plan's own period from receipt when the invoice names
 none), and `stripe_invoice_id` the invoice id, which is also the grant's ledger idempotency key, so a replay grants
 once and a renewal's new invoice issues the next period's grant starting where the old one ends. The plan comes from
-the price the invoice line names, falling back to the subscription metadata the Checkout session set, so a Week/Month
-switch Stripe applies at the renewal grants the new plan's quota even while the subscription metadata still names the
-old one. A paid period is never cut short: an upgrade from the trial grants the paid plan's Applications at once
+the price the invoice line names, so a Week/Month switch Stripe applies at the renewal grants the new plan's quota
+even while the subscription metadata still names the old one; a price Overture does not sell grants nothing instead
+of borrowing that metadata, and only an event that names no price at all falls back to it. A paid period is never cut short: an upgrade from the trial grants the paid plan's Applications at once
 beside the trial's, and cancelling at the period end only sets the flag below. A demo account never receives a period
 grant. A signed `customer.subscription.created`, `customer.subscription.updated` or `customer.subscription.deleted`
 stores the subscription in `subscriptions`: its `user_id` from the event metadata, the stored row or the event's Stripe
-customer; its `plan` from the price item first, then the metadata; its `status` verbatim; the period the event names;
+customer; its `plan` from the price item (a price Overture does not sell records no new plan, and only an event with no
+price falls back to the metadata); its `status` verbatim; the period the event names;
 and `cancel_at_period_end`. `invoice.paid` refreshes that row's plan and period too, so the state follows the invoice
 when the subscription update lags. An hourly `billing.grant-expiry` pass releases a reservation still held on a grant past its period end
 and then expires its available balance, so it never returns to spendable (ADR 0008); until that pass runs,
@@ -1285,14 +1291,26 @@ body, sender or attachment, so the admin never sees message content.
 - Encrypted: all `_enc` columns, resume files, mail HTML and attachments, exports.
 - **Delete account** (Settings → Delete account, re-auth): a signed-in session must have been created by a fresh sign-in (an
   emailed link, or Google or LinkedIn) in the last 15 minutes. The page offers "Email me a sign-in link"; there is no password check (ADR 0035).
-  The request queues one `account.erase` job.
-  The job deletes `user_keys` first (crypto-shredding), deletes Browser Use/Kernel profiles through the provider API,
-  retires the mailbox local part into `retired_addresses`, deletes R2 prefixes `files/{user_id}/`, `mail/{user_id}/`
-  and `exports/{user_id}/`, then cascade-deletes the user row (all remaining personal rows and the session). It keeps
-  only unlinked card fingerprints (M3) and admin audit rows. It completes within 24 h, sends the confirmation email,
-  and is idempotent across retries. The confirmation mail is queued as its own `account.deleted.notice`
-  job after the transaction, so a mail failure never leaves a keyless account behind. Backups and Litestream replicas keep only the shredded ciphertext
-  until normal rotation; without the wrapped key no copy is readable.
+  The request suspends the account, closes the mailbox, drops its sessions and queues one `account.erase` job.
+  In one transaction the job writes the durable `account_erasures` plan (every Browser Use/Kernel vendor profile id,
+  the R2 prefixes `files/{user_id}/`, `mail/{user_id}/` and `exports/{user_id}/`, and the name and address the
+  confirmation needs), deletes `user_keys` first (crypto-shredding), retires the mailbox local part into
+  `retired_addresses`, and cascade-deletes the user row (all remaining personal rows and the session). It then
+  deletes each vendor profile through the provider API and every object under the three prefixes, recording each
+  success on the plan; a profile the vendor already reports gone (404) counts as clean. It re-lists every prefix to
+  confirm nothing is left. If either external delete fails, the job is requeued without consuming an attempt every
+  minute (`RetryLaterError`), so a vendor outage or a restart keeps retrying until both are clean rather than losing
+  the profile ids with the cascade. Only after both are confirmed is the single `account.deleted.notice` job queued
+  (deduplicated per user) and the plan's name and address wiped, so a completed plan keeps only the opaque user id and
+  timestamps and a repeated erase is a no-op. It keeps only unlinked card fingerprints (M3) and admin audit rows. It
+  completes within 24 h when the vendors are reachable, and sends one confirmation email.
+- **Backups and replay window**: the erased account's ciphertext rows can remain in Litestream replicas and R2
+  backups until the normal rotation: the `overture-backups` bucket applies a 35-day lifecycle rule to the
+  `app.sqlite/` prefix and keeps nightly snapshots for 30 days (`retention: 720h`). Point-in-time replay or a restore
+  therefore brings back only keyless rows, because the wrapped key was destroyed first; a replay of a backup older
+  than the erasure cannot make them readable again. Object store deletes are not part of a database replay, so the
+  files, mail and exports stay deleted. The `account_erasures` row is not personal data after the notice is queued
+  and is not restored into anything readable.
 - **Export**: JSON (profile, facts, applications, snapshots, messages metadata + text) + resume + attachments, zipped,
   encrypted under a random per-export key that the server generates and wraps under the user's data key. The key is
   never stored in plaintext or logged; it reaches the page only with the download link (in its fragment), and the page

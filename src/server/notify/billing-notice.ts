@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { MailSender } from "../platform/mail/port.ts";
 import type { BillingPauseReason } from "../billing/pause.ts";
@@ -44,7 +44,7 @@ export function parseBillingNoticePayload(payload: string) {
  * @returns The queue receipt.
  */
 export function enqueueBillingNotice(
-  db: AppDatabase,
+  db: DatabaseWriter,
   clock: Clock,
   input: { notificationId: string; reason: BillingPauseReason },
 ) {
@@ -69,7 +69,7 @@ export function enqueueBillingNotice(
  * @returns The notification id.
  */
 export function createBillingPauseNotice(
-  db: AppDatabase,
+  db: DatabaseWriter,
   clock: Clock,
   input: { userId: string; reason: BillingPauseReason },
 ) {

@@ -153,7 +153,7 @@ function renderPage(
 <body>
 <main>
   <h1>${escapeHtml(title)}</h1>
-  <form class="application-form" id="application-form" data-apply-url="/api/v1/jobs/${encodeURIComponent(jobId)}/apply" data-confirmation="${state.confirmation}">
+  <form class="application-form" id="application-form" data-ui="application-form" data-apply-url="/api/v1/jobs/${encodeURIComponent(jobId)}/apply" data-confirmation="${state.confirmation}">
     ${body}
     <p id="form-error" role="alert"></p>
     <button type="submit">Submit application</button>

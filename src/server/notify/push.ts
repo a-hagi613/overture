@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PushSender } from "../platform/ports/push.ts";
 
@@ -37,7 +37,7 @@ export function parsePushNotifyPayload(payload: string) {
  * @param notificationId The notification to push.
  * @returns The queue receipt, with `inserted` false on a repeated request.
  */
-export function enqueueNotificationPush(db: AppDatabase, clock: Clock, notificationId: string) {
+export function enqueueNotificationPush(db: DatabaseWriter, clock: Clock, notificationId: string) {
   return enqueueJob(db, clock, PUSH_NOTIFY_JOB_KIND, pushNotifyPayload(notificationId), {
     dedupeKey: `${PUSH_NOTIFY_JOB_KIND}:${notificationId}`,
   });

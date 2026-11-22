@@ -1,4 +1,4 @@
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import { isNotificationPreferenceKey } from "../../shared/notifications.ts";
 import type { NotificationKind } from "../../shared/notifications.ts";
@@ -47,7 +47,7 @@ export function createNotification(db: AppDatabase, clock: Clock, input: Notific
  * @returns The notification id.
  */
 export function insertNotification(
-  db: AppDatabase,
+  db: DatabaseWriter,
   clock: Clock,
   input: NotificationInput,
   options: { push?: boolean } = {},
