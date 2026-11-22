@@ -24,7 +24,7 @@ import {
 
 const SECRET = "e2e-email-stage-secret-0123456789";
 const SELECTOR = "overture";
-const SIGNING_DOMAINS = ["us.greenhouse-mail.io", "personio.de"] as const;
+const SIGNING_DOMAINS = ["acme.example", "us.greenhouse-mail.io", "personio.de"] as const;
 
 type SigningDomain = (typeof SIGNING_DOMAINS)[number];
 
@@ -108,7 +108,11 @@ const boardSchema = z.object({
   ),
 });
 
-const messageSchema = z.object({ auth: z.string(), classification: z.string().nullable() });
+const messageSchema = z.object({
+  auth: z.string(),
+  classification: z.string().nullable(),
+  subject: z.string(),
+});
 
 const messagesSchema = z.object({ messages: z.array(messageSchema) });
 
@@ -497,6 +501,91 @@ test("a degraded flag makes mail classification rules-only and logs it", async (
   );
 
   expect(skipped).toContain("rules only");
+
+  await owner.dispose();
+});
+
+const RECORDED_MAIL = [
+  {
+    domain: "acme.example",
+    file: "acme-reply.eml",
+    label: "other",
+    subject: "A quick note about your application",
+  },
+  {
+    domain: "us.greenhouse-mail.io",
+    file: "greenhouse-ack.eml",
+    label: "ack",
+    subject: "Your application to Acme",
+  },
+  {
+    domain: "us.greenhouse-mail.io",
+    file: "greenhouse-code.eml",
+    label: "code",
+    subject: "Your application to Acme needs a security code",
+  },
+  {
+    domain: "us.greenhouse-mail.io",
+    file: "greenhouse-interview-brief.eml",
+    label: "interview",
+    subject: "Interview with Acme: the brief",
+  },
+  {
+    domain: "us.greenhouse-mail.io",
+    file: "greenhouse-interview.eml",
+    label: "interview",
+    subject: "Interview with Acme",
+  },
+  {
+    domain: "us.greenhouse-mail.io",
+    file: "greenhouse-offer.eml",
+    label: "offer",
+    subject: "Your offer from Acme",
+  },
+  {
+    domain: "us.greenhouse-mail.io",
+    file: "greenhouse-rejection.eml",
+    label: "rejection",
+    subject: "Update on your application to Acme",
+  },
+  {
+    domain: "us.greenhouse-mail.io",
+    file: "greenhouse-unclear.eml",
+    label: "interview",
+    subject: "Next steps with your application at Acme",
+  },
+  {
+    domain: "personio.de",
+    file: "personio-rejection.eml",
+    label: "rejection",
+    subject: "Ihre Bewerbung bei Acme",
+  },
+] as const;
+
+test("every recorded mail fixture keeps the label the research table records", async ({
+  moves,
+}) => {
+  const { owner, userId } = await ownerContextFor(moves.server.url);
+  await seed(owner, userId);
+  const address = await mailboxAddress(owner);
+  const mailboxId = await mailboxIdFor(owner, userId);
+
+  await Promise.all(
+    RECORDED_MAIL.map(async (row) => {
+      await forward(moves, owner, fresh(fixture(row.file)), address, row.domain);
+    }),
+  );
+  await runMailJobs(owner);
+
+  const listed = messagesSchema.parse(
+    await (
+      await owner.get(`/__test__/mail/messages?mailboxId=${encodeURIComponent(mailboxId)}`)
+    ).json(),
+  ).messages;
+
+  expect(new Map(listed.map((message) => [message.subject, message.classification]))).toEqual(
+    new Map(RECORDED_MAIL.map((row) => [row.subject, row.label])),
+  );
 
   await owner.dispose();
 });
