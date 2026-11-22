@@ -26,10 +26,12 @@ import { recordPasskeyAssertion } from "../platform/passkey/index.ts";
 import { isSameMailbox } from "./email.ts";
 import {
   acceptInvite,
+  deleteUnverifiedUserWithEmail,
   isSuspendedUser,
   liveInviteFor,
   pendingInviteFor,
   suspendedUserWithEmail,
+  verifiedUserWithEmail,
 } from "./invites.ts";
 import { verifyTurnstile } from "./turnstile-gate.ts";
 import { clientIpHeaders } from "./client-ip.ts";
@@ -146,7 +148,8 @@ export function createAuth(
   const mayJoin = (email: string) =>
     env.PUBLIC_SIGNUP_ENABLED ||
     isAllowedEmail(email) ||
-    liveInviteFor(db, inviteHashSecret, email) !== null;
+    liveInviteFor(db, inviteHashSecret, email) !== null ||
+    verifiedUserWithEmail(db, email) !== null;
 
   const discardUnverifiedAccount = async (email: string) => {
     const address = email.trim().toLowerCase();
@@ -313,12 +316,21 @@ export function createAuth(
           before: async (user) => {
             const email = user.email.trim().toLowerCase();
 
-            if (!mayJoin(email)) {
+            if (!mayJoin(email) || verifiedUserWithEmail(db, email) !== null) {
               throw new APIError("FORBIDDEN", {
                 code: "forbidden",
                 message: copy.auth.accountRefused,
               });
             }
+
+            if (suspendedUserWithEmail(db, email)) {
+              throw new APIError("FORBIDDEN", {
+                code: "account_suspended",
+                message: copy.auth.accountSuspended,
+              });
+            }
+
+            deleteUnverifiedUserWithEmail(db, email);
 
             const created = {
               data: {
