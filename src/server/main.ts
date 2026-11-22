@@ -905,6 +905,7 @@ if (env.ANTHROPIC_API_KEY !== undefined) {
 const app = createApp({
   db,
   clock,
+  databasePath,
   staticRoot: env.STATIC_ROOT,
   testRoutes: env.ENABLE_TEST_ROUTES,
   jobHandlers: allJobHandlers,

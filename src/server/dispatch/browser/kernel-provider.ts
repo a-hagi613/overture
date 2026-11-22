@@ -40,7 +40,7 @@ export function createKernelBrowserProvider(config: KernelProviderConfig) {
         return {
           browserMs: detail.usage?.uptime_ms ?? Math.max(0, clock.now() - startedAt),
           costMicros: toMicros(detail.cost?.estimated_usage_spend_usd),
-          proxyBytes: 0,
+          proxyBytes: null,
         };
       },
       liveViewUrl: browser.browser_live_view_url ?? null,
@@ -78,7 +78,7 @@ export function createKernelBrowserProvider(config: KernelProviderConfig) {
       usage: {
         browserMs: browser.usage?.uptime_ms ?? 0,
         costMicros: toMicros(browser.cost?.estimated_usage_spend_usd),
-        proxyBytes: 0,
+        proxyBytes: null,
       },
     };
   }

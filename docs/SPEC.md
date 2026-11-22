@@ -441,7 +441,10 @@ straight to tagging; Ashby's `isRemote` is ignored because Ashby sets it on hybr
    `scripts/load-discovered-boards.ts` loads the dataset's greenhouse, lever, ashby and personio rows as
    `source='discovered'` — 13,911 boards, in transactions of at most 500 boards with the event loop yielded
    between them, idempotent. v1 boards are not imported (the measured comparison is
-   `docs/research/seed-comparison.md`; the runbook is `docs/research/m1-09-runbook.md`).
+   `docs/research/seed-comparison.md`; the runbook is `docs/research/m1-09-runbook.md`). A weekly
+   `.github/workflows/stapply-seed.yml` run stages a candidate upstream snapshot behind schema, sha256 and
+   row-drop guards and never writes the pins itself; re-pinning stays a reviewed change (`docs/DEPLOY.md`,
+   the Stapply seed refresh).
 2. **Backfill**: one pass over every active board inside per-ATS limits; on production it is started with
    `bun run scripts/enqueue-backfill.ts --db /data/app.sqlite`, which enqueues the `catalog.backfill` job and
    prints the per-ATS request counts and the duration estimate at the 2 req/s per-ATS pace.
@@ -1035,7 +1038,9 @@ until #232 releases it after the 20-form probe, and Workable's until #235 does t
   one (Browser Use sends 300 s) requeues the job for exactly that delay without spending an attempt. A 402 (no credit)
   or 403 (forbidden) is never retried: it is a provider error, the `provider` kill switch for `browser_use` is set and
   the owner is alerted, so dispatch pauses until the owner turns the switch off.
-- **Kernel** (emergency fallback): headful browser, stealth on, ISP proxy, per-user profile. Its acceptable-use
+- **Kernel** (emergency fallback): headful browser, stealth on, ISP proxy, per-user profile. Its control API reports
+  uptime and estimated cost but no proxy volume, so its attempts keep `proxy_bytes` NULL (unknown) rather than a
+  misleading 0, and the admin report totals only the bytes providers actually measured. Its acceptable-use
   policy bans "bulk unsolicited form submission" (ADR 0003), so it is exercised only against the synthetic lab and
   fixtures, never sent real applications by default; the owner switches real traffic to it only if Browser Use's
   provider kill switch trips and the owner chooses to.
@@ -1374,6 +1379,15 @@ body, sender or attachment, so the admin never sees message content.
   summary and one row per form for the Catalog page. A form that reads completely is `readable`, a required custom
   question with no rule is an honest `needs_review`, and a control the flow cannot fill is `unsupported`; the probe
   passes only when all twenty forms read with no unreadable or unsupported form.
+- `GET /admin/api/storage-report` attributes what consumes disk and R2 space without any personal content:
+  `app.sqlite` with its `-wal`/`-shm` sidecars and `catalog.sqlite` when that file exists, the volume's total and
+  free bytes, posting counts by ATS with open and closed, object counts and bytes grouped by `files/`, `mail/`,
+  `exports/` and the rest, and Litestream backup totals when `R2_BUCKET_BACKUPS` is configured. It returns sizes,
+  counts and source/table/prefix names only: never an email, name, user id, answer, resume, message or job URL.
+  `?dbstat=1` adds a table and index byte breakdown read from an isolated `VACUUM INTO` snapshot opened read-only, so
+  it never blocks live WAL writes; without it the route copies nothing. A missing `catalog.sqlite` or an unconfigured
+  R2 bucket is reported as absent, never as an error. `bun run scripts/storage-report.ts --db <path>
+  [--objects-root <dir>] [--tables]` prints the same report as JSON and opens the database read-only.
 - `POST /admin/api/tag-imports` mounts the hiring.cafe import seam (§6.3.6) behind the same gate;
   `PUT /admin/api/settings/:key` and `PUT /admin/api/kill-switches/:scope/:key` are the admin's other write
   surfaces. `GET /admin/api/llm-usage` returns the recorded LLM usage and cost, filterable by `purpose`.
@@ -1428,7 +1442,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `GET /api/account/export` · `POST /api/account/export` · `GET /api/account/export/:id/download` · `GET /api/account/deletion` (email, re-authenticated) · `POST /api/account/reauth/link` (a fresh sign-in link) · `POST /api/account/delete` `{confirm: true}` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` (`enabled`, `customer`, the subscription's `plan`, `status`, `currentPeriodEnd`, `cancelAtPeriodEnd`, `applicationsLeft` and `planApplications`) · `POST /api/billing/checkout` `{plan}` (Checkout returns to `/settings/billing/plans?billing=success|cancelled`) · `POST /api/billing/portal` (returns to `/settings/billing`; plan switches, cancel at period end, payment method and invoices happen there, in Stripe) |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `POST /internal/mail/dead-letter` · `GET /internal/mailboxes/:local` |
-| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/probes/personio`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds`, `/billing/reconciliation` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
+| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/probes/personio`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds`, `/billing/reconciliation` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/storage-report`, `/audit`, `/provider-report` |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
 `home.updated`, `notification`, `calendar.updated`. TanStack Query invalidates by topic. The Calendar invalidates on
@@ -1582,7 +1596,9 @@ unhandled rejection in a background loop or timer (logged to stderr, alerted at 
 in-app `alert.raised` event plus a notification for every owner; with `ALERT_NTFY_URL` set, the same alert is pushed
 to the owner's phone. No Grafana is provisioned by this repository; dashboards stay with the owner's Grafana account
 and read the OTLP endpoint. `live.check` computes the same thresholds from the app database and machine and records
-each one, and the test-only drill route fires every alert kind.
+each one, and the test-only drill route fires every alert kind. When the disk alert fires, `GET
+/admin/api/storage-report` and `scripts/storage-report.ts` attribute the space the alert measures to database files,
+object prefixes and, on request, tables and indexes.
 
 Two of those alerts do not depend on the app being up, because they come from the sentinel Worker
 (`workers/sentinel`, ADR 0033): the health probe calls `/api/health` from outside Fly, and the Workable snapshot's
