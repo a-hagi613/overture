@@ -330,6 +330,13 @@
       "when": 1795314713384,
       "tag": "0046_trial_card_fingerprints",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1795317214001,
+      "tag": "0047_subscriptions",
+      "breakpoints": true
     }
   ]
 }

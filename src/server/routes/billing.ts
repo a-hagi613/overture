@@ -14,6 +14,7 @@ import {
 } from "../billing/card-fingerprint.ts";
 import { planForPriceId, stripePriceId } from "../billing/index.ts";
 import { stripeCustomerIdFor } from "../billing/customers.ts";
+import { currentSubscriptionOf } from "../billing/subscriptions.ts";
 import { createPaymentsWebhookService } from "../billing/webhooks.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { logError } from "../platform/log.ts";
@@ -100,9 +101,15 @@ export function createBillingRoutes(deps: {
 
     context.header("Cache-Control", "no-store");
 
+    const subscription = currentSubscriptionOf(db, access.account.id);
+
     return context.json({
+      cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd ?? false,
+      currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
       customer: stripeCustomerIdFor(db, access.account.id) !== null,
       enabled: payments !== null,
+      plan: subscription?.plan ?? null,
+      status: subscription?.status ?? null,
     });
   });
 

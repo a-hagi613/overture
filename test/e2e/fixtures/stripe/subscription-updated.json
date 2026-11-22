@@ -1,0 +1,56 @@
+{
+  "id": "__EVENT_ID__",
+  "object": "event",
+  "api_version": "2025-10-29.clover",
+  "created": 1795270000,
+  "data": {
+    "object": {
+      "id": "__SUBSCRIPTION_ID__",
+      "object": "subscription",
+      "billing_cycle_anchor": "__PERIOD_START__",
+      "cancel_at": null,
+      "cancel_at_period_end": "__CANCEL_AT_PERIOD_END__",
+      "canceled_at": null,
+      "collection_method": "charge_automatically",
+      "currency": "usd",
+      "customer": "__CUSTOMER_ID__",
+      "current_period_end": "__PERIOD_END__",
+      "current_period_start": "__PERIOD_START__",
+      "items": {
+        "object": "list",
+        "data": [
+          {
+            "id": "si_e2e_plan",
+            "object": "subscription_item",
+            "current_period_end": "__PERIOD_END__",
+            "current_period_start": "__PERIOD_START__",
+            "price": {
+              "id": "__PRICE_ID__",
+              "object": "price",
+              "currency": "usd",
+              "recurring": { "interval": "week", "interval_count": 1 },
+              "type": "recurring"
+            },
+            "quantity": 1
+          }
+        ],
+        "has_more": false
+      },
+      "livemode": false,
+      "metadata": {
+        "plan": "__PLAN__",
+        "user_id": "__USER_ID__"
+      },
+      "start_date": "__PERIOD_START__",
+      "status": "__STATUS__"
+    },
+    "previous_attributes": null
+  },
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": {
+    "id": null,
+    "idempotency_key": null
+  },
+  "type": "__EVENT_TYPE__"
+}

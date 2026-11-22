@@ -171,6 +171,17 @@ It keeps the queue and history, tells the person once by push and email with the
 the card), lets sends already in flight finish, and clears by itself when a later payment succeeds.
 _Avoid_: payment failure alert, dunning, lockout
 
+**Subscription**:
+Stripe's record of the user's renewing Plan: the Week or Month price it bills now, its status, when the current period
+ends and whether it will be cancelled then. Overture stores what signed Stripe events say and never shortens a paid
+period.
+_Avoid_: membership, recurring order, account
+
+**Cancel at period end**:
+The user stopping the renewal. The subscription ends when the paid period does, and the Applications that period paid
+for stay available until then.
+_Avoid_: cancel now, immediate cancellation
+
 ## Mail
 
 **Inbox**:
