@@ -2,6 +2,7 @@ import { marketingCopy } from "../../shared/marketing-copy.ts";
 
 const linkBase =
   "min-h-[44px] items-center whitespace-nowrap text-[15px] text-foreground underline-offset-4 hover:underline focus-visible:underline";
+
 const linkClass = `inline-flex ${linkBase}`;
 const desktopOnlyClass = `hidden md:inline-flex ${linkBase}`;
 
