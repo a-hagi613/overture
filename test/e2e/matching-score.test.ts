@@ -84,6 +84,16 @@ const llmUsageSchema = z.object({
   totals: z.object({ calls: z.number(), costMicros: z.number() }),
 });
 
+const jobSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  runAt: z.number(),
+  status: z.string(),
+  dedupeKey: z.string().nullable(),
+});
+
+const jobsSchema = z.object({ jobs: z.array(jobSchema) });
+
 async function seedCompanies(
   owner: APIRequestContext,
   prefix: string,
@@ -237,6 +247,43 @@ test("a strict threshold over a large pool stops at the scoring bound, alerts on
 
   expect(spendMicros).toBeGreaterThan(0);
   expect(spendMicros).toBeLessThan(18_000);
+
+  await owner.dispose();
+});
+
+test("a run after the daily time schedules only tomorrow, never a second run today", async ({
+  matching,
+}) => {
+  const { owner, userId } = await ownerContextFor(matching.server.url);
+
+  await clearCatalog(owner);
+  await grantApplications(owner, 70);
+  await configureMatching(owner);
+
+  await owner.put("/__test__/settings/match.auto_threshold_default", { data: { value: "95" } });
+
+  const beforeOffset = await clockNow(owner);
+  const todayStart = Math.floor(beforeOffset / 86_400_000) * 86_400_000;
+  const afterDailyRunAt = todayStart + 9 * 3_600_000;
+
+  await owner.post("/__test__/clock/offset", {
+    data: { offsetMs: afterDailyRunAt - beforeOffset },
+  });
+
+  await seedCompanies(owner, "late", 40, { salaryMinMinor: 15_000_000 });
+
+  await runPrepDaily(owner, matching.server.url, userId);
+
+  const now = await clockNow(owner);
+  const tomorrowRunAt = todayStart + 86_400_000 + 7 * 3_600_000;
+  const { jobs } = jobsSchema.parse(await (await owner.get("/__test__/jobs")).json());
+  const scheduled = jobs.filter((job) => job.kind === "prep.daily" && job.dedupeKey !== null);
+
+  expect(matching.anthropic.requests()).toHaveLength(30);
+  expect(scheduled.filter((job) => job.runAt <= now)).toHaveLength(0);
+  expect(
+    scheduled.filter((job) => job.runAt === tomorrowRunAt && job.status === "queued"),
+  ).toHaveLength(1);
 
   await owner.dispose();
 });
