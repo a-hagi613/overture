@@ -60,6 +60,8 @@ import { retryWhenBusy } from "../platform/db/busy.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 import { attachApplication, ensureOpenReview } from "../pipeline/review-store.ts";
 import { ensureApplyFailuresQueued } from "../notify/failure-digest.ts";
+import { createNotification } from "../notify/notifications.ts";
+import { NOTIFICATION_KINDS } from "../../shared/notifications.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
 import { createConsentService } from "../profile/consent.ts";
@@ -1100,6 +1102,34 @@ export function createTestRoutes(
     }
 
     return context.json({ ok: true });
+  });
+
+  const emitNotificationBody = z.object({
+    email: z.string().min(1),
+    kind: z.enum(NOTIFICATION_KINDS),
+    title: z.string(),
+    body: z.string(),
+    url: z.string(),
+  });
+
+  routes.post("/notifications/emit", zValidator("json", emitNotificationBody), (context) => {
+    const body = context.req.valid("json");
+
+    const user = db.select().from(users).where(eq(users.email, body.email.toLowerCase())).get();
+
+    if (user === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    const id = createNotification(db, clock, {
+      body: body.body,
+      kind: body.kind,
+      title: body.title,
+      url: body.url,
+      userId: user.id,
+    });
+
+    return context.json({ id });
   });
 
   routes.get("/push/subscriptions", zValidator("query", userQuery), (context) => {
