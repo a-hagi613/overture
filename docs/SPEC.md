@@ -229,7 +229,7 @@ src/
 drizzle/             generated migrations
 scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, capture-forms.ts, pull-forms.ts, restore-drill.ts
 test/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
-                     (the fifty unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
+                     (the fifty-two unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
 ```
 
@@ -312,7 +312,8 @@ other address only lowered and trimmed) · `session` · `account` (provider: goo
 | `posting_questions` | posting_id, question_id (a logical `questions.id` in `app.sqlite`, no foreign key), required, position, options JSON, field_name (the form input's name or id, taken from the ATS question fields and used to fill the live form); PK(posting_id,question_id) |
 | `tag_imports` | id, source, file_sha256, rows, matched, uploaded_by, applied_at |
 
-Descriptions (`description_gz`) are purged 90 days after `closed_at`.
+Descriptions (`description_gz`) are nulled 30 days after `closed_at`, and a closed Posting is deleted 90 days after
+`closed_at` with its tags, questions and `postings_fts` entry, in bounded chunks by `maintenance.retention` (§5.7).
 
 ### 5.4 Pipeline
 
@@ -422,7 +423,8 @@ scanned on a tick.
 
 Retention: `events` 24 h; `bg_jobs` done 7 days, dead 30 days; `attempts` 180 days; `llm_batches` applied or
 failed 30 days; `llm_usage` 400 days;
-`notifications` 90 days; descriptions 90 days after close; messages for account lifetime; `review_audit_events` and
+`notifications` 90 days; `catalog.sqlite` descriptions 30 days after close and closed Postings 90 days after close, in
+bounded chunks; messages for account lifetime; `review_audit_events` and
 Snapshots for account lifetime (the audit is only useful across a search).
 
 ---
@@ -1562,7 +1564,7 @@ Plus: route reachability for every page, axe on every page, and the visual snaps
 Review, Inbox, Profile, Settings and the legal and consent boards × 390 / 1280 px × light/dark; Ready joins them once it is
 drawn) in pinned Docker.
 
-### 16.2 Unit tests (fifty files, `bun:test`, beside their code)
+### 16.2 Unit tests (fifty-two files, `bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
@@ -1595,11 +1597,13 @@ drawn) in pinned Docker.
 | `src/server/platform/access/access.test.ts` | a malformed Access cookie or a missing team domain answers 401, never a 500 or an invented issuer |
 | `src/server/platform/alert-detail.test.ts` | a public alert carries the error type and count only, never the arbitrary message that can hold personal data or a token |
 | `src/server/platform/crypto.test.ts` | wrap/unwrap, AAD, shred |
+| `src/server/platform/db/catalog-split.test.ts` | `litestream.yml` replicates only `/data/app.sqlite`, a catalog write transaction never holds `app.sqlite`'s write lock, deleting and recreating `catalog.sqlite` leaves every user and Application row intact, and a closed Posting a crashed sweep never reported is still reconciled (#423) |
 | `src/server/platform/db/migration-snapshot.test.ts` | migration `0056_snapshot_decouple` backfills the copied display fields onto every existing Application, including readable placeholders when the catalog row is already gone, and leaves `applications`, `matches`, `posting_user_state` and `skip_companies` with no foreign key into `postings` or `companies` (#422) |
 | `src/server/platform/db/restore-check.test.ts` | the restored-database check reads only, refuses outbound calls and leaves `bg_jobs` untouched (#412) |
 | `src/server/platform/event-loop-lag.test.ts` | a late timer tick reports how long the loop was blocked, once per cooldown |
 | `src/server/platform/http-body.test.ts` | an unauthenticated webhook body stops at its byte cap and is never buffered whole, so a sender cannot choose how much memory it costs |
 | `src/server/platform/jobs/queue.test.ts` | a browser or LLM lane already at its limit is left out of the claim, the total in-flight cap bounds one claim, and the claim is planned through `bg_jobs_claim_due` (#425) |
+| `src/server/platform/jobs/retention.test.ts` | a Posting closed more than 30 days loses its description, one closed more than 90 days is deleted with its tags, questions and FTS entry, both phases stop at the per-run chunk cap and resume on the next run, a Posting an Application still waiting to send points at is held, and no Application row or snapshot changes (#424) |
 | `src/server/platform/jobs/scheduler.test.ts` | a completed job-worker wait retains no abort listener |
 | `src/server/platform/llm/anthropic-batches.test.ts` | the api key is sent only to the configured api origin, never to another origin named by a provider response (#418) |
 | `src/server/platform/llm/batch-store.test.ts` | one request set is recorded once, its results are claimed by one conditional update so every later caller reads them back, and a failed record reopens for one resubmission (#418) |
