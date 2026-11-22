@@ -5,10 +5,10 @@ import type { CalendarDate } from "../lib/calendar-grid.ts";
 
 import { copy } from "../../shared/copy.ts";
 import { CalendarAgenda } from "../components/calendar-agenda.tsx";
-import { CalendarChip } from "../components/calendar-chip.tsx";
 import { CalendarDayPanel } from "../components/calendar-day-panel.tsx";
 import { CalendarDaySheet } from "../components/calendar-day-sheet.tsx";
 import { CalendarMonthGrid } from "../components/calendar-month-grid.tsx";
+import { KindDot } from "../components/calendar-kind-dot.tsx";
 import { NavGlyph } from "../components/nav-glyph.tsx";
 import { PageHeader } from "../components/page-header.tsx";
 import { useCalendar } from "../lib/calendar-api.ts";
@@ -158,15 +158,6 @@ export function CalendarPage() {
             </h2>
             <div className="flex items-center gap-2">
               <button
-                className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold hover:bg-muted md:min-h-10"
-                onClick={() => {
-                  go(today);
-                }}
-                type="button"
-              >
-                {copy.calendar.today}
-              </button>
-              <button
                 aria-label={copy.calendar.previousMonth}
                 className={NAV_BUTTON}
                 onClick={() => {
@@ -185,6 +176,15 @@ export function CalendarPage() {
                 type="button"
               >
                 <NavGlyph name="forward" />
+              </button>
+              <button
+                className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold hover:bg-muted md:min-h-10"
+                onClick={() => {
+                  go(today);
+                }}
+                type="button"
+              >
+                {copy.calendar.today}
               </button>
             </div>
           </div>
@@ -208,8 +208,12 @@ export function CalendarPage() {
             className="mt-3.5 flex flex-wrap gap-x-5 gap-y-2"
           >
             {CHIP_KINDS.map((kind) => (
-              <li key={kind}>
-                <CalendarChip kind={kind} />
+              <li
+                className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground"
+                key={kind}
+              >
+                <KindDot kind={kind} />
+                {copy.calendar.kinds[kind]}
               </li>
             ))}
           </ul>
