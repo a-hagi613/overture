@@ -23,3 +23,19 @@ export function openDatabase(path: string) {
 
   return { db, sqlite };
 }
+
+/**
+ * Opens an existing database for reporting only. It never migrates, never
+ * creates the file and never writes, so a report cannot change what it measures.
+ * @param path an existing SQLite database file
+ * @returns the Drizzle handle and its SQLite connection
+ */
+export function openReadOnlyDatabase(path: string) {
+  const sqlite = new Database(path, { readonly: true });
+
+  sqlite.run("PRAGMA busy_timeout = 5000;");
+
+  const db = drizzle(sqlite);
+
+  return { db, sqlite };
+}

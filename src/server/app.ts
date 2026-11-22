@@ -51,6 +51,7 @@ import { createAccountRoutes } from "./routes/account.ts";
 import { createBillingRoutes, createStripeWebhookRoutes } from "./routes/billing.ts";
 import { createInboxRoutes } from "./routes/inbox.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
+import { createConfiguredBackupStore } from "./platform/object-store.ts";
 import { securityHeaders } from "./security-headers.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
 
@@ -58,6 +59,7 @@ export interface AppDependencies {
   db: AppDatabase;
   clock: AdjustableClock;
   backups: BackupMonitor;
+  databasePath: string;
   staticRoot: string;
   testRoutes: boolean;
   jobHandlers: JobHandlers;
@@ -130,6 +132,9 @@ export function createApp(deps: AppDependencies) {
   );
 
   const adminApi = createAdminApi(deps.db, deps.clock, deps.auth, {
+    backupObjects: createConfiguredBackupStore(),
+    databasePath: deps.databasePath,
+    objects: deps.objects,
     payments: deps.payments,
     providers: deps.providers,
     personal,

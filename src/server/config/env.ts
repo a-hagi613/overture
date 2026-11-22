@@ -110,6 +110,7 @@ const envSchema = z
     R2_ACCESS_KEY_ID: z.string().min(1).optional(),
     R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
     R2_BUCKET_FILES: z.string().min(1).optional(),
+    R2_BUCKET_BACKUPS: z.string().min(1).optional(),
     R2_ENDPOINT: z.url().optional(),
     MAIL_FROM: z.email().default("no-reply@tryoverture.com"),
     MAIL_DOMAIN: z
@@ -273,6 +274,15 @@ const envSchema = z
         code: "custom",
         message: "R2_BUCKET_FILES needs R2_ACCOUNT_ID, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY.",
         path: ["R2_BUCKET_FILES"],
+      });
+    }
+
+    if (value.R2_BUCKET_BACKUPS !== undefined && r2CredentialsPresent < r2Credentials.length) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "R2_BUCKET_BACKUPS needs R2_ACCOUNT_ID, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY.",
+        path: ["R2_BUCKET_BACKUPS"],
       });
     }
 

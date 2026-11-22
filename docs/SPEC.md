@@ -1369,6 +1369,15 @@ body, sender or attachment, so the admin never sees message content.
   summary and one row per form for the Catalog page. A form that reads completely is `readable`, a required custom
   question with no rule is an honest `needs_review`, and a control the flow cannot fill is `unsupported`; the probe
   passes only when all twenty forms read with no unreadable or unsupported form.
+- `GET /admin/api/storage-report` attributes what consumes disk and R2 space without any personal content:
+  `app.sqlite` with its `-wal`/`-shm` sidecars and `catalog.sqlite` when that file exists, the volume's total and
+  free bytes, posting counts by ATS with open and closed, object counts and bytes grouped by `files/`, `mail/`,
+  `exports/` and the rest, and Litestream backup totals when `R2_BUCKET_BACKUPS` is configured. It returns sizes,
+  counts and source/table/prefix names only: never an email, name, user id, answer, resume, message or job URL.
+  `?dbstat=1` adds a table and index byte breakdown read from an isolated `VACUUM INTO` snapshot opened read-only, so
+  it never blocks live WAL writes; without it the route copies nothing. A missing `catalog.sqlite` or an unconfigured
+  R2 bucket is reported as absent, never as an error. `bun run scripts/storage-report.ts --db <path>
+  [--objects-root <dir>] [--tables]` prints the same report as JSON and opens the database read-only.
 - `POST /admin/api/tag-imports` mounts the hiring.cafe import seam (§6.3.6) behind the same gate;
   `PUT /admin/api/settings/:key` and `PUT /admin/api/kill-switches/:scope/:key` are the admin's other write
   surfaces. `GET /admin/api/llm-usage` returns the recorded LLM usage and cost, filterable by `purpose`.
@@ -1423,7 +1432,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `GET /api/account/export` · `POST /api/account/export` · `GET /api/account/export/:id/download` · `GET /api/account/deletion` (email, re-authenticated) · `POST /api/account/reauth/link` (a fresh sign-in link) · `POST /api/account/delete` `{confirm: true}` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` (`enabled`, `customer`, the subscription's `plan`, `status`, `currentPeriodEnd`, `cancelAtPeriodEnd`, `applicationsLeft` and `planApplications`) · `POST /api/billing/checkout` `{plan}` (Checkout returns to `/settings/billing/plans?billing=success|cancelled`) · `POST /api/billing/portal` (returns to `/settings/billing`; plan switches, cancel at period end, payment method and invoices happen there, in Stripe) |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `POST /internal/mail/dead-letter` · `GET /internal/mailboxes/:local` |
-| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/probes/personio`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds`, `/billing/reconciliation` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
+| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/probes/personio`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds`, `/billing/reconciliation` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/storage-report`, `/audit`, `/provider-report` |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
 `home.updated`, `notification`, `calendar.updated`. TanStack Query invalidates by topic. The Calendar invalidates on
@@ -1577,7 +1586,9 @@ unhandled rejection in a background loop or timer (logged to stderr, alerted at 
 in-app `alert.raised` event plus a notification for every owner; with `ALERT_NTFY_URL` set, the same alert is pushed
 to the owner's phone. No Grafana is provisioned by this repository; dashboards stay with the owner's Grafana account
 and read the OTLP endpoint. `live.check` computes the same thresholds from the app database and machine and records
-each one, and the test-only drill route fires every alert kind.
+each one, and the test-only drill route fires every alert kind. When the disk alert fires, `GET
+/admin/api/storage-report` and `scripts/storage-report.ts` attribute the space the alert measures to database files,
+object prefixes and, on request, tables and indexes.
 
 Two of those alerts do not depend on the app being up, because they come from the sentinel Worker
 (`workers/sentinel`, ADR 0033): the health probe calls `/api/health` from outside Fly, and the Workable snapshot's
