@@ -327,6 +327,23 @@ export const copy = {
 
       return `${lines.join("\n")}\n`;
     },
+    billingPauseSubject: (reason: "plan_ended" | "payment_failed") =>
+      reason === "plan_ended"
+        ? "Your Overture plan has ended"
+        : "Your Overture payment didn't go through",
+    billingPauseBody: (input: { title: string; copy: string; fix: string; url: string }) =>
+      [
+        input.title,
+        "",
+        input.copy,
+        "",
+        `${input.fix}: ${input.url}`,
+        "",
+        "Applications already in flight will finish. Nothing new is sent until this is fixed.",
+        "",
+        "Overture",
+        "",
+      ].join("\n"),
     exportReadySubject: "Your Overture export is ready",
     exportReadyBody: (url: string) =>
       `Your Overture export is ready to download.\n\nOpen Settings in Overture and choose Download export. The link is valid for 24 hours, then the archive is deleted.\n\n${url}\n\nIf you didn't ask for this, write to admin@tryoverture.com.\n`,

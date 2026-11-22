@@ -114,6 +114,7 @@ import {
   applicationsLeft,
   commitForApplication,
   grantApplications,
+  releaseForApplication,
   reserveForApplication,
 } from "../billing/ledger.ts";
 
@@ -463,6 +464,11 @@ const ledgerApplicationBody = z.object({
   email: z.email(),
   applicationId: z.string().min(1),
   commit: z.boolean().default(false),
+});
+
+const ledgerReleaseBody = z.object({
+  email: z.email(),
+  applicationId: z.string().min(1),
 });
 
 const seedFactsBody = z.object({
@@ -2167,6 +2173,35 @@ export function createTestRoutes(
     return context.json({
       applicationsLeft: applicationsLeft(db, user.id, clock.now()),
       reserved: reserved.reserved,
+    });
+  });
+
+  routes.post("/ledger/release", zValidator("json", ledgerReleaseBody), async (context) => {
+    const { email, applicationId } = context.req.valid("json");
+
+    const user = db
+      .select()
+      .from(users)
+      .where(eq(users.email, lowercased(email)))
+      .get();
+
+    if (user === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    const released = await retryWhenBusy(
+      () =>
+        releaseForApplication(db, clock, {
+          applicationId,
+          idempotencyKey: `test-release:${user.id}:${applicationId}`,
+          userId: user.id,
+        }),
+      "test.ledger.release",
+    );
+
+    return context.json({
+      applicationsLeft: applicationsLeft(db, user.id, clock.now()),
+      released: released.released,
     });
   });
 

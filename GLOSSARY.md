@@ -157,8 +157,15 @@ _Avoid_: subscription tier, package, level
 
 **Period grant**:
 The Applications one paid period makes available. It expires at the period's end, so unused ones do not roll over,
-and a reservation still open then is released and expired with it.
+and a reservation still open then is released and expired with it, except a send already in flight, which finishes
+and is charged only if it was sent.
 _Avoid_: credit, allowance, rollover, plan balance
+
+**Billing pause**:
+The pause that stops new sends when a plan ends (`plan_ended`) or a payment does not go through (`payment_failed`).
+It keeps the queue and history, tells the person once by push and email with the one fix (choose a plan or update
+the card), lets sends already in flight finish, and clears by itself when a later payment succeeds.
+_Avoid_: payment failure alert, dunning, lockout
 
 ## Mail
 

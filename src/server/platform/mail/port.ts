@@ -35,10 +35,17 @@ export interface OutboundExportReadyMail {
   body: string;
 }
 
+export interface OutboundBillingNoticeMail {
+  to: string;
+  subject: string;
+  body: string;
+}
+
 export interface MailSender {
   sendMagicLink: (mail: OutboundMagicLinkMail) => Promise<void>;
   sendCheck: (mail: OutboundCheckMail) => Promise<void>;
   sendReadyRecap: (mail: OutboundReadyRecapMail) => Promise<void>;
   sendAccountDeleted: (mail: OutboundAccountDeletedMail) => Promise<void>;
   sendExportReady: (mail: OutboundExportReadyMail) => Promise<void>;
+  sendBillingNotice: (mail: OutboundBillingNoticeMail) => Promise<void>;
 }

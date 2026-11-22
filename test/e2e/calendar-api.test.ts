@@ -25,6 +25,7 @@ import {
 const SECRET = "e2e-calendar-secret-0123456789";
 const SELECTOR = "overture";
 const SIGNING_DOMAIN = "us.greenhouse-mail.io";
+const SIGNING_DOMAINS = [SIGNING_DOMAIN, "hire.lever.co", "ashbyhq.com"];
 
 const SERVER_NOW = Date.UTC(2026, 10, 21, 12, 0, 0);
 const DAY = 24 * 60 * 60_000;
@@ -34,7 +35,7 @@ const SENT_AT = Date.UTC(2026, 10, 19, 15, 0, 0);
 
 interface MailHarness {
   server: AppServer;
-  sign: (raw: string) => Promise<string>;
+  sign: (raw: string, signingDomain?: string) => Promise<string>;
 }
 
 const test = appTest.extend<{ mail: MailHarness }>({
@@ -46,9 +47,11 @@ const test = appTest.extend<{ mail: MailHarness }>({
       const publicDer = publicKey.export({ format: "der", type: "spki" });
       const record = `v=DKIM1; k=rsa; p=${Buffer.from(publicDer).toString("base64")}`;
 
-      const dns = await startTxtDnsServer({
-        [`${SELECTOR}._domainkey.${SIGNING_DOMAIN}`]: [record],
-      });
+      const dns = await startTxtDnsServer(
+        Object.fromEntries(
+          SIGNING_DOMAINS.map((domain) => [`${SELECTOR}._domainkey.${domain}`, [record]]),
+        ),
+      );
 
       const server = await startFreshAppServer(identityServer, {
         INBOUND_DNS_SERVER: dns.server,
@@ -58,11 +61,9 @@ const test = appTest.extend<{ mail: MailHarness }>({
 
       await provide({
         server,
-        sign: async (raw) => {
+        sign: async (raw, signingDomain = SIGNING_DOMAIN) => {
           const result = await dkimSign(raw, {
-            signatureData: [
-              { privateKey: privateKeyPem, selector: SELECTOR, signingDomain: SIGNING_DOMAIN },
-            ],
+            signatureData: [{ privateKey: privateKeyPem, selector: SELECTOR, signingDomain }],
             signTime: new Date(SENT_AT),
           });
 
@@ -128,6 +129,12 @@ function fresh(raw: string) {
     .replaceAll("__ACK_ID__", crypto.randomUUID());
 }
 
+function signingDomainOf(raw: string) {
+  const domain = /^From:[^\n]*@(?<domain>[^>\s]+)/mu.exec(raw)?.groups?.["domain"]?.toLowerCase();
+
+  return domain !== undefined && SIGNING_DOMAINS.includes(domain) ? domain : SIGNING_DOMAIN;
+}
+
 async function moveClockTo(request: APIRequestContext, target: number) {
   const current = z
     .object({ now: z.number(), offsetMs: z.number() })
@@ -156,7 +163,7 @@ async function mailboxAddress(owner: APIRequestContext) {
 }
 
 async function forward(mail: MailHarness, owner: APIRequestContext, raw: string, address: string) {
-  const body = new TextEncoder().encode(await mail.sign(raw));
+  const body = new TextEncoder().encode(await mail.sign(raw, signingDomainOf(raw)));
 
   const timestamp = Math.trunc(
     z.object({ now: z.number() }).parse(await (await owner.get("/__test__/clock")).json()).now /
@@ -466,5 +473,253 @@ test("the Calendar refuses a window over 42 days and never shows another user's 
   expect(missing.status()).toBe(400);
 
   await anonymous.dispose();
+  await owner.dispose();
+});
+
+function calendarFixture(name: string) {
+  return readFileSync(join(process.cwd(), "test/e2e/fixtures/mail/ics", name), "utf8");
+}
+
+function forwardedInvite(input: {
+  from: string;
+  subject: string;
+  text: string;
+  ics: string;
+  method?: string;
+}) {
+  return `From: ${input.from}
+To: Overture <in-forward@tryoverture.com>
+Subject: ${input.subject}
+Date: Thu, 19 Nov 2026 15:06:00 +0000
+Message-ID: <invite.__MESSAGE_ID__@ats-mail.example>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="overture-interview"
+
+--overture-interview
+Content-Type: text/plain; charset=utf-8
+
+${input.text}
+--overture-interview
+Content-Type: text/calendar; charset=utf-8; method=${input.method ?? "REQUEST"}
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="invite.ics"
+
+${input.ics}
+--overture-interview--
+`;
+}
+
+test("an .ics invite appears on the Calendar, a higher SEQUENCE replaces it, and a cancellation removes it", async ({
+  mail,
+}) => {
+  const { owner, userId } = await ownerContextFor(mail.server.url);
+
+  await moveClockTo(owner, SERVER_NOW);
+
+  const applicationId = await seededApplication(owner, userId, {
+    atsJobId: "calendar-ics",
+    sentAt: SENT_AT,
+    status: "sent",
+  });
+
+  const address = await mailboxAddress(owner);
+  const from = Date.UTC(2026, 11, 1);
+  const to = Date.UTC(2026, 11, 5);
+
+  await forward(
+    mail,
+    owner,
+    fresh(
+      forwardedInvite({
+        from: "Greenhouse <no-reply@us.greenhouse-mail.io>",
+        ics: calendarFixture("greenhouse-invite.ics"),
+        subject: "Interview with Acme",
+        text: "Acme has invited you to interview. The invitation is attached.",
+      }),
+    ),
+    address,
+  );
+  await runMailJobs(owner);
+
+  const invited = await calendarOf(owner, from, to);
+
+  expect(invited.items).toEqual([
+    {
+      applicationId,
+      at: Date.UTC(2026, 11, 2, 15, 0, 0),
+      closedReason: null,
+      company: "Acme",
+      id: expect.stringMatching(/^interview:/u),
+      kind: "interview",
+      source: "email",
+      stage: null,
+      title: "Senior Backend Engineer",
+    },
+  ]);
+
+  await forward(
+    mail,
+    owner,
+    fresh(
+      forwardedInvite({
+        from: "Greenhouse <no-reply@us.greenhouse-mail.io>",
+        ics: calendarFixture("greenhouse-update.ics"),
+        subject: "Interview with Acme rescheduled",
+        text: "Acme moved your interview. The updated invitation is attached.",
+      }),
+    ),
+    address,
+  );
+  await runMailJobs(owner);
+
+  const rescheduled = await calendarOf(owner, from, to);
+
+  expect(rescheduled.items.map((item) => [item.kind, item.at])).toEqual([
+    ["interview", Date.UTC(2026, 11, 3, 19, 30, 0)],
+  ]);
+
+  await forward(
+    mail,
+    owner,
+    fresh(
+      forwardedInvite({
+        from: "Greenhouse <no-reply@us.greenhouse-mail.io>",
+        ics: calendarFixture("greenhouse-stale.ics"),
+        subject: "Interview with Acme",
+        text: "An older copy of the invitation is attached.",
+      }),
+    ),
+    address,
+  );
+  await runMailJobs(owner);
+
+  const afterStale = await calendarOf(owner, from, to);
+
+  expect(afterStale.items.map((item) => [item.kind, item.at])).toEqual([
+    ["interview", Date.UTC(2026, 11, 3, 19, 30, 0)],
+  ]);
+
+  await forward(
+    mail,
+    owner,
+    fresh(
+      forwardedInvite({
+        from: "Greenhouse <no-reply@us.greenhouse-mail.io>",
+        ics: calendarFixture("greenhouse-cancel-stale.ics"),
+        method: "CANCEL",
+        subject: "Interview with Acme cancelled",
+        text: "An older cancellation of the invitation is attached.",
+      }),
+    ),
+    address,
+  );
+  await runMailJobs(owner);
+
+  const afterStaleCancel = await calendarOf(owner, from, to);
+
+  expect(afterStaleCancel.items.map((item) => [item.kind, item.at])).toEqual([
+    ["interview", Date.UTC(2026, 11, 3, 19, 30, 0)],
+  ]);
+
+  await forward(
+    mail,
+    owner,
+    fresh(
+      forwardedInvite({
+        from: "Greenhouse <no-reply@us.greenhouse-mail.io>",
+        ics: calendarFixture("greenhouse-cancel.ics"),
+        method: "CANCEL",
+        subject: "Interview with Acme cancelled",
+        text: "Acme cancelled your interview. The cancellation is attached.",
+      }),
+    ),
+    address,
+  );
+  await runMailJobs(owner);
+
+  const cancelled = await calendarOf(owner, from, to);
+
+  expect(cancelled.items).toEqual([]);
+
+  await forward(
+    mail,
+    owner,
+    fresh(
+      forwardedInvite({
+        from: "Greenhouse <no-reply@us.greenhouse-mail.io>",
+        ics: calendarFixture("greenhouse-unlinked.ics"),
+        subject: "Interview with Beta Corp",
+        text: "Beta Corp has invited you to interview.",
+      }),
+    ),
+    address,
+  );
+  await runMailJobs(owner);
+
+  const unlinked = await calendarOf(owner, Date.UTC(2027, 0, 12), Date.UTC(2027, 0, 13));
+
+  expect(unlinked.items).toEqual([]);
+
+  await owner.dispose();
+});
+
+test("the Calendar reads a TZID and a floating .ics time in the right zone, and ignores free text", async ({
+  mail,
+}) => {
+  const { owner, userId } = await ownerContextFor(mail.server.url);
+
+  await moveClockTo(owner, SERVER_NOW);
+
+  const saved = await owner.put("/api/profile/settings", {
+    data: { languages: ["en"], timezone: "Europe/Berlin" },
+  });
+
+  expect(saved.ok()).toBe(true);
+
+  await seededApplication(owner, userId, {
+    atsJobId: "calendar-ics-zones",
+    sentAt: SENT_AT,
+    status: "sent",
+  });
+
+  const address = await mailboxAddress(owner);
+
+  await forward(
+    mail,
+    owner,
+    fresh(
+      forwardedInvite({
+        from: "Lever <no-reply@hire.lever.co>",
+        ics: calendarFixture("lever-floating.ics"),
+        subject: "Acme phone screen",
+        text: "Your call with Acme is scheduled. The invitation is attached.",
+      }),
+    ),
+    address,
+  );
+  await forward(
+    mail,
+    owner,
+    fresh(
+      forwardedInvite({
+        from: "Ashby <no-reply@ashbyhq.com>",
+        ics: calendarFixture("ashby-sydney.ics"),
+        subject: "Interview with Acme - panel",
+        text: "Acme has invited you to a panel interview. The invitation is attached.",
+      }),
+    ),
+    address,
+  );
+  await forward(mail, owner, fresh(fixture("greenhouse-interview.eml")), address);
+  await runMailJobs(owner);
+
+  const window = await calendarOf(owner, Date.UTC(2026, 11, 8), Date.UTC(2026, 11, 17));
+
+  expect(window.timeZone).toBe("Europe/Berlin");
+  expect(window.items.map((item) => [item.kind, item.at])).toEqual([
+    ["interview", Date.UTC(2026, 11, 10, 9, 0, 0)],
+    ["interview", Date.UTC(2026, 11, 15, 3, 0, 0)],
+  ]);
+
   await owner.dispose();
 });

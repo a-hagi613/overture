@@ -40,6 +40,11 @@ export function createDemoSafeMailSender(db: AppDatabase, sender: MailSender) {
         await sender.sendReadyRecap(mail);
       }
     },
+    sendBillingNotice: async (mail) => {
+      if (allowed(mail.to)) {
+        await sender.sendBillingNotice(mail);
+      }
+    },
   };
 
   return guarded;

@@ -3,7 +3,7 @@ import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
 
 import type { Clock } from "../platform/ports/clock.ts";
 
-import { grants, ledger } from "../platform/db/schema.ts";
+import { applications, grants, ledger } from "../platform/db/schema.ts";
 
 export type BillingDb = BaseSQLiteDatabase<"sync", void>;
 
@@ -229,6 +229,36 @@ function reservationPairsOf(db: BillingDb, userId: string) {
   return pairs;
 }
 
+function applicationInFlight(db: BillingDb, applicationId: string | null) {
+  if (applicationId === null) {
+    return false;
+  }
+
+  const row = db
+    .select({ status: applications.status })
+    .from(applications)
+    .where(eq(applications.id, applicationId))
+    .get();
+
+  return row?.status === "sending" || row?.status === "confirming";
+}
+
+function nextExpireKey(db: BillingDb, grantId: string) {
+  const base = `expire:${grantId}`;
+
+  if (entryOf(db, base) === undefined) {
+    return base;
+  }
+
+  let sequence = 1;
+
+  while (entryOf(db, `${base}:${String(sequence)}`) !== undefined) {
+    sequence += 1;
+  }
+
+  return `${base}:${String(sequence)}`;
+}
+
 function openReservationOf(db: BillingDb, userId: string, applicationId: string) {
   const pair = reservationPairsOf(db, userId).find(
     (candidate) => candidate.closedBy === null && candidate.reserve.applicationId === applicationId,
@@ -330,6 +360,16 @@ export function releaseForApplication(db: BillingDb, clock: Clock, input: Reserv
   return { released: true as const, row };
 }
 
+/**
+ * Expires a user's due grants. A send already in flight keeps its reservation
+ * across the period end, so a confirmed send still commits (charged for what
+ * was sent) and a failed one releases then expires on the next sweep
+ * (ADR 0008, user story 14).
+ * @param db The database to expire grants in.
+ * @param clock The clock that decides what has ended.
+ * @param userId The user whose grants are due.
+ * @returns The grant ids the pass expired.
+ */
 export function expireDueGrants(db: BillingDb, clock: Clock, userId: string) {
   const at = clock.now();
 
@@ -365,7 +405,10 @@ export function expireDueGrants(db: BillingDb, clock: Clock, userId: string) {
       }
 
       const open = reservationPairsOf(tx, userId).filter(
-        (pair) => pair.closedBy === null && pair.reserve.grantId === grant.id,
+        (pair) =>
+          pair.closedBy === null &&
+          pair.reserve.grantId === grant.id &&
+          !applicationInFlight(tx, pair.reserve.applicationId),
       );
 
       for (const pair of open) {
@@ -388,7 +431,7 @@ export function expireDueGrants(db: BillingDb, clock: Clock, userId: string) {
           amount: availableAfter,
           grantId: grant.id,
           applicationId: null,
-          idempotencyKey: `expire:${grant.id}`,
+          idempotencyKey: nextExpireKey(tx, grant.id),
         });
       }
     });
