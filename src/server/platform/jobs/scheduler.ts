@@ -103,6 +103,21 @@ function expiring(ms: number) {
   return { promise, cancel };
 }
 
+export interface JobWorkerOptions {
+  /**
+   * How long after boot the worker ignores the enqueues that startup priming makes.
+   *
+   * A restart wakes the loop within the same second it starts listening: the
+   * startup enqueues (catalog sweep, check-ins, grant expiry, retention, prep…)
+   * notify the worker, which then claims a full batch of jobs. On a large volume
+   * that batch competed with the first health checks of the new machine, and a
+   * machine that missed them was marked critical for minutes. Waiting for one
+   * settle window lets the machine answer `/api/health` before any queued work
+   * runs; nothing is dropped, the work just starts a few seconds later.
+   */
+  startupSettleMs?: number;
+}
+
 export function startJobWorker(
   db: AppDatabase,
   clock: Clock,
@@ -110,9 +125,12 @@ export function startJobWorker(
   signal: AbortSignal,
   onEnqueue: (notify: () => void) => void,
   singletonKinds: readonly string[] = [],
+  options: JobWorkerOptions = {},
 ) {
   const inFlight = new Set<InFlightJob>();
   const exclusive = new Set(singletonKinds);
+  const startupSettleMs = Math.max(0, options.startupSettleMs ?? 0);
+  const settledAt = performance.now() + startupSettleMs;
 
   function runTracked(job: ClaimedJob) {
     const entry: InFlightJob = {
@@ -152,6 +170,10 @@ export function startJobWorker(
   let wakeResolve: (() => void) | null = null;
 
   onEnqueue(() => {
+    if (performance.now() < settledAt) {
+      return;
+    }
+
     if (wakeResolve !== null) {
       wakeResolve();
       wakeResolve = null;
@@ -170,15 +192,16 @@ export function startJobWorker(
     }
   }
 
-  async function step() {
+  async function step(first = true) {
     if (signal.aborted) {
       return;
     }
 
     try {
       const intervalMs = readPollIntervalMs(db);
+      const waitMs = first ? Math.min(intervalMs, startupSettleMs) : intervalMs;
 
-      await waitForWake(intervalMs, signal, (wake) => {
+      await waitForWake(waitMs, signal, (wake) => {
         wakeResolve = wake;
       });
 
@@ -191,7 +214,7 @@ export function startJobWorker(
       await waitForWake(ERROR_RETRY_DELAY_MS, signal);
     }
 
-    return step();
+    return step(false);
   }
 
   void step();

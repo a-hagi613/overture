@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overture Mobile Board</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+body{margin:0}
+.ov{--bg:#F3EEE4;--bg2:#ECE6DA;--card:#FBF8F2;--well:#E9E3D8;--ink:#151311;--mut:#5E5850;--line:rgba(21,19,17,.14);--line2:rgba(21,19,17,.28);--hl:rgba(255,255,255,.55);--acc:#D2561F;--acct:#A9431A;--accbg:rgba(210,86,31,.10);--hold:#8E3A2C;--holdbg:#EFD9D3;--ok:#3F6B52;--okbg:#DDE7DE;--btn:var(--ink);--btnink:#FBF8F2;--btnh:#3A3631;--scrim:rgba(21,19,17,.16);--sh:0 1px 0 rgba(21,19,17,.10),0 12px 24px -18px rgba(21,19,17,.38);--shc:rgba(21,19,17,.5);--bloom:rgba(255,255,255,.5);--emph:var(--ink);--eyebrow:var(--mut);--rank:var(--hold);--nbg:var(--ink);--nink:var(--bg);--inbg:var(--well);--inink:var(--ink);--meter:var(--ink);--focus:var(--ink);--sel:var(--ink);--score:var(--ink);--score2:var(--mut);--done:var(--ink);--donering:var(--well)}
+.ov.dark{--bg:#191714;--bg2:#1E1C19;--card:#221F1C;--well:#2A2723;--ink:#F2EDE4;--mut:#ADA69B;--line:rgba(242,237,228,.14);--line2:rgba(242,237,228,.26);--hl:rgba(255,255,255,.04);--acc:#F0743A;--acct:#F37D44;--accbg:rgba(240,116,58,.16);--hold:#E58A78;--holdbg:#40261F;--ok:#8DBFA2;--okbg:#25352B;--btn:var(--ink);--btnink:#191714;--btnh:#FFFBF2;--scrim:rgba(0,0,0,.38);--sh:0 1px 0 rgba(0,0,0,.4),0 12px 26px -20px rgba(0,0,0,.8);--shc:rgba(0,0,0,.7);--bloom:rgba(255,255,255,.04);--emph:var(--ink);--eyebrow:var(--mut);--rank:var(--hold);--nbg:var(--ink);--nink:var(--bg);--inbg:var(--well);--inink:var(--ink);--meter:var(--ink);--focus:var(--ink);--sel:var(--ink);--score:var(--ink);--score2:var(--mut);--done:var(--ink);--donering:var(--well)}
+.ov{background:var(--bg);color:var(--ink);font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:14px;line-height:1.5;position:relative;overflow:hidden;-webkit-font-smoothing:antialiased}
+.ov *{box-sizing:border-box}
+.ov a{color:inherit;text-decoration:none}
+.ov h1,.ov h2,.ov h3,.ov p{margin:0}
+.ov :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.serif{font-family:'Instrument Serif','Newsreader',Georgia,serif;font-weight:400;letter-spacing:-.005em}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-weight:400}
+.num{font-variant-numeric:tabular-nums}
+.it{font-style:italic;color:var(--emph)}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 16px;border-radius:6px;background:var(--btn);color:var(--btnink)!important;font:600 14px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--btn);cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.14)}
+.btn2{display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 14px;border-radius:6px;background:var(--card);color:var(--ink);font:600 14px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--line2);cursor:pointer;flex:1}
+.rule{border:0;border-top:1px solid var(--line);box-shadow:0 1px 0 var(--hl);margin:0}
+.eyebrow{font:600 11px 'Plus Jakarta Sans',sans-serif;letter-spacing:.15em;text-transform:uppercase;color:var(--eyebrow)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:999px;font:600 12px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--line2);background:var(--bg);color:var(--ink)}
+.stg{flex:none;min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line2);background:var(--card);color:var(--ink);font:600 13.5px 'Plus Jakarta Sans',sans-serif;display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap}
+.stg.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.stg b{font-weight:700;font-size:12px;opacity:.75}
+.kc{display:block;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px 13px;box-shadow:var(--sh)}
+.kc.sel{border-color:var(--sel);box-shadow:var(--sh),0 0 0 1px var(--sel)}
+.tab{min-height:44px;padding:0 2px;margin-right:20px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--mut);font:600 13.5px 'Plus Jakarta Sans',sans-serif;cursor:pointer;white-space:nowrap;flex:none}
+.tab.on{color:var(--ink);border-bottom-color:var(--sel)}
+.tb{flex:1;min-width:0;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--mut);font-size:10.5px;font-weight:600;position:relative}
+.tb.on{color:var(--ink)}
+.tb.on::before{content:'';position:absolute;top:0;left:22%;right:22%;height:2px;background:var(--acc);border-radius:0 0 2px 2px}
+.tbb{position:absolute;top:5px;left:calc(50% + 6px);min-width:16px;height:16px;padding:0 4px;border-radius:8px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.hs{scrollbar-width:none}
+.hs::-webkit-scrollbar{display:none}
+.hsfade{-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 54px),transparent 100%);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 54px),transparent 100%)}
+.sbody{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+.sbody::-webkit-scrollbar{width:10px}
+.sbody::-webkit-scrollbar-track{background:transparent}
+.sbody::-webkit-scrollbar-thumb{background:var(--line2);border-radius:5px;border:3px solid var(--card)}
+.tx-d{display:none}
+.dark .tx-l{display:none}
+.dark .tx-d{display:block}
+
+/* hover and pointer affordances */
+.ov a.who{border-radius:8px}
+.ov a.who:hover{background:var(--well)}
+.ov a[aria-label^="Overture"]:hover{opacity:.72}
+.ov .btn2:hover{background:var(--well)!important;border-color:var(--ink)}
+.ov .ibtn:hover{background:var(--well)!important}
+.ov select{cursor:pointer}
+.ov select:hover{border-color:var(--ink)}
+.ov .lk{cursor:pointer}
+.ov .lk:hover{text-decoration:underline}
+.ov .kc:hover{border-color:var(--line2);box-shadow:var(--sh)}
+.ov .os:hover,.ov .tab:hover{color:var(--ink)}
+.ov .os:hover{background:var(--well)}
+
+.ov .btn,.ov .btn2{white-space:nowrap}
+@media (max-width:767px){
+.ov .field{flex:1 1 0}
+.ov .apill{flex:1 1 100%;justify-content:space-between;height:auto!important;padding-top:4px;padding-bottom:4px}
+.ov .apill .btn2{min-height:44px!important}
+}
+
+@media (max-width:767px){
+.ov .btn,.ov .btn2,.ov .seg,.ov .lk,.ov .tab,.ov .flt,.ov .os,.ov .stg{min-height:44px!important}
+.ov .seg,.ov .lk{min-width:44px}
+.ov button[aria-label^="Remove"],.ov button[aria-label^="Edit"]{min-width:44px;min-height:44px}
+}
+</style>
+</helmet>
+<div class="{{t.cls}}" style="width:390px;height:844px">
+
+<div style="position:absolute;inset:0;z-index:0;pointer-events:none;opacity:{{t.grainOpacity}}" aria-hidden="true">
+<svg class="tx-l" width="100%" height="100%" aria-hidden="true" style="position:absolute;inset:0">
+<filter id="w5m-gl" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+<feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="7" stitchTiles="stitch"></feTurbulence>
+<feColorMatrix type="matrix" values="0 0 0 0 0.28  0 0 0 0 0.26  0 0 0 0 0.23  0 0 0 1.3 -0.2"></feColorMatrix>
+</filter>
+<rect width="100%" height="100%" filter="url(#w5m-gl)"></rect>
+</svg>
+<svg class="tx-d" width="100%" height="100%" aria-hidden="true" style="position:absolute;inset:0">
+<filter id="w5m-gd" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+<feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="7" stitchTiles="stitch"></feTurbulence>
+<feColorMatrix type="matrix" values="0 0 0 0 0.95  0 0 0 0 0.92  0 0 0 0 0.86  0 0 0 1.3 -0.2"></feColorMatrix>
+</filter>
+<rect width="100%" height="100%" filter="url(#w5m-gd)"></rect>
+</svg>
+</div>
+<div style="z-index:0;position:absolute;top:-170px;right:0;width:min(420px,100%);height:420px;border-radius:50%;background:radial-gradient(closest-side,var(--bloom),transparent);pointer-events:none" aria-hidden="true"></div>
+
+<div style="position:absolute;inset:0;z-index:1">
+<!-- top -->
+<header style="position:absolute;top:0;left:0;right:0;height:60px;padding:0 8px 0 18px;display:flex;align-items:center;justify-content:space-between">
+<a href="w5-home.dc.html" aria-label="Overture, Home" style="display:inline-flex;align-items:center;gap:9px;min-height:44px">
+<svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" style="fill:var(--ink)"/><circle cx="16" cy="16" r="8.5" fill="none" style="stroke:var(--bg)" stroke-width="1.5"/><path d="M16 5.5v21" style="stroke:var(--acc)" stroke-width="1.5" stroke-linecap="round"/></svg>
+<span class="serif" style="font-size:25px;line-height:1">Overture</span></a>
+<div style="display:flex;align-items:center;gap:2px">
+<span class="num" style="font-size:12px;color:var(--mut);margin-right:8px">Applications <b style="color:var(--ink);font-weight:600">7 / 25</b> today</span>
+<button type="button" aria-label="Notifications, 3 unread" style="width:44px;height:44px;border:0;background:transparent;color:var(--ink);position:relative;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16v-5a6 6 0 0112 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 004 0"/></svg><span class="num" style="position:absolute;top:6px;right:5px;min-width:17px;height:17px;border-radius:9px;background:var(--nbg);color:var(--nink);font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)">3</span></button>
+</div>
+</header>
+
+<div style="position:absolute;top:60px;left:0;right:0;padding:0 20px">
+<p class="serif" style="font-size:14px;font-style:italic;color:var(--mut)">Twenty-six applications</p>
+<h1 class="serif" style="font-size:36px;line-height:1.05">Job <span class="it">Board</span></h1>
+</div>
+
+<!-- stage pills -->
+<div class="hs hsfade" role="tablist" aria-label="Stages" data-scroll-region style="position:absolute;top:140px;left:0;right:0;height:52px;display:flex;gap:8px;padding:4px 20px;overflow-x:auto">
+<button type="button" role="tab" class="stg" aria-selected="false">Hold <b class="num">4</b></button>
+<button type="button" role="tab" class="stg" aria-selected="false">Applied <b class="num">12</b></button>
+<button type="button" role="tab" class="stg on" aria-selected="true">Screening <b class="num">2</b></button>
+<button type="button" role="tab" class="stg" aria-selected="false">Interviewing <b class="num">2</b></button>
+<button type="button" role="tab" class="stg" aria-selected="false">Offer <b class="num">1</b></button>
+<button type="button" role="tab" class="stg" aria-selected="false">Closed <b class="num">5</b></button>
+</div>
+
+<!-- cards -->
+<div role="tabpanel" data-scroll-region aria-label="Screening" style="position:absolute;top:204px;left:0;right:0;padding:0 20px;display:flex;flex-direction:column;gap:12px">
+<a href="#" class="kc sel">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="display:flex;align-items:center;gap:9px"><span class="serif" style="width:26px;height:26px;border-radius:6px;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:16px;font-style:italic">H</span><span style="font-size:13px;font-weight:600">Halden Systems</span></span><span class="num" style="font-size:12px;color:var(--mut)">6d</span></div>
+<p class="serif" style="font-size:24px;line-height:1.12;margin-top:9px">Senior Backend Engineer</p>
+<p style="font-size:13px;color:var(--mut);margin-top:2px">Toronto, ON · <span class="num">CAD 150–175k</span></p>
+<div style="margin-top:11px;padding-top:10px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center"><span style="display:flex;align-items:baseline;gap:6px"><span class="serif num" style="font-size:27px;line-height:1;font-style:italic;color:var(--score)">88</span><span style="font-size:11px;color:var(--mut);letter-spacing:.06em;text-transform:uppercase">Match</span></span><span style="font-size:12px;font-weight:600;color:var(--ok)">Reply received</span></div>
+</a>
+<a href="#" class="kc">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="display:flex;align-items:center;gap:9px"><span class="serif" style="width:26px;height:26px;border-radius:6px;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:16px;font-style:italic">L</span><span style="font-size:13px;font-weight:600">Larkspur Health</span></span><span class="num" style="font-size:12px;color:var(--mut)">9d</span></div>
+<p class="serif" style="font-size:24px;line-height:1.12;margin-top:9px">Infrastructure Engineer</p>
+<p style="font-size:13px;color:var(--mut);margin-top:2px">Austin, TX · <span class="num">USD 150–180k</span></p>
+</a>
+</div>
+
+<!-- bottom tab bar -->
+<nav aria-label="Main" style="position:absolute;left:0;right:0;bottom:0;height:64px;background:var(--bg2);border-top:1px solid var(--line);box-shadow:0 -1px 0 var(--hl);display:flex;padding-bottom:2px;z-index:10">
+<a class="tb" href="w5-home.dc.html"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/></svg>Home</a>
+<a class="tb on" href="w5-board.dc.html" aria-current="page"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/></svg>Job Board</a>
+<a class="tb" href="w5-holds.dc.html" aria-label="Holds, 4 waiting"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>Holds<span class="tbb num" style="background:var(--holdbg);color:var(--hold)">4</span></a>
+<a class="tb" href="w5-inbox.dc.html" aria-label="Inbox, 3 unread"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13l3-8h12l3 8"/><path d="M3 13v6h18v-6h-5l-1 2h-6l-1-2z"/></svg>Inbox<span class="tbb num" style="background:var(--inbg);color:var(--inink)">3</span></a>
+<a class="tb" href="w5-profile.dc.html"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Profile</a>
+<a class="tb" href="w5-settings.dc.html"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Settings</a>
+</nav>
+
+<!-- scrim -->
+<div style="position:absolute;left:0;right:0;top:0;bottom:64px;background:var(--scrim);z-index:20" aria-hidden="true"></div>
+
+<!-- bottom sheet -->
+<section aria-label="Application detail" style="position:absolute;left:0;right:0;bottom:64px;height:566px;z-index:30;background:var(--card);border-radius:18px 18px 0 0;border-top:1px solid var(--line2);box-shadow:0 -24px 50px -28px var(--shc);display:flex;flex-direction:column;overflow:hidden">
+<button type="button" aria-label="Drag to resize or close detail" style="flex:none;position:relative;z-index:2;height:44px;width:100%;border:0;background:var(--card);display:flex;align-items:center;justify-content:center;cursor:grab"><span style="width:44px;height:5px;border-radius:3px;background:var(--line2)"></span></button>
+<div style="position:relative;flex:1;min-height:0;display:flex;flex-direction:column">
+<div class="sbody" data-scroll-region style="flex:1;min-height:0;overflow-y:auto;padding:0 20px 24px">
+<div style="display:flex;gap:13px;align-items:flex-start">
+<div class="serif" style="flex:none;width:46px;height:46px;border-radius:9px;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:27px;font-style:italic">H</div>
+<div style="min-width:0;flex:1"><p style="font-size:12.5px;color:var(--mut);font-weight:500">Halden Systems · <span class="serif" style="font-style:italic;font-size:14px">no. 0412</span></p><h2 class="serif" style="font-size:30px;line-height:1.05">Senior Backend Engineer</h2></div>
+<button type="button" aria-label="Close detail" style="flex:none;width:44px;height:44px;margin:-6px -10px 0 0;border:0;background:transparent;color:var(--mut);display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+</div>
+<div style="margin-top:13px;display:flex;flex-wrap:wrap;gap:7px">
+<span class="pill">Toronto, ON</span><span class="pill num">CAD 150–175k</span><span class="pill num" style="background:var(--inbg);border-color:transparent;color:var(--inink)">Match 88</span><span class="pill" style="background:var(--okbg);border-color:transparent;color:var(--ok)">Screening</span>
+</div>
+<div style="margin-top:16px;display:flex;flex-direction:column;gap:9px">
+<a class="btn" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg>Open original posting</a>
+<div style="display:flex;gap:9px"><button type="button" class="btn2">Move stage<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><button type="button" class="btn2">Archive</button></div>
+</div>
+<div role="tablist" aria-label="Application sections" class="hs" style="margin:14px -20px 0;padding:0 20px;display:flex;border-bottom:1px solid var(--line);overflow-x:auto">
+<button type="button" role="tab" class="tab on" aria-selected="true">Timeline</button>
+<button type="button" role="tab" class="tab" aria-selected="false">Answers</button>
+<button type="button" role="tab" class="tab" aria-selected="false">Cover letter &amp; resume</button>
+<button type="button" role="tab" class="tab" aria-selected="false">Emails</button>
+</div>
+<ol role="tabpanel" aria-label="Timeline" style="list-style:none;margin:0;padding:18px 0 0;display:flex;flex-direction:column">
+<li style="display:flex;gap:14px"><div style="display:flex;flex-direction:column;align-items:center;width:14px;flex:none"><span style="width:12px;height:12px;border-radius:50%;margin-top:5px;background:var(--done);border:2px solid var(--donering)"></span><span style="flex:1;width:1px;background:var(--line2);margin-top:4px"></span></div><div style="padding-bottom:16px;flex:1"><div style="display:flex;justify-content:space-between;align-items:baseline"><h3 class="serif" style="font-size:20px;line-height:1.2">Found</h3><span class="mono" style="font-size:11px;color:var(--mut)">Nov 11 · 08:02</span></div><p style="font-size:13px;color:var(--mut)">Posting found on the Halden Systems career board.</p></div></li>
+<li style="display:flex;gap:14px"><div style="display:flex;flex-direction:column;align-items:center;width:14px;flex:none"><span style="width:12px;height:12px;border-radius:50%;margin-top:5px;background:var(--done);border:2px solid var(--donering)"></span><span style="flex:1;width:1px;background:var(--line2);margin-top:4px"></span></div><div style="padding-bottom:16px;flex:1"><div style="display:flex;justify-content:space-between;align-items:baseline"><h3 class="serif" style="font-size:20px;line-height:1.2">Scored 88</h3><span class="mono" style="font-size:11px;color:var(--mut)">Nov 11 · 08:03</span></div><p style="font-size:13px;color:var(--mut)">Strong match against your resume.</p></div></li>
+<li style="display:flex;gap:14px"><div style="display:flex;flex-direction:column;align-items:center;width:14px;flex:none"><span style="width:12px;height:12px;border-radius:50%;margin-top:5px;background:var(--done);border:2px solid var(--donering)"></span><span style="flex:1;width:1px;background:var(--line2);margin-top:4px"></span></div><div style="padding-bottom:16px;flex:1"><div style="display:flex;justify-content:space-between;align-items:baseline"><h3 class="serif" style="font-size:20px;line-height:1.2">Prepared</h3><span class="mono" style="font-size:11px;color:var(--mut)">Nov 11 · 08:20</span></div><p style="font-size:13px;color:var(--mut)">Eleven answers from your profile. Cover letter written for this role.</p></div></li>
+<li style="display:flex;gap:14px"><div style="display:flex;flex-direction:column;align-items:center;width:14px;flex:none"><span style="width:12px;height:12px;border-radius:50%;margin-top:5px;background:var(--done);border:2px solid var(--donering)"></span><span style="flex:1;width:1px;background:var(--line2);margin-top:4px"></span></div><div style="padding-bottom:16px;flex:1"><div style="display:flex;justify-content:space-between;align-items:baseline"><h3 class="serif" style="font-size:20px;line-height:1.2">Checked</h3><span class="mono" style="font-size:11px;color:var(--mut)">Nov 11 · 08:21</span></div><p style="font-size:13px;color:var(--mut)">Passed. No Holds, resume attached unchanged.</p></div></li>
+<li style="display:flex;gap:14px"><div style="display:flex;flex-direction:column;align-items:center;width:14px;flex:none"><span style="width:12px;height:12px;border-radius:50%;margin-top:5px;background:var(--acc);border:2px solid var(--accbg)"></span><span style="flex:1;width:1px;background:var(--line2);margin-top:4px"></span></div><div style="padding-bottom:16px;flex:1"><div style="display:flex;justify-content:space-between;align-items:baseline"><h3 class="serif" style="font-size:20px;line-height:1.2;color:var(--acct)">Submitted</h3><span class="mono" style="font-size:11px;color:var(--mut)">Nov 11 · 08:24</span></div><p style="font-size:13px;color:var(--mut)">Sent with Maya_Okafor_Resume.pdf and the cover letter.</p></div></li>
+<li style="display:flex;gap:14px"><div style="display:flex;flex-direction:column;align-items:center;width:14px;flex:none"><span style="width:12px;height:12px;border-radius:50%;margin-top:5px;background:var(--acc);border:2px solid var(--accbg)"></span></div><div style="flex:1"><div style="display:flex;justify-content:space-between;align-items:baseline"><h3 class="serif" style="font-size:20px;line-height:1.2;color:var(--acct)">Reply received</h3><span class="mono" style="font-size:11px;color:var(--mut)">Nov 16 · 15:10</span></div><p style="font-size:13px;color:var(--mut)">A recruiter asked for your availability. Moved to Screening.</p></div></li>
+</ol>
+</div>
+<div aria-hidden="true" style="position:absolute;left:0;right:0;bottom:0;height:32px;pointer-events:none;background:linear-gradient(to top,var(--card),rgba(0,0,0,0))"></div>
+</div>
+</section>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"grain":{"editor":"range","default":0.5,"min":0,"max":1,"step":0.05,"unit":""},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = !!this.props.dark;
+    const raw = this.props.grain;
+    const g = Math.max(0, Math.min(1, typeof raw === 'number' ? raw : 0.5));
+    const light = { cls: 'ov', grainOpacity: +(g * 0.24).toFixed(3) };
+    const night = { cls: 'ov dark', grainOpacity: +(g * 0.15).toFixed(3) };
+    return { t: dark ? night : light };
+  }
+}
+</script>
+</body>
+</html>

@@ -18,6 +18,7 @@ import type { BrowserProviderRegistry } from "./dispatch/browser/provider.ts";
 import type { CatalogSweepWorker } from "./catalog/sweep-worker-runner.ts";
 import type { AccountEraser } from "./account/erase.ts";
 import type { ExportService } from "./export/service.ts";
+import type { SpendGate } from "./billing/spend.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
 import { createLabRoutes } from "./routes/lab.ts";
@@ -62,6 +63,7 @@ export interface AppDependencies {
   auth: Auth;
   objects: ObjectStore;
   llm: LlmPort;
+  spendGate: SpendGate;
   mailboxes: ReturnType<typeof createMailboxService>;
   resolver: DNSResolver;
   liveCheckAddress: string;
@@ -73,6 +75,8 @@ export interface AppDependencies {
   eraser: AccountEraser;
   exports: ExportService;
   payments: Payments | null;
+  /** Aborted on shutdown; long-lived responses (the event stream) end with it. */
+  shutdown: AbortSignal;
 }
 
 async function staticResponseFrom(root: string, url: string) {
@@ -125,6 +129,7 @@ export function createApp(deps: AppDependencies) {
   );
 
   const adminApi = createAdminApi(deps.db, deps.clock, deps.auth, {
+    payments: deps.payments,
     providers: deps.providers,
     personal,
   });
@@ -136,6 +141,7 @@ export function createApp(deps: AppDependencies) {
     clock: deps.clock,
     llm: deps.llm,
     personal,
+    spendGate: deps.spendGate,
   });
 
   adminHost.route("/admin/api", adminApi);
@@ -186,7 +192,7 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createHealthRoutes(deps.db, deps.backups));
   app.route("/api", createMeRoutes(deps.auth));
   app.route("/api", createSupportAccessRoutes(deps.db, deps.auth));
-  app.route("/api", createApiRoutes(deps.db, deps.clock, deps.auth));
+  app.route("/api", createApiRoutes(deps.db, deps.clock, deps.auth, { shutdown: deps.shutdown }));
   app.route("/api", createNotificationRoutes(deps.db, deps.clock, deps.auth));
   app.route("/api", createProfileRoutes(deps));
   app.route(
@@ -208,6 +214,7 @@ export function createApp(deps: AppDependencies) {
       llm: deps.llm,
       objects: deps.objects,
       reviews: deps.reviews,
+      spendGate: deps.spendGate,
     }),
   );
   app.route(

@@ -30,7 +30,8 @@ type GlyphName =
   | "users"
   | "tag"
   | "link"
-  | "grid";
+  | "grid"
+  | "card";
 
 interface GlyphPaths {
   readonly paths: string[];
@@ -155,6 +156,10 @@ const glyphs: Record<GlyphName, GlyphPaths> = {
       "M3 5a2 2 0 012-2h6.2a2 2 0 011.4.6l7.8 7.8a2 2 0 010 2.8l-6.2 6.2a2 2 0 01-2.8 0L3.6 12.6A2 2 0 013 11.2z",
       "M8 8h.01",
     ],
+    strokeWidth: 1.6,
+  },
+  card: {
+    paths: ["M3 6h18v12H3z", "M3 10h18", "M7 15h4"],
     strokeWidth: 1.6,
   },
   link: {

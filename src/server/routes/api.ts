@@ -21,7 +21,12 @@ const searchQuerySchema = z.object({
   employmentType: z.enum(EMPLOYMENT_TYPES).optional(),
 });
 
-export function createApiRoutes(db: AppDatabase, clock: Clock, auth: Auth) {
+export function createApiRoutes(
+  db: AppDatabase,
+  clock: Clock,
+  auth: Auth,
+  options: { shutdown?: AbortSignal } = {},
+) {
   const routes = new Hono();
 
   routes.get("/search", zValidator("query", searchQuerySchema), (context) => {
@@ -72,12 +77,12 @@ export function createApiRoutes(db: AppDatabase, clock: Clock, auth: Auth) {
       abortController.abort();
     });
 
-    const stream = createSseStream(
-      db,
-      lastEventId,
-      session?.user.id ?? null,
-      abortController.signal,
-    );
+    const signal =
+      options.shutdown === undefined
+        ? abortController.signal
+        : AbortSignal.any([abortController.signal, options.shutdown]);
+
+    const stream = createSseStream(db, lastEventId, session?.user.id ?? null, signal);
 
     return new Response(stream, {
       headers: {

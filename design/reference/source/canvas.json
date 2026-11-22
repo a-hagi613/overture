@@ -1,0 +1,3576 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Main.dc.html": {
+      "h": 7400,
+      "page": "system",
+      "title": "Design system 1/3 · Brand, colour, type",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "answerbank-390-dark.dc.html": {
+      "h": 3920,
+      "page": "screens",
+      "title": "Answer Bank · 390 · dark",
+      "w": 390,
+      "x": 3510,
+      "y": 14500
+    },
+    "answerbank-390.dc.html": {
+      "h": 3920,
+      "page": "screens",
+      "title": "Answer Bank · 390",
+      "w": 390,
+      "x": 3040,
+      "y": 14500
+    },
+    "answerbank-dark.dc.html": {
+      "h": 2420,
+      "page": "screens",
+      "title": "Answer Bank · 1440 · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 14500
+    },
+    "bill-margin-1280-dark.dc.html": {
+      "h": 900,
+      "title": "Billing · margin · 1280 dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 90075
+    },
+    "bill-margin-1280.dc.html": {
+      "h": 900,
+      "title": "Billing · margin · 1280 light",
+      "w": 1280,
+      "x": 0,
+      "y": 90075
+    },
+    "bill-margin-390-dark.dc.html": {
+      "h": 1298,
+      "title": "Billing · margin · 390 dark",
+      "w": 390,
+      "x": 3190,
+      "y": 90075
+    },
+    "bill-margin-390.dc.html": {
+      "h": 1298,
+      "title": "Billing · margin · 390 light",
+      "w": 390,
+      "x": 2720,
+      "y": 90075
+    },
+    "bill-recon-1280-dark.dc.html": {
+      "h": 900,
+      "title": "Billing · recon · 1280 dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 88417
+    },
+    "bill-recon-1280.dc.html": {
+      "h": 900,
+      "title": "Billing · recon · 1280 light",
+      "w": 1280,
+      "x": 0,
+      "y": 88417
+    },
+    "bill-recon-390-dark.dc.html": {
+      "h": 1498,
+      "title": "Billing · recon · 390 dark",
+      "w": 390,
+      "x": 3190,
+      "y": 88417
+    },
+    "bill-recon-390.dc.html": {
+      "h": 1498,
+      "title": "Billing · recon · 390 light",
+      "w": 390,
+      "x": 2720,
+      "y": 88417
+    },
+    "bill-refund-1280-dark.dc.html": {
+      "h": 900,
+      "title": "Billing · refund · 1280 dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 86855
+    },
+    "bill-refund-1280.dc.html": {
+      "h": 900,
+      "title": "Billing · refund · 1280 light",
+      "w": 1280,
+      "x": 0,
+      "y": 86855
+    },
+    "bill-refund-390-dark.dc.html": {
+      "h": 1402,
+      "title": "Billing · refund · 390 dark",
+      "w": 390,
+      "x": 3190,
+      "y": 86855
+    },
+    "bill-refund-390.dc.html": {
+      "h": 1402,
+      "title": "Billing · refund · 390 light",
+      "w": 390,
+      "x": 2720,
+      "y": 86855
+    },
+    "bill-users-1280-dark.dc.html": {
+      "h": 1039,
+      "title": "Billing · users · 1280 dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 84900
+    },
+    "bill-users-1280.dc.html": {
+      "h": 1039,
+      "title": "Billing · users · 1280 light",
+      "w": 1280,
+      "x": 0,
+      "y": 84900
+    },
+    "bill-users-390-dark.dc.html": {
+      "h": 1795,
+      "title": "Billing · users · 390 dark",
+      "w": 390,
+      "x": 3190,
+      "y": 84900
+    },
+    "bill-users-390.dc.html": {
+      "h": 1795,
+      "title": "Billing · users · 390 light",
+      "w": 390,
+      "x": 2720,
+      "y": 84900
+    },
+    "board-1280-dark.dc.html": {
+      "h": 1100,
+      "page": "app",
+      "title": "Job Board · 1280 · dark",
+      "w": 1280,
+      "x": 8400,
+      "y": 3100
+    },
+    "board-1280.dc.html": {
+      "h": 1100,
+      "page": "app",
+      "title": "Job Board · 1280",
+      "w": 1280,
+      "x": 7040,
+      "y": 3100
+    },
+    "board-1440-dark.dc.html": {
+      "h": 1100,
+      "page": "app",
+      "title": "Job Board · 1440 · dark",
+      "w": 1440,
+      "x": 5520,
+      "y": 3100
+    },
+    "board-1920-dark.dc.html": {
+      "h": 1100,
+      "page": "app",
+      "title": "Job Board · 1920 · dark",
+      "w": 1920,
+      "x": 2000,
+      "y": 3100
+    },
+    "board-1920.dc.html": {
+      "h": 1100,
+      "page": "app",
+      "title": "Job Board · 1920",
+      "w": 1920,
+      "x": 0,
+      "y": 3100
+    },
+    "board-390-dark.dc.html": {
+      "h": 844,
+      "page": "app",
+      "title": "Job Board · 390 · dark",
+      "w": 390,
+      "x": 10230,
+      "y": 3100
+    },
+    "board-390.dc.html": {
+      "h": 844,
+      "page": "app",
+      "title": "Job Board · 390",
+      "w": 390,
+      "x": 9760,
+      "y": 3100
+    },
+    "carddetail-dark.dc.html": {
+      "h": 2220,
+      "page": "screens",
+      "title": "Card detail · 1440 · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 21220
+    },
+    "d203-consent-1280-dark.dc.html": {
+      "h": 900,
+      "page": "legal",
+      "title": "M2 legal · consent · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 17676
+    },
+    "d203-consent-1280.dc.html": {
+      "h": 900,
+      "page": "legal",
+      "title": "M2 legal · consent · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 17676
+    },
+    "d203-consent-390-dark.dc.html": {
+      "h": 900,
+      "page": "legal",
+      "title": "M2 legal · consent · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 17676
+    },
+    "d203-consent-390.dc.html": {
+      "h": 900,
+      "page": "legal",
+      "title": "M2 legal · consent · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 17676
+    },
+    "d203-forgot-password-1280-dark.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · forgot password · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 2700
+    },
+    "d203-forgot-password-1280.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · forgot password · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 2700
+    },
+    "d203-forgot-password-390-dark.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · forgot password · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 2700
+    },
+    "d203-forgot-password-390.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · forgot password · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 2700
+    },
+    "d203-privacy-1280-dark.dc.html": {
+      "h": 1932,
+      "page": "legal",
+      "title": "M2 legal · privacy · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 14972
+    },
+    "d203-privacy-1280.dc.html": {
+      "h": 1932,
+      "page": "legal",
+      "title": "M2 legal · privacy · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 14972
+    },
+    "d203-privacy-390-dark.dc.html": {
+      "h": 2404,
+      "page": "legal",
+      "title": "M2 legal · privacy · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 14972
+    },
+    "d203-privacy-390.dc.html": {
+      "h": 2404,
+      "page": "legal",
+      "title": "M2 legal · privacy · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 14972
+    },
+    "d203-reset-password-1280-dark.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · reset password · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 6604
+    },
+    "d203-reset-password-1280.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · reset password · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 6604
+    },
+    "d203-reset-password-390-dark.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · reset password · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 6604
+    },
+    "d203-reset-password-390.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · reset password · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 6604
+    },
+    "d203-signin-password-1280-dark.dc.html": {
+      "h": 935,
+      "page": "auth",
+      "title": "M2 sign-in · signin password · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 7804
+    },
+    "d203-signin-password-1280.dc.html": {
+      "h": 935,
+      "page": "auth",
+      "title": "M2 sign-in · signin password · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 7804
+    },
+    "d203-signin-password-390-dark.dc.html": {
+      "h": 1037,
+      "page": "auth",
+      "title": "M2 sign-in · signin password · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 7804
+    },
+    "d203-signin-password-390.dc.html": {
+      "h": 1037,
+      "page": "auth",
+      "title": "M2 sign-in · signin password · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 7804
+    },
+    "d203-signin-refused-1280-dark.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · signin refused · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 9141
+    },
+    "d203-signin-refused-1280.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · signin refused · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 9141
+    },
+    "d203-signin-refused-390-dark.dc.html": {
+      "h": 986,
+      "page": "auth",
+      "title": "M2 sign-in · signin refused · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 9141
+    },
+    "d203-signin-refused-390.dc.html": {
+      "h": 986,
+      "page": "auth",
+      "title": "M2 sign-in · signin refused · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 9141
+    },
+    "d203-signup-password-1280-dark.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · signup password · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 10427
+    },
+    "d203-signup-password-1280.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · signup password · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 10427
+    },
+    "d203-signup-password-390-dark.dc.html": {
+      "h": 937,
+      "page": "auth",
+      "title": "M2 sign-in · signup password · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 10427
+    },
+    "d203-signup-password-390.dc.html": {
+      "h": 937,
+      "page": "auth",
+      "title": "M2 sign-in · signup password · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 10427
+    },
+    "d203-suspended-1280-dark.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · suspended · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 11664
+    },
+    "d203-suspended-1280.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · suspended · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 11664
+    },
+    "d203-suspended-390-dark.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · suspended · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 11664
+    },
+    "d203-suspended-390.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · suspended · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 11664
+    },
+    "d203-terms-1280-dark.dc.html": {
+      "h": 1830,
+      "page": "legal",
+      "title": "M2 legal · terms · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 12500
+    },
+    "d203-terms-1280.dc.html": {
+      "h": 1830,
+      "page": "legal",
+      "title": "M2 legal · terms · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 12500
+    },
+    "d203-terms-390-dark.dc.html": {
+      "h": 2172,
+      "page": "legal",
+      "title": "M2 legal · terms · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 12500
+    },
+    "d203-terms-390.dc.html": {
+      "h": 2172,
+      "page": "legal",
+      "title": "M2 legal · terms · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 12500
+    },
+    "d203-verify-sent-1280-dark.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · verify sent · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 15336
+    },
+    "d203-verify-sent-1280.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · verify sent · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 15336
+    },
+    "d203-verify-sent-390-dark.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · verify sent · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 15336
+    },
+    "d203-verify-sent-390.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "M2 sign-in · verify sent · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 15336
+    },
+    "d205-board-card-mail-1280-dark.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 Inbox · board card mail · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 26600
+    },
+    "d205-board-card-mail-1280.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 Inbox · board card mail · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 26600
+    },
+    "d205-board-card-mail-390-dark.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 Inbox · board card mail · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 26600
+    },
+    "d205-board-card-mail-390.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 Inbox · board card mail · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 26600
+    },
+    "d205-code-paste-sheet-1280-dark.dc.html": {
+      "h": 1318,
+      "page": "screens",
+      "title": "M2 Inbox · code paste sheet · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 28040
+    },
+    "d205-code-paste-sheet-1280.dc.html": {
+      "h": 1318,
+      "page": "screens",
+      "title": "M2 Inbox · code paste sheet · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 28040
+    },
+    "d205-code-paste-sheet-390-dark.dc.html": {
+      "h": 2525,
+      "page": "screens",
+      "title": "M2 Inbox · code paste sheet · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 28040
+    },
+    "d205-code-paste-sheet-390.dc.html": {
+      "h": 2525,
+      "page": "screens",
+      "title": "M2 Inbox · code paste sheet · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 28040
+    },
+    "d205-code-wait-home-1280-dark.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 Inbox · code wait home · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 30865
+    },
+    "d205-code-wait-home-1280.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 Inbox · code wait home · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 30865
+    },
+    "d205-code-wait-home-390-dark.dc.html": {
+      "h": 1024,
+      "page": "screens",
+      "title": "M2 Inbox · code wait home · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 30865
+    },
+    "d205-code-wait-home-390.dc.html": {
+      "h": 1024,
+      "page": "screens",
+      "title": "M2 Inbox · code wait home · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 30865
+    },
+    "d205-inbox-address-1280-dark.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 Inbox · inbox address · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 32305
+    },
+    "d205-inbox-address-1280.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 Inbox · inbox address · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 32305
+    },
+    "d205-inbox-address-390-dark.dc.html": {
+      "h": 1643,
+      "page": "screens",
+      "title": "M2 Inbox · inbox address · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 32305
+    },
+    "d205-inbox-address-390.dc.html": {
+      "h": 1643,
+      "page": "screens",
+      "title": "M2 Inbox · inbox address · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 32305
+    },
+    "d205-inbox-empty-1280-dark.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 Inbox · inbox empty · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 34248
+    },
+    "d205-inbox-empty-1280.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 Inbox · inbox empty · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 34248
+    },
+    "d205-inbox-empty-390-dark.dc.html": {
+      "h": 948,
+      "page": "screens",
+      "title": "M2 Inbox · inbox empty · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 34248
+    },
+    "d205-inbox-empty-390.dc.html": {
+      "h": 948,
+      "page": "screens",
+      "title": "M2 Inbox · inbox empty · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 34248
+    },
+    "d205-inbox-list-1280-dark.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 Inbox · inbox list · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 35688
+    },
+    "d205-inbox-list-1280.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 Inbox · inbox list · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 35688
+    },
+    "d205-inbox-list-390-dark.dc.html": {
+      "h": 1160,
+      "page": "screens",
+      "title": "M2 Inbox · inbox list · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 35688
+    },
+    "d205-inbox-list-390.dc.html": {
+      "h": 1160,
+      "page": "screens",
+      "title": "M2 Inbox · inbox list · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 35688
+    },
+    "d205-inbox-thread-1280-dark.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 Inbox · inbox thread · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 37148
+    },
+    "d205-inbox-thread-1280.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 Inbox · inbox thread · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 37148
+    },
+    "d205-inbox-thread-390-dark.dc.html": {
+      "h": 1171,
+      "page": "screens",
+      "title": "M2 Inbox · inbox thread · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 37148
+    },
+    "d205-inbox-thread-390.dc.html": {
+      "h": 1171,
+      "page": "screens",
+      "title": "M2 Inbox · inbox thread · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 37148
+    },
+    "d205-profile-forwarding-1280-dark.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 Inbox · profile forwarding · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 38619
+    },
+    "d205-profile-forwarding-1280.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 Inbox · profile forwarding · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 38619
+    },
+    "d205-profile-forwarding-390-dark.dc.html": {
+      "h": 1274,
+      "page": "screens",
+      "title": "M2 Inbox · profile forwarding · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 38619
+    },
+    "d205-profile-forwarding-390.dc.html": {
+      "h": 1274,
+      "page": "screens",
+      "title": "M2 Inbox · profile forwarding · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 38619
+    },
+    "d206-auto-move-1280-dark.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 notifications · auto move · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 40493
+    },
+    "d206-auto-move-1280.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 notifications · auto move · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 40493
+    },
+    "d206-auto-move-390-dark.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 notifications · auto move · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 40493
+    },
+    "d206-auto-move-390.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 notifications · auto move · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 40493
+    },
+    "d206-notifications-empty-1280-dark.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 notifications · notifications empty · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 41933
+    },
+    "d206-notifications-empty-1280.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "M2 notifications · notifications empty · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 41933
+    },
+    "d206-notifications-empty-390-dark.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 notifications · notifications empty · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 41933
+    },
+    "d206-notifications-empty-390.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 notifications · notifications empty · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 41933
+    },
+    "d206-notifications-unread-1280-dark.dc.html": {
+      "h": 1384,
+      "page": "screens",
+      "title": "M2 notifications · notifications unread · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 43373
+    },
+    "d206-notifications-unread-1280.dc.html": {
+      "h": 1384,
+      "page": "screens",
+      "title": "M2 notifications · notifications unread · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 43373
+    },
+    "d206-notifications-unread-390-dark.dc.html": {
+      "h": 1881,
+      "page": "screens",
+      "title": "M2 notifications · notifications unread · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 43373
+    },
+    "d206-notifications-unread-390.dc.html": {
+      "h": 1881,
+      "page": "screens",
+      "title": "M2 notifications · notifications unread · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 43373
+    },
+    "d206-push-1280-dark.dc.html": {
+      "h": 1751,
+      "page": "screens",
+      "title": "M2 notifications · push · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 45554
+    },
+    "d206-push-1280.dc.html": {
+      "h": 1751,
+      "page": "screens",
+      "title": "M2 notifications · push · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 45554
+    },
+    "d206-push-390-dark.dc.html": {
+      "h": 3219,
+      "page": "screens",
+      "title": "M2 notifications · push · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 45554
+    },
+    "d206-push-390.dc.html": {
+      "h": 3219,
+      "page": "screens",
+      "title": "M2 notifications · push · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 45554
+    },
+    "d206-recap-1280-dark.dc.html": {
+      "h": 1146,
+      "page": "email",
+      "title": "M2 recap email · recap · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 16050
+    },
+    "d206-recap-1280.dc.html": {
+      "h": 1146,
+      "page": "email",
+      "title": "M2 recap email · recap · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 16050
+    },
+    "d206-recap-390-dark.dc.html": {
+      "h": 1214,
+      "page": "email",
+      "title": "M2 recap email · recap · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 16050
+    },
+    "d206-recap-390.dc.html": {
+      "h": 1214,
+      "page": "email",
+      "title": "M2 recap email · recap · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 16050
+    },
+    "d207-delete-1280-dark.dc.html": {
+      "h": 1773,
+      "page": "screens",
+      "title": "M2 settings · delete · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 49373
+    },
+    "d207-delete-1280.dc.html": {
+      "h": 1773,
+      "page": "screens",
+      "title": "M2 settings · delete · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 49373
+    },
+    "d207-delete-390-dark.dc.html": {
+      "h": 2148,
+      "page": "screens",
+      "title": "M2 settings · delete · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 49373
+    },
+    "d207-delete-390.dc.html": {
+      "h": 2148,
+      "page": "screens",
+      "title": "M2 settings · delete · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 49373
+    },
+    "d207-export-1280-dark.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 settings · export · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 51821
+    },
+    "d207-export-1280.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 settings · export · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 51821
+    },
+    "d207-export-390-dark.dc.html": {
+      "h": 1359,
+      "page": "screens",
+      "title": "M2 settings · export · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 51821
+    },
+    "d207-export-390.dc.html": {
+      "h": 1359,
+      "page": "screens",
+      "title": "M2 settings · export · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 51821
+    },
+    "d207-legal-1280-dark.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 settings · legal · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 53480
+    },
+    "d207-legal-1280.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 settings · legal · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 53480
+    },
+    "d207-legal-390-dark.dc.html": {
+      "h": 1133,
+      "page": "screens",
+      "title": "M2 settings · legal · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 53480
+    },
+    "d207-legal-390.dc.html": {
+      "h": 1133,
+      "page": "screens",
+      "title": "M2 settings · legal · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 53480
+    },
+    "d207-notifications-1280-dark.dc.html": {
+      "h": 1516,
+      "page": "screens",
+      "title": "M2 settings · notifications · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 54913
+    },
+    "d207-notifications-1280.dc.html": {
+      "h": 1516,
+      "page": "screens",
+      "title": "M2 settings · notifications · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 54913
+    },
+    "d207-notifications-390-dark.dc.html": {
+      "h": 2149,
+      "page": "screens",
+      "title": "M2 settings · notifications · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 54913
+    },
+    "d207-notifications-390.dc.html": {
+      "h": 2149,
+      "page": "screens",
+      "title": "M2 settings · notifications · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 54913
+    },
+    "d207-support-access-1280-dark.dc.html": {
+      "h": 954,
+      "page": "screens",
+      "title": "M2 settings · support access · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 57362
+    },
+    "d207-support-access-1280.dc.html": {
+      "h": 954,
+      "page": "screens",
+      "title": "M2 settings · support access · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 57362
+    },
+    "d207-support-access-390-dark.dc.html": {
+      "h": 1260,
+      "page": "screens",
+      "title": "M2 settings · support access · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 57362
+    },
+    "d207-support-access-390.dc.html": {
+      "h": 1260,
+      "page": "screens",
+      "title": "M2 settings · support access · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 57362
+    },
+    "d208-ats-1280-dark.dc.html": {
+      "h": 1144,
+      "page": "screens",
+      "title": "M2 admin · ats · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 59222
+    },
+    "d208-ats-1280.dc.html": {
+      "h": 1144,
+      "page": "screens",
+      "title": "M2 admin · ats · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 59222
+    },
+    "d208-ats-390-dark.dc.html": {
+      "h": 2301,
+      "page": "screens",
+      "title": "M2 admin · ats · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 59222
+    },
+    "d208-ats-390.dc.html": {
+      "h": 2301,
+      "page": "screens",
+      "title": "M2 admin · ats · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 59222
+    },
+    "d208-audit-1280-dark.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 admin · audit · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 61823
+    },
+    "d208-audit-1280.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 admin · audit · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 61823
+    },
+    "d208-audit-390-dark.dc.html": {
+      "h": 2300,
+      "page": "screens",
+      "title": "M2 admin · audit · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 61823
+    },
+    "d208-audit-390.dc.html": {
+      "h": 2300,
+      "page": "screens",
+      "title": "M2 admin · audit · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 61823
+    },
+    "d208-invites-1280-dark.dc.html": {
+      "h": 1050,
+      "page": "screens",
+      "title": "M2 admin · invites · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 64423
+    },
+    "d208-invites-1280.dc.html": {
+      "h": 1050,
+      "page": "screens",
+      "title": "M2 admin · invites · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 64423
+    },
+    "d208-invites-390-dark.dc.html": {
+      "h": 2119,
+      "page": "screens",
+      "title": "M2 admin · invites · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 64423
+    },
+    "d208-invites-390.dc.html": {
+      "h": 2119,
+      "page": "screens",
+      "title": "M2 admin · invites · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 64423
+    },
+    "d208-mail-health-1280-dark.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 admin · mail health · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 66842
+    },
+    "d208-mail-health-1280.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 admin · mail health · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 66842
+    },
+    "d208-mail-health-390-dark.dc.html": {
+      "h": 2152,
+      "page": "screens",
+      "title": "M2 admin · mail health · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 66842
+    },
+    "d208-mail-health-390.dc.html": {
+      "h": 2152,
+      "page": "screens",
+      "title": "M2 admin · mail health · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 66842
+    },
+    "d208-reveal-1280-dark.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 admin · reveal · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 69294
+    },
+    "d208-reveal-1280.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 admin · reveal · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 69294
+    },
+    "d208-reveal-390-dark.dc.html": {
+      "h": 1018,
+      "page": "screens",
+      "title": "M2 admin · reveal · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 69294
+    },
+    "d208-reveal-390.dc.html": {
+      "h": 1018,
+      "page": "screens",
+      "title": "M2 admin · reveal · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 69294
+    },
+    "d208-reveal-active-1280-dark.dc.html": {
+      "h": 1095,
+      "page": "screens",
+      "title": "M2 admin · reveal active · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 70612
+    },
+    "d208-reveal-active-1280.dc.html": {
+      "h": 1095,
+      "page": "screens",
+      "title": "M2 admin · reveal active · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 70612
+    },
+    "d208-reveal-active-390-dark.dc.html": {
+      "h": 2307,
+      "page": "screens",
+      "title": "M2 admin · reveal active · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 70612
+    },
+    "d208-reveal-active-390.dc.html": {
+      "h": 2307,
+      "page": "screens",
+      "title": "M2 admin · reveal active · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 70612
+    },
+    "d208-support-access-1280-dark.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 admin · support access · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 73219
+    },
+    "d208-support-access-1280.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 admin · support access · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 73219
+    },
+    "d208-support-access-390-dark.dc.html": {
+      "h": 1011,
+      "page": "screens",
+      "title": "M2 admin · support access · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 73219
+    },
+    "d208-support-access-390.dc.html": {
+      "h": 1011,
+      "page": "screens",
+      "title": "M2 admin · support access · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 73219
+    },
+    "d208-user-1280-dark.dc.html": {
+      "h": 904,
+      "page": "screens",
+      "title": "M2 admin · user · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 74530
+    },
+    "d208-user-1280.dc.html": {
+      "h": 904,
+      "page": "screens",
+      "title": "M2 admin · user · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 74530
+    },
+    "d208-user-390-dark.dc.html": {
+      "h": 1741,
+      "page": "screens",
+      "title": "M2 admin · user · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 74530
+    },
+    "d208-user-390.dc.html": {
+      "h": 1741,
+      "page": "screens",
+      "title": "M2 admin · user · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 74530
+    },
+    "d208-users-1280-dark.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 admin · users · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 76571
+    },
+    "d208-users-1280.dc.html": {
+      "h": 900,
+      "page": "screens",
+      "title": "M2 admin · users · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 76571
+    },
+    "d208-users-390-dark.dc.html": {
+      "h": 2197,
+      "page": "screens",
+      "title": "M2 admin · users · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 76571
+    },
+    "d208-users-390.dc.html": {
+      "h": 2197,
+      "page": "screens",
+      "title": "M2 admin · users · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 76571
+    },
+    "d292-calendar-empty-1280-dark.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "Calendar (#292) · calendar empty · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 78968
+    },
+    "d292-calendar-empty-1280.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "Calendar (#292) · calendar empty · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 78968
+    },
+    "d292-calendar-empty-390-dark.dc.html": {
+      "h": 740,
+      "page": "screens",
+      "title": "Calendar (#292) · calendar empty · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 78968
+    },
+    "d292-calendar-empty-390.dc.html": {
+      "h": 740,
+      "page": "screens",
+      "title": "Calendar (#292) · calendar empty · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 78968
+    },
+    "d292-calendar-entry-1280-dark.dc.html": {
+      "h": 315,
+      "page": "screens",
+      "title": "Calendar (#292) · calendar entry · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 80408
+    },
+    "d292-calendar-entry-1280.dc.html": {
+      "h": 315,
+      "page": "screens",
+      "title": "Calendar (#292) · calendar entry · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 80408
+    },
+    "d292-calendar-entry-390-dark.dc.html": {
+      "h": 270,
+      "page": "screens",
+      "title": "Calendar (#292) · calendar entry · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 80408
+    },
+    "d292-calendar-entry-390.dc.html": {
+      "h": 270,
+      "page": "screens",
+      "title": "Calendar (#292) · calendar entry · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 80408
+    },
+    "d292-calendar-month-1280-dark.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "Calendar (#292) · calendar month · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 81023
+    },
+    "d292-calendar-month-1280.dc.html": {
+      "h": 1140,
+      "page": "screens",
+      "title": "Calendar (#292) · calendar month · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 81023
+    },
+    "d292-calendar-month-390-dark.dc.html": {
+      "h": 1198,
+      "page": "screens",
+      "title": "Calendar (#292) · calendar month · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 81023
+    },
+    "d292-calendar-month-390.dc.html": {
+      "h": 1198,
+      "page": "screens",
+      "title": "Calendar (#292) · calendar month · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 81023
+    },
+    "d310-settings-nav-1280-dark.dc.html": {
+      "h": 2176,
+      "page": "screens",
+      "title": "Settings nav (#310) · settings nav · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 82421
+    },
+    "d310-settings-nav-1280.dc.html": {
+      "h": 2176,
+      "page": "screens",
+      "title": "Settings nav (#310) · settings nav · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 82421
+    },
+    "d310-settings-nav-390-dark.dc.html": {
+      "h": 1080,
+      "page": "screens",
+      "title": "Settings nav (#310) · settings nav · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 82421
+    },
+    "d310-settings-nav-390.dc.html": {
+      "h": 1080,
+      "page": "screens",
+      "title": "Settings nav (#310) · settings nav · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 82421
+    },
+    "digest-390.dc.html": {
+      "h": 2050,
+      "page": "email",
+      "title": "Daily digest · 390",
+      "w": 390,
+      "x": 3040,
+      "y": 0
+    },
+    "digest-dark.dc.html": {
+      "h": 1750,
+      "page": "email",
+      "title": "Daily digest · desktop · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "ds-2.dc.html": {
+      "h": 7300,
+      "page": "system",
+      "title": "Design system 2/3 · Layout, shape, icons, motion",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "ds-3.dc.html": {
+      "h": 7700,
+      "page": "system",
+      "title": "Design system 3/3 · Components, voice, accessibility",
+      "w": 1440,
+      "x": 3040,
+      "y": 0
+    },
+    "holds-1280-dark.dc.html": {
+      "h": 1360,
+      "page": "screens",
+      "title": "Holds · 1280 · dark",
+      "w": 1280,
+      "x": 8400,
+      "y": 0
+    },
+    "holds-1280.dc.html": {
+      "h": 1360,
+      "page": "screens",
+      "title": "Holds · 1280",
+      "w": 1280,
+      "x": 7040,
+      "y": 0
+    },
+    "holds-1440-dark.dc.html": {
+      "h": 1320,
+      "page": "screens",
+      "title": "Holds · 1440 · dark",
+      "w": 1440,
+      "x": 5520,
+      "y": 0
+    },
+    "holds-1920-dark.dc.html": {
+      "h": 1250,
+      "page": "screens",
+      "title": "Holds · 1920 · dark",
+      "w": 1920,
+      "x": 2000,
+      "y": 0
+    },
+    "holds-1920.dc.html": {
+      "h": 1250,
+      "page": "screens",
+      "title": "Holds · 1920",
+      "w": 1920,
+      "x": 0,
+      "y": 0
+    },
+    "holds-390-dark.dc.html": {
+      "h": 3000,
+      "page": "screens",
+      "title": "Holds · 390 · dark",
+      "w": 390,
+      "x": 10230,
+      "y": 0
+    },
+    "holds-390.dc.html": {
+      "h": 3000,
+      "page": "screens",
+      "title": "Holds · 390",
+      "w": 390,
+      "x": 9760,
+      "y": 0
+    },
+    "home-1280-dark.dc.html": {
+      "h": 1430,
+      "page": "app",
+      "title": "Home · 1280 · dark",
+      "w": 1280,
+      "x": 8400,
+      "y": 0
+    },
+    "home-1280.dc.html": {
+      "h": 1430,
+      "page": "app",
+      "title": "Home · 1280",
+      "w": 1280,
+      "x": 7040,
+      "y": 0
+    },
+    "home-1440-dark.dc.html": {
+      "h": 1260,
+      "page": "app",
+      "title": "Home · 1440 · dark",
+      "w": 1440,
+      "x": 5520,
+      "y": 0
+    },
+    "home-1920-dark.dc.html": {
+      "h": 1380,
+      "page": "app",
+      "title": "Home · 1920 · dark",
+      "w": 1920,
+      "x": 2000,
+      "y": 0
+    },
+    "home-1920.dc.html": {
+      "h": 1380,
+      "page": "app",
+      "title": "Home · 1920",
+      "w": 1920,
+      "x": 0,
+      "y": 0
+    },
+    "home-390-dark.dc.html": {
+      "h": 2650,
+      "page": "app",
+      "title": "Home · 390 · dark",
+      "w": 390,
+      "x": 10230,
+      "y": 0
+    },
+    "home-390.dc.html": {
+      "h": 2650,
+      "page": "app",
+      "title": "Home · 390",
+      "w": 390,
+      "x": 9760,
+      "y": 0
+    },
+    "home-paused-1280-dark.dc.html": {
+      "h": 2001,
+      "page": "app",
+      "title": "Home · paused · 1280 · dark",
+      "w": 1280,
+      "x": 1520,
+      "y": 4800
+    },
+    "home-paused-1280.dc.html": {
+      "h": 2001,
+      "page": "app",
+      "title": "Home · paused · 1280 (reference wrapper)",
+      "w": 1280,
+      "x": 3820,
+      "y": 4800
+    },
+    "home-paused-390-dark.dc.html": {
+      "h": 3245,
+      "page": "app",
+      "title": "Home · paused · 390 · dark",
+      "w": 390,
+      "x": 3350,
+      "y": 4800
+    },
+    "home-paused-390.dc.html": {
+      "h": 3245,
+      "page": "app",
+      "title": "Home · paused · 390",
+      "w": 390,
+      "x": 2880,
+      "y": 4800
+    },
+    "home-paused-reasons.dc.html": {
+      "h": 1080,
+      "page": "app",
+      "title": "Home · paused · all seven reasons",
+      "w": 1280,
+      "x": 5180,
+      "y": 4800
+    },
+    "inbox-1280-dark.dc.html": {
+      "h": 1380,
+      "page": "screens",
+      "title": "Inbox · 1280 · dark",
+      "w": 1280,
+      "x": 8400,
+      "y": 3500
+    },
+    "inbox-1280.dc.html": {
+      "h": 1380,
+      "page": "screens",
+      "title": "Inbox · 1280",
+      "w": 1280,
+      "x": 7040,
+      "y": 3500
+    },
+    "inbox-1440-dark.dc.html": {
+      "h": 1300,
+      "page": "screens",
+      "title": "Inbox · 1440 · dark",
+      "w": 1440,
+      "x": 5520,
+      "y": 3500
+    },
+    "inbox-1920-dark.dc.html": {
+      "h": 1250,
+      "page": "screens",
+      "title": "Inbox · 1920 · dark",
+      "w": 1920,
+      "x": 2000,
+      "y": 3500
+    },
+    "inbox-1920.dc.html": {
+      "h": 1250,
+      "page": "screens",
+      "title": "Inbox · 1920",
+      "w": 1920,
+      "x": 0,
+      "y": 3500
+    },
+    "inbox-390-dark.dc.html": {
+      "h": 1950,
+      "page": "screens",
+      "title": "Inbox · 390 · dark",
+      "w": 390,
+      "x": 10230,
+      "y": 3500
+    },
+    "inbox-390.dc.html": {
+      "h": 1950,
+      "page": "screens",
+      "title": "Inbox · 390",
+      "w": 390,
+      "x": 9760,
+      "y": 3500
+    },
+    "livetab-1440.dc.html": {
+      "h": 960,
+      "page": "flows",
+      "title": "Live Tab · 1440 · app shell",
+      "w": 1440,
+      "x": 940,
+      "y": 0
+    },
+    "livetab-390-dark.dc.html": {
+      "h": 844,
+      "page": "flows",
+      "title": "Live Tab · 390 · dark",
+      "w": 390,
+      "x": 470,
+      "y": 0
+    },
+    "lp-1280-dark.dc.html": {
+      "h": 1990,
+      "page": "landing",
+      "title": "Landing · 1280 · dark",
+      "w": 1280,
+      "x": 8400,
+      "y": 0
+    },
+    "lp-1280.dc.html": {
+      "h": 1990,
+      "page": "landing",
+      "title": "Landing · 1280",
+      "w": 1280,
+      "x": 7040,
+      "y": 0
+    },
+    "lp-1440-dark.dc.html": {
+      "h": 7800,
+      "page": "landing",
+      "title": "Landing · 1440 · dark",
+      "w": 1440,
+      "x": 5520,
+      "y": 0
+    },
+    "lp-1920-dark.dc.html": {
+      "h": 8000,
+      "page": "landing",
+      "title": "Landing · 1920 · dark",
+      "w": 1920,
+      "x": 2000,
+      "y": 0
+    },
+    "lp-1920.dc.html": {
+      "h": 8000,
+      "page": "landing",
+      "title": "Landing · 1920",
+      "w": 1920,
+      "x": 0,
+      "y": 0
+    },
+    "lp-390-dark.dc.html": {
+      "h": 3180,
+      "page": "landing",
+      "title": "Landing · 390 · dark",
+      "w": 390,
+      "x": 10230,
+      "y": 0
+    },
+    "nf-1440-dark.dc.html": {
+      "h": 820,
+      "page": "onboarding",
+      "title": "404 · Page not found · 1440 · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 14300
+    },
+    "nf-390-dark.dc.html": {
+      "h": 900,
+      "page": "onboarding",
+      "title": "404 · Page not found · 390 · dark",
+      "w": 390,
+      "x": 3510,
+      "y": 14300
+    },
+    "nf-390.dc.html": {
+      "h": 900,
+      "page": "onboarding",
+      "title": "404 · Page not found · 390",
+      "w": 390,
+      "x": 3040,
+      "y": 14300
+    },
+    "notifications-dark.dc.html": {
+      "h": 4400,
+      "page": "email",
+      "title": "Notifications · 1440 · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 9500
+    },
+    "onb-1-390-dark.dc.html": {
+      "h": 1100,
+      "page": "onboarding",
+      "title": "Onboarding 1 · Resume · 390 · dark",
+      "w": 390,
+      "x": 3510,
+      "y": 0
+    },
+    "onb-1-390.dc.html": {
+      "h": 1100,
+      "page": "onboarding",
+      "title": "Onboarding 1 · Resume · 390",
+      "w": 390,
+      "x": 3040,
+      "y": 0
+    },
+    "onb-1-dark.dc.html": {
+      "h": 1000,
+      "page": "onboarding",
+      "title": "Onboarding 1 · Resume · 1440 · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "onb-2-390-dark.dc.html": {
+      "h": 2150,
+      "page": "onboarding",
+      "title": "Onboarding 2 · Roles & locations · 390 · dark",
+      "w": 390,
+      "x": 3510,
+      "y": 1600
+    },
+    "onb-2-390.dc.html": {
+      "h": 2150,
+      "page": "onboarding",
+      "title": "Onboarding 2 · Roles & locations · 390",
+      "w": 390,
+      "x": 3040,
+      "y": 1600
+    },
+    "onb-2-dark.dc.html": {
+      "h": 1560,
+      "page": "onboarding",
+      "title": "Onboarding 2 · Roles & locations · 1440 · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 1600
+    },
+    "onb-2.dc.html": {
+      "h": 1560,
+      "page": "onboarding",
+      "title": "Onboarding 2 · Roles & locations · 1440",
+      "w": 1440,
+      "x": 0,
+      "y": 1600
+    },
+    "onb-3-390-dark.dc.html": {
+      "h": 2500,
+      "page": "onboarding",
+      "title": "Onboarding 3 · Memory Base · 390 · dark",
+      "w": 390,
+      "x": 3510,
+      "y": 4250
+    },
+    "onb-3-390.dc.html": {
+      "h": 2500,
+      "page": "onboarding",
+      "title": "Onboarding 3 · Memory Base · 390",
+      "w": 390,
+      "x": 3040,
+      "y": 4250
+    },
+    "onb-3-dark.dc.html": {
+      "h": 1620,
+      "page": "onboarding",
+      "title": "Onboarding 3 · Memory Base · 1440 · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 4250
+    },
+    "onb-3.dc.html": {
+      "h": 1620,
+      "page": "onboarding",
+      "title": "Onboarding 3 · Memory Base · 1440",
+      "w": 1440,
+      "x": 0,
+      "y": 4250
+    },
+    "onb-4-390-dark.dc.html": {
+      "h": 1300,
+      "page": "onboarding",
+      "title": "Onboarding 4 · Connect inbox · 390 · dark",
+      "w": 390,
+      "x": 3510,
+      "y": 7250
+    },
+    "onb-4-390.dc.html": {
+      "h": 1300,
+      "page": "onboarding",
+      "title": "Onboarding 4 · Connect inbox · 390",
+      "w": 390,
+      "x": 3040,
+      "y": 7250
+    },
+    "onb-4-dark.dc.html": {
+      "h": 1000,
+      "page": "onboarding",
+      "title": "Onboarding 4 · Connect inbox · 1440 · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 7250
+    },
+    "onb-4.dc.html": {
+      "h": 1000,
+      "page": "onboarding",
+      "title": "Onboarding 4 · Connect inbox · 1440",
+      "w": 1440,
+      "x": 0,
+      "y": 7250
+    },
+    "onbq-1280-dark.dc.html": {
+      "h": 1727,
+      "page": "onboarding",
+      "title": "Onboarding 3 · Your facts · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 15720
+    },
+    "onbq-1280.dc.html": {
+      "h": 1727,
+      "page": "onboarding",
+      "title": "Onboarding 3 · Your facts · 1280 (reference wrapper)",
+      "w": 1280,
+      "x": 3660,
+      "y": 15720
+    },
+    "onbq-390-dark.dc.html": {
+      "h": 2155,
+      "page": "onboarding",
+      "title": "Onboarding 3 · Your facts · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 15720
+    },
+    "onbq-390.dc.html": {
+      "h": 2155,
+      "page": "onboarding",
+      "title": "Onboarding 3 · Your facts · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 15720
+    },
+    "onbw-1-1280-dark.dc.html": {
+      "h": 900,
+      "page": "onboarding",
+      "title": "M2 onboarding 1 · Welcome · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 18000
+    },
+    "onbw-1-1280.dc.html": {
+      "h": 900,
+      "page": "onboarding",
+      "title": "M2 onboarding 1 · Welcome · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 18000
+    },
+    "onbw-1-390-dark.dc.html": {
+      "h": 900,
+      "page": "onboarding",
+      "title": "M2 onboarding 1 · Welcome · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 18000
+    },
+    "onbw-1-390.dc.html": {
+      "h": 900,
+      "page": "onboarding",
+      "title": "M2 onboarding 1 · Welcome · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 18000
+    },
+    "onbw-2-1280-dark.dc.html": {
+      "h": 968,
+      "page": "onboarding",
+      "title": "M2 onboarding 2 · Resume · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 19200
+    },
+    "onbw-2-1280.dc.html": {
+      "h": 968,
+      "page": "onboarding",
+      "title": "M2 onboarding 2 · Resume · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 19200
+    },
+    "onbw-2-390-dark.dc.html": {
+      "h": 958,
+      "page": "onboarding",
+      "title": "M2 onboarding 2 · Resume · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 19200
+    },
+    "onbw-2-390.dc.html": {
+      "h": 958,
+      "page": "onboarding",
+      "title": "M2 onboarding 2 · Resume · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 19200
+    },
+    "onbw-4-1280-dark.dc.html": {
+      "h": 1398,
+      "page": "onboarding",
+      "title": "M2 onboarding 4 · What you want · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 20468
+    },
+    "onbw-4-1280.dc.html": {
+      "h": 1398,
+      "page": "onboarding",
+      "title": "M2 onboarding 4 · What you want · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 20468
+    },
+    "onbw-4-390-dark.dc.html": {
+      "h": 1685,
+      "page": "onboarding",
+      "title": "M2 onboarding 4 · What you want · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 20468
+    },
+    "onbw-4-390.dc.html": {
+      "h": 1685,
+      "page": "onboarding",
+      "title": "M2 onboarding 4 · What you want · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 20468
+    },
+    "onbw-5-1280-dark.dc.html": {
+      "h": 1426,
+      "page": "onboarding",
+      "title": "M2 onboarding 5 · Forwarding & start · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 22453
+    },
+    "onbw-5-1280.dc.html": {
+      "h": 1426,
+      "page": "onboarding",
+      "title": "M2 onboarding 5 · Forwarding & start · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 22453
+    },
+    "onbw-5-390-dark.dc.html": {
+      "h": 1740,
+      "page": "onboarding",
+      "title": "M2 onboarding 5 · Forwarding & start · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 22453
+    },
+    "onbw-5-390.dc.html": {
+      "h": 1740,
+      "page": "onboarding",
+      "title": "M2 onboarding 5 · Forwarding & start · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 22453
+    },
+    "pricing-1280-dark.dc.html": {
+      "h": 1560,
+      "page": "pricing",
+      "title": "Pricing · 1280 · dark",
+      "w": 1280,
+      "x": 12760,
+      "y": 0
+    },
+    "pricing-1280.dc.html": {
+      "h": 1560,
+      "page": "pricing",
+      "title": "Pricing · 1280",
+      "w": 1280,
+      "x": 11400,
+      "y": 0
+    },
+    "pricing-390-dark.dc.html": {
+      "h": 2700,
+      "page": "pricing",
+      "title": "Pricing · 390 · dark",
+      "w": 390,
+      "x": 14590,
+      "y": 0
+    },
+    "pricing-390.dc.html": {
+      "h": 2700,
+      "page": "pricing",
+      "title": "Pricing · 390",
+      "w": 390,
+      "x": 14120,
+      "y": 0
+    },
+    "privacy-1440-dark.dc.html": {
+      "h": 4430,
+      "page": "legal",
+      "title": "Privacy · 1440 · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "privacy-390-dark.dc.html": {
+      "h": 6050,
+      "page": "legal",
+      "title": "Privacy · 390 · dark",
+      "w": 390,
+      "x": 3510,
+      "y": 0
+    },
+    "privacy-390.dc.html": {
+      "h": 6050,
+      "page": "legal",
+      "title": "Privacy · 390",
+      "w": 390,
+      "x": 3040,
+      "y": 0
+    },
+    "profile-1280-dark.dc.html": {
+      "h": 3300,
+      "page": "screens",
+      "title": "Profile · 1280 · dark",
+      "w": 1280,
+      "x": 8400,
+      "y": 5900
+    },
+    "profile-1280.dc.html": {
+      "h": 3300,
+      "page": "screens",
+      "title": "Profile · 1280",
+      "w": 1280,
+      "x": 7040,
+      "y": 5900
+    },
+    "profile-1440-dark.dc.html": {
+      "h": 3130,
+      "page": "screens",
+      "title": "Profile · 1440 · dark",
+      "w": 1440,
+      "x": 5520,
+      "y": 5900
+    },
+    "profile-1920-dark.dc.html": {
+      "h": 2970,
+      "page": "screens",
+      "title": "Profile · 1920 · dark",
+      "w": 1920,
+      "x": 2000,
+      "y": 5900
+    },
+    "profile-1920.dc.html": {
+      "h": 2970,
+      "page": "screens",
+      "title": "Profile · 1920",
+      "w": 1920,
+      "x": 0,
+      "y": 5900
+    },
+    "profile-390-dark.dc.html": {
+      "h": 5600,
+      "page": "screens",
+      "title": "Profile · 390 · dark",
+      "w": 390,
+      "x": 10230,
+      "y": 5900
+    },
+    "profile-390.dc.html": {
+      "h": 5600,
+      "page": "screens",
+      "title": "Profile · 390",
+      "w": 390,
+      "x": 9760,
+      "y": 5900
+    },
+    "ready-1280-dark.dc.html": {
+      "h": 1525,
+      "page": "app",
+      "title": "Ready · 1280 · dark",
+      "w": 1280,
+      "x": 1360,
+      "y": 8465
+    },
+    "ready-1280.dc.html": {
+      "h": 1525,
+      "page": "app",
+      "title": "Ready · 1280 (reference wrapper)",
+      "w": 1280,
+      "x": 3660,
+      "y": 8465
+    },
+    "ready-390-dark.dc.html": {
+      "h": 1933,
+      "page": "app",
+      "title": "Ready · 390 · dark",
+      "w": 390,
+      "x": 3190,
+      "y": 8465
+    },
+    "ready-390.dc.html": {
+      "h": 1933,
+      "page": "app",
+      "title": "Ready · 390",
+      "w": 390,
+      "x": 2720,
+      "y": 8465
+    },
+    "ready-email-390.dc.html": {
+      "h": 1330,
+      "page": "email",
+      "title": "Ready email · 390",
+      "w": 390,
+      "x": 3040,
+      "y": 14320
+    },
+    "ready-email-dark.dc.html": {
+      "h": 1210,
+      "page": "email",
+      "title": "Ready email · 1440 · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 14320
+    },
+    "ready-email.dc.html": {
+      "h": 1210,
+      "page": "email",
+      "title": "Ready email · 1440 (reference wrapper)",
+      "w": 1440,
+      "x": 3510,
+      "y": 14320
+    },
+    "resume-390-dark.dc.html": {
+      "h": 2560,
+      "page": "screens",
+      "title": "Resume · 390 · dark",
+      "w": 390,
+      "x": 3510,
+      "y": 18540
+    },
+    "resume-390.dc.html": {
+      "h": 2560,
+      "page": "screens",
+      "title": "Resume · 390",
+      "w": 390,
+      "x": 3040,
+      "y": 18540
+    },
+    "resume-dark.dc.html": {
+      "h": 1460,
+      "page": "screens",
+      "title": "Resume · 1440 · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 18540
+    },
+    "settings-1280-dark.dc.html": {
+      "h": 2050,
+      "page": "screens",
+      "title": "Settings · 1280 · dark",
+      "w": 1280,
+      "x": 8400,
+      "y": 11900
+    },
+    "settings-1280.dc.html": {
+      "h": 2050,
+      "page": "screens",
+      "title": "Settings · 1280",
+      "w": 1280,
+      "x": 7040,
+      "y": 11900
+    },
+    "settings-1440-dark.dc.html": {
+      "h": 1880,
+      "page": "screens",
+      "title": "Settings · 1440 · dark",
+      "w": 1440,
+      "x": 5520,
+      "y": 11900
+    },
+    "settings-1920-dark.dc.html": {
+      "h": 1780,
+      "page": "screens",
+      "title": "Settings · 1920 · dark",
+      "w": 1920,
+      "x": 2000,
+      "y": 11900
+    },
+    "settings-1920.dc.html": {
+      "h": 1780,
+      "page": "screens",
+      "title": "Settings · 1920",
+      "w": 1920,
+      "x": 0,
+      "y": 11900
+    },
+    "settings-390-dark.dc.html": {
+      "h": 3350,
+      "page": "screens",
+      "title": "Settings · 390 · dark",
+      "w": 390,
+      "x": 10230,
+      "y": 11900
+    },
+    "settings-390.dc.html": {
+      "h": 3350,
+      "page": "screens",
+      "title": "Settings · 390",
+      "w": 390,
+      "x": 9760,
+      "y": 11900
+    },
+    "signin-390-dark.dc.html": {
+      "h": 860,
+      "page": "auth",
+      "title": "Sign In · 390 · dark",
+      "w": 390,
+      "x": 3510,
+      "y": 0
+    },
+    "signin-390.dc.html": {
+      "h": 860,
+      "page": "auth",
+      "title": "Sign In · 390",
+      "w": 390,
+      "x": 3040,
+      "y": 0
+    },
+    "signin-dark.dc.html": {
+      "h": 900,
+      "page": "auth",
+      "title": "Sign In · 1440 · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "states-dark.dc.html": {
+      "h": 4750,
+      "page": "onboarding",
+      "title": "Product states · 1440 · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 9050
+    },
+    "terms-1440-dark.dc.html": {
+      "h": 4270,
+      "page": "legal",
+      "title": "Terms · 1440 · dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 6500
+    },
+    "terms-390-dark.dc.html": {
+      "h": 5400,
+      "page": "legal",
+      "title": "Terms · 390 · dark",
+      "w": 390,
+      "x": 3510,
+      "y": 6500
+    },
+    "terms-390.dc.html": {
+      "h": 5400,
+      "page": "legal",
+      "title": "Terms · 390",
+      "w": 390,
+      "x": 3040,
+      "y": 6500
+    },
+    "w5-404.dc.html": {
+      "expand": "fill",
+      "h": 820,
+      "page": "onboarding",
+      "title": "404 · Page not found · 1440",
+      "w": 1440,
+      "x": 0,
+      "y": 14300
+    },
+    "w5-admin-ats.dc.html": {
+      "h": 1146,
+      "w": 1280,
+      "x": 15060,
+      "y": 0
+    },
+    "w5-admin-audit.dc.html": {
+      "h": 902,
+      "w": 1280,
+      "x": 16420,
+      "y": 0
+    },
+    "w5-admin-invites.dc.html": {
+      "h": 1053,
+      "w": 1280,
+      "x": 17780,
+      "y": 0
+    },
+    "w5-admin-mail-health.dc.html": {
+      "h": 902,
+      "w": 1280,
+      "x": 19140,
+      "y": 0
+    },
+    "w5-admin-reveal-active.dc.html": {
+      "h": 1097,
+      "w": 1280,
+      "x": 20500,
+      "y": 0
+    },
+    "w5-admin-reveal.dc.html": {
+      "h": 902,
+      "w": 1280,
+      "x": 21860,
+      "y": 0
+    },
+    "w5-admin-support-access.dc.html": {
+      "h": 902,
+      "w": 1280,
+      "x": 23220,
+      "y": 0
+    },
+    "w5-admin-user.dc.html": {
+      "h": 907,
+      "w": 1280,
+      "x": 24580,
+      "y": 0
+    },
+    "w5-admin-users.dc.html": {
+      "h": 902,
+      "w": 1280,
+      "x": 25940,
+      "y": 0
+    },
+    "w5-answerbank.dc.html": {
+      "h": 2420,
+      "page": "screens",
+      "title": "Answer Bank · 1440",
+      "w": 1440,
+      "x": 0,
+      "y": 14500
+    },
+    "w5-auto-move.dc.html": {
+      "h": 1800,
+      "w": 1440,
+      "x": 27300,
+      "y": 0
+    },
+    "w5-board-card-mail.dc.html": {
+      "h": 1000,
+      "w": 1280,
+      "x": 28820,
+      "y": 0
+    },
+    "w5-board.dc.html": {
+      "expand": "fill",
+      "h": 1100,
+      "page": "app",
+      "title": "Job Board · 1440",
+      "w": 1440,
+      "x": 4000,
+      "y": 3100
+    },
+    "w5-brand.dc.html": {
+      "h": 6600,
+      "page": "email",
+      "title": "Brand assets",
+      "w": 1440,
+      "x": 0,
+      "y": 2700
+    },
+    "w5-calendar-empty.dc.html": {
+      "h": 1120,
+      "w": 1280,
+      "x": 30180,
+      "y": 0
+    },
+    "w5-calendar-entry.dc.html": {
+      "h": 1120,
+      "w": 1280,
+      "x": 31540,
+      "y": 0
+    },
+    "w5-calendar-month.dc.html": {
+      "h": 1120,
+      "w": 1280,
+      "x": 32900,
+      "y": 0
+    },
+    "w5-carddetail.dc.html": {
+      "h": 2220,
+      "page": "screens",
+      "title": "Card detail · 1440",
+      "w": 1440,
+      "x": 0,
+      "y": 21220
+    },
+    "w5-code-paste-sheet.dc.html": {
+      "h": 1500,
+      "w": 1280,
+      "x": 34260,
+      "y": 0
+    },
+    "w5-code-wait-home.dc.html": {
+      "h": 1000,
+      "w": 1280,
+      "x": 35620,
+      "y": 0
+    },
+    "w5-consent.dc.html": {
+      "h": 900,
+      "w": 1280,
+      "x": 36980,
+      "y": 0
+    },
+    "w5-digest.dc.html": {
+      "h": 1750,
+      "page": "email",
+      "title": "Daily digest · desktop",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "w5-dossier-answers.dc.html": {
+      "h": 2600,
+      "page": "screens",
+      "title": "Application dossier · Questions tab",
+      "w": 1440,
+      "x": 0,
+      "y": 23560
+    },
+    "w5-dossier-letter.dc.html": {
+      "h": 2200,
+      "page": "screens",
+      "title": "Application dossier · Cover letter & resume",
+      "w": 1440,
+      "x": 1520,
+      "y": 23560
+    },
+    "w5-forgot-password.dc.html": {
+      "h": 900,
+      "w": 1280,
+      "x": 38340,
+      "y": 0
+    },
+    "w5-holds.dc.html": {
+      "expand": "fill",
+      "h": 1320,
+      "page": "screens",
+      "title": "Holds · 1440",
+      "w": 1440,
+      "x": 4000,
+      "y": 0
+    },
+    "w5-home-paused.dc.html": {
+      "expand": "fill",
+      "h": 1900,
+      "page": "app",
+      "title": "Home · paused · 1280",
+      "w": 1440,
+      "x": 0,
+      "y": 4800
+    },
+    "w5-home.dc.html": {
+      "expand": "fill",
+      "h": 1260,
+      "page": "app",
+      "title": "Home · 1440",
+      "w": 1440,
+      "x": 4000,
+      "y": 0
+    },
+    "w5-inbox-address.dc.html": {
+      "h": 1500,
+      "w": 1280,
+      "x": 39700,
+      "y": 0
+    },
+    "w5-inbox-empty.dc.html": {
+      "h": 900,
+      "w": 1280,
+      "x": 41060,
+      "y": 0
+    },
+    "w5-inbox-list.dc.html": {
+      "h": 1100,
+      "w": 1280,
+      "x": 42420,
+      "y": 0
+    },
+    "w5-inbox-thread.dc.html": {
+      "h": 1400,
+      "w": 1280,
+      "x": 43780,
+      "y": 0
+    },
+    "w5-inbox.dc.html": {
+      "expand": "fill",
+      "h": 1300,
+      "page": "screens",
+      "title": "Inbox · 1440",
+      "w": 1440,
+      "x": 4000,
+      "y": 3500
+    },
+    "w5-landing-phone.dc.html": {
+      "h": 3180,
+      "page": "landing",
+      "title": "Landing · 390",
+      "w": 390,
+      "x": 9760,
+      "y": 0
+    },
+    "w5-landing.dc.html": {
+      "expand": "fill",
+      "h": 7800,
+      "page": "landing",
+      "title": "Landing · 1440",
+      "w": 1440,
+      "x": 4000,
+      "y": 0
+    },
+    "w5-livetab.dc.html": {
+      "expand": "fill",
+      "h": 844,
+      "page": "flows",
+      "title": "Live Tab · 390",
+      "w": 390,
+      "x": 0,
+      "y": 0
+    },
+    "w5-mobile.dc.html": {
+      "h": 844,
+      "page": "app",
+      "title": "Mobile reference (to retire)",
+      "w": 390,
+      "x": 10700,
+      "y": 3100
+    },
+    "w5-notifications.dc.html": {
+      "h": 4400,
+      "page": "email",
+      "title": "Notifications · 1440",
+      "w": 1440,
+      "x": 0,
+      "y": 9500
+    },
+    "w5-onb-questions.dc.html": {
+      "expand": "fill",
+      "h": 1727,
+      "page": "onboarding",
+      "title": "Onboarding 3 · Your facts · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 15720
+    },
+    "w5-onb.dc.html": {
+      "h": 1000,
+      "w": 1280,
+      "x": 45140,
+      "y": 0
+    },
+    "w5-onboarding.dc.html": {
+      "expand": "fill",
+      "h": 1000,
+      "page": "onboarding",
+      "title": "Onboarding 1 · Resume · 1440",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "w5-privacy.dc.html": {
+      "expand": "fill",
+      "h": 4430,
+      "page": "legal",
+      "title": "Privacy · 1440",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "w5-profile-forwarding.dc.html": {
+      "h": 900,
+      "w": 1280,
+      "x": 46500,
+      "y": 0
+    },
+    "w5-profile.dc.html": {
+      "expand": "fill",
+      "h": 3130,
+      "page": "screens",
+      "title": "Profile · 1440",
+      "w": 1440,
+      "x": 4000,
+      "y": 5900
+    },
+    "w5-push.dc.html": {
+      "h": 1800,
+      "w": 1440,
+      "x": 47860,
+      "y": 0
+    },
+    "w5-ready-email.dc.html": {
+      "h": 1210,
+      "page": "email",
+      "title": "Ready email · 1440",
+      "w": 1440,
+      "x": 0,
+      "y": 14320
+    },
+    "w5-ready.dc.html": {
+      "expand": "fill",
+      "h": 1200,
+      "page": "app",
+      "title": "Ready · 1280",
+      "w": 1280,
+      "x": 0,
+      "y": 8465
+    },
+    "w5-recap.dc.html": {
+      "h": 1500,
+      "w": 1440,
+      "x": 49380,
+      "y": 0
+    },
+    "w5-reset-password.dc.html": {
+      "h": 900,
+      "w": 1280,
+      "x": 50900,
+      "y": 0
+    },
+    "w5-resume.dc.html": {
+      "h": 1460,
+      "page": "screens",
+      "title": "Resume · 1440",
+      "w": 1440,
+      "x": 0,
+      "y": 18540
+    },
+    "w5-settings-delete.dc.html": {
+      "h": 2000,
+      "w": 1440,
+      "x": 52260,
+      "y": 0
+    },
+    "w5-settings-export.dc.html": {
+      "h": 2000,
+      "w": 1440,
+      "x": 53780,
+      "y": 0
+    },
+    "w5-settings-legal.dc.html": {
+      "h": 2000,
+      "w": 1440,
+      "x": 55300,
+      "y": 0
+    },
+    "w5-settings-nav.dc.html": {
+      "h": 2176,
+      "w": 1280,
+      "x": 56820,
+      "y": 0
+    },
+    "w5-settings-notifications.dc.html": {
+      "h": 2000,
+      "w": 1440,
+      "x": 58180,
+      "y": 0
+    },
+    "w5-settings-support-access.dc.html": {
+      "h": 2000,
+      "w": 1440,
+      "x": 59700,
+      "y": 0
+    },
+    "w5-settings.dc.html": {
+      "expand": "fill",
+      "h": 1880,
+      "page": "screens",
+      "title": "Settings · 1440",
+      "w": 1440,
+      "x": 4000,
+      "y": 11900
+    },
+    "w5-signin-password.dc.html": {
+      "h": 900,
+      "w": 1280,
+      "x": 61220,
+      "y": 0
+    },
+    "w5-signin-refused.dc.html": {
+      "h": 900,
+      "w": 1280,
+      "x": 62580,
+      "y": 0
+    },
+    "w5-signin.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "page": "auth",
+      "title": "Sign In · 1440",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "w5-signup-password.dc.html": {
+      "h": 900,
+      "w": 1280,
+      "x": 63940,
+      "y": 0
+    },
+    "w5-states.dc.html": {
+      "expand": "fill",
+      "h": 4750,
+      "page": "onboarding",
+      "title": "Product states · 1440",
+      "w": 1440,
+      "x": 0,
+      "y": 9050
+    },
+    "w5-suspended.dc.html": {
+      "h": 900,
+      "w": 1280,
+      "x": 65300,
+      "y": 0
+    },
+    "w5-terms.dc.html": {
+      "expand": "fill",
+      "h": 4270,
+      "page": "legal",
+      "title": "Terms · 1440",
+      "w": 1440,
+      "x": 0,
+      "y": 6500
+    },
+    "w5-verify-sent.dc.html": {
+      "h": 900,
+      "w": 1280,
+      "x": 66660,
+      "y": 0
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-11-18T20:05:00-05:00",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "page": "landing",
+    "view": "canvas"
+  },
+  "noteOrder": [
+    "row5",
+    "apphome",
+    "appboard",
+    "sholds",
+    "sinbox",
+    "sprofile",
+    "ssettings",
+    "lprivacy",
+    "lterms",
+    "edigest",
+    "ebrand",
+    "ob1",
+    "ob2",
+    "ob3",
+    "ob4",
+    "obstates",
+    "ob404",
+    "authsignin",
+    "flowlive",
+    "obq",
+    "homepaused",
+    "ready",
+    "readyemail"
+  ],
+  "notes": {
+    "appboard": {
+      "kind": "title1",
+      "maxW": 8000,
+      "page": "app",
+      "text": "Job Board",
+      "w": 240,
+      "x": 0,
+      "y": 2800
+    },
+    "apphome": {
+      "kind": "title1",
+      "maxW": 8000,
+      "page": "app",
+      "text": "Home",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "authsignin": {
+      "kind": "title1",
+      "maxW": 3900,
+      "page": "auth",
+      "text": "Sign In · 1440 · 390, light then dark",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "ebrand": {
+      "kind": "title1",
+      "maxW": 3430,
+      "page": "email",
+      "text": "Brand assets",
+      "w": 240,
+      "x": 0,
+      "y": 2400
+    },
+    "edigest": {
+      "kind": "title1",
+      "maxW": 3430,
+      "page": "email",
+      "text": "Daily digest email",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "flowlive": {
+      "kind": "title1",
+      "maxW": 2500,
+      "page": "flows",
+      "text": "Live Tab · Remote CAPTCHA runner · 390 phone-first & 1440 app shell",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "homepaused": {
+      "kind": "title1",
+      "maxW": 6460,
+      "page": "app",
+      "text": "Home · paused states, activity, Couldn’t apply (#157, draft)",
+      "w": 240,
+      "x": 0,
+      "y": 4500
+    },
+    "lprivacy": {
+      "kind": "title1",
+      "maxW": 3900,
+      "page": "legal",
+      "text": "Privacy policy",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "lterms": {
+      "kind": "title1",
+      "maxW": 3900,
+      "page": "legal",
+      "text": "Terms of service",
+      "w": 240,
+      "x": 0,
+      "y": 6200
+    },
+    "ob1": {
+      "kind": "title1",
+      "maxW": 3900,
+      "page": "onboarding",
+      "text": "Onboarding · Step 1 — Resume",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "ob2": {
+      "kind": "title1",
+      "maxW": 3900,
+      "page": "onboarding",
+      "text": "Onboarding · Step 2 — Roles & locations",
+      "w": 240,
+      "x": 0,
+      "y": 1300
+    },
+    "ob3": {
+      "kind": "title1",
+      "maxW": 3900,
+      "page": "onboarding",
+      "text": "Onboarding · Step 3 — Memory Base",
+      "w": 240,
+      "x": 0,
+      "y": 3950
+    },
+    "ob4": {
+      "kind": "title1",
+      "maxW": 3900,
+      "page": "onboarding",
+      "text": "Onboarding · Step 4 — Connect inbox",
+      "w": 240,
+      "x": 0,
+      "y": 6950
+    },
+    "ob404": {
+      "kind": "title1",
+      "maxW": 3900,
+      "page": "onboarding",
+      "text": "404 · Page not found",
+      "w": 240,
+      "x": 0,
+      "y": 14000
+    },
+    "obq": {
+      "kind": "title1",
+      "maxW": 4940,
+      "page": "onboarding",
+      "text": "Onboarding · Your facts — questions that prevent Reviews (#128, draft)",
+      "w": 240,
+      "x": 0,
+      "y": 15420
+    },
+    "obstates": {
+      "kind": "title1",
+      "maxW": 3900,
+      "page": "onboarding",
+      "text": "Product states board",
+      "w": 240,
+      "x": 0,
+      "y": 8750
+    },
+    "ready": {
+      "kind": "title1",
+      "maxW": 4940,
+      "page": "app",
+      "text": "Ready · approve every send (ADR 0029, draft)",
+      "w": 240,
+      "x": 0,
+      "y": 8165
+    },
+    "readyemail": {
+      "kind": "title1",
+      "maxW": 4950,
+      "page": "email",
+      "text": "Ready email · one a day after the morning run (ADR 0029, draft)",
+      "w": 240,
+      "x": 0,
+      "y": 14020
+    },
+    "row5": {
+      "kind": "title1",
+      "maxW": 8000,
+      "page": "landing",
+      "text": "Landing · 1920 · 1440 · 1280 · 390, each light then dark",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "sholds": {
+      "kind": "title1",
+      "maxW": 8000,
+      "page": "screens",
+      "text": "Holds",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "sinbox": {
+      "kind": "title1",
+      "maxW": 8000,
+      "page": "screens",
+      "text": "Inbox",
+      "w": 240,
+      "x": 0,
+      "y": 3200
+    },
+    "sprofile": {
+      "kind": "title1",
+      "maxW": 8000,
+      "page": "screens",
+      "text": "Profile",
+      "w": 240,
+      "x": 0,
+      "y": 5600
+    },
+    "ssettings": {
+      "kind": "title1",
+      "maxW": 8000,
+      "page": "screens",
+      "text": "Settings",
+      "w": 240,
+      "x": 0,
+      "y": 11600
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "ds-2.dc.html",
+    "ds-3.dc.html",
+    "lp-1920.dc.html",
+    "lp-1920-dark.dc.html",
+    "w5-landing.dc.html",
+    "lp-1440-dark.dc.html",
+    "lp-1280.dc.html",
+    "lp-1280-dark.dc.html",
+    "w5-landing-phone.dc.html",
+    "lp-390-dark.dc.html",
+    "home-1920.dc.html",
+    "home-1920-dark.dc.html",
+    "w5-home.dc.html",
+    "home-1440-dark.dc.html",
+    "home-1280.dc.html",
+    "home-1280-dark.dc.html",
+    "home-390.dc.html",
+    "home-390-dark.dc.html",
+    "board-1920.dc.html",
+    "board-1920-dark.dc.html",
+    "w5-board.dc.html",
+    "board-1440-dark.dc.html",
+    "board-1280.dc.html",
+    "board-1280-dark.dc.html",
+    "board-390.dc.html",
+    "board-390-dark.dc.html",
+    "w5-mobile.dc.html",
+    "holds-1920.dc.html",
+    "holds-1920-dark.dc.html",
+    "w5-holds.dc.html",
+    "holds-1440-dark.dc.html",
+    "holds-1280.dc.html",
+    "holds-1280-dark.dc.html",
+    "holds-390.dc.html",
+    "holds-390-dark.dc.html",
+    "inbox-1920.dc.html",
+    "inbox-1920-dark.dc.html",
+    "w5-inbox.dc.html",
+    "inbox-1440-dark.dc.html",
+    "inbox-1280.dc.html",
+    "inbox-1280-dark.dc.html",
+    "inbox-390.dc.html",
+    "inbox-390-dark.dc.html",
+    "profile-1920.dc.html",
+    "profile-1920-dark.dc.html",
+    "w5-profile.dc.html",
+    "profile-1440-dark.dc.html",
+    "profile-1280.dc.html",
+    "profile-1280-dark.dc.html",
+    "profile-390.dc.html",
+    "profile-390-dark.dc.html",
+    "settings-1920.dc.html",
+    "settings-1920-dark.dc.html",
+    "w5-settings.dc.html",
+    "settings-1440-dark.dc.html",
+    "settings-1280.dc.html",
+    "settings-1280-dark.dc.html",
+    "settings-390.dc.html",
+    "settings-390-dark.dc.html",
+    "w5-privacy.dc.html",
+    "privacy-1440-dark.dc.html",
+    "privacy-390.dc.html",
+    "privacy-390-dark.dc.html",
+    "w5-terms.dc.html",
+    "terms-1440-dark.dc.html",
+    "terms-390.dc.html",
+    "terms-390-dark.dc.html",
+    "w5-digest.dc.html",
+    "digest-dark.dc.html",
+    "digest-390.dc.html",
+    "w5-brand.dc.html",
+    "w5-onboarding.dc.html",
+    "onb-1-dark.dc.html",
+    "onb-1-390.dc.html",
+    "onb-1-390-dark.dc.html",
+    "onb-2.dc.html",
+    "onb-2-dark.dc.html",
+    "onb-2-390.dc.html",
+    "onb-2-390-dark.dc.html",
+    "onb-3.dc.html",
+    "onb-3-dark.dc.html",
+    "onb-3-390.dc.html",
+    "onb-3-390-dark.dc.html",
+    "onb-4.dc.html",
+    "onb-4-dark.dc.html",
+    "onb-4-390.dc.html",
+    "onb-4-390-dark.dc.html",
+    "w5-states.dc.html",
+    "states-dark.dc.html",
+    "w5-404.dc.html",
+    "nf-1440-dark.dc.html",
+    "nf-390.dc.html",
+    "nf-390-dark.dc.html",
+    "w5-signin.dc.html",
+    "signin-dark.dc.html",
+    "signin-390.dc.html",
+    "signin-390-dark.dc.html",
+    "w5-livetab.dc.html",
+    "livetab-390-dark.dc.html",
+    "livetab-1440.dc.html",
+    "w5-answerbank.dc.html",
+    "answerbank-dark.dc.html",
+    "answerbank-390.dc.html",
+    "answerbank-390-dark.dc.html",
+    "w5-resume.dc.html",
+    "resume-dark.dc.html",
+    "resume-390.dc.html",
+    "resume-390-dark.dc.html",
+    "w5-carddetail.dc.html",
+    "carddetail-dark.dc.html",
+    "w5-notifications.dc.html",
+    "notifications-dark.dc.html",
+    "w5-dossier-answers.dc.html",
+    "w5-dossier-letter.dc.html",
+    "w5-onb-questions.dc.html",
+    "onbq-1280-dark.dc.html",
+    "onbq-390.dc.html",
+    "onbq-390-dark.dc.html",
+    "onbq-1280.dc.html",
+    "w5-home-paused.dc.html",
+    "home-paused-1280-dark.dc.html",
+    "home-paused-390.dc.html",
+    "home-paused-390-dark.dc.html",
+    "home-paused-1280.dc.html",
+    "home-paused-reasons.dc.html",
+    "w5-ready.dc.html",
+    "ready-1280-dark.dc.html",
+    "ready-390.dc.html",
+    "ready-390-dark.dc.html",
+    "ready-1280.dc.html",
+    "w5-ready-email.dc.html",
+    "ready-email-dark.dc.html",
+    "ready-email-390.dc.html",
+    "ready-email.dc.html",
+    "onbw-1-1280.dc.html",
+    "onbw-1-1280-dark.dc.html",
+    "onbw-1-390.dc.html",
+    "onbw-1-390-dark.dc.html",
+    "onbw-2-1280.dc.html",
+    "onbw-2-1280-dark.dc.html",
+    "onbw-2-390.dc.html",
+    "onbw-2-390-dark.dc.html",
+    "onbw-4-1280.dc.html",
+    "onbw-4-1280-dark.dc.html",
+    "onbw-4-390.dc.html",
+    "onbw-4-390-dark.dc.html",
+    "onbw-5-1280.dc.html",
+    "onbw-5-1280-dark.dc.html",
+    "onbw-5-390.dc.html",
+    "onbw-5-390-dark.dc.html",
+    "d205-board-card-mail-1280.dc.html",
+    "d205-board-card-mail-1280-dark.dc.html",
+    "d205-board-card-mail-390.dc.html",
+    "d205-board-card-mail-390-dark.dc.html",
+    "d205-code-paste-sheet-1280.dc.html",
+    "d205-code-paste-sheet-1280-dark.dc.html",
+    "d205-code-paste-sheet-390.dc.html",
+    "d205-code-paste-sheet-390-dark.dc.html",
+    "d205-code-wait-home-1280.dc.html",
+    "d205-code-wait-home-1280-dark.dc.html",
+    "d205-code-wait-home-390.dc.html",
+    "d205-code-wait-home-390-dark.dc.html",
+    "d205-inbox-address-1280.dc.html",
+    "d205-inbox-address-1280-dark.dc.html",
+    "d205-inbox-address-390.dc.html",
+    "d205-inbox-address-390-dark.dc.html",
+    "d205-inbox-empty-1280.dc.html",
+    "d205-inbox-empty-1280-dark.dc.html",
+    "d205-inbox-empty-390.dc.html",
+    "d205-inbox-empty-390-dark.dc.html",
+    "d205-inbox-list-1280.dc.html",
+    "d205-inbox-list-1280-dark.dc.html",
+    "d205-inbox-list-390.dc.html",
+    "d205-inbox-list-390-dark.dc.html",
+    "d205-inbox-thread-1280.dc.html",
+    "d205-inbox-thread-1280-dark.dc.html",
+    "d205-inbox-thread-390.dc.html",
+    "d205-inbox-thread-390-dark.dc.html",
+    "d205-profile-forwarding-1280.dc.html",
+    "d205-profile-forwarding-1280-dark.dc.html",
+    "d205-profile-forwarding-390.dc.html",
+    "d205-profile-forwarding-390-dark.dc.html",
+    "d203-consent-1280.dc.html",
+    "d203-consent-1280-dark.dc.html",
+    "d203-consent-390.dc.html",
+    "d203-consent-390-dark.dc.html",
+    "d203-forgot-password-1280.dc.html",
+    "d203-forgot-password-1280-dark.dc.html",
+    "d203-forgot-password-390.dc.html",
+    "d203-forgot-password-390-dark.dc.html",
+    "d203-privacy-1280.dc.html",
+    "d203-privacy-1280-dark.dc.html",
+    "d203-privacy-390.dc.html",
+    "d203-privacy-390-dark.dc.html",
+    "d203-reset-password-1280.dc.html",
+    "d203-reset-password-1280-dark.dc.html",
+    "d203-reset-password-390.dc.html",
+    "d203-reset-password-390-dark.dc.html",
+    "d203-signin-password-1280.dc.html",
+    "d203-signin-password-1280-dark.dc.html",
+    "d203-signin-password-390.dc.html",
+    "d203-signin-password-390-dark.dc.html",
+    "d203-signin-refused-1280.dc.html",
+    "d203-signin-refused-1280-dark.dc.html",
+    "d203-signin-refused-390.dc.html",
+    "d203-signin-refused-390-dark.dc.html",
+    "d203-signup-password-1280.dc.html",
+    "d203-signup-password-1280-dark.dc.html",
+    "d203-signup-password-390.dc.html",
+    "d203-signup-password-390-dark.dc.html",
+    "d203-suspended-1280.dc.html",
+    "d203-suspended-1280-dark.dc.html",
+    "d203-suspended-390.dc.html",
+    "d203-suspended-390-dark.dc.html",
+    "d203-terms-1280.dc.html",
+    "d203-terms-1280-dark.dc.html",
+    "d203-terms-390.dc.html",
+    "d203-terms-390-dark.dc.html",
+    "d203-verify-sent-1280.dc.html",
+    "d203-verify-sent-1280-dark.dc.html",
+    "d203-verify-sent-390.dc.html",
+    "d203-verify-sent-390-dark.dc.html",
+    "d206-auto-move-1280.dc.html",
+    "d206-auto-move-1280-dark.dc.html",
+    "d206-auto-move-390.dc.html",
+    "d206-auto-move-390-dark.dc.html",
+    "d206-notifications-empty-1280.dc.html",
+    "d206-notifications-empty-1280-dark.dc.html",
+    "d206-notifications-empty-390.dc.html",
+    "d206-notifications-empty-390-dark.dc.html",
+    "d206-notifications-unread-1280.dc.html",
+    "d206-notifications-unread-1280-dark.dc.html",
+    "d206-notifications-unread-390.dc.html",
+    "d206-notifications-unread-390-dark.dc.html",
+    "d206-push-1280.dc.html",
+    "d206-push-1280-dark.dc.html",
+    "d206-push-390.dc.html",
+    "d206-push-390-dark.dc.html",
+    "d206-recap-1280.dc.html",
+    "d206-recap-1280-dark.dc.html",
+    "d206-recap-390.dc.html",
+    "d206-recap-390-dark.dc.html",
+    "d207-delete-1280.dc.html",
+    "d207-delete-1280-dark.dc.html",
+    "d207-delete-390.dc.html",
+    "d207-delete-390-dark.dc.html",
+    "d207-export-1280.dc.html",
+    "d207-export-1280-dark.dc.html",
+    "d207-export-390.dc.html",
+    "d207-export-390-dark.dc.html",
+    "d207-legal-1280.dc.html",
+    "d207-legal-1280-dark.dc.html",
+    "d207-legal-390.dc.html",
+    "d207-legal-390-dark.dc.html",
+    "d207-notifications-1280.dc.html",
+    "d207-notifications-1280-dark.dc.html",
+    "d207-notifications-390.dc.html",
+    "d207-notifications-390-dark.dc.html",
+    "d207-support-access-1280.dc.html",
+    "d207-support-access-1280-dark.dc.html",
+    "d207-support-access-390.dc.html",
+    "d207-support-access-390-dark.dc.html",
+    "d208-ats-1280.dc.html",
+    "d208-ats-1280-dark.dc.html",
+    "d208-ats-390.dc.html",
+    "d208-ats-390-dark.dc.html",
+    "d208-audit-1280.dc.html",
+    "d208-audit-1280-dark.dc.html",
+    "d208-audit-390.dc.html",
+    "d208-audit-390-dark.dc.html",
+    "d208-invites-1280.dc.html",
+    "d208-invites-1280-dark.dc.html",
+    "d208-invites-390.dc.html",
+    "d208-invites-390-dark.dc.html",
+    "d208-mail-health-1280.dc.html",
+    "d208-mail-health-1280-dark.dc.html",
+    "d208-mail-health-390.dc.html",
+    "d208-mail-health-390-dark.dc.html",
+    "d208-reveal-1280.dc.html",
+    "d208-reveal-1280-dark.dc.html",
+    "d208-reveal-390.dc.html",
+    "d208-reveal-390-dark.dc.html",
+    "d208-reveal-active-1280.dc.html",
+    "d208-reveal-active-1280-dark.dc.html",
+    "d208-reveal-active-390.dc.html",
+    "d208-reveal-active-390-dark.dc.html",
+    "d208-support-access-1280.dc.html",
+    "d208-support-access-1280-dark.dc.html",
+    "d208-support-access-390.dc.html",
+    "d208-support-access-390-dark.dc.html",
+    "d208-user-1280.dc.html",
+    "d208-user-1280-dark.dc.html",
+    "d208-user-390.dc.html",
+    "d208-user-390-dark.dc.html",
+    "d208-users-1280.dc.html",
+    "d208-users-1280-dark.dc.html",
+    "d208-users-390.dc.html",
+    "d208-users-390-dark.dc.html",
+    "d292-calendar-empty-1280.dc.html",
+    "d292-calendar-empty-1280-dark.dc.html",
+    "d292-calendar-empty-390.dc.html",
+    "d292-calendar-empty-390-dark.dc.html",
+    "d292-calendar-entry-1280.dc.html",
+    "d292-calendar-entry-1280-dark.dc.html",
+    "d292-calendar-entry-390.dc.html",
+    "d292-calendar-entry-390-dark.dc.html",
+    "d292-calendar-month-1280.dc.html",
+    "d292-calendar-month-1280-dark.dc.html",
+    "d292-calendar-month-390.dc.html",
+    "d292-calendar-month-390-dark.dc.html",
+    "d310-settings-nav-1280.dc.html",
+    "d310-settings-nav-1280-dark.dc.html",
+    "d310-settings-nav-390.dc.html",
+    "d310-settings-nav-390-dark.dc.html",
+    "pricing-1280.dc.html",
+    "pricing-1280-dark.dc.html",
+    "pricing-390.dc.html",
+    "pricing-390-dark.dc.html",
+    "bill-users-1280.dc.html",
+    "bill-users-1280-dark.dc.html",
+    "bill-users-390.dc.html",
+    "bill-users-390-dark.dc.html",
+    "bill-refund-1280.dc.html",
+    "bill-refund-1280-dark.dc.html",
+    "bill-refund-390.dc.html",
+    "bill-refund-390-dark.dc.html",
+    "bill-recon-1280.dc.html",
+    "bill-recon-1280-dark.dc.html",
+    "bill-recon-390.dc.html",
+    "bill-recon-390-dark.dc.html",
+    "bill-margin-1280.dc.html",
+    "bill-margin-1280-dark.dc.html",
+    "bill-margin-390.dc.html",
+    "bill-margin-390-dark.dc.html",
+    "w5-admin-ats.dc.html",
+    "w5-admin-audit.dc.html",
+    "w5-admin-invites.dc.html",
+    "w5-admin-mail-health.dc.html",
+    "w5-admin-reveal-active.dc.html",
+    "w5-admin-reveal.dc.html",
+    "w5-admin-support-access.dc.html",
+    "w5-admin-user.dc.html",
+    "w5-admin-users.dc.html",
+    "w5-auto-move.dc.html",
+    "w5-board-card-mail.dc.html",
+    "w5-calendar-empty.dc.html",
+    "w5-calendar-entry.dc.html",
+    "w5-calendar-month.dc.html",
+    "w5-code-paste-sheet.dc.html",
+    "w5-code-wait-home.dc.html",
+    "w5-consent.dc.html",
+    "w5-forgot-password.dc.html",
+    "w5-inbox-address.dc.html",
+    "w5-inbox-empty.dc.html",
+    "w5-inbox-list.dc.html",
+    "w5-inbox-thread.dc.html",
+    "w5-onb.dc.html",
+    "w5-profile-forwarding.dc.html",
+    "w5-push.dc.html",
+    "w5-recap.dc.html",
+    "w5-reset-password.dc.html",
+    "w5-settings-delete.dc.html",
+    "w5-settings-export.dc.html",
+    "w5-settings-legal.dc.html",
+    "w5-settings-nav.dc.html",
+    "w5-settings-notifications.dc.html",
+    "w5-settings-support-access.dc.html",
+    "w5-signin-password.dc.html",
+    "w5-signin-refused.dc.html",
+    "w5-signup-password.dc.html",
+    "w5-suspended.dc.html",
+    "w5-verify-sent.dc.html"
+  ],
+  "pages": [
+    {
+      "id": "landing",
+      "name": "Landing"
+    },
+    {
+      "id": "auth",
+      "name": "Sign In"
+    },
+    {
+      "id": "onboarding",
+      "name": "Onboarding, States & 404"
+    },
+    {
+      "id": "app",
+      "name": "Home & Job Board"
+    },
+    {
+      "id": "screens",
+      "name": "App screens"
+    },
+    {
+      "id": "flows",
+      "name": "Live Tab"
+    },
+    {
+      "id": "legal",
+      "name": "Privacy & Terms"
+    },
+    {
+      "id": "email",
+      "name": "Email & brand assets"
+    },
+    {
+      "id": "system",
+      "name": "Design system"
+    },
+    {
+      "id": "pricing",
+      "name": "Pricing"
+    }
+  ],
+  "title": "Overture Design Canvas"
+}

@@ -11,6 +11,7 @@ import { useHomeData } from "../lib/home-api.ts";
 import { CodePasteSheet } from "../components/code-paste-sheet.tsx";
 import type { CodePasteMode } from "../components/code-paste-sheet.tsx";
 import { HomeActivity } from "../components/home-activity.tsx";
+import { HomeBillingNotice } from "../components/home-billing-notice.tsx";
 import { HomeChart } from "../components/home-chart.tsx";
 import { HomeCheckIn } from "../components/home-checkin.tsx";
 import { HomeCodeWait } from "../components/home-code-wait.tsx";
@@ -166,6 +167,13 @@ export function HomePage() {
           }}
           serverNow={codeWaits?.now}
           wait={wait}
+        />
+      )}
+      {paused || home === undefined ? null : (
+        <HomeBillingNotice
+          applicationsLeft={home.applicationsLeft}
+          endingGrant={home.endingGrant}
+          planApplications={home.planApplications}
         />
       )}
       {paused || home === undefined ? null : <HomeReadyCard ready={home.ready} />}

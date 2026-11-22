@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overture design system</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+body{margin:0;background:#F3EEE4}
+.ov{--bg:#F3EEE4;--bg2:#ECE6DA;--card:#FBF8F2;--well:#E9E3D8;--ink:#151311;--mut:#5E5850;--line:rgba(21,19,17,.14);--line2:rgba(21,19,17,.28);--hl:rgba(255,255,255,.55);--acc:#D2561F;--acct:#A9431A;--accbg:rgba(210,86,31,.10);--hold:#8E3A2C;--holdbg:#EFD9D3;--ok:#3F6B52;--okbg:#DDE7DE;--btn:var(--ink);--btnink:#FBF8F2;--btnh:#3A3631;--scrim:rgba(21,19,17,.16);--sh:0 1px 0 rgba(21,19,17,.10),0 12px 24px -18px rgba(21,19,17,.38);--lift:0 1px 0 rgba(21,19,17,.10),0 28px 56px -26px rgba(21,19,17,.46);--shc:rgba(21,19,17,.5);--ez:cubic-bezier(.2,.7,.2,1)}
+.ov.dark{--bg:#191714;--bg2:#1E1C19;--card:#221F1C;--well:#2A2723;--ink:#F2EDE4;--mut:#ADA69B;--line:rgba(242,237,228,.14);--line2:rgba(242,237,228,.26);--hl:rgba(255,255,255,.04);--acc:#F0743A;--acct:#F37D44;--accbg:rgba(240,116,58,.16);--hold:#E58A78;--holdbg:#40261F;--ok:#8DBFA2;--okbg:#25352B;--btn:var(--ink);--btnink:#191714;--btnh:#FFFBF2;--scrim:rgba(0,0,0,.38);--sh:0 1px 0 rgba(0,0,0,.4),0 12px 26px -20px rgba(0,0,0,.8);--lift:0 1px 0 rgba(0,0,0,.45),0 30px 60px -26px rgba(0,0,0,.8);--shc:rgba(0,0,0,.7)}
+.ov{background:var(--bg);color:var(--ink);font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.ov *{box-sizing:border-box}
+.ov a{color:inherit;text-decoration:none}
+.ov h1,.ov h2,.ov h3,.ov h4,.ov p{margin:0}
+.serif{font-family:'Instrument Serif','Newsreader',Georgia,serif;font-weight:400;letter-spacing:-.005em}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-weight:400}
+.num{font-variant-numeric:tabular-nums}
+.it{font-style:italic}
+.wrap{max-width:1296px;margin:0 auto;padding:0 clamp(20px,4vw,72px)}
+.sec{padding:84px 0;border-top:1px solid var(--line)}
+.sec>.wrap>h2{font:400 clamp(40px,4.4vw,60px)/1.02 'Instrument Serif',Georgia,serif;letter-spacing:-.015em}
+.sec .lead{max-width:720px;color:var(--mut);margin-top:12px;font-size:15.5px}
+.sn{font:italic 400 22px/1 'Instrument Serif',Georgia,serif;color:var(--mut);margin-right:14px}
+h3.sub{font:400 28px/1.1 'Instrument Serif',Georgia,serif;margin:44px 0 6px}
+.note{font-size:12.5px;color:var(--mut);max-width:760px}
+.grid{display:grid;gap:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:var(--sh)}
+.rule{border:0;border-top:1px solid var(--line);box-shadow:0 1px 0 var(--hl);margin:0}
+.eyebrow{font:600 11px 'Plus Jakarta Sans',sans-serif;letter-spacing:.15em;text-transform:uppercase;color:var(--mut)}
+.lbl{font:600 10.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+.code{font:400 12px/1.5 'IBM Plex Mono',monospace}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{font:600 10.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);text-align:left;padding:10px 12px 10px 0;border-bottom:1px solid var(--line2)}
+.tbl td{padding:11px 12px 11px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl td.m{font:400 12px/1.5 'IBM Plex Mono',monospace}
+.sw{display:inline-block;width:44px;height:30px;border-radius:5px;border:1px solid var(--line2);vertical-align:middle}
+.dk{border-radius:10px;border:1px solid var(--line2);padding:26px;margin-top:20px}
+.pillrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.sp{display:flex;flex-direction:column;gap:10px}
+.sp .cap{font:400 11px 'IBM Plex Mono',monospace;color:var(--mut)}
+/* shipped components */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 18px;border-radius:6px;background:var(--btn);color:var(--btnink)!important;font:600 13.5px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--btn);cursor:pointer}
+.btn.is-h{background:var(--btnh);border-color:var(--btnh)}
+.btn2{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 16px;border-radius:6px;background:transparent;color:var(--ink);font:600 13.5px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--line2);cursor:pointer}
+.btn2.is-h{background:var(--well)}
+.btng{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 14px;border-radius:6px;background:transparent;color:var(--mut);font:600 13.5px 'Plus Jakarta Sans',sans-serif;border:1px solid transparent;cursor:pointer}
+.btng.is-h{background:var(--well);color:var(--ink)}
+.ibtn{width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--line2);background:var(--card);color:var(--ink);cursor:pointer;position:relative}
+.ibtn.is-h{background:var(--well)}
+.is-f{outline:2px solid var(--ink);outline-offset:3px}
+.is-d{opacity:.45;cursor:not-allowed}
+.field{display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;border:1px solid var(--line2);border-radius:6px;background:var(--card);width:260px}
+.field span.v{flex:1;font:500 13.5px 'Plus Jakarta Sans',sans-serif}
+kbd{font:500 11.5px 'Plus Jakarta Sans',sans-serif;color:var(--mut);border:1px solid var(--line2);border-radius:4px;padding:1px 6px;background:var(--bg)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:999px;font:600 12px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--line2);background:var(--bg);color:var(--ink)}
+.src{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font:600 11px 'Plus Jakarta Sans',sans-serif;border:1px solid var(--ink);color:var(--ink);background:var(--card);white-space:nowrap}
+.src.sv{border-style:dashed;border-color:var(--line2);color:var(--mut)}
+.badge{min-width:20px;height:20px;padding:0 6px;border-radius:10px;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.stamp{display:inline-flex;align-items:center;gap:7px;padding:4px 12px;border:1.5px solid var(--acc);border-radius:4px;color:var(--acct);font:700 11.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.16em;text-transform:uppercase;transform:rotate(-3deg)}
+.dotn{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--acc);flex:none}
+.kc{display:block;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:13px 14px 12px;box-shadow:var(--sh);width:260px}
+.kc.h{border-color:var(--line2)}
+.kc.sel{border-color:var(--ink);box-shadow:var(--sh),0 0 0 1px var(--ink)}
+.mk{flex:none;display:flex;align-items:center;justify-content:center;background:var(--ink);color:var(--bg);font-family:'Instrument Serif',Georgia,serif;font-style:italic;border-radius:5px;width:24px;height:24px;font-size:15px}
+.seg{min-height:34px;padding:0 15px;border:0;background:transparent;color:var(--mut);font:600 12.5px 'Plus Jakarta Sans',sans-serif;border-radius:5px;cursor:pointer}
+.seg.on{background:var(--card);color:var(--ink);box-shadow:var(--sh)}
+.tab{min-height:44px;padding:0 2px;margin-right:22px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--mut);font:600 13.5px 'Plus Jakarta Sans',sans-serif;cursor:pointer;white-space:nowrap}
+.tab.on{color:var(--ink);border-bottom-color:var(--ink)}
+.stg{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line2);background:var(--card);color:var(--ink);font:600 13.5px 'Plus Jakarta Sans',sans-serif;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.stg.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.ni{display:flex;align-items:center;gap:12px;min-height:40px;padding:0 12px;border-radius:6px;border:1px solid transparent;color:var(--mut);font-weight:500;font-size:14px;width:230px;position:relative}
+.ni.h{background:var(--well);color:var(--ink)}
+.ni.on{background:var(--card);color:var(--ink);border-color:var(--line);box-shadow:var(--sh)}
+.ni.on::before{content:'';position:absolute;left:-1px;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--acc)}
+.tb{flex:1;min-width:0;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--mut);font-size:10.5px;font-weight:600;position:relative}
+.tb.on{color:var(--ink)}
+.tb.on::before{content:'';position:absolute;top:0;left:22%;right:22%;height:2px;background:var(--acc);border-radius:0 0 2px 2px}
+.toast{display:flex;align-items:flex-start;gap:12px;width:340px;padding:14px 16px;background:var(--card);border:1px solid var(--line2);border-radius:8px;box-shadow:var(--lift)}
+.tgl .ic-sun{display:none}
+.ov.dark .tgl .ic-sun{display:block}.ov.dark .tgl .ic-moon{display:none}
+.mo-dot{position:relative;height:2px;background:var(--line2);width:100%;margin:22px 0}
+.mo-dot i{position:absolute;top:-4.5px;left:0;width:11px;height:11px;border-radius:50%;background:var(--acc);animation:demo 3.2s var(--ez) infinite}
+@keyframes demo{0%{left:0;opacity:0}10%{opacity:1}90%{opacity:1}100%{left:calc(100% - 11px);opacity:0}}
+@media (prefers-reduced-motion: reduce){.mo-dot i{animation:none;left:calc(100% - 11px);opacity:1}}
+.jh{display:flex;align-items:center;gap:14px}
+.jt{font-size:28px;line-height:1.05}
+.jm{font-size:13.5px;color:var(--mut);margin-top:3px}
+.jl{margin-top:12px;font-size:11.5px;color:var(--mut)}
+.ring{position:relative;width:56px;height:56px;flex:none}
+.ring svg{position:absolute;inset:0;width:100%;height:100%}
+.ring span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:23px;line-height:1}
+.evh{display:grid;grid-template-columns:1fr 18px 1fr;gap:0 8px;margin-top:16px}
+.evs{margin-top:6px;display:flex;flex-direction:column;gap:8px}
+.ev{display:grid;grid-template-columns:1fr 18px 1fr;gap:0 8px;align-items:center;line-height:1.3}
+.ask{font-size:12.5px;color:var(--mut)}
+.fact{font-size:13px;font-weight:600}
+.evc{position:relative;height:0;border-top:1px dotted var(--line2)}
+.evc::after{content:'';position:absolute;right:-2px;top:-3.5px;width:5px;height:5px;border-radius:50%;background:var(--ink)}
+.jcx{background:var(--card);border:1px solid var(--line2);border-radius:12px;box-shadow:var(--lift);padding:22px 24px 20px;width:480px;max-width:100%}
+.rci{border-top:1px solid var(--line2);padding-top:12px;margin-top:16px}
+.reason{font:italic 400 18px/1.2 'Instrument Serif',Georgia,serif;color:var(--mut)}
+.tally{display:flex;justify-content:center;align-items:baseline;gap:14px;height:36px;font:600 13px 'Plus Jakarta Sans',sans-serif;color:var(--mut)}
+.tally b{font:italic 400 26px/1 'Instrument Serif',Georgia,serif;margin-left:4px}
+.tally .ta{color:var(--acct)}
+.menu{width:230px;background:var(--card);border:1px solid var(--line2);border-radius:8px;box-shadow:var(--lift);padding:4px}
+.menu .opt{display:flex;align-items:center;justify-content:space-between;min-height:36px;padding:0 10px;border-radius:5px;font-size:13.5px;font-weight:500}
+.menu .opt.h{background:var(--well)}
+.menu .opt.sl{font-weight:600}
+.err{border-color:var(--hold)}
+@media (max-width:760px){.tbl{display:block;overflow-x:auto}}
+</style>
+</helmet>
+<div class="ov">
+<section style="padding:64px 0 56px"><div class="wrap"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:20px 40px"><span style="display:inline-flex;align-items:center;gap:12px"><svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--ink)"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--bg)" stroke-width="1.5"/><path d="M16 5.5v21" stroke="var(--acc)" stroke-width="1.5" stroke-linecap="round"/></svg><span class="serif" style="font-size:31px;line-height:1;letter-spacing:-.01em;color:var(--ink)">Overture</span></span><span class="mono" style="font-size:12.5px;color:var(--mut)">v0.2 · Ember · light and dark · 1/3</span></div><h1 class="serif" style="font-size:clamp(44px,6.4vw,92px);line-height:.96;letter-spacing:-.022em;margin-top:44px">Overture design system · <span class="it">v0.2</span> · 1/3</h1><p class="lead" style="max-width:760px;color:var(--mut);margin-top:20px;font-size:17px">The contract for every board and every build. Values here are the ones shipped on the landing, Home and Job Board boards, not intentions. Paper and serif italics carry the human side; ink hairlines, sans and mono timestamps show the precise machinery; orange marks the moment Overture acts.</p><nav aria-label="Sections" style="display:flex;flex-wrap:wrap;gap:8px 24px;margin-top:30px"><a href="#brand" style="font-weight:600;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line2)"><span class="serif it" style="margin-right:6px;color:var(--mut)">1</span>Brand</a><a href="#colour" style="font-weight:600;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line2)"><span class="serif it" style="margin-right:6px;color:var(--mut)">2</span>Colour</a><a href="#type" style="font-weight:600;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line2)"><span class="serif it" style="margin-right:6px;color:var(--mut)">3</span>Typography</a><span style="font-size:14px;padding:6px 0;color:var(--mut)"><span class="serif it" style="margin-right:6px">4</span>Space and layout</span><span style="font-size:14px;padding:6px 0;color:var(--mut)"><span class="serif it" style="margin-right:6px">5</span>Shape and depth</span><span style="font-size:14px;padding:6px 0;color:var(--mut)"><span class="serif it" style="margin-right:6px">6</span>Iconography</span><span style="font-size:14px;padding:6px 0;color:var(--mut)"><span class="serif it" style="margin-right:6px">7</span>Motion</span><span style="font-size:14px;padding:6px 0;color:var(--mut)"><span class="serif it" style="margin-right:6px">8</span>Components</span><span style="font-size:14px;padding:6px 0;color:var(--mut)"><span class="serif it" style="margin-right:6px">9</span>Voice</span><span style="font-size:14px;padding:6px 0;color:var(--mut)"><span class="serif it" style="margin-right:6px">10</span>Accessibility</span></nav></div></section>
+<section class="sec" id="brand"><div class="wrap">
+<h2><span class="sn">1</span>Brand</h2>
+<p class="lead">The mark is an ink square holding a ring, with one orange stroke through it. It appears beside or above the Overture wordmark, set in Instrument Serif. Nothing else carries the orange stroke.</p>
+
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr));margin-top:36px">
+<div class="card" style="padding:32px;display:flex;flex-direction:column;gap:26px;align-items:flex-start;background:#F3EEE4;color:#151311">
+<p class="lbl" style="color:#5E5850">On paper · beside</p><span style="display:inline-flex;align-items:center;gap:16px"><svg width="48" height="48" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#151311"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="#F3EEE4" stroke-width="1.5"/><path d="M16 5.5v21" stroke="#D2561F" stroke-width="1.5" stroke-linecap="round"/></svg><span class="serif" style="font-size:43px;line-height:1;letter-spacing:-.01em;color:#151311">Overture</span></span>
+<p class="lbl" style="color:#5E5850;margin-top:6px">On paper · stacked</p><span style="display:inline-flex;flex-direction:column;align-items:center;gap:8px"><svg width="64" height="64" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#151311"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="#F3EEE4" stroke-width="1.5"/><path d="M16 5.5v21" stroke="#D2561F" stroke-width="1.5" stroke-linecap="round"/></svg><span class="serif" style="font-size:35px;line-height:1;color:#151311">Overture</span></span>
+</div>
+<div style="padding:32px;display:flex;flex-direction:column;gap:26px;align-items:flex-start;background:#151311;border-radius:8px;border:1px solid rgba(21,19,17,.5)">
+<p class="lbl" style="color:rgba(251,248,242,.74)">On ink · beside</p><span style="display:inline-flex;align-items:center;gap:16px"><svg width="48" height="48" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#FBF8F2"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="#151311" stroke-width="1.5"/><path d="M16 5.5v21" stroke="#D2561F" stroke-width="1.5" stroke-linecap="round"/></svg><span class="serif" style="font-size:43px;line-height:1;letter-spacing:-.01em;color:#FBF8F2">Overture</span></span>
+<p class="lbl" style="color:rgba(251,248,242,.74);margin-top:6px">On ink · stacked</p><span style="display:inline-flex;flex-direction:column;align-items:center;gap:8px"><svg width="64" height="64" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#FBF8F2"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="#151311" stroke-width="1.5"/><path d="M16 5.5v21" stroke="#D2561F" stroke-width="1.5" stroke-linecap="round"/></svg><span class="serif" style="font-size:35px;line-height:1;color:#FBF8F2">Overture</span></span>
+</div>
+</div>
+
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr));margin-top:20px">
+<div class="card" style="padding:28px">
+<p class="eyebrow">Construction</p>
+<div style="display:flex;gap:28px;align-items:center;margin-top:18px;flex-wrap:wrap">
+<div style="position:relative;width:176px;height:176px;background:var(--well);border-radius:6px;display:flex;align-items:center;justify-content:center">
+<div style="position:absolute;inset:0;border:1px dashed var(--line2);border-radius:6px"></div>
+<div style="width:88px;height:88px"><svg width="88" height="88" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--ink)"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--bg)" stroke-width="1.5"/><path d="M16 5.5v21" stroke="var(--acc)" stroke-width="1.5" stroke-linecap="round"/></svg></div></div>
+<table class="tbl" style="max-width:420px"><tr><th>Part</th><th>Value</th></tr>
+<tr><td>Square</td><td class="m">32 × 32, radius 7, ink</td></tr>
+<tr><td>Ring</td><td class="m">r 8.5, 1.5 stroke, paper</td></tr>
+<tr><td>Stroke</td><td class="m">x 16, y 5.5 to 26.5, 1.5, round cap, orange</td></tr>
+<tr><td>Clear space</td><td class="m">½ mark on every side</td></tr>
+<tr><td>Gap, beside</td><td class="m">0.34 × mark; wordmark 0.9 × mark</td></tr>
+<tr><td>Minimum</td><td class="m">mark 16 px · lockup 96 px wide</td></tr></table>
+</div></div>
+<div class="card" style="padding:28px">
+<p class="eyebrow">What it means</p>
+<p class="serif" style="font-size:28px;line-height:1.15;margin-top:14px">The O is the opening. The orange stroke is <span class="it">the one move Overture makes for you.</span></p>
+<p class="note" style="margin-top:14px">The same rule runs through the product: orange appears only at the moment Overture acts (Applying, Submitted, the active step, the travelling dot). It is never decoration.</p>
+<p class="eyebrow" style="margin-top:26px">Sizes in use</p>
+<div style="display:flex;align-items:flex-end;gap:22px;margin-top:14px;color:var(--ink)"><svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--ink)"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--bg)" stroke-width="1.5"/><path d="M16 5.5v21" stroke="var(--acc)" stroke-width="1.5" stroke-linecap="round"/></svg><svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--ink)"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--bg)" stroke-width="1.5"/><path d="M16 5.5v21" stroke="var(--acc)" stroke-width="1.5" stroke-linecap="round"/></svg><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--ink)"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--bg)" stroke-width="1.5"/><path d="M16 5.5v21" stroke="var(--acc)" stroke-width="1.5" stroke-linecap="round"/></svg><svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--ink)"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--bg)" stroke-width="1.5"/><path d="M16 5.5v21" stroke="var(--acc)" stroke-width="1.5" stroke-linecap="round"/></svg><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--ink)"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--bg)" stroke-width="1.5"/><path d="M16 5.5v21" stroke="var(--acc)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+<p class="note" style="margin-top:10px">24 · 26 · 28 · 30 · 32 px (nav 32, sidebar 30, mobile 28, footer 26, rail 34).</p>
+</div></div>
+
+<h3 class="sub">Don't</h3>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(230px,100%),1fr))">
+<div class="card" style="padding:18px"><div style="height:64px;display:flex;align-items:center;justify-content:center;"><svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--ink)"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--bg)" stroke-width="1.5"/><path d="M16 5.5v21" stroke="var(--ink)" stroke-width="1.5" stroke-linecap="round"/></svg></div><p style="margin-top:12px;font-size:13px">Do not recolour the stroke. It is always orange.</p></div><div class="card" style="padding:18px"><div style="height:64px;display:flex;align-items:center;justify-content:center;transform:rotate(12deg)"><svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--ink)"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--bg)" stroke-width="1.5"/><path d="M16 5.5v21" stroke="var(--acc)" stroke-width="1.5" stroke-linecap="round"/></svg></div><p style="margin-top:12px;font-size:13px">Do not rotate or tilt the mark.</p></div><div class="card" style="padding:18px"><div style="height:64px;display:flex;align-items:center;justify-content:center;transform:scaleX(1.5)"><svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--ink)"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--bg)" stroke-width="1.5"/><path d="M16 5.5v21" stroke="var(--acc)" stroke-width="1.5" stroke-linecap="round"/></svg></div><p style="margin-top:12px;font-size:13px">Do not stretch or squash.</p></div><div class="card" style="padding:18px"><div style="height:64px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 6px 10px rgba(210,86,31,.7))"><svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--ink)"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--bg)" stroke-width="1.5"/><path d="M16 5.5v21" stroke="var(--acc)" stroke-width="1.5" stroke-linecap="round"/></svg></div><p style="margin-top:12px;font-size:13px">No glow, gradient or shadow effects.</p></div><div class="card" style="padding:18px"><div style="height:64px;display:flex;align-items:center;justify-content:center;background:linear-gradient(90deg,#D2561F,#8E3A2C);border-radius:6px"><svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#FBF8F2"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="#151311" stroke-width="1.5"/><path d="M16 5.5v21" stroke="#D2561F" stroke-width="1.5" stroke-linecap="round"/></svg></div><p style="margin-top:12px;font-size:13px">Do not place it on busy or coloured grounds.</p></div><div class="card" style="padding:18px"><div style="height:64px;display:flex;align-items:center;justify-content:center;"><span style="display:inline-flex;align-items:center;gap:10px"><svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--ink)"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--bg)" stroke-width="1.5"/><path d="M16 5.5v21" stroke="var(--acc)" stroke-width="1.5" stroke-linecap="round"/></svg><span style="font:800 24px/1 Arial,sans-serif;letter-spacing:.02em">OVERTURE</span></span></div><p style="margin-top:12px;font-size:13px">Do not change the wordmark typeface.</p></div>
+</div>
+</div></section>
+
+<section class="sec" id="colour"><div class="wrap">
+<h2><span class="sn">2</span>Colour</h2>
+<p class="lead">Ink, paper and one orange. Greys are warm neutrals, not brown. The palette is called Ember and is the only palette. Dark mode is its inverse: ink ground, paper text. In v0.2 the dark ground is lifted one step (page #191714, card #221F1C, well #2A2723, muted text #ADA69B) so it reads softer without losing the ink feel. Small orange text on dark (signal-text) moves from #F0743A to #F37D44 to keep 4.5:1 on the lifted surfaces; the orange fill, ink and status hues are unchanged.</p>
+<div class="card" style="margin-top:32px;padding:26px 28px;border-color:var(--ink)"><p class="serif" style="font-size:30px;line-height:1.15">Orange marks only the moment Overture acts.</p>
+<p class="note" style="margin-top:8px;max-width:820px">Applying, Submitted, the active step, the travelling dot, the Applied tray, the logo stroke. Not links, not hover, not focus, not decoration. Small orange text uses <span class="mono">acct</span>, never <span class="mono">acc</span>, because acc is 3.6:1 on paper.</p></div>
+
+<h3 class="sub">Tokens</h3>
+<p class="note">Left to right: light, dark swatch; internal name and its shadcn name; hex; role. In CSS the internal names are variables on the root class (<span class="mono">.ov</span> and <span class="mono">.ov.dark</span>). The build writes the shadcn names as the same values in <span class="mono">:root</span> and <span class="mono">.dark</span>.</p>
+<table class="tbl" style="margin-top:14px"><tr><th>Swatch</th><th>Name</th><th>Light<br>Dark</th><th>Role</th></tr><tr><td><span class="sw" style="background:#F3EEE4"></span> <span class="sw" style="background:#191714"></span></td><td class="m">bg<br><span style="color:var(--mut)">--background</span></td><td class="m">#F3EEE4<br>#191714</td><td>Page ground</td></tr><tr><td><span class="sw" style="background:#ECE6DA"></span> <span class="sw" style="background:#1E1C19"></span></td><td class="m">bg2<br><span style="color:var(--mut)">--sidebar</span></td><td class="m">#ECE6DA<br>#1E1C19</td><td>Sidebar, alternate bands</td></tr><tr><td><span class="sw" style="background:#FBF8F2"></span> <span class="sw" style="background:#221F1C"></span></td><td class="m">card<br><span style="color:var(--mut)">--card, --popover</span></td><td class="m">#FBF8F2<br>#221F1C</td><td>Cards, sheets, fields</td></tr><tr><td><span class="sw" style="background:#E9E3D8"></span> <span class="sw" style="background:#2A2723"></span></td><td class="m">well<br><span style="color:var(--mut)">--muted, --secondary, --accent</span></td><td class="m">#E9E3D8<br>#2A2723</td><td>Wells, hover and selected surfaces</td></tr><tr><td><span class="sw" style="background:#151311"></span> <span class="sw" style="background:#F2EDE4"></span></td><td class="m">ink<br><span style="color:var(--mut)">--foreground, --primary, --ring</span></td><td class="m">#151311<br>#F2EDE4</td><td>Text, primary button, focus ring</td></tr><tr><td><span class="sw" style="background:#5E5850"></span> <span class="sw" style="background:#ADA69B"></span></td><td class="m">mut<br><span style="color:var(--mut)">--muted-foreground</span></td><td class="m">#5E5850<br>#ADA69B</td><td>Secondary text</td></tr><tr><td><span class="sw" style="background:#D2561F"></span> <span class="sw" style="background:#F0743A"></span></td><td class="m">acc<br><span style="color:var(--mut)">--signal</span></td><td class="m">#D2561F<br>#F0743A</td><td>Orange: fills, strokes, large text. The moment Overture acts</td></tr><tr><td><span class="sw" style="background:#A9431A"></span> <span class="sw" style="background:#F37D44"></span></td><td class="m">acct<br><span style="color:var(--mut)">--signal-text</span></td><td class="m">#A9431A<br>#F37D44</td><td>Orange for small text</td></tr><tr><td><span class="sw" style="background:#8E3A2C"></span> <span class="sw" style="background:#E58A78"></span></td><td class="m">hold<br><span style="color:var(--mut)">--hold, --destructive</span></td><td class="m">#8E3A2C<br>#E58A78</td><td>A Hold: needs you</td></tr><tr><td><span class="sw" style="background:#3F6B52"></span> <span class="sw" style="background:#8DBFA2"></span></td><td class="m">ok<br><span style="color:var(--mut)">--ok</span></td><td class="m">#3F6B52<br>#8DBFA2</td><td>Screening, Interviewing, Offer</td></tr><tr><td><span class="sw" style="background:linear-gradient(#FBF8F2,#FBF8F2);position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:rgba(21,19,17,.14)"></span></span> <span class="sw" style="background:#221F1C;position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:rgba(242,237,228,.14)"></span></span></td><td class="m">line<br><span style="color:var(--mut)">--border</span></td><td class="m">rgba(21,19,17,.14)<br>rgba(242,237,228,.14)</td><td>Hairline, default</td></tr><tr><td><span class="sw" style="background:linear-gradient(#FBF8F2,#FBF8F2);position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:rgba(21,19,17,.28)"></span></span> <span class="sw" style="background:#221F1C;position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:rgba(242,237,228,.26)"></span></span></td><td class="m">line2<br><span style="color:var(--mut)">--input</span></td><td class="m">rgba(21,19,17,.28)<br>rgba(242,237,228,.26)</td><td>Control outline, strong hairline</td></tr><tr><td><span class="sw" style="background:linear-gradient(#FBF8F2,#FBF8F2);position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:rgba(255,255,255,.55)"></span></span> <span class="sw" style="background:#221F1C;position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:rgba(255,255,255,.04)"></span></span></td><td class="m">hl<br><span style="color:var(--mut)">(none)</span></td><td class="m">rgba(255,255,255,.55)<br>rgba(255,255,255,.04)</td><td>Letterpress highlight under rules</td></tr><tr><td><span class="sw" style="background:linear-gradient(#FBF8F2,#FBF8F2);position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:rgba(210,86,31,.10)"></span></span> <span class="sw" style="background:#221F1C;position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:rgba(240,116,58,.16)"></span></span></td><td class="m">accbg<br><span style="color:var(--mut)">--signal-soft</span></td><td class="m">rgba(210,86,31,.10)<br>rgba(240,116,58,.16)</td><td>Tinted chip and tray background</td></tr><tr><td><span class="sw" style="background:linear-gradient(#FBF8F2,#FBF8F2);position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:#EFD9D3"></span></span> <span class="sw" style="background:#221F1C;position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:#40261F"></span></span></td><td class="m">holdbg<br><span style="color:var(--mut)">--hold-soft</span></td><td class="m">#EFD9D3<br>#40261F</td><td>Hold pill background</td></tr><tr><td><span class="sw" style="background:linear-gradient(#FBF8F2,#FBF8F2);position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:#DDE7DE"></span></span> <span class="sw" style="background:#221F1C;position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:#25352B"></span></span></td><td class="m">okbg<br><span style="color:var(--mut)">--ok-soft</span></td><td class="m">#DDE7DE<br>#25352B</td><td>Status pill background</td></tr><tr><td><span class="sw" style="background:linear-gradient(#FBF8F2,#FBF8F2);position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:rgba(21,19,17,.16)"></span></span> <span class="sw" style="background:#221F1C;position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:rgba(0,0,0,.38)"></span></span></td><td class="m">scrim<br><span style="color:var(--mut)">--overlay</span></td><td class="m">rgba(21,19,17,.16)<br>rgba(0,0,0,.38)</td><td>Behind sheets</td></tr></table>
+
+<h3 class="sub">Status colours</h3>
+<div class="pillrow" style="margin-top:10px">
+<span class="pill" style="background:var(--holdbg);color:var(--hold);border-color:transparent">Hold · needs you</span>
+<span class="pill" style="background:var(--okbg);color:var(--ok);border-color:transparent">Screening</span>
+<span class="pill" style="background:var(--okbg);color:var(--ok);border-color:transparent">Interviewing</span>
+<span class="pill" style="background:var(--okbg);color:var(--ok);border-color:transparent">Offer</span>
+<span class="pill" style="background:var(--accbg);color:var(--acct);border-color:transparent">Submitted</span>
+<span class="pill" style="background:var(--well);color:var(--mut);border-color:transparent">Closed</span></div>
+<p class="note" style="margin-top:10px">Statuses differ in lightness as well as hue. Hold is the only red. Applied and Submitted are the only orange states. On the Job Board the stage rule colours are: Hold <span class="mono">hold</span>, Applied <span class="mono">acc</span>, Screening, Interviewing and Offer <span class="mono">ok</span>, Closed <span class="mono">mut</span>. App chrome (selected cards, active tabs, meters, KPI numerals) uses ink, not orange.</p>
+
+<h3 class="sub">Contrast</h3>
+<p class="note">Measured on the shipped hex values. Text needs 4.5:1 (3:1 at 24 px and above). Shaded rows are non-text or large-text only.</p>
+<table class="tbl" style="margin-top:14px"><tr><th>Pair</th><th>Light</th><th></th><th>Dark</th><th></th></tr><tr><td class="m">ink on bg</td><td class="m">16.0:1</td><td>AA</td><td class="m">15.3:1</td><td>AA</td></tr><tr><td class="m">ink on card</td><td class="m">17.5:1</td><td>AA</td><td class="m">14.1:1</td><td>AA</td></tr><tr><td class="m">mut on bg</td><td class="m">6.1:1</td><td>AA</td><td class="m">7.4:1</td><td>AA</td></tr><tr><td class="m">mut on card</td><td class="m">6.6:1</td><td>AA</td><td class="m">6.8:1</td><td>AA</td></tr><tr><td class="m">mut on well</td><td class="m">5.5:1</td><td>AA</td><td class="m">6.2:1</td><td>AA</td></tr><tr><td class="m">mut on bg2</td><td class="m">5.7:1</td><td>AA</td><td class="m">7.0:1</td><td>AA</td></tr><tr><td class="m">acct on bg (small text)</td><td class="m">5.2:1</td><td>AA</td><td class="m">6.7:1</td><td>AA</td></tr><tr><td class="m">acct on card</td><td class="m">5.7:1</td><td>AA</td><td class="m">6.1:1</td><td>AA</td></tr><tr><td class="m">acct on signal-soft</td><td class="m">5.0:1</td><td>AA</td><td class="m">4.8:1</td><td>AA</td></tr><tr><td class="m">acc on bg (large text, strokes only)</td><td class="m">3.6:1</td><td>AA</td><td class="m">6.2:1</td><td>AA</td></tr><tr><td class="m">hold on card</td><td class="m">7.1:1</td><td>AA</td><td class="m">6.4:1</td><td>AA</td></tr><tr><td class="m">hold on hold-soft</td><td class="m">5.6:1</td><td>AA</td><td class="m">5.4:1</td><td>AA</td></tr><tr><td class="m">ok on card</td><td class="m">5.8:1</td><td>AA</td><td class="m">7.9:1</td><td>AA</td></tr><tr><td class="m">ok on ok-soft</td><td class="m">4.8:1</td><td>AA</td><td class="m">6.2:1</td><td>AA</td></tr><tr><td class="m">bg on ink (primary button)</td><td class="m">16.0:1</td><td>AA</td><td class="m">15.3:1</td><td>AA</td></tr><tr><td class="m">band text on band (light: paper on ink)</td><td class="m">17.5:1</td><td>AA</td><td class="m">16.0:1</td><td>AA</td></tr><tr><td class="m">band muted on band (74% / 72%)</td><td class="m">9.8:1</td><td>AA</td><td class="m">6.9:1</td><td>AA</td></tr></table>
+
+<h3 class="sub">shadcn variable block</h3>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(420px,100%),1fr))">
+<pre class="card code" style="margin:0;padding:18px 20px;white-space:pre-wrap">:root {
+  --background: #F3EEE4;  --foreground: #151311;
+  --card: #FBF8F2;  --card-foreground: #151311;
+  --popover: #FBF8F2;  --popover-foreground: #151311;
+  --primary: #151311;  --primary-foreground: #FBF8F2;
+  --secondary: #E9E3D8;  --secondary-foreground: #151311;
+  --muted: #E9E3D8;  --muted-foreground: #5E5850;
+  --accent: #E9E3D8;  --accent-foreground: #151311;
+  --destructive: #8E3A2C;
+  --border: rgba(21,19,17,.14);
+  --input: rgba(21,19,17,.28);
+  --ring: #151311;
+  --signal: #D2561F;  --signal-text: #A9431A;
+  --signal-soft: rgba(210,86,31,.10);
+  --hold: #8E3A2C;  --hold-soft: #EFD9D3;
+  --ok: #3F6B52;  --ok-soft: #DDE7DE;
+  --sidebar: #ECE6DA;
+  --radius: 8px;
+}</pre>
+<pre class="card code" style="margin:0;padding:18px 20px;white-space:pre-wrap">.dark {
+  --background: #191714;  --foreground: #F2EDE4;
+  --card: #221F1C;  --card-foreground: #F2EDE4;
+  --popover: #221F1C;  --popover-foreground: #F2EDE4;
+  --primary: #F2EDE4;  --primary-foreground: #221F1C;
+  --secondary: #2A2723;  --secondary-foreground: #F2EDE4;
+  --muted: #2A2723;  --muted-foreground: #ADA69B;
+  --accent: #2A2723;  --accent-foreground: #F2EDE4;
+  --destructive: #E58A78;
+  --border: rgba(242,237,228,.14);
+  --input: rgba(242,237,228,.26);
+  --ring: #F2EDE4;
+  --signal: #F0743A;  --signal-text: #F37D44;
+  --signal-soft: rgba(240,116,58,.16);
+  --hold: #E58A78;  --hold-soft: #40261F;
+  --ok: #8DBFA2;  --ok-soft: #25352B;
+  --sidebar: #1E1C19;
+}</pre></div>
+<p class="note" style="margin-top:10px">Chart colours: <span class="mono">--chart-1</span> signal (applications line and area), <span class="mono">--chart-2</span> ink, <span class="mono">--chart-3</span> ok, <span class="mono">--chart-4</span> muted-foreground, <span class="mono">--chart-5</span> hold. The primary button is ink with paper text in both modes.</p>
+</div></section>
+
+<section class="sec" id="type"><div class="wrap">
+<h2><span class="sn">3</span>Typography</h2>
+<p class="lead">Three families, each with one job. Sizes are px at desktop; the 390 column is what changes on a phone.</p>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));margin-top:32px">
+<div class="card" style="padding:26px"><p class="serif" style="font-size:76px;line-height:1">Aa <span class="it">Aa</span></p><p class="eyebrow" style="margin-top:14px">Instrument Serif · 400 and italic</p><p class="note" style="margin-top:6px">Display, headings, big numerals, scores. A high-contrast editorial serif that carries the human, written-by-hand side of the product. Falls back to Newsreader, Georgia.</p></div>
+<div class="card" style="padding:26px"><p style="font:600 70px/1 'Plus Jakarta Sans',sans-serif;letter-spacing:-.02em">Aa</p><p class="eyebrow" style="margin-top:14px">Plus Jakarta Sans · 400 500 600 700</p><p class="note" style="margin-top:6px">All UI: body, buttons, labels, tables. Clean and round, reads well at 12 px. The precise, automated side. Falls back to system-ui.</p></div>
+<div class="card" style="padding:26px"><p class="mono" style="font-size:66px;line-height:1.1">Aa</p><p class="eyebrow" style="margin-top:14px">IBM Plex Mono · 400</p><p class="note" style="margin-top:6px">Timestamps, folio marks and "via Greenhouse" only. A typewriter note, sparingly, never for paragraphs.</p></div>
+</div>
+<h3 class="sub">Scale</h3>
+<table class="tbl"><tr><th>Style</th><th>Desktop size</th><th>At 390</th><th>Line height</th><th>Tracking</th><th>Sample</th></tr><tr><td style="width:170px"><b style="font-weight:600">Display</b><br><span style="color:var(--mut);font-size:12px">Instrument Serif 400, italic for one emphasis</span></td><td class="m">clamp(56px, 6.8vw, 100px) · 124 at 1700+</td><td class="m">56 at 390</td><td class="m">.96</td><td class="m">-.022em</td><td style="min-width:260px"><span style="font:400 64px/.96 'Instrument Serif',serif;letter-spacing:-.022em">The job hunt, <span class="it">handled.</span></span></td></tr><tr><td style="width:170px"><b style="font-weight:600">H1 page</b><br><span style="color:var(--mut);font-size:12px">Instrument Serif 400</span></td><td class="m">42</td><td class="m">32 at 390</td><td class="m">1.05</td><td class="m">-.005em</td><td style="min-width:260px"><span style="font:400 42px/1.05 'Instrument Serif',serif">Good morning, <span class="it">Maya.</span></span></td></tr><tr><td style="width:170px"><b style="font-weight:600">H2 section</b><br><span style="color:var(--mut);font-size:12px">Instrument Serif 400</span></td><td class="m">clamp(40px, 4.6vw, 64px)</td><td class="m">40</td><td class="m">1.02</td><td class="m">-.015em</td><td style="min-width:260px"><span style="font:400 52px/1.02 'Instrument Serif',serif;letter-spacing:-.015em">How it <span class="it">works</span></span></td></tr><tr><td style="width:170px"><b style="font-weight:600">H2 band</b><br><span style="color:var(--mut);font-size:12px">Instrument Serif 400</span></td><td class="m">clamp(34px, 5vw, 72px) · 72 to 92 at 1700+</td><td class="m">34</td><td class="m">.98</td><td class="m">-.02em</td><td style="min-width:260px"><span style="font:400 44px/.98 'Instrument Serif',serif;letter-spacing:-.02em">Applies where companies actually <span class="it">hire.</span></span></td></tr><tr><td style="width:170px"><b style="font-weight:600">H3 card title</b><br><span style="color:var(--mut);font-size:12px">Instrument Serif 400</span></td><td class="m">29 (large tile 42)</td><td class="m">29</td><td class="m">1.1</td><td class="m">-.005em</td><td style="min-width:260px"><span style="font:400 29px/1.1 'Instrument Serif',serif">Searches for you, every 3 hours.</span></td></tr><tr><td style="width:170px"><b style="font-weight:600">H4 panel / role</b><br><span style="color:var(--mut);font-size:12px">Instrument Serif 400</span></td><td class="m">25 to 28 (cards 21 to 24)</td><td class="m">22 to 24</td><td class="m">1.12</td><td class="m">-.005em</td><td style="min-width:260px"><span style="font:400 26px/1.12 'Instrument Serif',serif">Senior Backend Engineer</span></td></tr><tr><td style="width:170px"><b style="font-weight:600">KPI numeral</b><br><span style="color:var(--mut);font-size:12px">Instrument Serif, tabular</span></td><td class="m">56 · 66 at 1700+</td><td class="m">40</td><td class="m">1</td><td class="m">-.005em</td><td style="min-width:260px"><span style="font:400 56px/1 'Instrument Serif',serif;font-variant-numeric:tabular-nums"><span class="num">127</span></span></td></tr><tr><td style="width:170px"><b style="font-weight:600">Match score</b><br><span style="color:var(--mut);font-size:12px">Instrument Serif italic, tabular</span></td><td class="m">25 (card) to 46 (hero)</td><td class="m">27</td><td class="m">.9 to 1</td><td class="m">-.005em</td><td style="min-width:260px"><span style="font:italic 400 44px/.9 'Instrument Serif',serif;font-variant-numeric:tabular-nums"><span class="it num">91</span></span></td></tr><tr><td style="width:170px"><b style="font-weight:600">Body</b><br><span style="color:var(--mut);font-size:12px">Plus Jakarta Sans 400</span></td><td class="m">15 landing · 14 app · 19 hero lead</td><td class="m">15 · 14</td><td class="m">1.6 · 1.5</td><td class="m">0</td><td style="min-width:260px"><span style="font:400 15px/1.6 'Plus Jakarta Sans',sans-serif">Overture finds roles that fit your resume.</span></td></tr><tr><td style="width:170px"><b style="font-weight:600">Small</b><br><span style="color:var(--mut);font-size:12px">Plus Jakarta Sans 400 to 500</span></td><td class="m">12.5 to 13.5</td><td class="m">12.5 to 13</td><td class="m">1.4 to 1.5</td><td class="m">0</td><td style="min-width:260px"><span style="font:400 13px/1.5 'Plus Jakarta Sans',sans-serif;color:var(--mut)">Not found in your resume or saved answers.</span></td></tr><tr><td style="width:170px"><b style="font-weight:600">Label / eyebrow</b><br><span style="color:var(--mut);font-size:12px">Plus Jakarta Sans 600 uppercase</span></td><td class="m">10.5 to 11.5</td><td class="m">10.5 to 11</td><td class="m">1.4</td><td class="m">.14 to .16em</td><td style="min-width:260px"><span style="font:600 11px/1.4 'Plus Jakarta Sans',sans-serif;letter-spacing:.15em;text-transform:uppercase;color:var(--mut)">Today's limits</span></td></tr><tr><td style="width:170px"><b style="font-weight:600">Button / UI</b><br><span style="color:var(--mut);font-size:12px">Plus Jakarta Sans 600</span></td><td class="m">13.5 app · 14 to 15 landing</td><td class="m">14</td><td class="m">1</td><td class="m">0</td><td style="min-width:260px"><span style="font:600 14px/1 'Plus Jakarta Sans',sans-serif">Start free</span></td></tr><tr><td style="width:170px"><b style="font-weight:600">Mono</b><br><span style="color:var(--mut);font-size:12px">IBM Plex Mono 400</span></td><td class="m">11 to 12.5</td><td class="m">11</td><td class="m">1.5 to 1.7</td><td class="m">0</td><td style="min-width:260px"><span style="font:400 12px/1.6 'IBM Plex Mono',monospace">11:42 pm · via Greenhouse</span></td></tr></table>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));margin-top:30px">
+<div class="card" style="padding:22px 24px"><p class="eyebrow">Italic emphasis rule</p><p class="note" style="margin-top:8px">One word or short phrase per headline is set in serif italic, at the end: "The job hunt, <i class="serif">handled.</i>" Never a whole sentence, never in the sans. Italic is also used for scores, counts in trays, folio and figure marks.</p></div>
+<div class="card" style="padding:22px 24px"><p class="eyebrow">Tabular numerals rule</p><p class="note" style="margin-top:8px">Anything that counts, scores, dates or prices uses <span class="mono">font-variant-numeric: tabular-nums</span> (class <span class="mono">.num</span>): KPI values, Match scores, salaries, usage meters, tray counts, timestamps.</p></div>
+</div>
+<div class="dk ov dark" style="background:var(--bg);color:var(--ink)"><p class="eyebrow">Dark</p><p class="serif" style="font-size:54px;line-height:1;margin-top:10px">The job hunt, <span class="it">handled.</span></p><p style="margin-top:10px;color:var(--mut)">Same scale and weights. Paper text on ink; muted text 7.4:1 on the dark ground.</p></div>
+</div></section>
+
+<footer class="wrap" style="padding:30px 0 40px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px 24px;font-size:12.5px;color:var(--mut)"><span>Overture design system · v0.2 · 1/3</span><span class="serif it" style="font-size:14px">Set in Instrument Serif, Plus Jakarta Sans and IBM Plex Mono.</span></footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":7400}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

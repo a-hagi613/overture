@@ -12,6 +12,12 @@ import {
   GRANT_EXPIRY_JOB_KIND,
   runGrantExpirySweep,
 } from "./billing/expiry.ts";
+import { createSpendGate } from "./billing/spend.ts";
+import {
+  BILLING_RECONCILE_JOB_KIND,
+  billingReconcileJobHandler,
+  ensureReconcileQueued,
+} from "./billing/reconcile.ts";
 import { seedDemoAccount } from "./demo/seed.ts";
 import { createDemoSafeMailSender } from "./demo/mail-guard.ts";
 import { isDemoUser } from "./demo/role.ts";
@@ -21,6 +27,7 @@ import { openDatabase } from "./platform/db/client.ts";
 import { migrateDatabase } from "./platform/db/migrate.ts";
 import { createClock } from "./platform/ports/clock.ts";
 import { createRandom } from "./platform/ports/random.ts";
+import { createEventLoopLagMonitor } from "./platform/event-loop-lag.ts";
 import { createBackupMonitor } from "./platform/ports/backup.ts";
 import { installProcessGuards } from "./platform/process-guard.ts";
 import { enqueueJob, recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
@@ -171,6 +178,15 @@ const sdk = startTelemetry({
 
 const { db } = openDatabase(databasePath);
 
+createEventLoopLagMonitor({
+  onLag: (lagMs) => {
+    logError(
+      "event-loop-lag",
+      new Error(`the event loop was blocked for ${String(Math.round(lagMs))} ms`),
+    );
+  },
+}).start();
+
 migrateDatabase(db, "drizzle");
 
 if (env.NODE_ENV !== "production") {
@@ -197,6 +213,22 @@ void backups.run(shutdownController.signal);
 
 const mailSender = createDemoSafeMailSender(db, createMailSender(db, clock));
 const payments = createPayments(clock);
+
+const spendGate = createSpendGate({
+  db,
+  clock,
+  gated: payments !== null || env.PUBLIC_SIGNUP_ENABLED,
+});
+
+if (env.PUBLIC_SIGNUP_ENABLED) {
+  logInfo(
+    "auth",
+    payments === null
+      ? "public sign-up is on without billing: no account can prepare Applications until it has a grant"
+      : "public sign-up is on; paid work needs a trial card or a plan",
+  );
+}
+
 const pushSender = createPushSender(env, clock);
 const mailboxes = createMailboxService(db, clock, env.INBOUND_HMAC_SECRET ?? "", env.MAIL_DOMAIN);
 
@@ -245,6 +277,7 @@ const jobSingletons = [
   CHECKIN_SWEEP_JOB_KIND,
   DISPATCH_TICK_JOB_KIND,
   GRANT_EXPIRY_JOB_KIND,
+  BILLING_RECONCILE_JOB_KIND,
   LIVE_CHECK_JOB_KIND,
   WORKABLE_INGEST_JOB_KIND,
   RETENTION_JOB_KIND,
@@ -257,6 +290,10 @@ recoverStaleLocks(db, clock, jobSingletons);
 ensureCheckinSweepQueued(db, clock);
 
 ensureGrantExpiryQueued(db, clock);
+
+if (payments !== null) {
+  ensureReconcileQueued(db, clock);
+}
 
 ensureRetentionQueued(db, clock);
 
@@ -310,11 +347,11 @@ if (env.DEMO_LOGIN_ENABLED) {
 const planner = createPlanner({ clock, db, random });
 
 const preparation = createPreparationService({
-  billingEnabled: payments !== null,
   db,
   clock,
   llm: anthropicLlmPort,
   personal,
+  spendGate,
   source: createGreenhouseQuestionSource(env.GREENHOUSE_FEED_BASE_URL),
   greenhouseBoardOrigin: env.GREENHOUSE_BOARD_BASE_URL,
   plainFormReader: createPlainFormReader({
@@ -387,6 +424,7 @@ const prepDailyJobHandlers: JobHandlers = {
           llm: anthropicLlmPort,
           personal,
           preparation,
+          spendGate,
         },
         userId,
         since ?? clock.now(),
@@ -463,7 +501,14 @@ const mailPersonal = createPersonalCrypto(
   env.MASTER_KEY_CURRENT,
 );
 
-const resumes = createResumeService({ db, clock, llm: anthropicLlmPort, objects, personal });
+const resumes = createResumeService({
+  db,
+  clock,
+  llm: anthropicLlmPort,
+  objects,
+  personal,
+  spendGate,
+});
 
 const exports = createExportService({
   appOrigin,
@@ -497,6 +542,7 @@ const mailMoves = createMailMoves({
   degraded: degradedFlag,
   llm: anthropicLlmPort,
   personal: mailPersonal,
+  spendGate,
 });
 
 const resolver = createMailDnsResolver(env.INBOUND_DNS_SERVER);
@@ -735,6 +781,15 @@ const retentionJobHandlers: JobHandlers = {
   },
 };
 
+const reconcileJobHandlers: JobHandlers =
+  payments === null
+    ? {}
+    : {
+        [BILLING_RECONCILE_JOB_KIND]: async (payload: string) => {
+          await billingReconcileJobHandler({ clock, db, payments }, payload);
+        },
+      };
+
 const billingJobHandlers: JobHandlers = {
   [GRANT_EXPIRY_JOB_KIND]: async () => {
     try {
@@ -743,6 +798,7 @@ const billingJobHandlers: JobHandlers = {
       ensureGrantExpiryQueued(db, clock);
     }
   },
+  ...reconcileJobHandlers,
 };
 
 const allJobHandlers: JobHandlers = {
@@ -778,6 +834,7 @@ const worker = startJobWorker(
     registerEnqueueNotify(notify);
   },
   jobSingletons,
+  { startupSettleMs: env.JOBS_STARTUP_SETTLE_MS },
 );
 
 if (activeDispatcher !== null) {
@@ -813,6 +870,7 @@ const app = createApp({
   auth,
   objects,
   llm: anthropicLlmPort,
+  spendGate,
   mailboxes,
   resolver,
   liveCheckAddress: liveCheckAddressValue,
@@ -825,9 +883,12 @@ const app = createApp({
   eraser,
   exports,
   payments,
+  shutdown: shutdownController.signal,
 });
 
 const SERVER_IDLE_TIMEOUT_ABOVE_SSE_HEARTBEAT_SECONDS = 60;
+const SHUTDOWN_QUIET_GRACE_MS = 2000;
+const SHUTDOWN_HARD_EXIT_GRACE_MS = 1000;
 
 const server = Bun.serve({
   port: env.PORT,
@@ -837,8 +898,6 @@ const server = Bun.serve({
 
 process.stdout.write(`overture listening on ${String(server.port)}\n`);
 
-const SHUTDOWN_HARD_EXIT_GRACE_MS = 1000;
-
 let shuttingDown = false;
 
 async function stopTelemetry() {
@@ -847,41 +906,54 @@ async function stopTelemetry() {
   } catch {}
 }
 
-function handleShutdown() {
+async function quietGrace(budgetMs: number) {
+  const graceMs = Math.min(SHUTDOWN_QUIET_GRACE_MS, Math.max(50, Math.floor(budgetMs / 4)));
+
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, graceMs).unref();
+  });
+}
+
+function handleShutdown(signal: string) {
   if (shuttingDown) {
+    logInfo("shutdown", `${signal}: already stopping`);
+
     return;
   }
 
   shuttingDown = true;
+
+  const startedAt = performance.now();
+  const budgetMs = env.KILL_TIMEOUT_MS;
+
+  logInfo("shutdown", `${signal}: draining with a ${String(budgetMs)} ms budget`);
+
   shutdownController.abort();
 
-  const killTimer = setTimeout(() => {
-    void server.stop(true);
-    void stopTelemetry();
-  }, env.KILL_TIMEOUT_MS);
-
   const hardExitTimer = setTimeout(() => {
+    logError("shutdown", new Error(`still running after ${String(budgetMs)} ms; forcing exit`));
     process.kill(process.pid, "SIGKILL");
-  }, env.KILL_TIMEOUT_MS + SHUTDOWN_HARD_EXIT_GRACE_MS);
+  }, budgetMs + SHUTDOWN_HARD_EXIT_GRACE_MS);
 
-  killTimer.unref();
   hardExitTimer.unref();
 
   void (async () => {
     try {
-      await server.stop(false);
-      await worker.drain(env.KILL_TIMEOUT_MS);
+      await Promise.race([server.stop(false), quietGrace(budgetMs)]);
+      await server.stop(true);
+      await worker.drain(Math.max(0, budgetMs - (performance.now() - startedAt)));
       catalogWorker.stop();
-
-      clearTimeout(killTimer);
     } catch (error) {
       logError("shutdown", error);
     } finally {
-      await stopTelemetry();
+      await Promise.race([stopTelemetry(), quietGrace(budgetMs)]);
+      logInfo("shutdown", `stopped in ${String(Math.round(performance.now() - startedAt))} ms`);
     }
   })();
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, handleShutdown);
+  process.on(signal, () => {
+    handleShutdown(signal);
+  });
 }

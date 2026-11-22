@@ -8,6 +8,7 @@ import type { Auth } from "../auth/index.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
+import type { SpendGate } from "../billing/spend.ts";
 
 import { env } from "../config/env.ts";
 import { demoLocked } from "../demo/guard.ts";
@@ -62,6 +63,7 @@ export function createProfileRoutes(deps: {
   objects: ObjectStore;
   llm: LlmPort;
   reviews: ReviewService;
+  spendGate?: SpendGate | undefined;
 }) {
   const { db, clock, auth, objects, llm } = deps;
 
@@ -71,7 +73,14 @@ export function createProfileRoutes(deps: {
     env.MASTER_KEY_CURRENT,
   );
 
-  const resumesService = createResumeService({ db, clock, objects, personal, llm });
+  const resumesService = createResumeService({
+    db,
+    clock,
+    objects,
+    personal,
+    llm,
+    spendGate: deps.spendGate,
+  });
 
   const factsService = createFactService({ db, clock, personal });
 

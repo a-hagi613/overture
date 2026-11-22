@@ -67,10 +67,34 @@ export function suspendedUserWithEmail(db: AppDatabase, email: string) {
   const user = db
     .select({ suspendedAt: users.suspendedAt })
     .from(users)
-    .where(eq(users.email, email.trim().toLowerCase()))
+    .where(eq(users.mailbox, normaliseEmail(email)))
     .get();
 
   return user !== undefined && user.suspendedAt !== null;
+}
+
+export function verifiedUserWithEmail(db: AppDatabase, email: string) {
+  return (
+    db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.mailbox, normaliseEmail(email)), eq(users.emailVerified, true)))
+      .get() ?? null
+  );
+}
+
+export function deleteUnverifiedUserWithEmail(db: AppDatabase, email: string) {
+  return db
+    .delete(users)
+    .where(
+      and(
+        eq(users.mailbox, normaliseEmail(email)),
+        eq(users.emailVerified, false),
+        isNull(users.suspendedAt),
+      ),
+    )
+    .returning({ id: users.id })
+    .all();
 }
 
 export function isSuspendedUser(db: AppDatabase, userId: string) {

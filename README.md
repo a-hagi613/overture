@@ -8,6 +8,12 @@ through the employer's real ATS form in a managed cloud browser.
 The walking skeleton exists: Bun and Hono serve the Vite, React 19 and Tailwind SPA shell, SQLite runs
 through Drizzle with migrations applied at boot, and the health route answers at `/api/health`.
 
+## Architecture
+
+![Overture system architecture](diagrams/architecture.png)
+
+Source diagram: [diagrams/architecture.excalidraw](diagrams/architecture.excalidraw)
+
 ## Running it
 
 ```sh
@@ -26,6 +32,7 @@ Checks: `bun run lint`, `bun run lint:config`, `bun run format:check`, `bun run 
 |---|---|
 | GitHub Issues | Specs and tickets: the source of truth for what is being built |
 | `docs/SPEC.md` | Product and architecture reference |
+| `diagrams/` | System architecture Excalidraw diagram and PNG export |
 | `DESIGN.md` | Visual design system, with the canvas boards as the wireframe |
 | `GLOSSARY.md` | The words, used exactly in code, copy, issues and commits |
 | `docs/adr/` | Decisions that are hard to reverse, and why |

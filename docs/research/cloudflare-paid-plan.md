@@ -1,6 +1,6 @@
 # Cloudflare Workers Paid plan: what it can do for Overture under a $5 a month cap
 
-The owner bought Workers Paid ($5 a month) and wants it used where it really helps, with no spend above $5 a month in total. This note lists every product the plan covers, ranks the uses that fit Overture, and answers the cap question. It changes no code.
+The owner bought Workers Paid ($5 a month) and wants it used where it really helps, with no spend above $5 a month in total. This note lists every product the plan covers, ranks the uses that fit Overture, and answers the cap question. It changes no production code; §5 records the measurements behind the one dropped recommendation and the one e2e test that pins them.
 
 All facts below come from `developers.cloudflare.com` pages read on 2026-11-21 (each is linked where it is used). `cloudflare.com/plans` is a script-rendered page and was not read; the developer pricing pages are the same rate card and are the source of record. Overture's own figures come from `docs/SPEC.md`, ADR 0007, 0016, 0024, 0026, 0028 and 0032, and `docs/research/managed-browsers.md`.
 
@@ -47,7 +47,7 @@ Ranked by value for the owner's goals first, then lower effort, then lower risk.
 | 3   | **A cron "sentinel" Worker**: probes `/api/health` from outside Fly, checks the Workable snapshot manifest age (ADR 0032's 26 h alert) so it does not depend on GitHub alone, and pushes to the existing `ALERT_NTFY_URL` | A watcher that is independent of Fly and GitHub                                                                                                                                                                                                                      | S      | Low. At a 5-minute cron it is about 8,640 invocations a month against 10 M.                                                                                                                                                                            |
 | 4   | **Landing and pricing pages on Workers Static Assets**, attached by route patterns for `/` and the marketing paths only                                                              | The marketing pages stay up through Fly deploys (10–30 s of downtime each, SPEC §3.1) and take no load from the 2 GB machine; asset requests are free and unlimited                                                                                                  | M      | Low if routes are explicit patterns, so app traffic never passes through a Worker. ADR 0022 (SPA same origin) is untouched for the app. Needs the M3 landing redraw first.                                                                             |
 | 5   | **A Queue between the Email Worker and `overture-web`**                                                                                                                             | Today `workers/inbound-mail/src/handler.ts` throws if the app answers non-2xx, so mail arriving during a deploy has no retry of its own. A queue retries up to 100 times and keeps messages up to 14 days                                                           | M      | Medium. It touches ADR 0028's signed-MIME path; mail over 128 KB needs an R2 pointer; 3 operations per message (about 333,000 messages a month included).                                                                                              |
-| 6   | **Workers AI for the `email_classify` fallback**                                                                                                                                    | About 2.6 Neurons per call (my estimate: roughly 450 input and 20 output tokens on `@cf/meta/llama-3.1-8b-instruct-fp8-fast` at 4,119 and 34,868 Neurons per M tokens), so about 3,800 calls a day fit in the free 10,000 Neurons. Haiku already costs about $0.0001 a call (SPEC §8.6), so the saving is cents a month | M      | Medium. A weaker model on a path that can move a card forward (SPEC §11.3). Needs its own daily Neuron counter in the app, since free Neurons stop being free at 10,000 a day. Do it only if Haiku cost shows up in the cost review (#184).            |
+| 6   | **Workers AI for the `email_classify` fallback** — **dropped (#287), see §5**                                                                                                        | About 2.1 Neurons per call at the recorded 412 input and 12 output tokens on `@cf/meta/llama-3.1-8b-instruct-fp8-fast` (4,119 and 34,868 Neurons per M tokens), so about 4,700 calls a day fit in the free 10,000 Neurons. Haiku 5.5 already costs 24 µUSD a call (SPEC §8.6), so the saving at today's volume is about 1.4 cents a user-month | M      | Medium. A weaker model on a path that can move a card forward (SPEC §11.3). Needs its own daily Neuron counter in the app, since free Neurons stop being free at 10,000 a day. Dropped: the cost review (#184) puts the line at cents a month and no local Workers AI evidence exists to prove equal accuracy (§5). |
 | 7   | **Do not use Browser Run for sending applications**                                                                                                                                 | See below                                                                                                                                                                                                                                                            | n/a    | High                                                                                                                                                                                                                                                   |
 
 **Browser Run versus Browser Use (ranking 7).** On price Browser Run wins: using the typical 3 browser-minutes an application from `managed-browsers.md`, it is about $0.0045 beyond the free 10 hours, and 10 hours cover about 200 typical applications a month. It does not fit the job, for three documented reasons:
@@ -140,7 +140,7 @@ Layer these. None is exact; together they keep the plan inside its allowances.
    - at 70%: push to the owner's ntfy URL;
    - at 90%: act on what Overture controls, by writing a "degraded" flag the app reads (stop non-essential R2 writes such as export copies, use rules only for `email_classify`, queue mail without retries) and ntfy again.
    - It cannot natively block R2: the only hard action is revoking the R2 API token, which would stop backups, so it must not do that. R2 is therefore kept safe by design (the measured list cost in §2, the lifecycle rules and the 8 GB size alert) and alerted on, not blocked.
-6. **App-side counters for the rest**, matching the existing fail-closed caps in SPEC §8.6: a monthly Email Sending count (3,000 included, refuse above 2,700), and a daily Workers AI Neuron count if ranking 6 is built (stop at 8,000 of 10,000, fall back to rules and Haiku). An AI Gateway spend limit is an optional second belt for Workers AI.
+6. **App-side counters for the rest**, matching the existing fail-closed caps in SPEC §8.6: a monthly Email Sending count (3,000 included, refuse above 2,700). A Workers AI Neuron count is not needed: ranking 6 is dropped (§5). An AI Gateway spend limit is an optional second belt for Workers AI if it is ever revived.
 
 **What "self-stopping" cannot promise:** because the limits are eventually consistent and the usage API is alpha, a sudden spike (a loop, a leaked token) can still cost a few cents to dollars before it is stopped. Cloudflare offers a goal here, not a guarantee, and the owner should treat "never above $5" that way.
 
@@ -156,12 +156,68 @@ For the orchestrator to cut. Order is the ranking above.
 | 4   | App: monthly Email Sending counter                                              | Count sends, refuse above 2,700 a month, alert the owner; tested against the real adapter.                                                                         | none                                                               |
 | 5   | Landing and pricing on Workers Static Assets                                    | Deploy the redrawn marketing pages as static assets with route patterns for the marketing paths only; app traffic never touches the Worker.                        | M3 landing redraw                                                  |
 | 6   | Inbound mail through a Queue                                                    | Email Worker enqueues the signed MIME (R2 pointer above 128 KB); a consumer posts to `/internal/mail/inbound` with retries and a dead-letter queue; update ADR 0028. | 2 (the limit also stops the consumer)                              |
-| 7   | Workers AI `email_classify` trial (optional)                                    | Run the fallback against recorded `.eml` fixtures on Workers AI beside Haiku, compare accuracy, add a daily Neuron counter; adopt only if equal.                   | cost review #184 shows classification spend                        |
+| 7   | ~~Workers AI `email_classify` trial (optional)~~                                | Dropped in #287 (§5): the cost review puts classification spend at 24 µUSD a call and no local Workers AI response exists to prove equal accuracy.                 | closed                                                             |
 | 8   | Revisit Browser Run only if the M1 cost gate fails                              | Small spike: can Browser Run plus a proxy match Browser Use's success rate on the synthetic lab (never real ATS traffic, ADR 0016).                                | M1 cost gate result                                                |
+
+## 5. `email_classify` on Workers AI: measured on the recorded fixtures (issue #287)
+
+**Verdict: do not adopt. Dropped.** `email_classify` stays rules plus Haiku (SPEC §8.6, §11.3) and no Neuron counter is added: no production code changes, only the e2e pin below.
+
+### What was measured, and what was not
+
+Measured locally on 2026-11-21, with no network call (ADR 0016): the nine recorded `.eml` fixtures in `test/e2e/fixtures/mail/` were parsed with `mailparser` exactly as `src/server/inbox/ingest.ts:236-241` does it (code first, then `classifyMail` with the sender's ATS, `src/server/inbox/codes.ts:228-245`), and the one recorded Haiku answer was read from `test/e2e/fixtures/anthropic/email-classify-recording.jsonl`.
+
+**Not measured: Workers AI.** There is no Workers AI binding in `workers/inbound-mail/wrangler.jsonc`, no recorded Workers AI response in the repository, and no Cloudflare account reachable from the development box. The comparison #287 asks for ("adopt only if it is equal") therefore cannot be made on evidence, and no accuracy number below is a Workers AI number. The Neuron figures are arithmetic on Cloudflare's published rates applied to the recorded token counts, not a measured call.
+
+### Accuracy on the recorded fixtures
+
+| Fixture                          | Sender ATS        | Rules label | Needs the model  | Recorded Haiku | Label the product uses |
+| -------------------------------- | ----------------- | ----------- | ---------------- | -------------- | ---------------------- |
+| `acme-reply.eml`                 | none (not an ATS) | `other`     | no               | —              | `other`                |
+| `greenhouse-ack.eml`             | greenhouse        | `ack`       | no               | —              | `ack`                  |
+| `greenhouse-code.eml`            | greenhouse        | `code`      | no               | —              | `code`                 |
+| `greenhouse-interview-brief.eml` | greenhouse        | `interview` | no               | —              | `interview`            |
+| `greenhouse-interview.eml`       | greenhouse        | `interview` | no               | —              | `interview`            |
+| `greenhouse-offer.eml`           | greenhouse        | `offer`     | no               | —              | `offer`                |
+| `greenhouse-rejection.eml`       | greenhouse        | `rejection` | no               | —              | `rejection`            |
+| `greenhouse-unclear.eml`         | greenhouse        | `other`     | yes (ATS sender) | `interview`    | `interview`            |
+| `personio-rejection.eml`         | personio (German) | `rejection` | no               | —              | `rejection`            |
+
+- **Rules alone: 7 of the 9 get a decisive label, and both `other` results are honest.** `acme-reply.eml` is not ATS mail and never reaches the model; `greenhouse-unclear.eml` is the one mail that does.
+- **Rules plus the recorded Haiku answer: 8 of 9 labelled**, with the ninth correctly left `other` because its sender is not an ATS (`src/server/inbox/moves.ts:362`).
+- **Workers AI: 0 of 9 measured.** No fixture, no recorded answer, no local call.
+
+These fixtures are asserted end to end, not just read here: `test/e2e/email-stage-moves.test.ts:413` (the German rejection moves the card with zero model batches) and `:442` (the unsure mail calls the model once and records its cost), with the ack, code, interview, offer and reply fixtures covered by `test/e2e/inbound-mail.test.ts`, `test/e2e/inbox.test.ts` and `test/e2e/flow-28-notifications.test.ts`. #287 adds one table-driven test in `test/e2e/email-stage-moves.test.ts` ("every recorded mail fixture keeps the label the research table records") that forwards all nine through the real inbound path and asserts the "Label the product uses" column, so this table cannot drift without a failing test. No unit test is added: a unit test file needs an invariant on ADR 0013's list, and this classification is already exercised through the real endpoint (ADR 0013).
+
+### Cost, from the recorded tokens and the code's own price row
+
+One classification is 412 input and 12 output tokens in the recording. At the 5.5 batch row the code prices (`batchPricesFor(DEFAULT_ANTHROPIC_MODEL)`, `src/server/platform/llm/models.ts:26-33`: $0.05 and $0.25 per MTok) that is 23.6 µUSD, charged as **24 µUSD a call**, one microdollar above cost-m1 §2.3's $0.000023 from its 360-token estimate.
+
+| Volume                                            | Calls   | Haiku, today | If Workers AI were free | Saving   |
+| ------------------------------------------------- | ------- | ------------ | ----------------------- | -------- |
+| One application (two classifications, cost-m1 §2.3) | 2     | $0.000048    | $0            | $0.000048 |
+| Week plan at its cap (70 applications)             | 140     | $0.0034      | $0            | $0.0034  |
+| Month plan at its cap (300 applications)           | 600     | $0.0144      | $0            | $0.0144  |
+| Ten beta users on Month                            | 6,000   | $0.144       | $0            | $0.14    |
+| 300 Month users, each at 10 a day (M3 ceiling)      | 180,000 | $4.32        | $0.89 (overage only)    | **$3.43** |
+
+The last row is the whole case for adopting: a **$3.43 a month** saving against $10,500 of revenue, and only after a counter, a degraded path and an accuracy proof exist. Ten beta users at the Month plan's cap (the fourth row) is 14 cents a month; below that it is cents. That is exactly the condition #287 gives for skipping.
+
+### The counter would guard a budget the workload cannot reach
+
+One call is about **2.1 Neurons** by Cloudflare's rates (412 × 4,119 + 12 × 34,868 per M tokens), so the free 10,000 Neurons a day is about 4,700 calls and the proposed 8,000 stop is about 3,780. Ten beta users each at the Month plan's 10 applications a day is about 200 calls a day, about 423 Neurons, or 4 % of the daily allowance. A counter and a rules-only degraded path for a beta wave that uses 4 % of the allowance is machinery with no job; if Workers AI is ever revived at M3 volume, the counter belongs in the same pull request as the live comparison, not before it.
+
+### When to revisit
+
+- `/admin/api/llm-usage?purpose=email_classify` (SPEC §13.3) reports more than **$1 a month** over 30 days of real traffic, or
+- a **recorded Workers AI response** for these fixtures exists — an owner-run capture or a daily live check — so accuracy can be compared on the same evidence Haiku is judged on.
+
+Until then the fallback stays on Haiku: it is 24 µUSD a call, it is measured on the fixtures above, and it is the model ADR 0007 and SPEC §8.6 already chose.
 
 ## Not verified
 
 - The alpha billable-usage API response shape was not called; the sentinel ticket must record a real response first.
+- Workers AI's accuracy and Neuron use per classification are unknown: no call was made and no response is recorded (§5). Only the arithmetic on its published rates exists.
 - Whether Workers AI's free 10,000 Neurons a day counts toward an AI Gateway spend limit is not stated on the pages read.
 - The R2 operation counts are measured (§2). Storage size per bucket was not read; the 8 GB alert is the first reading. Re-measure once M2 users arrive and record Class A per user per month (#281).
 - Cloudflare Registrar renewals and any plan on another Cloudflare product (Access, Turnstile, DNS) are outside the Workers plan and not counted here.

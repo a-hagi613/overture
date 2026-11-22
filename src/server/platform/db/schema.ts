@@ -20,19 +20,32 @@ const cascadeUserId = () =>
     .references(() => users.id, { onDelete: "cascade" })
     .notNull();
 
-export const users = sqliteTable("users", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
-  image: text("image"),
-  role: text("role", { enum: ["user", "owner", "demo"] })
-    .notNull()
-    .default("user"),
-  suspendedAt: timestamp("suspended_at"),
-  createdAt: timestamp("created_at").notNull(),
-  updatedAt: timestamp("updated_at").notNull(),
-});
+const mailbox = sql`case
+  when instr(lower(trim(email)), '@') = 0 then lower(trim(email))
+  when lower(substr(lower(trim(email)), instr(lower(trim(email)), '@') + 1)) in ('gmail.com', 'googlemail.com')
+    and replace(substr(substr(lower(trim(email)), 1, instr(lower(trim(email)), '@') - 1), 1, instr(substr(lower(trim(email)), 1, instr(lower(trim(email)), '@') - 1) || '+', '+') - 1), '.', '') <> ''
+  then replace(substr(substr(lower(trim(email)), 1, instr(lower(trim(email)), '@') - 1), 1, instr(substr(lower(trim(email)), 1, instr(lower(trim(email)), '@') - 1) || '+', '+') - 1), '.', '') || '@gmail.com'
+  else lower(trim(email))
+end`;
+
+export const users = sqliteTable(
+  "users",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull().unique(),
+    emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
+    image: text("image"),
+    role: text("role", { enum: ["user", "owner", "demo"] })
+      .notNull()
+      .default("user"),
+    suspendedAt: timestamp("suspended_at"),
+    createdAt: timestamp("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull(),
+    mailbox: text("mailbox").generatedAlwaysAs(mailbox, { mode: "virtual" }),
+  },
+  (table) => [uniqueIndex("users_mailbox_unique").on(table.mailbox)],
+);
 
 export const sessions = sqliteTable("session", {
   id: text("id").primaryKey(),
@@ -788,6 +801,27 @@ export const cardFingerprints = sqliteTable("card_fingerprints", {
   createdAt: integer("created_at").notNull(),
 });
 
+export const subscriptions = sqliteTable(
+  "subscriptions",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    stripeSubscriptionId: text("stripe_subscription_id").notNull(),
+    plan: text("plan", { enum: ["week", "month"] }).notNull(),
+    status: text("status").notNull(),
+    currentPeriodStart: integer("current_period_start").notNull(),
+    currentPeriodEnd: integer("current_period_end").notNull(),
+    cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("subscriptions_stripe_subscription_id_unique").on(t.stripeSubscriptionId),
+    index("subscriptions_user").on(t.userId),
+  ],
+);
+
 export const stripeEvents = sqliteTable("stripe_events", {
   id: text("id").primaryKey(),
   type: text("type").notNull(),
@@ -1203,4 +1237,22 @@ export const ledger = sqliteTable(
     index("ledger_user_created_at").on(t.userId, t.createdAt),
     index("ledger_user_grant_kind").on(t.userId, t.grantId, t.kind),
   ],
+);
+
+export const billingReconciliations = sqliteTable(
+  "billing_reconciliations",
+  {
+    day: text("day").primaryKey(),
+    status: text("status", { enum: ["clean", "mismatch"] }).notNull(),
+    checkedAt: integer("checked_at").notNull(),
+    windowStart: integer("window_start").notNull(),
+    windowEnd: integer("window_end").notNull(),
+    stripeInvoices: integer("stripe_invoices").notNull(),
+    stripeRefunds: integer("stripe_refunds").notNull(),
+    ledgerGrants: integer("ledger_grants").notNull(),
+    ledgerRefunds: integer("ledger_refunds").notNull(),
+    mismatches: integer("mismatches").notNull(),
+    detail: text("detail").notNull().default("{}"),
+  },
+  (t) => [index("billing_reconciliations_checked").on(t.checkedAt)],
 );

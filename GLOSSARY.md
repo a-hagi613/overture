@@ -25,8 +25,14 @@ _Avoid_: preferences, filters
 
 **Verified email**:
 The address a user proved they own by opening the single-use link Overture mailed them. No Application is prepared
-or sent for an unverified address, and an invite is accepted on the first verified sign-in.
+or sent for an unverified address, and an invite, when one exists, is accepted on the first verified sign-in.
 _Avoid_: confirmed address, validated account
+
+**Public sign-up**:
+Any email address can create an account by any enabled method (magic link, Google or LinkedIn), with no invite.
+Turnstile and the per-IP limits still apply, and the account does no paid work until it has Applications from a
+verified trial card, a plan, or an admin grant.
+_Avoid_: open registration, self-serve join
 
 **Demo account**:
 The `role = demo` account (`test@email.com`) that the owner opens from the sign-in page with one click to see
@@ -81,6 +87,16 @@ _Avoid_: failed (in copy), error
 How many more Applications the user's plan allows; one is used only when an Application is confirmed sent.
 _Avoid_: credit, allowance, quota
 
+**Plan**:
+The paid recurring allowance: Week ($12, 70 applications over 7 days) or Month ($35, 300 applications over 30 days).
+It renews until cancelled, unused applications expire at the end of the period, and a failed Application is never charged.
+_Avoid_: tier, subscription level
+
+**Free trial**:
+Three applications at no charge, once per card. The card is verified with no charge, and a keyed fingerprint that is
+not linked to the user stops a second trial.
+_Avoid_: free plan, demo
+
 **Snapshot**:
 The permanent record of exactly what one sent Application said: answers with their sources, the letter, the resume file and the consent.
 _Avoid_: receipt, log
@@ -117,6 +133,12 @@ _Avoid_: action required, blocked
 **Free trial**:
 Three Applications, once per card, for a card verified with Stripe. Nothing is charged. The card is kept as an HMAC of its fingerprint, so it cannot start a second trial even after its account is deleted.
 _Avoid_: credit, promo, bonus, free plan
+
+**Paid work**:
+Any step that calls the LLM or a cloud browser: scoring, preparation, form reads, resume text extraction, email
+classification and sending. It never runs for an account with no Applications left while the spend gate is on, so
+nobody can cost the host money before a verified trial card, a paid plan, or an admin grant.
+_Avoid_: AI work, compute, usage
 
 ## The user's facts
 
@@ -171,6 +193,23 @@ It keeps the queue and history, tells the person once by push and email with the
 the card), lets sends already in flight finish, and clears by itself when a later payment succeeds.
 _Avoid_: payment failure alert, dunning, lockout
 
+**Subscription**:
+Stripe's record of the user's renewing Plan: the Week or Month price it bills now, its status, when the current period
+ends and whether it will be cancelled then. Overture stores what signed Stripe events say and never shortens a paid
+period.
+_Avoid_: membership, recurring order, account
+
+**Cancel at period end**:
+The user stopping the renewal. The subscription ends when the paid period does, and the Applications that period paid
+for stay available until then.
+_Avoid_: cancel now, immediate cancellation
+
+**Reconciliation**:
+The daily check of one UTC day where Stripe's paid invoices and refunds must match the ledger's period grants and
+refunds. It stores the day's result for the admin and alerts the owner on any mismatch; a clean day stores its result
+and alerts nobody.
+_Avoid_: audit, sync, settlement
+
 ## Mail
 
 **Inbox**:
@@ -192,7 +231,9 @@ _Avoid_: wiping, purge, hard delete
 `tryoverture.com` onboarded to Cloudflare Email Sending so Overture can mail any recipient, not only the owner. It adds bounce MX, SPF and DKIM on `cf-bounce.tryoverture.com` and keeps the Email Routing records on the apex; the `mail.sending` live check and the deploy guard verify it once `REQUIRE_EMAIL_SENDING` is on (M2-02).
 
 **Invite**:
-The owner's permission for one email address to join the beta. Accepting it by signing in with that email creates the account and an admin grant of 300 applications over 30 days.
+A pre-approved email address that still joins with an admin grant of 300 applications over 30 days. Public sign-up
+does not need one, but an invite that exists is accepted on the first verified sign-up and its grant is unchanged
+for users who joined in M2. With public sign-up turned off, only the owner and live invites may join.
 _Avoid_: waitlist spot, access code
 
 **Code paste**:
@@ -250,9 +291,9 @@ The daily `live.check` job on `overture-web` that exercises a real form capture 
 _Avoid_: smoke test, canary, health probe
 
 **Provider report**:
-The admin view of send results per browser provider and ATS — attempted, completed, completion rate, challenge and
-code rates, p50/p95 duration, proxy MB and cost per completed Application against the $0.03 gate — plus the synthetic
-lab's results per provider and lab page.
+The admin view of send results per browser provider and ATS over the last 30 days — attempted, completed, completion
+rate, challenge and code rates, p50/p95 duration, proxy MB and cost per completed Application against the $0.03 gate —
+plus the synthetic lab's results per provider and lab page.
 _Avoid_: browser stats, vendor dashboard
 
 **Form probe**:

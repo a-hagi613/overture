@@ -52,6 +52,7 @@ import {
   resumes,
   sessions,
   stripeEvents,
+  subscriptions,
   tagImports,
   users,
 } from "../platform/db/schema.ts";
@@ -396,6 +397,7 @@ const bulkPostingsBody = z.object({
 });
 
 const recordLlmUsageBody = z.object({
+  email: z.email().optional(),
   purpose: z.string().min(1),
   model: z.string().min(1),
   inputTokens: z.number().int().min(0),
@@ -465,6 +467,8 @@ const seedGrantBody = z.object({
   email: z.email(),
   quantity: z.number().int().min(1).max(10_000),
   idempotencyKey: z.string().min(1),
+  source: z.enum(["admin", "period", "trial"]).default("admin"),
+  expiresAt: z.number().int().positive().nullable().optional(),
 });
 
 const ledgerApplicationBody = z.object({
@@ -1545,11 +1549,20 @@ export function createTestRoutes(
   });
 
   routes.post("/llm/usage", zValidator("json", recordLlmUsageBody), (context) => {
-    const { purpose, model, inputTokens, cachedTokens, outputTokens, costMicros } =
+    const { email, purpose, model, inputTokens, cachedTokens, outputTokens, costMicros } =
       context.req.valid("json");
 
+    const user =
+      email === undefined
+        ? undefined
+        : db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.email, lowercased(email)))
+            .get();
+
     recordLlmUsage(db, clock, {
-      userId: null,
+      userId: user?.id ?? null,
       purpose,
       model,
       inputTokens,
@@ -2159,7 +2172,7 @@ export function createTestRoutes(
   });
 
   routes.post("/ledger/grant", zValidator("json", seedGrantBody), async (context) => {
-    const { email, quantity, idempotencyKey } = context.req.valid("json");
+    const { email, quantity, idempotencyKey, source, expiresAt } = context.req.valid("json");
 
     const user = db
       .select()
@@ -2174,9 +2187,11 @@ export function createTestRoutes(
     await retryWhenBusy(
       () =>
         grantApplications(db, clock, {
+          expiresAt: expiresAt ?? (source === "period" ? clock.now() + 30 * 86_400_000 : null),
           idempotencyKey,
           quantity,
-          source: "admin",
+          source,
+          startsAt: source === "period" ? clock.now() : null,
           userId: user.id,
         }),
       "test.ledger.grant",
@@ -3323,6 +3338,7 @@ export function createTestRoutes(
     context.json({
       customers: db.select().from(customers).all(),
       events: db.select().from(stripeEvents).all(),
+      subscriptions: db.select().from(subscriptions).all(),
     }),
   );
 

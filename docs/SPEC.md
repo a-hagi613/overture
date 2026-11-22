@@ -86,10 +86,17 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 - One Fly app, one machine, one volume. `fly scale count` stays 1. Machine: `shared-cpu-2x`, 2 GB; volume 10 GB.
   No runner app: browsers are remote.
 - Same origin for API and SPA. `admin.tryoverture.com` is the same process, routed by host, behind Cloudflare Access.
-- Deploys cause ~10–30 s downtime; `kill_timeout = 300` (Fly's maximum). On `SIGTERM` the process stops claiming
-  jobs and waits for in-flight jobs. A send that has not reached `submit_clicked_at` stops, releases and is
-  rescheduled as `interrupted`, which does not use one of its two tries; a send past it waits for its confirmation
-  signal. Anything still open at exit is recovered by lease expiry (§9.4).
+- Deploys cause ~10–30 s downtime; `kill_timeout = 300` (Fly's maximum) and Litestream's `-exec` wrapper are the
+  two clocks that matter. Litestream gives its child 30 s after the signal before it logs `shutdown timed out after
+  30s` and SIGKILLs it, so the app's own graceful budget (`KILL_TIMEOUT_MS`, 20 s) is deliberately shorter: on
+  `SIGINT`/`SIGTERM` it stops accepting, ends every open `/api/events` stream, waits for in-flight jobs, requeues
+  them, logs `shutdown: stopped in <ms>` and exits 0, with a SIGKILL backstop one second past the budget. A send
+  that has not reached `submit_clicked_at` stops, releases and is rescheduled as `interrupted`, which does not use
+  one of its two tries; a send past it waits for its confirmation signal. Anything still open at exit is recovered
+  by lease expiry (§9.4).
+- After a restart the job worker stays quiet for `JOBS_STARTUP_SETTLE_MS` (5 s): the startup enqueues otherwise wake
+  it in the same second the port opens and the new machine's first health checks compete with a full batch of jobs.
+  Nothing is dropped; the queued work starts a few seconds later.
 - The prerendered marketing pages (`/` and `/pricing`) are deployed as Workers Static Assets
   (`workers/marketing`, ADR 0033) on explicit routes for those paths only, so they stay up through those deploys.
   Every app and API path matches no Worker route and goes straight to `overture-web`; the app's HTML and assets are
@@ -123,6 +130,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | OpenCode Go | LLM (local dev only) | `OPENCODE_API_KEY` | — |
 | Cloudflare Email Sending | outbound mail (magic links, live check, later notices) | `CLOUDFLARE_EMAIL_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (both or neither); `CLOUDFLARE_EMAIL_API_BASE_URL` (test-only override of the real API host) | real adapter; the send endpoint is intercepted by MSW and the request body asserted (`test/e2e/cloudflare-email.test.ts`) |
 | Stripe (M3) | Managed Payments | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_WEEK`, `STRIPE_PRICE_MONTH`; `STRIPE_API_BASE_URL` (test-only override of the real API host) | stripe-mock (Stripe's own local server) + signed webhook fixtures |
+| Public sign-up (M3) | whether an unknown email may sign up without an invite; on from M3 | `PUBLIC_SIGNUP_ENABLED` (default `true`; `false` restores the M2 invite-only gate) | public-sign-up e2e with the Turnstile stub; the invite-only suites set it `false` |
 | Grafana Cloud | logs/metrics/traces | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | local LGTM docker |
 | Web Push | notifications | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | real adapter; push endpoints via MSW |
 | Master key | envelope encryption | `MASTER_KEY_V1` (32 bytes base64), `MASTER_KEY_CURRENT=1` | fixed test key |
@@ -153,7 +161,7 @@ refusal is stamped in `reserve_refused_at` and the cap refusal in `refused_at`, 
 The admin overview shows the month's count and says which of the two stops is in force. Tests reach Cloudflare only
 through MSW (ADR 0013, 0016).
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
-Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set; a half-set pair stops the server at boot and with neither the app boots and runs as in M2. `POST /webhooks/stripe` verifies the `Stripe-Signature` header (HMAC-SHA256 over the timestamped raw body, five-minute window) before it reads or writes any billing row, and a bad or stale signature is refused with 400. `STRIPE_PRICE_WEEK` and `STRIPE_PRICE_MONTH` name the Stripe prices a Checkout session sells; a missing one answers 503 `billing_not_configured` without a Stripe call. What each plan buys is configuration in `src/server/billing/plans.ts`: Week 70 Applications over 7 days, Month 300 over 30 days (ADR 0018); the price itself lives in Stripe and reaches Overture only as a price id. `invoice.paid` grants its period and clears a `plan_ended` or `payment_failed` pause; `invoice.payment_failed` sets `payment_failed` at once. Each transition writes one `paused` notification (pushed to the user's devices) and one email naming the fix in Settings (`Choose a plan` or `Update payment`, never the word `failed`), and a repeated event writes nothing twice. A grant's period end is the plan end: after the expiry sweep leaves the user with no unexpired grant, sending pauses with `plan_ended`. The demo account is never paused, granted or notified, and its billing mutations answer `403 demo_locked` before any Stripe call.
+Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set; a half-set pair stops the server at boot and with neither the app boots and runs as in M2. `POST /webhooks/stripe` verifies the `Stripe-Signature` header (HMAC-SHA256 over the timestamped raw body, five-minute window) before it reads or writes any billing row, and a bad or stale signature is refused with 400. `STRIPE_PRICE_WEEK` and `STRIPE_PRICE_MONTH` name the Stripe prices a Checkout session sells; a missing one answers 503 `billing_not_configured` without a Stripe call. What each plan buys is configuration in `src/server/billing/plans.ts`: Week 70 Applications over 7 days, Month 300 over 30 days (ADR 0018); the price itself lives in Stripe and reaches Overture only as a price id. `invoice.paid` grants its period and clears a `plan_ended` or `payment_failed` pause; `invoice.payment_failed` sets `payment_failed` at once. Each transition writes one `paused` notification (pushed to the user's devices) and one email naming the fix in Settings (`Choose a plan` links to `/settings/billing/plans`, `Update payment` to `/settings/billing`, never the word `failed`), and a repeated event writes nothing twice. A grant's period end is the plan end: after the expiry sweep leaves the user with no unexpired grant, sending pauses with `plan_ended`. The demo account is never paused, granted or notified, and its billing mutations answer `403 demo_locked` before any Stripe call.
 
 ### 3.3 Domains and DNS
 
@@ -243,8 +251,9 @@ data key (§13.2). Drizzle schema in `src/server/**/schema.ts` is the source of 
 ### 5.1 Auth (better-auth managed)
 
 `user` (id, name, email UNIQUE, email_verified, image, role CHECK IN ('user','owner'), suspended_at, created_at,
-updated_at) · `session` · `account` (provider: google, linkedin, credential) · `verification` · `passkey` (owner only)
-· `invites` (id, email_hash UNIQUE, email_enc NULL, invited_by, created_at, accepted_at, accepted_user_id NULL, revoked_at NULL, grant_id NULL) — M1 allowlist = `OWNER_EMAIL`, M2 = invites (§13.1); the invited email is stored hashed and shown to the owner as typed only in the admin, from an encrypted copy sealed under the inviter's data key.
+updated_at, mailbox UNIQUE — generated: Gmail dots and `+tag` removed, `googlemail.com` folded to `gmail.com`, every
+other address only lowered and trimmed) · `session` · `account` (provider: google, linkedin, credential) · `verification` · `passkey` (owner only)
+· `invites` (id, email_hash UNIQUE, email_enc NULL, invited_by, created_at, accepted_at, accepted_user_id NULL, revoked_at NULL, grant_id NULL) — M1 allowlist = `OWNER_EMAIL`; M2 and the `PUBLIC_SIGNUP_ENABLED=false` fallback = invites (§13.1); in M3 anyone may sign up, and an invite still issues its admin grant on first verified sign-in. The invited email is stored hashed and shown to the owner as typed only in the admin, from an encrypted copy sealed under the inviter's data key.
 
 ### 5.2 Profile
 
@@ -294,7 +303,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `checkins` | id, application_id UNIQUE, user_id, due_at, status CHECK IN ('open','answered','expired'), answer CHECK IN ('rejected','interviewing','still_waiting') NULL, created_at |
 | `interview_events` | id, user_id, application_id, message_id, uid, sequence DEFAULT 0, starts_at, ends_at NULL, tz NULL, source CHECK IN ('ics'), created_at; UNIQUE(user_id,uid), INDEX(user_id,starts_at), INDEX(message_id). The interview date parsed from a `text/calendar` attachment on forwarded ATS mail (ADR 0034); `tz` is the IANA `TZID` when `DTSTART` carried one, and a higher `sequence` replaces the row for the same `uid`, while `METHOD:CANCEL`/`STATUS:CANCELLED` deletes it. Mail body text is never parsed |
 | `plan_cache` | id, ats, form_signature, plan JSON (`{readPath, questions}`; each question carries its catalog `question_id`, label, field name, type, options, required and position), hits, failures, updated_at; UNIQUE(ats,form_signature). `hits` counts preparations served from the cache; `failures` counts a cached plan that no longer matched the live form or whose questions no longer exist. It never holds answers: they are rebuilt per user from Facts and Targets |
-| `consent_versions` | version PK (a whole number as text), text, published_at — the exact consent wording each `consent_version` refers to. Rows are never edited: publishing a version appends the next number with its text and date (`scripts/publish-consent-version.ts`), so an accepted version and every Snapshot keep the wording and version they were made under. Version 1 is seeded by migration 0038 |
+| `consent_versions` | version PK (a whole number as text), text, published_at — the exact consent wording each `consent_version` refers to. Rows are never edited: publishing a version appends the next number with its text and date (`scripts/publish-consent-version.ts`), so an accepted version and every Snapshot keep the wording and version they were made under. Version 1 is seeded by migration 0038; version 2 (billing) by migration `0048_consent_v2` |
 
 ### 5.5 Inbox
 
@@ -315,6 +324,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `grants` | id, user_id, source CHECK IN ('trial','period','admin'), quantity, starts_at, expires_at, stripe_invoice_id UNIQUE NULL, created_at |
 | `ledger` | id, user_id, kind CHECK IN ('grant','reserve','commit','release','expire','refund','adjust'), debit_account, credit_account, amount CHECK (amount > 0), grant_id, application_id NULL, idempotency_key UNIQUE, created_at. **Each row is one balanced transfer**, so the ledger is zero-sum by construction. No UPDATE/DELETE (triggers). |
 | `stripe_events` | id PK (Stripe event id), type, received_at, processed_at NULL |
+| `billing_reconciliations` | day PK (UTC date), status CHECK IN ('clean','mismatch'), checked_at, window_start, window_end, stripe_invoices, stripe_refunds, ledger_grants, ledger_refunds, mismatches, detail JSON |
 | `card_fingerprints` | hmac PK (HMAC-SHA256 of the Stripe card fingerprint, keyed by `CARD_FINGERPRINT_SECRET`), trial_used_at, created_at — **no foreign key**; survives account deletion |
 
 Accounts: `issued`, `available`, `reserved`, `used`, `expired`. The same no-UPDATE rule and the same user-gone `BEFORE DELETE` condition as snapshots apply. Transfers: grant `issued→available`; reserve
@@ -335,10 +345,28 @@ set in one transaction, so a replay finds the row and does nothing; a bad signat
 period start and `expires_at` at its end (or at receipt and the plan's own period from receipt when the invoice names
 none), and `stripe_invoice_id` the invoice id, which is also the grant's ledger idempotency key, so a replay grants
 once and a renewal's new invoice issues the next period's grant starting where the old one ends. The plan comes from
-the subscription metadata the Checkout session set, falling back to the price the invoice line names. A demo account
-never receives a period grant. An hourly `billing.grant-expiry` pass releases a reservation still held on a grant past its period end
+the price the invoice line names, falling back to the subscription metadata the Checkout session set, so a Week/Month
+switch Stripe applies at the renewal grants the new plan's quota even while the subscription metadata still names the
+old one. A paid period is never cut short: an upgrade from the trial grants the paid plan's Applications at once
+beside the trial's, and cancelling at the period end only sets the flag below. A demo account never receives a period
+grant. A signed `customer.subscription.created`, `customer.subscription.updated` or `customer.subscription.deleted`
+stores the subscription in `subscriptions`: its `user_id` from the event metadata, the stored row or the event's Stripe
+customer; its `plan` from the price item first, then the metadata; its `status` verbatim; the period the event names;
+and `cancel_at_period_end`. `invoice.paid` refreshes that row's plan and period too, so the state follows the invoice
+when the subscription update lags. An hourly `billing.grant-expiry` pass releases a reservation still held on a grant past its period end
 and then expires its available balance, so it never returns to spendable (ADR 0008); until that pass runs,
 "Applications left" already ignores the ended grant.
+
+A daily `billing.reconcile` pass, ten minutes after UTC midnight and only when billing is on, compares one UTC day
+of Stripe's side with Overture's: every paid invoice Stripe reports for the day must have its period grant (matched on
+`stripe_invoice_id`) and every period grant created that day must be an invoice Stripe reports; every refund Stripe
+reports must be a refund Overture audited (its `admin_audit` detail carries the Stripe refund id) with its ledger
+`refund` row, and every audited refund must still be at Stripe. The provider is read with six hours of slack on each
+edge, so an invoice paid just before midnight and granted just after it always matches, while the day's counts stay
+inside the window. The result is one `billing_reconciliations` row per day (a re-run replaces it), carrying the four
+counts and the first fifty mismatches; the first run that finds a mismatch raises the `billing.mismatch` alert with
+the day, the count and the kinds (a retry of the same day does not alert twice), and a clean day writes its row and
+alerts nobody. The admin billing page shows the last result.
 
 ### 5.7 Platform
 
@@ -583,6 +611,7 @@ starts later that day; a user never gets a second run in the same local day.
 
 ```
 free = min(limits.daily_cap, applications left) − Applications in preparing, ready or approved
+if the paid-work gate is on and applications left = 0: no score, no form read and no browser session runs
 for candidate in candidates ordered by code_rank desc, unscored-or-stale first:
     stop when free ≤ 0, the scoring bound (3 × limits.daily_cap) is reached, or LLM caps hit
     score = cached if valid else Haiku score (§8.6)
@@ -1032,7 +1061,9 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
   rate, code rate, challenge rate, p50/p95 duration, proxy MB and cost per completed application, per provider × ATS;
   the synthetic lab is reported beside it, aggregated per provider × lab page with the same rates, durations, proxy and
   cost and the average reCAPTCHA score, and is never counted inside the gate. `POST /admin/api/lab/runs` queues a lab
-  run (audited). Overview shows proxy MB and cost per completed application against the $0.03 gate.
+  run (audited). The report and the Overview measure the last 30 days (the same window as the margin page), and the
+  totals are summed in SQL. Overview shows proxy MB and cost per completed application against the $0.03 gate.
+- Cost per completed application (ADR 0026): Browser Use spend for attempted Applications plus the Anthropic spend of the Application purposes (`score`, `open_text`, `cover_letter`, `question_mapping`) for those users, divided by sent Applications. `llm_usage` has no application id, so that Anthropic spend is attributed per user. `/admin/billing/margin` shows the same measure per plan over 30 days, with revenue per Application and margin, and reports fixed infrastructure, mail and other model calls beside it.
   The report raises `browser.proxy_trend` when the latest 20 completed applications use more than 1.2× the proxy bytes
   per completed application of the 20 before them. Kernel stays the fallback unless the lab shows it clearly ahead
   and the owner decides otherwise.
@@ -1197,15 +1228,27 @@ body, sender or attachment, so the admin never sees message content.
 
 - better-auth: Google, LinkedIn (OIDC; name/email/photo only; each optional until its client ID and secret are both set, and only configured providers are registered and shown), and magic link (15 min, single use). **No passwords are stored or accepted** (ADR 0035): there is no email + password sign-in, sign-up, verification resend, forgot-password or reset, and `/sign-in/email`, `/sign-up/email`, `/send-verification-email`, `/request-password-reset` and `/reset-password` do not exist. A magic link or a verified provider sign-in proves the mailbox, so every session belongs to a verified email; preparation and the planner still skip an unverified user. A refused sign-in shows the same invite copy for every method.
 - Account linking only between methods with the **same verified email**; an OAuth provider is never linked to a local account whose email is still unverified. A verified provider sign-in to an address that only has an unproven credential row left over from before ADR 0035 first discards that row, so an old pre-registration cannot keep the address after the owner proves the mailbox. Existing `credential` rows and `accounts.password` values are inert and are removed by a later migration.
+- **One mailbox, one account** (#182): `users.mailbox` folds a Gmail address's dots, `+tag` and `googlemail.com` to one spelling and carries a unique index, so a dot or plus alias cannot open a second account, and a suspension is a property of the mailbox rather than one spelling of it. However an address is admitted (public sign-up, invite or the owner allowlist), it gets at most one account per mailbox, and an existing verified account only lets that mailbox sign in again. An unverified row proves nothing: when the mailbox is proved (magic link or verified provider) any unverified row on it — including one registered under another spelling — is discarded before the account is created, and a suspended mailbox is never erased that way.
 - Turnstile + rate limits: magic link 3/15 min, demo sign-in 3/15 min, social sign-in 10/15 min (IP), and the delete-account sign-in link 3 per window.
 - Turnstile gate (our own, in front of `/api/auth/sign-in/social`, `/api/auth/sign-in/magic-link` and `/api/auth/demo/sign-in`, before any auth logic): the token comes from `x-captcha-response` and must be a non-empty string of at most 2048 characters. The surface's action comes from `x-turnstile-action` and must be allowed for that endpoint: `signin` for social, `magiclink` for the emailed link and the demo sign-in. Each sign-in widget renders with its surface's action and resets after each submit. The server calls siteverify once per token (form-encoded `secret`, `response`, `remoteip`; 10 s timeout). Any missing or over-long token, non-OK response, error, `success: false`, `action` other than the surface's, or `hostname` outside `TURNSTILE_HOSTNAMES` gets a 403 `captcha_failed`. `TURNSTILE_HOSTNAMES` (comma-separated) defaults to the `APP_ORIGIN` hostname, or to localhost and 127.0.0.1 when `APP_ORIGIN` is unset outside production; boot fails in production if the list includes localhost or 127.0.0.1, or if neither `APP_ORIGIN` nor `TURNSTILE_HOSTNAMES` is set.
 - Cookies httpOnly, Secure, SameSite=Lax; CSRF by Origin check on state-changing routes; sessions 30 days rolling;
   "Sign out" (this device only) and "Sign out all devices" (every other session) in Settings. "Sign out" ends the current session and returns to `/signin`; it is also the only sign-out inside the signed-in app, and the demo account may use it.
 - M1 allowlist = owner; **M2 invites**: the admin creates an invite for an email; the first verified sign-in with that email by any
   method (magic link, Google, LinkedIn) accepts it, creates the account and issues one admin grant of 300
-  applications over 30 days (no card). A sign-in with any other email is refused with the same copy for every method; an
-  invite can be revoked until accepted; a suspended user cannot sign in. An accepted invite lands in onboarding after
-  sign-in until its steps are finished; the owner and legacy accounts go to Home, whose setup banner opens onboarding. M3 public.
+  applications over 30 days (no card). **M3 public sign-up** (`PUBLIC_SIGNUP_ENABLED=true`, the default): any unknown
+  email may sign up by that same magic link or provider and reaches onboarding with no invite; an invite that exists is
+  still accepted on the first verified sign-in and still issues its one admin grant, which existing M2 users keep
+  unchanged. Setting `PUBLIC_SIGNUP_ENABLED=false` restores the M2 invite-only gate: a sign-in with any other email is
+  refused with the same copy for every method. An invite can be revoked until accepted; a suspended user cannot sign in.
+  A new account lands in onboarding after sign-in until its steps are finished; the owner and legacy accounts go to Home,
+  whose setup banner opens onboarding.
+- **Paid work is gated** whenever billing is configured or public sign-up is on (so a missing Stripe pair fails closed, not
+  open): no LLM call, cloud browser session, preparation or send starts for a user with no Applications left. That covers
+  preparation, Match score (daily and on open), manual Apply, resume text extraction, email classification and dispatch;
+  each skips or stays rules-only until a verified trial card or a paid plan (or an admin grant) issues Applications. The
+  per-user and global LLM caps (`checkLlmCaps`) refuse the call and raise the `llm.cap` alert, and the daily `llm.spend`
+  live check alerts on the global cap; `invite.grant_quantity`/`invite.grant_days` still govern an admin grant. In
+  invite-only mode with billing off, nothing changes from M2.
 - **Demo account** (`DEMO_LOGIN_ENABLED=true`, off by default): entering `test@email.com` on the sign-in page signs in
   as the demo user with one click and sends no mail; with the flag off the same email is refused like any other. The
   demo is seeded idempotently (`bun run db:seed-demo`, or on its first sign-in) with fictional facts, a resume,
@@ -1289,8 +1332,16 @@ earlier rows and every Snapshot keep their version and wording. The business nam
 `admin@tryoverture.com` (it exists); the postal address is the literal placeholder `[POSTAL ADDRESS]` until the owner
 supplies one, and the pages say so plainly in the build, never invented.
 Sub-processors listed: Fly, Cloudflare (DNS, Email Routing and Sending, R2, Workers), Browser Use, Kernel (fallback),
-Anthropic, Grafana; Stripe joins in M3. AWS is not used. Vendors' standard published DPAs are accepted as-is; no vendor
-outreach. Drafts for owner review, not legal advice.
+Anthropic, Grafana, Stripe (payments; also the merchant of record for each charge). AWS is not used. Vendors' standard
+published DPAs are accepted as-is; no vendor outreach. Drafts for owner review, not legal advice, and the pages say
+so in their footer.
+Billing (M3, #252): the Terms cover the Week ($12, 70 applications over 7 days) and Month ($35, 300 over 30 days)
+plans, automatic renewal, cancellation at period end through the Stripe customer portal, refunds (none by default;
+a failed application is never charged and never uses an allowance) and the free trial (3 applications, one card gets
+one trial through a keyed fingerprint that survives account deletion). The Privacy Policy lists Stripe, explains that
+card details go straight to Stripe, and names the billing records kept and their deletion. Publishing the billing
+consent text is version 2: the migration appends the row, and version 1, every accepted profile and every Snapshot
+stay as they were (migration `0048_consent_v2`).
 
 ---
 
@@ -1316,9 +1367,9 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Consent | `GET /api/consent` (public current version and text; the signed-in user's accepted version and date) · `GET /api/consent/versions` (every published version, newest first) · `POST /api/consent/accept` `{version}` (refuses `version_changed` when a newer version is published) |
 | Onboarding | `POST /api/onboarding/start` (step 5 Start: 409 `consent_required` unless the user has accepted the current consent version through `POST /api/consent/accept`; then marks onboarding finished, clears the `onboarding` pause reason, sets `running`, and queues only the next `prep.run_local_time` run, never a catch-up, so the first run is the next 07:00 local time; `POST /api/onboarding/5` is refused with 409 `start_required`), `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET/PUT /api/onboarding/targets` (the "What you want" step: the saved Targets, the choices that have open Postings, and the live count) · `PUT /api/onboarding/timezone` (the browser's zone through the seven-day rule) · `GET /api/onboarding` (the step, `onboarded_at`, pause reason, current resume, skip list and whether an invited user must onboard) · `POST /api/onboarding/:step` (records a finished step and returns the state; step 2 refuses without a resume) · `POST /api/onboarding/address/accept` (M2) |
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `GET /api/account/export` · `POST /api/account/export` · `GET /api/account/export/:id/download` · `GET /api/account/deletion` (email, re-authenticated) · `POST /api/account/reauth/link` (a fresh sign-in link) · `POST /api/account/delete` `{confirm: true}` · `GET /api/support-access` |
-| Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
+| Billing (M3) | `GET /api/billing` (`enabled`, `customer`, the subscription's `plan`, `status`, `currentPeriodEnd`, `cancelAtPeriodEnd`, `applicationsLeft` and `planApplications`) · `POST /api/billing/checkout` `{plan}` (Checkout returns to `/settings/billing/plans?billing=success|cancelled`) · `POST /api/billing/portal` (returns to `/settings/billing`; plan switches, cancel at period end, payment method and invoices happen there, in Stripe) |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `POST /internal/mail/dead-letter` · `GET /internal/mailboxes/:local` |
-| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/probes/personio`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
+| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/probes/personio`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds`, `/billing/reconciliation` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
 `home.updated`, `notification`, `calendar.updated`. TanStack Query invalidates by topic. The Calendar invalidates on
@@ -1336,7 +1387,7 @@ Profile** (Ready added by ADR 0029, Calendar by ADR 0034; the phone tab bar keep
 
 | Surface | Content | Key states |
 |---|---|---|
-| Home | Start/Pause switch with pause reason; applications left; today sent / remaining; the Ready card ("3 ready to send", opens Ready); the "needs a code" card five minutes into a verification-code wait (countdown to expiry, Paste the code, No code yet, opens the paste sheet); queue position + ETA; Up next (code-ranked, score on open, Apply/Save/Hide); activity incl. "Couldn't apply" with reason; check-ins; strengthen-profile prompt | paused (each reason has its own copy and fix), nothing matching, waiting for Review, out of applications, a code wait to paste |
+| Home | Start/Pause switch with pause reason; applications left; the invite grant running out (its Applications left and end date, Choose a plan); today sent / remaining; the Ready card ("3 ready to send", opens Ready); the "needs a code" card five minutes into a verification-code wait (countdown to expiry, Paste the code, No code yet, opens the paste sheet); queue position + ETA; Up next (code-ranked, score on open, Apply/Save/Hide); activity incl. "Couldn't apply" with reason; check-ins; strengthen-profile prompt | paused (each reason has its own copy and fix), nothing matching, waiting for Review, out of applications, a code wait to paste |
 | Ready | Heading "Ready to send". Approval cards (§8.7): job, employer, resume file, every answer as it will be typed with its source, cover letter, what changed; Send, Skip, Edit an answer; approved cards show "Sends around 14:20" and Undo; "Send all" for everything listed. Never sends from a link | none ready, all approved, a card that came back with changes |
 | Board | Columns Queued, Ready, Applied, Screening, Interviewing, Offer, Closed (Ready holds an Application from Ready until it is confirmed sent); cards with company, title, score, Strong match badge, "why this match"; card sheet: timeline, proof (answers + source, letter, resume file), linked mail, stage buttons; desktop dnd-kit + keyboard; phone one column per screen, swipe, 250 ms hold to drag, stage buttons in sheet | empty board, auto-move undo toast |
 | Review | Open questions grouped by jobs unlocked; answer input matches field type; dismiss | none open |
@@ -1462,7 +1513,8 @@ OTel traces for every request and job; metrics: `attempt_outcome_total{provider,
 attempts), provider success < 60 %, code or CAPTCHA rate > 20 %, queue age > 30 min, LLM spend > 80 % of the global
 or tagging cap, a daily scoring run that stops at its bound (3 × the daily cap, §8.2), Litestream lag > 5 min, backup failure, health check failing, disk > 80 %, a catalog sweep worker crash,
 an employer reply rate under 5 % after 10 sends in the last 30 days, the domain-wide reply rate under 5 % after 20
-sends (§11.4), an inbound message dead-lettered by the mail Worker, and an
+sends (§11.4), an inbound message dead-lettered by the mail Worker, a daily billing reconciliation with any mismatch
+(§5.6), and an
 unhandled rejection in a background loop or timer (logged to stderr, alerted at most once a minute). The alert path is the
 in-app `alert.raised` event plus a notification for every owner; with `ALERT_NTFY_URL` set, the same alert is pushed
 to the owner's phone. No Grafana is provisioned by this repository; dashboards stay with the owner's Grafana account
@@ -1544,6 +1596,6 @@ v1 runs on Fly app `ai-auto-apply` (volume `data`, yyz). In order:
 | Cloudflare refuses sends to non-owner recipients until Workers Paid and a sending domain exist | one idempotent operator script, a deploy and live-check guard that fails loudly while the switch is pending; the owner pays, then runs one command |
 | Friends and family hit the same ATS limits as the owner, with real names and emails | 10 a day each, true answers, every send approved; beta wave starts only after the security, scalability and cost reviews |
 | Stripe declines Managed Payments for the account | the `Payments` port; plain Stripe Billing with Stripe Tax behind it (ADR 0018); found early in "M3: owner setup" |
-| Public sign-up exposes spend (LLM, browser) before anyone pays | nothing is prepared until a trial card is verified or a plan is paid; per-IP and per-email limits; `llm.cap_global_day_usd`; a global spend alert |
+| Public sign-up exposes spend (LLM, browser) before anyone pays | a spend gate stops preparation, scoring, resume extraction, email classification and sending for any account with no Applications left while billing or public sign-up is on (fail-closed); per-IP rate limits; Turnstile; `llm.cap_global_day_usd` and the `llm.cap`/`llm.spend` alerts |
 | Email-classification mistakes move cards wrongly | forward-only, undo, never over manual drags, confidence threshold |
 | Approval slows sending: Ready cards pile up while the user is away and fewer applications go out | one daily preparation run stops at the free slots to bound unapproved work (§8.2); one Recap email per run; Send all; measured against the 25-application M1 gate (ADR 0029) |

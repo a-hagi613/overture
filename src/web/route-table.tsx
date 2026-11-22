@@ -19,6 +19,8 @@ import { ProfilePage } from "./routes/profile.tsx";
 import { ReadyPage } from "./routes/ready.tsx";
 import { ReviewPage } from "./routes/review.tsx";
 import { SearchPage } from "./routes/search.tsx";
+import { SettingsBillingPage } from "./routes/settings-billing.tsx";
+import { SettingsBillingPlansPage } from "./routes/settings-billing-plans.tsx";
 import { SettingsDeletePage } from "./routes/settings-delete.tsx";
 import { SettingsExportPage } from "./routes/settings-export.tsx";
 import { SettingsSupportAccessPage } from "./routes/settings-support-access.tsx";
@@ -35,6 +37,11 @@ import { AdminSettingsPage } from "./routes/admin/settings.tsx";
 import { CatalogPage } from "./routes/admin/catalog.tsx";
 import { MailHealthPage } from "./routes/admin/mail-health.tsx";
 import { GrantsPage } from "./routes/admin/grants.tsx";
+import { MarginPage } from "./routes/admin/margin.tsx";
+import { BillingPage } from "./routes/admin/billing.tsx";
+import { BillingUserPage } from "./routes/admin/billing-user.tsx";
+import { BillingRefundPage } from "./routes/admin/billing-refund.tsx";
+import { BillingReconciliationPage } from "./routes/admin/billing-reconciliation.tsx";
 import { InvitesPage } from "./routes/admin/invites.tsx";
 import { OverviewPage } from "./routes/admin/overview.tsx";
 import { ProviderReportPage } from "./routes/admin/provider-report.tsx";
@@ -54,6 +61,8 @@ const appShellChildren: RouteObject[] = [
   { path: "/profile", element: <ProfilePage /> },
   { path: "/search", element: <SearchPage /> },
   { path: "/settings", element: <SettingsPage /> },
+  { path: "/settings/billing", element: <SettingsBillingPage /> },
+  { path: "/settings/billing/plans", element: <SettingsBillingPlansPage /> },
   { path: "/settings/delete", element: <SettingsDeletePage /> },
   { path: "/settings/export", element: <SettingsExportPage /> },
   { path: "/settings/support-access", element: <SettingsSupportAccessPage /> },
@@ -67,6 +76,11 @@ const adminShellChildren: RouteObject[] = [
   { path: "/admin/catalog", element: <CatalogPage /> },
   { path: "/admin/mail-health", element: <MailHealthPage /> },
   { path: "/admin/grants", element: <GrantsPage /> },
+  { path: "/admin/billing/margin", element: <MarginPage /> },
+  { path: "/admin/billing", element: <BillingPage /> },
+  { path: "/admin/billing/reconciliation", element: <BillingReconciliationPage /> },
+  { path: "/admin/billing/users/:id", element: <BillingUserPage /> },
+  { path: "/admin/billing/users/:id/refund", element: <BillingRefundPage /> },
   { path: "/admin/users", element: <UsersPage /> },
   { path: "/admin/users/:id", element: <UserPage /> },
   { path: "/admin/invites", element: <InvitesPage /> },

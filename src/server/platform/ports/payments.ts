@@ -75,9 +75,11 @@ export interface PaymentEvent {
   userId: string | null;
   /** The invoice a paid subscription event names, or null for other events. */
   invoiceId: string | null;
+  /** The subscription the event names, or null when it names none. */
+  subscriptionId: string | null;
   /** The plan the subscription metadata names, when the event carries it. */
   plan: BillingPlan | null;
-  /** The Stripe price the paid line item names, when the event carries one. */
+  /** The Stripe price the paid line item or subscription item names, when the event carries one. */
   priceId: string | null;
   /** The end of the paid period in epoch milliseconds, or null when unknown. */
   periodEndMs: number | null;
@@ -87,6 +89,67 @@ export interface PaymentEvent {
   mode: string | null;
   /** The Checkout session id for session events, or null. */
   sessionId: string | null;
+  /**
+   * Stripe's own subscription status (`trialing`, `active`, `past_due`,
+   * `canceled`, …) for a `customer.subscription.*` event, stored verbatim so a
+   * status Stripe adds tomorrow still lands instead of failing the webhook.
+   */
+  subscriptionStatus: string | null;
+  /**
+   * Whether Stripe will cancel the subscription at the period end the event
+   * names, for a `customer.subscription.*` event, or null for other events.
+   */
+  cancelAtPeriodEnd: boolean | null;
+}
+
+/**
+ * A refund of the payment behind a paid invoice. The key makes a retry return
+ * the same refund at the provider instead of refunding twice.
+ */
+export interface RefundRequest {
+  invoiceId: string;
+  /** Cents to return, or null to return the whole payment. */
+  amountCents: number | null;
+  idempotencyKey: string;
+}
+
+/**
+ * The refund the provider accepted, in cents.
+ */
+export interface Refund {
+  id: string;
+  status: string;
+  amountCents: number;
+}
+
+/**
+ * A half-open window of provider time in epoch milliseconds: a record at
+ * `sinceMs` is inside it, a record at `untilMs` is not.
+ */
+export interface BillingWindow {
+  sinceMs: number;
+  untilMs: number;
+}
+
+/**
+ * A paid invoice the provider reports, reduced to the fields reconciliation
+ * compares against the ledger.
+ */
+export interface ProviderInvoice {
+  invoiceId: string;
+  amountPaidCents: number;
+  paidAtMs: number;
+  customerId: string | null;
+}
+
+/**
+ * A refund the provider reports, reduced to the fields reconciliation compares
+ * against the ledger.
+ */
+export interface ProviderRefund {
+  refundId: string;
+  amountCents: number;
+  createdAtMs: number;
 }
 
 /**
@@ -98,6 +161,9 @@ export interface Payments {
   /** `null` until the setup session is complete and its card is attached. */
   retrieveVerifiedCard: (setupSessionId: string) => Promise<VerifiedCard | null>;
   createPortalSession: (request: PortalSessionRequest) => Promise<PortalSession>;
+  refundInvoice: (request: RefundRequest) => Promise<Refund>;
+  listPaidInvoices: (window: BillingWindow) => Promise<ProviderInvoice[]>;
+  listRefunds: (window: BillingWindow) => Promise<ProviderRefund[]>;
   verifyWebhook: (payload: string, signature: string | null) => Promise<PaymentEvent>;
 }
 
@@ -109,5 +175,15 @@ export class InvalidWebhookSignatureError extends Error {
   constructor(message = "The Stripe webhook signature is invalid.") {
     super(message);
     this.name = "InvalidWebhookSignatureError";
+  }
+}
+
+/**
+ * An invoice with no card payment behind it, so there is nothing to refund.
+ */
+export class NoRefundablePaymentError extends Error {
+  constructor(message = "This payment has no Stripe payment to refund.") {
+    super(message);
+    this.name = "NoRefundablePaymentError";
   }
 }

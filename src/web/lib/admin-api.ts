@@ -129,6 +129,40 @@ export const grantRowSchema = z.object({
 
 export const grantsResponseSchema = z.object({ grants: z.array(grantRowSchema) });
 
+const marginPlanRowSchema = z.object({
+  plan: z.enum(["trial", "week", "month"]),
+  priceMicros: z.number(),
+  applications: z.number(),
+  users: z.number(),
+  completed: z.number(),
+  costMicrosPerCompleted: z.number().nullable(),
+  revenueMicrosPerApplication: z.number(),
+  marginMicrosPerApplication: z.number().nullable(),
+  marginRatio: z.number().nullable(),
+  costGateMet: z.boolean().nullable(),
+});
+
+export const marginResponseSchema = z.object({
+  windowDays: z.number(),
+  generatedAt: z.number(),
+  costGateMicros: z.number(),
+  completed: z.number(),
+  costMicrosPerCompleted: z.number().nullable(),
+  browserMicrosPerCompleted: z.number().nullable(),
+  anthropicMicrosPerCompleted: z.number().nullable(),
+  plans: z.array(marginPlanRowSchema),
+  beside: z.object({
+    fixedInfraMicrosPerMonth: z.number(),
+    mail: z.object({
+      month: z.string(),
+      sends: z.number(),
+      includedSends: z.number(),
+      overageMicros: z.number(),
+    }),
+    otherAnthropicMicros: z.number(),
+  }),
+});
+
 export const grantCreateResponseSchema = z.object({
   applicationsLeft: z.number(),
   grantId: z.string(),
@@ -414,6 +448,13 @@ type AdminWriteBody =
       idempotencyKey: string;
       quantity: number;
     }
+  | {
+      amountCents: number | null;
+      grantId: string;
+      idempotencyKey: string;
+      note: string;
+      reason: string;
+    }
   | { email: string }
   | { reason: string }
   | { value: string }
@@ -487,6 +528,158 @@ export const setKillSwitch = async (scope: string, key: string, enabled: boolean
   );
 
 export const loadGrants = async () => adminGet("/admin/api/grants", grantsResponseSchema);
+
+export type MarginReport = z.infer<typeof marginResponseSchema>;
+
+export type MarginPlanRow = z.infer<typeof marginPlanRowSchema>;
+
+export const loadMargin = async () => adminGet("/admin/api/margin", marginResponseSchema);
+export const billingStateSchema = z.enum(["trial", "paying", "ending", "paused", "ended", "none"]);
+
+export const billingPlanSchema = z.enum(["week", "month"]);
+
+export const billingUserRowSchema = z.object({
+  email: z.string(),
+  expiresAt: z.number().nullable(),
+  id: z.string(),
+  name: z.string(),
+  plan: billingPlanSchema.nullable(),
+  refunded: z.boolean(),
+  state: billingStateSchema,
+  usage: z.object({ left: z.number(), quantity: z.number(), used: z.number() }).nullable(),
+});
+
+export const billingUsersResponseSchema = z.object({
+  counts: z.object({
+    endingSoon: z.number(),
+    onTrial: z.number(),
+    paused: z.number(),
+    paying: z.number(),
+  }),
+  page: z.number(),
+  pageSize: z.number(),
+  total: z.number(),
+  users: z.array(billingUserRowSchema),
+});
+
+export const billingPeriodSchema = z.object({
+  expiresAt: z.number().nullable(),
+  grantId: z.string(),
+  left: z.number(),
+  plan: billingPlanSchema,
+  quantity: z.number(),
+  refunded: z.boolean(),
+  source: z.enum(["trial", "period", "admin"]),
+  startsAt: z.number(),
+  used: z.number(),
+});
+
+export const billingUserViewSchema = z.object({
+  current: billingPeriodSchema.nullable(),
+  email: z.string(),
+  id: z.string(),
+  name: z.string(),
+  paused: z.boolean(),
+  pausedReason: z.literal("payment_failed").nullable(),
+  periods: z.array(billingPeriodSchema),
+  refundable: z.boolean(),
+  state: billingStateSchema,
+  trial: billingPeriodSchema.nullable(),
+});
+
+export const billingUserResponseSchema = z.object({ user: billingUserViewSchema });
+
+export const billingMismatchKindSchema = z.enum([
+  "invoice_without_grant",
+  "grant_without_invoice",
+  "refund_without_ledger",
+  "ledger_without_refund",
+  "refund_ledger_missing",
+]);
+
+export const billingMismatchSchema = z.object({
+  amountCents: z.number().nullable(),
+  id: z.string(),
+  kind: billingMismatchKindSchema,
+});
+
+export const billingReconciliationItemSchema = z.object({
+  amountCents: z.number().nullable(),
+  id: z.string(),
+  owner: z.object({ email: z.string(), name: z.string() }).nullable(),
+  result: z.enum(["matched", "not_in_overture", "not_in_stripe"]),
+});
+
+export const billingReconciliationSchema = z.object({
+  checkedAt: z.number(),
+  day: z.string(),
+  items: z.array(billingReconciliationItemSchema),
+  itemsTotal: z.number(),
+  ledgerGrants: z.number(),
+  ledgerRefunds: z.number(),
+  matched: z.number(),
+  mismatchTotal: z.number(),
+  mismatches: z.array(billingMismatchSchema),
+  unrecorded: z.number(),
+  status: z.enum(["clean", "mismatch"]),
+  stripeInvoices: z.number(),
+  stripeRefunds: z.number(),
+  windowEnd: z.number(),
+  windowStart: z.number(),
+});
+
+export const billingReconciliationResponseSchema = z.object({
+  reconciliation: billingReconciliationSchema.nullable(),
+});
+
+export const refundResponseSchema = z.object({
+  refund: z.object({
+    amountCents: z.number(),
+    applicationsStopped: z.number(),
+    grantId: z.string(),
+    refundId: z.string(),
+    status: z.string(),
+  }),
+  replayed: z.boolean(),
+});
+
+export type BillingUserRow = z.infer<typeof billingUserRowSchema>;
+
+export type BillingUsersResponse = z.infer<typeof billingUsersResponseSchema>;
+
+export type BillingUserView = z.infer<typeof billingUserViewSchema>;
+
+export type BillingPeriod = z.infer<typeof billingPeriodSchema>;
+
+export type BillingFilter = "all" | "trial" | "paying" | "paused" | "ended";
+
+export type BillingReconciliation = z.infer<typeof billingReconciliationSchema>;
+
+export type BillingMismatch = z.infer<typeof billingMismatchSchema>;
+
+export type BillingReconciliationItem = z.infer<typeof billingReconciliationItemSchema>;
+
+export type BillingMismatchKind = z.infer<typeof billingMismatchKindSchema>;
+
+export const loadBillingUsers = async (filter: BillingFilter, page: number) =>
+  adminGet(
+    `/admin/api/billing/users?filter=${filter}&page=${String(page)}`,
+    billingUsersResponseSchema,
+  );
+
+export const loadBillingReconciliation = async () =>
+  adminGet("/admin/api/billing/reconciliation", billingReconciliationResponseSchema);
+
+export const loadBillingUser = async (userId: string) =>
+  adminGet(`/admin/api/billing/users/${encodeURIComponent(userId)}`, billingUserResponseSchema);
+
+export const postRefund = async (body: {
+  amountCents: number | null;
+  grantId: string;
+  idempotencyKey: string;
+  note: string;
+  reason: string;
+}) => adminPost("/admin/api/billing/refunds", body, refundResponseSchema);
 
 export const createGrant = async (
   email: string,

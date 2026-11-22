@@ -4,14 +4,19 @@ import { z } from "zod";
 
 import type { Clock } from "../platform/ports/clock.ts";
 import type {
+  BillingWindow,
   CheckoutSessionRequest,
   PaymentEvent,
   Payments,
   PortalSessionRequest,
+  RefundRequest,
   SetupSessionRequest,
 } from "../platform/ports/payments.ts";
 
-import { InvalidWebhookSignatureError } from "../platform/ports/payments.ts";
+import {
+  InvalidWebhookSignatureError,
+  NoRefundablePaymentError,
+} from "../platform/ports/payments.ts";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const WEBHOOK_TOLERANCE_SECONDS = 300;
@@ -54,6 +59,76 @@ const portalSessionSchema = z.object({
   url: z.url(),
 });
 
+const invoicePaymentsSchema = z.object({
+  data: z.array(
+    z.object({
+      payment: z
+        .object({
+          payment_intent: z
+            .object({ id: z.string().min(1) })
+            .nullable()
+            .optional(),
+          type: z.string(),
+        })
+        .nullable()
+        .optional(),
+    }),
+  ),
+});
+
+const refundSchema = z.object({
+  id: z.string().min(1),
+  status: z.string().nullable(),
+  amount: z.number().int().nonnegative(),
+});
+
+const invoiceListSchema = z.object({
+  data: z.array(
+    z.object({
+      amount_paid: z.number().int().nonnegative(),
+      created: z.number().int(),
+      customer: z.string().nullable().optional(),
+      id: z.string().min(1),
+      status: z.string().optional(),
+      status_transitions: z
+        .object({ paid_at: z.number().int().nullable().optional() })
+        .nullable()
+        .optional(),
+    }),
+  ),
+  has_more: z.boolean(),
+});
+
+const refundListSchema = z.object({
+  data: z.array(
+    z.object({
+      amount: z.number().int().nonnegative(),
+      created: z.number().int(),
+      id: z.string().min(1),
+    }),
+  ),
+  has_more: z.boolean(),
+});
+
+const LIST_PAGE_SIZE = 100;
+const LIST_PAGE_LIMIT = 50;
+
+type StripePageCollector = <T extends { id: string }>(
+  path: string,
+  form: URLSearchParams,
+  pageSchema: z.ZodType<{ data: T[]; has_more: boolean }>,
+  startingAfter: string | null,
+  page: number,
+) => Promise<T[]>;
+
+function windowForm(window: BillingWindow, extra?: Record<string, string>) {
+  return new URLSearchParams({
+    "created[gte]": String(Math.trunc(window.sinceMs / 1000)),
+    "created[lte]": String(Math.trunc(window.untilMs / 1000)),
+    ...extra,
+  });
+}
+
 const metadataSchema = z.object({
   plan: z.string().optional(),
   user_id: z.string().optional(),
@@ -65,7 +140,13 @@ function planOf(value: string | undefined) {
   return planNames.find((plan) => plan === value) ?? null;
 }
 
+function nonEmpty(value: string | null | undefined) {
+  return value === undefined || value === null || value === "" ? null : value;
+}
+
 const lineSchema = z.object({
+  current_period_end: z.number().optional(),
+  current_period_start: z.number().optional(),
   period: z
     .object({ end: z.number().optional(), start: z.number().optional() })
     .nullable()
@@ -85,9 +166,16 @@ const eventSchema = z.object({
   data: z.object({
     object: z.object({
       id: z.string().optional(),
+      cancel_at_period_end: z.boolean().optional(),
       client_reference_id: z.string().nullable().optional(),
+      current_period_end: z.number().optional(),
+      current_period_start: z.number().optional(),
       customer: z.string().nullable().optional(),
       mode: z.string().nullable().optional(),
+      items: z
+        .object({ data: z.array(lineSchema).optional() })
+        .nullable()
+        .optional(),
       lines: z
         .object({ data: z.array(lineSchema).optional() })
         .nullable()
@@ -100,6 +188,11 @@ const eventSchema = z.object({
             .nullable()
             .optional(),
         })
+        .nullable()
+        .optional(),
+      status: z.string().max(64).optional(),
+      subscription: z
+        .union([z.string(), z.object({ id: z.string() }).transform((named) => named.id)])
         .nullable()
         .optional(),
       subscription_details: z
@@ -172,30 +265,48 @@ function priceIdOf(line: z.infer<typeof lineSchema>) {
   return line.pricing?.price_details?.price ?? line.price?.id ?? null;
 }
 
+function subscriptionIdOf(object: z.infer<typeof eventSchema>["data"]["object"], type: string) {
+  return (
+    nonEmpty(object.subscription) ??
+    (type.startsWith("customer.subscription.") ? (object.id ?? null) : null)
+  );
+}
+
 function eventFrom(parsed: z.infer<typeof eventSchema>) {
   const { object } = parsed.data;
+  const subscriptionEvent = parsed.type.startsWith("customer.subscription.");
 
   const subscriptionMetadata =
     object.parent?.subscription_details?.metadata ?? object.subscription_details?.metadata ?? null;
 
-  const userId =
-    object.client_reference_id ?? subscriptionMetadata?.user_id ?? object.metadata?.user_id ?? null;
+  const userId = nonEmpty(
+    object.client_reference_id ?? subscriptionMetadata?.user_id ?? object.metadata?.user_id,
+  );
 
   const customerId = object.customer ?? (parsed.type.startsWith("customer.") ? object.id : null);
-  const lines = object.lines?.data ?? [];
-  let periodEndSeconds = 0;
-  let periodStartSeconds = 0;
+  const lines = [...(object.lines?.data ?? []), ...(object.items?.data ?? [])];
+  let periodEndSeconds = subscriptionEvent ? (object.current_period_end ?? 0) : 0;
+  let periodStartSeconds = subscriptionEvent ? (object.current_period_start ?? 0) : 0;
   let priceId: string | null = null;
 
   for (const line of lines) {
-    periodEndSeconds = Math.max(periodEndSeconds, line.period?.end ?? 0);
-    periodStartSeconds = Math.max(periodStartSeconds, line.period?.start ?? 0);
+    periodEndSeconds = Math.max(
+      periodEndSeconds,
+      line.period?.end ?? 0,
+      line.current_period_end ?? 0,
+    );
+    periodStartSeconds = Math.max(
+      periodStartSeconds,
+      line.period?.start ?? 0,
+      line.current_period_start ?? 0,
+    );
     priceId ??= priceIdOf(line);
   }
 
   const isSession = parsed.type.startsWith("checkout.session.");
 
   const event: PaymentEvent = {
+    cancelAtPeriodEnd: subscriptionEvent ? (object.cancel_at_period_end ?? false) : null,
     customerId: customerId ?? null,
     id: parsed.id,
     invoiceId: parsed.type.startsWith("invoice.") ? (object.id ?? null) : null,
@@ -205,6 +316,8 @@ function eventFrom(parsed: z.infer<typeof eventSchema>) {
     priceId,
     mode: object.mode ?? null,
     sessionId: isSession ? (object.id ?? null) : null,
+    subscriptionId: subscriptionIdOf(object, parsed.type),
+    subscriptionStatus: subscriptionEvent ? (object.status ?? null) : null,
     type: parsed.type,
     userId,
   };
@@ -224,13 +337,19 @@ export function createStripePayments(config: StripePaymentsConfig) {
   const apiBaseUrl = config.apiBaseUrl.replace(/\/+$/u, "");
   const toleranceSeconds = config.toleranceSeconds ?? WEBHOOK_TOLERANCE_SECONDS;
 
-  async function postForm(path: string, form: URLSearchParams) {
+  async function postForm(path: string, form: URLSearchParams, idempotencyKey?: string) {
+    const headers = new Headers({
+      authorization: `Bearer ${config.secretKey}`,
+      "content-type": "application/x-www-form-urlencoded",
+    });
+
+    if (idempotencyKey !== undefined) {
+      headers.set("idempotency-key", idempotencyKey);
+    }
+
     const response = await fetch(`${apiBaseUrl}${path}`, {
       method: "POST",
-      headers: {
-        authorization: `Bearer ${config.secretKey}`,
-        "content-type": "application/x-www-form-urlencoded",
-      },
+      headers,
       body: form.toString(),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
@@ -266,6 +385,31 @@ export function createStripePayments(config: StripePaymentsConfig) {
 
     return payload;
   }
+
+  const collectPages: StripePageCollector = async (path, form, pageSchema, startingAfter, page) => {
+    if (page >= LIST_PAGE_LIMIT) {
+      throw new Error(
+        `Stripe ${path} returned more than ${String(LIST_PAGE_LIMIT)} pages for one window.`,
+      );
+    }
+
+    const params = new URLSearchParams(form);
+
+    params.set("limit", String(LIST_PAGE_SIZE));
+
+    if (startingAfter !== null) {
+      params.set("starting_after", startingAfter);
+    }
+
+    const parsed = pageSchema.parse(await getJson(`${path}?${params.toString()}`));
+    const last = parsed.data.at(-1);
+
+    if (!parsed.has_more || last === undefined) {
+      return parsed.data;
+    }
+
+    return [...parsed.data, ...(await collectPages(path, form, pageSchema, last.id, page + 1))];
+  };
 
   async function verifyWebhook(payload: string, signature: string | null) {
     if (signature === null) {
@@ -385,6 +529,63 @@ export function createStripePayments(config: StripePaymentsConfig) {
       );
 
       return { id: session.id, url: session.url };
+    },
+    refundInvoice: async (request: RefundRequest) => {
+      const invoicePayments = invoicePaymentsSchema.parse(
+        await getJson(
+          `/v1/invoice_payments?${new URLSearchParams({
+            invoice: request.invoiceId,
+            "expand[]": "data.payment.payment_intent",
+          }).toString()}`,
+        ),
+      );
+
+      const paymentIntent = invoicePayments.data
+        .map((row) => row.payment)
+        .find((payment) => payment?.type === "payment_intent")?.payment_intent;
+
+      if (paymentIntent === null || paymentIntent === undefined) {
+        throw new NoRefundablePaymentError();
+      }
+
+      const form = new URLSearchParams({ payment_intent: paymentIntent.id });
+
+      if (request.amountCents !== null) {
+        form.set("amount", String(request.amountCents));
+      }
+
+      const refund = refundSchema.parse(
+        await postForm("/v1/refunds", form, request.idempotencyKey),
+      );
+
+      return { amountCents: refund.amount, id: refund.id, status: refund.status ?? "unknown" };
+    },
+    listPaidInvoices: async (window: BillingWindow) => {
+      const rows = await collectPages(
+        "/v1/invoices",
+        windowForm(window, { status: "paid" }),
+        invoiceListSchema,
+        null,
+        0,
+      );
+
+      return rows
+        .filter((row) => row.status === "paid")
+        .map((row) => ({
+          amountPaidCents: row.amount_paid,
+          customerId: row.customer ?? null,
+          invoiceId: row.id,
+          paidAtMs: (row.status_transitions?.paid_at ?? row.created) * 1000,
+        }));
+    },
+    listRefunds: async (window: BillingWindow) => {
+      const rows = await collectPages("/v1/refunds", windowForm(window), refundListSchema, null, 0);
+
+      return rows.map((row) => ({
+        amountCents: row.amount,
+        createdAtMs: row.created * 1000,
+        refundId: row.id,
+      }));
     },
     verifyWebhook,
   };
