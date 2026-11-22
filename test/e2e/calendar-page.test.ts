@@ -1,0 +1,377 @@
+import { AxeBuilder } from "@axe-core/playwright";
+import { join } from "node:path";
+
+import { z } from "zod";
+
+import type { APIRequestContext, Browser, Page } from "@playwright/test";
+
+import type { AppServer } from "./app-server.ts";
+
+import { expect, test } from "./app.fixture.ts";
+import {
+  ownerContextFor,
+  seedApplication,
+  seedBoard,
+  seedCompany,
+  seedPosting,
+} from "./matching-harness.ts";
+
+const NOVEMBER = "/calendar?month=2026-11";
+const SENT_ON_17TH = Date.UTC(2026, 10, 17, 9, 12);
+const SENT_ON_16TH = Date.UTC(2026, 10, 16, 8, 30);
+const EMPLOYERS = ["Halden Systems", "Northwind Labs", "Ferro Cloud", "Quill Works"] as const;
+
+type Seeded = Awaited<ReturnType<typeof seedMonth>>;
+
+async function seedMonth(server: AppServer) {
+  const { owner, userId } = await ownerContextFor(server.url);
+
+  const applicationIds = await Promise.all(
+    EMPLOYERS.map(async (name, index) => {
+      const slug = name.replaceAll(" ", "").toLowerCase();
+      const atsJobId = `calendar-${String(index)}`;
+      const companyId = await seedCompany(owner, name, `${slug}.example`);
+      const boardId = await seedBoard(owner, companyId, "greenhouse", atsJobId);
+
+      const postingId = await seedPosting(owner, {
+        atsJobId,
+        boardId,
+        companyId,
+        title: "Platform Engineer",
+        url: `https://${slug}.example/${String(index)}`,
+      });
+
+      return seedApplication(owner, {
+        postingId,
+        sentAt: index === 3 ? SENT_ON_16TH : SENT_ON_17TH + index * 28 * 60_000,
+        status: "sent",
+        userId,
+      });
+    }),
+  );
+
+  return { applicationIds, owner, server };
+}
+
+async function moveClockTo(request: APIRequestContext, target: number) {
+  const current = z
+    .object({ now: z.number(), offsetMs: z.number() })
+    .parse(await (await request.get("/__test__/clock")).json());
+
+  const moved = await request.post("/__test__/clock/offset", {
+    data: { offsetMs: target - current.now + current.offsetMs },
+  });
+
+  expect(moved.ok()).toBe(true);
+}
+
+async function openCalendar(
+  browser: Browser,
+  seeded: Seeded,
+  options: { dark?: boolean; width: number; path?: string },
+) {
+  const context = await browser.newContext({
+    storageState: await seeded.owner.storageState(),
+    timezoneId: "UTC",
+    viewport: { height: options.width < 768 ? 844 : 900, width: options.width },
+  });
+
+  if (options.dark === true) {
+    await context.addInitScript(() => {
+      globalThis.localStorage.setItem("overture.theme", "dark");
+    });
+  }
+
+  const page = await context.newPage();
+
+  await page.goto(`${seeded.server.url}${options.path ?? NOVEMBER}`);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  return { context, page };
+}
+
+async function expectNoHorizontalOverflow(page: Page) {
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+
+  expect(overflow).toBeLessThanOrEqual(0);
+}
+
+test("the month grid shows each day's chips and the day panel lists them", async ({
+  browser,
+  isolatedAppServer,
+}) => {
+  const seeded = await seedMonth(isolatedAppServer);
+  const { context, page } = await openCalendar(browser, seeded, { width: 1280 });
+
+  const grid = page.getByRole("list", { name: "November 2026, one day per cell" });
+
+  await expect(grid).toBeVisible();
+  await expect(grid.getByRole("button")).toHaveCount(42);
+  await expect(grid.getByRole("button", { name: "Tuesday 17 November, 3 sent" })).toBeVisible();
+  await expect(grid.getByRole("button", { name: "Monday 16 November, 1 sent" })).toBeVisible();
+  await expect(grid.getByRole("button", { name: "Wednesday 18 November, nothing" })).toBeVisible();
+  await expect(
+    grid.getByRole("button", { name: "Tuesday 17 November, 3 sent" }).locator("[data-chip]"),
+  ).toHaveCount(3);
+
+  await grid.getByRole("button", { name: "Tuesday 17 November, 3 sent" }).click();
+
+  const panel = page.getByRole("complementary", { name: "Day panel" });
+
+  await expect(panel.getByRole("heading", { name: "Tuesday 17 November" })).toBeVisible();
+  await expect(panel.getByText("3 sent")).toBeVisible();
+  await expect(panel.getByRole("link")).toHaveCount(3);
+  await expect(panel.getByRole("link").first()).toContainText("Halden Systems");
+  await expect(panel.getByRole("link").first()).toContainText("09:12");
+
+  await panel.getByRole("link").first().click();
+  await expect(page).toHaveURL(/\/board\?application=/u);
+
+  await page.goBack();
+  await page.getByRole("button", { name: "Close day panel" }).click();
+  await expect(page.getByRole("complementary", { name: "Day panel" })).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+
+  await context.close();
+  await seeded.owner.dispose();
+});
+
+test("the grid follows the WAI-ARIA keyboard pattern", async ({ browser, isolatedAppServer }) => {
+  const seeded = await seedMonth(isolatedAppServer);
+  const { context, page } = await openCalendar(browser, seeded, { width: 1280 });
+  const day = (label: string) => page.getByRole("button", { name: label });
+
+  await expect(page.locator("[data-day][tabindex='0']")).toHaveCount(1);
+
+  await day("Tuesday 17 November, 3 sent").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(day("Wednesday 18 November, nothing")).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(day("Wednesday 25 November, nothing")).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowUp");
+  await expect(day("Tuesday 17 November, 3 sent")).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(day("Monday 16 November, 1 sent")).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(day("Sunday 22 November, nothing")).toBeFocused();
+
+  await page.keyboard.press("Home");
+  await page.keyboard.press("Enter");
+  await expect(
+    page
+      .getByRole("complementary", { name: "Day panel" })
+      .getByRole("heading", { name: "Monday 16 November" }),
+  ).toBeVisible();
+  await expect(day("Monday 16 November, 1 sent")).toHaveAttribute("aria-pressed", "true");
+
+  await page.keyboard.press("PageDown");
+  await expect(page.getByRole("heading", { name: "December 2026" })).toBeVisible();
+  await expect(page).toHaveURL(/month=2026-12/u);
+  await expect(day("Wednesday 16 December, nothing")).toBeFocused();
+  await page.keyboard.press("PageUp");
+  await expect(page.getByRole("heading", { name: "November 2026" })).toBeVisible();
+  await expect(day("Monday 16 November, 1 sent")).toBeFocused();
+
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowUp");
+  await expect(page.getByRole("heading", { name: "October 2026" })).toBeVisible();
+
+  await context.close();
+  await seeded.owner.dispose();
+});
+
+test("month buttons, Today and an empty month work, and the empty month says so", async ({
+  browser,
+  isolatedAppServer,
+}) => {
+  const seeded = await seedMonth(isolatedAppServer);
+  const { context, page } = await openCalendar(browser, seeded, { width: 1280 });
+
+  await page.getByRole("button", { name: "Next month" }).click();
+  await expect(page.getByRole("heading", { name: "December 2026" })).toBeVisible();
+  await expect(
+    page.getByText("Nothing yet. Applications you send and replies from employers appear here."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("complementary", { name: "Day panel" }).getByText("Nothing on this day."),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Previous month" }).click();
+  await expect(page.getByRole("heading", { name: "November 2026" })).toBeVisible();
+  await expect(page.getByText("Nothing yet.")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Today" }).click();
+  await expect(page.getByRole("heading", { level: 2 }).first()).toContainText(
+    String(new Date().getUTCFullYear()),
+  );
+
+  await context.close();
+  await seeded.owner.dispose();
+});
+
+test("a Stage move shows on the open Calendar without a reload", async ({
+  browser,
+  isolatedAppServer,
+}) => {
+  const seeded = await seedMonth(isolatedAppServer);
+  const { context, page } = await openCalendar(browser, seeded, { width: 1280 });
+  const before = page.getByRole("button", { name: "Tuesday 17 November, 3 sent" });
+
+  await expect(before).toBeVisible();
+  await moveClockTo(seeded.owner, Date.UTC(2026, 10, 17, 12));
+
+  const moved = await seeded.owner.patch(
+    `/api/applications/${encodeURIComponent(seeded.applicationIds[0] ?? "")}/stage`,
+    { data: { position: null, stage: "interviewing" } },
+  );
+
+  expect(moved.ok()).toBe(true);
+  await expect(
+    page.getByRole("button", { name: "Tuesday 17 November, 3 sent, 1 stage move" }),
+  ).toBeVisible();
+
+  await context.close();
+  await seeded.owner.dispose();
+});
+
+test("Calendar is the seventh destination after Inbox, and Home and Board headers open it", async ({
+  browser,
+  isolatedAppServer,
+}) => {
+  const seeded = await seedMonth(isolatedAppServer);
+  const side = await openCalendar(browser, seeded, { path: "/", width: 1280 });
+  const nav = side.page.getByRole("navigation", { name: "Main" });
+
+  await expect(nav.getByRole("link")).toHaveText([
+    /^Home/u,
+    /^Ready/u,
+    /^Board/u,
+    /^Review/u,
+    /^Inbox/u,
+    /^Calendar/u,
+    /^Profile/u,
+  ]);
+
+  await nav.getByRole("link", { name: "Calendar" }).click();
+  await expect(side.page).toHaveURL(/\/calendar/u);
+  await expect(nav.getByRole("link", { name: "Calendar" })).toHaveAttribute("aria-current", "page");
+  await side.context.close();
+
+  const home = await openCalendar(browser, seeded, { path: "/", width: 1280 });
+
+  await home.page.getByRole("main").getByRole("link", { name: "Calendar" }).click();
+  await expect(home.page).toHaveURL(/\/calendar/u);
+  await home.context.close();
+
+  const board = await openCalendar(browser, seeded, { path: "/board", width: 1280 });
+
+  await board.page.getByRole("main").getByRole("link", { name: "Calendar" }).click();
+  await expect(board.page).toHaveURL(/\/calendar/u);
+  await board.context.close();
+
+  const phone = await openCalendar(browser, seeded, { path: "/", width: 390 });
+  const tabs = phone.page.getByRole("navigation", { name: "Quick sections" });
+
+  await expect(tabs.getByRole("link")).toHaveCount(6);
+  await expect(tabs.getByRole("link", { name: "Calendar" })).toHaveCount(0);
+  await phone.page.getByRole("link", { name: "Calendar" }).click();
+  await expect(phone.page).toHaveURL(/\/calendar/u);
+  await phone.context.close();
+  await seeded.owner.dispose();
+});
+
+test("on the phone the agenda lists the days and a tap opens the day sheet", async ({
+  browser,
+  isolatedAppServer,
+}) => {
+  const seeded = await seedMonth(isolatedAppServer);
+  const { context, page } = await openCalendar(browser, seeded, { width: 390 });
+
+  await expect(page.getByRole("complementary", { name: "Day panel" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Agenda" })).toBeVisible();
+  await expect(page.getByText("3 applications sent")).toBeVisible();
+  await expect(page.getByText("Halden Systems, Northwind Labs, Ferro Cloud")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  await page.getByRole("button", { name: "Tuesday 17 November, 3 sent" }).click();
+
+  const sheet = page.getByRole("dialog");
+
+  await expect(sheet.getByRole("heading", { name: "Tuesday 17 November" })).toBeVisible();
+  await expect(sheet.getByRole("link")).toHaveCount(3);
+  await expect(sheet.getByRole("button", { name: "Close day panel" })).toBeFocused();
+  await expectNoHorizontalOverflow(page);
+
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Tuesday 17 November, 3 sent" })).toBeFocused();
+
+  await page.getByRole("button", { name: "Monday 16 November, 1 sent" }).click();
+  await page.getByRole("button", { name: "Close day panel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await context.close();
+  await seeded.owner.dispose();
+});
+
+for (const width of [390, 768, 1280, 2560]) {
+  for (const theme of ["light", "dark"] as const) {
+    test(`the Calendar has no axe violations and no sway at ${String(width)} px, ${theme}`, async ({
+      browser,
+      isolatedAppServer,
+    }) => {
+      const seeded = await seedMonth(isolatedAppServer);
+
+      const { context, page } = await openCalendar(browser, seeded, {
+        dark: theme === "dark",
+        width,
+      });
+
+      await page.getByRole("button", { name: "Tuesday 17 November, 3 sent" }).click();
+      await expect(
+        page.getByRole("heading", { name: "Tuesday 17 November", level: 2 }),
+      ).toBeVisible();
+
+      const results = await new AxeBuilder({ page }).analyze();
+
+      expect(results.violations, `${String(width)} ${theme}`).toEqual([]);
+      await expectNoHorizontalOverflow(page);
+      await page.screenshot({
+        fullPage: true,
+        path: join(process.cwd(), `test/e2e/.tmp/calendar-${String(width)}-${theme}.png`),
+      });
+
+      await context.close();
+      await seeded.owner.dispose();
+    });
+  }
+}
+
+for (const dark of [false, true]) {
+  test(`an empty Calendar passes axe in ${dark ? "dark" : "light"}`, async ({
+    browser,
+    isolatedAppServer,
+  }) => {
+    const { owner } = await ownerContextFor(isolatedAppServer.url);
+    const seeded = { applicationIds: [], owner, server: isolatedAppServer };
+    const { context, page } = await openCalendar(browser, seeded, { dark, width: 1280 });
+
+    await expect(page.getByText("Nothing yet.")).toBeVisible();
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await context.close();
+    await owner.dispose();
+  });
+}
+
+test("the Calendar needs a session", async ({ browser, isolatedAppServer }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  await page.goto(`${isolatedAppServer.url}/calendar`);
+  await expect(page).toHaveURL(/\/signin/u);
+  await context.close();
+});

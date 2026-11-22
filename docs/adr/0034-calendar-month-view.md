@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # A Calendar destination: our own month grid over existing events
