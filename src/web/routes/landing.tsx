@@ -29,10 +29,10 @@ const text = {
     "Each role is scored against your resume with plain reasons. Postings below your bar are passed over before any form opens.",
   remoteInCanada: "Remote in Canada",
   preparationBody:
-    "Application questions are filled strictly from your resume and Answer Bank. Nothing is guessed or fabricated.",
+    "Application questions are filled strictly from your resume and your Facts. Nothing is guessed or fabricated.",
   reviewBody:
-    "Anything uncertain pauses as a Hold. Answer once and every application waiting on that question moves forward.",
-  holdLabel: "Hold · needs you",
+    "Anything uncertain opens a Review. Answer once and every application waiting on that question moves forward.",
+  holdLabel: "Review · needs you",
   holdQuestion: "Are you authorized to work in the US?",
   holdUnblocks: "Unblocks 4 applications",
   holdAnswer: "Answer once",
@@ -46,7 +46,7 @@ const text = {
   returnNumeral: "VI.",
   returnName: "What comes back",
   returnBody:
-    "Every submitted application lands on your Job Board with a full record. Recruiter replies advance the card automatically.",
+    "Every submitted application lands on your Board with a full record. Recruiter replies advance the card automatically.",
   howTitleA: "How it",
   howTitleB: "works",
   howLede:
@@ -58,7 +58,7 @@ const text = {
   repliesTitleA: "Every reply,",
   repliesTitleB: "read and sorted.",
   repliesLede:
-    "Forward recruiter mail from ATS senders to Overture with one filter. Overture classifies each reply and updates the matching card on your Job Board.",
+    "Forward recruiter mail from ATS senders to Overture with one filter. Overture classifies each reply and updates the matching card on your Board.",
   forwardedMail: "Forwarded mail",
   readOnly: "read-only",
   mailNorthwindFrom: "Northwind Labs · Recruiting",
@@ -100,12 +100,12 @@ const text = {
     {
       question: "What happens when it's unsure about an answer?",
       answer:
-        "The application becomes a Hold instead of guessing. Answer once, it saves to your Answer Bank, and every waiting application moves forward.",
+        "The application opens a Review instead of guessing. Answer once, it saves to your Facts, and every waiting application moves forward.",
     },
     {
       question: "Can I see what was submitted?",
       answer:
-        "Yes. Every card on your Job Board opens a dossier with a dated Timeline, all form answers and their sources, the cover letter, the resume PDF, and recruiter emails.",
+        "Yes. Every card on your Board opens a dossier with a dated Timeline, all form answers and their sources, the cover letter, the resume PDF, and recruiter emails.",
     },
     {
       question: "Which job sites does it check?",
@@ -125,14 +125,14 @@ const text = {
     {
       number: "01",
       title: "Every answer traces to your facts",
-      body: "The Answer Bank stores each reusable answer with its exact source: your resume or a reply you saved once.",
-      proof: "Answer Bank · source linked",
+      body: "Your Facts store each reusable answer with its exact source: your resume or a reply you saved once.",
+      proof: "Facts · source linked",
     },
     {
       number: "02",
       title: "Nothing uncertain gets sent",
-      body: "When a form asks something missing from your profile, Overture pauses it as a Hold until you answer.",
-      proof: "Holds · answer once, reuse everywhere",
+      body: "When a form asks something missing from your profile, Overture opens a Review until you answer.",
+      proof: "Reviews · answer once, reuse everywhere",
     },
     {
       number: "03",
@@ -149,7 +149,7 @@ const text = {
   ],
   preparationRows: [
     ["Years of Kubernetes experience", "6 years", "From your resume"],
-    ["Authorized to work in Canada?", "Yes", "From your Answer Bank"],
+    ["Authorized to work in Canada?", "Yes", "From your Facts"],
   ],
   boardColumns: [
     { title: "Applied", count: "3", cards: [["Ferro Cloud", "DevOps Engineer"]] },
@@ -309,7 +309,7 @@ function renderHero() {
         />
         <aside
           aria-label={copy.previewStatus}
-          className={`${card} relative rounded-xl border-l-[3px] border-l-ok p-5 md:p-6`}
+          className={`${card} relative rounded-xl relative p-5 md:p-6`}
         >
           <div className="flex items-center justify-between gap-3">
             <span className="font-mono text-[12px] tracking-[0.12em] text-ok uppercase">
@@ -382,7 +382,7 @@ function renderHowItWorks() {
           className: "md:col-span-5",
           name: "Review",
           numeral: "IV.",
-          visual: renderHoldVisual(),
+          visual: renderReviewVisual(),
         })}
         {renderStep({
           body: text.overtureBody,
@@ -471,7 +471,7 @@ function renderPreparationVisual() {
   );
 }
 
-function renderHoldVisual() {
+function renderReviewVisual() {
   return (
     <div className={`${well} flex items-center justify-center p-[18px]`}>
       <div className={`${card} w-full max-w-[420px] p-5`}>
@@ -585,11 +585,11 @@ function renderWhereItApplies() {
         <p className="font-mono text-[12px] tracking-[0.12em] text-background uppercase md:text-[13px]">
           {copy.atsEyebrow}
         </p>
-        <div className="mt-5 flex flex-wrap items-end justify-between gap-x-16 gap-y-6">
+        <div className="mt-5 grid gap-x-16 gap-y-6 lg:grid-cols-2 lg:items-end">
           <h2 className="max-w-[760px] font-serif text-[clamp(34px,5vw,72px)] leading-[0.98] tracking-[-0.02em] text-balance">
             {text.appliesHeadingA} <span className="italic">{text.appliesHeadingB}</span>
           </h2>
-          <p className="max-w-[430px] text-[16.5px]">{text.appliesLede}</p>
+          <p className="text-[16.5px] lg:justify-self-end lg:max-w-[430px]">{text.appliesLede}</p>
         </div>
       </div>
       <div className={`${wrap} pt-14 pb-28`}>
