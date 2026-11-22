@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 export const CALENDAR_KINDS = ["sent", "stage", "checkin", "interview"] as const;
@@ -51,6 +51,7 @@ async function loadCalendar(range: CalendarRange) {
 export function useCalendar(range: CalendarRange) {
   return useQuery({
     queryFn: async () => loadCalendar(range),
+    placeholderData: keepPreviousData,
     queryKey: ["calendar", range.from, range.to],
   });
 }

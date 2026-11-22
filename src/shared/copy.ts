@@ -130,6 +130,7 @@ export const copy = {
     board: "Board",
     review: "Review",
     inbox: "Inbox",
+    calendar: "Calendar",
     profile: "Profile",
     readyCount: (count: number) => `Ready, ${String(count)} to send`,
     reviewCount: (count: number) => `Review, ${String(count)} waiting`,
@@ -279,6 +280,8 @@ export const copy = {
     recapBody: (input: {
       ready: { title: string; company: string }[];
       needAnswer: number;
+      sent: { title: string; company: string }[];
+      replied: { company: string }[];
       url: string;
     }) => {
       const lines =
@@ -299,6 +302,24 @@ export const copy = {
           input.needAnswer === 1
             ? "1 question needs an answer."
             : `${String(input.needAnswer)} questions need an answer.`,
+        );
+      }
+
+      if (input.sent.length > 0) {
+        lines.push(
+          "",
+          "Sent yesterday:",
+          ...input.sent.map((application) => `- ${application.title} at ${application.company}`),
+        );
+      }
+
+      if (input.replied.length > 0) {
+        lines.push(
+          "",
+          input.replied.length === 1
+            ? "1 employer replied yesterday:"
+            : "Employers replied yesterday:",
+          ...input.replied.map((reply) => `- ${reply.company}`),
         );
       }
 
@@ -732,6 +753,59 @@ export const copy = {
     earlierHeading: "Earlier versions",
     earlierNote: "Every version stays on record exactly as it was published.",
     publishedOn: (date: string) => `Published ${date}`,
+  },
+  calendar: {
+    lead: "Applications, replies and interviews by day",
+    titlePlain: "Your",
+    titleItalic: "Calendar",
+    dateLocale: "en-GB",
+    today: "Today",
+    previousMonth: "Previous month",
+    nextMonth: "Next month",
+    gridLabel: (month: string) => `${month}, one day per cell`,
+    legendLabel: "Colour key",
+    dayPanel: "Day panel",
+    closePanel: "Close day panel",
+    agenda: "Agenda",
+    loading: "Loading the Calendar",
+    emptyMonth: "Nothing yet. Applications you send and replies from employers appear here.",
+    emptyDay: "Nothing on this day.",
+    errorTitle: "The Calendar did not load.",
+    errorBody: "Your Applications are safe. Try again in a moment.",
+    retry: "Try again",
+    nothing: "nothing",
+    kinds: {
+      checkin: "Check-in",
+      closed: "Closed",
+      interview: "Interview",
+      offer: "Offer",
+      sent: "Sent",
+      stage: "Stage move",
+    },
+    countLabels: {
+      checkin: (count: number) => `${String(count)} ${count === 1 ? "check-in" : "check-ins"}`,
+      closed: (count: number) => `${String(count)} closed`,
+      interview: (count: number) => `${String(count)} ${count === 1 ? "interview" : "interviews"}`,
+      offer: (count: number) => `${String(count)} ${count === 1 ? "offer" : "offers"}`,
+      sent: (count: number) => `${String(count)} sent`,
+      stage: (count: number) => `${String(count)} ${count === 1 ? "stage move" : "stage moves"}`,
+    },
+    sentToday: (count: number) => `${String(count)} sent today`,
+    more: (count: number) => `+${String(count)} more`,
+    sentRollup: (count: number) =>
+      `${String(count)} ${count === 1 ? "application" : "applications"} sent`,
+    andMore: (names: string, count: number) => `${names} and ${String(count)} more`,
+    movedTo: (stage: string) => `Moved to ${stage}`,
+    checkinDue: "Check-in due",
+    stages: {
+      applied: "Applied",
+      closed: "Closed",
+      interviewing: "Interviewing",
+      offer: "Offer",
+      screening: "Screening",
+    },
+    closedReason: (reason: string | null) =>
+      reason === null ? "Closed" : `Closed · ${reason.replaceAll("_", " ")}`,
   },
   inbox: {
     accountNote: "Mail from other senders stays in your own mailbox and never reaches Overture.",
@@ -1652,6 +1726,44 @@ export const copy = {
         `${input.title} at ${input.company} is now in ${input.stage}. Open the Board to undo it.`,
       url: "/board",
       kind: "stage_move",
+    },
+    review: {
+      title: "A question for you",
+      body: "Open Review to answer it so these applications can go ahead.",
+      url: "/review",
+      kind: "review",
+    },
+    reply: {
+      title: (company: string) => `${company} replied`,
+      body: (title: string) => `About ${title}. Read it in Inbox.`,
+      url: "/inbox",
+      kind: "reply",
+    },
+    interview: {
+      title: (company: string) => `Interview request: ${company}`,
+      body: (title: string) => `${title}. Open the thread in Inbox to see the details.`,
+      url: "/inbox",
+      kind: "interview",
+    },
+    offer: {
+      title: (company: string) => `Offer from ${company}`,
+      body: (title: string) =>
+        `${title}. Open the thread in Inbox to see the details and what comes next.`,
+      url: "/inbox",
+      kind: "offer",
+    },
+    paused: {
+      url: "/",
+      kind: "paused",
+    },
+    failedSummary: {
+      title: (count: number) =>
+        count === 1
+          ? "Couldn't apply to 1 application"
+          : `Couldn't apply to ${String(count)} applications`,
+      body: (window: string) => `Between ${window}. Open Home to see why each one stopped.`,
+      url: "/",
+      kind: "failed",
     },
     noResponse: {
       title: "Closed as No response",

@@ -8,6 +8,8 @@ import type { PushSender } from "../platform/ports/push.ts";
 import { notifications, pushSubscriptions } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { isDemoUser } from "../demo/role.ts";
+import { isNotificationKind } from "../../shared/notifications.ts";
+import { notificationPreferenceEnabled } from "./preferences.ts";
 
 export const PUSH_NOTIFY_JOB_KIND = "push.notify";
 
@@ -61,6 +63,13 @@ export async function runNotificationPushJob(deps: PushNotifyDeps, notificationI
   }
 
   if (isDemoUser(deps.db, notification.userId)) {
+    return { gone: 0, sent: 0, skipped: true };
+  }
+
+  if (
+    isNotificationKind(notification.kind) &&
+    !notificationPreferenceEnabled(deps.db, notification.userId, notification.kind)
+  ) {
     return { gone: 0, sent: 0, skipped: true };
   }
 

@@ -1,6 +1,7 @@
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
+import { NavGlyph } from "./nav-glyph.tsx";
 import { ThemeToggle } from "./theme-toggle.tsx";
 
 export function BoardPageHeader(props: {
@@ -21,6 +22,14 @@ export function BoardPageHeader(props: {
         </h1>
       </div>
       <div className="flex flex-wrap items-center gap-3">
+        <Link
+          aria-label={copy.nav.calendar}
+          className="ibtn"
+          title={copy.nav.calendar}
+          to="/calendar"
+        >
+          <NavGlyph name="calendar" />
+        </Link>
         <ThemeToggle className="ibtn tgl" />
         <label className="field">
           <svg

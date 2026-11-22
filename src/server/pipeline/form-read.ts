@@ -9,18 +9,18 @@ import { formSignature, sanitiseFormHtml } from "../fixtures/sanitise.ts";
 import { LEVER_FIELD_TYPES, LEVER_SKIP_NAMES } from "../dispatch/ats/lever.ts";
 import { assertNoLiveTraffic, LiveServiceRequestError } from "../platform/outbound-guard.ts";
 
-export const FORM_READ_PATHS = ["lever_html", "ashby_graphql", "browser"] as const;
+export const FORM_READ_PATHS = ["lever_html", "ashby_graphql", "workable_form", "browser"] as const;
 
 export type FormReadPath = (typeof FORM_READ_PATHS)[number];
 
 export interface PlainFormReadResult {
   questions: FormQuestion[];
   formSignature: string;
-  path: "lever_html" | "ashby_graphql";
+  path: "lever_html" | "ashby_graphql" | "workable_form";
 }
 
 export interface FormReadTarget {
-  ats: "lever" | "ashby";
+  ats: "lever" | "ashby" | "workable";
   region: "us" | "eu";
   boardToken: string;
   atsJobId: string;
@@ -33,6 +33,10 @@ const LEVER_DEFAULT_JOBS_BASE_URL = "https://jobs.lever.co";
 const LEVER_EU_DEFAULT_JOBS_BASE_URL = "https://jobs.eu.lever.co";
 
 const ASHBY_DEFAULT_JOBS_BASE_URL = "https://jobs.ashbyhq.com";
+
+const WORKABLE_DEFAULT_APPLY_BASE_URL = "https://apply.workable.com";
+
+export const WORKABLE_APPLY_ORIGIN = WORKABLE_DEFAULT_APPLY_BASE_URL;
 
 const FETCH_TIMEOUT_MS = 15_000;
 
@@ -565,6 +569,109 @@ export function readAshbyGraphqlResponse(body: string) {
   } satisfies PlainFormReadResult;
 }
 
+const WORKABLE_STRUCTURAL_TYPES = new Set(["group", "hidden", "info"]);
+
+const WORKABLE_FIELD_TYPES = new Map<string, QuestionFieldType>([
+  ["text", "text"],
+  ["string", "text"],
+  ["email", "email"],
+  ["phone", "phone"],
+  ["paragraph", "textarea"],
+  ["free_text", "textarea"],
+  ["date", "date"],
+  ["number", "number"],
+  ["numeric", "number"],
+  ["boolean", "radio"],
+  ["dropdown", "select"],
+  ["multiple", "multiselect"],
+  ["multiple_choice", "multiselect"],
+  ["file", "file"],
+]);
+
+const workableOptionSchema = z
+  .object({ name: z.string(), value: z.string() })
+  .loose()
+  .transform((option) => cleanText(option.value));
+
+const workableFieldSchema = z
+  .object({
+    id: z.string().nullish(),
+    label: z.string().nullish(),
+    type: z.string().nullish(),
+    required: z.boolean().nullish(),
+    options: z.array(workableOptionSchema).nullish(),
+  })
+  .loose();
+
+const workableSectionSchema = z
+  .object({
+    name: z.string().nullish(),
+    fields: z.array(workableFieldSchema).nullish(),
+  })
+  .loose();
+
+const workableFormSchema = z.union([
+  z.array(workableSectionSchema),
+  z.object({ sections: z.array(workableSectionSchema).nullish() }).loose(),
+]);
+
+export function readWorkableFormResponse(body: string) {
+  let json: unknown;
+
+  try {
+    json = JSON.parse(body);
+  } catch {
+    return null;
+  }
+
+  const parsed = workableFormSchema.safeParse(json);
+
+  if (!parsed.success) {
+    return null;
+  }
+
+  const sections = Array.isArray(parsed.data) ? parsed.data : (parsed.data.sections ?? []);
+  const questions: FormQuestion[] = [];
+
+  for (const section of sections) {
+    for (const field of section.fields ?? []) {
+      const fieldName = (field.id ?? "").trim();
+      const label = cleanText(field.label ?? "");
+      const rawType = (field.type ?? "").trim().toLowerCase();
+      const fieldType = WORKABLE_FIELD_TYPES.get(rawType);
+
+      if (
+        fieldName === "" ||
+        label === "" ||
+        WORKABLE_STRUCTURAL_TYPES.has(rawType) ||
+        fieldType === undefined
+      ) {
+        continue;
+      }
+
+      const options = (field.options ?? []).filter((option) => option !== "");
+
+      questions.push({
+        fieldName,
+        fieldType,
+        label,
+        options: fieldType === "radio" && options.length === 0 ? ["Yes", "No"] : options,
+        required: field.required === true,
+      });
+    }
+  }
+
+  if (questions.length === 0) {
+    return null;
+  }
+
+  return {
+    questions,
+    formSignature: formSignatureForQuestions("workable_form", questions),
+    path: "workable_form" as const,
+  } satisfies PlainFormReadResult;
+}
+
 export function formSignatureForQuestions(
   action: string,
   questions: readonly Pick<FormQuestion, "fieldName">[],
@@ -602,6 +709,7 @@ export function createPlainFormReader(
     leverBaseUrl?: string | undefined;
     leverEuBaseUrl?: string | undefined;
     timeoutMs?: number;
+    workableBaseUrl?: string | undefined;
   } = {},
 ) {
   const fetcher: Fetcher =
@@ -626,6 +734,11 @@ export function createPlainFormReader(
   );
 
   const ashbyBase = (options.ashbyBaseUrl ?? ASHBY_DEFAULT_JOBS_BASE_URL).replace(/\/+$/u, "");
+
+  const workableBase = (options.workableBaseUrl ?? WORKABLE_DEFAULT_APPLY_BASE_URL).replace(
+    /\/+$/u,
+    "",
+  );
 
   async function lever(input: FormReadTarget) {
     const base = input.region === "eu" ? leverEuBase : leverBase;
@@ -671,10 +784,33 @@ export function createPlainFormReader(
     return readAshbyGraphqlResponse(await response.text());
   }
 
+  async function workable(input: FormReadTarget) {
+    const url = `${workableBase}/api/v1/jobs/${encodeURIComponent(input.atsJobId)}/form`;
+
+    const response = await guardedFetch(url, {
+      headers: { "user-agent": USER_AGENT },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return readWorkableFormResponse(await response.text());
+  }
+
   return {
     async read(input: FormReadTarget) {
       try {
-        return input.ats === "lever" ? await lever(input) : await ashby(input);
+        if (input.ats === "lever") {
+          return await lever(input);
+        }
+
+        if (input.ats === "ashby") {
+          return await ashby(input);
+        }
+
+        return await workable(input);
       } catch (error) {
         if (error instanceof LiveServiceRequestError) {
           throw error;

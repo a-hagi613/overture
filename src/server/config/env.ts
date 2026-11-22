@@ -35,6 +35,7 @@ const envSchema = z
     ASHBY_JOBS_BASE_URL: z.string().min(1).optional(),
     PERSONIO_FEED_BASE_URL: z.string().min(1).optional(),
     WORKABLE_FEED_URL: z.url().optional(),
+    WORKABLE_FORM_BASE_URL: z.url().optional(),
     APP_ORIGIN: z.url().optional(),
     ADMIN_ORIGIN: z.url().default("https://admin.tryoverture.com"),
     CF_ACCESS_AUD: z.string().min(1).optional(),
@@ -105,6 +106,11 @@ const envSchema = z
     CLOUDFLARE_ZONE_ID: z.string().min(1).optional(),
     CLOUDFLARE_EMAIL_API_BASE_URL: z.url().default("https://api.cloudflare.com/client/v4"),
     REQUIRE_EMAIL_SENDING: booleanFromString.default(false),
+    STRIPE_SECRET_KEY: z.string().min(1).optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+    STRIPE_API_BASE_URL: z.url().default("https://api.stripe.com"),
+    STRIPE_PRICE_WEEK: z.string().min(1).optional(),
+    STRIPE_PRICE_MONTH: z.string().min(1).optional(),
     VAPID_PUBLIC_KEY: z.string().min(1).optional(),
     VAPID_PRIVATE_KEY: z.string().min(1).optional(),
     VAPID_SUBJECT: z.string().min(1).default("mailto:admin@tryoverture.com"),
@@ -209,6 +215,17 @@ const envSchema = z
         code: "custom",
         message: "VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are set together or not at all.",
         path: [value.VAPID_PUBLIC_KEY === undefined ? "VAPID_PUBLIC_KEY" : "VAPID_PRIVATE_KEY"],
+      });
+    }
+
+    if ((value.STRIPE_SECRET_KEY === undefined) !== (value.STRIPE_WEBHOOK_SECRET === undefined)) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are set together or not at all: both turn billing on, neither leaves it off.",
+        path: [
+          value.STRIPE_SECRET_KEY === undefined ? "STRIPE_SECRET_KEY" : "STRIPE_WEBHOOK_SECRET",
+        ],
       });
     }
 

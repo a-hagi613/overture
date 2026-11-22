@@ -300,6 +300,9 @@ export const postings = sqliteTable(
     index("postings_apply_url_norm").on(t.applyUrlNorm),
     index("postings_closed_at").on(t.closedAt),
     index("postings_ats_closed_last_seen").on(t.ats, t.closedAt, t.lastSeenAt),
+    index("postings_open_location")
+      .on(t.city, t.countryCode, t.locationRaw, t.workplace, t.closedAt)
+      .where(sql`closed_at is null`),
   ],
 );
 
@@ -738,6 +741,22 @@ export const accountExports = sqliteTable(
   ],
 );
 
+export const customers = sqliteTable("customers", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  stripeCustomerId: text("stripe_customer_id").notNull().unique(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const stripeEvents = sqliteTable("stripe_events", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  receivedAt: integer("received_at").notNull(),
+  processedAt: integer("processed_at"),
+});
+
 export const grants = sqliteTable(
   "grants",
   {
@@ -1070,7 +1089,7 @@ export const planCache = sqliteTable(
   "plan_cache",
   {
     id: text("id").primaryKey(),
-    ats: text("ats", { enum: ["lever", "ashby"] }).notNull(),
+    ats: text("ats", { enum: ["lever", "ashby", "workable"] }).notNull(),
     formSignature: text("form_signature").notNull(),
     plan: text("plan").notNull(),
     hits: integer("hits").notNull().default(0),

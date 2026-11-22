@@ -27,6 +27,7 @@ import {
   companyBoards,
   facts,
   fxRates,
+  grants,
   ledger,
   liveCheckMail,
   mailUsage,
@@ -37,6 +38,7 @@ import {
   messageAttachments,
   messages,
   consentVersions,
+  customers,
   notifications,
   planCache,
   postingTags,
@@ -49,12 +51,15 @@ import {
   reviews,
   resumes,
   sessions,
+  stripeEvents,
   tagImports,
   users,
 } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
+import { attachApplication, ensureOpenReview } from "../pipeline/review-store.ts";
+import { ensureApplyFailuresQueued } from "../notify/failure-digest.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
 import { createConsentService } from "../profile/consent.ts";
@@ -153,7 +158,7 @@ const createCompanyBody = z.object({
 
 const createBoardBody = z.object({
   companyId: z.string().min(1),
-  ats: z.enum(["greenhouse", "lever", "ashby", "personio"]),
+  ats: z.enum(["greenhouse", "lever", "ashby", "workable", "personio"]),
   boardToken: z.string().min(1),
   region: z.enum(["us", "eu"]).default("us"),
   status: z.enum(["active", "empty", "gone", "disabled"]).default("active"),
@@ -354,7 +359,7 @@ function defaultStageFor(status: "approved" | "failed" | "needs_review" | "ready
 const createPostingBody = z.object({
   boardId: z.string().min(1),
   companyId: z.string().min(1),
-  ats: z.enum(["greenhouse", "lever", "ashby", "personio"]),
+  ats: z.enum(["greenhouse", "lever", "ashby", "workable", "personio"]),
   atsJobId: z.string().min(1),
   url: z.string().min(1),
   title: z.string().min(1),
@@ -452,6 +457,12 @@ const seedGrantBody = z.object({
   email: z.email(),
   quantity: z.number().int().min(1).max(10_000),
   idempotencyKey: z.string().min(1),
+});
+
+const ledgerApplicationBody = z.object({
+  email: z.email(),
+  applicationId: z.string().min(1),
+  commit: z.boolean().default(false),
 });
 
 const seedFactsBody = z.object({
@@ -758,7 +769,7 @@ export function createTestRoutes(
     );
   }
 
-  function seedReviewRow(body: z.infer<typeof seedReviewBody>) {
+  function questionForReview(body: z.infer<typeof seedReviewBody>) {
     const now = clock.now();
     const textNormHash = questionVariantHash(body.prompt);
 
@@ -792,6 +803,12 @@ export function createTestRoutes(
         .run();
     }
 
+    return questionId;
+  }
+
+  function seedReviewRow(body: z.infer<typeof seedReviewBody>) {
+    const now = clock.now();
+    const questionId = questionForReview(body);
     const reviewId = crypto.randomUUID();
 
     db.insert(reviews)
@@ -813,6 +830,28 @@ export function createTestRoutes(
 
     for (const applicationId of body.applicationIds) {
       db.insert(reviewApplications).values({ reviewId, applicationId }).onConflictDoNothing().run();
+    }
+
+    return { questionId, reviewId };
+  }
+
+  function openReviewThroughStore(body: z.infer<typeof seedReviewBody>) {
+    const questionId = questionForReview(body);
+
+    const reviewId = ensureOpenReview(db, clock, {
+      ats: null,
+      factKey: body.factKey ?? null,
+      fieldType: body.fieldType,
+      options: body.options,
+      prompt: body.prompt,
+      questionId,
+      reason: body.reason,
+      scope: body.scope,
+      userId: body.userId,
+    });
+
+    for (const applicationId of body.applicationIds) {
+      attachApplication(db, reviewId, applicationId);
     }
 
     return { questionId, reviewId };
@@ -1763,6 +1802,14 @@ export function createTestRoutes(
     context.json(seedReviewRow(context.req.valid("json"))),
   );
 
+  routes.post("/reviews/open", zValidator("json", seedReviewBody), (context) =>
+    context.json(openReviewThroughStore(context.req.valid("json"))),
+  );
+
+  routes.post("/notify/apply-failures/ensure", (context) =>
+    context.json({ queued: ensureApplyFailuresQueued(db, clock) }),
+  );
+
   routes.get("/reviews", zValidator("query", userQuery), (context) => {
     const { userId } = context.req.valid("query");
 
@@ -2080,6 +2127,67 @@ export function createTestRoutes(
     );
 
     return context.json({ applicationsLeft: applicationsLeft(db, user.id, clock.now()) });
+  });
+
+  routes.post("/ledger/application", zValidator("json", ledgerApplicationBody), async (context) => {
+    const { email, applicationId, commit } = context.req.valid("json");
+
+    const user = db
+      .select()
+      .from(users)
+      .where(eq(users.email, lowercased(email)))
+      .get();
+
+    if (user === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    const reserved = await retryWhenBusy(
+      () =>
+        reserveForApplication(db, clock, {
+          applicationId,
+          idempotencyKey: `test-reserve:${user.id}:${applicationId}`,
+          userId: user.id,
+        }),
+      "test.ledger.reserve",
+    );
+
+    if (commit) {
+      await retryWhenBusy(
+        () =>
+          commitForApplication(db, clock, {
+            applicationId,
+            idempotencyKey: `test-commit:${user.id}:${applicationId}`,
+            userId: user.id,
+          }),
+        "test.ledger.commit",
+      );
+    }
+
+    return context.json({
+      applicationsLeft: applicationsLeft(db, user.id, clock.now()),
+      reserved: reserved.reserved,
+    });
+  });
+
+  routes.get("/billing-state", zValidator("query", userQuery), (context) => {
+    const { userId } = context.req.valid("query");
+
+    return context.json({
+      applicationsLeft: applicationsLeft(db, userId, clock.now()),
+      grants: db
+        .select()
+        .from(grants)
+        .where(eq(grants.userId, userId))
+        .orderBy(asc(grants.createdAt))
+        .all(),
+      ledger: db
+        .select()
+        .from(ledger)
+        .where(eq(ledger.userId, userId))
+        .orderBy(asc(ledger.createdAt), asc(ledger.id))
+        .all(),
+    });
   });
 
   routes.get("/mail", (context) => {
@@ -3124,6 +3232,13 @@ export function createTestRoutes(
 
   routes.get("/ledger/rows", (context) =>
     context.json({ rows: db.select().from(ledger).all().length }),
+  );
+
+  routes.get("/stripe-state", (context) =>
+    context.json({
+      customers: db.select().from(customers).all(),
+      events: db.select().from(stripeEvents).all(),
+    }),
   );
 
   routes.get("/auth/state", (context) => {

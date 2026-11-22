@@ -27,6 +27,7 @@ import { addLocalDays, localDateAt, localDayStartFor } from "../platform/local-t
 import { enqueuePlannerDay } from "../dispatch/planner.ts";
 import { ensurePrepDailyQueued } from "../pipeline/daily-prep.ts";
 import { dueCheckins } from "../pipeline/checkins.ts";
+import { notifyPaused } from "../notify/events.ts";
 import { nextSendSlot, parseSendWindow } from "../dispatch/planning.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { copy, failedReasonText } from "../../shared/copy.ts";
@@ -737,6 +738,8 @@ export function createHomeRoutes(deps: {
     if (running) {
       enqueuePlannerDay(db, clock, user.id);
       ensurePrepDailyQueued(db, clock, user.id);
+    } else {
+      notifyPaused(db, clock, { reason: "user", userId: user.id });
     }
 
     publishEvent(db, clock, "home.updated", JSON.stringify({ running }), user.id);
