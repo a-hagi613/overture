@@ -68,11 +68,17 @@ async function moveClockTo(request: APIRequestContext, target: number) {
 async function openCalendar(
   browser: Browser,
   seeded: Seeded,
-  options: { dark?: boolean; width: number; path?: string },
+  options: {
+    beforeGoto?: (page: Page) => Promise<void>;
+    dark?: boolean;
+    timezoneId?: string;
+    width: number;
+    path?: string;
+  },
 ) {
   const context = await browser.newContext({
     storageState: await seeded.owner.storageState(),
-    timezoneId: "UTC",
+    timezoneId: options.timezoneId ?? "UTC",
     viewport: { height: options.width < 768 ? 844 : 900, width: options.width },
   });
 
@@ -84,6 +90,7 @@ async function openCalendar(
 
   const page = await context.newPage();
 
+  await options.beforeGoto?.(page);
   await page.goto(`${seeded.server.url}${options.path ?? NOVEMBER}`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
@@ -285,6 +292,31 @@ test("Calendar is the seventh destination after Inbox, and Home and Board header
   await seeded.owner.dispose();
 });
 
+test("the Calendar opens on today in the saved zone when the browser is in another zone", async ({
+  browser,
+  isolatedAppServer,
+}) => {
+  const seeded = await seedMonth(isolatedAppServer);
+
+  const { context, page } = await openCalendar(browser, seeded, {
+    beforeGoto: async (target) => {
+      await target.clock.setFixedTime(new Date("2026-11-18T02:30:00Z"));
+    },
+    timezoneId: "America/Los_Angeles",
+    width: 1280,
+  });
+
+  await expect(page.getByRole("button", { name: /^Tuesday 17 November, 3 sent/u })).toBeVisible();
+  await expect(page.locator('[data-day="2026-11-18"]')).toHaveAttribute("aria-current", "date");
+  await expect(page.locator('[data-day="2026-11-18"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("complementary", { name: "Day panel" }).getByRole("heading", { level: 2 }),
+  ).toContainText("Wednesday");
+
+  await context.close();
+  await seeded.owner.dispose();
+});
+
 test("on the phone the agenda lists the days and a tap opens the day sheet", async ({
   browser,
   isolatedAppServer,
@@ -314,6 +346,131 @@ test("on the phone the agenda lists the days and a tap opens the day sheet", asy
   await page.getByRole("button", { name: "Monday 16 November, 1 sent" }).click();
   await page.getByRole("button", { name: "Close day panel" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await context.close();
+  await seeded.owner.dispose();
+});
+
+for (const dark of [false, true]) {
+  const theme = dark ? "dark" : "light";
+
+  test(`the phone agenda passes axe and fits the screen in ${theme}`, async ({
+    browser,
+    isolatedAppServer,
+  }) => {
+    const seeded = await seedMonth(isolatedAppServer);
+    const { context, page } = await openCalendar(browser, seeded, { dark, width: 390 });
+
+    await expect(page.getByRole("heading", { name: "Agenda" })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await page.screenshot({
+      fullPage: true,
+      path: join(process.cwd(), `test/e2e/.tmp/calendar-agenda-390-${theme}.png`),
+    });
+
+    await context.close();
+    await seeded.owner.dispose();
+  });
+}
+
+test("on the phone an empty month and an empty day say so, with no agenda", async ({
+  browser,
+  isolatedAppServer,
+}) => {
+  const seeded = await seedMonth(isolatedAppServer);
+
+  const { context, page } = await openCalendar(browser, seeded, {
+    path: "/calendar?month=2026-12",
+    width: 390,
+  });
+
+  await expect(
+    page.getByText("Nothing yet. Applications you send and replies from employers appear here."),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Agenda" })).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+
+  await page.locator('[data-day="2026-12-01"]').click();
+
+  const sheet = page.getByRole("dialog");
+
+  await expect(sheet.getByRole("heading", { level: 2 })).toContainText("Tuesday");
+  await expect(sheet.getByText("Nothing on this day.")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  await context.close();
+  await seeded.owner.dispose();
+});
+
+test("the Calendar shows its busy state while a month loads and keeps the old grid", async ({
+  browser,
+  isolatedAppServer,
+}) => {
+  const seeded = await seedMonth(isolatedAppServer);
+  let holding = false;
+  const gate = Promise.withResolvers<true>();
+
+  const { context, page } = await openCalendar(browser, seeded, {
+    beforeGoto: async (target) => {
+      await target.route(/\/api\/calendar\?/u, async (route) => {
+        if (holding) {
+          await gate.promise;
+        }
+
+        await route.continue();
+      });
+    },
+    width: 1280,
+  });
+
+  const section = page.locator("section[aria-labelledby='calendar-month']");
+
+  await expect(section).toHaveAttribute("aria-busy", "false");
+  holding = true;
+  await page.getByRole("button", { name: "Next month" }).click();
+  await expect(section).toHaveAttribute("aria-busy", "true");
+  gate.resolve(true);
+  await expect(page.getByRole("heading", { name: "December 2026" })).toBeVisible();
+  await expect(section).toHaveAttribute("aria-busy", "false");
+
+  await context.close();
+  await seeded.owner.dispose();
+});
+
+test("when the Calendar does not load it says so, and Try again loads it", async ({
+  browser,
+  isolatedAppServer,
+}) => {
+  const seeded = await seedMonth(isolatedAppServer);
+  let failing = true;
+
+  const { context, page } = await openCalendar(browser, seeded, {
+    beforeGoto: async (target) => {
+      await target.route(/\/api\/calendar\?/u, async (route) => {
+        if (failing) {
+          await route.fulfill({ status: 500 });
+
+          return;
+        }
+
+        await route.continue();
+      });
+    },
+    width: 390,
+  });
+
+  await expect(page.getByRole("heading", { name: "The Calendar did not load." })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(page.getByText("Your Applications are safe. Try again in a moment.")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+
+  failing = false;
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByRole("heading", { name: "November 2026" })).toBeVisible();
+  await expect(page.getByText("3 applications sent")).toBeVisible();
 
   await context.close();
   await seeded.owner.dispose();
@@ -352,20 +509,29 @@ for (const width of [390, 768, 1280, 2560]) {
   }
 }
 
-for (const dark of [false, true]) {
-  test(`an empty Calendar passes axe in ${dark ? "dark" : "light"}`, async ({
-    browser,
-    isolatedAppServer,
-  }) => {
-    const { owner } = await ownerContextFor(isolatedAppServer.url);
-    const seeded = { applicationIds: [], owner, server: isolatedAppServer };
-    const { context, page } = await openCalendar(browser, seeded, { dark, width: 1280 });
+for (const width of [390, 1280]) {
+  for (const dark of [false, true]) {
+    const theme = dark ? "dark" : "light";
 
-    await expect(page.getByText("Nothing yet.")).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-    await context.close();
-    await owner.dispose();
-  });
+    test(`an empty Calendar passes axe at ${String(width)} px, ${theme}`, async ({
+      browser,
+      isolatedAppServer,
+    }) => {
+      const { owner } = await ownerContextFor(isolatedAppServer.url);
+      const seeded = { applicationIds: [], owner, server: isolatedAppServer };
+      const { context, page } = await openCalendar(browser, seeded, { dark, width });
+
+      await expect(page.getByText("Nothing yet.")).toBeVisible();
+      expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+      await expectNoHorizontalOverflow(page);
+      await page.screenshot({
+        fullPage: true,
+        path: join(process.cwd(), `test/e2e/.tmp/calendar-empty-${String(width)}-${theme}.png`),
+      });
+      await context.close();
+      await owner.dispose();
+    });
+  }
 }
 
 test("the Calendar needs a session", async ({ browser, isolatedAppServer }) => {

@@ -81,6 +81,14 @@ function checkinAnswerOf(value: string | null) {
   }
 }
 
+function isTimeZone(zone: string) {
+  try {
+    return new Intl.DateTimeFormat("en-US", { timeZone: zone }).format(0).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 function localDaysIn(from: number, to: number, zone: string) {
   const first = localDateAt(from, zone);
   const last = localDateAt(to - 1, zone);
@@ -371,12 +379,17 @@ export function createCalendarRoutes(deps: { auth: Auth; clock: Clock; db: AppDa
     const userId = session.user.id;
     const { timezone } = await zones.current(userId);
     const timeZone = timezone ?? "UTC";
+    const gridZone = context.req.query("timezone") ?? timeZone;
+
+    if (!isTimeZone(gridZone)) {
+      return context.json({ error: "range_invalid" }, 400);
+    }
 
     if (end <= start) {
       return context.json({ error: "range_invalid" }, 400);
     }
 
-    if (localDaysIn(start, end, timeZone) > CALENDAR_MAX_DAYS) {
+    if (localDaysIn(start, end, gridZone) > CALENDAR_MAX_DAYS) {
       return context.json({ error: "range_too_wide" }, 400);
     }
 

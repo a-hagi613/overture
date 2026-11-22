@@ -13,6 +13,7 @@ import { NavGlyph } from "../components/nav-glyph.tsx";
 import { PageHeader } from "../components/page-header.tsx";
 import { useCalendar } from "../lib/calendar-api.ts";
 import { CHIP_KINDS, monthName } from "../lib/calendar-format.ts";
+import { anchorFocus, initialFocus } from "../lib/calendar-focus.ts";
 import {
   bucketByDay,
   dateIn,
@@ -35,19 +36,17 @@ export function CalendarPage() {
   const localZone = browserZone();
   const asked = parseMonthKey(params.get("month"));
 
-  const [focus, setFocus] = useState<CalendarDate>(() => {
-    const todayLocal = dateIn(currentTime(), localZone);
-
-    return asked !== null && (asked.year !== todayLocal.year || asked.month !== todayLocal.month)
-      ? { day: 1, ...asked }
-      : todayLocal;
-  });
+  const [focus, setFocus] = useState<CalendarDate>(() =>
+    initialFocus({ asked, now: currentTime(), zone: localZone }),
+  );
 
   const [selected, setSelected] = useState<CalendarDate>(focus);
+  const [navigated, setNavigated] = useState(false);
+  const [zoneSynced, setZoneSynced] = useState(localZone);
   const [panelOpen, setPanelOpen] = useState(tablet);
   const { month, year } = focus;
   const range = monthRange(year, month, localZone);
-  const { data, isError, isPending, refetch } = useCalendar(range);
+  const { data, isError, isFetching, refetch } = useCalendar(range, localZone);
   const zone = data?.timeZone ?? localZone;
   const today = dateIn(currentTime(), zone);
   const buckets = bucketByDay(data?.items ?? [], zone);
@@ -60,6 +59,23 @@ export function CalendarPage() {
     setPanelOpen(tablet);
   }
 
+  if (data !== undefined && data.timeZone !== zoneSynced) {
+    setZoneSynced(data.timeZone);
+
+    const anchored = anchorFocus({
+      focus,
+      localZone,
+      navigated,
+      now: currentTime(),
+      savedZone: data.timeZone,
+    });
+
+    if (anchored !== focus) {
+      setFocus(anchored);
+      setSelected(anchored);
+    }
+  }
+
   useEffect(() => {
     if (params.get("month") !== monthKey) {
       setParams({ month: monthKey }, { replace: true });
@@ -70,14 +86,21 @@ export function CalendarPage() {
   const selectedItems = buckets.get(dayKeyOf(selected)) ?? [];
 
   const go = (date: CalendarDate) => {
+    setNavigated(true);
     setFocus(date);
     setSelected(date);
   };
 
   const select = (date: CalendarDate) => {
+    setNavigated(true);
     setFocus(date);
     setSelected(date);
     setPanelOpen(true);
+  };
+
+  const moveFocus = (date: CalendarDate) => {
+    setNavigated(true);
+    setFocus(date);
   };
 
   const closePanel = () => {
@@ -121,7 +144,7 @@ export function CalendarPage() {
     body = (
       <div className="mt-[18px] flex flex-col gap-5 lg:flex-row lg:items-start">
         <section
-          aria-busy={isPending}
+          aria-busy={isFetching}
           aria-labelledby="calendar-month"
           className="min-w-0 flex-1 rounded-lg border border-border bg-card p-4 shadow-sh md:p-5"
         >
@@ -174,7 +197,7 @@ export function CalendarPage() {
             buckets={buckets}
             focus={focus}
             month={month}
-            onFocusChange={setFocus}
+            onFocusChange={moveFocus}
             onSelect={select}
             selected={selected}
             today={today}
