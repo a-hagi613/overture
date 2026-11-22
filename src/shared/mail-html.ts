@@ -37,11 +37,11 @@ function renderBlock(block: MailBlock) {
   const items = block.items
     .map(
       (item) =>
-        `<li class="ink" style="margin:0 0 6px;font-size:15px;line-height:1.45">${escapeHtml(item)}</li>`,
+        `<li class="ink hair" style="margin:0;padding:10px 0;border-top-width:1px;border-top-style:solid;font-size:15px;line-height:1.45">${escapeHtml(item)}</li>`,
     )
     .join("");
 
-  return `<p class="lbl" style="margin:18px 0 8px">${escapeHtml(block.label)}</p><ul style="margin:0 0 14px;padding-left:20px">${items}</ul>`;
+  return `<p class="lbl" style="margin:18px 0 8px">${escapeHtml(block.label)}</p><ul style="margin:0 0 14px;padding:0;list-style:none">${items}</ul>`;
 }
 
 /**
@@ -75,6 +75,7 @@ body{margin:0;padding:0;background:#F3EEE4;font-family:-apple-system,'Segoe UI',
 .page{padding:32px 16px}
 .card{max-width:600px;margin:0 auto;background:#FBF8F2;border:1px solid rgba(21,19,17,.14);border-radius:12px;padding:32px 36px}
 .ink{color:#151311}
+.hair{border-color:rgba(21,19,17,.14)}
 .mut{color:#5E5850}
 .lbl{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#5E5850}
 .btn{background:#151311;color:#FBF8F2}
@@ -83,6 +84,7 @@ body{margin:0;padding:0;background:#F3EEE4;font-family:-apple-system,'Segoe UI',
 body,.page{background:#191714 !important}
 .card{background:#221F1C !important;border-color:rgba(242,237,228,.14) !important}
 .ink{color:#F2EDE4 !important}
+.hair{border-color:rgba(242,237,228,.14) !important}
 .mut,.lbl{color:#ADA69B !important}
 .btn{background:#F2EDE4 !important;color:#191714 !important}
 }
@@ -93,14 +95,14 @@ body,.page{background:#191714 !important}
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(input.preheader)}</div>
 <div class="page">
 <div class="card" role="article">
-<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px"><tr>
+<div style="margin:0 0 24px;padding-bottom:18px;border-bottom-width:1px;border-bottom-style:solid" class="hair"><table role="presentation" cellpadding="0" cellspacing="0"><tr>
 <td style="padding-right:10px"><img src="${escapeHtml(input.logoUrl)}" width="28" height="28" alt="" style="display:block;border:0"></td>
 <td class="serif ink" style="font-size:24px;line-height:1">Overture</td>
-</tr></table>
-<h1 class="serif ink" style="margin:0 0 18px;font-size:30px;line-height:1.1">${escapeHtml(input.heading)}</h1>
+</tr></table></div>
+<h1 class="serif ink" style="margin:0 0 18px;font-size:38px;line-height:1.04">${escapeHtml(input.heading)}</h1>
 ${blocks}
 ${cta}
-<div style="margin-top:28px;padding-top:18px;border-top:1px solid rgba(21,19,17,.14)">${footer}</div>
+<div style="margin-top:28px;padding-top:18px;border-top-width:1px;border-top-style:solid" class="hair">${footer}</div>
 </div>
 </div>
 </body>

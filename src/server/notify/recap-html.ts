@@ -1,5 +1,5 @@
-import { renderMailHtml } from "./mail-html.ts";
-import type { MailBlock } from "./mail-html.ts";
+import { renderMailHtml } from "../../shared/mail-html.ts";
+import type { MailBlock } from "../../shared/mail-html.ts";
 
 export interface RecapHtmlInput {
   logoUrl: string;

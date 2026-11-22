@@ -709,7 +709,7 @@ test("the recap sends one push and one email per run, lists yesterday's sends an
   await moveClockTo(owner, runAt);
 
   const ready = await seedReadyApplication(owner, {
-    company: "Recap Direct",
+    company: "Recap & Direct",
     domain: "recap-direct.example",
     readyAt: runAt,
     title: "Staff Platform Engineer",
@@ -784,14 +784,15 @@ test("the recap sends one push and one email per run, lists yesterday's sends an
   const [recap] = await mailFor(owner);
 
   expect(recap?.subject).toBe("Overture recap: 1 ready to approve, 1 need an answer");
-  expect(recap?.body).toContain("Staff Platform Engineer at Recap Direct");
+  expect(recap?.body).toContain("Staff Platform Engineer at Recap & Direct");
   expect(recap?.body).toContain("Sent yesterday:");
   expect(recap?.body).toContain("Platform Engineer at Northwind Labs");
   expect(recap?.body).toContain("1 employer replied yesterday:");
   expect(recap?.body).toContain("- Northwind Labs");
   expect(recap?.body).not.toContain("- Halden Systems");
   expect(recap?.html).toContain("<!doctype html>");
-  expect(recap?.html).toContain("Staff Platform Engineer at Recap Direct");
+  expect(recap?.html).toContain("Staff Platform Engineer at Recap &amp; Direct");
+  expect(recap?.html).not.toContain("Recap & Direct");
   expect(recap?.html).toContain("1 employer replied yesterday");
   expect(recap?.html).toMatch(/href="[^"]+\/ready"/u);
   expect(recap?.html).toContain("@media (prefers-color-scheme: dark)");
