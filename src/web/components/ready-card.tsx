@@ -168,7 +168,7 @@ export function ReadyCard(props: {
                       {isEditing ? null : (
                         <button
                           aria-label={copy.ready.editAria(answer.label)}
-                          className="min-h-8 px-0 py-1.5 text-[12.5px] font-semibold text-foreground underline underline-offset-[3px]"
+                          className="min-h-8 px-0 py-1.5 text-[12.5px] font-semibold text-foreground underline underline-offset-[3px] max-[767px]:min-h-11"
                           onClick={() => {
                             startEdit(answer);
                           }}
