@@ -5,10 +5,10 @@ import { copy } from "../../shared/copy.ts";
 type TabKey = keyof typeof copy.settingsAccount.tabs;
 
 const tabs: { key: TabKey; to: string | null }[] = [
-  { key: "notifications", to: null },
+  { key: "notifications", to: "/settings" },
   { key: "export", to: "/settings/export" },
   { key: "delete", to: "/settings/delete" },
-  { key: "supportAccess", to: null },
+  { key: "supportAccess", to: "/settings/support-access" },
   { key: "legal", to: null },
 ];
 

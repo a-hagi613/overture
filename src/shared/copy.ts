@@ -112,6 +112,13 @@ export function failedReasonText(reason: string | null) {
   return FAILED_REASON_TEXT.get(reason ?? "");
 }
 
+const ADMIN_PROBE_OUTCOME_LABELS = new Map([
+  ["readable", "Complete"],
+  ["needs_review", "Needs a review"],
+  ["unsupported", "Unsupported field"],
+  ["unreadable", "Unreadable"],
+]);
+
 export const copy = {
   app: {
     name: "Overture",
@@ -135,6 +142,15 @@ export const copy = {
     readyCount: (count: number) => `Ready, ${String(count)} to send`,
     reviewCount: (count: number) => `Review, ${String(count)} waiting`,
     inboxCount: (count: number) => `Inbox, ${String(count)} unread`,
+  },
+  settingsMenu: {
+    label: "Settings",
+    pagesLabel: "Show settings pages",
+    profileData: "Profile data",
+    export: "Export",
+    supportAccess: "Support access",
+    delete: "Delete account",
+    legal: "Terms and privacy",
   },
   brand: {
     homeAria: "Overture, Home",
@@ -1011,6 +1027,26 @@ export const copy = {
     legalConsentRead: "Read the consent",
     legalOpen: "Open",
     legalSeparator: " · ",
+    notificationsHeading: "Notifications",
+    notificationsIntro:
+      "Turn the recap email or a kind of push off. Each switch takes effect at once.",
+    recapTitle: "Recap email",
+    recapDetail:
+      "Yesterday’s applications sent, replies, open Reviews and check-ins, once each morning.",
+    pushTitle: "Push notifications",
+    pushIntro: "A push opens the app. Nothing is approved by a push or a link.",
+    pushKinds: {
+      ready: { label: "Ready to approve", detail: "Applications waiting for your approval." },
+      review: { label: "New Review", detail: "A question that needs your answer." },
+      reply: { label: "Employer reply", detail: "An employer wrote back to an application." },
+      interview: { label: "Interview", detail: "An interview was detected." },
+      offer: { label: "Offer", detail: "An offer was detected." },
+      stage_move: { label: "Card moved", detail: "A card moved for you, with Undo." },
+      code_wait: { label: "Code to paste", detail: "A verification code is waiting." },
+      paused: { label: "Paused", detail: "Overture paused, with the reason." },
+      failed: { label: "Couldn’t apply", detail: "Applications that could not be sent." },
+    },
+    notificationsSaveError: "We could not save that. Check your connection and try again.",
     dangerHeading: "Danger zone",
     deleteTitle: "Delete account",
     deleteDetail: "Permanently deletes your facts, letters and applications. This can’t be undone.",
@@ -1026,6 +1062,31 @@ export const copy = {
       legal: "Terms and privacy",
     },
     unavailable: "This page arrives with its own ticket.",
+    viewLog: "View log",
+    supportAccessRow: "Support access log",
+    supportAccessDetail:
+      "Each time support opens your account, it is recorded here with the reason.",
+    supportAccessPage: {
+      eyebrow: "— Settings",
+      titlePlain: "Support",
+      titleItalic: "access log",
+      lead: "Every time support opened your account, and why",
+      headingPlain: "Your",
+      headingItalic: "entries",
+      intro: "Each row is one Reveal of your data, with the date and the reason given.",
+      actions: {
+        "reveal.open": "Opened your account",
+        "reveal.view": "Viewed your data",
+        "reveal.close": "Closed the view",
+        "reveal.expired": "Access expired",
+      },
+      reason: "Reason",
+      emptyTitle: "No access so far.",
+      emptyBody: "Nobody on the support team has opened your account.",
+      errorTitle: "The log did not load.",
+      errorBody: "Nothing was changed. Try again in a moment.",
+      retry: "Try again",
+    },
   },
   deleteAccount: {
     titlePlain: "Delete your",
@@ -1630,6 +1691,33 @@ export const copy = {
     skipNote: "Skip anything. Unanswered questions wait in Review.",
     back: "Back",
     continue: "Continue",
+    trial: {
+      stepLabel: "Trial card",
+      eyebrow: "Overture · Set up",
+      titlePlain: "Verify a card for your",
+      titleItalic: "three",
+      titleRest: "free Applications",
+      kicker: "One free trial per card",
+      stepPill: "Step 6 of 6",
+      verifyTitle: "Verify a card",
+      intro:
+        "Stripe checks the card. Nothing is charged for the trial. Once it is verified, Overture prepares your first 3 free Applications and you approve each one before it is sent. One free trial per card.",
+      verifyButton: "Verify card",
+      verifying: "Checking the card…",
+      backButton: "Back",
+      declinedTitle: "Card declined",
+      declinedBody:
+        "Your bank declined this card. Nothing was charged and no Applications were prepared. Try another card, or choose a plan.",
+      tryAnother: "Try another card",
+      usedHeading: "Card already used",
+      usedTitle: "Trial used",
+      usedBody:
+        "This card has already had its free trial. Choose a plan to prepare Applications with it, or use another card.",
+      choosePlan: "Choose a plan",
+      anotherCard: "Use another card",
+      startButton: "Start",
+      loadFailed: "The card check did not go through. Try again in a moment.",
+    },
     forward: {
       titlePlain: "Forward your",
       titleItalic: "job mail",
@@ -2049,6 +2137,25 @@ export const copy = {
     catalogSwitchState: "Kill switch",
     catalogSwitchUnset: "Never set",
     catalogNotDiscovered: "The catalog has not been discovered yet.",
+    catalogProbeHeading: "Personio probe",
+    catalogProbeLead:
+      "Reads up to twenty open Personio forms over plain HTTP, without a browser and without submitting.",
+    catalogProbeRun: "Run the probe",
+    catalogProbeQueued: "The probe is queued. Refresh to see its results.",
+    catalogProbeEmpty: "No Personio form has been probed yet.",
+    catalogProbePassed: "The probe passes.",
+    catalogProbeFailed: "The probe does not pass yet.",
+    catalogProbeRanAt: (at: string) => `Last probed ${at}`,
+    catalogProbeSummary: (input: {
+      total: number;
+      readable: number;
+      needsReview: number;
+      unreadable: number;
+      unsupported: number;
+    }) =>
+      `${String(input.total)} forms: ${String(input.readable)} complete, ${String(input.needsReview)} need a review, ${String(input.unreadable)} unreadable, ${String(input.unsupported)} unsupported`,
+    catalogProbeOutcome: (outcome: string) =>
+      ADMIN_PROBE_OUTCOME_LABELS.get(outcome) ?? "Unreadable",
     catalogDiscoveredAt: (at: string) => `Last discovered ${at}`,
     grantsTitlePlain: "Applications",
     grantsTitleItalic: "granted",

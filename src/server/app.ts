@@ -234,6 +234,8 @@ export function createApp(deps: AppDependencies) {
     createBillingRoutes({
       appOrigin: env.APP_ORIGIN ?? "http://localhost:3000",
       auth: deps.auth,
+      cardFingerprintSecret: env.CARD_FINGERPRINT_SECRET ?? null,
+      clock: deps.clock,
       db: deps.db,
       payments: deps.payments,
     }),
@@ -304,6 +306,7 @@ export function createApp(deps: AppDependencies) {
   app.route(
     "/",
     createStripeWebhookRoutes({
+      cardFingerprintSecret: env.CARD_FINGERPRINT_SECRET ?? null,
       clock: deps.clock,
       db: deps.db,
       payments: deps.payments,

@@ -214,6 +214,8 @@ path. There is no cheaper token left to buy except a cheaper model, which is lev
   that day, with only an `llm.cap` alert. The cap is doing the job; the loop makes it fire.
 - **Fix:** bound the search at a multiple of `need` (for example 3× the daily cap), and alert when the bound is hit so
   the threshold, not the cap, is what is tuned.
+- **Fixed in #388:** the daily run scores at most 3× `limits.daily_cap` postings, stops there and raises
+  `match.score_bound` with the threshold, the need and the counts.
 
 ### 5.4 Minor accounting notes
 

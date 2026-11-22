@@ -102,6 +102,22 @@ async function billingState(request: APIRequestContext, appUrl: string, userId: 
   );
 }
 
+async function waitForExpirySweep(request: APIRequestContext, appUrl: string, userId: string) {
+  await expect
+    .poll(
+      async () => {
+        const { ledger } = await billingState(request, appUrl, userId);
+
+        return {
+          expire: ledger.some((row) => row.kind === "expire"),
+          release: ledger.some((row) => row.kind === "release"),
+        };
+      },
+      { timeout: 30_000 },
+    )
+    .toStrictEqual({ expire: true, release: true });
+}
+
 async function reserveApplication(
   request: APIRequestContext,
   appUrl: string,
@@ -219,11 +235,15 @@ test("a paid month grants 300, a replay grants once, expiry releases then expire
 
     const swept = await request.post(`${server.url}/__test__/jobs/run-due`);
 
-    expect(runDueSchema.parse(await swept.json()).ran).toBeGreaterThanOrEqual(1);
+    expect(swept.ok()).toBe(true);
+    runDueSchema.parse(await swept.json());
 
-    const expired = await billingState(request, server.url, ownerId);
     const [firstGrant] = granted.grants;
     const grantId = firstGrant?.id ?? "";
+
+    await waitForExpirySweep(request, server.url, ownerId);
+
+    const expired = await billingState(request, server.url, ownerId);
 
     const reserveRow = expired.ledger.find(
       (row) => row.kind === "reserve" && row.applicationId === "app-expiring",

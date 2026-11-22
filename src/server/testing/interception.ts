@@ -37,6 +37,7 @@ const recordedVerificationSchema = z.object({
 
 const loopbackPassthrough = [
   http.all(/^http:\/\/(?:127\.0\.0\.1|localhost):\d+\/.*/u, () => passthrough()),
+  http.all(/^http:\/\/\[::1\]:\d+\/.*/u, () => passthrough()),
 ];
 
 function fixturePassthrough(request: Request) {

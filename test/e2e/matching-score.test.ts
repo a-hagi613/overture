@@ -76,6 +76,14 @@ const postingSchema = z.object({
 
 const appliedSchema = z.object({ applicationId: z.string(), created: z.boolean() });
 
+const notificationsSchema = z.object({
+  notifications: z.array(z.object({ body: z.string(), kind: z.string(), title: z.string() })),
+});
+
+const llmUsageSchema = z.object({
+  totals: z.object({ calls: z.number(), costMicros: z.number() }),
+});
+
 async function seedCompanies(
   owner: APIRequestContext,
   prefix: string,
@@ -116,6 +124,19 @@ async function applicationsFor(owner: APIRequestContext, userId: string) {
   ).json();
 
   return applicationsSchema.parse(body).applications;
+}
+
+async function alertsFor(owner: APIRequestContext, userId: string) {
+  const body: unknown = await (
+    await owner.get(`/__test__/notifications?userId=${encodeURIComponent(userId)}`)
+  ).json();
+
+  return notificationsSchema.parse(body).notifications.filter((note) => note.kind === "alert");
+}
+
+async function scoreSpendMicros(owner: APIRequestContext) {
+  return llmUsageSchema.parse(await (await owner.get("/__test__/llm/usage?purpose=score")).json())
+    .totals.costMicros;
 }
 
 test("the daily run fills the free Ready slots in rank order and never scores twice", async ({
@@ -166,6 +187,56 @@ test("the daily run fills the free Ready slots in rank order and never scores tw
   expect(await applicationsFor(owner, userId)).toHaveLength(10);
   expect((await matchesFor(owner, userId)).filter((row) => row.score !== null)).toHaveLength(10);
   expect(matching.anthropic.requests()).toHaveLength(10);
+
+  const alerts = await alertsFor(owner, userId);
+
+  expect(
+    alerts.filter((alert) => alert.title === "Overture alert: match.score_bound"),
+  ).toHaveLength(0);
+
+  await owner.dispose();
+});
+
+test("a strict threshold over a large pool stops at the scoring bound, alerts once and leaves the LLM cap untripped", async ({
+  matching,
+}) => {
+  const { owner, userId } = await ownerContextFor(matching.server.url);
+
+  await clearCatalog(owner);
+  await grantApplications(owner, 70);
+  await configureMatching(owner);
+
+  await owner.put("/__test__/settings/match.auto_threshold_default", { data: { value: "95" } });
+  await owner.put("/__test__/settings/llm.cap_user_day_usd", { data: { value: "0.018" } });
+
+  await seedCompanies(owner, "bound", 40, { salaryMinMinor: 15_000_000 });
+
+  await runPrepDaily(owner, matching.server.url, userId);
+
+  const scored = (await matchesFor(owner, userId)).filter((row) => row.score !== null);
+  const alerts = await alertsFor(owner, userId);
+
+  expect(scored).toHaveLength(30);
+  expect(matching.anthropic.requests()).toHaveLength(30);
+  expect(await applicationsFor(owner, userId)).toHaveLength(0);
+
+  const boundAlerts = alerts.filter((alert) => alert.title === "Overture alert: match.score_bound");
+
+  expect(boundAlerts).toHaveLength(1);
+  expect(alerts.filter((alert) => alert.title === "Overture alert: llm.cap")).toHaveLength(0);
+
+  expect(JSON.parse(boundAlerts[0]?.body ?? "{}")).toMatchObject({
+    attempts: 30,
+    bound: 30,
+    candidates: 40,
+    need: 10,
+    threshold: 95,
+  });
+
+  const spendMicros = await scoreSpendMicros(owner);
+
+  expect(spendMicros).toBeGreaterThan(0);
+  expect(spendMicros).toBeLessThan(18_000);
 
   await owner.dispose();
 });

@@ -8,19 +8,27 @@ import type { QuestionFieldType } from "../../shared/questions.ts";
 import { formSignature, sanitiseFormHtml } from "../fixtures/sanitise.ts";
 import { LEVER_FIELD_TYPES, LEVER_SKIP_NAMES } from "../dispatch/ats/lever.ts";
 import { assertNoLiveTraffic, LiveServiceRequestError } from "../platform/outbound-guard.ts";
+import { personioApplyUrl, readPersonioFormHtml } from "./personio-form.ts";
 
-export const FORM_READ_PATHS = ["lever_html", "ashby_graphql", "workable_form", "browser"] as const;
+export const FORM_READ_PATHS = [
+  "lever_html",
+  "ashby_graphql",
+  "workable_form",
+  "personio_html",
+  "browser",
+] as const;
 
 export type FormReadPath = (typeof FORM_READ_PATHS)[number];
 
 export interface PlainFormReadResult {
   questions: FormQuestion[];
   formSignature: string;
-  path: "lever_html" | "ashby_graphql" | "workable_form";
+  path: "lever_html" | "ashby_graphql" | "workable_form" | "personio_html";
+  unhandled?: string[];
 }
 
 export interface FormReadTarget {
-  ats: "lever" | "ashby" | "workable";
+  ats: "lever" | "ashby" | "workable" | "personio";
   region: "us" | "eu";
   boardToken: string;
   atsJobId: string;
@@ -799,6 +807,25 @@ export function createPlainFormReader(
     return readWorkableFormResponse(await response.text());
   }
 
+  async function personio(input: FormReadTarget) {
+    const url = personioApplyUrl(input.applyUrl ?? input.url);
+
+    if (url === null) {
+      return null;
+    }
+
+    const response = await guardedFetch(url, {
+      headers: { "user-agent": USER_AGENT },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return readPersonioFormHtml(await response.text());
+  }
+
   return {
     async read(input: FormReadTarget) {
       try {
@@ -810,7 +837,11 @@ export function createPlainFormReader(
           return await ashby(input);
         }
 
-        return await workable(input);
+        if (input.ats === "workable") {
+          return await workable(input);
+        }
+
+        return await personio(input);
       } catch (error) {
         if (error instanceof LiveServiceRequestError) {
           throw error;

@@ -8,6 +8,7 @@ type GlyphName =
   | "chevron"
   | "copy"
   | "dash"
+  | "sliders"
   | "forward"
   | "home"
   | "inbox"
@@ -66,6 +67,10 @@ const glyphs: Record<GlyphName, GlyphPaths> = {
     strokeWidth: 1.7,
   },
   dash: { paths: ["M5 12h14"], strokeWidth: 1.8 },
+  sliders: {
+    paths: ["M4 7h9", "M17 7h3", "M4 17h3", "M11 17h9", "M13 5v4", "M7 15v4"],
+    strokeWidth: 1.6,
+  },
   ready: { paths: ["M3 11l18-8-8 18-2-8-8-2z"], strokeWidth: 1.6 },
   review: {
     paths: [
