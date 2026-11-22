@@ -125,11 +125,16 @@ function freshReport() {
 
     db.insert(applications)
       .values({
+        ats: input.ats,
         companyId,
+        companyName: "Engineer Co",
+        companyNameNorm: "engineer co",
         createdAt: at,
         id: input.id,
         origin: "auto",
         postingId: `posting-${input.id}`,
+        postingTitle: "Engineer",
+        postingUrl: `https://example.test/jobs/${input.id}`,
         status: input.status,
         updatedAt: at,
         userId: input.userId,

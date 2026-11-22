@@ -116,7 +116,7 @@ export const applicationDetailSchema = z.object({
     .nullable(),
   note: noteSchema.nullable(),
   posting: z.object({
-    ats: z.string(),
+    ats: z.string().nullable(),
     id: z.string(),
     location: z.string().nullable(),
     salaryCurrency: z.string().nullable(),

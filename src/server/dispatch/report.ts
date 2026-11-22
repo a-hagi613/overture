@@ -3,7 +3,7 @@ import { and, desc, eq, gte, sql } from "drizzle-orm";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
-import { applications, attempts, postings, users } from "../platform/db/schema.ts";
+import { applications, attempts, users } from "../platform/db/schema.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 import { percentile, ratio } from "../platform/stats.ts";
 
@@ -115,7 +115,7 @@ const sinceOf = (clock: Clock) => clock.now() - COST_REPORT_WINDOW_DAYS * DAY_MS
 const readGroupTotals = (db: AppDatabase, sinceMs: number) =>
   db
     .select({
-      ats: postings.ats,
+      ats: applications.ats,
       provider: attempts.provider,
       userId: applications.userId,
       attemptedApplications: sql<number>`count(distinct case when ${ATTEMPTED} then ${attempts.applicationId} end)`,
@@ -130,10 +130,9 @@ const readGroupTotals = (db: AppDatabase, sinceMs: number) =>
     })
     .from(attempts)
     .innerJoin(applications, eq(attempts.applicationId, applications.id))
-    .innerJoin(postings, eq(applications.postingId, postings.id))
     .innerJoin(users, eq(users.id, applications.userId))
     .where(and(sql`${users.role} <> 'demo'`, gte(attempts.startedAt, sinceMs)))
-    .groupBy(attempts.provider, postings.ats, applications.userId)
+    .groupBy(attempts.provider, applications.ats, applications.userId)
     .all();
 
 const summariseGroups = (totals: GroupTotals[]) => {

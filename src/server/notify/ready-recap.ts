@@ -9,11 +9,9 @@ import { copy } from "../../shared/copy.ts";
 import { isDemoRole } from "../../shared/demo.ts";
 import {
   applications,
-  companies,
   mailThreads,
   messages,
   notifications,
-  postings,
   reviews,
   users,
 } from "../platform/db/schema.ts";
@@ -72,10 +70,8 @@ export function enqueueReadyNotify(db: AppDatabase, clock: Clock, userId: string
 
 function sentYesterday(db: AppDatabase, userId: string, start: number, end: number) {
   return db
-    .select({ company: companies.name, title: postings.title })
+    .select({ company: applications.companyName, title: applications.postingTitle })
     .from(applications)
-    .innerJoin(postings, eq(postings.id, applications.postingId))
-    .innerJoin(companies, eq(companies.id, postings.companyId))
     .where(
       and(
         eq(applications.userId, userId),
@@ -103,11 +99,10 @@ export const REPLY_CLASSIFICATIONS = [
 
 function repliedYesterday(db: AppDatabase, userId: string, start: number, end: number) {
   return db
-    .selectDistinct({ company: companies.name })
+    .selectDistinct({ company: applications.companyName })
     .from(messages)
     .innerJoin(mailThreads, eq(mailThreads.id, messages.threadId))
     .innerJoin(applications, eq(applications.id, mailThreads.applicationId))
-    .innerJoin(companies, eq(companies.id, applications.companyId))
     .where(
       and(
         eq(messages.userId, userId),
@@ -117,16 +112,14 @@ function repliedYesterday(db: AppDatabase, userId: string, start: number, end: n
         lt(messages.createdAt, new Date(end)),
       ),
     )
-    .orderBy(asc(companies.name))
+    .orderBy(asc(applications.companyName))
     .all();
 }
 
 function recapContent(db: AppDatabase, userId: string, since: number) {
   const ready = db
-    .select({ company: companies.name, title: postings.title })
+    .select({ company: applications.companyName, title: applications.postingTitle })
     .from(applications)
-    .innerJoin(postings, eq(postings.id, applications.postingId))
-    .innerJoin(companies, eq(companies.id, postings.companyId))
     .where(
       and(
         eq(applications.userId, userId),
