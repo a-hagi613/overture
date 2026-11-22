@@ -1,9 +1,0 @@
-dbs:
-  - path: /data/app.sqlite
-    replicas:
-      - type: s3
-        endpoint: https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com
-        bucket: ${R2_BUCKET_BACKUPS}
-        path: app.sqlite
-        access-key-id: ${R2_DRILL_ACCESS_KEY_ID}
-        secret-access-key: ${R2_DRILL_SECRET_ACCESS_KEY}

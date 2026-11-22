@@ -1,1 +1,0 @@
-CREATE INDEX `postings_open_location` ON `postings` (`city`,`country_code`,`location_raw`,`workplace`,`closed_at`) WHERE closed_at is null;

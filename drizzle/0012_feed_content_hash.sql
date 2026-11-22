@@ -1,1 +1,0 @@
-ALTER TABLE `postings` ADD `feed_content_hash` text;
