@@ -140,7 +140,12 @@ test.describe("the setup-mode webhook grants the trial once", () => {
   const setupEvent = {
     customerId: null,
     id: "evt_setup_1",
+    invoiceId: null,
     mode: "setup",
+    periodEndMs: null,
+    periodStartMs: null,
+    plan: null,
+    priceId: null,
     sessionId: "cs_setup_1",
     type: "checkout.session.completed",
     userId: "user-1",
@@ -149,7 +154,7 @@ test.describe("the setup-mode webhook grants the trial once", () => {
   test("records the card and grants three Applications inside the webhook transaction", () => {
     const { clock, db } = freshDatabase();
     const hmac = cardFingerprintHmac(SECRET, STRIPE_FINGERPRINT);
-    const webhooks = createPaymentsWebhookService({ clock, db });
+    const webhooks = createPaymentsWebhookService({ clock, db, planForPrice: () => null });
 
     expect(webhooks.handle(setupEvent, { hmac, userId: "user-1" })).toBe("processed");
     expect(applicationsLeft(db, "user-1", clock.now())).toBe(3);
@@ -161,7 +166,7 @@ test.describe("the setup-mode webhook grants the trial once", () => {
   test("a redelivered event is a duplicate and grants nothing more", () => {
     const { clock, db } = freshDatabase();
     const hmac = cardFingerprintHmac(SECRET, STRIPE_FINGERPRINT);
-    const webhooks = createPaymentsWebhookService({ clock, db });
+    const webhooks = createPaymentsWebhookService({ clock, db, planForPrice: () => null });
 
     webhooks.handle(setupEvent, { hmac, userId: "user-1" });
 
@@ -172,7 +177,7 @@ test.describe("the setup-mode webhook grants the trial once", () => {
   test("a card already used by another account is refused in the webhook too", () => {
     const { clock, db } = freshDatabase();
     const hmac = cardFingerprintHmac(SECRET, STRIPE_FINGERPRINT);
-    const webhooks = createPaymentsWebhookService({ clock, db });
+    const webhooks = createPaymentsWebhookService({ clock, db, planForPrice: () => null });
 
     webhooks.handle(setupEvent, { hmac, userId: "user-1" });
     webhooks.handle(

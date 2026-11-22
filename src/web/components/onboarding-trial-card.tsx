@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+import type { RefObject } from "react";
 import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
@@ -13,17 +15,25 @@ const pillStyle = {
 } as const;
 
 function stateHeading({
+  headingRef,
   pill,
   state,
   title,
 }: {
+  headingRef: RefObject<HTMLHeadingElement | null>;
   pill: string;
   state: TrialCardState;
   title: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <h2 className="serif" id="ob-h" style={{ fontSize: 28, lineHeight: 1.1 }}>
+      <h2
+        className="serif"
+        id="ob-h"
+        ref={headingRef}
+        style={{ fontSize: 28, lineHeight: 1.1 }}
+        tabIndex={-1}
+      >
         {title}
       </h2>
       <span className="pill" style={pillStyle[state]}>
@@ -44,24 +54,50 @@ export function OnboardingTrialCard({
   onVerify: () => void;
   state: TrialCardState;
 }) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  const errorLine = error ? (
+    <p className="hint mt-4" role="alert" style={{ color: "var(--need)" }}>
+      {text.loadFailed}
+    </p>
+  ) : null;
+
+  useEffect(() => {
+    if (state !== "verify") {
+      headingRef.current?.focus();
+    }
+  }, [state]);
+
   if (state === "declined") {
     return (
       <section
         aria-labelledby="ob-h"
         className="obd rounded-lg border border-border bg-card p-5 shadow-sh"
       >
-        {stateHeading({ pill: text.declinedTitle, state: "declined", title: text.declinedTitle })}
+        {stateHeading({
+          headingRef,
+          pill: text.declinedTitle,
+          state: "declined",
+          title: text.declinedTitle,
+        })}
         <p className="hint mt-3 max-w-[620px]" role="alert">
           {text.declinedBody}
         </p>
         <div className="mt-4 flex flex-wrap gap-2.5">
-          <button className="btn" onClick={onVerify} style={{ minHeight: 44 }} type="button">
+          <button
+            className="btn"
+            disabled={busy}
+            onClick={onVerify}
+            style={{ minHeight: 44 }}
+            type="button"
+          >
             {text.tryAnother}
           </button>
           <Link className="btn2" style={{ minHeight: 44 }} to="/settings/billing">
             {text.choosePlan}
           </Link>
         </div>
+        {errorLine}
       </section>
     );
   }
@@ -72,7 +108,7 @@ export function OnboardingTrialCard({
         aria-labelledby="ob-h"
         className="obd rounded-lg border border-border bg-card p-5 shadow-sh"
       >
-        {stateHeading({ pill: text.usedTitle, state: "used", title: text.usedHeading })}
+        {stateHeading({ headingRef, pill: text.usedTitle, state: "used", title: text.usedHeading })}
         <p className="hint mt-3 max-w-[620px]" role="alert">
           {text.usedBody}
         </p>
@@ -80,10 +116,17 @@ export function OnboardingTrialCard({
           <Link className="btn2" style={{ minHeight: 44 }} to="/settings/billing">
             {text.choosePlan}
           </Link>
-          <button className="btn2" onClick={onVerify} style={{ minHeight: 44 }} type="button">
+          <button
+            className="btn2"
+            disabled={busy}
+            onClick={onVerify}
+            style={{ minHeight: 44 }}
+            type="button"
+          >
             {text.anotherCard}
           </button>
         </div>
+        {errorLine}
       </section>
     );
   }
@@ -93,7 +136,7 @@ export function OnboardingTrialCard({
       aria-labelledby="ob-h"
       className="obd rounded-lg border border-border bg-card p-5 shadow-sh"
     >
-      {stateHeading({ pill: text.stepPill, state: "verify", title: text.verifyTitle })}
+      {stateHeading({ headingRef, pill: text.stepPill, state: "verify", title: text.verifyTitle })}
       <p className="hint mt-3 max-w-[620px]">{text.intro}</p>
       <div className="mt-4 flex flex-wrap gap-2.5">
         <button
@@ -109,11 +152,7 @@ export function OnboardingTrialCard({
           {text.backButton}
         </Link>
       </div>
-      {error ? (
-        <p className="hint mt-4" role="alert" style={{ color: "var(--need)" }}>
-          {text.loadFailed}
-        </p>
-      ) : null}
+      {errorLine}
     </section>
   );
 }

@@ -31,6 +31,7 @@ const setupSessionSchema = z.object({
 });
 
 const verifiedSetupSessionSchema = z.object({
+  mode: z.string().nullable().optional(),
   status: z.string().nullable(),
   client_reference_id: z.string().nullable().optional(),
   customer: z.string().nullable().optional(),
@@ -359,6 +360,7 @@ export function createStripePayments(config: StripePaymentsConfig) {
       const fingerprint = session.setup_intent?.payment_method?.card?.fingerprint ?? null;
 
       if (
+        session.mode !== "setup" ||
         session.status !== "complete" ||
         session.setup_intent?.status !== "succeeded" ||
         fingerprint === null

@@ -7,7 +7,11 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PaymentEvent, Payments } from "../platform/ports/payments.ts";
 
-import { cardFingerprintHmac, claimTrialCard } from "../billing/card-fingerprint.ts";
+import {
+  cardFingerprintHmac,
+  claimTrialCard,
+  TRIAL_APPLICATIONS,
+} from "../billing/card-fingerprint.ts";
 import { planForPriceId, stripePriceId } from "../billing/index.ts";
 import { stripeCustomerIdFor } from "../billing/customers.ts";
 import { createPaymentsWebhookService } from "../billing/webhooks.ts";
@@ -208,7 +212,7 @@ export function createBillingRoutes(deps: {
       context.header("Cache-Control", "no-store");
 
       if (claim.status === "granted") {
-        return context.json({ result: "granted", applications: 3 });
+        return context.json({ result: "granted", applications: TRIAL_APPLICATIONS });
       }
 
       return context.json({ error: claim.status }, 409);

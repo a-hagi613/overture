@@ -14,11 +14,6 @@ type BillingDb = BaseSQLiteDatabase<"sync", void>;
 /** The Applications a verified card gets once, as the free trial (SPEC, M3). */
 export const TRIAL_APPLICATIONS = 3;
 
-export type TrialClaim =
-  | { status: "granted" }
-  | { status: "already_used" }
-  | { status: "already_trialed" };
-
 /**
  * HMAC-SHA256 of Stripe's card fingerprint, keyed by a server secret.
  *
