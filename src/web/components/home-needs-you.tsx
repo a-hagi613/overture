@@ -21,7 +21,7 @@ export function HomeNeedsYou(props: {
   return (
     <section
       aria-labelledby="home-needs-you"
-      className="min-w-0 flex-[1_1_380px] rounded-lg border border-border bg-card px-4 pb-5 pt-[22px] shadow-sh min-[768px]:px-6 min-[768px]:pb-2"
+      className="min-w-0 flex-[1_1_380px] rounded-lg border border-border bg-card px-4 pb-2 pt-[22px] shadow-sh min-[768px]:px-6"
     >
       <div>
         <h2 className="font-serif text-[26px] leading-[1.5]" id="home-needs-you">

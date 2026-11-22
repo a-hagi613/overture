@@ -15,7 +15,7 @@ const referenceSchema = z.object({
   page: z.object({ height: z.number(), width: z.number() }),
 });
 
-const USAGE_SUFFIX = "aside>div:nth-of-type(2)>div:nth-of-type(1)";
+const USAGE_SUFFIX = "aside>div>div:nth-of-type(2)>div:nth-of-type(2)";
 
 function rectOfBox(box: z.infer<typeof boxSchema>) {
   const x = Math.round(box.x);

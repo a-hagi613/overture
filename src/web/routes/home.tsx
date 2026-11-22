@@ -186,7 +186,7 @@ export function HomePage() {
           {RANGE_KEYS.map((key) => (
             <button
               aria-pressed={key === rangeKey}
-              className={`inline-flex min-h-[34px] items-center rounded-[5px] px-[15px] text-[12.5px] font-semibold ${
+              className={`inline-flex min-h-[34px] items-center rounded-[5px] px-[15px] text-[12.5px] font-semibold max-[767px]:min-h-11 ${
                 key === rangeKey
                   ? "bg-card text-foreground shadow-sh"
                   : "text-muted-foreground hover:text-foreground"
