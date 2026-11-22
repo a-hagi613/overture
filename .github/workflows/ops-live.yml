@@ -224,24 +224,34 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           set -uo pipefail
-          status=0
-          output="$(timeout 600s flyctl ssh console -a overture-web -C "mkdir -p /data/seed && chown app:app /data/seed && gosu app bun run /app/scripts/fetch-seed.ts --dir /data/seed && gosu app bun run /app/scripts/load-discovered-boards.ts --db /data/app.sqlite --manifest /data/seed/manifest.json --companies /data/seed/companies.parquet && gosu app bun run /app/scripts/enqueue-backfill.ts --db /data/app.sqlite" 2>&1)" || status=$?
-          printf '%s\n' "$output"
-          {
-            echo "### Catalog seed and backfill queue"
-            echo ""
-            echo '```'
+          run_ssh() {
+            duration="$1"
+            label="$2"
+            remote_command="$3"
+            status=0
+            output="$(timeout "$duration" flyctl ssh console -a overture-web -C "$remote_command" 2>&1)" || status=$?
             printf '%s\n' "$output"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          if [ "$status" -eq 124 ]; then
-            echo "::error::The catalog seed did not answer within 600s (machine down or unresponsive)."
-            exit 1
-          fi
-          if [ "$status" -ne 0 ]; then
-            echo "::error::The catalog seed failed on overture-web (exit $status)."
-            exit 1
-          fi
+            {
+              echo "### $label"
+              echo ""
+              echo '```'
+              printf '%s\n' "$output"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            if [ "$status" -eq 124 ]; then
+              echo "::error::$label did not answer within $duration (machine down or unresponsive)."
+              exit 1
+            fi
+            if [ "$status" -ne 0 ]; then
+              echo "::error::$label failed on overture-web (exit $status)."
+              exit 1
+            fi
+          }
+          run_ssh 60s "create /data/seed" "mkdir -p /data/seed"
+          run_ssh 60s "chown /data/seed" "chown app:app /data/seed"
+          run_ssh 300s "fetch-seed" "gosu app bun run /app/scripts/fetch-seed.ts --dir /data/seed"
+          run_ssh 300s "load-discovered-boards" "gosu app bun run /app/scripts/load-discovered-boards.ts --db /data/app.sqlite --manifest /data/seed/manifest.json --companies /data/seed/companies.parquet"
+          run_ssh 120s "enqueue-backfill" "gosu app bun run /app/scripts/enqueue-backfill.ts --db /data/app.sqlite"
 
       - name: Verify the production health route after the catalog seed
         if: steps.guard.outputs.skip != 'true' && inputs.action == 'seed-catalog'

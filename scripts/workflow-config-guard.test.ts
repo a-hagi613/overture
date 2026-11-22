@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { findBunVersionDrift, readBunVersions } from "./workflow-config-guard.ts";
+import { findBunVersionDrift, readBunVersions, readWorkflowStep } from "./workflow-config-guard.ts";
 
 const pinned = "1.4.5";
 
@@ -53,6 +53,55 @@ test("readBunVersions reads every setup-bun pin in a workflow", () => {
   ].join("\n");
 
   expect(readBunVersions(source)).toStrictEqual(["1.4.5", "latest"]);
+});
+
+function readSeedStep() {
+  return (
+    readWorkflowStep(
+      readFileSync(".github/workflows/ops-live.yml", "utf8"),
+      "Seed the catalog and enqueue the backfill on overture-web",
+    ) ?? ""
+  );
+}
+
+test("readWorkflowStep slices one step and returns null for a missing name", () => {
+  const source = [
+    "      - name: one",
+    "        run: |",
+    "          echo one",
+    "      - name: two",
+  ].join("\n");
+
+  expect(readWorkflowStep(source, "one")).toContain("echo one");
+  expect(readWorkflowStep(source, "one")).not.toContain("name: two");
+  expect(readWorkflowStep(source, "three")).toBeNull();
+});
+
+test("the catalog seed makes one bounded ssh call per command", () => {
+  const step = readSeedStep();
+  const script = step.slice(step.indexOf("run: |"));
+
+  expect(script).not.toContain("&&");
+  expect(step).toContain(
+    'timeout "$duration" flyctl ssh console -a overture-web -C "$remote_command"',
+  );
+  expect(step).toContain('if [ "$status" -eq 124 ]');
+  expect(step).toContain('if [ "$status" -ne 0 ]');
+  expect(step.match(/run_ssh \d+s "/gu) ?? []).toHaveLength(5);
+});
+
+test("the catalog seed runs its five commands in order", () => {
+  const labels = [...readSeedStep().matchAll(/^\s+run_ssh \d+s "(?<label>[^"]+)"/gmu)].map(
+    (match) => match.groups?.label,
+  );
+
+  expect(labels).toStrictEqual([
+    "create /data/seed",
+    "chown /data/seed",
+    "fetch-seed",
+    "load-discovered-boards",
+    "enqueue-backfill",
+  ]);
 });
 
 test("every workflow pins the Bun version package.json requires", () => {
