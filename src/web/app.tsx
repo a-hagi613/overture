@@ -115,12 +115,13 @@ export function AppShell() {
           }
         />
         <main
+          data-shell-main
           id="main-content"
           tabIndex={-1}
           className={
             pathname === "/board"
               ? "min-w-0 flex-1 outline-none"
-              : "min-w-0 flex-1 outline-none px-4 pb-7 pt-[18px] md:px-9 md:pb-10 md:pt-[26px] min-[1700px]:px-16 min-[1700px]:pt-8"
+              : "shell-main min-w-0 flex-1 px-4 pb-7 pt-[18px] outline-none md:px-9 md:pb-10 md:pt-[26px]"
           }
         >
           <div className={pathname === "/board" ? undefined : "mx-auto w-full max-w-[1440px]"}>

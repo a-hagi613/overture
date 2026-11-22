@@ -58,17 +58,17 @@ export function HomeChart(props: { range: HomeRange; rangeKey: HomeRangeKey }) {
         <p className="mt-0.5 text-[12.5px] leading-[1.5] text-muted-foreground">{subtitle}</p>
       </div>
       <div className="mt-4 flex gap-2.5">
-        <div className="flex h-[200px] w-[26px] flex-none flex-col items-end justify-between text-[11.5px] tabular-nums text-muted-foreground">
+        <div className="home-chart-frame flex w-[26px] flex-none flex-col items-end justify-between text-[11.5px] tabular-nums text-muted-foreground">
           <span>{top}</span>
           <span>{level * 3}</span>
           <span>{level * 2}</span>
           <span>{level}</span>
           <span>{String(0)}</span>
         </div>
-        <div className="relative h-[200px] min-w-0 flex-1">
+        <div className="home-chart-frame relative min-w-0 flex-1">
           <svg
             aria-label={copy.home.chart.aria(subtitle, total)}
-            className="block h-[200px] w-full overflow-visible"
+            className="home-chart-frame block w-full overflow-visible"
             preserveAspectRatio="none"
             role="img"
             viewBox="0 0 1000 200"
