@@ -260,6 +260,11 @@ if (env.PUBLIC_SIGNUP_ENABLED) {
       ? "public sign-up is on without billing: no account can prepare Applications until it has a grant"
       : "public sign-up is on; paid work needs a trial card or a plan",
   );
+} else {
+  logInfo(
+    "auth",
+    "public sign-up is off: only the owner, invited or previously verified users may sign in, plus the demo account when demo login is on",
+  );
 }
 
 const pushSender = createPushSender(env, clock);
