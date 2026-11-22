@@ -370,7 +370,7 @@ board row's URL decides `eu` at seed time). Discovery runs from `overture-web` d
 | Lever | `us` | `api.lever.co/v0/postings/{token}?mode=json&limit=100&skip=N`, paging until a page returns fewer than 100 | content hash | 4 concurrent, 2 req/s |
 | Lever | `eu` | `api.eu.lever.co/v0/postings/{token}?mode=json&limit=100&skip=N`, same paging; the same slug on each instance is a separate board | content hash | 4 concurrent, 2 req/s |
 | Ashby | one API | `api.ashbyhq.com/posting-api/job-board/{token}` (slug lowercased) `?includeCompensation=true`; skips `isListed === false` | content hash | 4 concurrent, 2 req/s |
-| Personio (M2) | one API | `{token}.jobs.personio.de/xml?language=en`; when an English description block is empty, the same board is read with `language=de` and the missing blocks are filled from it; no credentials; a missing board answers 404, and 3xx and 404 both mean `gone`; a posting's page is `{token}.jobs.personio.de/job/{id}` and its apply URL stays null until the apply flow lands (#232) | content hash | 2 concurrent, 1 req/s |
+| Personio (M2) | one API | `{token}.jobs.personio.de/xml?language=en`; when an English description block is empty, the same board is read with `language=de` and the missing blocks are filled from it; no credentials; a missing board answers 404, and 3xx and 404 both mean `gone`; a posting's page is `{token}.jobs.personio.de/job/{id}` and its apply URL is `{token}.jobs.personio.de/job/{id}/apply?language={en|de}` (the server-rendered form)` | content hash | 2 concurrent, 1 req/s |
 | Workable (M2) | one feed for every customer | `www.workable.com/boards/workable.xml`, gzip required, refreshed hourly, about 831 MiB uncompressed; carries a company display name and an apply shortcode, not a board slug, so it is ingested as a feed keyed by `<referencenumber>` with one `company_boards` row per company display name (the board token is the normalised name), not as a per-company feed. **Stream-parsed, never held in memory.** A daily GitHub Action at 04:00 UTC requests it with `Accept-Encoding: gzip` and `If-Modified-Since` from the previous manifest, streams it once, tags it with the repository's `htmlToText`/`tagPosting` (plus `<experience>` for missing seniority), keeps only Postings that could match the union of active users' Targets, and writes one gzipped JSONL snapshot plus `workable/manifest.json` (fetched-at, source `Last-Modified`, feed and distinct counts, row count and SHA-256 of the JSONL) to R2. The app ingests the latest snapshot at 05:00 UTC from `catalog.workable` in the catalog worker, upserts on `<referencenumber>` (keeping the display name and `https://apply.workable.com/j/<ref>`), stores the snapshot's tags, and closes Postings absent from the snapshot; it never fetches the feed (ADR 0032, `docs/research/workable-feed-ingest.md`). The app writes the Targets union to `workable-targets.json` (values only) for the next pass; Workable's `ats` kill switch is on (traffic off) until #235, whose apply flow reads the form first from `GET https://apply.workable.com/api/v1/jobs/{shortcode}/form` (no account slug, no browser). Alerts fire when the Action fails, a snapshot is older than 26 hours, or the row count drops more than 20 %; the last snapshot stands | `If-Modified-Since` from the previous manifest (the feed returns no `ETag` and no `Content-Length`) | a recorded 300-job trim, passed through the real pass to a disk object store |
 
 SmartRecruiters and Recruitee are not built: the SAP API Policy forbids systematic extraction by AI agents, and Recruitee's Careers API needs a per-company token from 2027-02-10 (ADR 0028). Their values stay in the `company_boards.ats` check only so a later decision needs no table rebuild; no client, sender list or probe exists for them. Pinpoint and Gem are the deferred replacements.
@@ -589,8 +589,8 @@ queue `ready.notify`, the one Recap email (§8.7), which sends only when the run
 - The Ready list never holds more than one day's work: `free` subtracts every Application already waiting for the
   user, so unapproved Ready Applications reduce the next day's run and nothing piles up beyond the daily cap
   (ADR 0029). Applications already `preparing` count too, so a retried or concurrent run cannot overfill the day.
-- Lever or Ashby Applications whose form signature is not cached get their one read-only form read in this run
-  (§8.3); Greenhouse questions come from its API as before.
+- Lever, Ashby or Personio Applications whose form signature is not cached get their one read-only form read in
+  this run (§8.3); Greenhouse questions come from its API as before.
 - The run never schedules or sends anything: an Application is queued only after its Approval (§8.7, §9).
 - Scores are cached per (posting, resume_id, targets_version); a job is never scored twice for the same inputs.
 - The run scores at most 3 × `limits.daily_cap` postings and then stops, so a strict threshold over a large pool
@@ -605,15 +605,15 @@ queue `ready.notify`, the one Recap email (§8.7), which sends only when the run
 
 Job `application.prepare`:
 
-1. Load questions: Greenhouse pre-flight via the questions endpoint. A Lever, Ashby or Workable form is read with a
-   plain HTTP request from `overture-web` first — Lever's server-rendered apply page, Ashby's public
-   `ApiJobPosting` GraphQL operation, Workable's public `GET /api/v1/jobs/{shortcode}/form` — and only when that
-   read cannot see the form does preparation fall back to
-   the read-only `fixtures.capture` browser path (no fill, no Submit). The read records the form's signature and
-   its questions in `plan_cache` together with the path that ran (`lever_html`, `ashby_graphql`, `workable_form`
-   or `browser`); later postings with the same form signature reuse the cached questions and their catalog
-   mappings. The development machine never makes these reads (ADR 0016). An Application never reaches `ready`
-   with questions still unknown, because the user approves every answer (ADR 0029).
+1. Load questions: Greenhouse pre-flight via the questions endpoint. A Lever, Ashby, Workable or Personio form is read
+   with a plain HTTP request from `overture-web` first — Lever's server-rendered apply page, Ashby's public
+   `ApiJobPosting` GraphQL operation, Workable's public `GET /api/v1/jobs/{shortcode}/form`, Personio's
+   server-rendered `/job/{id}/apply` page — and only when that read cannot see the form does preparation fall back to
+   the read-only `fixtures.capture` browser path (no fill, no Submit). The read records the form's signature and its
+   questions in `plan_cache` together with the path that ran (`lever_html`, `ashby_graphql`, `workable_form`,
+   `personio_html` or `browser`); later postings with the same form signature reuse the cached questions and their
+   catalog mappings. The development machine never makes these reads (ADR 0016). An Application never reaches
+   `ready` with questions still unknown, because the user approves every answer (ADR 0029).
 2. Map each question to the catalog: normalise text (lowercase, strip punctuation/numbers/company names) → hash →
    `question_variants`; unknown → rules (regex set for common facts) → else Haiku mapping call returning
    `{fact_key | 'open_text' | 'consent' | 'skip' | 'unknown'}` from the fixed fact list. Rules alone may also map a
@@ -906,6 +906,18 @@ its closure signal, and a form that 404s at send ends as a form change rather th
 switch stays engaged until its 20-form probe passes
 (#235); preparation skips a Workable Application as `ats_not_enabled` while it is engaged.
 
+**Personio.** The apply page is server-rendered: the whole form is in its HTML, and preparation reads it over plain
+HTTP (`personio_html`). Every control is named by its id: the profile fields (`first_name`, `last_name`, `email`,
+`phone`, `available_from`, `salary_expectations`, `gender`, `birthday`), the employer's own questions
+(`custom_attribute_<n>`) and documents (`documents.cv`, `documents.cover-letter`, …). A field's label is its
+`label[for]`, else its group's label; a star on either marks it required. The flow fills text, email, date and select
+controls (a select's option text is the answer), attaches the resume to its document category and waits for the file
+name to show as a pill, then runs the shared preflight. Submitting waits for the submit control to enable (a
+Cloudflare Turnstile box can hold it; still disabled → `captcha_blocked`), clicks it, and waits for the confirmation
+page before `sent`; a bare 2xx answer to `POST /api/v1/jobs/{id}/application` without a confirmation state is
+`unconfirmed` (never retried, §9.4), a 4xx is `blocked`. Personio's kill switch stays engaged until its 20-form probe
+passes; preparation skips a Personio Application as `ats_not_enabled` while it is engaged.
+
 **Confirming.** An application in `confirming` waits up to `limits.confirm_wait_hours` (24) for an acknowledgement:
 forwarded mail to the user's forwarding address with `auth='pass'`, from the company's or the ATS's sender domains, naming the company
 or the posting title, received after `submit_clicked_at`. Ingest checks each authenticated message as it arrives, and the
@@ -1029,8 +1041,10 @@ Submit. It saves sanitised HTML + assets (names, emails, tokens and employer tra
 `scripts/pull-forms.ts` (R2 read only, no ATS traffic); the local fixture server replays them, including fake
 confirmation pages, a fake code prompt and a fake visible challenge. The capture job opens at most ten URLs per run,
 with no user profile attached, and writes `fixtures/{ats}/{form_signature}/form.html`, its assets and `meta.json`. The ATS apps render the form after load, so the job waits up to 20 s for a form field and otherwise fails with `no_form_rendered`, saving nothing.
-Preparation reads a Lever or Ashby form over plain HTTP from `overture-web` first (§8.3) and falls back to this
-capture path only when the plain read cannot see the form; the path that ran is kept in `plan_cache`.
+Preparation reads a Lever, Ashby or Personio form over plain HTTP from `overture-web` first (§8.3) and falls back to
+this capture path only when the plain read cannot see the form; the path that ran is kept in `plan_cache`. Personio's
+form is complete in the server-rendered HTML, so its fill proof needs no browser read at all; `fixtures.capture`
+accepts `personio` for the capture job and the daily forms check reads it without a browser (§16.4).
 Every browser session, whether a capture, the early cloud probe or a dispatch send, takes a slot from one
 process-wide semaphore sized by `browser.max_concurrent_sessions` (default 3). That one setting is both the semaphore
 and the dispatcher's in-flight send cap (§9.3); a send takes its slot before it marks the Application `sending`, and a
@@ -1247,6 +1261,13 @@ body, sender or attachment, so the admin never sees message content.
   `killSwitchEnabled` (null until a kill switch for that ATS is set; Personio ships engaged until #232 releases it
   after its 20-form probe, so its catalog polling and matching stay off). Before discovery exists, `discoveredAt` is null. Later slices
   (M1-07) add optional per-ATS fields (`boardCount`, `lastPollAt`, `errorRate`) without changing this contract.
+  `POST /admin/api/probes/personio` queues a probe of up to twenty open Personio forms, or of an explicit
+  `{ urls }` list of at most twenty real apply URLs while the kill switch is still engaged; every URL must be on
+  `*.jobs.personio.com` or `*.jobs.personio.de` (a loopback fixture host is accepted only outside production). It
+  reads each form over plain HTTP, never submits, and records a result per form. `GET /admin/api/probes/personio` returns the last run's
+  summary and one row per form for the Catalog page. A form that reads completely is `readable`, a required custom
+  question with no rule is an honest `needs_review`, and a control the flow cannot fill is `unsupported`; the probe
+  passes only when all twenty forms read with no unreadable or unsupported form.
 - `POST /admin/api/tag-imports` mounts the hiring.cafe import seam (§6.3.6) behind the same gate;
   `PUT /admin/api/settings/:key` and `PUT /admin/api/kill-switches/:scope/:key` are the admin's other write
   surfaces. `GET /admin/api/llm-usage` returns the recorded LLM usage and cost, filterable by `purpose`.
@@ -1292,7 +1313,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `GET /api/account/export` · `POST /api/account/export` · `GET /api/account/export/:id/download` · `GET /api/account/deletion` (email, re-authenticated) · `POST /api/account/reauth/link` (a fresh sign-in link) · `POST /api/account/delete` `{confirm: true}` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `POST /internal/mail/dead-letter` · `GET /internal/mailboxes/:local` |
-| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
+| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/probes/personio`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
 `home.updated`, `notification`, `calendar.updated`. TanStack Query invalidates by topic. The Calendar invalidates on
@@ -1359,7 +1380,7 @@ crash recovery) ·
 10. tagging precedence incl. tag import · 11. candidate filters (skip list incl. near-match names and domains, one open
 application per company, cooldown, repost guard, language, remote country rules, salary/FX) · 12. lazy scoring stops at need, and at 3 × the daily cap with a `match.score_bound` alert · 13. score on open + manual apply · 14. preparation with factual,
 open-text, optional blank · 15. Review unlocks N applications · 16. planner window + spacing, in approval order · 17. dispatcher gates
-(cap, applications left, kill switch, one-in-flight, only `approved`, approval still current) · 18. submit success on Greenhouse/Lever/Ashby/Workable fixtures ·
+(cap, applications left, kill switch, one-in-flight, only `approved`, approval still current) · 18. submit success on Greenhouse/Lever/Ashby/Workable/Personio fixtures ·
 19. verification code read from mailbox · 20. challenge blocked before Submit → release + retry once → failed ·
 21. crash or missing confirmation after Submit → `confirming`, never retried; acknowledgement mail → sent; none in
 24 h → failed, not charged, repost guard set · 22. Board drag, lock, keyboard DnD, phone hold-drag · 23. email moves card forward + undo ·
@@ -1376,12 +1397,14 @@ Plus: route reachability for every page, axe on every page, and the visual snaps
 Review, Inbox, Profile, Settings and the legal and consent boards × 390 / 1280 px × light/dark; Ready joins them once it is
 drawn) in pinned Docker.
 
-### 16.2 Unit tests (nine files, Vitest, beside their code)
+### 16.2 Unit tests (ten files, Vitest, beside their code)
 
 `ledger.test.ts` (balances, idempotency, FIFO expiry), `crypto.test.ts` (wrap/unwrap, AAD, shred), `planner.test.ts`
 (window, spacing, DST), `address.test.ts` (slug, transliteration, collisions), `tag-rules.test.ts`,
 `question-normalize.test.ts`, `answer-derivations.test.ts`, `sanitise.test.ts` (recorded pages must carry no script,
-event handler, personal data or token), `v1-import.test.ts` (the v1 answer-bank and learned-answer mapping).
+event handler, personal data or token), `v1-import.test.ts` (the v1 answer-bank and learned-answer mapping), and
+`personio-form.test.ts` (a Personio form's fields, required stars, documents and unsupported controls are read from
+its server-rendered HTML).
 
 ### 16.3 CI
 
@@ -1416,7 +1439,7 @@ and none submits an application or touches a user:
 
 | Check | What is real | Also refreshes |
 |---|---|---|
-| Forms | the `fixtures.capture` path opens one posting per ATS chosen from the open catalog, saves its form and assets, reports a changed form signature, and never fills or submits | saved forms in R2 `fixtures/` (§10.5) |
+| Forms | the `fixtures.capture` path opens one posting per ATS chosen from the open catalog, saves its form and assets, reports a changed form signature, and never fills or submits; Personio is read over plain HTTP instead (no browser minutes) and reports its changed signature the same way, and is skipped while `ats.personio` is engaged so the check cannot page before the probe enables it | saved forms in R2 `fixtures/` (§10.5) |
 | AI | four fixed, deterministic Haiku calls (score, open text, question mapping, tag fallback) through `LlmPort`, checked against their output schemas and the resume-line rule | MSW recordings in R2 `recordings/anthropic/` |
 | Mail | a DKIM-signed message from `no-reply@tryoverture.com` to the reserved `live-check@tryoverture.com`, through Cloudflare Email Sending, Email Routing and the Worker, ingested with `auth='pass'` and its code matched within `live_checks.mail_wait_minutes` (default 5); first the same group's `mail.sending` guard verifies the sending domain's bounce MX, SPF, DKIM and DMARC records when `REQUIRE_EMAIL_SENDING` is set (gated and non-alerting before that) | recorded `.eml` fixtures in R2 `recordings/mail/` |
 | Storage | an R2 put, get, list and delete | — |

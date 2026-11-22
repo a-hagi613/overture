@@ -161,7 +161,7 @@ function postingsFromPositions(
       atsJobId: position.id,
       title: position.name?.trim() ?? "",
       url: `${origin}${JOB_PAGE_PATH}/${position.id}`,
-      applyUrl: null,
+      applyUrl: `${origin}${JOB_PAGE_PATH}/${position.id}/apply?language=${language}`,
       locationRaw: joinDistinctLocations(officesOf(position)),
       workplaceType: null,
       employmentType,
