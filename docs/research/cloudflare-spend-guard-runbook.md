@@ -213,8 +213,9 @@ live-check R2 round trip).
 
 Only Workers and Durable Objects can be blocked. R2, Queues, Workers KV, D1, Workers AI, Vectorize, Browser Run,
 Cloudflare Email Sending, Workflows, Containers and Images have no native limit; at most there is an email alert. For
-Overture the plausible ones are R2 (Litestream's write rate, #281), Email Sending (3,000 a month, app-side counter
-#282) and, if adopted, Workers AI neurons. R2 cannot be blocked natively: revoking its token would stop the backups,
+Overture the plausible ones are R2 (Litestream's write rate, #281) and Email Sending (3,000 a month, app-side counter
+#282). Workers AI is not used: the `email_classify` trial was dropped in #287, so there are no neurons to count
+(`docs/research/cloudflare-paid-plan.md` §5). R2 cannot be blocked natively: revoking its token would stop the backups,
 so it stays bounded by design, lifecycle rules and a size alert. The budget alert at $0.50 is the only account-wide
 signal until the sentinel (#283, built) is deployed and the app-side counters land.
 
