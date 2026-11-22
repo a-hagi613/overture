@@ -423,19 +423,14 @@ export function SignInCard() {
         </div>
         <div className="flex flex-col gap-3.5">
           <output
-            className="flex items-start gap-3 rounded-lg px-4 py-[15px] text-[13.5px] leading-normal text-ok"
+            className="rounded-lg px-4 py-[15px] text-[13.5px] leading-normal text-ok"
             style={{ background: "var(--color-ok-soft)" }}
           >
-            <span className="mt-0.5 flex-none">
-              <NavGlyph name="mail" size={18} />
-            </span>
-            <div>
-              <p className="font-semibold text-foreground">
-                {copy.signIn.sentHeading}{" "}
-                <span className="font-mono text-[13px] [overflow-wrap:anywhere]">{email}</span>
-              </p>
-              <p className="mt-1 text-[13px] text-muted-foreground">{copy.signIn.sentDetail}</p>
-            </div>
+            <p className="font-semibold text-foreground">
+              {copy.signIn.sentHeading}{" "}
+              <span className="font-mono text-[13px] [overflow-wrap:anywhere]">{email}</span>
+            </p>
+            <p className="mt-1 text-[13px] text-muted-foreground">{copy.signIn.sentDetail}</p>
           </output>
           <button
             aria-busy={busyResend || undefined}
@@ -508,7 +503,7 @@ export function SignInCard() {
             className="my-[18px] flex items-center gap-3 text-xs leading-[18px] text-muted-foreground"
           >
             <hr className="flex-1 border-border" />
-            <span>{copy.signIn.magicLegend}</span>
+            <span>{isRefused ? copy.signIn.refusedLegend : copy.signIn.magicLegend}</span>
             <hr className="flex-1 border-border" />
           </div>
         )}

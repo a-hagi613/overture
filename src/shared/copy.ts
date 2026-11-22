@@ -161,6 +161,7 @@ export const copy = {
     linkedin: "Continue with LinkedIn",
     linkedinBadge: "in",
     magicLegend: "or with your email",
+    refusedLegend: "or use your email",
     emailLabel: "Email",
     emailPlaceholder: "you@example.com",
     magicSubmit: "Email me a sign-in link",

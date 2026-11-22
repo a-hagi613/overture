@@ -84,6 +84,7 @@ async function assertMatchesBoard(
 
   await open(page, serverUrl, theme, state);
   await page.evaluate(async () => document.fonts.ready.then(() => true));
+  await page.mouse.move(0, 0);
   await page.evaluate(() => {
     const active = document.activeElement;
 

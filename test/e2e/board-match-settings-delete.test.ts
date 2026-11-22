@@ -157,6 +157,16 @@ async function expectNoHorizontalScroll(page: Page) {
   expect(widths.scroll).toBeLessThanOrEqual(widths.client);
 }
 
+const REAUTH_WINDOW_MS = 15 * 60 * 1000;
+
+async function setClockOffset(appServerUrl: string, offsetMs: number) {
+  await fetch(`${appServerUrl}/__test__/clock/offset`, {
+    body: JSON.stringify({ offsetMs }),
+    headers: { "content-type": "application/json" },
+    method: "POST",
+  });
+}
+
 async function expectButtonInteractive(page: Page, button: Locator) {
   expect(await button.evaluate((element) => getComputedStyle(element).cursor)).toBe("pointer");
 
@@ -229,6 +239,8 @@ async function expectDeleteBoard(
     });
   }
 
+  await setClockOffset(appServerUrl, REAUTH_WINDOW_MS + 1);
+
   await page.goto(`${appServerUrl}/settings/delete`);
   await expect(page.getByRole("heading", { name: "Delete your account" })).toBeVisible();
   await page.evaluate(async () => {
@@ -262,6 +274,8 @@ async function expectDeleteBoard(
     x: boxes[2]?.x ?? 0,
     y: boxes[2]?.y ?? 0,
   });
+
+  await setClockOffset(appServerUrl, 0);
 
   await page.getByLabel("I understand my data is erased").check();
   await page.getByRole("button", { name: "Delete my account" }).click();

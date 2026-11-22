@@ -1,7 +1,13 @@
 import { copy } from "../../shared/copy.ts";
 
 import { BusyIndicator } from "./busy-indicator.tsx";
-import { BTN_PRIMARY, INPUT_CLASS, INPUT_ERROR_CLASS, LABEL_CLASS } from "./signin-styles.ts";
+import {
+  BTN_PRIMARY,
+  BTN_SECONDARY,
+  INPUT_CLASS,
+  INPUT_ERROR_CLASS,
+  LABEL_CLASS,
+} from "./signin-styles.ts";
 
 export function SignInForm({
   email,
@@ -20,7 +26,7 @@ export function SignInForm({
 }) {
   return (
     <form
-      className="flex flex-col gap-3.5"
+      className="flex flex-col gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();
@@ -54,7 +60,7 @@ export function SignInForm({
       ) : null}
       <button
         aria-busy={busy || undefined}
-        className={`${BTN_PRIMARY} mt-1`}
+        className={refused ? BTN_PRIMARY : BTN_SECONDARY}
         disabled={pending}
         type="submit"
       >
