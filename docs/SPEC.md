@@ -116,7 +116,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Anthropic | LLM (prod) | `ANTHROPIC_API_KEY` | real adapter; API intercepted by MSW with responses recorded by the daily live check |
 | OpenCode Go | LLM (local dev only) | `OPENCODE_API_KEY` | — |
 | Cloudflare Email Sending | outbound mail (magic links, live check, later notices) | `CLOUDFLARE_EMAIL_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (both or neither); `CLOUDFLARE_EMAIL_API_BASE_URL` (test-only override of the real API host) | real adapter; the send endpoint is intercepted by MSW and the request body asserted (`test/e2e/cloudflare-email.test.ts`) |
-| Stripe (M3) | Managed Payments | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | stripe-mock (Stripe's own local server) + signed webhook fixtures |
+| Stripe (M3) | Managed Payments | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_WEEK`, `STRIPE_PRICE_MONTH`; `STRIPE_API_BASE_URL` (test-only override of the real API host) | stripe-mock (Stripe's own local server) + signed webhook fixtures |
 | Grafana Cloud | logs/metrics/traces | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | local LGTM docker |
 | Web Push | notifications | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | real adapter; push endpoints via MSW |
 | Master key | envelope encryption | `MASTER_KEY_V1` (32 bytes base64), `MASTER_KEY_CURRENT=1` | fixed test key |
@@ -147,6 +147,7 @@ refusal is stamped in `reserve_refused_at` and the cap refusal in `refused_at`, 
 The admin overview shows the month's count and says which of the two stops is in force. Tests reach Cloudflare only
 through MSW (ADR 0013, 0016).
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
+Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set; a half-set pair stops the server at boot and with neither the app boots and runs as in M2. `POST /webhooks/stripe` verifies the `Stripe-Signature` header (HMAC-SHA256 over the timestamped raw body, five-minute window) before it reads or writes any billing row, and a bad or stale signature is refused with 400. `STRIPE_PRICE_WEEK` and `STRIPE_PRICE_MONTH` name the Stripe prices a Checkout session sells; a missing one answers 503 `billing_not_configured` without a Stripe call.
 
 ### 3.3 Domains and DNS
 
@@ -213,7 +214,7 @@ interface RemoteBrowser { cdpUrl: string; sessionId: string; liveViewUrl: string
 interface MailSender { sendRaw(m: OutboundMime): Promise<{ providerMessageId: string }> }
 interface ObjectStore { put(k: string, b: Uint8Array, meta?): Promise<void>; get(k: string): Promise<Uint8Array | null>; delete(k: string): Promise<void>; list(prefix: string): AsyncIterable<string> }
 interface SearchIndex { indexPosting(p): void; removePosting(id): void; search(q: SearchQuery): SearchHit[] }
-interface Payments { /* M3: checkout, portal, webhook verify */ }
+interface Payments { createCheckoutSession(req: { userId; email; customerId: string | null; priceId; successUrl; cancelUrl }): Promise<{ id; url }>; createPortalSession(req: { customerId; returnUrl }): Promise<{ id; url }>; verifyWebhook(payload: string, signature: string | null): Promise<PaymentEvent> }
 interface PushSender { send(sub: PushSubscription, payload: PushPayload): Promise<"ok" | "gone"> }
 interface FxRates { perUsd(currency: string, date: string): number | null }
 interface Clock { now(): number }
@@ -302,7 +303,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 
 | Table | Columns |
 |---|---|
-| `customers` | user_id PK, stripe_customer_id UNIQUE |
+| `customers` | user_id PK, stripe_customer_id UNIQUE, created_at, updated_at |
 | `subscriptions` | id, user_id, stripe_subscription_id UNIQUE, plan CHECK IN ('week','month'), status, current_period_start, current_period_end, cancel_at_period_end, updated_at |
 | `grants` | id, user_id, source CHECK IN ('trial','period','admin'), quantity, starts_at, expires_at, stripe_invoice_id UNIQUE NULL, created_at |
 | `ledger` | id, user_id, kind CHECK IN ('grant','reserve','commit','release','expire','refund','adjust'), debit_account, credit_account, amount CHECK (amount > 0), grant_id, application_id NULL, idempotency_key UNIQUE, created_at. **Each row is one balanced transfer**, so the ledger is zero-sum by construction. No UPDATE/DELETE (triggers). |
@@ -316,6 +317,10 @@ per `(user_id, grant_id, account)`. Reserve draws from the grant expiring soones
 reserved or committed (a release counts against the day its reservation was made, never against today). No separate
 counters table. Expiry: `expire` moves only `available`; a reservation held on a grant that expires is released
 and expired in the same transaction (`release` then `expire`), so it never returns to spendable.
+`stripe_events` holds each signed Stripe event id once: the row is inserted, its effect applied and `processed_at`
+set in one transaction, so a replay finds the row and does nothing; a bad signature never reaches the table. A signed
+`checkout.session.completed` links `customers.stripe_customer_id` to the user named by `client_reference_id` (or
+`metadata.user_id`), and `customer.created`/`customer.updated` link the same way from `metadata.user_id`.
 
 ### 5.7 Platform
 

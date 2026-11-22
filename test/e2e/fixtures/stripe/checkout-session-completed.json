@@ -1,0 +1,36 @@
+{
+  "id": "evt_e2e_checkout_completed",
+  "object": "event",
+  "api_version": "2025-10-29.clover",
+  "created": 1795270000,
+  "data": {
+    "object": {
+      "id": "cs_test_e2e_month",
+      "object": "checkout.session",
+      "amount_subtotal": 3500,
+      "amount_total": 3500,
+      "cancel_url": "https://tryoverture.com/settings?billing=cancelled",
+      "client_reference_id": "__USER_ID__",
+      "currency": "usd",
+      "customer": "cus_e2e_owner",
+      "customer_email": "maya.okafor@example.com",
+      "livemode": false,
+      "metadata": {
+        "user_id": "__USER_ID__"
+      },
+      "mode": "subscription",
+      "payment_status": "paid",
+      "status": "complete",
+      "subscription": "sub_e2e_month",
+      "success_url": "https://tryoverture.com/settings?billing=success"
+    },
+    "previous_attributes": null
+  },
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": {
+    "id": null,
+    "idempotency_key": null
+  },
+  "type": "checkout.session.completed"
+}

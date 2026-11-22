@@ -9,8 +9,10 @@ with hand-written stand-ins: they run the production adapters. Where a real loca
 (SQLite, a local Chrome filling saved ATS forms served by the fixture server, a disk object store, the real signed
 inbound-mail endpoint). Third-party HTTP APIs (Anthropic, Cloudflare Email Sending, Browser Use's control API, the ATS feeds, push
 services, the FX feed, Stripe) are intercepted at the network by MSW, inside the app process, with
-`onUnhandledRequest: "error"` and responses recorded from the real service. MSW is pinned to 2.x: 3.x intercepts
-nothing under Bun, and a CI check fails if a request to an unmocked host gets through. Time comes from the real clock adapter,
+`onUnhandledRequest: "error"` and responses recorded from the real service. Stripe is the exception: its calls go to
+`stripe-mock`, Stripe's own local API server, and the webhooks it answers are signed with the test webhook secret, so
+the adapter, the signature check and the response shapes are Stripe's own code rather than our idea of it. MSW is
+pinned to 2.x: 3.x intercepts nothing under Bun, and a CI check fails if a request to an unmocked host gets through. Time comes from the real clock adapter,
 whose offset tests can move through a test-only route that is not mounted in production. Moving the clock does not
 fire timers, so a second test-only route runs every job that is due, and code waiting for mail is woken when mail
 arrives rather than by polling alone.

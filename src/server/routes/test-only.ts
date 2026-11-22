@@ -37,6 +37,7 @@ import {
   messageAttachments,
   messages,
   consentVersions,
+  customers,
   notifications,
   planCache,
   postingTags,
@@ -49,6 +50,7 @@ import {
   reviews,
   resumes,
   sessions,
+  stripeEvents,
   tagImports,
   users,
 } from "../platform/db/schema.ts";
@@ -3124,6 +3126,13 @@ export function createTestRoutes(
 
   routes.get("/ledger/rows", (context) =>
     context.json({ rows: db.select().from(ledger).all().length }),
+  );
+
+  routes.get("/stripe-state", (context) =>
+    context.json({
+      customers: db.select().from(customers).all(),
+      events: db.select().from(stripeEvents).all(),
+    }),
   );
 
   routes.get("/auth/state", (context) => {

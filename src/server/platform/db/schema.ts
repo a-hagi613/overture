@@ -738,6 +738,22 @@ export const accountExports = sqliteTable(
   ],
 );
 
+export const customers = sqliteTable("customers", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  stripeCustomerId: text("stripe_customer_id").notNull().unique(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const stripeEvents = sqliteTable("stripe_events", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  receivedAt: integer("received_at").notNull(),
+  processedAt: integer("processed_at"),
+});
+
 export const grants = sqliteTable(
   "grants",
   {
