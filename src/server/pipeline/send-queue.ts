@@ -2,15 +2,9 @@ import { nextSendSlot } from "../dispatch/planning.ts";
 import type { SendWindow } from "../dispatch/planning.ts";
 
 function scheduledOf(scheduledFor: readonly (number | null)[]) {
-  const scheduled: number[] = [];
-
-  for (const at of scheduledFor) {
-    if (at !== null) {
-      scheduled.push(at);
-    }
-  }
-
-  return scheduled.toSorted((left, right) => left - right);
+  return scheduledFor
+    .filter((at): at is number => at !== null)
+    .toSorted((left, right) => left - right);
 }
 
 /**

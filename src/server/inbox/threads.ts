@@ -37,6 +37,20 @@ function displayNameOf(from: string) {
   return name === "" ? from.trim() : name;
 }
 
+function groupBy<T>(rows: readonly T[], keyOf: (row: T) => string) {
+  const grouped = new Map<string, T[]>();
+
+  for (const row of rows) {
+    const key = keyOf(row);
+    const list = grouped.get(key) ?? [];
+
+    list.push(row);
+    grouped.set(key, list);
+  }
+
+  return grouped;
+}
+
 /**
  * Every Thread's messages in one read, grouped by Thread and kept in time order.
  * @param db The database to read.
@@ -44,10 +58,8 @@ function displayNameOf(from: string) {
  * @returns The messages of each Thread.
  */
 export function messagesByThreadOf(db: AppDatabase, threadIds: readonly string[]) {
-  const grouped = new Map<string, MessageRow[]>();
-
   if (threadIds.length === 0) {
-    return grouped;
+    return new Map<string, MessageRow[]>();
   }
 
   const rows = db
@@ -57,14 +69,7 @@ export function messagesByThreadOf(db: AppDatabase, threadIds: readonly string[]
     .orderBy(asc(messages.createdAt))
     .all();
 
-  for (const row of rows) {
-    const list = grouped.get(row.threadId) ?? [];
-
-    list.push(row);
-    grouped.set(row.threadId, list);
-  }
-
-  return grouped;
+  return groupBy(rows, (row) => row.threadId);
 }
 
 /**
@@ -105,10 +110,8 @@ export function applicationsByIdOf(
  * @returns The attachments of each message.
  */
 export function attachmentsByMessageOf(db: AppDatabase, messageIds: readonly string[]) {
-  const grouped = new Map<string, AttachmentRow[]>();
-
   if (messageIds.length === 0) {
-    return grouped;
+    return new Map<string, AttachmentRow[]>();
   }
 
   const rows = db
@@ -118,14 +121,7 @@ export function attachmentsByMessageOf(db: AppDatabase, messageIds: readonly str
     .orderBy(asc(messageAttachments.id))
     .all();
 
-  for (const row of rows) {
-    const list = grouped.get(row.messageId) ?? [];
-
-    list.push(row);
-    grouped.set(row.messageId, list);
-  }
-
-  return grouped;
+  return groupBy(rows, (row) => row.messageId);
 }
 
 async function threadViewOf(

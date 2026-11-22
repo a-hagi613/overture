@@ -150,14 +150,14 @@ export async function openApprovedPlans(input: {
     )
     .all();
 
-  const results = await Promise.all(
+  await Promise.all(
     rows.map(async (row) => {
       const approvedAt = row.approvedAt ?? null;
       const approvedPlanEnc = row.approvedPlanEnc ?? null;
       const approvedPlanSha256 = row.approvedPlanSha256 ?? null;
 
       if (approvedAt === null || approvedPlanEnc === null) {
-        return null;
+        return;
       }
 
       try {
@@ -174,20 +174,12 @@ export async function openApprovedPlans(input: {
           throw new Error("the stored approved plan hash does not match its contents");
         }
 
-        return [row.id, { approvedAt, plan, sha256 } satisfies ApprovedPlan] as const;
+        opened.set(row.id, { approvedAt, plan, sha256 } satisfies ApprovedPlan);
       } catch (error) {
         logError(`approved-plan.open ${row.id}`, error);
-
-        return null;
       }
     }),
   );
-
-  for (const result of results) {
-    if (result !== null) {
-      opened.set(result[0], result[1]);
-    }
-  }
 
   return opened;
 }
