@@ -145,12 +145,28 @@ test.describe("public landing and pricing, served and checked in the browser", (
   }
 });
 
-test("the mobile header shows only Sign in, Pricing stays in the footer, and section links return on wider screens", async ({
+test("the landing mobile header shows Pricing and Sign in, and section links return on wider screens", async ({
   page,
   appServerUrl,
 }) => {
   await page.setViewportSize({ width: 390, height: 900 });
   await page.goto(appServerUrl);
+  await expect(page.getByRole("link", { name: "How it works" })).toBeHidden();
+  await expect(
+    page.getByRole("banner").getByRole("link", { name: "Pricing", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(page.getByRole("link", { name: "How it works" }).first()).toBeVisible();
+});
+
+test("the pricing mobile header shows only Sign in, Pricing stays in the footer, and section links return on wider screens", async ({
+  page,
+  appServerUrl,
+}) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto(`${appServerUrl}/pricing`);
   await expect(page.getByRole("link", { name: "How it works" })).toBeHidden();
   await expect(
     page.getByRole("banner").getByRole("link", { name: "Pricing", exact: true }),
