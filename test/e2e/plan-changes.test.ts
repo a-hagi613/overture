@@ -265,8 +265,8 @@ test("a trial upgrade applies at once, a Week switch lands at renewal from its p
     );
 
     expect(await homeState(request, server.url)).toStrictEqual({
-      applicationsLeft: 303,
-      planApplications: 303,
+      applicationsLeft: 253,
+      planApplications: 253,
     });
 
     expect(await billingState(request, server.url)).toStrictEqual({
@@ -302,8 +302,8 @@ test("a trial upgrade applies at once, a Week switch lands at renewal from its p
       status: "active",
     });
     expect(await homeState(request, server.url)).toStrictEqual({
-      applicationsLeft: 303,
-      planApplications: 303,
+      applicationsLeft: 253,
+      planApplications: 253,
     });
 
     const replayedSwitch = await deliver(request, server.url, switchToWeek);
@@ -313,7 +313,7 @@ test("a trial upgrade applies at once, a Week switch lands at renewal from its p
       result: "duplicate",
     });
     expect((await billingState(request, server.url)).plan).toBe("week");
-    expect((await homeState(request, server.url)).applicationsLeft).toBe(303);
+    expect((await homeState(request, server.url)).applicationsLeft).toBe(253);
 
     await moveClock(monthEnd * 1000 + 60_000);
     await runDueJobs(request, server.url);
@@ -343,10 +343,10 @@ test("a trial upgrade applies at once, a Week switch lands at renewal from its p
       (grant) => grant.stripeInvoiceId === "in_e2e_m3_245_week",
     );
 
-    expect(weekGrant).toMatchObject({ quantity: 70, source: "period" });
+    expect(weekGrant).toMatchObject({ quantity: 50, source: "period" });
     expect(await homeState(request, server.url)).toStrictEqual({
-      applicationsLeft: 73,
-      planApplications: 73,
+      applicationsLeft: 53,
+      planApplications: 53,
     });
 
     const cancelAtPeriodEnd = subscriptionPayload({
@@ -375,8 +375,8 @@ test("a trial upgrade applies at once, a Week switch lands at renewal from its p
     await runDueJobs(request, server.url);
 
     expect(await homeState(request, server.url)).toStrictEqual({
-      applicationsLeft: 73,
-      planApplications: 73,
+      applicationsLeft: 53,
+      planApplications: 53,
     });
 
     const replayedRenewal = await deliver(request, server.url, weekRenewal);
@@ -384,7 +384,7 @@ test("a trial upgrade applies at once, a Week switch lands at renewal from its p
     expect(webhookResultSchema.parse(await replayedRenewal.json())).toStrictEqual({
       result: "duplicate",
     });
-    expect((await homeState(request, server.url)).applicationsLeft).toBe(73);
+    expect((await homeState(request, server.url)).applicationsLeft).toBe(53);
     expect(
       (await billingLedger(request, server.url, ownerId)).grants.filter(
         (grant) => grant.stripeInvoiceId === "in_e2e_m3_245_week",

@@ -11,14 +11,14 @@ export const TRIAL = {
 
 export const PLANS = {
   week: {
-    applications: 70,
+    applications: 50,
     periodDays: 7,
-    priceUsd: 12,
+    priceUsd: 9.99,
   },
   month: {
-    applications: 300,
+    applications: 250,
     periodDays: 30,
-    priceUsd: 35,
+    priceUsd: 29.99,
   },
 } as const;
 
@@ -36,6 +36,12 @@ export function formatHour(hour: number) {
   return `${String(hour).padStart(2, "0")}:00`;
 }
 
+/**
+ * Formats a price for the marketing and legal pages: a whole dollar amount
+ * stays whole (`$3`) and a decimal price keeps its cents (`$9.99`).
+ * @param amount The price in dollars.
+ * @returns The formatted dollar amount.
+ */
 export function formatUsd(amount: number) {
-  return `$${String(amount)}`;
+  return Number.isInteger(amount) ? `$${String(amount)}` : `$${amount.toFixed(2)}`;
 }

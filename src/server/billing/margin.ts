@@ -27,8 +27,8 @@ export type MarginPlan = (typeof MARGIN_PLANS)[number];
 /** Public prices in micros (ADR 0018). Stripe holds the live price ids. */
 export const PLAN_PRICE_MICROS: Record<MarginPlan, number> = {
   trial: 0,
-  week: 12_000_000,
-  month: 35_000_000,
+  week: 9_990_000,
+  month: 29_990_000,
 };
 
 export const PLAN_APPLICATIONS: Record<MarginPlan, number> = {

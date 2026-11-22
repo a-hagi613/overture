@@ -212,8 +212,8 @@ describe("a period grant that ends while a send is in flight", () => {
 
     expect(balancesPerGrant(db, userId).get(granted.grantId)).toStrictEqual({
       available: 0,
-      expired: 68,
-      issued: -70,
+      expired: 48,
+      issued: -50,
       reserved: 2,
       used: 0,
     });
@@ -231,8 +231,8 @@ describe("a period grant that ends while a send is in flight", () => {
 
     expect(balancesPerGrant(db, userId).get(granted.grantId)).toStrictEqual({
       available: 1,
-      expired: 68,
-      issued: -70,
+      expired: 48,
+      issued: -50,
       reserved: 0,
       used: 1,
     });
@@ -240,8 +240,8 @@ describe("a period grant that ends while a send is in flight", () => {
     expect(expireDueGrants(db, clock, userId)).toStrictEqual([granted.grantId]);
     expect(balancesPerGrant(db, userId).get(granted.grantId)).toStrictEqual({
       available: 0,
-      expired: 69,
-      issued: -70,
+      expired: 49,
+      issued: -50,
       reserved: 0,
       used: 1,
     });

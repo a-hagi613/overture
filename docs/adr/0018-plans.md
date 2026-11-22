@@ -4,7 +4,7 @@ status: accepted
 
 # Three plans, renewing, no annual
 
-Trial: 3 applications once, card verified, one per card by a fingerprint that survives account deletion. Week: $12 for 70 over 7 days. Month: $35 for 300 over 30 days. Both renew; unused applications expire; no refunds by default because failures are never charged. Billed through Stripe Managed Payments as merchant of record, behind a `Payments` port. Prices are final only after M1 cost is measured.
+Trial: 3 applications once, card verified, one per card by a fingerprint that survives account deletion. Week: $9.99 for 50 over 7 days. Month: $29.99 for 250 over 30 days. Both renew; unused applications expire; no refunds by default because failures are never charged. Billed through Stripe Managed Payments as merchant of record, behind a `Payments` port. The owner locked these prices in issue #254 after M1 cost was measured.
 
 ## Considered Options
 

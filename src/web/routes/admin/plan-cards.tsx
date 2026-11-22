@@ -2,7 +2,7 @@ import { copy } from "../../../shared/copy.ts";
 import type { MarginPlanRow } from "../../lib/admin-api.ts";
 import { MarginBar } from "./margin-bar.tsx";
 import { MarginGate } from "./margin-gate.tsx";
-import { costLabel, formatUsd, marginLabel } from "./margin-format.ts";
+import { costLabel, formatUsd, marginLabel, priceLabel } from "./margin-format.ts";
 
 export function PlanCards({ rows }: { rows: MarginPlanRow[] }) {
   return (
@@ -13,7 +13,7 @@ export function PlanCards({ rows }: { rows: MarginPlanRow[] }) {
             <h3 className="font-serif text-[22px]">
               {copy.admin.marginPlanName[row.plan]}
               {copy.admin.marginSeparator}
-              {formatUsd(row.priceMicros, 0)}
+              {priceLabel(row)}
             </h3>
             <MarginGate row={row} />
           </div>

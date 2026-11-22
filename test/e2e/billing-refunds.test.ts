@@ -210,7 +210,7 @@ test.describe("refunding a paid period against stripe-mock", () => {
 
     expect(view?.state).toBe("paying");
     expect(view?.current?.plan).toBe("month");
-    expect(view?.current?.quantity).toBe(300);
+    expect(view?.current?.quantity).toBe(250);
     expect(view?.refundable).toBe(true);
 
     const serialized = JSON.stringify(view).toLowerCase();

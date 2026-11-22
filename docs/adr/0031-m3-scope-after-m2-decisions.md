@@ -12,9 +12,9 @@ forwarded ATS mail (ADR 0028), and the plans of ADR 0018.
 - **Public sign-up replaces invites**, with Turnstile and rate limits. Because anyone can now sign up, nothing is
   prepared for a user until a trial card is verified or a plan is paid, so public sign-ups cannot spend LLM or browser
   money for free. Users invited in M2 keep their admin grants and choose a plan when those run out.
-- **Plans are ADR 0018's** (trial 3 once per card, Week $12 for 70 over 7 days, Month $35 for 300 over 30 days, renewing,
-  no rollover). Final prices are set from the cost and margin measured in M1 and M2 (including the cost review, #184); the
-  prices stay configuration until the owner confirms them.
+- **Plans are ADR 0018's** (trial 3 once per card, Week $9.99 for 50 over 7 days, Month $29.99 for 250 over 30 days,
+  renewing, no rollover). The owner locked these prices in from the cost and margin measured in M1 and M2 (including the
+  cost review, #184); the prices stay configuration until the owner confirms them.
 - **The landing and pricing pages** are redrawn for the current product: Overture prepares every application and sends it
   when you approve; the ATSes are Greenhouse, Lever, Ashby, Personio and Workable; no Workday; the real prices.
 - **The owner's console steps come last.** M3 ends with "M3: owner setup" (the Stripe account, Managed Payments approval,
