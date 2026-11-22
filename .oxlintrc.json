@@ -171,6 +171,7 @@
           "src/server/catalog/tag-rules.test.ts",
           "src/server/catalog/question-normalize.test.ts",
           "src/server/catalog/answer-derivations.test.ts",
+          "src/server/catalog/companies-parquet.test.ts",
           "src/server/fixtures/sanitise.test.ts",
           "src/server/profile/v1-import.test.ts",
           "src/server/profile/facts.test.ts",

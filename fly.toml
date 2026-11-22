@@ -22,6 +22,10 @@ LITESTREAM_CONFIG_PATH = "/etc/litestream.yml"
 # refused.
 PUBLIC_SIGNUP_ENABLED = "false"
 DEMO_LOGIN_ENABLED = "true"
+# Cloudflare Email Sending is onboarded on tryoverture.com, so the deploy guard
+# and the daily `mail.sending` live check verify the sending domain actively
+# instead of staying gated.
+REQUIRE_EMAIL_SENDING = "true"
 
 [http_service]
 internal_port = 3000
