@@ -1,4 +1,4 @@
-type GlyphName =
+export type GlyphName =
   | "back"
   | "bell"
   | "board"

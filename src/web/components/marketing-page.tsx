@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 import { MarketingFooter } from "./marketing-footer.tsx";
 import { MarketingHeader } from "./marketing-header.tsx";
 
-export function MarketingPage({ children }: { children: ReactNode }) {
+export function MarketingPage({ children, scope }: { children: ReactNode; scope?: string }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-background text-foreground">
+    <div className={`flex min-h-dvh flex-col bg-background text-foreground ${scope ?? ""}`.trim()}>
       <MarketingHeader />
       <main className="flex-1">{children}</main>
       <MarketingFooter />
