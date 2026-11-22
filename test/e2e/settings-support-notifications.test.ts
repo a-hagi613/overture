@@ -39,6 +39,10 @@ async function captureSettings(
   await page.setViewportSize({ width, height: 900 });
   await page.emulateMedia({ colorScheme: scheme });
   await page.goto(`${appUrl}/settings`);
+  await page.evaluate((theme) => {
+    globalThis.localStorage.setItem("overture.theme", theme);
+  }, scheme);
+  await page.goto(`${appUrl}/settings`);
   await page.screenshot({
     animations: "disabled",
     fullPage: true,

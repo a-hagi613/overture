@@ -21,7 +21,7 @@ export function PreferenceSwitch({
     >
       <span
         className={`relative inline-flex h-[22px] w-[38px] items-center rounded-full transition-colors ${
-          checked ? "bg-foreground" : "bg-input"
+          checked ? "bg-foreground" : "bg-muted-foreground"
         }`}
       >
         <span
