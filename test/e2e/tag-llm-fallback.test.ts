@@ -164,7 +164,7 @@ test("unclassified Postings are tagged from recorded Haiku batch responses", asy
     expect(requestsBefore).toBe(0);
     expect(requests.length).toBe(1);
     expect(capturedRequest?.title).toBe("Wardrobe Stylist Coordinator");
-    expect(capturedRequest?.model).toBe("claude-haiku-4-5");
+    expect(capturedRequest?.model).toBe("claude-haiku-5-5");
     expect(capturedRequest?.cacheControl).toBe("ephemeral");
     expect(capturedRequest?.outputFormatType).toBe("json_schema");
 
@@ -243,7 +243,7 @@ test("over the tagging cap nothing is sent until the next day", async () => {
 
     await harness.runBackfillCycle();
 
-    await setSetting(harness, "llm.cap_tagging_day_usd", "0.001");
+    await setSetting(harness, "llm.cap_tagging_day_usd", String(spentMicros / 1_000_000));
 
     await harness.runOneJob(TAG_FALLBACK_JOB_KIND);
 
@@ -356,7 +356,7 @@ test("LLM usage and cost are queryable", async () => {
     const [row] = usage.rows;
 
     expect(row?.purpose).toBe("tag_fallback");
-    expect(row?.model).toBe("claude-haiku-4-5");
+    expect(row?.model).toBe("claude-haiku-5-5");
     expect(row?.inputTokens).toBe(465);
     expect(row?.cachedTokens).toBe(126);
     expect(row?.outputTokens).toBe(12);
