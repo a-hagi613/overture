@@ -434,20 +434,23 @@ copy the values into `fly secrets set`, then delete the file.
 gh workflow run ops-live.yml -f action=seed-catalog -R a-hagi613/overture
 ```
 
-The action runs over `flyctl ssh console` with a 600 s timeout and, as the unprivileged `app` user:
+The action makes one bounded `flyctl ssh console -a overture-web -C <command>` call per step, because
+`flyctl` runs that command directly rather than through a shell, so `&&` chaining does not work. Each call
+runs under its own `timeout` and stops the action on a timeout (exit 124) or a non-zero exit:
 
-1. `mkdir -p /data/seed && chown app:app /data/seed`, then
-   `fetch-seed.ts --dir /data/seed` downloads the pinned `manifest.json` and `companies.parquet` and
-   verifies their checksums;
-2. `load-discovered-boards.ts --db /data/app.sqlite --manifest /data/seed/manifest.json
-   --companies /data/seed/companies.parquet` inserts the boards in batches of at most 500 (idempotent:
-   a second run loads no duplicate board);
-3. `enqueue-backfill.ts --db /data/app.sqlite` enqueues one `catalog.backfill` job and prints the job id,
-   whether it was newly enqueued and the estimated work; a second run does not queue a duplicate.
+1. `mkdir -p /data/seed` (60 s, root) and `chown app:app /data/seed` (60 s, root);
+2. as the unprivileged `app` user, `fetch-seed.ts --dir /data/seed` (300 s) downloads the pinned
+   `manifest.json` and `companies.parquet` and verifies their checksums;
+3. as `app`, `load-discovered-boards.ts --db /data/app.sqlite --manifest /data/seed/manifest.json
+   --companies /data/seed/companies.parquet` (300 s) inserts the boards in batches of at most 500
+   (idempotent: a second run loads no duplicate board);
+4. as `app`, `enqueue-backfill.ts --db /data/app.sqlite` (120 s) enqueues one `catalog.backfill` job and
+   prints the job id, whether it was newly enqueued and the estimated work; a second run does not queue a
+   duplicate.
 
-The output is appended to the run's step summary and the action finishes by checking
-`https://tryoverture.com/api/health`. The seed files stay in `/data/seed` so a later run reuses the
-verified download; the backfill job itself is picked up by the app's job worker.
+Each command's output is appended to the run's step summary under its own heading, and the action finishes
+by checking `https://tryoverture.com/api/health`. The seed files stay in `/data/seed` so a later run
+reuses the verified download; the backfill job itself is picked up by the app's job worker.
 
 ## Verifying the acceptance criteria
 

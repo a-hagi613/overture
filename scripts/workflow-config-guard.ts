@@ -14,6 +14,20 @@ export function readBunVersions(source: string) {
   );
 }
 
+export function readWorkflowStep(source: string, name: string) {
+  const marker = `- name: ${name}`;
+  const start = source.indexOf(marker);
+
+  if (start === -1) {
+    return null;
+  }
+
+  const rest = source.slice(start + marker.length);
+  const end = rest.search(/^ {6}- /mu);
+
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
 export function findBunVersionDrift(input: BunVersionDriftInput) {
   const problems: string[] = [];
 
