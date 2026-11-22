@@ -7,6 +7,11 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PaymentEvent, Payments } from "../platform/ports/payments.ts";
 
+import {
+  cardFingerprintHmac,
+  claimTrialCard,
+  TRIAL_APPLICATIONS,
+} from "../billing/card-fingerprint.ts";
 import { planForPriceId, stripePriceId } from "../billing/index.ts";
 import { stripeCustomerIdFor } from "../billing/customers.ts";
 import { createPaymentsWebhookService } from "../billing/webhooks.ts";
@@ -55,13 +60,18 @@ async function sessionUser(auth: Auth, raw: Request) {
   return result?.user ?? null;
 }
 
+const verifyTrialBodySchema = z.object({ sessionId: z.string().min(1).max(255) });
+
 export function createBillingRoutes(deps: {
   auth: Auth;
+  clock: Clock;
   db: AppDatabase;
   payments: Payments | null;
+  /** Keys the card fingerprint HMAC; null leaves the free trial off. */
+  cardFingerprintSecret: string | null;
   appOrigin: string;
 }) {
-  const { auth, db, payments, appOrigin } = deps;
+  const { auth, clock, db, payments, cardFingerprintSecret, appOrigin } = deps;
   const routes = new Hono();
   const settingsUrl = `${appOrigin.replace(/\/+$/u, "")}/settings`;
 
@@ -134,6 +144,81 @@ export function createBillingRoutes(deps: {
     }
   });
 
+  routes.post("/billing/trial/setup", async (context) => {
+    const access = await accountOrRefusal(context.req.raw);
+
+    if ("refusal" in access) {
+      return access.refusal;
+    }
+
+    if (payments === null || cardFingerprintSecret === null) {
+      return context.json({ error: "billing_disabled" }, 503);
+    }
+
+    try {
+      const origin = appOrigin.replace(/\/+$/u, "");
+
+      const session = await payments.createSetupSession({
+        cancelUrl: `${origin}/onboarding/trial?card=cancelled`,
+        customerId: stripeCustomerIdFor(db, access.account.id),
+        email: access.account.email,
+        successUrl: `${origin}/onboarding/trial?card=verified&session={CHECKOUT_SESSION_ID}`,
+        userId: access.account.id,
+      });
+
+      context.header("Cache-Control", "no-store");
+
+      return context.json({ url: session.url });
+    } catch (error) {
+      logError("billing", error);
+
+      return context.json({ error: "stripe_error" }, 502);
+    }
+  });
+
+  routes.post(
+    "/billing/trial/verify",
+    zValidator("json", verifyTrialBodySchema),
+    async (context) => {
+      const access = await accountOrRefusal(context.req.raw);
+
+      if ("refusal" in access) {
+        return access.refusal;
+      }
+
+      if (payments === null || cardFingerprintSecret === null) {
+        return context.json({ error: "billing_disabled" }, 503);
+      }
+
+      let card;
+
+      try {
+        card = await payments.retrieveVerifiedCard(context.req.valid("json").sessionId);
+      } catch (error) {
+        logError("billing", error);
+
+        return context.json({ error: "stripe_error" }, 502);
+      }
+
+      if (card === null || card.userId !== access.account.id) {
+        return context.json({ error: "card_not_verified" }, 402);
+      }
+
+      const claim = claimTrialCard(db, clock, {
+        hmac: cardFingerprintHmac(cardFingerprintSecret, card.fingerprint),
+        userId: access.account.id,
+      });
+
+      context.header("Cache-Control", "no-store");
+
+      if (claim.status === "granted") {
+        return context.json({ result: "granted", applications: TRIAL_APPLICATIONS });
+      }
+
+      return context.json({ error: claim.status }, 409);
+    },
+  );
+
   routes.post("/billing/portal", async (context) => {
     const access = await accountOrRefusal(context.req.raw);
 
@@ -171,8 +256,10 @@ export function createStripeWebhookRoutes(deps: {
   db: AppDatabase;
   clock: Clock;
   payments: Payments | null;
+  /** Keys the card fingerprint HMAC; null leaves the free trial off. */
+  cardFingerprintSecret: string | null;
 }) {
-  const { clock, db, payments } = deps;
+  const { clock, db, payments, cardFingerprintSecret } = deps;
   const routes = new Hono();
 
   const webhooks = createPaymentsWebhookService({ clock, db, planForPrice: planForPriceId });
@@ -206,7 +293,32 @@ export function createStripeWebhookRoutes(deps: {
       throw error;
     }
 
-    const result = webhooks.handle(event);
+    let trialCard = null;
+
+    if (
+      cardFingerprintSecret !== null &&
+      event.type === "checkout.session.completed" &&
+      event.mode === "setup" &&
+      event.sessionId !== null &&
+      event.userId !== null
+    ) {
+      try {
+        const card = await payments.retrieveVerifiedCard(event.sessionId);
+
+        if (card !== null && card.userId === event.userId) {
+          trialCard = {
+            hmac: cardFingerprintHmac(cardFingerprintSecret, card.fingerprint),
+            userId: event.userId,
+          };
+        }
+      } catch (error) {
+        logError("billing", error);
+
+        return context.json({ error: "stripe_error" }, 502);
+      }
+    }
+
+    const result = webhooks.handle(event, trialCard);
 
     context.header("Cache-Control", "no-store");
 

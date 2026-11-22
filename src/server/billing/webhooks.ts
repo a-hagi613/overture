@@ -10,11 +10,18 @@ import { createBillingPauseNotice } from "../notify/billing-notice.ts";
 import { logInfo } from "../platform/log.ts";
 import { enqueuePlannerDay } from "../dispatch/planner.ts";
 import { ensurePrepDailyQueued } from "../pipeline/daily-prep.ts";
+import { claimTrialCard } from "./card-fingerprint.ts";
 import { linkStripeCustomer, userIdForStripeCustomer } from "./customers.ts";
 import { grantPaidPeriod } from "./periods.ts";
 import { pauseForBilling, resumeAfterPayment } from "./pause.ts";
 import { periodEndFor } from "./plans.ts";
 import { stripeEvents, users } from "../platform/db/schema.ts";
+
+/** A verified trial card, keyed by HMAC, read from Stripe before the transaction. */
+export interface VerifiedTrialCard {
+  hmac: string;
+  userId: string;
+}
 
 const LINKING_EVENTS = new Set([
   "checkout.session.async_payment_succeeded",
@@ -85,7 +92,7 @@ export function createPaymentsWebhookService(deps: {
   }
 
   return {
-    handle(event: PaymentEvent) {
+    handle(event: PaymentEvent, trialCard: VerifiedTrialCard | null = null) {
       const result = db.transaction((tx) => {
         const now = clock.now();
 
@@ -127,6 +134,12 @@ export function createPaymentsWebhookService(deps: {
         }
 
         const notice = event.type === PAYMENT_FAILED_EVENT ? failPayment(tx, event) : null;
+
+        const isTrialSetup = event.type === "checkout.session.completed" && event.mode === "setup";
+
+        if (isTrialSetup && trialCard !== null && trialCard.userId === event.userId) {
+          claimTrialCard(tx, clock, { hmac: trialCard.hmac, userId: trialCard.userId });
+        }
 
         tx.update(stripeEvents)
           .set({ processedAt: now })

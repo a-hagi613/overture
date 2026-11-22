@@ -1,3 +1,4 @@
+import { Navigate } from "react-router";
 import type { RouteObject } from "react-router";
 
 import { BoardPage } from "./routes/board.tsx";
@@ -13,6 +14,7 @@ import { OnboardingFactsPage } from "./routes/onboarding-facts.tsx";
 import { OnboardingForwardPage } from "./routes/onboarding-forward.tsx";
 import { OnboardingResumePage } from "./routes/onboarding-resume.tsx";
 import { OnboardingTargetsPage } from "./routes/onboarding-targets.tsx";
+import { OnboardingTrialPage } from "./routes/onboarding-trial.tsx";
 import { ProfilePage } from "./routes/profile.tsx";
 import { ReadyPage } from "./routes/ready.tsx";
 import { ReviewPage } from "./routes/review.tsx";
@@ -72,6 +74,9 @@ const adminShellChildren: RouteObject[] = [
 const publicRoutes: RouteObject[] = [
   { path: "/signin", element: <SignInPage /> },
   { path: "/terms", element: <TermsPage /> },
+  { path: "/settings/terms", element: <Navigate replace to="/terms" /> },
+  { path: "/settings/notifications", element: <Navigate replace to="/settings" /> },
+  { path: "/settings/support", element: <Navigate replace to="/settings/support-access" /> },
   { path: "/privacy", element: <PrivacyPage /> },
   { path: "/pricing", element: <PricingPage /> },
   { path: "/consent", element: <ConsentPage /> },
@@ -80,6 +85,7 @@ const publicRoutes: RouteObject[] = [
   { path: "/onboarding/facts", element: <OnboardingFactsPage /> },
   { path: "/onboarding/targets", element: <OnboardingTargetsPage /> },
   { path: "/onboarding/forward", element: <OnboardingForwardPage /> },
+  { path: "/onboarding/trial", element: <OnboardingTrialPage /> },
 ];
 
 export const appRoutes: RouteObject[] = [

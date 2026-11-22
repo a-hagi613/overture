@@ -5,27 +5,85 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
 import type { LiveCheckResult } from "./types.ts";
+import type { PlainFormReader } from "../pipeline/form-read.ts";
 
 import { ATS_NAMES, captureFixtures } from "../fixtures/capture.ts";
 import { postings } from "../platform/db/schema.ts";
+import { env } from "../config/env.ts";
+import { createPlainFormReader } from "../pipeline/form-read.ts";
+import { isKillSwitchEnabled } from "../platform/settings/index.ts";
 import { previousCheckDetail } from "./store.ts";
-import { failedResult } from "./types.ts";
+import { failedResult, skippedResult } from "./types.ts";
 
 export interface FormsCheckDeps {
   db: AppDatabase;
   clock: Clock;
   objects: ObjectStore;
   providers: BrowserProviderRegistry | null;
+  plainFormReader?: PlainFormReader;
 }
 
 function postingFor(db: AppDatabase, ats: (typeof ATS_NAMES)[number]) {
   return db
-    .select({ id: postings.id, url: postings.url, applyUrl: postings.applyUrl })
+    .select({
+      id: postings.id,
+      url: postings.url,
+      applyUrl: postings.applyUrl,
+      atsJobId: postings.atsJobId,
+    })
     .from(postings)
     .where(and(eq(postings.ats, ats), isNull(postings.closedAt)))
     .orderBy(asc(postings.firstSeenAt), asc(postings.id))
     .limit(1)
     .get();
+}
+
+async function runPersonioCheck(
+  deps: FormsCheckDeps,
+  startedAt: number,
+  posting: NonNullable<ReturnType<typeof postingFor>>,
+) {
+  const reader = deps.plainFormReader ?? createPlainFormReader({ environment: env.NODE_ENV });
+
+  const read = await reader.read({
+    applyUrl: posting.applyUrl,
+    ats: "personio",
+    atsJobId: posting.atsJobId,
+    boardToken: "",
+    region: "us",
+    url: posting.url,
+  });
+
+  if (read === null || read.questions.length === 0) {
+    return failedResult(
+      "forms.personio",
+      startedAt,
+      "the Personio form could not be read over plain HTTP",
+      deps.clock.now() - startedAt,
+    );
+  }
+
+  const previous = previousCheckDetail(deps.db, "forms.personio");
+  const previousSignature = previous?.["formSignature"];
+  const changed = previousSignature !== undefined && previousSignature !== read.formSignature;
+
+  return {
+    check: "forms.personio",
+    ok: true,
+    startedAt,
+    durationMs: deps.clock.now() - startedAt,
+    detail: {
+      ats: "personio",
+      changed,
+      documents: read.questions.filter((question) => question.fieldType === "file").length,
+      formSignature: read.formSignature,
+      path: read.path,
+      postingId: posting.id,
+      questions: read.questions.length,
+      required: read.questions.filter((question) => question.required).length,
+      url: posting.applyUrl ?? posting.url,
+    },
+  } satisfies LiveCheckResult;
 }
 
 async function runOneAts(deps: FormsCheckDeps, ats: (typeof ATS_NAMES)[number]) {
@@ -34,6 +92,27 @@ async function runOneAts(deps: FormsCheckDeps, ats: (typeof ATS_NAMES)[number]) 
 
   if (posting === undefined) {
     return failedResult(`forms.${ats}`, startedAt, "no open posting for this ATS in the catalog");
+  }
+
+  if (ats === "personio") {
+    if (isKillSwitchEnabled(deps.db, "ats", "personio")) {
+      return skippedResult(
+        "forms.personio",
+        startedAt,
+        "ats.personio kill switch engaged; the probe enables it before the daily check runs",
+      );
+    }
+
+    try {
+      return await runPersonioCheck(deps, startedAt, posting);
+    } catch (error) {
+      return failedResult(
+        `forms.personio`,
+        startedAt,
+        error instanceof Error ? error.message : String(error),
+        deps.clock.now() - startedAt,
+      );
+    }
   }
 
   if (deps.providers === null) {

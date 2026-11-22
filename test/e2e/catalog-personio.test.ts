@@ -74,6 +74,7 @@ test("recorded Personio feeds ingest into searchable, tagged Postings with the G
 
     expect(businessDevelopment?.title).toBe("Business Development Representative (d/f/m)");
     expect(businessDevelopment?.url).toContain(`/personio/${PERSONIO_BOARD}/job/2885178`);
+    expect(businessDevelopment?.applyUrl).toContain(`/job/2885178/apply?language=en`);
     expect(businessDevelopment?.locationRaw).toBe("Berlin");
     expect(businessDevelopment?.countryCode).toBe("DE");
     expect(businessDevelopment?.employmentType).toBe("full_time");

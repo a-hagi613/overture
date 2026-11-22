@@ -38,6 +38,8 @@ import { runLeverAttempt } from "./ats/lever.ts";
 import type { LeverRun } from "./ats/lever.ts";
 import { runWorkableAttempt } from "./ats/workable.ts";
 import type { WorkableRun } from "./ats/workable.ts";
+import { runPersonioAttempt } from "./ats/personio.ts";
+import type { PersonioRun } from "./ats/personio.ts";
 import {
   CODE_WAIT_TIMEOUT_MS,
   createCodeWait,
@@ -85,7 +87,7 @@ export interface DispatcherDeps {
 
 type AttemptRow = typeof attempts.$inferSelect;
 
-type AttemptRun = GreenhouseRun | LeverRun | AshbyRun | WorkableRun;
+type AttemptRun = GreenhouseRun | LeverRun | AshbyRun | WorkableRun | PersonioRun;
 
 const zeroUsage: BrowserUsage = { browserMs: 0, costMicros: 0, proxyBytes: 0 };
 
@@ -695,6 +697,10 @@ export function createDispatcher(deps: DispatcherDeps) {
 
         if (plan.ats === "workable") {
           return runWorkableAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "personio") {
+          return runPersonioAttempt(page, planForRun, attemptHooks);
         }
 
         return runAshbyAttempt(page, planForRun, attemptHooks);
