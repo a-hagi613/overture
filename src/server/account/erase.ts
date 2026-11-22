@@ -5,6 +5,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
+import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { createMailboxService } from "../inbox/mailboxes.ts";
 
 import { logError } from "../platform/log.ts";
@@ -78,11 +79,12 @@ export interface AccountEraserDeps {
   objects: ObjectStore;
   sealNotice: (notice: { name: string; to: string }) => Promise<string>;
   mailboxes: Pick<ReturnType<typeof createMailboxService>, "retireFor">;
+  personal: Pick<PersonalCrypto, "forget">;
   providers: BrowserProviderRegistry | null;
 }
 
 export function createAccountEraser(deps: AccountEraserDeps) {
-  const { db, clock, mailboxes, objects, providers, sealNotice } = deps;
+  const { db, clock, mailboxes, objects, personal, providers, sealNotice } = deps;
 
   function recordFor(userId: string) {
     return db.select().from(accountErasures).where(eq(accountErasures.userId, userId)).get();
@@ -191,6 +193,8 @@ export function createAccountEraser(deps: AccountEraserDeps) {
 
       tx.delete(users).where(eq(users.id, userId)).run();
     });
+
+    personal.forget(userId);
 
     return recordFor(userId) ?? null;
   }

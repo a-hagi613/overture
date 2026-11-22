@@ -30,6 +30,7 @@ import {
 } from "../platform/db/schema.ts";
 import { ACCOUNT_ERASE_JOB_KIND, ERASURE_RETRY_DELAY_MS, createAccountEraser } from "./erase.ts";
 import { ACCOUNT_DELETED_NOTICE_JOB_KIND, createDeletionNoticeCrypto } from "./notice.ts";
+import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 
 const USER_ID = "user-erase-1";
 const PROFILE_ID = "vendor-profile-1";
@@ -202,6 +203,7 @@ function eraserFor(
       "tryoverture.example",
     ),
     objects: deps.objects ?? account.objects,
+    personal: createPersonalCrypto(account.db, new Uint8Array(32).fill(7), 1),
     providers: deps.providers,
     sealNotice: async (notice) => {
       await Promise.resolve();

@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 
 import type { Auth } from "../auth/index.ts";
@@ -10,21 +10,10 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 
-import { applications, mailThreads, messageAttachments, messages } from "../platform/db/schema.ts";
+import { mailThreads, messageAttachments, messages } from "../platform/db/schema.ts";
+import { attachmentsByMessageOf, messagesByThreadOf, threadViewsOf } from "../inbox/threads.ts";
 
 const MIME_PATTERN = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/iu;
-
-function displayNameOf(from: string) {
-  const open = from.indexOf("<");
-
-  if (open === -1) {
-    return from.trim();
-  }
-
-  const name = from.slice(0, open).trim().replaceAll(/^"|"$/gu, "");
-
-  return name === "" ? from.trim() : name;
-}
 
 function safeMime(mime: string) {
   const base = mime.split(";")[0]?.trim() ?? "";
@@ -57,76 +46,10 @@ export function createInboxRoutes(deps: {
     return result?.user ?? null;
   }
 
-  function applicationOf(userId: string, applicationId: string | null) {
-    return applicationId === null
-      ? undefined
-      : db
-          .select({ company: applications.companyName, title: applications.postingTitle })
-          .from(applications)
-          .where(and(eq(applications.id, applicationId), eq(applications.userId, userId)))
-          .get();
-  }
-
-  function messagesOf(threadId: string) {
-    return db
-      .select()
-      .from(messages)
-      .where(eq(messages.threadId, threadId))
-      .orderBy(asc(messages.createdAt))
-      .all();
-  }
-
-  async function threadView(thread: typeof mailThreads.$inferSelect) {
-    const rows = messagesOf(thread.id);
-    const latest = rows.at(-1);
-    const application = applicationOf(thread.userId, thread.applicationId);
-
-    const subject =
-      latest === undefined
-        ? await personal.openFor(
-            thread.userId,
-            { column: "subject_enc", rowId: thread.id, table: "mail_threads" },
-            thread.subjectEnc,
-          )
-        : await personal.openFor(
-            thread.userId,
-            { column: "subject_enc", rowId: latest.id, table: "messages" },
-            latest.subjectEnc,
-          );
-
-    const from =
-      latest === undefined
-        ? ""
-        : await personal.openFor(
-            thread.userId,
-            { column: "from_enc", rowId: latest.id, table: "messages" },
-            latest.fromEnc,
-          );
-
-    const snippet =
-      latest === undefined
-        ? ""
-        : await personal.openFor(
-            thread.userId,
-            { column: "snippet_enc", rowId: latest.id, table: "messages" },
-            latest.snippetEnc,
-          );
-
-    return {
-      applicationId: thread.applicationId,
-      classification: latest?.classification ?? null,
-      company: application?.company ?? displayNameOf(from),
-      id: thread.id,
-      lastMessageAt: thread.lastMessageAt.getTime(),
-      needsChecking: rows.some((row) => row.auth !== "pass"),
-      snippet,
-      subject,
-      title: application?.title ?? null,
-      unread: rows.some((row) => row.readAt === null && row.direction === "in"),
-    };
-  }
-
-  async function messageView(message: typeof messages.$inferSelect) {
+  async function messageView(
+    message: typeof messages.$inferSelect,
+    attachments: readonly (typeof messageAttachments.$inferSelect)[],
+  ) {
     const [subject, from, text] = await Promise.all([
       personal.openFor(
         message.userId,
@@ -145,26 +68,21 @@ export function createInboxRoutes(deps: {
       ),
     ]);
 
-    const attachments = await Promise.all(
-      db
-        .select()
-        .from(messageAttachments)
-        .where(eq(messageAttachments.messageId, message.id))
-        .all()
-        .map(async (attachment) => ({
-          bytes: attachment.bytes,
-          filename: await personal.openFor(
-            message.userId,
-            { column: "filename_enc", rowId: attachment.id, table: "message_attachments" },
-            attachment.filenameEnc,
-          ),
-          id: attachment.id,
-          mime: attachment.mime,
-        })),
+    const opened = await Promise.all(
+      attachments.map(async (attachment) => ({
+        bytes: attachment.bytes,
+        filename: await personal.openFor(
+          message.userId,
+          { column: "filename_enc", rowId: attachment.id, table: "message_attachments" },
+          attachment.filenameEnc,
+        ),
+        id: attachment.id,
+        mime: attachment.mime,
+      })),
     );
 
     return {
-      attachments,
+      attachments: opened,
       auth: message.auth,
       classification: message.classification,
       createdAt: message.createdAt.getTime(),
@@ -196,7 +114,7 @@ export function createInboxRoutes(deps: {
       .orderBy(desc(mailThreads.lastMessageAt))
       .all();
 
-    const rows = await Promise.all(threads.map(async (thread) => threadView(thread)));
+    const rows = await threadViewsOf({ db, personal, threads, userId: user.id });
 
     return context.json({
       counts: {
@@ -225,9 +143,20 @@ export function createInboxRoutes(deps: {
       return context.json({ error: "not found" }, 404);
     }
 
+    const messagesFor = messagesByThreadOf(db, [thread.id]).get(thread.id) ?? [];
+
+    const attachmentsFor = attachmentsByMessageOf(
+      db,
+      messagesFor.map((row) => row.id),
+    );
+
+    const views = await threadViewsOf({ db, personal, threads: [thread], userId: user.id });
+
     return context.json({
-      messages: await Promise.all(messagesOf(thread.id).map(async (row) => messageView(row))),
-      thread: await threadView(thread),
+      messages: await Promise.all(
+        messagesFor.map(async (row) => messageView(row, attachmentsFor.get(row.id) ?? [])),
+      ),
+      thread: views[0] ?? null,
     });
   });
 

@@ -14,12 +14,7 @@ import { reviewCategory } from "../catalog/question-normalize.ts";
 import { createFactService } from "../profile/facts.ts";
 import { factLabelFor } from "../../shared/facts.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
-import {
-  applicationIdsForReview,
-  dismissEmptyReview,
-  detachApplication,
-  openReviewIds,
-} from "./review-store.ts";
+import { applicationIdsForReview, detachApplication, dismissEmptyReview } from "./review-store.ts";
 import { recordReviewResolved } from "./review-events.ts";
 import { enqueueApplicationPrepare } from "./prepare-jobs.ts";
 import { returnStaleApprovals } from "./approval-invalidation.ts";
@@ -83,19 +78,135 @@ function closedApplicationIds(db: AppDatabase, applicationIds: readonly string[]
   );
 }
 
-function attachmentsFor(db: AppDatabase, reviewId: string) {
+interface ReviewAttachment {
+  applicationId: string;
+  company: string;
+  reviewId: string;
+  title: string;
+  postingId: string;
+}
+
+function attachmentsForReviews(db: AppDatabase, reviewIds: readonly string[]) {
+  if (reviewIds.length === 0) {
+    return [];
+  }
+
   return db
     .select({
+      applicationId: applications.id,
       applicationId: applications.id,
       company: applications.companyName,
       title: applications.postingTitle,
       postingId: applications.postingId,
+      reviewId: reviewApplications.reviewId,
     })
     .from(reviewApplications)
     .innerJoin(applications, eq(applications.id, reviewApplications.applicationId))
-    .where(eq(reviewApplications.reviewId, reviewId))
+    .where(inArray(reviewApplications.reviewId, [...reviewIds]))
     .orderBy(applications.createdAt, applications.id)
     .all();
+}
+
+function attachmentsByReview(attachments: readonly ReviewAttachment[]) {
+  const grouped = new Map<string, ReviewAttachment[]>();
+
+  for (const attachment of attachments) {
+    const list = grouped.get(attachment.reviewId) ?? [];
+
+    list.push(attachment);
+    grouped.set(attachment.reviewId, list);
+  }
+
+  return grouped;
+}
+
+function openReviewsWithAttachments(db: AppDatabase, userId: string) {
+  const openReviews = openReviewRows(db, userId);
+
+  const attachments = attachmentsForReviews(
+    db,
+    openReviews.map((review) => review.id),
+  );
+
+  return { attachments, reviews: openReviews };
+}
+
+function sweepClosedAttachments(db: AppDatabase, clock: Clock, userId: string) {
+  const loaded = openReviewsWithAttachments(db, userId);
+
+  const open = closedApplicationIds(
+    db,
+    loaded.attachments.map((attachment) => attachment.applicationId),
+  );
+
+  const kept = loaded.attachments.filter((attachment) => open.has(attachment.applicationId));
+  const detached = loaded.attachments.filter((attachment) => !open.has(attachment.applicationId));
+
+  for (const attachment of detached) {
+    detachApplication(db, attachment.reviewId, attachment.applicationId);
+  }
+
+  const remaining = attachmentsByReview(kept);
+
+  let dismissed = false;
+
+  for (const review of loaded.reviews) {
+    if ((remaining.get(review.id) ?? []).length === 0) {
+      dismissEmptyReview(db, clock, review.id);
+      dismissed = true;
+    }
+  }
+
+  if (detached.length === 0 && !dismissed) {
+    return loaded;
+  }
+
+  return openReviewsWithAttachments(db, userId);
+}
+
+/**
+ * Every open Review with the Applications waiting on it, read in a fixed number
+ * of queries rather than one per Review.
+ * @param input The database, the clock and the signed-in person.
+ * @returns The reviews, most Applications first.
+ */
+export function listReviews(input: { db: AppDatabase; clock: Clock; userId: string }) {
+  const { db, clock, userId } = input;
+  const { attachments, reviews: openReviews } = sweepClosedAttachments(db, clock, userId);
+  const byReview = attachmentsByReview(attachments);
+
+  const views: ReviewView[] = openReviews.map((review) => {
+    const reviewAttachments = byReview.get(review.id) ?? [];
+    const companiesUnlocked = new Set(reviewAttachments.map((attachment) => attachment.company));
+    const label = review.factKey === null ? null : factLabelFor(review.factKey);
+    const country = review.scope === "" ? null : countryNameFor(review.scope);
+
+    let factLabel = label;
+
+    if (label !== null && country !== null) {
+      factLabel = `${label} (${country})`;
+    }
+
+    return {
+      id: review.id,
+      prompt: review.prompt,
+      fieldType: review.fieldType,
+      options: optionsSchema.parse(JSON.parse(review.options)),
+      factKey: review.factKey,
+      scope: review.scope,
+      factLabel,
+      reason: review.reason,
+      category: reviewCategory(review.prompt, review.factKey),
+      unlocked: reviewAttachments.length,
+      companies: companiesUnlocked.size,
+      applications: reviewAttachments,
+      createdAt: review.createdAt,
+    };
+  });
+
+  return views.toSorted(
+    (left, right) => right.unlocked - left.unlocked || left.createdAt - right.createdAt,
+  );
 }
 
 export function createReviewService(deps: {
@@ -108,62 +219,6 @@ export function createReviewService(deps: {
 
   const catalog = createQuestionCatalog({ db, clock });
   const factsService = createFactService({ db, clock, personal });
-
-  function sweep(userId: string) {
-    for (const reviewId of openReviewIds(db, userId)) {
-      const attachments = attachmentsFor(db, reviewId);
-
-      const open = closedApplicationIds(
-        db,
-        attachments.map((attachment) => attachment.applicationId),
-      );
-
-      for (const attachment of attachments) {
-        if (!open.has(attachment.applicationId)) {
-          detachApplication(db, reviewId, attachment.applicationId);
-        }
-      }
-
-      dismissEmptyReview(db, clock, reviewId);
-    }
-  }
-
-  function list(userId: string) {
-    sweep(userId);
-
-    const views: ReviewView[] = openReviewRows(db, userId).map((review) => {
-      const attachments = attachmentsFor(db, review.id);
-      const companiesUnlocked = new Set(attachments.map((attachment) => attachment.company));
-      const label = review.factKey === null ? null : factLabelFor(review.factKey);
-      const country = review.scope === "" ? null : countryNameFor(review.scope);
-
-      let factLabel = label;
-
-      if (label !== null && country !== null) {
-        factLabel = `${label} (${country})`;
-      }
-
-      return {
-        id: review.id,
-        prompt: review.prompt,
-        fieldType: review.fieldType,
-        options: optionsSchema.parse(JSON.parse(review.options)),
-        factKey: review.factKey,
-        scope: review.scope,
-        factLabel,
-        reason: review.reason,
-        category: reviewCategory(review.prompt, review.factKey),
-        unlocked: attachments.length,
-        companies: companiesUnlocked.size,
-        applications: attachments,
-        createdAt: review.createdAt,
-      };
-    });
-
-    return views.toSorted(
-      (left, right) => right.unlocked - left.unlocked || left.createdAt - right.createdAt,
-    );
-  }
 
   async function answer(
     userId: string,
@@ -269,7 +324,11 @@ export function createReviewService(deps: {
     return { reviewId, applicationIds };
   }
 
-  return { answer, dismiss, list };
+  return {
+    answer,
+    dismiss,
+    list: (userId: string) => listReviews({ clock, db, userId }),
+  };
 }
 
 export type ReviewService = ReturnType<typeof createReviewService>;

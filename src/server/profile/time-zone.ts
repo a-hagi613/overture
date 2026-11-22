@@ -45,7 +45,36 @@ export function effectiveTimeZone(db: DatabaseWriter, userId: string, now: numbe
 export function createTimeZoneService(deps: { db: AppDatabase; clock: Clock }) {
   const { db, clock } = deps;
 
-  async function applyDue(userId: string) {
+  async function current(userId: string) {
+    const row = (
+      await db
+        .select({
+          timezone: profiles.timezone,
+          pendingTimezone: profiles.pendingTimezone,
+          pendingTimezoneAt: profiles.pendingTimezoneAt,
+        })
+        .from(profiles)
+        .where(eq(profiles.userId, userId))
+        .limit(1)
+    ).at(0);
+
+    if (row === undefined) {
+      return { timezone: null, pendingTimezone: null, pendingTimezoneAt: null };
+    }
+
+    const due =
+      row.pendingTimezone !== null &&
+      row.pendingTimezoneAt !== null &&
+      row.pendingTimezoneAt.getTime() <= clock.now();
+
+    if (!due) {
+      return {
+        timezone: row.timezone ?? null,
+        pendingTimezone: row.pendingTimezone ?? null,
+        pendingTimezoneAt: row.pendingTimezoneAt?.toISOString() ?? null,
+      };
+    }
+
     await db
       .update(profiles)
       .set({
@@ -60,28 +89,8 @@ export function createTimeZoneService(deps: { db: AppDatabase; clock: Clock }) {
           lte(profiles.pendingTimezoneAt, new Date(clock.now())),
         ),
       );
-  }
 
-  async function current(userId: string) {
-    await applyDue(userId);
-
-    const row = (
-      await db
-        .select({
-          timezone: profiles.timezone,
-          pendingTimezone: profiles.pendingTimezone,
-          pendingTimezoneAt: profiles.pendingTimezoneAt,
-        })
-        .from(profiles)
-        .where(eq(profiles.userId, userId))
-        .limit(1)
-    ).at(0);
-
-    return {
-      timezone: row?.timezone ?? null,
-      pendingTimezone: row?.pendingTimezone ?? null,
-      pendingTimezoneAt: row?.pendingTimezoneAt?.toISOString() ?? null,
-    };
+    return { timezone: row.pendingTimezone, pendingTimezone: null, pendingTimezoneAt: null };
   }
 
   async function plan(userId: string, timezone: string) {

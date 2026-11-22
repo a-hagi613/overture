@@ -12,15 +12,15 @@ import {
   applications,
   applicationEvents,
   applicationSnapshots,
-  mailThreads,
   matches,
-  messages,
   resumes,
   reviewApplications,
   reviews,
 } from "../platform/db/schema.ts";
 import { localDayStart, localPartsAt } from "../platform/local-time.ts";
 import { restartCheckinAfterUndo } from "../pipeline/checkins.ts";
+import { latestEmailNotesOf } from "../pipeline/email-notes.ts";
+import { linkedMailOf } from "../inbox/linked-mail.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { createTimeZoneService } from "../profile/time-zone.ts";
 import { resumeLines as splitResumeLines } from "../pipeline/grounding.ts";
@@ -206,31 +206,6 @@ export function createApplicationRoutes(
     return timezone ?? "UTC";
   }
 
-  function latestEmailNotes(userId: string) {
-    const notes = new Map<string, string>();
-
-    const rows = db
-      .select({
-        applicationId: applicationEvents.applicationId,
-        detail: applicationEvents.detail,
-        toValue: applicationEvents.toValue,
-      })
-      .from(applicationEvents)
-      .where(and(eq(applicationEvents.userId, userId), eq(applicationEvents.kind, "email")))
-      .orderBy(asc(applicationEvents.at))
-      .all();
-
-    for (const row of rows) {
-      const note = row.toValue ?? row.detail;
-
-      if (note !== null && note.trim() !== "") {
-        notes.set(row.applicationId, note);
-      }
-    }
-
-    return notes;
-  }
-
   function blockedApplicationIds(userId: string) {
     return new Set(
       db
@@ -279,7 +254,12 @@ export function createApplicationRoutes(
       .all();
 
     const blocked = blockedApplicationIds(userId);
-    const emailNotes = latestEmailNotes(userId);
+
+    const emailNotes = latestEmailNotesOf(
+      db,
+      userId,
+      rows.map((row) => row.id),
+    );
 
     const cards = (rows satisfies CardRow[]).map((row) => ({
       ageDays: Math.max(0, Math.floor((now - row.createdAt) / DAY_MS)),
@@ -643,7 +623,7 @@ export function createApplicationRoutes(
     const now = clock.now();
     const timeZone = await timeZoneOf(userId);
     const dayStart = localDayStart(now, timeZone);
-    const emailNotes = latestEmailNotes(userId);
+    const emailNotes = latestEmailNotesOf(db, userId, [id]);
 
     const note = noteFor(
       {
@@ -685,7 +665,12 @@ export function createApplicationRoutes(
       ageDays: Math.max(0, Math.floor((now - application.createdAt) / DAY_MS)),
       application,
       company: application.companyName,
-      mail: await linkedMail(userId, id),
+      mail: await linkedMailOf({
+        applicationId: id,
+        db,
+        personal,
+        userId,
+      }),
       match:
         match === undefined
           ? null
@@ -773,71 +758,6 @@ export function createApplicationRoutes(
     );
 
     return { bytes: row.bytes, filename, sha256: row.sha256 };
-  }
-
-  async function linkedMail(userId: string, applicationId: string) {
-    const threads = db
-      .select()
-      .from(mailThreads)
-      .where(and(eq(mailThreads.userId, userId), eq(mailThreads.applicationId, applicationId)))
-      .orderBy(desc(mailThreads.lastMessageAt))
-      .all();
-
-    return Promise.all(
-      threads.map(async (thread) => {
-        const subject = await personal.openFor(
-          userId,
-          { column: "subject_enc", rowId: thread.id, table: "mail_threads" },
-          thread.subjectEnc,
-        );
-
-        const rows = db
-          .select()
-          .from(messages)
-          .where(eq(messages.threadId, thread.id))
-          .orderBy(asc(messages.createdAt))
-          .all();
-
-        const items = await Promise.all(
-          rows.map(async (message) => {
-            const [from, snippet, messageSubject] = await Promise.all([
-              personal.openFor(
-                userId,
-                { column: "from_enc", rowId: message.id, table: "messages" },
-                message.fromEnc,
-              ),
-              personal.openFor(
-                userId,
-                { column: "snippet_enc", rowId: message.id, table: "messages" },
-                message.snippetEnc,
-              ),
-              personal.openFor(
-                userId,
-                { column: "subject_enc", rowId: message.id, table: "messages" },
-                message.subjectEnc,
-              ),
-            ]);
-
-            return {
-              at: message.createdAt.getTime(),
-              classification: message.classification,
-              direction: message.direction,
-              from,
-              id: message.id,
-              snippet,
-              subject: messageSubject,
-            };
-          }),
-        );
-
-        return {
-          id: thread.id,
-          lastMessageAt: thread.lastMessageAt.getTime(),
-          messages: items,
-          subject,
-        };
-      }),
-    );
   }
 
   return routes;

@@ -7,7 +7,11 @@ export type AppDatabase = ReturnType<typeof openDatabase>["db"];
 
 export type DatabaseWriter = Pick<AppDatabase, "select" | "insert" | "update" | "delete">;
 
-export function openDatabase(path: string) {
+export interface QueryLogger {
+  logQuery: (query: string, params: readonly unknown[]) => void;
+}
+
+export function openDatabase(path: string, options: { logger?: QueryLogger } = {}) {
   if (path !== ":memory:") {
     mkdirSync(dirname(path), { recursive: true });
   }
@@ -19,7 +23,7 @@ export function openDatabase(path: string) {
   sqlite.run("PRAGMA foreign_keys = ON;");
   sqlite.run("PRAGMA busy_timeout = 5000;");
 
-  const db = drizzle(sqlite);
+  const db = drizzle(sqlite, options.logger === undefined ? {} : { logger: options.logger });
 
   return { db, sqlite };
 }

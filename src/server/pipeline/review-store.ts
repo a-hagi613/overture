@@ -175,15 +175,6 @@ export function applicationIdsForReview(db: AppDatabase, reviewId: string) {
     .map((row) => row.applicationId);
 }
 
-export function openReviewIds(db: AppDatabase, userId: string) {
-  return db
-    .select({ id: reviews.id })
-    .from(reviews)
-    .where(and(eq(reviews.userId, userId), eq(reviews.status, "open")))
-    .all()
-    .map((row) => row.id);
-}
-
 export function reviewIdsWithApplications(
   db: AppDatabase,
   reviewIds: readonly string[],
