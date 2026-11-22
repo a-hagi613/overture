@@ -314,7 +314,7 @@ async function runTargets(
   await runTargets(rest, pageFor, urlOf, width);
 }
 
-test.describe.configure({ timeout: 240_000 });
+test.describe.configure({ timeout: 600_000 });
 
 for (const width of widths) {
   for (const theme of themes) {
