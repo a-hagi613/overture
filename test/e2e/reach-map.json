@@ -8992,6 +8992,7 @@
       "designs": ["design/reference/settings-delete/"],
       "modules": [
         "src/server/account/erase.ts",
+        "src/server/account/notice.ts",
         "src/server/admin/reveal-view.ts",
         "src/server/auth/email.ts",
         "src/server/auth/invites.ts",
@@ -15958,6 +15959,7 @@
       "designs": [],
       "modules": [
         "src/server/account/erase.ts",
+        "src/server/account/notice.ts",
         "src/server/admin/reveal-view.ts",
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -17286,6 +17288,7 @@
       "designs": [],
       "modules": [
         "src/server/account/erase.ts",
+        "src/server/account/notice.ts",
         "src/server/admin/reveal-view.ts",
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",
@@ -30892,6 +30895,7 @@
       "designs": [],
       "modules": [
         "src/server/account/erase.ts",
+        "src/server/account/notice.ts",
         "src/server/admin/reveal-view.ts",
         "src/server/auth/client-ip.ts",
         "src/server/auth/demo-login.ts",

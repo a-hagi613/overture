@@ -30,7 +30,7 @@ import { createRandom } from "./platform/ports/random.ts";
 import { createEventLoopLagMonitor } from "./platform/event-loop-lag.ts";
 import { createBackupMonitor } from "./platform/ports/backup.ts";
 import { installProcessGuards } from "./platform/process-guard.ts";
-import { enqueueJob, recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
+import { recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
 import {
   ensureRetentionQueued,
   RETENTION_JOB_KIND,
@@ -600,14 +600,14 @@ const noticeCrypto = createDeletionNoticeCrypto(
 const eraser = createAccountEraser({
   clock,
   db,
-  enqueueNotice: async (notice) => {
-    const payload = await noticeCrypto.seal(notice);
-
-    enqueueJob(db, clock, ACCOUNT_DELETED_NOTICE_JOB_KIND, payload, { maxAttempts: 5 });
-  },
   mailboxes,
   objects,
   providers: browserProviders,
+  sealNotice: async (notice) => {
+    const payload = await noticeCrypto.seal(notice);
+
+    return payload;
+  },
 });
 
 const accountJobHandlers: JobHandlers = {
