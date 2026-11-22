@@ -132,6 +132,7 @@
           "src/server/routes/test-only.ts",
           "src/server/pipeline/prepare.ts",
           "src/server/dispatch/dispatch.ts",
+          "src/server/dispatch/outcomes.test.ts",
           "src/server/demo/seed.ts",
           "src/server/billing/pause.test.ts",
           "src/server/dispatch/report.test.ts"
@@ -175,6 +176,7 @@
           "src/server/platform/llm/models.test.ts",
           "src/shared/copy.test.ts",
           "src/server/auth/client-ip.test.ts",
+          "src/server/dispatch/outcomes.test.ts",
           "scripts/database-sync-guard.test.ts"
         ]
       }
