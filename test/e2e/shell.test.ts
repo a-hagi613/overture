@@ -129,3 +129,28 @@ test("the shell is axe clean at 390 and 1280 in light and dark", async ({
   await expectShellAxeClean(browser, ownerStorageState, appServerUrl, 1280, "light");
   await expectShellAxeClean(browser, ownerStorageState, appServerUrl, 1280, "dark");
 });
+
+test("a keyboard user can skip the shell to the main content", async ({
+  browser,
+  appServerUrl,
+  ownerStorageState,
+}) => {
+  const context = await browser.newContext({ storageState: ownerStorageState });
+  const shellPage = await context.newPage();
+
+  await shellPage.setViewportSize({ width: 1280, height: 800 });
+  await openShell(shellPage, appServerUrl, "light");
+
+  const skipLink = shellPage.getByRole("link", { name: "Skip to content" });
+
+  await expect(skipLink).toHaveCount(1);
+
+  await shellPage.keyboard.press("Tab");
+  await expect(skipLink).toBeFocused();
+  await expect(skipLink).toBeInViewport();
+
+  await shellPage.keyboard.press("Enter");
+  await expect(shellPage.locator("main#main-content")).toBeFocused();
+
+  await context.close();
+});
