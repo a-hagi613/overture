@@ -1,11 +1,10 @@
 {
  "board": "signin",
  "variant": "390-dark-refused",
- "source": "w5-signin-refused",
  "viewport": 390,
  "page": {
   "width": 390,
-  "height": 924
+  "height": 904
  },
  "tokens": {
   "--bg2": "#181614",
@@ -43,14 +42,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 923.9
+    "h": 903.7
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "content-box",
     "width": "390px",
-    "height": "923.938px",
+    "height": "903.688px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -75,14 +74,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 923.9
+    "h": 903.7
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "content-box",
     "width": "390px",
-    "height": "923.938px",
+    "height": "903.688px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -107,14 +106,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 923.9
+    "h": 903.7
    },
    "style": {
     "display": "block",
     "position": "relative",
     "box-sizing": "content-box",
     "width": "390px",
-    "height": "923.938px",
+    "height": "903.688px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -141,14 +140,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 923.9
+    "h": 903.7
    },
    "style": {
     "display": "block",
     "position": "absolute",
     "box-sizing": "border-box",
     "width": "390px",
-    "height": "923.938px",
+    "height": "903.688px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -175,14 +174,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 923.9
+    "h": 903.7
    },
    "style": {
     "display": "block",
     "position": "absolute",
     "box-sizing": "border-box",
     "width": "390px",
-    "height": "923.938px",
+    "height": "903.688px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -208,14 +207,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 923.9
+    "h": 903.7
    },
    "style": {
     "display": "inline",
     "position": "static",
     "box-sizing": "border-box",
     "width": "390px",
-    "height": "923.938px",
+    "height": "903.688px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -277,20 +276,20 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 923.9
+    "h": 903.7
    },
    "style": {
     "display": "grid",
     "position": "relative",
     "box-sizing": "border-box",
     "width": "390px",
-    "height": "923.938px",
+    "height": "903.688px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
     "flex-shrink": "1",
     "grid-template-columns": "390px",
-    "grid-template-rows": "923.938px",
+    "grid-template-rows": "903.688px",
     "font-family": "\"Plus Jakarta Sans\", system-ui, sans-serif",
     "font-size": "14px",
     "font-weight": "400",
@@ -313,14 +312,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 923.9
+    "h": 903.7
    },
    "style": {
     "display": "flex",
     "position": "relative",
     "box-sizing": "border-box",
     "width": "390px",
-    "height": "923.938px",
+    "height": "903.688px",
     "padding-top": "18px",
     "padding-right": "18px",
     "padding-bottom": "28px",
@@ -666,14 +665,14 @@
     "x": 18,
     "y": 78,
     "w": 354,
-    "h": 817.9
+    "h": 797.7
    },
    "style": {
     "display": "flex",
     "position": "static",
     "box-sizing": "border-box",
     "width": "354px",
-    "height": "817.938px",
+    "height": "797.688px",
     "gap": "18px",
     "row-gap": "18px",
     "column-gap": "18px",
@@ -977,14 +976,14 @@
     "x": 18,
     "y": 167.5,
     "w": 354,
-    "h": 653.3
+    "h": 633
    },
    "style": {
     "display": "block",
     "position": "relative",
     "box-sizing": "border-box",
     "width": "354px",
-    "height": "653.25px",
+    "height": "633px",
     "padding-top": "24px",
     "padding-right": "20px",
     "padding-bottom": "22px",
@@ -1123,14 +1122,14 @@
     "x": 39,
     "y": 292.5,
     "w": 312,
-    "h": 505.3
+    "h": 485
    },
    "style": {
     "display": "flex",
     "position": "static",
     "box-sizing": "border-box",
     "width": "312px",
-    "height": "505.25px",
+    "height": "485px",
     "gap": "12px",
     "row-gap": "12px",
     "column-gap": "12px",
@@ -1160,14 +1159,14 @@
     "x": 39,
     "y": 292.5,
     "w": 312,
-    "h": 135.8
+    "h": 115.5
    },
    "style": {
     "display": "flex",
     "position": "static",
     "box-sizing": "border-box",
     "width": "312px",
-    "height": "135.75px",
+    "height": "115.5px",
     "padding-top": "15px",
     "padding-right": "16px",
     "padding-bottom": "15px",
@@ -1301,14 +1300,14 @@
     "x": 85,
     "y": 307.5,
     "w": 250,
-    "h": 105.8
+    "h": 85.5
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
     "width": "250px",
-    "height": "105.75px",
+    "height": "85.5px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -1365,19 +1364,19 @@
   {
    "path": "div>div>div>div:nth-of-type(3)>main>div:nth-of-type(2)>section>div:nth-of-type(2)>div:nth-of-type(1)>div>p",
    "tag": "p",
-   "text": "Overture is invite-only during the beta. Google, LinkedIn, Google, LinkedIn and emailed links all need an invite for the same email.",
+   "text": "Overture is invite-only during the beta. Google, LinkedIn and an emailed link all need an invite for the same email.",
    "box": {
     "x": 85,
     "y": 332.3,
     "w": 250,
-    "h": 81
+    "h": 60.8
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
     "width": "250px",
-    "height": "81px",
+    "height": "60.75px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -1401,7 +1400,7 @@
    "tag": "button",
    "box": {
     "x": 39,
-    "y": 440.3,
+    "y": 420,
     "w": 312,
     "h": 46
    },
@@ -1443,7 +1442,7 @@
    "tag": "span",
    "box": {
     "x": 110,
-    "y": 452.3,
+    "y": 432,
     "w": 22,
     "h": 22
    },
@@ -1480,7 +1479,7 @@
    "tag": "svg",
    "box": {
     "x": 114,
-    "y": 456.3,
+    "y": 436,
     "w": 14,
     "h": 14
    },
@@ -1512,7 +1511,7 @@
    "tag": "path",
    "box": {
     "x": 121,
-    "y": 462.1,
+    "y": 441.8,
     "w": 6.7,
     "h": 6.4
    },
@@ -1542,7 +1541,7 @@
    "tag": "path",
    "box": {
     "x": 114.7,
-    "y": 464.6,
+    "y": 444.3,
     "w": 10.9,
     "h": 5.7
    },
@@ -1572,7 +1571,7 @@
    "tag": "path",
    "box": {
     "x": 114,
-    "y": 460.1,
+    "y": 439.9,
     "w": 3.1,
     "h": 6.3
    },
@@ -1602,7 +1601,7 @@
    "tag": "path",
    "box": {
     "x": 114.7,
-    "y": 456.3,
+    "y": 436,
     "w": 10.9,
     "h": 5.7
    },
@@ -1633,7 +1632,7 @@
    "text": "Continue with Google",
    "box": {
     "x": 140,
-    "y": 454.8,
+    "y": 434.5,
     "w": 140,
     "h": 17
    },
@@ -1665,7 +1664,7 @@
    "tag": "button",
    "box": {
     "x": 39,
-    "y": 498.3,
+    "y": 478,
     "w": 312,
     "h": 46
    },
@@ -1708,7 +1707,7 @@
    "text": "in",
    "box": {
     "x": 107,
-    "y": 510.3,
+    "y": 490,
     "w": 22,
     "h": 22
    },
@@ -1745,7 +1744,7 @@
    "text": "Continue with LinkedIn",
    "box": {
     "x": 137,
-    "y": 512.8,
+    "y": 492.5,
     "w": 146,
     "h": 17
    },
@@ -1777,7 +1776,7 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 574.3,
+    "y": 554,
     "w": 312,
     "h": 18
    },
@@ -1816,7 +1815,7 @@
    "tag": "hr",
    "box": {
     "x": 39,
-    "y": 582.8,
+    "y": 562.5,
     "w": 97,
     "h": 1
    },
@@ -1851,7 +1850,7 @@
    "text": "or use your email",
    "box": {
     "x": 148,
-    "y": 574.3,
+    "y": 554,
     "w": 94,
     "h": 18
    },
@@ -1884,7 +1883,7 @@
    "tag": "hr",
    "box": {
     "x": 254,
-    "y": 582.8,
+    "y": 562.5,
     "w": 97,
     "h": 1
    },
@@ -1918,7 +1917,7 @@
    "tag": "form",
    "box": {
     "x": 39,
-    "y": 622.3,
+    "y": 602,
     "w": 312,
     "h": 175.5
    },
@@ -1954,7 +1953,7 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 622.3,
+    "y": 602,
     "w": 312,
     "h": 68
    },
@@ -1988,7 +1987,7 @@
    "text": "Email",
    "box": {
     "x": 39,
-    "y": 622.3,
+    "y": 602,
     "w": 312,
     "h": 16
    },
@@ -2021,7 +2020,7 @@
    "tag": "input",
    "box": {
     "x": 39,
-    "y": 644.3,
+    "y": 624,
     "w": 312,
     "h": 46
    },
@@ -2059,7 +2058,7 @@
    "text": "That email is not on the invite list. Check the address, or use the email your invitation was sent to.",
    "box": {
     "x": 39,
-    "y": 702.3,
+    "y": 682,
     "w": 312,
     "h": 37.5
    },
@@ -2093,7 +2092,7 @@
    "text": "Email me a sign-in link",
    "box": {
     "x": 39,
-    "y": 751.8,
+    "y": 731.5,
     "w": 312,
     "h": 46
    },
@@ -2135,7 +2134,7 @@
    "tag": "footer",
    "box": {
     "x": 18,
-    "y": 838.8,
+    "y": 818.5,
     "w": 354,
     "h": 57.2
    },
@@ -2172,7 +2171,7 @@
    "tag": "span",
    "box": {
     "x": 63.5,
-    "y": 838.8,
+    "y": 818.5,
     "w": 263,
     "h": 14
    },
@@ -2208,7 +2207,7 @@
    "tag": "svg",
    "box": {
     "x": 63.5,
-    "y": 839.8,
+    "y": 819.5,
     "w": 12,
     "h": 12
    },
@@ -2240,7 +2239,7 @@
    "tag": "rect",
    "box": {
     "x": 66,
-    "y": 845.3,
+    "y": 825,
     "w": 7,
     "h": 4.5
    },
@@ -2272,7 +2271,7 @@
    "tag": "path",
    "box": {
     "x": 67.5,
-    "y": 841.8,
+    "y": 821.5,
     "w": 4,
     "h": 3.5
    },
@@ -2303,7 +2302,7 @@
    "text": "Google, LinkedIn or an emailed link",
    "box": {
     "x": 81.5,
-    "y": 838.8,
+    "y": 818.5,
     "w": 245,
     "h": 14
    },
@@ -2336,7 +2335,7 @@
    "text": "By continuing, you agree to Overture's and .",
    "box": {
     "x": 18,
-    "y": 858.8,
+    "y": 838.5,
     "w": 354,
     "h": 37.2
    },
@@ -2370,7 +2369,7 @@
    "text": "Terms",
    "box": {
     "x": 254,
-    "y": 859.8,
+    "y": 839.5,
     "w": 33,
     "h": 15
    },
@@ -2403,7 +2402,7 @@
    "text": "Privacy Policy",
    "box": {
     "x": 176,
-    "y": 859.8,
+    "y": 839.5,
     "w": 178,
     "h": 33.6
    },
