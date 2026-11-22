@@ -423,7 +423,7 @@ interface LiveControl {
 
 const normaliseLabel = (raw: string) => norm(raw.replaceAll("*", ""));
 
-const isPositiveAnswer = (answer: string | null) =>
+export const isPositiveAnswer = (answer: string | null) =>
   answer !== null && !["", "0", "false", "no", "unchecked"].includes(norm(answer));
 
 function liveMatchesExpectation(expectation: LiveFormExpectation, control: LiveControl) {

@@ -899,6 +899,11 @@ export const copy = {
     exportRowDetail:
       "A zip of your profile, facts, Applications, messages, resume and attachments.",
     exportRowButton: "Export data",
+    signOutThis: "Sign out of this device",
+    signOutThisDetail: "Ends this session in this browser. Your other devices stay signed in.",
+    signOutThisButton: "Sign out",
+    signOutThisPending: "Signing out…",
+    signOutThisError: "We could not sign you out. Check your connection and try again.",
     signOutAll: "Sign out all devices",
     signOutAllDetail: "Ends every session except this one.",
     signOutAllButton: "Sign out everywhere",

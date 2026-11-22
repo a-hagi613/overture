@@ -21,7 +21,7 @@ function argumentsFor(name: string) {
   return args.flatMap((value, index) => (value === `--${name}` ? [args[index + 1] ?? ""] : []));
 }
 
-const ats = z.enum(["greenhouse", "lever", "ashby"]).parse(argument("ats"));
+const ats = z.enum(["greenhouse", "lever", "ashby", "workable"]).parse(argument("ats"));
 const applyUrls = argumentsFor("url").filter((value) => value.length > 0);
 const payload = fixtureCapturePayloadSchema.parse({ ats, applyUrls });
 const { db, sqlite } = openDatabase(databasePath);

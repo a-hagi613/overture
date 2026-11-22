@@ -50,7 +50,7 @@ export interface FormQuestion {
 export interface SendPlan {
   applicationId: string;
   userId: string;
-  ats: "greenhouse" | "lever" | "ashby";
+  ats: "greenhouse" | "lever" | "ashby" | "workable";
   companyName: string;
   boardToken: string;
   atsJobId: string;
@@ -95,7 +95,7 @@ export const sendPlanFieldSchema = z.object({
 
 export const sendPlanSchema = z.object({
   applicationId: z.string(),
-  ats: z.enum(["greenhouse", "lever", "ashby"]),
+  ats: z.enum(["greenhouse", "lever", "ashby", "workable"]),
   atsJobId: z.string(),
   boardToken: z.string(),
   companyName: z.string(),

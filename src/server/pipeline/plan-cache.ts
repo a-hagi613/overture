@@ -92,7 +92,7 @@ function matchQuestions(fresh: readonly FormQuestion[], cached: readonly CachedP
 export function createPlanCache(deps: { db: AppDatabase; clock: Clock }) {
   const { db, clock } = deps;
 
-  function get(ats: "lever" | "ashby", formSignature: string) {
+  function get(ats: "lever" | "ashby" | "workable", formSignature: string) {
     const row = db
       .select()
       .from(planCache)
@@ -120,7 +120,7 @@ export function createPlanCache(deps: { db: AppDatabase; clock: Clock }) {
     return { failures: row.failures, hits: row.hits, id: row.id, plan: parsed.data };
   }
 
-  function put(ats: "lever" | "ashby", formSignature: string, plan: CachedPlan) {
+  function put(ats: "lever" | "ashby" | "workable", formSignature: string, plan: CachedPlan) {
     const now = clock.now();
 
     db.insert(planCache)

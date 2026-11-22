@@ -13,7 +13,7 @@ export const POSTING_LIVENESS = ["open", "closed", "unknown"] as const;
 export type PostingLiveness = (typeof POSTING_LIVENESS)[number];
 
 export interface LivenessTarget {
-  ats: Ats;
+  ats: Ats | "workable";
   boardToken: string;
   region: BoardRegion;
   atsJobId: string;
@@ -64,6 +64,13 @@ async function fetchJson(url: string) {
   }
 }
 
+/**
+ * Builds the per-ATS liveness checker. Workable answers `open` without a request: its daily snapshot is the
+ * closure signal (`catalog/workable-ingest.ts`), and a form that 404s at send ends as a form change.
+ *
+ * @param env The environment holding the feed base URLs.
+ * @returns The liveness checker every dispatch tick uses.
+ */
 export function createPostingLiveness(env: Env) {
   const greenhouseBase = (env.GREENHOUSE_FEED_BASE_URL ?? GREENHOUSE_DEFAULT_BASE_URL).replace(
     /\/+$/u,
@@ -126,6 +133,10 @@ export function createPostingLiveness(env: Env) {
 
   return {
     check: async (target) => {
+      if (target.ats === "workable") {
+        return "open";
+      }
+
       if (target.ats === "greenhouse") {
         return greenhouse(target);
       }

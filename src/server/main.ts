@@ -293,6 +293,7 @@ const preparation = createPreparationService({
     environment: env.NODE_ENV,
     leverBaseUrl: env.LEVER_JOBS_BASE_URL,
     leverEuBaseUrl: env.LEVER_EU_JOBS_BASE_URL,
+    workableBaseUrl: env.WORKABLE_FORM_BASE_URL,
   }),
   captureForm: async (input) => {
     if (browserProviders === null) {
