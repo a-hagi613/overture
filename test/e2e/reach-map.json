@@ -10123,7 +10123,7 @@
         "src/server/platform/local-time.ts",
         "src/server/platform/log.ts",
         "src/server/platform/mail/budget.ts",
-        "src/server/platform/mail/metered.ts",
+        "src/server/platform/mail/errors.ts",
         "src/server/platform/mail/sending-domain.ts",
         "src/server/platform/mail/sink.ts",
         "src/server/platform/outbound-guard.ts",

@@ -180,6 +180,41 @@ describe("billing webhooks", () => {
     sqlite.close();
   });
 
+  test("a failure for the same period still pauses even when it names another invoice", () => {
+    const { at, db, sqlite, webhooks } = freshWebhooks();
+
+    expect(
+      webhooks.handle(
+        event({
+          id: "evt_paid_same_period",
+          invoiceId: "in_paid_same_period",
+          periodEndMs: at + 30 * DAY_MS,
+          periodStartMs: at,
+          priceId: MONTH_PRICE,
+          type: "invoice.paid",
+        }),
+      ),
+    ).toBe("processed");
+
+    expect(
+      webhooks.handle(
+        event({
+          id: "evt_failed_same_period",
+          invoiceId: "in_failed_same_period",
+          periodEndMs: at + 30 * DAY_MS,
+          periodStartMs: at,
+          priceId: MONTH_PRICE,
+          type: "invoice.payment_failed",
+        }),
+      ),
+    ).toBe("processed");
+
+    expect(profileOf(db)).toMatchObject({ pauseReason: "payment_failed", running: false });
+    expect(pauseNoticeCount(db)).toBe(1);
+
+    sqlite.close();
+  });
+
   test("an unrecognized Stripe price grants nothing and never falls back to metadata", () => {
     const { at, db, sqlite, webhooks } = freshWebhooks();
 

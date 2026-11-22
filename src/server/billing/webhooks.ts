@@ -55,7 +55,7 @@ function planFor(event: PaymentEvent, planForPrice: (priceId: string) => Billing
 }
 
 function failureIsStale(tx: BillingDb, event: PaymentEvent, userId: string) {
-  const failedPeriodEnd = event.periodEndMs ?? event.periodStartMs;
+  const failedPeriodEnd = event.periodEndMs;
 
   if (failedPeriodEnd === null) {
     return false;
@@ -70,7 +70,7 @@ function failureIsStale(tx: BillingDb, event: PaymentEvent, userId: string) {
   const conditions = [
     eq(grants.userId, userId),
     eq(grants.source, "period"),
-    gte(grants.expiresAt, failedPeriodEnd),
+    gte(grants.startsAt, failedPeriodEnd),
   ];
 
   if (event.invoiceId !== null) {
