@@ -336,7 +336,9 @@ Both products are created with `tax_code=txcd_10103000` (SaaS, personal use), wh
 
 The webhook endpoint is `https://tryoverture.com/api/webhooks/stripe` and subscribes to the nine events
 `src/server/billing/webhooks.ts` handles. The billing portal configuration cancels at period end, updates payment
-methods, shows invoice history and switches a subscription between the Week and Month prices.
+methods, shows invoice history and switches a subscription between the Week and Month prices with
+`proration_behavior=none`; it returns to `https://tryoverture.com/settings/billing` and links the site's privacy and
+terms pages.
 
 A second run reuses the active lookup-key prices, keeps the existing webhook (its secret is not rotated) and verifies
 the portal configuration, so no duplicate product, price or endpoint appears. `rotate_webhook=true` deletes the old
@@ -350,9 +352,11 @@ gh workflow run ops-live.yml -f action=live-diagnostics -R a-hagi613/overture
 ```
 
 `check-secrets` prints the sorted Fly secret names (never values), `flyctl status`, and the production health route.
-`live-diagnostics` runs `onboard-email-sending.ts --check`, prints `present` or `missing` for each runtime variable
-name, and prints integer row counts for `users`, `invites`, `applications`, `company_boards` and `postings`; it prints
-no value and no personal data.
+`live-diagnostics` runs `onboard-email-sending.ts --check`, prints `present` or `missing` for every credential and id
+name (never a value), then prints the non-secret runtime flags and config (`PUBLIC_SIGNUP_ENABLED`,
+`DEMO_LOGIN_ENABLED`, `REQUIRE_EMAIL_SENDING`, `ANTHROPIC_MODEL`, `BROWSER_PROVIDER`), and finally integer row counts
+for `users`, `invites`, `applications`, `company_boards` and `postings`; it prints no secret value and no personal
+data.
 
 ### 4. Roll back
 

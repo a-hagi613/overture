@@ -5,9 +5,11 @@ import { z } from "zod";
 
 import { catalogDatabasePath, databasePath, env } from "../src/server/config/env.ts";
 
-const runtimeNames = [
+const credentialNames = [
   "OWNER_EMAIL",
   "CLOUDFLARE_EMAIL_API_TOKEN",
+  "CLOUDFLARE_ACCOUNT_ID",
+  "CLOUDFLARE_ZONE_ID",
   "BROWSER_USE_API_KEY",
   "ANTHROPIC_API_KEY",
   "STRIPE_SECRET_KEY",
@@ -16,9 +18,8 @@ const runtimeNames = [
   "STRIPE_PRICE_MONTH",
   "CARD_FINGERPRINT_SECRET",
   "VAPID_PUBLIC_KEY",
+  "VAPID_PRIVATE_KEY",
   "INBOUND_HMAC_SECRET",
-  "PUBLIC_SIGNUP_ENABLED",
-  "DEMO_LOGIN_ENABLED",
 ] as const;
 
 const applicationTables = ["users", "invites", "applications"] as const;
@@ -47,13 +48,25 @@ function countRows(path: string, tables: readonly string[]) {
   return lines;
 }
 
-write("runtime environment (names only)");
+write("credential and id presence (names only; values are never printed)");
 
-for (const name of runtimeNames) {
+for (const name of credentialNames) {
   const value = env[name];
 
   write(`${name}: ${value === undefined || value === "" ? "missing" : "present"}`);
 }
+
+write("runtime configuration (non-secret values)");
+
+write(`PUBLIC_SIGNUP_ENABLED: ${String(env.PUBLIC_SIGNUP_ENABLED)}`);
+
+write(`DEMO_LOGIN_ENABLED: ${String(env.DEMO_LOGIN_ENABLED)}`);
+
+write(`REQUIRE_EMAIL_SENDING: ${String(env.REQUIRE_EMAIL_SENDING)}`);
+
+write(`ANTHROPIC_MODEL: ${env.ANTHROPIC_MODEL}`);
+
+write(`BROWSER_PROVIDER: ${env.BROWSER_PROVIDER ?? "unset"}`);
 
 write("sqlite application counts (integers only)");
 

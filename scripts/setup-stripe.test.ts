@@ -52,11 +52,17 @@ type ListedPrice =
 
 interface RecordedPortal {
   active: boolean;
+  business_profile: { privacy_policy_url: string | null; terms_of_service_url: string | null };
+  default_return_url: string | null;
   features: {
     invoice_history: { enabled: boolean };
     payment_method_update: { enabled: boolean };
     subscription_cancel: { enabled: boolean; mode: string | null };
-    subscription_update: { enabled: boolean; products: RecordedPortalProduct[] };
+    subscription_update: {
+      enabled: boolean;
+      products: RecordedPortalProduct[];
+      proration_behavior: string | null;
+    };
   };
   id: string;
   is_default: boolean;
@@ -124,9 +130,7 @@ function portalProductsFrom(form: URLSearchParams) {
     }
 
     const price =
-      /^features\[subscription_update\]\[products\]\[(?<index>\d+)\]\[prices\]\[0\]\[price\]$/u.exec(
-        key,
-      );
+      /^features\[subscription_update\]\[products\]\[(?<index>\d+)\]\[prices\]\[0\]$/u.exec(key);
 
     const priceIndex = price?.groups?.["index"];
 
@@ -145,6 +149,11 @@ function portalProductsFrom(form: URLSearchParams) {
 function portalFromForm(id: string, form: URLSearchParams, isDefault: boolean) {
   return {
     active: true,
+    business_profile: {
+      privacy_policy_url: form.get("business_profile[privacy_policy_url]"),
+      terms_of_service_url: form.get("business_profile[terms_of_service_url]"),
+    },
+    default_return_url: form.get("default_return_url"),
     features: {
       invoice_history: { enabled: form.get("features[invoice_history][enabled]") === "true" },
       payment_method_update: {
@@ -157,6 +166,7 @@ function portalFromForm(id: string, form: URLSearchParams, isDefault: boolean) {
       subscription_update: {
         enabled: form.get("features[subscription_update][enabled]") === "true",
         products: portalProductsFrom(form),
+        proration_behavior: form.get("features[subscription_update][proration_behavior]"),
       },
     },
     id,
@@ -430,6 +440,36 @@ test("a first run creates both plans, the webhook and the portal configuration",
   ]);
   expect(result.webhook.secret).toBe(fake.endpoints[0]?.secret ?? null);
   expect(result.webhook.rotated).toBe(false);
+});
+
+test("the portal configuration uses the documented Stripe form keys", async () => {
+  const fake = createRecordedStripe();
+  const sink = createLogSink();
+  const result = await runStripeSetup(optionsFor(fake, sink));
+
+  const createCall = fake.calls.find(
+    (call) =>
+      call.method === "POST" &&
+      call.url === "https://api.stripe.test/v1/billing_portal/configurations",
+  );
+
+  if (createCall === undefined) {
+    throw new Error("the first run posted no portal configuration");
+  }
+
+  const form = new URLSearchParams(createCall.body ?? "");
+
+  expect(form.get("features[subscription_update][products][0][prices][0]")).toBe(
+    result.priceIds.week,
+  );
+  expect(form.get("features[subscription_update][products][1][prices][0]")).toBe(
+    result.priceIds.month,
+  );
+  expect(form.has("features[subscription_update][products][0][prices][0][price]")).toBe(false);
+  expect(form.get("features[subscription_update][proration_behavior]")).toBe("none");
+  expect(form.get("default_return_url")).toBe("https://tryoverture.com/settings/billing");
+  expect(form.get("business_profile[privacy_policy_url]")).toBe("https://tryoverture.com/privacy");
+  expect(form.get("business_profile[terms_of_service_url]")).toBe("https://tryoverture.com/terms");
 });
 
 test("a second run reuses both prices, the webhook and the portal without duplicating anything", async () => {

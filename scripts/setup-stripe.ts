@@ -121,6 +121,13 @@ const deletedWebhookSchema = z.object({ id: z.string().min(1) });
 
 const portalConfigurationSchema = z.object({
   active: z.boolean(),
+  business_profile: z
+    .object({
+      privacy_policy_url: z.string().nullable().optional(),
+      terms_of_service_url: z.string().nullable().optional(),
+    })
+    .default({}),
+  default_return_url: z.string().nullable().optional(),
   features: z.object({
     invoice_history: z.object({ enabled: z.boolean() }),
     payment_method_update: z.object({ enabled: z.boolean() }),
@@ -134,6 +141,7 @@ const portalConfigurationSchema = z.object({
         .array(z.object({ prices: z.array(z.string()), product: z.string() }))
         .nullable()
         .optional(),
+      proration_behavior: z.string().nullable().optional(),
     }),
   }),
   id: z.string().min(1),
@@ -396,23 +404,24 @@ async function ensureWebhook(
   return { id: created.id, rotated: false, secret: created.secret };
 }
 
-function portalForm(plans: readonly PlanIds[]) {
+function portalForm(plans: readonly PlanIds[], origin: string) {
   const form = new URLSearchParams({
+    "business_profile[privacy_policy_url]": `${origin}/privacy`,
+    "business_profile[terms_of_service_url]": `${origin}/terms`,
+    default_return_url: `${origin}/settings/billing`,
     "features[invoice_history][enabled]": "true",
     "features[payment_method_update][enabled]": "true",
     "features[subscription_cancel][enabled]": "true",
     "features[subscription_cancel][mode]": "at_period_end",
     "features[subscription_update][enabled]": "true",
+    "features[subscription_update][proration_behavior]": "none",
   });
 
   form.append("features[subscription_update][default_allowed_updates][]", "price");
 
   for (const [index, plan] of plans.entries()) {
     form.set(`features[subscription_update][products][${String(index)}][product]`, plan.productId);
-    form.set(
-      `features[subscription_update][products][${String(index)}][prices][0][price]`,
-      plan.priceId,
-    );
+    form.set(`features[subscription_update][products][${String(index)}][prices][0]`, plan.priceId);
   }
 
   return form;
@@ -421,16 +430,21 @@ function portalForm(plans: readonly PlanIds[]) {
 function portalMatches(
   configuration: z.infer<typeof portalConfigurationSchema>,
   plans: readonly PlanIds[],
+  origin: string,
 ) {
   const { features } = configuration;
 
   if (
     !configuration.active ||
+    configuration.default_return_url !== `${origin}/settings/billing` ||
+    configuration.business_profile.privacy_policy_url !== `${origin}/privacy` ||
+    configuration.business_profile.terms_of_service_url !== `${origin}/terms` ||
     !features.invoice_history.enabled ||
     !features.payment_method_update.enabled ||
     !features.subscription_cancel.enabled ||
     features.subscription_cancel.mode !== "at_period_end" ||
-    !features.subscription_update.enabled
+    !features.subscription_update.enabled ||
+    features.subscription_update.proration_behavior !== "none"
   ) {
     return false;
   }
@@ -447,6 +461,7 @@ function portalMatches(
 async function ensurePortal(
   options: StripeClientOptions,
   plans: readonly PlanIds[],
+  origin: string,
   log: (line: string) => void,
 ) {
   const listed = await requestJson(
@@ -459,7 +474,7 @@ async function ensurePortal(
 
   const preferred = listed.data.find((configuration) => configuration.is_default) ?? listed.data[0];
 
-  if (preferred !== undefined && portalMatches(preferred, plans)) {
+  if (preferred !== undefined && portalMatches(preferred, plans, origin)) {
     log(
       `Billing portal configuration ${preferred.id} already cancels at period end, updates payment methods and switches between Week and Month.`,
     );
@@ -473,7 +488,7 @@ async function ensurePortal(
       "POST",
       `/v1/billing_portal/configurations/${encodeURIComponent(preferred.id)}`,
       portalConfigurationSchema,
-      portalForm(plans),
+      portalForm(plans, origin),
     );
 
     log(`Updated billing portal configuration ${updated.id}.`);
@@ -486,7 +501,7 @@ async function ensurePortal(
     "POST",
     "/v1/billing_portal/configurations",
     portalConfigurationSchema,
-    portalForm(plans),
+    portalForm(plans, origin),
   );
 
   log(`Created billing portal configuration ${created.id}.`);
@@ -530,7 +545,8 @@ export async function runStripeSetup(options: StripeSetupOptions) {
     week: weekPlan.priceId,
   };
 
-  const webhookUrl = `${options.appOrigin.replace(/\/+$/u, "")}/api/webhooks/stripe`;
+  const origin = options.appOrigin.replace(/\/+$/u, "");
+  const webhookUrl = `${origin}/api/webhooks/stripe`;
 
   const webhook = await ensureWebhook(
     clientOptions,
@@ -539,7 +555,7 @@ export async function runStripeSetup(options: StripeSetupOptions) {
     options.log,
   );
 
-  const portalConfigurationId = await ensurePortal(clientOptions, plans, options.log);
+  const portalConfigurationId = await ensurePortal(clientOptions, plans, origin, options.log);
 
   const result: StripeSetupResult = {
     mode,
