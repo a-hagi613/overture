@@ -369,7 +369,11 @@ test("the provider report shows completion, code, challenge, duration, proxy and
               url: `https://example.test/${ats}/report/${String(index)}`,
             });
 
-            return seedApplication(owner, { postingId, status: "sent", userId });
+            return seedApplication(owner, {
+              postingId,
+              status: index < 3 ? "sent" : "failed",
+              userId,
+            });
           }),
         );
 
