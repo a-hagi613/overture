@@ -3,9 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 
-import { http, passthrough } from "msw";
-import { setupServer } from "msw/node";
-
+import { createInterceptionServer } from "../../src/server/platform/outbound-interception.ts";
 import { createStreamConsole } from "../../src/server/probe/console.ts";
 import type { ProbeConsole } from "../../src/server/probe/console.ts";
 import { recordedBrowserUseHandlers } from "./browser-use-records.fixture.ts";
@@ -22,7 +20,7 @@ export interface ProbeHarness {
   workable: WorkableFixture;
   chromium: LocalChromium;
   browserUse: BrowserUseApiState;
-  server: ReturnType<typeof setupServer>;
+  server: ReturnType<typeof createInterceptionServer>;
   databasePath: string;
   resumePath: string;
   console: ProbeConsole;
@@ -47,12 +45,9 @@ export async function startProbeHarness() {
   const chromium = await launchLocalChromium();
   const { handlers, state } = recordedBrowserUseHandlers(chromium.cdpUrl);
 
-  const server = setupServer(
-    ...handlers,
-    http.all(/^http:\/\/127\.0\.0\.1:/u, () => passthrough()),
-  );
+  const server = createInterceptionServer(...handlers);
 
-  server.listen({ onUnhandledRequest: "error" });
+  server.listen();
 
   const input = new PassThrough();
   const output = new PassThrough();

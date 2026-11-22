@@ -1,5 +1,6 @@
-import { http, HttpResponse } from "msw";
 import { z } from "zod";
+
+import { http, HttpResponse } from "../../src/server/platform/outbound-interception.ts";
 
 const apiOrigin = "https://api.browser-use.com";
 
