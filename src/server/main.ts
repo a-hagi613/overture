@@ -67,7 +67,7 @@ import { createGreenhouseQuestionSource } from "./catalog/greenhouse-questions.t
 import { createPreparationService } from "./pipeline/prepare.ts";
 import {
   PREP_DAILY_JOB_KIND,
-  ensurePrepDailyQueued,
+  ensurePrepNextQueued,
   ensurePrepQueuedForRunningUsers,
   parsePrepDailyPayload,
   runPrepDailyJob,
@@ -430,7 +430,7 @@ const prepDailyJobHandlers: JobHandlers = {
         since ?? clock.now(),
       );
     } finally {
-      ensurePrepDailyQueued(db, clock, userId);
+      ensurePrepNextQueued(db, clock, userId);
     }
   },
 };
