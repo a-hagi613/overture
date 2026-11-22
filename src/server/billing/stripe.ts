@@ -65,7 +65,13 @@ function planOf(value: string | undefined) {
   return planNames.find((plan) => plan === value) ?? null;
 }
 
+function nonEmpty(value: string | null | undefined) {
+  return value === undefined || value === null || value === "" ? null : value;
+}
+
 const lineSchema = z.object({
+  current_period_end: z.number().optional(),
+  current_period_start: z.number().optional(),
   period: z
     .object({ end: z.number().optional(), start: z.number().optional() })
     .nullable()
@@ -85,9 +91,16 @@ const eventSchema = z.object({
   data: z.object({
     object: z.object({
       id: z.string().optional(),
+      cancel_at_period_end: z.boolean().optional(),
       client_reference_id: z.string().nullable().optional(),
+      current_period_end: z.number().optional(),
+      current_period_start: z.number().optional(),
       customer: z.string().nullable().optional(),
       mode: z.string().nullable().optional(),
+      items: z
+        .object({ data: z.array(lineSchema).optional() })
+        .nullable()
+        .optional(),
       lines: z
         .object({ data: z.array(lineSchema).optional() })
         .nullable()
@@ -100,6 +113,11 @@ const eventSchema = z.object({
             .nullable()
             .optional(),
         })
+        .nullable()
+        .optional(),
+      status: z.string().max(64).optional(),
+      subscription: z
+        .union([z.string(), z.object({ id: z.string() }).transform((named) => named.id)])
         .nullable()
         .optional(),
       subscription_details: z
@@ -172,30 +190,48 @@ function priceIdOf(line: z.infer<typeof lineSchema>) {
   return line.pricing?.price_details?.price ?? line.price?.id ?? null;
 }
 
+function subscriptionIdOf(object: z.infer<typeof eventSchema>["data"]["object"], type: string) {
+  return (
+    nonEmpty(object.subscription) ??
+    (type.startsWith("customer.subscription.") ? (object.id ?? null) : null)
+  );
+}
+
 function eventFrom(parsed: z.infer<typeof eventSchema>) {
   const { object } = parsed.data;
+  const subscriptionEvent = parsed.type.startsWith("customer.subscription.");
 
   const subscriptionMetadata =
     object.parent?.subscription_details?.metadata ?? object.subscription_details?.metadata ?? null;
 
-  const userId =
-    object.client_reference_id ?? subscriptionMetadata?.user_id ?? object.metadata?.user_id ?? null;
+  const userId = nonEmpty(
+    object.client_reference_id ?? subscriptionMetadata?.user_id ?? object.metadata?.user_id,
+  );
 
   const customerId = object.customer ?? (parsed.type.startsWith("customer.") ? object.id : null);
-  const lines = object.lines?.data ?? [];
-  let periodEndSeconds = 0;
-  let periodStartSeconds = 0;
+  const lines = [...(object.lines?.data ?? []), ...(object.items?.data ?? [])];
+  let periodEndSeconds = subscriptionEvent ? (object.current_period_end ?? 0) : 0;
+  let periodStartSeconds = subscriptionEvent ? (object.current_period_start ?? 0) : 0;
   let priceId: string | null = null;
 
   for (const line of lines) {
-    periodEndSeconds = Math.max(periodEndSeconds, line.period?.end ?? 0);
-    periodStartSeconds = Math.max(periodStartSeconds, line.period?.start ?? 0);
+    periodEndSeconds = Math.max(
+      periodEndSeconds,
+      line.period?.end ?? 0,
+      line.current_period_end ?? 0,
+    );
+    periodStartSeconds = Math.max(
+      periodStartSeconds,
+      line.period?.start ?? 0,
+      line.current_period_start ?? 0,
+    );
     priceId ??= priceIdOf(line);
   }
 
   const isSession = parsed.type.startsWith("checkout.session.");
 
   const event: PaymentEvent = {
+    cancelAtPeriodEnd: subscriptionEvent ? (object.cancel_at_period_end ?? false) : null,
     customerId: customerId ?? null,
     id: parsed.id,
     invoiceId: parsed.type.startsWith("invoice.") ? (object.id ?? null) : null,
@@ -205,6 +241,8 @@ function eventFrom(parsed: z.infer<typeof eventSchema>) {
     priceId,
     mode: object.mode ?? null,
     sessionId: isSession ? (object.id ?? null) : null,
+    subscriptionId: subscriptionIdOf(object, parsed.type),
+    subscriptionStatus: subscriptionEvent ? (object.status ?? null) : null,
     type: parsed.type,
     userId,
   };

@@ -15,6 +15,7 @@ import { linkStripeCustomer, userIdForStripeCustomer } from "./customers.ts";
 import { grantPaidPeriod } from "./periods.ts";
 import { pauseForBilling, resumeAfterPayment } from "./pause.ts";
 import { periodEndFor } from "./plans.ts";
+import { recordSubscription, storedSubscription } from "./subscriptions.ts";
 import { stripeEvents, users } from "../platform/db/schema.ts";
 
 /** A verified trial card, keyed by HMAC, read from Stripe before the transaction. */
@@ -36,12 +37,32 @@ const GRANTING_EVENT = "invoice.paid";
 
 const PAYMENT_FAILED_EVENT = "invoice.payment_failed";
 
-function userForEvent(db: BillingDb, event: PaymentEvent) {
+const SUBSCRIPTION_EVENTS = new Set([
+  "customer.subscription.created",
+  "customer.subscription.deleted",
+  "customer.subscription.updated",
+]);
+
+type StoredSubscription = ReturnType<typeof storedSubscription>;
+
+function planFor(event: PaymentEvent, planForPrice: (priceId: string) => BillingPlan | null) {
+  return (event.priceId === null ? null : planForPrice(event.priceId)) ?? event.plan;
+}
+
+function userIdFor(db: BillingDb, event: PaymentEvent, stored: StoredSubscription) {
   if (event.userId !== null) {
     return event.userId;
   }
 
+  if (stored !== null) {
+    return stored.userId;
+  }
+
   return event.customerId === null ? null : userIdForStripeCustomer(db, event.customerId);
+}
+
+function storedFor(db: BillingDb, event: PaymentEvent) {
+  return event.subscriptionId === null ? null : storedSubscription(db, event.subscriptionId);
 }
 
 export function createPaymentsWebhookService(deps: {
@@ -49,10 +70,10 @@ export function createPaymentsWebhookService(deps: {
   clock: Clock;
   planForPrice: (priceId: string) => BillingPlan | null;
 }) {
-  const { db, clock, planForPrice } = deps;
+  const { db, clock, planForPrice: planForPriceId } = deps;
 
   function grant(tx: BillingDb, event: PaymentEvent) {
-    const userId = userForEvent(tx, event);
+    const userId = userIdFor(tx, event, storedFor(tx, event));
 
     if (userId === null) {
       return null;
@@ -64,7 +85,7 @@ export function createPaymentsWebhookService(deps: {
       return null;
     }
 
-    const plan = event.plan ?? (event.priceId === null ? null : planForPrice(event.priceId));
+    const plan = planFor(event, planForPriceId);
 
     if (plan !== null && event.invoiceId !== null) {
       grantPaidPeriod(tx, clock, {
@@ -80,7 +101,7 @@ export function createPaymentsWebhookService(deps: {
   }
 
   function failPayment(tx: BillingDb, event: PaymentEvent) {
-    const userId = userForEvent(tx, event);
+    const userId = userIdFor(tx, event, storedFor(tx, event));
 
     if (userId === null) {
       return null;
@@ -89,6 +110,38 @@ export function createPaymentsWebhookService(deps: {
     const state = pauseForBilling(tx, clock, { reason: "payment_failed", userId });
 
     return state.changed ? { reason: state.reason, userId } : null;
+  }
+
+  function record(
+    tx: BillingDb,
+    event: PaymentEvent,
+    now: number,
+    state: { cancelAtPeriodEnd: boolean | null; defaultStatus: string; status: string | null },
+  ) {
+    const userId = userIdFor(tx, event, storedFor(tx, event));
+
+    if (event.subscriptionId === null || userId === null) {
+      return;
+    }
+
+    recordSubscription(tx, now, {
+      ...state,
+      currentPeriodEndMs: event.periodEndMs,
+      currentPeriodStartMs: event.periodStartMs,
+      plan: planFor(event, planForPriceId),
+      stripeSubscriptionId: event.subscriptionId,
+      userId,
+    });
+  }
+
+  function recordSubscriptionEvent(tx: BillingDb, event: PaymentEvent, now: number) {
+    const ended = event.type === "customer.subscription.deleted";
+
+    record(tx, event, now, {
+      cancelAtPeriodEnd: ended ? false : event.cancelAtPeriodEnd,
+      defaultStatus: ended ? "canceled" : "active",
+      status: ended ? "canceled" : event.subscriptionStatus,
+    });
   }
 
   return {
@@ -123,6 +176,10 @@ export function createPaymentsWebhookService(deps: {
           }
         }
 
+        if (SUBSCRIPTION_EVENTS.has(event.type)) {
+          recordSubscriptionEvent(tx, event, now);
+        }
+
         let resumed: string | null = null;
 
         if (event.type === GRANTING_EVENT) {
@@ -131,6 +188,12 @@ export function createPaymentsWebhookService(deps: {
           if (userId !== null && resumeAfterPayment(tx, clock, { userId }).resumed) {
             resumed = userId;
           }
+
+          record(tx, event, now, {
+            cancelAtPeriodEnd: null,
+            defaultStatus: "active",
+            status: null,
+          });
         }
 
         const notice = event.type === PAYMENT_FAILED_EVENT ? failPayment(tx, event) : null;

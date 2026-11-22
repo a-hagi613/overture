@@ -788,6 +788,27 @@ export const cardFingerprints = sqliteTable("card_fingerprints", {
   createdAt: integer("created_at").notNull(),
 });
 
+export const subscriptions = sqliteTable(
+  "subscriptions",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    stripeSubscriptionId: text("stripe_subscription_id").notNull(),
+    plan: text("plan", { enum: ["week", "month"] }).notNull(),
+    status: text("status").notNull(),
+    currentPeriodStart: integer("current_period_start").notNull(),
+    currentPeriodEnd: integer("current_period_end").notNull(),
+    cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("subscriptions_stripe_subscription_id_unique").on(t.stripeSubscriptionId),
+    index("subscriptions_user").on(t.userId),
+  ],
+);
+
 export const stripeEvents = sqliteTable("stripe_events", {
   id: text("id").primaryKey(),
   type: text("type").notNull(),
