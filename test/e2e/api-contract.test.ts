@@ -148,7 +148,7 @@ test("a refused body is a 400 invalid_request with its issues", async ({
   await owner.dispose();
 });
 
-test("the notification list keeps the newest hundred, newest first", async ({
+test("the notification list keeps the newest hundred in reading order", async ({
   contractServer: { url },
 }) => {
   const { owner } = await ownerContextFor(url);
@@ -171,8 +171,8 @@ test("the notification list keeps the newest hundred, newest first", async ({
   const listed = notificationsSchema.parse(await (await owner.get("/api/notifications")).json());
 
   expect(listed.notifications).toHaveLength(100);
-  expect(listed.notifications[0]?.title).toBe("Row 100");
-  expect(listed.notifications.at(-1)?.title).toBe("Row 1");
+  expect(listed.notifications[0]?.title).toBe("Row 1");
+  expect(listed.notifications.at(-1)?.title).toBe("Row 100");
   expect(listed.notifications.some((row) => row.title === "Row 0")).toBe(false);
 
   await owner.dispose();

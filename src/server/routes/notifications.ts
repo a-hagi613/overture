@@ -87,7 +87,8 @@ export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Au
       .where(eq(notifications.userId, user.id))
       .orderBy(desc(notifications.createdAt))
       .limit(LIST_LIMIT)
-      .all();
+      .all()
+      .toReversed();
 
     const unread =
       db
