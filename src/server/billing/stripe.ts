@@ -401,7 +401,7 @@ export function createStripePayments(config: StripePaymentsConfig) {
       params.set("starting_after", startingAfter);
     }
 
-    const parsed = pageSchema.parse(await stripeRequest("GET", path, params));
+    const parsed = pageSchema.parse(await getJson(`${path}?${params.toString()}`));
     const last = parsed.data.at(-1);
 
     if (!parsed.has_more || last === undefined) {

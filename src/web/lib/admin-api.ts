@@ -603,13 +603,24 @@ export const billingMismatchSchema = z.object({
   kind: billingMismatchKindSchema,
 });
 
+export const billingReconciliationItemSchema = z.object({
+  amountCents: z.number().nullable(),
+  id: z.string(),
+  owner: z.object({ email: z.string(), name: z.string() }).nullable(),
+  result: z.enum(["matched", "not_in_overture", "not_in_stripe"]),
+});
+
 export const billingReconciliationSchema = z.object({
   checkedAt: z.number(),
   day: z.string(),
+  items: z.array(billingReconciliationItemSchema),
+  itemsTotal: z.number(),
   ledgerGrants: z.number(),
   ledgerRefunds: z.number(),
+  matched: z.number(),
   mismatchTotal: z.number(),
   mismatches: z.array(billingMismatchSchema),
+  unrecorded: z.number(),
   status: z.enum(["clean", "mismatch"]),
   stripeInvoices: z.number(),
   stripeRefunds: z.number(),
@@ -645,6 +656,8 @@ export type BillingFilter = "all" | "trial" | "paying" | "paused" | "ended";
 export type BillingReconciliation = z.infer<typeof billingReconciliationSchema>;
 
 export type BillingMismatch = z.infer<typeof billingMismatchSchema>;
+
+export type BillingReconciliationItem = z.infer<typeof billingReconciliationItemSchema>;
 
 export type BillingMismatchKind = z.infer<typeof billingMismatchKindSchema>;
 

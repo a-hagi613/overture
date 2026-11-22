@@ -6,9 +6,11 @@ import type { BillingWindow, Payments } from "../platform/ports/payments.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { raiseAlert } from "../platform/alerts.ts";
-import { billingReconciliations, grants, ledger } from "../platform/db/schema.ts";
+import { billingReconciliations, grants, ledger, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { refundsRecordedBetween } from "./refunds.ts";
+import { reconcileItemSchema, reconciliationItems } from "./reconcile-items.ts";
+import type { ReconcileItem } from "./reconcile-items.ts";
 
 const HOUR_MS = 60 * 60_000;
 const DAY_MS = 24 * HOUR_MS;
@@ -52,6 +54,12 @@ export interface ReconcileRecord {
   ledgerRefunds: number;
   mismatchTotal: number;
   mismatches: ReconcileMismatch[];
+  /** Paid invoices that have a matching grant. */
+  matched: number;
+  /** Paid invoices with no grant in Overture. */
+  unrecorded: number;
+  itemsTotal: number;
+  items: ReconcileItem[];
 }
 
 const mismatchSchema = z.object({
@@ -61,8 +69,12 @@ const mismatchSchema = z.object({
 });
 
 const detailSchema = z.object({
+  items: z.array(reconcileItemSchema).default([]),
+  itemsTotal: z.number().int().nonnegative().default(0),
+  matched: z.number().int().nonnegative().default(0),
   mismatchTotal: z.number().int().nonnegative().default(0),
   mismatches: z.array(mismatchSchema).default([]),
+  unrecorded: z.number().int().nonnegative().default(0),
 });
 
 const windowPayloadSchema = z.object({
@@ -183,6 +195,22 @@ export async function runBillingReconciliation(
 
   const grantsInDay = periodGrants.filter((grant) => inWindow(grant.createdAt, window));
 
+  const checked = reconciliationItems({
+    grantsByInvoice: new Map(
+      periodGrants.flatMap((grant) =>
+        grant.stripeInvoiceId === null
+          ? []
+          : [[grant.stripeInvoiceId, { userId: grant.userId }] as const],
+      ),
+    ),
+    invoices,
+    unmatchedGrants: grantsInDay.flatMap((grant) =>
+      grant.stripeInvoiceId === null || reportedInvoiceIds.has(grant.stripeInvoiceId)
+        ? []
+        : [{ invoiceId: grant.stripeInvoiceId, userId: grant.userId }],
+    ),
+  });
+
   const storedRefunds = refundsRecordedBetween(db, readWindow);
   const storedRefundsInDay = storedRefunds.filter((refund) => inWindow(refund.at, window));
   const storedRefundIds = new Set(storedRefunds.map((refund) => refund.refundId));
@@ -248,12 +276,16 @@ export async function runBillingReconciliation(
     checkedAt: clock.now(),
     day: utcDay(window.sinceMs),
     ledgerGrants: grantsInDay.length,
+    items: checked.items,
+    itemsTotal: checked.itemsTotal,
     ledgerRefunds: storedRefundsInDay.length,
+    matched: checked.matched,
     mismatchTotal: mismatches.length,
     mismatches: mismatches.slice(0, MAX_STORED_MISMATCHES),
     status: mismatches.length === 0 ? "clean" : "mismatch",
     stripeInvoices: invoices.length,
     stripeRefunds: providerRefundsInDay.length,
+    unrecorded: checked.unrecorded,
     windowEnd: window.untilMs,
     windowStart: window.sinceMs,
   } satisfies ReconcileRecord;
@@ -293,8 +325,12 @@ export function recordReconciliation(db: AppDatabase, result: ReconcileRecord) {
   const updates = {
     checkedAt: result.checkedAt,
     detail: JSON.stringify({
+      items: result.items,
+      itemsTotal: result.itemsTotal,
+      matched: result.matched,
       mismatchTotal: result.mismatchTotal,
       mismatches: result.mismatches,
+      unrecorded: result.unrecorded,
     }),
     ledgerGrants: result.ledgerGrants,
     ledgerRefunds: result.ledgerRefunds,
@@ -331,10 +367,14 @@ export function readReconciliationDays(db: AppDatabase, limit: number) {
       return {
         checkedAt: row.checkedAt,
         day: row.day,
+        items: detail.items,
+        itemsTotal: detail.itemsTotal,
         ledgerGrants: row.ledgerGrants,
         ledgerRefunds: row.ledgerRefunds,
+        matched: detail.matched,
         mismatchTotal: row.mismatches,
         mismatches: detail.mismatches,
+        unrecorded: detail.unrecorded,
         status: row.status,
         stripeInvoices: row.stripeInvoices,
         stripeRefunds: row.stripeRefunds,
@@ -351,6 +391,45 @@ export function readReconciliationDays(db: AppDatabase, limit: number) {
  */
 export function latestReconciliation(db: AppDatabase) {
   return readReconciliationDays(db, 1)[0] ?? null;
+}
+
+/**
+ * The last reconciliation with each checked payment's owner looked up, for the
+ * admin page. The owner is null for a payment with no Overture grant.
+ * @param db The application database.
+ * @returns The newest stored result with owners in place of user ids, or null before the first run.
+ */
+export function reconciliationForAdmin(db: AppDatabase) {
+  const reconciliation = latestReconciliation(db);
+
+  if (reconciliation === null) {
+    return null;
+  }
+
+  const ownerIds = [
+    ...new Set(reconciliation.items.flatMap((item) => (item.userId === null ? [] : [item.userId]))),
+  ];
+
+  const owners = new Map(
+    ownerIds.length === 0
+      ? []
+      : db
+          .select({ email: users.email, id: users.id, name: users.name })
+          .from(users)
+          .where(inArray(users.id, ownerIds))
+          .all()
+          .map((row) => [row.id, { email: row.email, name: row.name }] as const),
+  );
+
+  return {
+    ...reconciliation,
+    items: reconciliation.items.map((item) => ({
+      amountCents: item.amountCents,
+      id: item.id,
+      owner: item.userId === null ? null : (owners.get(item.userId) ?? null),
+      result: item.result,
+    })),
+  };
 }
 
 /**

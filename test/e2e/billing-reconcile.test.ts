@@ -54,6 +54,17 @@ const notificationsSchema = z.object({
 const alertBodySchema = z.object({ day: z.string(), mismatches: z.number() });
 
 const detailSchema = z.object({
+  items: z.array(
+    z.object({
+      amountCents: z.number().nullable(),
+      id: z.string(),
+      result: z.enum(["matched", "not_in_overture", "not_in_stripe"]),
+      userId: z.string().nullable(),
+    }),
+  ),
+  itemsTotal: z.number(),
+  matched: z.number(),
+  unrecorded: z.number(),
   mismatchTotal: z.number(),
   mismatches: z.array(
     z.object({
@@ -242,6 +253,12 @@ test.describe("the daily Stripe reconciliation against stripe-mock", () => {
       expect(clean?.row.stripeRefunds).toBe(0);
       expect(clean?.row.ledgerGrants).toBe(1);
       expect(clean?.detail.mismatches).toEqual([]);
+      expect(clean?.detail.items).toEqual([
+        { amountCents: 3500, id: "in_reconcile_clean", result: "matched", userId: ownerId },
+      ]);
+      expect(clean?.detail.matched).toBe(1);
+      expect(clean?.detail.unrecorded).toBe(0);
+      expect(clean?.detail.itemsTotal).toBe(1);
       expect(storedDays(server)).toHaveLength(1);
 
       expect(await ownerNotifications(request, server.url, ownerId)).toEqual([]);
@@ -265,6 +282,13 @@ test.describe("the daily Stripe reconciliation against stripe-mock", () => {
         { amountCents: 3500, id: "in_reconcile_ghost", kind: "invoice_without_grant" },
         { amountCents: 3500, id: "re_reconcile_ghost", kind: "refund_without_ledger" },
       ]);
+      expect(mismatch?.detail.items).toEqual([
+        { amountCents: 3500, id: "in_reconcile_clean", result: "matched", userId: ownerId },
+        { amountCents: 3500, id: "in_reconcile_ghost", result: "not_in_overture", userId: null },
+      ]);
+      expect(mismatch?.detail.matched).toBe(1);
+      expect(mismatch?.detail.unrecorded).toBe(1);
+      expect(mismatch?.detail.itemsTotal).toBe(2);
       expect(storedDays(server)).toHaveLength(1);
 
       const alerts = await ownerNotifications(request, server.url, ownerId);

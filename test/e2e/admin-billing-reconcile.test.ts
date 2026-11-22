@@ -19,11 +19,20 @@ import { expect, test } from "./admin.fixture.ts";
 
 const DAY_MS = 86_400_000;
 
+interface StoredItem {
+  amountCents: number | null;
+  id: string;
+  result: "matched" | "not_in_overture" | "not_in_stripe";
+  userId: string | null;
+}
+
 interface StoredResult {
   checkedAt: number;
   day: string;
+  items: StoredItem[];
   ledgerGrants: number;
   ledgerRefunds: number;
+  matched: number;
   mismatchTotal: number;
   mismatches: {
     amountCents: number | null;
@@ -33,6 +42,18 @@ interface StoredResult {
   status: "clean" | "mismatch";
   stripeInvoices: number;
   stripeRefunds: number;
+  unrecorded: number;
+}
+
+function detailOf(result: StoredResult) {
+  return JSON.stringify({
+    items: result.items,
+    itemsTotal: result.items.length,
+    matched: result.matched,
+    mismatchTotal: result.mismatchTotal,
+    mismatches: result.mismatches,
+    unrecorded: result.unrecorded,
+  });
 }
 
 function storeResult(server: AppServer, result: StoredResult) {
@@ -43,10 +64,7 @@ function storeResult(server: AppServer, result: StoredResult) {
       .values({
         checkedAt: result.checkedAt,
         day: result.day,
-        detail: JSON.stringify({
-          mismatchTotal: result.mismatchTotal,
-          mismatches: result.mismatches,
-        }),
+        detail: detailOf(result),
         ledgerGrants: result.ledgerGrants,
         ledgerRefunds: result.ledgerRefunds,
         mismatches: result.mismatchTotal,
@@ -58,10 +76,7 @@ function storeResult(server: AppServer, result: StoredResult) {
       })
       .onConflictDoUpdate({
         set: {
-          detail: JSON.stringify({
-            mismatchTotal: result.mismatchTotal,
-            mismatches: result.mismatches,
-          }),
+          detail: detailOf(result),
           mismatches: result.mismatchTotal,
           status: result.status,
         },
@@ -123,13 +138,38 @@ function seedPaidPeriod(server: AppServer) {
   }
 }
 
-test("the billing page shows the last reconciliation, its mismatches and an axe-clean empty state", async ({
+function ownerOf(server: AppServer) {
+  const { db, sqlite } = openDatabase(server.databasePath);
+
+  try {
+    const owner = db
+      .select({ email: users.email, id: users.id, name: users.name })
+      .from(users)
+      .where(eq(users.email, authTestIdentity.ownerEmail))
+      .get();
+
+    if (owner === undefined) {
+      throw new Error("the owner is missing from the admin database");
+    }
+
+    return owner;
+  } finally {
+    sqlite.close();
+  }
+}
+
+const CLEAN_DAY = "2026-11-19";
+const MISMATCH_DAY = "2026-11-20";
+
+test("the billing overview links to the reconciliation page, which shows the clean and mismatch states", async ({
   page,
   adminIsolatedAppUrl,
   adminIsolatedAppServer,
   accessServer,
 }) => {
   await openAdminAsOwner(page, adminIsolatedAppUrl, accessServer.issueToken);
+
+  const owner = ownerOf(adminIsolatedAppServer);
 
   await page.goto(`${adminIsolatedAppUrl}/admin/billing`);
 
@@ -145,23 +185,54 @@ test("the billing page shows the last reconciliation, its mismatches and an axe-
 
   storeResult(adminIsolatedAppServer, {
     checkedAt: createClock().now(),
-    day: "2026-11-19",
+    day: CLEAN_DAY,
+    items: [
+      { amountCents: 3500, id: "in_clean_a", result: "matched", userId: owner.id },
+      { amountCents: 3500, id: "in_clean_b", result: "matched", userId: owner.id },
+    ],
     ledgerGrants: 2,
     ledgerRefunds: 0,
+    matched: 2,
     mismatchTotal: 0,
     mismatches: [],
     status: "clean",
     stripeInvoices: 2,
     stripeRefunds: 0,
+    unrecorded: 0,
   });
 
   await page.reload();
 
   await expect(page.getByText("Clean", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("Stripe and the ledger agree for 2026-11-19: 2 paid invoices and 0 refunds.", {
+    page.getByText(
+      "Stripe and Overture records agree for 2026-11-19: 2 paid invoices and 0 refunds.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+
+  await page.getByRole("link", { name: copy.admin.billingReconcileOpen }).click();
+
+  await expect(page).toHaveURL(`${adminIsolatedAppUrl}/admin/billing/reconciliation`);
+  await expect(page.getByRole("heading", { level: 1, name: "Reconciliation" })).toBeVisible();
+  await expect(
+    page.getByText("Stripe payments checked against Overture records each day. Last run: 19 Nov.", {
       exact: true,
     }),
+  ).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Billing sections" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Reconciliation" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(
+    page.getByText("Stripe and Overture records agree for 19 Nov", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /Review/u })).toHaveCount(0);
+  await expect(
+    page
+      .getByRole("cell", { name: owner.name.length > 0 ? owner.name : owner.email, exact: true })
+      .first(),
   ).toBeVisible();
 
   const clean = await new AxeBuilder({ page }).analyze();
@@ -170,9 +241,15 @@ test("the billing page shows the last reconciliation, its mismatches and an axe-
 
   storeResult(adminIsolatedAppServer, {
     checkedAt: createClock().now(),
-    day: "2026-11-20",
+    day: MISMATCH_DAY,
+    items: [
+      { amountCents: 3500, id: "in_matched", result: "matched", userId: owner.id },
+      { amountCents: 3500, id: "in_ghost", result: "not_in_overture", userId: null },
+      { amountCents: null, id: "in_gone", result: "not_in_stripe", userId: owner.id },
+    ],
     ledgerGrants: 2,
     ledgerRefunds: 0,
+    matched: 1,
     mismatchTotal: 2,
     mismatches: [
       { amountCents: 3500, id: "in_ghost", kind: "invoice_without_grant" },
@@ -181,24 +258,28 @@ test("the billing page shows the last reconciliation, its mismatches and an axe-
     status: "mismatch",
     stripeInvoices: 3,
     stripeRefunds: 1,
+    unrecorded: 1,
   });
 
   await page.reload();
 
-  await expect(page.getByText("Mismatch", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText("2 mismatches for 2026-11-20. The owner has been alerted.", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Paid invoice with no grant: in_ghost", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Refund with no ledger entry: re_ghost", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("2 payments do not match Stripe", { exact: true })).toBeVisible();
+  await expect(page.getByText("Nothing is changed automatically.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Review 2 mismatches" })).toBeVisible();
 
   const mismatch = await new AxeBuilder({ page }).analyze();
 
   expect(mismatch.violations).toEqual([]);
+
+  await page.getByRole("button", { name: "Review 2 mismatches" }).click();
+
+  await expect(page.getByText("Showing payments that need a review")).toBeVisible();
+  await expect(page.getByRole("cell", { name: "in_matched", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("cell", { name: "in_ghost", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Show all payments" }).click();
+
+  await expect(page.getByRole("cell", { name: "in_matched", exact: true })).toBeVisible();
 
   await page.setViewportSize({ height: 844, width: 390 });
 

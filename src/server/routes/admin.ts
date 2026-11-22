@@ -44,7 +44,7 @@ import {
   billingUsersPage,
 } from "../billing/admin-view.ts";
 import { REFUND_REASONS, refundGrant } from "../billing/refunds.ts";
-import { latestReconciliation } from "../billing/reconcile.ts";
+import { reconciliationForAdmin } from "../billing/reconcile.ts";
 import type { Payments } from "../platform/ports/payments.ts";
 import { buildCostSummary, buildProviderReport } from "../dispatch/report.ts";
 import { buildLabReport } from "../lab/report.ts";
@@ -1126,7 +1126,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
   });
 
   routes.get("/billing/reconciliation", (context) =>
-    context.json({ reconciliation: latestReconciliation(db) }),
+    context.json({ reconciliation: reconciliationForAdmin(db) }),
   );
 
   routes.get("/billing/users/:id", (context) => {
