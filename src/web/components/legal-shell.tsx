@@ -12,7 +12,11 @@ export function LegalShell({ children }: { children: ReactNode }) {
       <Backdrop />
       <div className="relative z-[1] flex min-h-screen flex-col">
         <LegalTopBar />
-        <main className="mx-auto w-full max-w-[636px] px-[18px] pt-[42px] md:pt-[70px]">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="outline-none mx-auto w-full max-w-[636px] px-[18px] pt-[42px] md:pt-[70px]"
+        >
           <Link
             className="-my-2 -ml-2 inline-flex min-h-11 items-center gap-[7px] rounded-md px-2 py-1 text-[13px] font-medium hover:bg-muted hover:text-foreground"
             to="/"

@@ -31,6 +31,7 @@ import { PricingPage } from "./routes/pricing.tsx";
 import { PrivacyPage } from "./routes/privacy.tsx";
 import { TermsPage } from "./routes/terms.tsx";
 import { AppShell } from "./app.tsx";
+import { RootLayout } from "./components/root-layout.tsx";
 import { AdminShell } from "./routes/admin/shell.tsx";
 import { AdminSettingsPage } from "./routes/admin/settings.tsx";
 import { CatalogPage } from "./routes/admin/catalog.tsx";
@@ -103,9 +104,14 @@ const publicRoutes: RouteObject[] = [
 ];
 
 export const appRoutes: RouteObject[] = [
-  { element: <AppShell />, children: appShellChildren },
-  { element: <AdminShell />, children: adminShellChildren },
-  ...publicRoutes,
+  {
+    element: <RootLayout />,
+    children: [
+      { element: <AppShell />, children: appShellChildren },
+      { element: <AdminShell />, children: adminShellChildren },
+      ...publicRoutes,
+    ],
+  },
 ];
 
 export const routePaths = collectPaths(appRoutes);

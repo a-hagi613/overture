@@ -65,12 +65,6 @@ export function AppShell() {
   return (
     <div className="relative overflow-x-clip bg-background text-foreground">
       <Backdrop />
-      <a
-        className="sr-only z-50 rounded-md bg-card px-3 py-2 text-sm font-semibold text-foreground shadow-lift focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
-        href="#main-content"
-      >
-        {copy.shell.skipToContent}
-      </a>
       <div className="relative z-[1] flex min-h-screen flex-col md:flex-row">
         {wide ? (
           <aside
@@ -78,7 +72,11 @@ export function AppShell() {
             data-shell-sidebar
           >
             <div className="flex items-center justify-between px-1.5">
-              <Link aria-label={copy.brand.homeAria} className="flex items-center gap-2.5" to="/">
+              <Link
+                aria-label={copy.brand.homeAria}
+                className="flex items-center gap-2.5 hover:opacity-80"
+                to="/"
+              >
                 <BrandMark size={30} />
                 <span className="font-serif text-[27px] leading-none tracking-tight">
                   {copy.app.name}
@@ -117,13 +115,13 @@ export function AppShell() {
           }
         />
         <main
-          className={
-            pathname === "/board"
-              ? "min-w-0 flex-1"
-              : "min-w-0 flex-1 px-4 pb-7 pt-[18px] md:px-9 md:pb-10 md:pt-[26px] min-[1700px]:px-16 min-[1700px]:pt-8"
-          }
           id="main-content"
           tabIndex={-1}
+          className={
+            pathname === "/board"
+              ? "min-w-0 flex-1 outline-none"
+              : "min-w-0 flex-1 outline-none px-4 pb-7 pt-[18px] md:px-9 md:pb-10 md:pt-[26px] min-[1700px]:px-16 min-[1700px]:pt-8"
+          }
         >
           <div className={pathname === "/board" ? undefined : "mx-auto w-full max-w-[1440px]"}>
             <Outlet />

@@ -459,7 +459,9 @@ state the boundary rather than the marketing line.
   source tags differ by outline style, the active tab is underlined, the active nav item carries a
   marker.
 - **Target size.** 44px minimum on touch: phone buttons 48, tab bar 60, stage pills 44, icon buttons
-  44, toggles 44. Pointer-only desktop controls may be 40.
+  44, toggles 44. Pointer-only desktop controls may be 40. A compact control that must stay 34px
+  visually (notification CTAs) is the 44px element, with a -5px top and bottom margin so the row does
+  not grow; the painted 34px box is an inner span.
 - **Focus.** 2px solid ink ring with a 2–3px offset on every interactive element. Never removed, never
   orange.
 - **Real elements.** `button`, `a`, `input` with a label or `aria-label`. Decorative SVG is
@@ -470,6 +472,13 @@ state the boundary rather than the marketing line.
   understand anything. Nothing flashes.
 - **Language and order.** Plain words, one `h1` per page, headings in order, reading order matching
   visual order.
+- **Landmarks and skip link.** Every route has exactly one visible `main` (`id="main-content"`) and one
+  visible `h1`. The first tab stop on every page is "Skip to content", rendered once by `RootLayout`,
+  which is hidden until focused and moves focus to `main`. A sheet or dialog title is an `h2`. Admin gate
+  screens carry the page `h1`.
+- **Hover.** Every pointer control changes surface, text, border or underline on hover, except the current
+  page and an on toggle, which already show their strongest state. Guard: `test/e2e/interactive.test.ts`
+  checks pointer cursor, hover, focus ring, 44px on phones, landmarks, headings and axe on every route.
 
 ---
 

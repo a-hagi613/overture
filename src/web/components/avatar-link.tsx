@@ -15,7 +15,7 @@ export function AvatarLink({ name, wide }: { name: string | null; wide: boolean 
   return (
     <Link
       aria-label={ariaLabel}
-      className={`flex items-center gap-[11px] rounded-md pt-1.5 ${wide ? "px-1.5" : "justify-center"}`}
+      className={`flex items-center gap-[11px] rounded-md pt-1.5 hover:bg-muted ${wide ? "px-1.5" : "justify-center"}`}
       to="/settings"
     >
       <span

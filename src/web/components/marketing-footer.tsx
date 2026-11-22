@@ -1,7 +1,7 @@
 import { marketingCopy } from "../../shared/marketing-copy.ts";
 
 const linkClass =
-  "inline-flex min-h-[44px] items-center text-[14px] text-foreground underline-offset-4 hover:underline focus-visible:underline";
+  "inline-flex min-h-[44px] min-w-11 items-center justify-center text-[14px] text-foreground underline-offset-4 hover:text-muted-foreground hover:underline focus-visible:underline";
 
 export function MarketingFooter() {
   return (

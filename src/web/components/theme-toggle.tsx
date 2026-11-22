@@ -1,18 +1,27 @@
 import { NavGlyph } from "./nav-glyph.tsx";
 import { useTheme } from "../lib/theme-context.ts";
 
-export function ThemeToggle({ className }: { className?: string }) {
+const COMPACT_BUTTON = "group flex items-center justify-center max-md:h-11 max-md:w-11";
+
+export function ThemeToggle({
+  className,
+  compact = false,
+}: {
+  className?: string;
+  compact?: boolean;
+}) {
   const { theme, toggleTheme, label } = useTheme();
+  const glyph = <NavGlyph name={theme === "dark" ? "sun" : "moon"} />;
 
   return (
     <button
       aria-label={label}
       aria-pressed={theme === "dark"}
-      className={className}
+      className={compact ? COMPACT_BUTTON : className}
       onClick={toggleTheme}
       type="button"
     >
-      <NavGlyph name={theme === "dark" ? "sun" : "moon"} />
+      {compact ? <span className={className}>{glyph}</span> : glyph}
     </button>
   );
 }

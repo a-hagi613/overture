@@ -54,7 +54,7 @@ export function PasskeyGate({ onDone }: { onDone: () => void }) {
 
   return (
     <section className="mt-10 rounded-lg border border-border bg-card p-6 shadow-sh">
-      <h2 className="font-serif text-[26px] leading-[1.1]">{copy.admin.gatePasskeyTitle}</h2>
+      <h1 className="font-serif text-[26px] leading-[1.1]">{copy.admin.gatePasskeyTitle}</h1>
       <p className="mt-2 max-w-[60ch] text-sm leading-[1.55] text-muted-foreground">
         {copy.admin.gatePasskeyBody}
       </p>
@@ -62,14 +62,16 @@ export function PasskeyGate({ onDone }: { onDone: () => void }) {
         <p className="mt-5 text-sm text-muted-foreground">{copy.admin.gatePasskeyWaiting}</p>
       ) : (
         <button
-          className="mt-5 inline-flex h-10 items-center justify-center rounded-md bg-foreground px-4 text-[13.5px] font-semibold text-card hover:opacity-90"
+          className="group mt-5 inline-flex h-10 items-center justify-center max-md:h-11 max-md:-my-[2px]"
           disabled={working}
           onClick={() => {
             void (hasPasskey ? assert() : add());
           }}
           type="button"
         >
-          {hasPasskey ? copy.admin.gatePasskeyAssert : copy.admin.gatePasskeyAdd}
+          <span className="inline-flex h-10 items-center justify-center rounded-md bg-foreground px-4 text-[13.5px] font-semibold text-card group-hover:opacity-90">
+            {hasPasskey ? copy.admin.gatePasskeyAssert : copy.admin.gatePasskeyAdd}
+          </span>
         </button>
       )}
       {failed ? (

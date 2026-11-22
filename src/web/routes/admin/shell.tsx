@@ -29,7 +29,11 @@ export function AdminShell() {
             <AdminSideIdentity />
           </div>
         </aside>
-        <main className="min-w-0 flex-1 px-4 pb-10 pt-4 md:px-[31px] md:pt-[26px]">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="min-w-0 flex-1 outline-none px-4 pb-10 pt-4 md:px-[31px] md:pt-[26px]"
+        >
           <AdminChipNav />
           <Outlet />
         </main>

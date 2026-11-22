@@ -58,7 +58,7 @@ export function OnboardingTrialPage() {
     <div className="board onb min-h-screen overflow-x-clip">
       <Backdrop />
       <div className="relative z-[1]">
-        <main className="ob">
+        <main className="ob outline-none" id="main-content" tabIndex={-1}>
           <p className="eyebrow">{text.eyebrow}</p>
           <h1 className="serif hd2 mt-2.5">
             {text.titlePlain} <span className="italic">{text.titleItalic}</span> {text.titleRest}

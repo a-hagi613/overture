@@ -10,7 +10,10 @@ export function MarketingHeader() {
   return (
     <header className="border-b border-border">
       <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-4 px-4 py-3 md:px-10">
-        <a className="font-serif text-[26px] leading-none tracking-tight md:text-[30px]" href="/">
+        <a
+          className="inline-flex max-md:min-h-11 max-md:-my-[9px] items-center font-serif text-[26px] leading-none tracking-tight hover:opacity-80 md:text-[30px]"
+          href="/"
+        >
           {marketingCopy.brand}
         </a>
         <nav

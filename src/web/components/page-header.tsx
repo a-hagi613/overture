@@ -23,7 +23,7 @@ export function PageHeader({
           <p className="font-serif text-[15px] italic text-muted-foreground">{lead}</p>
         ) : (
           <Link
-            className="inline-block text-[11px] font-semibold uppercase tracking-[1.65px] leading-[normal] text-foreground"
+            className="inline-flex max-md:min-h-11 max-md:-my-[15px] items-center text-[11px] font-semibold uppercase tracking-[1.65px] leading-[normal] text-foreground hover:underline"
             to={backLink.href}
           >
             {"← "}

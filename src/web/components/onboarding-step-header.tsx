@@ -17,7 +17,11 @@ export function OnboardingStepHeader() {
 
   return (
     <header className="relative z-[1] flex items-center justify-between gap-3 px-[clamp(16px,4vw,40px)] pb-[18px] pt-[22px]">
-      <Link aria-label={copy.brand.homeAria} className="inline-flex items-center gap-2.5" to="/">
+      <Link
+        aria-label={copy.brand.homeAria}
+        className="inline-flex max-md:min-h-11 max-md:-my-[13px] items-center gap-2.5 hover:opacity-80"
+        to="/"
+      >
         <BrandMark size={30} />
         <span className="serif text-[27px] leading-none">{copy.app.name}</span>
       </Link>
