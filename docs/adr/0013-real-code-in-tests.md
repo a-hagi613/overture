@@ -24,14 +24,15 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for twenty-three invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
+exist only for twenty-five invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
 derivations, the answer planner (a salary Fact kept per currency is chosen only for the currency a question names),
 the facts model (a Fact's scope is validated against its key), the onboarding step's salary and EEO reading, the
 fixture sanitiser (recorded pages must carry no script, event handler, personal data or token), the v1
 answer-bank mapping, the live-traffic guard (in test and development, an outbound request to an ATS or
 paid-service host is refused), the replica listing (the newest transaction is read from the first non-empty
 Litestream level, so a healthy replica costs one R2 list per read, #281), the job worker's wait (a completed wait
-retains no abort listener), the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
+retains no abort listener), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
+per cooldown, so a paused main thread becomes a log line), the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
 a copy string or key), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
 `x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the onboarding location plan (the
 open-Posting group-by is planned through the covering `postings_open_location` index, never a table scan or a
@@ -45,8 +46,10 @@ pause (a plan end or a failed payment pauses once with its own reason, a success
 pause, and an in-flight send keeps its reservation across the period end so only a sent Application is charged), the
 Anthropic model and its batch prices (`models.test.ts`: `ANTHROPIC_MODEL` defaults to the model SPEC §8.6 names,
 a dated 5.5 model id is priced from the exact 5.5 row rather than the 4.5 haiku prefix, and a model with no price row
-is refused, #387), and the Personio form reader (a server-rendered form's fields, required star, documents and
-unsupported controls are read without a browser). They
+is refused, #387), the Personio form reader (a server-rendered form's fields, required star, documents and
+unsupported controls are read without a browser), and the provider and cost report (completion and cost divide
+distinct attempted Applications, so a failure-then-success retry counts once and an email-confirmed send counts as
+completed, while attempt counts and page-confirmed sends stay diagnostics, #417). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
 depend on the runner. The mail count runs the real SQLite file and the real migrations, so the invariant is exercised
 against the shipped schema rather than a stand-in. CI stays under two minutes on pull requests: six shards balanced by

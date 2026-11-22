@@ -133,7 +133,8 @@
           "src/server/pipeline/prepare.ts",
           "src/server/dispatch/dispatch.ts",
           "src/server/demo/seed.ts",
-          "src/server/billing/pause.test.ts"
+          "src/server/billing/pause.test.ts",
+          "src/server/dispatch/report.test.ts"
         ],
         "allowRoots": ["test/e2e", "scripts"]
       }
@@ -154,6 +155,7 @@
           "src/server/platform/crypto.test.ts",
           "src/server/platform/event-loop-lag.test.ts",
           "src/server/dispatch/planner.test.ts",
+          "src/server/dispatch/report.test.ts",
           "src/server/profile/address.test.ts",
           "src/server/catalog/tag-rules.test.ts",
           "src/server/catalog/question-normalize.test.ts",

@@ -29,7 +29,7 @@ export function ReportSendRow(props: { row: ProviderReportRow }) {
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <ReportMetric label={copy.admin.reportColumnAttempted} value={String(row.attempted)} />
-        <ReportMetric label={copy.admin.reportColumnCompleted} value={String(row.sent)} />
+        <ReportMetric label={copy.admin.reportColumnCompleted} value={String(row.completed)} />
         <ReportMetric
           label={copy.admin.reportColumnCompletion}
           value={percent(row.completionRate)}
