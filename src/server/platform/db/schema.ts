@@ -579,6 +579,31 @@ export const retiredAddresses = sqliteTable("retired_addresses", {
   retiredAt: timestamp("retired_at").notNull(),
 });
 
+/**
+ * The durable plan for one account erasure. It is written in the same transaction that deletes the
+ * account, so the vendor profile ids and object prefixes survive the cascade that removes
+ * `browser_profiles`, and the confirmation target survives until the notice is queued. It has no
+ * foreign key on purpose: it outlives the `users` row it names.
+ *
+ * `vendor_profiles` shrinks as each remote profile is deleted, `object_prefixes` stays until every
+ * prefix lists empty, and both `*_cleaned_at` stamps mean the external cleanup was confirmed. The
+ * `notice_name` and `notice_to` columns are wiped as soon as `notice_queued_at` is set.
+ */
+export const accountErasures = sqliteTable("account_erasures", {
+  userId: text("user_id").primaryKey(),
+  vendorProfiles: text("vendor_profiles").notNull().default("[]"),
+  objectPrefixes: text("object_prefixes").notNull(),
+  noticeName: text("notice_name"),
+  noticeTo: text("notice_to"),
+  userDeletedAt: timestamp("user_deleted_at"),
+  vendorCleanedAt: timestamp("vendor_cleaned_at"),
+  objectsCleanedAt: timestamp("objects_cleaned_at"),
+  noticeQueuedAt: timestamp("notice_queued_at"),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+});
+
 export const mailThreads = sqliteTable(
   "mail_threads",
   {

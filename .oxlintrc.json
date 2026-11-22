@@ -151,6 +151,7 @@
       {
         "e2eRoot": "test/e2e",
         "allow": [
+          "src/server/account/erase.test.ts",
           "src/server/billing/ledger.test.ts",
           "src/server/billing/pause.test.ts",
           "src/server/platform/crypto.test.ts",
