@@ -317,14 +317,21 @@ function forwardRequest(original: typeof nodeHttp.request, args: NodeRequestArgs
   return isNodeCallback(second) ? original(first, second) : original(first);
 }
 
+const callableTags = new Set([
+  "[object Function]",
+  "[object AsyncFunction]",
+  "[object GeneratorFunction]",
+  "[object AsyncGeneratorFunction]",
+]);
+
 function isPatternFunction(value: Pattern): value is (context: InterceptionContext) => boolean {
-  return Object.prototype.toString.call(value) === "[object Function]";
+  return callableTags.has(Object.prototype.toString.call(value));
 }
 
 function isNodeCallback(
   value: NodeRequestArgs[0] | NodeRequestArgs[1] | NodeRequestArgs[2] | undefined,
 ): value is NodeResponseCallback {
-  return Object.prototype.toString.call(value) === "[object Function]";
+  return callableTags.has(Object.prototype.toString.call(value));
 }
 
 function isRequestOptions(
