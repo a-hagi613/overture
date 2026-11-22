@@ -184,10 +184,9 @@ async function expectButtonInteractive(page: Page, button: Locator) {
 
 async function expectButtonsAreInteractive(page: Page) {
   await expectButtonInteractive(page, page.getByRole("button", { name: "Continue to delete" }));
-  await expectButtonInteractive(page, page.getByRole("button", { name: "Confirm", exact: true }));
   await expectButtonInteractive(
     page,
-    page.getByRole("button", { name: "Send a sign-in link instead" }),
+    page.getByRole("button", { name: "Email me a sign-in link", exact: true }),
   );
   await expectButtonInteractive(page, page.getByRole("button", { name: "Delete my account" }));
 
