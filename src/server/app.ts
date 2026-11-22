@@ -123,7 +123,7 @@ async function staticResponseFrom(root: string, url: string) {
   return null;
 }
 
-function internalError(error: Error, context: Context) {
+function jsonError(error: Error, context: Context) {
   if (error instanceof HTTPException) {
     let code: string = API_ERRORS.internal;
 
@@ -181,8 +181,8 @@ export function createApp(deps: AppDependencies) {
 
   const app = new Hono();
 
-  app.onError(internalError);
-  adminHost.onError(internalError);
+  app.onError(jsonError);
+  adminHost.onError(jsonError);
 
   app.use("*", securityHeaders(env.NODE_ENV === "production"));
 

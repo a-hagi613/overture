@@ -114,16 +114,10 @@ export function createProfileRoutes(deps: {
     }
 
     const form = await context.req.formData().catch(() => null);
-    const parsed = form === null ? null : uploadSchema.safeParse({ file: form.get("file") });
+    const parsed = uploadSchema.safeParse({ file: form?.get("file") ?? null });
 
-    if (parsed === null || !parsed.success) {
-      return context.json(
-        {
-          error: API_ERRORS.invalidRequest,
-          issues: parsed === null ? [] : parsed.error.issues,
-        },
-        400,
-      );
+    if (!parsed.success) {
+      return context.json({ error: API_ERRORS.invalidRequest, issues: parsed.error.issues }, 400);
     }
 
     const upload = await resumesService.upload(account.id, {

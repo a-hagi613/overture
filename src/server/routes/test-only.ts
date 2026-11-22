@@ -1158,6 +1158,10 @@ export function createTestRoutes(
 
   routes.get("/push/requests", (context) => context.json({ requests: listPushRequests() }));
 
+  routes.get("/unhandled-error", () => {
+    throw new Error("test-only unhandled failure");
+  });
+
   routes.post("/push/clear", (context) => {
     clearPushRequests();
 

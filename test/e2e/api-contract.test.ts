@@ -32,16 +32,12 @@ const notificationsSchema = z.object({
   unread: z.number(),
 });
 
-async function anonymousContext(url: string) {
-  return apiRequest.newContext({ baseURL: url });
-}
-
 async function errorOf(response: Awaited<ReturnType<APIRequestContext["get"]>>) {
   return errorSchema.parse(await response.json()).error;
 }
 
 test("every signed-out route answers the one sign-in code", async ({ contractServer: { url } }) => {
-  const anonymous = await anonymousContext(url);
+  const anonymous = await apiRequest.newContext({ baseURL: url });
 
   const reads = [
     "/api/profile/targets",
@@ -144,6 +140,21 @@ test("a refused body is a 400 invalid_request with its issues", async ({
 
   expect(malformed.status()).toBe(400);
   expect(await errorOf(malformed)).toBe("invalid_request");
+
+  await owner.dispose();
+});
+
+test("an unhandled failure answers the shared 500 code, not a stack", async ({
+  contractServer: { url },
+}) => {
+  const { owner } = await ownerContextFor(url);
+
+  const response = await owner.get("/__test__/unhandled-error");
+  const body: unknown = await response.json();
+
+  expect(response.status()).toBe(500);
+  expect(body).toEqual({ error: "internal_error" });
+  expect(JSON.stringify(body)).not.toContain("test-only unhandled failure");
 
   await owner.dispose();
 });
