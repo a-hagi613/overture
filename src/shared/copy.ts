@@ -1681,7 +1681,7 @@ export const copy = {
       noSnapshot: "This application has not been sent yet.",
       resume: "Resume file",
       hash: "SHA-256",
-      lines: (count: number) => (count === 1 ? "1 resume line" : `${String(count)} resume lines`),
+      citedHeading: "Cited from your resume",
     },
     emails: {
       title: "Linked mail",
