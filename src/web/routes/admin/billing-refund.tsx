@@ -63,7 +63,7 @@ export function BillingRefundPage() {
         </Link>
         {" / "}
         <Link to={back} className="underline underline-offset-2">
-          {user.name}
+          {user.name.length > 0 ? user.name : copy.admin.billingUserNameFallback}
         </Link>
       </nav>
       <AdminPageHeading
@@ -84,7 +84,10 @@ export function BillingRefundPage() {
             {copy.admin.billingUserPaymentHeading}
           </h2>
           <dl className="mt-3">
-            <BillingRow label={copy.admin.billingUserUser} value={user.name} />
+            <BillingRow
+              label={copy.admin.billingUserUser}
+              value={user.name.length > 0 ? user.name : copy.admin.billingUserNameFallback}
+            />
             <BillingRow label={copy.admin.billingUserPlan} value={billingPlanLabel(period.plan)} />
             <BillingRow label={copy.admin.billingUserPeriod} value={periodSpan(period)} />
             <BillingRow

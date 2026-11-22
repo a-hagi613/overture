@@ -40,6 +40,7 @@ import { MarginPage } from "./routes/admin/margin.tsx";
 import { BillingPage } from "./routes/admin/billing.tsx";
 import { BillingUserPage } from "./routes/admin/billing-user.tsx";
 import { BillingRefundPage } from "./routes/admin/billing-refund.tsx";
+import { BillingReconciliationPage } from "./routes/admin/billing-reconciliation.tsx";
 import { InvitesPage } from "./routes/admin/invites.tsx";
 import { OverviewPage } from "./routes/admin/overview.tsx";
 import { ProviderReportPage } from "./routes/admin/provider-report.tsx";
@@ -76,6 +77,7 @@ const adminShellChildren: RouteObject[] = [
   { path: "/admin/grants", element: <GrantsPage /> },
   { path: "/admin/billing/margin", element: <MarginPage /> },
   { path: "/admin/billing", element: <BillingPage /> },
+  { path: "/admin/billing/reconciliation", element: <BillingReconciliationPage /> },
   { path: "/admin/billing/users/:id", element: <BillingUserPage /> },
   { path: "/admin/billing/users/:id/refund", element: <BillingRefundPage /> },
   { path: "/admin/users", element: <UsersPage /> },

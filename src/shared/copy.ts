@@ -2377,11 +2377,82 @@ export const copy = {
     billingStatPayingHint: "Week or Month plan",
     billingStatPausedHint: "Applications stopped",
     billingStatEndingHint: "Renewal or plan end",
+    billingReconcileHeading: "Last reconciliation",
+    billingReconcileNone:
+      "No reconciliation has run yet. It runs every day just after midnight UTC.",
+    billingReconcileCleanPill: "Clean",
+    billingReconcileMismatchPill: "Mismatch",
+    billingReconcileClean: (day: string, invoices: number, refunds: number) =>
+      `Stripe and Overture records agree for ${day}: ${String(invoices)} paid invoices and ${String(refunds)} refunds.`,
+    billingReconcileMismatch: (day: string, count: number) =>
+      `${String(count)} mismatches for ${day}. The owner has been alerted.`,
+    billingReconcileMore: (shown: number, total: number) =>
+      `Showing the first ${String(shown)} of ${String(total)}.`,
+    billingReconcileKinds: {
+      invoice_without_grant: "Paid invoice with no grant",
+      grant_without_invoice: "Grant with no paid invoice",
+      refund_without_ledger: "Refund with no Overture record",
+      ledger_without_refund: "Overture refund missing at Stripe",
+      refund_ledger_missing: "Refund record with no Overture entry",
+    },
+    billingReconcileItem: (label: string, id: string) => `${label}: ${id}`,
+    billingReconcileCrumbAdmin: "Admin",
+    billingReconcileTitlePlain: "Reconciliation",
+    billingReconcileLead: (day: string) =>
+      `Stripe payments checked against Overture records each day. Last run: ${day}.`,
+    billingReconcileCrumbLabel: "Breadcrumb",
+    billingReconcileCrumbSeparator: " / ",
+    billingReconcileOpen: "Open reconciliation",
+    billingReconcileLeadNone:
+      "Stripe payments checked against Overture records each day. The first run is just after midnight UTC.",
+    billingReconcileBannerMismatchTitle: (count: number) =>
+      count === 1
+        ? "1 payment does not match Stripe"
+        : `${String(count)} payments do not match Stripe`,
+    billingReconcileBannerMismatchBody:
+      "Nothing is changed automatically. Review each payment; it stays as it is until you resolve it.",
+    billingReconcileReview: (count: number) =>
+      count === 1 ? "Review 1 mismatch" : `Review ${String(count)} mismatches`,
+    billingReconcileBannerCleanTitle: (day: string) =>
+      `Stripe and Overture records agree for ${day}`,
+    billingReconcileBannerCleanBody: (invoices: number, refunds: number) =>
+      `${String(invoices)} paid invoices and ${String(refunds)} refunds checked. Nothing needs a review.`,
+    billingReconcileBannerNoneTitle: "No reconciliation has run yet",
+    billingReconcileStatChecked: "Checked",
+    billingReconcileStatCheckedHint: "Payments, last run",
+    billingReconcileStatMatched: "Matched",
+    billingReconcileStatMatchedHint: "Recorded in Overture",
+    billingReconcileStatMismatched: "Mismatched",
+    billingReconcileStatMismatchedHint: "Need a review",
+    billingReconcileStatOnlyStripe: "Only in Stripe",
+    billingReconcileStatOnlyStripeHint: "Not recorded in Overture",
+    billingReconcilePayments: "Payments",
+    billingReconcileShowing: (shown: number, total: number) =>
+      `Showing ${String(shown)} of ${String(total)}`,
+    billingReconcileShowAll: "Show all payments",
+    billingReconcileOnlyMismatches: "Showing payments that need a review",
+    billingReconcileEmptyList: "No payments were checked for this day.",
+    billingReconcileEmptyFiltered: "No payments need a review.",
+    billingReconcileColumnPayment: "Payment",
+    billingReconcileColumnUser: "User",
+    billingReconcileColumnStripe: "Stripe",
+    billingReconcileColumnOverture: "Overture",
+    billingReconcileColumnResult: "Result",
+    billingReconcileNoOwner: "—",
+    billingReconcileNotInStripe: "Not in Stripe",
+    billingReconcileRecorded: "Recorded",
+    billingReconcileNotRecorded: "Not recorded",
+    billingReconcileResults: {
+      matched: "Matched",
+      not_in_overture: "Not in Overture records",
+      not_in_stripe: "Not in Stripe",
+    },
     billingColumnUser: "User",
     billingColumnPlan: "Plan",
     billingColumnPeriod: "Period",
     billingColumnUsage: "Usage",
     billingColumnStatus: "Status",
+    billingUserNameFallback: "No name yet",
     billingPlanWeek: "Week",
     billingPlanMonth: "Month",
     billingPlanTrial: "Trial",

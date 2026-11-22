@@ -51,7 +51,7 @@ export function BillingUserPage() {
       <AdminPageHeading
         italic=""
         lead={user.name === user.email ? "" : user.email}
-        plain={user.name}
+        plain={user.name.length > 0 ? user.name : copy.admin.billingUserNameFallback}
       />
 
       {user.paused ? (

@@ -13,6 +13,11 @@ import {
   runGrantExpirySweep,
 } from "./billing/expiry.ts";
 import { createSpendGate } from "./billing/spend.ts";
+import {
+  BILLING_RECONCILE_JOB_KIND,
+  billingReconcileJobHandler,
+  ensureReconcileQueued,
+} from "./billing/reconcile.ts";
 import { seedDemoAccount } from "./demo/seed.ts";
 import { createDemoSafeMailSender } from "./demo/mail-guard.ts";
 import { isDemoUser } from "./demo/role.ts";
@@ -262,6 +267,7 @@ const jobSingletons = [
   CHECKIN_SWEEP_JOB_KIND,
   DISPATCH_TICK_JOB_KIND,
   GRANT_EXPIRY_JOB_KIND,
+  BILLING_RECONCILE_JOB_KIND,
   LIVE_CHECK_JOB_KIND,
   WORKABLE_INGEST_JOB_KIND,
   RETENTION_JOB_KIND,
@@ -274,6 +280,10 @@ recoverStaleLocks(db, clock, jobSingletons);
 ensureCheckinSweepQueued(db, clock);
 
 ensureGrantExpiryQueued(db, clock);
+
+if (payments !== null) {
+  ensureReconcileQueued(db, clock);
+}
 
 ensureRetentionQueued(db, clock);
 
@@ -761,6 +771,15 @@ const retentionJobHandlers: JobHandlers = {
   },
 };
 
+const reconcileJobHandlers: JobHandlers =
+  payments === null
+    ? {}
+    : {
+        [BILLING_RECONCILE_JOB_KIND]: async (payload: string) => {
+          await billingReconcileJobHandler({ clock, db, payments }, payload);
+        },
+      };
+
 const billingJobHandlers: JobHandlers = {
   [GRANT_EXPIRY_JOB_KIND]: async () => {
     try {
@@ -769,6 +788,7 @@ const billingJobHandlers: JobHandlers = {
       ensureGrantExpiryQueued(db, clock);
     }
   },
+  ...reconcileJobHandlers,
 };
 
 const allJobHandlers: JobHandlers = {

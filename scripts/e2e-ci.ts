@@ -857,7 +857,7 @@ function visitedUiRoutes(
   const combined = texts.join("\n");
 
   for (const match of combined.matchAll(gotoPathPattern)) {
-    const rawPath = match.groups?.path;
+    const rawPath = match.groups?.path?.replaceAll(/\$\{[^}]+\}/gu, ":param");
 
     if (rawPath === undefined || rawPath.startsWith("/api") || rawPath.startsWith("/__")) {
       continue;
@@ -865,10 +865,29 @@ function visitedUiRoutes(
 
     if (knownPaths.has(rawPath)) {
       routes.add(rawPath);
-    } else if (rawPath.startsWith("/admin/users/")) {
+      continue;
+    }
+
+    if (rawPath.startsWith("/admin/users/")) {
       routes.add("/admin/users/:id");
-    } else if (rawPath.startsWith("/inbox/")) {
+      continue;
+    }
+
+    if (rawPath.startsWith("/inbox/")) {
       routes.add("/inbox/:id");
+      continue;
+    }
+
+    const route = knownRoutes.find((entry) =>
+      routeMatches(
+        rawPath.split("/").filter((part) => part.length > 0),
+        entry.urlPath.split("/").filter((part) => part.length > 0),
+        false,
+      ),
+    );
+
+    if (route !== undefined) {
+      routes.add(route.urlPath);
     } else if (rawPath === "/missing-route" && knownPaths.has("*")) {
       routes.add("*");
     }

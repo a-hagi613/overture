@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lt } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -52,6 +52,14 @@ const refundDetailSchema = z.object({
 
 type RefundDetail = z.infer<typeof refundDetailSchema>;
 
+export interface StoredRefund {
+  at: number;
+  refundId: string;
+  refundKey: string;
+  grantId: string;
+  amountCents: number;
+}
+
 function refundDetailsOf(db: Pick<AppDatabase, "select">) {
   return db
     .select({ detail: adminAudit.detail })
@@ -71,6 +79,55 @@ export function refundRequestHash(input: {
   reason: RefundReason;
 }) {
   return JSON.stringify([input.grantId, input.amountCents, input.reason]);
+}
+
+/**
+ * The refunds Overture recorded in the audit log inside a window, which is the
+ * only place a ledger refund row's Stripe refund id lives.
+ * @param db The application database.
+ * @param window The half-open epoch-millisecond window (since inclusive, until exclusive).
+ * @returns One record per refund, with the time it was audited.
+ */
+export function refundsRecordedBetween(
+  db: AppDatabase,
+  window: { sinceMs: number; untilMs: number },
+) {
+  return db
+    .select({ at: adminAudit.at, detail: adminAudit.detail })
+    .from(adminAudit)
+    .where(
+      and(
+        eq(adminAudit.action, REFUND_AUDIT_ACTION),
+        gte(adminAudit.at, window.sinceMs),
+        lt(adminAudit.at, window.untilMs),
+      ),
+    )
+    .all()
+    .flatMap((row) => {
+      const parsed = refundDetailSchema.safeParse(JSON.parse(row.detail));
+
+      return parsed.success
+        ? [
+            {
+              amountCents: parsed.data.amountCents,
+              at: row.at,
+              grantId: parsed.data.grantId,
+              refundId: parsed.data.refundId,
+              refundKey: parsed.data.refundKey,
+            },
+          ]
+        : [];
+    });
+}
+
+/**
+ * The key one refund is written under, in the audit log and as its ledger
+ * row's idempotency key, so a replayed request never refunds twice.
+ * @param idempotencyKey The caller's request key.
+ * @returns The refund key for the audit detail and the ledger row.
+ */
+export function refundLedgerKey(idempotencyKey: string) {
+  return `refund:${idempotencyKey}`;
 }
 
 function recordOf(detail: RefundDetail) {
@@ -105,7 +162,7 @@ export async function refundGrant(
   input: RefundInput,
 ) {
   const { db, clock, payments, shipAudit } = deps;
-  const refundKey = `refund:${input.idempotencyKey}`;
+  const refundKey = refundLedgerKey(input.idempotencyKey);
   const requestHash = refundRequestHash(input);
 
   const replay = refundDetailsOf(db).find((detail) => detail.refundKey === refundKey);

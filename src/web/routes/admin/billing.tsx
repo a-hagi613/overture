@@ -2,11 +2,17 @@ import { useCallback, useState } from "react";
 import { Link } from "react-router";
 
 import { copy } from "../../../shared/copy.ts";
-import { loadBillingUsers } from "../../lib/admin-api.ts";
-import type { BillingFilter, BillingUserRow } from "../../lib/admin-api.ts";
+import { loadBillingReconciliation, loadBillingUsers } from "../../lib/admin-api.ts";
+import type {
+  BillingFilter,
+  BillingReconciliation,
+  BillingUserRow,
+  BillingUsersResponse,
+} from "../../lib/admin-api.ts";
 import { useAdminResource } from "../../lib/admin-resource.ts";
 import { AdminGateScreen } from "./gate-screen.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
+import { BillingReconcile } from "./billing-reconcile.tsx";
 import { BillingStatCard } from "./billing-stat-card.tsx";
 import { BillingTabs } from "./billing-tabs.tsx";
 import { BillingStatePill } from "./billing-format.tsx";
@@ -27,11 +33,35 @@ function usageText(row: BillingUserRow) {
     : copy.admin.billingUsed(row.usage.used, row.usage.quantity);
 }
 
+type BillingPageData = BillingUsersResponse & {
+  reconciliation: BillingReconciliation | null;
+};
+
 export function BillingPage() {
   const [filter, setFilter] = useState<BillingFilter>("all");
   const [page, setPage] = useState(1);
-  const load = useCallback(async () => loadBillingUsers(filter, page), [filter, page]);
-  const { data, refusal, refresh } = useAdminResource(load);
+
+  const load = useCallback(async () => {
+    const [users, reconciliation] = await Promise.all([
+      loadBillingUsers(filter, page),
+      loadBillingReconciliation(),
+    ]);
+
+    if (!users.ok) {
+      return { ok: false as const, refusal: users.refusal };
+    }
+
+    if (!reconciliation.ok) {
+      return { ok: false as const, refusal: reconciliation.refusal };
+    }
+
+    return {
+      data: { ...users.data, reconciliation: reconciliation.data.reconciliation },
+      ok: true as const,
+    };
+  }, [filter, page]);
+
+  const { data, refusal, refresh } = useAdminResource<BillingPageData>(load);
 
   if (refusal !== null) {
     return (
@@ -88,6 +118,8 @@ export function BillingPage() {
           value={data.counts.endingSoon}
         />
       </div>
+
+      <BillingReconcile reconciliation={data.reconciliation} />
 
       <div
         aria-label={copy.admin.billingFilterLabel}
@@ -152,7 +184,9 @@ export function BillingPage() {
         aria-label={copy.admin.navBilling}
         className="mt-4 hidden overflow-x-auto rounded-lg border border-border bg-card shadow-sh md:block"
       >
-        <table className="w-full min-w-[640px] border-collapse text-left text-[13px]">
+        <table
+          className={`w-full border-collapse text-left text-[13px] ${data.users.length === 0 ? "" : "min-w-[640px]"}`}
+        >
           <thead className="bg-muted text-[12px] text-muted-foreground">
             <tr>
               <th scope="col" className="px-4 py-2.5 font-medium">
@@ -187,7 +221,7 @@ export function BillingPage() {
                       to={`/admin/billing/users/${encodeURIComponent(row.id)}`}
                       className="block min-h-11 rounded-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
                     >
-                      {row.name}
+                      {row.name.length > 0 ? row.name : copy.admin.billingUserNameFallback}
                     </Link>
                     {row.name === row.email ? null : (
                       <span className="block text-[12px] text-muted-foreground">{row.email}</span>

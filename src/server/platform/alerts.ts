@@ -25,6 +25,7 @@ export const ALERT_KINDS = [
   "match.score_bound",
   "backup.lag",
   "backup.failure",
+  "billing.mismatch",
   "catalog.worker",
   "health",
   "disk",

@@ -8,14 +8,13 @@ const TAB_LINK = `${TAB_BASE} text-muted-foreground hover:text-foreground focus-
 const TAB_PENDING = `${TAB_BASE} text-muted-foreground`;
 
 /**
- * The billing sections. Users and Cost and margin are live; Refunds and
- * Reconciliation are shown as plain labels until their pages ship, so no
- * link leads nowhere.
+ * The billing sections. Users, Reconciliation and Cost and margin are live;
+ * Refunds is a plain label until its page ships, so no link leads nowhere.
  * @param props The section that is open.
  * @param props.current The section the page belongs to.
  * @returns The billing section navigation.
  */
-export function BillingTabs({ current }: { current: "users" | "margin" }) {
+export function BillingTabs({ current }: { current: "users" | "reconciliation" | "margin" }) {
   return (
     <nav
       aria-label={copy.admin.billingSections}
@@ -33,9 +32,15 @@ export function BillingTabs({ current }: { current: "users" | "margin" }) {
       <span aria-disabled="true" className={TAB_PENDING}>
         {copy.admin.billingTabRefunds}
       </span>
-      <span aria-disabled="true" className={TAB_PENDING}>
-        {copy.admin.billingTabReconciliation}
-      </span>
+      {current === "reconciliation" ? (
+        <Link aria-current="page" className={TAB_CURRENT} to="/admin/billing/reconciliation">
+          {copy.admin.billingTabReconciliation}
+        </Link>
+      ) : (
+        <Link className={TAB_LINK} to="/admin/billing/reconciliation">
+          {copy.admin.billingTabReconciliation}
+        </Link>
+      )}
       {current === "margin" ? (
         <Link aria-current="page" className={TAB_CURRENT} to="/admin/billing/margin">
           {copy.admin.billingTabMargin}

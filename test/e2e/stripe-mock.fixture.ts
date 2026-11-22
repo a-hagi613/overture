@@ -8,6 +8,38 @@ export interface StripeMockRequest {
   body: string;
 }
 
+/** A paid invoice in the shape Stripe's `/v1/invoices` list returns it. */
+export interface StripeMockInvoiceRecord {
+  id: string;
+  object: string;
+  amount_paid: number;
+  created: number;
+  currency?: string;
+  customer?: string | null;
+  status?: string;
+  status_transitions?: { paid_at?: number | null };
+}
+
+/** A refund in the shape Stripe's `/v1/refunds` list returns it. */
+export interface StripeMockRefundRecord {
+  id: string;
+  object: string;
+  amount: number;
+  created: number;
+  currency?: string;
+  status?: string;
+}
+
+/**
+ * The list endpoints stripe-mock answers with one canned record each. A
+ * reconciliation drill needs a day it can control, so a test seeds these and
+ * the proxy answers them; every other call still reaches stripe-mock.
+ */
+export interface StripeMockLists {
+  invoices: readonly StripeMockInvoiceRecord[];
+  refunds: readonly StripeMockRefundRecord[];
+}
+
 export interface StripeMock {
   url: string;
   requests: StripeMockRequest[];
@@ -17,6 +49,8 @@ export interface StripeMock {
    * the given fingerprint, the shape Stripe returns after a card check succeeds.
    */
   stubVerifiedSetupSession: (session: { id: string; userId: string; fingerprint: string }) => void;
+  /** Replaces what the list endpoints answer; null forwards to stripe-mock again. */
+  seed: (lists: StripeMockLists | null) => void;
   stop: () => Promise<void>;
 }
 
@@ -92,6 +126,24 @@ export async function startStripeMock() {
   const requests: StripeMockRequest[] = [];
   const setupStubs = new Map<string, { userId: string; fingerprint: string }>();
 
+  let seeded: StripeMockLists | null = null;
+
+  function seededPage(path: string) {
+    if (seeded === null) {
+      return null;
+    }
+
+    if (path === "/v1/invoices") {
+      return { data: seeded.invoices, has_more: false, object: "list", url: "/v1/invoices" };
+    }
+
+    if (path === "/v1/refunds") {
+      return { data: seeded.refunds, has_more: false, object: "list", url: "/v1/refunds" };
+    }
+
+    return null;
+  }
+
   const proxy = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
@@ -106,6 +158,12 @@ export async function startStripeMock() {
         method: request.method,
         path: url.pathname,
       });
+
+      const page = request.method === "GET" ? seededPage(url.pathname) : null;
+
+      if (page !== null) {
+        return Response.json(page);
+      }
 
       const sessionId = /^\/v1\/checkout\/sessions\/(?<id>[^/]+)$/u.exec(url.pathname)?.groups?.[
         "id"
@@ -151,6 +209,9 @@ export async function startStripeMock() {
     },
     stubVerifiedSetupSession: ({ id, userId, fingerprint }) => {
       setupStubs.set(id, { fingerprint, userId });
+    },
+    seed: (lists) => {
+      seeded = lists;
     },
     stop: async () => {
       await proxy.stop(true);

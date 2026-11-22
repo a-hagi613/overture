@@ -44,6 +44,7 @@ import {
   billingUsersPage,
 } from "../billing/admin-view.ts";
 import { REFUND_REASONS, refundGrant } from "../billing/refunds.ts";
+import { reconciliationForAdmin } from "../billing/reconcile.ts";
 import type { Payments } from "../platform/ports/payments.ts";
 import { buildCostSummary, buildProviderReport } from "../dispatch/report.ts";
 import { buildLabReport } from "../lab/report.ts";
@@ -1123,6 +1124,10 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
       ...billingUsersPage(db, clock, { filter, page }),
     });
   });
+
+  routes.get("/billing/reconciliation", (context) =>
+    context.json({ reconciliation: reconciliationForAdmin(db) }),
+  );
 
   routes.get("/billing/users/:id", (context) => {
     const view = billingUserView(db, clock, context.req.param("id"));
