@@ -21,9 +21,7 @@ export function BoardCover({ detail }: { detail: ApplicationDetail }) {
 
   return (
     <div aria-label={copy.board.tabs.cover} className="pt-[18px] md:pt-[22px]" role="tabpanel">
-      {snapshot === null ||
-      snapshot.coverLetter === null ||
-      snapshot.coverLetter.length === 0 ? (
+      {snapshot === null || snapshot.coverLetter === null || snapshot.coverLetter.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">{copy.board.cover.noSnapshot}</p>
       ) : (
         <>
