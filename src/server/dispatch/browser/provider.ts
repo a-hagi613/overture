@@ -1,6 +1,6 @@
 export interface BrowserUsage {
   browserMs: number;
-  proxyBytes: number;
+  proxyBytes: number | null;
   costMicros: number;
 }
 

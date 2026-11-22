@@ -123,6 +123,33 @@ async function notificationsFor(owner: APIRequestContext, userId: string) {
   return notificationsSchema.parse(body).notifications;
 }
 
+async function runDueJobs(owner: APIRequestContext) {
+  const response = await owner.post("/__test__/jobs/run-due", { data: {} });
+
+  expect(response.ok()).toBe(true);
+}
+
+async function pauseSchedulerPolling(owner: APIRequestContext) {
+  const response = await owner.put("/__test__/settings/jobs.poll_interval_ms", {
+    data: { value: "3600000" },
+  });
+
+  expect(response.ok()).toBe(true);
+}
+
+async function waitForRecapMail(owner: APIRequestContext) {
+  await expect
+    .poll(
+      async () => {
+        await runDueJobs(owner);
+
+        return (await mailFor(owner)).length;
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(1);
+}
+
 async function readyFor(owner: APIRequestContext) {
   return readySchema.parse(await (await owner.get("/api/ready")).json());
 }
@@ -221,15 +248,17 @@ test("a 07:00 run fills exactly the free Ready slots, sends one recap, and does 
   const before = await nextRunTarget(owner);
   const after = before + 60_000;
 
+  await pauseSchedulerPolling(owner);
   await moveClockTo(owner, before);
   await owner.post("/api/running", { data: { running: true } });
 
-  await owner.post("/__test__/jobs/run-due", { data: {} });
+  await runDueJobs(owner);
 
   expect(await applicationsFor(owner, userId)).toHaveLength(1);
   expect(await mailFor(owner)).toHaveLength(0);
 
   await moveClockTo(owner, after);
+  await runDueJobs(owner);
 
   await expect
     .poll(
@@ -243,7 +272,7 @@ test("a 07:00 run fills exactly the free Ready slots, sends one recap, and does 
 
   expect(await applicationsFor(owner, userId)).toHaveLength(10);
 
-  await expect.poll(async () => (await mailFor(owner)).length, { timeout: 30_000 }).toBe(1);
+  await waitForRecapMail(owner);
 
   const [recap] = await mailFor(owner);
 
@@ -380,15 +409,17 @@ test("the next day's run stops at the unapproved Ready Applications and sends no
   const firstRun = await nextRunTarget(owner);
   const secondRun = firstRun + 86_400_000 + 60_000;
 
+  await pauseSchedulerPolling(owner);
   await moveClockTo(owner, firstRun);
   await owner.post("/api/running", { data: { running: true } });
   await moveClockTo(owner, firstRun + 60_000);
-  await owner.post("/__test__/jobs/run-due", { data: {} });
+  await runDueJobs(owner);
 
   await expect
     .poll(async () => (await applicationsFor(owner, userId)).length, { timeout: 30_000 })
     .toBe(10);
-  await expect.poll(async () => (await mailFor(owner)).length, { timeout: 30_000 }).toBe(1);
+
+  await waitForRecapMail(owner);
 
   const scheduled = (await jobsFor(owner)).find(
     (job) => job.kind === "prep.daily" && job.runAt === secondRun,
@@ -397,6 +428,7 @@ test("the next day's run stops at the unapproved Ready Applications and sends no
   expect(scheduled).toBeDefined();
 
   await moveClockTo(owner, secondRun);
+  await runDueJobs(owner);
 
   await expect
     .poll(
@@ -405,6 +437,8 @@ test("the next day's run stops at the unapproved Ready Applications and sends no
       { timeout: 30_000 },
     )
     .toBe("done");
+
+  await runDueJobs(owner);
 
   expect(await applicationsFor(owner, userId)).toHaveLength(10);
   expect(await mailFor(owner)).toHaveLength(1);

@@ -389,27 +389,18 @@ export function createMatchingService(deps: MatchDeps) {
       return null;
     }
 
-    const posting = db
-      .select({ companyId: postings.companyId })
-      .from(postings)
-      .where(eq(postings.id, postingId))
-      .get();
-
-    if (posting === undefined) {
-      return null;
-    }
-
     const applicationId = createApplication(db, clock.now(), {
-      companyId: posting.companyId,
       origin: "manual",
       postingId,
       score: scored.score,
       userId,
     });
 
-    if (applicationId !== null) {
-      enqueueApplicationPrepare(db, clock, applicationId);
+    if (applicationId === null) {
+      return null;
     }
+
+    enqueueApplicationPrepare(db, clock, applicationId);
 
     return { applicationId, created: true };
   }
@@ -478,7 +469,6 @@ export function createMatchingService(deps: MatchDeps) {
       }
 
       const created = createApplication(db, clock.now(), {
-        companyId: candidate.companyId,
         origin: "auto",
         postingId: candidate.id,
         score,

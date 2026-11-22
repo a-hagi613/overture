@@ -77,6 +77,12 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
   sample Applications, never real Postings, and only when `DEMO_LOGIN_ENABLED=true` or the operator runs
   `bun run db:seed-demo`. `src/server/billing/pause.test.ts` is listed for the same reason: its one in-flight fixture
   writes a fictional company, board and posting so a reservation has a sending Application, never a real Posting.
+  `src/server/dispatch/outcomes.test.ts` is listed for the same reason: its email-receipt fixture writes fictional
+  companies, boards and postings so two Confirming Applications exist at one employer, never a real Posting.
+  `src/server/matching/applications.test.ts` is listed for the same reason: its fixture writes one fictional company,
+  board and posting so an Application can be created and then watch its catalog rows be deleted, never a real Posting.
+  `src/server/platform/db/migration-snapshot.test.ts` is listed for the same reason: it seeds the pre-`0056` catalog
+  shape in a scratch database to prove the backfill and the foreign-key decoupling, never a real Posting.
 - **The off-list and every scoped override are checked.** CI fails if the rules turned off in the configuration
   differ from the table below, if an override turns a rule down or changes its options without appearing in the
   "Rules off in one folder only" table, or if that table lists an override that does not exist. The same

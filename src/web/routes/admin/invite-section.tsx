@@ -120,7 +120,7 @@ export function InviteSection({
               </span>
               {mode === "pending" ? (
                 <button
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-need px-3 text-[12.5px] font-semibold text-need hover:bg-need-soft disabled:opacity-60"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-need px-3 max-md:h-11 text-[12.5px] font-semibold text-need hover:bg-need-soft disabled:opacity-60"
                   disabled={busyId === row.id}
                   onClick={() => {
                     onRevoke(row.id);

@@ -132,8 +132,12 @@
           "src/server/routes/test-only.ts",
           "src/server/pipeline/prepare.ts",
           "src/server/dispatch/dispatch.ts",
+          "src/server/dispatch/outcomes.test.ts",
           "src/server/demo/seed.ts",
-          "src/server/billing/pause.test.ts"
+          "src/server/billing/pause.test.ts",
+          "src/server/dispatch/report.test.ts",
+          "src/server/platform/db/migration-snapshot.test.ts",
+          "src/server/matching/applications.test.ts"
         ],
         "allowRoots": ["test/e2e", "scripts"]
       }
@@ -149,11 +153,14 @@
       {
         "e2eRoot": "test/e2e",
         "allow": [
+          "src/server/account/erase.test.ts",
           "src/server/billing/ledger.test.ts",
           "src/server/billing/pause.test.ts",
+          "src/server/billing/webhooks.test.ts",
           "src/server/platform/crypto.test.ts",
           "src/server/platform/event-loop-lag.test.ts",
           "src/server/dispatch/planner.test.ts",
+          "src/server/dispatch/report.test.ts",
           "src/server/profile/address.test.ts",
           "src/server/catalog/tag-rules.test.ts",
           "src/server/catalog/question-normalize.test.ts",
@@ -169,10 +176,17 @@
           "src/server/platform/outbound-guard.test.ts",
           "src/server/platform/db/restore-check.test.ts",
           "src/server/platform/ports/replica-listing.test.ts",
+          "src/server/platform/jobs/queue.test.ts",
           "src/server/platform/jobs/scheduler.test.ts",
+          "src/server/dispatch/browser/session-slots.test.ts",
           "src/server/platform/llm/models.test.ts",
+          "src/server/platform/llm/batch-store.test.ts",
+          "src/server/platform/llm/anthropic-batches.test.ts",
           "src/shared/copy.test.ts",
           "src/server/auth/client-ip.test.ts",
+          "src/server/dispatch/outcomes.test.ts",
+          "src/server/platform/db/migration-snapshot.test.ts",
+          "src/server/matching/applications.test.ts",
           "scripts/database-sync-guard.test.ts"
         ]
       }

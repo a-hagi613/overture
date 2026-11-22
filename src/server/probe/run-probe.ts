@@ -9,6 +9,7 @@ import {
   configureBrowserSessionLimitFromSetting,
 } from "../dispatch/browser/session-slots.ts";
 import { BrowserUseClient } from "../dispatch/browser/browser-use.ts";
+import { createNetworkPolicyResolver } from "../dispatch/browser/network-policy.ts";
 import { applySendProxyTrim } from "../dispatch/browser/proxy-trim.ts";
 import type { BrowserSession } from "../dispatch/browser/browser-use.ts";
 import type { ProbeConsole } from "./console.ts";
@@ -157,6 +158,7 @@ export async function runProbe(deps: ProbeDeps) {
   }
 
   const client = BrowserUseClient(deps.apiKey, deps.apiBaseUrl, deps.clock);
+  const resolveNetworkPolicy = createNetworkPolicyResolver(client);
   const { db } = openProbeDatabase(deps.databasePath);
 
   configureBrowserSessionLimitFromSetting(db);
@@ -169,7 +171,7 @@ export async function runProbe(deps: ProbeDeps) {
       return results;
     }
 
-    results.push(await runPosting(deps, client, db, posting, index));
+    results.push(await runPosting(deps, client, db, posting, index, resolveNetworkPolicy));
 
     return runFrom(index + 1);
   };
@@ -187,6 +189,7 @@ async function runPosting(
   db: ProbeDatabase["db"],
   posting: RunFilePosting,
   index: number,
+  resolveNetworkPolicy: () => Promise<string>,
 ) {
   const io = deps.console;
   const label = `posting ${String(index + 1)} (${posting.company} — ${posting.title})`;
@@ -194,20 +197,30 @@ async function runPosting(
   let browser: Browser | null = null;
   let attempt: GreenhouseAttempt | WorkableAttempt | null = null;
   let outcome = "browser_error";
+  let networkPolicyId: string | null = null;
 
   io.writeLine(
     `${label}: starting a Browser Use session (residential exit in ${deps.runFile.country}, solver on, ${String(SESSION_TIMEOUT_MINUTES)}-minute timeout)`,
   );
 
+  try {
+    networkPolicyId = await resolveNetworkPolicy();
+  } catch (error) {
+    io.writeLine(
+      `${label}: network policy unavailable (${error instanceof Error ? error.message : "unknown error"}); the Playwright trim still applies`,
+    );
+  }
+
   const releaseSlot = await acquireBrowserSession();
 
   try {
     session = await client.createSession({
+      metadata: { purpose: PROBE_METADATA_PURPOSE, ats: posting.ats, posting: String(index + 1) },
+      networkPolicyId,
       profileId: null,
       proxyCountryCode: deps.runFile.country,
       timeoutMinutes: SESSION_TIMEOUT_MINUTES,
       solveCaptchas: true,
-      metadata: { purpose: PROBE_METADATA_PURPOSE, ats: posting.ats, posting: String(index + 1) },
     });
 
     const { cdpUrl } = session;

@@ -5,11 +5,23 @@ const apiOrigin = "https://api.browser-use.com";
 
 export interface RecordedBrowserSession {
   id: string;
+  networkPolicyId: string | null;
   proxyUsedMb: string;
   proxyCost: string;
   browserCost: string;
   browserSeconds: number;
   stopped: boolean;
+}
+
+export interface RecordedNetworkPolicy {
+  id: string;
+  name: string;
+  defaultAction: "allow" | "block";
+  allow: { domains: string[] };
+  block: { domains: string[] };
+  version: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface BrowserUseApiState {
@@ -19,6 +31,8 @@ export interface BrowserUseApiState {
   cdpUrlBySession: Record<string, string>;
   readsBySession: Record<string, number>;
   readsBeforeFinalUsage: number;
+  networkPolicies: RecordedNetworkPolicy[];
+  networkPolicyIdsBySession: Record<string, string>;
 }
 
 export const recordedProxyUsedMb = "2.71";
@@ -31,6 +45,14 @@ const createSessionRequestSchema = z.object({
   timeout: z.literal(15),
   solveCaptchas: z.literal(true),
   metadata: z.record(z.string(), z.string()),
+  networkPolicyId: z.string().min(1).optional(),
+});
+
+const networkPolicyInputSchema = z.object({
+  name: z.string().min(1).max(100),
+  defaultAction: z.enum(["allow", "block"]).optional(),
+  allow: z.object({ domains: z.array(z.string().min(1)) }).optional(),
+  block: z.object({ domains: z.array(z.string().min(1)) }).optional(),
 });
 
 const stopSessionRequestSchema = z.object({ action: z.literal("stop") });
@@ -69,9 +91,66 @@ export function recordedBrowserUseHandlers(cdpUrl: string) {
     cdpUrlBySession: {},
     readsBySession: {},
     readsBeforeFinalUsage: 0,
+    networkPolicies: [],
+    networkPolicyIdsBySession: {},
   };
 
   const handlers = [
+    http.get(`${apiOrigin}/api/v4/network-policies`, () =>
+      HttpResponse.json({
+        items: state.networkPolicies.toReversed(),
+        pageNumber: 1,
+        pageSize: 100,
+        totalItems: state.networkPolicies.length,
+      }),
+    ),
+    http.post(`${apiOrigin}/api/v4/network-policies`, async ({ request }) => {
+      const parsed = networkPolicyInputSchema.safeParse(await request.json());
+
+      if (!parsed.success) {
+        return new HttpResponse(null, { status: 422 });
+      }
+
+      const now = new Date().toISOString();
+
+      const policy: RecordedNetworkPolicy = {
+        allow: parsed.data.allow ?? { domains: [] },
+        block: parsed.data.block ?? { domains: [] },
+        createdAt: now,
+        defaultAction: parsed.data.defaultAction ?? "allow",
+        id: crypto.randomUUID(),
+        name: parsed.data.name,
+        updatedAt: now,
+        version: 1,
+      };
+
+      state.networkPolicies.push(policy);
+
+      return HttpResponse.json(policy, { status: 201 });
+    }),
+    http.patch(`${apiOrigin}/api/v4/network-policies/:id`, async ({ request, params }) => {
+      const { id } = sessionIdSchema.parse(params);
+      const policy = state.networkPolicies.find((candidate) => candidate.id === id);
+
+      if (policy === undefined) {
+        return new HttpResponse(null, { status: 404 });
+      }
+
+      const parsed = networkPolicyInputSchema.partial().safeParse(await request.json());
+
+      if (!parsed.success) {
+        return new HttpResponse(null, { status: 422 });
+      }
+
+      policy.allow = parsed.data.allow ?? policy.allow;
+      policy.block = parsed.data.block ?? policy.block;
+      policy.defaultAction = parsed.data.defaultAction ?? policy.defaultAction;
+      policy.name = parsed.data.name ?? policy.name;
+      policy.updatedAt = new Date().toISOString();
+      policy.version += 1;
+
+      return HttpResponse.json(policy);
+    }),
     http.post(`${apiOrigin}/api/v4/browsers`, async ({ request }) => {
       const parsed = createSessionRequestSchema.safeParse(await request.json());
 
@@ -79,8 +158,18 @@ export function recordedBrowserUseHandlers(cdpUrl: string) {
         return new HttpResponse(null, { status: 422 });
       }
 
+      const networkPolicyId = parsed.data.networkPolicyId ?? null;
+
+      if (
+        networkPolicyId !== null &&
+        !state.networkPolicies.some((policy) => policy.id === networkPolicyId)
+      ) {
+        return new HttpResponse(null, { status: 404 });
+      }
+
       const session = {
         id: crypto.randomUUID(),
+        networkPolicyId,
         proxyUsedMb: "0",
         proxyCost: "0",
         browserCost: "0",
@@ -91,6 +180,10 @@ export function recordedBrowserUseHandlers(cdpUrl: string) {
       state.sessionCount += 1;
       state.createdSessions.push(session);
       state.cdpUrlBySession[session.id] = cdpUrl;
+
+      if (networkPolicyId !== null) {
+        state.networkPolicyIdsBySession[session.id] = networkPolicyId;
+      }
 
       return HttpResponse.json(browserUseSessionView(session, cdpUrl));
     }),

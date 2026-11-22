@@ -1,0 +1,1 @@
+CREATE INDEX `bg_jobs_claim_due` ON `bg_jobs` (`status`,`run_at`) WHERE status IN ('queued', 'running');

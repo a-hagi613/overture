@@ -1,12 +1,22 @@
 import { and, eq, isNull, lt, lte, ne, notInArray, or, sql } from "drizzle-orm";
 
-import type { AppDatabase } from "../db/client.ts";
+import type { AppDatabase, DatabaseWriter } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 
 import { retryWhenBusy } from "../db/busy.ts";
 import { logError } from "../log.ts";
 import { bgJobs } from "../db/schema.ts";
 import { publishEvent } from "../sse/stream.ts";
+import type { JobClass } from "./classes.ts";
+import {
+  DEFAULT_JOB_CLASS_LIMITS,
+  DEFAULT_MAX_IN_FLIGHT_JOBS,
+  exceedsJobClassLimit,
+  jobClassCounts,
+  jobClassOf,
+  NO_JOB_CLASS_LIMITS,
+  saturatedJobKinds,
+} from "./classes.ts";
 import { RETRY_LATER_DELAY_MS, RetryLaterError } from "./retry.ts";
 
 export type JobHandlers = Readonly<Record<string, (payload: string) => Promise<void>>>;
@@ -109,31 +119,54 @@ export function requeueWithoutConsumingAttempt(
   queueAgain(db, clock, jobId, { attempts: originalAttempts });
 }
 
-export function claimDueJobs(
-  db: AppDatabase,
-  clock: Clock,
-  batchSize: number,
-  singletonKinds: readonly string[] = [],
-  busyKinds: readonly string[] = [],
-) {
-  const now = clock.now();
+export interface ClaimDueOptions {
+  /** The most rows to claim in this pass. */
+  batchSize: number;
+  /** Kinds that may run only one at a time. */
+  singletonKinds?: readonly string[];
+  /** Singleton kinds already running, which must not be claimed again. */
+  busyKinds?: readonly string[];
+  /** Kinds left out of this claim because their class is at its in-flight limit. */
+  excludedKinds?: readonly string[];
+}
 
-  const reclaimable = singletonKinds.flatMap((kind) =>
-    busyKinds.includes(kind) ? [] : [sql`${kind}`],
-  );
+/**
+ * The claim query itself, so its plan can be proved against the shipped schema.
+ * `status IN ('queued', 'running')` is written with literal values rather than bound
+ * parameters: SQLite only matches the partial `bg_jobs_claim_due` index when it can
+ * prove the query implies the index's `WHERE`. The OR terms are shaped so that
+ * conjunct stays visible to the planner; a queued row is always claimable and a
+ * running row only when its lock is stale and its kind is an idle singleton.
+ * @param db The application database.
+ * @param clock The clock the claim's dates come from.
+ * @param options The batch, the singleton kinds and any excluded kinds.
+ * @returns The unexecuted update query.
+ */
+export function claimDueJobsQuery(db: AppDatabase, clock: Clock, options: ClaimDueOptions) {
+  const now = clock.now();
+  const singletonKinds = options.singletonKinds ?? [];
+  const busyKinds = options.busyKinds ?? [];
+  const excludedKinds = options.excludedKinds ?? [];
+
+  const reclaimable = singletonKinds.filter((kind) => !busyKinds.includes(kind));
 
   const claimable =
     reclaimable.length === 0
       ? sql`${bgJobs.status} = 'queued'`
-      : sql`(${bgJobs.status} = 'queued'
-          OR (${bgJobs.status} = 'running'
-            AND (${bgJobs.lockedUntil} IS NULL OR ${bgJobs.lockedUntil} < ${now})
-            AND ${bgJobs.kind} IN (${sql.join(reclaimable, sql`, `)})))`;
+      : and(
+          sql`${bgJobs.status} IN ('queued', 'running')`,
+          sql`(${bgJobs.status} = 'queued' OR ${bgJobs.lockedUntil} IS NULL OR ${bgJobs.lockedUntil} < ${now})`,
+          sql`(${bgJobs.status} = 'queued' OR ${bgJobs.kind} IN (${sql.join(
+            reclaimable.map((kind) => sql`${kind}`),
+            sql`, `,
+          )}))`,
+        );
 
-  const claimableNow = and(
+  const due = and(
     claimable,
     lte(bgJobs.runAt, now),
     or(isNull(bgJobs.lockedUntil), lt(bgJobs.lockedUntil, now)),
+    excludedKinds.length === 0 ? undefined : notInArray(bgJobs.kind, [...excludedKinds]),
   );
 
   return db
@@ -146,19 +179,20 @@ export function claimDueJobs(
     })
     .where(
       and(
-        claimableNow,
+        due,
         sql`${bgJobs.id} IN (
           SELECT id FROM bg_jobs
-          WHERE ${claimable}
-            AND run_at <= ${now}
-            AND (locked_until IS NULL OR locked_until < ${now})
+          WHERE ${due}
           ORDER BY priority DESC, run_at ASC
-          LIMIT ${batchSize}
+          LIMIT ${options.batchSize}
         )`,
       ),
     )
-    .returning()
-    .all();
+    .returning();
+}
+
+export function claimDueJobs(db: AppDatabase, clock: Clock, options: ClaimDueOptions) {
+  return claimDueJobsQuery(db, clock, options).all();
 }
 
 export async function runClaimedJob(
@@ -201,7 +235,13 @@ export async function claimAndRunDueJobs(
   singletonKinds: readonly string[] = [],
 ) {
   const claimed = await retryWhenBusy(
-    () => claimJobsToRun(db, clock, batchSize, singletonKinds, []),
+    () =>
+      claimJobsToRun(db, clock, {
+        batchSize,
+        classLimits: NO_JOB_CLASS_LIMITS,
+        maxInFlight: Number.POSITIVE_INFINITY,
+        singletonKinds,
+      }),
     "jobs.claim",
   );
 
@@ -212,19 +252,52 @@ export async function claimAndRunDueJobs(
   return results.filter(Boolean).length;
 }
 
-export function claimJobsToRun(
-  db: AppDatabase,
-  clock: Clock,
-  batchSize: number,
-  singletonKinds: readonly string[],
-  busyKinds: readonly string[],
-) {
+export interface ClaimJobsOptions {
+  /** The most rows to claim in this pass. */
+  batchSize: number;
+  /** Kinds that may run only one at a time. */
+  singletonKinds?: readonly string[];
+  /** Singleton kinds already running, which must not be claimed again. */
+  busyKinds?: readonly string[];
+  /** The kinds the worker is running right now. */
+  inFlightKinds?: readonly string[];
+  /** The most jobs the worker may hold at once, across every class. */
+  maxInFlight?: number;
+  /** The per-class in-flight limits. */
+  classLimits?: Readonly<Record<JobClass, number>>;
+}
+
+export function claimJobsToRun(db: AppDatabase, clock: Clock, options: ClaimJobsOptions) {
+  const singletonKinds = options.singletonKinds ?? [];
+  const busyKinds = options.busyKinds ?? [];
+  const inFlightKinds = options.inFlightKinds ?? [];
+  const maxInFlight = options.maxInFlight ?? DEFAULT_MAX_IN_FLIGHT_JOBS;
+  const classLimits = options.classLimits ?? DEFAULT_JOB_CLASS_LIMITS;
+  const room = Math.max(0, maxInFlight - inFlightKinds.length);
+
+  if (room === 0) {
+    return [];
+  }
+
   const exclusive = new Set(singletonKinds);
   const busy = new Set(busyKinds);
+  const classCounts = jobClassCounts(inFlightKinds);
   const startable: ClaimedJob[] = [];
 
-  for (const job of claimDueJobs(db, clock, batchSize, singletonKinds, busyKinds)) {
+  for (const job of claimDueJobs(db, clock, {
+    batchSize: Math.min(options.batchSize, room),
+    singletonKinds,
+    busyKinds,
+    excludedKinds: saturatedJobKinds(classCounts, classLimits),
+  })) {
+    if (exceedsJobClassLimit(job.kind, classCounts, classLimits)) {
+      requeueWithoutConsumingAttempt(db, clock, job.id, job.attempts - 1);
+
+      continue;
+    }
+
     if (!exclusive.has(job.kind)) {
+      classCounts[jobClassOf(job.kind)] += 1;
       startable.push(job);
 
       continue;
@@ -237,6 +310,7 @@ export function claimJobsToRun(
     }
 
     busy.add(job.kind);
+    classCounts[jobClassOf(job.kind)] += 1;
     startable.push(job);
   }
 
@@ -333,7 +407,7 @@ function queueAgain(db: AppDatabase, clock: Clock, jobId: string, input: QueueAg
 }
 
 export function enqueueJob(
-  db: AppDatabase,
+  db: DatabaseWriter,
   clock: Clock,
   kind: string,
   payload: string,

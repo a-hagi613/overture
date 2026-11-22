@@ -19,11 +19,9 @@ import {
 import {
   applicationEvents,
   applications,
-  companies,
   facts,
   mailThreads,
   messages,
-  postings,
   profiles,
 } from "../platform/db/schema.ts";
 import { getSetting } from "../platform/settings/index.ts";
@@ -295,14 +293,12 @@ export function createHomeRoutes(deps: {
     const candidateRows = db
       .select({
         at: sql<number>`coalesce(${applications.sentAt}, ${applications.updatedAt})`,
-        company: companies.name,
+        company: applications.companyName,
         id: applications.id,
         status: applications.status,
-        title: postings.title,
+        title: applications.postingTitle,
       })
       .from(applications)
-      .leftJoin(postings, eq(postings.id, applications.postingId))
-      .leftJoin(companies, eq(companies.id, applications.companyId))
       .where(
         and(eq(applications.userId, userId), inArray(applications.status, ["sent", "confirming"])),
       )
@@ -340,14 +336,12 @@ export function createHomeRoutes(deps: {
     const failedRows = db
       .select({
         at: sql<number>`coalesce(${applications.sentAt}, ${applications.updatedAt})`,
-        company: companies.name,
+        company: applications.companyName,
         id: applications.id,
         reason: applications.statusReason,
-        title: postings.title,
+        title: applications.postingTitle,
       })
       .from(applications)
-      .leftJoin(postings, eq(postings.id, applications.postingId))
-      .leftJoin(companies, eq(companies.id, applications.companyId))
       .where(
         and(eq(applications.userId, userId), inArray(applications.status, ["failed", "skipped"])),
       )
@@ -360,20 +354,20 @@ export function createHomeRoutes(deps: {
         (row) =>
           ({
             at: row.at,
-            company: row.company ?? "",
+            company: row.company,
             id: row.id,
             reason: failedReasonFor(row.reason),
-            title: row.title ?? "",
+            title: row.title,
           }) satisfies HomeActivityFailedView,
       ),
       sent: sentRows.map(
         (row) =>
           ({
             at: row.at > now ? now : row.at,
-            company: row.company ?? "",
+            company: row.company,
             id: row.id,
             status: row.status === "confirming" ? "confirming" : "sent",
-            title: row.title ?? "",
+            title: row.title,
           }) satisfies HomeActivitySentView,
       ),
     };
@@ -424,19 +418,17 @@ export function createHomeRoutes(deps: {
       .select({
         applicationId: mailThreads.applicationId,
         classification: messages.classification,
-        companyName: companies.name,
+        companyName: applications.companyName,
         createdAt: messages.createdAt,
         fromEnc: messages.fromEnc,
         id: messages.id,
-        postingTitle: postings.title,
+        postingTitle: applications.postingTitle,
         stage: applications.stage,
         subjectEnc: messages.subjectEnc,
       })
       .from(messages)
       .leftJoin(mailThreads, eq(mailThreads.id, messages.threadId))
       .leftJoin(applications, eq(applications.id, mailThreads.applicationId))
-      .leftJoin(postings, eq(postings.id, applications.postingId))
-      .leftJoin(companies, eq(companies.id, applications.companyId))
       .where(
         and(
           eq(messages.userId, userId),
@@ -638,9 +630,8 @@ export function createHomeRoutes(deps: {
       .get();
 
     const readyCompanies = db
-      .select({ company: companies.name })
+      .select({ company: applications.companyName })
       .from(applications)
-      .innerJoin(companies, eq(companies.id, applications.companyId))
       .where(and(eq(applications.userId, userId), eq(applications.status, "ready")))
       .orderBy(asc(applications.readyAt))
       .limit(3)

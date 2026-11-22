@@ -971,7 +971,7 @@ export function createDispatcher(deps: DispatcherDeps) {
           costMicros: attempt.costMicros ?? 0,
           endedAt: attempt.endedAt ?? clock.now(),
           outcome: attempt.outcome ?? "crash",
-          proxyBytes: attempt.proxyBytes ?? 0,
+          proxyBytes: attempt.proxyBytes,
         });
 
         confirmingCount += 1;
@@ -987,7 +987,7 @@ export function createDispatcher(deps: DispatcherDeps) {
           costMicros: attempt.costMicros ?? 0,
           endedAt: attempt.endedAt ?? clock.now(),
           outcome: "interrupted",
-          proxyBytes: attempt.proxyBytes ?? 0,
+          proxyBytes: attempt.proxyBytes,
         });
       }
 
@@ -1067,7 +1067,7 @@ export function createDispatcher(deps: DispatcherDeps) {
           return 0;
         }
 
-        if (reported.usage.costMicros === 0 && reported.usage.proxyBytes === 0) {
+        if (reported.usage.costMicros === 0 && (reported.usage.proxyBytes ?? 0) === 0) {
           return 0;
         }
 

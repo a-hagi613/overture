@@ -1,0 +1,104 @@
+name: Stapply seed refresh
+
+on:
+  schedule:
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      allow_row_drop:
+        description: "Publish a snapshot whose row count dropped more than 20%"
+        type: boolean
+        default: false
+
+concurrency:
+  group: stapply-seed
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.5
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+      - run: bun install --frozen-lockfile
+      - name: Restore the prior staged snapshot
+        uses: actions/cache/restore@v4
+        with:
+          path: .stapply-seed
+          key: stapply-seed-${{ github.run_id }}
+          restore-keys: |
+            stapply-seed-
+      - name: Stage the refresh behind the schema, checksum and row-drop guards
+        env:
+          STAPPLY_LIVE_FETCH: "1"
+          ALLOW_ROW_DROP: ${{ inputs.allow_row_drop == true && '1' || '' }}
+          STAPPLY_MANIFEST_URL: ${{ vars.STAPPLY_MANIFEST_URL || 'https://storage.stapply.ai/jobs/v1/manifest.json' }}
+          STAPPLY_COMPANIES_URL: ${{ vars.STAPPLY_COMPANIES_URL || 'https://storage.stapply.ai/jobs/v1/companies.parquet' }}
+        run: |
+          flag=""
+          if [ "$ALLOW_ROW_DROP" = "1" ]; then
+            flag="--allow-row-drop"
+          fi
+          bun run scripts/refresh-stapply-seed.ts \
+            --out-dir .stapply-seed \
+            --manifest-url "$STAPPLY_MANIFEST_URL" \
+            --companies-url "$STAPPLY_COMPANIES_URL" \
+            $flag | tee stapply-refresh.json
+      - name: Report the refresh outcome
+        if: always()
+        run: |
+          {
+            echo "### Stapply seed refresh"
+            echo ""
+            if [ -f stapply-refresh.json ]; then
+              echo '```json'
+              cat stapply-refresh.json
+              echo '```'
+            else
+              echo "The refresh produced no summary; the step log has the error."
+            fi
+            echo ""
+            echo "A staged snapshot is a candidate only: review the checksums and row count, then re-pin"
+            echo "\`src/server/catalog/companies-parquet.ts\` and rerun the seed runbook before production reads it."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Tell the owner the refresh failed
+        if: failure()
+        env:
+          NTFY_URL: ${{ secrets.STAPPLY_ALERT_NTFY_URL }}
+        run: |
+          if [ -z "$NTFY_URL" ]; then
+            exit 0
+          fi
+          curl -fsS -X POST -H "Title: Stapply seed refresh aborted" \
+            --data-binary "The weekly Stapply seed refresh did not finish. The last staged snapshot stands." \
+            "$NTFY_URL"
+      - name: Keep the staged snapshot for the next run
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: .stapply-seed
+          key: stapply-seed-${{ github.run_id }}
+      - name: Upload the staged snapshot
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: stapply-seed-${{ github.run_id }}
+          path: |
+            .stapply-seed
+            stapply-refresh.json
+          if-no-files-found: ignore
+          retention-days: 30

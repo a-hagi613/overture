@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
@@ -100,7 +100,7 @@ function dedupeKeyFor(userId: string, at: number, timeZone: string) {
 }
 
 function enqueueRun(
-  db: AppDatabase,
+  db: DatabaseWriter,
   clock: Clock,
   userId: string,
   runAt: number,
@@ -121,7 +121,7 @@ function enqueueRun(
  * @param clock The clock the schedule is read from.
  * @param userId The user to schedule.
  */
-export function ensurePrepDailyQueued(db: AppDatabase, clock: Clock, userId: string) {
+export function ensurePrepDailyQueued(db: DatabaseWriter, clock: Clock, userId: string) {
   const now = clock.now();
   const timeZone = effectiveTimeZone(db, userId, now);
   const runMinutes = parsePrepRunMinutes(getSetting(db, "prep.run_local_time"));

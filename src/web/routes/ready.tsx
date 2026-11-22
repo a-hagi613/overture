@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { copy } from "../../shared/copy.ts";
 import { useHomeData } from "../lib/home-api.ts";
@@ -13,6 +13,7 @@ import {
 } from "../lib/ready-api.ts";
 import type { ReadyAnswer, ReadyCard as ReadyCardData } from "../lib/ready-api.ts";
 import { ReadyCard } from "../components/ready-card.tsx";
+import { ReadyStatus } from "../components/ready-status.tsx";
 import { ThemeToggle } from "../components/theme-toggle.tsx";
 
 function dateLine() {
@@ -28,7 +29,7 @@ function errorCode(error: Error) {
 }
 
 export function ReadyPage() {
-  const { data: ready } = useReady();
+  const { data: ready, isError, isFetching, isPending, isSuccess, refetch } = useReady();
   const { data: home } = useHomeData();
   const approve = useApprove();
   const approveAll = useApproveAll();
@@ -45,6 +46,25 @@ export function ReadyPage() {
   const [toast, setToast] = useState<string | null>(null);
 
   const cards = ready?.cards ?? [];
+
+  const stale = isError && ready !== undefined;
+  const failedToLoad = isError && ready === undefined;
+  const confirmedEmpty = isSuccess && cards.length === 0;
+
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const recoveringRef = useRef(false);
+
+  const retry = () => {
+    recoveringRef.current = true;
+    void refetch();
+  };
+
+  useEffect(() => {
+    if (recoveringRef.current && !isFetching) {
+      recoveringRef.current = false;
+      headingRef.current?.focus();
+    }
+  }, [isFetching]);
 
   const readyCards = cards.filter((card) => card.status === "ready" && card.plan !== null);
 
@@ -137,7 +157,11 @@ export function ReadyPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="font-serif text-[15px] italic text-muted-foreground">{dateLine()}</p>
-          <h1 className="mt-0.5 font-serif text-[32px] leading-[1.05] md:text-[42px]">
+          <h1
+            className="mt-0.5 font-serif text-[32px] leading-[1.05] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-signal md:text-[42px]"
+            ref={headingRef}
+            tabIndex={-1}
+          >
             {copy.ready.titlePlain} <span className="italic">{copy.ready.titleItalic}</span>
           </h1>
           <p className="mt-2 text-[14px] leading-[1.5] text-muted-foreground">{copy.ready.lead}</p>
@@ -146,48 +170,58 @@ export function ReadyPage() {
       </header>
       <ThemeToggle className="mt-4 flex h-11 w-11 items-center justify-center rounded-md border border-input bg-card hover:bg-muted md:hidden" />
 
-      <section
-        aria-label={copy.ready.sendAll}
-        className="mt-[22px] flex flex-wrap items-center justify-between gap-x-[18px] gap-y-3 rounded-lg border border-border bg-card px-[18px] py-[14px] shadow-sh"
-      >
-        <div className="flex flex-wrap items-center gap-3">
-          <p className="text-[14px] font-semibold leading-[1.5]">
-            {copy.ready.summary(ready?.ready ?? 0, ready?.approved ?? 0)}
-          </p>
-          <span
-            aria-hidden="true"
-            className="inline-block w-1 text-[14px] leading-[1.5] text-muted-foreground"
-          >
-            {copy.ready.dot}
-          </span>
-          <button
-            className="btn"
-            disabled={readyCards.length === 0}
-            onClick={approveEverything}
-            type="button"
-          >
-            {copy.ready.sendAll}
-          </button>
-        </div>
-        <div className="flex min-w-0 items-center gap-3">
-          <p className="num whitespace-nowrap text-[12.5px] text-muted-foreground">
-            {copy.ready.sentToday(sentToday, dailyCap)}
-          </p>
-          <div aria-hidden="true" className="h-[5px] w-[110px] rounded-[3px] bg-border">
-            <div
-              className="h-full rounded-[3px] bg-foreground"
-              style={{ width: `${String(fill)}%` }}
-            />
-          </div>
-        </div>
-      </section>
+      {stale ? <ReadyStatus busy={isFetching} onRetry={retry} variant="stale" /> : null}
 
-      {cards.length === 0 ? (
+      {ready === undefined ? null : (
+        <section
+          aria-label={copy.ready.sendAll}
+          className="mt-[22px] flex flex-wrap items-center justify-between gap-x-[18px] gap-y-3 rounded-lg border border-border bg-card px-[18px] py-[14px] shadow-sh"
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-[14px] font-semibold leading-[1.5]">
+              {copy.ready.summary(ready.ready, ready.approved)}
+            </p>
+            <span
+              aria-hidden="true"
+              className="inline-block w-1 text-[14px] leading-[1.5] text-muted-foreground"
+            >
+              {copy.ready.dot}
+            </span>
+            <button
+              className="btn"
+              disabled={readyCards.length === 0}
+              onClick={approveEverything}
+              type="button"
+            >
+              {copy.ready.sendAll}
+            </button>
+          </div>
+          <div className="flex min-w-0 items-center gap-3">
+            <p className="num whitespace-nowrap text-[12.5px] text-muted-foreground">
+              {copy.ready.sentToday(sentToday, dailyCap)}
+            </p>
+            <div aria-hidden="true" className="h-[5px] w-[110px] rounded-[3px] bg-border">
+              <div
+                className="h-full rounded-[3px] bg-foreground"
+                style={{ width: `${String(fill)}%` }}
+              />
+            </div>
+          </div>
+        </section>
+      )}
+
+      {isPending ? <ReadyStatus variant="loading" /> : null}
+
+      {failedToLoad ? <ReadyStatus busy={isFetching} onRetry={retry} variant="failed" /> : null}
+
+      {confirmedEmpty ? (
         <div className="mt-[22px] flex flex-col items-start gap-1.5 rounded-lg border border-border bg-card px-6 py-7 shadow-sh">
           <p className="font-serif text-[26px] leading-[1.15]">{copy.ready.emptyTitle}</p>
           <p className="text-[13.5px] text-muted-foreground">{copy.ready.emptyBody}</p>
         </div>
-      ) : (
+      ) : null}
+
+      {cards.length > 0 ? (
         <section aria-label="Applications ready to send" className="mt-[18px] flex flex-col gap-4">
           {cards.map((card, index) => (
             <ReadyCard
@@ -221,7 +255,7 @@ export function ReadyPage() {
             />
           ))}
         </section>
-      )}
+      ) : null}
 
       {toast === null ? null : (
         <div

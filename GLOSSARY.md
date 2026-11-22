@@ -291,9 +291,9 @@ The daily `live.check` job on `overture-web` that exercises a real form capture 
 _Avoid_: smoke test, canary, health probe
 
 **Provider report**:
-The admin view of send results per browser provider and ATS over the last 30 days — attempted, completed, completion
-rate, challenge and code rates, p50/p95 duration, proxy MB and cost per completed Application against the $0.03 gate —
-plus the synthetic lab's results per provider and lab page.
+The admin view of send results per browser provider and ATS over the last 30 days — attempted Applications,
+completed Applications, completion rate, challenge and code rates, p50/p95 duration, proxy MB and cost per completed
+Application against the $0.03 gate — plus the synthetic lab's results per provider and lab page.
 _Avoid_: browser stats, vendor dashboard
 
 **Form probe**:

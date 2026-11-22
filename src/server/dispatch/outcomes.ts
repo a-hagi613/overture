@@ -9,12 +9,11 @@ import { isAtsMailDomain } from "../../shared/ats-mail-domains.ts";
 import {
   applications,
   applicationEvents,
+  applicationReceipts,
   applicationSnapshots,
   attempts,
-  companies,
   mailThreads,
   messages,
-  postings,
 } from "../platform/db/schema.ts";
 import { commitForApplication, releaseForApplication } from "../billing/ledger.ts";
 import { getSetting } from "../platform/settings/index.ts";
@@ -32,6 +31,19 @@ export interface OutcomeDeps {
   db: AppDatabase;
   clock: Clock;
   personal: PersonalCrypto;
+}
+
+interface ConfirmationCandidate {
+  applicationId: string;
+  employerMatched: boolean;
+  roleMatched: boolean;
+  sharedEmployer: boolean;
+}
+
+interface ConfirmationTarget {
+  companyDomain: string | null;
+  companyName: string;
+  postingTitle: string;
 }
 
 export function recordApplicationEvent(
@@ -71,6 +83,47 @@ function sameDomain(sender: string, wanted: string) {
   const from = sender.trim().toLowerCase().replace(/\.$/u, "");
 
   return host !== "" && (from === host || from.endsWith(`.${host}`));
+}
+
+function unambiguousTarget(candidates: readonly ConfirmationCandidate[]) {
+  const eligible = candidates.filter((candidate) =>
+    candidate.sharedEmployer
+      ? candidate.employerMatched && candidate.roleMatched
+      : candidate.employerMatched || candidate.roleMatched,
+  );
+
+  if (eligible.length === 1) {
+    return eligible.at(0)?.applicationId ?? null;
+  }
+
+  if (eligible.length > 1) {
+    const strongest = eligible.filter(
+      (candidate) => candidate.employerMatched && candidate.roleMatched,
+    );
+
+    if (strongest.length === 1) {
+      return strongest.at(0)?.applicationId ?? null;
+    }
+  }
+
+  return null;
+}
+
+function confirmationEvidence(target: ConfirmationTarget, message: MessageRow, opened: string) {
+  const domainAccepted =
+    isAtsMailDomain(message.senderDomain) ||
+    (target.companyDomain !== null && sameDomain(message.senderDomain, target.companyDomain));
+
+  if (!domainAccepted) {
+    return null;
+  }
+
+  const title = (target.postingTitle.split("|")[0] ?? "").trim().toLowerCase();
+
+  return {
+    employer: opened.includes(target.companyName.toLowerCase()),
+    role: title.length >= 4 && opened.includes(title),
+  };
 }
 
 export function createOutcomes(deps: OutcomeDeps) {
@@ -155,10 +208,12 @@ export function createOutcomes(deps: OutcomeDeps) {
     costMicros: number;
     confirmedBy: "page" | "email";
     markAttemptSent: boolean;
+    receiptMessageId?: string | null;
   }) {
     const at = clock.now();
     const submittedAt = input.attempt.submitClickedAt ?? at;
     const fromStatus = input.confirmedBy === "email" ? "confirming" : "sending";
+    const receiptMessageId = input.receiptMessageId ?? null;
 
     const snapshot = await sealSnapshot(
       input.applicationId,
@@ -170,7 +225,29 @@ export function createOutcomes(deps: OutcomeDeps) {
       { approvedAt: input.approvedAt, approvedPlanSha256: input.approvedPlanSha256 },
     );
 
-    db.transaction((tx) => {
+    const recorded = db.transaction((tx) => {
+      if (receiptMessageId !== null) {
+        const owner = tx
+          .select({ applicationId: applicationReceipts.applicationId })
+          .from(applicationReceipts)
+          .where(eq(applicationReceipts.messageId, receiptMessageId))
+          .get();
+
+        if (owner !== undefined && owner.applicationId !== input.applicationId) {
+          return false;
+        }
+
+        if (owner === undefined) {
+          tx.insert(applicationReceipts)
+            .values({
+              applicationId: input.applicationId,
+              confirmedAt: at,
+              messageId: receiptMessageId,
+            })
+            .run();
+        }
+      }
+
       commitForApplication(tx, clock, {
         applicationId: input.applicationId,
         idempotencyKey: `commit:${input.applicationId}`,
@@ -215,7 +292,13 @@ export function createOutcomes(deps: OutcomeDeps) {
           .where(eq(attempts.id, input.attempt.id))
           .run();
       }
+
+      return true;
     });
+
+    if (!recorded) {
+      return false;
+    }
 
     const source = input.confirmedBy === "email" ? "email" : "system";
 
@@ -250,6 +333,8 @@ export function createOutcomes(deps: OutcomeDeps) {
       JSON.stringify({ applicationId: input.applicationId }),
       input.plan.userId,
     );
+
+    return true;
   }
 
   function latestAttempt(applicationId: string) {
@@ -266,34 +351,18 @@ export function createOutcomes(deps: OutcomeDeps) {
     return db
       .select({
         userId: applications.userId,
-        companyName: companies.name,
-        companyDomain: companies.domain,
-        postingTitle: postings.title,
+        companyName: applications.companyName,
+        companyDomain: applications.companyDomain,
+        postingTitle: applications.postingTitle,
       })
       .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
-      .innerJoin(companies, eq(companies.id, applications.companyId))
       .where(eq(applications.id, applicationId))
       .get();
   }
 
-  async function matchesConfirmation(applicationId: string, message: MessageRow) {
+  async function openedMessage(message: MessageRow) {
     if (message.auth !== "pass" || message.classification === "code") {
-      return false;
-    }
-
-    const target = confirmationTarget(applicationId);
-
-    if (target === undefined) {
-      return false;
-    }
-
-    const domainAccepted =
-      isAtsMailDomain(message.senderDomain) ||
-      (target.companyDomain !== null && sameDomain(message.senderDomain, target.companyDomain));
-
-    if (!domainAccepted) {
-      return false;
+      return null;
     }
 
     const scope = (column: "subject_enc" | "text_enc") => ({
@@ -309,15 +378,65 @@ export function createOutcomes(deps: OutcomeDeps) {
     );
 
     const text = await personal.openFor(message.userId, scope("text_enc"), message.textEnc);
-    const haystack = `${subject}\n${text}`.toLowerCase();
 
-    if (haystack.includes(target.companyName.toLowerCase())) {
-      return true;
+    return `${subject}\n${text}`.toLowerCase();
+  }
+
+  async function applicationEvidence(applicationId: string, message: MessageRow) {
+    const target = confirmationTarget(applicationId);
+
+    if (target === undefined) {
+      return null;
     }
 
-    const title = (target.postingTitle.split("|")[0] ?? "").trim().toLowerCase();
+    const opened = await openedMessage(message);
 
-    return title.length >= 4 && haystack.includes(title);
+    return opened === null ? null : confirmationEvidence(target, message, opened);
+  }
+
+  function receiptOwner(messageId: string) {
+    return db
+      .select({ applicationId: applicationReceipts.applicationId })
+      .from(applicationReceipts)
+      .where(eq(applicationReceipts.messageId, messageId))
+      .get();
+  }
+
+  async function confirmationCandidates(userId: string, message: MessageRow) {
+    const opened = await openedMessage(message);
+
+    if (opened === null) {
+      return [];
+    }
+
+    const confirming = db
+      .select({
+        companyDomain: applications.companyDomain,
+        companyName: applications.companyName,
+        employer: applications.companyNameNorm,
+        id: applications.id,
+        postingTitle: applications.postingTitle,
+      })
+      .from(applications)
+      .where(and(eq(applications.userId, userId), eq(applications.status, "confirming")))
+      .all();
+
+    const perEmployer = new Map<string, number>();
+
+    for (const application of confirming) {
+      perEmployer.set(application.employer, (perEmployer.get(application.employer) ?? 0) + 1);
+    }
+
+    return confirming.map((application) => {
+      const evidence = confirmationEvidence(application, message, opened);
+
+      return {
+        applicationId: application.id,
+        employerMatched: evidence?.employer ?? false,
+        roleMatched: evidence?.role ?? false,
+        sharedEmployer: (perEmployer.get(application.employer) ?? 0) > 1,
+      };
+    });
   }
 
   async function resolveWithMessage(applicationId: string, message: MessageRow) {
@@ -345,7 +464,15 @@ export function createOutcomes(deps: OutcomeDeps) {
       return false;
     }
 
-    if (!(await matchesConfirmation(applicationId, message))) {
+    const evidence = await applicationEvidence(applicationId, message);
+
+    if (evidence === null || (!evidence.employer && !evidence.role)) {
+      return false;
+    }
+
+    const owner = receiptOwner(message.id);
+
+    if (owner !== undefined && owner.applicationId !== applicationId) {
       return false;
     }
 
@@ -360,12 +487,7 @@ export function createOutcomes(deps: OutcomeDeps) {
       return false;
     }
 
-    db.update(mailThreads)
-      .set({ applicationId })
-      .where(and(eq(mailThreads.id, message.threadId), isNull(mailThreads.applicationId)))
-      .run();
-
-    await recordSent({
+    const recorded = await recordSent({
       applicationId,
       attempt,
       approvedAt: approved.approvedAt,
@@ -374,7 +496,17 @@ export function createOutcomes(deps: OutcomeDeps) {
       costMicros: attempt.costMicros ?? 0,
       markAttemptSent: false,
       plan: approved.plan,
+      receiptMessageId: message.id,
     });
+
+    if (!recorded) {
+      return false;
+    }
+
+    db.update(mailThreads)
+      .set({ applicationId })
+      .where(and(eq(mailThreads.id, message.threadId), isNull(mailThreads.applicationId)))
+      .run();
 
     return true;
   }
@@ -386,26 +518,17 @@ export function createOutcomes(deps: OutcomeDeps) {
       return false;
     }
 
-    const confirming = db
-      .select({ id: applications.id })
-      .from(applications)
-      .where(and(eq(applications.userId, input.userId), eq(applications.status, "confirming")))
-      .all();
-
-    const matches = await Promise.all(
-      confirming.map(async (application) => ({
-        id: application.id,
-        matched: await matchesConfirmation(application.id, message),
-      })),
-    );
-
-    const target = matches.find((match) => match.matched);
-
-    if (target === undefined) {
+    if (receiptOwner(message.id) !== undefined) {
       return false;
     }
 
-    return resolveWithMessage(target.id, message);
+    const target = unambiguousTarget(await confirmationCandidates(input.userId, message));
+
+    if (target === null) {
+      return false;
+    }
+
+    return resolveWithMessage(target, message);
   }
 
   async function resolveFromStoredMail(applicationId: string, submitClickedAt: number) {
@@ -433,20 +556,33 @@ export function createOutcomes(deps: OutcomeDeps) {
       .orderBy(asc(messages.createdAt))
       .all();
 
-    const matches = await Promise.all(
-      stored.map(async (message) => ({
-        matched: await matchesConfirmation(applicationId, message),
-        message,
-      })),
+    const used = new Set(
+      db
+        .select({ messageId: applicationReceipts.messageId })
+        .from(applicationReceipts)
+        .all()
+        .map((receipt) => receipt.messageId),
     );
 
-    const target = matches.find((match) => match.matched);
+    const targets = await Promise.all(
+      stored.map(async (message) => {
+        if (used.has(message.id)) {
+          return null;
+        }
+
+        const target = unambiguousTarget(await confirmationCandidates(application.userId, message));
+
+        return target === applicationId ? message : null;
+      }),
+    );
+
+    const target = targets.find((message) => message !== null);
 
     if (target === undefined) {
       return false;
     }
 
-    return resolveWithMessage(applicationId, target.message);
+    return resolveWithMessage(applicationId, target);
   }
 
   async function expireConfirming() {
