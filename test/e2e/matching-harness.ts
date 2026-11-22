@@ -294,8 +294,31 @@ export async function approveApplication(request: APIRequestContext, application
 
 const clockSchema = z.object({ now: z.number(), offsetMs: z.number() });
 
+export async function clockState(owner: APIRequestContext) {
+  return clockSchema.parse(await (await owner.get("/__test__/clock")).json());
+}
+
 export async function clockNow(owner: APIRequestContext) {
-  return clockSchema.parse(await (await owner.get("/__test__/clock")).json()).now;
+  return (await clockState(owner)).now;
+}
+
+/**
+ * Point the server clock at `at`, keeping any offset already applied so moving
+ * it again never compounds. Callers move forward: moving back rewinds the
+ * instant earlier writes happened at.
+ * @param owner The request context for the app server.
+ * @param at The instant the clock should read.
+ */
+export async function moveClockTo(owner: APIRequestContext, at: number) {
+  const { now, offsetMs } = await clockState(owner);
+
+  const response = await owner.post("/__test__/clock/offset", {
+    data: { offsetMs: offsetMs + (at - now) },
+  });
+
+  if (!response.ok()) {
+    throw new Error(`moving the clock to ${String(at)} failed: ${await response.text()}`);
+  }
 }
 
 const boardsSchema = z.object({

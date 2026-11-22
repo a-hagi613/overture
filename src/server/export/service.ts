@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, exists, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -61,6 +61,19 @@ function payloadOf(exportId: string, objectKey?: string) {
 
 function objectKeyFor(userId: string, exportId: string) {
   return `files/${userId}/exports/${exportId}.ovex`;
+}
+
+function failPreparingExport(deps: ExportServiceDeps, exportId: string, message: string) {
+  deps.db
+    .update(accountExports)
+    .set({
+      error: message,
+      objectKey: null,
+      status: "failed",
+      updatedAt: new Date(deps.clock.now()),
+    })
+    .where(and(eq(accountExports.id, exportId), eq(accountExports.status, "preparing")))
+    .run();
 }
 
 function downloadPath(exportId: string) {
@@ -344,16 +357,7 @@ export async function runExportBuildJob(deps: ExportServiceDeps, exportId: strin
     .get();
 
   if (user === undefined || user.suspendedAt !== null) {
-    deps.db
-      .update(accountExports)
-      .set({
-        error: "The account cannot receive an export.",
-        objectKey: null,
-        status: "failed",
-        updatedAt: new Date(deps.clock.now()),
-      })
-      .where(and(eq(accountExports.id, exportId), eq(accountExports.status, "preparing")))
-      .run();
+    failPreparingExport(deps, exportId, "The account cannot receive an export.");
 
     await deps.objects.delete(objectKey);
 
@@ -391,11 +395,32 @@ export async function runExportBuildJob(deps: ExportServiceDeps, exportId: strin
         status: "ready",
         updatedAt: new Date(now),
       })
-      .where(and(eq(accountExports.id, exportId), eq(accountExports.status, "preparing")))
+      .where(
+        and(
+          eq(accountExports.id, exportId),
+          eq(accountExports.status, "preparing"),
+          exists(
+            deps.db
+              .select({ id: users.id })
+              .from(users)
+              .where(and(eq(users.id, row.userId), isNull(users.suspendedAt))),
+          ),
+        ),
+      )
       .returning({ id: accountExports.id })
       .all();
 
     if (updated.length === 0) {
+      const current = deps.db
+        .select({ suspendedAt: users.suspendedAt })
+        .from(users)
+        .where(eq(users.id, row.userId))
+        .get();
+
+      if (current === undefined || current.suspendedAt !== null) {
+        failPreparingExport(deps, exportId, "The account cannot receive an export.");
+      }
+
       await deps.objects.delete(objectKey);
 
       return;

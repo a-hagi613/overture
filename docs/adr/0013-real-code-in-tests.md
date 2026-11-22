@@ -51,10 +51,12 @@ a dated 5.5 model id is priced from the exact 5.5 row rather than the 4.5 haiku 
 is refused, #387), the Personio form reader (a server-rendered form's fields, required star, documents and
 unsupported controls are read without a browser), the provider and cost report (completion and cost divide
 distinct attempted Applications, so a failure-then-success retry counts once and an email-confirmed send counts as
-completed, while attempt counts and page-confirmed sends stay diagnostics, #417), and the email receipt match
+completed, while attempt counts and page-confirmed sends stay diagnostics, #417), the email receipt match
 (`outcomes.test.ts`: a Confirming Application is charged only by the one message that names its employer and role
 unambiguously, one message confirms at most one Application, and a replayed message never commits a second credit,
-#413). They
+#413), and the account erasure plan (`erase.test.ts`: the vendor profile ids, R2 prefixes and confirmation target are
+written before the user row goes, the confirmation is queued only after both external deletes confirm clean, a
+failure retries without consuming a job attempt, and a restart resumes the cleanup from the plan, #415). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
 depend on the runner. The mail count runs the real SQLite file and the real migrations, so the invariant is exercised
 against the shipped schema rather than a stand-in. CI stays under two minutes on pull requests: six shards balanced by

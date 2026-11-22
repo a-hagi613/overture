@@ -96,7 +96,9 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
   by lease expiry (§9.4).
 - After a restart the job worker stays quiet for `JOBS_STARTUP_SETTLE_MS` (5 s): the startup enqueues otherwise wake
   it in the same second the port opens and the new machine's first health checks compete with a full batch of jobs.
-  Nothing is dropped; the queued work starts a few seconds later.
+  Nothing is dropped; the queued work starts a few seconds later. `JOBS_AUTORUN=false` (test-only; refused in
+  production) starts the process without the worker, so an e2e test can drive each job through `/__test__/jobs/*`
+  without a live scheduler claiming it first.
 - The prerendered marketing pages (`/` and `/pricing`) are deployed as Workers Static Assets
   (`workers/marketing`, ADR 0033) on explicit routes for those paths only, so they stay up through those deploys.
   Every app and API path matches no Worker route and goes straight to `overture-web`; the app's HTML and assets are
@@ -269,6 +271,7 @@ other address only lowered and trimmed) · `session` · `account` (provider: goo
 | `browser_profiles` | user_id, provider, provider_profile_id, country_code, created_at, last_used_at; PK(user_id, provider) |
 | `mailboxes` | id (the forwarding id, `[a-z0-9]{8,32}`), user_id UNIQUE, local_part UNIQUE (the `in-{id}-{mac}` local part), status CHECK IN ('active','receive_only','closed'), receive_until NULL, first_forwarded_at NULL (set once by the first ATS mail that arrives; the API reads it as "forwarding works"), created_at |
 | `retired_addresses` | local_part PK, retired_at — **a local part is never reassigned** |
+| `account_erasures` | user_id PK (**no foreign key**: it outlives the `users` row), vendor_profiles JSON (`[{provider, providerProfileId}]`, shrinks as each is deleted), object_prefixes JSON, notice_name NULL, notice_to NULL, user_deleted_at, vendor_cleaned_at, objects_cleaned_at, notice_queued_at, last_error NULL, created_at, updated_at. The durable plan for one erasure: written in the transaction that deletes the account, so the vendor ids and prefixes survive the `browser_profiles` cascade; `notice_name`/`notice_to` are wiped as soon as the confirmation notice is queued |
 
 ### 5.3 Catalog
 
@@ -1286,14 +1289,26 @@ body, sender or attachment, so the admin never sees message content.
 - Encrypted: all `_enc` columns, resume files, mail HTML and attachments, exports.
 - **Delete account** (Settings → Delete account, re-auth): a signed-in session must have been created by a fresh sign-in (an
   emailed link, or Google or LinkedIn) in the last 15 minutes. The page offers "Email me a sign-in link"; there is no password check (ADR 0035).
-  The request queues one `account.erase` job.
-  The job deletes `user_keys` first (crypto-shredding), deletes Browser Use/Kernel profiles through the provider API,
-  retires the mailbox local part into `retired_addresses`, deletes R2 prefixes `files/{user_id}/`, `mail/{user_id}/`
-  and `exports/{user_id}/`, then cascade-deletes the user row (all remaining personal rows and the session). It keeps
-  only unlinked card fingerprints (M3) and admin audit rows. It completes within 24 h, sends the confirmation email,
-  and is idempotent across retries. The confirmation mail is queued as its own `account.deleted.notice`
-  job after the transaction, so a mail failure never leaves a keyless account behind. Backups and Litestream replicas keep only the shredded ciphertext
-  until normal rotation; without the wrapped key no copy is readable.
+  The request suspends the account, closes the mailbox, drops its sessions and queues one `account.erase` job.
+  In one transaction the job writes the durable `account_erasures` plan (every Browser Use/Kernel vendor profile id,
+  the R2 prefixes `files/{user_id}/`, `mail/{user_id}/` and `exports/{user_id}/`, and the name and address the
+  confirmation needs), deletes `user_keys` first (crypto-shredding), retires the mailbox local part into
+  `retired_addresses`, and cascade-deletes the user row (all remaining personal rows and the session). It then
+  deletes each vendor profile through the provider API and every object under the three prefixes, recording each
+  success on the plan; a profile the vendor already reports gone (404) counts as clean. It re-lists every prefix to
+  confirm nothing is left. If either external delete fails, the job is requeued without consuming an attempt every
+  minute (`RetryLaterError`), so a vendor outage or a restart keeps retrying until both are clean rather than losing
+  the profile ids with the cascade. Only after both are confirmed is the single `account.deleted.notice` job queued
+  (deduplicated per user) and the plan's name and address wiped, so a completed plan keeps only the opaque user id and
+  timestamps and a repeated erase is a no-op. It keeps only unlinked card fingerprints (M3) and admin audit rows. It
+  completes within 24 h when the vendors are reachable, and sends one confirmation email.
+- **Backups and replay window**: the erased account's ciphertext rows can remain in Litestream replicas and R2
+  backups until the normal rotation: the `overture-backups` bucket applies a 35-day lifecycle rule to the
+  `app.sqlite/` prefix and keeps nightly snapshots for 30 days (`retention: 720h`). Point-in-time replay or a restore
+  therefore brings back only keyless rows, because the wrapped key was destroyed first; a replay of a backup older
+  than the erasure cannot make them readable again. Object store deletes are not part of a database replay, so the
+  files, mail and exports stay deleted. The `account_erasures` row is not personal data after the notice is queued
+  and is not restored into anything readable.
 - **Export**: JSON (profile, facts, applications, snapshots, messages metadata + text) + resume + attachments, zipped,
   encrypted under a random per-export key that the server generates and wraps under the user's data key. The key is
   never stored in plaintext or logged; it reaches the page only with the download link (in its fragment), and the page
