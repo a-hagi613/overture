@@ -25,7 +25,12 @@ screen is drawn on the canvas first (ADR 0021).
 - **Placement**: a seventh destination after Inbox on the desktop nav, which amends ADR 0029's six. On the phone it is
   reached from Home and Board, not the tab bar, unless the board shows otherwise.
 - **Phone**: agenda list at 390 px; month grid from the tablet width up.
-- **Later, M4**: a read-only `.ics` feed on a revocable signed URL. No Google Calendar OAuth.
+- **M4, built (#297)**: a read-only `.ics` feed at `GET /calendar/<token>.ics`. The token is 32 random bytes; only its
+  SHA-256 is stored (`calendar_feed_tokens`), so it is shown once, when the feed is turned on or rotated. Rotating
+  replaces the hash and turning off deletes the row, so the old URL stops working at once; every failure is the same
+  404. The feed reuses the Calendar's item query, so it carries the same minimal fields (kind, job, employer, Stage) and
+  never mail text or answers. Interviews are timed; other items are all-day on the user's timezone date. The window is
+  180 days back to 365 days ahead. No Google Calendar OAuth.
 
 ## Considered Options
 
