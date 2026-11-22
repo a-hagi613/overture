@@ -686,6 +686,33 @@ export const liveCheckMail = sqliteTable(
   (t) => [index("live_check_mail_sent").on(t.sentAt)],
 );
 
+export const labRuns = sqliteTable(
+  "lab_runs",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id").notNull(),
+    provider: text("provider", { enum: ["browser_use", "kernel", "local"] }).notNull(),
+    page: text("page", { enum: ["recaptcha_v3", "hcaptcha", "turnstile", "form"] }).notNull(),
+    ats: text("ats"),
+    outcome: text("outcome", { enum: ["completed", "challenge_blocked", "error"] }).notNull(),
+    challengeSeen: integer("challenge_seen", { mode: "boolean" }).notNull().default(false),
+    codeAsked: integer("code_asked", { mode: "boolean" }).notNull().default(false),
+    captchaScore: real("captcha_score"),
+    durationMs: integer("duration_ms").notNull(),
+    proxyBytes: integer("proxy_bytes"),
+    costMicros: integer("cost_micros"),
+    sessionId: text("session_id"),
+    startedAt: integer("started_at").notNull(),
+    endedAt: integer("ended_at").notNull(),
+    errorCode: text("error_code"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [
+    index("lab_runs_provider_started").on(t.provider, t.startedAt),
+    index("lab_runs_run").on(t.runId),
+  ],
+);
+
 export const notifications = sqliteTable(
   "notifications",
   {
@@ -902,6 +929,32 @@ export const applicationEvents = sqliteTable(
     detail: text("detail"),
   },
   (t) => [index("application_events_application_at").on(t.applicationId, t.at)],
+);
+
+export const interviewEvents = sqliteTable(
+  "interview_events",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    messageId: text("message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    uid: text("uid").notNull(),
+    sequence: integer("sequence").notNull().default(0),
+    startsAt: integer("starts_at").notNull(),
+    endsAt: integer("ends_at"),
+    tz: text("tz"),
+    source: text("source", { enum: ["ics"] }).notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("interview_events_user_uid_unique").on(t.userId, t.uid),
+    index("interview_events_user_starts").on(t.userId, t.startsAt),
+    index("interview_events_message").on(t.messageId),
+  ],
 );
 
 export const attempts = sqliteTable(

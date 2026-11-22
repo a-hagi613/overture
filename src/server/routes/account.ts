@@ -1,6 +1,5 @@
 import { Hono } from "hono";
-import { and, eq } from "drizzle-orm";
-import { verifyPassword } from "better-auth/crypto";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AccountEraser } from "../account/erase.ts";
@@ -11,19 +10,13 @@ import type { Clock } from "../platform/ports/clock.ts";
 
 import { copy } from "../../shared/copy.ts";
 import { env } from "../config/env.ts";
-import { accounts, rateLimits, sessions } from "../platform/db/schema.ts";
+import { rateLimits, sessions } from "../platform/db/schema.ts";
 import { ERASURE_COMPLETES_WITHIN_MS, REAUTH_WINDOW_MS } from "../account/erase.ts";
 import { EXPORT_VALID_MS } from "../export/service.ts";
 
-const passwordSchema = z.object({ password: z.string().min(1).max(1024) });
 const deleteSchema = z.object({ confirm: z.literal(true) });
 
-const REAUTH_MAX_ATTEMPTS = 5;
 const LINK_MAX_ATTEMPTS = 3;
-
-function reauthLimitKey(userId: string) {
-  return `account-reauth:${userId}`;
-}
 
 function linkLimitKey(userId: string) {
   return `account-reauth-link:${userId}`;
@@ -48,16 +41,6 @@ export function createAccountRoutes(deps: {
     const result = await sessionOf(raw);
 
     return result?.user ?? null;
-  }
-
-  function passwordHashFor(userId: string) {
-    const row = db
-      .select({ password: accounts.password })
-      .from(accounts)
-      .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")))
-      .get();
-
-    return row?.password ?? null;
   }
 
   function sessionReauthenticated(sessionId: string, now: number) {
@@ -104,10 +87,6 @@ export function createAccountRoutes(deps: {
     db.update(rateLimits).set({ count, lastRequest: now }).where(eq(rateLimits.id, row.id)).run();
   }
 
-  function clearAttempts(key: string) {
-    db.delete(rateLimits).where(eq(rateLimits.key, key)).run();
-  }
-
   routes.get("/account/deletion", async (context) => {
     const result = await sessionOf(context.req.raw);
 
@@ -119,60 +98,8 @@ export function createAccountRoutes(deps: {
 
     return context.json({
       email: result.user.email,
-      hasPassword: passwordHashFor(result.user.id) !== null,
       reauthenticated: sessionReauthenticated(result.session.id, clock.now()),
     });
-  });
-
-  routes.post("/account/reauth", async (context) => {
-    const result = await sessionOf(context.req.raw);
-
-    if (result === null) {
-      return context.json({ error: "unauthorised" }, 401);
-    }
-
-    const body = passwordSchema.safeParse(await context.req.json().catch(() => null));
-
-    if (!body.success) {
-      return context.json({ error: "invalid_body" }, 400);
-    }
-
-    const now = clock.now();
-
-    if (tooManyAttempts(reauthLimitKey(result.user.id), now, REAUTH_MAX_ATTEMPTS)) {
-      return context.json({ error: "too_many", message: copy.deleteAccount.errors.tooMany }, 429);
-    }
-
-    const hash = passwordHashFor(result.user.id);
-
-    if (hash === null) {
-      return context.json(
-        { error: "password_not_set", message: copy.deleteAccount.errors.passwordNotSet },
-        409,
-      );
-    }
-
-    const verified = await verifyPassword({ hash, password: body.data.password }).catch(
-      () => false,
-    );
-
-    if (!verified) {
-      recordFailedAttempt(reauthLimitKey(result.user.id), now);
-
-      return context.json(
-        { error: "invalid_password", message: copy.deleteAccount.errors.wrongPassword },
-        403,
-      );
-    }
-
-    clearAttempts(reauthLimitKey(result.user.id));
-
-    db.update(sessions)
-      .set({ reauthAt: new Date(now), updatedAt: new Date(now) })
-      .where(eq(sessions.id, result.session.id))
-      .run();
-
-    return context.json({ reauthenticated: true });
   });
 
   routes.post("/account/reauth/link", async (context) => {

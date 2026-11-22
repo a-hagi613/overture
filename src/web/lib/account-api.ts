@@ -2,7 +2,6 @@ import { z } from "zod";
 
 const deletionStateSchema = z.object({
   email: z.string(),
-  hasPassword: z.boolean(),
   reauthenticated: z.boolean(),
 });
 
@@ -16,14 +15,6 @@ export async function fetchDeletionState() {
   }
 
   return deletionStateSchema.parse(await response.json());
-}
-
-export async function confirmPassword(password: string) {
-  return fetch("/api/account/reauth", {
-    body: JSON.stringify({ password }),
-    headers: { "content-type": "application/json" },
-    method: "POST",
-  });
 }
 
 export async function sendReauthLink() {

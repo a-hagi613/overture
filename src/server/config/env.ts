@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { turnstileScriptUrl } from "../../shared/turnstile.ts";
+import { DEFAULT_ANTHROPIC_MODEL } from "../platform/llm/models.ts";
 
 const booleanFromString = z.enum(["true", "false"]).transform((value) => value === "true");
 
@@ -76,6 +77,18 @@ const envSchema = z
           .filter((host) => host.length > 0),
       )
       .optional(),
+    LAB_BASE_URL: z.url().optional(),
+    LAB_RECAPTCHA_SCRIPT_URL: z.string().min(1).default("https://www.google.com/recaptcha/api.js"),
+    LAB_RECAPTCHA_SITE_KEY: z.string().min(1).default("lab-recaptcha-site-key"),
+    LAB_HCAPTCHA_SCRIPT_URL: z.string().min(1).default("https://js.hcaptcha.com/1/api.js"),
+    LAB_HCAPTCHA_SITE_KEY: z.string().min(1).default("lab-hcaptcha-site-key"),
+    LAB_TURNSTILE_SCRIPT_URL: z
+      .string()
+      .min(1)
+      .default("https://challenges.cloudflare.com/turnstile/v0/api.js"),
+    LAB_TURNSTILE_SITE_KEY: z.string().min(1).default("lab-turnstile-site-key"),
+    LAB_RECAPTCHA_VERIFY_URL: z.url().default("https://www.google.com/recaptcha/api/siteverify"),
+    LAB_RECAPTCHA_SECRET: z.string().min(1).optional(),
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
     LINKEDIN_CLIENT_ID: z.string().min(1).optional(),
@@ -146,7 +159,7 @@ const envSchema = z
       .default("ca"),
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     ANTHROPIC_BASE_URL: z.url().default("https://api.anthropic.com"),
-    ANTHROPIC_MODEL: z.string().min(1).default("claude-haiku-4-5"),
+    ANTHROPIC_MODEL: z.string().min(1).default(DEFAULT_ANTHROPIC_MODEL),
     FLY_APP_NAME: z.string().min(1).optional(),
     FLY_MACHINE_ID: z.string().min(1).optional(),
   })
@@ -264,5 +277,16 @@ export const databasePath = env.DATABASE_PATH ?? env.DATABASE_URL;
 
 export const turnstileHostnames =
   env.TURNSTILE_HOSTNAMES ?? turnstileDefaultHostnames(env.APP_ORIGIN);
+
+export const labBaseUrl = env.LAB_BASE_URL ?? env.APP_ORIGIN ?? null;
+
+export const labEnvironment = {
+  hcaptchaScriptUrl: env.LAB_HCAPTCHA_SCRIPT_URL,
+  hcaptchaSiteKey: env.LAB_HCAPTCHA_SITE_KEY,
+  recaptchaScriptUrl: env.LAB_RECAPTCHA_SCRIPT_URL,
+  recaptchaSiteKey: env.LAB_RECAPTCHA_SITE_KEY,
+  turnstileScriptUrl: env.LAB_TURNSTILE_SCRIPT_URL,
+  turnstileSiteKey: env.LAB_TURNSTILE_SITE_KEY,
+} as const;
 
 export type Env = z.infer<typeof envSchema>;

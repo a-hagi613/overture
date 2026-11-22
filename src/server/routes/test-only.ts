@@ -60,6 +60,8 @@ import { retryWhenBusy } from "../platform/db/busy.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 import { attachApplication, ensureOpenReview } from "../pipeline/review-store.ts";
 import { ensureApplyFailuresQueued } from "../notify/failure-digest.ts";
+import { createNotification } from "../notify/notifications.ts";
+import { NOTIFICATION_KINDS } from "../../shared/notifications.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
 import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
 import { createConsentService } from "../profile/consent.ts";
@@ -83,6 +85,11 @@ import {
   turnstileBrowserScenarioBody,
 } from "../testing/turnstile-browser-scenario.ts";
 import { turnstileBrowserStub } from "../testing/turnstile-browser-stub.ts";
+import {
+  labHcaptchaStub,
+  labRecaptchaStub,
+  labTurnstileStub,
+} from "../testing/lab-vendor-stubs.ts";
 import {
   emailSendingScenarios,
   setEmailSendingScenario,
@@ -114,6 +121,7 @@ import {
   applicationsLeft,
   commitForApplication,
   grantApplications,
+  releaseForApplication,
   reserveForApplication,
 } from "../billing/ledger.ts";
 
@@ -463,6 +471,11 @@ const ledgerApplicationBody = z.object({
   email: z.email(),
   applicationId: z.string().min(1),
   commit: z.boolean().default(false),
+});
+
+const ledgerReleaseBody = z.object({
+  email: z.email(),
+  applicationId: z.string().min(1),
 });
 
 const seedFactsBody = z.object({
@@ -1091,6 +1104,34 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
+  const emitNotificationBody = z.object({
+    email: z.string().min(1),
+    kind: z.enum(NOTIFICATION_KINDS),
+    title: z.string(),
+    body: z.string(),
+    url: z.string(),
+  });
+
+  routes.post("/notifications/emit", zValidator("json", emitNotificationBody), (context) => {
+    const body = context.req.valid("json");
+
+    const user = db.select().from(users).where(eq(users.email, body.email.toLowerCase())).get();
+
+    if (user === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    const id = createNotification(db, clock, {
+      body: body.body,
+      kind: body.kind,
+      title: body.title,
+      url: body.url,
+      userId: user.id,
+    });
+
+    return context.json({ id });
+  });
+
   routes.get("/push/subscriptions", zValidator("query", userQuery), (context) => {
     const { userId } = context.req.valid("query");
 
@@ -1201,6 +1242,21 @@ export function createTestRoutes(
       "content-type": "text/javascript; charset=utf-8",
     }),
   );
+
+  const labScripts = {
+    "lab-hcaptcha.js": labHcaptchaStub,
+    "lab-recaptcha.js": labRecaptchaStub,
+    "lab-turnstile.js": labTurnstileStub,
+  } as const;
+
+  for (const [name, source] of Object.entries(labScripts)) {
+    routes.get(`/${name}`, (context) =>
+      context.body(source, 200, {
+        "cache-control": "no-store",
+        "content-type": "text/javascript; charset=utf-8",
+      }),
+    );
+  }
 
   routes.post("/jobs/run-due", async (context) => {
     const ran = await runDueJobs(db, clock, handlers, singletonJobKinds);
@@ -2167,6 +2223,35 @@ export function createTestRoutes(
     return context.json({
       applicationsLeft: applicationsLeft(db, user.id, clock.now()),
       reserved: reserved.reserved,
+    });
+  });
+
+  routes.post("/ledger/release", zValidator("json", ledgerReleaseBody), async (context) => {
+    const { email, applicationId } = context.req.valid("json");
+
+    const user = db
+      .select()
+      .from(users)
+      .where(eq(users.email, lowercased(email)))
+      .get();
+
+    if (user === undefined) {
+      return context.json({ error: "not found" }, 404);
+    }
+
+    const released = await retryWhenBusy(
+      () =>
+        releaseForApplication(db, clock, {
+          applicationId,
+          idempotencyKey: `test-release:${user.id}:${applicationId}`,
+          userId: user.id,
+        }),
+      "test.ledger.release",
+    );
+
+    return context.json({
+      applicationsLeft: applicationsLeft(db, user.id, clock.now()),
+      released: released.released,
     });
   });
 

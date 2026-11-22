@@ -20,6 +20,7 @@ import type { AccountEraser } from "./account/erase.ts";
 import type { ExportService } from "./export/service.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
+import { createLabRoutes } from "./routes/lab.ts";
 import { createMeRoutes } from "./routes/me.ts";
 import { createApiRoutes } from "./routes/api.ts";
 import { createNotificationRoutes } from "./routes/notifications.ts";
@@ -34,7 +35,7 @@ import { createReviewRoutes } from "./routes/reviews.ts";
 import { createAdminApi, isAdminHost } from "./routes/admin.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
 import { stripUntrustedIpHeaders } from "./auth/client-ip.ts";
-import { env } from "./config/env.ts";
+import { env, labEnvironment } from "./config/env.ts";
 import { demoLocked } from "./demo/guard.ts";
 import { createProfileRoutes } from "./routes/profile.ts";
 import { createOnboardingRoutes } from "./routes/onboarding.ts";
@@ -43,7 +44,6 @@ import { createConsentService } from "./profile/consent.ts";
 import { createMatchingService } from "./matching/score.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
-import { createPasswordResetRoutes } from "./routes/password-reset.ts";
 import { createSupportAccessRoutes } from "./routes/support-access.ts";
 import { createAccountRoutes } from "./routes/account.ts";
 import { createBillingRoutes, createStripeWebhookRoutes } from "./routes/billing.ts";
@@ -80,16 +80,33 @@ async function staticResponseFrom(root: string, url: string) {
   const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/u, "");
   const resolvedRoot = resolve(root);
   const requested = resolve(resolvedRoot, relativePath);
-  const file = Bun.file(requested);
 
-  if (requested.startsWith(`${resolvedRoot}/`) && (await file.exists())) {
-    return new Response(file);
+  const candidates = requested.startsWith(`${resolvedRoot}/`)
+    ? [requested, join(requested, "index.html")]
+    : [];
+
+  const found = await Promise.all(
+    candidates.map(async (candidate) => ((await Bun.file(candidate).exists()) ? candidate : null)),
+  );
+
+  const match = found.find((candidate) => candidate !== null);
+
+  if (match !== undefined) {
+    return new Response(Bun.file(match));
   }
 
-  const fallback = Bun.file(join(resolvedRoot, "index.html"));
+  const shells = await Promise.all(
+    ["app-shell.html", "index.html"].map(async (name) => {
+      const shell = Bun.file(join(resolvedRoot, name));
 
-  if (await fallback.exists()) {
-    return new Response(fallback, { headers: { "content-type": "text/html; charset=utf-8" } });
+      return (await shell.exists()) ? shell : null;
+    }),
+  );
+
+  const shell = shells.find((candidate) => candidate !== null);
+
+  if (shell !== undefined) {
+    return new Response(shell, { headers: { "content-type": "text/html; charset=utf-8" } });
   }
 
   return null;
@@ -157,9 +174,17 @@ export function createApp(deps: AppDependencies) {
   app.all("/api/auth/*", async (context) =>
     deps.auth.handler(stripUntrustedIpHeaders(context.req.raw, clientIpConfig)),
   );
+  app.route(
+    "/lab",
+    createLabRoutes({
+      clock: deps.clock,
+      environment: labEnvironment,
+      recaptchaSecret: env.LAB_RECAPTCHA_SECRET,
+      recaptchaVerifyUrl: env.LAB_RECAPTCHA_VERIFY_URL,
+    }),
+  );
   app.route("/api", createHealthRoutes(deps.db, deps.backups));
   app.route("/api", createMeRoutes(deps.auth));
-  app.route("/api", createPasswordResetRoutes(deps.db, deps.clock));
   app.route("/api", createSupportAccessRoutes(deps.db, deps.auth));
   app.route("/api", createApiRoutes(deps.db, deps.clock, deps.auth));
   app.route("/api", createNotificationRoutes(deps.db, deps.clock, deps.auth));

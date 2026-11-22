@@ -5,7 +5,7 @@
  "viewport": 390,
  "page": {
   "width": 390,
-  "height": 2147
+  "height": 2086
  },
  "tokens": {
   "--bg2": "#1E1C19",
@@ -44,8 +44,8 @@
   "--donering": "#2A2723",
   "--line2": "rgba(242,237,228,.26)",
   "--inink": "#F2EDE4",
-  "--needbg": "#40261F",
   "--hl": "rgba(255,255,255,.04)",
+  "--needbg": "#40261F",
   "--need": "#E58A78",
   "--bloom": "rgba(255,255,255,.04)"
  },
@@ -57,14 +57,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 2147.2
+    "h": 2085.9
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "content-box",
     "width": "390px",
-    "height": "2147.19px",
+    "height": "2085.94px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -89,14 +89,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 2147.2
+    "h": 2085.9
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "content-box",
     "width": "390px",
-    "height": "2147.19px",
+    "height": "2085.94px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -121,78 +121,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 2147.2
-   },
-   "style": {
-    "display": "block",
-    "position": "static",
-    "box-sizing": "content-box",
-    "width": "390px",
-    "height": "2147.19px",
-    "flex-direction": "row",
-    "flex-wrap": "nowrap",
-    "flex-grow": "0",
-    "flex-shrink": "1",
-    "font-family": "\"Times New Roman\"",
-    "font-size": "16px",
-    "font-weight": "400",
-    "text-align": "start",
-    "color": "rgb(0, 0, 0)",
-    "border-top": "0px none rgb(0, 0, 0)",
-    "border-right": "0px none rgb(0, 0, 0)",
-    "border-bottom": "0px none rgb(0, 0, 0)",
-    "border-left": "0px none rgb(0, 0, 0)",
-    "opacity": "1",
-    "overflow": "visible"
-   }
-  },
-  {
-   "path": "div>div>div>div",
-   "tag": "div",
-   "box": {
-    "x": 0,
-    "y": 0,
-    "w": 390,
-    "h": 2147.2
-   },
-   "style": {
-    "display": "block",
-    "position": "static",
-    "box-sizing": "content-box",
-    "width": "390px",
-    "height": "2147.19px",
-    "flex-direction": "row",
-    "flex-wrap": "nowrap",
-    "flex-grow": "0",
-    "flex-shrink": "1",
-    "font-family": "\"Times New Roman\"",
-    "font-size": "16px",
-    "font-weight": "400",
-    "text-align": "start",
-    "color": "rgb(0, 0, 0)",
-    "border-top": "0px none rgb(0, 0, 0)",
-    "border-right": "0px none rgb(0, 0, 0)",
-    "border-bottom": "0px none rgb(0, 0, 0)",
-    "border-left": "0px none rgb(0, 0, 0)",
-    "opacity": "1",
-    "overflow": "visible"
-   }
-  },
-  {
-   "path": "div>div>div>div>div",
-   "tag": "div",
-   "box": {
-    "x": 0,
-    "y": 0,
-    "w": 390,
-    "h": 2147.2
+    "h": 2085.9
    },
    "style": {
     "display": "block",
     "position": "relative",
     "box-sizing": "content-box",
     "width": "390px",
-    "height": "2147.19px",
+    "height": "2085.94px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -213,7 +149,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(1)",
    "tag": "div",
    "box": {
     "x": 0,
@@ -247,7 +183,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(1)>svg:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(1)>svg:nth-of-type(2)",
    "tag": "svg",
    "box": {
     "x": 0,
@@ -280,7 +216,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(1)>svg:nth-of-type(2)>rect",
+   "path": "div>div>div>div:nth-of-type(1)>svg:nth-of-type(2)>rect",
    "tag": "rect",
    "box": {
     "x": 0,
@@ -313,7 +249,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(2)",
    "tag": "div",
    "box": {
     "x": -70,
@@ -349,20 +285,20 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)",
+   "path": "div>div>div>div:nth-of-type(3)",
    "tag": "div",
    "box": {
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 2083.2
+    "h": 2021.9
    },
    "style": {
     "display": "flex",
     "position": "relative",
     "box-sizing": "border-box",
     "width": "390px",
-    "height": "2083.19px",
+    "height": "2021.94px",
     "flex-direction": "row",
     "flex-wrap": "wrap",
     "align-items": "stretch",
@@ -384,20 +320,20 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main",
+   "path": "div>div>div>div:nth-of-type(3)>main",
    "tag": "main",
    "box": {
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 2083.2
+    "h": 2021.9
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
     "width": "390px",
-    "height": "2083.19px",
+    "height": "2021.94px",
     "padding-top": "18px",
     "padding-right": "16px",
     "padding-bottom": "28px",
@@ -422,7 +358,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header",
+   "path": "div>div>div>div:nth-of-type(3)>main>header",
    "tag": "header",
    "box": {
     "x": 16,
@@ -460,7 +396,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(1)",
    "tag": "div",
    "box": {
     "x": 16,
@@ -493,7 +429,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(1)>a",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(1)>a",
    "tag": "a",
    "text": "← Settings",
    "box": {
@@ -528,7 +464,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(1)>h1",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(1)>h1",
    "tag": "h1",
    "text": "Delete your",
    "box": {
@@ -564,7 +500,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(1)>h1>span",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(1)>h1>span",
    "tag": "span",
    "text": "account",
    "box": {
@@ -598,7 +534,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(1)>p",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(1)>p",
    "tag": "p",
    "text": "Permanent, and it cannot be undone",
    "box": {
@@ -635,7 +571,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)",
    "tag": "div",
    "box": {
     "x": 16,
@@ -674,7 +610,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>label",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>label",
    "tag": "label",
    "box": {
     "x": 16,
@@ -716,7 +652,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>label>svg",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>label>svg",
    "tag": "svg",
    "box": {
     "x": 29,
@@ -749,7 +685,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>label>svg>circle",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>label>svg>circle",
    "tag": "circle",
    "box": {
     "x": 31.7,
@@ -780,7 +716,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>label>svg>path",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>label>svg>path",
    "tag": "path",
    "box": {
     "x": 39.7,
@@ -811,7 +747,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>label>input",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>label>input",
    "tag": "input",
    "aria": "Search",
    "box": {
@@ -849,7 +785,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(1)",
    "tag": "button",
    "aria": "Switch to light mode",
    "box": {
@@ -890,7 +826,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(1)>svg:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(1)>svg:nth-of-type(2)",
    "tag": "svg",
    "box": {
     "x": 343,
@@ -922,7 +858,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(1)>svg:nth-of-type(2)>circle",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(1)>svg:nth-of-type(2)>circle",
    "tag": "circle",
    "box": {
     "x": 349,
@@ -952,7 +888,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(1)>svg:nth-of-type(2)>path",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(1)>svg:nth-of-type(2)>path",
    "tag": "path",
    "box": {
     "x": 344.5,
@@ -982,7 +918,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(2)",
    "tag": "button",
    "aria": "Notifications, 3 unread",
    "box": {
@@ -1023,7 +959,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(2)>svg",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(2)>svg",
    "tag": "svg",
    "box": {
     "x": 287,
@@ -1055,7 +991,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(2)>svg>path:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(2)>svg>path:nth-of-type(1)",
    "tag": "path",
    "box": {
     "x": 290.4,
@@ -1085,7 +1021,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(2)>svg>path:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(2)>svg>path:nth-of-type(2)",
    "tag": "path",
    "box": {
     "x": 294.5,
@@ -1115,7 +1051,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(2)>span",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>button:nth-of-type(2)>span",
    "tag": "span",
    "text": "3",
    "box": {
@@ -1153,7 +1089,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>a",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>a",
    "tag": "a",
    "aria": "Settings",
    "box": {
@@ -1191,7 +1127,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>a>span",
+   "path": "div>div>div>div:nth-of-type(3)>main>header>div:nth-of-type(2)>a>span",
    "tag": "span",
    "text": "MO",
    "box": {
@@ -1227,7 +1163,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>nav",
+   "path": "div>div>div>div:nth-of-type(3)>main>nav",
    "tag": "nav",
    "aria": "Settings pages",
    "box": {
@@ -1265,7 +1201,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>nav>a:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>nav>a:nth-of-type(1)",
    "tag": "a",
    "text": "Notifications",
    "box": {
@@ -1307,7 +1243,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>nav>a:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>nav>a:nth-of-type(2)",
    "tag": "a",
    "text": "Export",
    "box": {
@@ -1349,7 +1285,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>nav>a:nth-of-type(3)",
+   "path": "div>div>div>div:nth-of-type(3)>main>nav>a:nth-of-type(3)",
    "tag": "a",
    "text": "Delete account",
    "box": {
@@ -1391,7 +1327,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>nav>a:nth-of-type(4)",
+   "path": "div>div>div>div:nth-of-type(3)>main>nav>a:nth-of-type(4)",
    "tag": "a",
    "text": "Support access",
    "box": {
@@ -1433,7 +1369,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>nav>a:nth-of-type(5)",
+   "path": "div>div>div>div:nth-of-type(3)>main>nav>a:nth-of-type(5)",
    "tag": "a",
    "text": "Terms and privacy",
    "box": {
@@ -1475,20 +1411,20 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div",
+   "path": "div>div>div>div:nth-of-type(3)>main>div",
    "tag": "div",
    "box": {
     "x": 16,
     "y": 369.1,
     "w": 358,
-    "h": 1686.1
+    "h": 1624.8
    },
    "style": {
     "display": "flex",
     "position": "static",
     "box-sizing": "border-box",
     "width": "358px",
-    "height": "1686.09px",
+    "height": "1624.84px",
     "margin-top": "28px",
     "gap": "20px",
     "row-gap": "20px",
@@ -1512,7 +1448,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)",
    "tag": "div",
    "box": {
     "x": 16,
@@ -1545,7 +1481,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>p",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>p",
    "tag": "p",
    "text": "1 · Before you start",
    "box": {
@@ -1581,7 +1517,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section",
    "tag": "section",
    "box": {
     "x": 16,
@@ -1621,7 +1557,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(1)",
    "tag": "div",
    "box": {
     "x": 33,
@@ -1659,7 +1595,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(1)>h2",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(1)>h2",
    "tag": "h2",
    "text": "This erases everything",
    "box": {
@@ -1694,7 +1630,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)",
    "tag": "div",
    "box": {
     "x": 33,
@@ -1734,7 +1670,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>p:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>p:nth-of-type(1)",
    "tag": "p",
    "text": "Deleting your account can’t be undone.",
    "box": {
@@ -1768,7 +1704,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>p:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>p:nth-of-type(2)",
    "tag": "p",
    "text": "These are erased:",
    "box": {
@@ -1803,7 +1739,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>ul",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>ul",
    "tag": "ul",
    "box": {
     "x": 52,
@@ -1838,7 +1774,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>ul>li:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>ul>li:nth-of-type(1)",
    "tag": "li",
    "text": "Your facts, resume and cover letters",
    "box": {
@@ -1872,7 +1808,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>ul>li:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>ul>li:nth-of-type(2)",
    "tag": "li",
    "text": "Every Application, its history and its messages",
    "box": {
@@ -1906,7 +1842,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>ul>li:nth-of-type(3)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>ul>li:nth-of-type(3)",
    "tag": "li",
    "text": "Stored files and attachments",
    "box": {
@@ -1940,7 +1876,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>ul>li:nth-of-type(4)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>ul>li:nth-of-type(4)",
    "tag": "li",
    "text": "Your saved preferences and push subscriptions",
    "box": {
@@ -1974,7 +1910,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>p:nth-of-type(3)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>p:nth-of-type(3)",
    "tag": "p",
    "text": "will never be given to anyone else, and it is never reused.",
    "box": {
@@ -2009,7 +1945,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>p:nth-of-type(3)>strong",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>p:nth-of-type(3)>strong",
    "tag": "strong",
    "text": "Your forwarding address is retired forever.",
    "box": {
@@ -2041,7 +1977,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>p:nth-of-type(3)>span",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(2)>p:nth-of-type(3)>span",
    "tag": "span",
    "text": "in-…@tryoverture.com",
    "box": {
@@ -2073,7 +2009,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>p",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>p",
    "tag": "p",
    "text": "Erasing completes within 24 hours. You get a confirmation email when it is done.",
    "box": {
@@ -2108,7 +2044,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(3)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(3)",
    "tag": "div",
    "box": {
     "x": 33,
@@ -2145,7 +2081,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(3)>button",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(3)>button",
    "tag": "button",
    "text": "Continue to delete",
    "box": {
@@ -2186,7 +2122,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(3)>a",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(1)>section>div:nth-of-type(3)>a",
    "tag": "a",
    "text": "Keep my account",
    "box": {
@@ -2227,20 +2163,20 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)",
    "tag": "div",
    "box": {
     "x": 16,
     "y": 904,
     "w": 358,
-    "h": 285.3
+    "h": 224
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
     "width": "358px",
-    "height": "285.297px",
+    "height": "224.047px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -2260,7 +2196,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>p",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>p",
    "tag": "p",
    "text": "2 · Confirm it’s you",
    "box": {
@@ -2296,20 +2232,20 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section",
    "tag": "section",
    "box": {
     "x": 16,
     "y": 927,
     "w": 358,
-    "h": 262.3
+    "h": 201
    },
    "style": {
     "display": "flex",
     "position": "static",
     "box-sizing": "border-box",
     "width": "358px",
-    "height": "262.297px",
+    "height": "201.047px",
     "padding-top": "20px",
     "padding-right": "16px",
     "padding-bottom": "22px",
@@ -2336,7 +2272,7 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>div:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>div:nth-of-type(1)",
    "tag": "div",
    "box": {
     "x": 33,
@@ -2374,20 +2310,20 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>div:nth-of-type(1)>h2",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>div:nth-of-type(1)>h2",
    "tag": "h2",
-   "text": "Enter your password",
+   "text": "Confirm it’s you",
    "box": {
     "x": 33,
     "y": 948,
-    "w": 194.3,
+    "w": 148.8,
     "h": 30.8
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
-    "width": "194.344px",
+    "width": "148.766px",
     "height": "30.7969px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
@@ -2409,21 +2345,21 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>p",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>p",
    "tag": "p",
-   "text": "Deleting needs a fresh check. Enter the password you sign in with.",
+   "text": "Deleting needs a fresh sign-in. We email you a link that works once. Open it on this device, then come back here.",
    "box": {
     "x": 33,
     "y": 986.8,
     "w": 324,
-    "h": 37.5
+    "h": 56.3
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
     "width": "324px",
-    "height": "37.5px",
+    "height": "56.25px",
     "margin-top": "8px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
@@ -2444,158 +2380,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>div:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>div:nth-of-type(2)",
    "tag": "div",
    "box": {
     "x": 33,
-    "y": 1038.3,
-    "w": 324,
-    "h": 66
-   },
-   "style": {
-    "display": "block",
-    "position": "static",
-    "box-sizing": "border-box",
-    "width": "324px",
-    "height": "66px",
-    "margin-top": "14px",
-    "flex-direction": "row",
-    "flex-wrap": "nowrap",
-    "flex-grow": "0",
-    "flex-shrink": "1",
-    "font-family": "\"Plus Jakarta Sans\", system-ui, sans-serif",
-    "font-size": "14px",
-    "font-weight": "400",
-    "line-height": "21px",
-    "text-align": "start",
-    "color": "rgb(242, 237, 228)",
-    "border-top": "0px none rgb(242, 237, 228)",
-    "border-right": "0px none rgb(242, 237, 228)",
-    "border-bottom": "0px none rgb(242, 237, 228)",
-    "border-left": "0px none rgb(242, 237, 228)",
-    "opacity": "1",
-    "overflow": "visible"
-   }
-  },
-  {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>div:nth-of-type(2)>label",
-   "tag": "label",
-   "text": "Password",
-   "box": {
-    "x": 33,
-    "y": 1038.3,
-    "w": 324,
-    "h": 16
-   },
-   "style": {
-    "display": "block",
-    "position": "static",
-    "box-sizing": "border-box",
-    "width": "324px",
-    "height": "16px",
-    "margin-bottom": "6px",
-    "flex-direction": "row",
-    "flex-wrap": "nowrap",
-    "flex-grow": "0",
-    "flex-shrink": "1",
-    "font-family": "\"Plus Jakarta Sans\", sans-serif",
-    "font-size": "12.5px",
-    "font-weight": "600",
-    "text-align": "start",
-    "color": "rgb(242, 237, 228)",
-    "border-top": "0px none rgb(242, 237, 228)",
-    "border-right": "0px none rgb(242, 237, 228)",
-    "border-bottom": "0px none rgb(242, 237, 228)",
-    "border-left": "0px none rgb(242, 237, 228)",
-    "opacity": "1",
-    "overflow": "visible"
-   }
-  },
-  {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>div:nth-of-type(2)>div",
-   "tag": "div",
-   "box": {
-    "x": 33,
-    "y": 1060.3,
-    "w": 324,
-    "h": 44
-   },
-   "style": {
-    "display": "flex",
-    "position": "static",
-    "box-sizing": "border-box",
-    "width": "324px",
-    "height": "44px",
-    "padding-right": "12px",
-    "padding-left": "12px",
-    "gap": "10px",
-    "row-gap": "10px",
-    "column-gap": "10px",
-    "flex-direction": "row",
-    "flex-wrap": "nowrap",
-    "align-items": "center",
-    "flex-grow": "1",
-    "flex-shrink": "1",
-    "flex-basis": "100%",
-    "font-family": "\"Plus Jakarta Sans\", system-ui, sans-serif",
-    "font-size": "14px",
-    "font-weight": "400",
-    "line-height": "21px",
-    "text-align": "start",
-    "color": "rgb(242, 237, 228)",
-    "background-color": "rgb(34, 31, 28)",
-    "border-top": "1px solid rgba(242, 237, 228, 0.26)",
-    "border-right": "1px solid rgba(242, 237, 228, 0.26)",
-    "border-bottom": "1px solid rgba(242, 237, 228, 0.26)",
-    "border-left": "1px solid rgba(242, 237, 228, 0.26)",
-    "border-radius": "6px",
-    "opacity": "1",
-    "overflow": "visible"
-   }
-  },
-  {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>div:nth-of-type(2)>div>input",
-   "tag": "input",
-   "box": {
-    "x": 46,
-    "y": 1072.8,
-    "w": 298,
-    "h": 19
-   },
-   "style": {
-    "display": "block",
-    "position": "static",
-    "box-sizing": "border-box",
-    "width": "298px",
-    "height": "19px",
-    "padding-top": "1px",
-    "padding-right": "2px",
-    "padding-bottom": "1px",
-    "padding-left": "2px",
-    "flex-direction": "row",
-    "flex-wrap": "nowrap",
-    "flex-grow": "1",
-    "flex-shrink": "1",
-    "flex-basis": "0%",
-    "font-family": "\"Plus Jakarta Sans\", sans-serif",
-    "font-size": "13.5px",
-    "font-weight": "500",
-    "text-align": "start",
-    "color": "rgb(242, 237, 228)",
-    "border-top": "0px none rgb(242, 237, 228)",
-    "border-right": "0px none rgb(242, 237, 228)",
-    "border-bottom": "0px none rgb(242, 237, 228)",
-    "border-left": "0px none rgb(242, 237, 228)",
-    "opacity": "1",
-    "overflow": "clip"
-   }
-  },
-  {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>div:nth-of-type(3)",
-   "tag": "div",
-   "box": {
-    "x": 33,
-    "y": 1122.3,
+    "y": 1061.1,
     "w": 324,
     "h": 44
    },
@@ -2629,20 +2418,20 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>div:nth-of-type(3)>button",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>div:nth-of-type(2)>button",
    "tag": "button",
-   "text": "Confirm",
+   "text": "Email me a sign-in link",
    "box": {
     "x": 33,
-    "y": 1122.3,
-    "w": 90,
+    "y": 1061.1,
+    "w": 176,
     "h": 44
    },
    "style": {
     "display": "flex",
     "position": "static",
     "box-sizing": "border-box",
-    "width": "90px",
+    "width": "176px",
     "height": "44px",
     "padding-right": "18px",
     "padding-left": "18px",
@@ -2672,52 +2461,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(2)>section>div:nth-of-type(3)>a",
-   "tag": "a",
-   "text": "Send a sign-in link instead",
-   "box": {
-    "x": 133,
-    "y": 1122.3,
-    "w": 196,
-    "h": 44
-   },
-   "style": {
-    "display": "flex",
-    "position": "static",
-    "box-sizing": "border-box",
-    "width": "196px",
-    "height": "44px",
-    "padding-right": "14px",
-    "padding-left": "14px",
-    "gap": "8px",
-    "row-gap": "8px",
-    "column-gap": "8px",
-    "flex-direction": "row",
-    "flex-wrap": "nowrap",
-    "justify-content": "center",
-    "align-items": "center",
-    "flex-grow": "0",
-    "flex-shrink": "1",
-    "font-family": "\"Plus Jakarta Sans\", sans-serif",
-    "font-size": "13.5px",
-    "font-weight": "600",
-    "text-align": "start",
-    "color": "rgb(242, 237, 228)",
-    "border-top": "1px solid rgba(0, 0, 0, 0)",
-    "border-right": "1px solid rgba(0, 0, 0, 0)",
-    "border-bottom": "1px solid rgba(0, 0, 0, 0)",
-    "border-left": "1px solid rgba(0, 0, 0, 0)",
-    "border-radius": "6px",
-    "opacity": "1",
-    "overflow": "visible"
-   }
-  },
-  {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)",
    "tag": "div",
    "box": {
     "x": 16,
-    "y": 1209.3,
+    "y": 1148.1,
     "w": 358,
     "h": 213.8
    },
@@ -2746,12 +2494,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>p",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>p",
    "tag": "p",
    "text": "3 · Confirm",
    "box": {
     "x": 16,
-    "y": 1209.3,
+    "y": 1148.1,
     "w": 358,
     "h": 13
    },
@@ -2782,11 +2530,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section",
    "tag": "section",
    "box": {
     "x": 16,
-    "y": 1232.3,
+    "y": 1171.1,
     "w": 358,
     "h": 190.8
    },
@@ -2822,11 +2570,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(1)",
    "tag": "div",
    "box": {
     "x": 33,
-    "y": 1253.3,
+    "y": 1192.1,
     "w": 324,
     "h": 30.8
    },
@@ -2860,12 +2608,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(1)>h2",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(1)>h2",
    "tag": "h2",
    "text": "Delete account",
    "box": {
     "x": 33,
-    "y": 1253.3,
+    "y": 1192.1,
     "w": 134,
     "h": 30.8
    },
@@ -2895,11 +2643,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(2)",
    "tag": "div",
    "box": {
     "x": 33,
-    "y": 1296.1,
+    "y": 1234.9,
     "w": 324,
     "h": 104
    },
@@ -2929,11 +2677,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(2)>label",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(2)>label",
    "tag": "label",
    "box": {
     "x": 33,
-    "y": 1296.1,
+    "y": 1234.9,
     "w": 324,
     "h": 42
    },
@@ -2966,11 +2714,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(2)>label>input",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(2)>label>input",
    "tag": "input",
    "box": {
     "x": 37,
-    "y": 1300.1,
+    "y": 1238.9,
     "w": 13,
     "h": 18
    },
@@ -3002,12 +2750,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(2)>label>span",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(2)>label>span",
    "tag": "span",
    "text": "I understand my data is erased, and my forwarding address is retired forever.",
    "box": {
     "x": 65,
-    "y": 1296.1,
+    "y": 1234.9,
     "w": 292,
     "h": 42
    },
@@ -3036,11 +2784,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(2)>div",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(2)>div",
    "tag": "div",
    "box": {
     "x": 33,
-    "y": 1356.1,
+    "y": 1294.9,
     "w": 324,
     "h": 44
    },
@@ -3073,12 +2821,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(2)>div>button",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(2)>div>button",
    "tag": "button",
    "text": "Delete my account",
    "box": {
     "x": 33,
-    "y": 1356.1,
+    "y": 1294.9,
     "w": 154,
     "h": 44
    },
@@ -3115,12 +2863,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(2)>div>a",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(3)>section>div:nth-of-type(2)>div>a",
    "tag": "a",
    "text": "Cancel",
    "box": {
     "x": 197,
-    "y": 1356.1,
+    "y": 1294.9,
     "w": 75,
     "h": 44
    },
@@ -3156,11 +2904,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)",
    "tag": "div",
    "box": {
     "x": 16,
-    "y": 1443.1,
+    "y": 1381.9,
     "w": 358,
     "h": 199
    },
@@ -3189,12 +2937,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)>p",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)>p",
    "tag": "p",
    "text": "4 · Erasing",
    "box": {
     "x": 16,
-    "y": 1443.1,
+    "y": 1381.9,
     "w": 358,
     "h": 13
    },
@@ -3225,11 +2973,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)>section",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)>section",
    "tag": "section",
    "box": {
     "x": 16,
-    "y": 1466.1,
+    "y": 1404.9,
     "w": 358,
     "h": 176
    },
@@ -3265,11 +3013,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)>section>div:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)>section>div:nth-of-type(1)",
    "tag": "div",
    "box": {
     "x": 33,
-    "y": 1487.1,
+    "y": 1425.9,
     "w": 324,
     "h": 30.8
    },
@@ -3303,12 +3051,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)>section>div:nth-of-type(1)>h2",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)>section>div:nth-of-type(1)>h2",
    "tag": "h2",
    "text": "Erasing your account",
    "box": {
     "x": 33,
-    "y": 1487.1,
+    "y": 1425.9,
     "w": 195.2,
     "h": 30.8
    },
@@ -3338,12 +3086,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)>section>div:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)>section>div:nth-of-type(2)",
    "tag": "div",
    "role": "status",
    "box": {
     "x": 33,
-    "y": 1529.9,
+    "y": 1468.7,
     "w": 324,
     "h": 89.3
    },
@@ -3373,12 +3121,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)>section>div:nth-of-type(2)>span",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)>section>div:nth-of-type(2)>span",
    "tag": "span",
    "text": "Erasing within 24 hours",
    "box": {
     "x": 33,
-    "y": 1531.9,
+    "y": 1470.7,
     "w": 149,
     "h": 19
    },
@@ -3416,12 +3164,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)>section>div:nth-of-type(2)>p",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(4)>section>div:nth-of-type(2)>p",
    "tag": "p",
    "text": "Your data is being erased now. It will be gone within 24 hours and this can’t be undone. You don’t need to do anything else.",
    "box": {
     "x": 33,
-    "y": 1562.9,
+    "y": 1501.7,
     "w": 324,
     "h": 56.3
    },
@@ -3451,11 +3199,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)",
    "tag": "div",
    "box": {
     "x": 16,
-    "y": 1662.2,
+    "y": 1600.9,
     "w": 358,
     "h": 393
    },
@@ -3484,12 +3232,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>p",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>p",
    "tag": "p",
    "text": "5 · Confirmation email",
    "box": {
     "x": 16,
-    "y": 1662.2,
+    "y": 1600.9,
     "w": 358,
     "h": 13
    },
@@ -3520,11 +3268,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section",
    "tag": "section",
    "box": {
     "x": 16,
-    "y": 1685.2,
+    "y": 1623.9,
     "w": 358,
     "h": 370
    },
@@ -3560,11 +3308,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(1)",
    "tag": "div",
    "box": {
     "x": 33,
-    "y": 1706.2,
+    "y": 1644.9,
     "w": 324,
     "h": 30.8
    },
@@ -3598,12 +3346,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(1)>h2",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(1)>h2",
    "tag": "h2",
    "text": "What arrives when it is done",
    "box": {
     "x": 33,
-    "y": 1706.2,
+    "y": 1644.9,
     "w": 263.1,
     "h": 30.8
    },
@@ -3633,11 +3381,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)",
    "tag": "div",
    "box": {
     "x": 33,
-    "y": 1749,
+    "y": 1687.7,
     "w": 324,
     "h": 283.2
    },
@@ -3669,11 +3417,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(1)",
    "tag": "div",
    "box": {
     "x": 34,
-    "y": 1750,
+    "y": 1688.7,
     "w": 322,
     "h": 62.5
    },
@@ -3706,12 +3454,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(1)>div:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(1)>div:nth-of-type(1)",
    "tag": "div",
    "text": "Overture <no-reply@tryoverture.com>",
    "box": {
     "x": 50,
-    "y": 1762,
+    "y": 1700.7,
     "w": 290,
     "h": 18.8
    },
@@ -3740,12 +3488,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(1)>div:nth-of-type(1)>strong",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(1)>div:nth-of-type(1)>strong",
    "tag": "strong",
    "text": "From",
    "box": {
     "x": 50,
-    "y": 1763,
+    "y": 1701.7,
     "w": 32,
     "h": 16
    },
@@ -3772,12 +3520,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(1)>div:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(1)>div:nth-of-type(2)",
    "tag": "div",
    "text": "Your Overture account has been deleted",
    "box": {
     "x": 50,
-    "y": 1780.7,
+    "y": 1719.5,
     "w": 290,
     "h": 18.8
    },
@@ -3806,12 +3554,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(1)>div:nth-of-type(2)>strong",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(1)>div:nth-of-type(2)>strong",
    "tag": "strong",
    "text": "Subject",
    "box": {
     "x": 50,
-    "y": 1781.7,
+    "y": 1720.5,
     "w": 47,
     "h": 16
    },
@@ -3838,11 +3586,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(2)",
    "tag": "div",
    "box": {
     "x": 34,
-    "y": 1812.5,
+    "y": 1751.2,
     "w": 322,
     "h": 218.7
    },
@@ -3875,12 +3623,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(2)>p:nth-of-type(1)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(2)>p:nth-of-type(1)",
    "tag": "p",
    "text": "Hi Maya,",
    "box": {
     "x": 50,
-    "y": 1828.5,
+    "y": 1767.2,
     "w": 290,
     "h": 22.4
    },
@@ -3909,12 +3657,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(2)>p:nth-of-type(2)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(2)>p:nth-of-type(2)",
    "tag": "p",
    "text": "Your Overture account and its data have been erased. Your forwarding address is retired and will not be used again.",
    "box": {
     "x": 50,
-    "y": 1860.8,
+    "y": 1799.6,
     "w": 290,
     "h": 67.2
    },
@@ -3944,12 +3692,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(2)>p:nth-of-type(3)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(2)>p:nth-of-type(3)",
    "tag": "p",
    "text": "If you didn’t ask for this, write to admin@tryoverture.com as soon as you can.",
    "box": {
     "x": 50,
-    "y": 1938,
+    "y": 1876.8,
     "w": 290,
     "h": 44.8
    },
@@ -3979,12 +3727,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(2)>p:nth-of-type(4)",
+   "path": "div>div>div>div:nth-of-type(3)>main>div>div:nth-of-type(5)>section>div:nth-of-type(2)>div:nth-of-type(2)>p:nth-of-type(4)",
    "tag": "p",
    "text": "Overture",
    "box": {
     "x": 50,
-    "y": 1992.8,
+    "y": 1931.5,
     "w": 290,
     "h": 22.4
    },
@@ -4014,12 +3762,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav",
+   "path": "div>div>div>nav",
    "tag": "nav",
    "aria": "Main",
    "box": {
     "x": 0,
-    "y": 2083.2,
+    "y": 2021.9,
     "w": 390,
     "h": 64
    },
@@ -4051,12 +3799,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(1)",
+   "path": "div>div>div>nav>a:nth-of-type(1)",
    "tag": "a",
    "text": "Home",
    "box": {
     "x": 0,
-    "y": 2084.2,
+    "y": 2022.9,
     "w": 65,
     "h": 63
    },
@@ -4091,11 +3839,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(1)>svg",
+   "path": "div>div>div>nav>a:nth-of-type(1)>svg",
    "tag": "svg",
    "box": {
     "x": 22,
-    "y": 2095.8,
+    "y": 2034.6,
     "w": 21,
     "h": 21
    },
@@ -4124,11 +3872,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(1)>svg>path:nth-of-type(1)",
+   "path": "div>div>div>nav>a:nth-of-type(1)>svg>path:nth-of-type(1)",
    "tag": "path",
    "box": {
     "x": 25.5,
-    "y": 2099.3,
+    "y": 2038.1,
     "w": 14,
     "h": 6.1
    },
@@ -4155,11 +3903,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(1)>svg>path:nth-of-type(2)",
+   "path": "div>div>div>nav>a:nth-of-type(1)>svg>path:nth-of-type(2)",
    "tag": "path",
    "box": {
     "x": 27.3,
-    "y": 2104.6,
+    "y": 2043.3,
     "w": 10.5,
     "h": 8.8
    },
@@ -4186,12 +3934,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(2)",
+   "path": "div>div>div>nav>a:nth-of-type(2)",
    "tag": "a",
    "text": "Ready",
    "box": {
     "x": 65,
-    "y": 2084.2,
+    "y": 2022.9,
     "w": 65,
     "h": 63
    },
@@ -4226,11 +3974,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(2)>svg",
+   "path": "div>div>div>nav>a:nth-of-type(2)>svg",
    "tag": "svg",
    "box": {
     "x": 87,
-    "y": 2095.8,
+    "y": 2034.6,
     "w": 21,
     "h": 21
    },
@@ -4259,11 +4007,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(2)>svg>path",
+   "path": "div>div>div>nav>a:nth-of-type(2)>svg>path",
    "tag": "path",
    "box": {
     "x": 89.6,
-    "y": 2098.4,
+    "y": 2037.2,
     "w": 15.8,
     "h": 15.8
    },
@@ -4290,12 +4038,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(2)>span",
+   "path": "div>div>div>nav>a:nth-of-type(2)>span",
    "tag": "span",
    "text": "2",
    "box": {
     "x": 103.5,
-    "y": 2089.2,
+    "y": 2027.9,
     "w": 16,
     "h": 16
    },
@@ -4331,12 +4079,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(3)",
+   "path": "div>div>div>nav>a:nth-of-type(3)",
    "tag": "a",
    "text": "Board",
    "box": {
     "x": 130,
-    "y": 2084.2,
+    "y": 2022.9,
     "w": 65,
     "h": 63
    },
@@ -4371,11 +4119,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(3)>svg",
+   "path": "div>div>div>nav>a:nth-of-type(3)>svg",
    "tag": "svg",
    "box": {
     "x": 152,
-    "y": 2095.8,
+    "y": 2034.6,
     "w": 21,
     "h": 21
    },
@@ -4404,11 +4152,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(3)>svg>rect:nth-of-type(1)",
+   "path": "div>div>div>nav>a:nth-of-type(3)>svg>rect:nth-of-type(1)",
    "tag": "rect",
    "box": {
     "x": 154.6,
-    "y": 2099.3,
+    "y": 2038.1,
     "w": 4.4,
     "h": 14
    },
@@ -4437,11 +4185,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(3)>svg>rect:nth-of-type(2)",
+   "path": "div>div>div>nav>a:nth-of-type(3)>svg>rect:nth-of-type(2)",
    "tag": "rect",
    "box": {
     "x": 160.8,
-    "y": 2099.3,
+    "y": 2038.1,
     "w": 4.4,
     "h": 8.8
    },
@@ -4470,11 +4218,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(3)>svg>rect:nth-of-type(3)",
+   "path": "div>div>div>nav>a:nth-of-type(3)>svg>rect:nth-of-type(3)",
    "tag": "rect",
    "box": {
     "x": 166.9,
-    "y": 2099.3,
+    "y": 2038.1,
     "w": 3.5,
     "h": 11.4
    },
@@ -4503,13 +4251,13 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(4)",
+   "path": "div>div>div>nav>a:nth-of-type(4)",
    "tag": "a",
    "text": "Review",
    "aria": "Review, 4 waiting",
    "box": {
     "x": 195,
-    "y": 2084.2,
+    "y": 2022.9,
     "w": 65,
     "h": 63
    },
@@ -4544,11 +4292,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(4)>svg",
+   "path": "div>div>div>nav>a:nth-of-type(4)>svg",
    "tag": "svg",
    "box": {
     "x": 217,
-    "y": 2095.8,
+    "y": 2034.6,
     "w": 21,
     "h": 21
    },
@@ -4577,11 +4325,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(4)>svg>circle",
+   "path": "div>div>div>nav>a:nth-of-type(4)>svg>circle",
    "tag": "circle",
    "box": {
     "x": 219.6,
-    "y": 2098.4,
+    "y": 2037.2,
     "w": 15.8,
     "h": 15.8
    },
@@ -4608,11 +4356,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(4)>svg>path",
+   "path": "div>div>div>nav>a:nth-of-type(4)>svg>path",
    "tag": "path",
    "box": {
     "x": 225.3,
-    "y": 2102.1,
+    "y": 2040.9,
     "w": 4.4,
     "h": 8.5
    },
@@ -4639,12 +4387,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(4)>span",
+   "path": "div>div>div>nav>a:nth-of-type(4)>span",
    "tag": "span",
    "text": "4",
    "box": {
     "x": 233.5,
-    "y": 2089.2,
+    "y": 2027.9,
     "w": 16,
     "h": 16
    },
@@ -4680,13 +4428,13 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(5)",
+   "path": "div>div>div>nav>a:nth-of-type(5)",
    "tag": "a",
    "text": "Inbox",
    "aria": "Inbox, 3 unread",
    "box": {
     "x": 260,
-    "y": 2084.2,
+    "y": 2022.9,
     "w": 65,
     "h": 63
    },
@@ -4721,11 +4469,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(5)>svg",
+   "path": "div>div>div>nav>a:nth-of-type(5)>svg",
    "tag": "svg",
    "box": {
     "x": 282,
-    "y": 2095.8,
+    "y": 2034.6,
     "w": 21,
     "h": 21
    },
@@ -4754,11 +4502,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(5)>svg>path:nth-of-type(1)",
+   "path": "div>div>div>nav>a:nth-of-type(5)>svg>path:nth-of-type(1)",
    "tag": "path",
    "box": {
     "x": 284.6,
-    "y": 2100.2,
+    "y": 2038.9,
     "w": 15.8,
     "h": 7
    },
@@ -4785,11 +4533,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(5)>svg>path:nth-of-type(2)",
+   "path": "div>div>div>nav>a:nth-of-type(5)>svg>path:nth-of-type(2)",
    "tag": "path",
    "box": {
     "x": 284.6,
-    "y": 2107.2,
+    "y": 2045.9,
     "w": 15.8,
     "h": 5.3
    },
@@ -4816,12 +4564,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(5)>span",
+   "path": "div>div>div>nav>a:nth-of-type(5)>span",
    "tag": "span",
    "text": "3",
    "box": {
     "x": 298.5,
-    "y": 2089.2,
+    "y": 2027.9,
     "w": 16,
     "h": 16
    },
@@ -4857,12 +4605,12 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(6)",
+   "path": "div>div>div>nav>a:nth-of-type(6)",
    "tag": "a",
    "text": "Profile",
    "box": {
     "x": 325,
-    "y": 2084.2,
+    "y": 2022.9,
     "w": 65,
     "h": 63
    },
@@ -4897,11 +4645,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(6)>svg",
+   "path": "div>div>div>nav>a:nth-of-type(6)>svg",
    "tag": "svg",
    "box": {
     "x": 347,
-    "y": 2095.8,
+    "y": 2034.6,
     "w": 21,
     "h": 21
    },
@@ -4930,11 +4678,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(6)>svg>circle",
+   "path": "div>div>div>nav>a:nth-of-type(6)>svg>circle",
    "tag": "circle",
    "box": {
     "x": 354,
-    "y": 2099.3,
+    "y": 2038.1,
     "w": 7,
     "h": 7
    },
@@ -4961,11 +4709,11 @@
    }
   },
   {
-   "path": "div>div>div>div>div>nav>a:nth-of-type(6)>svg>path",
+   "path": "div>div>div>nav>a:nth-of-type(6)>svg>path",
    "tag": "path",
    "box": {
     "x": 350.5,
-    "y": 2108.9,
+    "y": 2047.7,
     "w": 14,
     "h": 5.3
    },

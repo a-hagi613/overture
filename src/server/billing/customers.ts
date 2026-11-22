@@ -14,6 +14,16 @@ export function stripeCustomerIdFor(db: DatabaseWriter, userId: string) {
   return row?.stripeCustomerId ?? null;
 }
 
+export function userIdForStripeCustomer(db: DatabaseWriter, stripeCustomerId: string) {
+  const row = db
+    .select({ userId: customers.userId })
+    .from(customers)
+    .where(eq(customers.stripeCustomerId, stripeCustomerId))
+    .get();
+
+  return row?.userId ?? null;
+}
+
 export function linkStripeCustomer(
   db: DatabaseWriter,
   input: { userId: string; stripeCustomerId: string; at: number },

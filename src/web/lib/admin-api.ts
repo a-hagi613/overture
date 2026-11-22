@@ -47,6 +47,47 @@ export const overviewSchema = z.object({
   audit: z.array(auditRowSchema),
 });
 
+export const providerReportRowSchema = z.object({
+  ats: z.string(),
+  attempted: z.number(),
+  challengeRate: z.number().nullable(),
+  codeRate: z.number().nullable(),
+  completionRate: z.number().nullable(),
+  costGateMet: z.boolean().nullable(),
+  costGateMicros: z.number(),
+  costMicrosPerCompleted: z.number().nullable(),
+  p50BrowserMs: z.number().nullable(),
+  p95BrowserMs: z.number().nullable(),
+  provider: z.string(),
+  proxyMbPerCompleted: z.number().nullable(),
+  proxyTrend: z.boolean(),
+  sent: z.number(),
+});
+
+export const labReportRowSchema = z.object({
+  ats: z.string().nullable(),
+  captchaScore: z.number().nullable(),
+  challengeRate: z.number().nullable(),
+  codeRate: z.number().nullable(),
+  completed: z.number(),
+  completionRate: z.number().nullable(),
+  costMicrosPerCompleted: z.number().nullable(),
+  lastError: z.string().nullable(),
+  p50DurationMs: z.number().nullable(),
+  p95DurationMs: z.number().nullable(),
+  page: z.string(),
+  provider: z.string(),
+  proxyMbPerCompleted: z.number().nullable(),
+  sessions: z.number(),
+});
+
+export const providerReportSchema = z.object({
+  lab: z.array(labReportRowSchema),
+  providers: z.array(providerReportRowSchema),
+});
+
+export const labRunResponseSchema = z.object({ jobId: z.string() });
+
 export const settingsResponseSchema = z.object({
   settings: z.record(z.string(), z.string()),
 });
@@ -288,6 +329,12 @@ export type InviteRow = z.infer<typeof inviteRowSchema>;
 
 export type Overview = z.infer<typeof overviewSchema>;
 
+export type ProviderReport = z.infer<typeof providerReportSchema>;
+
+export type ProviderReportRow = z.infer<typeof providerReportRowSchema>;
+
+export type LabReportRow = z.infer<typeof labReportRowSchema>;
+
 export type AuditRow = z.infer<typeof auditRowSchema>;
 
 export type KillSwitchRow = z.infer<typeof killSwitchRowSchema>;
@@ -340,7 +387,8 @@ type AdminWriteBody =
     }
   | { email: string }
   | { reason: string }
-  | { value: string };
+  | { value: string }
+  | { providers: string[]; pages: string[]; sessionsPerPage: number };
 
 async function adminWrite<T>(
   method: "POST" | "PUT",
@@ -377,6 +425,12 @@ async function adminPut<T>(path: string, body: AdminWriteBody, schema: z.ZodType
 export const loadOverview = async () => adminGet("/admin/api/overview", overviewSchema);
 
 export const loadSettings = async () => adminGet("/admin/api/settings", settingsResponseSchema);
+
+export const loadProviderReport = async () =>
+  adminGet("/admin/api/provider-report", providerReportSchema);
+
+export const runLab = async (providers: string[], pages: string[], sessionsPerPage: number) =>
+  adminPost("/admin/api/lab/runs", { pages, providers, sessionsPerPage }, labRunResponseSchema);
 
 export const loadKillSwitches = async () =>
   adminGet("/admin/api/kill-switches", killSwitchesResponseSchema);

@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { copy } from "../../shared/copy.ts";
@@ -8,12 +8,7 @@ import { PageHeader } from "../components/page-header.tsx";
 import { SettingsAccountTabs } from "../components/settings-account-tabs.tsx";
 import { DeleteEmailCard } from "../components/delete-email-card.tsx";
 import { authClient } from "../lib/auth-client.ts";
-import {
-  confirmPassword,
-  fetchDeletionState,
-  requestDeletion,
-  sendReauthLink,
-} from "../lib/account-api.ts";
+import { fetchDeletionState, requestDeletion, sendReauthLink } from "../lib/account-api.ts";
 
 const stepClass =
   "text-[11px] font-semibold uppercase tracking-[1.65px] leading-[normal] text-muted-foreground mb-2.5";
@@ -43,58 +38,27 @@ async function errorMessage(response: Response) {
 }
 
 export function SettingsDeletePage() {
-  const queryClient = useQueryClient();
   const { data: session } = authClient.useSession();
   const state = useQuery({ queryKey: ["account-deletion"], queryFn: fetchDeletionState });
-  const [password, setPassword] = useState("");
-  const [reauth, setReauth] = useState(false);
   const [linkSent, setLinkSent] = useState(false);
   const [checked, setChecked] = useState(false);
   const [erasing, setErasing] = useState(false);
-  const [reauthNote, setReauthNote] = useState<string | null>(null);
   const [reauthError, setReauthError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const reauthRef = useRef<HTMLDivElement>(null);
   const erasingRef = useRef<HTMLDivElement>(null);
 
-  const reauthenticated = reauth || (state.data?.reauthenticated ?? false);
+  const reauthenticated = state.data?.reauthenticated ?? false;
   const firstName = (session?.user.name ?? "").trim().split(/\s+/u)[0] ?? "";
 
   function focusReauth() {
     reauthRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    reauthRef.current?.querySelector("input")?.focus();
-  }
-
-  async function onConfirmPassword() {
-    setReauthError(null);
-    setReauthNote(null);
-    setBusy(true);
-
-    const response = await confirmPassword(password).catch(() => null);
-
-    setBusy(false);
-
-    if (response === null) {
-      setReauthError(copy.deleteAccount.errors.deleteFailed);
-
-      return;
-    }
-
-    if (!response.ok) {
-      setReauthError((await errorMessage(response)) ?? copy.deleteAccount.errors.wrongPassword);
-
-      return;
-    }
-
-    setReauth(true);
-    setReauthNote(copy.deleteAccount.reauthenticated);
-    void queryClient.invalidateQueries({ queryKey: ["account-deletion"] });
+    reauthRef.current?.querySelector("button")?.focus();
   }
 
   async function onSendLink() {
     setReauthError(null);
-    setReauthNote(null);
     setBusy(true);
 
     const response = await sendReauthLink().catch(() => null);
@@ -111,7 +75,6 @@ export function SettingsDeletePage() {
     }
 
     setLinkSent(true);
-    setReauthNote(copy.deleteAccount.linkSent);
   }
 
   async function onDelete() {
@@ -217,41 +180,10 @@ export function SettingsDeletePage() {
             <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
               {copy.deleteAccount.reauthBody}
             </p>
-            <div className="mt-3.5">
-              <label
-                className="mb-1.5 block text-[12.5px] font-semibold leading-4"
-                htmlFor="delete-password"
-              >
-                {copy.deleteAccount.passwordLabel}
-              </label>
-              <div className="flex h-10 items-center gap-2.5 rounded-md border border-input bg-card px-3 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-foreground max-[767px]:h-11">
-                <input
-                  autoComplete="current-password"
-                  className="min-w-0 flex-1 border-0 bg-transparent text-[13.5px] font-medium outline-0 placeholder:text-muted-foreground"
-                  id="delete-password"
-                  onChange={(event) => {
-                    setPassword(event.target.value);
-                  }}
-                  placeholder={copy.deleteAccount.passwordPlaceholder}
-                  type="password"
-                  value={password}
-                />
-              </div>
-            </div>
             <div className="mt-[18px] flex flex-wrap items-center gap-2.5">
               <button
                 className={solidButtonClass}
-                disabled={busy}
-                onClick={() => {
-                  void onConfirmPassword();
-                }}
-                type="button"
-              >
-                {copy.deleteAccount.confirmIdentity}
-              </button>
-              <button
-                className={textButtonClass}
-                disabled={busy}
+                disabled={busy || reauthenticated}
                 onClick={() => {
                   void onSendLink();
                 }}
@@ -260,14 +192,9 @@ export function SettingsDeletePage() {
                 {copy.deleteAccount.sendLink}
               </button>
             </div>
-            {reauth || linkSent ? (
+            {reauthenticated || linkSent ? (
               <output className="mt-3 block text-[12.5px] leading-[1.5] text-ok">
                 {linkSent ? copy.deleteAccount.linkSent : copy.deleteAccount.reauthenticated}
-              </output>
-            ) : null}
-            {reauthNote !== null && !linkSent && !reauthenticated ? (
-              <output className="mt-3 block text-[12.5px] leading-[1.5] text-muted-foreground">
-                {reauthNote}
               </output>
             ) : null}
             {reauthError === null ? null : (

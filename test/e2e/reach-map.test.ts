@@ -111,7 +111,7 @@ test("test-only diffs select only the touched test and single-route UI edits sta
   );
 
   const testOnlyPlan = computePlan({
-    changed: ["test/e2e/signup-flow.test.ts"],
+    changed: ["test/e2e/passwordless-auth.test.ts"],
     isMain: false,
     shardCount: 6,
     map,
@@ -120,7 +120,7 @@ test("test-only diffs select only the touched test and single-route UI edits sta
   });
 
   expect(testOnlyPlan.full).toBe(false);
-  expect(testOnlyPlan.selected).toEqual(["test/e2e/signup-flow.test.ts"]);
+  expect(testOnlyPlan.selected).toEqual(["test/e2e/passwordless-auth.test.ts"]);
   expect(testOnlyPlan.shards).toHaveLength(1);
 
   const boardCardPlan = computePlan({

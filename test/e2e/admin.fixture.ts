@@ -52,7 +52,7 @@ interface AdminWorkerFixtures {
 
 const ADMIN_PORT_BASE = 4600;
 
-function adminPort(offset: number) {
+export function adminPort(offset: number) {
   return ADMIN_PORT_BASE + Number(process.env.TEST_WORKER_INDEX ?? "0") * 10 + offset;
 }
 
@@ -75,7 +75,7 @@ function adminEnv(
   };
 }
 
-async function startFreshAdminServer(
+export async function startFreshAdminServer(
   identityServer: IdentityServer,
   accessServer: AccessServer,
   offset: number,
@@ -95,7 +95,7 @@ async function startFreshAdminServer(
   );
 }
 
-function adminUrlOf(server: AppServer) {
+export function adminUrlOf(server: AppServer) {
   return server.url.replace("127.0.0.1", "localhost");
 }
 

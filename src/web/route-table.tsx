@@ -2,7 +2,6 @@ import type { RouteObject } from "react-router";
 
 import { BoardPage } from "./routes/board.tsx";
 import { CalendarPage } from "./routes/calendar.tsx";
-import { ForgotPasswordPage } from "./routes/forgot-password.tsx";
 import { HomePage } from "./routes/home.tsx";
 import { InboxAddressPage } from "./routes/inbox-address.tsx";
 import { InboxThreadPage } from "./routes/inbox-thread.tsx";
@@ -16,14 +15,15 @@ import { OnboardingResumePage } from "./routes/onboarding-resume.tsx";
 import { OnboardingTargetsPage } from "./routes/onboarding-targets.tsx";
 import { ProfilePage } from "./routes/profile.tsx";
 import { ReadyPage } from "./routes/ready.tsx";
-import { ResetPasswordPage } from "./routes/reset-password.tsx";
 import { ReviewPage } from "./routes/review.tsx";
 import { SearchPage } from "./routes/search.tsx";
 import { SettingsDeletePage } from "./routes/settings-delete.tsx";
 import { SettingsExportPage } from "./routes/settings-export.tsx";
+import { SettingsSupportAccessPage } from "./routes/settings-support-access.tsx";
 import { SettingsPage } from "./routes/settings.tsx";
 import { SignInPage } from "./routes/signin.tsx";
 import { ConsentPage } from "./routes/consent.tsx";
+import { PricingPage } from "./routes/pricing.tsx";
 import { PrivacyPage } from "./routes/privacy.tsx";
 import { TermsPage } from "./routes/terms.tsx";
 import { AppShell } from "./app.tsx";
@@ -34,6 +34,7 @@ import { MailHealthPage } from "./routes/admin/mail-health.tsx";
 import { GrantsPage } from "./routes/admin/grants.tsx";
 import { InvitesPage } from "./routes/admin/invites.tsx";
 import { OverviewPage } from "./routes/admin/overview.tsx";
+import { ProviderReportPage } from "./routes/admin/provider-report.tsx";
 import { UserPage } from "./routes/admin/user.tsx";
 import { UsersPage } from "./routes/admin/users.tsx";
 
@@ -52,11 +53,13 @@ const appShellChildren: RouteObject[] = [
   { path: "/settings", element: <SettingsPage /> },
   { path: "/settings/delete", element: <SettingsDeletePage /> },
   { path: "/settings/export", element: <SettingsExportPage /> },
+  { path: "/settings/support-access", element: <SettingsSupportAccessPage /> },
   { path: "*", element: <NotFoundPage /> },
 ];
 
 const adminShellChildren: RouteObject[] = [
   { path: "/admin", element: <OverviewPage /> },
+  { path: "/admin/provider-report", element: <ProviderReportPage /> },
   { path: "/admin/settings", element: <AdminSettingsPage /> },
   { path: "/admin/catalog", element: <CatalogPage /> },
   { path: "/admin/mail-health", element: <MailHealthPage /> },
@@ -70,11 +73,10 @@ const publicRoutes: RouteObject[] = [
   { path: "/signin", element: <SignInPage /> },
   { path: "/terms", element: <TermsPage /> },
   { path: "/privacy", element: <PrivacyPage /> },
+  { path: "/pricing", element: <PricingPage /> },
   { path: "/consent", element: <ConsentPage /> },
   { path: "/onboarding", element: <OnboardingPage /> },
   { path: "/onboarding/resume", element: <OnboardingResumePage /> },
-  { path: "/forgot-password", element: <ForgotPasswordPage /> },
-  { path: "/reset-password", element: <ResetPasswordPage /> },
   { path: "/onboarding/facts", element: <OnboardingFactsPage /> },
   { path: "/onboarding/targets", element: <OnboardingTargetsPage /> },
   { path: "/onboarding/forward", element: <OnboardingForwardPage /> },

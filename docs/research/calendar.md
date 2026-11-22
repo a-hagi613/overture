@@ -66,20 +66,22 @@ stores the date.
 ```
 interview_events
   id, user_id (cascade), application_id (cascade), message_id (cascade),
+  uid, sequence (default 0),
   starts_at INTEGER NOT NULL, ends_at INTEGER NULL, tz TEXT NULL,
-  source TEXT CHECK IN ('ics','text') NOT NULL,
-  title_enc TEXT NULL (sealed like other mail fields),
+  source TEXT CHECK IN ('ics') NOT NULL,
   created_at INTEGER NOT NULL
-  UNIQUE(message_id, starts_at); INDEX(user_id, starts_at)
+  UNIQUE(user_id, uid); INDEX(user_id, starts_at); INDEX(message_id)
 ```
 
-STRICT table, next free migration number taken at build time. Parsing: only a `text/calendar` attachment
-(`message_attachments.mime`) or an inline `.ics` with a `VEVENT` and `DTSTART` is trusted (`source = 'ics'`); `TZID` is
-honoured, a floating time uses the user's timezone. Free-text dates ("Tuesday at 3pm") are **not** parsed in v1 (error
+STRICT table, next free migration number taken at build time. `uid` and `sequence` are stored so an invite can be
+recognised across messages; the built table leaves out the sketch's `title_enc` because the Calendar shows the job title
+and company only, so no mail text needs to be kept for it. Parsing: only a `text/calendar` attachment
+(`message_attachments.mime`) or a file named `.ics` with a `VEVENT` and `DTSTART` is trusted (`source = 'ics'`); `TZID`
+is honoured, a floating time uses the user's timezone. Free-text dates ("Tuesday at 3pm") are **not** parsed in v1 (error
 rate, no recordings to test against, and no synthetic data in tests, ADR 0013); the Calendar shows no interview rather
-than a wrong one. A rescheduled invite (same `UID`, higher `SEQUENCE`) replaces the earlier row; a `METHOD:CANCEL` deletes
-it. No new third-party dependency is needed for this: parse with a small in-repo reader for the three properties, or add
-`ical.js`/`node-ical` only if the recorded fixtures show it is needed.
+than a wrong one. A rescheduled invite (same `UID`, higher `SEQUENCE`) replaces the earlier row; a `METHOD:CANCEL` or
+`STATUS:CANCELLED` deletes it. No new third-party dependency is needed for this: the parser is a small in-repo RFC 5545
+reader (`src/server/inbox/ics.ts`) for the three properties, tested through realistic RFC 5545 fixtures (`test/e2e/fixtures/mail/ics`) that are reconstructed until a captured employer invite replaces them.
 
 API (Hono, Zod, typed client, SPEC §14):
 

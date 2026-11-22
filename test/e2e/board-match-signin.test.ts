@@ -4,14 +4,14 @@ import type { Browser, Page } from "@playwright/test";
 
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, test as appTest } from "./app.fixture.ts";
-import { latestMailLink, setTurnstileScenario } from "./sign-in.ts";
+import { setTurnstileScenario } from "./sign-in.ts";
 
 const widths = [390, 1280];
 const themes = ["light", "dark"];
 
-const statelessStates = ["sign-in", "sign-up", "forgot-password", "suspended"] as const;
+const statelessStates = ["sign-in", "suspended"] as const;
 
-const statefulStates = ["magic-sent", "verify-sent", "reset-password", "refused"] as const;
+const statefulStates = ["magic-sent", "refused"] as const;
 
 type State = (typeof statelessStates)[number] | (typeof statefulStates)[number];
 
@@ -29,47 +29,6 @@ async function open(page: Page, serverUrl: string, theme: string, state: State) 
     await page.addInitScript(() => {
       globalThis.localStorage.setItem("overture.theme", "dark");
     });
-  }
-
-  if (state === "forgot-password") {
-    await page.goto(`${serverUrl}/forgot-password`);
-    await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
-
-    return;
-  }
-
-  if (state === "reset-password") {
-    await page.goto(`${serverUrl}/signin`);
-    await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
-    await page.getByRole("button", { name: "Create an account" }).click();
-    await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
-    await setTurnstileScenario(page.request, serverUrl, { action: "signup" });
-    await page.getByLabel("Create a password").fill("e2e-password-813");
-    await page.getByRole("button", { name: "Create account" }).click();
-    await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
-
-    await setTurnstileScenario(page.request, serverUrl, { action: "reset" });
-
-    const reset = await page.request.post(`${serverUrl}/api/auth/request-password-reset`, {
-      data: {
-        email: authTestIdentity.ownerEmail,
-        redirectTo: `${serverUrl}/reset-password`,
-      },
-      headers: {
-        "x-captcha-response": authTestIdentity.turnstilePassToken,
-        "x-turnstile-action": "reset",
-        origin: serverUrl,
-      },
-    });
-
-    expect(reset.ok()).toBe(true);
-
-    const link = await latestMailLink(serverUrl, page.request, authTestIdentity.ownerEmail);
-
-    await page.goto(link);
-    await expect(page.getByRole("heading", { name: "Choose a new password" })).toBeVisible();
-
-    return;
   }
 
   await page.goto(`${serverUrl}/signin`);
@@ -100,25 +59,7 @@ async function open(page: Page, serverUrl: string, theme: string, state: State) 
     return;
   }
 
-  await page.getByRole("button", { name: "Create an account" }).click();
   await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
-
-  if (state === "sign-up") {
-    await setTurnstileScenario(page.request, serverUrl, { action: "signup" });
-
-    return;
-  }
-
-  if (state === "verify-sent") {
-    await setTurnstileScenario(page.request, serverUrl, { action: "signup" });
-    await page.getByLabel("Create a password").fill("e2e-password-813");
-    await page.getByRole("button", { name: "Create account" }).click();
-    await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
-
-    return;
-  }
-
-  await page.getByRole("button", { name: "Sign in" }).click();
   await setTurnstileScenario(page.request, serverUrl, { action: "magiclink" });
   await page.getByRole("button", { name: "Email me a sign-in link" }).click();
   await expect(page.getByText("Link sent to")).toBeVisible();
@@ -143,6 +84,7 @@ async function assertMatchesBoard(
 
   await open(page, serverUrl, theme, state);
   await page.evaluate(async () => document.fonts.ready.then(() => true));
+  await page.mouse.move(0, 0);
   await page.evaluate(() => {
     const active = document.activeElement;
 

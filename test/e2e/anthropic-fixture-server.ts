@@ -110,6 +110,7 @@ export interface AnthropicFixtureServer {
 
 interface BatchItem {
   customId: string;
+  model: string;
   recording: z.infer<typeof recordingSchema>;
 }
 
@@ -251,7 +252,7 @@ function serveResults(batch: TrackedBatch) {
             id: item.recording.messageId,
             type: "message",
             role: "assistant",
-            model: "claude-haiku-4-5",
+            model: item.model,
             content: [{ type: "text", text: item.recording.messageText }],
             stop_reason: "end_turn",
             stop_sequence: null,
@@ -416,7 +417,7 @@ export async function startAnthropicFixtureServer() {
         user: userContent,
       });
 
-      items.push({ customId: batchRequest.custom_id, recording });
+      items.push({ customId: batchRequest.custom_id, model: batchRequest.params.model, recording });
     }
 
     batches.set(batchId, { id: batchId, items });

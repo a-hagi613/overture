@@ -11,6 +11,7 @@ const LIVE_TOPICS = [
   "message.received",
   "notification",
   "code.wait_resolved",
+  "calendar.updated",
 ] as const;
 
 const boardMovedSchema = z.object({
@@ -61,7 +62,11 @@ export function useLiveUpdates() {
         void queryClient.invalidateQueries({ queryKey: ["reviews"] });
       }
 
-      if (event.type === "application.updated" || event.type === "board.moved") {
+      if (
+        event.type === "application.updated" ||
+        event.type === "board.moved" ||
+        event.type === "calendar.updated"
+      ) {
         void queryClient.invalidateQueries({ queryKey: ["board"] });
         void queryClient.invalidateQueries({ queryKey: ["calendar"] });
       }
