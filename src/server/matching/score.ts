@@ -3,20 +3,15 @@ import { gunzipSync } from "node:zlib";
 import { and, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmOutputSchema, LlmPort, LlmRequest } from "../platform/ports/llm.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { RankedCandidate } from "./candidates.ts";
 
-import {
-  applications,
-  companies,
-  matches,
-  postings,
-  postingUserState,
-  resumes,
-} from "../platform/db/schema.ts";
+import { applications, matches, postingUserState, resumes } from "../platform/db/schema.ts";
+import { companies, postings } from "../platform/db/catalog-schema.ts";
+
 import { applicationsLeft } from "../billing/ledger.ts";
 import type { SpendGate } from "../billing/spend.ts";
 import { ungatedSpend } from "../billing/spend.ts";
@@ -67,6 +62,7 @@ type ScoreOutput = z.infer<typeof scoreOutputSchema>;
 
 interface MatchDeps {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   llm: LlmPort;
   personal: PersonalCrypto;
@@ -131,9 +127,9 @@ function scoreRequest(input: {
 }
 
 export function createMatchingService(deps: MatchDeps) {
-  const { db, clock, llm, personal, spendGate = ungatedSpend } = deps;
+  const { db, catalogDb, clock, llm, personal, spendGate = ungatedSpend } = deps;
 
-  const candidates = createCandidateService({ db, clock, personal });
+  const candidates = createCandidateService({ db, catalogDb, clock, personal });
   const languagesService = createLanguagesService({ db, clock });
   const targetsService = createTargetsService({ db, clock });
 
@@ -282,7 +278,7 @@ export function createMatchingService(deps: MatchDeps) {
   }
 
   async function scorePosting(userId: string, postingId: string) {
-    const row = db
+    const row = catalogDb
       .select({
         id: postings.id,
         companyId: postings.companyId,
@@ -389,7 +385,7 @@ export function createMatchingService(deps: MatchDeps) {
       return null;
     }
 
-    const applicationId = createApplication(db, clock.now(), {
+    const applicationId = createApplication({ db, catalogDb }, clock.now(), {
       origin: "manual",
       postingId,
       score: scored.score,
@@ -468,7 +464,7 @@ export function createMatchingService(deps: MatchDeps) {
         return;
       }
 
-      const created = createApplication(db, clock.now(), {
+      const created = createApplication({ db, catalogDb }, clock.now(), {
         origin: "auto",
         postingId: candidate.id,
         score,

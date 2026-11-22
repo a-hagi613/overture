@@ -1,8 +1,9 @@
 import { and, eq } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 
-import { applications, companies, postings } from "../platform/db/schema.ts";
+import { applications } from "../platform/db/schema.ts";
+import { companies, postings } from "../platform/db/catalog-schema.ts";
 
 export const ACTIVE_APPLICATION_STATUSES = [
   "preparing",
@@ -47,7 +48,7 @@ export type PostingDisplay = Pick<
  * @param postingId The Posting to read.
  * @returns The display fields, or undefined when the Posting or its Company is no longer in the catalog.
  */
-export function postingDisplayFor(db: AppDatabase, postingId: string) {
+export function postingDisplayFor(db: CatalogDatabase, postingId: string) {
   return db
     .select({
       applyUrl: postings.applyUrl,
@@ -82,19 +83,24 @@ export function applicationFor(db: AppDatabase, userId: string, postingId: strin
  * Queue one Application for the user, copying the Posting's display fields onto the row. Returns null when the
  * Application already exists, and also when the Posting is no longer in the catalog: preparation needs the live
  * Posting, so an Application that cannot be prepared is not created.
- * @param db The database to write.
+ * @param deps The application database to write and the catalog database to read the display fields from.
  * @param at Creation time, epoch milliseconds.
  * @param input The user, the Posting, the origin and the score.
  * @returns The new Application id, or null when nothing was created.
  */
-export function createApplication(db: AppDatabase, at: number, input: ApplicationInput) {
+export function createApplication(
+  deps: { db: AppDatabase; catalogDb: CatalogDatabase },
+  at: number,
+  input: ApplicationInput,
+) {
+  const { db, catalogDb } = deps;
   const existing = applicationFor(db, input.userId, input.postingId);
 
   if (existing !== undefined) {
     return null;
   }
 
-  const display = postingDisplayFor(db, input.postingId);
+  const display = postingDisplayFor(catalogDb, input.postingId);
 
   if (display === undefined) {
     return null;

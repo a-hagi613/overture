@@ -1,4 +1,4 @@
-import { copyFileSync, mkdtempSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,6 +7,7 @@ import { request as apiRequest, test as base } from "@playwright/test";
 import type { BrowserContext, Page } from "@playwright/test";
 
 import type { AppServer } from "./app-server.ts";
+import { copyTemplateDatabases } from "./template-databases.ts";
 import type { IdentityServer } from "./identity-server-test.fixture.ts";
 
 import { authTestIdentity, testAuthEnvironment } from "./auth.fixture.ts";
@@ -52,7 +53,7 @@ async function startFreshAppServer(
   const directory = mkdtempSync(join(tmpdir(), "overture-e2e-"));
   const databasePath = join(directory, "overture.db");
 
-  copyFileSync(join(process.cwd(), "test/e2e/.tmp/template.db"), databasePath);
+  copyTemplateDatabases(databasePath);
 
   return startAppServer(databasePath, {
     ...authEnv(identityServer),

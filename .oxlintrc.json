@@ -137,6 +137,7 @@
           "src/server/billing/pause.test.ts",
           "src/server/dispatch/report.test.ts",
           "src/server/platform/db/migration-snapshot.test.ts",
+          "src/server/platform/db/catalog-split.test.ts",
           "src/server/matching/applications.test.ts",
           "src/server/inbox/linked-mail.test.ts",
           "src/server/inbox/threads.test.ts",
@@ -191,6 +192,7 @@
           "src/server/auth/client-ip.test.ts",
           "src/server/dispatch/outcomes.test.ts",
           "src/server/platform/db/migration-snapshot.test.ts",
+          "src/server/platform/db/catalog-split.test.ts",
           "src/server/matching/applications.test.ts",
           "src/server/platform/access/access.test.ts",
           "src/server/platform/alert-detail.test.ts",
@@ -578,7 +580,12 @@
       }
     },
     {
-      "files": ["src/server/config/env.ts", "drizzle.config.ts", "test/e2e/**"],
+      "files": [
+        "src/server/config/env.ts",
+        "drizzle.config.ts",
+        "drizzle-catalog.config.ts",
+        "test/e2e/**"
+      ],
       "rules": {
         "node/no-process-env": "off"
       }

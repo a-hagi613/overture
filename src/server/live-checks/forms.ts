@@ -1,6 +1,6 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
@@ -8,7 +8,8 @@ import type { LiveCheckResult } from "./types.ts";
 import type { PlainFormReader } from "../pipeline/form-read.ts";
 
 import { ATS_NAMES, captureFixtures } from "../fixtures/capture.ts";
-import { postings } from "../platform/db/schema.ts";
+import { postings } from "../platform/db/catalog-schema.ts";
+
 import { env } from "../config/env.ts";
 import { createPlainFormReader } from "../pipeline/form-read.ts";
 import { isKillSwitchEnabled } from "../platform/settings/index.ts";
@@ -16,6 +17,7 @@ import { previousCheckDetail } from "./store.ts";
 import { failedResult, skippedResult } from "./types.ts";
 
 export interface FormsCheckDeps {
+  catalogDb: CatalogDatabase;
   db: AppDatabase;
   clock: Clock;
   objects: ObjectStore;
@@ -23,7 +25,7 @@ export interface FormsCheckDeps {
   plainFormReader?: PlainFormReader;
 }
 
-function postingFor(db: AppDatabase, ats: (typeof ATS_NAMES)[number]) {
+function postingFor(db: CatalogDatabase, ats: (typeof ATS_NAMES)[number]) {
   return db
     .select({
       id: postings.id,
@@ -88,7 +90,7 @@ async function runPersonioCheck(
 
 async function runOneAts(deps: FormsCheckDeps, ats: (typeof ATS_NAMES)[number]) {
   const startedAt = deps.clock.now();
-  const posting = postingFor(deps.db, ats);
+  const posting = postingFor(deps.catalogDb, ats);
 
   if (posting === undefined) {
     return failedResult(`forms.${ats}`, startedAt, "no open posting for this ATS in the catalog");

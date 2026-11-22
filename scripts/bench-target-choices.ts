@@ -1,8 +1,12 @@
 import { mkdirSync, rmSync } from "node:fs";
 import { dirname } from "node:path";
 
-import { openDatabase } from "../src/server/platform/db/client.ts";
-import { migrateDatabase } from "../src/server/platform/db/migrate.ts";
+import {
+  catalogPathFor,
+  openCatalogDatabase,
+  openDatabase,
+} from "../src/server/platform/db/client.ts";
+import { migrateCatalogDatabase, migrateDatabase } from "../src/server/platform/db/migrate.ts";
 import { createTargetChoicesCache, targetChoices } from "../src/server/profile/target-choices.ts";
 import { countMatchingPostings } from "../src/server/profile/targets.ts";
 
@@ -28,9 +32,15 @@ function build(path: string) {
   mkdirSync(dirname(path), { recursive: true });
   rmSync(path, { force: true });
 
-  const { db, sqlite } = openDatabase(path);
+  const catalogPath = catalogPathFor(path);
+
+  rmSync(catalogPath, { force: true });
+
+  const { db } = openDatabase(path);
+  const { db: catalogDb, sqlite } = openCatalogDatabase(catalogPath);
 
   migrateDatabase(db, "drizzle");
+  migrateCatalogDatabase(catalogDb, "drizzle-catalog");
   sqlite.run("PRAGMA synchronous = OFF;");
 
   const company = sqlite.prepare(
@@ -94,7 +104,7 @@ function build(path: string) {
 
   sqlite.run("ANALYZE;");
 
-  return db;
+  return { catalogDb, db };
 }
 
 function time<T>(label: string, run: () => T) {
@@ -118,12 +128,12 @@ if (path === undefined) {
   throw new Error("usage: bun scripts/bench-target-choices.ts <database path>");
 }
 
-const db = build(path);
+const { catalogDb } = build(path);
 
-const choices = time("targetChoices", () => targetChoices(db));
+const choices = time("targetChoices", () => targetChoices(catalogDb));
 
 const cache = createTargetChoicesCache({
-  db,
+  catalogDb,
   now: () => performance.timeOrigin + performance.now(),
   staleMs: 600_000,
 });
@@ -132,7 +142,7 @@ time("cache.read", () => cache.read());
 
 time("countMatchingPostings", () =>
   countMatchingPostings(
-    db,
+    catalogDb,
     {
       employmentTypes: ["full_time"],
       locations: ["City 1"],

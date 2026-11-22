@@ -1,12 +1,13 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { AnswerKind, QuestionFieldType, QuestionMapper } from "../../shared/questions.ts";
 import type { AtsQuestion } from "./greenhouse-questions.ts";
 import type { RuleMapping } from "./question-rules.ts";
 
-import { postingQuestions, questionVariants, questions } from "../platform/db/schema.ts";
+import { questionVariants, questions } from "../platform/db/schema.ts";
+import { postingQuestions } from "../platform/db/catalog-schema.ts";
 import {
   normalizeFieldType,
   normalizeQuestionText,
@@ -32,8 +33,12 @@ export interface QuestionInput {
   companyNames: string[];
 }
 
-export function createQuestionCatalog(deps: { db: AppDatabase; clock: Clock }) {
-  const { db, clock } = deps;
+export function createQuestionCatalog(deps: {
+  db: AppDatabase;
+  catalogDb: CatalogDatabase;
+  clock: Clock;
+}) {
+  const { db, catalogDb, clock } = deps;
 
   function byVariantHash(hash: string) {
     return db
@@ -173,7 +178,7 @@ export function createQuestionCatalog(deps: { db: AppDatabase; clock: Clock }) {
       fieldName: string | null;
     },
   ) {
-    const positions = db
+    const positions = catalogDb
       .select({ position: postingQuestions.position })
       .from(postingQuestions)
       .where(eq(postingQuestions.postingId, postingId))
@@ -187,7 +192,8 @@ export function createQuestionCatalog(deps: { db: AppDatabase; clock: Clock }) {
 
     const position = highest + 1;
 
-    db.insert(postingQuestions)
+    catalogDb
+      .insert(postingQuestions)
       .values({
         postingId,
         questionId: entry.questionId,
@@ -210,10 +216,11 @@ export function createQuestionCatalog(deps: { db: AppDatabase; clock: Clock }) {
       fieldName: string | null;
     }[],
   ) {
-    db.delete(postingQuestions).where(eq(postingQuestions.postingId, postingId)).run();
+    catalogDb.delete(postingQuestions).where(eq(postingQuestions.postingId, postingId)).run();
 
     for (const entry of entries) {
-      db.insert(postingQuestions)
+      catalogDb
+        .insert(postingQuestions)
         .values({
           postingId,
           questionId: entry.questionId,
@@ -228,13 +235,26 @@ export function createQuestionCatalog(deps: { db: AppDatabase; clock: Clock }) {
   }
 
   function forPosting(postingId: string) {
-    return db
+    const linked = catalogDb
       .select({
         questionId: postingQuestions.questionId,
         required: postingQuestions.required,
         position: postingQuestions.position,
         options: postingQuestions.options,
         fieldName: postingQuestions.fieldName,
+      })
+      .from(postingQuestions)
+      .where(eq(postingQuestions.postingId, postingId))
+      .orderBy(postingQuestions.position)
+      .all();
+
+    if (linked.length === 0) {
+      return [];
+    }
+
+    const questionRows = db
+      .select({
+        id: questions.id,
         textDisplay: questions.textDisplay,
         fieldType: questions.fieldType,
         factKey: questions.factKey,
@@ -242,11 +262,22 @@ export function createQuestionCatalog(deps: { db: AppDatabase; clock: Clock }) {
         mappedBy: questions.mappedBy,
         seenCount: questions.seenCount,
       })
-      .from(postingQuestions)
-      .innerJoin(questions, eq(questions.id, postingQuestions.questionId))
-      .where(eq(postingQuestions.postingId, postingId))
-      .orderBy(postingQuestions.position)
+      .from(questions)
+      .where(
+        inArray(
+          questions.id,
+          linked.map((row) => row.questionId),
+        ),
+      )
       .all();
+
+    const questionsById = new Map(questionRows.map((row) => [row.id, row]));
+
+    return linked.flatMap((row) => {
+      const question = questionsById.get(row.questionId);
+
+      return question === undefined ? [] : [{ ...row, ...question }];
+    });
   }
 
   return {

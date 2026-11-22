@@ -8,6 +8,7 @@ import { openDatabase } from "./client.ts";
 import { migrateDatabase } from "./migrate.ts";
 
 const SNAPSHOT_MIGRATION = "0056_snapshot_decouple";
+const CATALOG_SPLIT_MIGRATION = "0057_catalog_split";
 
 const journalSchema = z.object({
   entries: z.array(z.looseObject({ idx: z.number(), tag: z.string(), when: z.number() })),
@@ -30,7 +31,9 @@ function migrationsBeforeSnapshot() {
     JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8")),
   );
 
-  const before = journal.entries.filter((entry) => entry.tag !== SNAPSHOT_MIGRATION);
+  const before = journal.entries.filter(
+    (entry) => entry.tag !== SNAPSHOT_MIGRATION && entry.tag !== CATALOG_SPLIT_MIGRATION,
+  );
 
   if (before.length === journal.entries.length) {
     throw new Error(`migration ${SNAPSHOT_MIGRATION} is missing from the journal`);

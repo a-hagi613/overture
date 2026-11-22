@@ -1,7 +1,7 @@
 import { and, count, eq, inArray, isNull } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
-import { companyBoards, postings } from "../platform/db/schema.ts";
+import type { CatalogDatabase } from "../platform/db/client.ts";
+import { companyBoards, postings } from "../platform/db/catalog-schema.ts";
 import { ASHBY_LIMITS } from "./ashby-feed.ts";
 import { GREENHOUSE_LIMITS } from "./greenhouse-feed.ts";
 import { LEVER_LIMITS } from "./lever-feed.ts";
@@ -31,7 +31,7 @@ export interface BackfillAtsEstimate {
   durationMs: number;
 }
 
-export function estimateBackfill(db: AppDatabase) {
+export function estimateBackfill(db: CatalogDatabase) {
   const boardRows = db
     .select({ ats: companyBoards.ats, boards: count() })
     .from(companyBoards)

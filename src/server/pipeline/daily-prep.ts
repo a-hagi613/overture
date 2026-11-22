@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
@@ -27,6 +27,7 @@ const payloadSchema = z.object({
 
 export interface PrepDailyDeps {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   llm: LlmPort;
   personal: PersonalCrypto;
@@ -229,6 +230,7 @@ export async function runPrepDailyJob(deps: PrepDailyDeps, userId: string, since
   const { createMatchingService } = await import("../matching/score.ts");
 
   const matching = createMatchingService({
+    catalogDb: deps.catalogDb,
     clock: deps.clock,
     db: deps.db,
     llm: deps.llm,

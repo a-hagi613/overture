@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { migrateDatabase } from "../platform/db/migrate.ts";
-import { openDatabase } from "../platform/db/client.ts";
+import { migrateCatalogDatabase } from "../platform/db/migrate.ts";
+import { openCatalogDatabase } from "../platform/db/client.ts";
 import { locationChoiceCounts, locationChoices } from "./target-choices.ts";
 
 const NOW = 1_795_000_000_000;
@@ -12,15 +12,15 @@ const WORKPLACES = ["remote", "hybrid", "onsite"] as const;
 type Fixture = ReturnType<typeof migrated>;
 
 function migrated() {
-  const { db, sqlite } = openDatabase(":memory:");
+  const { db: catalogDb, sqlite } = openCatalogDatabase(":memory:");
 
-  migrateDatabase(db, "drizzle");
+  migrateCatalogDatabase(catalogDb, "drizzle-catalog");
   sqlite.run("INSERT INTO companies (id, name, name_norm, created_at) VALUES ('c', 'Co', 'co', 1)");
   sqlite.run(
     "INSERT INTO company_boards (id, company_id, ats, board_token, region, status, source, created_at) VALUES ('b', 'c', 'greenhouse', 't', 'us', 'active', 'import', 1)",
   );
 
-  return { db, sqlite };
+  return { catalogDb, sqlite };
 }
 
 function addPosting(fixture: Fixture, input: { closed: boolean; index: number }) {
@@ -64,7 +64,7 @@ function seeded() {
 }
 
 function planOf(fixture: Fixture) {
-  const compiled = locationChoiceCounts(fixture.db).toSQL();
+  const compiled = locationChoiceCounts(fixture.catalogDb).toSQL();
 
   return fixture.sqlite
     .query<{ detail: string }, []>(`EXPLAIN QUERY PLAN ${compiled.sql}`)
@@ -82,8 +82,13 @@ describe("the open-Posting location query", () => {
   });
 
   test("offers each city an open Posting names exactly once", () => {
-    const { db } = seeded();
+    const { catalogDb } = seeded();
 
-    expect(locationChoices(db).toSorted()).toEqual(["Austin", "Berlin", "Lisbon", "Toronto"]);
+    expect(locationChoices(catalogDb).toSorted()).toEqual([
+      "Austin",
+      "Berlin",
+      "Lisbon",
+      "Toronto",
+    ]);
   });
 });

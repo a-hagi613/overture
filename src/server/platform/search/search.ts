@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
-import type { AppDatabase } from "../db/client.ts";
+import type { CatalogDatabase } from "../db/client.ts";
 
 import type { EmploymentType, Seniority, Workplace } from "../../../shared/tag-taxonomy.ts";
 
@@ -78,7 +78,7 @@ function filtersExpression(filters: SearchFilters) {
   return parts.length === 0 ? sql`` : sql.join(parts, sql``);
 }
 
-export function searchPostings(db: AppDatabase, query: SearchQuery) {
+export function searchPostings(db: CatalogDatabase, query: SearchQuery) {
   const match = ftsMatchExpression(query.text);
 
   if (match === null) {

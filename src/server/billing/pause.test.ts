@@ -5,14 +5,7 @@ import { eq } from "drizzle-orm";
 import { migrateDatabase } from "../platform/db/migrate.ts";
 import { openDatabase } from "../platform/db/client.ts";
 import { createClock } from "../platform/ports/clock.ts";
-import {
-  applications,
-  companyBoards,
-  companies,
-  postings,
-  profiles,
-  users,
-} from "../platform/db/schema.ts";
+import { applications, profiles, users } from "../platform/db/schema.ts";
 
 import {
   applicationsLeft,
@@ -73,37 +66,6 @@ function seedSendingApplication(
   at: number,
   status: "sending" | "confirming" = "sending",
 ) {
-  db.insert(companies)
-    .values({ createdAt: at, id: "company-1", name: "Acme", nameNorm: "acme" })
-    .onConflictDoNothing()
-    .run();
-  db.insert(companyBoards)
-    .values({
-      ats: "greenhouse",
-      boardToken: "acme",
-      companyId: "company-1",
-      createdAt: at,
-      id: "board-1",
-      source: "v1_seed",
-    })
-    .onConflictDoNothing()
-    .run();
-  db.insert(postings)
-    .values({
-      applyUrlNorm: `https://example.com/jobs/${applicationId}`,
-      ats: "greenhouse",
-      atsJobId: `job-${applicationId}`,
-      boardId: "board-1",
-      companyId: "company-1",
-      dedupeKey: `acme:${applicationId}`,
-      firstSeenAt: at,
-      id: `posting-${applicationId}`,
-      lastSeenAt: at,
-      title: "Engineer",
-      titleNorm: "engineer",
-      url: `https://example.com/jobs/${applicationId}`,
-    })
-    .run();
   db.insert(applications)
     .values({
       ats: "greenhouse",

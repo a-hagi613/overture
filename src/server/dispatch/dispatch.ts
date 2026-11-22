@@ -15,7 +15,7 @@ import {
 import { z } from "zod";
 
 import type { BoardRegion } from "../catalog/board-feed.ts";
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { PostingLiveness, PostingLivenessChecker } from "./liveness.ts";
@@ -25,14 +25,14 @@ import {
   applications,
   attempts,
   bgJobs,
-  companyBoards,
   killSwitches,
   mailboxes,
-  postings,
   profiles,
   resumes,
   users,
 } from "../platform/db/schema.ts";
+import { companyBoards, postings } from "../platform/db/catalog-schema.ts";
+
 import { applicationsLeft, dailyUsageSince } from "../billing/ledger.ts";
 import { skipClosedPostingApplications } from "../catalog/posting-close.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
@@ -65,6 +65,7 @@ export interface DispatcherTick {
 
 export interface DispatchDeps {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   providerId: string;
   liveness: PostingLivenessChecker;
@@ -271,8 +272,7 @@ export function createDispatcherTick(deps: DispatchDeps) {
       .select({ total: count() })
       .from(attempts)
       .innerJoin(applications, eq(attempts.applicationId, applications.id))
-      .innerJoin(postings, eq(applications.postingId, postings.id))
-      .where(and(eq(postings.ats, candidate.ats), gte(attempts.startedAt, now - HOUR_MS)))
+      .where(and(eq(applications.ats, candidate.ats), gte(attempts.startedAt, now - HOUR_MS)))
       .get();
 
     if ((recent?.total ?? 0) >= hourlyLimit) {
@@ -314,14 +314,15 @@ export function createDispatcherTick(deps: DispatchDeps) {
   }
 
   function skipClosed(candidate: Candidate, now: number) {
-    const skipped = db.transaction((tx) => {
-      tx.update(postings)
-        .set({ closedAt: now })
-        .where(and(eq(postings.id, candidate.postingId), isNull(postings.closedAt)))
-        .run();
+    deps.catalogDb
+      .update(postings)
+      .set({ closedAt: now })
+      .where(and(eq(postings.id, candidate.postingId), isNull(postings.closedAt)))
+      .run();
 
-      return skipClosedPostingApplications(tx, now, [candidate.postingId]);
-    });
+    const skipped = db.transaction((tx) =>
+      skipClosedPostingApplications(tx, now, [candidate.postingId]),
+    );
 
     for (const application of skipped) {
       publishEvent(
@@ -418,33 +419,68 @@ export function createDispatcherTick(deps: DispatchDeps) {
       return summary;
     }
 
-    const rows: Candidate[] = db
+    const dueApplications = db
       .select({
-        ats: postings.ats,
-        atsJobId: postings.atsJobId,
-        boardToken: companyBoards.boardToken,
         companyId: applications.companyId,
         id: applications.id,
         postingId: applications.postingId,
-        region: companyBoards.region,
         scheduledFor: applications.scheduledFor,
         userId: applications.userId,
       })
       .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
-      .innerJoin(companyBoards, eq(companyBoards.id, postings.boardId))
       .where(
         and(
           eq(applications.status, "approved"),
-          inArray(postings.ats, DISPATCHABLE_ATS),
           isNotNull(applications.scheduledFor),
           lte(applications.scheduledFor, now),
         ),
       )
       .orderBy(asc(applications.approvedAt), asc(applications.createdAt))
       .all()
-      .filter((row) => !activeSends.applicationIds.has(row.id))
-      .flatMap((row) => (isDispatchAts(row.ats) ? [{ ...row, ats: row.ats }] : []));
+      .filter((row) => !activeSends.applicationIds.has(row.id));
+
+    const postingRows = new Map(
+      deps.catalogDb
+        .select({
+          ats: postings.ats,
+          atsJobId: postings.atsJobId,
+          boardToken: companyBoards.boardToken,
+          id: postings.id,
+          region: companyBoards.region,
+        })
+        .from(postings)
+        .innerJoin(companyBoards, eq(companyBoards.id, postings.boardId))
+        .where(
+          inArray(
+            postings.id,
+            dueApplications.map((row) => row.postingId),
+          ),
+        )
+        .all()
+        .map((row) => [row.id, row]),
+    );
+
+    const rows: Candidate[] = dueApplications.flatMap((application) => {
+      const posting = postingRows.get(application.postingId);
+
+      if (posting === undefined || !isDispatchAts(posting.ats)) {
+        return [];
+      }
+
+      return [
+        {
+          ats: posting.ats,
+          atsJobId: posting.atsJobId,
+          boardToken: posting.boardToken,
+          companyId: application.companyId,
+          id: application.id,
+          postingId: application.postingId,
+          region: posting.region,
+          scheduledFor: application.scheduledFor,
+          userId: application.userId,
+        },
+      ];
+    });
 
     if (rows.length === 0) {
       return summary;

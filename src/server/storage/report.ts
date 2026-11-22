@@ -5,11 +5,11 @@ import { basename, dirname, join, resolve } from "node:path";
 import { Database } from "bun:sqlite";
 import { sql } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 
-import { postings } from "../platform/db/schema.ts";
+import { postings } from "../platform/db/catalog-schema.ts";
 import { logError } from "../platform/log.ts";
 
 const NAMED_PREFIXES = ["files/", "mail/", "exports/"] as const;
@@ -91,6 +91,7 @@ export interface StorageReport {
 
 export interface StorageReportDeps {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   databasePath: string;
   catalogPath?: string | null;
@@ -152,7 +153,7 @@ async function volumeUsage(databasePath: string) {
   } satisfies VolumeUsage;
 }
 
-function postingsBySource(db: AppDatabase) {
+function postingsBySource(db: CatalogDatabase) {
   const rows = db
     .select({
       source: postings.ats,
@@ -331,7 +332,7 @@ export async function buildStorageReport(deps: StorageReportDeps) {
     objectUsage(deps.objects, deps.backups),
   ]);
 
-  const bySource = postingsBySource(deps.db);
+  const bySource = postingsBySource(deps.catalogDb);
 
   return {
     databases: { app, catalog: catalog?.present === true ? catalog : null },

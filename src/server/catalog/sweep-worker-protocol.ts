@@ -19,6 +19,7 @@ export const workableIngestReportSchema = z.object({
   added: z.number(),
   updated: z.number(),
   closed: z.number(),
+  closedPostingIds: z.array(z.string()),
   ageMs: z.number().nullable(),
   previousRows: z.number().nullable(),
   dropped: z.boolean(),
@@ -34,6 +35,8 @@ export const sweepRunSummarySchema = z.object({
   added: z.number(),
   updated: z.number(),
   closed: z.number(),
+  /** Postings the sweep closed; the application process skips their unsent Applications next (ADR 0036). */
+  closedPostingIds: z.array(z.string()),
   durationMs: z.number(),
   workable: workableIngestReportSchema.nullish(),
 });

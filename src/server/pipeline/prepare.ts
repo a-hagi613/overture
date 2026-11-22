@@ -3,7 +3,7 @@ import { gunzipSync } from "node:zlib";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
@@ -18,13 +18,12 @@ import type { FormReadPath, PlainFormReader } from "./form-read.ts";
 import {
   applicationAnswers,
   applications,
-  companies,
-  companyBoards,
-  postings,
   profiles,
   questions as questionsTable,
   resumes,
 } from "../platform/db/schema.ts";
+import { companies, companyBoards, postings } from "../platform/db/catalog-schema.ts";
+
 import type { FormQuestion, SendPlan, SendPlanField } from "./send-plan.ts";
 import { createFactService } from "../profile/facts.ts";
 import { createPlainFormReader } from "./form-read.ts";
@@ -241,6 +240,7 @@ function openTextResolution(
 
 export function createPreparationService(deps: {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   llm: LlmPort;
   personal: PersonalCrypto;
@@ -261,6 +261,7 @@ export function createPreparationService(deps: {
 }) {
   const {
     db,
+    catalogDb,
     clock,
     llm,
     personal,
@@ -271,7 +272,7 @@ export function createPreparationService(deps: {
     spendGate = ungatedSpend,
   } = deps;
 
-  const catalog = createQuestionCatalog({ db, clock });
+  const catalog = createQuestionCatalog({ db, catalogDb, clock });
   const factsService = createFactService({ db, clock, personal });
   const openText = createOpenTextService({ db, clock, llm });
   const planCache = createPlanCache({ db, clock });
@@ -544,7 +545,8 @@ export function createPreparationService(deps: {
       }
     }
 
-    db.update(postings)
+    catalogDb
+      .update(postings)
       .set({ questionsFetchedAt: clock.now() })
       .where(eq(postings.id, posting.postingId))
       .run();
@@ -605,16 +607,25 @@ export function createPreparationService(deps: {
       fieldName: string | null;
     }[];
   }) {
-    const row = db
+    const application = db
+      .select({ postingId: applications.postingId })
+      .from(applications)
+      .where(eq(applications.id, input.applicationId))
+      .get();
+
+    if (application === undefined) {
+      return [];
+    }
+
+    const row = catalogDb
       .select({
         ats: postings.ats,
         companyName: companies.name,
         postingId: postings.id,
       })
-      .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
+      .from(postings)
       .innerJoin(companies, eq(companies.id, postings.companyId))
-      .where(eq(applications.id, input.applicationId))
+      .where(eq(postings.id, application.postingId))
       .get();
 
     if (row === undefined) {
@@ -667,12 +678,26 @@ export function createPreparationService(deps: {
   }
 
   async function prepare(applicationId: string) {
-    const row = db
+    const application = db
       .select({
         id: applications.id,
         userId: applications.userId,
         postingId: applications.postingId,
         status: applications.status,
+      })
+      .from(applications)
+      .where(eq(applications.id, applicationId))
+      .get();
+
+    if (
+      application === undefined ||
+      !PREPARABLE_STATUSES.some((status) => status === application.status)
+    ) {
+      return null;
+    }
+
+    const postingRow = catalogDb
+      .select({
         ats: postings.ats,
         atsJobId: postings.atsJobId,
         boardToken: companyBoards.boardToken,
@@ -689,16 +714,17 @@ export function createPreparationService(deps: {
         url: postings.url,
         questionsFetchedAt: postings.questionsFetchedAt,
       })
-      .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
+      .from(postings)
       .innerJoin(companyBoards, eq(companyBoards.id, postings.boardId))
       .innerJoin(companies, eq(companies.id, postings.companyId))
-      .where(eq(applications.id, applicationId))
+      .where(eq(postings.id, application.postingId))
       .get();
 
-    if (row === undefined || !PREPARABLE_STATUSES.some((status) => status === row.status)) {
+    if (postingRow === undefined) {
       return null;
     }
+
+    const row = { ...application, ...postingRow };
 
     if (!spendGate.allows(row.userId)) {
       logInfo("spend", `preparation skipped for ${applicationId}: no Applications left`);

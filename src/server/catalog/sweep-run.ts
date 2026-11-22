@@ -1,10 +1,10 @@
 import { and, inArray, notInArray, sql } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { retryWhenBusy } from "../platform/db/busy.ts";
-import { companyBoards } from "../platform/db/schema.ts";
+import { companyBoards } from "../platform/db/catalog-schema.ts";
 import { CATALOG_ATS_NAMES } from "./discovered-boards.ts";
 import { pollBoard } from "./poll-board.ts";
 import { engagedCatalogAts, SWEEP_CLAIM_MS, sweepBatchPerAts } from "./sweep-config.ts";
@@ -15,11 +15,19 @@ import type { SweepRunKind } from "./sweep-worker-protocol.ts";
 
 type CatalogAts = (typeof CATALOG_ATS_NAMES)[number];
 
+/** The app database carries the sweep settings and kill switches; the catalog database carries the boards and postings. */
+export interface SweepDeps {
+  db: AppDatabase;
+  catalogDb: CatalogDatabase;
+  clock: Clock;
+}
+
 function isCatalogAts(ats: string): ats is CatalogAts {
   return CATALOG_ATS_NAMES.some((name) => name === ats);
 }
 
-export async function pollDueBoards(db: AppDatabase, clock: Clock, feeds: BoardFeeds) {
+export async function pollDueBoards(deps: SweepDeps, feeds: BoardFeeds) {
+  const { db, catalogDb, clock } = deps;
   const now = clock.now();
   const batches = sweepBatchPerAts(db);
   const engaged = engagedCatalogAts(db);
@@ -28,7 +36,7 @@ export async function pollDueBoards(db: AppDatabase, clock: Clock, feeds: BoardF
   const claimed = await retryWhenBusy(
     () =>
       pollableAts.flatMap((ats) =>
-        db
+        catalogDb
           .update(companyBoards)
           .set({ nextPollAt: now + SWEEP_CLAIM_MS })
           .where(
@@ -56,19 +64,23 @@ export async function pollDueBoards(db: AppDatabase, clock: Clock, feeds: BoardF
       }
 
       return [
-        retryWhenBusy(async () => pollBoard(db, clock, feeds[ats], board), `catalog.sweep.${ats}`),
+        retryWhenBusy(
+          async () => pollBoard(catalogDb, clock, feeds[ats], board),
+          `catalog.sweep.${ats}`,
+        ),
       ];
     }),
   );
 }
 
-export async function runBackfillPass(db: AppDatabase, clock: Clock, feeds: BoardFeeds) {
+export async function runBackfillPass(deps: SweepDeps, feeds: BoardFeeds) {
+  const { db, catalogDb, clock } = deps;
   const now = clock.now();
   const engaged = [...engagedCatalogAts(db)];
 
   await retryWhenBusy(
     () =>
-      db
+      catalogDb
         .update(companyBoards)
         .set({ nextPollAt: now })
         .where(
@@ -83,7 +95,7 @@ export async function runBackfillPass(db: AppDatabase, clock: Clock, feeds: Boar
     "catalog.backfill",
   );
 
-  return pollDueBoards(db, clock, feeds);
+  return pollDueBoards(deps, feeds);
 }
 
 export function summarizeRun(kind: SweepRunKind, reports: PollBoardReport[], durationMs: number) {
@@ -97,6 +109,7 @@ export function summarizeRun(kind: SweepRunKind, reports: PollBoardReport[], dur
     added: reports.reduce((total, report) => total + report.added, 0),
     updated: reports.reduce((total, report) => total + report.updated, 0),
     closed: reports.reduce((total, report) => total + report.closed, 0),
+    closedPostingIds: reports.flatMap((report) => report.closedPostingIds),
     durationMs: Math.round(durationMs),
     workable: null,
   };

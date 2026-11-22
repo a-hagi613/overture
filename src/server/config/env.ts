@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { turnstileScriptUrl } from "../../shared/turnstile.ts";
+import { catalogPathFor } from "../platform/db/client.ts";
 import { DEFAULT_ANTHROPIC_MODEL } from "../platform/llm/models.ts";
 
 const booleanFromString = z.enum(["true", "false"]).transform((value) => value === "true");
@@ -25,6 +26,7 @@ const envSchema = z
     JOBS_AUTORUN: booleanFromString.default(true),
     DATABASE_URL: z.string().min(1).default("data/overture.db"),
     DATABASE_PATH: z.string().min(1).optional(),
+    CATALOG_DATABASE_PATH: z.string().min(1).optional(),
     STATIC_ROOT: z.string().min(1).default("dist"),
     ENABLE_TEST_ROUTES: booleanFromString.default(false),
     DEMO_LOGIN_ENABLED: booleanFromString.default(false),
@@ -298,6 +300,12 @@ const envSchema = z
 export const env = envSchema.parse(process.env);
 
 export const databasePath = env.DATABASE_PATH ?? env.DATABASE_URL;
+
+/**
+ * Where `catalog.sqlite` lives (ADR 0036). It sits beside the application database unless `CATALOG_DATABASE_PATH`
+ * overrides it, so a Fly volume with `/data/app.sqlite` gets `/data/catalog.sqlite`.
+ */
+export const catalogDatabasePath = env.CATALOG_DATABASE_PATH ?? catalogPathFor(databasePath);
 
 export const turnstileHostnames =
   env.TURNSTILE_HOSTNAMES ?? turnstileDefaultHostnames(env.APP_ORIGIN);

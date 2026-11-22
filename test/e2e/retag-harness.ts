@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { openDatabase } from "../../src/server/platform/db/client.ts";
 import { WRITE_BATCH_ROWS } from "../../src/server/platform/db/batches.ts";
-import { companies, companyBoards, postings } from "../../src/server/platform/db/schema.ts";
+import { companies, companyBoards, postings } from "../../src/server/platform/db/catalog-schema.ts";
 
 export const FEED_POSTINGS_PER_BOARD = 12_500;
 export const CLOSED_POSTINGS = 30;

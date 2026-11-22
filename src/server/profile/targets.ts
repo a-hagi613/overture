@@ -2,10 +2,11 @@ import { and, count, eq, exists, gte, inArray, isNull, or, sql } from "drizzle-o
 import type { SQL } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
-import { postings, postingTags, targets } from "../platform/db/schema.ts";
+import { targets } from "../platform/db/schema.ts";
+import { postings, postingTags } from "../platform/db/catalog-schema.ts";
 import { normalizeTitle } from "../catalog/normalize.ts";
 import { resolveLocation } from "../catalog/geo.ts";
 import { emptyTargets, targetsInputSchema } from "../../shared/targets.ts";
@@ -88,7 +89,7 @@ function salaryCondition(floorMinor: number | null, currency: string | null) {
   );
 }
 
-export function matchedRoleTags(db: AppDatabase, roles: readonly string[]) {
+export function matchedRoleTags(db: CatalogDatabase, roles: readonly string[]) {
   const tagRows = db
     .selectDistinct({ value: postingTags.value })
     .from(postingTags)
@@ -101,7 +102,7 @@ export function matchedRoleTags(db: AppDatabase, roles: readonly string[]) {
 }
 
 export function countMatchingPostings(
-  db: AppDatabase,
+  db: CatalogDatabase,
   input: z.input<typeof targetsInputSchema>,
   languages: readonly string[],
 ) {

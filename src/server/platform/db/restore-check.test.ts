@@ -48,33 +48,6 @@ function seededRestoredDatabase() {
     stamp,
     stamp,
   ]);
-  sqlite.run("insert into companies (id, name, name_norm, created_at) values (?, ?, ?, ?)", [
-    "company-1",
-    "Example",
-    "example",
-    NOW,
-  ]);
-  sqlite.run(
-    "insert into company_boards (id, company_id, ats, board_token, region, status, source, created_at) values (?, ?, ?, ?, ?, ?, ?, ?)",
-    ["board-1", "company-1", "greenhouse", "example", "us", "active", "v1_seed", NOW],
-  );
-  sqlite.run(
-    "insert into postings (id, board_id, company_id, ats, ats_job_id, url, apply_url_norm, title, title_norm, first_seen_at, last_seen_at, dedupe_key) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [
-      "posting-1",
-      "board-1",
-      "company-1",
-      "greenhouse",
-      "job-1",
-      "https://boards.greenhouse.io/example/jobs/1",
-      "https://boards.greenhouse.io/example/jobs/1",
-      "Engineer",
-      "engineer",
-      NOW,
-      NOW,
-      "example:engineer",
-    ],
-  );
   sqlite.run(
     "insert into applications (id, user_id, posting_id, company_id, company_name, company_name_norm, posting_title, posting_url, origin, status, approved_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [

@@ -74,6 +74,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
                      │  scheduler · bg_jobs workers · discovery       │
                      │  dispatch (playwright-core over CDP)           │
                      │  /data/app.sqlite (WAL, synchronous=FULL)      │
+                     │  /data/catalog.sqlite (WAL, NORMAL, no replica) │
                      └───────────────────────────────────────────────┘
         │CDP/WSS        │HTTPS            │HTTPS          │OTLP           │S3 API
         ▼               ▼                 ▼               ▼               ▼
@@ -115,9 +116,17 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
   code and tests against the local fixture server only. Outside production the app and its catalog worker install an
   outbound guard (ADR 0016): a request to an ATS or paid-service host that is not a local fixture throws instead of
   leaving the machine.
-- Litestream replicates continuously to R2 `overture-backups`; a nightly snapshot is kept 30 days; a restore drill
-  runs in CI weekly against a throwaway machine, checks the restored file read-only and never starts the app server
-  or any scheduler, worker or outbound client (issue #412).
+- Litestream replicates `app.sqlite` continuously to R2 `overture-backups`; a nightly snapshot is kept 30 days; a
+  restore drill runs in CI weekly against a throwaway machine, checks the restored file read-only and never starts
+  the app server or any scheduler, worker or outbound client (issue #412). `catalog.sqlite` is excluded from
+  `litestream.yml` (ADR 0036): it is public, rebuildable feed data, and streaming it every second would cost more
+  than it protects. A missing or deleted catalog file is normal startup work and is repopulated by the seed and
+  board feeds.
+- The catalog tables live in `/data/catalog.sqlite` on the same volume, in their own `drizzle-catalog/` migrations,
+  with `synchronous=NORMAL`. The two files share no foreign key and never share a transaction: a sweep that closes
+  Postings returns those ids and the application process skips their unsent Applications afterwards. This keeps the
+  sweep's heavy writes off the write lock that approvals, webhooks and `/api/health` need, and gives
+  `synchronous=FULL` durability to user data only.
 
 ### 3.2 External services and environment
 
@@ -144,7 +153,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Master key | envelope encryption | `MASTER_KEY_V1` (32 bytes base64), `MASTER_KEY_CURRENT=1` | fixed test key |
 | Google + LinkedIn (OIDC) | OAuth sign-in providers | `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID` with `LINKEDIN_CLIENT_SECRET`; each pair optional, both or neither (a half-set pair stops boot); an unset pair leaves that provider unregistered and hidden | local OIDC identity server; discovery URLs overridable via `OAUTH_GOOGLE_DISCOVERY_URL`, `OAUTH_LINKEDIN_DISCOVERY_URL` |
 | Auth | better-auth sessions | `BETTER_AUTH_SECRET`, `AUTH_ALLOWED_HOSTS` | local test secret and loopback hosts |
-| App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com` (forwarding addresses), `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `LAB_BASE_URL` (defaults to `APP_ORIGIN`), `ALERT_NTFY_URL` (optional) | |
+| App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com` (forwarding addresses), `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `CATALOG_DATABASE_PATH=/data/catalog.sqlite` (defaults to `catalog.sqlite` beside the application file), `MAIL_FROM`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `LAB_BASE_URL` (defaults to `APP_ORIGIN`), `ALERT_NTFY_URL` (optional) | |
 
 Inbound mail is buffered on the `overture-inbound-mail` Queue (100 retries, 14-day retention) and its dead-letter queue
 `overture-inbound-mail-dlq`; spilled messages live in the separate R2 bucket `overture-inbound-mail-spill` under
@@ -191,7 +200,7 @@ Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both
 |---|---|
 | Runtime | Bun 1.4.5 (pinned in `package.json`, CI and the Dockerfile), strict TypeScript (`bun check` for typecheck) |
 | HTTP | Hono + `@hono/zod-validator`; Zod on every input, webhook and env var |
-| DB | `bun:sqlite`, WAL, `synchronous=FULL`, `foreign_keys=ON`, STRICT tables; Drizzle ORM + drizzle-kit migrations; no SQLite-only SQL outside `server/platform/search` |
+| DB | Two SQLite files (ADR 0036): `/data/app.sqlite` for user and job-queue data (WAL, `synchronous=FULL`, Litestream) and `/data/catalog.sqlite` for the public job catalog (WAL, `synchronous=NORMAL`, not replicated), both `foreign_keys=ON` and STRICT; Drizzle ORM + drizzle-kit with `drizzle/` and `drizzle-catalog/` migrations; no SQLite-only SQL outside `server/platform/search` |
 | Auth | better-auth (Google, LinkedIn OIDC and magic link; no passwords, ADR 0035; passkey for admin) with Drizzle adapter |
 | Web | Vite 8, React 19, React Router 7 (library mode, Zod-typed search params), TanStack Query, Hono RPC client, Tailwind v4, shadcn/ui, 21st.dev, dnd-kit, lucide |
 | Browser control | `playwright-core` `chromium.connectOverCDP` |
@@ -287,6 +296,10 @@ other address only lowered and trimmed) · `session` · `account` (provider: goo
 
 ### 5.3 Catalog
 
+`companies`, `company_boards`, `postings`, `posting_tags`, `posting_questions` and `postings_fts` live in
+`catalog.sqlite` (ADR 0036). `questions`, `question_variants` and `tag_imports` stay in `app.sqlite`, so
+`posting_questions.question_id` is a plain logical id and its join to `questions` happens in code, never in SQL.
+
 | Table | Columns |
 |---|---|
 | `companies` | id, name, name_norm, domain NULL, industry NULL, created_at; INDEX(name_norm) |
@@ -297,7 +310,7 @@ other address only lowered and trimmed) · `session` · `account` (provider: goo
 | `postings_fts` | FTS5(title, company, location, department) (short fields only): self-contained, kept in step with `postings` and `companies` by SQLite triggers (insert, update, delete, company rename); closed Postings leave the index |
 | `questions` | id, text_display, text_norm_hash UNIQUE, field_type CHECK IN ('text','textarea','select','multiselect','radio','checkbox','file','date','number','email','phone','url'), options_hash NULL, fact_key NULL (a fact key, or a derivation key for `target`/`derived`), answer_kind CHECK IN ('fact','target','derived','open_text','consent','skip','unknown'), mapped_by CHECK IN ('rules','llm','owner'), seen_count, created_at |
 | `question_variants` | variant_hash PK, question_id |
-| `posting_questions` | posting_id, question_id, required, position, options JSON, field_name (the form input's name or id, taken from the ATS question fields and used to fill the live form); PK(posting_id,question_id) |
+| `posting_questions` | posting_id, question_id (a logical `questions.id` in `app.sqlite`, no foreign key), required, position, options JSON, field_name (the form input's name or id, taken from the ATS question fields and used to fill the live form); PK(posting_id,question_id) |
 | `tag_imports` | id, source, file_sha256, rows, matched, uploaded_by, applied_at |
 
 Descriptions (`description_gz`) are purged 90 days after `closed_at`.

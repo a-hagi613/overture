@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
 import type { DatabaseWriter } from "../platform/db/client.ts";
-import { postings, postingTags } from "../platform/db/schema.ts";
+import { postings, postingTags } from "../platform/db/catalog-schema.ts";
 
 import type { PostingTags, SalaryPeriod, TagSource } from "../../shared/tag-taxonomy.ts";
 

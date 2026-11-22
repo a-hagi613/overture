@@ -4,7 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import type { DNSResolver } from "mailauth";
 import { join, resolve } from "node:path";
 
-import type { AppDatabase } from "./platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "./platform/db/client.ts";
 import type { BackupMonitor } from "./platform/ports/backup.ts";
 import type { ClientIpConfig } from "./auth/client-ip.ts";
 import type { Auth } from "./auth/index.ts";
@@ -61,6 +61,7 @@ import { API_ERRORS } from "../shared/api-errors.ts";
 
 export interface AppDependencies {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: AdjustableClock;
   backups: BackupMonitor;
   databasePath: string;
@@ -157,6 +158,7 @@ export function createApp(deps: AppDependencies) {
 
   const adminApi = createAdminApi(deps.db, deps.clock, deps.auth, {
     backupObjects: createConfiguredBackupStore(),
+    catalogDb: deps.catalogDb,
     databasePath: deps.databasePath,
     objects: deps.objects,
     payments: deps.payments,
@@ -168,6 +170,7 @@ export function createApp(deps: AppDependencies) {
 
   const matching = createMatchingService({
     db: deps.db,
+    catalogDb: deps.catalogDb,
     clock: deps.clock,
     llm: deps.llm,
     personal,
@@ -225,7 +228,10 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createHealthRoutes(deps.db, deps.backups));
   app.route("/api", createMeRoutes(deps.auth));
   app.route("/api", createSupportAccessRoutes(deps.db, deps.auth));
-  app.route("/api", createApiRoutes(deps.db, deps.clock, deps.auth, { shutdown: deps.shutdown }));
+  app.route(
+    "/api",
+    createApiRoutes(deps.db, deps.catalogDb, deps.clock, deps.auth, { shutdown: deps.shutdown }),
+  );
   app.route("/api", createNotificationRoutes(deps.db, deps.clock, deps.auth));
   app.route("/api", createProfileRoutes(deps));
   app.route(
@@ -242,6 +248,7 @@ export function createApp(deps: AppDependencies) {
     "/api",
     createOnboardingRoutes({
       auth: deps.auth,
+      catalogDb: deps.catalogDb,
       clock: deps.clock,
       db: deps.db,
       llm: deps.llm,
@@ -298,6 +305,7 @@ export function createApp(deps: AppDependencies) {
     "/api",
     createMatchingRoutes({
       auth: deps.auth,
+      catalogDb: deps.catalogDb,
       clock: deps.clock,
       db: deps.db,
       matching,
@@ -359,6 +367,7 @@ export function createApp(deps: AppDependencies) {
       "/__test__",
       createTestRoutes(
         deps.db,
+        deps.catalogDb,
         deps.clock,
         deps.jobHandlers,
         deps.singletonJobKinds,

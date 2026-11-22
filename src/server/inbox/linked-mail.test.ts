@@ -2,16 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { openCountingDatabase } from "../testing/query-counter.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
-import {
-  applications,
-  companies,
-  companyBoards,
-  mailThreads,
-  mailboxes,
-  messages,
-  postings,
-  users,
-} from "../platform/db/schema.ts";
+import { applications, mailThreads, mailboxes, messages, users } from "../platform/db/schema.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { linkedMailOf } from "./linked-mail.ts";
 
@@ -37,40 +28,6 @@ function seeded() {
 
   db.insert(mailboxes)
     .values({ id: "mailbox-1", userId: USER, localPart: "mail", createdAt: at })
-    .run();
-
-  db.insert(companies)
-    .values({ id: "co-1", name: "Northwind", nameNorm: "northwind", createdAt: NOW })
-    .run();
-
-  db.insert(companyBoards)
-    .values({
-      id: "board-1",
-      companyId: "co-1",
-      ats: "greenhouse",
-      boardToken: "board-1",
-      region: "us",
-      source: "v1_seed",
-      lastPolledAt: NOW,
-      createdAt: NOW,
-    })
-    .run();
-
-  db.insert(postings)
-    .values({
-      id: "posting-1",
-      boardId: "board-1",
-      companyId: "co-1",
-      ats: "greenhouse",
-      atsJobId: "job-1",
-      url: "https://example.test/job-1",
-      applyUrlNorm: "https://example.test/job-1",
-      title: "Platform Engineer",
-      titleNorm: "platform engineer",
-      firstSeenAt: NOW,
-      lastSeenAt: NOW,
-      dedupeKey: "job-1",
-    })
     .run();
 
   db.insert(applications)

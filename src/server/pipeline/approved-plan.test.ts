@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { openCountingDatabase } from "../testing/query-counter.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
-import { applications, companies, companyBoards, postings, users } from "../platform/db/schema.ts";
+import { applications, users } from "../platform/db/schema.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { openApprovedPlans, sealApprovedPlan } from "./approved-plan.ts";
 
@@ -47,23 +47,6 @@ function seeded() {
     })
     .run();
 
-  db.insert(companies)
-    .values({ id: "co-1", name: "Northwind", nameNorm: "northwind", createdAt: NOW })
-    .run();
-
-  db.insert(companyBoards)
-    .values({
-      id: "board-1",
-      companyId: "co-1",
-      ats: "greenhouse",
-      boardToken: "board-1",
-      region: "us",
-      source: "v1_seed",
-      lastPolledAt: NOW,
-      createdAt: NOW,
-    })
-    .run();
-
   return { counter, db, personal: createPersonalCrypto(db, new Uint8Array(32).fill(6), 1) };
 }
 
@@ -72,23 +55,6 @@ async function addApproved(
   personal: ReturnType<typeof createPersonalCrypto>,
   index: number,
 ) {
-  db.insert(postings)
-    .values({
-      id: `posting-${String(index)}`,
-      boardId: "board-1",
-      companyId: "co-1",
-      ats: "greenhouse",
-      atsJobId: `job-${String(index)}`,
-      url: `https://example.test/job-${String(index)}`,
-      applyUrlNorm: `https://example.test/job-${String(index)}`,
-      title: `Platform Engineer ${String(index)}`,
-      titleNorm: `platform engineer ${String(index)}`,
-      firstSeenAt: NOW,
-      lastSeenAt: NOW,
-      dedupeKey: `job-${String(index)}`,
-    })
-    .run();
-
   const sealed = await sealApprovedPlan({
     applicationId: `app-${String(index)}`,
     personal,

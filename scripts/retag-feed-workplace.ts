@@ -1,8 +1,8 @@
 import { parseArgs } from "node:util";
 
 import { resetFeedContentHashes } from "../src/server/catalog/feed-retag.ts";
-import { openDatabase } from "../src/server/platform/db/client.ts";
-import { migrateDatabase } from "../src/server/platform/db/migrate.ts";
+import { catalogPathFor, openCatalogDatabase } from "../src/server/platform/db/client.ts";
+import { migrateCatalogDatabase } from "../src/server/platform/db/migrate.ts";
 
 const args = parseArgs({ options: { db: { type: "string" } }, strict: true });
 
@@ -14,9 +14,9 @@ if (databasePath === undefined) {
   );
 }
 
-const { db } = openDatabase(databasePath);
+const { db } = openCatalogDatabase(catalogPathFor(databasePath));
 
-migrateDatabase(db, "drizzle");
+migrateCatalogDatabase(db, "drizzle-catalog");
 
 const report = await resetFeedContentHashes(db);
 

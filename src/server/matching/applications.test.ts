@@ -2,9 +2,10 @@ import { describe, expect, test } from "bun:test";
 
 import { eq } from "drizzle-orm";
 
-import { migrateDatabase } from "../platform/db/migrate.ts";
-import { openDatabase } from "../platform/db/client.ts";
-import { applications, companies, companyBoards, postings, users } from "../platform/db/schema.ts";
+import { migrateCatalogDatabase, migrateDatabase } from "../platform/db/migrate.ts";
+import { openCatalogDatabase, openDatabase } from "../platform/db/client.ts";
+import { applications, users } from "../platform/db/schema.ts";
+import { companies, companyBoards, postings } from "../platform/db/catalog-schema.ts";
 
 import { createApplication, postingDisplayFor } from "./applications.ts";
 
@@ -12,8 +13,10 @@ const NOW = 1_800_000_000_000;
 
 function freshCatalog() {
   const { db, sqlite } = openDatabase(":memory:");
+  const catalog = openCatalogDatabase(":memory:");
 
   migrateDatabase(db, "drizzle");
+  migrateCatalogDatabase(catalog.db, "drizzle-catalog");
 
   db.insert(users)
     .values({
@@ -26,7 +29,8 @@ function freshCatalog() {
       updatedAt: new Date(NOW),
     })
     .run();
-  db.insert(companies)
+  catalog.db
+    .insert(companies)
     .values({
       createdAt: NOW,
       domain: "ferro.example",
@@ -36,7 +40,8 @@ function freshCatalog() {
       nameNorm: "ferro cloud",
     })
     .run();
-  db.insert(companyBoards)
+  catalog.db
+    .insert(companyBoards)
     .values({
       ats: "greenhouse",
       boardToken: "ferro",
@@ -46,7 +51,8 @@ function freshCatalog() {
       source: "v1_seed",
     })
     .run();
-  db.insert(postings)
+  catalog.db
+    .insert(postings)
     .values({
       applyUrl: "https://boards.example/jobs/1/apply",
       applyUrlNorm: "https://boards.example/jobs/1/apply",
@@ -69,14 +75,14 @@ function freshCatalog() {
     })
     .run();
 
-  return { db, sqlite };
+  return { catalogDb: catalog.db, db, sqlite };
 }
 
 describe("creating an Application", () => {
   test("copies the Posting and Company display fields onto the row", () => {
-    const { db, sqlite } = freshCatalog();
+    const { catalogDb, db, sqlite } = freshCatalog();
 
-    const id = createApplication(db, NOW, {
+    const id = createApplication({ catalogDb, db }, NOW, {
       origin: "auto",
       postingId: "posting-1",
       score: 82,
@@ -111,21 +117,21 @@ describe("creating an Application", () => {
   });
 
   test("keeps the snapshot after the catalog prunes its Posting and Company", () => {
-    const { db, sqlite } = freshCatalog();
+    const { catalogDb, db, sqlite } = freshCatalog();
 
-    const id = createApplication(db, NOW, {
+    const id = createApplication({ catalogDb, db }, NOW, {
       origin: "manual",
       postingId: "posting-1",
       score: null,
       userId: "user-1",
     });
 
-    expect(postingDisplayFor(db, "posting-1")).toBeDefined();
+    expect(postingDisplayFor(catalogDb, "posting-1")).toBeDefined();
 
-    db.delete(companies).where(eq(companies.id, "company-1")).run();
-    db.delete(postings).where(eq(postings.id, "posting-1")).run();
+    catalogDb.delete(companies).where(eq(companies.id, "company-1")).run();
+    catalogDb.delete(postings).where(eq(postings.id, "posting-1")).run();
 
-    expect(postingDisplayFor(db, "posting-1")).toBeUndefined();
+    expect(postingDisplayFor(catalogDb, "posting-1")).toBeUndefined();
     expect(
       db
         .select()
@@ -141,10 +147,10 @@ describe("creating an Application", () => {
   });
 
   test("creates nothing when the Posting has already left the catalog", () => {
-    const { db, sqlite } = freshCatalog();
+    const { catalogDb, db, sqlite } = freshCatalog();
 
     expect(
-      createApplication(db, NOW, {
+      createApplication({ catalogDb, db }, NOW, {
         origin: "manual",
         postingId: "posting-gone",
         score: null,

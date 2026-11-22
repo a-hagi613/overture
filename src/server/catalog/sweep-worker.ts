@@ -1,5 +1,5 @@
-import { databasePath, env } from "../config/env.ts";
-import { openDatabase } from "../platform/db/client.ts";
+import { catalogDatabasePath, databasePath, env } from "../config/env.ts";
+import { openCatalogDatabase, openDatabase } from "../platform/db/client.ts";
 import { createClock } from "../platform/ports/clock.ts";
 import { createConfiguredObjectStore } from "../platform/object-store.ts";
 import { installOutboundGuard } from "../platform/outbound-guard.ts";
@@ -12,9 +12,11 @@ import { runWorkableIngest } from "./workable-ingest.ts";
 import { sweepRunRequestSchema, sweepRunSummarySchema } from "./sweep-worker-protocol.ts";
 
 import type { BoardFeeds } from "./board-feed.ts";
+import type { SweepDeps } from "./sweep-run.ts";
 import type { SweepRunKind, SweepWorkerResponse } from "./sweep-worker-protocol.ts";
 
 const { db } = openDatabase(databasePath);
+const { db: catalogDb } = openCatalogDatabase(catalogDatabasePath);
 
 if (env.NODE_ENV !== "production") {
   installOutboundGuard(env.NODE_ENV);
@@ -23,9 +25,11 @@ if (env.NODE_ENV !== "production") {
 const clock = createClock();
 const objects = createConfiguredObjectStore();
 
+const deps: SweepDeps = { db, catalogDb, clock };
+
 const feeds: BoardFeeds = {
   greenhouse: createGreenhouseFeed(env.GREENHOUSE_FEED_BASE_URL),
-  lever: createLeverFeed(env.LEVER_FEED_BASE_URL, undefined, env.LEVER_EU_FEED_BASE_URL),
+  lever: createLeverFeed(env.LEVER_FEED_BASE_URL, undefined, env.LEVER_FEED_BASE_URL),
   ashby: createAshbyFeed(env.ASHBY_FEED_BASE_URL),
   personio: createPersonioFeed(env.PERSONIO_FEED_BASE_URL ?? PERSONIO_DEFAULT_BASE_URL),
 };
@@ -38,7 +42,7 @@ async function run(kind: SweepRunKind) {
   const started = performance.now();
 
   if (kind === "workable") {
-    const report = await runWorkableIngest({ db, clock, objects });
+    const report = await runWorkableIngest({ db, catalogDb, clock, objects });
 
     return {
       kind,
@@ -50,15 +54,14 @@ async function run(kind: SweepRunKind) {
       added: report.added,
       updated: report.updated,
       closed: report.closed,
+      closedPostingIds: report.closedPostingIds,
       durationMs: Math.round(performance.now() - started),
       workable: report,
     };
   }
 
   const reports =
-    kind === "backfill"
-      ? await runBackfillPass(db, clock, feeds)
-      : await pollDueBoards(db, clock, feeds);
+    kind === "backfill" ? await runBackfillPass(deps, feeds) : await pollDueBoards(deps, feeds);
 
   return summarizeRun(kind, reports, performance.now() - started);
 }
