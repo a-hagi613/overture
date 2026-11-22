@@ -13,14 +13,14 @@ import { threadViewsOf } from "./threads.ts";
 
 const NOW = 1_795_000_000_000;
 const USER = "inbox-user";
-const { db: catalogDb } = openCatalogDatabase(":memory:");
+const { db: seedCatalogDb } = openCatalogDatabase(":memory:");
 
-migrateCatalogDatabase(catalogDb, "drizzle-catalog");
+migrateCatalogDatabase(seedCatalogDb, "drizzle-catalog");
 
 function seeded() {
   const { counter, db } = openCountingDatabase();
 
-  catalogDb.delete(companies).run();
+  seedCatalogDb.delete(companies).run();
 
   const at = new Date(NOW);
 
@@ -40,12 +40,12 @@ function seeded() {
     .values({ id: "mailbox-1", userId: USER, localPart: "inbox", createdAt: at })
     .run();
 
-  catalogDb
+  seedCatalogDb
     .insert(companies)
     .values({ id: "co-1", name: "Northwind", nameNorm: "northwind", createdAt: NOW })
     .run();
 
-  catalogDb
+  seedCatalogDb
     .insert(companyBoards)
     .values({
       id: "board-1",
@@ -61,12 +61,12 @@ function seeded() {
 
   const personal = createPersonalCrypto(db, new Uint8Array(32).fill(3), 1);
 
-  return { counter, db, personal };
+  return { catalogDb: seedCatalogDb, counter, db, personal };
 }
 
 async function addThread(
   db: AppDatabase,
-  catalogDbToSeed: typeof catalogDb,
+  catalogDbToSeed: typeof seedCatalogDb,
   personal: ReturnType<typeof createPersonalCrypto>,
   input: { application: boolean; index: number; unread: boolean },
 ) {
@@ -193,7 +193,7 @@ function threadsOf(db: AppDatabase) {
 
 describe("the Inbox thread list", () => {
   test("keeps one set of statements however many Threads the person has", async () => {
-    const { counter, db, personal } = seeded();
+    const { catalogDb, counter, db, personal } = seeded();
 
     await Promise.all(
       Array.from({ length: 3 }, async (_unused, index) =>
@@ -232,7 +232,7 @@ describe("the Inbox thread list", () => {
   });
 
   test("reads the latest message, the employer and the unread flag for every Thread", async () => {
-    const { db, personal } = seeded();
+    const { catalogDb, db, personal } = seeded();
 
     await Promise.all(
       Array.from({ length: 4 }, async (_unused, index) =>
@@ -267,7 +267,7 @@ describe("the Inbox thread list", () => {
   });
 
   test("keeps the employer and title after the catalog drops the Posting and Company", async () => {
-    const { db, personal } = seeded();
+    const { catalogDb, db, personal } = seeded();
 
     await addThread(db, catalogDb, personal, { application: true, index: 0, unread: false });
 

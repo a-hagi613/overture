@@ -18,9 +18,9 @@ import { listReviews } from "./reviews.ts";
 
 const NOW = 1_795_000_000_000;
 const USER = "review-user";
-const { db: catalogDb } = openCatalogDatabase(":memory:");
+const { db: seedCatalogDb } = openCatalogDatabase(":memory:");
 
-migrateCatalogDatabase(catalogDb, "drizzle-catalog");
+migrateCatalogDatabase(seedCatalogDb, "drizzle-catalog");
 
 function seedUser(db: AppDatabase) {
   const at = new Date(NOW);
@@ -37,12 +37,12 @@ function seedUser(db: AppDatabase) {
     })
     .run();
 
-  catalogDb
+  seedCatalogDb
     .insert(companies)
     .values({ id: "co-1", name: "Northwind", nameNorm: "northwind", createdAt: NOW })
     .run();
 
-  catalogDb
+  seedCatalogDb
     .insert(companyBoards)
     .values({
       id: "board-1",
@@ -58,7 +58,7 @@ function seedUser(db: AppDatabase) {
 }
 
 function addApplication(db: AppDatabase, index: number) {
-  catalogDb
+  seedCatalogDb
     .insert(postings)
     .values({
       id: `posting-${String(index)}`,
@@ -137,7 +137,7 @@ function addReview(db: AppDatabase, input: { applicationIds: readonly string[]; 
 function seeded(reviewCount: number) {
   const { counter, db } = openCountingDatabase();
 
-  catalogDb.delete(companies).run();
+  seedCatalogDb.delete(companies).run();
 
   seedUser(db);
 
@@ -151,7 +151,7 @@ function seeded(reviewCount: number) {
     addReview(db, { applicationIds, index });
   }
 
-  return { catalogDb, counter, db, clock: createClock() };
+  return { catalogDb: seedCatalogDb, counter, db, clock: createClock() };
 }
 
 describe("the review list", () => {

@@ -65,6 +65,7 @@ export function openDatabase(path: string, options: { logger?: QueryLogger } = {
  * cut is rebuilt by the next feed sweep, while the full fsync on every write would turn the sweep's thousands of rows
  * into the slowest write lock on the volume. The file is excluded from `litestream.yml`.
  * @param path The catalog SQLite file, or `:memory:` in tests.
+ * @param options An optional Drizzle query logger.
  * @returns The Drizzle handle and its SQLite connection.
  */
 export function openCatalogDatabase(path: string, options: { logger?: QueryLogger } = {}) {
