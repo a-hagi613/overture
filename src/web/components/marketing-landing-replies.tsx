@@ -4,24 +4,29 @@ import { NavGlyph } from "./nav-glyph.tsx";
 const { landing: copy } = marketingCopy;
 const { replies } = copy;
 
+function boardCard(card: (typeof replies.columns)[number]["cards"][number]) {
+  return (
+    <div
+      className={`rcd${"hot" in card ? " hotc" : ""}${"muted" in card ? " mut" : ""}`}
+      key={card.name}
+    >
+      <span className="kn">{card.name}</span>
+      <span className="kr serif">{card.role}</span>
+      {"tag" in card ? <span className="rtag">{card.tag}</span> : null}
+    </div>
+  );
+}
+
 function boardMock() {
   return (
     <>
       <div aria-hidden="true" className="rb">
-        {replies.columns.map((column, index) => (
-          <div className={`rcolh rc${String(index)}`} key={column}>
-            <span className="serif">{column}</span>
-          </div>
-        ))}
-        {replies.cards.map((card) => (
-          <div
-            className={`rcd col${String(card.column)}${"hot" in card ? " hotc" : ""}${"muted" in card ? " mut" : ""}`}
-            key={`${card.name}-${card.top}`}
-            style={{ top: card.top }}
-          >
-            <span className="kn">{card.name}</span>
-            <span className="kr serif">{card.role}</span>
-            {"tag" in card ? <span className="rtag">{card.tag}</span> : null}
+        {replies.columns.map((column) => (
+          <div className="rb-col" key={column.title}>
+            <p className="rcolh">
+              <span className="serif">{column.title}</span>
+            </p>
+            {column.cards.map((card) => boardCard(card))}
           </div>
         ))}
       </div>
