@@ -36,6 +36,8 @@ const reportSchema = z.object({
     z.object({
       ats: z.string(),
       costMicrosPerCompleted: z.number().nullable(),
+      p50BrowserMs: z.number().nullable(),
+      p95BrowserMs: z.number().nullable(),
       proxyMbPerCompleted: z.number().nullable(),
       proxyTrend: z.boolean(),
       sent: z.number(),
@@ -44,6 +46,8 @@ const reportSchema = z.object({
 });
 
 const captureSchema = z.object({ jobId: z.string() });
+
+const DAY_MS = 86_400_000;
 
 const jobSchema = z.object({ lastError: z.string().nullable(), status: z.string() });
 
@@ -427,6 +431,81 @@ test("the admin Overview and provider report show proxy MB and cost per complete
 
   await expect(page.getByText("Sending is stopped for this month.")).toBeVisible();
   await expect(page.getByText("Notices are paused for this month")).toHaveCount(0);
+});
+
+test("attempts older than the 30-day cost window are left out of the Overview and the provider report", async ({
+  page,
+  captureAppServer,
+  captureAppUrl,
+  accessServer,
+}) => {
+  const { owner, userId } = await ownerContextFor(captureAppServer.url);
+
+  const companyId = await seedCompany(owner, "Window Street", "windowstreet.example");
+
+  const boardId = await seedBoard(owner, companyId, "greenhouse", "windowstreet");
+
+  const postingId = await seedPosting(owner, {
+    atsJobId: "8004209005",
+    boardId,
+    companyId,
+    title: "Assistant General Manager | Raleigh",
+    url: "https://example.test/windowstreet/jobs/8004209005",
+  });
+
+  const applicationId = await seedApplication(owner, { postingId, status: "ready", userId });
+
+  const { now } = z
+    .object({ now: z.number() })
+    .parse(await (await owner.get("/__test__/clock")).json());
+
+  const seedAttempt = async (daysAgo: number, browserMs: number, proxyBytes: number) => {
+    const seeded = await owner.post("/__test__/attempts/seed", {
+      data: {
+        applicationId,
+        browserMs,
+        costMicros: 20_000,
+        n: 1,
+        outcome: "sent",
+        provider: "browser_use",
+        proxyBytes,
+        startedAt: now - daysAgo * DAY_MS,
+        userId,
+      },
+    });
+
+    expect(seeded.ok()).toBe(true);
+  };
+
+  await seedAttempt(31, 999_000, 9_000_000);
+  await seedAttempt(2, 10_000, 1_000_000);
+  await seedAttempt(3, 20_000, 1_000_000);
+  await seedAttempt(4, 30_000, 1_000_000);
+  await seedAttempt(5, 40_000, 1_000_000);
+
+  await openAdminAsOwner(page, captureAppUrl, accessServer.issueToken);
+
+  const overview = overviewSchema.parse(
+    await (await page.request.get(`${captureAppUrl}/admin/api/overview`)).json(),
+  );
+
+  expect(overview.cost.completed).toBe(4);
+  expect(overview.cost.proxyMbPerCompleted).toBe(1);
+  expect(overview.cost.costMicrosPerCompleted).toBe(20_000);
+
+  const report = reportSchema.parse(
+    await (await page.request.get(`${captureAppUrl}/admin/api/provider-report`)).json(),
+  );
+
+  expect(report.providers).toHaveLength(1);
+  expect(report.providers[0]).toMatchObject({
+    ats: "greenhouse",
+    costMicrosPerCompleted: 20_000,
+    p50BrowserMs: 20_000,
+    p95BrowserMs: 30_000,
+    proxyMbPerCompleted: 1,
+    sent: 4,
+  });
 });
 
 test("an attempt's live view and replay open from the admin", async ({
