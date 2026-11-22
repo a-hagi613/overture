@@ -538,5 +538,11 @@ test("test@email.com signs out of this device from Settings without demo_locked"
   expect(state.sessions.filter((session) => session.userId === user?.id)).toHaveLength(0);
 
   await page.goto(`${demoServer.url}/`);
+  await expect(page).toHaveURL(`${demoServer.url}/`);
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Overture prepares every application/u }),
+  ).toBeVisible();
+
+  await page.goto(`${demoServer.url}/board`);
   await expect(page).toHaveURL(/\/signin$/u);
 });

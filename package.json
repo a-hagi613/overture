@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "bun run src/server/main.ts",
     "dev:web": "vite",
-    "build": "vite build",
+    "build": "vite build && bun run scripts/prerender.tsx",
     "build:checked": "bun run build && bun run copy:check:dist",
     "copy:check:dist": "bun run scripts/check-copy-dist.ts",
     "start": "bun run src/server/main.ts",

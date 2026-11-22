@@ -1,0 +1,41 @@
+/**
+ * Product configuration for plans, allowances and the send rules shown on the public landing and
+ * pricing pages. Every number a marketing page prints comes from here, so a price change is one edit
+ * (ADR 0018 for the plan shapes; ADR 0029 for approval; the daytime window is the SPEC send rule).
+ */
+
+export const TRIAL = {
+  applications: 3,
+  cardVerified: true,
+} as const;
+
+export const PLANS = {
+  week: {
+    applications: 70,
+    periodDays: 7,
+    priceUsd: 12,
+  },
+  month: {
+    applications: 300,
+    periodDays: 30,
+    priceUsd: 35,
+  },
+} as const;
+
+export const SEND_WINDOW = {
+  endHour: 20,
+  minGapMinutes: 20,
+  startHour: 8,
+  maxPerDay: 10,
+} as const;
+
+/** The hiring systems Overture fills. Workday is out of scope (ADR 0017). */
+export const PUBLIC_ATS = ["Greenhouse", "Lever", "Ashby", "Personio", "Workable"] as const;
+
+export function formatHour(hour: number) {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+export function formatUsd(amount: number) {
+  return `$${String(amount)}`;
+}

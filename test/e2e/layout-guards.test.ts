@@ -31,6 +31,7 @@ function storageFor(path: string) {
     path === "/signin" ||
     path === "/terms" ||
     path === "/privacy" ||
+    path === "/pricing" ||
     path === "/consent" ||
     path === "/forgot-password" ||
     path === "/reset-password"

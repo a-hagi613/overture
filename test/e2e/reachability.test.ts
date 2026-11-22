@@ -2,7 +2,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 
 import { expect, test } from "./app.fixture.ts";
 
-test("the sign-in screen and the health route are reachable, and the screen is axe clean", async ({
+test("the health route is reachable, and a visitor at / sees the public landing, not the app", async ({
   page,
   appServerUrl,
 }) => {
@@ -12,7 +12,12 @@ test("the sign-in screen and the health route are reachable, and the screen is a
   await expect(health.json()).resolves.toEqual({ status: "ok", database: "ok" });
 
   await page.goto(appServerUrl);
-  await expect(page).toHaveURL(/\/signin/u);
+  await expect(page).toHaveURL(`${appServerUrl}/`);
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Overture prepares every application/u }),
+  ).toBeVisible();
+
+  await page.goto(`${appServerUrl}/signin`);
   await expect(page.getByRole("heading", { level: 1, name: "Sign in to Overture" })).toBeVisible();
 
   const results = await new AxeBuilder({ page }).analyze();

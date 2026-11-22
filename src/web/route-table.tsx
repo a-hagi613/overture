@@ -24,6 +24,7 @@ import { SettingsExportPage } from "./routes/settings-export.tsx";
 import { SettingsPage } from "./routes/settings.tsx";
 import { SignInPage } from "./routes/signin.tsx";
 import { ConsentPage } from "./routes/consent.tsx";
+import { PricingPage } from "./routes/pricing.tsx";
 import { PrivacyPage } from "./routes/privacy.tsx";
 import { TermsPage } from "./routes/terms.tsx";
 import { AppShell } from "./app.tsx";
@@ -70,6 +71,7 @@ const publicRoutes: RouteObject[] = [
   { path: "/signin", element: <SignInPage /> },
   { path: "/terms", element: <TermsPage /> },
   { path: "/privacy", element: <PrivacyPage /> },
+  { path: "/pricing", element: <PricingPage /> },
   { path: "/consent", element: <ConsentPage /> },
   { path: "/onboarding", element: <OnboardingPage /> },
   { path: "/onboarding/resume", element: <OnboardingResumePage /> },
