@@ -63,8 +63,9 @@ Stripe Managed Payments fees and taxes are not in these figures. They change mar
 - Anthropic spend is attributed per user, not per Application, because `llm_usage` has no application id and this
   change adds no migration. For a user, all of the window's Application-purpose calls are counted, including scoring for
   postings that were never attempted. That overstates cost slightly and is conservative for the gate.
-- The per-provider report (`/admin/api/provider-report`) stays browser-only, as before. Anthropic spend cannot be split
-  per ATS without an application id on `llm_usage`.
+- The per-provider report (`/admin/api/provider-report`) carries the same Anthropic attribution as the Overview: a
+  user's window spend is spread across their attempted tries, so each provider × ATS row gets the share of that spend
+  its tries hold. `llm_usage` still has no application id, so no row is joined to a call.
 
 ## Limits
 

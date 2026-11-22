@@ -34,9 +34,18 @@ import { DEFAULT_IMPORT_SOURCE, importTags, readTagImports } from "../catalog/ta
 import { createAccessVerifier } from "../platform/access/index.ts";
 import { env } from "../config/env.ts";
 import { hasRecentPasskeyAssertion, lastPasskeyAssertionAt } from "../platform/passkey/index.ts";
-import { listAdminAudit, recordAdminAudit } from "../platform/audit/index.ts";
+import { listAdminAudit, recordAdminAudit, shipAdminAudit } from "../platform/audit/index.ts";
 import { readLlmUsage } from "../platform/llm/usage.ts";
 import { applicationsLeft, balancesPerGrant, grantApplications } from "../billing/ledger.ts";
+import {
+  BILLING_FILTERS,
+  BILLING_USERS_PAGE_SIZE,
+  billingUserView,
+  billingUsersPage,
+} from "../billing/admin-view.ts";
+import { REFUND_REASONS, refundGrant } from "../billing/refunds.ts";
+import { reconciliationForAdmin } from "../billing/reconcile.ts";
+import type { Payments } from "../platform/ports/payments.ts";
 import { buildCostSummary, buildProviderReport } from "../dispatch/report.ts";
 import { buildLabReport } from "../lab/report.ts";
 import { LAB_JOB_KIND, labRunPayloadSchema } from "../lab/job.ts";
@@ -94,6 +103,19 @@ const grantBody = z.object({
   expiresInDays: z.number().int().min(0).max(365).nullable(),
   idempotencyKey: z.string().min(1),
   quantity: z.number().int().min(1).max(100_000),
+});
+
+const billingUsersQuery = z.object({
+  filter: z.enum(BILLING_FILTERS).default("all"),
+  page: z.coerce.number().int().min(1).default(1),
+});
+
+const refundBody = z.object({
+  amountCents: z.number().int().min(1).max(100_000_000).nullable(),
+  grantId: z.string().min(1),
+  idempotencyKey: z.string().min(1).max(200),
+  note: z.string().trim().min(1).max(500),
+  reason: z.enum(REFUND_REASONS),
 });
 
 const tagImportBody = z.object({
@@ -155,6 +177,7 @@ const personioProbeSummarySchema = z.object({
 export interface AdminDeps {
   providers: BrowserProviderRegistry | null;
   personal: PersonalCrypto;
+  payments: Payments | null;
 }
 
 const ATS_NAMES = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
@@ -712,7 +735,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
         total: allSwitches.length,
         enabled: allSwitches.filter((row) => row.enabled === 1).length,
       },
-      cost: buildCostSummary(db),
+      cost: buildCostSummary(db, clock),
       mail: readMailSummary(db, clock.now()),
       audit: audit.map((row) => ({
         id: row.id,
@@ -1091,6 +1114,55 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
       applicationsLeft: applicationsLeft(db, user.id, at),
       grantId: placed.grantId,
     });
+  });
+
+  routes.get("/billing/users", zValidator("query", billingUsersQuery), (context) => {
+    const { filter, page } = context.req.valid("query");
+
+    return context.json({
+      pageSize: BILLING_USERS_PAGE_SIZE,
+      ...billingUsersPage(db, clock, { filter, page }),
+    });
+  });
+
+  routes.get("/billing/reconciliation", (context) =>
+    context.json({ reconciliation: reconciliationForAdmin(db) }),
+  );
+
+  routes.get("/billing/users/:id", (context) => {
+    const view = billingUserView(db, clock, context.req.param("id"));
+
+    return view === null
+      ? context.json({ error: "user_not_found" }, 404)
+      : context.json({ user: view });
+  });
+
+  routes.post("/billing/refunds", zValidator("json", refundBody), async (context) => {
+    const { payments } = deps;
+
+    if (payments === null) {
+      return context.json({ error: "billing_disabled" }, 503);
+    }
+
+    const owner = context.get("owner");
+    const body = context.req.valid("json");
+
+    const outcome = await refundGrant(
+      { clock, db, payments, shipAudit: shipAdminAudit },
+      { ...body, actorId: owner.userId },
+    );
+
+    if (outcome.kind === "refunded") {
+      return context.json({ refund: outcome.refund, replayed: outcome.replayed });
+    }
+
+    if (outcome.kind === "idempotency_key_reused") {
+      return context.json({ error: outcome.kind }, 422);
+    }
+
+    const status = outcome.kind === "not_found" ? 404 : 409;
+
+    return context.json({ error: outcome.kind }, status);
   });
 
   routes.get("/llm-usage", zValidator("query", llmUsageQuery), (context) => {

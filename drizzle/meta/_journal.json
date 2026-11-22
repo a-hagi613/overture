@@ -337,6 +337,20 @@
       "when": 1795317214001,
       "tag": "0047_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1795404800000,
+      "tag": "0048_consent_v2",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1795491600000,
+      "tag": "0049_billing_reconciliation",
+      "breakpoints": true
     }
   ]
 }

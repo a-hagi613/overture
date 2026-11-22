@@ -12,7 +12,8 @@ import {
   claimTrialCard,
   TRIAL_APPLICATIONS,
 } from "../../src/server/billing/card-fingerprint.ts";
-import { applicationsLeft } from "../../src/server/billing/ledger.ts";
+import { applicationsLeft, grantApplications } from "../../src/server/billing/ledger.ts";
+import { createSpendGate, ungatedSpend } from "../../src/server/billing/spend.ts";
 
 const SECRET = "test-fingerprint-secret-0123456789";
 const STRIPE_FINGERPRINT = "fingerprint_card_a";
@@ -132,5 +133,57 @@ test.describe("preparation gate input", () => {
     const { clock, db } = freshDatabase();
 
     expect(applicationsLeft(db, "user-2", clock.now())).toBe(0);
+  });
+});
+
+test.describe("the spend gate", () => {
+  test("lets everyone spend when invite-only and billing is off", () => {
+    const { clock, db } = freshDatabase();
+    const gate = createSpendGate({ clock, db, gated: false });
+
+    expect(gate.gated).toBe(false);
+    expect(gate.allows("user-1")).toBe(true);
+    expect(ungatedSpend.allows("user-1")).toBe(true);
+  });
+
+  test("refuses paid work without Applications left", () => {
+    const { clock, db } = freshDatabase();
+    const gate = createSpendGate({ clock, db, gated: true });
+
+    expect(gate.allows("user-1")).toBe(false);
+  });
+
+  test("allows paid work once a trial or plan grants Applications", () => {
+    const { clock, db } = freshDatabase();
+
+    grantApplications(db, clock, {
+      idempotencyKey: "trial:1",
+      quantity: 3,
+      source: "trial",
+      userId: "user-1",
+    });
+
+    const gate = createSpendGate({ clock, db, gated: true });
+
+    expect(gate.allows("user-1")).toBe(true);
+  });
+
+  test("refuses again once the grant expires", () => {
+    const { clock, db } = freshDatabase();
+    const at = clock.now();
+
+    grantApplications(db, clock, {
+      expiresAt: at + 1,
+      idempotencyKey: "trial:expired",
+      quantity: 3,
+      source: "trial",
+      userId: "user-1",
+    });
+
+    clock.setOffset(2000);
+
+    const gate = createSpendGate({ clock, db, gated: true });
+
+    expect(gate.allows("user-1")).toBe(false);
   });
 });

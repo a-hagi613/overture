@@ -9,6 +9,7 @@ import { SpanStatusCode } from "@opentelemetry/api";
 import { adminAudit } from "../db/schema.ts";
 import { logError } from "../log.ts";
 import { lokiAuditConfig, shipAuditToLoki } from "./loki.ts";
+import { insertAdminAudit } from "./insert.ts";
 import { trace } from "../telemetry/otel.ts";
 
 const auditDetailSchema = z.record(
@@ -48,18 +49,6 @@ export function auditRowOfStored(row: typeof adminAudit.$inferSelect) {
   } satisfies AdminAuditRow;
 }
 
-export function auditRowOf(id: string, at: Date, entry: AdminAuditEntry) {
-  return {
-    id,
-    at,
-    actorId: entry.actorId,
-    action: entry.action,
-    targetUserId: entry.targetUserId ?? null,
-    reason: entry.reason ?? "",
-    detail: entry.detail ?? {},
-  } satisfies AdminAuditRow;
-}
-
 export function startAuditSpan(action: string, targetUserId: string | undefined) {
   return trace.getTracer("overture").startSpan("admin.audit", {
     attributes: {
@@ -72,29 +61,6 @@ export function startAuditSpan(action: string, targetUserId: string | undefined)
 export function failAuditSpan(span: ReturnType<typeof startAuditSpan>, cause: unknown) {
   logError("admin.audit", cause);
   span.setStatus({ code: SpanStatusCode.ERROR });
-}
-
-export function insertAdminAudit(
-  db: Pick<AppDatabase, "insert">,
-  clock: Clock,
-  entry: AdminAuditEntry,
-) {
-  const id = crypto.randomUUID();
-  const at = clock.now();
-
-  db.insert(adminAudit)
-    .values({
-      id,
-      at,
-      actorId: entry.actorId,
-      action: entry.action,
-      targetUserId: entry.targetUserId ?? null,
-      reason: entry.reason ?? "",
-      detail: JSON.stringify(entry.detail ?? {}),
-    })
-    .run();
-
-  return auditRowOf(id, new Date(at), entry);
 }
 
 export async function shipAdminAudit(row: AdminAuditRow) {

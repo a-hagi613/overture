@@ -26,6 +26,7 @@ const envSchema = z
     STATIC_ROOT: z.string().min(1).default("dist"),
     ENABLE_TEST_ROUTES: booleanFromString.default(false),
     DEMO_LOGIN_ENABLED: booleanFromString.default(false),
+    PUBLIC_SIGNUP_ENABLED: booleanFromString.default(true),
     GREENHOUSE_FEED_BASE_URL: z.string().min(1).optional(),
     GREENHOUSE_BOARD_BASE_URL: z.url().optional(),
     LEVER_FEED_BASE_URL: z.string().min(1).optional(),

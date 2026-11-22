@@ -133,6 +133,23 @@ async function pausedNotices(request: APIRequestContext, appUrl: string, userId:
   return state.notifications.filter((row) => row.kind === "paused");
 }
 
+async function waitForPauseNoticeDelivery(
+  request: APIRequestContext,
+  appUrl: string,
+  userId: string,
+) {
+  await expect
+    .poll(
+      async () => {
+        const [notice] = await pausedNotices(request, appUrl, userId);
+
+        return notice !== undefined && notice.pushedAt !== null && notice.emailedAt !== null;
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true);
+}
+
 async function mailTo(request: APIRequestContext, appUrl: string, to: string) {
   const mail = mailSchema.parse(await (await request.get(`${appUrl}/__test__/mail`)).json());
 
@@ -294,6 +311,8 @@ test("a failed payment pauses with its own copy, a push and an email, and a paid
     });
 
     await runDue(request, server.url);
+
+    await waitForPauseNoticeDelivery(request, server.url, ownerId);
 
     notices = await pausedNotices(request, server.url, ownerId);
 
@@ -497,6 +516,8 @@ test("the end of a plan pauses and lets an in-flight send finish, charged only i
     expect(applications.applications.find((row) => row.id === heldApp)?.scheduledFor).toBeNull();
 
     await runDue(request, server.url);
+
+    await waitForPauseNoticeDelivery(request, server.url, ownerId);
 
     notices = await pausedNotices(request, server.url, ownerId);
 

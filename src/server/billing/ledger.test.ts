@@ -15,6 +15,7 @@ import {
   commitForApplication,
   committedSince,
   dailyUsageSince,
+  endingGrantOf,
   expireDueGrants,
   grantApplications,
   ledgerBalances,
@@ -51,6 +52,38 @@ function freshLedger() {
 }
 
 describe("the ledger", () => {
+  test("names the invite grant that is running out, with its Applications left and end date", () => {
+    const { clock, db, userId } = freshLedger();
+    const at = clock.now();
+
+    expect(endingGrantOf(db, userId, at)).toBeNull();
+
+    grantApplications(db, clock, {
+      expiresAt: at + 37 * DAY_MS,
+      startsAt: at,
+      idempotencyKey: "grant:invite",
+      quantity: 12,
+      source: "admin",
+      userId,
+    });
+
+    expect(endingGrantOf(db, userId, at)).toStrictEqual({
+      applicationsLeft: 12,
+      expiresAt: at + 37 * DAY_MS,
+    });
+
+    grantApplications(db, clock, {
+      idempotencyKey: "grant:open",
+      startsAt: at,
+      quantity: 4,
+      source: "admin",
+      userId,
+    });
+
+    expect(endingGrantOf(db, userId, at)?.applicationsLeft).toBe(12);
+    expect(endingGrantOf(db, userId, at + 40 * DAY_MS)).toBeNull();
+  });
+
   test("equals itself across every transfer", () => {
     const { clock, db, sqlite, userId } = freshLedger();
 

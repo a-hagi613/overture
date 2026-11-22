@@ -10,7 +10,12 @@ import type { MatchingService } from "../matching/score.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
 
-import { applicationsLeft, committedSince, planApplications } from "../billing/ledger.ts";
+import {
+  applicationsLeft,
+  committedSince,
+  endingGrantOf,
+  planApplications,
+} from "../billing/ledger.ts";
 import {
   applicationEvents,
   applications,
@@ -666,6 +671,7 @@ export function createHomeRoutes(deps: {
       checkInDue: checkIns.length,
       checkIns,
       dailyCap,
+      endingGrant: endingGrantOf(db, userId, now),
       nextSendAt,
       now,
       pauseReason: profile.pauseReason,

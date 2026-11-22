@@ -468,6 +468,7 @@ const seedGrantBody = z.object({
   quantity: z.number().int().min(1).max(10_000),
   idempotencyKey: z.string().min(1),
   source: z.enum(["admin", "period", "trial"]).default("admin"),
+  expiresAt: z.number().int().positive().nullable().optional(),
 });
 
 const ledgerApplicationBody = z.object({
@@ -2171,7 +2172,7 @@ export function createTestRoutes(
   });
 
   routes.post("/ledger/grant", zValidator("json", seedGrantBody), async (context) => {
-    const { email, quantity, idempotencyKey, source } = context.req.valid("json");
+    const { email, quantity, idempotencyKey, source, expiresAt } = context.req.valid("json");
 
     const user = db
       .select()
@@ -2186,11 +2187,11 @@ export function createTestRoutes(
     await retryWhenBusy(
       () =>
         grantApplications(db, clock, {
+          expiresAt: expiresAt ?? (source === "period" ? clock.now() + 30 * 86_400_000 : null),
           idempotencyKey,
           quantity,
           source,
           startsAt: source === "period" ? clock.now() : null,
-          expiresAt: source === "period" ? clock.now() + 30 * 86_400_000 : null,
           userId: user.id,
         }),
       "test.ledger.grant",

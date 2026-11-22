@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
@@ -90,4 +91,48 @@ export async function signedInUserId(request: APIRequestContext, appUrl: string,
   }
 
   return user.id;
+}
+
+const invoiceFixture = readFileSync("test/e2e/fixtures/stripe/invoice-paid.json", "utf8");
+
+const failedInvoiceFixture = readFileSync(
+  "test/e2e/fixtures/stripe/invoice-payment-failed.json",
+  "utf8",
+);
+
+export interface InvoiceInput {
+  eventId: string;
+  invoiceId: string;
+  userId: string;
+  periodStart: number;
+  periodEnd: number;
+  plan?: string;
+}
+
+function renderInvoice(template: string, input: InvoiceInput) {
+  return template
+    .replaceAll("__EVENT_ID__", input.eventId)
+    .replaceAll("__INVOICE_ID__", input.invoiceId)
+    .replaceAll("__USER_ID__", input.userId)
+    .replaceAll("__PLAN__", input.plan ?? "month")
+    .replaceAll("__PRICE_ID__", BILLING_PRICE_MONTH)
+    .replaceAll('"__PERIOD_START__"', String(input.periodStart))
+    .replaceAll('"__PERIOD_END__"', String(input.periodEnd));
+}
+
+export function invoicePayload(input: InvoiceInput) {
+  return renderInvoice(invoiceFixture, input);
+}
+
+export function failedInvoicePayload(input: InvoiceInput) {
+  return renderInvoice(failedInvoiceFixture, input);
+}
+
+export async function deliverInvoice(request: APIRequestContext, appUrl: string, payload: string) {
+  return postWebhook(
+    request,
+    appUrl,
+    payload,
+    signPayload(payload, await appNowSeconds(request, appUrl)),
+  );
 }

@@ -12,7 +12,9 @@ export function AdminPageHeading({
   return (
     <div className="mt-6 flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0">
-        <p className="font-serif text-[15px] italic text-muted-foreground">{lead}</p>
+        {lead.length === 0 ? null : (
+          <p className="font-serif text-[15px] italic text-muted-foreground">{lead}</p>
+        )}
         <h1 className="mt-0.5 font-serif text-[32px] leading-[1.05] md:text-[42px]">
           {plain}
           {italic.length === 0 ? null : (

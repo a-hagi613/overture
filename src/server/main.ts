@@ -12,6 +12,12 @@ import {
   GRANT_EXPIRY_JOB_KIND,
   runGrantExpirySweep,
 } from "./billing/expiry.ts";
+import { createSpendGate } from "./billing/spend.ts";
+import {
+  BILLING_RECONCILE_JOB_KIND,
+  billingReconcileJobHandler,
+  ensureReconcileQueued,
+} from "./billing/reconcile.ts";
 import { seedDemoAccount } from "./demo/seed.ts";
 import { createDemoSafeMailSender } from "./demo/mail-guard.ts";
 import { isDemoUser } from "./demo/role.ts";
@@ -197,6 +203,22 @@ void backups.run(shutdownController.signal);
 
 const mailSender = createDemoSafeMailSender(db, createMailSender(db, clock));
 const payments = createPayments(clock);
+
+const spendGate = createSpendGate({
+  db,
+  clock,
+  gated: payments !== null || env.PUBLIC_SIGNUP_ENABLED,
+});
+
+if (env.PUBLIC_SIGNUP_ENABLED) {
+  logInfo(
+    "auth",
+    payments === null
+      ? "public sign-up is on without billing: no account can prepare Applications until it has a grant"
+      : "public sign-up is on; paid work needs a trial card or a plan",
+  );
+}
+
 const pushSender = createPushSender(env, clock);
 const mailboxes = createMailboxService(db, clock, env.INBOUND_HMAC_SECRET ?? "", env.MAIL_DOMAIN);
 
@@ -245,6 +267,7 @@ const jobSingletons = [
   CHECKIN_SWEEP_JOB_KIND,
   DISPATCH_TICK_JOB_KIND,
   GRANT_EXPIRY_JOB_KIND,
+  BILLING_RECONCILE_JOB_KIND,
   LIVE_CHECK_JOB_KIND,
   WORKABLE_INGEST_JOB_KIND,
   RETENTION_JOB_KIND,
@@ -257,6 +280,10 @@ recoverStaleLocks(db, clock, jobSingletons);
 ensureCheckinSweepQueued(db, clock);
 
 ensureGrantExpiryQueued(db, clock);
+
+if (payments !== null) {
+  ensureReconcileQueued(db, clock);
+}
 
 ensureRetentionQueued(db, clock);
 
@@ -310,11 +337,11 @@ if (env.DEMO_LOGIN_ENABLED) {
 const planner = createPlanner({ clock, db, random });
 
 const preparation = createPreparationService({
-  billingEnabled: payments !== null,
   db,
   clock,
   llm: anthropicLlmPort,
   personal,
+  spendGate,
   source: createGreenhouseQuestionSource(env.GREENHOUSE_FEED_BASE_URL),
   greenhouseBoardOrigin: env.GREENHOUSE_BOARD_BASE_URL,
   plainFormReader: createPlainFormReader({
@@ -387,6 +414,7 @@ const prepDailyJobHandlers: JobHandlers = {
           llm: anthropicLlmPort,
           personal,
           preparation,
+          spendGate,
         },
         userId,
         since ?? clock.now(),
@@ -463,7 +491,14 @@ const mailPersonal = createPersonalCrypto(
   env.MASTER_KEY_CURRENT,
 );
 
-const resumes = createResumeService({ db, clock, llm: anthropicLlmPort, objects, personal });
+const resumes = createResumeService({
+  db,
+  clock,
+  llm: anthropicLlmPort,
+  objects,
+  personal,
+  spendGate,
+});
 
 const exports = createExportService({
   appOrigin,
@@ -497,6 +532,7 @@ const mailMoves = createMailMoves({
   degraded: degradedFlag,
   llm: anthropicLlmPort,
   personal: mailPersonal,
+  spendGate,
 });
 
 const resolver = createMailDnsResolver(env.INBOUND_DNS_SERVER);
@@ -735,6 +771,15 @@ const retentionJobHandlers: JobHandlers = {
   },
 };
 
+const reconcileJobHandlers: JobHandlers =
+  payments === null
+    ? {}
+    : {
+        [BILLING_RECONCILE_JOB_KIND]: async (payload: string) => {
+          await billingReconcileJobHandler({ clock, db, payments }, payload);
+        },
+      };
+
 const billingJobHandlers: JobHandlers = {
   [GRANT_EXPIRY_JOB_KIND]: async () => {
     try {
@@ -743,6 +788,7 @@ const billingJobHandlers: JobHandlers = {
       ensureGrantExpiryQueued(db, clock);
     }
   },
+  ...reconcileJobHandlers,
 };
 
 const allJobHandlers: JobHandlers = {
@@ -813,6 +859,7 @@ const app = createApp({
   auth,
   objects,
   llm: anthropicLlmPort,
+  spendGate,
   mailboxes,
   resolver,
   liveCheckAddress: liveCheckAddressValue,

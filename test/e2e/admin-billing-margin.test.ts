@@ -193,7 +193,10 @@ test("the margin page shows the measured numbers and marks the unbuilt billing s
   );
   await expect(
     page.getByRole("navigation", { name: "Billing sections" }).getByRole("link"),
-  ).toHaveCount(1);
+  ).toHaveCount(3);
+  await expect(
+    page.getByRole("navigation", { name: "Billing sections" }).getByRole("link", { name: "Users" }),
+  ).toHaveAttribute("href", "/admin/billing");
   await expect(page.getByText("$0.033").first()).toBeVisible();
   await expect(page.getByText("81%").first()).toBeVisible();
   await expect(page.getByText("n/a").first()).toBeVisible();

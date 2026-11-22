@@ -9,7 +9,7 @@ export type BillingDb = BaseSQLiteDatabase<"sync", void>;
 
 type LedgerRow = typeof ledger.$inferSelect;
 
-type LedgerKindPostable = Exclude<LedgerRow["kind"], "refund" | "adjust">;
+type LedgerKindPostable = Exclude<LedgerRow["kind"], "adjust">;
 
 type LedgerAccount = LedgerRow["debitAccount"];
 
@@ -24,6 +24,7 @@ export const LEDGER_TRANSFERS: Record<
   commit: { credit: "used", debit: "reserved" },
   expire: { credit: "expired", debit: "available" },
   grant: { credit: "available", debit: "issued" },
+  refund: { credit: "expired", debit: "available" },
   release: { credit: "available", debit: "reserved" },
   reserve: { credit: "reserved", debit: "available" },
 };
@@ -184,6 +185,33 @@ export function applicationsLeft(db: BillingDb, userId: string, at: number) {
 
 export function planApplications(db: BillingDb, userId: string, at: number) {
   return activeGrantsOf(db, userId, at).reduce((sum, grant) => sum + grant.quantity, 0);
+}
+
+/**
+ * The invite grant that is running out: the soonest-ending admin grant that has
+ * an end date and still holds Applications. Home shows its count and end date
+ * so an invited user can choose a plan before the grant ends.
+ * @param db The database to read.
+ * @param userId The user whose grant to check.
+ * @param at The instant the grant is checked at.
+ * @returns The Applications left on that grant and when it ends, or null.
+ */
+export function endingGrantOf(db: BillingDb, userId: string, at: number) {
+  const per = balancesPerGrant(db, userId);
+
+  const grant = activeGrantsOf(db, userId, at).find(
+    (row) => row.source === "admin" && row.expiresAt !== null,
+  );
+
+  const expiresAt = grant?.expiresAt ?? null;
+
+  if (grant === undefined || expiresAt === null) {
+    return null;
+  }
+
+  const left = per.get(grant.id)?.available ?? 0;
+
+  return left > 0 ? { applicationsLeft: left, expiresAt } : null;
 }
 
 interface ReservationPair {
@@ -358,6 +386,35 @@ export function releaseForApplication(db: BillingDb, clock: Clock, input: Reserv
   });
 
   return { released: true as const, row };
+}
+
+/**
+ * Stops the unused Applications on a refunded grant, so the refunded period
+ * can no longer spend them. Callers record the refund itself in the audit log.
+ * @param db The database, inside the caller's transaction.
+ * @param clock The clock the ledger row is dated with.
+ * @param input The user, the grant and the idempotency key of the refund row.
+ * @returns The ledger row, or null when the grant had no unused Applications left.
+ */
+export function refundGrantApplications(
+  db: BillingDb,
+  clock: Clock,
+  input: { userId: string; grantId: string; idempotencyKey: string },
+) {
+  const available = balancesPerGrant(db, input.userId).get(input.grantId)?.available ?? 0;
+
+  if (available <= 0) {
+    return null;
+  }
+
+  return postLedgerEntry(db, clock.now(), {
+    userId: input.userId,
+    kind: "refund",
+    amount: available,
+    grantId: input.grantId,
+    applicationId: null,
+    idempotencyKey: input.idempotencyKey,
+  });
 }
 
 /**
