@@ -862,8 +862,12 @@ export const copy = {
   },
   consent: {
     eyebrow: "Consent",
+    versionWord: "Version",
     versionLabel: (version: string) => `Version ${version}`,
     title: "What you agree to",
+    titleBefore: "What you ",
+    titleItalic: "agree",
+    titleAfter: " to",
     readNoticeBefore: "I have read the ",
     readNoticeBetween: " and the ",
     readNoticeEnd: ".",
