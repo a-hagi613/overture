@@ -36,7 +36,7 @@ export function MarginPage() {
       </h1>
       <p className="mt-2 text-[15px] text-muted-foreground">{copy.admin.marginLead}</p>
 
-      <BillingTabs />
+      <BillingTabs current="margin" />
 
       <section aria-labelledby="margin-plans" className="mt-7">
         <div className="flex items-baseline justify-between gap-3">
