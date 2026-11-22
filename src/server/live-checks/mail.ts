@@ -173,6 +173,32 @@ export function resolveLiveCheckMail(deps: MailCheckDeps, mailId: string) {
   return resultForRow(row, waitMs, deps.clock.now());
 }
 
+/**
+ * Whether a token belongs to a check that is still waiting for its message.
+ *
+ * Inbound mail to the live-check address is attacker-written: anyone can email it. Only a token
+ * this app generated, for a check that has not been answered or resolved yet, may create an
+ * object or a result row, so a stranger cannot write arbitrary recordings to the bucket.
+ * @param db The application database.
+ * @param token The token found in the message.
+ * @returns True when an outstanding check row owns the token.
+ */
+export function hasOpenLiveCheckMailToken(db: AppDatabase, token: string) {
+  const row = db
+    .select({ id: liveCheckMail.id })
+    .from(liveCheckMail)
+    .where(
+      and(
+        eq(liveCheckMail.token, token),
+        isNull(liveCheckMail.receivedAt),
+        isNull(liveCheckMail.resolvedAt),
+      ),
+    )
+    .get();
+
+  return row !== undefined;
+}
+
 export function recordLiveCheckMailInbound(
   db: AppDatabase,
   clock: Clock,

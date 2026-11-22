@@ -187,6 +187,9 @@
           "src/server/dispatch/outcomes.test.ts",
           "src/server/platform/db/migration-snapshot.test.ts",
           "src/server/matching/applications.test.ts",
+          "src/server/platform/access/access.test.ts",
+          "src/server/platform/alert-detail.test.ts",
+          "src/server/platform/http-body.test.ts",
           "scripts/database-sync-guard.test.ts"
         ]
       }

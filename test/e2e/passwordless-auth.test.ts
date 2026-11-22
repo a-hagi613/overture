@@ -1,5 +1,6 @@
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, test } from "./app.fixture.ts";
+import { readVerifications } from "./db.fixture.ts";
 import {
   clearSinkMail,
   latestMailLink,
@@ -98,4 +99,35 @@ test("a magic link signs the owner in and stores no password", async ({
 
   expect(owner?.emailVerified).toBe(true);
   expect(state.accounts.filter((account) => account.userId === owner?.id)).toEqual([]);
+});
+
+test("a magic-link token is stored hashed and the mailed link still signs in", async ({
+  request,
+  isolatedAppServer,
+}) => {
+  const { url, databasePath } = isolatedAppServer;
+
+  await clearSinkMail(url, request);
+  await setTurnstileScenario(request, url, { action: "magiclink" });
+  expect((await requestMagicLink(url, request, authTestIdentity.ownerEmail)).ok()).toBe(true);
+
+  const link = await latestMailLink(url, request, authTestIdentity.ownerEmail);
+  const token = new URL(link).searchParams.get("token");
+
+  expect(token).not.toBeNull();
+
+  const rows = readVerifications(databasePath);
+
+  expect(rows.length).toBeGreaterThan(0);
+  expect(JSON.stringify(rows)).not.toContain(token ?? "");
+
+  const verified = await request.get(link, { maxRedirects: 0 });
+
+  expect(verified.status()).toBeGreaterThanOrEqual(300);
+  expect(verified.status()).toBeLessThan(400);
+  expect(verified.headers()["set-cookie"]).toContain("session_token");
+
+  const state = await verifyAuthState(url, request);
+
+  expect(state.sessions.length).toBe(1);
 });

@@ -424,6 +424,7 @@ export function createAuth(
         expiresIn: 15 * 60,
         rateLimit: { window: 15 * 60, max: 3 },
         disableSignUp: false,
+        storeToken: "hashed",
         sendMagicLink: async (data) => {
           const email = data.email.trim().toLowerCase();
 
