@@ -30,6 +30,7 @@ function storageFor(path: string) {
   }
 
   if (
+    path === "*" ||
     path === "/signin" ||
     path === "/terms" ||
     path === "/privacy" ||
@@ -66,7 +67,6 @@ const shellPaths = new Set([
   "/profile",
   "/search",
   "/settings",
-  "*",
 ]);
 
 const redirectedPaths = new Map([
