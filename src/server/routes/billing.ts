@@ -174,6 +174,7 @@ export function createStripeWebhookRoutes(deps: {
 }) {
   const { clock, db, payments } = deps;
   const routes = new Hono();
+
   const webhooks = createPaymentsWebhookService({ clock, db, planForPrice: planForPriceId });
 
   routes.post("/webhooks/stripe", async (context) => {

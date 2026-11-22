@@ -132,7 +132,8 @@
           "src/server/routes/test-only.ts",
           "src/server/pipeline/prepare.ts",
           "src/server/dispatch/dispatch.ts",
-          "src/server/demo/seed.ts"
+          "src/server/demo/seed.ts",
+          "src/server/billing/pause.test.ts"
         ],
         "allowRoots": ["test/e2e", "scripts"]
       }
@@ -149,6 +150,7 @@
         "e2eRoot": "test/e2e",
         "allow": [
           "src/server/billing/ledger.test.ts",
+          "src/server/billing/pause.test.ts",
           "src/server/platform/crypto.test.ts",
           "src/server/dispatch/planner.test.ts",
           "src/server/profile/address.test.ts",
