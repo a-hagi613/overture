@@ -1,4 +1,4 @@
-import type { AppDatabase } from "../db/client.ts";
+import type { AppDatabase, DatabaseWriter } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 
 import { events } from "../db/schema.ts";
@@ -7,7 +7,7 @@ import { subscribeToEvents, wakeEventHub } from "./hub.ts";
 const HEARTBEAT_INTERVAL_MS = 25_000;
 
 export function publishEvent(
-  db: AppDatabase,
+  db: DatabaseWriter,
   clock: Clock,
   topic: string,
   payload: string,

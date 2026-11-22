@@ -33,6 +33,7 @@ export interface KernelFixture {
   sessions: KernelSessionState[];
   deletedSessionIds: string[];
   deletedAttemptIds: string[];
+  deletedProfileIds: string[];
   profiles: { id: string; name: string }[];
   close: () => void;
 }
@@ -63,6 +64,7 @@ export function startKernelFixture() {
   const sessions: KernelSessionState[] = [];
   const deletedSessionIds: string[] = [];
   const deletedAttemptIds: string[] = [];
+  const deletedProfileIds: string[] = [];
   const profiles: { id: string; name: string }[] = [];
 
   const server = Bun.serve({
@@ -90,6 +92,22 @@ export function startKernelFixture() {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
+      }
+
+      const profileMatch = /^\/profiles\/(?<id>[^/]+)$/u.exec(path);
+
+      if (request.method === "DELETE" && profileMatch?.groups?.id !== undefined) {
+        const { id: profileId } = profileMatch.groups;
+        const index = profiles.findIndex((profile) => profile.id === profileId);
+
+        if (index === -1) {
+          return Response.json({ code: "not_found", message: "no profile" }, { status: 404 });
+        }
+
+        profiles.splice(index, 1);
+        deletedProfileIds.push(profileId);
+
+        return new Response(null, { status: 204 });
       }
 
       if (request.method === "POST" && path === "/browsers") {
@@ -188,6 +206,7 @@ export function startKernelFixture() {
       void server.stop(true);
     },
     deletedAttemptIds,
+    deletedProfileIds,
     deletedSessionIds,
     profiles,
     sessions,

@@ -1,0 +1,12 @@
+{
+  "version": "2.0",
+  "generated_at": "2026-11-18T23:27:27Z",
+  "updated_at": "2026-11-19T20:39:08Z",
+  "companies": {
+    "csv": "companies.csv",
+    "parquet": "companies.parquet",
+    "parquet_sha256": "18d8988b8a5c2daa12f95a8fc073756b8ec37c37076e8dc7c63da4276a28cadc",
+    "parquet_size_bytes": 1786,
+    "rows": 11
+  }
+}

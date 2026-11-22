@@ -132,6 +132,9 @@ export const bgJobs = sqliteTable(
     uniqueIndex("bg_jobs_dedupe_key_queued")
       .on(t.dedupeKey)
       .where(sql`status = 'queued'`),
+    index("bg_jobs_claim_due")
+      .on(t.status, t.runAt)
+      .where(sql`status IN ('queued', 'running')`),
   ],
 );
 
@@ -425,6 +428,30 @@ export const llmUsage = sqliteTable("llm_usage", {
   createdAt: integer("created_at").notNull(),
 });
 
+export const llmBatches = sqliteTable(
+  "llm_batches",
+  {
+    id: text("id").primaryKey(),
+    inputRevisionHash: text("input_revision_hash").notNull(),
+    model: text("model").notNull(),
+    batchId: text("batch_id"),
+    status: text("status", { enum: ["creating", "in_progress", "applied", "failed"] })
+      .notNull()
+      .default("creating"),
+    results: text("results"),
+    resultAppliedAt: integer("result_applied_at"),
+    expiresAt: integer("expires_at"),
+    lastPolledAt: integer("last_polled_at"),
+    lastError: text("last_error"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("llm_batches_input_revision_hash_unique").on(t.inputRevisionHash),
+    index("llm_batches_status_updated").on(t.status, t.updatedAt),
+  ],
+);
+
 export const mailUsage = sqliteTable("mail_usage", {
   month: text("month").primaryKey(),
   authSends: integer("auth_sends").notNull().default(0),
@@ -577,6 +604,31 @@ export const mailboxes = sqliteTable("mailboxes", {
 export const retiredAddresses = sqliteTable("retired_addresses", {
   localPart: text("local_part").primaryKey(),
   retiredAt: timestamp("retired_at").notNull(),
+});
+
+/**
+ * The durable plan for one account erasure. It is written in the same transaction that deletes the
+ * account, so the vendor profile ids and object prefixes survive the cascade that removes
+ * `browser_profiles`, and the confirmation target survives until the notice is queued. It has no
+ * foreign key on purpose: it outlives the `users` row it names.
+ *
+ * `vendor_profiles` shrinks as each remote profile is deleted, `object_prefixes` stays until every
+ * prefix lists empty, and both `*_cleaned_at` stamps mean the external cleanup was confirmed. The
+ * `notice_name` and `notice_to` columns are wiped as soon as `notice_queued_at` is set.
+ */
+export const accountErasures = sqliteTable("account_erasures", {
+  userId: text("user_id").primaryKey(),
+  vendorProfiles: text("vendor_profiles").notNull().default("[]"),
+  objectPrefixes: text("object_prefixes").notNull(),
+  noticeName: text("notice_name"),
+  noticeTo: text("notice_to"),
+  userDeletedAt: timestamp("user_deleted_at"),
+  vendorCleanedAt: timestamp("vendor_cleaned_at"),
+  objectsCleanedAt: timestamp("objects_cleaned_at"),
+  noticeQueuedAt: timestamp("notice_queued_at"),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
 });
 
 export const mailThreads = sqliteTable(

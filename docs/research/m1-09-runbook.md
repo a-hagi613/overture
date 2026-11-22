@@ -17,6 +17,12 @@ hash against `src/server/catalog/companies-parquet.ts`, and only then writes
 `/data/seed/manifest.json` and `/data/seed/companies.parquet`. A mismatch fails loudly before anything is
 written, including on the loader (below), which re-checks the pins on every run.
 
+A weekly `.github/workflows/stapply-seed.yml` run stages a candidate snapshot before anyone re-pins: it runs
+`scripts/refresh-stapply-seed.ts`, which applies the same schema check, the manifest's own sha256 and a 20 % row-drop
+guard, keeps the prior snapshot when upstream fails, and uploads the staged files plus a JSON summary as an artifact
+(`docs/DEPLOY.md`, the Stapply seed refresh). To adopt one, read its hashes and row count, update both pins in
+`src/server/catalog/companies-parquet.ts`, and rerun steps 1 and 2.
+
 ## 2. Load the discovered boards
 
 ```sh

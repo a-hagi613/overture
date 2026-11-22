@@ -30,6 +30,7 @@ import {
   grants,
   ledger,
   liveCheckMail,
+  llmBatches,
   mailUsage,
   matches,
   postingQuestions,
@@ -1546,6 +1547,12 @@ export function createTestRoutes(
     });
 
     return context.json(summary);
+  });
+
+  routes.get("/llm/batches", (context) => {
+    const rows = db.select().from(llmBatches).all();
+
+    return context.json({ batches: rows });
   });
 
   routes.post("/llm/usage", zValidator("json", recordLlmUsageBody), (context) => {

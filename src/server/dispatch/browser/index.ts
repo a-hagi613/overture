@@ -4,8 +4,10 @@ import type { Env } from "../../config/env.ts";
 import type { BrowserProvider, BrowserProviderRegistry } from "./provider.ts";
 
 import { getSetting } from "../../platform/settings/index.ts";
+import { raiseAlert } from "../../platform/alerts.ts";
 import { BrowserUseClient } from "./browser-use.ts";
 import { createBrowserUseBrowserProvider } from "./browser-use-provider.ts";
+import { createNetworkPolicyResolver } from "./network-policy.ts";
 import { createBrowserProfileStore } from "./profiles.ts";
 import { KernelClient } from "./kernel.ts";
 import { createKernelBrowserProvider } from "./kernel-provider.ts";
@@ -33,11 +35,25 @@ export function createBrowserProvider(env: Env, clock: Clock, db: AppDatabase) {
   }
 
   if (env.BROWSER_USE_API_KEY !== undefined) {
+    const client = BrowserUseClient(env.BROWSER_USE_API_KEY, env.BROWSER_USE_API_BASE_URL, clock);
+    const resolveNetworkPolicy = createNetworkPolicyResolver(client);
+
     providers.set(
       "browser_use",
       createBrowserUseBrowserProvider({
-        client: BrowserUseClient(env.BROWSER_USE_API_KEY, env.BROWSER_USE_API_BASE_URL, clock),
+        client,
         clock,
+        resolveNetworkPolicyId: async () => {
+          try {
+            return await resolveNetworkPolicy();
+          } catch (error) {
+            raiseAlert(db, clock, "browser.network_policy", {
+              message: error instanceof Error ? error.message.slice(0, 300) : "unknown error",
+            });
+
+            return null;
+          }
+        },
         profiles,
         usageSettleDeadlineMs: env.BROWSER_USE_USAGE_SETTLE_MS,
       }),

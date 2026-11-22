@@ -81,7 +81,7 @@ const kindFromPrompt = /(?:^|\n)kind: (?<kind>[a-z_]+)$/mu;
 
 const CREATED_AT = "2026-11-20T12:00:00.000Z";
 const ENDED_AT = "2026-11-20T12:01:00.000Z";
-const EXPIRES_AT = "2026-11-21T12:00:00.000Z";
+const EXPIRES_AT = "2099-01-01T12:00:00.000Z";
 
 export interface RecordedBatchRequest {
   customId: string;
@@ -104,8 +104,14 @@ export interface AnthropicFixtureServer {
   url: string;
   stop: () => void;
   batchesCreated: () => number;
+  batchesRetrieved: () => number;
+  releaseHeldBatches: () => void;
   requests: () => RecordedBatchRequest[];
   singleMessages: () => RecordedSingleMessage[];
+}
+
+export interface AnthropicFixtureServerOptions {
+  holdBatches?: boolean;
 }
 
 interface BatchItem {
@@ -269,7 +275,7 @@ function serveResults(batch: TrackedBatch) {
     .join("\n");
 }
 
-export async function startAnthropicFixtureServer() {
+export async function startAnthropicFixtureServer(options: AnthropicFixtureServerOptions = {}) {
   const recordings = loadTagFallbackRecordingsSync();
   const scoreRecordings = loadScoreRecordingsSync();
   const questionRecordings = loadQuestionMappingRecordingsSync();
@@ -282,6 +288,8 @@ export async function startAnthropicFixtureServer() {
   const seenSingleMessages: RecordedSingleMessage[] = [];
 
   let createdBatches = 0;
+  let retrievedBatches = 0;
+  let holdBatches = options.holdBatches ?? false;
   let batchCounter = 0;
 
   const server: Server = createServer((request, response) => {
@@ -459,6 +467,8 @@ export async function startAnthropicFixtureServer() {
       return;
     }
 
+    retrievedBatches += 1;
+
     finishJson(
       response,
       200,
@@ -466,18 +476,18 @@ export async function startAnthropicFixtureServer() {
         type: "message_batch",
         id: batch.id,
         archived_at: null,
-        processing_status: "ended",
+        processing_status: holdBatches ? "in_progress" : "ended",
         request_counts: {
-          processing: 0,
-          succeeded: batch.items.length,
+          processing: holdBatches ? batch.items.length : 0,
+          succeeded: holdBatches ? 0 : batch.items.length,
           errored: 0,
           canceled: 0,
           expired: 0,
         },
         ends_at: null,
-        ended_at: ENDED_AT,
+        ended_at: holdBatches ? null : ENDED_AT,
         expires_at: EXPIRES_AT,
-        results_url: `${baseUrl()}/v1/messages/batches/${batch.id}/results`,
+        results_url: holdBatches ? null : `${baseUrl()}/v1/messages/batches/${batch.id}/results`,
         created_at: CREATED_AT,
       }),
     );
@@ -546,6 +556,10 @@ export async function startAnthropicFixtureServer() {
       server.close();
     },
     batchesCreated: () => createdBatches,
+    batchesRetrieved: () => retrievedBatches,
+    releaseHeldBatches: () => {
+      holdBatches = false;
+    },
     requests: () => [...seenRequests],
     singleMessages: () => [...seenSingleMessages],
   } satisfies AnthropicFixtureServer;

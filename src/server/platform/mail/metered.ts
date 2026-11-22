@@ -1,24 +1,11 @@
-import type { MailCategory, MailRefusalReason, MailUsage } from "./budget.ts";
+import type { MailCategory } from "./budget.ts";
 import type { MailSender } from "./port.ts";
 import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 
 import { raiseAlert } from "../alerts.ts";
+import { MailCapExceededError } from "./errors.ts";
 import { isProtectedCategory, reserveMailSend } from "./budget.ts";
-
-/**
- * Thrown when the month's Email Sending allowance refuses a send. Callers that
- * can wait for the next month treat it as nothing to send; sign-in mail and the
- * live check let it surface so nothing claims a mail that was never sent.
- */
-export class MailCapExceededError extends Error {
-  constructor(category: MailCategory, reason: MailRefusalReason, usage: MailUsage) {
-    super(
-      `Email Sending refused a ${category} mail for ${usage.month}: ${String(usage.total)} of the month is spent (${reason})`,
-    );
-    this.name = "MailCapExceededError";
-  }
-}
 
 /**
  * Wraps a mail sender so every send is counted before it leaves the machine and

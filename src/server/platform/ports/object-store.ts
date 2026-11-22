@@ -1,13 +1,20 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+
+export interface ObjectEntry {
+  key: string;
+  bytes: number;
+}
 
 export interface ObjectStore {
+  kind: "disk" | "r2";
   put: (key: string, data: Uint8Array<ArrayBuffer>) => Promise<void>;
   putStream: (key: string, data: AsyncIterable<Uint8Array>) => Promise<number>;
   get: (key: string) => Promise<Uint8Array<ArrayBuffer> | null>;
   getStream: (key: string) => Promise<ReadableStream<Uint8Array> | null>;
   delete: (key: string) => Promise<void>;
   list: (prefix: string) => AsyncIterable<string>;
+  listWithSizes: (prefix: string) => AsyncIterable<ObjectEntry>;
 }
 
 async function keysUnder(root: string) {
@@ -19,6 +26,33 @@ async function keysUnder(root: string) {
 
   return keys;
 }
+
+const STAT_BATCH_SIZE = 128;
+
+const statInBatches: (
+  root: string,
+  keys: readonly string[],
+  offset?: number,
+  collected?: ObjectEntry[],
+) => Promise<ObjectEntry[]> = async (root, keys, offset = 0, collected = []) => {
+  if (offset >= keys.length) {
+    return collected;
+  }
+
+  const batch = keys.slice(offset, offset + STAT_BATCH_SIZE);
+
+  const entries = await Promise.all(
+    batch.map(async (key) => {
+      const details = await stat(join(root, key)).catch(() => null);
+
+      return details?.isFile() === true ? { key, bytes: details.size } : null;
+    }),
+  );
+
+  collected.push(...entries.filter((entry) => entry !== null));
+
+  return statInBatches(root, keys, offset + STAT_BATCH_SIZE, collected);
+};
 
 export function createDiskObjectStore(root: string) {
   const pathFor = (key: string) => {
@@ -36,6 +70,7 @@ export function createDiskObjectStore(root: string) {
   };
 
   return {
+    kind: "disk",
     put: async (key: string, data: Uint8Array<ArrayBuffer>) => {
       const path = pathFor(key);
 
@@ -98,6 +133,15 @@ export function createDiskObjectStore(root: string) {
         if (key.startsWith(prefix)) {
           yield key;
         }
+      }
+    },
+    async *listWithSizes(prefix: string) {
+      const rootPath = resolve(root);
+      const found = (await keysUnder(rootPath)).filter((key) => key.startsWith(prefix));
+      const entries = await statInBatches(rootPath, found);
+
+      for (const entry of entries) {
+        yield entry;
       }
     },
   } satisfies ObjectStore;

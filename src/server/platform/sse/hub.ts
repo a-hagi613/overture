@@ -1,6 +1,6 @@
 import { gt } from "drizzle-orm";
 
-import type { AppDatabase } from "../db/client.ts";
+import type { AppDatabase, DatabaseWriter } from "../db/client.ts";
 
 import { logError } from "../log.ts";
 import { events } from "../db/schema.ts";
@@ -107,7 +107,7 @@ function createHub(db: AppDatabase) {
   return { subscribe, wake };
 }
 
-const hubs = new WeakMap<AppDatabase, ReturnType<typeof createHub>>();
+const hubs = new WeakMap<DatabaseWriter, ReturnType<typeof createHub>>();
 
 function hubFor(db: AppDatabase) {
   const existing = hubs.get(db);
@@ -127,6 +127,6 @@ export function subscribeToEvents(db: AppDatabase, subscriber: EventSubscriber) 
   return hubFor(db).subscribe(subscriber);
 }
 
-export function wakeEventHub(db: AppDatabase) {
+export function wakeEventHub(db: DatabaseWriter) {
   hubs.get(db)?.wake();
 }

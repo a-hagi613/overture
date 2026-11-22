@@ -1,6 +1,6 @@
 import { and, eq, isNotNull, lte, sql } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { profiles } from "../platform/db/schema.ts";
@@ -16,7 +16,7 @@ const DAY_MS = 24 * 60 * 60_000;
  * @param now The current time.
  * @returns The effective IANA timezone, UTC when the profile has none.
  */
-export function effectiveTimeZone(db: AppDatabase, userId: string, now: number) {
+export function effectiveTimeZone(db: DatabaseWriter, userId: string, now: number) {
   const row = db
     .select({
       pendingTimezone: profiles.pendingTimezone,
