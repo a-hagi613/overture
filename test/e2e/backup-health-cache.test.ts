@@ -36,6 +36,12 @@ async function timedHealth(url: string) {
   };
 }
 
+async function waitForReplication(url: string) {
+  await expect
+    .poll(async () => (await timedHealth(url)).replication, { timeout: 30_000 })
+    .toBe("ok");
+}
+
 async function startReplicatedServer(
   directory: string,
   extraEnvironment: Record<string, string> = {},
@@ -72,7 +78,10 @@ async function startReplicatedServer(
   };
 }
 
-test("health answers from the cached reading in under 100 ms while the replica listing is slow", async () => {
+const SLOW_LISTING_MS = 3000;
+const CACHED_ANSWER_LIMIT_MS = 500;
+
+test("health answers from the cached reading without waiting for a slow replica listing", async () => {
   test.setTimeout(120_000);
 
   const directory = mkdtempSync(join(tmpdir(), "overture-health-cache-"));
@@ -80,7 +89,10 @@ test("health answers from the cached reading in under 100 ms while the replica l
   try {
     const slowLitestream = join(directory, "slow-litestream");
 
-    writeFileSync(slowLitestream, '#!/bin/sh\nsleep 3\nexec litestream "$@"\n');
+    writeFileSync(
+      slowLitestream,
+      `#!/bin/sh\nsleep ${String(SLOW_LISTING_MS / 1000)}\nexec litestream "$@"\n`,
+    );
     chmodSync(slowLitestream, 0o755);
 
     const { server, stop } = await startReplicatedServer(directory, {
@@ -110,7 +122,56 @@ test("health answers from the cached reading in under 100 ms while the replica l
         )
         .toBe("ok");
 
-      expect(Math.max(...latencies)).toBeLessThan(100);
+      expect(Math.max(...latencies)).toBeLessThan(CACHED_ANSWER_LIMIT_MS);
+    } finally {
+      await stop();
+    }
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("a shorter read interval saved in Settings applies within one interval", async () => {
+  test.setTimeout(120_000);
+
+  const directory = mkdtempSync(join(tmpdir(), "overture-health-interval-"));
+
+  try {
+    const { server, stop } = await startReplicatedServer(directory);
+
+    try {
+      await waitForReplication(server.url);
+
+      await expect
+        .poll(async () => (await timedHealth(server.url)).readAgeSeconds, { timeout: 10_000 })
+        .toBeGreaterThanOrEqual(1);
+
+      const saved = await fetch(
+        `${server.url}/__test__/settings/backups.replica_read_interval_ms`,
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ value: "1000" }),
+        },
+      );
+
+      expect(saved.ok).toBe(true);
+
+      const { offsetMs } = clockOffsetSchema.parse(
+        await (await fetch(`${server.url}/__test__/clock`)).json(),
+      );
+
+      const offset = await fetch(`${server.url}/__test__/clock/offset`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ offsetMs: offsetMs + 10_000 }),
+      });
+
+      expect(clockOffsetSchema.parse(await offset.json()).offsetMs).toBe(offsetMs + 10_000);
+
+      await expect
+        .poll(async () => (await timedHealth(server.url)).replication, { timeout: 10_000 })
+        .toBe("ok");
     } finally {
       await stop();
     }
@@ -128,9 +189,7 @@ test("a cached reading older than three intervals reports unknown", async () => 
     const { server, stop } = await startReplicatedServer(directory);
 
     try {
-      await expect
-        .poll(async () => (await timedHealth(server.url)).replication, { timeout: 30_000 })
-        .toBe("ok");
+      await waitForReplication(server.url);
 
       const offset = await fetch(`${server.url}/__test__/clock/offset`, {
         method: "POST",

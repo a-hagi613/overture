@@ -35,8 +35,19 @@ const boardCode = "A1B2C3D4";
 
 const BOARD_DIFF_LIMIT = 0.01;
 
+const CONTEXT_PX = 4;
+
 function variantOf(width: 390 | 1280, theme: "light" | "dark") {
   return `${String(width)}-${theme}` as const;
+}
+
+function frameAround(box: { height: number; width: number; x: number; y: number }) {
+  return {
+    height: Math.round(box.height) + CONTEXT_PX * 2,
+    width: Math.round(box.width) + CONTEXT_PX * 2,
+    x: Math.round(box.x) - CONTEXT_PX,
+    y: Math.round(box.y) - CONTEXT_PX,
+  };
 }
 
 const CARD_BOX = {
@@ -312,18 +323,20 @@ for (const width of [390, 1280] as const) {
       expect(Math.round(actualBox.width)).toBe(box.width);
       expect(Math.abs(Math.round(actualBox.height) - box.height)).toBeLessThanOrEqual(3);
 
+      const frame = frameAround(actualBox);
+
       const ratio = await page.evaluate(compareRegion, {
-        actual: (await card.screenshot({ animations: "disabled", caret: "hide" })).toString(
-          "base64",
-        ),
+        actual: (
+          await page.screenshot({ animations: "disabled", caret: "hide", clip: frame })
+        ).toString("base64"),
         expected: readFileSync(
           join(process.cwd(), `design/reference/code-wait/${variant}.png`),
         ).toString("base64"),
         region: {
-          height: Math.round(actualBox.height),
-          width: Math.round(actualBox.width),
-          x: box.x,
-          y: box.y,
+          height: frame.height,
+          width: frame.width,
+          x: box.x - CONTEXT_PX,
+          y: box.y - CONTEXT_PX,
         },
       });
 

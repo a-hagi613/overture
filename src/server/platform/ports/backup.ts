@@ -23,6 +23,7 @@ export type { ReplicaTransaction } from "./replica-listing.ts";
 
 const DEFAULT_READ_INTERVAL_MS = 30_000;
 const MIN_READ_INTERVAL_MS = 1000;
+const INTERVAL_CHECK_MS = 1000;
 const STALE_AFTER_INTERVALS = 3;
 
 export type BackupStatus =
@@ -157,12 +158,26 @@ export function createBackupMonitor(db: AppDatabase, clock: Clock) {
       }
 
       await refresh(path);
-      await delay(readIntervalMs(), undefined, { signal }).catch(() => undefined);
+      await waitForNextRead(performance.now(), signal);
 
       return step(path);
     }
 
     await step(configPath);
+  }
+
+  async function waitForNextRead(startedAt: number, signal: AbortSignal) {
+    const remainingMs = readIntervalMs() - (performance.now() - startedAt);
+
+    if (remainingMs <= 0 || signal.aborted) {
+      return;
+    }
+
+    await delay(Math.min(remainingMs, INTERVAL_CHECK_MS), undefined, { signal }).catch(
+      () => undefined,
+    );
+
+    return waitForNextRead(startedAt, signal);
   }
 
   return { status, run };
