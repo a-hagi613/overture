@@ -1,4 +1,4 @@
-import { zValidator } from "@hono/zod-validator";
+import { validJson } from "./validators.ts";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
@@ -38,7 +38,7 @@ function revealViewOf(session: RevealSession, now: number) {
 export function createAdminRevealRoutes(db: AppDatabase, clock: Clock, personal: PersonalCrypto) {
   const routes = new Hono<AdminEnv>();
 
-  routes.post("/users/:id/reveal", zValidator("json", revealBody), async (context) => {
+  routes.post("/users/:id/reveal", validJson(revealBody), async (context) => {
     const owner = context.get("owner");
     const { reason } = context.req.valid("json");
 

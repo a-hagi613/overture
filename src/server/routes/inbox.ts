@@ -9,6 +9,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import { API_ERRORS } from "../../shared/api-errors.ts";
 
 import { mailThreads, messageAttachments, messages } from "../platform/db/schema.ts";
 import { attachmentsByMessageOf, messagesByThreadOf, threadViewsOf } from "../inbox/threads.ts";
@@ -104,7 +105,7 @@ export function createInboxRoutes(deps: {
     const user = await sessionUser(context.req.raw);
 
     if (user === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const threads = db
@@ -130,7 +131,7 @@ export function createInboxRoutes(deps: {
     const user = await sessionUser(context.req.raw);
 
     if (user === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const thread = db
@@ -140,7 +141,7 @@ export function createInboxRoutes(deps: {
       .get();
 
     if (thread === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     const messagesFor = messagesByThreadOf(db, [thread.id]).get(thread.id) ?? [];
@@ -164,7 +165,7 @@ export function createInboxRoutes(deps: {
     const user = await sessionUser(context.req.raw);
 
     if (user === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const row = db
@@ -174,7 +175,7 @@ export function createInboxRoutes(deps: {
       .get();
 
     if (row === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     if (row.readAt === null) {
@@ -194,7 +195,7 @@ export function createInboxRoutes(deps: {
     const user = await sessionUser(context.req.raw);
 
     if (user === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const attachment = db
@@ -205,13 +206,13 @@ export function createInboxRoutes(deps: {
       .get();
 
     if (attachment === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     const stored = await objects.get(attachment.message_attachments.objectKey);
 
     if (stored === null) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     const base64 = await personal.openFor(

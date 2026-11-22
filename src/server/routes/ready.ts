@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
+import { validJson } from "./validators.ts";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -372,7 +372,7 @@ export function createReadyRoutes(deps: {
     };
   }
 
-  routes.post("/applications/:id/approve", zValidator("json", approveBody), async (context) => {
+  routes.post("/applications/:id/approve", validJson(approveBody), async (context) => {
     const user = await sessionUser(context.req.raw.headers);
 
     if (user === null) {
@@ -404,7 +404,7 @@ export function createReadyRoutes(deps: {
     return context.json(result);
   });
 
-  routes.post("/ready/approve", zValidator("json", approveAllBody), async (context) => {
+  routes.post("/ready/approve", validJson(approveAllBody), async (context) => {
     const user = await sessionUser(context.req.raw.headers);
 
     if (user === null) {
@@ -527,55 +527,51 @@ export function createReadyRoutes(deps: {
     return context.json({ status: "ready" });
   });
 
-  routes.put(
-    "/applications/:id/answers/:questionId",
-    zValidator("json", answerBody),
-    async (context) => {
-      const user = await sessionUser(context.req.raw.headers);
+  routes.put("/applications/:id/answers/:questionId", validJson(answerBody), async (context) => {
+    const user = await sessionUser(context.req.raw.headers);
 
-      if (user === null) {
-        return context.json({ error: "sign_in_required" }, 401);
-      }
+    if (user === null) {
+      return context.json({ error: "sign_in_required" }, 401);
+    }
 
-      const locked = demoLocked(user.role);
+    const locked = demoLocked(user.role);
 
-      if (locked !== null) {
-        return locked;
-      }
+    if (locked !== null) {
+      return locked;
+    }
 
-      const { id, questionId } = context.req.param();
-      const { value } = context.req.valid("json");
+    const { id, questionId } = context.req.param();
+    const { value } = context.req.valid("json");
 
-      const result = await preparation.editAnswer({
+    const result = await preparation.editAnswer({
+      applicationId: id,
+      questionId,
+      userId: user.id,
+      value,
+    });
+
+    if (result.kind === "saved") {
+      return context.json({
+        answer: result.answer,
         applicationId: id,
+        byUser: result.byUser,
+        factKey: result.factKey,
+        factRevision: result.factRevision,
         questionId,
-        userId: user.id,
-        value,
+        status: "ready",
       });
+    }
 
-      if (result.kind === "saved") {
-        return context.json({
-          answer: result.answer,
-          applicationId: id,
-          byUser: result.byUser,
-          factKey: result.factKey,
-          factRevision: result.factRevision,
-          questionId,
-          status: "ready",
-        });
-      }
+    if (result.kind === "not_found" || result.kind === "question_not_found") {
+      return context.json({ error: result.kind }, 404);
+    }
 
-      if (result.kind === "not_found" || result.kind === "question_not_found") {
-        return context.json({ error: result.kind }, 404);
-      }
+    if (result.kind === "invalid_answer") {
+      return context.json({ error: result.kind }, 422);
+    }
 
-      if (result.kind === "invalid_answer") {
-        return context.json({ error: result.kind }, 422);
-      }
-
-      return context.json({ error: result.kind }, 409);
-    },
-  );
+    return context.json({ error: result.kind }, 409);
+  });
 
   return routes;
 }

@@ -4,6 +4,7 @@ import type { Auth } from "../auth/index.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 
 import { listAdminAuditForUser } from "../platform/audit/index.ts";
+import { API_ERRORS } from "../../shared/api-errors.ts";
 
 const MAX_ENTRIES = 200;
 const REVEAL_ACTION_PREFIX = "reveal.";
@@ -19,7 +20,7 @@ export function createSupportAccessRoutes(db: AppDatabase, auth: Auth) {
       .catch(() => null);
 
     if (session === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const entries = listAdminAuditForUser(db, session.user.id, MAX_ENTRIES)

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
+import { validJson } from "./validators.ts";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -31,6 +31,7 @@ import {
   onboardingTimezoneInputSchema,
 } from "../../shared/onboarding.ts";
 import { targetsInputSchema } from "../../shared/targets.ts";
+import { API_ERRORS } from "../../shared/api-errors.ts";
 
 const CHOICES_STALE_MS = 10 * 60_000;
 
@@ -145,7 +146,7 @@ export function createOnboardingRoutes(deps: {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     return context.json(await view(account));
@@ -155,7 +156,7 @@ export function createOnboardingRoutes(deps: {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     if (!account.emailVerified) {
@@ -185,7 +186,7 @@ export function createOnboardingRoutes(deps: {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const finished = Number(context.req.param("step"));
@@ -211,17 +212,17 @@ export function createOnboardingRoutes(deps: {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     return context.json(await targetsView(account.id));
   });
 
-  routes.put("/onboarding/targets", zValidator("json", targetsInputSchema), async (context) => {
+  routes.put("/onboarding/targets", validJson(targetsInputSchema), async (context) => {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     await targetsService.save(account.id, context.req.valid("json"));
@@ -229,56 +230,48 @@ export function createOnboardingRoutes(deps: {
     return context.json(await targetsView(account.id));
   });
 
-  routes.put(
-    "/onboarding/timezone",
-    zValidator("json", onboardingTimezoneInputSchema),
-    async (context) => {
-      const account = await sessionUser(auth, context.req.raw);
+  routes.put("/onboarding/timezone", validJson(onboardingTimezoneInputSchema), async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
 
-      if (account === null) {
-        return context.json({ error: "unauthorised" }, 401);
-      }
+    if (account === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
 
-      const languages = await ensureLanguages(account.id);
+    const languages = await ensureLanguages(account.id);
 
-      return context.json(
-        await languagesService.save(account.id, {
-          languages,
-          timezone: context.req.valid("json").timezone,
-        }),
-      );
-    },
-  );
+    return context.json(
+      await languagesService.save(account.id, {
+        languages,
+        timezone: context.req.valid("json").timezone,
+      }),
+    );
+  });
 
   routes.get("/onboarding/facts", async (context) => {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     return context.json(await step.read(account.id));
   });
 
-  routes.put(
-    "/onboarding/facts",
-    zValidator("json", onboardingFactsInputSchema),
-    async (context) => {
-      const account = await sessionUser(auth, context.req.raw);
+  routes.put("/onboarding/facts", validJson(onboardingFactsInputSchema), async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
 
-      if (account === null) {
-        return context.json({ error: "unauthorised" }, 401);
-      }
+    if (account === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
 
-      const locked = demoLocked(account.role);
+    const locked = demoLocked(account.role);
 
-      if (locked !== null) {
-        return locked;
-      }
+    if (locked !== null) {
+      return locked;
+    }
 
-      return context.json(await step.save(account.id, context.req.valid("json")));
-    },
-  );
+    return context.json(await step.save(account.id, context.req.valid("json")));
+  });
 
   return routes;
 }

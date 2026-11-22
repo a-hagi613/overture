@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
+import { validJson } from "./validators.ts";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -22,6 +22,7 @@ import { createStrengthenService } from "../profile/strengthen.ts";
 import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
 import { returnStaleApprovals } from "../pipeline/approval-invalidation.ts";
 import { TIER_2_FACT_KEYS } from "../../shared/facts.ts";
+import { API_ERRORS } from "../../shared/api-errors.ts";
 import {
   languagesInputSchema,
   profileSettingsInputSchema,
@@ -103,7 +104,7 @@ export function createProfileRoutes(deps: {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const locked = demoLocked(account.role);
@@ -112,13 +113,16 @@ export function createProfileRoutes(deps: {
       return locked;
     }
 
-    const form = uploadSchema.parse({
-      file: (await context.req.formData()).get("file"),
-    });
+    const form = await context.req.formData().catch(() => null);
+    const parsed = uploadSchema.safeParse({ file: form?.get("file") ?? null });
+
+    if (!parsed.success) {
+      return context.json({ error: API_ERRORS.invalidRequest, issues: parsed.error.issues }, 400);
+    }
 
     const upload = await resumesService.upload(account.id, {
-      name: form.file.name === "" ? "resume.pdf" : form.file.name,
-      bytes: new Uint8Array(await form.file.arrayBuffer()),
+      name: parsed.data.file.name === "" ? "resume.pdf" : parsed.data.file.name,
+      bytes: new Uint8Array(await parsed.data.file.arrayBuffer()),
     });
 
     const prefilled = await factsService.prefillFromResume(account.id, upload.text);
@@ -141,7 +145,7 @@ export function createProfileRoutes(deps: {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     return context.json(await resumesService.current(account.id));
@@ -151,7 +155,7 @@ export function createProfileRoutes(deps: {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const locked = demoLocked(account.role);
@@ -160,10 +164,11 @@ export function createProfileRoutes(deps: {
       return locked;
     }
 
-    const file = await resumesService.currentFileBytes(account.id);
+    const { id } = context.req.param();
+    const file = await resumesService.fileBytes(account.id, id);
 
     if (file === null) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     return new Response(file.bytes, {
@@ -178,7 +183,7 @@ export function createProfileRoutes(deps: {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     return context.json({ facts: await factsService.list(account.id) });
@@ -188,7 +193,7 @@ export function createProfileRoutes(deps: {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     let raw: unknown;
@@ -196,7 +201,7 @@ export function createProfileRoutes(deps: {
     try {
       raw = await context.req.json();
     } catch {
-      return context.json({ error: "invalid_json" }, 400);
+      return context.json({ error: API_ERRORS.invalidRequest }, 400);
     }
 
     const parsed = factsSchema.safeParse(raw);
@@ -224,17 +229,17 @@ export function createProfileRoutes(deps: {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     return context.json(await strengthenService.read(account.id));
   });
 
-  routes.put("/profile/strengthen", zValidator("json", strengthenSchema), async (context) => {
+  routes.put("/profile/strengthen", validJson(strengthenSchema), async (context) => {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const { key, value } = context.req.valid("json");
@@ -246,17 +251,17 @@ export function createProfileRoutes(deps: {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     return context.json({ languages: (await languagesService.read(account.id)).languages });
   });
 
-  routes.put("/profile/languages", zValidator("json", languagesInputSchema), async (context) => {
+  routes.put("/profile/languages", validJson(languagesInputSchema), async (context) => {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     return context.json({
@@ -268,31 +273,27 @@ export function createProfileRoutes(deps: {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     return context.json(await languagesService.read(account.id));
   });
 
-  routes.put(
-    "/profile/settings",
-    zValidator("json", profileSettingsInputSchema),
-    async (context) => {
-      const account = await sessionUser(auth, context.req.raw);
+  routes.put("/profile/settings", validJson(profileSettingsInputSchema), async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
 
-      if (account === null) {
-        return context.json({ error: "unauthorised" }, 401);
-      }
+    if (account === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
 
-      return context.json(await languagesService.save(account.id, context.req.valid("json")));
-    },
-  );
+    return context.json(await languagesService.save(account.id, context.req.valid("json")));
+  });
 
   routes.get("/profile/targets", async (context) => {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const saved = await targetsService.read(account.id);
@@ -304,11 +305,11 @@ export function createProfileRoutes(deps: {
     });
   });
 
-  routes.put("/profile/targets", zValidator("json", targetsInputSchema), async (context) => {
+  routes.put("/profile/targets", validJson(targetsInputSchema), async (context) => {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const saved = await targetsService.save(account.id, context.req.valid("json"));
@@ -320,52 +321,44 @@ export function createProfileRoutes(deps: {
     });
   });
 
-  routes.post(
-    "/profile/targets/match-count",
-    zValidator("json", targetsInputSchema),
-    async (context) => {
-      const account = await sessionUser(auth, context.req.raw);
+  routes.post("/profile/targets/match-count", validJson(targetsInputSchema), async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
 
-      if (account === null) {
-        return context.json({ error: "unauthorised" }, 401);
-      }
+    if (account === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
 
-      const { languages } = await languagesService.read(account.id);
+    const { languages } = await languagesService.read(account.id);
 
-      return context.json({
-        matchedCount: countMatchingPostings(db, context.req.valid("json"), languages),
-      });
-    },
-  );
+    return context.json({
+      matchedCount: countMatchingPostings(db, context.req.valid("json"), languages),
+    });
+  });
 
   routes.get("/profile/skip-companies", async (context) => {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     return context.json({ companies: await skipCompanyService.list(account.id) });
   });
 
-  routes.put(
-    "/profile/skip-companies",
-    zValidator("json", skipCompaniesInputSchema),
-    async (context) => {
-      const account = await sessionUser(auth, context.req.raw);
+  routes.put("/profile/skip-companies", validJson(skipCompaniesInputSchema), async (context) => {
+    const account = await sessionUser(auth, context.req.raw);
 
-      if (account === null) {
-        return context.json({ error: "unauthorised" }, 401);
-      }
+    if (account === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
 
-      return context.json({
-        companies: await skipCompanyService.replaceUserCompanies(
-          account.id,
-          context.req.valid("json"),
-        ),
-      });
-    },
-  );
+    return context.json({
+      companies: await skipCompanyService.replaceUserCompanies(
+        account.id,
+        context.req.valid("json"),
+      ),
+    });
+  });
 
   return routes;
 }

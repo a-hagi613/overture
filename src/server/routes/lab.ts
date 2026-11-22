@@ -1,4 +1,4 @@
-import { zValidator } from "@hono/zod-validator";
+import { validJson } from "./validators.ts";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -129,7 +129,7 @@ export function createLabRoutes(deps: LabRouteDeps) {
     return html(renderConfirmationPage(ats));
   });
 
-  routes.post("/recaptcha/score", zValidator("json", scoreBody), async (context) => {
+  routes.post("/recaptcha/score", validJson(scoreBody), async (context) => {
     const origin = context.req.header("origin");
 
     if (origin !== undefined && origin !== new URL(context.req.url).origin) {

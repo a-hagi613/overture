@@ -1,6 +1,6 @@
-import { and, asc, count, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
+import { validJson } from "./validators.ts";
 import { z } from "zod";
 
 import type { MiddlewareHandler } from "hono";
@@ -85,9 +85,10 @@ export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Au
       .select()
       .from(notifications)
       .where(eq(notifications.userId, user.id))
-      .orderBy(asc(notifications.createdAt))
+      .orderBy(desc(notifications.createdAt))
       .limit(LIST_LIMIT)
-      .all();
+      .all()
+      .toReversed();
 
     const unread =
       db
@@ -99,7 +100,7 @@ export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Au
     return context.json({ notifications: rows.map((row) => view(row)), now: clock.now(), unread });
   });
 
-  routes.post("/notifications/read", requireUser, zValidator("json", readBody), (context) => {
+  routes.post("/notifications/read", requireUser, validJson(readBody), (context) => {
     const user = context.get("user");
     const { id } = context.req.valid("json");
     const now = clock.now();
@@ -142,7 +143,7 @@ export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Au
   routes.put(
     "/notifications/preferences",
     requireUser,
-    zValidator("json", preferenceBody),
+    validJson(preferenceBody),
     async (context) => {
       const user = context.get("user");
       const { enabled, kind } = context.req.valid("json");
@@ -156,7 +157,7 @@ export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Au
     },
   );
 
-  routes.post("/push/subscribe", requireUser, zValidator("json", subscriptionBody), (context) => {
+  routes.post("/push/subscribe", requireUser, validJson(subscriptionBody), (context) => {
     const user = context.get("user");
     const { endpoint, keys } = context.req.valid("json");
     const now = clock.now();
@@ -179,7 +180,7 @@ export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Au
     return context.json({ ok: true });
   });
 
-  routes.post("/push/unsubscribe", requireUser, zValidator("json", unsubscribeBody), (context) => {
+  routes.post("/push/unsubscribe", requireUser, validJson(unsubscribeBody), (context) => {
     const user = context.get("user");
     const { endpoint } = context.req.valid("json");
 

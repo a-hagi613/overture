@@ -105,6 +105,72 @@ test("an uploaded resume is stored encrypted and retrievable byte for byte", asy
   sqlite.close();
 });
 
+test("a resume download is scoped to the id in the path", async ({
+  isolatedAppServer: { url: appServerUrl },
+}) => {
+  const owner = await ownerContextFor(appServerUrl);
+  const firstBytes = new Uint8Array(readFileSync("test/e2e/fixtures/resume-text.pdf"));
+  const secondBytes = new Uint8Array(readFileSync("test/e2e/fixtures/resume-board.pdf"));
+
+  const first = uploadSchema.parse(
+    await (
+      await owner.post("/api/profile/resume", {
+        multipart: {
+          file: { buffer: Buffer.from(firstBytes), mimeType: "application/pdf", name: "first.pdf" },
+        },
+      })
+    ).json(),
+  );
+
+  await owner.post("/api/profile/resume", {
+    multipart: {
+      file: { buffer: Buffer.from(secondBytes), mimeType: "application/pdf", name: "second.pdf" },
+    },
+  });
+
+  const firstDownload = await owner.get(`/api/profile/resume/${first.id}/file`);
+
+  expect(firstDownload.status()).toBe(200);
+  expect(
+    Buffer.from(new Uint8Array(await firstDownload.body())).equals(Buffer.from(firstBytes)),
+  ).toBe(true);
+
+  const missing = await owner.get(`/api/profile/resume/${crypto.randomUUID()}/file`);
+
+  expect(missing.status()).toBe(404);
+  expect(await missing.json()).toEqual({ error: "not_found" });
+
+  const anonymous = await apiRequest.newContext({ baseURL: appServerUrl });
+
+  expect((await anonymous.get(`/api/profile/resume/${first.id}/file`)).status()).toBe(401);
+
+  await anonymous.dispose();
+  await owner.dispose();
+});
+
+test("a refused resume upload is a 400, not a 500", async ({
+  isolatedAppServer: { url: appServerUrl },
+}) => {
+  const owner = await ownerContextFor(appServerUrl);
+
+  const wrongType = await owner.post("/api/profile/resume", {
+    multipart: {
+      file: { buffer: Buffer.from("not a pdf"), mimeType: "text/plain", name: "resume.txt" },
+    },
+  });
+
+  expect(wrongType.status()).toBe(400);
+  expect(await wrongType.json()).toEqual(expect.objectContaining({ error: "invalid_request" }));
+
+  const missingFile = await owner.post("/api/profile/resume", {
+    multipart: { note: "no file attached" },
+  });
+
+  expect(missingFile.status()).toBe(400);
+
+  await owner.dispose();
+});
+
 test("tier 1 facts are prefilled from the resume and confirmed on Profile", async ({
   isolatedAppServer: { url: appServerUrl },
 }) => {

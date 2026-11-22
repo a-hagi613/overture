@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
+import { validJson } from "./validators.ts";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -16,7 +16,7 @@ export function createCheckinRoutes(deps: { db: AppDatabase; clock: Clock; auth:
 
   const routes = new Hono();
 
-  routes.post("/checkins/:id", zValidator("json", answerBody), async (context) => {
+  routes.post("/checkins/:id", validJson(answerBody), async (context) => {
     const session = await auth.api
       .getSession({ headers: context.req.raw.headers })
       .catch(() => null);

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
+import { validJson } from "./validators.ts";
 import { z } from "zod";
 
 import type { Auth } from "../auth/index.ts";
@@ -20,6 +20,7 @@ import { createPaymentsWebhookService } from "../billing/webhooks.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { logError } from "../platform/log.ts";
 import { InvalidWebhookSignatureError } from "../platform/ports/payments.ts";
+import { API_ERRORS } from "../../shared/api-errors.ts";
 
 const MAX_WEBHOOK_BYTES = 1_000_000;
 
@@ -83,7 +84,7 @@ export function createBillingRoutes(deps: {
     const account = await sessionUser(auth, raw);
 
     if (account === null) {
-      return { refusal: Response.json({ error: "unauthorised" }, { status: 401 }) };
+      return { refusal: Response.json({ error: API_ERRORS.signInRequired }, { status: 401 }) };
     }
 
     const locked = demoLocked(account.role);
@@ -119,7 +120,7 @@ export function createBillingRoutes(deps: {
     });
   });
 
-  routes.post("/billing/checkout", zValidator("json", checkoutBodySchema), async (context) => {
+  routes.post("/billing/checkout", validJson(checkoutBodySchema), async (context) => {
     const access = await accountOrRefusal(context.req.raw);
 
     if ("refusal" in access) {
@@ -189,48 +190,44 @@ export function createBillingRoutes(deps: {
     }
   });
 
-  routes.post(
-    "/billing/trial/verify",
-    zValidator("json", verifyTrialBodySchema),
-    async (context) => {
-      const access = await accountOrRefusal(context.req.raw);
+  routes.post("/billing/trial/verify", validJson(verifyTrialBodySchema), async (context) => {
+    const access = await accountOrRefusal(context.req.raw);
 
-      if ("refusal" in access) {
-        return access.refusal;
-      }
+    if ("refusal" in access) {
+      return access.refusal;
+    }
 
-      if (payments === null || cardFingerprintSecret === null) {
-        return context.json({ error: "billing_disabled" }, 503);
-      }
+    if (payments === null || cardFingerprintSecret === null) {
+      return context.json({ error: "billing_disabled" }, 503);
+    }
 
-      let card;
+    let card;
 
-      try {
-        card = await payments.retrieveVerifiedCard(context.req.valid("json").sessionId);
-      } catch (error) {
-        logError("billing", error);
+    try {
+      card = await payments.retrieveVerifiedCard(context.req.valid("json").sessionId);
+    } catch (error) {
+      logError("billing", error);
 
-        return context.json({ error: "stripe_error" }, 502);
-      }
+      return context.json({ error: "stripe_error" }, 502);
+    }
 
-      if (card === null || card.userId !== access.account.id) {
-        return context.json({ error: "card_not_verified" }, 402);
-      }
+    if (card === null || card.userId !== access.account.id) {
+      return context.json({ error: "card_not_verified" }, 402);
+    }
 
-      const claim = claimTrialCard(db, clock, {
-        hmac: cardFingerprintHmac(cardFingerprintSecret, card.fingerprint),
-        userId: access.account.id,
-      });
+    const claim = claimTrialCard(db, clock, {
+      hmac: cardFingerprintHmac(cardFingerprintSecret, card.fingerprint),
+      userId: access.account.id,
+    });
 
-      context.header("Cache-Control", "no-store");
+    context.header("Cache-Control", "no-store");
 
-      if (claim.status === "granted") {
-        return context.json({ result: "granted", applications: TRIAL_APPLICATIONS });
-      }
+    if (claim.status === "granted") {
+      return context.json({ result: "granted", applications: TRIAL_APPLICATIONS });
+    }
 
-      return context.json({ error: claim.status }, 409);
-    },
-  );
+    return context.json({ error: claim.status }, 409);
+  });
 
   routes.post("/billing/portal", async (context) => {
     const access = await accountOrRefusal(context.req.raw);

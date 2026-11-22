@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
+import { validJson } from "./validators.ts";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -679,7 +679,7 @@ export function createHomeRoutes(deps: {
     });
   });
 
-  routes.post("/running", zValidator("json", runningBody), async (context) => {
+  routes.post("/running", validJson(runningBody), async (context) => {
     const user = await sessionUser(context.req.raw.headers);
 
     if (user === null) {

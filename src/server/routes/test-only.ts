@@ -1,4 +1,4 @@
-import { zValidator } from "@hono/zod-validator";
+import { validJson, validQuery } from "./validators.ts";
 import { Buffer } from "node:buffer";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { readFileSync } from "node:fs";
@@ -11,6 +11,7 @@ import type { AdjustableClock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
 import type { CatalogSweepWorker } from "../catalog/sweep-worker-runner.ts";
+import { API_ERRORS } from "../../shared/api-errors.ts";
 
 import {
   accountExports,
@@ -993,7 +994,7 @@ export function createTestRoutes(
 
   routes.get("/clock", (context) => context.json({ now: clock.now(), offsetMs: clock.offset() }));
 
-  routes.post("/consent/publish", zValidator("json", consentPublishBody), (context) => {
+  routes.post("/consent/publish", validJson(consentPublishBody), (context) => {
     const { publishedAt, text } = context.req.valid("json");
 
     const published = createConsentService({ clock, db }).publish(
@@ -1008,7 +1009,7 @@ export function createTestRoutes(
     });
   });
 
-  routes.post("/consent/tamper", zValidator("json", consentTamperBody), (context) => {
+  routes.post("/consent/tamper", validJson(consentTamperBody), (context) => {
     const { action } = context.req.valid("json");
 
     try {
@@ -1027,7 +1028,7 @@ export function createTestRoutes(
     }
   });
 
-  routes.post("/clock/offset", zValidator("json", offsetBody), (context) => {
+  routes.post("/clock/offset", validJson(offsetBody), (context) => {
     const { offsetMs } = context.req.valid("json");
 
     clock.setOffset(offsetMs);
@@ -1036,34 +1037,30 @@ export function createTestRoutes(
     return context.json({ now: clock.now(), offsetMs: clock.offset() });
   });
 
-  routes.get(
-    "/notifications",
-    zValidator("query", z.object({ userId: z.string().min(1) })),
-    (context) => {
-      const { userId } = context.req.valid("query");
+  routes.get("/notifications", validQuery(z.object({ userId: z.string().min(1) })), (context) => {
+    const { userId } = context.req.valid("query");
 
-      const rows = db
-        .select()
-        .from(notifications)
-        .where(eq(notifications.userId, userId))
-        .orderBy(asc(notifications.createdAt))
-        .all();
+    const rows = db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(asc(notifications.createdAt))
+      .all();
 
-      return context.json({
-        notifications: rows.map((row) => ({
-          id: row.id,
-          kind: row.kind,
-          title: row.title,
-          body: row.body,
-          url: row.url,
-          createdAt: row.createdAt,
-          readAt: row.readAt?.getTime() ?? null,
-          pushedAt: row.pushedAt?.getTime() ?? null,
-          emailedAt: row.emailedAt?.getTime() ?? null,
-        })),
-      });
-    },
-  );
+    return context.json({
+      notifications: rows.map((row) => ({
+        id: row.id,
+        kind: row.kind,
+        title: row.title,
+        body: row.body,
+        url: row.url,
+        createdAt: row.createdAt,
+        readAt: row.readAt?.getTime() ?? null,
+        pushedAt: row.pushedAt?.getTime() ?? null,
+        emailedAt: row.emailedAt?.getTime() ?? null,
+      })),
+    });
+  });
 
   const seedNotificationsBody = z.object({
     email: z.string().min(1),
@@ -1082,13 +1079,13 @@ export function createTestRoutes(
       .min(1),
   });
 
-  routes.post("/notifications/seed", zValidator("json", seedNotificationsBody), (context) => {
+  routes.post("/notifications/seed", validJson(seedNotificationsBody), (context) => {
     const body = context.req.valid("json");
 
     const user = db.select().from(users).where(eq(users.email, body.email.toLowerCase())).get();
 
     if (user === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     for (const row of body.rows) {
@@ -1118,13 +1115,13 @@ export function createTestRoutes(
     url: z.string(),
   });
 
-  routes.post("/notifications/emit", zValidator("json", emitNotificationBody), (context) => {
+  routes.post("/notifications/emit", validJson(emitNotificationBody), (context) => {
     const body = context.req.valid("json");
 
     const user = db.select().from(users).where(eq(users.email, body.email.toLowerCase())).get();
 
     if (user === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     const id = createNotification(db, clock, {
@@ -1138,7 +1135,7 @@ export function createTestRoutes(
     return context.json({ id });
   });
 
-  routes.get("/push/subscriptions", zValidator("query", userQuery), (context) => {
+  routes.get("/push/subscriptions", validQuery(userQuery), (context) => {
     const { userId } = context.req.valid("query");
 
     const rows = db
@@ -1161,6 +1158,10 @@ export function createTestRoutes(
 
   routes.get("/push/requests", (context) => context.json({ requests: listPushRequests() }));
 
+  routes.get("/unhandled-error", () => {
+    throw new Error("test-only unhandled failure");
+  });
+
   routes.post("/push/clear", (context) => {
     clearPushRequests();
 
@@ -1169,8 +1170,7 @@ export function createTestRoutes(
 
   routes.post(
     "/push/subscriptions",
-    zValidator(
-      "json",
+    validJson(
       z.object({
         endpoint: z.string().min(1),
         keys: z.object({ auth: z.string().min(1), p256dh: z.string().min(1) }),
@@ -1207,7 +1207,7 @@ export function createTestRoutes(
 
   routes.post(
     "/live-checks/mail/expire",
-    zValidator("json", z.object({ id: z.string().min(1) })),
+    validJson(z.object({ id: z.string().min(1) })),
     (context) => {
       const { id } = context.req.valid("json");
 
@@ -1226,7 +1226,7 @@ export function createTestRoutes(
     return context.json(report);
   });
 
-  routes.post("/turnstile", zValidator("json", turnstileScenarioBody), (context) => {
+  routes.post("/turnstile", validJson(turnstileScenarioBody), (context) => {
     setTurnstileScenario(context.req.valid("json"));
 
     return context.json({ ok: true });
@@ -1236,7 +1236,7 @@ export function createTestRoutes(
 
   routes.get("/turnstile/browser", (context) => context.json(turnstileBrowserScenario()));
 
-  routes.post("/turnstile/browser", zValidator("json", turnstileBrowserScenarioBody), (context) => {
+  routes.post("/turnstile/browser", validJson(turnstileBrowserScenarioBody), (context) => {
     setTurnstileBrowserScenario(context.req.valid("json"));
 
     return context.json({ ok: true });
@@ -1276,7 +1276,7 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
-  routes.post("/jobs/run-now", zValidator("json", runNowBody), async (context) => {
+  routes.post("/jobs/run-now", validJson(runNowBody), async (context) => {
     const { kind, payload } = context.req.valid("json");
     const handler = handlers[kind];
 
@@ -1289,7 +1289,7 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
-  routes.post("/jobs/enqueue", zValidator("json", enqueueBody), async (context) => {
+  routes.post("/jobs/enqueue", validJson(enqueueBody), async (context) => {
     const { kind, payload, runAt, priority, maxAttempts, dedupeKey } = context.req.valid("json");
 
     const opts = {
@@ -1318,7 +1318,7 @@ export function createTestRoutes(
     const job = db.select().from(bgJobs).where(eq(bgJobs.id, id)).get();
 
     if (job === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     return context.json(job);
@@ -1330,7 +1330,7 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
-  routes.put("/settings/:key", zValidator("json", settingBody), async (context) => {
+  routes.put("/settings/:key", validJson(settingBody), async (context) => {
     const { key } = context.req.param();
     const { value } = context.req.valid("json");
 
@@ -1341,14 +1341,14 @@ export function createTestRoutes(
     return context.json({ key, value });
   });
 
-  routes.put("/kill-switches/:scope/:key", zValidator("json", killSwitchBody), (context) => {
+  routes.put("/kill-switches/:scope/:key", validJson(killSwitchBody), (context) => {
     const { scope, key } = context.req.param();
     const { enabled, reason, setBy } = context.req.valid("json");
 
     const validScope = z.enum(["global", "ats", "employer", "provider"]).safeParse(scope);
 
     if (!validScope.success) {
-      return context.json({ error: "invalid scope" }, 400);
+      return context.json({ error: "invalid_scope" }, 400);
     }
 
     setKillSwitch(db, clock, validScope.data, key, enabled, reason, setBy);
@@ -1356,7 +1356,7 @@ export function createTestRoutes(
     return context.json({ scope, key, enabled, reason, setBy });
   });
 
-  routes.post("/events/publish", zValidator("json", publishBody), (context) => {
+  routes.post("/events/publish", validJson(publishBody), (context) => {
     const { topic, payload, userId } = context.req.valid("json");
 
     publishEvent(db, clock, topic, JSON.stringify(payload), userId);
@@ -1379,7 +1379,7 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
-  routes.post("/catalog/companies", zValidator("json", createCompanyBody), (context) => {
+  routes.post("/catalog/companies", validJson(createCompanyBody), (context) => {
     const { name, domain } = context.req.valid("json");
     const id = crypto.randomUUID();
 
@@ -1396,7 +1396,7 @@ export function createTestRoutes(
     return context.json({ id });
   });
 
-  routes.post("/catalog/boards", zValidator("json", createBoardBody), (context) => {
+  routes.post("/catalog/boards", validJson(createBoardBody), (context) => {
     const { companyId, ats, boardToken, region, status, source } = context.req.valid("json");
     const id = crypto.randomUUID();
 
@@ -1458,13 +1458,13 @@ export function createTestRoutes(
     return context.json({ postings: postingRows });
   });
 
-  routes.post("/catalog/postings", zValidator("json", createPostingBody), (context) => {
+  routes.post("/catalog/postings", validJson(createPostingBody), (context) => {
     const id = seedPosting(db, context.req.valid("json"), clock.now());
 
     return context.json({ id });
   });
 
-  routes.post("/catalog/postings/bulk", zValidator("json", bulkPostingsBody), (context) => {
+  routes.post("/catalog/postings/bulk", validJson(bulkPostingsBody), (context) => {
     const { postings: rows } = context.req.valid("json");
     const now = clock.now();
 
@@ -1477,7 +1477,7 @@ export function createTestRoutes(
     return context.json({ created: rows.length });
   });
 
-  routes.post("/catalog/postings/close", zValidator("json", closePostingBody), (context) => {
+  routes.post("/catalog/postings/close", validJson(closePostingBody), (context) => {
     const { id } = context.req.valid("json");
 
     db.update(postings).set({ closedAt: clock.now() }).where(eq(postings.id, id)).run();
@@ -1506,27 +1506,23 @@ export function createTestRoutes(
     return context.json({ companies: removed.length });
   });
 
-  routes.post(
-    "/catalog/discovered-boards",
-    zValidator("json", discoveredBoardsBody),
-    async (context) => {
-      const body = context.req.valid("json");
+  routes.post("/catalog/discovered-boards", validJson(discoveredBoardsBody), async (context) => {
+    const body = context.req.valid("json");
 
-      if ("rows" in body) {
-        return context.json(await loadDiscoveredBoards(db, clock, body.rows));
-      }
+    if ("rows" in body) {
+      return context.json(await loadDiscoveredBoards(db, clock, body.rows));
+    }
 
-      const bytes = readFileSync(body.path);
-      const file = new ArrayBuffer(bytes.byteLength);
+    const bytes = readFileSync(body.path);
+    const file = new ArrayBuffer(bytes.byteLength);
 
-      new Uint8Array(file).set(bytes);
+    new Uint8Array(file).set(bytes);
 
-      const { rows } = await readCompaniesParquet(file);
-      const report = await loadDiscoveredBoards(db, clock, rows);
+    const { rows } = await readCompaniesParquet(file);
+    const report = await loadDiscoveredBoards(db, clock, rows);
 
-      return context.json(report);
-    },
-  );
+    return context.json(report);
+  });
 
   routes.get("/catalog/posting-tags", (context) => {
     const rows = db.select().from(postingTags).all();
@@ -1534,7 +1530,7 @@ export function createTestRoutes(
     return context.json({ postingTags: rows });
   });
 
-  routes.post("/tag-imports", zValidator("json", tagImportBody), (context) => {
+  routes.post("/tag-imports", validJson(tagImportBody), (context) => {
     const { content, source } = context.req.valid("json");
 
     const report = importTags(db, clock, { content, source, uploadedBy: "owner" });
@@ -1548,7 +1544,7 @@ export function createTestRoutes(
     return context.json({ tagImports: rows });
   });
 
-  routes.get("/llm/usage", zValidator("query", llmUsageQuery), (context) => {
+  routes.get("/llm/usage", validQuery(llmUsageQuery), (context) => {
     const { purpose, limit } = context.req.valid("query");
 
     const summary = readLlmUsage(db, {
@@ -1566,7 +1562,7 @@ export function createTestRoutes(
     return context.json({ batches: rows });
   });
 
-  routes.post("/llm/usage", zValidator("json", recordLlmUsageBody), (context) => {
+  routes.post("/llm/usage", validJson(recordLlmUsageBody), (context) => {
     const { email, purpose, model, inputTokens, cachedTokens, outputTokens, costMicros } =
       context.req.valid("json");
 
@@ -1594,7 +1590,7 @@ export function createTestRoutes(
 
   routes.get("/mail/usage", (context) => context.json(readMailSummary(db, clock.now())));
 
-  routes.post("/mail/usage", zValidator("json", mailUsageBody), (context) => {
+  routes.post("/mail/usage", validJson(mailUsageBody), (context) => {
     const body = context.req.valid("json");
     const month = monthKey(clock.now());
     const current = readMailUsage(db, month);
@@ -1628,7 +1624,7 @@ export function createTestRoutes(
     return context.json(readMailSummary(db, clock.now()));
   });
 
-  routes.post("/fx-rates", zValidator("json", fxRateBody), (context) => {
+  routes.post("/fx-rates", validJson(fxRateBody), (context) => {
     const { date, currency, perUsd } = context.req.valid("json");
 
     db.insert(fxRates)
@@ -1642,7 +1638,7 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
-  routes.post("/users", zValidator("json", createUserBody), async (context) => {
+  routes.post("/users", validJson(createUserBody), async (context) => {
     const { email, name } = context.req.valid("json");
     const id = crypto.randomUUID();
     const now = new Date(clock.now());
@@ -1664,7 +1660,7 @@ export function createTestRoutes(
     return context.json({ id });
   });
 
-  routes.post("/applications/seed", zValidator("json", seedApplicationBody), (context) => {
+  routes.post("/applications/seed", validJson(seedApplicationBody), (context) => {
     const {
       userId,
       postingId,
@@ -1683,7 +1679,7 @@ export function createTestRoutes(
     const posting = postingDisplayFor(db, postingId);
 
     if (posting === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     const id = crypto.randomUUID();
@@ -1713,7 +1709,7 @@ export function createTestRoutes(
     return context.json({ id });
   });
 
-  routes.post("/matches/seed", zValidator("json", seedMatchBody), (context) => {
+  routes.post("/matches/seed", validJson(seedMatchBody), (context) => {
     const { userId, postingId, score, reason, codeRank } = context.req.valid("json");
 
     db.insert(matches)
@@ -1736,7 +1732,7 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
-  routes.post("/applications/events/seed", zValidator("json", seedEventBody), (context) => {
+  routes.post("/applications/events/seed", validJson(seedEventBody), (context) => {
     const { applicationId, events } = context.req.valid("json");
 
     const application = db
@@ -1746,7 +1742,7 @@ export function createTestRoutes(
       .get();
 
     if (application === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     db.insert(applicationEvents)
@@ -1768,7 +1764,7 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
-  routes.post("/facts/seed", zValidator("json", seedFactsBody), async (context) => {
+  routes.post("/facts/seed", validJson(seedFactsBody), async (context) => {
     const { facts: records, userId } = context.req.valid("json");
     const saved = [];
 
@@ -1836,7 +1832,7 @@ export function createTestRoutes(
     return context.json({ saved });
   });
 
-  routes.post("/applications/status", zValidator("json", applicationStatusBody), (context) => {
+  routes.post("/applications/status", validJson(applicationStatusBody), (context) => {
     const { applicationId, scheduledFor, status, statusReason } = context.req.valid("json");
 
     const stage = stageForStatus(status);
@@ -1855,13 +1851,13 @@ export function createTestRoutes(
       .all();
 
     if (updated.length === 0) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     return context.json({ id: applicationId, status });
   });
 
-  routes.post("/user/suspend", zValidator("json", userSuspendBody), (context) => {
+  routes.post("/user/suspend", validJson(userSuspendBody), (context) => {
     const { userId, suspended } = context.req.valid("json");
 
     const updated = db
@@ -1875,17 +1871,17 @@ export function createTestRoutes(
       .all();
 
     if (updated.length === 0) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     return context.json({ id: userId, suspended });
   });
 
-  routes.post("/reviews/seed", zValidator("json", seedReviewBody), (context) =>
+  routes.post("/reviews/seed", validJson(seedReviewBody), (context) =>
     context.json(seedReviewRow(context.req.valid("json"))),
   );
 
-  routes.post("/reviews/open", zValidator("json", seedReviewBody), (context) =>
+  routes.post("/reviews/open", validJson(seedReviewBody), (context) =>
     context.json(openReviewThroughStore(context.req.valid("json"))),
   );
 
@@ -1893,7 +1889,7 @@ export function createTestRoutes(
     context.json({ queued: ensureApplyFailuresQueued(db, clock) }),
   );
 
-  routes.get("/reviews", zValidator("query", userQuery), (context) => {
+  routes.get("/reviews", validQuery(userQuery), (context) => {
     const { userId } = context.req.valid("query");
 
     return context.json({
@@ -1902,7 +1898,7 @@ export function createTestRoutes(
     });
   });
 
-  routes.get("/questions", zValidator("query", questionsQuery), (context) => {
+  routes.get("/questions", validQuery(questionsQuery), (context) => {
     const { userId, postingId } = context.req.valid("query");
 
     const application =
@@ -1963,7 +1959,7 @@ export function createTestRoutes(
     return context.json({ plans });
   });
 
-  routes.get("/prepared-answers", zValidator("query", applicationQuery), async (context) => {
+  routes.get("/prepared-answers", validQuery(applicationQuery), async (context) => {
     const { applicationId } = context.req.valid("query");
 
     if (preparation === null) {
@@ -1973,14 +1969,14 @@ export function createTestRoutes(
     return context.json({ answers: await preparation.answersFor(applicationId) });
   });
 
-  routes.get("/applications", zValidator("query", userQuery), (context) => {
+  routes.get("/applications", validQuery(userQuery), (context) => {
     const { userId } = context.req.valid("query");
     const rows = db.select().from(applications).where(eq(applications.userId, userId)).all();
 
     return context.json({ applications: rows });
   });
 
-  routes.post("/application-answers", zValidator("json", seedAnswerBody), async (context) => {
+  routes.post("/application-answers", validJson(seedAnswerBody), async (context) => {
     const { applicationId, questionId, kind, sentences } = context.req.valid("json");
 
     const application = db
@@ -1990,7 +1986,7 @@ export function createTestRoutes(
       .get();
 
     if (application === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     const existing = db
@@ -2043,7 +2039,7 @@ export function createTestRoutes(
     return context.json({ id });
   });
 
-  routes.get("/attempts", zValidator("query", attemptsQuery), (context) => {
+  routes.get("/attempts", validQuery(attemptsQuery), (context) => {
     const { applicationId } = context.req.valid("query");
 
     return context.json({
@@ -2056,7 +2052,7 @@ export function createTestRoutes(
     });
   });
 
-  routes.post("/attempts/seed", zValidator("json", seedAttemptBody), (context) => {
+  routes.post("/attempts/seed", validJson(seedAttemptBody), (context) => {
     const { applicationId, userId, ...rest } = context.req.valid("json");
     const startedAt = rest.startedAt ?? clock.now();
     const id = crypto.randomUUID();
@@ -2071,7 +2067,7 @@ export function createTestRoutes(
         : { userId };
 
     if (application === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     db.insert(attempts)
@@ -2100,7 +2096,7 @@ export function createTestRoutes(
     return context.json({ id });
   });
 
-  routes.post("/attempts", zValidator("json", seedAttemptsBody), (context) => {
+  routes.post("/attempts", validJson(seedAttemptsBody), (context) => {
     const { attempts: rows } = context.req.valid("json");
     const now = clock.now();
 
@@ -2114,7 +2110,7 @@ export function createTestRoutes(
         .get();
 
       if (application === undefined) {
-        return context.json({ error: "not found" }, 404);
+        return context.json({ error: API_ERRORS.notFound }, 404);
       }
 
       db.insert(attempts)
@@ -2143,7 +2139,7 @@ export function createTestRoutes(
     return context.json({ seeded: rows.length });
   });
 
-  routes.post("/snapshots/tamper", zValidator("json", tamperSnapshotBody), (context) => {
+  routes.post("/snapshots/tamper", validJson(tamperSnapshotBody), (context) => {
     const { applicationId, action } = context.req.valid("json");
 
     const row = db
@@ -2178,14 +2174,14 @@ export function createTestRoutes(
     }
   });
 
-  routes.get("/matches", zValidator("query", userQuery), (context) => {
+  routes.get("/matches", validQuery(userQuery), (context) => {
     const { userId } = context.req.valid("query");
     const rows = db.select().from(matches).where(eq(matches.userId, userId)).all();
 
     return context.json({ matches: rows });
   });
 
-  routes.post("/ledger/grant", zValidator("json", seedGrantBody), async (context) => {
+  routes.post("/ledger/grant", validJson(seedGrantBody), async (context) => {
     const { email, quantity, idempotencyKey, source, expiresAt } = context.req.valid("json");
 
     const user = db
@@ -2195,7 +2191,7 @@ export function createTestRoutes(
       .get();
 
     if (user === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     await retryWhenBusy(
@@ -2214,7 +2210,7 @@ export function createTestRoutes(
     return context.json({ applicationsLeft: applicationsLeft(db, user.id, clock.now()) });
   });
 
-  routes.post("/ledger/application", zValidator("json", ledgerApplicationBody), async (context) => {
+  routes.post("/ledger/application", validJson(ledgerApplicationBody), async (context) => {
     const { email, applicationId, commit } = context.req.valid("json");
 
     const user = db
@@ -2224,7 +2220,7 @@ export function createTestRoutes(
       .get();
 
     if (user === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     const reserved = await retryWhenBusy(
@@ -2255,7 +2251,7 @@ export function createTestRoutes(
     });
   });
 
-  routes.post("/ledger/release", zValidator("json", ledgerReleaseBody), async (context) => {
+  routes.post("/ledger/release", validJson(ledgerReleaseBody), async (context) => {
     const { email, applicationId } = context.req.valid("json");
 
     const user = db
@@ -2265,7 +2261,7 @@ export function createTestRoutes(
       .get();
 
     if (user === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     const released = await retryWhenBusy(
@@ -2284,7 +2280,7 @@ export function createTestRoutes(
     });
   });
 
-  routes.get("/billing-state", zValidator("query", userQuery), (context) => {
+  routes.get("/billing-state", validQuery(userQuery), (context) => {
     const { userId } = context.req.valid("query");
 
     return context.json({
@@ -2325,7 +2321,7 @@ export function createTestRoutes(
 
   routes.post(
     "/mail/fail-next",
-    zValidator("json", z.object({ count: z.number().int().min(1).max(100).default(1) })),
+    validJson(z.object({ count: z.number().int().min(1).max(100).default(1) })),
     (context) => {
       failNextSinkMail(context.req.valid("json").count);
 
@@ -2345,7 +2341,7 @@ export function createTestRoutes(
 
   routes.post(
     "/cloudflare-email/sending-scenario",
-    zValidator("json", z.object({ scenario: z.enum(emailSendingScenarios) })),
+    validJson(z.object({ scenario: z.enum(emailSendingScenarios) })),
     (context) => {
       const { scenario } = context.req.valid("json");
 
@@ -2355,11 +2351,11 @@ export function createTestRoutes(
     },
   );
 
-  routes.post("/mail/seed", zValidator("json", seedMailBody), async (context) =>
+  routes.post("/mail/seed", validJson(seedMailBody), async (context) =>
     context.json(await insertMailRow(context.req.valid("json"))),
   );
 
-  routes.post("/snapshots/seed", zValidator("json", seedSnapshotBody), async (context) => {
+  routes.post("/snapshots/seed", validJson(seedSnapshotBody), async (context) => {
     const body = context.req.valid("json");
 
     const application = db
@@ -2369,7 +2365,7 @@ export function createTestRoutes(
       .get();
 
     if (application === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     const resume = db
@@ -2430,7 +2426,7 @@ export function createTestRoutes(
     return context.json({ applicationId: body.applicationId });
   });
 
-  routes.post("/mail/bulk", zValidator("json", bulkMailBody), async (context) => {
+  routes.post("/mail/bulk", validJson(bulkMailBody), async (context) => {
     const body = context.req.valid("json");
     const at = body.at ?? clock.now();
     const localPart = `owner-${body.userId.slice(0, 8)}`;
@@ -2522,7 +2518,7 @@ export function createTestRoutes(
 
   routes.post(
     "/account-exports/seed",
-    zValidator("json", exportsQuery.pick({ userId: true })),
+    validJson(exportsQuery.pick({ userId: true })),
     async (context) => {
       if (objects === null) {
         return context.json({ error: "no object store" }, 503);
@@ -2564,7 +2560,7 @@ export function createTestRoutes(
     },
   );
 
-  routes.get("/account/exports", zValidator("query", exportsQuery), (context) => {
+  routes.get("/account/exports", validQuery(exportsQuery), (context) => {
     const { userId } = context.req.valid("query");
 
     return context.json({
@@ -2582,7 +2578,7 @@ export function createTestRoutes(
     });
   });
 
-  routes.get("/objects", zValidator("query", objectsQuery), async (context) => {
+  routes.get("/objects", validQuery(objectsQuery), async (context) => {
     if (objects === null) {
       return context.json({ error: "no object store" }, 503);
     }
@@ -2597,7 +2593,7 @@ export function createTestRoutes(
     return context.json({ keys });
   });
 
-  routes.post("/user/name", zValidator("json", userNameBody), (context) => {
+  routes.post("/user/name", validJson(userNameBody), (context) => {
     const { email, name } = context.req.valid("json");
 
     db.update(users)
@@ -2608,7 +2604,7 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
-  routes.post("/ledger/sample", zValidator("json", sampleLedgerBody), async (context) => {
+  routes.post("/ledger/sample", validJson(sampleLedgerBody), async (context) => {
     const { email } = context.req.valid("json");
 
     const user = db
@@ -2618,7 +2614,7 @@ export function createTestRoutes(
       .get();
 
     if (user === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     await seedSampleLedger(user.id, "sample");
@@ -2626,7 +2622,7 @@ export function createTestRoutes(
     return context.json({ applicationsLeft: applicationsLeft(db, user.id, clock.now()) });
   });
 
-  routes.post("/home/sample", zValidator("json", homeSampleBody), async (context) => {
+  routes.post("/home/sample", validJson(homeSampleBody), async (context) => {
     const { email, variant } = context.req.valid("json");
 
     const user = db
@@ -2636,7 +2632,7 @@ export function createTestRoutes(
       .get();
 
     if (user === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     const userId = user.id;
@@ -3266,7 +3262,7 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
-  routes.post("/profile/running", zValidator("json", profileRunningBody), (context) => {
+  routes.post("/profile/running", validJson(profileRunningBody), (context) => {
     const { running, userId } = context.req.valid("json");
     const now = clock.now();
 
@@ -3289,7 +3285,7 @@ export function createTestRoutes(
     return context.json({ running });
   });
 
-  routes.post("/home/pause", zValidator("json", homePauseBody), (context) => {
+  routes.post("/home/pause", validJson(homePauseBody), (context) => {
     const { email, pauseReason } = context.req.valid("json");
 
     const user = db
@@ -3299,7 +3295,7 @@ export function createTestRoutes(
       .get();
 
     if (user === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     db.update(profiles)
@@ -3310,7 +3306,7 @@ export function createTestRoutes(
     return context.json({ pauseReason });
   });
 
-  routes.post("/ledger/tamper", zValidator("json", tamperLedgerBody), (context) => {
+  routes.post("/ledger/tamper", validJson(tamperLedgerBody), (context) => {
     const { action } = context.req.valid("json");
     const row = db.select().from(ledger).limit(1).get();
 
@@ -3372,7 +3368,7 @@ export function createTestRoutes(
     });
   });
 
-  routes.post("/auth/role", zValidator("json", roleBody), (context) => {
+  routes.post("/auth/role", validJson(roleBody), (context) => {
     const { userId, role } = context.req.valid("json");
 
     const updated = db
@@ -3383,7 +3379,7 @@ export function createTestRoutes(
       .all();
 
     if (updated.length === 0) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     return context.json({ userId, role });
@@ -3391,8 +3387,7 @@ export function createTestRoutes(
 
   routes.post(
     "/mail/code-waits",
-    zValidator(
-      "json",
+    validJson(
       z.object({
         mailboxId: z.string().min(1).optional(),
         attemptId: z.string().min(1).optional(),
@@ -3418,7 +3413,7 @@ export function createTestRoutes(
         const user = db.select().from(users).where(eq(users.email, body.email.toLowerCase())).get();
 
         if (user === undefined || testMailboxes === null) {
-          return context.json({ error: "not found" }, 404);
+          return context.json({ error: API_ERRORS.notFound }, 404);
         }
 
         const ensured = await testMailboxes.ensureFor(user.id);
@@ -3428,7 +3423,7 @@ export function createTestRoutes(
       }
 
       if (mailboxId === undefined || ownerId === undefined) {
-        return context.json({ error: "not found" }, 404);
+        return context.json({ error: API_ERRORS.notFound }, 404);
       }
 
       const wait =
@@ -3467,7 +3462,7 @@ export function createTestRoutes(
       .get();
 
     if (wait === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     const code =
@@ -3490,7 +3485,7 @@ export function createTestRoutes(
 
   routes.get(
     "/mail/messages",
-    zValidator("query", z.object({ mailboxId: z.string().min(1) })),
+    validQuery(z.object({ mailboxId: z.string().min(1) })),
     async (context) => {
       const { mailboxId } = context.req.valid("query");
 
@@ -3546,7 +3541,7 @@ export function createTestRoutes(
         : db.select().from(mailboxes).where(eq(mailboxes.id, mailboxId)).get();
 
     if (mailbox === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     const rows = db
@@ -3573,31 +3568,27 @@ export function createTestRoutes(
     return context.json({ threads });
   });
 
-  routes.get(
-    "/mailboxes",
-    zValidator("query", z.object({ userId: z.string().min(1) })),
-    (context) => {
-      const rows = db
-        .select()
-        .from(mailboxes)
-        .where(eq(mailboxes.userId, context.req.valid("query").userId))
-        .all();
+  routes.get("/mailboxes", validQuery(z.object({ userId: z.string().min(1) })), (context) => {
+    const rows = db
+      .select()
+      .from(mailboxes)
+      .where(eq(mailboxes.userId, context.req.valid("query").userId))
+      .all();
 
-      return context.json({
-        mailboxes: rows.map((row) => ({
-          id: row.id,
-          localPart: row.localPart,
-          status: row.status,
-          receiveUntil: row.receiveUntil?.getTime() ?? null,
-          firstForwardedAt: row.firstForwardedAt?.getTime() ?? null,
-        })),
-      });
-    },
-  );
+    return context.json({
+      mailboxes: rows.map((row) => ({
+        id: row.id,
+        localPart: row.localPart,
+        status: row.status,
+        receiveUntil: row.receiveUntil?.getTime() ?? null,
+        firstForwardedAt: row.firstForwardedAt?.getTime() ?? null,
+      })),
+    });
+  });
 
   routes.post(
     "/mailboxes/first-forwarded",
-    zValidator("json", z.object({ userId: z.string().min(1) })),
+    validJson(z.object({ userId: z.string().min(1) })),
     async (context) => {
       if (testMailboxes === null) {
         return context.json({ error: "inbound_not_configured" }, 503);
@@ -3613,7 +3604,7 @@ export function createTestRoutes(
 
   routes.post(
     "/mailboxes/:id/status",
-    zValidator("json", z.object({ status: z.enum(["active", "receive_only", "closed"]) })),
+    validJson(z.object({ status: z.enum(["active", "receive_only", "closed"]) })),
     (context) => {
       const { status } = context.req.valid("json");
 
@@ -3627,7 +3618,7 @@ export function createTestRoutes(
       const id = updated[0]?.id;
 
       if (id === undefined) {
-        return context.json({ error: "not found" }, 404);
+        return context.json({ error: API_ERRORS.notFound }, 404);
       }
 
       return context.json({ id, status });
