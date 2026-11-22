@@ -76,7 +76,7 @@ const publicRoutes: RouteObject[] = [
   { path: "/terms", element: <TermsPage /> },
   { path: "/settings/terms", element: <Navigate replace to="/terms" /> },
   { path: "/settings/notifications", element: <Navigate replace to="/settings" /> },
-  { path: "/settings/support", element: <Navigate replace to="/settings" /> },
+  { path: "/settings/support", element: <Navigate replace to="/settings/support-access" /> },
   { path: "/privacy", element: <PrivacyPage /> },
   { path: "/pricing", element: <PricingPage /> },
   { path: "/consent", element: <ConsentPage /> },

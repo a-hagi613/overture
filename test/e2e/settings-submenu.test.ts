@@ -72,7 +72,7 @@ test("the Settings row opens the account page, and /settings/terms lands on the 
   await expect(page).toHaveURL(/\/settings$/u);
 
   await page.goto(`${appServerUrl}/settings/support`);
-  await expect(page).toHaveURL(/\/settings$/u);
+  await expect(page).toHaveURL(/\/settings\/support-access$/u);
 
   await context.close();
 });

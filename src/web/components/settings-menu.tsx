@@ -8,6 +8,7 @@ import { NavGlyph } from "./nav-glyph.tsx";
 const pages = [
   { key: "profileData", to: "/profile" },
   { key: "export", to: "/settings/export" },
+  { key: "supportAccess", to: "/settings/support-access" },
   { key: "delete", to: "/settings/delete" },
   { key: "legal", to: "/terms" },
 ] as const;

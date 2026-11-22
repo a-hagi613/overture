@@ -235,7 +235,7 @@ async function navigate(page: Page, path: string, landsOn: string = path) {
 
 const redirectedPaths = new Map([
   ["/settings/notifications", "/settings"],
-  ["/settings/support", "/settings"],
+  ["/settings/support", "/settings/support-access"],
   ["/settings/terms", "/terms"],
 ]);
 

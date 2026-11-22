@@ -148,6 +148,7 @@ export const copy = {
     pagesLabel: "Show settings pages",
     profileData: "Profile data",
     export: "Export",
+    supportAccess: "Support access",
     delete: "Delete account",
     legal: "Terms and privacy",
   },
