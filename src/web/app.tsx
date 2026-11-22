@@ -65,12 +65,6 @@ export function AppShell() {
   return (
     <div className="relative overflow-x-clip bg-background text-foreground">
       <Backdrop />
-      <a
-        className="sr-only z-50 rounded-md bg-card px-3 py-2 text-sm font-semibold text-foreground shadow-lift focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
-        href="#main-content"
-      >
-        {copy.shell.skipToContent}
-      </a>
       <div className="relative z-[1] flex min-h-screen flex-col md:flex-row">
         {wide ? (
           <aside
@@ -121,15 +115,13 @@ export function AppShell() {
           }
         />
         <main
-          id="main"
+          id="main-content"
           tabIndex={-1}
           className={
             pathname === "/board"
               ? "min-w-0 flex-1 outline-none"
               : "min-w-0 flex-1 outline-none px-4 pb-7 pt-[18px] md:px-9 md:pb-10 md:pt-[26px] min-[1700px]:px-16 min-[1700px]:pt-8"
           }
-          id="main-content"
-          tabIndex={-1}
         >
           <div className={pathname === "/board" ? undefined : "mx-auto w-full max-w-[1440px]"}>
             <Outlet />

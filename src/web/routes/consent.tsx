@@ -16,7 +16,7 @@ export function ConsentPage() {
       <div className="relative z-[1] flex min-h-screen flex-col">
         <LegalTopBar />
         <main
-          id="main"
+          id="main-content"
           tabIndex={-1}
           className="outline-none mx-auto w-full max-w-[574px] px-[18px] pb-[40px] pt-[24px]"
         >

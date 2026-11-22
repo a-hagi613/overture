@@ -18,7 +18,7 @@ export function SignInLayout({ children }: { children: ReactNode }) {
       <SignInStory />
       <main
         className="outline-none relative flex min-h-screen w-full flex-1 flex-col justify-between gap-5 px-[clamp(18px,4vw,52px)] pb-7 pt-[18px] min-[961px]:pb-8 min-[961px]:pt-7"
-        id="main"
+        id="main-content"
         tabIndex={-1}
       >
         <div className="mx-auto flex w-full max-w-[560px] items-center justify-between gap-3">

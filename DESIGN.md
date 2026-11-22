@@ -472,9 +472,10 @@ state the boundary rather than the marketing line.
   understand anything. Nothing flashes.
 - **Language and order.** Plain words, one `h1` per page, headings in order, reading order matching
   visual order.
-- **Landmarks and skip link.** Every route has exactly one visible `main` (`id="main"`) and one visible
-  `h1`. The first tab stop on every page is "Skip to main content", which is hidden until focused and
-  moves focus to `main`. A sheet or dialog title is an `h2`. Admin gate screens carry the page `h1`.
+- **Landmarks and skip link.** Every route has exactly one visible `main` (`id="main-content"`) and one
+  visible `h1`. The first tab stop on every page is "Skip to content", rendered once by `RootLayout`,
+  which is hidden until focused and moves focus to `main`. A sheet or dialog title is an `h2`. Admin gate
+  screens carry the page `h1`.
 - **Hover.** Every pointer control changes surface, text, border or underline on hover, except the current
   page and an on toggle, which already show their strongest state. Guard: `test/e2e/interactive.test.ts`
   checks pointer cursor, hover, focus ring, 44px on phones, landmarks, headings and axe on every route.

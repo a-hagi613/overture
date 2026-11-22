@@ -157,7 +157,6 @@ export const copy = {
   },
   shell: {
     settings: "Settings",
-    skipToMain: "Skip to main content",
     collapseSidebar: "Collapse sidebar",
     expandSidebar: "Expand sidebar",
     skipToContent: "Skip to content",
