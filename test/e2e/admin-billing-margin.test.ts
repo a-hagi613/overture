@@ -193,7 +193,7 @@ test("the margin page shows the measured numbers and marks the unbuilt billing s
   );
   await expect(
     page.getByRole("navigation", { name: "Billing sections" }).getByRole("link"),
-  ).toHaveCount(2);
+  ).toHaveCount(3);
   await expect(
     page.getByRole("navigation", { name: "Billing sections" }).getByRole("link", { name: "Users" }),
   ).toHaveAttribute("href", "/admin/billing");
