@@ -12,7 +12,7 @@ const healthSchema = z.object({ status: z.string(), database: z.string() });
 
 const HEALTH_BUDGET_MS = 1000;
 const SETTLE_MS = 6000;
-const EARLIEST_RUN_MS = SETTLE_MS * 0.8;
+const EARLIEST_RUN_MS = SETTLE_MS / 2;
 
 function isDoneForJob(id: string) {
   return (event: SseEvent) => {
