@@ -93,6 +93,11 @@ export function SettingsMenu({ showLabels }: { showLabels: boolean }) {
               event.preventDefault();
               items()[0]?.focus();
             }
+
+            if (event.key === "Escape" && open) {
+              event.preventDefault();
+              setOpen(false);
+            }
           }}
           ref={toggleRef}
           type="button"
@@ -113,7 +118,7 @@ export function SettingsMenu({ showLabels }: { showLabels: boolean }) {
           return (
             <Link
               aria-current={current ? "page" : undefined}
-              className={`${itemClass} ${current ? "border-border bg-card shadow-sh" : "border-transparent"}`}
+              className={`${itemClass} ${page.key === "delete" ? "text-need" : ""} ${current ? "border-border bg-card shadow-sh" : "border-transparent"}`}
               key={page.key}
               onKeyDown={onItemKeyDown}
               to={page.to}
