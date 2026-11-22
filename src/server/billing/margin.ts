@@ -7,14 +7,15 @@ import {
   applicationLlmMicrosByUser,
   APPLICATION_LLM_PURPOSES,
 } from "../dispatch/application-spend.ts";
-import { COST_GATE_MICROS, isAttempted } from "../dispatch/report.ts";
+import { COST_GATE_MICROS, COST_REPORT_WINDOW_DAYS, isAttempted } from "../dispatch/report.ts";
 import { attempts, grants, llmUsage, mailUsage, users } from "../platform/db/schema.ts";
 
 import { PLAN_DEFINITIONS } from "./plans.ts";
 
 const DAY_MS = 24 * 60 * 60_000;
 
-export const MARGIN_WINDOW_DAYS = 30;
+/** The margin page measures over the same window as the cost report. */
+export const MARGIN_WINDOW_DAYS = COST_REPORT_WINDOW_DAYS;
 
 /** Trial Applications, once per person (ADR 0018). */
 export const TRIAL_APPLICATIONS = 3;

@@ -16,10 +16,19 @@ const EVENT_RETENTION_MS = DAY_MS;
 const DONE_JOB_RETENTION_MS = 7 * DAY_MS;
 const DEAD_JOB_RETENTION_MS = 30 * DAY_MS;
 
-type Table = "events" | "bg_jobs";
+/** SPEC §5.7 keeps `attempts` 180 days, as the cost report wants its history. */
+export const ATTEMPT_RETENTION_MS = 180 * DAY_MS;
+
+const TABLE_KEYS = {
+  attempts: "id",
+  bg_jobs: "id",
+  events: "seq",
+} as const;
+
+type Table = keyof typeof TABLE_KEYS;
 
 async function deleteInChunks(db: AppDatabase, table: Table, where: ReturnType<typeof sql>) {
-  const key = sql.raw(table === "events" ? "seq" : "id");
+  const key = sql.raw(TABLE_KEYS[table]);
   const name = sql.raw(table);
 
   const removeChunk: (total: number) => Promise<number> = async (total) => {
@@ -50,6 +59,12 @@ export async function runRetention(db: AppDatabase, clock: Clock) {
 
   const events = await deleteInChunks(db, "events", sql`created_at < ${now - EVENT_RETENTION_MS}`);
 
+  const attempts = await deleteInChunks(
+    db,
+    "attempts",
+    sql`started_at < ${now - ATTEMPT_RETENTION_MS}`,
+  );
+
   const doneJobs = await deleteInChunks(
     db,
     "bg_jobs",
@@ -62,7 +77,7 @@ export async function runRetention(db: AppDatabase, clock: Clock) {
     sql`status = 'dead' AND updated_at < ${now - DEAD_JOB_RETENTION_MS}`,
   );
 
-  return { events, doneJobs, deadJobs };
+  return { attempts, deadJobs, doneJobs, events };
 }
 
 export function ensureRetentionQueued(db: AppDatabase, clock: Clock) {

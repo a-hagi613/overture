@@ -229,18 +229,22 @@ path. There is no cheaper token left to buy except a cheaper model, which is lev
 
 ### 5.5 The report behind the gate scans every attempt ever recorded
 
-- **Evidence:** `attemptRows` selects every attempt joined to its application, posting and user, with no date bound
-  and no limit, then aggregates in JavaScript (`src/server/dispatch/report.ts:130-150`). The admin Overview calls
-  `buildCostSummary` on each load (`routes/admin.ts:681`) and the provider report calls the same scan
-  (`routes/admin.ts:1128`). SPEC §5.7 says `attempts` is kept 180 days, but the retention job deletes only `events` and
-  `bg_jobs` (`platform/jobs/retention.ts:51-62`), so the table is never pruned. The indexes are
-  `(application_id, started_at)` and `(user_id, lease_until)` (`schema.ts:919-920`); neither serves the
-  `ORDER BY started_at` full scan.
+- **Evidence:** `attemptRows` selected every attempt joined to its application, posting and user, with no date bound
+  and no limit, then aggregated in JavaScript (`src/server/dispatch/report.ts`). The admin Overview called
+  `buildCostSummary` on each load (`routes/admin.ts`) and the provider report called the same scan. SPEC §5.7 says
+  `attempts` is kept 180 days, but the retention job deleted only `events` and `bg_jobs`
+  (`platform/jobs/retention.ts`), so the table was never pruned.
 - **Impact (estimate):** at 300 users sending 10 a day, 180 days is about 540,000 rows scanned and aggregated on the
   single event-loop thread for one page load. M2's 10 users are about 18,000 rows, which is fine; this is a wall the
   cost dashboard reaches on the way to M3, not today.
-- **Fix:** filter the report to a window (`since` equal to the current or last billing period), compute the totals in
-  SQL, and add attempts to the retention job so the table matches SPEC §5.7.
+- **Fixed in #390:** the report, the Overview and the provider report measure the last 30 days (`COST_REPORT_WINDOW_DAYS`,
+  the same window the margin page uses), every total is summed in SQLite and only the p50/p95 rows per provider × ATS
+  leave the database; the trend reads the latest 40 completed attempts. The retention job now prunes `attempts` at
+  180 days (SPEC §5.7) in the same chunked, busy-retrying delete as `events` and `bg_jobs`; `attempts` has no child
+  rows, so nothing cascades. The query still reads the whole table to filter it: no index starts at `started_at`
+  (`attempts_application` leads on `application_id`), so a `started_at` index is the follow-up when the table is large
+  enough to need one, and it needs a migration.
+
 
 ## 6. Considered and rejected
 
@@ -285,7 +289,7 @@ Ordered by saving per unit of risk. Tickets 1, 2, 5, 6 and 8 are #180's follow-u
 6. **Network policy behind the trim** (#180 follow-up 4), which is also where the SDK swap belongs (#180 follow-up 5).
 7. **Bound lazy scoring per day** and alert when the bound is hit (finding 5.3).
 8. **Minutes trend beside `browser.proxy_trend`** (#180 follow-up 8), and bound the provider report to a date window
-   before M3 (finding 5.5).
+   before M3 (finding 5.5, the window landed in #390; the minutes trend is open).
 9. **Housekeeping**: `SESSION_TIMEOUT_MINUTES` 15 → 12 (#180 follow-up 6); right-size the 10 GB volume (lever 9);
    reuse saved letters when the resume and fact revisions are unchanged (lever 7).
 
