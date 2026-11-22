@@ -1572,6 +1572,12 @@ export const copy = {
     saving: "Saving…",
     emptyTitle: "Nothing to approve right now.",
     emptyBody: "New applications appear here before anything is sent.",
+    loading: "Loading your Ready list",
+    loadFailedTitle: "Ready could not load.",
+    loadFailedBody: "Nothing has been sent. Try again in a moment.",
+    staleWarning: "Could not refresh Ready. The cards below may be out of date.",
+    retry: "Try again",
+    retrying: "Trying again…",
     changesTitle: "What changed",
     source: {
       fact: "Fact",

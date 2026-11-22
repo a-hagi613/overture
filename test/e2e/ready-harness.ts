@@ -115,7 +115,7 @@ async function moveClockTo(request: APIRequestContext) {
   });
 }
 
-async function seedProfile(request: APIRequestContext, appServerUrl: string) {
+export async function seedProfile(request: APIRequestContext, appServerUrl: string) {
   await requestMagicLink(appServerUrl, request, authTestIdentity.ownerEmail);
 
   const link = await latestMailLink(appServerUrl, request, authTestIdentity.ownerEmail);
