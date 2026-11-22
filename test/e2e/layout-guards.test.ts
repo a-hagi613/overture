@@ -221,7 +221,7 @@ async function expectSidebarFixed(page: Page, path: string, width: number) {
   }
 }
 
-async function navigate(page: Page, path: string) {
+async function navigate(page: Page, path: string, landsOn: string = path) {
   await page.evaluate(async (next) => {
     globalThis.history.pushState({}, "", next);
     globalThis.dispatchEvent(new PopStateEvent("popstate"));
@@ -231,7 +231,7 @@ async function navigate(page: Page, path: string) {
       });
     });
   }, path);
-  await page.waitForFunction((next) => globalThis.location.pathname === next, path);
+  await page.waitForFunction((next) => globalThis.location.pathname === next, landsOn);
 }
 
 // Legacy settings paths that redirect; the sweep checks the page they land on.
@@ -245,7 +245,7 @@ async function checkTarget(page: Page, target: Target, url: string, width: numbe
   const requestedPath = new URL(url).pathname;
   const expectedPath = redirectedPaths[requestedPath] ?? requestedPath;
 
-  await navigate(page, requestedPath);
+  await navigate(page, requestedPath, expectedPath);
   await expect(page.locator("main").first()).toBeVisible({ timeout: 15_000 });
   await expect(page).toHaveURL((current) => current.pathname === expectedPath);
   await page.evaluate(async () => {
