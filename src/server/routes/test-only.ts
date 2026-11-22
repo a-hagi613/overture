@@ -289,9 +289,18 @@ const seedSnapshotBody = z.object({
     }),
   ),
   coverLetter: z
-    .array(z.object({ sentence: z.string(), by_user: z.boolean().optional() }))
+    .array(
+      z.object({
+        sentence: z.string(),
+        by_user: z.boolean().optional(),
+        resume_line_ids: z.array(z.string()).optional(),
+      }),
+    )
     .nullable()
     .default(null),
+  provider: z.string().min(1).default("greenhouse"),
+  confirmedBy: z.enum(["page", "email"]).default("page"),
+  resumeSha256: z.string().min(1).optional(),
 });
 
 const bulkMailBody = z.object({
@@ -2427,17 +2436,17 @@ export function createTestRoutes(
         applicationId: body.applicationId,
         approvedAt: clock.now(),
         approvedPlanSha256: null,
-        confirmedBy: "page",
+        confirmedBy: body.confirmedBy,
         consentVersion: "m1",
         costMicros: 0,
         coverLetterEnc,
         descriptionHash: null,
         postingTitle: "Senior Backend Engineer",
         postingUrl: "https://export.example/jobs/1",
-        provider: "local",
+        provider: body.provider,
         providerSessionId: null,
         resumeId: resume.id,
-        resumeSha256: resume.sha256,
+        resumeSha256: body.resumeSha256 ?? resume.sha256,
         submittedAt: clock.now(),
         userId: application.userId,
       })

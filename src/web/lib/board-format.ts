@@ -113,3 +113,35 @@ export function money(detail: ApplicationDetail) {
 
   return copy.board.salary(minimum, maximum, salaryCurrency, suffix);
 }
+
+export function providerName(provider: string) {
+  switch (provider) {
+    case "ashby": {
+      return "Ashby";
+    }
+
+    case "greenhouse": {
+      return "Greenhouse";
+    }
+
+    case "lever": {
+      return "Lever";
+    }
+
+    case "personio": {
+      return "Personio";
+    }
+
+    case "workable": {
+      return "Workable";
+    }
+
+    default: {
+      return provider;
+    }
+  }
+}
+
+export function kilobytes(bytes: number) {
+  return copy.board.dossier.fileKb(Math.round(bytes / 1024));
+}

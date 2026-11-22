@@ -30,6 +30,7 @@ import {
   canWithdrawApplication,
   isBoardStage,
 } from "../../shared/board.ts";
+import { buildDossier } from "../../shared/dossier.ts";
 
 const STRONG_SCORE = 80;
 
@@ -661,8 +662,26 @@ export function createApplicationRoutes(
       .orderBy(asc(applicationEvents.at))
       .all();
 
+    const resumeLines =
+      snapshotView === null
+        ? []
+        : await citedResumeLines(userId, snapshot?.resumeId ?? null, snapshotView);
+
     return context.json({
       ageDays: Math.max(0, Math.floor((now - application.createdAt) / DAY_MS)),
+      dossier:
+        snapshotView === null
+          ? null
+          : buildDossier({
+              answers: snapshotView.answers,
+              confirmedBy: snapshotView.confirmedBy,
+              coverLetter: snapshotView.coverLetter,
+              provider: snapshotView.provider,
+              resume: snapshotView.resume,
+              resumeLines,
+              resumeSha256: snapshotView.resumeSha256,
+              submittedAt: snapshotView.submittedAt,
+            }),
       application,
       company: application.companyName,
       mail: await linkedMailOf({
@@ -691,13 +710,7 @@ export function createApplicationRoutes(
         title: application.postingTitle,
         url: application.postingUrl,
       },
-      snapshot:
-        snapshotView === null
-          ? null
-          : {
-              ...snapshotView,
-              resumeLines: await citedResumeLines(userId, snapshot?.resumeId ?? null, snapshotView),
-            },
+      snapshot: snapshotView === null ? null : { ...snapshotView, resumeLines },
       timeZone,
       timeline,
     });

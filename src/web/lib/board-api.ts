@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { BOARD_STAGES } from "../../shared/board.ts";
+import { dossierSchema } from "../../shared/dossier.ts";
 
 export const STAGE_KEYS = BOARD_STAGES;
 
@@ -110,6 +111,7 @@ export const applicationDetailSchema = z.object({
     updatedAt: z.number(),
   }),
   company: z.string(),
+  dossier: dossierSchema.nullable(),
   mail: z.array(mailThreadSchema),
   match: z
     .object({ reason: z.string().nullable(), score: z.number().nullable(), strong: z.boolean() })
