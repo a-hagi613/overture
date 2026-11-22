@@ -7,7 +7,7 @@ export const TAGGING_PURPOSES = ["tag_fallback"] as const;
 
 export type LlmCapKind = "user" | "global" | "tagging";
 
-function capMicros(db: AppDatabase, key: string) {
+export function capMicros(db: AppDatabase, key: string) {
   const raw = getSetting(db, key);
   const parsed = raw === null ? Number.NaN : Number(raw);
 

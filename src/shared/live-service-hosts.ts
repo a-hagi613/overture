@@ -1,3 +1,5 @@
+import { isSameHostOrSubdomain, normaliseHost } from "./host-match.ts";
+
 const ATS_DOMAINS = [
   "greenhouse.io",
   "lever.co",
@@ -22,18 +24,8 @@ const PAID_SERVICE_DOMAINS = [
 
 export const LIVE_SERVICE_DOMAINS: readonly string[] = [...ATS_DOMAINS, ...PAID_SERVICE_DOMAINS];
 
-function normaliseHost(hostname: string) {
-  return hostname.trim().toLowerCase().replace(/\.$/u, "");
-}
-
-function matchesDomain(host: string, domain: string) {
-  return host === domain || host.endsWith(`.${domain}`);
-}
-
 export function isLiveServiceHost(hostname: string) {
-  const host = normaliseHost(hostname);
-
-  return LIVE_SERVICE_DOMAINS.some((domain) => matchesDomain(host, domain));
+  return LIVE_SERVICE_DOMAINS.some((domain) => isSameHostOrSubdomain(hostname, domain));
 }
 
 export function isFixtureHost(hostname: string) {

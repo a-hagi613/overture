@@ -9,6 +9,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 
+import { readSessionUser } from "../auth/session.ts";
 import { notifications, pushSubscriptions } from "../platform/db/schema.ts";
 import { env } from "../config/env.ts";
 import { isAllowedPushEndpoint } from "../platform/push/endpoint.ts";
@@ -57,16 +58,10 @@ function view(row: typeof notifications.$inferSelect) {
 export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Auth) {
   const routes = new Hono<NotificationEnv>();
 
-  async function sessionUser(headers: Headers) {
-    const result = await auth.api.getSession({ headers }).catch(() => null);
-
-    return result?.user ?? null;
-  }
-
   const requireUser: MiddlewareHandler<NotificationEnv> = async (context, next) => {
     context.header("Cache-Control", "private, no-store");
 
-    const user = await sessionUser(context.req.raw.headers);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: "sign_in_required" }, 401);

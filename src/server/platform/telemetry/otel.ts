@@ -56,16 +56,6 @@ export const OTEL_ATTRIBUTE_ALLOWLIST = new Set([
   "otel.status_description",
 ]);
 
-export function redactAttributes(attributes: Record<string, string | number | boolean>) {
-  const redacted: Record<string, string | number | boolean> = {};
-
-  for (const [key, value] of Object.entries(attributes)) {
-    redacted[key] = OTEL_ATTRIBUTE_ALLOWLIST.has(key) ? value : "[redacted]";
-  }
-
-  return redacted;
-}
-
 class RedactingSpanProcessor implements SpanProcessor {
   private readonly inner: SpanProcessor;
 

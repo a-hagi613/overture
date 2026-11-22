@@ -301,16 +301,6 @@ function openReservationOf(db: BillingDb, userId: string, applicationId: string)
   return pair === undefined ? null : pair.reserve;
 }
 
-export function openReservationsOfApplication(
-  db: BillingDb,
-  userId: string,
-  applicationId: string,
-) {
-  return reservationPairsOf(db, userId)
-    .filter((pair) => pair.closedBy === null && pair.reserve.applicationId === applicationId)
-    .map((pair) => pair.reserve);
-}
-
 export function reserveForApplication(db: BillingDb, clock: Clock, input: ReservationInput) {
   const existing = entryOf(db, input.idempotencyKey);
 

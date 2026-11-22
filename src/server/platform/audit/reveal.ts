@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AdminAuditEntry, AdminAuditRow } from "./index.ts";
+import type { AdminAuditEntry, AdminAuditRow } from "./types.ts";
 import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 
@@ -111,6 +111,16 @@ function expiredEntry(inspection: RevealInspection) {
   } satisfies AdminAuditEntry;
 }
 
+function supersededEntry(inspection: RevealInspection) {
+  return {
+    actorId: inspection.session.actorId,
+    action: "reveal.close",
+    targetUserId: inspection.session.targetUserId,
+    reason: "Superseded by a new Reveal",
+    detail: { cause: "superseded", revealId: inspection.session.id },
+  } satisfies AdminAuditEntry;
+}
+
 async function recordExpiredReveal(db: AppDatabase, clock: Clock, inspection: RevealInspection) {
   await recordAdminAudit(db, clock, expiredEntry(inspection));
 }
@@ -140,19 +150,13 @@ export async function openReveal(db: AppDatabase, clock: Clock, input: RevealOpe
       const rows: AdminAuditRow[] = [];
 
       if (inspection !== null) {
-        if (inspection.expired) {
-          rows.push(insertAdminAudit(tx, clock, expiredEntry(inspection)));
-        } else {
-          rows.push(
-            insertAdminAudit(tx, clock, {
-              actorId: input.actorId,
-              action: "reveal.close",
-              targetUserId: inspection.session.targetUserId,
-              reason: "Superseded by a new Reveal",
-              detail: { cause: "superseded", revealId: inspection.session.id },
-            }),
-          );
-        }
+        rows.push(
+          insertAdminAudit(
+            tx,
+            clock,
+            inspection.expired ? expiredEntry(inspection) : supersededEntry(inspection),
+          ),
+        );
       }
 
       const id = crypto.randomUUID();
@@ -196,27 +200,21 @@ export async function openReveal(db: AppDatabase, clock: Clock, input: RevealOpe
 }
 
 export async function closeReveal(db: AppDatabase, clock: Clock, actorId: string) {
-  const inspection = inspectReveal(db, clock, actorId);
+  const session = await activeReveal(db, clock, actorId);
 
-  if (inspection === null) {
-    return null;
-  }
-
-  if (inspection.expired) {
-    await recordExpiredReveal(db, clock, inspection);
-
+  if (session === null) {
     return null;
   }
 
   await recordAdminAudit(db, clock, {
     actorId,
     action: "reveal.close",
-    targetUserId: inspection.session.targetUserId,
+    targetUserId: session.targetUserId,
     reason: "Closed from the admin",
-    detail: { cause: "manual", revealId: inspection.session.id },
+    detail: { cause: "manual", revealId: session.id },
   });
 
-  return inspection.session;
+  return session;
 }
 
 export async function recordRevealView(

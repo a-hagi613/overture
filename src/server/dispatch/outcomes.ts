@@ -6,6 +6,7 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { SendPlan } from "../pipeline/send-plan.ts";
 
 import { isAtsMailDomain } from "../../shared/ats-mail-domains.ts";
+import { isSameHostOrSubdomain } from "../../shared/host-match.ts";
 import {
   applications,
   applicationEvents,
@@ -78,13 +79,6 @@ function confirmWaitMs(db: AppDatabase) {
   return (Number.isFinite(parsed) && parsed > 0 ? parsed : 24) * HOUR_MS;
 }
 
-function sameDomain(sender: string, wanted: string) {
-  const host = wanted.trim().toLowerCase().replace(/\.$/u, "");
-  const from = sender.trim().toLowerCase().replace(/\.$/u, "");
-
-  return host !== "" && (from === host || from.endsWith(`.${host}`));
-}
-
 function unambiguousTarget(candidates: readonly ConfirmationCandidate[]) {
   const eligible = candidates.filter((candidate) =>
     candidate.sharedEmployer
@@ -112,7 +106,8 @@ function unambiguousTarget(candidates: readonly ConfirmationCandidate[]) {
 function confirmationEvidence(target: ConfirmationTarget, message: MessageRow, opened: string) {
   const domainAccepted =
     isAtsMailDomain(message.senderDomain) ||
-    (target.companyDomain !== null && sameDomain(message.senderDomain, target.companyDomain));
+    (target.companyDomain !== null &&
+      isSameHostOrSubdomain(message.senderDomain, target.companyDomain));
 
   if (!domainAccepted) {
     return null;

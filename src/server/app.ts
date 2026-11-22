@@ -22,6 +22,7 @@ import type { AccountEraser } from "./account/erase.ts";
 import type { ExportService } from "./export/service.ts";
 import type { SpendGate } from "./billing/spend.ts";
 
+import { readSession } from "./auth/session.ts";
 import { createHealthRoutes } from "./routes/health.ts";
 import { createLabRoutes } from "./routes/lab.ts";
 import { createMeRoutes } from "./routes/me.ts";
@@ -200,9 +201,7 @@ export function createApp(deps: AppDependencies) {
       return next();
     }
 
-    const session = await deps.auth.api
-      .getSession({ headers: context.req.raw.headers })
-      .catch(() => null);
+    const session = await readSession(deps.auth, context.req.raw.headers);
 
     const locked = demoLocked(session?.user.role);
 

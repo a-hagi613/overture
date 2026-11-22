@@ -99,10 +99,6 @@ const GREENHOUSE_FETCHER: FeedFetcher = async (url, request) => {
   return { status: response.status, etag, json: await response.json() };
 };
 
-export function greenhouseFetchFetcher() {
-  return GREENHOUSE_FETCHER;
-}
-
 export function greenhouseBoardTokenFromUrl(raw: string) {
   let parsed: URL;
 

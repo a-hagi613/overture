@@ -28,8 +28,6 @@ export const CONFIRMATION_SOURCES = [
 const APPLICATION_URL_PATH = "/application";
 const CONFIRMATION_URL_PATH = "/confirmation";
 
-const acceptedStatus = (status: number | null) => status !== null && status >= 200 && status < 300;
-
 const cssValue = (raw: string) => raw.replaceAll(/["\\]/gu, String.raw`\$&`);
 
 export const norm = (raw: string) => raw.replaceAll(/\s+/gu, " ").trim().toLowerCase();
@@ -1589,5 +1587,3 @@ export async function codeStepVisible(page: Page) {
 
   return true;
 }
-
-export const responseAccepted = acceptedStatus;

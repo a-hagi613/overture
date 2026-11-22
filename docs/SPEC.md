@@ -229,7 +229,7 @@ src/
 drizzle/             generated migrations
 scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, capture-forms.ts, pull-forms.ts, restore-drill.ts
 test/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
-                     (the forty-nine unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
+                     (the fifty unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
 ```
 
@@ -1562,7 +1562,7 @@ Plus: route reachability for every page, axe on every page, and the visual snaps
 Review, Inbox, Profile, Settings and the legal and consent boards × 390 / 1280 px × light/dark; Ready joins them once it is
 drawn) in pinned Docker.
 
-### 16.2 Unit tests (forty-nine files, `bun:test`, beside their code)
+### 16.2 Unit tests (fifty files, `bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
@@ -1615,6 +1615,7 @@ drawn) in pinned Docker.
 | `src/server/profile/v1-import.test.ts` | the v1 answer-bank and learned-answer mapping |
 | `src/shared/copy.test.ts` | no canvas annotation is a copy string or key |
 | `src/shared/dossier.test.ts` | the file is sent as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key, and a "did not happen" line appears only when the stored data proves it |
+| `src/shared/host-match.test.ts` | a host matches only its own domain or a real subdomain of it, after trimming, lower-casing and dropping a trailing root dot, so `evilgreenhouse.io` never matches `greenhouse.io` |
 
 ### 16.3 CI
 

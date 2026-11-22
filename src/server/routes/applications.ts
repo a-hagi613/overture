@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
+import { readSession } from "../auth/session.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 
 import {
@@ -195,12 +196,6 @@ export function createApplicationRoutes(
   const routes = new Hono();
   const zones = createTimeZoneService({ db, clock });
 
-  async function sessionOf(headers: Headers) {
-    const result = await auth.api.getSession({ headers }).catch(() => null);
-
-    return result ?? null;
-  }
-
   async function timeZoneOf(userId: string) {
     const { timezone } = await zones.current(userId);
 
@@ -305,7 +300,7 @@ export function createApplicationRoutes(
   }
 
   routes.get("/board", async (context) => {
-    const session = await sessionOf(context.req.raw.headers);
+    const session = await readSession(auth, context.req.raw.headers);
 
     if (session === null) {
       return context.json({ error: "sign_in_required" }, 401);
@@ -315,7 +310,7 @@ export function createApplicationRoutes(
   });
 
   routes.patch("/applications/:id/stage", validJson(stageMoveSchema), async (context) => {
-    const session = await sessionOf(context.req.raw.headers);
+    const session = await readSession(auth, context.req.raw.headers);
 
     if (session === null) {
       return context.json({ error: "sign_in_required" }, 401);
@@ -393,7 +388,7 @@ export function createApplicationRoutes(
   });
 
   routes.post("/applications/:id/undo-stage", async (context) => {
-    const session = await sessionOf(context.req.raw.headers);
+    const session = await readSession(auth, context.req.raw.headers);
 
     if (session === null) {
       return context.json({ error: "sign_in_required" }, 401);
@@ -483,7 +478,7 @@ export function createApplicationRoutes(
   });
 
   routes.post("/applications/:id/withdraw", async (context) => {
-    const session = await sessionOf(context.req.raw.headers);
+    const session = await readSession(auth, context.req.raw.headers);
 
     if (session === null) {
       return context.json({ error: "sign_in_required" }, 401);
@@ -554,7 +549,7 @@ export function createApplicationRoutes(
   });
 
   routes.get("/applications/:id", async (context) => {
-    const session = await sessionOf(context.req.raw.headers);
+    const session = await readSession(auth, context.req.raw.headers);
 
     if (session === null) {
       return context.json({ error: "sign_in_required" }, 401);

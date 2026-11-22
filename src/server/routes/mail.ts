@@ -4,6 +4,7 @@ import { and, asc, eq, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Auth } from "../auth/index.ts";
+import { readSessionUser } from "../auth/session.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
@@ -30,18 +31,12 @@ export function createMailRoutes(deps: {
   const { db, clock, auth, personal, mailboxes, secretSet } = deps;
   const routes = new Hono();
 
-  async function sessionUser(raw: Request) {
-    const result = await auth.api.getSession({ headers: raw.headers }).catch(() => null);
-
-    return result?.user ?? null;
-  }
-
   routes.get("/profile/mailbox", async (context) => {
     if (!secretSet) {
       return context.json({ error: "inbound_not_configured" }, 503);
     }
 
-    const user = await sessionUser(context.req.raw);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -57,7 +52,7 @@ export function createMailRoutes(deps: {
   });
 
   routes.get("/mail/code-waits", async (context) => {
-    const user = await sessionUser(context.req.raw);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -101,7 +96,7 @@ export function createMailRoutes(deps: {
   });
 
   routes.post("/mail/code-waits/:id", validJson(codeBodySchema), async (context) => {
-    const user = await sessionUser(context.req.raw);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);

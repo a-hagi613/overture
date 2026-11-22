@@ -24,7 +24,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for the forty-nine files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
+exist only for the fifty files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
 as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key,
 and a "did not happen" line appears only when the stored data proves it), ledger, crypto, planner, the
 restored-database check (a restored file is read
@@ -44,7 +44,9 @@ user holds a slot from, so a capture holding the last session offers a send no s
 `sending`, #425), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
 per cooldown, so a paused main thread becomes a log line), the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
 a copy string or key), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
-`x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the onboarding location plan (the
+`x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the host match
+(`host-match.test.ts`: a host matches only its own domain or a real subdomain of it, after trimming, lower-casing and
+dropping a trailing root dot, so `evilgreenhouse.io` never matches `greenhouse.io`), the onboarding location plan (the
 open-Posting group-by is planned through the covering `postings_open_location` index, never a table scan or a
 temporary b-tree, #337), the SQLite handle guard (a file
 in `src/` or `test/` that opens a `new DatabaseSync` also configures `PRAGMA busy_timeout`, or is a documented opt-out

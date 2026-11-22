@@ -4,6 +4,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 
 import type { Auth } from "../auth/index.ts";
+
+import { readSessionUser } from "../auth/session.ts";
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -40,12 +42,6 @@ export function createInboxRoutes(deps: {
 }) {
   const { auth, clock, db, objects, personal } = deps;
   const routes = new Hono();
-
-  async function sessionUser(raw: Request) {
-    const result = await auth.api.getSession({ headers: raw.headers }).catch(() => null);
-
-    return result?.user ?? null;
-  }
 
   async function messageView(
     message: typeof messages.$inferSelect,
@@ -102,7 +98,7 @@ export function createInboxRoutes(deps: {
   });
 
   routes.get("/threads", async (context) => {
-    const user = await sessionUser(context.req.raw);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -128,7 +124,7 @@ export function createInboxRoutes(deps: {
   });
 
   routes.get("/threads/:id", async (context) => {
-    const user = await sessionUser(context.req.raw);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -162,7 +158,7 @@ export function createInboxRoutes(deps: {
   });
 
   routes.post("/messages/:id/read", async (context) => {
-    const user = await sessionUser(context.req.raw);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -192,7 +188,7 @@ export function createInboxRoutes(deps: {
   });
 
   routes.get("/attachments/:id", async (context) => {
-    const user = await sessionUser(context.req.raw);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);

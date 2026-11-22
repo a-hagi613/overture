@@ -221,10 +221,6 @@ export function codeFromText(text: string) {
   return numeric?.groups?.code ?? null;
 }
 
-export function isSupportedCode(code: string) {
-  return Object.values(codePatterns).some((pattern) => pattern.test(code));
-}
-
 export function classifyMail(text: string, options: { ats?: string | null } = {}) {
   const language = detectMailLanguage(text);
 

@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
+import { readSessionUser } from "../auth/session.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
@@ -102,7 +103,7 @@ export function createProfileRoutes(deps: {
   const routes = new Hono();
 
   routes.post("/profile/resume", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -143,7 +144,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.get("/profile/resume", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -153,7 +154,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.get("/profile/resume/:id/file", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -181,7 +182,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.get("/profile/facts", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -191,7 +192,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.put("/profile/facts", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -227,7 +228,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.get("/profile/strengthen", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -237,7 +238,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.put("/profile/strengthen", validJson(strengthenSchema), async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -249,7 +250,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.get("/profile/languages", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -259,7 +260,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.put("/profile/languages", validJson(languagesInputSchema), async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -271,7 +272,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.get("/profile/settings", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -281,7 +282,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.put("/profile/settings", validJson(profileSettingsInputSchema), async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -291,7 +292,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.get("/profile/targets", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -307,7 +308,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.put("/profile/targets", validJson(targetsInputSchema), async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -323,7 +324,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.post("/profile/targets/match-count", validJson(targetsInputSchema), async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -337,7 +338,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.get("/profile/skip-companies", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -347,7 +348,7 @@ export function createProfileRoutes(deps: {
   });
 
   routes.put("/profile/skip-companies", validJson(skipCompaniesInputSchema), async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -362,10 +363,4 @@ export function createProfileRoutes(deps: {
   });
 
   return routes;
-}
-
-async function sessionUser(auth: Auth, raw: Request) {
-  const result = await auth.api.getSession({ headers: raw.headers }).catch(() => null);
-
-  return result?.user ?? null;
 }

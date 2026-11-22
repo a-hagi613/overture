@@ -206,6 +206,7 @@
           "src/server/pipeline/send-queue.test.ts",
           "src/server/profile/personal-crypto.test.ts",
           "src/server/profile/time-zone.test.ts",
+          "src/shared/host-match.test.ts",
           "scripts/database-sync-guard.test.ts",
           "scripts/lint-config-guard.test.ts",
           "scripts/workflow-config-guard.test.ts"

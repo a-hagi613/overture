@@ -10,10 +10,10 @@ import type { LiveCheckResult } from "./types.ts";
 import type { MailReplyCounts } from "../inbox/health.ts";
 
 import { raiseAlert } from "../platform/alerts.ts";
+import { capMicros } from "../platform/llm/caps.ts";
 import { llmSpendTodayMicros } from "../platform/llm/usage.ts";
 import { unhandledRejectionCount } from "../platform/process-guard.ts";
 import { catalogWorkerCrashCount } from "../catalog/worker-restarts.ts";
-import { getSetting } from "../platform/settings/index.ts";
 import { applications, attempts, bgJobs } from "../platform/db/schema.ts";
 
 import {
@@ -54,13 +54,6 @@ export interface AlertMetrics {
   unhandledRejections: number;
   catalogWorkerCrashes: number;
   mailHealth: MailReplyCounts;
-}
-
-function capMicros(db: AppDatabase, key: string) {
-  const raw = getSetting(db, key);
-  const parsed = raw === null ? Number.NaN : Number(raw);
-
-  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 1_000_000) : 0;
 }
 
 function rateMetrics(rows: { key: string; outcome: string | null }[]) {

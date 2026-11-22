@@ -6,6 +6,7 @@ import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 
+import { readSession } from "../auth/session.ts";
 import { createSseStream } from "../platform/sse/stream.ts";
 import { getAllKillSwitches, getAllSettings, getSetting } from "../platform/settings/index.ts";
 import { searchPostings } from "../platform/search/search.ts";
@@ -71,9 +72,7 @@ export function createApiRoutes(
     const lastEventId = context.req.header("Last-Event-ID") ?? null;
     const abortController = new AbortController();
 
-    const session = await auth.api
-      .getSession({ headers: context.req.raw.headers })
-      .catch(() => null);
+    const session = await readSession(auth, context.req.raw.headers);
 
     context.req.raw.signal.addEventListener("abort", () => {
       abortController.abort();

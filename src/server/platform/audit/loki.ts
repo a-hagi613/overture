@@ -1,4 +1,4 @@
-import type { AdminAuditRow } from "./index.ts";
+import type { AdminAuditRow } from "./types.ts";
 
 import { env } from "../../config/env.ts";
 import { logError } from "../log.ts";

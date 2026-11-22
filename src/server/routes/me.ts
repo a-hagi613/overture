@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 
 import type { Auth } from "../auth/index.ts";
+
+import { readSession } from "../auth/session.ts";
 import { enabledSocialProviders } from "../auth/index.ts";
 
 import { env } from "../config/env.ts";
@@ -9,11 +11,7 @@ export function createMeRoutes(auth: Auth) {
   const routes = new Hono();
 
   routes.get("/me", async (context) => {
-    const result = await auth.api
-      .getSession({ headers: context.req.raw.headers })
-      .catch(() => null);
-
-    const session = result ?? null;
+    const session = await readSession(auth, context.req.raw.headers);
 
     return context.json({
       user: session
