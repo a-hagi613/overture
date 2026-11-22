@@ -19,6 +19,7 @@ No secret value ever appears in this repository: secrets are set with `fly secre
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`), a `security-and-restore` job (gitleaks over the history, the private-files guard, and the Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations, untouched `bg_jobs`), and the `ci-ok` aggregator every other job feeds |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
+| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets), `live-diagnostics` (runtime names present/missing and integer SQLite counts). Skips with a green notice while `FLY_API_TOKEN` is unset |
 | `scripts/check-restored-db.ts` | Restored-database checks, read-only: PRAGMA `integrity_check`, applied-migration count, per-table row counts, untouched `bg_jobs`, zero outbound requests |
 | `scripts/restore-drill.ts` | `DRILL_TARGET=local` (CI round-trip) or `DRILL_TARGET=fly` (throwaway machine drill); never starts the app server |
 | `litestream-drill.yml` | Restore-only Litestream config for drills: same bucket, dedicated read-only `R2_DRILL_*` credential |
@@ -295,6 +296,104 @@ origin for tagged landing links.
   10–30 s deploy downtime.
 
 No migration, secret or DNS record is part of this deployment.
+
+## M3: Stripe plans, webhook and billing portal (owner runbook)
+
+Billing turns on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both on `overture-web` (SPEC §11).
+`scripts/setup-stripe.ts` creates the two recurring prices and the webhook the app verifies, and configures the billing
+portal; it is idempotent, so the same run can be repeated safely.
+
+### 1. Store the key as a repository secret
+
+```sh
+gh secret set STRIPE_SECRET_KEY -b <sk_live_…-from-the-Stripe-dashboard> -R a-hagi613/overture
+```
+
+A restricted key (`rk_live_…`) works when it grants write access to Products, Prices, Webhooks and Billing Portal
+configurations; the script accepts `sk_test_`, `rk_test_`, `sk_live_` and `rk_live_` prefixes and refuses any other.
+The key is never printed, committed or written to a file other than the temporary env file below. The script prints
+only the key's mode (`test` or `live`) and public Stripe ids (`prod_…`, `price_…`, `we_…`, `bpc_…`).
+
+### 2. Run the setup from GitHub Actions
+
+```sh
+gh workflow run ops-live.yml -f action=setup-stripe -R a-hagi613/overture
+```
+
+The workflow reads the Fly secret names, passes `--rotate-webhook` automatically when `STRIPE_WEBHOOK_SECRET` is not on
+the app yet (or when the `rotate_webhook` input is `true`), runs the script, masks every secret it is about to set and
+sets them on `overture-web` in one `flyctl secrets import` call, so the values never appear in a command line. A fresh 32-byte `CARD_FINGERPRINT_SECRET` is generated
+with `openssl rand -hex 32` only when the app does not have one. The script's `STRIPE_WEBHOOK_SECRET` lands in
+`/tmp/stripe-setup.env` (mode `0600`), which an `always()` step deletes; the workflow finishes by polling
+`https://tryoverture.com/api/health`.
+
+| Plan | Product | Price | Lookup key |
+|---|---|---|---|
+| Week | `Overture Week` | $9.99 USD recurring weekly (50 applications over 7 days) | `overture_week_usd` |
+| Month | `Overture Month` | $29.99 USD recurring monthly (250 applications over 30 days) | `overture_month_usd` |
+
+Both products are created with `tax_code=txcd_10103000` (SaaS, personal use), which Stripe Managed Payments requires.
+
+The webhook endpoint is `https://tryoverture.com/api/webhooks/stripe` and subscribes to the nine events
+`src/server/billing/webhooks.ts` handles. The billing portal configuration cancels at period end, updates payment
+methods, shows invoice history and switches a subscription between the Week and Month prices with
+`proration_behavior=none`; it returns to `https://tryoverture.com/settings/billing` and links the site's privacy and
+terms pages.
+
+A second run reuses the active lookup-key prices, keeps the existing webhook (its secret is not rotated) and verifies
+the portal configuration, so no duplicate product, price or endpoint appears. `rotate_webhook=true` deletes the old
+endpoint after the replacement exists, so the app always has one endpoint receiving events.
+
+When the launch price changes on an existing product, the old price still holds the lookup key, so the default run
+refuses with the drift message instead of guessing. Re-run with `reconcile_prices=true` to create the replacement price
+on the same product with `transfer_lookup_key=true`, archive the old price, update the billing portal configuration to
+the new price ids and set them on `overture-web`:
+
+```sh
+gh workflow run ops-live.yml -f action=setup-stripe -f reconcile_prices=true -R a-hagi613/overture
+```
+
+The same flag exists on the script as `--reconcile-prices`.
+
+### 3. Verify and diagnose
+
+```sh
+gh workflow run ops-live.yml -f action=check-secrets -R a-hagi613/overture
+gh workflow run ops-live.yml -f action=live-diagnostics -R a-hagi613/overture
+```
+
+`check-secrets` prints the sorted Fly secret names (never values), `flyctl status`, and the production health route.
+`live-diagnostics` runs `onboard-email-sending.ts --check`, prints `present` or `missing` for every credential and id
+name (never a value), then prints the non-secret runtime flags and config (`PUBLIC_SIGNUP_ENABLED`,
+`DEMO_LOGIN_ENABLED`, `REQUIRE_EMAIL_SENDING`, `ANTHROPIC_MODEL`, `BROWSER_PROVIDER`), and finally integer row counts
+for `users`, `invites`, `applications`, `company_boards` and `postings`; it prints no secret value and no personal
+data.
+
+### 4. Roll back
+
+- **A wrong price or webhook id:** re-run `setup-stripe`; the script prints the public ids it reused or created and sets
+  them on the app. A hand-set `STRIPE_PRICE_WEEK` or `STRIPE_PRICE_MONTH` is replaced by the next run.
+- **A leaked or wrong webhook signing secret:** run the workflow with `rotate_webhook=true`. The replacement endpoint
+  exists before the old one is deleted, then the new secret is set on the app.
+- **Turn billing off:** `flyctl secrets unset -a overture-web STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET`. The app boots
+  with billing off when neither is set; unsetting only one stops the server at boot.
+- **Test-mode resources:** the objects the script creates under `sk_test_`/`rk_test_` are test data; delete them in the
+  Stripe dashboard when they are no longer needed.
+
+The workflow itself is `workflow_dispatch` only, so reverting this change removes an operator tool without changing a
+running release.
+
+### 5. Run it locally
+
+```sh
+STRIPE_SECRET_KEY=sk_test_… APP_ORIGIN=https://tryoverture.com bun run scripts/setup-stripe.ts --out-env /tmp/stripe-test.env
+```
+
+Add `--reconcile-prices` to replace a drifted lookup-key price and archive the old one; without it the script stops
+with the drift message.
+
+Against a test key this creates test-mode products, prices, a webhook and a portal; delete them in the dashboard when
+you are done. `--rotate-webhook` replaces the endpoint and writes the new `STRIPE_WEBHOOK_SECRET` to the env file.
 
 ## Verifying the acceptance criteria
 

@@ -1,0 +1,253 @@
+name: Ops live
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Which live operation to run"
+        required: true
+        type: choice
+        options:
+          - check-secrets
+          - onboard-email
+          - setup-stripe
+          - live-diagnostics
+      rotate_webhook:
+        description: "Replace the Stripe webhook endpoint and rotate its signing secret"
+        required: false
+        type: boolean
+        default: false
+      reconcile_prices:
+        description: "Replace drifted lookup-key prices on the existing products and archive the old prices"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: ops-live
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ops:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip unless FLY_API_TOKEN is set (docs/DEPLOY.md, one-time step 6)
+        id: guard
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::notice::FLY_API_TOKEN is not set yet (docs/DEPLOY.md one-time step 6); skipping the ops-live action."
+            {
+              echo "### Ops-live skipped"
+              echo ""
+              echo "The \`FLY_API_TOKEN\` repository secret is not set yet (see docs/DEPLOY.md, one-time step 6)."
+              echo "Nothing ran. Once \`gh secret set FLY_API_TOKEN\` is done, re-run this workflow."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v7
+        if: steps.guard.outputs.skip != 'true'
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        if: steps.guard.outputs.skip != 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.5
+      - run: bun install --frozen-lockfile
+        if: steps.guard.outputs.skip != 'true'
+      - name: Scan this checkout for secrets and verify the lint configuration
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+          work=$(mktemp -d)
+          curl -fsSLo "$work/gitleaks.tar.gz" https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "${GITLEAKS_SHA256}  $work/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf "$work/gitleaks.tar.gz" -C "$work" gitleaks
+          mkdir -p "$HOME/.local/bin"
+          install -m 0755 "$work/gitleaks" "$HOME/.local/bin/gitleaks"
+          "$HOME/.local/bin/gitleaks" git --log-opts=-1 --config .gitleaks.toml --redact --exit-code 1 --no-banner
+          bun run lint:config
+      - name: Set up flyctl (superfly/flyctl-actions/setup-flyctl @ master @ 98172f7)
+        if: steps.guard.outputs.skip != 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
+
+      - name: List the Fly secret names and the app status
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'check-secrets'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          flyctl secrets list -a overture-web --json | jq -r '[.[].name] | sort | .[]'
+          flyctl status -a overture-web
+
+      - name: Check the production health route
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'check-secrets'
+        run: curl -fsS https://tryoverture.com/api/health
+
+      - name: Onboard the Cloudflare sending domain on overture-web
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'onboard-email'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          status=0
+          output="$(timeout 300s flyctl ssh console -a overture-web -C "bun run /app/scripts/onboard-email-sending.ts" 2>&1)" || status=$?
+          printf '%s\n' "$output"
+          {
+            echo "### Cloudflare Email Sending onboarding"
+            echo '```'
+            printf '%s\n' "$output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -eq 124 ]; then
+            echo "::error::The onboarding script did not answer within 300s (machine down or unresponsive)."
+            exit 1
+          fi
+          if ! grep -q "Cloudflare Email Sending" <<<"$output"; then
+            echo "::error::The onboarding command failed to run on overture-web (exit $status)."
+            exit 1
+          fi
+          if ! grep -q "verdict: verified" <<<"$output"; then
+            echo "::warning::The sending domain is not verified yet; DNS usually propagates in 5-15 minutes. Re-run this action."
+          fi
+
+      - name: Check the sending-domain records
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'onboard-email'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          status=0
+          output="$(timeout 120s flyctl ssh console -a overture-web -C "bun run /app/scripts/onboard-email-sending.ts --check" 2>&1)" || status=$?
+          printf '%s\n' "$output"
+          {
+            echo "### Cloudflare sending-domain check"
+            echo '```'
+            printf '%s\n' "$output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -eq 124 ]; then
+            echo "::error::The sending-domain check did not answer within 120s (machine down or unresponsive)."
+            exit 1
+          fi
+          if ! grep -q "Cloudflare Email Sending check" <<<"$output"; then
+            echo "::error::The sending-domain check failed to run on overture-web (exit $status)."
+            exit 1
+          fi
+          if ! grep -q "verdict: ready" <<<"$output"; then
+            echo "::warning::The sending domain is not ready; the records above name every missing one."
+          fi
+
+      - name: Read the Fly secret names for the Stripe action
+        id: stripe-secrets
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'setup-stripe'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          flyctl secrets list -a overture-web --json > "$RUNNER_TEMP/fly-secrets.json"
+          names="$(jq -r '.[].name' "$RUNNER_TEMP/fly-secrets.json")"
+          if grep -qx 'STRIPE_WEBHOOK_SECRET' <<<"$names"; then
+            echo "webhook_present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "webhook_present=false" >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qx 'CARD_FINGERPRINT_SECRET' <<<"$names"; then
+            echo "fingerprint_present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "fingerprint_present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create the plans, webhook and portal and set the Fly secrets
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'setup-stripe'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          APP_ORIGIN: https://tryoverture.com
+          ROTATE_WEBHOOK: ${{ inputs.rotate_webhook }}
+          RECONCILE_PRICES: ${{ inputs.reconcile_prices }}
+          WEBHOOK_PRESENT: ${{ steps.stripe-secrets.outputs.webhook_present }}
+          FINGERPRINT_PRESENT: ${{ steps.stripe-secrets.outputs.fingerprint_present }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STRIPE_SECRET_KEY:-}" ]; then
+            echo "::error::The STRIPE_SECRET_KEY repository secret is not set. Add it with gh secret set STRIPE_SECRET_KEY -R a-hagi613/overture, then re-run."
+            exit 1
+          fi
+          echo "::add-mask::$STRIPE_SECRET_KEY"
+          extra_args=(--out-env /tmp/stripe-setup.env)
+          if [ "${ROTATE_WEBHOOK}" = "true" ] || [ "${WEBHOOK_PRESENT}" != "true" ]; then
+            extra_args+=(--rotate-webhook)
+          fi
+          if [ "${RECONCILE_PRICES}" = "true" ]; then
+            extra_args+=(--reconcile-prices)
+          fi
+          bun run scripts/setup-stripe.ts "${extra_args[@]}"
+          value() { sed -n "s/^$1=//p" /tmp/stripe-setup.env | head -n 1; }
+          week="$(value STRIPE_PRICE_WEEK)"
+          month="$(value STRIPE_PRICE_MONTH)"
+          if [ -z "$week" ] || [ -z "$month" ]; then
+            echo "::error::The setup script wrote no plan price ids; refusing to set Fly secrets."
+            exit 1
+          fi
+          set_args=(
+            "STRIPE_SECRET_KEY=$STRIPE_SECRET_KEY"
+            "STRIPE_PRICE_WEEK=$week"
+            "STRIPE_PRICE_MONTH=$month"
+          )
+          if grep -q '^STRIPE_WEBHOOK_SECRET=' /tmp/stripe-setup.env; then
+            webhook_secret="$(value STRIPE_WEBHOOK_SECRET)"
+            echo "::add-mask::$webhook_secret"
+            set_args+=("STRIPE_WEBHOOK_SECRET=$webhook_secret")
+          fi
+          if [ "${FINGERPRINT_PRESENT}" != "true" ]; then
+            fingerprint="$(openssl rand -hex 32)"
+            echo "::add-mask::$fingerprint"
+            set_args+=("CARD_FINGERPRINT_SECRET=$fingerprint")
+          fi
+          printf '%s\n' "${set_args[@]}" | flyctl secrets import -a overture-web
+
+      - name: Verify the production health route
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'setup-stripe'
+        run: |
+          for attempt in $(seq 1 24); do
+            if curl -fsS https://tryoverture.com/api/health; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::The health route did not answer within 120s after the Stripe release."
+          exit 1
+
+      - name: Remove the Stripe setup file
+        if: always() && inputs.action == 'setup-stripe'
+        run: rm -f /tmp/stripe-setup.env
+
+      - name: Run the live diagnostics on overture-web
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'live-diagnostics'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          status=0
+          output="$(timeout 120s flyctl ssh console -a overture-web -C "bun run /app/scripts/onboard-email-sending.ts --check" 2>&1)" || status=$?
+          printf '%s\n' "$output"
+          {
+            echo "### Cloudflare sending-domain check"
+            echo '```'
+            printf '%s\n' "$output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -eq 124 ]; then
+            echo "::error::The sending-domain check did not answer within 120s."
+            exit 1
+          fi
+          set -e
+          timeout 120s flyctl ssh console -a overture-web -C "bun run /app/scripts/live-diagnostics.ts"
