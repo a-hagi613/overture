@@ -245,9 +245,10 @@ function jobDoneIds(events: SseEvent[]) {
 async function waitForJobDone(
   appUrl: string,
   lastEventId: string,
-  requiredJobId: string | null,
-  excludedJobId: string | null,
+  requiredJobIds: readonly string[] | null,
 ) {
+  const wanted = requiredJobIds;
+
   const response = await fetch(`${appUrl}/api/events`, {
     headers: { "Last-Event-ID": lastEventId },
   });
@@ -276,9 +277,13 @@ async function waitForJobDone(
   }
 
   function settled() {
-    const matches = [...settledDone].filter((jobId) => jobId !== excludedJobId);
+    const matches = [...settledDone];
 
-    return requiredJobId === null ? matches.length > 0 : matches.includes(requiredJobId);
+    if (wanted === null) {
+      return matches.length > 0;
+    }
+
+    return wanted.some((jobId) => matches.includes(jobId));
   }
 
   async function readUntilSettled() {
@@ -370,13 +375,13 @@ export async function startCatalogHarness(
 
     const enqueued = enqueueSchema.parse(await enqueueResponse.json());
 
-    lastEventId = await waitForJobDone(app.url, lastEventId, enqueued.id, null);
+    lastEventId = await waitForJobDone(app.url, lastEventId, [enqueued.id]);
   }
 
   async function runOneJob(kind: string) {
     const enqueuedId = await enqueueJob(kind);
 
-    lastEventId = await waitForJobDone(app.url, lastEventId, enqueuedId, null);
+    lastEventId = await waitForJobDone(app.url, lastEventId, [enqueuedId]);
 
     return enqueuedId;
   }
@@ -391,10 +396,14 @@ export async function startCatalogHarness(
   }
 
   async function waitForJob(jobId: string) {
-    lastEventId = await waitForJobDone(app.url, lastEventId, jobId, null);
+    lastEventId = await waitForJobDone(app.url, lastEventId, [jobId]);
   }
 
   async function pollThroughScheduledSweep(clockOffsetMs: number) {
+    const queuedSweeps = (await listJobs())
+      .filter((job) => job.kind === "catalog.sweep" && job.status === "queued")
+      .map((job) => job.id);
+
     const offsetResponse = await postJson(`${app.url}/__test__/clock/offset`, {
       offsetMs: clockOffsetMs,
     });
@@ -403,15 +412,17 @@ export async function startCatalogHarness(
       throw new Error("moving the clock failed");
     }
 
-    const nudgeResponse = await postJson(`${app.url}/__test__/jobs/enqueue`, {
+    await postJson(`${app.url}/__test__/jobs/enqueue`, {
       kind: "catalog.sweep",
       payload: "{}",
       runAt: (await clockNow()) + 3_600_000,
     });
 
-    const nudge = enqueueSchema.parse(await nudgeResponse.json());
-
-    lastEventId = await waitForJobDone(app.url, lastEventId, null, nudge.id);
+    lastEventId = await waitForJobDone(
+      app.url,
+      lastEventId,
+      queuedSweeps.length === 0 ? null : queuedSweeps,
+    );
   }
 
   async function clockNow() {

@@ -194,8 +194,9 @@ Typing a verification code into Overture when the forwarded email did not arrive
 _Avoid_: manual code entry, OTP
 
 **Recap**:
-The one email after a user's Daily run that lists the new Ready Applications and the open Reviews, with one link to
-Ready. It is never sent when the run produced nothing, and opening it never sends an Application.
+The one email and push after a user's Daily run that lists the new Ready Applications, the open Reviews and
+yesterday's sends and replies, with one link to Ready. It is never sent when the run produced nothing, and opening it
+never sends an Application.
 _Avoid_: Ready email, digest, notification
 
 ## The legal pages

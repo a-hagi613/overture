@@ -7,7 +7,6 @@ import type { LlmPort } from "../platform/ports/llm.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 
 import { isAtsMailDomain } from "../../shared/ats-mail-domains.ts";
-import { copy } from "../../shared/copy.ts";
 import {
   applications,
   applicationEvents,
@@ -16,7 +15,12 @@ import {
   messages,
   postings,
 } from "../platform/db/schema.ts";
-import { createNotification } from "../notify/notifications.ts";
+import {
+  notifyCardMoved,
+  notifyEmployerReply,
+  notifyInterviewDetected,
+  notifyOfferDetected,
+} from "../notify/events.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { classifyWithLlm } from "./classify-llm.ts";
@@ -56,12 +60,6 @@ function sameDomain(sender: string, wanted: string) {
   const from = sender.trim().toLowerCase().replace(/\.$/u, "");
 
   return host !== "" && (from === host || from.endsWith(`.${host}`));
-}
-
-function stageText(stage: string) {
-  const labels: Readonly<Record<string, string>> = copy.stages;
-
-  return labels[stage] ?? stage;
 }
 
 function isForwardMove(from: string, to: string) {
@@ -271,19 +269,27 @@ export function createMailMoves(deps: {
     );
 
     if (context !== undefined) {
-      const label = stageText(target.stage);
-
-      createNotification(db, clock, {
-        body: copy.notifications.stageMove.body({
+      if (input.classification === "interview") {
+        notifyInterviewDetected(db, clock, {
           company: context.company,
-          stage: label,
           title: context.title,
-        }),
-        kind: copy.notifications.stageMove.kind,
-        title: copy.notifications.stageMove.title(label),
-        url: `${copy.notifications.stageMove.url}?undo=${input.applicationId}`,
-        userId: input.userId,
-      });
+          userId: input.userId,
+        });
+      } else if (input.classification === "offer") {
+        notifyOfferDetected(db, clock, {
+          company: context.company,
+          title: context.title,
+          userId: input.userId,
+        });
+      } else {
+        notifyCardMoved(db, clock, {
+          applicationId: input.applicationId,
+          company: context.company,
+          stage: target.stage,
+          title: context.title,
+          userId: input.userId,
+        });
+      }
     }
 
     return { fromStage, stage: target.stage };
@@ -313,6 +319,28 @@ export function createMailMoves(deps: {
     });
   }
 
+  function applicationContextOf(applicationId: string) {
+    return db
+      .select({ company: companies.name, title: postings.title, userId: applications.userId })
+      .from(applications)
+      .innerJoin(companies, eq(companies.id, applications.companyId))
+      .innerJoin(postings, eq(postings.id, applications.postingId))
+      .where(eq(applications.id, applicationId))
+      .get();
+  }
+
+  function notifyReplyFor(applicationId: string) {
+    const context = applicationContextOf(applicationId);
+
+    if (context !== undefined) {
+      notifyEmployerReply(db, clock, {
+        company: context.company,
+        title: context.title,
+        userId: context.userId,
+      });
+    }
+  }
+
   async function handleAuthenticatedMessage(input: { userId: string; messageId: string }) {
     const message = db.select().from(messages).where(eq(messages.id, input.messageId)).get();
 
@@ -336,6 +364,12 @@ export function createMailMoves(deps: {
           dedupeKey: `mail.classify:${message.id}`,
           maxAttempts: 2,
         });
+
+        return;
+      }
+
+      if (message.classification === "other" && applicationId !== null) {
+        notifyReplyFor(applicationId);
       }
 
       return;
@@ -378,6 +412,12 @@ export function createMailMoves(deps: {
     );
 
     if (classification === "other") {
+      const thread = applicationForThread(message.threadId);
+
+      if (thread?.applicationId !== undefined && thread.applicationId !== null) {
+        notifyReplyFor(thread.applicationId);
+      }
+
       return;
     }
 

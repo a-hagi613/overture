@@ -16,9 +16,11 @@ import {
   mailboxes as mailboxRows,
   profiles,
   sessions,
+  settings,
   userKeys,
   users,
 } from "../platform/db/schema.ts";
+import { notificationPreferencesKey } from "../../shared/notifications.ts";
 
 export const ACCOUNT_ERASE_JOB_KIND = "account.erase";
 
@@ -113,6 +115,9 @@ export function createAccountEraser(deps: AccountEraserDeps) {
             tx.delete(userKeys).where(eq(userKeys.userId, userId)).run();
             tx.delete(events).where(eq(events.userId, userId)).run();
             tx.delete(llmUsage).where(eq(llmUsage.userId, userId)).run();
+            tx.delete(settings)
+              .where(eq(settings.key, notificationPreferencesKey(userId)))
+              .run();
 
             const deleted = tx
               .delete(users)

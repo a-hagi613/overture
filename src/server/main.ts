@@ -76,6 +76,11 @@ import {
   parsePushNotifyPayload,
   runNotificationPushJob,
 } from "./notify/push.ts";
+import {
+  APPLY_FAILURES_JOB_KIND,
+  ensureApplyFailuresQueued,
+  runApplyFailures,
+} from "./notify/failure-digest.ts";
 import { createPushSender } from "./platform/push/index.ts";
 import { createReviewService } from "./pipeline/reviews.ts";
 import { createResumeService } from "./profile/resume.ts";
@@ -232,6 +237,7 @@ const jobSingletons = [
   WORKABLE_INGEST_JOB_KIND,
   RETENTION_JOB_KIND,
   EXPORT_BUILD_JOB_KIND,
+  APPLY_FAILURES_JOB_KIND,
 ];
 
 recoverStaleLocks(db, clock, jobSingletons);
@@ -241,6 +247,8 @@ ensureCheckinSweepQueued(db, clock);
 ensureGrantExpiryQueued(db, clock);
 
 ensureRetentionQueued(db, clock);
+
+ensureApplyFailuresQueued(db, clock);
 
 const tracer = trace.getTracer("overture");
 
@@ -389,6 +397,13 @@ const pushNotifyJobHandlers: JobHandlers = {
     const { notificationId } = parsePushNotifyPayload(payload);
 
     await runNotificationPushJob({ clock, db, push: pushSender }, notificationId);
+  },
+  [APPLY_FAILURES_JOB_KIND]: async () => {
+    try {
+      await runApplyFailures({ clock, db });
+    } finally {
+      ensureApplyFailuresQueued(db, clock);
+    }
   },
 };
 

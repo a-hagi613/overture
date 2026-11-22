@@ -12,6 +12,9 @@ import type { Auth } from "../auth/index.ts";
 import { notifications, pushSubscriptions } from "../platform/db/schema.ts";
 import { env } from "../config/env.ts";
 import { isAllowedPushEndpoint } from "../platform/push/endpoint.ts";
+import { NOTIFICATION_PREFERENCE_KEYS } from "../../shared/notifications.ts";
+import { readNotificationPreferences, setNotificationPreference } from "../notify/preferences.ts";
+import { retryWhenBusy } from "../platform/db/busy.ts";
 
 const LIST_LIMIT = 100;
 
@@ -28,6 +31,11 @@ const subscriptionBody = z.object({
 const unsubscribeBody = z.object({ endpoint: z.url() });
 
 const readBody = z.object({ id: z.string().min(1) });
+
+const preferenceBody = z.object({
+  enabled: z.boolean(),
+  kind: z.enum(NOTIFICATION_PREFERENCE_KEYS),
+});
 
 interface NotificationEnv {
   Variables: { user: { id: string } };
@@ -56,7 +64,7 @@ export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Au
   }
 
   const requireUser: MiddlewareHandler<NotificationEnv> = async (context, next) => {
-    context.header("Cache-Control", "no-store");
+    context.header("Cache-Control", "private, no-store");
 
     const user = await sessionUser(context.req.raw.headers);
 
@@ -123,6 +131,29 @@ export function createNotificationRoutes(db: AppDatabase, clock: Clock, auth: Au
 
   routes.get("/push", requireUser, (context) =>
     context.json({ publicKey: env.VAPID_PUBLIC_KEY ?? null }),
+  );
+
+  routes.get("/notifications/preferences", requireUser, (context) => {
+    const user = context.get("user");
+
+    return context.json({ preferences: readNotificationPreferences(db, user.id) });
+  });
+
+  routes.put(
+    "/notifications/preferences",
+    requireUser,
+    zValidator("json", preferenceBody),
+    async (context) => {
+      const user = context.get("user");
+      const { enabled, kind } = context.req.valid("json");
+
+      const preferences = await retryWhenBusy(
+        () => setNotificationPreference(db, clock, user.id, kind, enabled),
+        "notifications.preferences",
+      );
+
+      return context.json({ preferences });
+    },
   );
 
   routes.post("/push/subscribe", requireUser, zValidator("json", subscriptionBody), (context) => {
