@@ -2117,8 +2117,12 @@ export const copy = {
     emptyHeadingNote: "Overture will build this screen next.",
   },
   notFound: {
-    title: "Not found",
-    body: "This page does not exist yet.",
+    code: "404",
+    title: "Page",
+    titleEmphasis: "not found.",
+    body: "This page has moved on, or never existed.",
+    home: "Go to Home",
+    board: "Open the Board",
   },
   search: {
     title: "Search",
