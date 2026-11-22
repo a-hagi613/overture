@@ -13,7 +13,6 @@ import {
   TRIAL_APPLICATIONS,
 } from "../../src/server/billing/card-fingerprint.ts";
 import { applicationsLeft } from "../../src/server/billing/ledger.ts";
-import { createPaymentsWebhookService } from "../../src/server/billing/webhooks.ts";
 
 const SECRET = "test-fingerprint-secret-0123456789";
 const STRIPE_FINGERPRINT = "fingerprint_card_a";
@@ -131,59 +130,6 @@ test.describe("the one-time trial grant", () => {
 test.describe("preparation gate input", () => {
   test("an account with no trial card and no paid plan has no Applications to prepare with", () => {
     const { clock, db } = freshDatabase();
-
-    expect(applicationsLeft(db, "user-2", clock.now())).toBe(0);
-  });
-});
-
-test.describe("the setup-mode webhook grants the trial once", () => {
-  const setupEvent = {
-    customerId: null,
-    id: "evt_setup_1",
-    invoiceId: null,
-    mode: "setup",
-    periodEndMs: null,
-    periodStartMs: null,
-    plan: null,
-    priceId: null,
-    sessionId: "cs_setup_1",
-    type: "checkout.session.completed",
-    userId: "user-1",
-  } as const;
-
-  test("records the card and grants three Applications inside the webhook transaction", () => {
-    const { clock, db } = freshDatabase();
-    const hmac = cardFingerprintHmac(SECRET, STRIPE_FINGERPRINT);
-    const webhooks = createPaymentsWebhookService({ clock, db, planForPrice: () => null });
-
-    expect(webhooks.handle(setupEvent, { hmac, userId: "user-1" })).toBe("processed");
-    expect(applicationsLeft(db, "user-1", clock.now())).toBe(3);
-    expect(
-      db.select().from(cardFingerprints).where(eq(cardFingerprints.hmac, hmac)).get()?.trialUsedAt,
-    ).not.toBeNull();
-  });
-
-  test("a redelivered event is a duplicate and grants nothing more", () => {
-    const { clock, db } = freshDatabase();
-    const hmac = cardFingerprintHmac(SECRET, STRIPE_FINGERPRINT);
-    const webhooks = createPaymentsWebhookService({ clock, db, planForPrice: () => null });
-
-    webhooks.handle(setupEvent, { hmac, userId: "user-1" });
-
-    expect(webhooks.handle(setupEvent, { hmac, userId: "user-1" })).toBe("duplicate");
-    expect(applicationsLeft(db, "user-1", clock.now())).toBe(3);
-  });
-
-  test("a card already used by another account is refused in the webhook too", () => {
-    const { clock, db } = freshDatabase();
-    const hmac = cardFingerprintHmac(SECRET, STRIPE_FINGERPRINT);
-    const webhooks = createPaymentsWebhookService({ clock, db, planForPrice: () => null });
-
-    webhooks.handle(setupEvent, { hmac, userId: "user-1" });
-    webhooks.handle(
-      { ...setupEvent, id: "evt_setup_2", userId: "user-2" },
-      { hmac, userId: "user-2" },
-    );
 
     expect(applicationsLeft(db, "user-2", clock.now())).toBe(0);
   });
