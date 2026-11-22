@@ -22,12 +22,12 @@ export function LegalShell({ children }: { children: ReactNode }) {
           </Link>
           {children}
         </main>
-        <footer className="mx-auto mt-[98px] w-full max-w-[716px] px-[18px] pb-[34px]">
+        <footer className="mx-auto mt-[98px] w-full max-w-[636px] px-[18px] pb-[34px]">
           <div className="border-t border-border pt-[16px]">
-            <p className="font-serif text-[13px] leading-[1.6] text-muted-foreground">
+            <p className="text-[12.5px] leading-[1.6] text-muted-foreground">
               {copy.legal.draftNotice}
             </p>
-            <p className="mt-1 font-serif text-[14px] leading-[1.6] text-muted-foreground">
+            <p className="mt-1 text-[12.5px] leading-[1.6] text-muted-foreground">
               {copy.legal.footerName}
               {copy.legal.footerSeparator}
               {copy.legal.footerContact}
@@ -36,7 +36,7 @@ export function LegalShell({ children }: { children: ReactNode }) {
             </p>
             <nav
               aria-label={copy.legal.footerLinksLabel}
-              className="mt-1 flex items-center gap-[6px] font-serif text-[14px] leading-[1.6] text-muted-foreground"
+              className="mt-1 flex items-center gap-[6px] text-[12.5px] leading-[1.6] text-muted-foreground"
             >
               <Link
                 className="-my-2 inline-flex min-h-11 items-center underline underline-offset-[3px] transition-colors hover:text-foreground"

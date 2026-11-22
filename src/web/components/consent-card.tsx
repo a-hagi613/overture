@@ -7,6 +7,24 @@ import { copy } from "../../shared/copy.ts";
 import { longDate } from "../lib/consent-format.ts";
 import { useAcceptConsent } from "../lib/consent-api.ts";
 
+const EMPHASIZED_WORD = "agree";
+
+function renderTitle(title: string) {
+  const start = title.indexOf(EMPHASIZED_WORD);
+
+  if (start === -1) {
+    return title;
+  }
+
+  return (
+    <>
+      {title.slice(0, start)}
+      <em className="italic">{EMPHASIZED_WORD}</em>
+      {title.slice(start + EMPHASIZED_WORD.length)}
+    </>
+  );
+}
+
 export function ConsentCard({ state }: { state: ConsentState }) {
   const accept = useAcceptConsent();
   const agreed = state.accepted?.version === state.current.version;
@@ -46,7 +64,7 @@ export function ConsentCard({ state }: { state: ConsentState }) {
         className="mt-[22px] font-serif text-[31px] leading-[1.06] tracking-tight md:mt-[14px] md:text-[36px]"
         id="consent-title"
       >
-        {copy.consent.title}
+        {renderTitle(copy.consent.title)}
       </h1>
       <p className="mt-[14px] text-[14px] leading-[1.6] md:text-[14.5px]">{state.current.text}</p>
       <p className="mt-[14px] text-[14px] leading-[1.6] md:text-[14.5px]">

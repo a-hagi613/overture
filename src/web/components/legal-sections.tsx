@@ -9,7 +9,7 @@ export function LegalSections({ sections }: { sections: readonly LegalSection[] 
         <section
           className={
             index === sections.length - 1
-              ? "pb-1"
+              ? "pb-1 pt-[42px] md:pt-[26px]"
               : "border-b border-border pb-[29px] pt-[42px] first:pb-[30px] first:pt-0 md:pb-[21px] md:pt-[26px] md:first:pb-[30px]"
           }
           key={section.heading}
