@@ -5,7 +5,7 @@ import { BrandMark } from "./brand-mark.tsx";
 const text = copy.notFound;
 
 const linkClass =
-  "inline-flex min-h-11 items-center text-[14px] font-medium text-muted-foreground hover:text-foreground";
+  "inline-flex min-h-11 items-center px-1 -mx-1 text-[14px] font-medium text-muted-foreground hover:text-foreground";
 
 /**
  * The footer drawn on the 404 board, with the full public link set and colophon.
@@ -21,10 +21,10 @@ export function NotFoundFooter() {
           <span className="font-serif text-[25px] leading-none">{copy.app.name}</span>
         </div>
         <nav aria-label={text.footerNavLabel} className="flex flex-wrap gap-x-[30px] gap-y-1.5">
-          <a className={linkClass} href="/#how-it-works">
+          <a className={linkClass} href="/#how">
             {text.nav.howItWorks}
           </a>
-          <a className={linkClass} href="/#where-it-applies">
+          <a className={linkClass} href="/#boards">
             {text.nav.whereItApplies}
           </a>
           <a className={linkClass} href="/pricing">
