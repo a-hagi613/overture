@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
 import { AccountRow } from "../components/account-row.tsx";
@@ -12,7 +12,10 @@ import { authClient } from "../lib/auth-client.ts";
 export function SettingsPage() {
   const { data: session } = authClient.useSession();
   const email = session === null ? "" : session.user.email;
+  const navigate = useNavigate();
   const [signedOutOthers, setSignedOutOthers] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutFailed, setSignOutFailed] = useState(false);
 
   const revokeOthers = async () => {
     const result = await authClient.revokeOtherSessions();
@@ -20,6 +23,26 @@ export function SettingsPage() {
     if (result.error === null) {
       setSignedOutOthers(true);
     }
+  };
+
+  const signOutHere = async () => {
+    setSigningOut(true);
+    setSignOutFailed(false);
+
+    try {
+      const result = await authClient.signOut();
+
+      if (result.error === null) {
+        await navigate("/signin");
+
+        return;
+      }
+    } catch {
+      setSignOutFailed(true);
+    }
+
+    setSigningOut(false);
+    setSignOutFailed(true);
   };
 
   return (
@@ -96,6 +119,30 @@ export function SettingsPage() {
             </div>
             <div className="flex items-center justify-between gap-4 border-t border-border py-3.5">
               <div className="min-w-0">
+                <p className="text-sm font-semibold">{copy.settings.signOutThis}</p>
+                <p className="text-[12.5px] text-muted-foreground">
+                  {copy.settings.signOutThisDetail}
+                </p>
+                {signOutFailed ? (
+                  <p className="mt-1.5 text-[12.5px] leading-[1.5] text-need" role="alert">
+                    {copy.settings.signOutThisError}
+                  </p>
+                ) : null}
+              </div>
+              <button
+                aria-busy={signingOut}
+                className="inline-flex min-h-11 flex-none cursor-pointer items-center justify-center rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={signingOut}
+                onClick={() => {
+                  void signOutHere();
+                }}
+                type="button"
+              >
+                {signingOut ? copy.settings.signOutThisPending : copy.settings.signOutThisButton}
+              </button>
+            </div>
+            <div className="flex items-center justify-between gap-4 border-t border-border py-3.5">
+              <div className="min-w-0">
                 <p className="text-sm font-semibold">{copy.settings.signOutAll}</p>
                 <p className="text-[12.5px] text-muted-foreground">
                   {signedOutOthers
@@ -104,7 +151,7 @@ export function SettingsPage() {
                 </p>
               </div>
               <button
-                className="inline-flex h-11 flex-none items-center justify-center rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold hover:bg-muted"
+                className="inline-flex min-h-11 flex-none cursor-pointer items-center justify-center rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
                 onClick={() => {
                   void revokeOthers();
                 }}

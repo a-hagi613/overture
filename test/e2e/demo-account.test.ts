@@ -510,3 +510,33 @@ test("the demo never sends, queues a send job or reaches a service", async ({ de
 
   await request.dispose();
 });
+
+test("test@email.com signs out of this device from Settings without demo_locked", async ({
+  browser,
+  demoServer,
+}) => {
+  const page = await browser.newPage();
+
+  await page.goto(`${demoServer.url}/signin`);
+  await page.getByLabel("Email").fill(demoEmail);
+  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+
+  await page.goto(`${demoServer.url}/settings`);
+
+  const signedOut = page.waitForResponse(
+    (response) => response.url().endsWith("/api/auth/sign-out") && response.ok(),
+  );
+
+  await page.getByRole("button", { exact: true, name: "Sign out" }).click();
+  await signedOut;
+
+  await expect(page).toHaveURL(/\/signin$/u);
+
+  const { state, user } = await demoUser(page.request, demoServer.url);
+
+  expect(state.sessions.filter((session) => session.userId === user?.id)).toHaveLength(0);
+
+  await page.goto(`${demoServer.url}/`);
+  await expect(page).toHaveURL(/\/signin$/u);
+});

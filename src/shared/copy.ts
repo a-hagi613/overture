@@ -900,6 +900,11 @@ export const copy = {
     exportRowDetail:
       "A zip of your profile, facts, Applications, messages, resume and attachments.",
     exportRowButton: "Export data",
+    signOutThis: "Sign out of this device",
+    signOutThisDetail: "Ends this session in this browser. Your other devices stay signed in.",
+    signOutThisButton: "Sign out",
+    signOutThisPending: "Signing out…",
+    signOutThisError: "We could not sign you out. Check your connection and try again.",
     signOutAll: "Sign out all devices",
     signOutAllDetail: "Ends every session except this one.",
     signOutAllButton: "Sign out everywhere",
@@ -1844,6 +1849,15 @@ export const copy = {
     overviewOwners: "Owners",
     overviewSessions: "Sessions",
     overviewSwitches: "Kill switches switched off",
+    overviewMail: "Email sending",
+    overviewMailSent: "Sent this month",
+    overviewMailCap: "Monthly cap",
+    overviewMailReserve: "Kept for sign-in mail",
+    overviewMailNote: (cap: number, reserve: number) =>
+      `Sends stop at ${cap.toLocaleString("en-US")}; the last ${reserve.toLocaleString("en-US")} are kept for sign-in mail and the live check, so notices stop first.`,
+    overviewMailRefused: "Sending is stopped for this month.",
+    overviewMailReservePaused:
+      "Notices are paused for this month; sign-in mail and the live check still go.",
     overviewJobs: "Background jobs",
     overviewJobsEmpty: "No background jobs yet.",
     overviewAudit: "Recent admin actions",

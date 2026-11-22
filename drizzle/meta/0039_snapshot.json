@@ -2,7 +2,7 @@
   "version": "6",
   "dialect": "sqlite",
   "id": "6abd51e0-8a4f-46d7-b3b2-928613c122e8",
-  "prevId": "a882e856-e750-4440-b573-4b7d0118de36",
+  "prevId": "054d396f-285d-4966-b725-a14490fc6e00",
   "tables": {
     "account": {
       "name": "account",
@@ -1500,6 +1500,37 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "consent_versions": {
+      "name": "consent_versions",
+      "columns": {
+        "version": {
+          "name": "version",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -3562,6 +3593,11 @@
           "name": "postings_closed_at",
           "columns": ["closed_at"],
           "isUnique": false
+        },
+        "postings_ats_closed_last_seen": {
+          "name": "postings_ats_closed_last_seen",
+          "columns": ["ats", "closed_at", "last_seen_at"],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -3785,7 +3821,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'m1'"
+          "default": "'1'"
         },
         "consent_at": {
           "name": "consent_at",
@@ -5090,6 +5126,97 @@
         }
       },
       "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "workable_ingests": {
+      "name": "workable_ingests",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "snapshot_key": {
+          "name": "snapshot_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fetched_at": {
+          "name": "fetched_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_last_modified": {
+          "name": "source_last_modified",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "rows": {
+          "name": "rows",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "added": {
+          "name": "added",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated": {
+          "name": "updated",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "closed": {
+          "name": "closed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ingested_at": {
+          "name": "ingested_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "workable_ingests_snapshot_unique": {
+          "name": "workable_ingests_snapshot_unique",
+          "columns": ["snapshot_key"],
+          "isUnique": true
+        },
+        "workable_ingests_ingested_at": {
+          "name": "workable_ingests_ingested_at",
+          "columns": ["ingested_at"],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
