@@ -69,6 +69,7 @@ export function BoardPageHeader(props: {
             {props.running ? copy.board.running : copy.board.paused}
           </span>
           <button
+            aria-label={copy.home.switchAria(props.running)}
             className="btn2 min-h-[30px] bg-muted px-3 text-[12.5px]"
             onClick={props.onToggleRunning}
             type="button"
