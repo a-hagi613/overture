@@ -476,7 +476,7 @@ test("when the Calendar does not load it says so, and Try again loads it", async
   await seeded.owner.dispose();
 });
 
-for (const width of [390, 768, 1280, 2560]) {
+for (const width of [390, 768, 1280, 1920, 2560]) {
   for (const theme of ["light", "dark"] as const) {
     test(`the Calendar has no axe violations and no sway at ${String(width)} px, ${theme}`, async ({
       browser,
