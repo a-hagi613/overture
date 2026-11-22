@@ -84,7 +84,7 @@ test("the shell lists the five destinations on desktop and opens settings from t
   await expect(shellPage.getByRole("heading", { name: "Inbox" })).toBeVisible();
 
   await shellPage.goto(`${appServerUrl}/missing-route`);
-  await expect(shellPage.getByRole("heading", { name: "Not found" })).toBeVisible();
+  await expect(shellPage.getByRole("heading", { level: 1, name: "Page not found." })).toBeVisible();
 
   await desktop.close();
 });
