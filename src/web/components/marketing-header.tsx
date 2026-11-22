@@ -1,7 +1,9 @@
 import { marketingCopy } from "../../shared/marketing-copy.ts";
 
-const linkClass =
-  "inline-flex min-h-[44px] items-center text-[15px] text-foreground underline-offset-4 hover:underline focus-visible:underline";
+const linkBase =
+  "min-h-[44px] items-center whitespace-nowrap text-[15px] text-foreground underline-offset-4 hover:underline focus-visible:underline";
+const linkClass = `inline-flex ${linkBase}`;
+const desktopOnlyClass = `hidden md:inline-flex ${linkBase}`;
 
 export function MarketingHeader() {
   return (
@@ -14,10 +16,10 @@ export function MarketingHeader() {
           aria-label={marketingCopy.nav.primaryLabel}
           className="flex items-center gap-1 md:gap-6"
         >
-          <a className={`${linkClass} hidden md:inline-flex`} href="/#how-it-works">
+          <a className={desktopOnlyClass} href="/#how-it-works">
             {marketingCopy.nav.howItWorks}
           </a>
-          <a className={`${linkClass} hidden md:inline-flex`} href="/#where-it-applies">
+          <a className={desktopOnlyClass} href="/#where-it-applies">
             {marketingCopy.nav.whereItApplies}
           </a>
           <a className={linkClass} href="/pricing">

@@ -144,3 +144,17 @@ test.describe("public landing and pricing, served and checked in the browser", (
     }
   }
 });
+
+test("the mobile header shows Pricing and Sign in, and keeps the section links for wider screens", async ({
+  page,
+  appServerUrl,
+}) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto(appServerUrl);
+  await expect(page.getByRole("link", { name: "How it works" })).toBeHidden();
+  await expect(page.getByRole("link", { name: "Pricing", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(page.getByRole("link", { name: "How it works" }).first()).toBeVisible();
+});
