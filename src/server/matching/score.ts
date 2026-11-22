@@ -18,6 +18,8 @@ import {
   resumes,
 } from "../platform/db/schema.ts";
 import { applicationsLeft } from "../billing/ledger.ts";
+import type { SpendGate } from "../billing/spend.ts";
+import { ungatedSpend } from "../billing/spend.ts";
 import { checkLlmCaps } from "../platform/llm/caps.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
 import { raiseAlert } from "../platform/alerts.ts";
@@ -68,6 +70,8 @@ interface MatchDeps {
   clock: Clock;
   llm: LlmPort;
   personal: PersonalCrypto;
+  /** Paid scoring never runs without Applications left when gated. */
+  spendGate?: SpendGate | undefined;
 }
 
 interface ScoreContext {
@@ -127,7 +131,7 @@ function scoreRequest(input: {
 }
 
 export function createMatchingService(deps: MatchDeps) {
-  const { db, clock, llm, personal } = deps;
+  const { db, clock, llm, personal, spendGate = ungatedSpend } = deps;
 
   const candidates = createCandidateService({ db, clock, personal });
   const languagesService = createLanguagesService({ db, clock });
@@ -229,7 +233,7 @@ export function createMatchingService(deps: MatchDeps) {
   async function runScoreRequests(userId: string, requests: LlmRequest[]) {
     const scores = new Map<string, ScoreOutput>();
 
-    if (requests.length === 0) {
+    if (requests.length === 0 || !spendGate.allows(userId)) {
       return scores;
     }
 

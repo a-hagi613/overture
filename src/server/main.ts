@@ -12,6 +12,7 @@ import {
   GRANT_EXPIRY_JOB_KIND,
   runGrantExpirySweep,
 } from "./billing/expiry.ts";
+import { createSpendGate } from "./billing/spend.ts";
 import { seedDemoAccount } from "./demo/seed.ts";
 import { createDemoSafeMailSender } from "./demo/mail-guard.ts";
 import { isDemoUser } from "./demo/role.ts";
@@ -197,6 +198,22 @@ void backups.run(shutdownController.signal);
 
 const mailSender = createDemoSafeMailSender(db, createMailSender(db, clock));
 const payments = createPayments(clock);
+
+const spendGate = createSpendGate({
+  db,
+  clock,
+  gated: payments !== null || env.PUBLIC_SIGNUP_ENABLED,
+});
+
+if (env.PUBLIC_SIGNUP_ENABLED) {
+  logInfo(
+    "auth",
+    payments === null
+      ? "public sign-up is on without billing: no account can prepare Applications until it has a grant"
+      : "public sign-up is on; paid work needs a trial card or a plan",
+  );
+}
+
 const pushSender = createPushSender(env, clock);
 const mailboxes = createMailboxService(db, clock, env.INBOUND_HMAC_SECRET ?? "", env.MAIL_DOMAIN);
 
@@ -310,11 +327,11 @@ if (env.DEMO_LOGIN_ENABLED) {
 const planner = createPlanner({ clock, db, random });
 
 const preparation = createPreparationService({
-  billingEnabled: payments !== null,
   db,
   clock,
   llm: anthropicLlmPort,
   personal,
+  spendGate,
   source: createGreenhouseQuestionSource(env.GREENHOUSE_FEED_BASE_URL),
   greenhouseBoardOrigin: env.GREENHOUSE_BOARD_BASE_URL,
   plainFormReader: createPlainFormReader({
@@ -387,6 +404,7 @@ const prepDailyJobHandlers: JobHandlers = {
           llm: anthropicLlmPort,
           personal,
           preparation,
+          spendGate,
         },
         userId,
         since ?? clock.now(),
@@ -463,7 +481,14 @@ const mailPersonal = createPersonalCrypto(
   env.MASTER_KEY_CURRENT,
 );
 
-const resumes = createResumeService({ db, clock, llm: anthropicLlmPort, objects, personal });
+const resumes = createResumeService({
+  db,
+  clock,
+  llm: anthropicLlmPort,
+  objects,
+  personal,
+  spendGate,
+});
 
 const exports = createExportService({
   appOrigin,
@@ -497,6 +522,7 @@ const mailMoves = createMailMoves({
   degraded: degradedFlag,
   llm: anthropicLlmPort,
   personal: mailPersonal,
+  spendGate,
 });
 
 const resolver = createMailDnsResolver(env.INBOUND_DNS_SERVER);
@@ -813,6 +839,7 @@ const app = createApp({
   auth,
   objects,
   llm: anthropicLlmPort,
+  spendGate,
   mailboxes,
   resolver,
   liveCheckAddress: liveCheckAddressValue,

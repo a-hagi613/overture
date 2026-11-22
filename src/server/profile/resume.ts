@@ -7,10 +7,13 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PersonalCrypto } from "./personal-crypto.ts";
+import type { SpendGate } from "../billing/spend.ts";
 
 import { resumes } from "../platform/db/schema.ts";
+import { raiseAlert } from "../platform/alerts.ts";
 import { checkLlmCaps } from "../platform/llm/caps.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
+import { ungatedSpend } from "../billing/spend.ts";
 
 export const MAX_RESUME_BYTES = 10 * 1024 * 1024;
 export const RESUME_PDF_PURPOSE = "resume_pdf";
@@ -69,8 +72,10 @@ export function createResumeService(deps: {
   objects: ObjectStore;
   personal: PersonalCrypto;
   llm: LlmPort;
+  /** Paid text extraction never runs without Applications left when gated. */
+  spendGate?: SpendGate | undefined;
 }) {
-  const { db, clock, objects, personal, llm } = deps;
+  const { db, clock, objects, personal, llm, spendGate = ungatedSpend } = deps;
 
   async function currentRow(userId: string) {
     const rows = await db
@@ -118,15 +123,33 @@ export function createResumeService(deps: {
       } satisfies ParsedResume;
     }
 
+    if (!spendGate.allows(userId)) {
+      return {
+        text: "",
+        parsedWith: "unpdf" as const,
+        pages: extracted.totalPages,
+      } satisfies ParsedResume;
+    }
+
     const request = { user: RESUME_PDF_PROMPT, pdf };
+
+    const estimatedCostMicros = llm.estimateSingleCostMicros(request);
 
     const caps = checkLlmCaps(db, clock, {
       userId,
       purpose: RESUME_PDF_PURPOSE,
-      estimatedCostMicros: llm.estimateSingleCostMicros(request),
+      estimatedCostMicros,
     });
 
     if (!caps.withinCaps) {
+      raiseAlert(db, clock, "llm.cap", {
+        cap: caps.exceeded,
+        capMicros: caps.capMicros,
+        estimatedMicros: estimatedCostMicros,
+        purpose: RESUME_PDF_PURPOSE,
+        spentMicros: caps.spentMicros,
+      });
+
       return {
         text: "",
         parsedWith: "unpdf" as const,
