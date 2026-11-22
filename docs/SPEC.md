@@ -432,7 +432,10 @@ straight to tagging; Ashby's `isRemote` is ignored because Ashby sets it on hybr
    `scripts/load-discovered-boards.ts` loads the dataset's greenhouse, lever, ashby and personio rows as
    `source='discovered'` — 13,911 boards, in transactions of at most 500 boards with the event loop yielded
    between them, idempotent. v1 boards are not imported (the measured comparison is
-   `docs/research/seed-comparison.md`; the runbook is `docs/research/m1-09-runbook.md`).
+   `docs/research/seed-comparison.md`; the runbook is `docs/research/m1-09-runbook.md`). A weekly
+   `.github/workflows/stapply-seed.yml` run stages a candidate upstream snapshot behind schema, sha256 and
+   row-drop guards and never writes the pins itself; re-pinning stays a reviewed change (`docs/DEPLOY.md`,
+   the Stapply seed refresh).
 2. **Backfill**: one pass over every active board inside per-ATS limits; on production it is started with
    `bun run scripts/enqueue-backfill.ts --db /data/app.sqlite`, which enqueues the `catalog.backfill` job and
    prints the per-ATS request counts and the duration estimate at the 2 req/s per-ATS pace.
@@ -1025,7 +1028,9 @@ until #232 releases it after the 20-form probe, and Workable's until #235 does t
   one (Browser Use sends 300 s) requeues the job for exactly that delay without spending an attempt. A 402 (no credit)
   or 403 (forbidden) is never retried: it is a provider error, the `provider` kill switch for `browser_use` is set and
   the owner is alerted, so dispatch pauses until the owner turns the switch off.
-- **Kernel** (emergency fallback): headful browser, stealth on, ISP proxy, per-user profile. Its acceptable-use
+- **Kernel** (emergency fallback): headful browser, stealth on, ISP proxy, per-user profile. Its control API reports
+  uptime and estimated cost but no proxy volume, so its attempts keep `proxy_bytes` NULL (unknown) rather than a
+  misleading 0, and the admin report totals only the bytes providers actually measured. Its acceptable-use
   policy bans "bulk unsolicited form submission" (ADR 0003), so it is exercised only against the synthetic lab and
   fixtures, never sent real applications by default; the owner switches real traffic to it only if Browser Use's
   provider kill switch trips and the owner chooses to.
