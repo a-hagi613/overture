@@ -24,7 +24,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for thirty-three invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
+exist only for thirty-six invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
 derivations, the answer planner (a salary Fact kept per currency is chosen only for the currency a question names),
 the facts model (a Fact's scope is validated against its key), the onboarding step's salary and EEO reading, the
 fixture sanitiser (recorded pages must carry no script, event handler, personal data or token), the v1
@@ -68,10 +68,14 @@ update so every later caller reads them back, and a failed record reopens for on
 results fetch (`anthropic-batches.test.ts`: the api key is sent only to the configured api origin, never to another
 origin named by a provider response, #418), the catalog snapshot (`applications.test.ts`: an Application copies the
 Posting's and Company's display fields onto its own row when it is created, keeps them after the catalog rows are
-deleted, and is not created for a Posting that has already left the catalog, #422), and the catalog split migration
+deleted, and is not created for a Posting that has already left the catalog, #422), the catalog split migration
 (`migration-snapshot.test.ts`: migration `0056_snapshot_decouple` backfills that copy onto every existing Application,
 including readable placeholders when the catalog row is already gone, and leaves `applications`, `matches`,
-`posting_user_state` and `skip_companies` with no foreign key into `postings` or `companies`, #422). They
+`posting_user_state` and `skip_companies` with no foreign key into `postings` or `companies`, #422), the admin gate's
+fail-closed parsing (a malformed Access cookie or a missing team domain answers 401, never a 500 or an invented
+issuer), the capped request-body reader (an unauthenticated webhook body stops at its byte cap and is never buffered
+whole, so a sender cannot choose how much memory it costs), and the unhandled-rejection alert (a public alert carries
+the error type and count only, never the arbitrary message that can hold personal data or a token). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
 depend on the runner. The mail count runs the real SQLite file and the real migrations, so the invariant is exercised
 against the shipped schema rather than a stand-in. CI stays under two minutes on pull requests: six shards balanced by

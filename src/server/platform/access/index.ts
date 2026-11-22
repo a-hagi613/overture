@@ -50,7 +50,28 @@ function tokenFromRequest(request: Request) {
 
   const value = paired?.slice(ACCESS_COOKIE.length + 1);
 
-  return value === undefined || value.length === 0 ? null : decodeURIComponent(value);
+  if (value === undefined || value.length === 0) {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The Cloudflare Access issuer for a team, or undefined when the deployment names only a JWKS URL.
+ *
+ * Building `https://undefined` from a missing team domain made every valid token fail closed with
+ * 401 instead of accepting the configured team; a deployment without a team domain now verifies
+ * the signature and audience against its JWKS URL and skips the issuer claim it cannot know.
+ * @param teamDomain The Access team domain from `CF_ACCESS_TEAM_DOMAIN`.
+ * @returns The issuer claim to verify, or undefined when the team domain is not configured.
+ */
+export function accessIssuer(teamDomain: string | undefined) {
+  return teamDomain === undefined ? undefined : `https://${teamDomain}`;
 }
 
 export function createAccessVerifier(config: {
@@ -64,7 +85,7 @@ export function createAccessVerifier(config: {
     return null;
   }
 
-  const issuer = `https://${config.teamDomain}`;
+  const issuer = accessIssuer(config.teamDomain);
   const { audience } = config;
   const jwks = createRemoteJWKSet(jwksUrl);
 
@@ -77,7 +98,11 @@ export function createAccessVerifier(config: {
       }
 
       try {
-        const { payload } = await jwtVerify(token, jwks, { issuer, audience });
+        const { payload } = await jwtVerify(
+          token,
+          jwks,
+          issuer === undefined ? { audience } : { audience, issuer },
+        );
 
         const parsed = accessIdentitySchema.safeParse(payload);
 
