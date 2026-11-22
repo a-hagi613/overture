@@ -84,6 +84,11 @@ import {
 } from "../testing/turnstile-browser-scenario.ts";
 import { turnstileBrowserStub } from "../testing/turnstile-browser-stub.ts";
 import {
+  labHcaptchaStub,
+  labRecaptchaStub,
+  labTurnstileStub,
+} from "../testing/lab-vendor-stubs.ts";
+import {
   emailSendingScenarios,
   setEmailSendingScenario,
 } from "../testing/email-sending-scenario.ts";
@@ -1207,6 +1212,21 @@ export function createTestRoutes(
       "content-type": "text/javascript; charset=utf-8",
     }),
   );
+
+  const labScripts = {
+    "lab-hcaptcha.js": labHcaptchaStub,
+    "lab-recaptcha.js": labRecaptchaStub,
+    "lab-turnstile.js": labTurnstileStub,
+  } as const;
+
+  for (const [name, source] of Object.entries(labScripts)) {
+    routes.get(`/${name}`, (context) =>
+      context.body(source, 200, {
+        "cache-control": "no-store",
+        "content-type": "text/javascript; charset=utf-8",
+      }),
+    );
+  }
 
   routes.post("/jobs/run-due", async (context) => {
     const ran = await runDueJobs(db, clock, handlers, singletonJobKinds);

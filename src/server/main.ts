@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createApp } from "./app.ts";
 import { createAuth } from "./auth/index.ts";
 import type { AuthOptions } from "./auth/index.ts";
-import { databasePath, env } from "./config/env.ts";
+import { databasePath, env, labBaseUrl } from "./config/env.ts";
 import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
 import { MailCapExceededError } from "./platform/mail/metered.ts";
 import { createPayments } from "./billing/index.ts";
@@ -139,6 +139,7 @@ import { createInterviewCalendar } from "./inbox/interviews.ts";
 import { createMailMoves, MAIL_CLASSIFY_JOB_KIND } from "./inbox/moves.ts";
 import { createMailboxService } from "./inbox/mailboxes.ts";
 import { FIXTURE_CAPTURE_JOB_KIND, runFixtureCaptureJob } from "./fixtures/job.ts";
+import { LAB_JOB_KIND, runLabJob } from "./lab/job.ts";
 import { ACCOUNT_ERASE_JOB_KIND, createAccountEraser } from "./account/erase.ts";
 import { ACCOUNT_DELETED_NOTICE_JOB_KIND, createDeletionNoticeCrypto } from "./account/notice.ts";
 import {
@@ -641,6 +642,17 @@ const planningJobHandlers: JobHandlers = {
   },
 };
 
+const labBase = labBaseUrl;
+
+const labJobHandlers: JobHandlers =
+  browserProviders === null || labBase === null
+    ? {}
+    : {
+        [LAB_JOB_KIND]: async (payload) => {
+          await runLabJob({ baseUrl: labBase, clock, db, providers: browserProviders }, payload);
+        },
+      };
+
 const fixtureJobHandlers: JobHandlers =
   browserProviders === null
     ? {}
@@ -733,6 +745,7 @@ const allJobHandlers: JobHandlers = {
   ...mailJobHandlers,
   ...dispatchJobHandlers,
   ...fixtureJobHandlers,
+  ...labJobHandlers,
   ...watchJobHandlers,
   ...checkinJobHandlers,
   ...liveCheckJobHandlers,

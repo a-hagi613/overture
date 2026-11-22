@@ -22,6 +22,7 @@ const adminPaths = [
   "/admin/users",
   "/admin/invites",
   "/admin/mail-health",
+  "/admin/provider-report",
 ];
 
 function combinations() {
@@ -54,6 +55,7 @@ async function checkPage(
       .or(page.getByRole("heading", { name: "Users and access" }))
       .or(page.getByRole("heading", { name: "Invites", exact: true }))
       .or(page.getByRole("heading", { name: "Mail health" }))
+      .or(page.getByRole("heading", { name: "The provider report" }))
       .first(),
   ).toBeVisible();
 

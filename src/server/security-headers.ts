@@ -27,7 +27,10 @@ export function securityHeaders(production: boolean) {
   const handler: MiddlewareHandler = async (context, next) => {
     await next();
 
-    context.res.headers.set("content-security-policy", CONTENT_SECURITY_POLICY);
+    if (!context.res.headers.has("content-security-policy")) {
+      context.res.headers.set("content-security-policy", CONTENT_SECURITY_POLICY);
+    }
+
     context.res.headers.set("x-content-type-options", "nosniff");
     context.res.headers.set("referrer-policy", "strict-origin-when-cross-origin");
     context.res.headers.set("x-frame-options", "DENY");
