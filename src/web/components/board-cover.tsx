@@ -12,33 +12,41 @@ export function BoardCover({ detail }: { detail: ApplicationDetail }) {
     );
   }
 
+  const citedIds = new Set((snapshot.coverLetter ?? []).flatMap((line) => line.resume_line_ids));
+
+  const cited = snapshot.resumeLines.filter((line) => citedIds.has(line.id));
+
   return (
     <div aria-label={copy.board.tabs.cover} className="pt-[18px] md:pt-[22px]" role="tabpanel">
       {snapshot.coverLetter === null || snapshot.coverLetter.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">{copy.board.cover.empty}</p>
       ) : (
-        <div>
-          {snapshot.coverLetter.map((line) => (
-            <div className="mb-3" key={line.sentence}>
-              <p className="serif text-[19px] leading-[1.4]">{line.sentence}</p>
-              <p className="mono mt-1 text-[11px] text-muted-foreground">
-                {copy.board.cover.lines(line.resume_line_ids.length)}
+        <>
+          <div className="rounded-lg border border-border bg-background px-5 py-4">
+            {snapshot.coverLetter.map((line) => (
+              <p className="serif text-[17px] leading-[1.6] [&+&]:mt-3" key={line.sentence}>
+                {line.sentence}
               </p>
-              {line.resume_line_ids.map((id) => {
-                const cited = snapshot.resumeLines.find((resumeLine) => resumeLine.id === id);
-
-                return cited === undefined ? null : (
-                  <p
-                    className="mono mt-1 border-l border-border pl-2 text-[11px] text-muted-foreground"
-                    key={id}
+            ))}
+          </div>
+          {cited.length === 0 ? null : (
+            <div className="mt-3">
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {copy.board.cover.citedHeading}
+              </p>
+              <ul className="mt-1.5 flex flex-col gap-1">
+                {cited.map((line) => (
+                  <li
+                    className="mono border-l border-border pl-2 text-[11px] text-muted-foreground"
+                    key={line.id}
                   >
-                    {`${cited.id} · ${cited.text}`}
-                  </p>
-                );
-              })}
+                    {`${line.id} · ${line.text}`}
+                  </li>
+                ))}
+              </ul>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
       {snapshot.resume === null ? null : (
         <div className="mt-4 rounded-md border border-border bg-muted/40 p-3">
