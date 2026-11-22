@@ -50,7 +50,25 @@ export const targets: Target[] = routerPaths.map((path) => ({
   url: urlFor(path),
 }));
 
-export async function navigate(page: Page, path: string) {
+const redirects = new Map(
+  [
+    ...routeSource.matchAll(
+      /path: "(?<from>[^"]+)", element: <Navigate replace to="(?<to>[^"]+)" \/>/gu,
+    ),
+  ].map((match) => [match.groups?.from ?? "", match.groups?.to ?? ""]),
+);
+
+/**
+ * The path a route settles on: its own path, or the target of a `<Navigate>` redirect.
+ *
+ * @param path - A route path as listed in the route table.
+ * @returns The path the browser ends on after the route renders.
+ */
+export function landingPath(path: string) {
+  return redirects.get(path) ?? path;
+}
+
+export async function navigate(page: Page, path: string, landing = path) {
   await page.evaluate(async (next) => {
     globalThis.history.pushState({}, "", next);
     globalThis.dispatchEvent(new PopStateEvent("popstate"));
@@ -60,7 +78,7 @@ export async function navigate(page: Page, path: string) {
       });
     });
   }, path);
-  await page.waitForFunction((next) => globalThis.location.pathname === next, path);
+  await page.waitForFunction((next) => globalThis.location.pathname === next, landing);
 }
 
 export async function openContext(

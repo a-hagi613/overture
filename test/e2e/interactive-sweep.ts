@@ -1,12 +1,22 @@
 import { AxeBuilder } from "@axe-core/playwright";
-import type { Page } from "@playwright/test";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
 
-import { test, expect } from "./admin.fixture.ts";
-import { navigate, openContext, targets } from "./route-sweep.ts";
+import { expect } from "./admin.fixture.ts";
+import { landingPath, navigate, openContext, targets } from "./route-sweep.ts";
 import type { Storage, Target } from "./route-sweep.ts";
 
-const widths = [390, 1280] as const;
-const themes = ["light", "dark"] as const;
+export const widths = [390, 1280] as const;
+export const themes = ["light", "dark"] as const;
+
+export type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
+
+export interface SweepFixtures {
+  adminAppUrl: string;
+  appServerUrl: string;
+  browser: Browser;
+  chromeOwnerStorage: StorageState;
+  ownerAccessCookieState: StorageState;
+}
 
 const interactiveSelector =
   'a[href], button, [role="button"], [role="tab"], [role="switch"], summary';
@@ -259,17 +269,26 @@ async function measureLandmarks(page: Page) {
 async function checkTarget(page: Page, target: Target, url: string, width: number) {
   const expectedPath = new URL(url).pathname;
 
-  await navigate(page, expectedPath);
+  await navigate(page, expectedPath, landingPath(expectedPath));
   await expect(page.locator("main").first()).toBeVisible({ timeout: 15_000 });
   await page.evaluate(async () => {
     globalThis.scrollTo(0, 0);
-    await document.fonts.ready;
+
+    const bounded = new Promise<void>((resolve) => {
+      setTimeout(resolve, 5000);
+    });
+
+    await Promise.race([document.fonts.ready, bounded]);
   });
-  await page.waitForLoadState("networkidle").catch(() => undefined);
   await page
     .locator("h1")
     .first()
-    .waitFor({ state: "attached", timeout: 10_000 })
+    .waitFor({ state: "visible", timeout: 10_000 })
+    .catch(() => undefined);
+  await page
+    .locator('[aria-busy="true"]')
+    .first()
+    .waitFor({ state: "detached", timeout: 10_000 })
     .catch(() => undefined);
 
   const landmarks = await measureLandmarks(page);
@@ -300,7 +319,7 @@ async function checkTarget(page: Page, target: Target, url: string, width: numbe
 
 async function runTargets(
   remaining: Target[],
-  pageFor: (storage: Storage) => Promise<Page>,
+  pageFor: () => Promise<Page>,
   urlOf: (target: Target) => string,
   width: number,
 ) {
@@ -310,73 +329,54 @@ async function runTargets(
     return;
   }
 
-  await checkTarget(await pageFor(target.storage), target, urlOf(target), width);
+  await checkTarget(await pageFor(), target, urlOf(target), width);
   await runTargets(rest, pageFor, urlOf, width);
 }
 
-test.describe.configure({ timeout: 600_000 });
+export const CHUNK_SIZE = 5;
 
-for (const width of widths) {
-  for (const theme of themes) {
-    test(`G3/G7 every route at ${String(width)} ${theme}`, async ({
-      adminAppUrl,
-      appServerUrl,
-      browser,
-      chromeOwnerStorage,
-      ownerAccessCookieState,
-    }) => {
-      const states = { admin: ownerAccessCookieState, app: chromeOwnerStorage };
+export function chunksFor(storage: Storage) {
+  const count = targets.filter((target) => target.storage === storage).length;
 
-      const contexts = {
-        admin: await openContext(browser, "admin", width, theme, states),
-        anonymous: await openContext(browser, "anonymous", width, theme, states),
-        app: await openContext(browser, "app", width, theme, states),
-      };
+  return Array.from({ length: Math.ceil(count / CHUNK_SIZE) }, (_, index) => index);
+}
 
-      const urls: Record<Storage, string> = {
-        admin: adminAppUrl,
-        anonymous: appServerUrl,
-        app: appServerUrl,
-      };
+export async function runSweep(
+  storage: Storage,
+  width: number,
+  theme: string,
+  fixtures: SweepFixtures,
+  chunk: number,
+) {
+  const states = { admin: fixtures.ownerAccessCookieState, app: fixtures.chromeOwnerStorage };
+  const context = await openContext(fixtures.browser, storage, width, theme, states);
+  const url = storage === "admin" ? fixtures.adminAppUrl : fixtures.appServerUrl;
+  const startPath = { admin: "/admin", anonymous: "/signin", app: "/" }[storage];
 
-      const startPaths: Record<Storage, string> = {
-        admin: "/admin",
-        anonymous: "/signin",
-        app: "/",
-      };
+  const storageTargets = targets
+    .filter((target) => target.storage === storage)
+    .slice(chunk * CHUNK_SIZE, (chunk + 1) * CHUNK_SIZE);
 
-      const pages = new Map<Storage, Page>();
+  let page: Page | undefined;
 
-      const pageFor = async (storage: Storage) => {
-        const open = pages.get(storage);
+  const pageFor = async () => {
+    if (page !== undefined) {
+      return page;
+    }
 
-        if (open !== undefined) {
-          return open;
-        }
-
-        const page = await contexts[storage].newPage();
-
-        await page.goto(`${urls[storage]}${startPaths[storage]}`);
-        await expect(page.locator("main").first()).toBeVisible({ timeout: 15_000 });
-        await page.addStyleTag({
-          content:
-            "*, ::before, ::after { transition: none !important; animation: none !important; }",
-        });
-        pages.set(storage, page);
-
-        return page;
-      };
-
-      try {
-        await runTargets(
-          targets,
-          pageFor,
-          (target) => `${urls[target.storage]}${target.url}`,
-          width,
-        );
-      } finally {
-        await Promise.all(Object.values(contexts).map(async (context) => context.close()));
-      }
+    page = await context.newPage();
+    await page.goto(`${url}${startPath}`);
+    await expect(page.locator("main").first()).toBeVisible({ timeout: 15_000 });
+    await page.addStyleTag({
+      content: "*, ::before, ::after { transition: none !important; animation: none !important; }",
     });
+
+    return page;
+  };
+
+  try {
+    await runTargets(storageTargets, pageFor, (target) => `${url}${target.url}`, width);
+  } finally {
+    await context.close();
   }
 }
