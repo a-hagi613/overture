@@ -6,6 +6,7 @@ import { AccountRow } from "../components/account-row.tsx";
 import { LimitRow } from "../components/limit-row.tsx";
 import { PageHeader } from "../components/page-header.tsx";
 import { SettingsLegal } from "../components/settings-legal.tsx";
+import { SettingsNotifications } from "../components/settings-notifications.tsx";
 import { TimeLanguageSection } from "../components/time-language-section.tsx";
 import { authClient } from "../lib/auth-client.ts";
 
@@ -80,6 +81,7 @@ export function SettingsPage() {
             {copy.settings.limitsFixed}
           </p>
         </section>
+        <SettingsNotifications />
         <TimeLanguageSection />
         <SettingsLegal />
         <section
@@ -140,6 +142,20 @@ export function SettingsPage() {
               >
                 {signingOut ? copy.settings.signOutThisPending : copy.settings.signOutThisButton}
               </button>
+            </div>
+            <div className="flex items-center justify-between gap-4 border-t border-border py-3.5">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">{copy.settingsAccount.supportAccessRow}</p>
+                <p className="text-[12.5px] text-muted-foreground">
+                  {copy.settingsAccount.supportAccessDetail}
+                </p>
+              </div>
+              <Link
+                className="inline-flex h-11 flex-none items-center justify-center rounded-md border border-input bg-card px-[18px] text-[13.5px] font-semibold hover:bg-muted"
+                to="/settings/support-access"
+              >
+                {copy.settingsAccount.viewLog}
+              </Link>
             </div>
             <div className="flex items-center justify-between gap-4 border-t border-border py-3.5">
               <div className="min-w-0">
