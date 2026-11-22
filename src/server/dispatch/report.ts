@@ -5,7 +5,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 
 import { applications, attempts, postings, users } from "../platform/db/schema.ts";
 import { raiseAlert } from "../platform/alerts.ts";
-import { ratio } from "../platform/stats.ts";
+import { percentile, ratio } from "../platform/stats.ts";
 
 import { applicationLlmMicrosByUser } from "./application-spend.ts";
 
@@ -31,6 +31,10 @@ const ATTEMPTED = sql`(${attempts.outcome} IS NULL OR ${attempts.outcome} NOT IN
   sql`, `,
 )}))`;
 
+const DURATIONS = sql<
+  string | null
+>`group_concat(${attempts.browserMs}) FILTER (WHERE ${attempts.browserMs} > 0)`;
+
 /**
  * Whether a try with this outcome counts as an attempted Application (ADR 0026).
  * @param outcome The outcome of the try, or null while it is still running.
@@ -47,15 +51,9 @@ interface GroupTotals {
   browserMicros: number;
   captchaSeen: number;
   codeUsed: number;
+  durations: string | null;
   proxyBytes: number;
   sent: number;
-}
-
-interface DurationRanks {
-  ats: string | null;
-  provider: string;
-  p50: number | null;
-  p95: number | null;
 }
 
 interface GroupSummary {
@@ -67,6 +65,7 @@ interface GroupSummary {
   browserMicros: number;
   captchaSeen: number;
   codeUsed: number;
+  durations: number[];
   proxyBytes: number;
   sent: number;
 }
@@ -96,6 +95,9 @@ export interface ProviderReportRow {
 
 const groupKey = (provider: string, ats: string | null) => `${provider}\u0000${ats ?? "unknown"}`;
 
+const durationsOf = (values: string | null) =>
+  values === null || values === "" ? [] : values.split(",").map(Number);
+
 const sinceOf = (clock: Clock) => clock.now() - COST_REPORT_WINDOW_DAYS * DAY_MS;
 
 const readGroupTotals = (db: AppDatabase, sinceMs: number) =>
@@ -108,6 +110,7 @@ const readGroupTotals = (db: AppDatabase, sinceMs: number) =>
       browserMicros: sql<number>`sum(case when ${ATTEMPTED} then coalesce(${attempts.costMicros}, 0) else 0 end)`,
       captchaSeen: sql<number>`sum(case when ${ATTEMPTED} and ${attempts.captchaSeen} then 1 else 0 end)`,
       codeUsed: sql<number>`sum(case when ${ATTEMPTED} and ${attempts.codeUsed} then 1 else 0 end)`,
+      durations: DURATIONS,
       proxyBytes: sql<number>`sum(case when ${ATTEMPTED} then coalesce(${attempts.proxyBytes}, 0) else 0 end)`,
       sent: sql<number>`sum(case when ${attempts.outcome} = 'sent' then 1 else 0 end)`,
     })
@@ -118,33 +121,6 @@ const readGroupTotals = (db: AppDatabase, sinceMs: number) =>
     .where(and(sql`${users.role} <> 'demo'`, gte(attempts.startedAt, sinceMs)))
     .groupBy(attempts.provider, postings.ats, applications.userId)
     .all();
-
-const readDurationRanks = (db: AppDatabase, sinceMs: number) =>
-  db.all<DurationRanks>(sql`
-    SELECT provider, ats,
-      max(CASE WHEN position = p50_position THEN browser_ms END) AS p50,
-      max(CASE WHEN position = p95_position THEN browser_ms END) AS p95
-    FROM (
-      SELECT provider, ats, browser_ms, position,
-        CAST((total - 1) * 0.5 AS INTEGER) + 1 AS p50_position,
-        CAST((total - 1) * 0.95 AS INTEGER) + 1 AS p95_position
-      FROM (
-        SELECT ${attempts.provider} AS provider, ${postings.ats} AS ats,
-          ${attempts.browserMs} AS browser_ms,
-          row_number() OVER (
-            PARTITION BY ${attempts.provider}, ${postings.ats} ORDER BY ${attempts.browserMs}
-          ) AS position,
-          count(*) OVER (PARTITION BY ${attempts.provider}, ${postings.ats}) AS total
-        FROM ${attempts}
-        INNER JOIN ${applications} ON ${applications.id} = ${attempts.applicationId}
-        INNER JOIN ${postings} ON ${postings.id} = ${applications.postingId}
-        INNER JOIN ${users} ON ${users.id} = ${applications.userId}
-        WHERE ${users.role} <> 'demo' AND ${attempts.startedAt} >= ${sinceMs}
-          AND ${attempts.browserMs} IS NOT NULL AND ${attempts.browserMs} > 0
-      )
-    )
-    GROUP BY provider, ats
-  `);
 
 const summariseGroups = (totals: GroupTotals[]) => {
   const groups = new Map<string, GroupSummary>();
@@ -159,6 +135,7 @@ const summariseGroups = (totals: GroupTotals[]) => {
       browserMicros: 0,
       captchaSeen: 0,
       codeUsed: 0,
+      durations: [],
       key,
       provider: row.provider,
       proxyBytes: 0,
@@ -173,6 +150,7 @@ const summariseGroups = (totals: GroupTotals[]) => {
     group.browserMicros += row.browserMicros;
     group.captchaSeen += row.captchaSeen;
     group.codeUsed += row.codeUsed;
+    group.durations.push(...durationsOf(row.durations));
     group.proxyBytes += row.proxyBytes;
     group.sent += row.sent;
     groups.set(key, group);
@@ -214,18 +192,9 @@ const anthropicMicrosOf = (
     0,
   );
 
-const summarise = (
-  groups: GroupSummary[],
-  ranks: DurationRanks[],
-  trend: boolean,
-  population: CostPopulation,
-) => {
-  const percentiles = new Map(ranks.map((row) => [groupKey(row.provider, row.ats), row]));
-
-  return groups
+const summarise = (groups: GroupSummary[], trend: boolean, population: CostPopulation) =>
+  groups
     .map((group) => {
-      const groupRanks = percentiles.get(group.key);
-
       const costPerCompleted = ratio(
         group.browserMicros +
           anthropicMicrosOf(
@@ -245,8 +214,8 @@ const summarise = (
         costGateMet: costPerCompleted === null ? null : costPerCompleted <= COST_GATE_MICROS,
         costGateMicros: COST_GATE_MICROS,
         costMicrosPerCompleted: costPerCompleted,
-        p50BrowserMs: groupRanks?.p50 ?? null,
-        p95BrowserMs: groupRanks?.p95 ?? null,
+        p50BrowserMs: percentile(group.durations, 0.5),
+        p95BrowserMs: percentile(group.durations, 0.95),
         provider: group.provider,
         proxyMbPerCompleted: ratio(group.proxyBytes, group.sent * 1_000_000),
         proxyTrend: trend,
@@ -257,7 +226,6 @@ const summarise = (
       (left, right) =>
         left.provider.localeCompare(right.provider) || left.ats.localeCompare(right.ats),
     );
-};
 
 const completedProxyBytes = (db: AppDatabase, sinceMs: number) =>
   db
@@ -316,7 +284,7 @@ export function buildProviderReport(db: AppDatabase, clock: Clock) {
     });
   }
 
-  return summarise(population.groups, readDurationRanks(db, sinceMs), trend, population);
+  return summarise(population.groups, trend, population);
 }
 
 /**

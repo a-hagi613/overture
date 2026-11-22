@@ -238,12 +238,13 @@ path. There is no cheaper token left to buy except a cheaper model, which is lev
   single event-loop thread for one page load. M2's 10 users are about 18,000 rows, which is fine; this is a wall the
   cost dashboard reaches on the way to M3, not today.
 - **Fixed in #390:** the report, the Overview and the provider report measure the last 30 days (`COST_REPORT_WINDOW_DAYS`,
-  the same window the margin page uses), every total is summed in SQLite and only the p50/p95 rows per provider × ATS
-  leave the database; the trend reads the latest 40 completed attempts. The retention job now prunes `attempts` at
-  180 days (SPEC §5.7) in the same chunked, busy-retrying delete as `events` and `bg_jobs`; `attempts` has no child
-  rows, so nothing cascades. The query still reads the whole table to filter it: no index starts at `started_at`
-  (`attempts_application` leads on `application_id`), so a `started_at` index is the follow-up when the table is large
-  enough to need one, and it needs a migration.
+  the same window the margin page uses), every total is summed in SQLite and only the p50/p95 durations of the window
+  leave the database; the trend reads the latest 40 completed attempts. Measured on a synthetic 540,000-attempt,
+  60,000-Application database: the whole report takes about 210 ms and 55 MB, against about 1 s and 480 MB for the
+  unbounded scan. The retention job now prunes `attempts` at 180 days (SPEC §5.7) in the same chunked, busy-retrying
+  delete as `events` and `bg_jobs`; `attempts` has no child rows, so nothing cascades. The query still reads the whole
+  table to filter it: no index starts at `started_at` (`attempts_application` leads on `application_id`), so a
+  `started_at` index is the follow-up when the table is large enough to need one, and it needs a migration.
 
 
 ## 6. Considered and rejected
