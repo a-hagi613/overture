@@ -54,7 +54,7 @@ export function BoardCover({ detail }: { detail: ApplicationDetail }) {
           )}
         </>
       )}
-      {snapshot?.resume == null ? null : (
+      {snapshot?.resume === null || snapshot?.resume === undefined ? null : (
         <div className="mt-4 rounded-md border border-border bg-muted/40 p-3">
           <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             {copy.board.cover.resume}
