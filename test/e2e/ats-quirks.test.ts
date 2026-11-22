@@ -5,6 +5,7 @@ import { expect, test } from "@playwright/test";
 
 import {
   CONFIRMATION_HTML,
+  ashbyConsentPage,
   ashbyOverwritePage,
   ashbyResumePage,
   ashbyYesNoPage,
@@ -383,6 +384,40 @@ test("an Ashby resume autofill that rewrites contact details or consent never su
 
     expect(run.outcome).toBe("form_changed");
     expect(server.posts).toHaveLength(0);
+  } finally {
+    server.close();
+  }
+});
+
+test("Ashby checks an unchecked consent box through a real Playwright check", async ({ page }) => {
+  const server = startAtsPage(ashbyConsentPage());
+
+  try {
+    const plan = {
+      fields: [
+        answered("_systemfield_name", "text", "Name", "Maya Okafor"),
+        answered(
+          "privacy-consent",
+          "multiselect",
+          "I agree to the privacy policy",
+          "I agree to the privacy policy",
+          { answerKind: "consent", options: ["I agree to the privacy policy"] },
+        ),
+      ],
+      identity: {
+        ats: "ashby" as const,
+        boardToken: "example",
+        companyName: "Example",
+        jobId: "123e02c6-445b-42bb-893c-addb1f6d4752",
+        url: `${server.url}/example/123e02c6-445b-42bb-893c-addb1f6d4752/application`,
+      },
+      resume: null,
+    };
+
+    const run = await runAshbyAttempt(page, plan, silentHooks);
+
+    expect(run.outcome).toBe("sent");
+    expect(server.posts).toHaveLength(1);
   } finally {
     server.close();
   }

@@ -243,6 +243,16 @@ export const ashbyOverwritePage = () =>
     });`,
   );
 
+export const ashbyConsentPage = () =>
+  ashbyShell(`<div class="ashby-application-form-field-entry">
+      <label for="candidate-name">Name</label>
+      <input id="candidate-name" name="_systemfield_name" type="text" required>
+    </div>
+    <div class="ashby-application-form-field-entry">
+      <label class="ashby-application-form-question-title" for="privacy-consent">I agree to the privacy policy</label>
+      <input id="privacy-consent" name="privacy-consent" type="checkbox" value="yes" required>
+    </div>`);
+
 export const ashbyYesNoPage = () =>
   ashbyShell(
     `<div class="ashby-application-form-field-entry">
