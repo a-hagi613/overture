@@ -33,7 +33,10 @@ paid-service host is refused), the replica listing (the newest transaction is re
 Litestream level, so a healthy replica costs one R2 list per read, #281), the job worker's wait (a completed wait
 retains no abort listener), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
 per cooldown, so a paused main thread becomes a log line), the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
-a copy string or key), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
+a copy string or key), the recap email's HTML (`recap-html.test.ts`: the same facts as the text, one Ready
+link, employer and question text escaped, yesterday left out on request, no banned word and the dark palette),
+the notification preferences (`notifications.test.ts`: the recap and yesterday switches are preferences rather
+than push kinds, and every preference starts on), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
 `x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the onboarding location plan (the
 open-Posting group-by is planned through the covering `postings_open_location` index, never a table scan or a
 temporary b-tree, #337), the SQLite handle guard (a file

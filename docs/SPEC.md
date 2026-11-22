@@ -861,8 +861,8 @@ stateDiagram-v2
   email, and only when the run produced something: at least one new Ready Application or at least one new open Review.
   It comes from `no-reply@tryoverture.com` through Cloudflare Email Sending (§11.2) to the user's verified email, lists
   each new Ready Application by employer and job title (no answers), how many Reviews are open ("10 ready to approve,
-  2 need an answer"), and yesterday's sends and the employers who replied, and carries one link to
-  `{APP_ORIGIN}/ready`. At most one is sent to a user per local day, a retried run sends no second one, and the job
+  2 need an answer"), and yesterday's sends (between 08:00 and 20:00) and the employers who replied, and carries one link to
+  `{APP_ORIGIN}/ready`. The user can turn yesterday's summary off in Settings; the email still lists the run's new work. At most one is sent to a user per local day, a retried run sends no second one, and the job
   retries a failed send without failing the run. Opening that link only shows the page, because mail scanners open
   links; nothing is ever approved or sent by a GET. It is recorded as a `notifications` row (`kind='ready'`,
   `emailed_at`). There is no per-application email and no second recap that day. M2 adds its push, which opens Ready
@@ -1471,7 +1471,7 @@ Undo), a verification code to paste, paused (with reason), and "Couldn't apply" 
 the app (the recap and a Ready item open Ready); **nothing is approved by a push or a link**, so a user approves from the
 phone inside the app. The header bell opens the in-app Notifications list: unread rows carry a dot, Mark all as read
 clears them, and a push endpoint the service says is gone is deleted. There is no separate 08:00 digest: the one daily
-email is the recap, which also lists yesterday's sends and replies, and the user can turn the email and each kind of
+email is the recap, which also lists yesterday's sends and replies, and the user can turn the email, yesterday's summary in it and each kind of
 push off in Settings. Each kind's switch is stored per user and read again when a push is dispatched and when a row is
 written, so turning a kind off stops both; the one exception is the Recap row itself, which is also the per-day marker
 the email dedupes on, so its push switch only stops the push. "Couldn't apply" notices are written from the hour's

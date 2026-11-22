@@ -293,13 +293,71 @@ export const copy = {
         ? `Overture recap: ${readyPart}, ${String(needAnswer)} need an answer`
         : `Overture recap: ${readyPart}`;
     },
+    recapHeading: "Good morning.",
+    recapIntro: (ready: number) => {
+      if (ready === 0) {
+        return "No new applications are ready to approve this morning. Nothing is sent until you approve.";
+      }
+
+      return ready === 1
+        ? "Overture filled in 1 application this morning. Nothing is sent until you approve."
+        : `Overture filled in ${String(ready)} applications this morning. Nothing is sent until you approve.`;
+    },
+    recapAway: (input: { sent: number; skipped: number; needAnswer: number }) => {
+      const parts = [`${String(input.sent)} sent`];
+
+      if (input.skipped > 0) {
+        parts.push(`${String(input.skipped)} skipped`);
+      }
+
+      parts.push(input.needAnswer === 1 ? "1 needs you" : `${String(input.needAnswer)} need you`);
+
+      return `While you were away: ${parts.join(" · ")}`;
+    },
+    recapReadyLabel: (ready: number) => `Ready to approve · ${String(ready)}`,
+    recapNeedsLabel: (needAnswer: number) => `Needs you · ${String(needAnswer)}`,
+    recapNeedsPill: (needAnswer: number) =>
+      needAnswer === 1
+        ? "1 question needs an answer"
+        : `${String(needAnswer)} questions need an answer`,
+    recapQuestionsNote: (unblocked: number) =>
+      unblocked === 1
+        ? "Answering it lets 1 application go ahead."
+        : `Answering them lets ${String(unblocked)} applications go ahead.`,
+    recapMore: (more: number) =>
+      more === 1
+        ? "1 more is ready in Overture, with the answers and cover letter for it."
+        : `${String(more)} more are ready in Overture, with the answers and cover letter for each.`,
+    recapSentLabel: (sent: number) =>
+      sent === 1
+        ? "Sent yesterday · 1 application"
+        : `Sent yesterday · ${String(sent)} applications`,
+    recapSentWindow: "Between 08:00–20:00 your time.",
+    recapRepliesLabel: (replied: number) =>
+      replied === 1 ? "1 employer replied yesterday" : "Employers replied yesterday",
+    recapReplyKind: {
+      interview: "Interview request",
+      offer: "Offer",
+      rejection: "Rejection",
+      screening: "Screening",
+      other: "Reply",
+    } as const,
+    recapFooterWhy: "You are getting this because the recap email is on in your Overture settings.",
+    recapFooterWhen: "One email after each daily run, when it has something for you.",
+    recapFooterHours: "Applications go out only between 08:00–20:00 your time.",
+    recapManage: "Manage email preferences",
+    recapUnsubscribe: "Unsubscribe",
     recapBody: (input: {
       ready: { title: string; company: string }[];
       needAnswer: number;
       sent: { title: string; company: string }[];
       replied: { company: string }[];
       url: string;
+      includeYesterday?: boolean;
+      skipped?: number;
     }) => {
+      const includeYesterday = input.includeYesterday ?? true;
+
       const lines =
         input.ready.length === 0
           ? ["No new applications are ready to approve."]
@@ -312,24 +370,37 @@ export const copy = {
               ),
             ];
 
+      if (includeYesterday) {
+        lines.unshift(
+          "",
+          copy.mail.recapAway({
+            needAnswer: input.needAnswer,
+            sent: input.sent.length,
+            skipped: input.skipped ?? 0,
+          }),
+        );
+      }
+
       if (input.needAnswer > 0) {
         lines.push(
           "",
+          "Needs you:",
           input.needAnswer === 1
             ? "1 question needs an answer."
             : `${String(input.needAnswer)} questions need an answer.`,
         );
       }
 
-      if (input.sent.length > 0) {
+      if (includeYesterday && input.sent.length > 0) {
         lines.push(
           "",
           "Sent yesterday:",
+          copy.mail.recapSentWindow,
           ...input.sent.map((application) => `- ${application.title} at ${application.company}`),
         );
       }
 
-      if (input.replied.length > 0) {
+      if (includeYesterday && input.replied.length > 0) {
         lines.push(
           "",
           input.replied.length === 1
@@ -1114,23 +1185,60 @@ export const copy = {
     legalOpen: "Open",
     legalSeparator: " · ",
     notificationsHeading: "Notifications",
-    notificationsIntro:
-      "Turn the recap email or a kind of push off. Each switch takes effect at once.",
+    notificationsIntro: "How Overture reaches you, and when.",
     recapTitle: "Recap email",
     recapDetail:
-      "Yesterday’s applications sent, replies, open Reviews and check-ins, once each morning.",
-    pushTitle: "Push notifications",
-    pushIntro: "A push opens the app. Nothing is approved by a push or a link.",
+      "One email after each daily run, and only when it has something for you: new Ready Applications and open Reviews. It links to Ready and never sends an Application.",
+    recapSwitchLabel: "Send me the recap email",
+    recapYesterdayTitle: "Include yesterday",
+    recapYesterdayDetail: "The recap also lists yesterday’s sends and replies.",
+    pushTitle: "Push",
+    pushIntro:
+      "A push opens Overture. Nothing is approved by a push or a link: you approve every Application inside the app.",
+    deviceTitle: "This device",
+    deviceInstalled: "Installed on your home screen",
+    deviceInstalledDetail:
+      "Overture is added to this phone. Push works only from the installed app.",
+    deviceInstalledPill: "Installed",
+    deviceNotInstalled: "Not installed yet",
+    deviceNotInstalledPill: "Not installed",
+    deviceNotInstalledDetail:
+      "Add Overture to your home screen first. Then allow notifications when asked.",
+    deviceAllowed: "Notifications allowed",
+    deviceAllowedDetail: "Your browser lets Overture send push to this device.",
+    deviceAllowedPill: "Allowed",
+    deviceBlocked: "Blocked in your browser",
+    deviceBlockedPill: "Blocked",
+    deviceBlockedDetail:
+      "Turn notifications on for Overture in your browser or phone settings. Overture cannot do it for you. Until then, the recap email still arrives.",
+    deviceNotAsked: "Notifications not on yet",
+    deviceNotAskedDetail: "Turn on push to hear about a Review or a reply on this device.",
+    deviceNotAskedPill: "Off",
+    deviceUnsupported:
+      "This browser cannot show push. The recap email still arrives, and everything is in Overture.",
+    deviceEnable: "Turn on push",
+    deviceDisable: "Turn off push",
+    deviceSaveError:
+      "We could not change push on this device. Check your connection and try again.",
     pushKinds: {
-      ready: { label: "Ready to approve", detail: "Applications waiting for your approval." },
-      review: { label: "New Review", detail: "A question that needs your answer." },
-      reply: { label: "Employer reply", detail: "An employer wrote back to an application." },
-      interview: { label: "Interview", detail: "An interview was detected." },
-      offer: { label: "Offer", detail: "An offer was detected." },
-      stage_move: { label: "Card moved", detail: "A card moved for you, with Undo." },
-      code_wait: { label: "Code to paste", detail: "A verification code is waiting." },
-      paused: { label: "Paused", detail: "Overture paused, with the reason." },
-      failed: { label: "Couldn’t apply", detail: "Applications that could not be sent." },
+      ready: { label: "Recap", detail: "“10 ready to approve, 2 need an answer”" },
+      review: { label: "A new Review", detail: "When something needs you." },
+      reply: { label: "An employer reply", detail: "When a company writes back." },
+      interview: {
+        label: "An interview",
+        detail: "When one is found in your forwarded mail.",
+      },
+      offer: { label: "An offer", detail: "When one is found in your forwarded mail." },
+      stage_move: {
+        label: "A card moved automatically",
+        detail: "Shows Undo for a short time.",
+      },
+      code_wait: {
+        label: "A verification code to paste",
+        detail: "When a code did not arrive in five minutes.",
+      },
+      paused: { label: "Paused, with the reason", detail: "When Overture stops and why." },
+      failed: { label: "Couldn’t apply", detail: "Batched into one message each hour." },
     },
     notificationsSaveError: "We could not save that. Check your connection and try again.",
     calendarFeedHeading: "Calendar feed",

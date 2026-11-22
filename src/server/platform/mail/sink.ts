@@ -58,7 +58,7 @@ export function createSinkMailSender(clock: Clock) {
     sendReadyRecap: async (mail) => {
       failIfAsked();
 
-      const sent = {
+      const sent: SentMail = {
         id: randomUUID(),
         to: mail.to,
         from: env.MAIL_FROM,
@@ -66,6 +66,10 @@ export function createSinkMailSender(clock: Clock) {
         body: mail.body,
         sentAt: clock.now(),
       };
+
+      if (mail.html !== undefined) {
+        sent.html = mail.html;
+      }
 
       captured.push(sent);
 
