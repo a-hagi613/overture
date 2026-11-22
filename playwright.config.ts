@@ -165,6 +165,16 @@ export default defineConfig({
       },
     },
     {
+      name: "pricing-boards",
+      testMatch: /board-match-pricing\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/../../design/reference/pricing/{arg}{ext}",
+        },
+      },
+    },
+    {
       name: "notifications-boards",
       testMatch: /board-match-notifications\.test\.ts/u,
     },
