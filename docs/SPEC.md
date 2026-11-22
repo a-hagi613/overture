@@ -286,6 +286,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `review_applications` | review_id, application_id; PK(review_id,application_id) |
 | `review_audit_events` | id, user_id, at, kind CHECK IN ('review_opened','review_resolved','auto_answer','snapshot_sent'), application_id NULL, review_id NULL, question_id NULL, ats NULL CHECK IN ('greenhouse','lever','ashby'), source NULL CHECK IN ('fact','target','derived','consent','file','open_text'), fact_key NULL, fact_revision NULL, scope, detail JSON; INDEX(user_id,at), INDEX(kind,at). Append-only by code: every Review opened and resolved, every automatic answer with its source, and every Snapshot sent. The owner's Review-rate and false-answer reports read it (§8.4) |
 | `checkins` | id, application_id UNIQUE, user_id, due_at, status CHECK IN ('open','answered','expired'), answer CHECK IN ('rejected','interviewing','still_waiting') NULL, created_at |
+| `interview_events` | id, user_id, application_id, message_id, uid, sequence DEFAULT 0, starts_at, ends_at NULL, tz NULL, source CHECK IN ('ics'), created_at; UNIQUE(user_id,uid), INDEX(user_id,starts_at), INDEX(message_id). The interview date parsed from a `text/calendar` attachment on forwarded ATS mail (ADR 0034); `tz` is the IANA `TZID` when `DTSTART` carried one, and a higher `sequence` replaces the row for the same `uid`, while `METHOD:CANCEL`/`STATUS:CANCELLED` deletes it. Mail body text is never parsed |
 | `plan_cache` | id, ats, form_signature, plan JSON (`{readPath, questions}`; each question carries its catalog `question_id`, label, field name, type, options, required and position), hits, failures, updated_at; UNIQUE(ats,form_signature). `hits` counts preparations served from the cache; `failures` counts a cached plan that no longer matched the live form or whose questions no longer exist. It never holds answers: they are rebuilt per user from Facts and Targets |
 | `consent_versions` | version PK (a whole number as text), text, published_at — the exact consent wording each `consent_version` refers to. Rows are never edited: publishing a version appends the next number with its text and date (`scripts/publish-consent-version.ts`), so an accepted version and every Snapshot keep the wording and version they were made under. Version 1 is seeded by migration 0038 |
 
@@ -1094,6 +1095,11 @@ candidates") → `rejection`; scheduling links (Calendly, GoodTime, Greenhouse s
 "phone screen", "recruiter call" → `screening`; offer phrases → `offer`. Not confident → `email_classify` (§8.6).
 Stage effect: rejection → closed (`rejected`); screening → screening; interview → interviewing; offer → offer.
 
+A `text/calendar` attachment (or a file named `.ics`) is also read on its own, whatever the message's classification:
+its `VEVENT` `UID`, `SEQUENCE`, `DTSTART`/`DTEND` and `TZID` become one `interview_events` row on the Calendar for the
+Application the thread is linked to (ADR 0034). The mail body is never parsed for a date, so "Tuesday at 3pm" shows no
+interview rather than a guessed one.
+
 ### 11.4 Mail health (admin)
 
 `GET /admin/api/mail-health?days=7|30` (default 30) groups forwarded ATS mail by employer and counts only:
@@ -1256,7 +1262,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Review | `GET /api/reviews` · `POST /api/reviews/:id/answer` · `POST /api/reviews/:id/dismiss` |
 | Check-ins | `POST /api/checkins/:id` `{answer}` |
 | Inbox | `GET /api/threads` · `GET /api/threads/:id` · `GET /api/attachments/:id` · `POST /api/messages/:id/read` · `GET /api/mail/code-waits` · `POST /api/mail/code-waits/:id` (paste a code) |
-| Calendar | `GET /api/calendar?from&to` (signed in only, `Cache-Control: no-store`; at most 42 days, counted in the user's timezone: every Sent Application, Stage move and Check-in with its job, employer and Stage, ordered by time; the response carries the user's `timeZone` so the client buckets days the same way; no mail body and no answers) |
+| Calendar | `GET /api/calendar?from&to` (signed in only, `Cache-Control: no-store`; at most 42 days, counted in the user's timezone: every Sent Application, Stage move, Check-in and interview date with its job, employer and Stage, ordered by time; the response carries the user's `timeZone` so the client buckets days the same way; no mail body and no answers) |
 | Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/mailbox` (read-only address, `forwardingWorks`, `firstForwardedAt`) · `GET/PUT /api/profile/strengthen` (the Tier 2 Facts that would unlock queued Applications, each with its count; answering saves the Fact and resolves the Reviews it answers) |
 | Consent | `GET /api/consent` (public current version and text; the signed-in user's accepted version and date) · `GET /api/consent/versions` (every published version, newest first) · `POST /api/consent/accept` `{version}` (refuses `version_changed` when a newer version is published) |
 | Onboarding | `POST /api/onboarding/start` (step 5 Start: 409 `consent_required` unless the user has accepted the current consent version through `POST /api/consent/accept`; then marks onboarding finished, clears the `onboarding` pause reason, sets `running`, and queues only the next `prep.run_local_time` run, never a catch-up, so the first run is the next 07:00 local time; `POST /api/onboarding/5` is refused with 409 `start_required`), `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET/PUT /api/onboarding/targets` (the "What you want" step: the saved Targets, the choices that have open Postings, and the live count) · `PUT /api/onboarding/timezone` (the browser's zone through the seven-day rule) · `GET /api/onboarding` (the step, `onboarded_at`, pause reason, current resume, skip list and whether an invited user must onboard) · `POST /api/onboarding/:step` (records a finished step and returns the state; step 2 refuses without a resume) · `POST /api/onboarding/address/accept` (M2) |
@@ -1266,9 +1272,9 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
-`home.updated`, `notification`. TanStack Query invalidates by topic. The Calendar needs no topic of its own: it
-invalidates on `application.updated` and `board.moved`, and gains `calendar.updated` only with interview dates read
-from mail (#296, ADR 0034).
+`home.updated`, `notification`, `calendar.updated`. TanStack Query invalidates by topic. The Calendar invalidates on
+`application.updated` and `board.moved`, and `calendar.updated` is published only when an interview row is written or
+removed from a forwarded `.ics` attachment (#296, ADR 0034).
 
 ---
 

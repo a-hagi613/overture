@@ -15,6 +15,7 @@ import {
   applicationSnapshots,
   checkins,
   companies,
+  interviewEvents,
   postings,
 } from "../platform/db/schema.ts";
 import { localDateAt } from "../platform/local-time.ts";
@@ -26,7 +27,7 @@ const CALENDAR_STAGES = ["applied", "screening", "interviewing", "offer", "close
 
 type CalendarStage = (typeof CALENDAR_STAGES)[number];
 
-type CalendarKind = "sent" | "stage" | "checkin";
+type CalendarKind = "sent" | "stage" | "checkin" | "interview";
 
 type CalendarSource = "system" | "user" | "email" | "checkin" | "admin";
 
@@ -304,6 +305,46 @@ export function createCalendarRoutes(deps: { auth: Auth; clock: Clock; db: AppDa
     return items;
   }
 
+  function interviewItemsOf(userId: string, start: number, end: number) {
+    const rows = db
+      .select({
+        applicationId: applications.id,
+        at: interviewEvents.startsAt,
+        company: companies.name,
+        eventId: interviewEvents.id,
+        snapshotTitle: applicationSnapshots.postingTitle,
+        title: postings.title,
+      })
+      .from(interviewEvents)
+      .innerJoin(applications, eq(applications.id, interviewEvents.applicationId))
+      .innerJoin(postings, eq(postings.id, applications.postingId))
+      .innerJoin(companies, eq(companies.id, applications.companyId))
+      .leftJoin(applicationSnapshots, eq(applicationSnapshots.applicationId, applications.id))
+      .where(
+        and(
+          eq(interviewEvents.userId, userId),
+          gte(interviewEvents.startsAt, start),
+          lt(interviewEvents.startsAt, end),
+        ),
+      )
+      .all();
+
+    return rows.map(
+      (row) =>
+        ({
+          applicationId: row.applicationId,
+          at: row.at,
+          closedReason: null,
+          company: row.company,
+          id: `interview:${row.eventId}`,
+          kind: "interview",
+          source: "email",
+          stage: null,
+          title: row.snapshotTitle ?? row.title,
+        }) satisfies CalendarItemView,
+    );
+  }
+
   routes.get("/calendar", async (context) => {
     const session = await auth.api
       .getSession({ headers: context.req.raw.headers })
@@ -344,6 +385,7 @@ export function createCalendarRoutes(deps: { auth: Auth; clock: Clock; db: AppDa
       ...stageItemsOf(userId, start, end),
       ...openCheckinItemsOf(userId, start, end),
       ...answeredCheckinItemsOf(userId, start, end),
+      ...interviewItemsOf(userId, start, end),
     ];
 
     items.sort((left, right) => left.at - right.at || left.id.localeCompare(right.id));

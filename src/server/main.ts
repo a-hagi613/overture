@@ -130,6 +130,7 @@ import {
   runCheckinSweep,
 } from "./pipeline/checkins.ts";
 import { createMailIngest, MAIL_INGEST_JOB_KIND } from "./inbox/ingest.ts";
+import { createInterviewCalendar } from "./inbox/interviews.ts";
 import { createMailMoves, MAIL_CLASSIFY_JOB_KIND } from "./inbox/moves.ts";
 import { createMailboxService } from "./inbox/mailboxes.ts";
 import { FIXTURE_CAPTURE_JOB_KIND, runFixtureCaptureJob } from "./fixtures/job.ts";
@@ -479,6 +480,13 @@ const mailMoves = createMailMoves({
 
 const resolver = createMailDnsResolver(env.INBOUND_DNS_SERVER);
 
+const interviewCalendar = createInterviewCalendar({
+  clock,
+  db,
+  objects,
+  personal: mailPersonal,
+});
+
 const mailIngest = createMailIngest({
   db,
   clock,
@@ -489,6 +497,12 @@ const mailIngest = createMailIngest({
   onAuthenticatedMessage: async (input) => {
     await outcomes.confirmMessage(input);
     await mailMoves.handleAuthenticatedMessage(input);
+
+    try {
+      await interviewCalendar.recordForMessage(input);
+    } catch (error) {
+      logError("interview_calendar", error);
+    }
   },
   onStoredMessage: async (input) => {
     await mailMoves.linkMessage(input);
