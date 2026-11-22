@@ -10,7 +10,9 @@ export function BoardFileAsSent({ file }: { file: NonNullable<Dossier["file"]> }
         <BoardMark kind={file.sentUnchanged ? "check" : "cross"} />
         <div>
           <h3 className="serif text-[22px] leading-[1.15]" id="dossier-file">
-            {copy.board.dossier.fileTitle}
+            {file.sentUnchanged
+              ? copy.board.dossier.fileTitle
+              : copy.board.dossier.fileTitleMismatch}
           </h3>
           <p className="mt-2 text-[13px] text-muted-foreground">{copy.board.dossier.fileBody}</p>
         </div>

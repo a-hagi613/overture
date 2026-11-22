@@ -297,6 +297,8 @@ const seedSnapshotBody = z.object({
     .nullable()
     .default(null),
   provider: z.string().min(1).default("greenhouse"),
+  confirmedBy: z.enum(["page", "email"]).default("page"),
+  resumeSha256: z.string().min(1).optional(),
 });
 
 const bulkMailBody = z.object({
@@ -2410,7 +2412,7 @@ export function createTestRoutes(
         applicationId: body.applicationId,
         approvedAt: clock.now(),
         approvedPlanSha256: null,
-        confirmedBy: "page",
+        confirmedBy: body.confirmedBy,
         consentVersion: "m1",
         costMicros: 0,
         coverLetterEnc,
@@ -2420,7 +2422,7 @@ export function createTestRoutes(
         provider: body.provider,
         providerSessionId: null,
         resumeId: resume.id,
-        resumeSha256: resume.sha256,
+        resumeSha256: body.resumeSha256 ?? resume.sha256,
         submittedAt: clock.now(),
         userId: application.userId,
       })

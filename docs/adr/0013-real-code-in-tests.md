@@ -24,7 +24,10 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for the forty-eight files SPEC §16.2 lists: ledger, crypto, planner, the restored-database check (a restored file is read
+exist only for the forty-nine files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
+as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key,
+and a "did not happen" line appears only when the stored data proves it), ledger, crypto, planner, the
+restored-database check (a restored file is read
 only, refuses outbound calls and leaves `bg_jobs` untouched, #412), tag rules, question normalisation, answer
 derivations, the answer planner (a salary Fact kept per currency is chosen only for the currency a question names),
 the facts model (a Fact's scope is validated against its key), the onboarding step's salary and EEO reading, the

@@ -220,7 +220,7 @@ src/
 drizzle/             generated migrations
 scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, capture-forms.ts, pull-forms.ts, restore-drill.ts
 test/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
-                     (the forty-eight unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
+                     (the forty-nine unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
 ```
 
@@ -1447,7 +1447,7 @@ hand-written typed clients under `src/web/lib/`; there is no Hono RPC client. A 
 | Home | `GET /api/home` (running and pause reason, applications left, today's sent/remaining, ready-to-send count, queued count + next send time, sent/replies/interviews and a per-day or per-week series for 7D/30D/90D, open Reviews grouped by jobs unlocked, recent authenticated Inbox items, up next, activity, check-ins) · `POST /api/running` `{running}` |
 | Board | `GET /api/board` · `PATCH /api/applications/:id/stage` `{stage, position}` · `POST /api/applications/:id/undo-stage` · `POST /api/applications/:id/withdraw` (before `sending`: Queued, or Skip on a Ready card) |
 | Ready | `GET /api/ready` (Ready and approved cards with their plans, `planSha256`, `changes`, queue position and ETA) · `POST /api/applications/:id/approve` `{planSha256}` · `POST /api/applications/:id/unapprove` · `POST /api/ready/approve` `{items}` (Send all) · `PUT /api/applications/:id/answers/:questionId` (§8.7) |
-| Application | `GET /api/applications/:id` (card + timeline + snapshot "proof": answers with sources, letter with mapped lines, resume hash) |
+| Application | `GET /api/applications/:id` (card + timeline + snapshot "proof": answers with sources, letter with mapped lines, resume hash, and the derived `dossier`: sent-via details, facts trace, and only the "did not happen" lines the stored data proves) |
 | Jobs | `GET /api/search?q&filters` (FTS ≤ 50 ms; filters: `role`, `seniority`, `workplace`, `location` = resolved city, `employmentType`) · `GET /api/postings/:id` (scores on open) · `POST /api/postings/:id/apply` · `PUT /api/postings/:id/state` `{saved|hidden|null}` |
 | Review | `GET /api/reviews` · `POST /api/reviews/:id/answer` · `POST /api/reviews/:id/dismiss` |
 | Check-ins | `POST /api/checkins/:id` `{answer}` |
@@ -1549,7 +1549,7 @@ Plus: route reachability for every page, axe on every page, and the visual snaps
 Review, Inbox, Profile, Settings and the legal and consent boards × 390 / 1280 px × light/dark; Ready joins them once it is
 drawn) in pinned Docker.
 
-### 16.2 Unit tests (forty-eight files, `bun:test`, beside their code)
+### 16.2 Unit tests (forty-nine files, `bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
@@ -1601,6 +1601,7 @@ drawn) in pinned Docker.
 | `src/server/profile/time-zone.test.ts` | an empty timezone change takes no write (#430) |
 | `src/server/profile/v1-import.test.ts` | the v1 answer-bank and learned-answer mapping |
 | `src/shared/copy.test.ts` | no canvas annotation is a copy string or key |
+| `src/shared/dossier.test.ts` | the file is sent as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key, and a "did not happen" line appears only when the stored data proves it |
 
 ### 16.3 CI
 

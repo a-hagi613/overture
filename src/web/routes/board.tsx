@@ -101,10 +101,28 @@ export function BoardPage() {
     [],
   );
 
+  const selectedRef = useRef(selectedId);
+
+  useEffect(() => {
+    selectedRef.current = selectedId;
+  }, [selectedId]);
+
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
+        const closedId = selectedRef.current;
+
         setSelectedId(null);
+
+        if (closedId !== null) {
+          globalThis.requestAnimationFrame(() => {
+            const candidates = document.querySelectorAll<HTMLElement>(
+              `button[data-card="${CSS.escape(closedId)}"]`,
+            );
+
+            [...candidates].find((element) => element.getClientRects().length > 0)?.focus();
+          });
+        }
       }
     };
 

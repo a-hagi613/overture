@@ -1690,6 +1690,7 @@ export const copy = {
       sentConfirmedPage: "The employer's confirmation page was seen.",
       sentConfirmedEmail: "The employer's confirmation email was received.",
       fileTitle: "The file is sent as-is",
+      fileTitleMismatch: "The stored file is not the file that was sent",
       fileBody:
         "The employer receives these bytes and nothing else. Overture never opens the PDF for editing, never rewrites its text and never renames it.",
       fileMatch: "The stored copy matches the bytes that were sent.",
