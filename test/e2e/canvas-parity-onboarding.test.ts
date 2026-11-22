@@ -273,15 +273,27 @@ test.describe("Canvas parity: onboarding, states and 404", () => {
             browser,
             name: "onboarding-forward",
             path: "/onboarding/forward",
-            ready: async (page) => {
+            ready: async (page, width) => {
               await expect(
                 page.getByRole("heading", { level: 2, name: /Forward your job mail/u }),
               ).toBeVisible();
-              await expect(page.getByLabel("Your forwarding address")).toHaveValue(/^in-.+@.+/u);
+              const address = page.getByLabel("Your forwarding address");
+
+              await expect(address).toHaveValue(/^in-.+@.+/u);
               await expect(page.getByText("workablemail.com", { exact: false })).toBeVisible();
               await expect(page.getByText("personio.com", { exact: false })).toBeVisible();
               await expect(page.getByText(/smartrecruiters\.com/u)).toHaveCount(0);
               await expect(page.getByText(/recruitee\.com/u)).toHaveCount(0);
+
+              const fits = await address.evaluate((element) => ({
+                client: element.clientWidth,
+                scroll: element.scrollWidth,
+              }));
+
+              expect(
+                fits.scroll,
+                `the forwarding address clips at ${String(width)}px`,
+              ).toBeLessThanOrEqual(fits.client);
             },
             storageState,
           });

@@ -69,17 +69,16 @@ export function OnboardingForwardCard({
         <label className="lbl" htmlFor="w-addr">
           {text.addressLabel}
         </label>
-        <div className="flex flex-wrap items-stretch gap-2">
+        <div className="grid grid-cols-1 gap-2 min-[640px]:grid-cols-[minmax(0,1fr)_auto] min-[640px]:items-stretch">
           <input
-            className="inp mono"
+            className="inp addr-inp mono h-11 w-full min-w-0"
             id="w-addr"
             readOnly
-            style={{ flex: "1 1 260px", fontSize: 13, height: 44, minWidth: 0 }}
             value={address}
           />
           <button
             aria-label={text.copyLabel}
-            className="btn2"
+            className="btn2 w-full min-[640px]:w-auto"
             onClick={() => {
               void copyAddress();
             }}

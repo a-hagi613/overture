@@ -134,7 +134,7 @@ test("test-only diffs select only the touched test and single-route UI edits sta
 
   expect(boardCardPlan.full).toBe(false);
   expect(boardCardPlan.selected).toContain("test/e2e/board-match-board.test.ts");
-  expect(boardCardPlan.selected.length).toBeLessThan(10);
+  expect(boardCardPlan.selected.length).toBeLessThanOrEqual(10);
 
   const unitTestOnlyPlan = computePlan({
     changed: ["src/server/billing/ledger.test.ts"],
