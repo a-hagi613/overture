@@ -12,7 +12,7 @@ export function MarketingRing({ score, size }: { score: number; size: "m" | "l" 
         viewBox={`0 0 ${String(box)} ${String(box)}`}
       >
         <circle
-          className="ring-track"
+          className="score-track"
           cx={center}
           cy={center}
           fill="none"
@@ -20,7 +20,7 @@ export function MarketingRing({ score, size }: { score: number; size: "m" | "l" 
           strokeWidth={size === "l" ? 3 : 2.5}
         />
         <circle
-          className="ring-arc"
+          className="score-arc"
           cx={center}
           cy={center}
           fill="none"

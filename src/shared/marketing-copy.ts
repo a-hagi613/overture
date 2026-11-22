@@ -193,20 +193,28 @@ export const marketingCopy = {
       ] as const,
       boardLabel:
         "Board: the Northwind Labs card moved to Interviewing, the Ferro Cloud card to Closed as Rejected",
-      columns: ["Applied", "Screening", "Interviewing", "Closed"] as const,
-      cards: [
-        { column: 0, top: "56px", name: "Halden Systems", role: "Senior Backend Eng." },
-        { column: 1, top: "134px", name: "Larkspur Health", role: "Platform Engineer" },
-        { column: 1, top: "212px", name: "Quill & Ash", role: "Backend Engineer", muted: true },
-        { column: 2, top: "56px", name: "Northwind Labs", role: "Platform Engineer", hot: true },
-        { column: 3, top: "134px", name: "Corva Maps", role: "Infrastructure Eng.", muted: true },
+      columns: [
         {
-          column: 3,
-          top: "56px",
-          name: "Ferro Cloud",
-          role: "DevOps Engineer",
-          hot: true,
-          tag: "Rejected",
+          title: "Applied",
+          cards: [{ name: "Halden Systems", role: "Senior Backend Eng." }],
+        },
+        {
+          title: "Screening",
+          cards: [
+            { name: "Larkspur Health", role: "Platform Engineer" },
+            { name: "Quill & Ash", role: "Backend Engineer", muted: true },
+          ],
+        },
+        {
+          title: "Interviewing",
+          cards: [{ name: "Northwind Labs", role: "Platform Engineer", hot: true }],
+        },
+        {
+          title: "Closed",
+          cards: [
+            { name: "Ferro Cloud", role: "DevOps Engineer", hot: true, tag: "Rejected" },
+            { name: "Corva Maps", role: "Infrastructure Eng.", muted: true },
+          ],
         },
       ] as const,
       note: "Moved to Interviewing · 2 min ago",

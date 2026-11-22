@@ -1709,11 +1709,11 @@ canvas {
   line-height: 1;
 }
 
-.landing .ring-track {
+.landing .score-track {
   stroke: var(--line2);
 }
 
-.landing .ring-arc {
+.landing .score-arc {
   stroke: var(--ink);
 }
 
@@ -2605,44 +2605,28 @@ canvas {
 }
 
 .landing .rb {
-  position: relative;
-  height: 300px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
   margin: 0;
 }
 
+.landing .rb-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
 .landing .rcolh {
-  position: absolute;
-  top: 0;
-  width: calc(25% - 9px);
   border-top: 3px solid var(--ink);
   padding-top: 8px;
+  min-height: 44px;
   font-size: 19px;
   line-height: 1.1;
 }
 
-.landing .rc0,
-.landing .col0 {
-  left: 0;
-}
-
-.landing .rc1,
-.landing .col1 {
-  left: calc(25% + 3px);
-}
-
-.landing .rc2,
-.landing .col2 {
-  left: calc(50% + 6px);
-}
-
-.landing .rc3,
-.landing .col3 {
-  left: calc(75% + 9px);
-}
-
 .landing .rcd {
-  position: absolute;
-  width: calc(25% - 9px);
   height: 70px;
   background: var(--card);
   border: 1px solid var(--line);
@@ -3672,6 +3656,42 @@ canvas {
   }
 }
 
+@media (max-width: 640px) {
+  .landing .kcols {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 10px;
+  }
+
+  .landing .kh {
+    height: 38px;
+  }
+
+  .landing .kh .serif {
+    font-size: 15px;
+  }
+
+  .landing .kcard {
+    height: 56px;
+  }
+
+  .landing .kcard .kn {
+    font-size: 11px;
+  }
+
+  .landing .kcard .kr {
+    display: block;
+    font-size: 13px;
+  }
+
+  .landing .rb {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .landing .rcd {
+    height: 64px;
+  }
+}
+
 @media (max-width: 480px) {
   .landing .landing-hd {
     padding-top: 16px;
@@ -3870,16 +3890,7 @@ canvas {
   }
 
   .landing .kcard {
-    height: 48px;
-    padding: 6px 7px;
-  }
-
-  .landing .kcard .kn {
-    font-size: 10px;
-  }
-
-  .landing .kcard .kr {
-    display: none;
+    padding: 8px 9px;
   }
 
   .landing .kcol {
@@ -3890,26 +3901,13 @@ canvas {
     gap: 12px;
   }
 
-  .landing .rb {
-    height: 290px;
-    zoom: 0.76;
-  }
-
   .landing .rcd {
-    height: 68px;
     padding: 8px 10px;
   }
 
-  .landing .rcd .kr {
-    display: block;
-  }
-
-  .landing .rcd .kn {
-    font-size: 12px;
-  }
-
   .landing .rcolh {
-    font-size: 18px;
+    min-height: 40px;
+    font-size: 17px;
   }
 
   .landing .rbwrap {
