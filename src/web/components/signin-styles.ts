@@ -1,5 +1,5 @@
 export const CARD_CLASS =
-  "relative rounded-xl border border-border bg-card px-5 pb-[22px] pt-6 shadow-lift min-[961px]:px-[30px] min-[961px]:pb-[26px] min-[961px]:pt-8";
+  "signin-card relative border border-border bg-card px-5 pb-[22px] pt-6 min-[961px]:px-[30px] min-[961px]:pb-[26px] min-[961px]:pt-8";
 
 export const CARD_HEADING =
   "font-serif font-serif-tight text-[30px] leading-[1.05] min-[961px]:text-[34px]";

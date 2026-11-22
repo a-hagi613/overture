@@ -428,7 +428,9 @@ export function SignInCard() {
           >
             <p className="font-semibold text-foreground">
               {copy.signIn.sentHeading}{" "}
-              <span className="font-mono text-[13px] [overflow-wrap:anywhere]">{email}</span>
+              <span className="font-mono text-[13px] font-normal [overflow-wrap:anywhere]">
+                {email}
+              </span>
             </p>
             <p className="mt-1 text-[13px] text-muted-foreground">{copy.signIn.sentDetail}</p>
           </output>

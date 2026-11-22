@@ -19,6 +19,7 @@
   --color-ok-soft: #dde7de;
   --color-border: rgba(21, 19, 17, 0.14);
   --color-input: rgba(21, 19, 17, 0.28);
+  --color-grid-line: rgba(21, 19, 17, 0.055);
   --color-bloom: rgba(255, 255, 255, 0.55);
   --color-hl: rgba(255, 255, 255, 0.55);
   --color-primary-ink: #fbf8f2;
@@ -53,6 +54,7 @@
   --color-ok-soft: #25352b;
   --color-border: rgba(242, 237, 228, 0.14);
   --color-input: rgba(242, 237, 228, 0.26);
+  --color-grid-line: rgba(242, 237, 228, 0.045);
   --color-bloom: rgba(255, 255, 255, 0.04);
   --color-hl: rgba(255, 255, 255, 0.04);
   --color-primary-ink: #221f1c;
@@ -147,6 +149,7 @@ canvas {
   --color-muted-foreground: #a39c92;
   --color-border: rgba(242, 237, 228, 0.12);
   --color-input: rgba(242, 237, 228, 0.24);
+  --color-grid-line: rgba(242, 237, 228, 0.045);
   --color-bloom: rgba(255, 255, 255, 0.04);
   --color-hl: rgba(255, 255, 255, 0.035);
   --color-signal: #f0743a;
@@ -161,6 +164,29 @@ canvas {
   --color-btn-hover: #fffbf2;
   --shadow-sh: 0 1px 0 rgba(0, 0, 0, 0.45), 0 12px 26px -20px rgba(0, 0, 0, 0.9);
   --shadow-lift: 0 1px 0 rgba(0, 0, 0, 0.5), 0 30px 60px -26px rgba(0, 0, 0, 0.92);
+}
+
+/*
+ * The sign-in story panel's 48px architectural grid, faded by the radial mask the canvas draws
+ * (design/reference/source/w5-signin.dc.html, `.si-archgrid`).
+ */
+.signin-archgrid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, var(--color-grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-grid-line) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 85% 75% at 45% 45%, #000 35%, transparent 100%);
+}
+
+/* The sign-in card: the canvas's 10px radius and its inset top highlight under the lift shadow. */
+.signin-card {
+  border-radius: 10px;
+  box-shadow:
+    inset 0 1px 0 var(--color-hl),
+    var(--shadow-lift);
 }
 
 .grain-dark {
