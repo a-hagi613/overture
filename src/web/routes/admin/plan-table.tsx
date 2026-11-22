@@ -2,7 +2,7 @@ import { copy } from "../../../shared/copy.ts";
 import type { MarginPlanRow } from "../../lib/admin-api.ts";
 import { MarginBar } from "./margin-bar.tsx";
 import { MarginGate } from "./margin-gate.tsx";
-import { costLabel, formatUsd, marginLabel } from "./margin-format.ts";
+import { costLabel, formatUsd, marginLabel, priceLabel } from "./margin-format.ts";
 
 export function PlanTable({ rows }: { rows: MarginPlanRow[] }) {
   return (
@@ -39,7 +39,7 @@ export function PlanTable({ rows }: { rows: MarginPlanRow[] }) {
               <th scope="row" className="px-5 py-5 text-left font-medium">
                 {copy.admin.marginPlanName[row.plan]}
               </th>
-              <td className="px-4 py-5 tabular-nums">{formatUsd(row.priceMicros, 0)}</td>
+              <td className="px-4 py-5 tabular-nums">{priceLabel(row)}</td>
               <td className="px-4 py-5 tabular-nums">{row.applications}</td>
               <td className="px-4 py-5 tabular-nums">{costLabel(row)}</td>
               <td className="px-4 py-5 tabular-nums">

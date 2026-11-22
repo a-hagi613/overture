@@ -51,7 +51,7 @@ async function seedOwnerHistory(page: Page, adminAppUrl: string) {
     data: {
       email: authTestIdentity.ownerEmail,
       idempotencyKey: `period:${crypto.randomUUID()}`,
-      quantity: 70,
+      quantity: 50,
       source: "period",
     },
   });
@@ -129,15 +129,15 @@ test("cost and margin per plan come from attempts and model calls, and Anthropic
   expect(report.completed).toBe(1);
   expect(report.costMicrosPerCompleted).toBe(33_000);
   expect(week).toMatchObject({
-    applications: 70,
+    applications: 50,
     users: 1,
     completed: 1,
     costMicrosPerCompleted: 33_000,
-    revenueMicrosPerApplication: 171_429,
-    marginMicrosPerApplication: 138_429,
+    revenueMicrosPerApplication: 199_800,
+    marginMicrosPerApplication: 166_800,
     costGateMet: false,
   });
-  expect(week?.marginRatio).toBeCloseTo(138_429 / 171_429, 6);
+  expect(week?.marginRatio).toBeCloseTo(166_800 / 199_800, 6);
   expect(report.plans.find((row) => row.plan === "trial")).toMatchObject({
     users: 0,
     costMicrosPerCompleted: null,
@@ -163,6 +163,7 @@ for (const width of widths) {
 
       await expect(page.getByRole("heading", { name: "Cost and margin" })).toBeVisible();
       await expect(page.getByText("Over $0.03").filter({ visible: true }).first()).toBeVisible();
+      await expect(page.getByText("$9.99").filter({ visible: true }).first()).toBeVisible();
 
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -198,6 +199,6 @@ test("the margin page shows the measured numbers and marks the unbuilt billing s
     page.getByRole("navigation", { name: "Billing sections" }).getByRole("link", { name: "Users" }),
   ).toHaveAttribute("href", "/admin/billing");
   await expect(page.getByText("$0.033").first()).toBeVisible();
-  await expect(page.getByText("81%").first()).toBeVisible();
+  await expect(page.getByText("83%").first()).toBeVisible();
   await expect(page.getByText("n/a").first()).toBeVisible();
 });

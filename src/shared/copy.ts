@@ -620,7 +620,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "Overture is a paid service after the free trial. The Week plan costs $12 and includes 70 applications over 7 days. The Month plan costs $35 and includes 300 applications over 30 days. Checkout shows the price in your local currency, and taxes are added where they apply. Stripe takes the payment and is the merchant of record for each charge.",
+              text: "Overture is a paid service after the free trial. The Week plan costs $9.99 and includes 50 applications over 7 days. The Month plan costs $29.99 and includes 250 applications over 30 days. Checkout shows the price in your local currency, and taxes are added where they apply. Stripe takes the payment and is the merchant of record for each charge.",
             },
             {
               kind: "paragraph",
@@ -642,7 +642,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "The Week and Month plans are subscriptions. Each one renews automatically at the end of its period at the price you agreed, until you cancel. Every paid period issues its allowance in full: 70 applications for Week over 7 days, 300 for Month over 30 days. Unused applications do not roll over. They expire when the period ends and are never refunded.",
+              text: "The Week and Month plans are subscriptions. Each one renews automatically at the end of its period at the price you agreed, until you cancel. Every paid period issues its allowance in full: 50 applications for Week over 7 days, 250 for Month over 30 days. Unused applications do not roll over. They expire when the period ends and are never refunded.",
             },
             {
               kind: "paragraph",
@@ -1169,8 +1169,8 @@ export const copy = {
     planHeading: "Your plan",
     weekPlan: "Week plan",
     monthPlan: "Month plan",
-    weekDetail: "$12 for 70 Applications over 7 days. Renews every 7 days.",
-    monthDetail: "$35 for 300 Applications over 30 days. Renews every 30 days.",
+    weekDetail: "$9.99 for 50 Applications over 7 days. Renews every 7 days.",
+    monthDetail: "$29.99 for 250 Applications over 30 days. Renews every 30 days.",
     leftHeading: "Applications left",
     leftOf: (total: number) => `of ${String(total)} this period`,
     renews: "Renews",
@@ -1203,12 +1203,12 @@ export const copy = {
     lead: "Week or Month, for Applications you approve",
     weekName: "Week",
     monthName: "Month",
-    weekPrice: "$12",
-    monthPrice: "$35",
+    weekPrice: "$9.99",
+    monthPrice: "$29.99",
     weekUnit: "/ week",
     monthUnit: "/ month",
-    weekDetail: "70 Applications over 7 days. Renews every 7 days. No rollover.",
-    monthDetail: "300 Applications over 30 days. Renews every 30 days. No rollover.",
+    weekDetail: "50 Applications over 7 days. Renews every 7 days. No rollover.",
+    monthDetail: "250 Applications over 30 days. Renews every 30 days. No rollover.",
     chooseWeek: "Choose Week",
     chooseMonth: "Choose Month",
     startError: "Checkout did not open. Try again in a moment.",

@@ -237,7 +237,7 @@ test.describe("plan and billing in Settings, and the paused and out-of-applicati
         await (await app.api.get(`${app.server.url}/api/billing`)).json(),
       );
 
-      expect(billing).toMatchObject({ applicationsLeft: 300, plan: "month" });
+      expect(billing).toMatchObject({ applicationsLeft: 250, plan: "month" });
 
       const { close, page } = await openPage(browser, app, { dark: false, width: 1280 });
 
@@ -248,9 +248,9 @@ test.describe("plan and billing in Settings, and the paused and out-of-applicati
         await expect(page.getByRole("heading", { name: "Your plan" })).toBeVisible();
         await expect(page.getByText("Month plan")).toBeVisible();
         await expect(
-          page.getByRole("region", { name: "Your plan" }).getByText("300", { exact: true }),
+          page.getByRole("region", { name: "Your plan" }).getByText("250", { exact: true }),
         ).toBeVisible();
-        await expect(page.getByText("of 300 this period")).toBeVisible();
+        await expect(page.getByText("of 250 this period")).toBeVisible();
         await expect(
           page.getByRole("region", { name: "Your plan" }).getByText(/^Renews/u),
         ).toBeVisible();
