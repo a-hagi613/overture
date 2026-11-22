@@ -7,6 +7,7 @@ import { BoardSheetHeader } from "./board-sheet-header.tsx";
 import { BoardSheetNavigation } from "./board-sheet-navigation.tsx";
 import { BoardSheetPanel } from "./board-sheet-panel.tsx";
 import type { BoardTab } from "./board-sheet-panel.tsx";
+import { BoardSentBanner } from "./board-sent-banner.tsx";
 import { BoardSheetPills } from "./board-sheet-pills.tsx";
 
 export function BoardSheet(props: {
@@ -72,6 +73,7 @@ export function BoardSheet(props: {
           >
             <BoardSheetHeader detail={detail} />
             <BoardSheetPills detail={detail} />
+            <BoardSentBanner detail={detail} />
             <BoardSheetActions detail={detail} onArchive={props.onArchive} onMove={props.onMove} />
             <div
               aria-label={copy.board.sectionsLabel}

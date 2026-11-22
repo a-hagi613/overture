@@ -287,9 +287,16 @@ const seedSnapshotBody = z.object({
     }),
   ),
   coverLetter: z
-    .array(z.object({ sentence: z.string(), by_user: z.boolean().optional() }))
+    .array(
+      z.object({
+        sentence: z.string(),
+        by_user: z.boolean().optional(),
+        resume_line_ids: z.array(z.string()).optional(),
+      }),
+    )
     .nullable()
     .default(null),
+  provider: z.string().min(1).default("greenhouse"),
 });
 
 const bulkMailBody = z.object({
@@ -2410,7 +2417,7 @@ export function createTestRoutes(
         descriptionHash: null,
         postingTitle: "Senior Backend Engineer",
         postingUrl: "https://export.example/jobs/1",
-        provider: "local",
+        provider: body.provider,
         providerSessionId: null,
         resumeId: resume.id,
         resumeSha256: resume.sha256,

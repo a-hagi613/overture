@@ -1681,12 +1681,46 @@ export const copy = {
       typedHere: "Typed here",
     },
     cover: {
-      title: "The letter and the file",
-      empty: "No letter was sent with this application.",
       noSnapshot: "This application has not been sent yet.",
-      resume: "Resume file",
-      hash: "SHA-256",
-      lines: (count: number) => (count === 1 ? "1 resume line" : `${String(count)} resume lines`),
+    },
+    dossier: {
+      sentLabel: "How this was sent",
+      sentVia: (provider: string, time: string) => `Sent via ${provider} · ${time}`,
+      sentOnce: "One submission. Nothing is sent after it.",
+      sentConfirmedPage: "The employer's confirmation page was seen.",
+      sentConfirmedEmail: "The employer's confirmation email was received.",
+      fileTitle: "The file is sent as-is",
+      fileBody:
+        "The employer receives these bytes and nothing else. Overture never opens the PDF for editing, never rewrites its text and never renames it.",
+      fileMatch: "The stored copy matches the bytes that were sent.",
+      fileMismatch:
+        "The stored copy does not match the bytes that were sent. Check this before you rely on it.",
+      fileSha: "SHA-256",
+      fileKb: (kilobytes: number) => `${String(kilobytes)} KB`,
+      traceTitle: "What Overture wrote from your facts",
+      traceBody:
+        "Each sentence and answer names where it came from. Nothing was added to make the fit look better.",
+      traceEmpty: "Nothing was written for this application.",
+      traceLetter: "Cover letter",
+      traceAnswers: "Answers",
+      traceSource: {
+        fact: "From your facts",
+        none: "No source recorded",
+        resume: "From your resume",
+        typed: "Typed here",
+      },
+      traceFact: (key: string, revision: number) => `${key} · revision ${String(revision)}`,
+      didNotTitle: "What did not happen",
+      didNotLines: {
+        file_not_changed: {
+          body: "Same file name, same bytes, same hash as the file you uploaded.",
+          title: "The PDF was not restyled or regenerated",
+        },
+        nothing_invented: {
+          body: "Every line above traces to a fact, a resume line or your own words.",
+          title: "No fact was invented",
+        },
+      },
     },
     emails: {
       title: "Linked mail",
