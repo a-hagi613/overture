@@ -1,12 +1,12 @@
-# Final prices proposal (issue #249, M3-08), 2026-11-21
+# Final prices (issue #249, M3-08), 2026-11-21
 
-Owner confirmation is step 5 of [#254](https://github.com/a-hagi613/overture/issues/254) (owner setup). Nothing here is a
-price until the owner confirms it there. Stripe is not yet connected to live prices.
+The owner locked the prices in for step 5 of [#254](https://github.com/a-hagi613/overture/issues/254) (owner setup).
+Stripe is not yet connected to live prices.
 
 ## Recommendation
 
-- **Keep the public prices as they are:** Week $12 for 70 Applications over 7 days, Month $35 for 300 over 30 days,
-  Trial 3 Applications free of revenue (ADR 0018).
+- **Locked in by the owner:** Week **$9.99** for **50 Applications** over 7 days, Month **$29.99** for **250 Applications**
+  over 30 days, Trial 3 Applications free of revenue (ADR 0018).
 - **Re-measure before the beta wave is priced.** Real sends are the first measured data (#181 is deferred to the end of
   M3). Two conditions come first (see "Before the price is final").
 
@@ -29,20 +29,23 @@ With Anthropic spend included, the number is $0.027. The browser-only figure the
 
 ## Margin per plan
 
-Revenue per Application is the price divided by its allowance. Margin is revenue minus the measured cost.
+Gross revenue per Application is the price divided by its allowance. Stripe Managed Payments charges 6.4 % + $0.30 per
+charge; the fee line is that whole charge and the net line is what reaches Overture. Profit per Application is net revenue
+minus the measured cost, and Margin is profit over gross revenue. Taxes are set and collected by Stripe as merchant of
+record, so they are neither revenue nor cost here.
 
-| Plan | Price | Applications | Revenue per Application | Cost | Margin per Application | Margin |
-|---|---|---|---|---|---|---|
-| Trial | $0 | 3 | $0.000 | $0.027 | −$0.027 | n/a (3 Applications cost about $0.08) |
-| Week | $12 | 70 | $0.171 | $0.027 | $0.144 | 84 % |
-| Month | $35 | 300 | $0.117 | $0.027 | $0.090 | 77 % |
+| Plan | Price | Applications | Gross per Application | Stripe fee | Net revenue | Net per Application | Cost | Profit per Application | Margin |
+|---|---|---|---|---|---|---|---|---|---|
+| Trial | $0 | 3 | $0.000 | $0.00 | $0.00 | $0.000 | $0.027 | −$0.027 | n/a (3 Applications cost about $0.08) |
+| Week | $9.99 | 50 | $0.200 | $0.94 | $9.05 | $0.181 | $0.027 | $0.154 | 77.1 % |
+| Month | $29.99 | 250 | $0.120 | $2.22 | $27.77 | $0.111 | $0.027 | $0.084 | 70.1 % |
 
-Break-even at the measured cost is far below the price: a Month Application earns $0.117 against $0.027 of cost. A 60 %
-margin holds up to a cost per completed Application of about $0.047 on Month and $0.068 on Week. The cost-m1 note's 10-minute
-code paste case ($0.038 per completed) keeps Month above 60 %.
+Break-even at the measured cost is far below the price: a Month Application nets $0.111 against $0.027 of cost and a Week
+Application nets $0.181. After fees, a 60 % margin holds while cost per completed Application stays under about $0.044 on
+Month and $0.072 on Week. The cost-m1 note's 10-minute code paste case ($0.038 per completed) keeps Month above 60 %.
 
-Stripe Managed Payments fees and taxes are not in these figures. They change margin, not the browser or model levers
-(cost-m1 §Limits). The owner adds them when step 2 of #254 sets the prices.
+The model and browser levers do not change with the price (cost-m1 §Limits). The live Stripe price objects are still an
+owner step (`scripts/setup-stripe.ts`, #254).
 
 ## Before the price is final
 
@@ -58,7 +61,7 @@ Stripe Managed Payments fees and taxes are not in these figures. They change mar
 - `buildCostSummary` (the Overview gate) now includes the Anthropic spend of the Application purposes for the users
   whose attempts it counts (ADR 0026, finding 5.1). Before this change it summed only `attempts.cost_micros`.
 - `/admin/billing/margin` reads the same data per plan over 30 days (`src/server/billing/margin.ts`). A user's plan is
-  their latest paid period (by allowance: 70 is Week, 300 is Month); a user with no paid period is on the Trial; a user
+  their latest paid period (by allowance: 50 is Week, 250 is Month); a user with no paid period is on the Trial; a user
   with no grant is in no plan.
 - Anthropic spend is attributed per user, not per Application, because `llm_usage` has no application id and this
   change adds no migration. For a user, all of the window's Application-purpose calls are counted, including scoring for

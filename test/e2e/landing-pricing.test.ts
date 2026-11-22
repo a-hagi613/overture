@@ -4,7 +4,7 @@ import type { Browser } from "@playwright/test";
 
 import { expect, test } from "./app.fixture.ts";
 
-const PLAN = { weekPrice: 12, weekApps: 70, weekDays: 7, monthPrice: 35, monthApps: 300 };
+const PLAN = { weekPrice: 9.99, weekApps: 50, weekDays: 7, monthPrice: 29.99, monthApps: 250 };
 const TRIAL_APPS = 3;
 const SEND = { startHour: 8, endHour: 20 };
 const PUBLIC_ATS = ["Greenhouse", "Lever", "Ashby", "Personio", "Workable"];

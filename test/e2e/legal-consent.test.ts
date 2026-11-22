@@ -78,8 +78,8 @@ test("the legal pages cover billing and mark themselves as drafts", async ({
     ),
   );
 
-  await expect(page.getByText(/\$12/u).first()).toBeVisible();
-  await expect(page.getByText(/\$35/u).first()).toBeVisible();
+  await expect(page.getByText(/\$9\.99/u).first()).toBeVisible();
+  await expect(page.getByText(/\$29\.99/u).first()).toBeVisible();
   await expect(page.getByText(/One card gets one trial/u).first()).toBeVisible();
   await expect(page.getByText(/renews automatically/u).first()).toBeVisible();
   await expect(page.getByText(/We do not give refunds by default/u)).toBeVisible();

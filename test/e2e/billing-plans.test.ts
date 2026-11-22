@@ -100,7 +100,7 @@ async function reserveApplication(
   );
 }
 
-test("a paid month grants 300, a replay grants once, expiry releases then expires, and renewal grants the next period", async ({
+test("a paid month grants 250, a replay grants once, expiry releases then expires, and renewal grants the next period", async ({
   identityServer,
   request,
 }) => {
@@ -155,14 +155,14 @@ test("a paid month grants 300, a replay grants once, expiry releases then expire
 
     const afterPaid = await homeState(request, server.url);
 
-    expect(afterPaid).toStrictEqual({ applicationsLeft: 300, planApplications: 300 });
+    expect(afterPaid).toStrictEqual({ applicationsLeft: 250, planApplications: 250 });
 
     const granted = await billingState(request, server.url, ownerId);
 
     expect(granted.grants).toHaveLength(1);
     expect(granted.grants[0]).toMatchObject({
       expiresAt: firstPeriodEnd * 1000,
-      quantity: 300,
+      quantity: 250,
       source: "period",
       stripeInvoiceId: "in_e2e_month_1",
     });
@@ -172,7 +172,7 @@ test("a paid month grants 300, a replay grants once, expiry releases then expire
 
     expect(replay.status()).toBe(200);
     expect(webhookResultSchema.parse(await replay.json())).toStrictEqual({ result: "duplicate" });
-    expect((await homeState(request, server.url)).applicationsLeft).toBe(300);
+    expect((await homeState(request, server.url)).applicationsLeft).toBe(250);
     expect((await billingState(request, server.url, ownerId)).grants).toHaveLength(1);
 
     const held = await reserveApplication(request, server.url, {
@@ -250,7 +250,7 @@ test("a paid month grants 300, a replay grants once, expiry releases then expire
 
     const afterRenewal = await homeState(request, server.url);
 
-    expect(afterRenewal).toStrictEqual({ applicationsLeft: 300, planApplications: 300 });
+    expect(afterRenewal).toStrictEqual({ applicationsLeft: 250, planApplications: 250 });
 
     const renewedState = await billingState(request, server.url, ownerId);
 
@@ -280,7 +280,7 @@ test("a paid month grants 300, a replay grants once, expiry releases then expire
 
     expect(fallbackState.grants).toHaveLength(3);
     expect(fallbackState.grants[2]).toMatchObject({
-      quantity: 300,
+      quantity: 250,
       source: "period",
       stripeInvoiceId: "in_e2e_month_3",
     });

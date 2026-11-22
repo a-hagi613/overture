@@ -278,7 +278,7 @@ test("a failed payment pauses with its own copy, a push and an email, and a paid
       result: "processed",
     });
     expect(await homeState(request, server.url)).toMatchObject({
-      applicationsLeft: 300,
+      applicationsLeft: 250,
       pauseReason: null,
       running: true,
     });
@@ -460,7 +460,7 @@ test("the end of a plan pauses and lets an in-flight send finish, charged only i
       "confirming",
     );
 
-    expect(await homeState(request, server.url)).toMatchObject({ applicationsLeft: 298 });
+    expect(await homeState(request, server.url)).toMatchObject({ applicationsLeft: 248 });
 
     const clock = z
       .object({ now: z.number() })
@@ -535,7 +535,7 @@ test("the end of a plan pauses and lets an in-flight send finish, charged only i
     const afterExpiry = await billingState(request, server.url, ownerId);
 
     expect(afterExpiry.ledger.filter((row) => row.kind === "release")).toHaveLength(0);
-    expect(afterExpiry.ledger.find((row) => row.kind === "expire")?.amount).toBe(298);
+    expect(afterExpiry.ledger.find((row) => row.kind === "expire")?.amount).toBe(248);
 
     await catalog.post(`${server.url}/__test__/applications/status`, {
       data: { applicationId: sentApp, status: "sent" },
@@ -576,7 +576,7 @@ test("the end of a plan pauses and lets an in-flight send finish, charged only i
     const settled = await billingState(request, server.url, ownerId);
     const expireRows = settled.ledger.filter((row) => row.kind === "expire");
 
-    expect(expireRows.reduce((sum, row) => sum + row.amount, 0)).toBe(299);
+    expect(expireRows.reduce((sum, row) => sum + row.amount, 0)).toBe(249);
     expect(settled.applicationsLeft).toBe(0);
 
     const resume = await deliver(
@@ -593,7 +593,7 @@ test("the end of a plan pauses and lets an in-flight send finish, charged only i
 
     expect(webhookResultSchema.parse(await resume.json())).toStrictEqual({ result: "processed" });
     expect(await homeState(request, server.url)).toMatchObject({
-      applicationsLeft: 300,
+      applicationsLeft: 250,
       pauseReason: null,
       running: true,
     });

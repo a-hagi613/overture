@@ -464,14 +464,14 @@ describe("a period grant", () => {
     });
 
     expect(granted.created).toBe(true);
-    expect(applicationsLeft(db, userId, at)).toBe(70);
-    expect(planApplications(db, userId, at)).toBe(70);
+    expect(applicationsLeft(db, userId, at)).toBe(50);
+    expect(planApplications(db, userId, at)).toBe(50);
 
     const row = db.select().from(grants).where(eq(grants.id, granted.grantId)).get();
 
     expect(row).toMatchObject({
       expiresAt: periodEnd,
-      quantity: 70,
+      quantity: 50,
       source: "period",
       startsAt: at,
       stripeInvoiceId: "in_week_1",
@@ -496,13 +496,13 @@ describe("a period grant", () => {
     expect(replayed.created).toBe(false);
     expect(replayed.grantId).toBe(next.grantId);
     expect(db.select().from(grants).where(eq(grants.userId, userId)).all()).toHaveLength(2);
-    expect(applicationsLeft(db, userId, at)).toBe(70);
-    expect(planApplications(db, userId, at)).toBe(70);
+    expect(applicationsLeft(db, userId, at)).toBe(50);
+    expect(planApplications(db, userId, at)).toBe(50);
 
     clock.setOffset(8 * DAY_MS);
 
-    expect(applicationsLeft(db, userId, clock.now())).toBe(70);
-    expect(planApplications(db, userId, clock.now())).toBe(70);
+    expect(applicationsLeft(db, userId, clock.now())).toBe(50);
+    expect(planApplications(db, userId, clock.now())).toBe(50);
 
     clock.setOffset(15 * DAY_MS);
 
@@ -530,7 +530,7 @@ describe("a period grant", () => {
       userId,
     });
 
-    expect(applicationsLeft(db, userId, at)).toBe(299);
+    expect(applicationsLeft(db, userId, at)).toBe(249);
     expect(balancesPerGrant(db, userId).get(granted.grantId)?.reserved).toBe(1);
 
     clock.setOffset(30 * DAY_MS + 1);
@@ -540,8 +540,8 @@ describe("a period grant", () => {
     expect(expired).toStrictEqual([granted.grantId]);
     expect(balancesPerGrant(db, userId).get(granted.grantId)).toStrictEqual({
       available: 0,
-      expired: 300,
-      issued: -300,
+      expired: 250,
+      issued: -250,
       reserved: 0,
       used: 0,
     });
@@ -556,7 +556,7 @@ describe("a period grant", () => {
     expect(releaseRow?.idempotencyKey).toBe(`expire-release:${reserveRow?.id ?? ""}`);
     expect(releaseRow?.applicationId).toBe("app-open");
     expect(expireRow).toMatchObject({
-      amount: 300,
+      amount: 250,
       applicationId: null,
       creditAccount: "expired",
       debitAccount: "available",
@@ -599,10 +599,10 @@ describe("a period grant", () => {
     });
 
     expect(second.created).toBe(true);
-    expect(applicationsLeft(db, userId, clock.now())).toBe(300);
-    expect(planApplications(db, userId, clock.now())).toBe(300);
-    expect(balancesPerGrant(db, userId).get(first.grantId)?.expired).toBe(300);
-    expect(balancesPerGrant(db, userId).get(second.grantId)?.available).toBe(300);
+    expect(applicationsLeft(db, userId, clock.now())).toBe(250);
+    expect(planApplications(db, userId, clock.now())).toBe(250);
+    expect(balancesPerGrant(db, userId).get(first.grantId)?.expired).toBe(250);
+    expect(balancesPerGrant(db, userId).get(second.grantId)?.available).toBe(250);
 
     sqlite.close();
   });

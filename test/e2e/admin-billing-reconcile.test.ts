@@ -109,7 +109,7 @@ function seedPaidPeriod(server: AppServer) {
         createdAt: at,
         expiresAt: at + 30 * DAY_MS,
         id: grantId,
-        quantity: 300,
+        quantity: 250,
         source: "period",
         startsAt: at,
         stripeInvoiceId: "in_admin_billing_view",
@@ -119,7 +119,7 @@ function seedPaidPeriod(server: AppServer) {
 
     db.insert(ledger)
       .values({
-        amount: 300,
+        amount: 250,
         applicationId: null,
         createdAt: at,
         creditAccount: "available",
