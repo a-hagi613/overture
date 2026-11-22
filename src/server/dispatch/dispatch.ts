@@ -44,7 +44,7 @@ import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 import { parseSendWindow, planningWindow } from "./planning.ts";
 import { APPLICATION_SEND_JOB_KIND } from "./executor.ts";
-import { maxConcurrentSessionsFromSetting } from "./browser/session-slots.ts";
+import { browserSessionAvailability, freeSendSlots } from "./browser/session-slots.ts";
 
 export const DISPATCH_TICK_JOB_KIND = "dispatch.tick";
 
@@ -411,10 +411,8 @@ export function createDispatcherTick(deps: DispatchDeps) {
       switches.filter((entry) => entry.scope === "employer").map((entry) => entry.key),
     );
 
-    const concurrency = maxConcurrentSessionsFromSetting(db);
     const activeSends = activeSendWork(db);
-
-    let freeSlots = Math.max(0, concurrency - activeSends.applicationIds.size);
+    let freeSlots = freeSendSlots(activeSends.applicationIds.size, browserSessionAvailability());
 
     if (freeSlots === 0) {
       return summary;

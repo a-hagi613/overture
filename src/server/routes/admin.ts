@@ -7,6 +7,7 @@ import type { Auth } from "../auth/index.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
+import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { InviteRow } from "../auth/invites.ts";
 import { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
@@ -71,6 +72,7 @@ import {
 } from "../auth/invites.ts";
 import { isSameMailbox } from "../auth/email.ts";
 import { readMailHealth } from "../inbox/health.ts";
+import { buildStorageReport } from "../storage/report.ts";
 
 const settingBody = z.object({ value: z.string().min(1) });
 
@@ -145,6 +147,13 @@ const mailHealthQuery = z.object({
     .default(30),
 });
 
+const storageReportQuery = z.object({
+  dbstat: z
+    .enum(["0", "1"])
+    .default("0")
+    .transform((value) => value === "1"),
+});
+
 const personioProbeBody = z.object({
   urls: z
     .array(z.url().refine((url) => isPersonioProbeUrl(url, env.NODE_ENV)))
@@ -178,6 +187,9 @@ export interface AdminDeps {
   providers: BrowserProviderRegistry | null;
   personal: PersonalCrypto;
   payments: Payments | null;
+  backupObjects: ObjectStore | null;
+  databasePath: string;
+  objects: ObjectStore;
 }
 
 const ATS_NAMES = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
@@ -748,6 +760,19 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
       })),
     });
   });
+
+  routes.get("/storage-report", zValidator("query", storageReportQuery), async (context) =>
+    context.json(
+      await buildStorageReport({
+        backups: deps.backupObjects,
+        clock,
+        databasePath: deps.databasePath,
+        db,
+        includeTables: context.req.valid("query").dbstat,
+        objects: deps.objects,
+      }),
+    ),
+  );
 
   routes.get("/settings", (context) => context.json({ settings: getAllSettings(db) }));
 

@@ -13,6 +13,8 @@ import {
 
 import { CHECKIN_ANSWERS } from "../../../shared/checkins.ts";
 
+const ATS_VALUES = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
+
 const timestamp = (name: string) => integer(name, { mode: "timestamp" });
 
 const cascadeUserId = () =>
@@ -132,6 +134,9 @@ export const bgJobs = sqliteTable(
     uniqueIndex("bg_jobs_dedupe_key_queued")
       .on(t.dedupeKey)
       .where(sql`status = 'queued'`),
+    index("bg_jobs_claim_due")
+      .on(t.status, t.runAt)
+      .where(sql`status IN ('queued', 'running')`),
   ],
 );
 
@@ -234,7 +239,7 @@ export const companyBoards = sqliteTable(
     companyId: text("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
-    ats: text("ats", { enum: ["greenhouse", "lever", "ashby", "workable", "personio"] }).notNull(),
+    ats: text("ats", { enum: ATS_VALUES }).notNull(),
     boardToken: text("board_token").notNull(),
     region: text("region", { enum: ["us", "eu"] })
       .notNull()
@@ -268,7 +273,7 @@ export const postings = sqliteTable(
     companyId: text("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
-    ats: text("ats", { enum: ["greenhouse", "lever", "ashby", "workable", "personio"] }).notNull(),
+    ats: text("ats", { enum: ATS_VALUES }).notNull(),
     atsJobId: text("ats_job_id").notNull(),
     url: text("url").notNull(),
     applyUrl: text("apply_url"),
@@ -425,6 +430,30 @@ export const llmUsage = sqliteTable("llm_usage", {
   createdAt: integer("created_at").notNull(),
 });
 
+export const llmBatches = sqliteTable(
+  "llm_batches",
+  {
+    id: text("id").primaryKey(),
+    inputRevisionHash: text("input_revision_hash").notNull(),
+    model: text("model").notNull(),
+    batchId: text("batch_id"),
+    status: text("status", { enum: ["creating", "in_progress", "applied", "failed"] })
+      .notNull()
+      .default("creating"),
+    results: text("results"),
+    resultAppliedAt: integer("result_applied_at"),
+    expiresAt: integer("expires_at"),
+    lastPolledAt: integer("last_polled_at"),
+    lastError: text("last_error"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("llm_batches_input_revision_hash_unique").on(t.inputRevisionHash),
+    index("llm_batches_status_updated").on(t.status, t.updatedAt),
+  ],
+);
+
 export const mailUsage = sqliteTable("mail_usage", {
   month: text("month").primaryKey(),
   authSends: integer("auth_sends").notNull().default(0),
@@ -530,7 +559,7 @@ export const skipCompanies = sqliteTable(
   {
     id: text("id").primaryKey(),
     userId: cascadeUserId(),
-    companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+    companyId: text("company_id"),
     name: text("name").notNull(),
     nameNorm: text("name_norm").notNull(),
     domain: text("domain"),
@@ -869,13 +898,15 @@ export const grants = sqliteTable(
   (t) => [uniqueIndex("grants_stripe_invoice_id_unique").on(t.stripeInvoiceId)],
 );
 
+/**
+ * A user's ranking of one catalog Posting. `posting_id` is a plain logical id, not a foreign key: the catalog can be
+ * pruned or rebuilt without touching user data (SPEC §5.4).
+ */
 export const matches = sqliteTable(
   "matches",
   {
     userId: cascadeUserId(),
-    postingId: text("posting_id")
-      .notNull()
-      .references(() => postings.id, { onDelete: "cascade" }),
+    postingId: text("posting_id").notNull(),
     codeRank: real("code_rank").notNull(),
     score: integer("score"),
     reason: text("reason"),
@@ -889,30 +920,45 @@ export const matches = sqliteTable(
   ],
 );
 
+/**
+ * What a user saved or hid in their Home feed. `posting_id` is a plain logical id, not a foreign key, so a catalog
+ * prune never touches this row (SPEC §5.4).
+ */
 export const postingUserState = sqliteTable(
   "posting_user_state",
   {
     userId: cascadeUserId(),
-    postingId: text("posting_id")
-      .notNull()
-      .references(() => postings.id, { onDelete: "cascade" }),
+    postingId: text("posting_id").notNull(),
     state: text("state", { enum: ["saved", "hidden"] }).notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.postingId] })],
 );
 
+/**
+ * One Application the user has queued, prepared or sent. `posting_id` and `company_id` are logical ids only: the row
+ * carries its own copy of the display fields taken when it was created (SPEC §5.4), so pruning or rebuilding the
+ * catalog can never break the Board, Ready, Home, Inbox, Calendar or the cost report.
+ */
 export const applications = sqliteTable(
   "applications",
   {
     id: text("id").primaryKey(),
     userId: cascadeUserId(),
-    postingId: text("posting_id")
-      .notNull()
-      .references(() => postings.id, { onDelete: "cascade" }),
-    companyId: text("company_id")
-      .notNull()
-      .references(() => companies.id, { onDelete: "cascade" }),
+    postingId: text("posting_id").notNull(),
+    companyId: text("company_id").notNull(),
+    ats: text("ats", { enum: ATS_VALUES }),
+    companyName: text("company_name").notNull(),
+    companyNameNorm: text("company_name_norm").notNull(),
+    companyDomain: text("company_domain"),
+    postingTitle: text("posting_title").notNull(),
+    postingUrl: text("posting_url").notNull(),
+    applyUrl: text("apply_url"),
+    locationRaw: text("location_raw"),
+    salaryCurrency: text("salary_currency"),
+    salaryMinMinor: integer("salary_min_minor"),
+    salaryMaxMinor: integer("salary_max_minor"),
+    salaryPeriod: text("salary_period", { enum: ["year", "month", "hour"] }),
     origin: text("origin", { enum: ["auto", "manual"] }).notNull(),
     status: text("status", {
       enum: [

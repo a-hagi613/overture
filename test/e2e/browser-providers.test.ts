@@ -435,7 +435,7 @@ test("the sweep lists an orphaned Browser Use session by attempt id and stops it
   }
 });
 
-test("a Kernel session runs the same port, keeps its own profile and reports uptime and cost", async () => {
+test("a Kernel session reports uptime and cost, and its unmeasured proxy stays unknown", async () => {
   const harness = startHarness();
 
   try {
@@ -459,19 +459,42 @@ test("a Kernel session runs the same port, keeps its own profile and reports upt
 
     expect(usage.browserMs).toBe(556_000);
     expect(usage.costMicros).toBe(28_800);
-    expect(usage.proxyBytes).toBe(0);
+    expect(usage.proxyBytes).toBeNull();
     expect(harness.kernel.deletedSessionIds).toContain(remote.sessionId);
     expect(harness.kernel.deletedAttemptIds).toContain("attempt-kernel-1");
 
     await expect(provider.sessionUsage(remote.sessionId)).resolves.toEqual({
       status: "stopped",
-      usage: { browserMs: 556_000, costMicros: 28_800, proxyBytes: 0 },
+      usage: { browserMs: 556_000, costMicros: 28_800, proxyBytes: null },
     });
 
     const replay = await provider.view(remote.sessionId);
 
     expect(replay?.recordingUrl).toContain(remote.sessionId);
     await expect(provider.listOpen()).resolves.toEqual([]);
+  } finally {
+    harness.close();
+  }
+});
+
+test("a Kernel profile is deleted through the API, forgotten and replaced on the next need", async () => {
+  const harness = startHarness();
+
+  try {
+    const provider = harness.buildKernel();
+    const first = await provider.ensureProfile("user-one", "ca");
+
+    expect(harness.kernel.profiles.map((profile) => profile.id)).toContain(first);
+
+    await provider.deleteProfile(first);
+
+    expect(harness.kernel.deletedProfileIds).toContain(first);
+    expect(harness.kernel.profiles.map((profile) => profile.id)).not.toContain(first);
+
+    const second = await provider.ensureProfile("user-one", "ca");
+
+    expect(second).not.toBe(first);
+    expect(harness.kernel.profiles.map((profile) => profile.id)).toContain(second);
   } finally {
     harness.close();
   }

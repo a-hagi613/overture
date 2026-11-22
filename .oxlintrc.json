@@ -135,7 +135,9 @@
           "src/server/dispatch/outcomes.test.ts",
           "src/server/demo/seed.ts",
           "src/server/billing/pause.test.ts",
-          "src/server/dispatch/report.test.ts"
+          "src/server/dispatch/report.test.ts",
+          "src/server/platform/db/migration-snapshot.test.ts",
+          "src/server/matching/applications.test.ts"
         ],
         "allowRoots": ["test/e2e", "scripts"]
       }
@@ -174,11 +176,17 @@
           "src/server/platform/outbound-guard.test.ts",
           "src/server/platform/db/restore-check.test.ts",
           "src/server/platform/ports/replica-listing.test.ts",
+          "src/server/platform/jobs/queue.test.ts",
           "src/server/platform/jobs/scheduler.test.ts",
+          "src/server/dispatch/browser/session-slots.test.ts",
           "src/server/platform/llm/models.test.ts",
+          "src/server/platform/llm/batch-store.test.ts",
+          "src/server/platform/llm/anthropic-batches.test.ts",
           "src/shared/copy.test.ts",
           "src/server/auth/client-ip.test.ts",
           "src/server/dispatch/outcomes.test.ts",
+          "src/server/platform/db/migration-snapshot.test.ts",
+          "src/server/matching/applications.test.ts",
           "scripts/database-sync-guard.test.ts"
         ]
       }

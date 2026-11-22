@@ -17,11 +17,13 @@ const DONE_JOB_RETENTION_MS = 7 * DAY_MS;
 const DEAD_JOB_RETENTION_MS = 30 * DAY_MS;
 
 const ATTEMPT_RETENTION_MS = 180 * DAY_MS;
+const LLM_BATCH_RETENTION_MS = 30 * DAY_MS;
 
 const TABLE_KEYS = {
   attempts: "id",
   bg_jobs: "id",
   events: "seq",
+  llm_batches: "id",
 } as const;
 
 type Table = keyof typeof TABLE_KEYS;
@@ -76,7 +78,13 @@ export async function runRetention(db: AppDatabase, clock: Clock) {
     sql`status = 'dead' AND updated_at < ${now - DEAD_JOB_RETENTION_MS}`,
   );
 
-  return { attempts, deadJobs, doneJobs, events };
+  const llmBatches = await deleteInChunks(
+    db,
+    "llm_batches",
+    sql`status IN ('applied', 'failed') AND updated_at < ${now - LLM_BATCH_RETENTION_MS}`,
+  );
+
+  return { attempts, deadJobs, doneJobs, events, llmBatches };
 }
 
 export function ensureRetentionQueued(db: AppDatabase, clock: Clock) {

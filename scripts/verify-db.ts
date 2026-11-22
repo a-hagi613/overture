@@ -32,6 +32,17 @@ const tables = tablesSchema.parse(
     .all(),
 );
 
+const USER_TABLES_WITHOUT_CATALOG_FOREIGN_KEYS = [
+  "applications",
+  "matches",
+  "posting_user_state",
+  "skip_companies",
+] as const;
+
+const CATALOG_TABLES = new Set(["postings", "companies"]);
+
+const foreignKeyListSchema = z.array(z.object({ table: z.string() }));
+
 const failures: string[] = [];
 
 const migrationJournalSchema = z.object({
@@ -67,6 +78,18 @@ if (foreignKeys.foreign_keys !== 1) {
 for (const table of tables) {
   if (!table.structure.includes("STRICT")) {
     failures.push(`table ${table.name} is not STRICT`);
+  }
+}
+
+for (const table of USER_TABLES_WITHOUT_CATALOG_FOREIGN_KEYS) {
+  const keys = foreignKeyListSchema.parse(sqlite.query(`PRAGMA foreign_key_list(${table})`).all());
+
+  for (const key of keys) {
+    if (CATALOG_TABLES.has(key.table)) {
+      failures.push(
+        `${table} has a foreign key to the catalog table ${key.table}; catalog ids stay plain logical ids`,
+      );
+    }
   }
 }
 

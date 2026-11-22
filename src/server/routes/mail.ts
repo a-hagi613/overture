@@ -11,7 +11,7 @@ import type { createMailboxService } from "../inbox/mailboxes.ts";
 
 import { codePatterns } from "../inbox/codes.ts";
 import { resolveCodeWaitWithPaste } from "../inbox/waits.ts";
-import { applications, attempts, codeWaits, companies, postings } from "../platform/db/schema.ts";
+import { applications, attempts, codeWaits } from "../platform/db/schema.ts";
 
 const codeBodySchema = z.object({
   code: z.string().regex(codePatterns.greenhouse, "Enter the 8-character code."),
@@ -68,14 +68,12 @@ export function createMailRoutes(deps: {
         startedAt: codeWaits.startedAt,
         expiresAt: codeWaits.expiresAt,
         applicationId: applications.id,
-        company: companies.name,
-        title: postings.title,
+        company: applications.companyName,
+        title: applications.postingTitle,
       })
       .from(codeWaits)
       .innerJoin(attempts, eq(attempts.id, codeWaits.attemptId))
       .innerJoin(applications, eq(applications.id, attempts.applicationId))
-      .innerJoin(companies, eq(companies.id, applications.companyId))
-      .innerJoin(postings, eq(postings.id, applications.postingId))
       .where(
         and(
           eq(codeWaits.userId, user.id),

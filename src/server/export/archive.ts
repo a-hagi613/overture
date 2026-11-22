@@ -13,13 +13,11 @@ import {
   applicationEvents,
   applicationSnapshots,
   applications,
-  companies,
   facts,
   mailThreads,
   mailboxes,
   messageAttachments,
   messages,
-  postings,
   profiles,
   resumes,
   skipCompanies,
@@ -351,13 +349,6 @@ export function* exportEntries(deps: ExportArchiveDeps, userId: string) {
         serializePages(pages.iterate(), async (page) =>
           Promise.all(
             page.map(async (row) => {
-              const posting = db
-                .select({ company: companies.name, title: postings.title, url: postings.url })
-                .from(postings)
-                .innerJoin(companies, eq(companies.id, postings.companyId))
-                .where(eq(postings.id, row.postingId))
-                .get();
-
               const events = db
                 .select()
                 .from(applicationEvents)
@@ -390,9 +381,9 @@ export function* exportEntries(deps: ExportArchiveDeps, userId: string) {
 
               return JSON.stringify({
                 id: row.id,
-                company: posting?.company ?? null,
-                title: posting?.title ?? null,
-                postingUrl: posting?.url ?? null,
+                company: row.companyName,
+                title: row.postingTitle,
+                postingUrl: row.postingUrl,
                 origin: row.origin,
                 status: row.status,
                 statusReason: row.statusReason,

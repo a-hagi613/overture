@@ -92,7 +92,8 @@ repeat-application throttles.
 - Every session is stopped through Browser Use's API in a `finally` path and by the recovery sweep. Closing CDP alone
   does not stop billing.
 - Every attempt records `browser_ms`, `proxy_bytes` and `cost_micros`. The admin view reports proxy MB and cost per
-  completed application against the $0.03 gate (cost as defined in ADR 0026).
+  completed application against the $0.03 gate (cost as defined in ADR 0026). Kernel's control API exposes no proxy
+  volume, so its attempts keep `proxy_bytes` NULL (unknown) instead of a fake 0.
 
 ## Catalog
 

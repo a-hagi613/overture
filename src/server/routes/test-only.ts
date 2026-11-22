@@ -30,6 +30,7 @@ import {
   grants,
   ledger,
   liveCheckMail,
+  llmBatches,
   mailUsage,
   matches,
   postingQuestions,
@@ -59,6 +60,7 @@ import {
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
+import { postingDisplayFor } from "../matching/applications.ts";
 import { attachApplication, ensureOpenReview } from "../pipeline/review-store.ts";
 import { ensureApplyFailuresQueued } from "../notify/failure-digest.ts";
 import { createNotification } from "../notify/notifications.ts";
@@ -1494,6 +1496,16 @@ export function createTestRoutes(
     return context.json({ closed: closed.length });
   });
 
+  routes.post("/catalog/prune", (context) => {
+    const removed = db
+      .delete(companies)
+      .returning({ id: companies.id })
+      .all()
+      .map((row) => row.id);
+
+    return context.json({ companies: removed.length });
+  });
+
   routes.post(
     "/catalog/discovered-boards",
     zValidator("json", discoveredBoardsBody),
@@ -1546,6 +1558,12 @@ export function createTestRoutes(
     });
 
     return context.json(summary);
+  });
+
+  routes.get("/llm/batches", (context) => {
+    const rows = db.select().from(llmBatches).all();
+
+    return context.json({ batches: rows });
   });
 
   routes.post("/llm/usage", zValidator("json", recordLlmUsageBody), (context) => {
@@ -1662,11 +1680,7 @@ export function createTestRoutes(
       scheduledFor,
     } = context.req.valid("json");
 
-    const posting = db
-      .select({ companyId: postings.companyId })
-      .from(postings)
-      .where(eq(postings.id, postingId))
-      .get();
+    const posting = postingDisplayFor(db, postingId);
 
     if (posting === undefined) {
       return context.json({ error: "not found" }, 404);
@@ -1678,10 +1692,10 @@ export function createTestRoutes(
 
     db.insert(applications)
       .values({
+        ...posting,
         id,
         userId,
         postingId,
-        companyId: posting.companyId,
         boardPosition,
         closedReason,
         origin,
@@ -2714,7 +2728,6 @@ export function createTestRoutes(
     }
 
     function addApplication(input: {
-      companyId: string;
       postingId: string;
       status: "approved" | "ready" | "needs_review" | "sent" | "failed";
       createdAt?: number;
@@ -2725,12 +2738,17 @@ export function createTestRoutes(
       updatedAt?: number;
     }) {
       const id = crypto.randomUUID();
+      const display = postingDisplayFor(db, input.postingId);
+
+      if (display === undefined) {
+        throw new Error(`the seeded posting ${input.postingId} is missing`);
+      }
 
       db.insert(applications)
         .values({
+          ...display,
           attempts: 0,
           closedReason: input.stage === "closed" ? "rejected" : null,
-          companyId: input.companyId,
           createdAt: input.createdAt ?? now,
           id,
           origin: "auto",
@@ -2845,7 +2863,6 @@ export function createTestRoutes(
       const postingId = addPosting(owner, entry.title, `${entry.token}-1`);
 
       const applicationId = addApplication({
-        companyId: owner.companyId,
         postingId,
         sentAt: entry.sentAt,
         stage: entry.stage,
@@ -2871,7 +2888,6 @@ export function createTestRoutes(
         const postingId = addPosting(sample, "Backend Engineer", `home-sent-${String(sequence)}`);
 
         addApplication({
-          companyId: sample.companyId,
           postingId,
           sentAt: dayStart(offset) + 6 * hour + extra * 6 * minute,
           status: "sent",
@@ -2888,7 +2904,6 @@ export function createTestRoutes(
         const postingId = addPosting(sample, "Backend Engineer", `home-prior-${String(sequence)}`);
 
         addApplication({
-          companyId: sample.companyId,
           postingId,
           sentAt: dayStart(offset) + 10 * hour + extra * 5 * minute,
           status: "sent",
@@ -2910,7 +2925,6 @@ export function createTestRoutes(
       }
 
       addApplication({
-        companyId: sample.companyId,
         postingId,
         scheduledFor,
         stage: "queued",
@@ -2938,7 +2952,6 @@ export function createTestRoutes(
       const postingId = addPosting(owner, entry.title, `${entry.token}-1`);
 
       addApplication({
-        companyId: owner.companyId,
         postingId,
         stage: "ready",
         status: "ready",
@@ -2959,7 +2972,6 @@ export function createTestRoutes(
     );
 
     addApplication({
-      companyId: approvedOwner.companyId,
       postingId: approvedPosting,
       scheduledFor: dayStart(0) + 14 * hour + 20 * minute,
       stage: "ready",
@@ -2971,7 +2983,6 @@ export function createTestRoutes(
     const failedPosting = addPosting(failedOwner, "DevOps Engineer", "home-ferro-failed-1");
 
     addApplication({
-      companyId: failedOwner.companyId,
       postingId: failedPosting,
       stage: null,
       status: "failed",
@@ -2984,7 +2995,6 @@ export function createTestRoutes(
     const checkInSentAt = dayStart(-25) + 10 * hour;
 
     const checkInApplication = addApplication({
-      companyId: sample.companyId,
       postingId: checkInPosting,
       sentAt: checkInSentAt,
       stage: "applied",
@@ -3047,7 +3057,6 @@ export function createTestRoutes(
       const postingId = addPosting(sample, "Backend Engineer", `home-event-${String(sequence)}`);
 
       const applicationId = addApplication({
-        companyId: sample.companyId,
         postingId,
         sentAt: dayStart(extra.offset) + 10 * hour,
         stage: "interviewing",
@@ -3133,7 +3142,6 @@ export function createTestRoutes(
 
       reviewApplicationIds.push(
         addApplication({
-          companyId: owner.companyId,
           createdAt: index + 1,
           postingId,
           stage: "queued",

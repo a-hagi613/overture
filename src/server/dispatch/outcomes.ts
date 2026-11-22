@@ -12,10 +12,8 @@ import {
   applicationReceipts,
   applicationSnapshots,
   attempts,
-  companies,
   mailThreads,
   messages,
-  postings,
 } from "../platform/db/schema.ts";
 import { commitForApplication, releaseForApplication } from "../billing/ledger.ts";
 import { getSetting } from "../platform/settings/index.ts";
@@ -353,13 +351,11 @@ export function createOutcomes(deps: OutcomeDeps) {
     return db
       .select({
         userId: applications.userId,
-        companyName: companies.name,
-        companyDomain: companies.domain,
-        postingTitle: postings.title,
+        companyName: applications.companyName,
+        companyDomain: applications.companyDomain,
+        postingTitle: applications.postingTitle,
       })
       .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
-      .innerJoin(companies, eq(companies.id, applications.companyId))
       .where(eq(applications.id, applicationId))
       .get();
   }
@@ -415,15 +411,13 @@ export function createOutcomes(deps: OutcomeDeps) {
 
     const confirming = db
       .select({
-        companyDomain: companies.domain,
-        companyName: companies.name,
-        employer: companies.nameNorm,
+        companyDomain: applications.companyDomain,
+        companyName: applications.companyName,
+        employer: applications.companyNameNorm,
         id: applications.id,
-        postingTitle: postings.title,
+        postingTitle: applications.postingTitle,
       })
       .from(applications)
-      .innerJoin(companies, eq(companies.id, applications.companyId))
-      .innerJoin(postings, eq(postings.id, applications.postingId))
       .where(and(eq(applications.userId, userId), eq(applications.status, "confirming")))
       .all();
 

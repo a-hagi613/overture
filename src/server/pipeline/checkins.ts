@@ -10,10 +10,8 @@ import {
   applications,
   applicationEvents,
   checkins,
-  companies,
   mailThreads,
   messages,
-  postings,
   users,
 } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
@@ -104,15 +102,13 @@ export function runCheckinSweep(deps: { db: AppDatabase; clock: Clock }) {
 
   const rows = db
     .select({
-      company: companies.name,
+      company: applications.companyName,
       id: applications.id,
       sentAt: applications.sentAt,
-      title: postings.title,
+      title: applications.postingTitle,
       userId: applications.userId,
     })
     .from(applications)
-    .innerJoin(companies, eq(companies.id, applications.companyId))
-    .innerJoin(postings, eq(postings.id, applications.postingId))
     .innerJoin(users, eq(users.id, applications.userId))
     .where(
       and(
@@ -477,16 +473,14 @@ export function dueCheckins(deps: { db: AppDatabase; now: number }, userId: stri
   const rows = deps.db
     .select({
       applicationId: applications.id,
-      company: companies.name,
+      company: applications.companyName,
       dueAt: checkins.dueAt,
       id: checkins.id,
       sentAt: applications.sentAt,
-      title: postings.title,
+      title: applications.postingTitle,
     })
     .from(checkins)
     .innerJoin(applications, eq(applications.id, checkins.applicationId))
-    .innerJoin(companies, eq(companies.id, applications.companyId))
-    .innerJoin(postings, eq(postings.id, applications.postingId))
     .where(
       and(
         eq(checkins.userId, userId),

@@ -99,6 +99,11 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
   Nothing is dropped; the queued work starts a few seconds later. `JOBS_AUTORUN=false` (test-only; refused in
   production) starts the process without the worker, so an e2e test can drive each job through `/__test__/jobs/*`
   without a live scheduler claiming it first.
+- The job worker holds at most 10 jobs at once, with per-class limits: 3 in the browser lane (`application.send`,
+  `fixtures.capture`, `lab.run`, `live.check`), 3 in the LLM lane (`application.prepare`,
+  `tag.llm_fallback`), and the rest for control, notification, mail, export and catalog work. A lane already at its
+  limit is left out of the claim, so a stalled browser or model vendor cannot put older slow rows in front of a fast
+  control, notification or mail job on the next 15 s tick; a claim also never starts more jobs than the free room.
 - The prerendered marketing pages (`/` and `/pricing`) are deployed as Workers Static Assets
   (`workers/marketing`, ADR 0033) on explicit routes for those paths only, so they stay up through those deploys.
   Every app and API path matches no Worker route and goes straight to `overture-web`; the app's HTML and assets are
@@ -251,6 +256,13 @@ minor units `INTEGER`; enums are `TEXT` with `CHECK`; every table `STRICT`; ever
 `user_id … REFERENCES user(id) ON DELETE CASCADE`. Columns ending `_enc` are AES-256-GCM ciphertext under the user's
 data key (§13.2). Drizzle schema in `src/server/**/schema.ts` is the source of truth; this section is its contract.
 
+User data never depends on the catalog: `applications`, `matches`, `posting_user_state` and `skip_companies` keep
+`posting_id` / `company_id` as plain logical ids with no foreign key into `postings` or `companies`, and every
+Application carries its own copy of the posting and company display fields (§5.4). Board, Ready, Home, Inbox,
+Calendar, Notifications, the cost report and the account export therefore read one database only. Preparing a
+form, sending an Application, scoring and review attachment still read the live catalog, because they act on a
+Posting that must still be open; `bun run db:verify` fails if a user table ever grows a catalog foreign key again.
+
 ### 5.1 Auth (better-auth managed)
 
 `user` (id, name, email UNIQUE, email_verified, image, role CHECK IN ('user','owner'), suspended_at, created_at,
@@ -266,7 +278,7 @@ other address only lowered and trimmed) · `session` · `account` (provider: goo
 | `profiles` | user_id PK, running, pause_reason CHECK IN ('user','onboarding','no_resume','plan_ended','payment_failed','suspended','no_mailbox') NULL, timezone (IANA, taken from the browser at sign-up; the first zone saved applies at once; a later change is stored in pending_timezone with pending_timezone_at = now + `limits.timezone_change_days` (7) and the current zone stays in force until then; every read of the zone applies a due pending change first, through one function), pending_timezone, pending_timezone_at, languages TEXT JSON (ISO 639-1), auto_threshold CHECK IN (50,60) DEFAULT 60, onboarding_step, onboarded_at, digest_enabled DEFAULT 1, push_prompted_at, consent_version, consent_at, created_at, updated_at. M1-14 creates the row with `languages`, `timezone` and the timestamps; the remaining columns arrive with the slices that read them. M1-22 adds `running` and `pause_reason`: `running` defaults to 0 and `pause_reason` to `onboarding`, so no send is planned until the owner presses Start; `POST /api/running {running:true}` clears the reason, and setting `running:false` records `user`. The billing lifecycle owns two more reasons: a plan end sets `plan_ended` and a failed payment sets `payment_failed` (both `running=0`), each announced once by push and email with its fix, and a later successful payment clears only one of those two reasons and starts sending again. `consent_version` defaults to the published `1` (migration 0038 replaces the M1 `m1` placeholder); `consent_at` is set only when the user accepts the consent at /consent, and the accepted version stays on the profile when a later version is published |
 | `facts` | id, user_id, key, scope ('' or an ISO 3166-1 alpha-2 country), value_enc, source CHECK IN ('resume','user','review','import'), confirmed, revision, updated_at; UNIQUE(user_id,key,scope). Keys from the fact catalog (§7.1) or `q:<question_id>` for learned answers. `work_auth` and `sponsorship_required` are country-scoped; every other key has `scope=''` |
 | `targets` | user_id PK, roles JSON (strings as typed), seniorities JSON, workplaces JSON, locations JSON (strings as typed), employment_types JSON, salary_floor_minor NULL, salary_currency NULL, salary_period CHECK IN ('year','month','hour') NULL, version INTEGER, updated_at |
-| `skip_companies` | id, user_id, company_id NULL, name, name_norm, domain NULL, reason CHECK IN ('current_employer','user'), created_at; UNIQUE(user_id,name_norm). Matching rules in §8.1 |
+| `skip_companies` | id, user_id, company_id NULL (a plain logical id: no foreign key to `companies`, so a catalog prune keeps the skip), name, name_norm, domain NULL, reason CHECK IN ('current_employer','user'), created_at; UNIQUE(user_id,name_norm). Matching rules in §8.1 |
 | `resumes` | id, user_id, object_key, sha256, bytes, pages, filename_enc, text_enc, parsed_with CHECK IN ('unpdf','llm'), is_current, uploaded_at; partial UNIQUE(user_id) WHERE is_current=1 |
 | `browser_profiles` | user_id, provider, provider_profile_id, country_code, created_at, last_used_at; PK(user_id, provider) |
 | `mailboxes` | id (the forwarding id, `[a-z0-9]{8,32}`), user_id UNIQUE, local_part UNIQUE (the `in-{id}-{mac}` local part), status CHECK IN ('active','receive_only','closed'), receive_until NULL, first_forwarded_at NULL (set once by the first ATS mail that arrives; the API reads it as "forwarding works"), created_at |
@@ -294,9 +306,9 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 
 | Table | Columns |
 |---|---|
-| `matches` | user_id, posting_id, code_rank REAL, score NULL, reason NULL, resume_id NULL, targets_version NULL, scored_at NULL; PK(user_id,posting_id). A score is valid only while `resume_id` and `targets_version` equal the user's current ones |
-| `posting_user_state` | user_id, posting_id, state CHECK IN ('saved','hidden'), updated_at; PK(user_id,posting_id) |
-| `applications` | id, user_id, posting_id, company_id, origin CHECK IN ('auto','manual'), status CHECK IN ('preparing','needs_review','ready','approved','sending','confirming','sent','failed','skipped','withdrawn'), status_reason NULL (§11), stage CHECK IN ('queued','ready','applied','screening','interviewing','offer','closed') NULL, stage_locked INTEGER DEFAULT 0, board_position REAL, score_at_queue, scheduled_for NULL, attempts INTEGER DEFAULT 0, ready_at NULL, approved_at NULL, approved_plan_sha256 NULL, approved_plan_enc NULL (the frozen send plan, sealed; §8.7), changes JSON NULL (what changed since the last approval, shown on the card), sent_at NULL, closed_reason CHECK IN ('rejected','no_response','withdrawn','offer_declined','offer_accepted','other') NULL, created_at, updated_at; UNIQUE(user_id,posting_id); partial UNIQUE(user_id) WHERE status='sending'. `withdrawn` applies only before `sent` (the user stops a queued application, or presses Skip on a Ready card); a sent application cannot be un-sent, so the user moves it to Closed with `closed_reason='withdrawn'` |
+| `matches` | user_id, posting_id, code_rank REAL, score NULL, reason NULL, resume_id NULL, targets_version NULL, scored_at NULL; PK(user_id,posting_id). A score is valid only while `resume_id` and `targets_version` equal the user's current ones. `posting_id` is a plain logical id: no foreign key to `postings` |
+| `posting_user_state` | user_id, posting_id, state CHECK IN ('saved','hidden'), updated_at; PK(user_id,posting_id). `posting_id` is a plain logical id: no foreign key to `postings` |
+| `applications` | id, user_id, posting_id, company_id, ats NULL CHECK IN ('greenhouse','lever','ashby','workable','personio'), company_name, company_name_norm, company_domain NULL, posting_title, posting_url, apply_url NULL, location_raw NULL, salary_currency NULL, salary_min_minor NULL, salary_max_minor NULL, salary_period CHECK IN ('year','month','hour') NULL, origin CHECK IN ('auto','manual'), status CHECK IN ('preparing','needs_review','ready','approved','sending','confirming','sent','failed','skipped','withdrawn'), status_reason NULL (§11), stage CHECK IN ('queued','ready','applied','screening','interviewing','offer','closed') NULL, stage_locked INTEGER DEFAULT 0, board_position REAL, score_at_queue, scheduled_for NULL, attempts INTEGER DEFAULT 0, ready_at NULL, approved_at NULL, approved_plan_sha256 NULL, approved_plan_enc NULL (the frozen send plan, sealed; §8.7), changes JSON NULL (what changed since the last approval, shown on the card), sent_at NULL, closed_reason CHECK IN ('rejected','no_response','withdrawn','offer_declined','offer_accepted','other') NULL, created_at, updated_at; UNIQUE(user_id,posting_id); partial UNIQUE(user_id) WHERE status='sending'. **Self-contained**: `posting_id` and `company_id` are logical ids (no foreign key to `postings` or `companies`), and the display fields (`ats` … `salary_period`) are an immutable copy taken from the Posting and Company when the Application is created, so pruning or rebuilding the catalog never changes what the Board, Ready, Home, Inbox, Calendar, the cost report or the account export show. Migration `0056_snapshot_decouple` backfills them for existing rows and uses "Unknown company" / "Unknown role" when the catalog row is already gone. Where the copy is empty (an Application whose Posting left the catalog before it was written), `ats` is NULL and readers show "unknown". `withdrawn` applies only before `sent` (the user stops a queued application, or presses Skip on a Ready card); a sent application cannot be un-sent, so the user moves it to Closed with `closed_reason='withdrawn'` |
 | `application_snapshots` | application_id PK, user_id, posting_url, posting_title, description_hash, answers_enc (JSON array `{question_id, label, answer, fact_key, fact_revision, kind, resume_line_ids, by_user}`), cover_letter_enc NULL (JSON `[{sentence, resume_line_ids, by_user}]`), resume_id, resume_sha256, consent_version, approved_at, approved_plan_sha256, provider, provider_session_id, submitted_at, confirmed_by CHECK IN ('page','email'), cost_micros. **Immutable**: a `BEFORE UPDATE` trigger always raises; a `BEFORE DELETE` trigger raises `WHEN EXISTS (SELECT 1 FROM user WHERE id = OLD.user_id)`, so rows go only when the user row is gone (account deletion cascade). Flow 29 proves both |
 | `application_answers` | id, application_id, question_id, user_id, kind CHECK IN ('open_text','cover_letter'), sentences_enc (JSON `[{sentence, resumeLineIds, byUser?}]`, sealed), word_count, created_at, updated_at; UNIQUE(application_id,question_id). The generated, grounded open text and letter kept from preparation until the Snapshot takes them; `byUser: true` marks text the user edited on the card, which preparation keeps |
 | `application_events` | id, application_id, user_id, at, kind CHECK IN ('status','stage','email','checkin','note'), from_value, to_value, source CHECK IN ('system','user','email','checkin','admin'), detail JSON; the card timeline and stage history |
@@ -388,10 +400,16 @@ alerts nobody. The admin billing page shows the last result.
 | `settings` | key PK, value JSON, updated_at, updated_by — admin-tunable limits (§12) |
 | `kill_switches` | scope CHECK IN ('global','ats','employer','provider'), key, enabled, reason, set_by CHECK IN ('auto','owner'), set_at; PK(scope,key) |
 | `llm_usage` | id, user_id NULL, purpose, model, input_tokens, cached_tokens, output_tokens, cost_micros, created_at |
+| `llm_batches` | id, input_revision_hash UNIQUE (sha256 of the model and the request set), model, batch_id NULL, status CHECK IN ('creating','in_progress','applied','failed'), results JSON NULL, result_applied_at NULL, expires_at NULL, last_polled_at NULL, last_error NULL, created_at, updated_at |
 | `fx_rates` | date, currency, per_usd REAL; PK(date,currency) |
 | `admin_audit` | id, at, actor_id, action, target_user_id NULL, reason, detail JSON — also shipped to Loki (off-box, append-only) |
 
-Retention: `events` 24 h; `bg_jobs` done 7 days, dead 30 days; `attempts` 180 days; `llm_usage` 400 days;
+The `bg_jobs` claim query reads only queued and running rows through the partial index `bg_jobs_claim_due` on
+`(status, run_at)` where `status IN ('queued','running')`, so a long lifetime history of done and dead rows is never
+scanned on a tick.
+
+Retention: `events` 24 h; `bg_jobs` done 7 days, dead 30 days; `attempts` 180 days; `llm_batches` applied or
+failed 30 days; `llm_usage` 400 days;
 `notifications` 90 days; descriptions 90 days after close; messages for account lifetime; `review_audit_events` and
 Snapshots for account lifetime (the audit is only useful across a search).
 
@@ -430,7 +448,10 @@ straight to tagging; Ashby's `isRemote` is ignored because Ashby sets it on hybr
    `scripts/load-discovered-boards.ts` loads the dataset's greenhouse, lever, ashby and personio rows as
    `source='discovered'` — 13,911 boards, in transactions of at most 500 boards with the event loop yielded
    between them, idempotent. v1 boards are not imported (the measured comparison is
-   `docs/research/seed-comparison.md`; the runbook is `docs/research/m1-09-runbook.md`).
+   `docs/research/seed-comparison.md`; the runbook is `docs/research/m1-09-runbook.md`). A weekly
+   `.github/workflows/stapply-seed.yml` run stages a candidate upstream snapshot behind schema, sha256 and
+   row-drop guards and never writes the pins itself; re-pinning stays a reviewed change (`docs/DEPLOY.md`,
+   the Stapply seed refresh).
 2. **Backfill**: one pass over every active board inside per-ATS limits; on production it is started with
    `bun run scripts/enqueue-backfill.ts --db /data/app.sqlite`, which enqueues the `catalog.backfill` job and
    prints the per-ATS request counts and the duration estimate at the 2 req/s per-ATS pace.
@@ -767,6 +788,20 @@ scoring pauses until the next UTC day, preparation waits, the owner is alerted. 
 search at three times the daily cap (§8.2) and alerts `match.score_bound` when it stops there, so a strict threshold
 reaches that alert rather than the cap.
 
+An Anthropic batch is recorded in `llm_batches` before its id exists and keyed by the sha256 of the model and its
+request set, so the id, its status and the moment its results were stored survive a deploy or a crash. A producer
+that restarts finds the record and polls the same provider batch instead of submitting a second one, so the same
+requests are never billed twice: a single conditional update claims the stored results, and every later call returns
+them. A `llm.batch_poll` job, queued when the batch is submitted, checks the provider every
+`ANTHROPIC_BATCH_POLL_INTERVAL_MS` (10 s) and requeues itself without holding a worker, so polling continues when the
+producer is gone; it stops once the provider's `expires_at` has passed and records the reason in `last_error`. The
+producing call
+still waits for the results because `LlmPort` returns them, bounded by `ANTHROPIC_BATCH_WAIT_MS` (1 h), and a wait
+that gives up leaves the record resumable. The submission carries `Idempotency-Key: <input_revision_hash>`, and a
+record still in `creating` after two minutes is submitted again with the same key, so a crash between the POST and
+the write is billed once wherever Anthropic honours the key. The results url is fetched with the api key only when it
+points at the configured api origin, so a provider response that names another host cannot take the key with it.
+
 > `email_classify` is the one LLM use beyond scoring, answers, letters, PDF fallback and question mapping; it runs only when the rules in §11.3 are not confident.
 
 ### 8.7 Approval and Ready (ADR 0029)
@@ -878,14 +913,15 @@ bound: the planner gives it the first free slot at or after that time inside a w
 
 ### 9.3 Dispatcher
 
-Job `dispatch.tick` every 15 s claims at most `free_slots = session_cap − active_sends` applications
-in `approved` (never `ready`) that pass every gate below, in order, where `session_cap` is
-`browser.max_concurrent_sessions`, the same process-wide browser session cap every send holds a slot from, and
-`active_sends` is the number of distinct Applications with send work in flight: those in `sending`, plus those with an
-`application.send` job still `queued` or `running` (a job waiting in the session-slot queue is `running` while its
-Application is still `approved`). An Application becomes `sending` only after it holds one of those slots, so a send
-that is queued or waiting for a browser already counts against the cap and `sending` never counts an Application that
-is still waiting for a browser:
+Job `dispatch.tick` every 15 s claims at most `free_slots` Applications in `approved` (never `ready`) that pass
+every gate below, in order. `free_slots` is the smaller of `session_cap − active_sends` and the sessions free right
+now in the process-wide browser semaphore: `session_cap` is `browser.max_concurrent_sessions`, the cap every send
+holds a slot from, and a capture, probe or lab run holding a slot leaves one fewer send free, so no Application is
+claimed to wait in `sending`. `active_sends` is the number of distinct Applications with send work in flight: those
+in `sending`, plus those with an `application.send` job still `queued` or `running` (a job waiting in the session-slot
+queue is `running` while its Application is still `approved`). An Application becomes `sending` only after it holds
+one of those slots, so a send that is queued or waiting for a browser already counts against the cap and `sending`
+never counts an Application that is still waiting for a browser:
 
 1. Global and provider kill switches off; ATS and employer kill switches off.
 2. User `running=1`, not suspended, has a current resume and an active mailbox.
@@ -1009,7 +1045,9 @@ until #232 releases it after the 20-form probe, and Workable's until #235 does t
   one (Browser Use sends 300 s) requeues the job for exactly that delay without spending an attempt. A 402 (no credit)
   or 403 (forbidden) is never retried: it is a provider error, the `provider` kill switch for `browser_use` is set and
   the owner is alerted, so dispatch pauses until the owner turns the switch off.
-- **Kernel** (emergency fallback): headful browser, stealth on, ISP proxy, per-user profile. Its acceptable-use
+- **Kernel** (emergency fallback): headful browser, stealth on, ISP proxy, per-user profile. Its control API reports
+  uptime and estimated cost but no proxy volume, so its attempts keep `proxy_bytes` NULL (unknown) rather than a
+  misleading 0, and the admin report totals only the bytes providers actually measured. Its acceptable-use
   policy bans "bulk unsolicited form submission" (ADR 0003), so it is exercised only against the synthetic lab and
   fixtures, never sent real applications by default; the owner switches real traffic to it only if Browser Use's
   provider kill switch trips and the owner chooses to.
@@ -1348,6 +1386,15 @@ body, sender or attachment, so the admin never sees message content.
   summary and one row per form for the Catalog page. A form that reads completely is `readable`, a required custom
   question with no rule is an honest `needs_review`, and a control the flow cannot fill is `unsupported`; the probe
   passes only when all twenty forms read with no unreadable or unsupported form.
+- `GET /admin/api/storage-report` attributes what consumes disk and R2 space without any personal content:
+  `app.sqlite` with its `-wal`/`-shm` sidecars and `catalog.sqlite` when that file exists, the volume's total and
+  free bytes, posting counts by ATS with open and closed, object counts and bytes grouped by `files/`, `mail/`,
+  `exports/` and the rest, and Litestream backup totals when `R2_BUCKET_BACKUPS` is configured. It returns sizes,
+  counts and source/table/prefix names only: never an email, name, user id, answer, resume, message or job URL.
+  `?dbstat=1` adds a table and index byte breakdown read from an isolated `VACUUM INTO` snapshot opened read-only, so
+  it never blocks live WAL writes; without it the route copies nothing. A missing `catalog.sqlite` or an unconfigured
+  R2 bucket is reported as absent, never as an error. `bun run scripts/storage-report.ts --db <path>
+  [--objects-root <dir>] [--tables]` prints the same report as JSON and opens the database read-only.
 - `POST /admin/api/tag-imports` mounts the hiring.cafe import seam (§6.3.6) behind the same gate;
   `PUT /admin/api/settings/:key` and `PUT /admin/api/kill-switches/:scope/:key` are the admin's other write
   surfaces. `GET /admin/api/llm-usage` returns the recorded LLM usage and cost, filterable by `purpose`.
@@ -1402,7 +1449,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `GET /api/account/export` · `POST /api/account/export` · `GET /api/account/export/:id/download` · `GET /api/account/deletion` (email, re-authenticated) · `POST /api/account/reauth/link` (a fresh sign-in link) · `POST /api/account/delete` `{confirm: true}` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` (`enabled`, `customer`, the subscription's `plan`, `status`, `currentPeriodEnd`, `cancelAtPeriodEnd`, `applicationsLeft` and `planApplications`) · `POST /api/billing/checkout` `{plan}` (Checkout returns to `/settings/billing/plans?billing=success|cancelled`) · `POST /api/billing/portal` (returns to `/settings/billing`; plan switches, cancel at period end, payment method and invoices happen there, in Stripe) |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `POST /internal/mail/dead-letter` · `GET /internal/mailboxes/:local` |
-| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/probes/personio`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds`, `/billing/reconciliation` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
+| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/probes/personio`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds`, `/billing/reconciliation` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/storage-report`, `/audit`, `/provider-report` |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
 `home.updated`, `notification`, `calendar.updated`. TanStack Query invalidates by topic. The Calendar invalidates on
@@ -1556,7 +1603,9 @@ unhandled rejection in a background loop or timer (logged to stderr, alerted at 
 in-app `alert.raised` event plus a notification for every owner; with `ALERT_NTFY_URL` set, the same alert is pushed
 to the owner's phone. No Grafana is provisioned by this repository; dashboards stay with the owner's Grafana account
 and read the OTLP endpoint. `live.check` computes the same thresholds from the app database and machine and records
-each one, and the test-only drill route fires every alert kind.
+each one, and the test-only drill route fires every alert kind. When the disk alert fires, `GET
+/admin/api/storage-report` and `scripts/storage-report.ts` attribute the space the alert measures to database files,
+object prefixes and, on request, tables and indexes.
 
 Two of those alerts do not depend on the app being up, because they come from the sentinel Worker
 (`workers/sentinel`, ADR 0033): the health probe calls `/api/health` from outside Fly, and the Workable snapshot's

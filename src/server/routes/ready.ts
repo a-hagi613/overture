@@ -9,15 +9,7 @@ import type { Auth } from "../auth/index.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
 
-import {
-  applicationEvents,
-  applications,
-  companies,
-  facts,
-  matches,
-  postings,
-  resumes,
-} from "../platform/db/schema.ts";
+import { applicationEvents, applications, facts, matches, resumes } from "../platform/db/schema.ts";
 import { enqueuePlannerDay } from "../dispatch/planner.ts";
 import {
   approvalProblem,
@@ -223,17 +215,15 @@ export function createReadyRoutes(deps: {
       .select({
         approvedAt: applications.approvedAt,
         changes: applications.changes,
-        company: companies.name,
+        company: applications.companyName,
         id: applications.id,
-        location: postings.locationRaw,
+        location: applications.locationRaw,
         readyAt: applications.readyAt,
         scheduledFor: applications.scheduledFor,
         score: matches.score,
         status: applications.status,
       })
       .from(applications)
-      .innerJoin(postings, eq(postings.id, applications.postingId))
-      .innerJoin(companies, eq(companies.id, applications.companyId))
       .leftJoin(
         matches,
         and(eq(matches.userId, applications.userId), eq(matches.postingId, applications.postingId)),

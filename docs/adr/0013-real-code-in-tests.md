@@ -24,14 +24,20 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for twenty-seven invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
+exist only for thirty-three invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
 derivations, the answer planner (a salary Fact kept per currency is chosen only for the currency a question names),
 the facts model (a Fact's scope is validated against its key), the onboarding step's salary and EEO reading, the
 fixture sanitiser (recorded pages must carry no script, event handler, personal data or token), the v1
 answer-bank mapping, the live-traffic guard (in test and development, an outbound request to an ATS or
 paid-service host is refused), the replica listing (the newest transaction is read from the first non-empty
 Litestream level, so a healthy replica costs one R2 list per read, #281), the job worker's wait (a completed wait
-retains no abort listener), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
+retains no abort listener), the job worker's class limits (`queue.test.ts`, `scheduler.test.ts`: a browser or LLM
+lane already at its limit is left out of the claim, so a fast control or notification job behind older stalled rows
+still runs, the total in-flight cap bounds one claim, and the `bg_jobs` claim is planned through the partial
+`bg_jobs_claim_due` index rather than scanning the lifetime history, #425), the browser session alignment
+(`session-slots.test.ts`: the dispatcher's free-send count comes from the same process-wide semaphore every browser
+user holds a slot from, so a capture holding the last session offers a send no slot and no Application waits in
+`sending`, #425), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
 per cooldown, so a paused main thread becomes a log line), the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
 a copy string or key), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
 `x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the onboarding location plan (the
@@ -54,9 +60,18 @@ distinct attempted Applications, so a failure-then-success retry counts once and
 completed, while attempt counts and page-confirmed sends stay diagnostics, #417), the email receipt match
 (`outcomes.test.ts`: a Confirming Application is charged only by the one message that names its employer and role
 unambiguously, one message confirms at most one Application, and a replayed message never commits a second credit,
-#413), and the account erasure plan (`erase.test.ts`: the vendor profile ids, R2 prefixes and confirmation target are
+#413), the account erasure plan (`erase.test.ts`: the vendor profile ids, R2 prefixes and confirmation target are
 written before the user row goes, the confirmation is queued only after both external deletes confirm clean, a
-failure retries without consuming a job attempt, and a restart resumes the cleanup from the plan, #415). They
+failure retries without consuming a job attempt, and a restart resumes the cleanup from the plan, #415), the Anthropic
+batch record (`batch-store.test.ts`: one request set is recorded once, its results are claimed by one conditional
+update so every later caller reads them back, and a failed record reopens for one resubmission, #418), the batch
+results fetch (`anthropic-batches.test.ts`: the api key is sent only to the configured api origin, never to another
+origin named by a provider response, #418), the catalog snapshot (`applications.test.ts`: an Application copies the
+Posting's and Company's display fields onto its own row when it is created, keeps them after the catalog rows are
+deleted, and is not created for a Posting that has already left the catalog, #422), and the catalog split migration
+(`migration-snapshot.test.ts`: migration `0056_snapshot_decouple` backfills that copy onto every existing Application,
+including readable placeholders when the catalog row is already gone, and leaves `applications`, `matches`,
+`posting_user_state` and `skip_companies` with no foreign key into `postings` or `companies`, #422). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
 depend on the runner. The mail count runs the real SQLite file and the real migrations, so the invariant is exercised
 against the shipped schema rather than a stand-in. CI stays under two minutes on pull requests: six shards balanced by

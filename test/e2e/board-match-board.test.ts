@@ -80,7 +80,6 @@ async function expectBoardMatches(
     ]);
     await document.fonts.ready;
   });
-  await page.waitForLoadState("networkidle");
 
   const results = await new AxeBuilder({ page }).analyze();
 
