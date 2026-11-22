@@ -7,15 +7,14 @@ import {
   APPLICATION_RESPONSE_MS,
   CONFIRMATION_SOURCES,
   CONFIRMATION_WAIT_MS,
-  FORM_APPEAR_MS,
   fillField,
   norm,
   isPositiveAnswer,
+  openForm,
   preflightForm,
 } from "../forms/engine.ts";
-import type { LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
+import type { FormScope, LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
 import { checkPostingIdentity } from "../posting-identity.ts";
-import { cssValue } from "./shared.ts";
 
 import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identity.ts";
 import type { PlannedResume } from "./shared.ts";
@@ -23,11 +22,12 @@ import type { PlannedResume } from "./shared.ts";
 const RESUME_FIELD = "resume";
 
 /**
- * The hosted Workable application is a single form on the apply host. The fallback to a bare `form` covers the
- * recorded fixtures and any page that drops the class; preparation always sends the exact field names the plan
- * was built from, and preflight refuses a form that does not match, so the broad selector cannot cause a wrong fill.
+ * Workable's hosted apply page marks its one application form with `data-ui="application-form"`; the class and id
+ * forms cover the recorded fixtures and any page that drops the attribute. There is no bare `form` fallback: a page
+ * with a second form (a newsletter, a hidden duplicate) must fail closed instead of filling the wrong one.
  */
-export const WORKABLE_FORM_SELECTOR = "form.application-form, form#application-form, form";
+export const WORKABLE_FORM_SELECTOR =
+  "form[data-ui='application-form'], form.application-form, form#application-form";
 
 const FIELD_TYPES = new Map<string, QuestionFieldType>([
   ["email", "email"],
@@ -83,205 +83,213 @@ const answered = (field: SendPlanField) =>
  * @returns The controls, with their labels, kinds, options and required flags.
  */
 export async function readWorkableQuestions(page: Page) {
-  return page.evaluate<FormQuestion[], readonly [string, QuestionFieldType][]>((fieldTypes) => {
-    const types = new Map(fieldTypes);
+  return page.evaluate<
+    FormQuestion[],
+    { fieldTypes: readonly [string, QuestionFieldType][]; selector: string }
+  >(
+    (input) => {
+      const types = new Map(input.fieldTypes);
+      const roots = [...document.querySelectorAll(input.selector)];
 
-    const root =
-      document.querySelector("form.application-form") ??
-      document.querySelector("form#application-form") ??
-      document.querySelector("form");
-
-    if (root === null) {
-      return [];
-    }
-
-    const labelFor = (element: Element) => {
-      const ariaLabel = element.getAttribute("aria-label");
-
-      if (ariaLabel !== null && ariaLabel.trim() !== "") {
-        return ariaLabel
-          .replaceAll(/[*✱]/gu, "")
-          .replaceAll(/\s+/gu, " ")
-          .trim();
+      if (roots.length !== 1) {
+        return [];
       }
 
-      const id = element.getAttribute("id");
+      const [root] = roots;
 
-      if (id !== null && id !== "") {
-        const label = root.querySelector(`label[for="${CSS.escape(id)}"]`);
+      if (root === undefined) {
+        return [];
+      }
 
-        if (label !== null) {
-          return label.textContent
+      const labelFor = (element: Element) => {
+        const ariaLabel = element.getAttribute("aria-label");
+
+        if (ariaLabel !== null && ariaLabel.trim() !== "") {
+          return ariaLabel
             .replaceAll(/[*✱]/gu, "")
             .replaceAll(/\s+/gu, " ")
             .trim();
         }
-      }
 
-      const legend = element.closest("fieldset")?.querySelector("legend");
+        const id = element.getAttribute("id");
 
-      if (legend !== null && legend !== undefined) {
-        return legend.textContent
-          .replaceAll(/[*✱]/gu, "")
-          .replaceAll(/\s+/gu, " ")
-          .trim();
-      }
+        if (id !== null && id !== "") {
+          const label = root.querySelector(`label[for="${CSS.escape(id)}"]`);
 
-      const field = element.closest("[class*='form-field'], [class*='field']");
+          if (label !== null) {
+            return label.textContent
+              .replaceAll(/[*✱]/gu, "")
+              .replaceAll(/\s+/gu, " ")
+              .trim();
+          }
+        }
 
-      const fieldLabel = field?.querySelector("label, legend");
+        const legend = element.closest("fieldset")?.querySelector("legend");
 
-      if (fieldLabel !== null && fieldLabel !== undefined) {
-        return fieldLabel.textContent
-          .replaceAll(/[*✱]/gu, "")
-          .replaceAll(/\s+/gu, " ")
-          .trim();
-      }
-
-      const wrapping = element.closest("label");
-
-      if (wrapping !== null) {
-        return wrapping.textContent
-          .replaceAll(/[*✱]/gu, "")
-          .replaceAll(/\s+/gu, " ")
-          .trim();
-      }
-
-      return "";
-    };
-
-    const optionLabelFor = (element: Element) => {
-      const wrapping = element.closest("label");
-
-      if (wrapping !== null) {
-        return wrapping.textContent
-          .replaceAll(/[*✱]/gu, "")
-          .replaceAll(/\s+/gu, " ")
-          .trim();
-      }
-
-      const id = element.getAttribute("id");
-
-      if (id !== null && id !== "") {
-        const label = root.querySelector(`label[for="${CSS.escape(id)}"]`);
-
-        if (label !== null) {
-          return label.textContent
+        if (legend !== null && legend !== undefined) {
+          return legend.textContent
             .replaceAll(/[*✱]/gu, "")
             .replaceAll(/\s+/gu, " ")
             .trim();
         }
-      }
 
-      return element.getAttribute("value") ?? "";
-    };
+        const field = element.closest("[class*='form-field'], [class*='field']");
 
-    const questions: FormQuestion[] = [];
+        const fieldLabel = field?.querySelector("label, legend");
 
-    const seen = new Set<string>();
+        if (fieldLabel !== null && fieldLabel !== undefined) {
+          return fieldLabel.textContent
+            .replaceAll(/[*✱]/gu, "")
+            .replaceAll(/\s+/gu, " ")
+            .trim();
+        }
 
-    for (const element of root.querySelectorAll("input, select, textarea")) {
-      const fieldName = element.getAttribute("name") ?? element.getAttribute("id") ?? "";
+        const wrapping = element.closest("label");
 
-      if (
-        fieldName === "" ||
-        seen.has(fieldName) ||
-        (element instanceof HTMLInputElement &&
-          ["hidden", "submit", "button", "reset", "image", "file"].includes(element.type))
-      ) {
-        continue;
-      }
+        if (wrapping !== null) {
+          return wrapping.textContent
+            .replaceAll(/[*✱]/gu, "")
+            .replaceAll(/\s+/gu, " ")
+            .trim();
+        }
 
-      seen.add(fieldName);
+        return "";
+      };
 
-      const label = labelFor(element);
+      const optionLabelFor = (element: Element) => {
+        const wrapping = element.closest("label");
 
-      if (label === "") {
-        continue;
-      }
+        if (wrapping !== null) {
+          return wrapping.textContent
+            .replaceAll(/[*✱]/gu, "")
+            .replaceAll(/\s+/gu, " ")
+            .trim();
+        }
 
-      const required =
-        element.hasAttribute("required") || element.getAttribute("aria-required") === "true";
+        const id = element.getAttribute("id");
 
-      if (element instanceof HTMLSelectElement) {
-        questions.push({
-          fieldName,
-          fieldType: "select",
-          label,
-          options: [...element.options].flatMap((option) =>
-            option.value === "" ? [] : [option.textContent.replaceAll(/\s+/gu, " ").trim()],
+        if (id !== null && id !== "") {
+          const label = root.querySelector(`label[for="${CSS.escape(id)}"]`);
+
+          if (label !== null) {
+            return label.textContent
+              .replaceAll(/[*✱]/gu, "")
+              .replaceAll(/\s+/gu, " ")
+              .trim();
+          }
+        }
+
+        return element.getAttribute("value") ?? "";
+      };
+
+      const questions: FormQuestion[] = [];
+
+      const seen = new Set<string>();
+
+      for (const element of root.querySelectorAll("input, select, textarea")) {
+        const fieldName = element.getAttribute("name") ?? element.getAttribute("id") ?? "";
+
+        if (
+          fieldName === "" ||
+          seen.has(fieldName) ||
+          (element instanceof HTMLInputElement &&
+            ["hidden", "submit", "button", "reset", "image", "file"].includes(element.type))
+        ) {
+          continue;
+        }
+
+        seen.add(fieldName);
+
+        const label = labelFor(element);
+
+        if (label === "") {
+          continue;
+        }
+
+        const required =
+          element.hasAttribute("required") || element.getAttribute("aria-required") === "true";
+
+        if (element instanceof HTMLSelectElement) {
+          questions.push({
+            fieldName,
+            fieldType: "select",
+            label,
+            options: [...element.options].flatMap((option) =>
+              option.value === "" ? [] : [option.textContent.replaceAll(/\s+/gu, " ").trim()],
+            ),
+            required,
+          });
+
+          continue;
+        }
+
+        if (element instanceof HTMLTextAreaElement) {
+          questions.push({ fieldName, fieldType: "textarea", label, options: [], required });
+
+          continue;
+        }
+
+        const radios = [
+          ...root.querySelectorAll<HTMLInputElement>(
+            `input[type="radio"][name="${CSS.escape(fieldName)}"]`,
           ),
-          required,
-        });
+        ];
 
-        continue;
+        if (radios.length > 0) {
+          questions.push({
+            fieldName,
+            fieldType: "radio",
+            label,
+            options: radios.map((radio) => optionLabelFor(radio)),
+            required,
+          });
+
+          continue;
+        }
+
+        const boxes = [
+          ...root.querySelectorAll<HTMLInputElement>(
+            `input[type="checkbox"][name="${CSS.escape(fieldName)}"]`,
+          ),
+        ];
+
+        if (boxes.length > 0) {
+          questions.push({
+            fieldName,
+            fieldType: "multiselect",
+            label,
+            options: boxes.map((box) => optionLabelFor(box)),
+            required,
+          });
+
+          continue;
+        }
+
+        if (element instanceof HTMLInputElement) {
+          questions.push({
+            fieldName,
+            fieldType: types.get(element.type) ?? "text",
+            label,
+            options: [],
+            required,
+          });
+        }
       }
 
-      if (element instanceof HTMLTextAreaElement) {
-        questions.push({ fieldName, fieldType: "textarea", label, options: [], required });
-
-        continue;
-      }
-
-      const radios = [
-        ...root.querySelectorAll<HTMLInputElement>(
-          `input[type="radio"][name="${CSS.escape(fieldName)}"]`,
-        ),
-      ];
-
-      if (radios.length > 0) {
-        questions.push({
-          fieldName,
-          fieldType: "radio",
-          label,
-          options: radios.map((radio) => optionLabelFor(radio)),
-          required,
-        });
-
-        continue;
-      }
-
-      const boxes = [
-        ...root.querySelectorAll<HTMLInputElement>(
-          `input[type="checkbox"][name="${CSS.escape(fieldName)}"]`,
-        ),
-      ];
-
-      if (boxes.length > 0) {
-        questions.push({
-          fieldName,
-          fieldType: "multiselect",
-          label,
-          options: boxes.map((box) => optionLabelFor(box)),
-          required,
-        });
-
-        continue;
-      }
-
-      if (element instanceof HTMLInputElement) {
-        questions.push({
-          fieldName,
-          fieldType: types.get(element.type) ?? "text",
-          label,
-          options: [],
-          required,
-        });
-      }
-    }
-
-    return questions;
-  }, WORKABLE_FIELD_TYPE_ENTRIES);
+      return questions;
+    },
+    { fieldTypes: WORKABLE_FIELD_TYPE_ENTRIES, selector: WORKABLE_FORM_SELECTOR },
+  );
 }
 
-async function fillByLabel(page: Page, field: SendPlanField) {
+async function fillByLabel(scope: FormScope, field: SendPlanField) {
   const { answer } = field;
 
   if (answer === null) {
     return false;
   }
 
-  const control = page.getByLabel(field.label, { exact: false }).first();
+  const control = scope.root.getByLabel(field.label, { exact: false }).first();
 
   if ((await control.count()) === 0) {
     return false;
@@ -322,21 +330,21 @@ async function fillByLabel(page: Page, field: SendPlanField) {
   return true;
 }
 
-async function fillPlannedField(page: Page, field: SendPlanField) {
+async function fillPlannedField(scope: FormScope, field: SendPlanField) {
   const { answer, fieldName } = field;
 
   if (answer === null || fieldName === null || fieldName === "") {
     return false;
   }
 
-  if (await fillField(page, fieldName, answer)) {
+  if (await fillField(scope, fieldName, answer)) {
     return true;
   }
 
-  return fillByLabel(page, field);
+  return fillByLabel(scope, field);
 }
 
-async function fillPlannedFields(page: Page, fields: readonly SendPlanField[]) {
+async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanField[]) {
   const fillFrom: (index: number) => Promise<boolean> = async (index) => {
     const field = fields[index];
 
@@ -348,7 +356,7 @@ async function fillPlannedFields(page: Page, fields: readonly SendPlanField[]) {
       return fillFrom(index + 1);
     }
 
-    const filled = await fillPlannedField(page, field);
+    const filled = await fillPlannedField(scope, field);
     const rest = await fillFrom(index + 1);
 
     return (filled || !field.required) && rest;
@@ -357,32 +365,103 @@ async function fillPlannedFields(page: Page, fields: readonly SendPlanField[]) {
   return fillFrom(0);
 }
 
-async function resumeControl(page: Page, fieldName: string | null) {
-  if (fieldName !== null && fieldName !== "") {
-    const named = page
-      .locator(
-        `input[type="file"][name="${cssValue(fieldName)}"], input[type="file"][id="${cssValue(fieldName)}"]`,
-      )
-      .first();
+interface FileInputFact {
+  id: string;
+  index: number;
+  label: string;
+  name: string;
+}
 
-    if ((await named.count()) > 0) {
-      return named;
+const normalisedWords = (raw: string) =>
+  raw
+    .normalize("NFD")
+    .replaceAll(/\p{M}/gu, "")
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/gu, " ")
+    .trim();
+
+const mentionsResume = (fact: FileInputFact) => {
+  const text = normalisedWords(`${fact.name} ${fact.id} ${fact.label}`);
+  const words = text.split(" ");
+
+  return words.includes("resume") || words.includes("cv") || text.includes("curriculum vitae");
+};
+
+async function fileInputFacts(scope: FormScope) {
+  return scope.root.locator("input[type='file']").evaluateAll((elements) =>
+    elements.map((element, index) => {
+      const id = element.getAttribute("id") ?? "";
+      const name = element.getAttribute("name") ?? "";
+
+      const labelledBy = (element.getAttribute("aria-labelledby") ?? "")
+        .split(/\s+/u)
+        .filter((value) => value !== "")
+        .map((value) => document.querySelector(`#${value}`)?.textContent ?? "")
+        .join(" ");
+
+      const wrapping = element.closest("label")?.textContent ?? "";
+
+      const form = element.closest("form") ?? document;
+
+      const forLabel =
+        id === ""
+          ? ""
+          : ([...form.querySelectorAll("label[for]")].find(
+              (label) => label.getAttribute("for") === id,
+            )?.textContent ?? "");
+
+      const block =
+        element.closest("[class*='form-field'], [class*='field']")?.querySelector("label, legend")
+          ?.textContent ?? "";
+
+      const label =
+        [element.getAttribute("aria-label") ?? "", labelledBy, wrapping, forLabel, block]
+          .map((text) => text.replaceAll(/\s+/gu, " ").trim())
+          .find((text) => text !== "") ?? "";
+
+      return { id, index, label, name };
+    }),
+  );
+}
+
+/**
+ * Finds the one resume file input inside the verified form: the plan's file field name first, then a control whose
+ * own name, id or label says resume/CV. No resume-ish control, or more than one, returns `null` so the attempt fails
+ * closed instead of uploading the resume into a cover-letter or portfolio slot.
+ *
+ * @param scope The verified Workable application form.
+ * @param fieldName The file field name from the approved plan, when it has one.
+ * @returns The identified resume input, or `null` when the page is ambiguous.
+ */
+export async function findResumeFileInput(scope: FormScope, fieldName: string | null) {
+  const inputs = scope.root.locator("input[type='file']");
+
+  if ((await inputs.count()) === 0) {
+    return null;
+  }
+
+  const facts = await fileInputFacts(scope);
+
+  if (fieldName !== null && fieldName !== "") {
+    const exact = facts.filter((fact) => fact.name === fieldName || fact.id === fieldName);
+
+    const [only] = exact;
+
+    if (only !== undefined) {
+      return exact.length === 1 ? inputs.nth(only.index) : null;
     }
   }
 
-  const named = page.locator(`input[type="file"][name="${RESUME_FIELD}"]`).first();
+  const labelled = facts.filter((fact) => mentionsResume(fact));
+  const [onlyLabelled] = labelled;
 
-  if ((await named.count()) > 0) {
-    return named;
-  }
-
-  const first = page.locator("input[type='file']").first();
-
-  return (await first.count()) > 0 ? first : null;
+  return labelled.length === 1 && onlyLabelled !== undefined
+    ? inputs.nth(onlyLabelled.index)
+    : null;
 }
 
-async function uploadResume(page: Page, fieldName: string | null, resume: PlannedResume) {
-  const input = await resumeControl(page, fieldName);
+async function uploadResume(scope: FormScope, fieldName: string | null, resume: PlannedResume) {
+  const input = await findResumeFileInput(scope, fieldName);
 
   if (input === null) {
     return { fieldName: null, uploaded: false };
@@ -403,11 +482,8 @@ async function uploadResume(page: Page, fieldName: string | null, resume: Planne
   return { fieldName: liveName, uploaded: true };
 }
 
-export const WORKABLE_SUBMIT_SELECTOR =
-  "form.application-form button[type='submit'], form#application-form button[type='submit'], form button[type='submit'], form.application-form input[type='submit'], form#application-form input[type='submit'], form input[type='submit']";
-
-function submitControl(page: Page) {
-  return page.locator(WORKABLE_SUBMIT_SELECTOR).first();
+function submitControl(scope: FormScope) {
+  return scope.root.locator("button[type='submit'], input[type='submit']").first();
 }
 
 async function listenForSubmit(page: Page, origin: string) {
@@ -438,7 +514,8 @@ export async function workableConfirmationSeen(page: Page) {
         return sources.some((source) => new RegExp(source, "iu").test(text));
       },
       {
-        formSelector: "form.application-form, form#application-form",
+        formSelector:
+          "form[data-ui='application-form'], form.application-form, form#application-form",
         sources: CONFIRMATION_SOURCES,
       },
       { timeout: CONFIRMATION_WAIT_MS },
@@ -482,11 +559,9 @@ export const runWorkableAttempt: (
     };
   }
 
-  const form = page.locator(WORKABLE_FORM_SELECTOR).first();
+  const scope = await openForm(page, WORKABLE_FORM_SELECTOR);
 
-  try {
-    await form.waitFor({ state: "visible", timeout: FORM_APPEAR_MS });
-  } catch {
+  if (scope === null) {
     return {
       confirmationSeen: false,
       outcome: "form_missing",
@@ -495,14 +570,16 @@ export const runWorkableAttempt: (
     };
   }
 
-  const filled = await fillPlannedFields(page, plan.fields);
+  const filled = await fillPlannedFields(scope, plan.fields);
 
-  const resumeField = plan.fields.find((field) => field.fieldType === "file");
+  const resumeField = plan.fields.find(
+    (field) => field.fieldType === "file" && field.file === "resume",
+  );
 
   let liveResumeField = resumeField?.fieldName ?? null;
 
   if (plan.resume !== null) {
-    const uploaded = await uploadResume(page, liveResumeField, plan.resume);
+    const uploaded = await uploadResume(scope, liveResumeField, plan.resume);
 
     if (!uploaded.uploaded) {
       return {
@@ -541,7 +618,7 @@ export const runWorkableAttempt: (
     });
   }
 
-  const verdict = await preflightForm(page, expectations, WORKABLE_FORM_SELECTOR);
+  const verdict = await preflightForm(scope, expectations);
 
   if (verdict.outcome !== "ok" || !filled) {
     const problems =
@@ -570,7 +647,7 @@ export const runWorkableAttempt: (
   hooks.onWillSubmit();
 
   const settled = await Promise.allSettled([
-    submitControl(page).click({ timeout: APPLICATION_RESPONSE_MS }),
+    submitControl(scope).click({ timeout: APPLICATION_RESPONSE_MS }),
     listenForSubmit(page, new URL(plan.identity.url).origin),
   ]);
 

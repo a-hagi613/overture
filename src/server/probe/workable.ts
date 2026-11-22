@@ -3,10 +3,17 @@ import type { Page } from "playwright-core";
 import type { ProbeConsole } from "./console.ts";
 import type { RunFilePosting } from "./run-file.ts";
 
-import { APPLICATION_RESPONSE_MS, FORM_APPEAR_MS, fillField } from "../dispatch/forms/engine.ts";
+import {
+  APPLICATION_RESPONSE_MS,
+  FORM_APPEAR_MS,
+  fillField,
+  openForm,
+  submitButton,
+} from "../dispatch/forms/engine.ts";
+import type { FormScope } from "../dispatch/forms/engine.ts";
 import {
   WORKABLE_FORM_SELECTOR,
-  WORKABLE_SUBMIT_SELECTOR,
+  findResumeFileInput,
   workableConfirmationSeen,
 } from "../dispatch/ats/workable.ts";
 
@@ -33,7 +40,7 @@ const emptyAttempt = (outcome: WorkableAttempt["outcome"], filledIds: string[]) 
     confirmationSeen: false,
   }) satisfies WorkableAttempt;
 
-async function fillApprovedQuestions(page: Page, questions: RunFilePosting["questions"]) {
+async function fillApprovedQuestions(scope: FormScope, questions: RunFilePosting["questions"]) {
   const filledIds: string[] = [];
   const failedIds: string[] = [];
 
@@ -44,7 +51,7 @@ async function fillApprovedQuestions(page: Page, questions: RunFilePosting["ques
       return;
     }
 
-    const filled = await fillField(page, question.id, question.value);
+    const filled = await fillField(scope, question.id, question.value);
 
     (filled ? filledIds : failedIds).push(question.id);
 
@@ -54,20 +61,6 @@ async function fillApprovedQuestions(page: Page, questions: RunFilePosting["ques
   await fillFrom(0);
 
   return { failedIds, filledIds };
-}
-
-async function resumeInput(page: Page, fieldId: string) {
-  const named = page
-    .locator(`input[type="file"][name="${fieldId}"], input[type="file"][id="${fieldId}"]`)
-    .first();
-
-  if ((await named.count()) > 0) {
-    return named;
-  }
-
-  const first = page.locator("input[type='file']").first();
-
-  return (await first.count()) > 0 ? first : null;
 }
 
 export async function probeWorkable(
@@ -80,23 +73,20 @@ export async function probeWorkable(
 ) {
   await page.goto(applicationUrl, { waitUntil: "domcontentloaded" });
 
-  try {
-    await page
-      .locator(WORKABLE_FORM_SELECTOR)
-      .first()
-      .waitFor({ state: "visible", timeout: FORM_APPEAR_MS });
-  } catch {
+  const scope = await openForm(page, WORKABLE_FORM_SELECTOR, FORM_APPEAR_MS);
+
+  if (scope === null) {
     return emptyAttempt("form_missing", []);
   }
 
-  const { failedIds, filledIds } = await fillApprovedQuestions(page, posting.questions);
+  const { failedIds, filledIds } = await fillApprovedQuestions(scope, posting.questions);
 
   if (failedIds.length > 0) {
     return { ...emptyAttempt("fill_failed", filledIds), failedIds };
   }
 
   const { resumeFieldId } = posting;
-  const input = await resumeInput(page, resumeFieldId);
+  const input = await findResumeFileInput(scope, resumeFieldId);
 
   if (input === null) {
     throw new Error(messages.uploadRefused(resumeFieldId));
@@ -121,7 +111,7 @@ export async function probeWorkable(
   const { origin } = new URL(applicationUrl);
 
   const settled = await Promise.allSettled([
-    page.locator(WORKABLE_SUBMIT_SELECTOR).first().click({ timeout: APPLICATION_RESPONSE_MS }),
+    submitButton(scope).click({ timeout: APPLICATION_RESPONSE_MS }),
     page.waitForResponse(
       (candidate) => {
         if (candidate.request().method() !== "POST") {
