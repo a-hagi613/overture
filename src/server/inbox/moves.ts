@@ -8,6 +8,7 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { SpendGate } from "../billing/spend.ts";
 
 import { isAtsMailDomain } from "../../shared/ats-mail-domains.ts";
+import { isSameHostOrSubdomain } from "../../shared/host-match.ts";
 import { applications, applicationEvents, mailThreads, messages } from "../platform/db/schema.ts";
 import {
   notifyCardMoved,
@@ -48,13 +49,6 @@ const FORWARD_TARGETS: ForwardTargets = {
 };
 
 const classifyPayloadSchema = z.object({ messageId: z.string().min(1) });
-
-function sameDomain(sender: string, wanted: string) {
-  const host = wanted.trim().toLowerCase().replace(/\.$/u, "");
-  const from = sender.trim().toLowerCase().replace(/\.$/u, "");
-
-  return host !== "" && (from === host || from.endsWith(`.${host}`));
-}
 
 function isForwardMove(from: string, to: string) {
   const fromRank = STAGE_RANK.get(from);
@@ -129,7 +123,8 @@ export function createMailMoves(deps: {
     for (const row of rows) {
       const domainAccepted =
         isAtsMailDomain(input.senderDomain) ||
-        (row.companyDomain !== null && sameDomain(input.senderDomain, row.companyDomain));
+        (row.companyDomain !== null &&
+          isSameHostOrSubdomain(input.senderDomain, row.companyDomain));
 
       if (!domainAccepted) {
         continue;

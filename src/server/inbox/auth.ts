@@ -3,15 +3,10 @@ import { Buffer } from "node:buffer";
 import { authenticate } from "mailauth";
 import type { DNSResolver } from "mailauth";
 
-function alignedDomains(left: string, right: string) {
-  const leftHost = left.trim().toLowerCase().replace(/\.$/u, "");
-  const rightHost = right.trim().toLowerCase().replace(/\.$/u, "");
+import { isSameHostOrSubdomain } from "../../shared/host-match.ts";
 
-  return (
-    leftHost === rightHost ||
-    leftHost.endsWith(`.${rightHost}`) ||
-    rightHost.endsWith(`.${leftHost}`)
-  );
+function alignedDomains(left: string, right: string) {
+  return isSameHostOrSubdomain(left, right) || isSameHostOrSubdomain(right, left);
 }
 
 export async function inboundAuth(

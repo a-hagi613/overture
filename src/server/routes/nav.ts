@@ -3,6 +3,8 @@ import { and, eq, isNull, or, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Auth } from "../auth/index.ts";
+
+import { readSessionUser } from "../auth/session.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
 
 import { applications, messages } from "../platform/db/schema.ts";
@@ -15,11 +17,7 @@ export function createNavRoutes(deps: { auth: Auth; db: AppDatabase; reviews: Re
   routes.get("/nav", async (context) => {
     context.header("Cache-Control", "no-store");
 
-    const session = await auth.api
-      .getSession({ headers: context.req.raw.headers })
-      .catch(() => null);
-
-    const user = session?.user ?? null;
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: "sign_in_required" }, 401);

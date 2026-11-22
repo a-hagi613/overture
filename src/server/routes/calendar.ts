@@ -5,6 +5,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 
+import { readSession } from "../auth/session.ts";
 import { calendarItemsOf } from "../calendar/items.ts";
 import { localDateAt } from "../platform/local-time.ts";
 import { createTimeZoneService } from "../profile/time-zone.ts";
@@ -52,9 +53,7 @@ export function createCalendarRoutes(deps: { auth: Auth; clock: Clock; db: AppDa
   const zones = createTimeZoneService({ db, clock: deps.clock });
 
   routes.get("/calendar", async (context) => {
-    const session = await auth.api
-      .getSession({ headers: context.req.raw.headers })
-      .catch(() => null);
+    const session = await readSession(auth, context.req.raw.headers);
 
     if (session === null) {
       return context.json({ error: "sign_in_required" }, 401);

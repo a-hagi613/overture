@@ -33,12 +33,6 @@ export function enqueueSweep(deps: CatalogDeps, runAt: number) {
   });
 }
 
-export function enqueueBackfill(deps: CatalogDeps) {
-  return enqueueJob(deps.db, deps.clock, BACKFILL_JOB_KIND, "{}", {
-    dedupeKey: BACKFILL_DEDUPE_KEY,
-  });
-}
-
 export function ensureBackfillQueued(db: AppDatabase, clock: Clock) {
   const active = db
     .select({ id: bgJobs.id })

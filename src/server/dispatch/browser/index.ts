@@ -1,7 +1,7 @@
 import type { AppDatabase } from "../../platform/db/client.ts";
 import type { Clock } from "../../platform/ports/clock.ts";
 import type { Env } from "../../config/env.ts";
-import type { BrowserProvider, BrowserProviderRegistry } from "./provider.ts";
+import type { BrowserProvider } from "./provider.ts";
 
 import { getSetting } from "../../platform/settings/index.ts";
 import { raiseAlert } from "../../platform/alerts.ts";
@@ -94,5 +94,3 @@ export function createBrowserProvider(env: Env, clock: Clock, db: AppDatabase) {
     pick,
   };
 }
-
-export type BrowserProviders = BrowserProviderRegistry;

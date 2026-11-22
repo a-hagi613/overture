@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
+import { readSessionUser } from "../auth/session.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
 
@@ -100,12 +101,6 @@ export function createReadyRoutes(deps: {
 }) {
   const { auth, clock, db, personal, preparation } = deps;
   const routes = new Hono();
-
-  async function sessionUser(headers: Headers) {
-    const result = await auth.api.getSession({ headers }).catch(() => null);
-
-    return result?.user ?? null;
-  }
 
   async function resumeView(userId: string, resumeId: string | null) {
     if (resumeId === null) {
@@ -202,7 +197,7 @@ export function createReadyRoutes(deps: {
   }
 
   routes.get("/ready", async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: "sign_in_required" }, 401);
@@ -373,7 +368,7 @@ export function createReadyRoutes(deps: {
   }
 
   routes.post("/applications/:id/approve", validJson(approveBody), async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: "sign_in_required" }, 401);
@@ -405,7 +400,7 @@ export function createReadyRoutes(deps: {
   });
 
   routes.post("/ready/approve", validJson(approveAllBody), async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: "sign_in_required" }, 401);
@@ -450,7 +445,7 @@ export function createReadyRoutes(deps: {
   });
 
   routes.post("/applications/:id/unapprove", async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: "sign_in_required" }, 401);
@@ -528,7 +523,7 @@ export function createReadyRoutes(deps: {
   });
 
   routes.put("/applications/:id/answers/:questionId", validJson(answerBody), async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: "sign_in_required" }, 401);

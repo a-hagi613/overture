@@ -10,6 +10,7 @@ import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { InviteRow } from "../auth/invites.ts";
+import { readSession } from "../auth/session.ts";
 import { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
 import type { AdminEnv } from "./admin-refusals.ts";
 import { createAdminRevealRoutes } from "./admin-reveal.ts";
@@ -221,7 +222,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
         return context.json({ error: ADMIN_REFUSAL_CODES.accessRequired }, 401);
       }
 
-      const session = await auth.api.getSession({ headers: context.req.raw.headers });
+      const session = await readSession(auth, context.req.raw.headers);
 
       if (session === null) {
         return context.json({ error: ADMIN_REFUSAL_CODES.signInRequired }, 401);

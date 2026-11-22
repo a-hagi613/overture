@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
+import { readSession } from "../auth/session.ts";
 
 import { CHECKIN_ANSWERS } from "../../shared/checkins.ts";
 import { answerCheckin } from "../pipeline/checkins.ts";
@@ -17,9 +18,7 @@ export function createCheckinRoutes(deps: { db: AppDatabase; clock: Clock; auth:
   const routes = new Hono();
 
   routes.post("/checkins/:id", validJson(answerBody), async (context) => {
-    const session = await auth.api
-      .getSession({ headers: context.req.raw.headers })
-      .catch(() => null);
+    const session = await readSession(auth, context.req.raw.headers);
 
     if (session === null) {
       return context.json({ error: "sign_in_required" }, 401);

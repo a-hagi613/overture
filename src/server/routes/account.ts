@@ -8,6 +8,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Auth } from "../auth/index.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
+import { readSession, readSessionUser } from "../auth/session.ts";
 import { copy } from "../../shared/copy.ts";
 import { env } from "../config/env.ts";
 import { rateLimits, sessions } from "../platform/db/schema.ts";
@@ -33,16 +34,6 @@ export function createAccountRoutes(deps: {
   const { db, clock, auth, eraser, exports } = deps;
 
   const routes = new Hono();
-
-  async function sessionOf(raw: Request) {
-    return auth.api.getSession({ headers: raw.headers }).catch(() => null);
-  }
-
-  async function sessionUser(raw: Request) {
-    const result = await sessionOf(raw);
-
-    return result?.user ?? null;
-  }
 
   function sessionReauthenticated(sessionId: string, now: number) {
     const row = db
@@ -89,7 +80,7 @@ export function createAccountRoutes(deps: {
   }
 
   routes.get("/account/deletion", async (context) => {
-    const result = await sessionOf(context.req.raw);
+    const result = await readSession(auth, context.req.raw.headers);
 
     if (result === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -104,7 +95,7 @@ export function createAccountRoutes(deps: {
   });
 
   routes.post("/account/reauth/link", async (context) => {
-    const result = await sessionOf(context.req.raw);
+    const result = await readSession(auth, context.req.raw.headers);
 
     if (result === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -130,7 +121,7 @@ export function createAccountRoutes(deps: {
   });
 
   routes.post("/account/delete", async (context) => {
-    const result = await sessionOf(context.req.raw);
+    const result = await readSession(auth, context.req.raw.headers);
 
     if (result === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -162,7 +153,7 @@ export function createAccountRoutes(deps: {
   });
 
   routes.get("/account/export", async (context) => {
-    const user = await sessionUser(context.req.raw);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -172,7 +163,7 @@ export function createAccountRoutes(deps: {
   });
 
   routes.post("/account/export", async (context) => {
-    const user = await sessionUser(context.req.raw);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -186,7 +177,7 @@ export function createAccountRoutes(deps: {
   });
 
   routes.get("/account/export/:id/download", async (context) => {
-    const user = await sessionUser(context.req.raw);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);

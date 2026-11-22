@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
+import { readSessionUser } from "../auth/session.ts";
 import type { MatchingService } from "../matching/score.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
@@ -269,12 +270,6 @@ export function createHomeRoutes(deps: {
   const routes = new Hono();
   const zones = createTimeZoneService({ db, clock });
 
-  async function sessionUser(headers: Headers) {
-    const result = await auth.api.getSession({ headers }).catch(() => null);
-
-    return result?.user ?? null;
-  }
-
   function profileOf(userId: string) {
     const row = db
       .select({ pauseReason: profiles.pauseReason, running: profiles.running })
@@ -495,7 +490,7 @@ export function createHomeRoutes(deps: {
   }
 
   routes.get("/home", async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: "sign_in_required" }, 401);
@@ -680,7 +675,7 @@ export function createHomeRoutes(deps: {
   });
 
   routes.post("/running", validJson(runningBody), async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: "sign_in_required" }, 401);

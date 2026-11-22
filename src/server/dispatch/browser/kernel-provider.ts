@@ -4,8 +4,6 @@ import type { BrowserProvider, OpenBrowserInput } from "./provider.ts";
 
 import type { KernelClient } from "./kernel.ts";
 
-export const KERNEL_METADATA_PURPOSE = "application";
-
 const toMicros = (raw: string | undefined) => {
   const parsed = Number(raw ?? 0);
 

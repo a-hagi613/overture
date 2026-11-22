@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
+import { readSessionUser } from "../auth/session.ts";
 import type { MatchingService } from "../matching/score.ts";
 
 import { postingUserState } from "../platform/db/schema.ts";
@@ -27,7 +28,7 @@ export function createMatchingRoutes(deps: {
   const routes = new Hono();
 
   routes.get("/postings/:id", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -76,7 +77,7 @@ export function createMatchingRoutes(deps: {
   });
 
   routes.post("/postings/:id/apply", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -103,7 +104,7 @@ export function createMatchingRoutes(deps: {
   });
 
   routes.put("/postings/:id/state", validJson(stateBody), async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -142,10 +143,4 @@ export function createMatchingRoutes(deps: {
   });
 
   return routes;
-}
-
-async function sessionUser(auth: Auth, raw: Request) {
-  const result = await auth.api.getSession({ headers: raw.headers }).catch(() => null);
-
-  return result?.user ?? null;
 }

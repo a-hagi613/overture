@@ -4,6 +4,7 @@ import { validJson } from "./validators.ts";
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
+import { readSessionUser } from "../auth/session.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
@@ -145,7 +146,7 @@ export function createOnboardingRoutes(deps: {
   const routes = new Hono();
 
   routes.get("/onboarding", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -155,7 +156,7 @@ export function createOnboardingRoutes(deps: {
   });
 
   routes.post("/onboarding/start", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -185,7 +186,7 @@ export function createOnboardingRoutes(deps: {
   });
 
   routes.post("/onboarding/:step", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -211,7 +212,7 @@ export function createOnboardingRoutes(deps: {
   });
 
   routes.get("/onboarding/targets", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -221,7 +222,7 @@ export function createOnboardingRoutes(deps: {
   });
 
   routes.put("/onboarding/targets", validJson(targetsInputSchema), async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -233,7 +234,7 @@ export function createOnboardingRoutes(deps: {
   });
 
   routes.put("/onboarding/timezone", validJson(onboardingTimezoneInputSchema), async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -250,7 +251,7 @@ export function createOnboardingRoutes(deps: {
   });
 
   routes.get("/onboarding/facts", async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -260,7 +261,7 @@ export function createOnboardingRoutes(deps: {
   });
 
   routes.put("/onboarding/facts", validJson(onboardingFactsInputSchema), async (context) => {
-    const account = await sessionUser(auth, context.req.raw);
+    const account = await readSessionUser(auth, context.req.raw.headers);
 
     if (account === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
@@ -276,10 +277,4 @@ export function createOnboardingRoutes(deps: {
   });
 
   return routes;
-}
-
-async function sessionUser(auth: Auth, raw: Request) {
-  const result = await auth.api.getSession({ headers: raw.headers }).catch(() => null);
-
-  return result?.user ?? null;
 }

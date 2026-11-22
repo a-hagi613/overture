@@ -17,7 +17,6 @@ import type { PostingTags, Seniority } from "../../shared/tag-taxonomy.ts";
 
 export const WORKABLE_TARGETS_KEY = "workable-targets.json";
 export const WORKABLE_MANIFEST_KEY = "workable/manifest.json";
-export const WORKABLE_SNAPSHOT_PREFIX = "workable/";
 
 export const workableTargetsSchema = z.object({
   version: z.literal(1),

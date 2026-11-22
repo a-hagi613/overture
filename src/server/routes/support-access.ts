@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 
 import type { Auth } from "../auth/index.ts";
+
+import { readSession } from "../auth/session.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 
 import { listAdminAuditForUser } from "../platform/audit/index.ts";
@@ -15,9 +17,7 @@ export function createSupportAccessRoutes(db: AppDatabase, auth: Auth) {
   routes.get("/support-access", async (context) => {
     context.header("Cache-Control", "private, no-store");
 
-    const session = await auth.api
-      .getSession({ headers: context.req.raw.headers })
-      .catch(() => null);
+    const session = await readSession(auth, context.req.raw.headers);
 
     if (session === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);

@@ -4,6 +4,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 
+import { readSessionUser } from "../auth/session.ts";
 import { calendarItemsOf } from "../calendar/items.ts";
 import type { CalendarItemView } from "../calendar/items.ts";
 import { renderIcsCalendar } from "../calendar/ics.ts";
@@ -66,9 +67,9 @@ export function createCalendarFeedRoutes(deps: { auth: Auth; clock: Clock; db: A
   const zones = createTimeZoneService({ db, clock });
 
   async function signedInUserId(headers: Headers) {
-    const session = await auth.api.getSession({ headers }).catch(() => null);
+    const user = await readSessionUser(auth, headers);
 
-    return session?.user.id ?? null;
+    return user?.id ?? null;
   }
 
   routes.get("/api/calendar/feed", async (context) => {

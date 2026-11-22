@@ -2,6 +2,7 @@ import { validJson } from "./validators.ts";
 import { Hono } from "hono";
 
 import type { Auth } from "../auth/index.ts";
+import { readSessionUser } from "../auth/session.ts";
 import type { ConsentService } from "../profile/consent.ts";
 
 import { consentAcceptInputSchema } from "../../shared/consent.ts";
@@ -18,14 +19,8 @@ export function createConsentRoutes(deps: { auth: Auth; consent: ConsentService 
   const { auth, consent } = deps;
   const routes = new Hono();
 
-  async function sessionUser(headers: Headers) {
-    const result = await auth.api.getSession({ headers }).catch(() => null);
-
-    return result?.user ?? null;
-  }
-
   routes.get("/consent", async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       const current = consent.current();
@@ -49,7 +44,7 @@ export function createConsentRoutes(deps: { auth: Auth; consent: ConsentService 
   });
 
   routes.get("/consent/versions", async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: "sign_in_required" }, 401);
@@ -59,7 +54,7 @@ export function createConsentRoutes(deps: { auth: Auth; consent: ConsentService 
   });
 
   routes.post("/consent/accept", validJson(consentAcceptInputSchema), async (context) => {
-    const user = await sessionUser(context.req.raw.headers);
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: "sign_in_required" }, 401);

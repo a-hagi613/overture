@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
+import type { AdminAuditEntry, AdminAuditRow } from "./types.ts";
 
 import { SpanStatusCode } from "@opentelemetry/api";
 
@@ -17,23 +18,7 @@ const auditDetailSchema = z.record(
   z.union([z.string(), z.number(), z.boolean(), z.null()]),
 );
 
-export interface AdminAuditEntry {
-  actorId: string;
-  action: string;
-  targetUserId?: string;
-  reason?: string;
-  detail?: Record<string, string | number | boolean | null>;
-}
-
-export interface AdminAuditRow {
-  id: string;
-  at: Date;
-  actorId: string;
-  action: string;
-  targetUserId: string | null;
-  reason: string;
-  detail: Record<string, string | number | boolean | null>;
-}
+export type { AdminAuditEntry, AdminAuditRow } from "./types.ts";
 
 export function auditRowOfStored(row: typeof adminAudit.$inferSelect) {
   const parsed = auditDetailSchema.safeParse(JSON.parse(row.detail));

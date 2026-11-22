@@ -54,10 +54,6 @@ function profile(language: string) {
   return grams;
 }
 
-export function knownLanguages() {
-  return [...functionWords.keys()];
-}
-
 export function detectLanguage(text: string) {
   const trimmed = text.trim();
 

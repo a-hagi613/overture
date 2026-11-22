@@ -1,6 +1,6 @@
 import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
-import type { AdminAuditEntry, AdminAuditRow } from "./index.ts";
+import type { AdminAuditEntry, AdminAuditRow } from "./types.ts";
 
 import { adminAudit } from "../db/schema.ts";
 

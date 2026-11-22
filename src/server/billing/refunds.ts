@@ -7,7 +7,7 @@ import type { Payments } from "../platform/ports/payments.ts";
 
 import { adminAudit, grants } from "../platform/db/schema.ts";
 import { NoRefundablePaymentError } from "../platform/ports/payments.ts";
-import type { AdminAuditRow } from "../platform/audit/index.ts";
+import type { AdminAuditRow } from "../platform/audit/types.ts";
 import { insertAdminAudit } from "../platform/audit/insert.ts";
 import { refundGrantApplications } from "./ledger.ts";
 

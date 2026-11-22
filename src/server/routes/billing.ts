@@ -7,6 +7,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PaymentEvent, Payments } from "../platform/ports/payments.ts";
 
+import { readSessionUser } from "../auth/session.ts";
 import {
   cardFingerprintHmac,
   claimTrialCard,
@@ -57,12 +58,6 @@ async function readBodyCapped(request: Request, limit: number) {
   return new TextDecoder().decode(body);
 }
 
-async function sessionUser(auth: Auth, raw: Request) {
-  const result = await auth.api.getSession({ headers: raw.headers }).catch(() => null);
-
-  return result?.user ?? null;
-}
-
 const verifyTrialBodySchema = z.object({ sessionId: z.string().min(1).max(255) });
 
 export function createBillingRoutes(deps: {
@@ -81,7 +76,7 @@ export function createBillingRoutes(deps: {
   const plansUrl = `${billingUrl}/plans`;
 
   async function accountOrRefusal(raw: Request) {
-    const account = await sessionUser(auth, raw);
+    const account = await readSessionUser(auth, raw.headers);
 
     if (account === null) {
       return { refusal: Response.json({ error: API_ERRORS.signInRequired }, { status: 401 }) };
