@@ -27,11 +27,15 @@ const answerFor = (name: string) => {
     return "maya.okafor@example.invalid";
   }
 
-  if (name.includes("first_name")) {
+  if (name.includes("first_name") || name === "firstname") {
     return "Maya";
   }
 
-  return name.includes("last_name") ? "Okafor" : "Maya Okafor";
+  if (name.includes("last_name") || name === "lastname") {
+    return "Okafor";
+  }
+
+  return "Maya Okafor";
 };
 
 export interface LabRunInput {

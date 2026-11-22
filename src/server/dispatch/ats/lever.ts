@@ -11,6 +11,7 @@ import {
   readConfirmation,
   submitPathnameOf,
   uploadFile,
+  waitForStableForm,
   watchApplicationResponse,
 } from "../forms/engine.ts";
 import type { FormScope, LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
@@ -19,8 +20,15 @@ import { checkPostingIdentity } from "../posting-identity.ts";
 import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identity.ts";
 import type { PlannedResume } from "./shared.ts";
 
+import { normText } from "./shared.ts";
+
 const RESUME_FIELD = "resume";
 const RESUME_READ_MS = 15_000;
+const LOCATION_FIELD = "location";
+const SELECTED_LOCATION_FIELD = "selectedLocation";
+
+const LEVER_UPLOAD_NOISE =
+  ".resume-upload-working, .resume-upload-success, .resume-upload-failure, .resume-upload-oversize, .filename, .default-label, [class*='upload-label'], [class*='upload-status']";
 
 export interface LeverRunPlan {
   identity: PostingIdentity;
@@ -78,9 +86,30 @@ export const LEVER_FIELD_TYPES = new Map<string, QuestionFieldType>([
 
 export async function readLeverQuestions(page: Page) {
   return page.evaluate(
-    (input: { skip: string[]; fieldTypes: [string, QuestionFieldType][] }) => {
+    (input: { skip: string[]; fieldTypes: [string, QuestionFieldType][]; uploadNoise: string }) => {
       const form = document.querySelector("form#application-form");
       const fieldTypes = new Map(input.fieldTypes);
+
+      const labelText = (element: Element | null | undefined) => {
+        if (element === null || element === undefined) {
+          return "";
+        }
+
+        const clone = element.cloneNode(true);
+
+        if (!(clone instanceof Element)) {
+          return "";
+        }
+
+        for (const noise of clone.querySelectorAll(input.uploadNoise)) {
+          noise.remove();
+        }
+
+        return clone.textContent
+          .replaceAll(/[✱*]/gu, "")
+          .replaceAll(/\s+/gu, " ")
+          .trim();
+      };
 
       if (form === null) {
         return [];
@@ -124,14 +153,7 @@ export async function readLeverQuestions(page: Page) {
         const box = first.closest(".application-question");
         const labelElement = box?.querySelector(".application-label");
 
-        const innerLabel = (
-          labelElement?.querySelector(".text")?.textContent ??
-          labelElement?.textContent ??
-          ""
-        )
-          .replaceAll(/[✱*]/gu, "")
-          .replaceAll(/\s+/gu, " ")
-          .trim();
+        const innerLabel = labelText(labelElement?.querySelector(".text") ?? labelElement);
 
         const heading = box
           ?.closest(".section")
@@ -205,8 +227,42 @@ export async function readLeverQuestions(page: Page) {
 
       return questions;
     },
-    { fieldTypes: [...LEVER_FIELD_TYPES], skip: LEVER_SKIP_NAMES },
+    { fieldTypes: [...LEVER_FIELD_TYPES], skip: LEVER_SKIP_NAMES, uploadNoise: LEVER_UPLOAD_NOISE },
   );
+}
+
+async function verifyLocationCommitted(scope: FormScope, answer: string) {
+  return scope.root.evaluate(
+    (root, { backingName, fieldName, wanted }) => {
+      const backing = root.querySelector<HTMLInputElement>(
+        `input[name="${CSS.escape(backingName)}"]`,
+      );
+
+      if (backing === null) {
+        return true;
+      }
+
+      const input = root.querySelector<HTMLInputElement>(`input[name="${CSS.escape(fieldName)}"]`);
+
+      const shown = (input?.value ?? "").replaceAll(/\s+/gu, " ").trim().toLowerCase();
+      const target = wanted.replaceAll(/\s+/gu, " ").trim().toLowerCase();
+      const city = (target.split(",")[0] ?? "").trim();
+
+      const readable = shown !== "" && (shown === target || (city !== "" && shown.includes(city)));
+
+      return readable && backing.value.trim() !== "";
+    },
+    { backingName: SELECTED_LOCATION_FIELD, fieldName: LOCATION_FIELD, wanted: answer },
+  );
+}
+
+async function committedLocation(scope: FormScope) {
+  return scope.root.evaluate((root) => {
+    const input = root.querySelector<HTMLInputElement>(`input[name="location"]`);
+    const value = (input?.value ?? "").replaceAll(/\s+/gu, " ").trim();
+
+    return value === "" ? null : value;
+  });
 }
 
 async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanField[]) {
@@ -225,7 +281,16 @@ async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanFiel
       return fillFrom(index + 1);
     }
 
-    await fillField(scope, field.fieldName, field.answer);
+    if (!(await fillField(scope, field.fieldName, field.answer))) {
+      return false;
+    }
+
+    if (
+      normText(field.fieldName) === LOCATION_FIELD &&
+      !(await verifyLocationCommitted(scope, field.answer))
+    ) {
+      return false;
+    }
 
     return fillFrom(index + 1);
   };
@@ -314,10 +379,20 @@ export const runLeverAttempt: (
     }
 
     await waitForResumeRead(page);
+    await waitForStableForm(scope);
   }
 
+  const location = plan.fields.some(
+    (field) => field.answer !== null && normText(field.fieldName) === LOCATION_FIELD,
+  )
+    ? await committedLocation(scope)
+    : null;
+
   const expectations: LiveFormExpectation[] = plan.fields.map((field) => ({
-    answer: field.answer,
+    answer:
+      location !== null && field.answer !== null && normText(field.fieldName) === LOCATION_FIELD
+        ? location
+        : field.answer,
     fieldName: field.fieldName,
     fieldType: field.fieldType,
     file: null,

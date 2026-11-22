@@ -133,6 +133,17 @@ test("the lab pages serve challenge pages and recorded forms with no vendor host
   expect(form).toContain('name="resume"');
   expect(form).not.toContain("http");
 
+  const workable = await (await fetch(`${labAppUrl}/lab/forms/workable`)).text();
+
+  expect(workable).toContain('data-ui="application-form"');
+  expect(workable).toContain('name="firstname"');
+  expect(workable).toContain('name="resume"');
+
+  const personio = await (await fetch(`${labAppUrl}/lab/forms/personio`)).text();
+
+  expect(personio).toContain('name="first_name"');
+  expect(personio).toContain('name="documents.cv"');
+
   const score = await fetch(`${labAppUrl}/lab/recaptcha/score`, {
     body: JSON.stringify({ token: "lab-recaptcha-token" }),
     headers: { "content-type": "application/json" },
@@ -211,6 +222,8 @@ test("a lab run records a session per browser and lab page, and the provider rep
         "form:greenhouse",
         "form:lever",
         "form:ashby",
+        "form:workable",
+        "form:personio",
       ],
       providers: ["browser_use", "kernel"],
       sessionsPerPage: 1,
@@ -236,7 +249,7 @@ test("a lab run records a session per browser and lab page, and the provider rep
 
   await expect
     .poll(async () => (await reportOf(page, labAppUrl)).lab.length, { timeout: 180_000 })
-    .toBe(12);
+    .toBe(16);
 
   const submitCheck = await fetch(`${labAppServer.url}/lab/forms/greenhouse/submit`, {
     body: "first_name=Maya",
@@ -270,7 +283,7 @@ test("a lab run records a session per browser and lab page, and the provider rep
       expect(row?.challengeRate).toBe(1);
     }
 
-    for (const ats of ["greenhouse", "lever", "ashby"]) {
+    for (const ats of ["greenhouse", "lever", "ashby", "workable", "personio"]) {
       const row = report.lab.find(
         (candidate) => candidate.provider === provider && candidate.page === `form:${ats}`,
       );

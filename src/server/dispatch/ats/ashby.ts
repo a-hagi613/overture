@@ -11,7 +11,7 @@ import {
   CONFIRMATION_WAIT_MS,
   openForm,
   preflightForm,
-  uploadFile,
+  waitForStableForm,
 } from "../forms/engine.ts";
 import type { FormScope, LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
 import { checkPostingIdentity } from "../posting-identity.ts";
@@ -346,12 +346,69 @@ async function pressYesNoOption(scope: FormScope, fieldName: string, value: stri
   return (await option.getAttribute("aria-pressed")) === "true";
 }
 
+async function fillCheckboxGroup(scope: FormScope, fieldName: string, value: string) {
+  const boxes = scope.root.locator(`input[type='checkbox'][name="${cssValue(fieldName)}"]`);
+  const count = await boxes.count();
+
+  if (count === 0) {
+    return false;
+  }
+
+  const labels = await boxes.evaluateAll((elements) =>
+    elements.map((element) => {
+      const id = element.getAttribute("id") ?? "";
+
+      const label =
+        id === ""
+          ? ""
+          : (document.querySelector(`label[for="${CSS.escape(id)}"]`)?.textContent ?? "");
+
+      return label.replaceAll(/\s+/gu, " ").trim() || (element.getAttribute("value") ?? "");
+    }),
+  );
+
+  const wanted = new Set(
+    value
+      .split(", ")
+      .map((part) => normText(part))
+      .filter((part) => part !== ""),
+  );
+
+  const matched = new Set<number>();
+
+  for (const [index, label] of labels.entries()) {
+    if (wanted.has(normText(label))) {
+      matched.add(index);
+    }
+  }
+
+  if (matched.size !== wanted.size) {
+    return false;
+  }
+
+  const setFrom: (index: number) => Promise<boolean> = async (index) => {
+    if (index >= count) {
+      return true;
+    }
+
+    await boxes.nth(index).setChecked(matched.has(index));
+
+    return setFrom(index + 1);
+  };
+
+  return setFrom(0);
+}
+
 async function fillAshbyField(scope: FormScope, field: SendPlanField, value: string) {
   if (field.fieldType === "radio") {
     return (
       (await pressYesNoOption(scope, field.fieldName ?? "", value)) ||
       fillRadio(scope, field.fieldName ?? "", value)
     );
+  }
+
+  if (field.fieldType === "multiselect" || field.fieldType === "checkbox") {
+    return fillCheckboxGroup(scope, field.fieldName ?? "", value);
   }
 
   if (field.fieldType === "select") {
@@ -439,6 +496,96 @@ async function waitForAshbyState(page: Page) {
   return parsed.success ? parsed.data : null;
 }
 
+interface AshbyFileInput {
+  autofill: boolean;
+  id: string;
+  index: number;
+  label: string;
+  name: string;
+}
+
+async function ashbyFileInputs(scope: FormScope) {
+  return scope.root.locator("input[type='file']").evaluateAll((elements) =>
+    elements.map((element, index) => {
+      const id = element.getAttribute("id") ?? "";
+      const name = element.getAttribute("name") ?? "";
+      const form = element.closest("form") ?? document;
+
+      const forLabel =
+        id === ""
+          ? ""
+          : ([...form.querySelectorAll("label[for]")].find(
+              (label) => label.getAttribute("for") === id,
+            )?.textContent ?? "");
+
+      const wrapping = element.closest("label")?.textContent ?? "";
+
+      const block =
+        element.closest("[class*='ashby-application-form-field-entry']")?.querySelector("label")
+          ?.textContent ?? "";
+
+      const label =
+        [element.getAttribute("aria-label") ?? "", forLabel, wrapping, block]
+          .map((text) => text.replaceAll(/\s+/gu, " ").trim())
+          .find((text) => text !== "") ?? "";
+
+      return {
+        autofill: element.closest("[class*='ashby-application-form-autofill']") !== null,
+        id,
+        index,
+        label,
+        name,
+      } satisfies AshbyFileInput;
+    }),
+  );
+}
+
+/**
+ * Finds the one real resume attachment, never the optional "Autofill from
+ * resume" dropzone. The plan's field name wins; without one, a single file
+ * control whose name, id or label says resume/CV is accepted. None or more
+ * than one returns `null`, so the attempt fails closed.
+ *
+ * @param scope The verified Ashby form.
+ * @param fieldName The approved resume field name.
+ * @returns The resume file input, or `null` when it is missing or ambiguous.
+ */
+export async function findAshbyResumeInput(scope: FormScope, fieldName: string | null) {
+  const inputs = scope.root.locator("input[type='file']");
+
+  if ((await inputs.count()) === 0) {
+    return null;
+  }
+
+  const facts = await ashbyFileInputs(scope);
+
+  if (fieldName !== null && fieldName !== "") {
+    const exact = facts.filter(
+      (fact) => !fact.autofill && (fact.name === fieldName || fact.id === fieldName),
+    );
+
+    const [only] = exact;
+
+    if (only !== undefined) {
+      return exact.length === 1 ? inputs.nth(only.index) : null;
+    }
+  }
+
+  const labelled = facts.filter(
+    (fact) =>
+      !fact.autofill &&
+      /(?:^|[^a-z])(?:resume|cv)(?:[^a-z]|$)|curriculum vitae/iu.test(
+        `${fact.label} ${fact.name} ${fact.id}`,
+      ),
+  );
+
+  const [onlyLabelled] = labelled;
+
+  return labelled.length === 1 && onlyLabelled !== undefined
+    ? inputs.nth(onlyLabelled.index)
+    : null;
+}
+
 export const runAshbyAttempt: (
   page: Page,
   plan: AshbyRunPlan,
@@ -478,14 +625,12 @@ export const runAshbyAttempt: (
     };
   }
 
-  if (plan.resume !== null) {
-    const uploaded = await uploadFile(scope, RESUME_FIELD, {
-      bytes: plan.resume.bytes,
-      mimeType: "application/pdf",
-      name: plan.resume.filename,
-    });
+  let liveResumeField = RESUME_FIELD;
 
-    if (!uploaded) {
+  if (plan.resume !== null) {
+    const input = await findAshbyResumeInput(scope, RESUME_FIELD);
+
+    if (input === null) {
       return {
         confirmationSeen: false,
         outcome: "upload_failed",
@@ -493,22 +638,52 @@ export const runAshbyAttempt: (
         submitResponseStatus: null,
       };
     }
+
+    try {
+      await input.setInputFiles({
+        buffer: Buffer.from(plan.resume.bytes),
+        mimeType: "application/pdf",
+        name: plan.resume.filename,
+      });
+    } catch {
+      return {
+        confirmationSeen: false,
+        outcome: "upload_failed",
+        submitMayHaveLanded: false,
+        submitResponseStatus: null,
+      };
+    }
+
+    liveResumeField =
+      (await input.getAttribute("name")) ?? (await input.getAttribute("id")) ?? RESUME_FIELD;
+
+    await waitForStableForm(scope);
   }
 
-  const expectations: LiveFormExpectation[] = plan.fields.map((field) => ({
-    answer: field.answer,
-    fieldName: field.fieldName,
-    fieldType: field.fieldType,
-    file: null,
-    label: field.label,
-    options: field.options,
-    required: field.required,
-  }));
+  const resumeField = plan.fields.find(
+    (field) => field.fieldType === "file" && field.file === "resume",
+  );
+
+  const expectations: LiveFormExpectation[] = plan.fields.flatMap((field) =>
+    field === resumeField
+      ? []
+      : [
+          {
+            answer: field.answer,
+            fieldName: field.fieldName,
+            fieldType: field.fieldType,
+            file: null,
+            label: field.label,
+            options: field.options,
+            required: field.required,
+          },
+        ],
+  );
 
   if (plan.resume !== null) {
     expectations.push({
       answer: null,
-      fieldName: RESUME_FIELD,
+      fieldName: liveResumeField,
       fieldType: "file",
       file: { name: plan.resume.filename, size: plan.resume.bytes.byteLength },
       label: "Resume",

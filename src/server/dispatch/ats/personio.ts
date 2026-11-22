@@ -18,7 +18,12 @@ import type { PlannedResume } from "./shared.ts";
 
 import { cssValue, normText } from "./shared.ts";
 
-export const PERSONIO_FORM_SELECTOR = "form:has(button[type='submit'])";
+/**
+ * Personio's apply page has one application form, identified by its document
+ * upload controls. Anchoring on `documents.*` keeps a cookie banner, newsletter
+ * or any other `<form>` with a submit button from being filled or submitted.
+ */
+export const PERSONIO_FORM_SELECTOR = "form:has(input[name^='documents.'])";
 
 export const PERSONIO_SUBMIT_PATH = /^\/api\/v1\/jobs\/\d+\/application$/u;
 
@@ -281,11 +286,16 @@ async function uploadDocuments(
   fields: readonly SendPlanField[],
 ) {
   const resumeField = fields.find((field) => field.fieldType === "file" && field.file === "resume");
+  const requested = resumeField?.fieldName ?? resume.fieldName ?? null;
 
-  const fieldName = resumeField?.fieldName ?? resume.fieldName ?? "documents.cv";
-  const input = scope.root.locator(`input[type='file'][name="${cssValue(fieldName)}"]`).first();
+  if (requested !== null && requested !== "" && !requested.startsWith("documents.")) {
+    return false;
+  }
 
-  if ((await input.count()) === 0) {
+  const fieldName = requested === null || requested === "" ? "documents.cv" : requested;
+  const input = scope.root.locator(`input[type='file'][name="${cssValue(fieldName)}"]`);
+
+  if ((await input.count()) !== 1) {
     return false;
   }
 
@@ -299,20 +309,16 @@ async function uploadDocuments(
     return false;
   }
 
-  return waitForDocumentPill(scope.page, resume.filename);
+  return waitForDocumentPill(scope, resume.filename);
 }
 
-async function waitForDocumentPill(page: Page, filename: string) {
+async function waitForDocumentPill(scope: FormScope, filename: string) {
   try {
-    await page.waitForFunction(
-      ({ name }: { name: string }) => {
-        const pills = [...document.querySelectorAll("[role='listitem'] span")];
-
-        return pills.some((pill) => pill.textContent.replaceAll(/\s+/gu, " ").trim() === name);
-      },
-      { name: filename },
-      { timeout: DOCUMENT_PILL_MS },
-    );
+    await scope.root
+      .getByRole("listitem")
+      .getByText(filename, { exact: true })
+      .first()
+      .waitFor({ state: "visible", timeout: DOCUMENT_PILL_MS });
   } catch {
     return false;
   }
@@ -354,13 +360,16 @@ async function waitForSubmitEnabled(scope: FormScope) {
 async function waitForPersonioConfirmation(page: Page) {
   try {
     await page.waitForFunction(
-      (sources: string[]) => {
+      ({ selector, sources }: { selector: string; sources: string[] }) => {
         const text = document.body.textContent;
-        const formGone = document.querySelector("form") === null;
+        const formGone = document.querySelector(selector) === null;
 
-        return sources.some((source) => new RegExp(source, "iu").test(text)) && formGone;
+        return formGone && sources.some((source) => new RegExp(source, "iu").test(text));
       },
-      PERSONIO_CONFIRMATION.map((pattern) => pattern.source),
+      {
+        selector: PERSONIO_FORM_SELECTOR,
+        sources: PERSONIO_CONFIRMATION.map((pattern) => pattern.source),
+      },
       { timeout: CONFIRMATION_WAIT_MS },
     );
   } catch {
@@ -390,9 +399,14 @@ function expectationsFor(plan: PersonioRunPlan) {
     );
 
     if (!covered) {
+      const slot =
+        plan.resume.fieldName?.startsWith("documents.") === true
+          ? plan.resume.fieldName
+          : "documents.cv";
+
       expectations.push({
         answer: null,
-        fieldName: plan.resume.fieldName ?? "documents.cv",
+        fieldName: slot,
         fieldType: "file",
         file: { name: plan.resume.filename, size: plan.resume.bytes.byteLength },
         label: "Resume",
