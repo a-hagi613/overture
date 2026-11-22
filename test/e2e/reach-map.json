@@ -22711,6 +22711,8 @@
         "/__test__/catalog/postings/close",
         "/__test__/catalog/postings/close-all",
         "/__test__/clock",
+        "/__test__/clock/offset",
+        "/__test__/jobs",
         "/__test__/jobs/enqueue",
         "/__test__/ledger/grant",
         "/__test__/ledger/sample",
