@@ -140,15 +140,15 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Cloudflare Access | admin host gate | `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_JWKS_URL` (tests override the certs URL) | real verification against a test signing key |
 | Cloudflare Email Routing + Email Worker + Queues | inbound mail (ADR 0028) | `INBOUND_HMAC_SECRET` (shared by the Worker and `overture-web`); the `overture-inbound-mail` and `overture-inbound-mail-dlq` queues, the `INBOUND_QUEUE` producer and `INBOUND_SPILL` R2 binding in `workers/inbound-mail/wrangler.jsonc`, with the queue names and retry policy in `src/shared/inbound-queue.ts` | the Worker's `email` and `queue` handlers run against recorded `.eml` fixtures (`test/e2e/inbound-mail-worker.test.ts`), and the queue consumer against the real app: an outage, a retry, a recovery and a redelivery store the message exactly once (`test/e2e/inbound-mail-queue.test.ts`); signed requests to the real `POST /internal/mail/inbound`; DKIM checked by `mailauth` against recorded keys |
 | Cloudflare R2 `overture-inbound-mail-spill` | inbound mail over the 128 KB Queue limit (ADR 0028) | the `INBOUND_SPILL` Worker binding; objects under `spill/{reference}.eml` | a fake R2 binding in the Worker tests (put, get, delete) |
-| Browser Use Cloud | primary browser | `BROWSER_USE_API_KEY`, `BROWSER_USE_API_BASE_URL` (test-only override) | `local` provider: real local Chrome filling saved forms from the fixture server (§10.5); control API from recorded responses, through MSW in-process or a local recorded fixture server for the app |
+| Browser Use Cloud | primary browser | `BROWSER_USE_API_KEY`, `BROWSER_USE_API_BASE_URL` (test-only override) | `local` provider: real local Chrome filling saved forms from the fixture server (§10.5); control API from recorded responses, through the fail-closed test interceptor in-process or a local recorded fixture server for the app |
 | Kernel | fallback browser | `KERNEL_API_KEY`, `KERNEL_API_BASE_URL` (test-only override) | local recorded control-API server with real local Chrome behind it; lab only |
 | reCAPTCHA v3, hCaptcha, Turnstile | synthetic lab challenge pages (§10.4) | `LAB_RECAPTCHA_SCRIPT_URL`, `LAB_HCAPTCHA_SCRIPT_URL`, `LAB_TURNSTILE_SCRIPT_URL`, `LAB_RECAPTCHA_SITE_KEY`, `LAB_HCAPTCHA_SITE_KEY`, `LAB_TURNSTILE_SITE_KEY`, `LAB_RECAPTCHA_VERIFY_URL`, `LAB_RECAPTCHA_SECRET` (all optional; the script and verify URLs default to the vendors') | same-origin `/__test__/lab-*.js` stubs and a local recorded siteverify; no challenge host is contacted (ADR 0016) |
-| Anthropic | LLM (prod) | `ANTHROPIC_API_KEY` | real adapter; API intercepted by MSW with responses recorded by the daily live check |
-| Cloudflare Email Sending | outbound mail (magic links, live check, later notices) | `CLOUDFLARE_EMAIL_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (both or neither); `CLOUDFLARE_EMAIL_API_BASE_URL` (test-only override of the real API host) | real adapter; the send endpoint is intercepted by MSW and the request body asserted (`test/e2e/cloudflare-email.test.ts`) |
+| Anthropic | LLM (prod) | `ANTHROPIC_API_KEY` | real adapter; API intercepted by the test interceptor with responses recorded by the daily live check |
+| Cloudflare Email Sending | outbound mail (magic links, live check, later notices) | `CLOUDFLARE_EMAIL_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (both or neither); `CLOUDFLARE_EMAIL_API_BASE_URL` (test-only override of the real API host) | real adapter; the send endpoint is intercepted by the test interceptor and the request body asserted (`test/e2e/cloudflare-email.test.ts`) |
 | Stripe (M3) | Managed Payments | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_WEEK`, `STRIPE_PRICE_MONTH`; `STRIPE_API_BASE_URL` (test-only override of the real API host) | stripe-mock (Stripe's own local server) + signed webhook fixtures |
 | Public sign-up (M3) | whether an unknown email may sign up without an invite; on from M3 | `PUBLIC_SIGNUP_ENABLED` (default `true`; `false` restores the M2 invite-only gate) | public-sign-up e2e with the Turnstile stub; the invite-only suites set it `false` |
 | Grafana Cloud | logs/metrics/traces | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | local LGTM docker |
-| Web Push | notifications | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | real adapter; push endpoints via MSW |
+| Web Push | notifications | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | real adapter; push endpoints via the test interceptor |
 | Master key | envelope encryption | `MASTER_KEY_V1` (32 bytes base64), `MASTER_KEY_CURRENT=1` | fixed test key |
 | Google + LinkedIn (OIDC) | OAuth sign-in providers | `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID` with `LINKEDIN_CLIENT_SECRET`; each pair optional, both or neither (a half-set pair stops boot); an unset pair leaves that provider unregistered and hidden | local OIDC identity server; discovery URLs overridable via `OAUTH_GOOGLE_DISCOVERY_URL`, `OAUTH_LINKEDIN_DISCOVERY_URL` |
 | Auth | better-auth sessions | `BETTER_AUTH_SECRET`, `AUTH_ALLOWED_HOSTS` | local test secret and loopback hosts |
@@ -175,7 +175,7 @@ the live check, so a Recap cannot starve them; a refused send fails closed like 
 the cap, once when notices pause at the reserve, and once when every kind of mail stops at the cap — the reserve
 refusal is stamped in `reserve_refused_at` and the cap refusal in `refused_at`, so the first never hides the second.
 The admin overview shows the month's count and says which of the two stops is in force. Tests reach Cloudflare only
-through MSW (ADR 0013, 0016).
+through the fail-closed test interceptor (ADR 0013, 0016).
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
 Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set; a half-set pair stops the server at boot and with neither the app boots and runs as in M2. `POST /webhooks/stripe` verifies the `Stripe-Signature` header (HMAC-SHA256 over the timestamped raw body, five-minute window) before it reads or writes any billing row, and a bad or stale signature is refused with 400. `STRIPE_PRICE_WEEK` and `STRIPE_PRICE_MONTH` name the Stripe prices a Checkout session sells; a missing one answers 503 `billing_not_configured` without a Stripe call. What each plan buys is configuration in `src/server/billing/plans.ts`: Week 50 Applications over 7 days, Month 250 over 30 days (ADR 0018); the price itself lives in Stripe and reaches Overture only as a price id. `invoice.paid` grants its period and clears a `plan_ended` or `payment_failed` pause; `invoice.payment_failed` sets `payment_failed` at once, unless the failed invoice's period is older than the subscription's current period, so a stale out-of-order delivery cannot pause a paid user. Each transition writes one `paused` notification (pushed to the user's devices) and one email naming the fix in Settings (`Choose a plan` links to `/settings/billing/plans`, `Update payment` to `/settings/billing`, never the word `failed`), and a repeated event writes nothing twice. A grant's period end is the plan end: after the expiry sweep leaves the user with no unexpired grant, sending pauses with `plan_ended`. The demo account is never paused, granted or notified, and its billing mutations answer `403 demo_locked` before any Stripe call.
 
@@ -207,7 +207,7 @@ Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both
 | Mail | `mailparser`, `mailauth` (SPF/DKIM/DMARC verification), Cloudflare Email Sending over a small `fetch` to its REST endpoint |
 | Telemetry | OpenTelemetry SDK (traces, metrics, logs) → OTLP |
 | Lint/format | oxlint, every category at error + type-aware (`oxlint-tsgolint`), from Landmines' own configuration, plus `@interfere/landmines`, vendored anti-slop, React / `jsx-a11y` / Vitest plugins and architecture rules (ADR 0023), with the Cloudflare preset rules; `bun lint` runs Oxlint with `--deny-warnings`; `bun fmt` formats |
-| Tests | Playwright e2e (sharded), `bun test` for the ADR 0013 invariant files, MSW at the network edge, daily live checks on Fly (ADR 0013) |
+| Tests | Playwright e2e (sharded), `bun test` for the ADR 0013 invariant files, a fail-closed test interceptor at the network edge, daily live checks on Fly (ADR 0013) |
 
 ```
 src/
@@ -228,8 +228,8 @@ src/
   web/               React app (routes/, features/, components/ui = shadcn)
 drizzle/             generated migrations
 scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, capture-forms.ts, pull-forms.ts, restore-drill.ts
-test/e2e/           Playwright `*.test.ts` flows, fixture server, MSW handlers and recordings, `*.test-utils.ts`
-                     (the fifty-four unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
+test/e2e/           Playwright `*.test.ts` flows, fixture server, interceptor handlers and recordings, `*.test-utils.ts`
+                     (the fifty-five unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
 ```
 
@@ -787,7 +787,7 @@ Job `application.prepare`:
 ### 8.6 LLM usage
 
 Model `claude-haiku-5-5` through `LlmPort`; the Anthropic adapter is the only one, and tests intercept its API with
-MSW. All calls:
+the test interceptor. All calls:
 structured outputs (`output_config.format`), thinking disabled with `effort: "low"` except cover letters
 (`effort: "medium"`), prompt caching on the system prompt + the user's resume digest, no PII in telemetry.
 
@@ -1541,7 +1541,7 @@ those raises the auto-move notice with its Undo link.
 
 ## 16. Quality: testing, CI, observability
 
-### 16.1 End-to-end flows (Playwright, real code, network edge via MSW; ADR 0013)
+### 16.1 End-to-end flows (Playwright, real code, network edge via the test interceptor; ADR 0013)
 
 1. Passwords are gone (the old endpoints and screens are refused) · 2. magic link · 3. Google (local OIDC server) · 4. LinkedIn (local OIDC server)
 · 5. account linking refused for unverified email · 6. v1 importer loads resume, answer bank, learned answers ·
@@ -1567,7 +1567,7 @@ Plus: route reachability for every page, axe on every page, and the visual snaps
 Review, Inbox, Profile, Settings and the legal and consent boards × 390 / 1280 px × light/dark; Ready joins them once it is
 drawn) in pinned Docker.
 
-### 16.2 Unit tests (fifty-four files, `bun:test`, beside their code)
+### 16.2 Unit tests (fifty-five files, `bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
@@ -1614,6 +1614,7 @@ drawn) in pinned Docker.
 | `src/server/platform/llm/models.test.ts` | `ANTHROPIC_MODEL` defaults to the model SPEC §8.6 names, and a dated 5.5 id is priced from the exact 5.5 row (#387) |
 | `src/server/platform/mail/budget.test.ts` | one row per UTC month counts every send by kind and fails closed at each stop (#282) |
 | `src/server/platform/outbound-guard.test.ts` | in test and development, an outbound request to an ATS or paid-service host is refused |
+| `src/server/platform/outbound-interception.test.ts` | a fetch or node `https` request to an unmocked non-loopback host rejects with `UnhandledRequestError`, while a mocked host still answers, so the test interceptor fails closed |
 | `src/server/platform/ports/replica-listing.test.ts` | the newest replica transaction is read from the first non-empty Litestream level (#281) |
 | `src/server/profile/facts.test.ts` | a Fact's scope is validated against its key |
 | `src/server/profile/onboarding-step.test.ts` | the onboarding step's salary and EEO reading |
@@ -1633,9 +1634,9 @@ Parallel jobs: `bun lint` with zero warnings (ADR 0023, which includes Landmines
 locally by `bun run verify`. E2E runs inside the pinned `mcr.microsoft.com/playwright` image that matches
 `@playwright/test`, so CI downloads no browser and installs no system package. The app is built once per run and the
 `dist` artifact is handed to six shards balanced by recorded per-file time (`test/e2e/timings.json`, refreshed from
-main runs); every shard starts one server per Playwright worker (template SQLite copy, API-seeded auth, MSW with
-unhandled requests as errors, MSW pinned to 2.x with a check that an unmocked host fails, a test-only route that runs
-due jobs, no sleeps, zero retries).
+main runs); every shard starts one server per Playwright worker (template SQLite copy, API-seeded auth, a Bun-native test
+interceptor that refuses every unmocked non-loopback host, a canary test that fails if a request leaks, a test-only
+route that runs due jobs, no sleeps, zero retries).
 
 A pull request runs only the e2e files its diff can reach. `test/e2e/reach-map.json`, regenerated on main, maps each
 test file to the source modules it exercises, derived from the test's import graph and the routes it calls. A changed
@@ -1660,7 +1661,7 @@ and none submits an application or touches a user:
 | Check | What is real | Also refreshes |
 |---|---|---|
 | Forms | the `fixtures.capture` path opens one posting per ATS chosen from the open catalog, saves its form and assets, reports a changed form signature, and never fills or submits; Personio is read over plain HTTP instead (no browser minutes) and reports its changed signature the same way, and is skipped while `ats.personio` is engaged so the check cannot page before the probe enables it | saved forms in R2 `fixtures/` (§10.5) |
-| AI | four fixed, deterministic Haiku calls (score, open text, question mapping, tag fallback) through `LlmPort`, checked against their output schemas and the resume-line rule | MSW recordings in R2 `recordings/anthropic/` |
+| AI | four fixed, deterministic Haiku calls (score, open text, question mapping, tag fallback) through `LlmPort`, checked against their output schemas and the resume-line rule | recorded responses in R2 `recordings/anthropic/` |
 | Mail | a DKIM-signed message from `no-reply@tryoverture.com` to the reserved `live-check@tryoverture.com`, through Cloudflare Email Sending, Email Routing and the Worker, ingested with `auth='pass'` and its code matched within `live_checks.mail_wait_minutes` (default 5); first the same group's `mail.sending` guard verifies the sending domain's bounce MX, SPF, DKIM and DMARC records when `REQUIRE_EMAIL_SENDING` is set (gated and non-alerting before that) | recorded `.eml` fixtures in R2 `recordings/mail/` |
 | Storage | an R2 put, get, list and delete | — |
 

@@ -8,11 +8,18 @@ Every external dependency sits behind a port, and domain code imports ports only
 with hand-written stand-ins: they run the production adapters. Where a real local equivalent exists, tests use it
 (SQLite, a local Chrome filling saved ATS forms served by the fixture server, a disk object store, the real signed
 inbound-mail endpoint). Third-party HTTP APIs (Anthropic, Cloudflare Email Sending, Browser Use's control API, the ATS feeds, push
-services, the FX feed, Stripe) are intercepted at the network by MSW, inside the app process, with
-`onUnhandledRequest: "error"` and responses recorded from the real service. Stripe is the exception: its calls go to
-`stripe-mock`, Stripe's own local API server, and the webhooks it answers are signed with the test webhook secret, so
-the adapter, the signature check and the response shapes are Stripe's own code rather than our idea of it. MSW is
-pinned to 2.x: 3.x intercepts nothing under Bun, and a CI check fails if a request to an unmocked host gets through. Time comes from the real clock adapter,
+services, the FX feed, Stripe) are intercepted at the network edge inside the app process by a Bun-native
+interceptor (`src/server/platform/outbound-interception.ts`). It wraps `globalThis.fetch` and the `node:http` and
+`node:https` `request`/`get` transports, answers from handlers whose responses are recorded from the real service, and
+fails closed: a request to any host no handler mocks and that is not a loopback fixture rejects with
+`UnhandledRequestError` before it reaches the network. There is no opt-out option such as MSW's
+`onUnhandledRequest`; failing closed is the only mode. The interceptor's canary
+(`src/server/platform/outbound-interception.test.ts`) fails if a fetch or a node `https` request to an unmocked host
+does not reject with that error, so a leaked request cannot hide behind a DNS failure. MSW was removed because 3.x
+intercepted nothing under Bun and its 2.x pin held the whole suite to an old mechanism. Stripe is the exception: its
+calls go to `stripe-mock`, Stripe's own local API server, and the webhooks it answers are signed with the test webhook
+secret, so the adapter, the signature check and the response shapes are Stripe's own code rather than our idea of it.
+Time comes from the real clock adapter,
 whose offset tests can move through a test-only route that is not mounted in production. Moving the clock does not
 fire timers, so a second test-only route runs every job that is due, and code waiting for mail is woken when mail
 arrives rather than by polling alone.
@@ -24,7 +31,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for the fifty-four files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
+exist only for the fifty-five files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
 as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key,
 and a "did not happen" line appears only when the stored data proves it), ledger, crypto, planner, the
 restored-database check (a restored file is read
@@ -102,7 +109,9 @@ stays bounded, the count query probes `posting_tags` by its primary key rather t
 filter changes stay under 500ms p95 while catalog writes run, #426), the unit-test
 allowlist (`lint-config-guard.test.ts`: every path the allowlist names exists, and every unit test file in `src/` or
 `scripts/` is named, so a deleted test cannot leave a stale entry), and the workflow Bun pin
-(`workflow-config-guard.test.ts`: every `oven-sh/setup-bun` step pins the version `package.json` requires). They
+(`workflow-config-guard.test.ts`: every `oven-sh/setup-bun` step pins the version `package.json` requires), and the
+interception canary (`outbound-interception.test.ts`: a fetch or node `https` request to an unmocked host rejects with
+the interceptor's own error while a mocked host still answers, so a request that leaks fails instead of reaching DNS). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
 depend on the runner. The mail count runs the real SQLite file and the real migrations, so the invariant is exercised
 against the shipped schema rather than a stand-in. CI stays under two minutes on pull requests: six shards balanced by

@@ -1,10 +1,14 @@
 import { readFileSync } from "node:fs";
 
-import { http, HttpResponse, passthrough } from "msw";
-import { setupServer } from "msw/node";
 import { z } from "zod";
 
 import { env } from "../config/env.ts";
+import {
+  createInterceptionServer,
+  http,
+  HttpResponse,
+  passthrough,
+} from "../platform/outbound-interception.ts";
 import { assertNoLiveTraffic, LiveServiceRequestError } from "../platform/outbound-guard.ts";
 import { isLiveServiceHost } from "../../shared/live-service-hosts.ts";
 import {
@@ -34,11 +38,6 @@ const recordedVerificationSchema = z.object({
   "error-codes": z.array(z.string()).optional(),
   messages: z.array(z.string()).optional(),
 });
-
-const loopbackPassthrough = [
-  http.all(/^http:\/\/(?:127\.0\.0\.1|localhost):\d+\/.*/u, () => passthrough()),
-  http.all(/^http:\/\/\[::1\]:\d+\/.*/u, () => passthrough()),
-];
 
 function fixturePassthrough(request: Request) {
   assertNoLiveTraffic(request.url, request.method, env.NODE_ENV);
@@ -83,8 +82,7 @@ export function startInterception() {
   const cloudflareRoot = env.CLOUDFLARE_EMAIL_API_BASE_URL.replace(/\/+$/u, "");
   const cloudflareZone = env.CLOUDFLARE_ZONE_ID ?? "unconfigured-zone";
 
-  const server = setupServer(
-    ...loopbackPassthrough,
+  const server = createInterceptionServer(
     http.get(`${cloudflareRoot}/zones/${cloudflareZone}/email/sending/subdomains`, () => {
       const scenario = emailSendingScenario();
 
@@ -235,5 +233,5 @@ export function startInterception() {
     ),
   );
 
-  server.listen({ onUnhandledRequest: "error" });
+  server.listen();
 }

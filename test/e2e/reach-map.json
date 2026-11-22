@@ -26761,13 +26761,6 @@
         "test/e2e/template-databases.ts"
       ]
     },
-    "test/e2e/msw-canary.test.ts": {
-      "full": false,
-      "paths": [],
-      "routes": [],
-      "designs": [],
-      "modules": []
-    },
     "test/e2e/nav-badges.test.ts": {
       "full": false,
       "paths": [

@@ -81,7 +81,6 @@
     "landmines-testing/no-flake-masking": "error",
     "landmines-testing/no-test-doubles": "error",
     "landmines-testing/no-unsignaled-poll": "error",
-    "landmines-testing/strict-msw": "error",
     "landmines-style/no-comments": [
       "error",
       {
@@ -182,6 +181,7 @@
           "src/server/pipeline/personio-form.test.ts",
           "src/server/platform/mail/budget.test.ts",
           "src/server/platform/outbound-guard.test.ts",
+          "src/server/platform/outbound-interception.test.ts",
           "src/server/platform/db/restore-check.test.ts",
           "src/server/platform/ports/replica-listing.test.ts",
           "src/server/platform/jobs/queue.test.ts",
