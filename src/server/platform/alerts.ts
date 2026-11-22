@@ -22,6 +22,7 @@ export const ALERT_KINDS = [
   "code.challenge_rate",
   "queue.age",
   "llm.spend",
+  "match.score_bound",
   "backup.lag",
   "backup.failure",
   "catalog.worker",

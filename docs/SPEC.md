@@ -574,7 +574,7 @@ starts later that day; a user never gets a second run in the same local day.
 ```
 free = min(limits.daily_cap, applications left) − Applications in preparing, ready or approved
 for candidate in candidates ordered by code_rank desc, unscored-or-stale first:
-    stop when free ≤ 0 or LLM caps hit
+    stop when free ≤ 0, the scoring bound (3 × limits.daily_cap) is reached, or LLM caps hit
     score = cached if valid else Haiku score (§8.6)
     if score ≥ auto_threshold: create application(origin='auto', status='preparing'); free -= 1
 prepare every new Application in the run (§8.3)
@@ -588,6 +588,9 @@ queue `ready.notify`, the one Recap email (§8.7), which sends only when the run
   (§8.3); Greenhouse questions come from its API as before.
 - The run never schedules or sends anything: an Application is queued only after its Approval (§8.7, §9).
 - Scores are cached per (posting, resume_id, targets_version); a job is never scored twice for the same inputs.
+- The run scores at most 3 × `limits.daily_cap` postings and then stops, so a strict threshold over a large pool
+  cannot walk the account into the LLM cap. Stopping at that bound raises the owner's `match.score_bound` alert with
+  the threshold and the counts, so the threshold is what gets tuned; the `llm.cap` fail-closed path stays the backstop.
 - Browsing: Home "Up next" and Search show code-ranked candidates; opening a card scores it if unscored
   (`match.score_on_open`). Manual Apply is allowed below threshold (`origin='manual'`) and is prepared by
   `application.prepare` when it is created.
@@ -712,7 +715,9 @@ structured outputs (`output_config.format`), thinking disabled with `effort: "lo
 | email_classify (fallback) | subject + first 1,000 chars | classification | ~$0.0001 |
 
 Caps (settings): `$0.25` per user per day, `$10` per day global, `$1` per day tagging. A capped call fails closed:
-scoring pauses until the next UTC day, preparation waits, the owner is alerted.
+scoring pauses until the next UTC day, preparation waits, the owner is alerted. The daily run bounds its scoring
+search at three times the daily cap (§8.2) and alerts `match.score_bound` when it stops there, so a strict threshold
+reaches that alert rather than the cap.
 
 > `email_classify` is the one LLM use beyond scoring, answers, letters, PDF fallback and question mapping; it runs only when the rules in §11.3 are not confident.
 
@@ -1328,7 +1333,7 @@ those raises the auto-move notice with its Undo link.
 7. resume upload + parse + confirm facts · 8. targets with live count · 9. discovery backfill + trickle + close + the sweep's board claim (per-ATS batch,
 crash recovery) ·
 10. tagging precedence incl. tag import · 11. candidate filters (skip list incl. near-match names and domains, one open
-application per company, cooldown, repost guard, language, remote country rules, salary/FX) · 12. lazy scoring stops at need · 13. score on open + manual apply · 14. preparation with factual,
+application per company, cooldown, repost guard, language, remote country rules, salary/FX) · 12. lazy scoring stops at need, and at 3 × the daily cap with a `match.score_bound` alert · 13. score on open + manual apply · 14. preparation with factual,
 open-text, optional blank · 15. Review unlocks N applications · 16. planner window + spacing, in approval order · 17. dispatcher gates
 (cap, applications left, kill switch, one-in-flight, only `approved`, approval still current) · 18. submit success on Greenhouse/Lever/Ashby/Workable fixtures ·
 19. verification code read from mailbox · 20. challenge blocked before Submit → release + retry once → failed ·
@@ -1403,7 +1408,7 @@ OTel traces for every request and job; metrics: `attempt_outcome_total{provider,
 `attempt_cost_micros`, `queue_depth{kind}`, `llm_cost_micros{purpose}`, `mail_inbound_total{auth}`,
 `discovery_poll_total{ats,status}`. Alerts to the owner: ATS success < 70 % over the last hour (at least five
 attempts), provider success < 60 %, code or CAPTCHA rate > 20 %, queue age > 30 min, LLM spend > 80 % of the global
-or tagging cap, Litestream lag > 5 min, backup failure, health check failing, disk > 80 %, a catalog sweep worker crash,
+or tagging cap, a daily scoring run that stops at its bound (3 × the daily cap, §8.2), Litestream lag > 5 min, backup failure, health check failing, disk > 80 %, a catalog sweep worker crash,
 an employer reply rate under 5 % after 10 sends in the last 30 days, the domain-wide reply rate under 5 % after 20
 sends (§11.4), an inbound message dead-lettered by the mail Worker, and an
 unhandled rejection in a background loop or timer (logged to stderr, alerted at most once a minute). The alert path is the
