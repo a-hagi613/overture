@@ -10,10 +10,17 @@ on:
         options:
           - check-secrets
           - onboard-email
+          - setup-vapid
+          - seed-catalog
           - setup-stripe
           - live-diagnostics
       rotate_webhook:
         description: "Replace the Stripe webhook endpoint and rotate its signing secret"
+        required: false
+        type: boolean
+        default: false
+      rotate_vapid:
+        description: "Replace existing VAPID keys on overture-web"
         required: false
         type: boolean
         default: false
@@ -144,6 +151,109 @@ jobs:
           if ! grep -q "verdict: ready" <<<"$output"; then
             echo "::warning::The sending domain is not ready; the records above name every missing one."
           fi
+
+      - name: Read the Fly secret names for the VAPID action
+        id: vapid-secrets
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'setup-vapid'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          flyctl secrets list -a overture-web --json > "$RUNNER_TEMP/fly-secrets.json"
+          names="$(jq -r '.[].name' "$RUNNER_TEMP/fly-secrets.json")"
+          if grep -qx 'VAPID_PUBLIC_KEY' <<<"$names"; then
+            echo "public_present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "public_present=false" >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qx 'VAPID_PRIVATE_KEY' <<<"$names"; then
+            echo "private_present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "private_present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate and set the VAPID keys on overture-web
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'setup-vapid'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          ROTATE_VAPID: ${{ inputs.rotate_vapid }}
+          PUBLIC_PRESENT: ${{ steps.vapid-secrets.outputs.public_present }}
+          PRIVATE_PRESENT: ${{ steps.vapid-secrets.outputs.private_present }}
+        run: |
+          set -euo pipefail
+          if [ "${PUBLIC_PRESENT}" = "true" ] && [ "${PRIVATE_PRESENT}" = "true" ] && [ "${ROTATE_VAPID}" != "true" ]; then
+            echo "VAPID keys are already set on overture-web."
+            {
+              echo "### VAPID keys already set"
+              echo ""
+              echo "Both \`VAPID_PUBLIC_KEY\` and \`VAPID_PRIVATE_KEY\` are on \`overture-web\`; re-run with \`rotate_vapid=true\` to replace them."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          bun run scripts/generate-vapid.ts --out-env /tmp/vapid-setup.env
+          value() { sed -n "s/^$1=//p" /tmp/vapid-setup.env; }
+          public_key="$(value VAPID_PUBLIC_KEY)"
+          private_key="$(value VAPID_PRIVATE_KEY)"
+          if [ -z "$public_key" ] || [ -z "$private_key" ]; then
+            echo "::error::The generator wrote no VAPID key pair; refusing to set Fly secrets."
+            exit 1
+          fi
+          echo "::add-mask::$public_key"
+          echo "::add-mask::$private_key"
+          printf '%s\n' "VAPID_PUBLIC_KEY=$public_key" "VAPID_PRIVATE_KEY=$private_key" | flyctl secrets import -a overture-web
+
+      - name: Verify the production health route after the VAPID release
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'setup-vapid'
+        run: |
+          for attempt in $(seq 1 24); do
+            if curl -fsS https://tryoverture.com/api/health; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::The health route did not answer within 120s after the VAPID release."
+          exit 1
+
+      - name: Remove the VAPID setup file
+        if: always() && inputs.action == 'setup-vapid'
+        run: rm -f /tmp/vapid-setup.env
+
+      - name: Seed the catalog and enqueue the backfill on overture-web
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'seed-catalog'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          status=0
+          output="$(timeout 600s flyctl ssh console -a overture-web -C "mkdir -p /data/seed && chown app:app /data/seed && gosu app bun run /app/scripts/fetch-seed.ts --dir /data/seed && gosu app bun run /app/scripts/load-discovered-boards.ts --db /data/app.sqlite --manifest /data/seed/manifest.json --companies /data/seed/companies.parquet && gosu app bun run /app/scripts/enqueue-backfill.ts --db /data/app.sqlite" 2>&1)" || status=$?
+          printf '%s\n' "$output"
+          {
+            echo "### Catalog seed and backfill queue"
+            echo ""
+            echo '```'
+            printf '%s\n' "$output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -eq 124 ]; then
+            echo "::error::The catalog seed did not answer within 600s (machine down or unresponsive)."
+            exit 1
+          fi
+          if [ "$status" -ne 0 ]; then
+            echo "::error::The catalog seed failed on overture-web (exit $status)."
+            exit 1
+          fi
+
+      - name: Verify the production health route after the catalog seed
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'seed-catalog'
+        run: |
+          for attempt in $(seq 1 24); do
+            if curl -fsS https://tryoverture.com/api/health; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::The health route did not answer within 120s after the catalog seed."
+          exit 1
 
       - name: Read the Fly secret names for the Stripe action
         id: stripe-secrets
