@@ -1225,3 +1225,21 @@ export const ledger = sqliteTable(
     index("ledger_user_grant_kind").on(t.userId, t.grantId, t.kind),
   ],
 );
+
+export const billingReconciliations = sqliteTable(
+  "billing_reconciliations",
+  {
+    day: text("day").primaryKey(),
+    status: text("status", { enum: ["clean", "mismatch"] }).notNull(),
+    checkedAt: integer("checked_at").notNull(),
+    windowStart: integer("window_start").notNull(),
+    windowEnd: integer("window_end").notNull(),
+    stripeInvoices: integer("stripe_invoices").notNull(),
+    stripeRefunds: integer("stripe_refunds").notNull(),
+    ledgerGrants: integer("ledger_grants").notNull(),
+    ledgerRefunds: integer("ledger_refunds").notNull(),
+    mismatches: integer("mismatches").notNull(),
+    detail: text("detail").notNull().default("{}"),
+  },
+  (t) => [index("billing_reconciliations_checked").on(t.checkedAt)],
+);

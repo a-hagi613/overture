@@ -204,6 +204,12 @@ The user stopping the renewal. The subscription ends when the paid period does, 
 for stay available until then.
 _Avoid_: cancel now, immediate cancellation
 
+**Reconciliation**:
+The daily check of one UTC day where Stripe's paid invoices and refunds must match the ledger's period grants and
+refunds. It stores the day's result for the admin and alerts the owner on any mismatch; a clean day stores its result
+and alerts nobody.
+_Avoid_: audit, sync, settlement
+
 ## Mail
 
 **Inbox**:

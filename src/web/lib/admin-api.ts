@@ -589,6 +589,38 @@ export const billingUserViewSchema = z.object({
 
 export const billingUserResponseSchema = z.object({ user: billingUserViewSchema });
 
+export const billingMismatchKindSchema = z.enum([
+  "invoice_without_grant",
+  "grant_without_invoice",
+  "refund_without_ledger",
+  "ledger_without_refund",
+  "refund_ledger_missing",
+]);
+
+export const billingMismatchSchema = z.object({
+  amountCents: z.number().nullable(),
+  id: z.string(),
+  kind: billingMismatchKindSchema,
+});
+
+export const billingReconciliationSchema = z.object({
+  checkedAt: z.number(),
+  day: z.string(),
+  ledgerGrants: z.number(),
+  ledgerRefunds: z.number(),
+  mismatchTotal: z.number(),
+  mismatches: z.array(billingMismatchSchema),
+  status: z.enum(["clean", "mismatch"]),
+  stripeInvoices: z.number(),
+  stripeRefunds: z.number(),
+  windowEnd: z.number(),
+  windowStart: z.number(),
+});
+
+export const billingReconciliationResponseSchema = z.object({
+  reconciliation: billingReconciliationSchema.nullable(),
+});
+
 export const refundResponseSchema = z.object({
   refund: z.object({
     amountCents: z.number(),
@@ -602,17 +634,28 @@ export const refundResponseSchema = z.object({
 
 export type BillingUserRow = z.infer<typeof billingUserRowSchema>;
 
+export type BillingUsersResponse = z.infer<typeof billingUsersResponseSchema>;
+
 export type BillingUserView = z.infer<typeof billingUserViewSchema>;
 
 export type BillingPeriod = z.infer<typeof billingPeriodSchema>;
 
 export type BillingFilter = "all" | "trial" | "paying" | "paused" | "ended";
 
+export type BillingReconciliation = z.infer<typeof billingReconciliationSchema>;
+
+export type BillingMismatch = z.infer<typeof billingMismatchSchema>;
+
+export type BillingMismatchKind = z.infer<typeof billingMismatchKindSchema>;
+
 export const loadBillingUsers = async (filter: BillingFilter, page: number) =>
   adminGet(
     `/admin/api/billing/users?filter=${filter}&page=${String(page)}`,
     billingUsersResponseSchema,
   );
+
+export const loadBillingReconciliation = async () =>
+  adminGet("/admin/api/billing/reconciliation", billingReconciliationResponseSchema);
 
 export const loadBillingUser = async (userId: string) =>
   adminGet(`/admin/api/billing/users/${encodeURIComponent(userId)}`, billingUserResponseSchema);

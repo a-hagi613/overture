@@ -123,6 +123,36 @@ export interface Refund {
 }
 
 /**
+ * A half-open window of provider time in epoch milliseconds: a record at
+ * `sinceMs` is inside it, a record at `untilMs` is not.
+ */
+export interface BillingWindow {
+  sinceMs: number;
+  untilMs: number;
+}
+
+/**
+ * A paid invoice the provider reports, reduced to the fields reconciliation
+ * compares against the ledger.
+ */
+export interface ProviderInvoice {
+  invoiceId: string;
+  amountPaidCents: number;
+  paidAtMs: number;
+  customerId: string | null;
+}
+
+/**
+ * A refund the provider reports, reduced to the fields reconciliation compares
+ * against the ledger.
+ */
+export interface ProviderRefund {
+  refundId: string;
+  amountCents: number;
+  createdAtMs: number;
+}
+
+/**
  * The one payment provider Overture bills through (ADR 0018, ADR 0031).
  */
 export interface Payments {
@@ -132,6 +162,8 @@ export interface Payments {
   retrieveVerifiedCard: (setupSessionId: string) => Promise<VerifiedCard | null>;
   createPortalSession: (request: PortalSessionRequest) => Promise<PortalSession>;
   refundInvoice: (request: RefundRequest) => Promise<Refund>;
+  listPaidInvoices: (window: BillingWindow) => Promise<ProviderInvoice[]>;
+  listRefunds: (window: BillingWindow) => Promise<ProviderRefund[]>;
   verifyWebhook: (payload: string, signature: string | null) => Promise<PaymentEvent>;
 }
 

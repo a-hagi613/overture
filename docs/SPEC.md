@@ -316,6 +316,7 @@ Descriptions (`description_gz`) are purged 90 days after `closed_at`.
 | `grants` | id, user_id, source CHECK IN ('trial','period','admin'), quantity, starts_at, expires_at, stripe_invoice_id UNIQUE NULL, created_at |
 | `ledger` | id, user_id, kind CHECK IN ('grant','reserve','commit','release','expire','refund','adjust'), debit_account, credit_account, amount CHECK (amount > 0), grant_id, application_id NULL, idempotency_key UNIQUE, created_at. **Each row is one balanced transfer**, so the ledger is zero-sum by construction. No UPDATE/DELETE (triggers). |
 | `stripe_events` | id PK (Stripe event id), type, received_at, processed_at NULL |
+| `billing_reconciliations` | day PK (UTC date), status CHECK IN ('clean','mismatch'), checked_at, window_start, window_end, stripe_invoices, stripe_refunds, ledger_grants, ledger_refunds, mismatches, detail JSON |
 | `card_fingerprints` | hmac PK (HMAC-SHA256 of the Stripe card fingerprint, keyed by `CARD_FINGERPRINT_SECRET`), trial_used_at, created_at — **no foreign key**; survives account deletion |
 
 Accounts: `issued`, `available`, `reserved`, `used`, `expired`. The same no-UPDATE rule and the same user-gone `BEFORE DELETE` condition as snapshots apply. Transfers: grant `issued→available`; reserve
@@ -347,6 +348,17 @@ and `cancel_at_period_end`. `invoice.paid` refreshes that row's plan and period 
 when the subscription update lags. An hourly `billing.grant-expiry` pass releases a reservation still held on a grant past its period end
 and then expires its available balance, so it never returns to spendable (ADR 0008); until that pass runs,
 "Applications left" already ignores the ended grant.
+
+A daily `billing.reconcile` pass, ten minutes after UTC midnight and only when billing is on, compares one UTC day
+of Stripe's side with Overture's: every paid invoice Stripe reports for the day must have its period grant (matched on
+`stripe_invoice_id`) and every period grant created that day must be an invoice Stripe reports; every refund Stripe
+reports must be a refund Overture audited (its `admin_audit` detail carries the Stripe refund id) with its ledger
+`refund` row, and every audited refund must still be at Stripe. The provider is read with six hours of slack on each
+edge, so an invoice paid just before midnight and granted just after it always matches, while the day's counts stay
+inside the window. The result is one `billing_reconciliations` row per day (a re-run replaces it), carrying the four
+counts and the first fifty mismatches; the first run that finds a mismatch raises the `billing.mismatch` alert with
+the day, the count and the kinds (a retry of the same day does not alert twice), and a clean day writes its row and
+alerts nobody. The admin billing page shows the last result.
 
 ### 5.7 Platform
 
@@ -1347,7 +1359,7 @@ All routes Zod-validated, JSON, typed client exported via Hono RPC. Auth routes 
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `POST /api/push/subscribe` · `DELETE /api/push/:id` · `GET /api/account/export` · `POST /api/account/export` · `GET /api/account/export/:id/download` · `GET /api/account/deletion` (email, re-authenticated) · `POST /api/account/reauth/link` (a fresh sign-in link) · `POST /api/account/delete` `{confirm: true}` · `GET /api/support-access` |
 | Billing (M3) | `GET /api/billing` (`enabled`, `customer`, the subscription's `plan`, `status`, `currentPeriodEnd` and `cancelAtPeriodEnd`) · `POST /api/billing/checkout` `{plan}` · `POST /api/billing/portal` |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `POST /internal/mail/dead-letter` · `GET /internal/mailboxes/:local` |
-| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/probes/personio`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
+| Admin | `/admin/api/overview`, `/users`, `/users/:id`, `/users/:id/reveal`, `/act-as/:userId`, `/applications`, `/attempts`, `/attempts/:id/live`, `/fixtures/capture`, `/probes/personio`, `/reviews`, `/kill-switches`, `/settings`, `/grants`, `/refunds`, `/billing/reconciliation` (M3), `/catalog`, `/tag-imports`, `/llm-usage`, `/invites`, `/mail-health`, `/audit`, `/provider-report` |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
 `home.updated`, `notification`, `calendar.updated`. TanStack Query invalidates by topic. The Calendar invalidates on
@@ -1491,7 +1503,8 @@ OTel traces for every request and job; metrics: `attempt_outcome_total{provider,
 attempts), provider success < 60 %, code or CAPTCHA rate > 20 %, queue age > 30 min, LLM spend > 80 % of the global
 or tagging cap, a daily scoring run that stops at its bound (3 × the daily cap, §8.2), Litestream lag > 5 min, backup failure, health check failing, disk > 80 %, a catalog sweep worker crash,
 an employer reply rate under 5 % after 10 sends in the last 30 days, the domain-wide reply rate under 5 % after 20
-sends (§11.4), an inbound message dead-lettered by the mail Worker, and an
+sends (§11.4), an inbound message dead-lettered by the mail Worker, a daily billing reconciliation with any mismatch
+(§5.6), and an
 unhandled rejection in a background loop or timer (logged to stderr, alerted at most once a minute). The alert path is the
 in-app `alert.raised` event plus a notification for every owner; with `ALERT_NTFY_URL` set, the same alert is pushed
 to the owner's phone. No Grafana is provisioned by this repository; dashboards stay with the owner's Grafana account

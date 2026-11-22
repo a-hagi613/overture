@@ -2300,11 +2300,31 @@ export const copy = {
     billingStatPayingHint: "Week or Month plan",
     billingStatPausedHint: "Applications stopped",
     billingStatEndingHint: "Renewal or plan end",
+    billingReconcileHeading: "Last reconciliation",
+    billingReconcileNone:
+      "No reconciliation has run yet. It runs every day just after midnight UTC.",
+    billingReconcileCleanPill: "Clean",
+    billingReconcileMismatchPill: "Mismatch",
+    billingReconcileClean: (day: string, invoices: number, refunds: number) =>
+      `Stripe and the ledger agree for ${day}: ${String(invoices)} paid invoices and ${String(refunds)} refunds.`,
+    billingReconcileMismatch: (day: string, count: number) =>
+      `${String(count)} mismatches for ${day}. The owner has been alerted.`,
+    billingReconcileMore: (shown: number, total: number) =>
+      `Showing the first ${String(shown)} of ${String(total)}.`,
+    billingReconcileKinds: {
+      invoice_without_grant: "Paid invoice with no grant",
+      grant_without_invoice: "Grant with no paid invoice",
+      refund_without_ledger: "Refund with no ledger entry",
+      ledger_without_refund: "Ledger refund missing at Stripe",
+      refund_ledger_missing: "Refund audit row with no ledger entry",
+    },
+    billingReconcileItem: (label: string, id: string) => `${label}: ${id}`,
     billingColumnUser: "User",
     billingColumnPlan: "Plan",
     billingColumnPeriod: "Period",
     billingColumnUsage: "Usage",
     billingColumnStatus: "Status",
+    billingUserNameFallback: "No name yet",
     billingPlanWeek: "Week",
     billingPlanMonth: "Month",
     billingPlanTrial: "Trial",
