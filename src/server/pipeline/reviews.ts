@@ -94,7 +94,6 @@ function attachmentsForReviews(db: AppDatabase, reviewIds: readonly string[]) {
   return db
     .select({
       applicationId: applications.id,
-      applicationId: applications.id,
       company: applications.companyName,
       title: applications.postingTitle,
       postingId: applications.postingId,

@@ -91,7 +91,11 @@ export function applicationsByIdOf(
   }
 
   const rows = db
-    .select({ company: applications.companyName, id: applications.id, title: applications.postingTitle })
+    .select({
+      company: applications.companyName,
+      id: applications.id,
+      title: applications.postingTitle,
+    })
     .from(applications)
     .where(and(eq(applications.userId, userId), inArray(applications.id, [...applicationIds])))
     .all();
