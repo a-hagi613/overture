@@ -8964,6 +8964,7 @@
         "src/web/lib/board-api.ts",
         "src/web/lib/board-format.ts",
         "src/web/lib/calendar-api.ts",
+        "src/web/lib/calendar-focus.ts",
         "src/web/lib/calendar-format.ts",
         "src/web/lib/calendar-grid.ts",
         "src/web/lib/calendar-style.ts",

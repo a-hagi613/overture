@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 import type { CalendarItem } from "../lib/calendar-api.ts";
 import type { CalendarDate } from "../lib/calendar-grid.ts";
 
@@ -22,6 +24,9 @@ export function CalendarAgenda({
   year: number;
   zone: string;
 }) {
+  const todayRef = useRef<HTMLDivElement>(null);
+  const todayKey = dayKeyOf(today);
+
   const days = [...buckets.entries()]
     .flatMap(([key, items]) => {
       const date = parseDayKey(key);
@@ -29,6 +34,14 @@ export function CalendarAgenda({
       return date?.month === month && date.year === year ? [{ date, items, key }] : [];
     })
     .toSorted((left, right) => left.key.localeCompare(right.key));
+
+  const showsToday = days.some(({ key }) => key === todayKey);
+
+  useEffect(() => {
+    if (showsToday) {
+      todayRef.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [showsToday]);
 
   if (days.length === 0) {
     return null;
@@ -45,10 +58,10 @@ export function CalendarAgenda({
       {days.map(({ date, items, key }) => {
         const sent = items.filter((entry) => chipKindOf(entry) === "sent");
         const others = items.filter((entry) => chipKindOf(entry) !== "sent");
-        const isToday = key === dayKeyOf(today);
+        const isToday = key === todayKey;
 
         return (
-          <div key={key}>
+          <div key={key} ref={isToday ? todayRef : undefined}>
             <h3 className="mt-[18px] text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {dayLabel(date)}
               {isToday ? (
