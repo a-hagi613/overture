@@ -35,6 +35,8 @@ const playwrightProjectPattern =
 const webRouteEntryPattern =
   /\{\s*path:\s*"(?<path>[^"]+)"\s*,\s*element:\s*<(?<component>[A-Za-z0-9_]+)\s*\/>/gu;
 
+const billingUserRoutePattern = /\/admin\/billing\/users\/\$\{[^}]*\}(?<refund>\/refund)?/gu;
+
 const gotoPathPattern = /\.(?:goto|toHaveURL)\([\s\S]{0,160}?(?<path>\/[A-Za-z0-9_\-.:/]*)/gu;
 
 const jobRoutePattern = /^\/__test__\/jobs(?:\/|$)/u;
@@ -869,6 +871,14 @@ function visitedUiRoutes(
       routes.add("/inbox/:id");
     } else if (rawPath === "/missing-route" && knownPaths.has("*")) {
       routes.add("*");
+    }
+  }
+
+  for (const match of combined.matchAll(billingUserRoutePattern)) {
+    routes.add("/admin/billing/users/:id");
+
+    if (match.groups?.refund !== undefined) {
+      routes.add("/admin/billing/users/:id/refund");
     }
   }
 

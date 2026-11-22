@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { request as apiRequest } from "@playwright/test";
 import { z } from "zod";
 
@@ -13,14 +12,12 @@ import {
   BILLING_SECRET_KEY,
   BILLING_WEBHOOK_SECRET,
   DEMO_LOGIN_EMAIL,
-  postWebhook,
+  deliverInvoice,
+  invoicePayload,
   signInOwner,
-  signPayload,
   signedInUserId,
 } from "./billing-harness.ts";
 import { startStripeMock } from "./stripe-mock.fixture.ts";
-
-const invoiceFixture = readFileSync("test/e2e/fixtures/stripe/invoice-paid.json", "utf8");
 
 const DAY_SECONDS = 86_400;
 
@@ -62,35 +59,6 @@ const billingStateSchema = z.object({
 const runDueSchema = z.object({ ran: z.number() });
 
 const reservationSchema = z.object({ applicationsLeft: z.number(), reserved: z.boolean() });
-
-interface InvoiceInput {
-  eventId: string;
-  invoiceId: string;
-  userId: string;
-  periodStart: number;
-  periodEnd: number;
-  plan?: string;
-}
-
-function invoicePayload(input: InvoiceInput) {
-  return invoiceFixture
-    .replaceAll("__EVENT_ID__", input.eventId)
-    .replaceAll("__INVOICE_ID__", input.invoiceId)
-    .replaceAll("__USER_ID__", input.userId)
-    .replaceAll("__PLAN__", input.plan ?? "month")
-    .replaceAll("__PRICE_ID__", BILLING_PRICE_MONTH)
-    .replaceAll('"__PERIOD_START__"', String(input.periodStart))
-    .replaceAll('"__PERIOD_END__"', String(input.periodEnd));
-}
-
-async function deliverInvoice(request: APIRequestContext, appUrl: string, payload: string) {
-  return postWebhook(
-    request,
-    appUrl,
-    payload,
-    signPayload(payload, await appNowSeconds(request, appUrl)),
-  );
-}
 
 async function homeState(request: APIRequestContext, appUrl: string) {
   return homeSchema.parse(await (await request.get(`${appUrl}/api/home`)).json());

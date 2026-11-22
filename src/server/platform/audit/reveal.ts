@@ -6,10 +6,10 @@ import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 
 import { adminAudit } from "../db/schema.ts";
+import { insertAdminAudit } from "./insert.ts";
 import {
   auditRowOfStored,
   failAuditSpan,
-  insertAdminAudit,
   recordAdminAudit,
   shipAdminAudit,
   startAuditSpan,
