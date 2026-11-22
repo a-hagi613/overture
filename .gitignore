@@ -46,3 +46,4 @@ profile/*
 # Recorded feeds and measurement output (orchestrator recordings)
 .measure/
 .stapply-seed/
+parity-captures/

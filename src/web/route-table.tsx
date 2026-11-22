@@ -66,6 +66,7 @@ const appShellChildren: RouteObject[] = [
   { path: "/settings/delete", element: <SettingsDeletePage /> },
   { path: "/settings/export", element: <SettingsExportPage /> },
   { path: "/settings/support-access", element: <SettingsSupportAccessPage /> },
+  { path: "*", element: <NotFoundPage /> },
 ];
 
 const adminShellChildren: RouteObject[] = [
@@ -100,7 +101,6 @@ const publicRoutes: RouteObject[] = [
   { path: "/onboarding/targets", element: <OnboardingTargetsPage /> },
   { path: "/onboarding/forward", element: <OnboardingForwardPage /> },
   { path: "/onboarding/trial", element: <OnboardingTrialPage /> },
-  { path: "*", element: <NotFoundPage /> },
 ];
 
 export const appRoutes: RouteObject[] = [
