@@ -20,19 +20,32 @@ const cascadeUserId = () =>
     .references(() => users.id, { onDelete: "cascade" })
     .notNull();
 
-export const users = sqliteTable("users", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
-  image: text("image"),
-  role: text("role", { enum: ["user", "owner", "demo"] })
-    .notNull()
-    .default("user"),
-  suspendedAt: timestamp("suspended_at"),
-  createdAt: timestamp("created_at").notNull(),
-  updatedAt: timestamp("updated_at").notNull(),
-});
+const mailbox = sql`case
+  when instr(lower(trim(email)), '@') = 0 then lower(trim(email))
+  when lower(substr(lower(trim(email)), instr(lower(trim(email)), '@') + 1)) in ('gmail.com', 'googlemail.com')
+    and replace(substr(substr(lower(trim(email)), 1, instr(lower(trim(email)), '@') - 1), 1, instr(substr(lower(trim(email)), 1, instr(lower(trim(email)), '@') - 1) || '+', '+') - 1), '.', '') <> ''
+  then replace(substr(substr(lower(trim(email)), 1, instr(lower(trim(email)), '@') - 1), 1, instr(substr(lower(trim(email)), 1, instr(lower(trim(email)), '@') - 1) || '+', '+') - 1), '.', '') || '@gmail.com'
+  else lower(trim(email))
+end`;
+
+export const users = sqliteTable(
+  "users",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull().unique(),
+    emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
+    image: text("image"),
+    role: text("role", { enum: ["user", "owner", "demo"] })
+      .notNull()
+      .default("user"),
+    suspendedAt: timestamp("suspended_at"),
+    createdAt: timestamp("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull(),
+    mailbox: text("mailbox").generatedAlwaysAs(mailbox, { mode: "virtual" }),
+  },
+  (table) => [uniqueIndex("users_mailbox_unique").on(table.mailbox)],
+);
 
 export const sessions = sqliteTable("session", {
   id: text("id").primaryKey(),
