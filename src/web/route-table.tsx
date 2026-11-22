@@ -1,3 +1,4 @@
+import { Navigate } from "react-router";
 import type { RouteObject } from "react-router";
 
 import { BoardPage } from "./routes/board.tsx";
@@ -73,6 +74,7 @@ const adminShellChildren: RouteObject[] = [
 const publicRoutes: RouteObject[] = [
   { path: "/signin", element: <SignInPage /> },
   { path: "/terms", element: <TermsPage /> },
+  { path: "/settings/terms", element: <Navigate replace to="/terms" /> },
   { path: "/privacy", element: <PrivacyPage /> },
   { path: "/pricing", element: <PricingPage /> },
   { path: "/consent", element: <ConsentPage /> },
