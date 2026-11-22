@@ -36,6 +36,12 @@ async function timedHealth(url: string) {
   };
 }
 
+async function waitForReplication(url: string) {
+  await expect
+    .poll(async () => (await timedHealth(url)).replication, { timeout: 30_000 })
+    .toBe("ok");
+}
+
 async function startReplicatedServer(
   directory: string,
   extraEnvironment: Record<string, string> = {},
@@ -134,9 +140,7 @@ test("a shorter read interval saved in Settings applies within one interval", as
     const { server, stop } = await startReplicatedServer(directory);
 
     try {
-      await expect
-        .poll(async () => (await timedHealth(server.url)).replication, { timeout: 30_000 })
-        .toBe("ok");
+      await waitForReplication(server.url);
 
       await expect
         .poll(async () => (await timedHealth(server.url)).readAgeSeconds, { timeout: 10_000 })
@@ -185,9 +189,7 @@ test("a cached reading older than three intervals reports unknown", async () => 
     const { server, stop } = await startReplicatedServer(directory);
 
     try {
-      await expect
-        .poll(async () => (await timedHealth(server.url)).replication, { timeout: 30_000 })
-        .toBe("ok");
+      await waitForReplication(server.url);
 
       const offset = await fetch(`${server.url}/__test__/clock/offset`, {
         method: "POST",

@@ -137,6 +137,19 @@ async function pauseSchedulerPolling(owner: APIRequestContext) {
   expect(response.ok()).toBe(true);
 }
 
+async function waitForRecapMail(owner: APIRequestContext) {
+  await expect
+    .poll(
+      async () => {
+        await runDueJobs(owner);
+
+        return (await mailFor(owner)).length;
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(1);
+}
+
 async function readyFor(owner: APIRequestContext) {
   return readySchema.parse(await (await owner.get("/api/ready")).json());
 }
@@ -259,16 +272,7 @@ test("a 07:00 run fills exactly the free Ready slots, sends one recap, and does 
 
   expect(await applicationsFor(owner, userId)).toHaveLength(10);
 
-  await expect
-    .poll(
-      async () => {
-        await runDueJobs(owner);
-
-        return (await mailFor(owner)).length;
-      },
-      { timeout: 30_000 },
-    )
-    .toBe(1);
+  await waitForRecapMail(owner);
 
   const [recap] = await mailFor(owner);
 
@@ -414,16 +418,8 @@ test("the next day's run stops at the unapproved Ready Applications and sends no
   await expect
     .poll(async () => (await applicationsFor(owner, userId)).length, { timeout: 30_000 })
     .toBe(10);
-  await expect
-    .poll(
-      async () => {
-        await runDueJobs(owner);
 
-        return (await mailFor(owner)).length;
-      },
-      { timeout: 30_000 },
-    )
-    .toBe(1);
+  await waitForRecapMail(owner);
 
   const scheduled = (await jobsFor(owner)).find(
     (job) => job.kind === "prep.daily" && job.runAt === secondRun,

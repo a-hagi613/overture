@@ -24,6 +24,13 @@ function newestTxid(path: string) {
   return txids.toSorted().at(-1);
 }
 
+function replicaHoldsNewest(shadowDirectory: string, replicaDirectory: string) {
+  const shadowTxid = newestTxid(shadowDirectory);
+  const replicaTxid = newestTxid(replicaDirectory);
+
+  return shadowTxid !== undefined && replicaTxid !== undefined && replicaTxid >= shadowTxid;
+}
+
 /**
  * Waits until the replica holds every transaction the local shadow has.
  *
@@ -38,17 +45,7 @@ export async function waitForReplicaTransactions(directory: string) {
   const shadowDirectory = join(directory, ".live.db-litestream");
   const replicaDirectory = join(directory, "replica");
 
-  await expect.poll(() => newestTxid(shadowDirectory), { timeout: 30_000 }).toBeDefined();
-
   await expect
-    .poll(
-      () => {
-        const shadowTxid = newestTxid(shadowDirectory);
-        const replicaTxid = newestTxid(replicaDirectory);
-
-        return shadowTxid !== undefined && replicaTxid !== undefined && replicaTxid >= shadowTxid;
-      },
-      { timeout: 30_000 },
-    )
+    .poll(() => replicaHoldsNewest(shadowDirectory, replicaDirectory), { timeout: 30_000 })
     .toBe(true);
 }
