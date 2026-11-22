@@ -154,7 +154,10 @@ export function SettingsBillingPage() {
       {body}
       {billing?.plan === null ? (
         <p className="mt-5 text-[12.5px] text-muted-foreground">
-          <Link className="font-semibold text-foreground underline" to="/pricing">
+          <Link
+            className="font-semibold text-foreground underline hover:text-muted-foreground"
+            to="/pricing"
+          >
             {COPY.pricingLink}
           </Link>
         </p>

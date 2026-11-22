@@ -78,7 +78,7 @@ export function SettingsBillingPlansPage() {
   return (
     <div className="mx-auto max-w-[940px]">
       <Link
-        className="text-[13px] font-semibold text-muted-foreground hover:text-foreground"
+        className="inline-flex max-md:min-h-11 max-md:-my-[14px] items-center text-[13px] font-semibold text-muted-foreground hover:text-foreground"
         to="/settings/billing"
       >
         {`← ${COPY.backLink}`}
