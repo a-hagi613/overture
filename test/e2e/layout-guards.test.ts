@@ -191,12 +191,11 @@ async function expectSidebarFixed(page: Page, path: string, width: number) {
 
   const metrics = await aside.evaluate((element) => {
     const box = element.getBoundingClientRect();
-    // The Settings row sits above the nav's end; the avatar at the bottom is the last match.
-    const settingsLinks = element.querySelectorAll('a[href="/settings"]');
-    const bottomLink = settingsLinks.item(settingsLinks.length - 1);
+    const settingsLinks = [...element.querySelectorAll('a[href="/settings"]')];
+    const bottomLink = settingsLinks.at(-1);
 
     return {
-      bottomLinkBottom: bottomLink === null ? null : bottomLink.getBoundingClientRect().bottom,
+      bottomLinkBottom: bottomLink?.getBoundingClientRect().bottom ?? null,
       position: getComputedStyle(element).position,
       top: box.top,
       width: box.width,
@@ -234,16 +233,15 @@ async function navigate(page: Page, path: string, landsOn: string = path) {
   await page.waitForFunction((next) => globalThis.location.pathname === next, landsOn);
 }
 
-// Legacy settings paths that redirect; the sweep checks the page they land on.
-const redirectedPaths: Record<string, string> = {
-  "/settings/notifications": "/settings",
-  "/settings/support": "/settings",
-  "/settings/terms": "/terms",
-};
+const redirectedPaths = new Map([
+  ["/settings/notifications", "/settings"],
+  ["/settings/support", "/settings"],
+  ["/settings/terms", "/terms"],
+]);
 
 async function checkTarget(page: Page, target: Target, url: string, width: number) {
   const requestedPath = new URL(url).pathname;
-  const expectedPath = redirectedPaths[requestedPath] ?? requestedPath;
+  const expectedPath = redirectedPaths.get(requestedPath) ?? requestedPath;
 
   await navigate(page, requestedPath, expectedPath);
   await expect(page.locator("main").first()).toBeVisible({ timeout: 15_000 });
