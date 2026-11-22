@@ -25,6 +25,16 @@ export default defineConfig({
       },
     },
     {
+      name: "pricing-boards",
+      testMatch: /board-match-pricing\.test\.ts/u,
+      expect: {
+        toHaveScreenshot: {
+          maxDiffPixelRatio: 0.01,
+          pathTemplate: "{testDir}/../../design/reference/pricing/{arg}{ext}",
+        },
+      },
+    },
+    {
       name: "profile-boards",
       testMatch: /board-match-profile\.test\.ts/u,
       expect: {
