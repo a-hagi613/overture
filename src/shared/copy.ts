@@ -548,12 +548,14 @@ export const copy = {
     eyebrow: "Legal",
     lastUpdated: "Last updated 21 November 2026",
     metaSeparator: " · ",
-    effective: "Effective when the beta opens",
+    effective: "Effective when the plans open to the public",
     footerName: "Overture",
     footerContact: "admin@tryoverture.com",
     footerAddress: "[POSTAL ADDRESS]",
     footerSeparator: " · ",
     footerLinksLabel: "Legal pages",
+    draftNotice:
+      "Draft for owner review, not legal advice. Billing terms take effect when the plans open to the public.",
     termsLink: "Terms of Service",
     privacyLink: "Privacy Policy",
     contactHref: "mailto:admin@tryoverture.com",
@@ -587,7 +589,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "You sign in with Google, LinkedIn or an emailed link, using the email your invitation was sent to. Keep your sign-in details to yourself, and tell us if you think someone else has used your account.",
+              text: "You sign in with Google, LinkedIn or an emailed link. Keep your sign-in details to yourself, and tell us if you think someone else has used your account.",
             },
           ],
         },
@@ -601,11 +603,62 @@ export const copy = {
           ],
         },
         {
-          heading: "The beta",
+          heading: "Plans and payment",
           blocks: [
             {
               kind: "paragraph",
-              text: "Overture is invite-only during the beta. An accepted invite comes with 300 applications over 30 days. The beta has no charge and asks for no card.",
+              text: "Overture is a paid service after the free trial. The Week plan costs $12 and includes 70 applications over 7 days. The Month plan costs $35 and includes 300 applications over 30 days. Checkout shows the price in your local currency, and taxes are added where they apply. Stripe takes the payment and is the merchant of record for each charge.",
+            },
+            {
+              kind: "paragraph",
+              text: "Accounts invited during the beta keep the applications their invite included. They choose a plan when those run out.",
+            },
+          ],
+        },
+        {
+          heading: "Free trial",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "A new account can try Overture with 3 applications at no charge. The trial starts after a card is checked with Stripe: Stripe verifies the card with a temporary authorisation and does not charge it. One card gets one trial. To enforce that, we keep a keyed fingerprint of the card, not the card number, apart from your account. It is not linked to you and it survives deleting your account.",
+            },
+          ],
+        },
+        {
+          heading: "Renewal",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "The Week and Month plans are subscriptions. Each one renews automatically at the end of its period at the price you agreed, until you cancel. Every paid period issues its allowance in full: 70 applications for Week over 7 days, 300 for Month over 30 days. Unused applications do not roll over. They expire when the period ends and are never refunded.",
+            },
+            {
+              kind: "paragraph",
+              text: "If a renewal payment fails, Overture pauses preparing and sending new applications until the payment succeeds or you choose another plan. Applications already sent are not affected.",
+            },
+          ],
+        },
+        {
+          heading: "Cancelling",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "You can cancel at any time from Settings, which opens the Stripe customer portal. Cancelling stops the next renewal. Your current period keeps running to its end, and its remaining applications stay usable until then. If you move between Week and Month, the new plan starts at your next renewal, not straight away.",
+            },
+          ],
+        },
+        {
+          heading: "Refunds and failed applications",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "We do not give refunds by default, including for a period you cancel part-way through or for applications you did not use. A failed application is different: if Overture could not send an application, that attempt is never charged and never uses one of your applications. You can try it again within your allowance.",
+            },
+            {
+              kind: "paragraphWithLink",
+              before: "If you think you were charged in error, write to ",
+              after: " and we will look at it.",
+              href: "mailto:admin@tryoverture.com",
+              link: "admin@tryoverture.com",
             },
           ],
         },
@@ -641,7 +694,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "If we change these terms, we will tell you by email before the change takes effect.",
+              text: "If we change these terms, we will tell you by email before the change takes effect. A change to a price applies from your next renewal.",
             },
           ],
         },
@@ -685,6 +738,7 @@ export const copy = {
                 "Your forwarding address, and the job emails you forward to it.",
                 "Application records: what was filled in, what you approved, what was sent and when.",
                 "The consent versions you agreed to, and the records needed to keep the service running and secure.",
+                "Billing records: your plan, the invoices Stripe issues, the payment status, and the last four digits and expiry of the card Stripe holds. We never store the full card number.",
               ],
             },
           ],
@@ -694,7 +748,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "To find jobs for you, prepare and send the applications you approve, email you what you asked for (sign-in and verification links, the daily recap), and keep Overture safe.",
+              text: "To find jobs for you, prepare and send the applications you approve, email you what you asked for (sign-in and verification links, the daily recap), take and track your payments, and keep Overture safe.",
             },
           ],
         },
@@ -728,7 +782,24 @@ export const copy = {
                   name: "Anthropic",
                 },
                 { does: "Service logs and health monitoring.", name: "Grafana Cloud" },
+                {
+                  does: "Takes payments, holds the card details and handles tax as merchant of record.",
+                  name: "Stripe",
+                },
               ],
+            },
+          ],
+        },
+        {
+          heading: "Payments and card details",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Stripe processes payments for Overture as a sub-processor and is the merchant of record for each charge. Card details go from your browser to Stripe and are never stored by Overture. Stripe sends us the plan, the invoices, the payment status and the last four digits and expiry of the card, and we keep those records to run your allowance, answer questions and meet tax and accounting rules.",
+            },
+            {
+              kind: "paragraph",
+              text: "For the free trial we store a keyed fingerprint of the card, not the card number. It is not linked to your account and it survives deleting your account, so one card cannot start a second trial.",
             },
           ],
         },
@@ -751,6 +822,10 @@ export const copy = {
               after: ".",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
+            },
+            {
+              kind: "paragraph",
+              text: "Deleting your account removes your billing records with it. Stripe keeps the invoices it must keep as merchant of record. The keyed card fingerprint used for the free trial is not linked to you and is kept so the same card cannot start a second trial.",
             },
           ],
         },

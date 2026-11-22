@@ -87,6 +87,16 @@ _Avoid_: failed (in copy), error
 How many more Applications the user's plan allows; one is used only when an Application is confirmed sent.
 _Avoid_: credit, allowance, quota
 
+**Plan**:
+The paid recurring allowance: Week ($12, 70 applications over 7 days) or Month ($35, 300 applications over 30 days).
+It renews until cancelled, unused applications expire at the end of the period, and a failed Application is never charged.
+_Avoid_: tier, subscription level
+
+**Free trial**:
+Three applications at no charge, once per card. The card is verified with no charge, and a keyed fingerprint that is
+not linked to the user stops a second trial.
+_Avoid_: free plan, demo
+
 **Snapshot**:
 The permanent record of exactly what one sent Application said: answers with their sources, the letter, the resume file and the consent.
 _Avoid_: receipt, log
