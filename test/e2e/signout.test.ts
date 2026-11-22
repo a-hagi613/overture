@@ -30,6 +30,12 @@ test("the owner signs out of this device from Settings and cannot return to the 
   expect((await verifyAuthState(appServerUrl, request)).sessions).toHaveLength(0);
 
   await page.goto(`${appServerUrl}/`);
+  await expect(page).toHaveURL(`${appServerUrl}/`);
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Overture prepares every application/u }),
+  ).toBeVisible();
+
+  await page.goto(`${appServerUrl}/board`);
   await expect(page).toHaveURL(/\/signin$/u);
 });
 

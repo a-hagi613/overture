@@ -282,7 +282,7 @@ test("sign out of all devices ends every other session and keeps this one", asyn
   await expect(page.getByText("You are signed out on your other devices.")).toBeVisible();
   expect((await verifyAuthState(appServerUrl, request)).sessions).toHaveLength(1);
 
-  await otherPage.goto(`${appServerUrl}/`);
+  await otherPage.goto(`${appServerUrl}/board`);
   await expect(otherPage).toHaveURL(/\/signin/u);
 
   await otherContext.close();
