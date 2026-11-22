@@ -63,7 +63,7 @@ export function BoardPageHeader(props: {
             type="search"
           />
         </label>
-        <div className="flex h-10 items-center gap-2.5 rounded-md border border-input bg-card pr-1.5 pl-[13px]">
+        <div className="flex h-10 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-md border border-input bg-card pr-1.5 pl-[13px]">
           <span className="flex items-center gap-2 text-[13px] font-medium">
             <span className="h-2 w-2 rounded-full bg-signal" />
             {props.running ? copy.board.running : copy.board.paused}
