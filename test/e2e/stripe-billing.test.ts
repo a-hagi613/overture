@@ -111,8 +111,12 @@ test("a signed event is processed once, a replay and bad signatures change nothi
     expect(checkoutParams.get("client_reference_id")).toBe(ownerId);
     expect(checkoutParams.get("metadata[user_id]")).toBe(ownerId);
     expect(checkoutParams.get("customer_email")).toBe(authTestIdentity.ownerEmail);
-    expect(checkoutParams.get("success_url")).toBe(`${APP_ORIGIN}/settings?billing=success`);
-    expect(checkoutParams.get("cancel_url")).toBe(`${APP_ORIGIN}/settings?billing=cancelled`);
+    expect(checkoutParams.get("success_url")).toBe(
+      `${APP_ORIGIN}/settings/billing/plans?billing=success`,
+    );
+    expect(checkoutParams.get("cancel_url")).toBe(
+      `${APP_ORIGIN}/settings/billing/plans?billing=cancelled`,
+    );
 
     stripe.clear();
 
@@ -225,7 +229,7 @@ test("a signed event is processed once, a replay and bad signatures change nothi
     const portalParams = new URLSearchParams(portalRequest.body);
 
     expect(portalParams.get("customer")).toBe(CUSTOMER_ID);
-    expect(portalParams.get("return_url")).toBe(`${APP_ORIGIN}/settings`);
+    expect(portalParams.get("return_url")).toBe(`${APP_ORIGIN}/settings/billing`);
 
     stripe.clear();
 

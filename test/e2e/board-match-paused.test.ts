@@ -51,14 +51,14 @@ const pauseReasons = [
   {
     action: "Choose a plan",
     copy: "Sending stopped when it ran out. Your queue and history are kept.",
-    href: "/settings",
+    href: "/settings/billing/plans",
     reason: "plan_ended",
     title: "Your plan has ended.",
   },
   {
     action: "Update payment",
     copy: "Sending stays paused until the card is updated.",
-    href: "/settings",
+    href: "/settings/billing",
     reason: "payment_failed",
     title: "Payment didn't go through.",
   },

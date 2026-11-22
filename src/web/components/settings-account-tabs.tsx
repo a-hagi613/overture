@@ -10,6 +10,7 @@ const tabs: { key: TabKey; to: string | null }[] = [
   { key: "delete", to: "/settings/delete" },
   { key: "supportAccess", to: "/settings/support-access" },
   { key: "legal", to: null },
+  { key: "billing", to: "/settings/billing" },
 ];
 
 const baseClass =

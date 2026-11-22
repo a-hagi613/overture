@@ -11,8 +11,8 @@ const FIX_PATH: Record<Exclude<PauseReason, "suspended" | "user">, string> = {
   no_mailbox: "/profile#profile-address",
   no_resume: "/profile#profile-resume",
   onboarding: "/onboarding",
-  payment_failed: "/settings",
-  plan_ended: "/settings",
+  payment_failed: "/settings/billing",
+  plan_ended: "/settings/billing/plans",
 };
 
 const BUTTON_CLASS =
