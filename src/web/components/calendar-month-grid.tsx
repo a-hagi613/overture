@@ -72,7 +72,7 @@ export function CalendarMonthGrid({
   };
 
   return (
-    <div className="overflow-hidden rounded-md border border-border" ref={grid}>
+    <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sh" ref={grid}>
       <ul
         aria-hidden="true"
         className="grid grid-cols-[repeat(7,minmax(0,1fr))] border-b border-border bg-sidebar"
