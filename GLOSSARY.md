@@ -28,11 +28,6 @@ The address a user proved they own by opening the single-use link Overture maile
 or sent for an unverified address, and an invite is accepted on the first verified sign-in.
 _Avoid_: confirmed address, validated account
 
-**Password reset**:
-A single-use link (one hour) that lets a user choose a new password. Saving it signs the user out of other devices
-and then signs them in on the device that opened it.
-_Avoid_: forgot-password flow, credential recovery
-
 **Demo account**:
 The `role = demo` account (`test@email.com`) that the owner opens from the sign-in page with one click to see
 Overture as a long-time user would. It is seeded with fictional data, receives no mail, sends no Application, makes

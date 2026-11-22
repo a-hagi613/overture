@@ -67,12 +67,6 @@ export function createMeteredMailSender(db: AppDatabase, clock: Clock, adapter: 
     sendMagicLink: async (mail) => {
       await metered("auth", async () => adapter.sendMagicLink(mail));
     },
-    sendEmailVerification: async (mail) => {
-      await metered("auth", async () => adapter.sendEmailVerification(mail));
-    },
-    sendPasswordReset: async (mail) => {
-      await metered("auth", async () => adapter.sendPasswordReset(mail));
-    },
     sendCheck: async (mail) => {
       await metered("system", async () => adapter.sendCheck(mail));
     },

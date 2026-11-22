@@ -69,22 +69,6 @@ export function createCloudflareMailSender(config: CloudflareMailConfig) {
         copy.mail.magicLinkBody(mail.url),
       );
     },
-    sendEmailVerification: async (mail) => {
-      await sendEmail(
-        config,
-        mail.to,
-        copy.mail.verifyEmailSubject,
-        copy.mail.verifyEmailBody(mail.url),
-      );
-    },
-    sendPasswordReset: async (mail) => {
-      await sendEmail(
-        config,
-        mail.to,
-        copy.mail.resetPasswordSubject,
-        copy.mail.resetPasswordBody(mail.url),
-      );
-    },
     sendCheck: async (mail) => {
       await sendEmail(config, mail.to, mail.subject, mail.body);
     },

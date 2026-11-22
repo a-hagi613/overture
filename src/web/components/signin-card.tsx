@@ -1,27 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { z } from "zod";
 
 import { copy } from "../../shared/copy.ts";
 import { isDemoEmail } from "../../shared/demo.ts";
 import { turnstileActionHeader, turnstileTokenHeader } from "../../shared/turnstile.ts";
-import type { TurnstileAction } from "../../shared/turnstile.ts";
 import { BusyIndicator } from "./busy-indicator.tsx";
 import { GoogleMark } from "./google-mark.tsx";
 import { NavGlyph } from "./nav-glyph.tsx";
 import { SignInForm } from "./signin-form.tsx";
-import { SignUpForm } from "./signup-form.tsx";
 import {
   ALERT_CLASS,
   BTN_GHOST,
-  BTN_PRIMARY,
   BTN_SECONDARY,
   CARD_CLASS,
   CARD_DESCRIPTION,
   CARD_HEADING,
-  INPUT_ERROR_CLASS,
-  LABEL_CLASS,
   SWITCH_CLASS,
 } from "./signin-styles.ts";
 import { authClient } from "../lib/auth-client.ts";
@@ -29,13 +23,11 @@ import { fetchOnboardingState } from "../lib/onboarding-api.ts";
 import { useTurnstile, turnstileFailureMessage } from "../lib/turnstile.ts";
 import type { TurnstileTokenResult } from "../lib/turnstile.ts";
 
-type Mode = "sign-in" | "sign-up";
-
 type SocialProvider = "google" | "linkedin";
 
-type Pending = "google" | "linkedin" | "magic" | "password" | "verify";
+type Pending = "google" | "linkedin" | "magic";
 
-type Phase = "form" | "magic-sent" | "refused" | "suspended" | "verify-sent";
+type Phase = "form" | "magic-sent" | "refused" | "suspended";
 
 interface TurnstileCardConfig {
   scriptUrl: string | undefined;
@@ -43,7 +35,6 @@ interface TurnstileCardConfig {
 }
 
 const CALLBACK_URL = "/signin";
-const VERIFIED_CALLBACK_URL = "/signin?verified=1";
 
 const meSchema = z.object({
   user: z.unknown().nullable(),
@@ -58,11 +49,6 @@ const callbackPhase = new Map<string, Phase>([
   ["forbidden", "refused"],
   ["account_suspended", "suspended"],
 ]);
-
-const headlineByMode = {
-  "sign-in": { title: copy.signIn.title, description: copy.signIn.description },
-  "sign-up": { title: copy.signIn.signUpTitle, description: copy.signIn.signUpDescription },
-};
 
 async function nextAfterSignIn() {
   const onboarding = await fetchOnboardingState().catch(() => null);
@@ -115,13 +101,9 @@ export function SignInCard() {
   const navigate = useNavigate();
   const [search] = useSearchParams();
   const callbackError = search.get("error") ?? "";
-  const resetSaved = search.get("reset") === "1";
   const phaseFromCallback = callbackPhase.get(callbackError);
-  const [mode, setMode] = useState<Mode>("sign-in");
   const [phase, setPhase] = useState<Phase>(phaseFromCallback ?? "form");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [actionError, setActionError] = useState<string | null>(callbackMessage(callbackError));
 
   const [turnstileConfig, setTurnstileConfig] = useState<TurnstileCardConfig | undefined>(
@@ -132,30 +114,16 @@ export function SignInCard() {
   const [pending, setPending] = useState<Pending | null>(null);
   const pendingRef = useRef(false);
   const siteKey = turnstileConfig === undefined ? undefined : turnstileConfig.siteKey;
-  const socialAction: TurnstileAction = mode === "sign-up" ? "signup" : "signin";
-  const passwordAction: TurnstileAction = mode === "sign-up" ? "signup" : "signin";
 
   const { containerRef: socialContainer, obtainToken: obtainSocialToken } = useTurnstile(
     socialProviders.length > 0 ? siteKey : null,
-    socialAction,
-    turnstileConfig?.scriptUrl,
-  );
-
-  const { containerRef: passwordContainer, obtainToken: obtainPasswordToken } = useTurnstile(
-    siteKey,
-    passwordAction,
+    "signin",
     turnstileConfig?.scriptUrl,
   );
 
   const { containerRef: magicContainer, obtainToken: obtainMagicToken } = useTurnstile(
     siteKey,
     "magiclink",
-    turnstileConfig?.scriptUrl,
-  );
-
-  const { containerRef: verifyContainer, obtainToken: obtainVerifyToken } = useTurnstile(
-    siteKey,
-    "signup",
     turnstileConfig?.scriptUrl,
   );
 
@@ -245,7 +213,7 @@ export function SignInCard() {
           callbackURL: CALLBACK_URL,
           errorCallbackURL: CALLBACK_URL,
           fetchOptions: {
-            headers: { [turnstileTokenHeader]: token, [turnstileActionHeader]: socialAction },
+            headers: { [turnstileTokenHeader]: token, [turnstileActionHeader]: "signin" },
           },
         })
         .catch(() => null);
@@ -268,94 +236,6 @@ export function SignInCard() {
         }
       }
     });
-  };
-
-  const submitPassword = async () => {
-    if (mode === "sign-up" && password.length < 10) {
-      setActionError(copy.signIn.passwordShort);
-
-      return;
-    }
-
-    const token = await confirmToken(obtainPasswordToken);
-
-    if (token === null) {
-      return;
-    }
-
-    const trimmed = email.trim();
-    const headers = { [turnstileTokenHeader]: token, [turnstileActionHeader]: passwordAction };
-
-    if (mode === "sign-up") {
-      const result = await authClient.signUp
-        .email({
-          email: trimmed,
-          name: trimmed.split("@")[0] ?? trimmed,
-          password,
-          callbackURL: VERIFIED_CALLBACK_URL,
-          fetchOptions: { headers },
-        })
-        .catch(() => null);
-
-      if (result === null) {
-        setActionError(copy.signIn.genericError);
-
-        return;
-      }
-
-      if (result.error === null) {
-        setPhase("verify-sent");
-        setActionError(null);
-
-        return;
-      }
-
-      if (result.error.code === "forbidden") {
-        setPhase("refused");
-        setActionError(copy.signIn.refusedField);
-      } else if (result.error.code === "PASSWORD_COMPROMISED") {
-        setActionError(copy.signIn.passwordCompromised);
-      } else {
-        setActionError(presentError(result.error.status, result.error.code));
-      }
-
-      return;
-    }
-
-    const result = await authClient.signIn
-      .email({
-        email: trimmed,
-        password,
-        callbackURL: CALLBACK_URL,
-        fetchOptions: { headers },
-      })
-      .catch(() => null);
-
-    if (result === null) {
-      setActionError(copy.signIn.genericError);
-
-      return;
-    }
-
-    if (result.error === null) {
-      void navigate(await nextAfterSignIn(), { replace: true });
-
-      return;
-    }
-
-    if (result.error.code === "forbidden") {
-      setPhase("refused");
-      setActionError(null);
-    } else if (result.error.code === "account_suspended") {
-      setPhase("suspended");
-    } else if (result.error.code === "EMAIL_NOT_VERIFIED") {
-      setPhase("verify-sent");
-      setActionError(null);
-    } else if (result.error.status === 401) {
-      setActionError(copy.signIn.badCredentials);
-    } else {
-      setActionError(presentError(result.error.status, result.error.code));
-    }
   };
 
   const submitMagic = async () => {
@@ -437,46 +317,8 @@ export function SignInCard() {
     }
   };
 
-  const onPassword = async () => {
-    await runPending("password", submitPassword);
-  };
-
   const onMagic = async () => {
     await runPending("magic", submitMagic);
-  };
-
-  const onVerifyResend = async () => {
-    await runPending("verify", submitVerify);
-  };
-
-  const switchMode = (next: Mode) => {
-    setMode(next);
-    setPhase("form");
-    setActionError(null);
-  };
-
-  const submitVerify = async () => {
-    const token = await confirmToken(obtainVerifyToken);
-
-    if (token === null) {
-      return;
-    }
-
-    const result = await authClient
-      .sendVerificationEmail({
-        email,
-        callbackURL: VERIFIED_CALLBACK_URL,
-        fetchOptions: {
-          headers: { [turnstileTokenHeader]: token, [turnstileActionHeader]: "signup" },
-        },
-      })
-      .catch(() => null);
-
-    if (result === null) {
-      setActionError(copy.signIn.genericError);
-    } else if (result.error !== null) {
-      setActionError(copy.signIn.genericError);
-    }
   };
 
   const socialButtons =
@@ -568,285 +410,132 @@ export function SignInCard() {
     );
   }
 
-  if (phase === "magic-sent" || phase === "verify-sent") {
-    const verify = phase === "verify-sent";
-    const busyResend = verify ? pending === "verify" : pending === "magic";
+  if (phase === "magic-sent") {
+    const busyResend = pending === "magic";
 
     return (
-      <>
-        <section aria-labelledby="signin-heading" className={CARD_CLASS}>
-          <div className="mb-[22px] flex flex-col gap-1.5">
-            <h1 className={CARD_HEADING} id="signin-heading">
-              {verify ? copy.signIn.verifyTitle : copy.signIn.sentTitle}
-            </h1>
-            <p className={CARD_DESCRIPTION}>
-              {verify ? copy.signIn.verifyDescription : copy.signIn.sentDescription}
+      <section aria-labelledby="signin-heading" className={CARD_CLASS}>
+        <div className="mb-[22px] flex flex-col gap-1.5">
+          <h1 className={CARD_HEADING} id="signin-heading">
+            {copy.signIn.sentTitle}
+          </h1>
+          <p className={CARD_DESCRIPTION}>{copy.signIn.sentDescription}</p>
+        </div>
+        <div className="flex flex-col gap-3.5">
+          <output
+            className="rounded-lg px-4 py-[15px] text-[13.5px] leading-normal text-ok"
+            style={{ background: "var(--color-ok-soft)" }}
+          >
+            <p className="font-semibold text-foreground">
+              {copy.signIn.sentHeading}{" "}
+              <span className="font-mono text-[13px] [overflow-wrap:anywhere]">{email}</span>
             </p>
-          </div>
-          <div className="flex flex-col gap-3.5">
-            <output
-              className="flex items-start gap-3 rounded-lg px-4 py-[15px] text-[13.5px] leading-normal text-ok"
-              style={{ background: "var(--color-ok-soft)" }}
-            >
-              <span className="mt-0.5 flex-none">
-                <NavGlyph name="mail" size={18} />
-              </span>
-              <div>
-                <p className="font-semibold text-foreground">
-                  {verify ? copy.signIn.verifyHeading : copy.signIn.sentHeading}{" "}
-                  <span className="font-mono text-[13px] [overflow-wrap:anywhere]">{email}</span>
-                </p>
-                <p className="mt-1 text-[13px] text-muted-foreground">
-                  {verify ? copy.signIn.verifyDetail : copy.signIn.sentDetail}
-                </p>
-              </div>
-            </output>
-            <button
-              aria-busy={busyResend || undefined}
-              className={BTN_SECONDARY}
-              disabled={pending !== null}
-              onClick={() => {
-                void (verify ? onVerifyResend() : onMagic());
-              }}
-              type="button"
-            >
-              {busyResend ? <BusyIndicator /> : null}
-              {verify ? copy.signIn.verifyResend : copy.signIn.resend}
-            </button>
-            <p className="text-center text-[13.5px] text-muted-foreground">
-              {copy.signIn.resendHint}
-            </p>
-            <button
-              className={`${BTN_GHOST} disabled:cursor-not-allowed disabled:opacity-[.45]`}
-              disabled={pending !== null}
-              onClick={() => {
-                setPhase("form");
-                setEmail("");
-                setActionError(null);
-              }}
-              type="button"
-            >
-              {copy.signIn.changeEmail}
-            </button>
-          </div>
-          <div data-turnstile="social" ref={socialContainer} />
-          <div data-turnstile="password" ref={passwordContainer} />
-          <div data-turnstile="magic" ref={magicContainer} />
-          <div data-turnstile="verify" ref={verifyContainer} />
-        </section>
-        {verify ? (
-          <p className={SWITCH_CLASS}>
-            {copy.signIn.verifyAlready}{" "}
-            <button
-              className="inline min-h-[44px] border-0 bg-transparent px-1 text-[13px] font-semibold text-foreground underline underline-offset-[3px] disabled:cursor-not-allowed disabled:opacity-[.45]"
-              disabled={pending !== null}
-              onClick={() => {
-                switchMode("sign-in");
-              }}
-              type="button"
-            >
-              {copy.signIn.switchToSignIn}
-            </button>
+            <p className="mt-1 text-[13px] text-muted-foreground">{copy.signIn.sentDetail}</p>
+          </output>
+          <button
+            aria-busy={busyResend || undefined}
+            className={BTN_SECONDARY}
+            disabled={pending !== null}
+            onClick={() => {
+              void onMagic();
+            }}
+            type="button"
+          >
+            {busyResend ? <BusyIndicator /> : null}
+            {copy.signIn.resend}
+          </button>
+          <p className="text-center text-[13.5px] text-muted-foreground">
+            {copy.signIn.resendHint}
           </p>
-        ) : null}
-      </>
+          <button
+            className={`${BTN_GHOST} disabled:cursor-not-allowed disabled:opacity-[.45]`}
+            disabled={pending !== null}
+            onClick={() => {
+              setPhase("form");
+              setEmail("");
+              setActionError(null);
+            }}
+            type="button"
+          >
+            {copy.signIn.changeEmail}
+          </button>
+        </div>
+        <div data-turnstile="social" ref={socialContainer} />
+        <div data-turnstile="magic" ref={magicContainer} />
+      </section>
     );
   }
 
   const isRefused = phase === "refused";
-  const isSignUp = mode === "sign-up";
-  const switchToSignUp = isRefused || !isSignUp;
-  const switchPrompt = switchToSignUp ? copy.signIn.switchPrompt : copy.signIn.switchBackPrompt;
-  const switchLabel = switchToSignUp ? copy.signIn.switchToSignUp : copy.signIn.switchToSignIn;
-
-  const headline = isRefused
-    ? { title: copy.signIn.title, description: copy.signIn.refusedDescription }
-    : headlineByMode[mode];
-
-  let formArea: ReactNode;
-
-  if (isRefused) {
-    formArea = (
-      <form
-        className="flex flex-col gap-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void onMagic();
-        }}
-      >
-        <div>
-          <label className={LABEL_CLASS} htmlFor="signin-email">
-            {copy.signIn.emailLabel}
-          </label>
-          <input
-            aria-describedby="signin-email-error"
-            aria-invalid="true"
-            autoComplete="email"
-            className={INPUT_ERROR_CLASS}
-            id="signin-email"
-            onInput={(event) => {
-              setEmail(event.currentTarget.value);
-            }}
-            placeholder={copy.signIn.emailPlaceholder}
-            type="email"
-            value={email}
-          />
-        </div>
-        <p
-          className="text-left text-[12.5px] font-semibold leading-[1.5] text-need"
-          id="signin-email-error"
-        >
-          {copy.signIn.refusedField}
-        </p>
-        <button
-          aria-busy={pending === "magic" || undefined}
-          className={BTN_PRIMARY}
-          disabled={pending !== null}
-          type="submit"
-        >
-          {pending === "magic" ? <BusyIndicator /> : null}
-          {copy.signIn.magicSubmit}
-        </button>
-      </form>
-    );
-  } else if (isSignUp) {
-    formArea = (
-      <SignUpForm
-        email={email}
-        onEmail={setEmail}
-        onPassword={setPassword}
-        onSubmit={() => {
-          void onPassword();
-        }}
-        password={password}
-        pending={pending !== null}
-        busy={pending === "password"}
-        showPassword={showPassword}
-        togglePassword={() => {
-          setShowPassword(!showPassword);
-        }}
-      />
-    );
-  } else {
-    formArea = (
-      <>
-        <SignInForm
-          email={email}
-          onEmail={setEmail}
-          onPassword={setPassword}
-          onSubmit={() => {
-            void onPassword();
-          }}
-          password={password}
-          pending={pending !== null}
-          busy={pending === "password"}
-          showPassword={showPassword}
-          togglePassword={() => {
-            setShowPassword(!showPassword);
-          }}
-        />
-        <div
-          aria-hidden="true"
-          className="my-1 flex items-center gap-3 text-xs leading-[18px] text-muted-foreground"
-        >
-          <hr className="flex-1 border-border" />
-          <span>{copy.signIn.orPlain}</span>
-          <hr className="flex-1 border-border" />
-        </div>
-        <button
-          aria-busy={pending === "magic" || undefined}
-          className={BTN_SECONDARY}
-          disabled={pending !== null}
-          onClick={() => {
-            void onMagic();
-          }}
-          type="button"
-        >
-          {pending === "magic" ? <BusyIndicator /> : null}
-          {copy.signIn.magicSubmit}
-        </button>
-        <p className="flex items-start gap-[9px] text-pretty text-[12.5px] leading-[1.52] text-muted-foreground">
-          <span className="mt-0.5 flex-none">
-            <NavGlyph name="lock" size={14} />
-          </span>
-          <span>
-            <span className="font-semibold text-foreground">{copy.signIn.allowHeading}</span>{" "}
-            {copy.signIn.allowNote}
-          </span>
-        </p>
-      </>
-    );
-  }
 
   return (
-    <>
-      <section aria-labelledby="signin-heading" className={CARD_CLASS}>
-        <div className="mb-[22px] flex flex-col gap-1.5">
-          <h1 className={CARD_HEADING} id="signin-heading">
-            {headline.title}
-          </h1>
-          <p className={CARD_DESCRIPTION}>{headline.description}</p>
-        </div>
-        <div className="flex flex-col gap-3">
-          {isRefused ? (
-            <div
-              className={ALERT_CLASS}
-              role="alert"
-              style={{ background: "var(--color-need-soft)" }}
-            >
-              <span className="mt-0.5 flex-none">
-                <NavGlyph name="lock" size={18} />
-              </span>
-              <div>
-                <strong className="block text-[14.5px] font-bold">
-                  {copy.signIn.refusedHeading}
-                </strong>
-                <p className="mt-[3px] text-foreground">{copy.signIn.refusedBody}</p>
-              </div>
+    <section aria-labelledby="signin-heading" className={CARD_CLASS}>
+      <div className="mb-[22px] flex flex-col gap-1.5">
+        <h1 className={CARD_HEADING} id="signin-heading">
+          {copy.signIn.title}
+        </h1>
+        <p className={CARD_DESCRIPTION}>
+          {isRefused ? copy.signIn.refusedDescription : copy.signIn.description}
+        </p>
+      </div>
+      <div className="flex flex-col gap-3">
+        {isRefused ? (
+          <div
+            className={ALERT_CLASS}
+            role="alert"
+            style={{ background: "var(--color-need-soft)" }}
+          >
+            <span className="mt-0.5 flex-none">
+              <NavGlyph name="lock" size={18} />
+            </span>
+            <div>
+              <strong className="block text-[14.5px] font-bold">
+                {copy.signIn.refusedHeading}
+              </strong>
+              <p className="mt-[3px] text-foreground">{copy.signIn.refusedBody}</p>
             </div>
-          ) : null}
-          {socialButtons}
-          {socialProviders.length === 0 ? null : (
-            <div
-              aria-hidden="true"
-              className="my-[18px] flex items-center gap-3 text-xs leading-[18px] text-muted-foreground"
-            >
-              <hr className="flex-1 border-border" />
-              <span>{copy.signIn.magicLegend}</span>
-              <hr className="flex-1 border-border" />
-            </div>
-          )}
-          {formArea}
-        </div>
-        <div data-turnstile="social" ref={socialContainer} />
-        <div data-turnstile="password" ref={passwordContainer} />
-        <div data-turnstile="magic" ref={magicContainer} />
-        <div data-turnstile="verify" ref={verifyContainer} />
-      </section>
-      <p className={SWITCH_CLASS}>
-        {switchPrompt}{" "}
-        <button
-          aria-busy={pending !== null || undefined}
-          className="inline min-h-[44px] border-0 bg-transparent px-1 text-[13px] font-semibold text-foreground underline underline-offset-[3px] disabled:cursor-not-allowed disabled:opacity-[.45]"
-          disabled={pending !== null}
-          onClick={() => {
-            switchMode(switchToSignUp ? "sign-up" : "sign-in");
+          </div>
+        ) : null}
+        {socialButtons}
+        {socialProviders.length === 0 ? null : (
+          <div
+            aria-hidden="true"
+            className="my-[18px] flex items-center gap-3 text-xs leading-[18px] text-muted-foreground"
+          >
+            <hr className="flex-1 border-border" />
+            <span>{isRefused ? copy.signIn.refusedLegend : copy.signIn.magicLegend}</span>
+            <hr className="flex-1 border-border" />
+          </div>
+        )}
+        <SignInForm
+          busy={pending === "magic"}
+          email={email}
+          onEmail={setEmail}
+          onSubmit={() => {
+            void onMagic();
           }}
-          type="button"
-        >
-          {switchLabel}
-        </button>
-      </p>
-      {resetSaved && !isRefused ? (
-        <output className="block text-center text-[13px] font-semibold text-ok">
-          {copy.signIn.resetSaved}
-        </output>
-      ) : null}
+          pending={pending !== null}
+          refused={isRefused}
+        />
+        {isRefused ? null : (
+          <p className="flex items-start gap-[9px] text-pretty text-[12.5px] leading-[1.52] text-muted-foreground">
+            <span className="mt-0.5 flex-none">
+              <NavGlyph name="lock" size={14} />
+            </span>
+            <span>
+              <span className="font-semibold text-foreground">{copy.signIn.allowHeading}</span>{" "}
+              {copy.signIn.allowNote}
+            </span>
+          </p>
+        )}
+      </div>
+      <div data-turnstile="social" ref={socialContainer} />
+      <div data-turnstile="magic" ref={magicContainer} />
       {actionError === null ? null : (
-        <p className="text-center text-[13px] font-semibold text-need" role="alert">
+        <p className="mt-3 text-center text-[13px] font-semibold text-need" role="alert">
           {actionError}
         </p>
       )}
-    </>
+    </section>
   );
 }
