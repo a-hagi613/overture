@@ -958,6 +958,20 @@ export const applicationSnapshots = sqliteTable("application_snapshots", {
   costMicros: integer("cost_micros").notNull().default(0),
 });
 
+export const applicationReceipts = sqliteTable(
+  "application_receipts",
+  {
+    applicationId: text("application_id")
+      .primaryKey()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    messageId: text("message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    confirmedAt: integer("confirmed_at").notNull(),
+  },
+  (t) => [uniqueIndex("application_receipts_message_unique").on(t.messageId)],
+);
+
 export const applicationEvents = sqliteTable(
   "application_events",
   {
