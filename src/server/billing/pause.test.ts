@@ -106,11 +106,16 @@ function seedSendingApplication(
     .run();
   db.insert(applications)
     .values({
+      ats: "greenhouse",
       companyId: "company-1",
+      companyName: "Acme",
+      companyNameNorm: "acme",
       createdAt: at,
       id: applicationId,
       origin: "auto",
       postingId: `posting-${applicationId}`,
+      postingTitle: "Engineer",
+      postingUrl: `https://example.com/jobs/${applicationId}`,
       status,
       updatedAt: at,
       userId,

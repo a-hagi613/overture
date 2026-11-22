@@ -1,16 +1,9 @@
-import { and, count, eq, gte, inArray, isNotNull } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
-import {
-  applications,
-  companies,
-  killSwitches,
-  mailThreads,
-  messages,
-  postings,
-} from "../platform/db/schema.ts";
+import { applications, killSwitches, mailThreads, messages } from "../platform/db/schema.ts";
 
 export const MAIL_HEALTH_WINDOW_DAYS = 30;
 export const MAIL_REPLY_MIN_SENDS = 10;
@@ -138,14 +131,13 @@ export function readMailHealth(
 
   const sendRows = db
     .select({
-      companyId: companies.id,
-      employer: companies.name,
+      companyId: applications.companyId,
+      employer: sql<string>`max(${applications.companyName})`,
       sent: count(applications.id),
     })
     .from(applications)
-    .innerJoin(companies, eq(applications.companyId, companies.id))
     .where(and(isNotNull(applications.sentAt), gte(applications.sentAt, since)))
-    .groupBy(companies.id, companies.name)
+    .groupBy(applications.companyId)
     .all();
 
   const applicationRows = db
@@ -156,11 +148,10 @@ export function readMailHealth(
     .all();
 
   const atsRows = db
-    .select({ ats: postings.ats, companyId: applications.companyId })
+    .select({ ats: applications.ats, companyId: applications.companyId })
     .from(applications)
-    .innerJoin(postings, eq(postings.id, applications.postingId))
     .where(and(isNotNull(applications.sentAt), gte(applications.sentAt, since)))
-    .groupBy(applications.companyId, postings.ats)
+    .groupBy(applications.companyId, applications.ats)
     .all();
 
   const mailRows = db
@@ -199,6 +190,10 @@ export function readMailHealth(
   >();
 
   for (const row of atsRows) {
+    if (row.ats === null) {
+      continue;
+    }
+
     const values = atsByCompany.get(row.companyId) ?? [];
 
     if (!values.includes(row.ats)) {
@@ -232,11 +227,15 @@ export function readMailHealth(
 
   if (missingNames.length > 0) {
     for (const row of db
-      .select({ id: companies.id, name: companies.name })
-      .from(companies)
-      .where(inArray(companies.id, missingNames))
+      .select({
+        companyId: applications.companyId,
+        name: sql<string>`max(${applications.companyName})`,
+      })
+      .from(applications)
+      .where(inArray(applications.companyId, missingNames))
+      .groupBy(applications.companyId)
       .all()) {
-      names.set(row.id, row.name);
+      names.set(row.companyId, row.name);
     }
   }
 

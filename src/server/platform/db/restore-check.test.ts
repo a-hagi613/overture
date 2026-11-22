@@ -76,8 +76,22 @@ function seededRestoredDatabase() {
     ],
   );
   sqlite.run(
-    "insert into applications (id, user_id, posting_id, company_id, origin, status, approved_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    ["application-1", "user-1", "posting-1", "company-1", "manual", "approved", NOW, NOW, NOW],
+    "insert into applications (id, user_id, posting_id, company_id, company_name, company_name_norm, posting_title, posting_url, origin, status, approved_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      "application-1",
+      "user-1",
+      "posting-1",
+      "company-1",
+      "Example",
+      "example",
+      "Engineer",
+      "https://boards.greenhouse.io/example/jobs/1",
+      "manual",
+      "approved",
+      NOW,
+      NOW,
+      NOW,
+    ],
   );
   sqlite.run(
     "insert into mailboxes (id, user_id, local_part, status, created_at) values (?, ?, ?, ?, ?)",

@@ -6,16 +6,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { RevealSession } from "../platform/audit/reveal.ts";
 
-import {
-  applications,
-  companies,
-  facts,
-  postings,
-  profiles,
-  resumes,
-  targets,
-  users,
-} from "../platform/db/schema.ts";
+import { applications, facts, profiles, resumes, targets, users } from "../platform/db/schema.ts";
 import { EEO_FACT_KEYS } from "../../shared/facts.ts";
 
 const EEO_FIELDS = ["gender", "ethnicity", "hispanicLatino", "veteran", "disability"] as const;
@@ -191,28 +182,26 @@ async function resumeView(db: AppDatabase, personal: PersonalCrypto, userId: str
 function boardRows(db: AppDatabase, userId: string) {
   return db
     .select({
-      company: companies.name,
+      company: applications.companyName,
       id: applications.id,
       sentAt: applications.sentAt,
       stage: applications.stage,
       status: applications.status,
-      title: postings.title,
+      title: applications.postingTitle,
       updatedAt: applications.updatedAt,
     })
     .from(applications)
-    .leftJoin(companies, eq(companies.id, applications.companyId))
-    .leftJoin(postings, eq(postings.id, applications.postingId))
     .where(eq(applications.userId, userId))
     .orderBy(desc(applications.updatedAt))
     .limit(100)
     .all()
     .map((row) => ({
-      company: row.company ?? "",
+      company: row.company,
       id: row.id,
       sentAt: row.sentAt,
       stage: row.stage,
       status: row.status,
-      title: row.title ?? "",
+      title: row.title,
       updatedAt: row.updatedAt,
     }));
 }

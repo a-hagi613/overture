@@ -7,13 +7,7 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { QuestionFieldType, ReviewCategory, ReviewReason } from "../../shared/questions.ts";
 import type { PreparationService } from "./prepare.ts";
 
-import {
-  applications,
-  companies,
-  postings,
-  reviewApplications,
-  reviews,
-} from "../platform/db/schema.ts";
+import { applications, postings, reviewApplications, reviews } from "../platform/db/schema.ts";
 import { createQuestionCatalog } from "../catalog/questions.ts";
 import { countryNameFor } from "../catalog/geo.ts";
 import { reviewCategory } from "../catalog/question-normalize.ts";
@@ -93,14 +87,12 @@ function attachmentsFor(db: AppDatabase, reviewId: string) {
   return db
     .select({
       applicationId: applications.id,
-      company: companies.name,
-      title: postings.title,
-      postingId: postings.id,
+      company: applications.companyName,
+      title: applications.postingTitle,
+      postingId: applications.postingId,
     })
     .from(reviewApplications)
     .innerJoin(applications, eq(applications.id, reviewApplications.applicationId))
-    .innerJoin(postings, eq(postings.id, applications.postingId))
-    .innerJoin(companies, eq(companies.id, postings.companyId))
     .where(eq(reviewApplications.reviewId, reviewId))
     .orderBy(applications.createdAt, applications.id)
     .all();
