@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { turnstileScriptUrl } from "../../shared/turnstile.ts";
+import { DEFAULT_ANTHROPIC_MODEL } from "../platform/llm/models.ts";
 
 const booleanFromString = z.enum(["true", "false"]).transform((value) => value === "true");
 
@@ -146,7 +147,7 @@ const envSchema = z
       .default("ca"),
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     ANTHROPIC_BASE_URL: z.url().default("https://api.anthropic.com"),
-    ANTHROPIC_MODEL: z.string().min(1).default("claude-haiku-4-5"),
+    ANTHROPIC_MODEL: z.string().min(1).default(DEFAULT_ANTHROPIC_MODEL),
     FLY_APP_NAME: z.string().min(1).optional(),
     FLY_MACHINE_ID: z.string().min(1).optional(),
   })

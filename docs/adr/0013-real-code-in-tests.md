@@ -24,7 +24,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for twenty-one invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
+exist only for twenty-two invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
 derivations, the answer planner (a salary Fact kept per currency is chosen only for the currency a question names),
 the facts model (a Fact's scope is validated against its key), the onboarding step's salary and EEO reading, the
 fixture sanitiser (recorded pages must carry no script, event handler, personal data or token), the v1
@@ -40,9 +40,12 @@ in `src/` or `test/` that opens a `new DatabaseSync` also configures `PRAGMA bus
 in `scripts/database-sync-guard.ts`, so an unconfigured handle cannot stall `main` with `SQLITE_BUSY` again), and the
 monthly mail budget (`budget.test.ts`: one row per UTC month counts every send by kind and fails closed, notices stop
 at the sign-in reserve while sign-in mail and the live check may spend it, each stop is stamped once in its own column
-so the reserve alert never hides the cap alert, and the count survives reopening the database, #282), and the billing
+so the reserve alert never hides the cap alert, and the count survives reopening the database, #282), the billing
 pause (a plan end or a failed payment pauses once with its own reason, a successful payment resumes only a billing
-pause, and an in-flight send keeps its reservation across the period end so only a sent Application is charged). They
+pause, and an in-flight send keeps its reservation across the period end so only a sent Application is charged), and
+the Anthropic model and its batch prices (`models.test.ts`: `ANTHROPIC_MODEL` defaults to the model SPEC §8.6 names,
+a dated 5.5 model id is priced from the exact 5.5 row rather than the 4.5 haiku prefix, and a model with no price row
+is refused, #387). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
 depend on the runner. The mail count runs the real SQLite file and the real migrations, so the invariant is exercised
 against the shipped schema rather than a stand-in. CI stays under two minutes on pull requests: six shards balanced by

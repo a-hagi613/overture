@@ -3,6 +3,7 @@ import { Buffer } from "node:buffer";
 import { z } from "zod";
 
 import type { LlmBatchCall, LlmPort, LlmRequest } from "../ports/llm.ts";
+import { batchPricesFor } from "./models.ts";
 
 const API_VERSION = "2023-06-01";
 const POLL_INTERVAL_MS = 10_000;
@@ -69,43 +70,6 @@ const resultLineSchema = z.object({
   ]),
 });
 
-interface BatchPricesMicros {
-  inputPerMillionTokens: number;
-  cacheReadPerMillionTokens: number;
-  cacheWritePerMillionTokens: number;
-  outputPerMillionTokens: number;
-}
-
-const BATCH_PRICES_MICROS: { prefix: string; prices: BatchPricesMicros }[] = [
-  {
-    prefix: "claude-haiku",
-    prices: {
-      inputPerMillionTokens: 500_000,
-      cacheReadPerMillionTokens: 50_000,
-      cacheWritePerMillionTokens: 625_000,
-      outputPerMillionTokens: 2_500_000,
-    },
-  },
-  {
-    prefix: "claude-sonnet",
-    prices: {
-      inputPerMillionTokens: 1_500_000,
-      cacheReadPerMillionTokens: 150_000,
-      cacheWritePerMillionTokens: 1_875_000,
-      outputPerMillionTokens: 7_500_000,
-    },
-  },
-  {
-    prefix: "claude-opus",
-    prices: {
-      inputPerMillionTokens: 2_500_000,
-      cacheReadPerMillionTokens: 250_000,
-      cacheWritePerMillionTokens: 3_125_000,
-      outputPerMillionTokens: 12_500_000,
-    },
-  },
-];
-
 interface TokenUsage {
   input: number;
   cacheRead: number;
@@ -113,18 +77,8 @@ interface TokenUsage {
   output: number;
 }
 
-function pricesFor(model: string) {
-  const entry = BATCH_PRICES_MICROS.find((candidate) => model.startsWith(candidate.prefix));
-
-  if (entry === undefined) {
-    throw new Error(`no batch pricing is known for model ${model}`);
-  }
-
-  return entry.prices;
-}
-
 function costMicrosFor(model: string, usage: TokenUsage) {
-  const prices = pricesFor(model);
+  const prices = batchPricesFor(model);
 
   const micros =
     (usage.input * prices.inputPerMillionTokens +
