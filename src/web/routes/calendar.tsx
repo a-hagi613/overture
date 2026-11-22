@@ -33,14 +33,15 @@ export function CalendarPage() {
   const tablet = useMediaQuery("(min-width: 768px)");
   const headingId = useId();
   const localZone = browserZone();
-  const today = dateIn(currentTime(), localZone);
   const asked = parseMonthKey(params.get("month"));
 
-  const [focus, setFocus] = useState<CalendarDate>(() =>
-    asked !== null && (asked.year !== today.year || asked.month !== today.month)
+  const [focus, setFocus] = useState<CalendarDate>(() => {
+    const todayLocal = dateIn(currentTime(), localZone);
+
+    return asked !== null && (asked.year !== todayLocal.year || asked.month !== todayLocal.month)
       ? { day: 1, ...asked }
-      : today,
-  );
+      : todayLocal;
+  });
 
   const [selected, setSelected] = useState<CalendarDate>(focus);
   const [panelOpen, setPanelOpen] = useState(tablet);
@@ -48,8 +49,16 @@ export function CalendarPage() {
   const range = monthRange(year, month, localZone);
   const { data, isError, isPending, refetch } = useCalendar(range);
   const zone = data?.timeZone ?? localZone;
+  const today = dateIn(currentTime(), zone);
   const buckets = bucketByDay(data?.items ?? [], zone);
   const monthKey = monthKeyOf(focus);
+
+  const [seenTablet, setSeenTablet] = useState(tablet);
+
+  if (seenTablet !== tablet) {
+    setSeenTablet(tablet);
+    setPanelOpen(tablet);
+  }
 
   useEffect(() => {
     if (params.get("month") !== monthKey) {
