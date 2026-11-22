@@ -25,7 +25,7 @@ export function HomeCodeWait({
   return (
     <section
       aria-labelledby="home-code-wait"
-      className="mt-[22px] rounded-lg border border-need bg-card px-6 pt-[21px] pb-[22px]"
+      className="mt-[22px] rounded-lg border border-need bg-card px-6 pt-[22px] pb-[22px]"
       data-testid="home-code-wait"
     >
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">

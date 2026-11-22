@@ -1,4 +1,4 @@
-import { request as apiRequest } from "@playwright/test";
+import { expect, request as apiRequest } from "@playwright/test";
 import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
@@ -7,7 +7,6 @@ import type { AnswerKind } from "../../src/shared/questions.ts";
 
 import { authTestIdentity } from "./auth.fixture.ts";
 import { latestMailLink, requestMagicLink, verifyAuthState } from "./sign-in.ts";
-import { readSseEventUntil } from "./sse.ts";
 
 const createdSchema = z.object({ id: z.string() });
 
@@ -189,14 +188,23 @@ export async function homeFor(owner: APIRequestContext) {
   return homeSchema.parse(await (await owner.get("/api/home")).json());
 }
 
-const jobEventSchema = z.object({ id: z.string() });
+const jobStatusSchema = z.object({ status: z.string() });
 
-export async function runPrepDaily(
-  request: APIRequestContext,
-  appServerUrl: string,
-  userId: string,
-) {
-  await request.post("/__test__/profile/running", { data: { running: true, userId } });
+/**
+ * Runs one Daily run and waits for its job to finish.
+ *
+ * The job's own status is the signal, not an SSE event: a stream that ends
+ * before the event (a dropped connection, a restart) would otherwise let the
+ * caller assert on work that has not run yet.
+ * @param request The owner's API context.
+ * @param userId The running user to prepare for.
+ */
+export async function runPrepDaily(request: APIRequestContext, userId: string) {
+  const running = await request.post("/__test__/profile/running", {
+    data: { running: true, userId },
+  });
+
+  expect(running.ok()).toBe(true);
 
   const body: unknown = await (
     await request.post("/__test__/jobs/enqueue", {
@@ -206,13 +214,13 @@ export async function runPrepDaily(
 
   const jobId = createdSchema.parse(body).id;
 
-  await readSseEventUntil(`${appServerUrl}/api/events`, null, (event) => {
-    if (event.event !== "job.done") {
-      return false;
-    }
-
-    return jobEventSchema.parse(JSON.parse(event.data)).id === jobId;
-  });
+  await expect
+    .poll(
+      async () =>
+        jobStatusSchema.parse(await (await request.get(`/__test__/jobs/${jobId}`)).json()).status,
+      { timeout: 30_000 },
+    )
+    .toBe("done");
 }
 
 export async function seedApplication(
