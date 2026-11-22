@@ -213,6 +213,7 @@
           "src/shared/host-match.test.ts",
           "scripts/database-sync-guard.test.ts",
           "scripts/lint-config-guard.test.ts",
+          "scripts/setup-stripe.test.ts",
           "scripts/workflow-config-guard.test.ts"
         ]
       }
