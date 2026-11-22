@@ -105,3 +105,44 @@ for (const width of [1280]) {
     });
   }
 }
+
+test("the Running pill keeps its Pause button inside its border at 1280px", async ({
+  browser,
+  boardServer,
+}) => {
+  const request = await apiRequest.newContext({ baseURL: boardServer.url });
+
+  const userId = await seedBoardOwner(request, boardServer.url);
+
+  await seedBoard(request, userId);
+
+  const storageState = await request.storageState();
+
+  await request.dispose();
+
+  const context = await browser.newContext({ storageState, timezoneId: "America/Toronto" });
+  const page = await context.newPage();
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(`${boardServer.url}/board`);
+
+  const pause = page.getByRole("button", { name: "Pause auto-apply" });
+
+  await expect(pause).toBeVisible();
+
+  const pill = pause.locator("xpath=..");
+  const buttonBox = await pause.boundingBox();
+  const pillBox = await pill.boundingBox();
+
+  expect(buttonBox).not.toBeNull();
+  expect(pillBox).not.toBeNull();
+
+  if (buttonBox === null || pillBox === null) {
+    throw new Error("the Running pill or its Pause button has no box");
+  }
+
+  expect(buttonBox.x).toBeGreaterThanOrEqual(pillBox.x);
+  expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(pillBox.x + pillBox.width);
+
+  await context.close();
+});
