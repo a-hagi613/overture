@@ -12,6 +12,7 @@ import { SignInForm } from "./signin-form.tsx";
 import {
   ALERT_CLASS,
   BTN_GHOST,
+  BTN_PRIMARY,
   BTN_SECONDARY,
   CARD_CLASS,
   CARD_DESCRIPTION,
@@ -327,7 +328,7 @@ export function SignInCard() {
         {socialProviders.includes("google") ? (
           <button
             aria-busy={pending === "google" || undefined}
-            className={BTN_SECONDARY}
+            className={BTN_PRIMARY}
             disabled={pending !== null}
             onClick={() => {
               void onSocial("google");

@@ -17,7 +17,7 @@ export function SignInLayout({ children }: { children: ReactNode }) {
       <Backdrop />
       <SignInStory />
       <main
-        className="outline-none relative flex min-h-screen w-full flex-1 flex-col justify-between gap-5 px-[clamp(18px,4vw,52px)] pb-7 pt-[18px] min-[961px]:pb-8 min-[961px]:pt-7"
+        className="outline-none relative flex min-h-screen w-full flex-1 flex-col justify-start gap-5 min-[961px]:justify-between px-[clamp(18px,4vw,52px)] pb-7 pt-[18px] min-[961px]:pb-8 min-[961px]:pt-7"
         id="main-content"
         tabIndex={-1}
       >
@@ -41,7 +41,7 @@ export function SignInLayout({ children }: { children: ReactNode }) {
             </span>
           </button>
         </div>
-        <div className="mx-auto my-auto flex w-full max-w-[418px] flex-col gap-[18px]">
+        <div className="mx-auto my-0 flex w-full max-w-[418px] flex-col gap-[18px] pt-[14px] min-[961px]:my-auto min-[961px]:pt-0">
           <div className="mb-[4px] flex flex-col items-center gap-2 text-center min-[961px]:mb-0 min-[961px]:hidden">
             <Link
               aria-label={copy.brand.homeAria}

@@ -178,7 +178,7 @@ export const copy = {
     google: "Continue with Google",
     linkedin: "Continue with LinkedIn",
     linkedinBadge: "in",
-    magicLegend: "or with your email",
+    magicLegend: "or use an emailed link",
     refusedLegend: "or use your email",
     emailLabel: "Email",
     emailPlaceholder: "you@example.com",
@@ -196,7 +196,7 @@ export const copy = {
     legalJoin: "and",
     legalPrivacy: "Privacy Policy",
     legalEnd: ".",
-    trust: "Google, LinkedIn or an emailed link",
+    trust: "No password to keep · Google, LinkedIn or an emailed link",
     refusedHeading: "This email isn't invited yet.",
     refusedBody:
       "Overture is invite-only during the beta. Google, LinkedIn and an emailed link all need an invite for the same email.",
