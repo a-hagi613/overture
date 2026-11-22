@@ -99,6 +99,11 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
   Nothing is dropped; the queued work starts a few seconds later. `JOBS_AUTORUN=false` (test-only; refused in
   production) starts the process without the worker, so an e2e test can drive each job through `/__test__/jobs/*`
   without a live scheduler claiming it first.
+- The job worker holds at most 10 jobs at once, with per-class limits: 3 in the browser lane (`application.send`,
+  `fixtures.capture`, `lab.run`, `live.check`), 3 in the LLM lane (`application.prepare`,
+  `tag.llm_fallback`), and the rest for control, notification, mail, export and catalog work. A lane already at its
+  limit is left out of the claim, so a stalled browser or model vendor cannot put older slow rows in front of a fast
+  control, notification or mail job on the next 15 s tick; a claim also never starts more jobs than the free room.
 - The prerendered marketing pages (`/` and `/pricing`) are deployed as Workers Static Assets
   (`workers/marketing`, ADR 0033) on explicit routes for those paths only, so they stay up through those deploys.
   Every app and API path matches no Worker route and goes straight to `overture-web`; the app's HTML and assets are
@@ -391,6 +396,10 @@ alerts nobody. The admin billing page shows the last result.
 | `llm_batches` | id, input_revision_hash UNIQUE (sha256 of the model and the request set), model, batch_id NULL, status CHECK IN ('creating','in_progress','applied','failed'), results JSON NULL, result_applied_at NULL, expires_at NULL, last_polled_at NULL, last_error NULL, created_at, updated_at |
 | `fx_rates` | date, currency, per_usd REAL; PK(date,currency) |
 | `admin_audit` | id, at, actor_id, action, target_user_id NULL, reason, detail JSON — also shipped to Loki (off-box, append-only) |
+
+The `bg_jobs` claim query reads only queued and running rows through the partial index `bg_jobs_claim_due` on
+`(status, run_at)` where `status IN ('queued','running')`, so a long lifetime history of done and dead rows is never
+scanned on a tick.
 
 Retention: `events` 24 h; `bg_jobs` done 7 days, dead 30 days; `attempts` 180 days; `llm_batches` applied or
 failed 30 days; `llm_usage` 400 days;
@@ -897,14 +906,15 @@ bound: the planner gives it the first free slot at or after that time inside a w
 
 ### 9.3 Dispatcher
 
-Job `dispatch.tick` every 15 s claims at most `free_slots = session_cap − active_sends` applications
-in `approved` (never `ready`) that pass every gate below, in order, where `session_cap` is
-`browser.max_concurrent_sessions`, the same process-wide browser session cap every send holds a slot from, and
-`active_sends` is the number of distinct Applications with send work in flight: those in `sending`, plus those with an
-`application.send` job still `queued` or `running` (a job waiting in the session-slot queue is `running` while its
-Application is still `approved`). An Application becomes `sending` only after it holds one of those slots, so a send
-that is queued or waiting for a browser already counts against the cap and `sending` never counts an Application that
-is still waiting for a browser:
+Job `dispatch.tick` every 15 s claims at most `free_slots` Applications in `approved` (never `ready`) that pass
+every gate below, in order. `free_slots` is the smaller of `session_cap − active_sends` and the sessions free right
+now in the process-wide browser semaphore: `session_cap` is `browser.max_concurrent_sessions`, the cap every send
+holds a slot from, and a capture, probe or lab run holding a slot leaves one fewer send free, so no Application is
+claimed to wait in `sending`. `active_sends` is the number of distinct Applications with send work in flight: those
+in `sending`, plus those with an `application.send` job still `queued` or `running` (a job waiting in the session-slot
+queue is `running` while its Application is still `approved`). An Application becomes `sending` only after it holds
+one of those slots, so a send that is queued or waiting for a browser already counts against the cap and `sending`
+never counts an Application that is still waiting for a browser:
 
 1. Global and provider kill switches off; ATS and employer kill switches off.
 2. User `running=1`, not suspended, has a current resume and an active mailbox.

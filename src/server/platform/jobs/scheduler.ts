@@ -167,6 +167,10 @@ export function startJobWorker(
     return [...inFlight].flatMap((entry) => (exclusive.has(entry.kind) ? [entry.kind] : []));
   }
 
+  function inFlightKinds() {
+    return [...inFlight].map((entry) => entry.kind);
+  }
+
   let wakeResolve: (() => void) | null = null;
 
   onEnqueue(() => {
@@ -185,7 +189,12 @@ export function startJobWorker(
       return;
     }
 
-    const claimed = claimJobsToRun(db, clock, readBatchSize(db), singletonKinds, busyKinds());
+    const claimed = claimJobsToRun(db, clock, {
+      batchSize: readBatchSize(db),
+      busyKinds: busyKinds(),
+      inFlightKinds: inFlightKinds(),
+      singletonKinds,
+    });
 
     for (const job of claimed) {
       runTracked(job);
