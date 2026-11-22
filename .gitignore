@@ -21,6 +21,7 @@ tmp/
 # Dependencies and build output
 node_modules/
 dist/
+dist-marketing/
 coverage/
 .wrangler/
 
