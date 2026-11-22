@@ -1,95 +1,42 @@
+import { readFileSync } from "node:fs";
+
 import { z } from "zod";
 
-import { openDatabase } from "../src/server/platform/db/client.ts";
+import { verifyRestoredDatabase } from "../src/server/platform/db/restore-check.ts";
+import { createClock } from "../src/server/platform/ports/clock.ts";
 
-const healthSchema = z.object({
-  status: z.string(),
-  database: z.string(),
-  backups: z.union([
-    z.object({
-      replication: z.literal("ok"),
-      lagSeconds: z.number(),
-      replicaTxid: z.string(),
-      readAgeSeconds: z.number(),
-    }),
-    z.object({ replication: z.enum(["unconfigured", "unknown", "unavailable"]) }),
-  ]),
+const journalSchema = z.object({
+  entries: z.array(z.object({ tag: z.string() })),
 });
 
-const [restoredDatabasePath, healthUrl] = process.argv.slice(2);
+const databasePathSchema = z.string().min(1);
 
-async function checkHealthEndpoint(
-  endpoint: string,
-  checked: { integrity: string; migrations: number; rowCount: Record<string, number> },
-) {
-  const response = await fetch(endpoint);
-  const body = healthSchema.parse(await response.json());
+function journalMigrationCount() {
+  try {
+    const journal = journalSchema.parse(
+      JSON.parse(readFileSync(new URL("../drizzle/meta/_journal.json", import.meta.url), "utf8")),
+    );
 
-  const report = {
-    integrity: checked.integrity,
-    migrations: checked.migrations,
-    rowCount: checked.rowCount,
-    health: body.status,
-    database: body.database,
-    replication: body.backups.replication,
-    replicaTxid: body.backups.replication === "ok" ? body.backups.replicaTxid : null,
-  };
-
-  const failed =
-    !response.ok ||
-    body.status !== "ok" ||
-    body.database !== "ok" ||
-    body.backups.replication !== "ok" ||
-    checked.integrity !== "ok" ||
-    checked.migrations === 0;
-
-  return [report, failed] as const;
+    return journal.entries.length;
+  } catch {
+    return null;
+  }
 }
 
-const restored = z.string().min(1).parse(restoredDatabasePath);
-const health = z.url().optional().parse(healthUrl);
+const [restoredDatabasePath] = process.argv.slice(2);
 
-const { sqlite } = openDatabase(restored);
+const path = databasePathSchema.parse(restoredDatabasePath);
+const expectedMigrations = journalMigrationCount();
 
-const integrity = z
-  .object({ integrity_check: z.string() })
-  .parse(sqlite.query("pragma integrity_check").get()).integrity_check;
-
-const migrations = z
-  .object({ n: z.number() })
-  .parse(sqlite.query("select count(*) as n from __drizzle_migrations").get()).n;
-
-const tableNames = z
-  .array(z.object({ name: z.string() }))
-  .parse(
-    sqlite
-      .query(
-        "select name from sqlite_master where type = 'table' and name not like 'sqlite_%' and name not like '__drizzle_%'",
-      )
-      .all(),
-  )
-  .map((table) => table.name);
-
-const rowCount = Object.fromEntries(
-  tableNames.map((name) => [
-    name,
-    z.object({ n: z.number() }).parse(sqlite.query(`select count(*) as n from "${name}"`).get()).n,
-  ]),
-);
-
-sqlite.close();
-
-const checked = { integrity, migrations, rowCount };
-
-const [report, failed] =
-  health === undefined
-    ? [checked, integrity !== "ok" || migrations === 0]
-    : await checkHealthEndpoint(health, checked);
+const report = verifyRestoredDatabase(path, {
+  now: createClock().now(),
+  ...(expectedMigrations !== null && { expectedMigrations }),
+});
 
 process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 
-if (failed) {
-  throw new Error("restored database checks failed");
+if (!report.ok) {
+  throw new Error(`restored database checks failed: ${report.failures.join("; ")}`);
 }
 
-process.stdout.write("restored database checks passed\n");
+process.stdout.write("restore check passed\n");

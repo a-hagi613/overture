@@ -5,6 +5,7 @@ import { copy } from "../../shared/copy.ts";
 import { AccountRow } from "../components/account-row.tsx";
 import { LimitRow } from "../components/limit-row.tsx";
 import { PageHeader } from "../components/page-header.tsx";
+import { SettingsCalendarFeed } from "../components/settings-calendar-feed.tsx";
 import { SettingsLegal } from "../components/settings-legal.tsx";
 import { SettingsNotifications } from "../components/settings-notifications.tsx";
 import { TimeLanguageSection } from "../components/time-language-section.tsx";
@@ -82,6 +83,7 @@ export function SettingsPage() {
           </p>
         </section>
         <SettingsNotifications />
+        <SettingsCalendarFeed />
         <TimeLanguageSection />
         <SettingsLegal />
         <section
