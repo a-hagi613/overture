@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
+import { validJson } from "./validators.ts";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -10,6 +10,7 @@ import type { MatchingService } from "../matching/score.ts";
 
 import { postingUserState, postings } from "../platform/db/schema.ts";
 import { demoLocked } from "../demo/guard.ts";
+import { API_ERRORS } from "../../shared/api-errors.ts";
 
 const stateBody = z.object({ state: z.enum(["saved", "hidden"]).nullable() });
 
@@ -27,7 +28,7 @@ export function createMatchingRoutes(deps: {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const locked = demoLocked(account.role);
@@ -40,7 +41,7 @@ export function createMatchingRoutes(deps: {
     const row = db.select().from(postings).where(eq(postings.id, id)).get();
 
     if (row === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     const scored = await matching.scoreOnOpen(account.id, id);
@@ -76,7 +77,7 @@ export function createMatchingRoutes(deps: {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const locked = demoLocked(account.role);
@@ -89,7 +90,7 @@ export function createMatchingRoutes(deps: {
     const applied = await matching.applyManually(account.id, id);
 
     if (applied === null) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     if ("refused" in applied) {
@@ -99,11 +100,11 @@ export function createMatchingRoutes(deps: {
     return context.json(applied);
   });
 
-  routes.put("/postings/:id/state", zValidator("json", stateBody), async (context) => {
+  routes.put("/postings/:id/state", validJson(stateBody), async (context) => {
     const account = await sessionUser(auth, context.req.raw);
 
     if (account === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const { id } = context.req.param();
@@ -111,7 +112,7 @@ export function createMatchingRoutes(deps: {
     const posting = db.select({ id: postings.id }).from(postings).where(eq(postings.id, id)).get();
 
     if (posting === undefined) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     if (state === null) {

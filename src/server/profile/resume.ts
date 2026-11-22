@@ -54,6 +54,10 @@ export interface ResumeService {
   currentFileBytes: (
     userId: string,
   ) => Promise<{ bytes: Uint8Array<ArrayBuffer>; filename: string } | null>;
+  fileBytes: (
+    userId: string,
+    resumeId: string,
+  ) => Promise<{ bytes: Uint8Array<ArrayBuffer>; filename: string } | null>;
 }
 
 async function sha256(bytes: Uint8Array<ArrayBuffer>) {
@@ -182,6 +186,24 @@ export function createResumeService(deps: {
     return { text, parsedWith: "llm" as const, pages: extracted.totalPages } satisfies ParsedResume;
   }
 
+  async function fileBytesForRow(userId: string, row: typeof resumes.$inferSelect) {
+    const stored = await objects.get(row.objectKey);
+
+    if (stored === null) {
+      return null;
+    }
+
+    const base64 = await personal.openFor(userId, resumeScope(row.id, "bytes"), decodeUtf8(stored));
+
+    const filename = await personal.openFor(
+      userId,
+      resumeScope(row.id, "filename_enc"),
+      row.filenameEnc,
+    );
+
+    return { bytes: bytesFromBase64(base64), filename };
+  }
+
   return {
     upload: async (userId: string, file: { name: string; bytes: Uint8Array<ArrayBuffer> }) => {
       const id = crypto.randomUUID();
@@ -254,29 +276,16 @@ export function createResumeService(deps: {
     currentFileBytes: async (userId: string) => {
       const row = await currentRow(userId);
 
-      if (row === undefined) {
-        return null;
-      }
+      return row === undefined ? null : fileBytesForRow(userId, row);
+    },
+    fileBytes: async (userId: string, resumeId: string) => {
+      const row = db
+        .select()
+        .from(resumes)
+        .where(and(eq(resumes.id, resumeId), eq(resumes.userId, userId)))
+        .get();
 
-      const stored = await objects.get(row.objectKey);
-
-      if (stored === null) {
-        return null;
-      }
-
-      const base64 = await personal.openFor(
-        userId,
-        resumeScope(row.id, "bytes"),
-        decodeUtf8(stored),
-      );
-
-      const filename = await personal.openFor(
-        userId,
-        resumeScope(row.id, "filename_enc"),
-        row.filenameEnc,
-      );
-
-      return { bytes: bytesFromBase64(base64), filename };
+      return row === undefined ? null : fileBytesForRow(userId, row);
     },
   } satisfies ResumeService;
 }

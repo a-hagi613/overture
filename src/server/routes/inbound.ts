@@ -4,6 +4,7 @@ import type { DNSResolver } from "mailauth";
 import { Buffer } from "node:buffer";
 
 import { simpleParser } from "mailparser";
+import { API_ERRORS } from "../../shared/api-errors.ts";
 
 import {
   INBOUND_DEAD_LETTER_MAX_BYTES,
@@ -243,7 +244,7 @@ export function createInboundRoutes(deps: {
     const mailbox = await mailboxes.byForwardingAddress(address);
 
     if (mailbox === null) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     const waits = openCodeWaits(db, clock, mailbox.id).map((wait) => ({

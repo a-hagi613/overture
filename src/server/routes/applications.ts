@@ -1,6 +1,6 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
+import { validJson } from "./validators.ts";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -313,7 +313,7 @@ export function createApplicationRoutes(
     return context.json(await boardResponse(session.user.id));
   });
 
-  routes.patch("/applications/:id/stage", zValidator("json", stageMoveSchema), async (context) => {
+  routes.patch("/applications/:id/stage", validJson(stageMoveSchema), async (context) => {
     const session = await sessionOf(context.req.raw.headers);
 
     if (session === null) {

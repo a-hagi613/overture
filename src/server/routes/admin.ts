@@ -1,4 +1,4 @@
-import { zValidator } from "@hono/zod-validator";
+import { validJson, validQuery } from "./validators.ts";
 import { and, asc, count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -398,7 +398,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
   });
 
-  routes.get("/users", zValidator("query", usersQuery), async (context) => {
+  routes.get("/users", validQuery(usersQuery), async (context) => {
     const { page, q, status } = context.req.valid("query");
     const owner = context.get("owner");
     const now = clock.now();
@@ -616,7 +616,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
   });
 
-  routes.post("/users/:id/suspend", zValidator("json", suspendBody), async (context) => {
+  routes.post("/users/:id/suspend", validJson(suspendBody), async (context) => {
     const owner = context.get("owner");
     const { reason } = context.req.valid("json");
 
@@ -667,7 +667,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     return context.json({ id: user.id, suspendedAt: at.getTime() });
   });
 
-  routes.post("/users/:id/reinstate", zValidator("json", suspendBody), async (context) => {
+  routes.post("/users/:id/reinstate", validJson(suspendBody), async (context) => {
     const owner = context.get("owner");
     const { reason } = context.req.valid("json");
 
@@ -776,7 +776,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
   routes.get("/settings", (context) => context.json({ settings: getAllSettings(db) }));
 
-  routes.put("/settings/:key", zValidator("json", settingBody), async (context) => {
+  routes.put("/settings/:key", validJson(settingBody), async (context) => {
     const { key } = context.req.param();
     const { value } = context.req.valid("json");
 
@@ -798,14 +798,14 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
   routes.get("/kill-switches", (context) => context.json({ switches: getAllKillSwitches(db) }));
 
-  routes.put("/kill-switches/:scope/:key", zValidator("json", killSwitchBody), async (context) => {
+  routes.put("/kill-switches/:scope/:key", validJson(killSwitchBody), async (context) => {
     const { scope, key } = context.req.param();
     const { enabled, reason } = context.req.valid("json");
     const owner = context.get("owner");
     const scopeCheck = z.enum(["global", "ats", "employer", "provider"]).safeParse(scope);
 
     if (!scopeCheck.success) {
-      return context.json({ error: "invalid scope" }, 400);
+      return context.json({ error: "invalid_scope" }, 400);
     }
 
     const before = getAllKillSwitches(db).find(
@@ -851,7 +851,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     return context.json({ discoveredAt: null, ats });
   });
 
-  routes.get("/mail-health", zValidator("query", mailHealthQuery), (context) => {
+  routes.get("/mail-health", validQuery(mailHealthQuery), (context) => {
     const { days } = context.req.valid("query");
 
     return context.json(readMailHealth(db, clock, days));
@@ -881,7 +881,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
   });
 
-  routes.post("/probes/personio", zValidator("json", personioProbeBody), async (context) => {
+  routes.post("/probes/personio", validJson(personioProbeBody), async (context) => {
     const owner = context.get("owner");
     const { urls } = context.req.valid("json");
 
@@ -915,7 +915,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
   });
 
-  routes.post("/tag-imports", zValidator("json", tagImportBody), async (context) => {
+  routes.post("/tag-imports", validJson(tagImportBody), async (context) => {
     const owner = context.get("owner");
     const { content, source } = context.req.valid("json");
     const report = importTags(db, clock, { content, source, uploadedBy: owner.userId });
@@ -956,7 +956,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
   });
 
-  routes.post("/invites", zValidator("json", inviteBody), async (context) => {
+  routes.post("/invites", validJson(inviteBody), async (context) => {
     const owner = context.get("owner");
     const email = context.req.valid("json").email.trim();
 
@@ -1101,7 +1101,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
   });
 
-  routes.post("/grants", zValidator("json", grantBody), async (context) => {
+  routes.post("/grants", validJson(grantBody), async (context) => {
     const { email, expiresInDays, idempotencyKey, quantity } = context.req.valid("json");
     const owner = context.get("owner");
     const user = db.select().from(users).where(eq(users.email, email.trim().toLowerCase())).get();
@@ -1141,7 +1141,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
   });
 
-  routes.get("/billing/users", zValidator("query", billingUsersQuery), (context) => {
+  routes.get("/billing/users", validQuery(billingUsersQuery), (context) => {
     const { filter, page } = context.req.valid("query");
 
     return context.json({
@@ -1162,7 +1162,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
       : context.json({ user: view });
   });
 
-  routes.post("/billing/refunds", zValidator("json", refundBody), async (context) => {
+  routes.post("/billing/refunds", validJson(refundBody), async (context) => {
     const { payments } = deps;
 
     if (payments === null) {
@@ -1190,13 +1190,13 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     return context.json({ error: outcome.kind }, status);
   });
 
-  routes.get("/llm-usage", zValidator("query", llmUsageQuery), (context) => {
+  routes.get("/llm-usage", validQuery(llmUsageQuery), (context) => {
     const { purpose, limit } = context.req.valid("query");
 
     return context.json(readLlmUsage(db, { purpose: purpose ?? null, sinceMs: null, limit }));
   });
 
-  routes.get("/attempts", zValidator("query", attemptsQuery), (context) => {
+  routes.get("/attempts", validQuery(attemptsQuery), (context) => {
     const { applicationId, limit } = context.req.valid("query");
 
     const rows = db
@@ -1304,7 +1304,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     context.json({ lab: buildLabReport(db), providers: buildProviderReport(db, clock) }),
   );
 
-  routes.post("/lab/runs", zValidator("json", labRunPayloadSchema), async (context) => {
+  routes.post("/lab/runs", validJson(labRunPayloadSchema), async (context) => {
     if (deps.providers === null) {
       return context.json({ error: "browser_provider_unconfigured" }, 503);
     }
@@ -1364,7 +1364,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     return context.json({ jobId: job.id });
   });
 
-  routes.post("/fixtures/capture", zValidator("json", captureBody), async (context) => {
+  routes.post("/fixtures/capture", validJson(captureBody), async (context) => {
     if (deps.providers === null) {
       return context.json({ error: "browser_provider_unconfigured" }, 503);
     }

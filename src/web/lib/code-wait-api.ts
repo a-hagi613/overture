@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 
-import { CODE_WAIT_ASK_MS } from "../../shared/code-wait.ts";
+import { CODE_WAIT_ASK_MS, CODE_WAIT_ERRORS } from "../../shared/code-wait.ts";
 
 const waitSchema = z.object({
   applicationId: z.string(),
@@ -71,11 +71,11 @@ async function pasteCode(input: { code: string; waitId: string }) {
     const parsed = z.object({ error: z.string() }).safeParse(body);
     const error = parsed.success ? parsed.data.error : "";
 
-    if (response.status === 409 && error === "expired") {
+    if (response.status === 409 && error === CODE_WAIT_ERRORS.expired) {
       throw new CodePasteError("expired");
     }
 
-    if (response.status === 409 && error === "already resolved") {
+    if (response.status === 409 && error === CODE_WAIT_ERRORS.alreadyResolved) {
       throw new CodePasteError("resolved");
     }
 

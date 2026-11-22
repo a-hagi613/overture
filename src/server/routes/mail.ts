@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
+import { validJson } from "./validators.ts";
 import { and, asc, eq, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
 
@@ -11,7 +11,9 @@ import type { createMailboxService } from "../inbox/mailboxes.ts";
 
 import { codePatterns } from "../inbox/codes.ts";
 import { resolveCodeWaitWithPaste } from "../inbox/waits.ts";
-import { applications, attempts, codeWaits } from "../platform/db/schema.ts";
+import { applications, attempts, codeWaits, companies, postings } from "../platform/db/schema.ts";
+import { API_ERRORS } from "../../shared/api-errors.ts";
+import { CODE_WAIT_ERRORS } from "../../shared/code-wait.ts";
 
 const codeBodySchema = z.object({
   code: z.string().regex(codePatterns.greenhouse, "Enter the 8-character code."),
@@ -42,7 +44,7 @@ export function createMailRoutes(deps: {
     const user = await sessionUser(context.req.raw);
 
     if (user === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const mailbox = await mailboxes.ensureFor(user.id);
@@ -58,7 +60,7 @@ export function createMailRoutes(deps: {
     const user = await sessionUser(context.req.raw);
 
     if (user === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const rows = db
@@ -98,11 +100,11 @@ export function createMailRoutes(deps: {
     });
   });
 
-  routes.post("/mail/code-waits/:id", zValidator("json", codeBodySchema), async (context) => {
+  routes.post("/mail/code-waits/:id", validJson(codeBodySchema), async (context) => {
     const user = await sessionUser(context.req.raw);
 
     if (user === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const { code } = context.req.valid("json");
@@ -114,15 +116,15 @@ export function createMailRoutes(deps: {
     );
 
     if (result.outcome === "not_found") {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     if (result.outcome === "already_resolved") {
-      return context.json({ error: "already resolved" }, 409);
+      return context.json({ error: CODE_WAIT_ERRORS.alreadyResolved }, 409);
     }
 
     if (result.outcome === "expired") {
-      return context.json({ error: "expired" }, 409);
+      return context.json({ error: CODE_WAIT_ERRORS.expired }, 409);
     }
 
     return context.json({

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
+import { validQuery } from "./validators.ts";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -10,6 +10,7 @@ import { createSseStream } from "../platform/sse/stream.ts";
 import { getAllKillSwitches, getAllSettings, getSetting } from "../platform/settings/index.ts";
 import { searchPostings } from "../platform/search/search.ts";
 import { EMPLOYMENT_TYPES, SENIORITIES, WORKPLACES } from "../../shared/tag-taxonomy.ts";
+import { API_ERRORS } from "../../shared/api-errors.ts";
 
 const searchQuerySchema = z.object({
   q: z.string().min(1).max(200),
@@ -29,7 +30,7 @@ export function createApiRoutes(
 ) {
   const routes = new Hono();
 
-  routes.get("/search", zValidator("query", searchQuerySchema), (context) => {
+  routes.get("/search", validQuery(searchQuerySchema), (context) => {
     const { q, limit, role, seniority, workplace, location, employmentType } =
       context.req.valid("query");
 
@@ -104,7 +105,7 @@ export function createApiRoutes(
     const value = getSetting(db, key);
 
     if (value === null) {
-      return context.json({ error: "not found" }, 404);
+      return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
     return context.json({ key, value });

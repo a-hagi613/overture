@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
+import { HTTPException } from "hono/http-exception";
 import type { DNSResolver } from "mailauth";
 import { join, resolve } from "node:path";
 
@@ -54,6 +56,8 @@ import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { createConfiguredBackupStore } from "./platform/object-store.ts";
 import { securityHeaders } from "./security-headers.ts";
 import { parseMasterKey } from "./platform/crypto.ts";
+import { logError } from "./platform/log.ts";
+import { API_ERRORS } from "../shared/api-errors.ts";
 
 export interface AppDependencies {
   db: AppDatabase;
@@ -119,6 +123,26 @@ async function staticResponseFrom(root: string, url: string) {
   return null;
 }
 
+function internalError(error: Error, context: Context) {
+  if (error instanceof HTTPException) {
+    let code: string = API_ERRORS.internal;
+
+    if (error.status === 400) {
+      code = API_ERRORS.invalidRequest;
+    } else if (error.status === 401) {
+      code = API_ERRORS.signInRequired;
+    } else if (error.status === 404) {
+      code = API_ERRORS.notFound;
+    }
+
+    return context.json({ error: code }, error.status);
+  }
+
+  logError("http", error);
+
+  return context.json({ error: API_ERRORS.internal }, 500);
+}
+
 export function createApp(deps: AppDependencies) {
   const clientIpConfig = {
     flyAppName: env.FLY_APP_NAME,
@@ -156,6 +180,9 @@ export function createApp(deps: AppDependencies) {
   );
 
   const app = new Hono();
+
+  app.onError(internalError);
+  adminHost.onError(internalError);
 
   app.use("*", securityHeaders(env.NODE_ENV === "production"));
 

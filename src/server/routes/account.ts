@@ -13,6 +13,7 @@ import { env } from "../config/env.ts";
 import { rateLimits, sessions } from "../platform/db/schema.ts";
 import { ERASURE_COMPLETES_WITHIN_MS, REAUTH_WINDOW_MS } from "../account/erase.ts";
 import { EXPORT_VALID_MS } from "../export/service.ts";
+import { API_ERRORS } from "../../shared/api-errors.ts";
 
 const deleteSchema = z.object({ confirm: z.literal(true) });
 
@@ -91,7 +92,7 @@ export function createAccountRoutes(deps: {
     const result = await sessionOf(context.req.raw);
 
     if (result === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     context.header("Cache-Control", "no-store");
@@ -106,7 +107,7 @@ export function createAccountRoutes(deps: {
     const result = await sessionOf(context.req.raw);
 
     if (result === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const now = clock.now();
@@ -132,13 +133,13 @@ export function createAccountRoutes(deps: {
     const result = await sessionOf(context.req.raw);
 
     if (result === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const body = deleteSchema.safeParse(await context.req.json().catch(() => null));
 
     if (!body.success) {
-      return context.json({ error: "invalid_body" }, 400);
+      return context.json({ error: API_ERRORS.invalidRequest }, 400);
     }
 
     if (!sessionReauthenticated(result.session.id, clock.now())) {
@@ -164,7 +165,7 @@ export function createAccountRoutes(deps: {
     const user = await sessionUser(context.req.raw);
 
     if (user === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     return context.json(await exports.state(user.id), 200, { "cache-control": "no-store" });
@@ -174,7 +175,7 @@ export function createAccountRoutes(deps: {
     const user = await sessionUser(context.req.raw);
 
     if (user === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const result = await exports.request(user.id);
@@ -188,7 +189,7 @@ export function createAccountRoutes(deps: {
     const user = await sessionUser(context.req.raw);
 
     if (user === null) {
-      return context.json({ error: "unauthorised" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
     const result = await exports.download(user.id, context.req.param("id"));

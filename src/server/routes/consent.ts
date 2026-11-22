@@ -1,4 +1,4 @@
-import { zValidator } from "@hono/zod-validator";
+import { validJson } from "./validators.ts";
 import { Hono } from "hono";
 
 import type { Auth } from "../auth/index.ts";
@@ -58,7 +58,7 @@ export function createConsentRoutes(deps: { auth: Auth; consent: ConsentService 
     return context.json({ versions: consent.list().map((row) => versionView(row)) });
   });
 
-  routes.post("/consent/accept", zValidator("json", consentAcceptInputSchema), async (context) => {
+  routes.post("/consent/accept", validJson(consentAcceptInputSchema), async (context) => {
     const user = await sessionUser(context.req.raw.headers);
 
     if (user === null) {
