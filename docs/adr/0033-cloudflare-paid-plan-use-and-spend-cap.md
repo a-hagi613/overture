@@ -10,7 +10,8 @@ account-wide budget alert exist on the account, and their commands, reading and 
 `docs/research/cloudflare-spend-guard-runbook.md`. The sentinel is built (#283, `workers/sentinel`): it probes
 health from outside Fly, watches the Workable snapshot's age and Cloudflare usage, and writes the degraded flag the app
 reads. The marketing pages are served from Workers Static Assets (#284, `workers/marketing`) on routes for `/` and
-`/pricing` only. The Queue, the app-side counters and the R2 bounds are separate tickets (#281–#287).
+`/pricing` only. The Queue, the app-side counters and the R2 bounds are separate tickets (#281–#287); the Workers AI
+`email_classify` trial (#287) is dropped, so `email_classify` stays rules plus Haiku with no Neuron counter.
 
 ## Context
 
@@ -20,9 +21,14 @@ The owner pays $5 a month for Workers Paid and wants no spend above $5 a month i
 
 - **Use Cloudflare for what it does free at Overture's volume:** the inbound-mail Email Worker, a cron sentinel Worker, Workers Static Assets for the marketing pages, a Queue under the inbound mail path, and R2 as today.
 - **Do not adopt** Browser Run for sending (no residential proxy or CAPTCHA solving, and a non-removable bot signature; ADR 0003 and 0016 stand), D1, KV, Durable Objects, Workflows, Vectorize, Hyperdrive, Containers or Images. The Workable pass stays on the GitHub Action (ADR 0032).
+- **Workers AI is not adopted for `email_classify` (#287).** The fallback stays rules plus Haiku (SPEC §8.6, §11.3).
+  The cost review (#184) prices a classification at 24 µUSD, or about 1.4 cents a user-month at the Month plan's full
+  allowance, and no local Workers AI response exists to prove equal accuracy, so the issue's own rule skips the trial
+  (`docs/research/cloudflare-paid-plan.md` §5). No Neuron counter is added: it would guard a spend the workload cannot
+  reach, and it belongs with the live comparison if Workers AI is ever revived.
 - **Guards, layered:** a Workers and a Durable Objects spending limit at $0.01, each emailing the owner at 80% and
   100%; a $0.50 account-wide budget alert; a sentinel Worker that watches usage and sets a degraded flag; and
-  app-side counters for Email Sending and, if adopted, Workers AI. R2 cannot be blocked natively, so it is bounded by
+  an app-side counter for Email Sending. R2 cannot be blocked natively, so it is bounded by
   design: a Litestream sync interval chosen from measured Class A operations, a lag read that lists one replica level
   instead of ten, a five-minute L0 retention check, lifecycle rules and a size alert. The measured list floor is about
   104k Class A a month before writes (#281, `docs/research/cloudflare-paid-plan.md` §2).
@@ -35,6 +41,7 @@ The owner pays $5 a month for Workers Paid and wants no spend above $5 a month i
 - **A watchdog that revokes the R2 token at a threshold.** Rejected: it would stop the backups.
 - **Browser Run for sending.** Rejected for the reasons above; cheaper per application but not a like-for-like browser.
 - **Workable ingest on a Worker.** Rejected: about 3.6 M CPU-ms a day for the full pass against 30 M a month included, and no gain over the free Action.
+- **Workers AI for the `email_classify` fallback.** Rejected (#287): the cost review puts the line at 24 µUSD a call and cents a user-month, and no Workers AI response is recorded, so equal accuracy cannot be shown. The rule that decides it is #287's own (`docs/research/cloudflare-paid-plan.md` §5).
 
 ## Consequences
 
