@@ -8956,6 +8956,7 @@
         "src/web/lib/board-api.ts",
         "src/web/lib/board-format.ts",
         "src/web/lib/calendar-api.ts",
+        "src/web/lib/calendar-focus.ts",
         "src/web/lib/calendar-format.ts",
         "src/web/lib/calendar-grid.ts",
         "src/web/lib/calendar-style.ts",
@@ -20004,6 +20005,17 @@
         "src/shared/checkins.ts",
         "src/shared/inbound-mail.ts",
         "src/shared/turnstile.ts"
+      ]
+    },
+    "test/e2e/marketing-worker.test.ts": {
+      "full": false,
+      "paths": [],
+      "routes": [],
+      "designs": [],
+      "modules": [
+        "src/shared/marketing-paths.ts",
+        "src/shared/security-headers.ts",
+        "test/e2e/marketing-worker.fixture.ts"
       ]
     },
     "test/e2e/matching-candidates.test.ts": {

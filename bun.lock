@@ -64,6 +64,13 @@
         "wrangler": "4.164.0",
       },
     },
+    "workers/marketing": {
+      "name": "@overture/marketing",
+      "version": "0.1.0",
+      "devDependencies": {
+        "wrangler": "4.164.0",
+      },
+    },
     "workers/sentinel": {
       "name": "@overture/sentinel",
       "version": "0.1.0",
@@ -461,6 +468,8 @@
     "@opentelemetry/sql-common": ["@opentelemetry/sql-common@0.43.1", "", { "dependencies": { "@opentelemetry/core": "^3.0.0" }, "peerDependencies": { "@opentelemetry/api": "^1.10.0" } }, "sha512-a6QbfVVjLUatgzpcE37pWK1GIHCcG6nXJF5FS+O+ExU64VPs1HtGhdZ96CERhwTY5fOP1pJfFsYUpEqtOY1Uqg=="],
 
     "@overture/inbound-mail": ["@overture/inbound-mail@workspace:workers/inbound-mail"],
+
+    "@overture/marketing": ["@overture/marketing@workspace:workers/marketing"],
 
     "@overture/sentinel": ["@overture/sentinel@workspace:workers/sentinel"],
 
