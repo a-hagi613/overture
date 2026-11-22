@@ -7,6 +7,8 @@ import { applications, attempts, postings, users } from "../platform/db/schema.t
 import { raiseAlert } from "../platform/alerts.ts";
 import { percentile, ratio } from "../platform/stats.ts";
 
+import { applicationLlmMicrosByUser } from "./application-spend.ts";
+
 export const COST_GATE_MICROS = 30_000;
 const TREND_WINDOW = 20;
 const TREND_MINIMUM = 10;
@@ -14,7 +16,16 @@ const TREND_RATIO = 1.2;
 
 const ATTEMPTED_EXCLUDED = new Set(["posting_closed", "duplicate", "needs_review"]);
 
+/**
+ * Whether a try with this outcome counts as an attempted Application (ADR 0026).
+ * @param outcome The outcome of the try, or null while it is still running.
+ * @returns True when the try counts towards the cost denominator.
+ */
+export const isAttempted = (outcome: string | null) =>
+  outcome === null || !ATTEMPTED_EXCLUDED.has(outcome);
+
 interface AttemptRow {
+  userId: string;
   provider: string;
   ats: string | null;
   outcome: string | null;
@@ -42,10 +53,34 @@ export interface ProviderReportRow {
   proxyTrend: boolean;
 }
 
-const attemptedRows = (rows: AttemptRow[]) =>
-  rows.filter((row) => row.outcome === null || !ATTEMPTED_EXCLUDED.has(row.outcome));
+const attemptedRows = (rows: AttemptRow[]) => rows.filter((row) => isAttempted(row.outcome));
 
-function summarise(rows: AttemptRow[], trend: boolean) {
+function anthropicMicrosOf(
+  group: AttemptRow[],
+  population: AttemptRow[],
+  llmByUser: Map<string, number>,
+) {
+  const perUser = (rows: AttemptRow[]) => {
+    const counts = new Map<string, number>();
+
+    for (const row of rows) {
+      counts.set(row.userId, (counts.get(row.userId) ?? 0) + 1);
+    }
+
+    return counts;
+  };
+
+  const totals = perUser(attemptedRows(population));
+  const inGroup = perUser(attemptedRows(group));
+
+  return [...inGroup].reduce(
+    (total, [userId, count]) =>
+      total + ((llmByUser.get(userId) ?? 0) * count) / (totals.get(userId) ?? count),
+    0,
+  );
+}
+
+function summarise(rows: AttemptRow[], trend: boolean, llmByUser: Map<string, number>) {
   const groups = new Map<string, AttemptRow[]>();
 
   for (const row of rows) {
@@ -69,8 +104,12 @@ function summarise(rows: AttemptRow[], trend: boolean) {
         .filter((value): value is number => value !== null && value > 0);
 
       const proxyBytes = attempted.reduce((total, row) => total + (row.proxyBytes ?? 0), 0);
-      const costMicros = attempted.reduce((total, row) => total + (row.costMicros ?? 0), 0);
-      const costPerCompleted = ratio(costMicros, sent.length);
+      const browserMicros = attempted.reduce((total, row) => total + (row.costMicros ?? 0), 0);
+
+      const costPerCompleted = ratio(
+        browserMicros + anthropicMicrosOf(attempted, rows, llmByUser),
+        sent.length,
+      );
 
       return {
         ats,
@@ -119,6 +158,7 @@ function attemptRows(db: AppDatabase) {
     .select({
       ats: postings.ats,
       browserMs: attempts.browserMs,
+      userId: attempts.userId,
       captchaSeen: attempts.captchaSeen,
       codeUsed: attempts.codeUsed,
       costMicros: attempts.costMicros,
@@ -147,18 +187,29 @@ export function buildProviderReport(db: AppDatabase, clock: Clock) {
     });
   }
 
-  return summarise(rows, trend);
+  return summarise(rows, trend, applicationLlmMicrosByUser(db, null));
 }
 
+/**
+ * Cost per completed Application for the population of attempts (ADR 0026):
+ * the attempted Browser Use spend plus the Anthropic spend of the users whose
+ * attempts are counted, divided by the sent Applications.
+ * @param db The database to read.
+ * @returns The completed count, the cost split, the gate verdict and the proxy figures.
+ */
 export function buildCostSummary(db: AppDatabase) {
   const rows = attemptRows(db);
   const attempted = attemptedRows(rows);
   const sent = rows.filter((row) => row.outcome === "sent").length;
-  const costMicros = attempted.reduce((total, row) => total + (row.costMicros ?? 0), 0);
+  const browserMicros = attempted.reduce((total, row) => total + (row.costMicros ?? 0), 0);
   const proxyBytes = attempted.reduce((total, row) => total + (row.proxyBytes ?? 0), 0);
-  const costPerCompleted = ratio(costMicros, sent);
+  const anthropicMicros = anthropicMicrosOf(attempted, rows, applicationLlmMicrosByUser(db, null));
+
+  const costPerCompleted = ratio(browserMicros + anthropicMicros, sent);
 
   return {
+    anthropicMicros,
+    browserMicros,
     completed: sent,
     costGateMicros: COST_GATE_MICROS,
     costGateMet: costPerCompleted === null ? null : costPerCompleted <= COST_GATE_MICROS,

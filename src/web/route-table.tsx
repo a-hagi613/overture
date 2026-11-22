@@ -34,6 +34,7 @@ import { AdminSettingsPage } from "./routes/admin/settings.tsx";
 import { CatalogPage } from "./routes/admin/catalog.tsx";
 import { MailHealthPage } from "./routes/admin/mail-health.tsx";
 import { GrantsPage } from "./routes/admin/grants.tsx";
+import { MarginPage } from "./routes/admin/margin.tsx";
 import { InvitesPage } from "./routes/admin/invites.tsx";
 import { OverviewPage } from "./routes/admin/overview.tsx";
 import { ProviderReportPage } from "./routes/admin/provider-report.tsx";
@@ -66,6 +67,7 @@ const adminShellChildren: RouteObject[] = [
   { path: "/admin/catalog", element: <CatalogPage /> },
   { path: "/admin/mail-health", element: <MailHealthPage /> },
   { path: "/admin/grants", element: <GrantsPage /> },
+  { path: "/admin/billing/margin", element: <MarginPage /> },
   { path: "/admin/users", element: <UsersPage /> },
   { path: "/admin/users/:id", element: <UserPage /> },
   { path: "/admin/invites", element: <InvitesPage /> },

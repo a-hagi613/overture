@@ -397,6 +397,7 @@ const bulkPostingsBody = z.object({
 });
 
 const recordLlmUsageBody = z.object({
+  email: z.email().optional(),
   purpose: z.string().min(1),
   model: z.string().min(1),
   inputTokens: z.number().int().min(0),
@@ -466,7 +467,7 @@ const seedGrantBody = z.object({
   email: z.email(),
   quantity: z.number().int().min(1).max(10_000),
   idempotencyKey: z.string().min(1),
-  source: z.enum(["admin", "trial"]).default("admin"),
+  source: z.enum(["admin", "period", "trial"]).default("admin"),
 });
 
 const ledgerApplicationBody = z.object({
@@ -1547,11 +1548,20 @@ export function createTestRoutes(
   });
 
   routes.post("/llm/usage", zValidator("json", recordLlmUsageBody), (context) => {
-    const { purpose, model, inputTokens, cachedTokens, outputTokens, costMicros } =
+    const { email, purpose, model, inputTokens, cachedTokens, outputTokens, costMicros } =
       context.req.valid("json");
 
+    const user =
+      email === undefined
+        ? undefined
+        : db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.email, lowercased(email)))
+            .get();
+
     recordLlmUsage(db, clock, {
-      userId: null,
+      userId: user?.id ?? null,
       purpose,
       model,
       inputTokens,
@@ -2179,6 +2189,8 @@ export function createTestRoutes(
           idempotencyKey,
           quantity,
           source,
+          startsAt: source === "period" ? clock.now() : null,
+          expiresAt: source === "period" ? clock.now() + 30 * 86_400_000 : null,
           userId: user.id,
         }),
       "test.ledger.grant",

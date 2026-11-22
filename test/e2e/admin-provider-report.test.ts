@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 
 import { z } from "zod";
 
+import { authTestIdentity } from "./auth.fixture.ts";
 import { openAdminAsOwner } from "./admin-sign-in.ts";
 import { expect, test } from "./admin.fixture.ts";
 import {
@@ -508,4 +509,103 @@ test("an attempt's live view and replay open from the admin", async ({
     );
 
   expect(replay.recordingUrl).toContain(session.id);
+});
+
+test("Anthropic spend of the Application purposes raises the cost summary and the provider row, and the gate follows the total", async ({
+  page,
+  captureAppServer,
+  captureAppUrl,
+  accessServer,
+}) => {
+  const { owner, userId } = await ownerContextFor(captureAppServer.url);
+
+  const companyId = await seedCompany(owner, "Blank Street", "blankstreet.example");
+  const boardId = await seedBoard(owner, companyId, "greenhouse", "blankstreet");
+
+  const postingId = await seedPosting(owner, {
+    atsJobId: "8004209004",
+    boardId,
+    companyId,
+    title: "Assistant General Manager | Durham",
+    url: "https://example.test/blankstreet/jobs/8004209004",
+  });
+
+  const applicationId = await seedApplication(owner, { postingId, status: "ready", userId });
+
+  const seeded = await owner.post("/__test__/attempts/seed", {
+    data: {
+      applicationId,
+      browserMs: 60_000,
+      costMicros: 20_000,
+      n: 1,
+      outcome: "sent",
+      proxyBytes: 0,
+      provider: "browser_use",
+      startedAt: 1_800_000_000_000,
+      userId,
+    },
+  });
+
+  expect(seeded.ok()).toBe(true);
+
+  const recordLlm = async (purpose: string, costMicros: number) => {
+    const recorded = await owner.post("/__test__/llm/usage", {
+      data: {
+        email: authTestIdentity.ownerEmail,
+        model: "claude-haiku-5-5",
+        purpose,
+        inputTokens: 1,
+        cachedTokens: 0,
+        outputTokens: 1,
+        costMicros,
+      },
+    });
+
+    expect(recorded.ok()).toBe(true);
+  };
+
+  await recordLlm("score", 15_000);
+  await recordLlm("tag_fallback", 900_000);
+
+  await openAdminAsOwner(page, captureAppUrl, accessServer.issueToken);
+
+  const overview = z
+    .object({
+      cost: z.object({
+        anthropicMicros: z.number(),
+        completed: z.number(),
+        costGateMet: z.boolean().nullable(),
+        costGateMicros: z.number(),
+        costMicrosPerCompleted: z.number().nullable(),
+      }),
+    })
+    .parse(await (await page.request.get(`${captureAppUrl}/admin/api/overview`)).json());
+
+  expect(overview.cost).toMatchObject({
+    anthropicMicros: 15_000,
+    completed: 1,
+    costGateMet: false,
+    costGateMicros: 30_000,
+    costMicrosPerCompleted: 35_000,
+  });
+
+  const report = z
+    .object({
+      providers: z.array(
+        z.object({
+          ats: z.string(),
+          costGateMet: z.boolean().nullable(),
+          costGateMicros: z.number(),
+          costMicrosPerCompleted: z.number().nullable(),
+          sent: z.number(),
+        }),
+      ),
+    })
+    .parse(await (await page.request.get(`${captureAppUrl}/admin/api/provider-report`)).json());
+
+  expect(report.providers.find((row) => row.ats === "greenhouse" && row.sent === 1)).toMatchObject({
+    costGateMet: false,
+    costGateMicros: 30_000,
+    costMicrosPerCompleted: 35_000,
+  });
 });

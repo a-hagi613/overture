@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 
 import type { ChildProcess } from "node:child_process";
 
@@ -75,7 +76,7 @@ function authDefaults(extraEnvironment: Record<string, string>) {
   const defaults: Record<string, string> = {};
 
   for (const [key, value] of Object.entries(testAuthEnvironment)) {
-    if (process.env[key] === undefined && extraEnvironment[key] === undefined) {
+    if (extraEnvironment[key] === undefined) {
       defaults[key] = value;
     }
   }
@@ -83,14 +84,34 @@ function authDefaults(extraEnvironment: Record<string, string>) {
   return defaults;
 }
 
+function developerEnvKeys() {
+  if (!existsSync(".env")) {
+    return [];
+  }
+
+  return readFileSync(".env", "utf8")
+    .split("\n")
+    .map((line) => /^\s*(?:export\s+)?(?<key>[A-Za-z_][A-Za-z0-9_]*)\s*=/u.exec(line)?.groups?.key)
+    .filter((key): key is string => key !== undefined);
+}
+
 export function serverEnvironment(extraEnvironment: Record<string, string>) {
+  const developerKeys = new Set(developerEnvKeys());
+
+  const inherited = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([key]) => !developerKeys.has(key) || extraEnvironment[key] !== undefined,
+    ),
+  );
+
   const merged = {
-    ...process.env,
+    ...inherited,
     NODE_ENV: "test",
     PORT: "0",
     STATIC_ROOT: "dist",
     ENABLE_TEST_ROUTES: "true",
     TURNSTILE_SCRIPT_URL: "/__test__/turnstile-api.js",
+    TURNSTILE_HOSTNAMES: "localhost,127.0.0.1",
     LAB_RECAPTCHA_SCRIPT_URL: "/__test__/lab-recaptcha.js",
     LAB_HCAPTCHA_SCRIPT_URL: "/__test__/lab-hcaptcha.js",
     LAB_TURNSTILE_SCRIPT_URL: "/__test__/lab-turnstile.js",
@@ -108,7 +129,7 @@ async function spawnServer(
   extraEnvironment: Record<string, string>,
   stderr: ReturnType<typeof createStderrMonitor>,
 ) {
-  const child = spawn("bun", ["run", "src/server/main.ts"], {
+  const child = spawn("bun", ["--no-env-file", "run", "src/server/main.ts"], {
     env: {
       ...serverEnvironment(extraEnvironment),
       DATABASE_URL: databasePath,
