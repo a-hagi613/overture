@@ -5,7 +5,7 @@
  "viewport": 390,
  "page": {
   "width": 390,
-  "height": 1933
+  "height": 1993
  },
  "tokens": {
   "--bg2": "#ECE6DA",
@@ -27,10 +27,10 @@
   "--done": "#151311",
   "--btnink": "#FBF8F2",
   "--score2": "#5E5850",
-  "--rank": "#8E3A2C",
+  "--meter": "#151311",
   "--acc": "#D2561F",
   "--focus": "#151311",
-  "--meter": "#151311",
+  "--rank": "#8E3A2C",
   "--acct": "#A9431A",
   "--okbg": "#DDE7DE",
   "--sh": "0 1px 0 rgba(21,19,17,.10),0 12px 24px -18px rgba(21,19,17,.38)",
@@ -40,8 +40,8 @@
   "--donering": "#E9E3D8",
   "--line2": "rgba(21,19,17,.28)",
   "--inink": "#151311",
-  "--hl": "rgba(255,255,255,.55)",
   "--needbg": "#EFD9D3",
+  "--hl": "rgba(255,255,255,.55)",
   "--need": "#8E3A2C",
   "--bloom": "rgba(255,255,255,.5)"
  },
@@ -53,14 +53,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 1932.7
+    "h": 1992.7
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "content-box",
     "width": "390px",
-    "height": "1932.73px",
+    "height": "1992.73px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -85,14 +85,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 1932.7
+    "h": 1992.7
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "content-box",
     "width": "390px",
-    "height": "1932.73px",
+    "height": "1992.73px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -117,14 +117,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 1932.7
+    "h": 1992.7
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "content-box",
     "width": "390px",
-    "height": "1932.73px",
+    "height": "1992.73px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -149,14 +149,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 1932.7
+    "h": 1992.7
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "content-box",
     "width": "390px",
-    "height": "1932.73px",
+    "height": "1992.73px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -181,14 +181,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 1932.7
+    "h": 1992.7
    },
    "style": {
     "display": "block",
     "position": "relative",
     "box-sizing": "content-box",
     "width": "390px",
-    "height": "1932.73px",
+    "height": "1992.73px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -205,7 +205,7 @@
     "border-bottom": "0px none rgb(21, 19, 17)",
     "border-left": "0px none rgb(21, 19, 17)",
     "opacity": "1",
-    "overflow": "hidden"
+    "overflow": "clip"
    }
   },
   {
@@ -215,14 +215,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 1932.7
+    "h": 1992.7
    },
    "style": {
     "display": "block",
     "position": "absolute",
     "box-sizing": "border-box",
     "width": "390px",
-    "height": "1932.73px",
+    "height": "1992.73px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -249,14 +249,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 1932.7
+    "h": 1992.7
    },
    "style": {
     "display": "block",
     "position": "absolute",
     "box-sizing": "border-box",
     "width": "390px",
-    "height": "1932.73px",
+    "height": "1992.73px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -282,14 +282,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 1932.7
+    "h": 1992.7
    },
    "style": {
     "display": "inline",
     "position": "static",
     "box-sizing": "border-box",
     "width": "390px",
-    "height": "1932.73px",
+    "height": "1992.73px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -312,16 +312,16 @@
    "path": "div>div>div>div>div>div:nth-of-type(2)",
    "tag": "div",
    "box": {
-    "x": -70,
+    "x": 0,
     "y": -260,
-    "w": 700,
+    "w": 390,
     "h": 700
    },
    "style": {
     "display": "block",
     "position": "absolute",
     "box-sizing": "border-box",
-    "width": "700px",
+    "width": "390px",
     "height": "700px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
@@ -351,14 +351,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 1868.7
+    "h": 1928.7
    },
    "style": {
     "display": "flex",
     "position": "relative",
     "box-sizing": "border-box",
     "width": "390px",
-    "height": "1868.73px",
+    "height": "1928.73px",
     "flex-direction": "row",
     "flex-wrap": "wrap",
     "align-items": "stretch",
@@ -386,14 +386,14 @@
     "x": 0,
     "y": 0,
     "w": 390,
-    "h": 1868.7
+    "h": 1928.7
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
     "width": "390px",
-    "height": "1868.73px",
+    "height": "1928.73px",
     "padding-top": "18px",
     "padding-right": "16px",
     "padding-bottom": "28px",
@@ -776,14 +776,14 @@
     "x": 16,
     "y": 208.1,
     "w": 358,
-    "h": 1632.6
+    "h": 1692.6
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
     "width": "358px",
-    "height": "1632.64px",
+    "height": "1692.64px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
     "flex-grow": "0",
@@ -984,6 +984,7 @@
     "font-size": "13.5px",
     "font-weight": "600",
     "text-align": "center",
+    "white-space": "nowrap",
     "color": "rgb(251, 248, 242)",
     "background-color": "rgb(21, 19, 17)",
     "border-top": "1px solid rgb(21, 19, 17)",
@@ -1147,14 +1148,14 @@
     "x": 16,
     "y": 330.8,
     "w": 358,
-    "h": 1509.9
+    "h": 1569.9
    },
    "style": {
     "display": "flex",
     "position": "static",
     "box-sizing": "border-box",
     "width": "358px",
-    "height": "1509.89px",
+    "height": "1569.89px",
     "margin-top": "18px",
     "gap": "16px",
     "row-gap": "16px",
@@ -1184,14 +1185,14 @@
     "x": 16,
     "y": 330.8,
     "w": 358,
-    "h": 1059.6
+    "h": 1119.6
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
     "width": "358px",
-    "height": "1059.61px",
+    "height": "1119.61px",
     "padding-top": "20px",
     "padding-right": "22px",
     "padding-bottom": "18px",
@@ -1756,6 +1757,7 @@
     "font-size": "13.5px",
     "font-weight": "600",
     "text-align": "center",
+    "white-space": "nowrap",
     "color": "rgb(251, 248, 242)",
     "background-color": "rgb(21, 19, 17)",
     "border-top": "1px solid rgb(21, 19, 17)",
@@ -1799,6 +1801,7 @@
     "font-size": "13.5px",
     "font-weight": "600",
     "text-align": "center",
+    "white-space": "nowrap",
     "color": "rgb(21, 19, 17)",
     "background-color": "rgb(251, 248, 242)",
     "border-top": "1px solid rgba(21, 19, 17, 0.28)",
@@ -1816,16 +1819,16 @@
    "text": "Hide answers",
    "box": {
     "x": 271,
-    "y": 483,
+    "y": 477,
     "w": 80,
-    "h": 32
+    "h": 44
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
     "width": "80px",
-    "height": "32px",
+    "height": "44px",
     "padding-top": "6px",
     "padding-bottom": "6px",
     "margin-left": "77px",
@@ -1854,14 +1857,14 @@
     "x": 39,
     "y": 533,
     "w": 312,
-    "h": 609
+    "h": 669
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
     "width": "312px",
-    "height": "609px",
+    "height": "669px",
     "margin-top": "12px",
     "flex-direction": "row",
     "flex-wrap": "nowrap",
@@ -1888,14 +1891,14 @@
     "x": 39,
     "y": 534,
     "w": 312,
-    "h": 113.5
+    "h": 125.5
    },
    "style": {
     "display": "grid",
     "position": "static",
     "box-sizing": "border-box",
     "width": "312px",
-    "height": "113.5px",
+    "height": "125.5px",
     "padding-top": "14px",
     "padding-bottom": "14px",
     "gap": "6px 14px",
@@ -1907,7 +1910,7 @@
     "flex-grow": "0",
     "flex-shrink": "1",
     "grid-template-columns": "312px",
-    "grid-template-rows": "19.5px 21px 32px",
+    "grid-template-rows": "19.5px 21px 44px",
     "font-family": "\"Plus Jakarta Sans\", system-ui, sans-serif",
     "font-size": "14px",
     "font-weight": "400",
@@ -1997,14 +2000,14 @@
     "x": 39,
     "y": 601.5,
     "w": 312,
-    "h": 32
+    "h": 44
    },
    "style": {
     "display": "flex",
     "position": "static",
     "box-sizing": "border-box",
     "width": "312px",
-    "height": "32px",
+    "height": "44px",
     "gap": "6px",
     "row-gap": "6px",
     "column-gap": "6px",
@@ -2034,7 +2037,7 @@
    "text": "Fact",
    "box": {
     "x": 39,
-    "y": 606.5,
+    "y": 612.5,
     "w": 39.9,
     "h": 22
    },
@@ -2076,17 +2079,17 @@
    "text": "Edit",
    "aria": "Edit answer: Full name",
    "box": {
-    "x": 327,
+    "x": 307,
     "y": 601.5,
-    "w": 24,
-    "h": 32
+    "w": 44,
+    "h": 44
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
-    "width": "24px",
-    "height": "32px",
+    "width": "44px",
+    "height": "44px",
     "padding-top": "6px",
     "padding-bottom": "6px",
     "flex-direction": "row",
@@ -2112,16 +2115,16 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 647.5,
+    "y": 659.5,
     "w": 312,
-    "h": 113.5
+    "h": 125.5
    },
    "style": {
     "display": "grid",
     "position": "static",
     "box-sizing": "border-box",
     "width": "312px",
-    "height": "113.5px",
+    "height": "125.5px",
     "padding-top": "14px",
     "padding-bottom": "14px",
     "gap": "6px 14px",
@@ -2133,7 +2136,7 @@
     "flex-grow": "0",
     "flex-shrink": "1",
     "grid-template-columns": "312px",
-    "grid-template-rows": "19.5px 21px 32px",
+    "grid-template-rows": "19.5px 21px 44px",
     "font-family": "\"Plus Jakarta Sans\", system-ui, sans-serif",
     "font-size": "14px",
     "font-weight": "400",
@@ -2154,7 +2157,7 @@
    "text": "Are you legally able to work in the UK?",
    "box": {
     "x": 39,
-    "y": 662.5,
+    "y": 674.5,
     "w": 312,
     "h": 19.5
    },
@@ -2188,7 +2191,7 @@
    "text": "Yes.",
    "box": {
     "x": 39,
-    "y": 688,
+    "y": 700,
     "w": 312,
     "h": 21
    },
@@ -2221,16 +2224,16 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 715,
+    "y": 727,
     "w": 312,
-    "h": 32
+    "h": 44
    },
    "style": {
     "display": "flex",
     "position": "static",
     "box-sizing": "border-box",
     "width": "312px",
-    "height": "32px",
+    "height": "44px",
     "gap": "6px",
     "row-gap": "6px",
     "column-gap": "6px",
@@ -2260,7 +2263,7 @@
    "text": "Fact",
    "box": {
     "x": 39,
-    "y": 720,
+    "y": 738,
     "w": 39.9,
     "h": 22
    },
@@ -2302,17 +2305,17 @@
    "text": "Edit",
    "aria": "Edit answer: Are you legally able to work in the UK?",
    "box": {
-    "x": 327,
-    "y": 715,
-    "w": 24,
-    "h": 32
+    "x": 307,
+    "y": 727,
+    "w": 44,
+    "h": 44
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
-    "width": "24px",
-    "height": "32px",
+    "width": "44px",
+    "height": "44px",
     "padding-top": "6px",
     "padding-bottom": "6px",
     "flex-direction": "row",
@@ -2338,16 +2341,16 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 761,
+    "y": 785,
     "w": 312,
-    "h": 154
+    "h": 166
    },
    "style": {
     "display": "grid",
     "position": "static",
     "box-sizing": "border-box",
     "width": "312px",
-    "height": "154px",
+    "height": "166px",
     "padding-top": "14px",
     "padding-bottom": "14px",
     "gap": "6px 14px",
@@ -2359,7 +2362,7 @@
     "flex-grow": "0",
     "flex-shrink": "1",
     "grid-template-columns": "312px",
-    "grid-template-rows": "39px 42px 32px",
+    "grid-template-rows": "39px 42px 44px",
     "font-family": "\"Plus Jakarta Sans\", system-ui, sans-serif",
     "font-size": "14px",
     "font-weight": "400",
@@ -2380,7 +2383,7 @@
    "text": "Are you comfortable with a weekly on-call rotation?",
    "box": {
     "x": 39,
-    "y": 776,
+    "y": 800,
     "w": 312,
     "h": 39
    },
@@ -2414,7 +2417,7 @@
    "text": "Yes. I have been on a weekly rotation before and I am happy to keep one.",
    "box": {
     "x": 39,
-    "y": 821,
+    "y": 845,
     "w": 312,
     "h": 42
    },
@@ -2447,16 +2450,16 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 869,
+    "y": 893,
     "w": 312,
-    "h": 32
+    "h": 44
    },
    "style": {
     "display": "flex",
     "position": "static",
     "box-sizing": "border-box",
     "width": "312px",
-    "height": "32px",
+    "height": "44px",
     "gap": "6px",
     "row-gap": "6px",
     "column-gap": "6px",
@@ -2486,7 +2489,7 @@
    "text": "Review",
    "box": {
     "x": 39,
-    "y": 874,
+    "y": 904,
     "w": 56.3,
     "h": 22
    },
@@ -2528,17 +2531,17 @@
    "text": "Edit",
    "aria": "Edit answer: Are you comfortable with a weekly on-call rotation?",
    "box": {
-    "x": 327,
-    "y": 869,
-    "w": 24,
-    "h": 32
+    "x": 307,
+    "y": 893,
+    "w": 44,
+    "h": 44
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
-    "width": "24px",
-    "height": "32px",
+    "width": "44px",
+    "height": "44px",
     "padding-top": "6px",
     "padding-bottom": "6px",
     "flex-direction": "row",
@@ -2564,16 +2567,16 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 915,
+    "y": 951,
     "w": 312,
-    "h": 113.5
+    "h": 125.5
    },
    "style": {
     "display": "grid",
     "position": "static",
     "box-sizing": "border-box",
     "width": "312px",
-    "height": "113.5px",
+    "height": "125.5px",
     "padding-top": "14px",
     "padding-bottom": "14px",
     "gap": "6px 14px",
@@ -2585,7 +2588,7 @@
     "flex-grow": "0",
     "flex-shrink": "1",
     "grid-template-columns": "312px",
-    "grid-template-rows": "19.5px 21px 32px",
+    "grid-template-rows": "19.5px 21px 44px",
     "font-family": "\"Plus Jakarta Sans\", system-ui, sans-serif",
     "font-size": "14px",
     "font-weight": "400",
@@ -2606,7 +2609,7 @@
    "text": "Years of Kubernetes experience",
    "box": {
     "x": 39,
-    "y": 930,
+    "y": 966,
     "w": 312,
     "h": 19.5
    },
@@ -2640,7 +2643,7 @@
    "text": "6",
    "box": {
     "x": 39,
-    "y": 955.5,
+    "y": 991.5,
     "w": 312,
     "h": 21
    },
@@ -2673,16 +2676,16 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 982.5,
+    "y": 1018.5,
     "w": 312,
-    "h": 32
+    "h": 44
    },
    "style": {
     "display": "flex",
     "position": "static",
     "box-sizing": "border-box",
     "width": "312px",
-    "height": "32px",
+    "height": "44px",
     "gap": "6px",
     "row-gap": "6px",
     "column-gap": "6px",
@@ -2712,7 +2715,7 @@
    "text": "Resume",
    "box": {
     "x": 39,
-    "y": 987.5,
+    "y": 1029.5,
     "w": 60.3,
     "h": 22
    },
@@ -2754,17 +2757,17 @@
    "text": "Edit",
    "aria": "Edit answer: Years of Kubernetes experience",
    "box": {
-    "x": 327,
-    "y": 982.5,
-    "w": 24,
-    "h": 32
+    "x": 307,
+    "y": 1018.5,
+    "w": 44,
+    "h": 44
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
-    "width": "24px",
-    "height": "32px",
+    "width": "44px",
+    "height": "44px",
     "padding-top": "6px",
     "padding-bottom": "6px",
     "flex-direction": "row",
@@ -2790,16 +2793,16 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 1028.5,
+    "y": 1076.5,
     "w": 312,
-    "h": 113.5
+    "h": 125.5
    },
    "style": {
     "display": "grid",
     "position": "static",
     "box-sizing": "border-box",
     "width": "312px",
-    "height": "113.5px",
+    "height": "125.5px",
     "padding-top": "14px",
     "padding-bottom": "14px",
     "gap": "6px 14px",
@@ -2811,7 +2814,7 @@
     "flex-grow": "0",
     "flex-shrink": "1",
     "grid-template-columns": "312px",
-    "grid-template-rows": "19.5px 21px 32px",
+    "grid-template-rows": "19.5px 21px 44px",
     "font-family": "\"Plus Jakarta Sans\", system-ui, sans-serif",
     "font-size": "14px",
     "font-weight": "400",
@@ -2832,7 +2835,7 @@
    "text": "Notice period",
    "box": {
     "x": 39,
-    "y": 1043.5,
+    "y": 1091.5,
     "w": 312,
     "h": 19.5
    },
@@ -2866,7 +2869,7 @@
    "text": "Two weeks",
    "box": {
     "x": 39,
-    "y": 1069,
+    "y": 1117,
     "w": 312,
     "h": 21
    },
@@ -2899,16 +2902,16 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 1096,
+    "y": 1144,
     "w": 312,
-    "h": 32
+    "h": 44
    },
    "style": {
     "display": "flex",
     "position": "static",
     "box-sizing": "border-box",
     "width": "312px",
-    "height": "32px",
+    "height": "44px",
     "gap": "6px",
     "row-gap": "6px",
     "column-gap": "6px",
@@ -2938,7 +2941,7 @@
    "text": "Fact",
    "box": {
     "x": 39,
-    "y": 1101,
+    "y": 1155,
     "w": 39.9,
     "h": 22
    },
@@ -2980,17 +2983,17 @@
    "text": "Edit",
    "aria": "Edit answer: Notice period",
    "box": {
-    "x": 327,
-    "y": 1096,
-    "w": 24,
-    "h": 32
+    "x": 307,
+    "y": 1144,
+    "w": 44,
+    "h": 44
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
-    "width": "24px",
-    "height": "32px",
+    "width": "44px",
+    "height": "44px",
     "padding-top": "6px",
     "padding-bottom": "6px",
     "flex-direction": "row",
@@ -3016,7 +3019,7 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 1148,
+    "y": 1208,
     "w": 312,
     "h": 223.5
    },
@@ -3052,7 +3055,7 @@
    "text": "Cover letter · preview",
    "box": {
     "x": 39,
-    "y": 1165,
+    "y": 1225,
     "w": 312,
     "h": 13
    },
@@ -3087,7 +3090,7 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 1188,
+    "y": 1248,
     "w": 312,
     "h": 136
    },
@@ -3127,7 +3130,7 @@
    "text": "Dear Northwind Labs team, I am applying for the Platform Engineer role. For the last four years I have built and run deploy pipelines for a payments team, and I would like to bring that work to your p",
    "box": {
     "x": 55,
-    "y": 1202,
+    "y": 1262,
     "w": 280,
     "h": 108
    },
@@ -3161,7 +3164,7 @@
    "text": "If the form has changed when we send, we stop and ask you first.",
    "box": {
     "x": 39,
-    "y": 1334,
+    "y": 1394,
     "w": 312,
     "h": 37.5
    },
@@ -3199,7 +3202,7 @@
    "tag": "svg",
    "box": {
     "x": 39,
-    "y": 1336,
+    "y": 1396,
     "w": 15,
     "h": 15
    },
@@ -3233,7 +3236,7 @@
    "tag": "circle",
    "box": {
     "x": 40.9,
-    "y": 1337.8,
+    "y": 1397.8,
     "w": 11.3,
     "h": 11.3
    },
@@ -3264,7 +3267,7 @@
    "tag": "path",
    "box": {
     "x": 46.5,
-    "y": 1341,
+    "y": 1401,
     "w": 0,
     "h": 5
    },
@@ -3295,7 +3298,7 @@
    "tag": "article",
    "box": {
     "x": 16,
-    "y": 1406.5,
+    "y": 1466.5,
     "w": 358,
     "h": 209.1
    },
@@ -3335,7 +3338,7 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 1427.5,
+    "y": 1487.5,
     "w": 312,
     "h": 69.1
    },
@@ -3373,7 +3376,7 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 1427.5,
+    "y": 1487.5,
     "w": 265,
     "h": 69.1
    },
@@ -3412,7 +3415,7 @@
    "text": "HS",
    "box": {
     "x": 39,
-    "y": 1427.5,
+    "y": 1487.5,
     "w": 40,
     "h": 40
    },
@@ -3450,7 +3453,7 @@
    "tag": "div",
    "box": {
     "x": 93,
-    "y": 1427.5,
+    "y": 1487.5,
     "w": 154,
     "h": 69.1
    },
@@ -3484,7 +3487,7 @@
    "text": "Halden Systems",
    "box": {
     "x": 93,
-    "y": 1427.5,
+    "y": 1487.5,
     "w": 154,
     "h": 26.4
    },
@@ -3519,7 +3522,7 @@
    "text": "Site Reliability Engineer",
    "box": {
     "x": 93,
-    "y": 1456.8,
+    "y": 1516.8,
     "w": 154,
     "h": 21
    },
@@ -3554,7 +3557,7 @@
    "text": "Manchester, hybrid",
    "box": {
     "x": 93,
-    "y": 1477.8,
+    "y": 1537.8,
     "w": 154,
     "h": 18.8
    },
@@ -3587,7 +3590,7 @@
    "tag": "div",
    "box": {
     "x": 318,
-    "y": 1427.5,
+    "y": 1487.5,
     "w": 33,
     "h": 50.5
    },
@@ -3621,7 +3624,7 @@
    "text": "81",
    "box": {
     "x": 318,
-    "y": 1427.5,
+    "y": 1487.5,
     "w": 33,
     "h": 34
    },
@@ -3657,7 +3660,7 @@
    "text": "match",
    "box": {
     "x": 318,
-    "y": 1461.5,
+    "y": 1521.5,
     "w": 33,
     "h": 16.5
    },
@@ -3690,7 +3693,7 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 1510.6,
+    "y": 1570.6,
     "w": 312,
     "h": 26
    },
@@ -3729,7 +3732,7 @@
    "text": "Resume: maya-okafor-2026.pdf",
    "box": {
     "x": 39,
-    "y": 1510.6,
+    "y": 1570.6,
     "w": 218.7,
     "h": 26
    },
@@ -3771,7 +3774,7 @@
    "text": "5 answers",
    "box": {
     "x": 273.7,
-    "y": 1514.2,
+    "y": 1574.2,
     "w": 58,
     "h": 18.8
    },
@@ -3805,7 +3808,7 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 1552.6,
+    "y": 1612.6,
     "w": 312,
     "h": 44
    },
@@ -3844,7 +3847,7 @@
    "text": "Send",
    "box": {
     "x": 39,
-    "y": 1552.6,
+    "y": 1612.6,
     "w": 72,
     "h": 44
    },
@@ -3869,6 +3872,7 @@
     "font-size": "13.5px",
     "font-weight": "600",
     "text-align": "center",
+    "white-space": "nowrap",
     "color": "rgb(251, 248, 242)",
     "background-color": "rgb(21, 19, 17)",
     "border-top": "1px solid rgb(21, 19, 17)",
@@ -3887,7 +3891,7 @@
    "text": "Skip",
    "box": {
     "x": 121,
-    "y": 1552.6,
+    "y": 1612.6,
     "w": 63,
     "h": 44
    },
@@ -3912,6 +3916,7 @@
     "font-size": "13.5px",
     "font-weight": "600",
     "text-align": "center",
+    "white-space": "nowrap",
     "color": "rgb(21, 19, 17)",
     "background-color": "rgb(251, 248, 242)",
     "border-top": "1px solid rgba(21, 19, 17, 0.28)",
@@ -3930,16 +3935,16 @@
    "aria": "Show answers, Halden Systems",
    "box": {
     "x": 265,
-    "y": 1558.6,
+    "y": 1612.6,
     "w": 86,
-    "h": 32
+    "h": 44
    },
    "style": {
     "display": "block",
     "position": "static",
     "box-sizing": "border-box",
     "width": "86px",
-    "height": "32px",
+    "height": "44px",
     "padding-top": "6px",
     "padding-bottom": "6px",
     "margin-left": "71px",
@@ -3966,7 +3971,7 @@
    "tag": "article",
    "box": {
     "x": 16,
-    "y": 1631.6,
+    "y": 1691.6,
     "w": 358,
     "h": 209.1
    },
@@ -4006,7 +4011,7 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 1652.6,
+    "y": 1712.6,
     "w": 312,
     "h": 69.1
    },
@@ -4044,7 +4049,7 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 1652.6,
+    "y": 1712.6,
     "w": 265,
     "h": 69.1
    },
@@ -4083,7 +4088,7 @@
    "text": "LH",
    "box": {
     "x": 39,
-    "y": 1652.6,
+    "y": 1712.6,
     "w": 40,
     "h": 40
    },
@@ -4121,7 +4126,7 @@
    "tag": "div",
    "box": {
     "x": 93,
-    "y": 1652.6,
+    "y": 1712.6,
     "w": 166,
     "h": 69.1
    },
@@ -4155,7 +4160,7 @@
    "text": "Larkspur Health",
    "box": {
     "x": 93,
-    "y": 1652.6,
+    "y": 1712.6,
     "w": 166,
     "h": 26.4
    },
@@ -4190,7 +4195,7 @@
    "text": "Senior Backend Engineer",
    "box": {
     "x": 93,
-    "y": 1682,
+    "y": 1742,
     "w": 166,
     "h": 21
    },
@@ -4225,7 +4230,7 @@
    "text": "Remote, UK",
    "box": {
     "x": 93,
-    "y": 1703,
+    "y": 1763,
     "w": 166,
     "h": 18.8
    },
@@ -4258,7 +4263,7 @@
    "tag": "div",
    "box": {
     "x": 318,
-    "y": 1652.6,
+    "y": 1712.6,
     "w": 33,
     "h": 50.5
    },
@@ -4292,7 +4297,7 @@
    "text": "78",
    "box": {
     "x": 318,
-    "y": 1652.6,
+    "y": 1712.6,
     "w": 33,
     "h": 34
    },
@@ -4328,7 +4333,7 @@
    "text": "match",
    "box": {
     "x": 318,
-    "y": 1686.6,
+    "y": 1746.6,
     "w": 33,
     "h": 16.5
    },
@@ -4361,7 +4366,7 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 1735.7,
+    "y": 1795.7,
     "w": 312,
     "h": 26
    },
@@ -4400,7 +4405,7 @@
    "text": "Resume: maya-okafor-2026.pdf",
    "box": {
     "x": 39,
-    "y": 1735.7,
+    "y": 1795.7,
     "w": 218.7,
     "h": 26
    },
@@ -4442,7 +4447,7 @@
    "text": "4 answers",
    "box": {
     "x": 273.7,
-    "y": 1739.4,
+    "y": 1799.4,
     "w": 58,
     "h": 18.8
    },
@@ -4476,7 +4481,7 @@
    "tag": "div",
    "box": {
     "x": 39,
-    "y": 1777.7,
+    "y": 1837.7,
     "w": 312,
     "h": 44
    },
@@ -4516,7 +4521,7 @@
    "role": "status",
    "box": {
     "x": 39,
-    "y": 1789.6,
+    "y": 1849.6,
     "w": 214,
     "h": 20.3
    },
@@ -4550,7 +4555,7 @@
    "text": "Undo",
    "box": {
     "x": 263,
-    "y": 1777.7,
+    "y": 1837.7,
     "w": 70,
     "h": 44
    },
@@ -4575,6 +4580,7 @@
     "font-size": "13.5px",
     "font-weight": "600",
     "text-align": "center",
+    "white-space": "nowrap",
     "color": "rgb(21, 19, 17)",
     "background-color": "rgb(251, 248, 242)",
     "border-top": "1px solid rgba(21, 19, 17, 0.28)",
@@ -4592,7 +4598,7 @@
    "aria": "Main",
    "box": {
     "x": 0,
-    "y": 1868.7,
+    "y": 836,
     "w": 390,
     "h": 64
    },
@@ -4629,15 +4635,15 @@
    "text": "Home",
    "box": {
     "x": 0,
-    "y": 1869.7,
-    "w": 65,
+    "y": 837,
+    "w": 55.7,
     "h": 63
    },
    "style": {
     "display": "flex",
     "position": "relative",
     "box-sizing": "border-box",
-    "width": "65px",
+    "width": "55.7031px",
     "height": "63px",
     "gap": "3px",
     "row-gap": "3px",
@@ -4667,8 +4673,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(1)>svg",
    "tag": "svg",
    "box": {
-    "x": 22,
-    "y": 1881.4,
+    "x": 17.3,
+    "y": 848.6,
     "w": 21,
     "h": 21
    },
@@ -4700,8 +4706,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(1)>svg>path:nth-of-type(1)",
    "tag": "path",
    "box": {
-    "x": 25.5,
-    "y": 1884.9,
+    "x": 20.8,
+    "y": 852.1,
     "w": 14,
     "h": 6.1
    },
@@ -4731,8 +4737,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(1)>svg>path:nth-of-type(2)",
    "tag": "path",
    "box": {
-    "x": 27.3,
-    "y": 1890.1,
+    "x": 22.6,
+    "y": 857.4,
     "w": 10.5,
     "h": 8.8
    },
@@ -4763,16 +4769,16 @@
    "tag": "a",
    "text": "Ready",
    "box": {
-    "x": 65,
-    "y": 1869.7,
-    "w": 65,
+    "x": 55.7,
+    "y": 837,
+    "w": 55.7,
     "h": 63
    },
    "style": {
     "display": "flex",
     "position": "relative",
     "box-sizing": "border-box",
-    "width": "65px",
+    "width": "55.7188px",
     "height": "63px",
     "gap": "3px",
     "row-gap": "3px",
@@ -4802,8 +4808,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(2)>svg",
    "tag": "svg",
    "box": {
-    "x": 87,
-    "y": 1881.4,
+    "x": 73.1,
+    "y": 848.6,
     "w": 21,
     "h": 21
    },
@@ -4835,8 +4841,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(2)>svg>path",
    "tag": "path",
    "box": {
-    "x": 89.6,
-    "y": 1884,
+    "x": 75.7,
+    "y": 851.3,
     "w": 15.8,
     "h": 15.8
    },
@@ -4867,8 +4873,8 @@
    "tag": "span",
    "text": "2",
    "box": {
-    "x": 103.5,
-    "y": 1874.7,
+    "x": 89.6,
+    "y": 842,
     "w": 16,
     "h": 16
    },
@@ -4891,15 +4897,16 @@
     "font-weight": "700",
     "line-height": "15px",
     "text-align": "start",
-    "color": "rgb(63, 107, 82)",
-    "background-color": "rgb(221, 231, 222)",
-    "border-top": "0px none rgb(63, 107, 82)",
-    "border-right": "0px none rgb(63, 107, 82)",
-    "border-bottom": "0px none rgb(63, 107, 82)",
-    "border-left": "0px none rgb(63, 107, 82)",
+    "color": "rgb(21, 19, 17)",
+    "background-color": "rgb(233, 227, 216)",
+    "border-top": "0px none rgb(21, 19, 17)",
+    "border-right": "0px none rgb(21, 19, 17)",
+    "border-bottom": "0px none rgb(21, 19, 17)",
+    "border-left": "0px none rgb(21, 19, 17)",
     "border-radius": "8px",
     "opacity": "1",
-    "overflow": "visible"
+    "overflow": "visible",
+    "font-variant-numeric": "tabular-nums"
    }
   },
   {
@@ -4907,16 +4914,16 @@
    "tag": "a",
    "text": "Board",
    "box": {
-    "x": 130,
-    "y": 1869.7,
-    "w": 65,
+    "x": 111.4,
+    "y": 837,
+    "w": 55.7,
     "h": 63
    },
    "style": {
     "display": "flex",
     "position": "relative",
     "box-sizing": "border-box",
-    "width": "65px",
+    "width": "55.7031px",
     "height": "63px",
     "gap": "3px",
     "row-gap": "3px",
@@ -4946,8 +4953,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(3)>svg",
    "tag": "svg",
    "box": {
-    "x": 152,
-    "y": 1881.4,
+    "x": 128.8,
+    "y": 848.6,
     "w": 21,
     "h": 21
    },
@@ -4979,8 +4986,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(3)>svg>rect:nth-of-type(1)",
    "tag": "rect",
    "box": {
-    "x": 154.6,
-    "y": 1884.9,
+    "x": 131.4,
+    "y": 852.1,
     "w": 4.4,
     "h": 14
    },
@@ -5012,8 +5019,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(3)>svg>rect:nth-of-type(2)",
    "tag": "rect",
    "box": {
-    "x": 160.8,
-    "y": 1884.9,
+    "x": 137.5,
+    "y": 852.1,
     "w": 4.4,
     "h": 8.8
    },
@@ -5045,8 +5052,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(3)>svg>rect:nth-of-type(3)",
    "tag": "rect",
    "box": {
-    "x": 166.9,
-    "y": 1884.9,
+    "x": 143.6,
+    "y": 852.1,
     "w": 3.5,
     "h": 11.4
    },
@@ -5078,18 +5085,17 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(4)",
    "tag": "a",
    "text": "Review",
-   "aria": "Review, 4 waiting",
    "box": {
-    "x": 195,
-    "y": 1869.7,
-    "w": 65,
+    "x": 167.1,
+    "y": 837,
+    "w": 55.7,
     "h": 63
    },
    "style": {
     "display": "flex",
     "position": "relative",
     "box-sizing": "border-box",
-    "width": "65px",
+    "width": "55.7188px",
     "height": "63px",
     "gap": "3px",
     "row-gap": "3px",
@@ -5119,8 +5125,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(4)>svg",
    "tag": "svg",
    "box": {
-    "x": 217,
-    "y": 1881.4,
+    "x": 184.5,
+    "y": 848.6,
     "w": 21,
     "h": 21
    },
@@ -5152,8 +5158,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(4)>svg>circle",
    "tag": "circle",
    "box": {
-    "x": 219.6,
-    "y": 1884,
+    "x": 187.1,
+    "y": 851.3,
     "w": 15.8,
     "h": 15.8
    },
@@ -5183,8 +5189,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(4)>svg>path",
    "tag": "path",
    "box": {
-    "x": 225.3,
-    "y": 1887.7,
+    "x": 192.8,
+    "y": 855,
     "w": 4.4,
     "h": 8.5
    },
@@ -5215,8 +5221,8 @@
    "tag": "span",
    "text": "4",
    "box": {
-    "x": 233.5,
-    "y": 1874.7,
+    "x": 201,
+    "y": 842,
     "w": 16,
     "h": 16
    },
@@ -5255,18 +5261,17 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(5)",
    "tag": "a",
    "text": "Inbox",
-   "aria": "Inbox, 3 unread",
    "box": {
-    "x": 260,
-    "y": 1869.7,
-    "w": 65,
+    "x": 222.8,
+    "y": 837,
+    "w": 55.7,
     "h": 63
    },
    "style": {
     "display": "flex",
     "position": "relative",
     "box-sizing": "border-box",
-    "width": "65px",
+    "width": "55.7188px",
     "height": "63px",
     "gap": "3px",
     "row-gap": "3px",
@@ -5296,8 +5301,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(5)>svg",
    "tag": "svg",
    "box": {
-    "x": 282,
-    "y": 1881.4,
+    "x": 240.2,
+    "y": 848.6,
     "w": 21,
     "h": 21
    },
@@ -5329,8 +5334,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(5)>svg>path:nth-of-type(1)",
    "tag": "path",
    "box": {
-    "x": 284.6,
-    "y": 1885.7,
+    "x": 242.8,
+    "y": 853,
     "w": 15.8,
     "h": 7
    },
@@ -5360,8 +5365,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(5)>svg>path:nth-of-type(2)",
    "tag": "path",
    "box": {
-    "x": 284.6,
-    "y": 1892.7,
+    "x": 242.8,
+    "y": 860,
     "w": 15.8,
     "h": 5.3
    },
@@ -5392,8 +5397,8 @@
    "tag": "span",
    "text": "3",
    "box": {
-    "x": 298.5,
-    "y": 1874.7,
+    "x": 256.7,
+    "y": 842,
     "w": 16,
     "h": 16
    },
@@ -5433,16 +5438,16 @@
    "tag": "a",
    "text": "Profile",
    "box": {
-    "x": 325,
-    "y": 1869.7,
-    "w": 65,
+    "x": 278.6,
+    "y": 837,
+    "w": 55.7,
     "h": 63
    },
    "style": {
     "display": "flex",
     "position": "relative",
     "box-sizing": "border-box",
-    "width": "65px",
+    "width": "55.7188px",
     "height": "63px",
     "gap": "3px",
     "row-gap": "3px",
@@ -5472,8 +5477,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(6)>svg",
    "tag": "svg",
    "box": {
-    "x": 347,
-    "y": 1881.4,
+    "x": 295.9,
+    "y": 848.6,
     "w": 21,
     "h": 21
    },
@@ -5505,8 +5510,8 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(6)>svg>circle",
    "tag": "circle",
    "box": {
-    "x": 354,
-    "y": 1884.9,
+    "x": 302.9,
+    "y": 852.1,
     "w": 7,
     "h": 7
    },
@@ -5536,10 +5541,176 @@
    "path": "div>div>div>div>div>nav>a:nth-of-type(6)>svg>path",
    "tag": "path",
    "box": {
-    "x": 350.5,
-    "y": 1894.5,
+    "x": 299.4,
+    "y": 861.8,
     "w": 14,
     "h": 5.3
+   },
+   "style": {
+    "display": "inline",
+    "position": "static",
+    "box-sizing": "border-box",
+    "flex-direction": "row",
+    "flex-wrap": "nowrap",
+    "flex-grow": "0",
+    "flex-shrink": "1",
+    "font-family": "\"Plus Jakarta Sans\", system-ui, sans-serif",
+    "font-size": "10.5px",
+    "font-weight": "600",
+    "line-height": "15.75px",
+    "text-align": "start",
+    "color": "rgb(21, 19, 17)",
+    "border-top": "0px none rgb(21, 19, 17)",
+    "border-right": "0px none rgb(21, 19, 17)",
+    "border-bottom": "0px none rgb(21, 19, 17)",
+    "border-left": "0px none rgb(21, 19, 17)",
+    "opacity": "1",
+    "overflow": "visible"
+   }
+  },
+  {
+   "path": "div>div>div>div>div>nav>a:nth-of-type(7)",
+   "tag": "a",
+   "text": "Settings",
+   "box": {
+    "x": 334.3,
+    "y": 837,
+    "w": 55.7,
+    "h": 63
+   },
+   "style": {
+    "display": "flex",
+    "position": "relative",
+    "box-sizing": "border-box",
+    "width": "55.7188px",
+    "height": "63px",
+    "gap": "3px",
+    "row-gap": "3px",
+    "column-gap": "3px",
+    "flex-direction": "column",
+    "flex-wrap": "nowrap",
+    "justify-content": "center",
+    "align-items": "center",
+    "flex-grow": "1",
+    "flex-shrink": "1",
+    "flex-basis": "0%",
+    "font-family": "\"Plus Jakarta Sans\", system-ui, sans-serif",
+    "font-size": "10.5px",
+    "font-weight": "600",
+    "line-height": "15.75px",
+    "text-align": "start",
+    "color": "rgb(21, 19, 17)",
+    "border-top": "0px none rgb(21, 19, 17)",
+    "border-right": "0px none rgb(21, 19, 17)",
+    "border-bottom": "0px none rgb(21, 19, 17)",
+    "border-left": "0px none rgb(21, 19, 17)",
+    "opacity": "1",
+    "overflow": "visible"
+   }
+  },
+  {
+   "path": "div>div>div>div>div>nav>a:nth-of-type(7)>svg",
+   "tag": "svg",
+   "box": {
+    "x": 351.6,
+    "y": 848.6,
+    "w": 21,
+    "h": 21
+   },
+   "style": {
+    "display": "block",
+    "position": "static",
+    "box-sizing": "border-box",
+    "width": "21px",
+    "height": "21px",
+    "flex-direction": "row",
+    "flex-wrap": "nowrap",
+    "flex-grow": "0",
+    "flex-shrink": "1",
+    "font-family": "\"Plus Jakarta Sans\", system-ui, sans-serif",
+    "font-size": "10.5px",
+    "font-weight": "600",
+    "line-height": "15.75px",
+    "text-align": "start",
+    "color": "rgb(21, 19, 17)",
+    "border-top": "0px none rgb(21, 19, 17)",
+    "border-right": "0px none rgb(21, 19, 17)",
+    "border-bottom": "0px none rgb(21, 19, 17)",
+    "border-left": "0px none rgb(21, 19, 17)",
+    "opacity": "1",
+    "overflow": "hidden"
+   }
+  },
+  {
+   "path": "div>div>div>div>div>nav>a:nth-of-type(7)>svg>path",
+   "tag": "path",
+   "box": {
+    "x": 355.1,
+    "y": 854.8,
+    "w": 14,
+    "h": 8.8
+   },
+   "style": {
+    "display": "inline",
+    "position": "static",
+    "box-sizing": "border-box",
+    "flex-direction": "row",
+    "flex-wrap": "nowrap",
+    "flex-grow": "0",
+    "flex-shrink": "1",
+    "font-family": "\"Plus Jakarta Sans\", system-ui, sans-serif",
+    "font-size": "10.5px",
+    "font-weight": "600",
+    "line-height": "15.75px",
+    "text-align": "start",
+    "color": "rgb(21, 19, 17)",
+    "border-top": "0px none rgb(21, 19, 17)",
+    "border-right": "0px none rgb(21, 19, 17)",
+    "border-bottom": "0px none rgb(21, 19, 17)",
+    "border-left": "0px none rgb(21, 19, 17)",
+    "opacity": "1",
+    "overflow": "visible"
+   }
+  },
+  {
+   "path": "div>div>div>div>div>nav>a:nth-of-type(7)>svg>circle:nth-of-type(1)",
+   "tag": "circle",
+   "box": {
+    "x": 363.9,
+    "y": 853,
+    "w": 3.5,
+    "h": 3.5
+   },
+   "style": {
+    "display": "inline",
+    "position": "static",
+    "box-sizing": "border-box",
+    "flex-direction": "row",
+    "flex-wrap": "nowrap",
+    "flex-grow": "0",
+    "flex-shrink": "1",
+    "font-family": "\"Plus Jakarta Sans\", system-ui, sans-serif",
+    "font-size": "10.5px",
+    "font-weight": "600",
+    "line-height": "15.75px",
+    "text-align": "start",
+    "color": "rgb(21, 19, 17)",
+    "border-top": "0px none rgb(21, 19, 17)",
+    "border-right": "0px none rgb(21, 19, 17)",
+    "border-bottom": "0px none rgb(21, 19, 17)",
+    "border-left": "0px none rgb(21, 19, 17)",
+    "opacity": "1",
+    "overflow": "visible"
+   }
+  },
+  {
+   "path": "div>div>div>div>div>nav>a:nth-of-type(7)>svg>circle:nth-of-type(2)",
+   "tag": "circle",
+   "box": {
+    "x": 356.9,
+    "y": 861.8,
+    "w": 3.5,
+    "h": 3.5
    },
    "style": {
     "display": "inline",
