@@ -41,7 +41,7 @@ export function BoardSheet(props: {
       <div aria-hidden="true" className="fixed inset-0 z-20 bg-[var(--color-scrim)]" />
       <aside
         aria-label={copy.board.sheetLabel}
-        className="board fixed inset-x-0 bottom-0 z-30 flex h-[566px] flex-col overflow-hidden rounded-t-[18px] border-t border-input bg-card max-md:shadow-[0_-24px_50px_-28px_rgba(21,19,17,0.5)] md:inset-y-0 md:left-auto md:right-0 md:h-auto md:w-[468px] md:rounded-none md:border-t-0 md:border-l md:shadow-[-30px_0_60px_-34px_var(--color-scrim)] min-[1700px]:w-[520px]"
+        className="board board-sheet fixed inset-x-0 bottom-0 z-30 flex h-[566px] flex-col overflow-hidden rounded-t-[18px] border-t border-input bg-card max-md:shadow-[0_-24px_50px_-28px_rgba(21,19,17,0.5)] md:inset-y-0 md:left-auto md:right-0 md:h-auto md:w-[468px] md:rounded-none md:border-t-0 md:border-l md:shadow-[-30px_0_60px_-34px_var(--color-scrim)]"
       >
         <button
           aria-label={copy.board.grabHandle}

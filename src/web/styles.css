@@ -634,6 +634,45 @@ canvas {
   }
 }
 
+/* Home and Board at the canvas's wide frame (`home-1440`/`home-1920`/`home-1920-dark`,
+   `board-1440-dark`/`board-1920`/`board-1920-dark`). These are the canvas's own
+   `@media (min-width: 1700px)` rules from `w5-home.dc.html` and `w5-board.dc.html`, kept
+   here rather than in `min-[1700px]:` utilities because Tailwind emits arbitrary
+   `min-[1700px]:` variants *before* the named `sm`/`md`/`lg` blocks: a `md:` or `lg:`
+   utility silently wins over them, which is why the wide frame never applied. */
+.home-chart-frame {
+  height: 200px;
+}
+
+@media (min-width: 1700px) {
+  .shell-main {
+    padding: 32px 64px 52px;
+  }
+
+  .home-kpi-value {
+    font-size: 66px;
+  }
+
+  .home-kpis {
+    gap: 24px;
+  }
+
+  .home-chart-frame {
+    height: 270px;
+  }
+
+  .cols [data-stage] {
+    width: auto;
+    min-width: 252px;
+    max-width: 340px;
+    flex: 1 0 252px;
+  }
+
+  .board-sheet {
+    width: 520px;
+  }
+}
+
 /* Ready page buttons use the canvas padding (18px), not the Board's 16px. */
 .ready .btn {
   padding: 0 18px;

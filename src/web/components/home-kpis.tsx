@@ -56,7 +56,7 @@ export function HomeKpis(props: {
   ];
 
   return (
-    <div className="mt-4 grid grid-cols-2 gap-3 min-[1100px]:grid-cols-4 min-[1100px]:gap-4">
+    <div className="home-kpis mt-4 grid grid-cols-2 gap-3 min-[1100px]:grid-cols-4 min-[1100px]:gap-4">
       {cards.map((card) => (
         <article
           className="rounded-lg border border-border bg-card p-[14px_14px_12px] shadow-sh min-[768px]:p-[18px_20px_16px]"
@@ -65,7 +65,7 @@ export function HomeKpis(props: {
           <p className="text-[12.5px] font-medium leading-[1.5] text-muted-foreground">
             {card.label}
           </p>
-          <p className="mt-2 font-serif text-[40px] leading-none tabular-nums min-[768px]:text-[56px]">
+          <p className="home-kpi-value mt-2 font-serif text-[40px] leading-none tabular-nums min-[768px]:text-[56px]">
             {card.value}
           </p>
           <p
