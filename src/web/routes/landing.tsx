@@ -307,10 +307,7 @@ function renderHero() {
           aria-hidden="true"
           className="absolute inset-x-3 top-16 h-[360px] -rotate-[2.5deg] rounded-xl border border-border bg-card opacity-50"
         />
-        <aside
-          aria-label={copy.previewStatus}
-          className={`${card} relative rounded-xl relative p-5 md:p-6`}
-        >
+        <aside aria-label={copy.previewStatus} className={`${card} relative rounded-xl p-5 md:p-6`}>
           <div className="flex items-center justify-between gap-3">
             <span className="font-mono text-[12px] tracking-[0.12em] text-ok uppercase">
               {copy.previewStatus}
