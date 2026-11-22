@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 
-import { mailThreads, messages } from "../platform/db/schema.ts";
+import { mailThreads } from "../platform/db/schema.ts";
+import { messagesByThreadOf } from "./threads.ts";
 
 /**
  * The mail threads linked to an Application, with every message of every
@@ -26,28 +27,10 @@ export async function linkedMailOf(input: {
     .orderBy(desc(mailThreads.lastMessageAt))
     .all();
 
-  const messagesByThread = new Map<string, (typeof messages.$inferSelect)[]>();
-
-  if (threads.length > 0) {
-    const rows = db
-      .select()
-      .from(messages)
-      .where(
-        inArray(
-          messages.threadId,
-          threads.map((thread) => thread.id),
-        ),
-      )
-      .orderBy(asc(messages.createdAt))
-      .all();
-
-    for (const row of rows) {
-      const list = messagesByThread.get(row.threadId) ?? [];
-
-      list.push(row);
-      messagesByThread.set(row.threadId, list);
-    }
-  }
+  const messagesByThread = messagesByThreadOf(
+    db,
+    threads.map((thread) => thread.id),
+  );
 
   return Promise.all(
     threads.map(async (thread) => {

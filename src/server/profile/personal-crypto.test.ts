@@ -98,6 +98,23 @@ describe("the stored key", () => {
     expect(db.select().from(userKeys).all()).toHaveLength(1);
   });
 
+  test("a read in flight when a person is forgotten does not cache their key again", async () => {
+    const { counter, db, personal } = freshUsers(["user-1"]);
+    const scope = { column: "value_enc", rowId: "r", table: "facts" } as const;
+
+    const sealed = await createPersonalCrypto(db, MASTER, 1).sealFor("user-1", scope, "value");
+
+    const inFlight = personal.openFor("user-1", scope, sealed);
+
+    personal.forget("user-1");
+
+    expect(await inFlight).toBe("value");
+
+    await personal.openFor("user-1", scope, sealed);
+
+    expect(keyReads(counter)).toBe(3);
+  });
+
   test("forgetting a person drops their cached key, so the next read comes from the database", async () => {
     const { counter, personal } = freshUsers(["user-1"]);
     const scope = { column: "value_enc", rowId: "r", table: "facts" } as const;

@@ -19,7 +19,8 @@ export interface PersonalCrypto {
  * Seals and opens a person's values with their wrapped data key. The wrapped
  * key is read once and kept for the process, keyed by person, because it never
  * changes for them; the cache holds at most 1000 people and `forget` drops an
- * entry so account erasure leaves no decryptable key in memory.
+ * entry, and stops an in-flight load from caching it again, so account erasure
+ * leaves no decryptable key in memory.
  * @param db The database the wrapped keys live in.
  * @param masterKey The master key that wraps each person's data key.
  * @param keyVersion The master key version new data keys are wrapped under.
@@ -32,8 +33,13 @@ export function createPersonalCrypto(
 ) {
   const keys = new Map<string, StoredUserKey>();
   const pending = new Map<string, Promise<StoredUserKey>>();
+  const forgotten = new Set<string>();
 
   function remember(userId: string, stored: StoredUserKey) {
+    if (forgotten.has(userId)) {
+      return stored;
+    }
+
     if (!keys.has(userId) && keys.size >= KEY_CACHE_USERS) {
       const oldest = keys.keys().next().value;
 
@@ -133,6 +139,7 @@ export function createPersonalCrypto(
     forget: (userId: string) => {
       keys.delete(userId);
       pending.delete(userId);
+      forgotten.add(userId);
     },
   } satisfies PersonalCrypto;
 }
