@@ -218,13 +218,12 @@ function locationLabel(row: {
 }
 
 /**
- * Cities, remote forms and countries that open Postings actually name, most
- * common first.
+ * The open Postings grouped by the four columns a location choice is read from.
  * @param db The application database.
- * @returns The location choices.
+ * @returns One row per city, country, raw location and workplace, with its open Posting count.
  */
-export function locationChoices(db: AppDatabase) {
-  const rows = db
+export function locationChoiceCounts(db: AppDatabase) {
+  return db
     .select({
       city: postings.city,
       countryCode: postings.countryCode,
@@ -234,8 +233,17 @@ export function locationChoices(db: AppDatabase) {
     })
     .from(postings)
     .where(isNull(postings.closedAt))
-    .groupBy(postings.city, postings.countryCode, postings.locationRaw, postings.workplace)
-    .all();
+    .groupBy(postings.city, postings.countryCode, postings.locationRaw, postings.workplace);
+}
+
+/**
+ * Cities, remote forms and countries that open Postings actually name, most
+ * common first.
+ * @param db The application database.
+ * @returns The location choices.
+ */
+export function locationChoices(db: AppDatabase) {
+  const rows = locationChoiceCounts(db).all();
 
   const totals = new Map<string, number>();
 
