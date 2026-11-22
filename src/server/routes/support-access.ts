@@ -6,6 +6,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import { listAdminAuditForUser } from "../platform/audit/index.ts";
 
 const MAX_ENTRIES = 200;
+const REVEAL_ACTION_PREFIX = "reveal.";
 
 export function createSupportAccessRoutes(db: AppDatabase, auth: Auth) {
   const routes = new Hono();
@@ -21,13 +22,15 @@ export function createSupportAccessRoutes(db: AppDatabase, auth: Auth) {
       return context.json({ error: "unauthorised" }, 401);
     }
 
-    const entries = listAdminAuditForUser(db, session.user.id, MAX_ENTRIES).map((row) => ({
-      action: row.action,
-      at: row.at.getTime(),
-      detail: row.detail,
-      id: row.id,
-      reason: row.reason,
-    }));
+    const entries = listAdminAuditForUser(db, session.user.id, MAX_ENTRIES)
+      .filter((row) => row.action.startsWith(REVEAL_ACTION_PREFIX))
+      .map((row) => ({
+        action: row.action,
+        at: row.at.getTime(),
+        detail: row.detail,
+        id: row.id,
+        reason: row.reason,
+      }));
 
     return context.json({ entries });
   });
