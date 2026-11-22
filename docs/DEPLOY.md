@@ -12,14 +12,15 @@ No secret value ever appears in this repository: secrets are set with `fly secre
 | File | Role |
 |---|---|
 | `Dockerfile` | Multi-stage build on Bun 1.4: installs, builds the SPA (`dist/`), ships a slim runtime with Litestream 0.5.18 (checksum-verified) |
-| `scripts/docker-entrypoint.sh` | On start: Litestream restores `/data/app.sqlite` from the replica if it does not exist, then runs `litestream replicate -exec "bun run /app/src/server/main.ts"`; migrations run inside `main.ts` |
+| `scripts/docker-entrypoint.sh` | On start: Litestream restores `/data/app.sqlite` from the replica if it does not exist, then runs `litestream replicate -exec "bun run /app/src/server/main.ts"`; migrations run inside `main.ts`. With `LITESTREAM_RESTORE_ONLY=true` it restores, runs the read-only restored-database check and never starts `main.ts` |
 | `litestream.yml` | Continuous replication (1 s sync) to R2 `overture-backups`, nightly snapshot (`interval: 24h`) kept 30 days (`retention: 720h`); the L0 retention check runs every 5 minutes so its ListObjects cost stays bounded (#281) |
 | `fly.toml` | App `overture-web`, region `yyz`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health` |
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`) and a `restore-drill` job (Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations) |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
-| `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks it, destroys the machine |
-| `scripts/check-restored-db.ts` | Restored-database checks: PRAGMA `integrity_check`, applied-migration count, per-table row counts, optional health-route probe |
-| `scripts/restore-drill.ts` | `DRILL_TARGET=local` (CI round-trip) or `DRILL_TARGET=fly` (throwaway machine drill) |
+| `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
+| `scripts/check-restored-db.ts` | Restored-database checks, read-only: PRAGMA `integrity_check`, applied-migration count, per-table row counts, untouched `bg_jobs`, zero outbound requests |
+| `scripts/restore-drill.ts` | `DRILL_TARGET=local` (CI round-trip) or `DRILL_TARGET=fly` (throwaway machine drill); never starts the app server |
+| `litestream-drill.yml` | Restore-only Litestream config for drills: same bucket, dedicated read-only `R2_DRILL_*` credential |
 
 ## One-time human steps
 
@@ -69,6 +70,12 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    `gh secret set FLY_API_TOKEN -b <token-in-your-terminal> -R a-hagi613/overture`
 7. Point DNS at the app in Cloudflare: `tryoverture.com` (proxied) → `overture-web.fly.dev`, then
    `fly certs add tryoverture.com -a overture-web`. `tryoverture.com` is already registered.
+8. In Cloudflare, create a second R2 API token for restore drills: **Object Read only**, scoped to the
+   `overture-backups` bucket alone. Set it on the app under drill-only names, never the write pair:
+   `fly secrets set R2_DRILL_ACCESS_KEY_ID=… R2_DRILL_SECRET_ACCESS_KEY=… -a overture-web`
+   The weekly drill uses `litestream-drill.yml`, which reads only these names, so a drill can list and
+   fetch the replica but can never write, delete or replicate into it. `scripts/restore-drill.ts fly`
+   refuses to start a drill machine when either name is missing.
 
 Merge to `main` and watch the first run of the **Deploy** workflow.
 
@@ -314,8 +321,8 @@ No migration, secret or DNS record is part of this deployment.
   last reading could not list the replica or the local transactions. Right after a cold start with no replica
   yet, the first reading can be `"unknown"` or `"unavailable"` for up to one read interval. Drill: run the **Restore drill** workflow once
   (`gh workflow run "Restore drill" -R a-hagi613/overture`); it is scheduled weekly thereafter. A run
-  proves a restore into a throwaway machine passed `integrity_check`, has applied migrations and
-  answers `/api/health`, and the machine was destroyed.
+  proves a restore into a throwaway machine passed `integrity_check`, holds every applied migration, left
+  every `bg_jobs` row untouched and made no outbound request, and the machine was destroyed.
 - **Secrets come only from Fly secrets; none are printed or committed**
   `.env` is git-ignored; the Zod config (`src/server/config/env.ts`) takes values from process env,
   which on Fly is exactly Fly secrets. R2 and deploy credentials exist only as Fly/GitHub secrets.
@@ -401,9 +408,28 @@ background loop or timer is logged and alerted (`process.unhandled`), not fatal.
 
 ## Restore drill safety
 
-The throwaway machine runs the same image with `LITESTREAM_RESTORE_ONLY=true`: it restores from R2 and
-serves the app from an empty ephemeral filesystem. It never mounts the production volume and never
-runs a Litestream replicator, so the drill cannot overwrite or contend with the live backup.
+A restore drill must prove the backup is usable without ever running the application on restored
+production data (issue #412). The throwaway machine runs the same image with
+`LITESTREAM_RESTORE_ONLY=true`, which changes the entrypoint to:
+
+1. restore `/data/app.sqlite` from R2 with `litestream-drill.yml` and the read-only `R2_DRILL_ACCESS_KEY_ID` /
+   `R2_DRILL_SECRET_ACCESS_KEY` pair;
+2. run `scripts/check-restored-db.ts` against the restored file, opened `readonly` with `PRAGMA query_only = on`:
+   `PRAGMA integrity_check`, the applied-migration count (`__drizzle_migrations` and the journal this build
+   ships), per-table row counts, a `bg_jobs` snapshot that must stay identical, and an outbound guard that
+   refuses and reports any request;
+3. print the report and hold the machine open for `RESTORE_DRILL_KEEPALIVE_SECONDS` (default 600) while the drill
+   driver runs the same check over SSH for an exit code, then destroys the machine.
+
+`bun run /app/src/server/main.ts` is never reached in this mode, and `main.ts` itself refuses to start when
+`LITESTREAM_RESTORE_ONLY=true`: no scheduler, job worker, mail sender, billing
+job or outbound client is constructed, so due `application.send`, queued mail and billing jobs in the restored
+database cannot be claimed or run. The machine has no volume mount, so it also cannot touch the production
+database. Fly gives every machine in an app the app's secrets, so the drill machine also holds the write pair;
+only the restore process reads the read-only `R2_DRILL_*` pair, and no application code runs there. The drill
+first checks over SSH that the running release carries this drill mode and `litestream-drill.yml`, and refuses to
+start when it predates this change, so an old image that would start the app server is never drilled. The local CI
+job (`bun run scripts/restore-drill.ts local`) restores into a file replica and runs the same check against it.
 
 ## Runtime security
 
