@@ -5,6 +5,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import type { SpendGate } from "../billing/spend.ts";
 import type { PreparationService } from "./prepare.ts";
 
 import { addLocalDays, localDateAt, localPartsAt, localTimeOn } from "../platform/local-time.ts";
@@ -30,6 +31,7 @@ export interface PrepDailyDeps {
   llm: LlmPort;
   personal: PersonalCrypto;
   preparation: PreparationService;
+  spendGate?: SpendGate | undefined;
 }
 
 export interface PrepDailyRun {
@@ -231,6 +233,7 @@ export async function runPrepDailyJob(deps: PrepDailyDeps, userId: string, since
     db: deps.db,
     llm: deps.llm,
     personal: deps.personal,
+    spendGate: deps.spendGate,
   });
 
   const run = await matching.fill(userId);

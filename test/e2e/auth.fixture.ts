@@ -14,6 +14,7 @@ export const testAuthEnvironment = {
   OWNER_EMAIL: ownerEmail,
   TURNSTILE_SECRET: "1x0000000000000000000000000000000AA",
   TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+  PUBLIC_SIGNUP_ENABLED: "false",
   MASTER_KEY_V1: masterKeyBytes.toString("base64"),
   MASTER_KEY_CURRENT: "1",
 } as const;

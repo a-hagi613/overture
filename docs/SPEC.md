@@ -123,6 +123,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | OpenCode Go | LLM (local dev only) | `OPENCODE_API_KEY` | — |
 | Cloudflare Email Sending | outbound mail (magic links, live check, later notices) | `CLOUDFLARE_EMAIL_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (both or neither); `CLOUDFLARE_EMAIL_API_BASE_URL` (test-only override of the real API host) | real adapter; the send endpoint is intercepted by MSW and the request body asserted (`test/e2e/cloudflare-email.test.ts`) |
 | Stripe (M3) | Managed Payments | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_WEEK`, `STRIPE_PRICE_MONTH`; `STRIPE_API_BASE_URL` (test-only override of the real API host) | stripe-mock (Stripe's own local server) + signed webhook fixtures |
+| Public sign-up (M3) | whether an unknown email may sign up without an invite; on from M3 | `PUBLIC_SIGNUP_ENABLED` (default `true`; `false` restores the M2 invite-only gate) | public-sign-up e2e with the Turnstile stub; the invite-only suites set it `false` |
 | Grafana Cloud | logs/metrics/traces | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | local LGTM docker |
 | Web Push | notifications | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | real adapter; push endpoints via MSW |
 | Master key | envelope encryption | `MASTER_KEY_V1` (32 bytes base64), `MASTER_KEY_CURRENT=1` | fixed test key |
@@ -244,7 +245,7 @@ data key (§13.2). Drizzle schema in `src/server/**/schema.ts` is the source of 
 
 `user` (id, name, email UNIQUE, email_verified, image, role CHECK IN ('user','owner'), suspended_at, created_at,
 updated_at) · `session` · `account` (provider: google, linkedin, credential) · `verification` · `passkey` (owner only)
-· `invites` (id, email_hash UNIQUE, email_enc NULL, invited_by, created_at, accepted_at, accepted_user_id NULL, revoked_at NULL, grant_id NULL) — M1 allowlist = `OWNER_EMAIL`, M2 = invites (§13.1); the invited email is stored hashed and shown to the owner as typed only in the admin, from an encrypted copy sealed under the inviter's data key.
+· `invites` (id, email_hash UNIQUE, email_enc NULL, invited_by, created_at, accepted_at, accepted_user_id NULL, revoked_at NULL, grant_id NULL) — M1 allowlist = `OWNER_EMAIL`; M2 and the `PUBLIC_SIGNUP_ENABLED=false` fallback = invites (§13.1); in M3 anyone may sign up, and an invite still issues its admin grant on first verified sign-in. The invited email is stored hashed and shown to the owner as typed only in the admin, from an encrypted copy sealed under the inviter's data key.
 
 ### 5.2 Profile
 
@@ -590,6 +591,7 @@ starts later that day; a user never gets a second run in the same local day.
 
 ```
 free = min(limits.daily_cap, applications left) − Applications in preparing, ready or approved
+if the paid-work gate is on and applications left = 0: no score, no form read and no browser session runs
 for candidate in candidates ordered by code_rank desc, unscored-or-stale first:
     stop when free ≤ 0, the scoring bound (3 × limits.daily_cap) is reached, or LLM caps hit
     score = cached if valid else Haiku score (§8.6)
@@ -1211,9 +1213,20 @@ body, sender or attachment, so the admin never sees message content.
   "Sign out" (this device only) and "Sign out all devices" (every other session) in Settings. "Sign out" ends the current session and returns to `/signin`; it is also the only sign-out inside the signed-in app, and the demo account may use it.
 - M1 allowlist = owner; **M2 invites**: the admin creates an invite for an email; the first verified sign-in with that email by any
   method (magic link, Google, LinkedIn) accepts it, creates the account and issues one admin grant of 300
-  applications over 30 days (no card). A sign-in with any other email is refused with the same copy for every method; an
-  invite can be revoked until accepted; a suspended user cannot sign in. An accepted invite lands in onboarding after
-  sign-in until its steps are finished; the owner and legacy accounts go to Home, whose setup banner opens onboarding. M3 public.
+  applications over 30 days (no card). **M3 public sign-up** (`PUBLIC_SIGNUP_ENABLED=true`, the default): any unknown
+  email may sign up by that same magic link or provider and reaches onboarding with no invite; an invite that exists is
+  still accepted on the first verified sign-in and still issues its one admin grant, which existing M2 users keep
+  unchanged. Setting `PUBLIC_SIGNUP_ENABLED=false` restores the M2 invite-only gate: a sign-in with any other email is
+  refused with the same copy for every method. An invite can be revoked until accepted; a suspended user cannot sign in.
+  A new account lands in onboarding after sign-in until its steps are finished; the owner and legacy accounts go to Home,
+  whose setup banner opens onboarding.
+- **Paid work is gated** whenever billing is configured or public sign-up is on (so a missing Stripe pair fails closed, not
+  open): no LLM call, cloud browser session, preparation or send starts for a user with no Applications left. That covers
+  preparation, Match score (daily and on open), manual Apply, resume text extraction, email classification and dispatch;
+  each skips or stays rules-only until a verified trial card or a paid plan (or an admin grant) issues Applications. The
+  per-user and global LLM caps (`checkLlmCaps`) refuse the call and raise the `llm.cap` alert, and the daily `llm.spend`
+  live check alerts on the global cap; `invite.grant_quantity`/`invite.grant_days` still govern an admin grant. In
+  invite-only mode with billing off, nothing changes from M2.
 - **Demo account** (`DEMO_LOGIN_ENABLED=true`, off by default): entering `test@email.com` on the sign-in page signs in
   as the demo user with one click and sends no mail; with the flag off the same email is refused like any other. The
   demo is seeded idempotently (`bun run db:seed-demo`, or on its first sign-in) with fictional facts, a resume,
@@ -1552,6 +1565,6 @@ v1 runs on Fly app `ai-auto-apply` (volume `data`, yyz). In order:
 | Cloudflare refuses sends to non-owner recipients until Workers Paid and a sending domain exist | one idempotent operator script, a deploy and live-check guard that fails loudly while the switch is pending; the owner pays, then runs one command |
 | Friends and family hit the same ATS limits as the owner, with real names and emails | 10 a day each, true answers, every send approved; beta wave starts only after the security, scalability and cost reviews |
 | Stripe declines Managed Payments for the account | the `Payments` port; plain Stripe Billing with Stripe Tax behind it (ADR 0018); found early in "M3: owner setup" |
-| Public sign-up exposes spend (LLM, browser) before anyone pays | nothing is prepared until a trial card is verified or a plan is paid; per-IP and per-email limits; `llm.cap_global_day_usd`; a global spend alert |
+| Public sign-up exposes spend (LLM, browser) before anyone pays | a spend gate stops preparation, scoring, resume extraction, email classification and sending for any account with no Applications left while billing or public sign-up is on (fail-closed); per-IP rate limits; Turnstile; `llm.cap_global_day_usd` and the `llm.cap`/`llm.spend` alerts |
 | Email-classification mistakes move cards wrongly | forward-only, undo, never over manual drags, confidence threshold |
 | Approval slows sending: Ready cards pile up while the user is away and fewer applications go out | one daily preparation run stops at the free slots to bound unapproved work (§8.2); one Recap email per run; Send all; measured against the 25-application M1 gate (ADR 0029) |

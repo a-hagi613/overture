@@ -25,8 +25,14 @@ _Avoid_: preferences, filters
 
 **Verified email**:
 The address a user proved they own by opening the single-use link Overture mailed them. No Application is prepared
-or sent for an unverified address, and an invite is accepted on the first verified sign-in.
+or sent for an unverified address, and an invite, when one exists, is accepted on the first verified sign-in.
 _Avoid_: confirmed address, validated account
+
+**Public sign-up**:
+Any email address can create an account by any enabled method (magic link, Google or LinkedIn), with no invite.
+Turnstile and the per-IP limits still apply, and the account does no paid work until it has Applications from a
+verified trial card, a plan, or an admin grant.
+_Avoid_: open registration, self-serve join
 
 **Demo account**:
 The `role = demo` account (`test@email.com`) that the owner opens from the sign-in page with one click to see
@@ -118,6 +124,12 @@ _Avoid_: action required, blocked
 Three Applications, once per card, for a card verified with Stripe. Nothing is charged. The card is kept as an HMAC of its fingerprint, so it cannot start a second trial even after its account is deleted.
 _Avoid_: credit, promo, bonus, free plan
 
+**Paid work**:
+Any step that calls the LLM or a cloud browser: scoring, preparation, form reads, resume text extraction, email
+classification and sending. It never runs for an account with no Applications left while the spend gate is on, so
+nobody can cost the host money before a verified trial card, a paid plan, or an admin grant.
+_Avoid_: AI work, compute, usage
+
 ## The user's facts
 
 **Fact**:
@@ -203,7 +215,9 @@ _Avoid_: wiping, purge, hard delete
 `tryoverture.com` onboarded to Cloudflare Email Sending so Overture can mail any recipient, not only the owner. It adds bounce MX, SPF and DKIM on `cf-bounce.tryoverture.com` and keeps the Email Routing records on the apex; the `mail.sending` live check and the deploy guard verify it once `REQUIRE_EMAIL_SENDING` is on (M2-02).
 
 **Invite**:
-The owner's permission for one email address to join the beta. Accepting it by signing in with that email creates the account and an admin grant of 300 applications over 30 days.
+A pre-approved email address that still joins with an admin grant of 300 applications over 30 days. Public sign-up
+does not need one, but an invite that exists is accepted on the first verified sign-up and its grant is unchanged
+for users who joined in M2. With public sign-up turned off, only the owner and live invites may join.
 _Avoid_: waitlist spot, access code
 
 **Code paste**:

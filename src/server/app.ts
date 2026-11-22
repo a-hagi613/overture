@@ -18,6 +18,7 @@ import type { BrowserProviderRegistry } from "./dispatch/browser/provider.ts";
 import type { CatalogSweepWorker } from "./catalog/sweep-worker-runner.ts";
 import type { AccountEraser } from "./account/erase.ts";
 import type { ExportService } from "./export/service.ts";
+import type { SpendGate } from "./billing/spend.ts";
 
 import { createHealthRoutes } from "./routes/health.ts";
 import { createLabRoutes } from "./routes/lab.ts";
@@ -62,6 +63,7 @@ export interface AppDependencies {
   auth: Auth;
   objects: ObjectStore;
   llm: LlmPort;
+  spendGate: SpendGate;
   mailboxes: ReturnType<typeof createMailboxService>;
   resolver: DNSResolver;
   liveCheckAddress: string;
@@ -136,6 +138,7 @@ export function createApp(deps: AppDependencies) {
     clock: deps.clock,
     llm: deps.llm,
     personal,
+    spendGate: deps.spendGate,
   });
 
   adminHost.route("/admin/api", adminApi);
@@ -208,6 +211,7 @@ export function createApp(deps: AppDependencies) {
       llm: deps.llm,
       objects: deps.objects,
       reviews: deps.reviews,
+      spendGate: deps.spendGate,
     }),
   );
   app.route(

@@ -33,11 +33,13 @@ import { guardPosting } from "./guard/posting-guard.ts";
 import { createOpenTextService, isCoverLetterQuestion } from "./open-text.ts";
 import { isKillSwitchEnabled } from "../platform/settings/index.ts";
 import { createTargetsService } from "../profile/targets.ts";
-import { applicationsLeft } from "../billing/ledger.ts";
+import type { SpendGate } from "../billing/spend.ts";
+import { ungatedSpend } from "../billing/spend.ts";
 import { greenhouseBoardUrl } from "./greenhouse-board-url.ts";
 import { countriesNamedIn } from "../catalog/question-normalize.ts";
 import { mapQuestionsWithLlm } from "../catalog/question-mapping.ts";
 import { createQuestionCatalog, questionInputsFromAts } from "../catalog/questions.ts";
+import { logInfo } from "../platform/log.ts";
 import { isCountryScopedFactKey } from "../../shared/facts.ts";
 import { indexFacts, isUnsupportedBlock, resolveQuestion } from "./answer-plan.ts";
 import { answerIsValid, formatFactValue } from "./answer-value.ts";
@@ -245,8 +247,8 @@ export function createPreparationService(deps: {
   source: QuestionSource | null;
   greenhouseBoardOrigin?: string | undefined;
   onReady?: (applicationId: string, userId: string) => void;
-  /** When billing is configured, nothing is prepared without Applications left (trial or plan). */
-  billingEnabled?: boolean;
+  /** When gated, nothing is prepared without Applications left (trial or plan). */
+  spendGate?: SpendGate | undefined;
   plainFormReader?: PlainFormReader;
   captureForm?: (input: {
     ats: "lever" | "ashby" | "workable" | "personio";
@@ -266,7 +268,7 @@ export function createPreparationService(deps: {
     greenhouseBoardOrigin,
     onReady,
     captureForm,
-    billingEnabled = false,
+    spendGate = ungatedSpend,
   } = deps;
 
   const catalog = createQuestionCatalog({ db, clock });
@@ -698,7 +700,9 @@ export function createPreparationService(deps: {
       return null;
     }
 
-    if (billingEnabled && applicationsLeft(db, row.userId, clock.now()) < 1) {
+    if (!spendGate.allows(row.userId)) {
+      logInfo("spend", `preparation skipped for ${applicationId}: no Applications left`);
+
       return { status: "skipped" as const, blocked: 0 };
     }
 

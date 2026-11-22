@@ -144,7 +144,9 @@ export function createAuth(
   const adminOrigin = new URL(env.ADMIN_ORIGIN);
 
   const mayJoin = (email: string) =>
-    isAllowedEmail(email) || liveInviteFor(db, inviteHashSecret, email) !== null;
+    env.PUBLIC_SIGNUP_ENABLED ||
+    isAllowedEmail(email) ||
+    liveInviteFor(db, inviteHashSecret, email) !== null;
 
   const discardUnverifiedAccount = async (email: string) => {
     const address = email.trim().toLowerCase();
@@ -346,14 +348,16 @@ export function createAuth(
 
             const accepted = invite === null ? null : acceptInvite(db, clock, invite, user.id);
 
-            if (accepted === null) {
-              db.delete(users).where(eq(users.id, user.id)).run();
-
-              throw new APIError("FORBIDDEN", {
-                code: "forbidden",
-                message: copy.auth.accountRefused,
-              });
+            if (accepted !== null || env.PUBLIC_SIGNUP_ENABLED) {
+              return;
             }
+
+            db.delete(users).where(eq(users.id, user.id)).run();
+
+            throw new APIError("FORBIDDEN", {
+              code: "forbidden",
+              message: copy.auth.accountRefused,
+            });
           },
         },
         update: {

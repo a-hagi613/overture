@@ -7,6 +7,7 @@ import type { Auth } from "../auth/index.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
+import type { SpendGate } from "../billing/spend.ts";
 
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import { startOnboarding } from "../profile/onboarding-start.ts";
@@ -46,6 +47,7 @@ export function createOnboardingRoutes(deps: {
   llm: LlmPort;
   objects: ObjectStore;
   reviews: ReviewService;
+  spendGate?: SpendGate | undefined;
 }) {
   const { db, clock, auth, llm, objects, reviews: reviewService } = deps;
 
@@ -58,7 +60,16 @@ export function createOnboardingRoutes(deps: {
   const targetsService = createTargetsService({ db, clock });
   const languagesService = createLanguagesService({ db, clock });
   const progress = createOnboardingProgressService({ db, clock });
-  const resumes = createResumeService({ db, clock, objects, personal, llm });
+
+  const resumes = createResumeService({
+    db,
+    clock,
+    objects,
+    personal,
+    llm,
+    spendGate: deps.spendGate,
+  });
+
   const skipCompanies = createSkipCompanyService({ db, clock });
   const consent = createConsentService({ db, clock });
 
