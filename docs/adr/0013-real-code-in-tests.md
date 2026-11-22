@@ -24,7 +24,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for twenty-seven invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
+exist only for twenty-nine invariants: ledger, crypto, planner, address, tag rules, question normalisation, answer
 derivations, the answer planner (a salary Fact kept per currency is chosen only for the currency a question names),
 the facts model (a Fact's scope is validated against its key), the onboarding step's salary and EEO reading, the
 fixture sanitiser (recorded pages must carry no script, event handler, personal data or token), the v1
@@ -54,9 +54,13 @@ distinct attempted Applications, so a failure-then-success retry counts once and
 completed, while attempt counts and page-confirmed sends stay diagnostics, #417), the email receipt match
 (`outcomes.test.ts`: a Confirming Application is charged only by the one message that names its employer and role
 unambiguously, one message confirms at most one Application, and a replayed message never commits a second credit,
-#413), and the account erasure plan (`erase.test.ts`: the vendor profile ids, R2 prefixes and confirmation target are
+#413), the account erasure plan (`erase.test.ts`: the vendor profile ids, R2 prefixes and confirmation target are
 written before the user row goes, the confirmation is queued only after both external deletes confirm clean, a
-failure retries without consuming a job attempt, and a restart resumes the cleanup from the plan, #415). They
+failure retries without consuming a job attempt, and a restart resumes the cleanup from the plan, #415), the Anthropic
+batch record (`batch-store.test.ts`: one request set is recorded once, its results are claimed by one conditional
+update so every later caller reads them back, and a failed record reopens for one resubmission, #418), and the batch
+results fetch (`anthropic-batches.test.ts`: the api key is sent only to the configured api origin, never to another
+origin named by a provider response, #418). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
 depend on the runner. The mail count runs the real SQLite file and the real migrations, so the invariant is exercised
 against the shipped schema rather than a stand-in. CI stays under two minutes on pull requests: six shards balanced by

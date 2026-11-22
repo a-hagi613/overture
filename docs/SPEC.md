@@ -388,10 +388,12 @@ alerts nobody. The admin billing page shows the last result.
 | `settings` | key PK, value JSON, updated_at, updated_by — admin-tunable limits (§12) |
 | `kill_switches` | scope CHECK IN ('global','ats','employer','provider'), key, enabled, reason, set_by CHECK IN ('auto','owner'), set_at; PK(scope,key) |
 | `llm_usage` | id, user_id NULL, purpose, model, input_tokens, cached_tokens, output_tokens, cost_micros, created_at |
+| `llm_batches` | id, input_revision_hash UNIQUE (sha256 of the model and the request set), model, batch_id NULL, status CHECK IN ('creating','in_progress','applied','failed'), results JSON NULL, result_applied_at NULL, expires_at NULL, last_polled_at NULL, last_error NULL, created_at, updated_at |
 | `fx_rates` | date, currency, per_usd REAL; PK(date,currency) |
 | `admin_audit` | id, at, actor_id, action, target_user_id NULL, reason, detail JSON — also shipped to Loki (off-box, append-only) |
 
-Retention: `events` 24 h; `bg_jobs` done 7 days, dead 30 days; `attempts` 180 days; `llm_usage` 400 days;
+Retention: `events` 24 h; `bg_jobs` done 7 days, dead 30 days; `attempts` 180 days; `llm_batches` applied or
+failed 30 days; `llm_usage` 400 days;
 `notifications` 90 days; descriptions 90 days after close; messages for account lifetime; `review_audit_events` and
 Snapshots for account lifetime (the audit is only useful across a search).
 
@@ -766,6 +768,20 @@ Caps (settings): `$0.25` per user per day, `$10` per day global, `$1` per day ta
 scoring pauses until the next UTC day, preparation waits, the owner is alerted. The daily run bounds its scoring
 search at three times the daily cap (§8.2) and alerts `match.score_bound` when it stops there, so a strict threshold
 reaches that alert rather than the cap.
+
+An Anthropic batch is recorded in `llm_batches` before its id exists and keyed by the sha256 of the model and its
+request set, so the id, its status and the moment its results were stored survive a deploy or a crash. A producer
+that restarts finds the record and polls the same provider batch instead of submitting a second one, so the same
+requests are never billed twice: a single conditional update claims the stored results, and every later call returns
+them. A `llm.batch_poll` job, queued when the batch is submitted, checks the provider every
+`ANTHROPIC_BATCH_POLL_INTERVAL_MS` (10 s) and requeues itself without holding a worker, so polling continues when the
+producer is gone; it stops once the provider's `expires_at` has passed and records the reason in `last_error`. The
+producing call
+still waits for the results because `LlmPort` returns them, bounded by `ANTHROPIC_BATCH_WAIT_MS` (1 h), and a wait
+that gives up leaves the record resumable. The submission carries `Idempotency-Key: <input_revision_hash>`, and a
+record still in `creating` after two minutes is submitted again with the same key, so a crash between the POST and
+the write is billed once wherever Anthropic honours the key. The results url is fetched with the api key only when it
+points at the configured api origin, so a provider response that names another host cannot take the key with it.
 
 > `email_classify` is the one LLM use beyond scoring, answers, letters, PDF fallback and question mapping; it runs only when the rules in §11.3 are not confident.
 

@@ -425,6 +425,30 @@ export const llmUsage = sqliteTable("llm_usage", {
   createdAt: integer("created_at").notNull(),
 });
 
+export const llmBatches = sqliteTable(
+  "llm_batches",
+  {
+    id: text("id").primaryKey(),
+    inputRevisionHash: text("input_revision_hash").notNull(),
+    model: text("model").notNull(),
+    batchId: text("batch_id"),
+    status: text("status", { enum: ["creating", "in_progress", "applied", "failed"] })
+      .notNull()
+      .default("creating"),
+    results: text("results"),
+    resultAppliedAt: integer("result_applied_at"),
+    expiresAt: integer("expires_at"),
+    lastPolledAt: integer("last_polled_at"),
+    lastError: text("last_error"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("llm_batches_input_revision_hash_unique").on(t.inputRevisionHash),
+    index("llm_batches_status_updated").on(t.status, t.updatedAt),
+  ],
+);
+
 export const mailUsage = sqliteTable("mail_usage", {
   month: text("month").primaryKey(),
   authSends: integer("auth_sends").notNull().default(0),
