@@ -28,8 +28,11 @@ export function BoardCover({ detail }: { detail: ApplicationDetail }) {
       ) : (
         <>
           <div className="rounded-lg border border-border bg-background px-5 py-4">
-            {snapshot.coverLetter.map((line) => (
-              <p className="serif text-[17px] leading-[1.6] [&+&]:mt-3" key={line.sentence}>
+            {snapshot.coverLetter.map((line, index) => (
+              <p
+                className="serif text-[17px] leading-[1.6] [&+&]:mt-3"
+                key={`${String(index)}-${line.sentence}`}
+              >
                 {line.sentence}
               </p>
             ))}
