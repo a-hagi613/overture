@@ -1796,9 +1796,6 @@ export const copy = {
     },
     cover: {
       noSnapshot: "This application has not been sent yet.",
-      resume: "Resume file",
-      hash: "SHA-256",
-      citedHeading: "Cited from your resume",
     },
     dossier: {
       sentLabel: "How this was sent",

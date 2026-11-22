@@ -623,7 +623,7 @@ test("the cover tab is reachable and activatable from the keyboard", async ({
     "traced",
   );
 
-  await page.getByRole("tab", { name: "Timeline" }).focus();
+  await page.getByRole("tab", { name: "Overview" }).focus();
 
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
