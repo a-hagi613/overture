@@ -99,13 +99,15 @@ export function NotificationsPage() {
             </h2>
             {data.unread > 0 ? (
               <button
-                className="flex h-9 items-center justify-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold hover:bg-muted"
+                className="group flex h-9 items-center justify-center max-md:h-11 max-md:-my-[4px]"
                 onClick={() => {
                   markAll.mutate();
                 }}
                 type="button"
               >
-                {copy.notifications.page.markAll}
+                <span className="flex h-9 items-center justify-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold group-hover:bg-muted">
+                  {copy.notifications.page.markAll}
+                </span>
               </button>
             ) : null}
           </div>

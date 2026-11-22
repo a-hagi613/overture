@@ -23,7 +23,7 @@ export function SignInLayout({ children }: { children: ReactNode }) {
       >
         <div className="mx-auto flex w-full max-w-[560px] items-center justify-between gap-3">
           <Link
-            className="-ml-2.5 inline-flex min-h-11 items-center gap-[7px] rounded-md px-2.5 py-1.5 text-[13px] font-medium hover:bg-muted hover:text-foreground"
+            className="-ml-2.5 inline-flex max-md:min-h-11 max-md:-my-[10px] items-center gap-[7px] rounded-md px-2.5 py-1.5 text-[13px] font-medium hover:bg-muted hover:text-foreground"
             to="/"
           >
             <NavGlyph name="back" size={15} />
@@ -32,18 +32,20 @@ export function SignInLayout({ children }: { children: ReactNode }) {
           <button
             aria-label={label}
             aria-pressed={theme === "dark"}
-            className="flex h-10 w-10 items-center justify-center rounded-md border border-input bg-card hover:bg-muted"
+            className="group flex items-center justify-center max-md:h-11 max-md:w-11"
             onClick={toggleTheme}
             type="button"
           >
-            <NavGlyph name={theme === "dark" ? "sun" : "moon"} />
+            <span className="flex h-10 w-10 items-center justify-center rounded-md border border-input bg-card group-hover:bg-muted">
+              <NavGlyph name={theme === "dark" ? "sun" : "moon"} />
+            </span>
           </button>
         </div>
         <div className="mx-auto my-auto flex w-full max-w-[418px] flex-col gap-[18px]">
           <div className="mb-[4px] flex flex-col items-center gap-2 text-center min-[961px]:mb-0 min-[961px]:hidden">
             <Link
               aria-label={copy.brand.homeAria}
-              className="inline-flex min-h-11 items-center gap-[10px] hover:opacity-80"
+              className="inline-flex max-md:min-h-11 items-center gap-[10px] hover:opacity-80"
               to="/"
             >
               <BrandMark size={34} />

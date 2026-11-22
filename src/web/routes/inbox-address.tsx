@@ -70,15 +70,17 @@ export function InboxAddressPage() {
               </button>
             ) : null}
             <button
-              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-input bg-card px-3 text-[12.5px] font-semibold hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              className="group inline-flex min-h-9 items-center justify-center max-md:min-h-11 max-md:-my-[4px] disabled:cursor-not-allowed disabled:opacity-50"
               disabled={address === ""}
               onClick={() => {
                 void copyAddress();
               }}
               type="button"
             >
-              <NavGlyph name="copy" size={14} />
-              {copied ? copy.inbox.addressCopied : copy.inbox.addressCopy}
+              <span className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-input bg-card px-3 text-[12.5px] font-semibold group-hover:bg-muted">
+                <NavGlyph name="copy" size={14} />
+                {copied ? copy.inbox.addressCopied : copy.inbox.addressCopy}
+              </span>
             </button>
           </div>
           {copyFailed ? (

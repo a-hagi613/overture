@@ -31,7 +31,7 @@ export function PasswordField({
       />
       <button
         aria-label={show ? copy.signIn.hidePassword : copy.signIn.showPassword}
-        className="absolute right-1.5 top-1/2 min-h-[34px] -translate-y-1/2 rounded-md px-2.5 text-[12.5px] font-semibold text-foreground hover:bg-muted"
+        className="absolute right-1.5 top-1/2 min-h-[34px] max-md:min-h-11 -translate-y-1/2 rounded-md px-2.5 text-[12.5px] font-semibold text-foreground hover:bg-muted"
         onClick={toggle}
         type="button"
       >

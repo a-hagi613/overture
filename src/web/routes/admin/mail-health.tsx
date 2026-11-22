@@ -97,7 +97,10 @@ export function MailHealthPage() {
               </button>
             ))}
           </fieldset>
-          <ThemeToggle className="flex h-10 w-10 flex-none items-center justify-center rounded-md border border-input bg-card hover:bg-muted" />
+          <ThemeToggle
+            compact
+            className="flex h-10 w-10 flex-none items-center justify-center rounded-md border border-input bg-card hover:bg-muted"
+          />
         </div>
       </div>
 

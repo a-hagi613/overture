@@ -123,14 +123,6 @@ canvas {
   opacity: 0.45;
 }
 
-/* DESIGN §7: 44px touch targets on phones. Unlayered, so it outranks utility heights. */
-@media (max-width: 767px) {
-  :where(button, [role="button"], [role="tab"], summary) {
-    min-height: 44px;
-    min-width: 44px;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,

@@ -132,7 +132,7 @@ export function SearchPage() {
         />
         <button
           type="submit"
-          className="h-10 shrink-0 rounded-[6px] bg-foreground px-4 text-sm font-medium text-card hover:opacity-90"
+          className="h-10 max-md:h-11 max-md:-my-[2px] shrink-0 rounded-[6px] bg-foreground px-4 text-sm font-medium text-card hover:opacity-90"
         >
           {copy.search.submit}
         </button>

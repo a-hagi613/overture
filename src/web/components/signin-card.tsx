@@ -553,7 +553,7 @@ export function SignInCard() {
         </section>
         <p className={SWITCH_CLASS}>
           <button
-            className="inline-flex min-h-[44px] items-center gap-2 px-1 font-semibold text-foreground underline underline-offset-[3px] hover:no-underline"
+            className="inline-flex max-md:min-h-[44px] items-center gap-2 px-1 font-semibold text-foreground underline underline-offset-[3px] hover:no-underline"
             onClick={() => {
               setPhase("form");
               setActionError(null);

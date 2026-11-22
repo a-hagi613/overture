@@ -120,18 +120,22 @@ export function InboxPage() {
           {filters.map((entry) => (
             <button
               aria-pressed={filter === entry.key}
-              className={`inline-flex min-h-[34px] items-center rounded-[5px] px-[15px] text-[12.5px] font-semibold ${
-                filter === entry.key
-                  ? "bg-card text-foreground shadow-sh"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className="group inline-flex max-md:min-h-11 max-md:-my-[5px] items-center"
               key={entry.key}
               onClick={() => {
                 setFilter(entry.key);
               }}
               type="button"
             >
-              {entry.label}
+              <span
+                className={`inline-flex min-h-[34px] items-center rounded-[5px] px-[15px] text-[12.5px] font-semibold ${
+                  filter === entry.key
+                    ? "bg-card text-foreground shadow-sh"
+                    : "text-muted-foreground group-hover:text-foreground"
+                }`}
+              >
+                {entry.label}
+              </span>
             </button>
           ))}
         </fieldset>

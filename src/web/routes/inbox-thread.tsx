@@ -60,7 +60,7 @@ export function InboxThreadPage() {
         </section>
         <section className="rounded-lg border border-border bg-card px-6 py-5.5 shadow-sh max-md:px-4">
           <Link
-            className="inline-flex min-h-11 items-center text-[13.5px] leading-[20.25px] font-semibold text-muted-foreground hover:text-foreground md:hidden"
+            className="inline-flex max-md:min-h-11 items-center text-[13.5px] leading-[20.25px] font-semibold text-muted-foreground hover:text-foreground md:hidden"
             to="/inbox"
           >
             {copy.inbox.backToInbox}

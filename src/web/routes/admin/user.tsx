@@ -161,7 +161,10 @@ export function UserPage() {
             <NavGlyph name="lock" size={15} />
             {copy.admin.userReveal}
           </button>
-          <ThemeToggle className="flex h-10 w-10 flex-none items-center justify-center rounded-md border border-input bg-card hover:bg-muted" />
+          <ThemeToggle
+            compact
+            className="flex h-10 w-10 flex-none items-center justify-center rounded-md border border-input bg-card hover:bg-muted"
+          />
         </div>
       </div>
       <div className="mt-6 grid gap-5 lg:grid-cols-2">

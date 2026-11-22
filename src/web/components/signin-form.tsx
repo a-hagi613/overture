@@ -58,7 +58,7 @@ export function SignInForm({
             {copy.signIn.passwordLabel}
           </label>
           <a
-            className="inline-flex min-h-11 items-center text-[12.5px] font-semibold text-foreground underline underline-offset-[3px] hover:no-underline"
+            className="inline-flex max-md:min-h-11 max-md:-my-[13px] items-center text-[12.5px] font-semibold text-foreground underline underline-offset-[3px] hover:no-underline"
             href="/forgot-password"
           >
             {copy.signIn.forgotPassword}

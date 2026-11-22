@@ -18,10 +18,12 @@ export function SettingsLegalRow({
         <p className="text-[12.5px] text-muted-foreground">{detail}</p>
       </div>
       <Link
-        className="inline-flex h-9 flex-none max-md:h-11 items-center justify-center rounded-md border border-input px-3.5 text-[13px] font-semibold hover:bg-muted"
+        className="group inline-flex h-9 flex-none items-center justify-center max-md:h-11 max-md:-my-[4px]"
         to={to}
       >
-        {linkText}
+        <span className="inline-flex h-9 items-center justify-center rounded-md border border-input px-3.5 text-[13px] font-semibold group-hover:bg-muted">
+          {linkText}
+        </span>
       </Link>
     </div>
   );

@@ -21,7 +21,7 @@ export function BoardMobileHeader() {
     <header className="flex h-[60px] flex-none items-center justify-between pr-2 pl-[18px]">
       <Link
         aria-label={copy.brand.homeAria}
-        className="flex min-h-11 items-center gap-[9px] hover:opacity-80"
+        className="flex max-md:min-h-11 max-md:-my-[6px] items-center gap-[9px] hover:opacity-80"
         to="/"
       >
         <BrandMark size={28} />
