@@ -56,32 +56,6 @@ export function SignInLayout({ children }: { children: ReactNode }) {
             </p>
           </div>
           {children}
-<<<<<<< HEAD
-          <footer className="flex flex-col items-center gap-1.5 text-center text-xs leading-[1.55] text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5 font-mono text-[11px] [line-height:normal]">
-              <NavGlyph name="lock" size={12} />
-              <span>{copy.signIn.trust}</span>
-            </span>
-            <p>
-              {copy.signIn.legalIntro}{" "}
-              <a
-                className="decoration-input underline underline-offset-[3px] hover:text-foreground"
-                href="/terms"
-              >
-                {copy.signIn.legalTerms}
-              </a>{" "}
-              {copy.signIn.legalJoin}{" "}
-              <a
-                className="decoration-input underline underline-offset-[3px] hover:text-foreground"
-                href="/privacy"
-              >
-                {copy.signIn.legalPrivacy}
-              </a>
-              {copy.signIn.legalEnd}
-            </p>
-          </footer>
-=======
->>>>>>> 4beed867 (Design parity (Sign In): match the canvas layout and refresh the signin snapshots)
         </div>
         <footer className="flex flex-col items-center gap-1.5 text-center text-xs leading-[1.55] text-muted-foreground">
           <p className="font-mono text-[11px] [line-height:normal]">
@@ -92,11 +66,17 @@ export function SignInLayout({ children }: { children: ReactNode }) {
           </p>
           <p>
             {copy.signIn.legalIntro}{" "}
-            <a className="decoration-input underline underline-offset-[3px]" href="/terms">
+            <a
+              className="decoration-input underline underline-offset-[3px] hover:text-foreground"
+              href="/terms"
+            >
               {copy.signIn.legalTerms}
             </a>{" "}
             {copy.signIn.legalJoin}{" "}
-            <a className="decoration-input underline underline-offset-[3px]" href="/privacy">
+            <a
+              className="decoration-input underline underline-offset-[3px] hover:text-foreground"
+              href="/privacy"
+            >
               {copy.signIn.legalPrivacy}
             </a>
             {copy.signIn.legalEnd}

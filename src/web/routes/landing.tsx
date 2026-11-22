@@ -203,7 +203,7 @@ export function LandingPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       {renderLandingHeader()}
-      <main className="flex-1">
+      <main className="flex-1 outline-none" id="main-content" tabIndex={-1}>
         {renderHero()}
         {renderHowItWorks()}
         {renderWhereItApplies()}
