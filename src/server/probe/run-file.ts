@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { WORKABLE_APPLY_ORIGIN } from "../pipeline/form-read.ts";
+
 export const runFileQuestionSchema = z.object({
   id: z.string().min(1),
   value: z.string(),
@@ -8,8 +10,11 @@ export const runFileQuestionSchema = z.object({
 
 export const GREENHOUSE_BOARD_ORIGIN = "https://job-boards.greenhouse.io";
 
+export const probeAtsSchema = z.enum(["greenhouse", "workable"]);
+
 export const runFilePostingSchema = z
   .object({
+    ats: probeAtsSchema.default("greenhouse"),
     board: z.string().min(1),
     jobId: z.string().min(1),
     url: z.url().optional(),
@@ -21,6 +26,7 @@ export const runFilePostingSchema = z
   .refine(
     (posting) =>
       posting.url !== undefined ||
+      posting.ats === "workable" ||
       URL.canParse(`${GREENHOUSE_BOARD_ORIGIN}/${posting.board}/jobs/${posting.jobId}`),
   );
 
@@ -36,6 +42,14 @@ export type RunFilePosting = z.infer<typeof runFilePostingSchema>;
 
 export type RunFile = z.infer<typeof runFileSchema>;
 
-export function postingUrl(posting: RunFilePosting, origin: string) {
-  return posting.url ?? `${origin}/${posting.board}/jobs/${posting.jobId}`;
+export function postingUrl(posting: RunFilePosting, origin: string | undefined) {
+  if (posting.url !== undefined) {
+    return posting.url;
+  }
+
+  if (posting.ats === "workable") {
+    return `${origin ?? WORKABLE_APPLY_ORIGIN}/j/${encodeURIComponent(posting.jobId)}`;
+  }
+
+  return `${origin ?? GREENHOUSE_BOARD_ORIGIN}/${posting.board}/jobs/${posting.jobId}`;
 }

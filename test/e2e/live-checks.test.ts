@@ -89,6 +89,16 @@ const ashbyPage = `<!doctype html>
 </form>
 </body></html>`;
 
+const workablePage = `<!doctype html>
+<html><body>
+<form class="application-form" id="application-form" method="post" action="/apply">
+  <label for="firstname">First name <input id="firstname" type="text" name="firstname" required /></label>
+  <label for="email">Email <input id="email" type="email" name="email" required /></label>
+  <label for="resume">Resume <input id="resume" type="file" name="resume" /></label>
+  <button type="submit">Submit application</button>
+</form>
+</body></html>`;
+
 let app: AppServer | undefined;
 let identity: Awaited<ReturnType<typeof startIdentityServer>> | undefined;
 let anthropic: AnthropicFixtureServer | undefined;
@@ -167,6 +177,7 @@ function serveForms() {
         ["/greenhouse", greenhousePage],
         ["/lever", leverPage],
         ["/ashby", ashbyPage],
+        ["/workable", workablePage],
       ]);
 
       const page = pages.get(pathname);
@@ -180,7 +191,7 @@ function serveForms() {
 
 async function seedCatalog(context = api) {
   await Promise.all(
-    (["greenhouse", "lever", "ashby"] as const).map(async (ats) => {
+    (["greenhouse", "lever", "ashby", "workable"] as const).map(async (ats) => {
       const companyId = await seedCompany(context, `Live Check ${ats}`, `${ats}.example`);
       const boardId = await seedBoard(context, companyId, ats, `live-check-${ats}`);
 
@@ -299,7 +310,7 @@ test("the daily job captures one sample per ATS without submitting, calls Haiku 
   const results = await liveCheckResults();
   const byCheck = new Map(results.map((row) => [row.check, row]));
 
-  for (const ats of ["greenhouse", "lever", "ashby"]) {
+  for (const ats of ["greenhouse", "lever", "ashby", "workable"]) {
     expect(byCheck.get(`forms.${ats}`)?.ok).toBe(true);
     expect(byCheck.get(`forms.${ats}`)?.detail["formSignature"]).toMatch(/^[a-f0-9]{16,}$/u);
     expect(byCheck.get(`forms.${ats}`)?.durationMs).toBeGreaterThanOrEqual(0);

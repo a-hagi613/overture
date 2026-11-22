@@ -31,6 +31,7 @@ import { createPlainFormReader } from "./form-read.ts";
 import { createPlanCache } from "./plan-cache.ts";
 import { guardPosting } from "./guard/posting-guard.ts";
 import { createOpenTextService, isCoverLetterQuestion } from "./open-text.ts";
+import { isKillSwitchEnabled } from "../platform/settings/index.ts";
 import { createTargetsService } from "../profile/targets.ts";
 import { greenhouseBoardUrl } from "./greenhouse-board-url.ts";
 import { countriesNamedIn } from "../catalog/question-normalize.ts";
@@ -245,7 +246,7 @@ export function createPreparationService(deps: {
   onReady?: (applicationId: string, userId: string) => void;
   plainFormReader?: PlainFormReader;
   captureForm?: (input: {
-    ats: "lever" | "ashby";
+    ats: "lever" | "ashby" | "workable";
     region: "us" | "eu";
     boardToken: string;
     atsJobId: string;
@@ -419,10 +420,6 @@ export function createPreparationService(deps: {
 
       return entries;
     };
-
-    if (posting.ats === "workable") {
-      return;
-    }
 
     if (posting.ats === "greenhouse") {
       if (source === null) {
@@ -688,7 +685,7 @@ export function createPreparationService(deps: {
       return null;
     }
 
-    if (row.ats === "workable") {
+    if (row.ats === "workable" && isKillSwitchEnabled(db, "ats", "workable")) {
       db.update(applications)
         .set({
           status: "skipped",
@@ -1077,7 +1074,7 @@ export function createPreparationService(deps: {
       .where(eq(applications.id, applicationId))
       .get();
 
-    if (row === undefined || row.ats === "personio" || row.ats === "workable") {
+    if (row === undefined || row.ats === "personio") {
       return null;
     }
 
