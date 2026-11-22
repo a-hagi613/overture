@@ -14,7 +14,9 @@ function setup() {
 
   migrateDatabase(db, "drizzle");
   migrateCatalogDatabase(catalog.db, "drizzle-catalog");
-  sqlite.run("INSERT INTO companies (id, name, name_norm, created_at) VALUES ('c', 'Co', 'co', 1)");
+  catalog.sqlite.run(
+    "INSERT INTO companies (id, name, name_norm, created_at) VALUES ('c', 'Co', 'co', 1)",
+  );
 
   catalog.sqlite.run(
     "INSERT INTO company_boards (id, company_id, ats, board_token, region, status, source, created_at) VALUES ('b', 'c', 'greenhouse', 't', 'us', 'active', 'import', 1)",
@@ -48,7 +50,7 @@ function setup() {
       .run(id, input.role);
   }
 
-  return { addPosting, catalogDb: catalog.db, db, sqlite };
+  return { addPosting, catalogDb: catalog.db, catalogSqlite: catalog.sqlite, db, sqlite };
 }
 
 test("role choices: closed Postings with more tags never crowd an open role out of the list", () => {
@@ -83,7 +85,7 @@ test("role choices: ranks open roles by how many open Postings carry them", () =
 });
 
 test("a failed background refresh is reported, not swallowed", async () => {
-  const { catalogDb, sqlite } = setup();
+  const { catalogDb, catalogSqlite } = setup();
   const failures: unknown[] = [];
   let reported = Promise.withResolvers<undefined>();
 
@@ -97,7 +99,7 @@ test("a failed background refresh is reported, not swallowed", async () => {
     staleMs: 1000,
   });
 
-  sqlite.close();
+  catalogSqlite.close();
   cache.warm();
   await reported.promise;
 
