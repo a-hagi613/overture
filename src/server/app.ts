@@ -75,6 +75,8 @@ export interface AppDependencies {
   eraser: AccountEraser;
   exports: ExportService;
   payments: Payments | null;
+  /** Aborted on shutdown; long-lived responses (the event stream) end with it. */
+  shutdown: AbortSignal;
 }
 
 async function staticResponseFrom(root: string, url: string) {
@@ -190,7 +192,7 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createHealthRoutes(deps.db, deps.backups));
   app.route("/api", createMeRoutes(deps.auth));
   app.route("/api", createSupportAccessRoutes(deps.db, deps.auth));
-  app.route("/api", createApiRoutes(deps.db, deps.clock, deps.auth));
+  app.route("/api", createApiRoutes(deps.db, deps.clock, deps.auth, { shutdown: deps.shutdown }));
   app.route("/api", createNotificationRoutes(deps.db, deps.clock, deps.auth));
   app.route("/api", createProfileRoutes(deps));
   app.route(

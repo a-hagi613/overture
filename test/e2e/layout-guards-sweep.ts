@@ -3,18 +3,20 @@ import { join } from "node:path";
 
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 
-import { test, expect } from "./admin.fixture.ts";
+import { expect, test } from "./admin.fixture.ts";
 
-const widths = [390, 768, 1280, 1440, 1920, 2560] as const;
-const themes = ["light", "dark"] as const;
+export const widths = [390, 768, 1280, 1440, 1920, 2560] as const;
+export const themes = ["light", "dark"] as const;
+
+export type Theme = (typeof themes)[number];
+
+export type Storage = "app" | "admin" | "anonymous";
 
 const routeSource = readFileSync(join(process.cwd(), "src/web/route-table.tsx"), "utf8");
 
 const routerPaths = [...routeSource.matchAll(/path: "(?<path>[^"]+)"/gu)].map(
   (match) => match.groups?.path ?? "",
 );
-
-type Storage = "app" | "admin" | "anonymous";
 
 interface Target {
   path: string;
@@ -24,7 +26,7 @@ interface Target {
 
 function storageFor(path: string) {
   if (path.startsWith("/admin")) {
-    return "admin" as const;
+    return "admin";
   }
 
   if (
@@ -34,10 +36,10 @@ function storageFor(path: string) {
     path === "/pricing" ||
     path === "/consent"
   ) {
-    return "anonymous" as const;
+    return "anonymous";
   }
 
-  return "app" as const;
+  return "app";
 }
 
 function urlFor(path: string) {
@@ -66,6 +68,28 @@ const shellPaths = new Set([
   "/settings",
   "*",
 ]);
+
+const redirectedPaths = new Map([
+  ["/settings/notifications", "/settings"],
+  ["/settings/support", "/settings/support-access"],
+  ["/settings/terms", "/terms"],
+]);
+
+const FONT_SETTLE_TIMEOUT_MS = 5000;
+
+export type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
+
+export interface SweepFixtures {
+  adminAppUrl: string;
+  appServerUrl: string;
+  browser: Browser;
+  chromeOwnerStorage: StorageState;
+  ownerAccessCookieState: StorageState;
+}
+
+export function targetsFor(storage: Storage) {
+  return targets.filter((target) => target.storage === storage);
+}
 
 async function measureOverflow(page: Page) {
   return page.evaluate(() => {
@@ -233,11 +257,18 @@ async function navigate(page: Page, path: string, landsOn: string = path) {
   await page.waitForFunction((next) => globalThis.location.pathname === next, landsOn);
 }
 
-const redirectedPaths = new Map([
-  ["/settings/notifications", "/settings"],
-  ["/settings/support", "/settings/support-access"],
-  ["/settings/terms", "/terms"],
-]);
+async function settleLayout(page: Page) {
+  await page.evaluate(async (timeoutMs) => {
+    globalThis.scrollTo(0, 0);
+
+    await Promise.race([
+      document.fonts.ready.then(() => undefined),
+      new Promise((resolve) => {
+        setTimeout(resolve, timeoutMs);
+      }),
+    ]);
+  }, FONT_SETTLE_TIMEOUT_MS);
+}
 
 async function checkTarget(page: Page, target: Target, url: string, width: number) {
   const requestedPath = new URL(url).pathname;
@@ -246,10 +277,7 @@ async function checkTarget(page: Page, target: Target, url: string, width: numbe
   await navigate(page, requestedPath, expectedPath);
   await expect(page.locator("main").first()).toBeVisible({ timeout: 15_000 });
   await expect(page).toHaveURL((current) => current.pathname === expectedPath);
-  await page.evaluate(async () => {
-    globalThis.scrollTo(0, 0);
-    await document.fonts.ready;
-  });
+  await settleLayout(page);
 
   await expectNoOverflow(page, target.path);
 
@@ -258,45 +286,15 @@ async function checkTarget(page: Page, target: Target, url: string, width: numbe
   }
 }
 
-async function runTargets(
-  remaining: Target[],
-  pageFor: (storage: Storage) => Promise<Page>,
-  urlOf: (target: Target) => string,
-  width: number,
-) {
-  if (remaining.length === 0) {
-    return;
-  }
-
-  const [target, ...rest] = remaining;
-
-  if (target === undefined) {
-    return;
-  }
-
-  const page = await pageFor(target.storage);
-
-  await checkTarget(page, target, urlOf(target), width);
-  await runTargets(rest, pageFor, urlOf, width);
-}
-
-async function openContext(
-  browser: Browser,
-  storage: Storage,
-  width: number,
-  theme: string,
-  storageStates: {
-    admin: Awaited<ReturnType<BrowserContext["storageState"]>>;
-    app: Awaited<ReturnType<BrowserContext["storageState"]>>;
-  },
-) {
+async function openContext(fixtures: SweepFixtures, storage: Storage, width: number, theme: Theme) {
   const viewport = { height: 900, width };
 
   const context =
     storage === "anonymous"
-      ? await browser.newContext({ viewport })
-      : await browser.newContext({
-          storageState: storage === "app" ? storageStates.app : storageStates.admin,
+      ? await fixtures.browser.newContext({ viewport })
+      : await fixtures.browser.newContext({
+          storageState:
+            storage === "app" ? fixtures.chromeOwnerStorage : fixtures.ownerAccessCookieState,
           viewport,
         });
 
@@ -309,72 +307,98 @@ async function openContext(
   return context;
 }
 
-test.describe.configure({ timeout: 120_000 });
+const urlsFor = (fixtures: SweepFixtures) => ({
+  admin: fixtures.adminAppUrl,
+  anonymous: fixtures.appServerUrl,
+  app: fixtures.appServerUrl,
+});
 
-for (const width of widths) {
-  for (const theme of themes) {
-    test(`G1/G4/G5 every route at ${String(width)} ${theme}`, async ({
-      adminAppUrl,
-      appServerUrl,
-      browser,
-      chromeOwnerStorage,
-      ownerAccessCookieState,
-    }) => {
-      const contexts = {
-        admin: await openContext(browser, "admin", width, theme, {
-          admin: ownerAccessCookieState,
-          app: chromeOwnerStorage,
-        }),
-        anonymous: await openContext(browser, "anonymous", width, theme, {
-          admin: ownerAccessCookieState,
-          app: chromeOwnerStorage,
-        }),
-        app: await openContext(browser, "app", width, theme, {
-          admin: ownerAccessCookieState,
-          app: chromeOwnerStorage,
-        }),
-      };
+const startPaths: Record<Storage, string> = {
+  admin: "/admin",
+  anonymous: "/signin",
+  app: "/",
+};
 
-      const urls: Record<Storage, string> = {
-        admin: adminAppUrl,
-        anonymous: appServerUrl,
-        app: appServerUrl,
-      };
+async function sweepTargets(
+  page: Page,
+  group: readonly Target[],
+  urlOf: (target: Target) => string,
+  width: number,
+) {
+  const [target, ...rest] = group;
 
-      const pages = new Map<Storage, Page>();
+  if (target === undefined) {
+    return;
+  }
 
-      const startPaths: Record<Storage, string> = {
-        admin: "/admin",
-        anonymous: "/signin",
-        app: "/",
-      };
+  await test.step(target.path, async () => {
+    await checkTarget(page, target, urlOf(target), width);
+  });
 
-      const pageFor = async (storage: Storage) => {
-        const open = pages.get(storage);
+  await sweepTargets(page, rest, urlOf, width);
+}
 
-        if (open !== undefined) {
-          return open;
-        }
+/**
+ * Walks every route that belongs to one storage group at one width and theme.
+ *
+ * Each group needs its own browser context (anonymous, a signed-in app session, an
+ * owner admin session) and the three groups together used to fill one 120 s test, so
+ * a single stalled route took the other groups' routes down with it and surfaced only
+ * as a bare timeout.
+ * @param storage Which context the routes are visited with.
+ * @param width The viewport width to measure at.
+ * @param theme The colour scheme the page is painted with.
+ * @param fixtures The Playwright fixtures that provide the two app servers and sessions.
+ * @returns Nothing; every assertion runs inside the test.
+ */
+export async function sweepStorageGroup(
+  storage: Storage,
+  width: number,
+  theme: Theme,
+  fixtures: SweepFixtures,
+) {
+  const group = targetsFor(storage);
+  const context = await openContext(fixtures, storage, width, theme);
+  const urls = urlsFor(fixtures);
 
-        const page = await contexts[storage].newPage();
+  try {
+    const page = await context.newPage();
 
-        await page.goto(`${urls[storage]}${startPaths[storage]}`);
-        await expect(page.locator("main").first()).toBeVisible({ timeout: 15_000 });
-        pages.set(storage, page);
+    await page.goto(`${urls[storage]}${startPaths[storage]}`);
+    await expect(page.locator("main").first()).toBeVisible({ timeout: 15_000 });
 
-        return page;
-      };
+    await sweepTargets(page, group, (target) => `${urls[storage]}${target.url}`, width);
+  } finally {
+    await context.close();
+  }
+}
 
-      try {
-        await runTargets(
-          targets,
-          pageFor,
-          (target) => `${urls[target.storage]}${target.url}`,
-          width,
-        );
-      } finally {
-        await Promise.all(Object.values(contexts).map(async (context) => context.close()));
-      }
-    });
+/**
+ * Registers the twelve width × theme tests for one storage group.
+ * @param label The group's name in the test title.
+ * @param storage Which context the routes are visited with.
+ * @returns Nothing.
+ */
+export function defineLayoutGuardSpecs(label: string, storage: Storage) {
+  test.describe.configure({ timeout: 120_000 });
+
+  for (const width of widths) {
+    for (const theme of themes) {
+      test(`G1/G4/G5 ${label} routes at ${String(width)} ${theme}`, async ({
+        adminAppUrl,
+        appServerUrl,
+        browser,
+        chromeOwnerStorage,
+        ownerAccessCookieState,
+      }) => {
+        await sweepStorageGroup(storage, width, theme, {
+          adminAppUrl,
+          appServerUrl,
+          browser,
+          chromeOwnerStorage,
+          ownerAccessCookieState,
+        });
+      });
+    }
   }
 }
