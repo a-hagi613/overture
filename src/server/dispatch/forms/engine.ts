@@ -12,6 +12,9 @@ const COMBOBOX_MENU_MS = 5000;
 const COMBOBOX_REVEAL_MS = 1000;
 const COMBOBOX_KEY_DELAY_MS = 50;
 
+const DOM_STABILITY_TIMEOUT_MS = 3000;
+const DOM_STABILITY_QUIET_MS = 150;
+
 const FILLABLE_INPUT_TYPES = new Set(["text", "email", "tel", "number", "date", "url"]);
 
 export const CONFIRMATION_SOURCES = [
@@ -380,6 +383,65 @@ export async function openForm(page: Page, selector: string, timeout = FORM_APPE
   }
 
   return { page, root: matches.first() };
+}
+
+interface StabilityState {
+  last: number;
+  observer: MutationObserver | null;
+}
+
+/**
+ * Waits, for a bounded time, until the verified form's DOM stops changing.
+ * An upload can trigger an ATS's own resume parser, a combobox can reveal a new
+ * control, and a React rerender can replace the whole subtree; the preflight
+ * must read the form after those settle, never mid-update. Nothing leaves the
+ * page: a MutationObserver in the page records the last change, and the wait
+ * ends after a short quiet window or at the timeout, whichever comes first.
+ *
+ * @param scope The one verified live form.
+ * @param timeout The upper bound, in milliseconds.
+ * @returns `true` when the form went quiet, `false` when the timeout won.
+ */
+export async function waitForStableForm(scope: FormScope, timeout = DOM_STABILITY_TIMEOUT_MS) {
+  try {
+    const root = await scope.root.elementHandle();
+
+    const state = await scope.page.evaluateHandle((element) => {
+      const monitor: StabilityState = { last: performance.now(), observer: null };
+
+      monitor.observer = new MutationObserver(() => {
+        monitor.last = performance.now();
+      });
+
+      monitor.observer.observe(element, {
+        attributes: true,
+        characterData: true,
+        childList: true,
+        subtree: true,
+      });
+
+      return monitor;
+    }, root);
+
+    try {
+      await scope.page.waitForFunction(
+        ({ monitor, quietMs }: { monitor: { last: number }; quietMs: number }) =>
+          performance.now() - monitor.last >= quietMs,
+        { monitor: state, quietMs: DOM_STABILITY_QUIET_MS },
+        { polling: 25, timeout },
+      );
+
+      return true;
+    } finally {
+      await state
+        .evaluate((monitor: StabilityState) => monitor.observer?.disconnect())
+        .catch(() => undefined);
+      await state.dispose().catch(() => undefined);
+      await root.dispose().catch(() => undefined);
+    }
+  } catch {
+    return false;
+  }
 }
 
 export const fieldById = (scope: FormScope, id: string) =>
@@ -792,9 +854,13 @@ async function readLiveForm(scope: FormScope) {
         continue;
       }
 
+      const yesNoGroup = element.closest("[class*='yesno']");
+
       const pressedButtons = [
-        ...(element.parentElement?.querySelectorAll<HTMLButtonElement>("button[aria-pressed]") ??
-          []),
+        ...(yesNoGroup === null
+          ? (element.parentElement?.querySelectorAll<HTMLButtonElement>("button[aria-pressed]") ??
+            [])
+          : yesNoGroup.querySelectorAll<HTMLButtonElement>("button")),
       ];
 
       if (pressedButtons.length > 0) {
@@ -804,7 +870,12 @@ async function readLiveForm(scope: FormScope) {
           titleId === "" ? null : root.querySelector(`label[for="${CSS.escape(titleId)}"]`);
 
         const pressed =
-          pressedButtons.find((button) => button.getAttribute("aria-pressed") === "true") ?? null;
+          pressedButtons.find((button) => button.getAttribute("aria-pressed") === "true") ??
+          (yesNoGroup !== null && element instanceof HTMLInputElement && element.checked
+            ? (pressedButtons.find(
+                (button) => dom.textOf(button) === element.value.replaceAll(/\s+/gu, " ").trim(),
+              ) ?? null)
+            : null);
 
         controls.push({
           checked: pressed !== null,
@@ -1349,6 +1420,8 @@ export const preflightForm: (
     return decideLiveFormVerdict({ ok: false, problems: [missingFormProblem()] });
   }
 
+  await waitForStableForm(scope);
+
   return decideLiveFormVerdict(await checkLiveForm(scope, expectations));
 };
 
@@ -1495,7 +1568,7 @@ export async function readConfirmation(
     await page.waitForFunction(
       ({ sources, path }) =>
         globalThis.location.pathname.endsWith(path) ||
-        (document.querySelector("form#application-form") === null &&
+        (document.querySelector("form#application-form, form#application_form") === null &&
           sources.some((source) => new RegExp(source, "iu").test(document.body.textContent))),
       { path: confirmationPath, sources: CONFIRMATION_SOURCES },
       { timeout: CONFIRMATION_WAIT_MS },

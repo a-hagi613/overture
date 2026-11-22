@@ -22,6 +22,14 @@ import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identi
 
 const CODE_REQUIRED_STATUS = 428;
 
+/**
+ * Greenhouse served `#application-form` for years and still serves the classic
+ * `#application_form` on some boards and embed versions. Both name the same one
+ * form; a page with either root is scoped identically, and a page with two
+ * matching roots fails closed in `openForm`.
+ */
+export const GREENHOUSE_FORM_SELECTOR = "form#application-form, form#application_form";
+
 export interface PlannedResume {
   fieldName: string | null;
   filename: string;
@@ -126,7 +134,7 @@ export const runGreenhouseAttempt: (
 
   const confirmationPath = `${new URL(plan.identity.url).pathname.replace(/\/+$/u, "")}/confirmation`;
 
-  const scope = await openForm(page, "form#application-form");
+  const scope = await openForm(page, GREENHOUSE_FORM_SELECTOR);
 
   if (scope === null) {
     return {

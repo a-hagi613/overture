@@ -1,4 +1,4 @@
-export const LAB_FORM_ATS = ["greenhouse", "lever", "ashby"] as const;
+export const LAB_FORM_ATS = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
 
 export type LabFormAts = (typeof LAB_FORM_ATS)[number];
 
@@ -30,6 +30,18 @@ export const LAB_FORM_FIELDS = {
     { label: "Full name", name: "name", type: "text" },
     { label: "Email", name: "email", type: "email" },
     { label: "Resume/CV", name: "resume", type: "file" },
+  ],
+  personio: [
+    { label: "First name", name: "first_name", type: "text" },
+    { label: "Last name", name: "last_name", type: "text" },
+    { label: "Email", name: "email", type: "email" },
+    { label: "Resume", name: "documents.cv", type: "file" },
+  ],
+  workable: [
+    { label: "First name", name: "firstname", type: "text" },
+    { label: "Last name", name: "lastname", type: "text" },
+    { label: "Email", name: "email", type: "email" },
+    { label: "Resume", name: "resume", type: "file" },
   ],
 } satisfies Record<LabFormAts, readonly LabFormField[]>;
 
@@ -191,6 +203,18 @@ const formFieldMarkup = (ats: LabFormAts) =>
     )
     .join("\n");
 
+const formOpenTag = (ats: LabFormAts) => {
+  if (ats === "workable") {
+    return `<form id="application-form" data-ui="application-form" action="/lab/forms/${ats}/submit" method="post">`;
+  }
+
+  if (ats === "personio") {
+    return `<form action="/lab/forms/${ats}/submit" method="post">`;
+  }
+
+  return `<form id="application-form" action="/lab/forms/${ats}/submit" method="post">`;
+};
+
 export function renderFormPage(ats: LabFormAts) {
   return `<!doctype html>
 <html lang="en">
@@ -204,7 +228,7 @@ export function renderFormPage(ats: LabFormAts) {
 <body data-lab-page="form" data-lab-ats="${ats}">
 <main>
 <h1>Recorded ${ats} form</h1>
-<form action="/lab/forms/${ats}/submit" method="post">
+${formOpenTag(ats)}
 ${formFieldMarkup(ats)}
 <button type="submit">Submit application</button>
 </form>
