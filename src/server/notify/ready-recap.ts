@@ -8,10 +8,12 @@ import type { MailSender } from "../platform/mail/port.ts";
 import { copy } from "../../shared/copy.ts";
 import { isDemoRole } from "../../shared/demo.ts";
 import {
+  applicationEvents,
   applications,
   mailThreads,
   messages,
   notifications,
+  reviewApplications,
   reviews,
   users,
 } from "../platform/db/schema.ts";
@@ -23,9 +25,11 @@ import {
   localDayStart,
   localDayStartFor,
 } from "../platform/local-time.ts";
+import { RECAP_INCLUDE_YESTERDAY_PREFERENCE } from "../../shared/notifications.ts";
 import { effectiveTimeZone } from "../profile/time-zone.ts";
 import { insertNotification } from "./notifications.ts";
 import { notificationPreferenceEnabled } from "./preferences.ts";
+import { renderRecapHtml } from "./recap-html.ts";
 
 export const READY_NOTIFY_JOB_KIND = "ready.notify";
 
@@ -70,7 +74,13 @@ export function enqueueReadyNotify(db: AppDatabase, clock: Clock, userId: string
 
 function sentYesterday(db: AppDatabase, userId: string, start: number, end: number) {
   return db
-    .select({ company: applications.companyName, title: applications.postingTitle })
+    .select({
+      at: applications.sentAt,
+      ats: applications.ats,
+      company: applications.companyName,
+      location: applications.locationRaw,
+      title: applications.postingTitle,
+    })
     .from(applications)
     .where(
       and(
@@ -81,7 +91,38 @@ function sentYesterday(db: AppDatabase, userId: string, start: number, end: numb
       ),
     )
     .orderBy(asc(applications.sentAt))
-    .all();
+    .all()
+    .flatMap((row) =>
+      row.at === null
+        ? []
+        : [
+            {
+              at: row.at,
+              ats: row.ats,
+              company: row.company,
+              location: row.location,
+              title: row.title,
+            },
+          ],
+    );
+}
+
+function skippedYesterday(db: AppDatabase, userId: string, start: number, end: number) {
+  return (
+    db
+      .select({ total: count() })
+      .from(applicationEvents)
+      .where(
+        and(
+          eq(applicationEvents.userId, userId),
+          eq(applicationEvents.kind, "status"),
+          eq(applicationEvents.toValue, "skipped"),
+          gte(applicationEvents.at, start),
+          lt(applicationEvents.at, end),
+        ),
+      )
+      .get()?.total ?? 0
+  );
 }
 
 /**
@@ -97,9 +138,15 @@ export const REPLY_CLASSIFICATIONS = [
   "other",
 ] as const;
 
+function isReplyClassification(
+  value: string | null,
+): value is (typeof REPLY_CLASSIFICATIONS)[number] {
+  return value !== null && REPLY_CLASSIFICATIONS.some((classification) => classification === value);
+}
+
 function repliedYesterday(db: AppDatabase, userId: string, start: number, end: number) {
   return db
-    .selectDistinct({ company: applications.companyName })
+    .selectDistinct({ classification: messages.classification, company: applications.companyName })
     .from(messages)
     .innerJoin(mailThreads, eq(mailThreads.id, messages.threadId))
     .innerJoin(applications, eq(applications.id, mailThreads.applicationId))
@@ -113,12 +160,22 @@ function repliedYesterday(db: AppDatabase, userId: string, start: number, end: n
       ),
     )
     .orderBy(asc(applications.companyName))
-    .all();
+    .all()
+    .flatMap((row) =>
+      isReplyClassification(row.classification)
+        ? [{ classification: row.classification, company: row.company }]
+        : [],
+    );
 }
 
 function recapContent(db: AppDatabase, userId: string, since: number) {
   const ready = db
-    .select({ company: applications.companyName, title: applications.postingTitle })
+    .select({
+      ats: applications.ats,
+      company: applications.companyName,
+      location: applications.locationRaw,
+      title: applications.postingTitle,
+    })
     .from(applications)
     .where(
       and(
@@ -128,7 +185,13 @@ function recapContent(db: AppDatabase, userId: string, since: number) {
       ),
     )
     .orderBy(asc(applications.readyAt))
-    .all();
+    .all()
+    .map((row) => ({
+      ats: row.ats,
+      company: row.company,
+      location: row.location,
+      title: row.title,
+    }));
 
   const openReviews =
     db
@@ -138,6 +201,24 @@ function recapContent(db: AppDatabase, userId: string, since: number) {
       .get()?.total ?? 0;
 
   return { openReviews, ready };
+}
+
+function openQuestions(db: AppDatabase, userId: string) {
+  const rows = db
+    .select({ applicationId: reviewApplications.applicationId, prompt: reviews.prompt })
+    .from(reviews)
+    .leftJoin(reviewApplications, eq(reviewApplications.reviewId, reviews.id))
+    .where(and(eq(reviews.userId, userId), eq(reviews.status, "open")))
+    .orderBy(asc(reviews.createdAt))
+    .all();
+
+  const prompts = [...new Set(rows.map((row) => row.prompt))];
+
+  const unblocked = new Set(
+    rows.map((row) => row.applicationId).filter((id): id is string => id !== null),
+  ).size;
+
+  return { prompts, unblocked };
 }
 
 /**
@@ -243,7 +324,7 @@ async function emailRecap(
   recap: {
     notificationId: string;
     openReviews: number;
-    ready: { company: string; title: string }[];
+    ready: { ats: string | null; company: string; location: string | null; title: string }[];
     subject: string;
     url: string;
   },
@@ -267,16 +348,52 @@ async function emailRecap(
   const todayStart = localDayStart(now, timeZone);
   const yesterdayStart = localDayStartFor(addLocalDays(localDateAt(now, timeZone), -1), timeZone);
 
+  const includeYesterday = notificationPreferenceEnabled(
+    deps.db,
+    userId,
+    RECAP_INCLUDE_YESTERDAY_PREFERENCE,
+  );
+
+  const sent = includeYesterday ? sentYesterday(deps.db, userId, yesterdayStart, todayStart) : [];
+
+  const replied = includeYesterday
+    ? repliedYesterday(deps.db, userId, yesterdayStart, todayStart)
+    : [];
+
+  const skipped = includeYesterday
+    ? skippedYesterday(deps.db, userId, yesterdayStart, todayStart)
+    : 0;
+
+  const { prompts, unblocked } = openQuestions(deps.db, userId);
+
   const body = copy.mail.recapBody({
+    includeYesterday,
     needAnswer: recap.openReviews,
     ready: recap.ready,
-    replied: repliedYesterday(deps.db, userId, yesterdayStart, todayStart),
-    sent: sentYesterday(deps.db, userId, yesterdayStart, todayStart),
+    replied,
+    sent,
+    skipped,
+    url: recap.url,
+  });
+
+  const html = renderRecapHtml({
+    appOrigin: deps.appOrigin,
+    date: now,
+    includeYesterday,
+    needAnswer: recap.openReviews,
+    prompts,
+    ready: recap.ready,
+    replied,
+    sent,
+    skipped,
+    subject: recap.subject,
+    timeZone,
+    unblocked,
     url: recap.url,
   });
 
   try {
-    await deps.mail.sendReadyRecap({ body, subject: recap.subject, to: to.email });
+    await deps.mail.sendReadyRecap({ body, html, subject: recap.subject, to: to.email });
   } catch (error) {
     if (!(error instanceof MailCapExceededError)) {
       throw error;

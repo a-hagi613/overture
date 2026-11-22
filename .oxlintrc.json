@@ -165,6 +165,8 @@
           "src/server/billing/ledger.test.ts",
           "src/server/billing/pause.test.ts",
           "src/server/billing/webhooks.test.ts",
+          "src/server/notify/recap-html.test.ts",
+          "src/shared/notifications.test.ts",
           "src/server/platform/crypto.test.ts",
           "src/server/platform/event-loop-lag.test.ts",
           "src/server/dispatch/planner.test.ts",

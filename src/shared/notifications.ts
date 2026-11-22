@@ -19,9 +19,17 @@ export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 export const RECAP_EMAIL_PREFERENCE = "recap_email";
 
+/**
+ * Whether the Recap also lists yesterday's sends and replies. The board draws
+ * it under the recap switch; the digest always summarises yesterday unless the
+ * user turns this off (SPEC §15.1).
+ */
+export const RECAP_INCLUDE_YESTERDAY_PREFERENCE = "recap_include_yesterday";
+
 export const NOTIFICATION_PREFERENCE_KEYS = [
   ...NOTIFICATION_KINDS,
   RECAP_EMAIL_PREFERENCE,
+  RECAP_INCLUDE_YESTERDAY_PREFERENCE,
 ] as const;
 
 export type NotificationPreferenceKey = (typeof NOTIFICATION_PREFERENCE_KEYS)[number];
@@ -40,6 +48,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   paused: true,
   ready: true,
   recap_email: true,
+  recap_include_yesterday: true,
   reply: true,
   review: true,
   stage_move: true,

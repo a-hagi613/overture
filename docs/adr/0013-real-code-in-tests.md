@@ -46,7 +46,10 @@ points at is held and no Application row or snapshot changes, #424), the browser
 user holds a slot from, so a capture holding the last session offers a send no slot and no Application waits in
 `sending`, #425), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
 per cooldown, so a paused main thread becomes a log line), the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
-a copy string or key), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
+a copy string or key), the recap email's HTML (`recap-html.test.ts`: the same facts as the text, one Ready
+link, employer and question text escaped, yesterday left out on request, no banned word and the dark palette),
+the notification preferences (`notifications.test.ts`: the recap and yesterday switches are preferences rather
+than push kinds, and every preference starts on), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
 `x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the host match
 (`host-match.test.ts`: a host matches only its own domain or a real subdomain of it, after trimming, lower-casing and
 dropping a trailing root dot, so `evilgreenhouse.io` never matches `greenhouse.io`), the onboarding location plan (the

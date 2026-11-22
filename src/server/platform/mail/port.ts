@@ -9,6 +9,8 @@ export interface SentMail {
   from: string;
   subject: string;
   body: string;
+  /** The HTML part, when the message has one; the text body is always sent too. */
+  html?: string;
   sentAt: number;
 }
 
@@ -22,6 +24,8 @@ export interface OutboundReadyRecapMail {
   to: string;
   subject: string;
   body: string;
+  /** The HTML part; the text body is always sent with it. */
+  html?: string;
 }
 
 export interface OutboundAccountDeletedMail {

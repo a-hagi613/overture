@@ -243,7 +243,8 @@ _Avoid_: manual code entry, OTP
 **Recap**:
 The one email and push after a user's Daily run that lists the new Ready Applications, the open Reviews and
 yesterday's sends and replies, with one link to Ready. It is never sent when the run produced nothing, and opening it
-never sends an Application.
+never sends an Application. Yesterday's summary can be turned off in Settings; the recap itself can be turned off
+there too.
 _Avoid_: Ready email, digest, notification
 
 ## The legal pages

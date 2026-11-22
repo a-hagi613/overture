@@ -110,23 +110,39 @@ test("a Reveal shows in the user's Support access log with its reason, and a swi
 
   await page.goto(`${appUrl}/settings`);
 
-  const replySwitch = page.getByRole("switch", { name: "Employer reply", exact: true });
+  const replySwitch = page.getByRole("switch", { name: "An employer reply", exact: true });
 
   await expect(replySwitch).toHaveAttribute("aria-checked", "true");
   await replySwitch.click();
   await expect(replySwitch).toHaveAttribute("aria-checked", "false");
 
   await page.reload();
-  await expect(page.getByRole("switch", { name: "Employer reply", exact: true })).toHaveAttribute(
-    "aria-checked",
-    "false",
-  );
+  await expect(
+    page.getByRole("switch", { name: "An employer reply", exact: true }),
+  ).toHaveAttribute("aria-checked", "false");
 
   const saved = preferencesSchema.parse(
     await (await page.request.get(`${appUrl}/api/notifications/preferences`)).json(),
   );
 
   expect(saved.preferences.reply).toBe(false);
+
+  const includeSwitch = page.getByRole("switch", { name: "Include yesterday", exact: true });
+
+  await expect(includeSwitch).toHaveAttribute("aria-checked", "true");
+  await includeSwitch.click();
+  await expect(includeSwitch).toHaveAttribute("aria-checked", "false");
+
+  await page.reload();
+  await expect(
+    page.getByRole("switch", { name: "Include yesterday", exact: true }),
+  ).toHaveAttribute("aria-checked", "false");
+
+  const savedInclude = preferencesSchema.parse(
+    await (await page.request.get(`${appUrl}/api/notifications/preferences`)).json(),
+  );
+
+  expect(savedInclude.preferences.recap_include_yesterday).toBe(false);
 
   const emitOff = emitSchema.parse(
     await (
@@ -153,7 +169,7 @@ test("a Reveal shows in the user's Support access log with its reason, and a swi
   );
 
   await page.goto(`${appUrl}/settings`);
-  const replyAgain = page.getByRole("switch", { name: "Employer reply", exact: true });
+  const replyAgain = page.getByRole("switch", { name: "An employer reply", exact: true });
 
   await replyAgain.click();
   await expect(replyAgain).toHaveAttribute("aria-checked", "true");

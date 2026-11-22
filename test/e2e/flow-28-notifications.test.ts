@@ -102,7 +102,14 @@ const pushRequestsSchema = z.object({
 });
 
 const mailSchema = z.object({
-  messages: z.array(z.object({ body: z.string(), subject: z.string(), to: z.string() })),
+  messages: z.array(
+    z.object({
+      body: z.string(),
+      html: z.string().nullable().optional(),
+      subject: z.string(),
+      to: z.string(),
+    }),
+  ),
 });
 
 const preferencesSchema = z.object({
@@ -114,6 +121,7 @@ const preferencesSchema = z.object({
     paused: z.boolean(),
     ready: z.boolean(),
     recap_email: z.boolean(),
+    recap_include_yesterday: z.boolean(),
     reply: z.boolean(),
     review: z.boolean(),
     stage_move: z.boolean(),
@@ -785,6 +793,11 @@ test("the recap sends one push and one email per run, lists yesterday's sends an
   expect(recap?.body).not.toContain("- Halden Systems");
   expect(recap?.body).toContain("Site Reliability Engineer at Halden Systems");
   expect(recap?.body.match(/\/ready/gu)).toHaveLength(1);
+  expect(recap?.html).toContain("Needs you");
+  expect(recap?.html).toContain("08:00–20:00");
+  expect(recap?.html).toContain("Site Reliability Engineer");
+  expect(recap?.html).toContain("Review and send");
+  expect(recap?.html).not.toContain("Job Board");
 
   const recapRows = await notificationsOfKind(owner, userId, "ready");
 
@@ -799,11 +812,13 @@ test("the recap sends one push and one email per run, lists yesterday's sends an
   expect(await mailFor(owner)).toHaveLength(1);
   expect(await notificationsOfKind(owner, userId, "ready")).toHaveLength(1);
 
-  const saved = await owner.put("/api/notifications/preferences", {
-    data: { enabled: false, kind: "recap_email" },
+  const savedYesterday = await owner.put("/api/notifications/preferences", {
+    data: { enabled: false, kind: "recap_include_yesterday" },
   });
 
-  expect(preferencesSchema.parse(await saved.json()).preferences.recap_email).toBe(false);
+  expect(
+    preferencesSchema.parse(await savedYesterday.json()).preferences.recap_include_yesterday,
+  ).toBe(false);
 
   await owner.post("/__test__/mail/clear", { data: {} });
   await owner.post("/__test__/push/clear", { data: {} });
@@ -819,12 +834,68 @@ test("the recap sends one push and one email per run, lists yesterday's sends an
     userId,
   });
 
+  const sentForNextRun = await seedSentApplication(owner, {
+    company: "Meridian Freight",
+    domain: "meridian.example",
+    sentAt: nextRun - 20 * 60 * 60_000,
+    title: "Site Reliability Engineer",
+    userId,
+  });
+
+  await owner.post("/__test__/mail/seed", {
+    data: {
+      applicationId: sentForNextRun,
+      at: nextRun - 18 * 60 * 60_000,
+      auth: "pass",
+      classification: "interview",
+      direction: "in",
+      from: "Talent <talent@meridian.example>",
+      senderDomain: "meridian.example",
+      subject: "A call next week",
+      text: "Can we talk on Thursday?",
+      userId,
+    },
+  });
+
   await runJob(owner, "ready.notify", JSON.stringify({ since: nextRun - 60_000, userId }));
 
   await waitForPushTitle(owner, keys, "Overture recap: 1 ready to approve, 1 need an answer");
 
+  const [noYesterday] = await mailFor(owner);
+
+  expect(noYesterday?.body).toContain("Backend Engineer at Recap Direct");
+  expect(noYesterday?.body).not.toContain("Sent yesterday:");
+  expect(noYesterday?.body).not.toContain("replied yesterday");
+  expect(noYesterday?.html).toContain("Needs you");
+  expect(noYesterday?.html).not.toContain("Sent yesterday");
+  expect(noYesterday?.html).not.toContain("Meridian Freight");
+
+  const saved = await owner.put("/api/notifications/preferences", {
+    data: { enabled: false, kind: "recap_email" },
+  });
+
+  expect(preferencesSchema.parse(await saved.json()).preferences.recap_email).toBe(false);
+
+  await owner.post("/__test__/mail/clear", { data: {} });
+  await owner.post("/__test__/push/clear", { data: {} });
+
+  const finalRun = nextRun + 24 * 60 * 60_000;
+
+  await moveClockTo(owner, finalRun);
+  await seedReadyApplication(owner, {
+    company: "Recap Direct",
+    domain: "recap-direct.example",
+    readyAt: finalRun,
+    title: "Platform Engineer",
+    userId,
+  });
+
+  await runJob(owner, "ready.notify", JSON.stringify({ since: finalRun - 60_000, userId }));
+
+  await waitForPushTitle(owner, keys, "Overture recap: 1 ready to approve, 1 need an answer");
+
   expect(await mailFor(owner)).toHaveLength(0);
-  expect(await notificationsOfKind(owner, userId, "ready")).toHaveLength(2);
+  expect(await notificationsOfKind(owner, userId, "ready")).toHaveLength(3);
 
   await owner.dispose();
 });
