@@ -9,6 +9,7 @@ export interface SentMail {
   from: string;
   subject: string;
   body: string;
+  html?: string | undefined;
   sentAt: number;
 }
 
@@ -22,6 +23,7 @@ export interface OutboundReadyRecapMail {
   to: string;
   subject: string;
   body: string;
+  html?: string | undefined;
 }
 
 export interface OutboundAccountDeletedMail {
@@ -39,6 +41,7 @@ export interface OutboundBillingNoticeMail {
   to: string;
   subject: string;
   body: string;
+  html?: string | undefined;
 }
 
 export interface MailSender {

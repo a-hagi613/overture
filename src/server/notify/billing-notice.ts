@@ -11,6 +11,7 @@ import { isDemoRole } from "../../shared/demo.ts";
 import { notifications, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { insertNotification } from "./notifications.ts";
+import { mailLogoUrl, renderMailHtml } from "./mail-html.ts";
 
 export const BILLING_NOTICE_JOB_KIND = "billing.notice";
 
@@ -131,6 +132,18 @@ export async function runBillingNoticeJob(
       fix: pause.fix,
       title: pause.title,
       url,
+    }),
+    html: renderMailHtml({
+      blocks: [{ kind: "text", text: pause.copy }],
+      cta: { label: pause.fix, url },
+      footer: [
+        "Applications already in flight will finish. Nothing new is sent until this is fixed.",
+        `${pause.fix}: ${url}`,
+        "Overture",
+      ],
+      heading: pause.title,
+      logoUrl: mailLogoUrl(deps.appOrigin),
+      preheader: pause.copy,
     }),
     subject: copy.mail.billingPauseSubject(input.reason),
     to: to.email,

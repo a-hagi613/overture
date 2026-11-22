@@ -64,6 +64,7 @@ export function createSinkMailSender(clock: Clock) {
         from: env.MAIL_FROM,
         subject: mail.subject,
         body: mail.body,
+        html: mail.html,
         sentAt: clock.now(),
       };
 
@@ -112,6 +113,7 @@ export function createSinkMailSender(clock: Clock) {
         from: env.MAIL_FROM,
         subject: mail.subject,
         body: mail.body,
+        html: mail.html,
         sentAt: clock.now(),
       };
 
