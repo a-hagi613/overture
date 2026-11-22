@@ -95,7 +95,11 @@ in flight, the Inbox Thread list and an Application's linked mail read their mes
 Thread, the open Review list and a Board's email notes read their rows in one query rather than one per Review or per
 Application, the Ready cards open every approved plan in one query rather than one per card, an empty timezone change
 takes no write, and Home's billing strip is one grants read plus one ledger read; each test counts the statements
-through the real drizzle query logger and grows the row count to prove the count stays flat), the unit-test
+through the real drizzle query logger and grows the row count to prove the count stays flat), the live match count
+(`src/server/profile/targets.test.ts`: a cached count equals a fresh handle across filters that differ only in order,
+case or duplicates, a same-connection write and a sweep-worker connection's WAL write both invalidate it, the store
+stays bounded, the count query probes `posting_tags` by its primary key rather than scanning it, and 25 interleaved
+filter changes stay under 500ms p95 while catalog writes run, #426), the unit-test
 allowlist (`lint-config-guard.test.ts`: every path the allowlist names exists, and every unit test file in `src/` or
 `scripts/` is named, so a deleted test cannot leave a stale entry), and the workflow Bun pin
 (`workflow-config-guard.test.ts`: every `oven-sh/setup-bun` step pins the version `package.json` requires). They

@@ -635,7 +635,10 @@ filters above that depend on the catalog: role and subrole tags, seniority tags,
 location and the profile's posting languages. A role target matches when its words intersect the words of a role
 or subrole tag (`Backend` matches `Senior Backend Engineer`); a location target is resolved with the geo dataset
 (§6.1) and matched on country with city or region. The salary floor is applied only when the posting's currency
-equals the floor's; a posting without a salary always counts. FX conversion arrives with matching (M1-16).
+equals the floor's; a posting without a salary always counts. FX conversion arrives with matching (M1-16). The
+count is cached per normalized filters and catalog revision (`PRAGMA data_version` plus `total_changes()`), so a
+repeated count, or the second request of a burst, answers from memory, and any catalog write — from this
+connection or the sweep worker's own — invalidates the whole bounded store.
 
 **Skip matching** (the current employer and skipped companies): a posting's company is skipped when any of
 these match a `skip_companies` row: same `company_id`; same registrable domain; same name after normalisation
@@ -1615,6 +1618,7 @@ drawn) in pinned Docker.
 | `src/server/profile/onboarding-step.test.ts` | the onboarding step's salary and EEO reading |
 | `src/server/profile/personal-crypto.test.ts` | the personal key is read once however many values one request opens and seals, each person's key stays apart, a race creates it once, and a read in flight when a person is forgotten does not cache their key again (#430) |
 | `src/server/profile/target-choices.test.ts` | the onboarding location plan uses the covering `postings_open_location` index (#337) |
+| `src/server/profile/targets.test.ts` | the live match count is cached per normalized filters and catalog revision, a same-connection or sweep-worker write invalidates it, the store is bounded, the count plan probes `posting_tags` by its primary key rather than scanning it, and 25 concurrent filter changes answer under 500ms p95 during catalog writes (#426) |
 | `src/server/profile/time-zone.test.ts` | an empty timezone change takes no write (#430) |
 | `src/server/profile/v1-import.test.ts` | the v1 answer-bank and learned-answer mapping |
 | `src/shared/copy.test.ts` | no canvas annotation is a copy string or key |

@@ -27,6 +27,31 @@ const storedSchema = z.object({
 
 const STOP_WORDS = new Set(["and", "or", "the", "of", "at", "in", "on", "for", "to", "a", "an"]);
 
+const MATCH_COUNT_CACHE_MAX = 512;
+
+interface LocationFilter {
+  key: string;
+  condition: SQL;
+}
+
+interface MatchFilters {
+  roles: string[];
+  seniorities: string[];
+  workplaces: (typeof postings.$inferSelect)["workplace"][];
+  employmentTypes: (typeof postings.$inferSelect)["employmentType"][];
+  locations: LocationFilter[];
+  salaryFloorMinor: number | null;
+  salaryCurrency: string | null;
+  languages: string[];
+}
+
+interface MatchCountCache {
+  revision: string;
+  entries: Map<string, number>;
+}
+
+const matchCountCaches = new WeakMap<CatalogDatabase, MatchCountCache>();
+
 function stringArrayFromColumn(value: string) {
   const parsed: unknown = JSON.parse(value);
 
@@ -45,35 +70,107 @@ export function roleTargetMatches(target: string, tagValues: readonly string[]) 
   return tagValues.some((tag) => wordsOf(tag).some((word) => targetWords.has(word)));
 }
 
-function locationCondition(raw: string) {
+function sortedUnique<T extends string>(values: readonly T[]) {
+  return [...new Set(values)].toSorted((left, right) => left.localeCompare(right));
+}
+
+function locationFilter(raw: string) {
   const resolved = resolveLocation(raw);
 
   if (resolved.countryCode === null) {
-    return sql`lower(coalesce(${postings.locationRaw}, '')) like ${`%${raw.toLowerCase()}%`}`;
+    const needle = raw.toLowerCase();
+
+    return {
+      key: `raw:${needle}`,
+      condition: sql`lower(coalesce(${postings.locationRaw}, '')) like ${`%${needle}%`}`,
+    } satisfies LocationFilter;
   }
 
   if (resolved.city !== null) {
-    return and(
-      eq(postings.countryCode, resolved.countryCode),
-      sql`lower(${postings.city}) = ${resolved.city.toLowerCase()}`,
-    );
+    const city = resolved.city.toLowerCase();
+
+    return {
+      key: `city:${resolved.countryCode}:${city}`,
+      condition: sql`${postings.countryCode} = ${resolved.countryCode} and lower(${postings.city}) = ${city}`,
+    } satisfies LocationFilter;
   }
 
   if (resolved.region !== null) {
-    const legacyRegion = resolved.regionCode?.split(".")[1];
+    const region = resolved.region.toLowerCase();
+    const legacyRegion = resolved.regionCode?.split(".")[1]?.toLowerCase();
 
-    return and(
-      eq(postings.countryCode, resolved.countryCode),
-      or(
-        eq(sql`lower(${postings.region})`, resolved.region.toLowerCase()),
+    return {
+      key: `region:${resolved.countryCode}:${region}`,
+      condition:
         legacyRegion === undefined
-          ? undefined
-          : eq(sql`lower(${postings.region})`, legacyRegion.toLowerCase()),
-      ),
-    );
+          ? sql`${postings.countryCode} = ${resolved.countryCode} and lower(${postings.region}) = ${region}`
+          : sql`${postings.countryCode} = ${resolved.countryCode} and (lower(${postings.region}) = ${region} or lower(${postings.region}) = ${legacyRegion})`,
+    } satisfies LocationFilter;
   }
 
-  return eq(postings.countryCode, resolved.countryCode);
+  return {
+    key: `country:${resolved.countryCode}`,
+    condition: sql`${postings.countryCode} = ${resolved.countryCode}`,
+  } satisfies LocationFilter;
+}
+
+function normalizeFilters(
+  parsed: z.infer<typeof targetsInputSchema>,
+  languages: readonly string[],
+) {
+  const locations = new Map<string, SQL>();
+
+  for (const location of parsed.locations) {
+    const filter = locationFilter(location);
+
+    if (!locations.has(filter.key)) {
+      locations.set(filter.key, filter.condition);
+    }
+  }
+
+  return {
+    roles: sortedUnique(parsed.roles.flatMap((role) => wordsOf(role))),
+    seniorities: sortedUnique(parsed.seniorities),
+    workplaces: sortedUnique(parsed.workplaces),
+    employmentTypes: sortedUnique(parsed.employmentTypes),
+    locations: [...locations.entries()]
+      .toSorted(([left], [right]) => left.localeCompare(right))
+      .map(([key, condition]) => ({ condition, key })),
+    salaryFloorMinor: parsed.salaryFloorMinor,
+    salaryCurrency: parsed.salaryCurrency,
+    languages: sortedUnique(languages.map((language) => language.trim().toLowerCase())),
+  } satisfies MatchFilters;
+}
+
+function cacheKeyOf(filters: MatchFilters) {
+  return JSON.stringify([
+    filters.roles,
+    filters.seniorities,
+    filters.workplaces,
+    filters.employmentTypes,
+    filters.locations.map((location) => location.key),
+    filters.salaryFloorMinor,
+    filters.salaryCurrency,
+    filters.languages,
+  ]);
+}
+
+function catalogRevision(db: CatalogDatabase) {
+  const client = db.$client;
+
+  const dataVersion = client
+    .query<{ data_version: number }, []>("PRAGMA data_version")
+    .get()?.data_version;
+
+  const totalChanges = client
+    .query<{ total: number }, []>("SELECT total_changes() AS total")
+    .get()?.total;
+
+  if (dataVersion === undefined || totalChanges === undefined) {
+    return null;
+  }
+
+  return `${String(dataVersion)}:${String(totalChanges)}`;
 }
 
 function salaryCondition(floorMinor: number | null, currency: string | null) {
@@ -90,6 +187,12 @@ function salaryCondition(floorMinor: number | null, currency: string | null) {
 }
 
 export function matchedRoleTags(db: CatalogDatabase, roles: readonly string[]) {
+  const wanted = new Set(roles.flatMap((role) => wordsOf(role)));
+
+  if (wanted.size === 0) {
+    return [];
+  }
+
   const tagRows = db
     .selectDistinct({ value: postingTags.value })
     .from(postingTags)
@@ -98,29 +201,11 @@ export function matchedRoleTags(db: CatalogDatabase, roles: readonly string[]) {
 
   const values = tagRows.map((row) => roleTagSchema.parse(row).value);
 
-  return values.filter((value) => roles.some((role) => roleTargetMatches(role, [value])));
+  return values.filter((value) => wordsOf(value).some((word) => wanted.has(word)));
 }
 
-export function countMatchingPostings(
-  db: CatalogDatabase,
-  input: z.input<typeof targetsInputSchema>,
-  languages: readonly string[],
-) {
-  const parsed = targetsInputSchema.parse(input);
-
-  if (
-    parsed.roles.length === 0 ||
-    parsed.seniorities.length === 0 ||
-    parsed.workplaces.length === 0 ||
-    parsed.locations.length === 0 ||
-    parsed.employmentTypes.length === 0 ||
-    languages.length === 0 ||
-    (parsed.salaryFloorMinor !== null && parsed.salaryCurrency === null)
-  ) {
-    return 0;
-  }
-
-  const roleTags = matchedRoleTags(db, parsed.roles);
+function countMatches(db: CatalogDatabase, filters: MatchFilters) {
+  const roleTags = matchedRoleTags(db, filters.roles);
 
   if (roleTags.length === 0) {
     return 0;
@@ -128,12 +213,9 @@ export function countMatchingPostings(
 
   const conditions: (SQL | null | undefined)[] = [
     isNull(postings.closedAt),
-    inArray(postings.workplace, parsed.workplaces),
-    inArray(postings.employmentType, parsed.employmentTypes),
-    inArray(
-      sql`lower(${postings.language})`,
-      languages.map((language) => language.toLowerCase()),
-    ),
+    inArray(postings.workplace, filters.workplaces),
+    inArray(postings.employmentType, filters.employmentTypes),
+    inArray(sql`lower(${postings.language})`, filters.languages),
     exists(
       db
         .select({ one: sql`1` })
@@ -154,12 +236,12 @@ export function countMatchingPostings(
           and(
             eq(postingTags.postingId, postings.id),
             eq(postingTags.dimension, "seniority"),
-            inArray(postingTags.value, parsed.seniorities),
+            inArray(postingTags.value, filters.seniorities),
           ),
         ),
     ),
-    or(...parsed.locations.map((location) => locationCondition(location))),
-    salaryCondition(parsed.salaryFloorMinor, parsed.salaryCurrency),
+    or(...filters.locations.map((location) => location.condition)),
+    salaryCondition(filters.salaryFloorMinor, filters.salaryCurrency),
   ];
 
   const usable = conditions.filter((condition) => condition !== undefined && condition !== null);
@@ -171,6 +253,78 @@ export function countMatchingPostings(
     .all();
 
   return rows.at(0)?.total ?? 0;
+}
+
+/**
+ * Counts the open Postings a candidate's Targets match, caching per catalog handle.
+ *
+ * The cache key is the normalized filters (roles reduced to their meaningful words, arrays sorted and deduplicated,
+ * locations reduced to the geo tuple they resolve to, languages lowercased) plus the catalog revision: `PRAGMA
+ * data_version` moves when another connection — the sweep worker — commits, and `total_changes()` moves when this
+ * connection writes, so either kind of catalog change invalidates every entry. The store is a 512-entry LRU, so
+ * memory is capped, and the call is synchronous: two requests can never interleave inside one count, so the second
+ * of a burst reads the entry the first stored rather than starting another scan.
+ * @param db The catalog database.
+ * @param input The candidate's Targets.
+ * @param languages The profile's posting languages.
+ * @returns How many open Postings pass the catalog filters, or 0 when a filter is empty.
+ */
+export function countMatchingPostings(
+  db: CatalogDatabase,
+  input: z.input<typeof targetsInputSchema>,
+  languages: readonly string[],
+) {
+  const parsed = targetsInputSchema.parse(input);
+
+  if (
+    parsed.roles.length === 0 ||
+    parsed.seniorities.length === 0 ||
+    parsed.workplaces.length === 0 ||
+    parsed.locations.length === 0 ||
+    parsed.employmentTypes.length === 0 ||
+    languages.length === 0 ||
+    (parsed.salaryFloorMinor !== null && parsed.salaryCurrency === null)
+  ) {
+    return 0;
+  }
+
+  const filters = normalizeFilters(parsed, languages);
+  const revision = catalogRevision(db);
+
+  if (revision === null) {
+    return countMatches(db, filters);
+  }
+
+  let cache = matchCountCaches.get(db);
+
+  if (cache === undefined || cache.revision !== revision) {
+    cache = { entries: new Map(), revision };
+    matchCountCaches.set(db, cache);
+  }
+
+  const key = cacheKeyOf(filters);
+  const cached = cache.entries.get(key);
+
+  if (cached !== undefined) {
+    cache.entries.delete(key);
+    cache.entries.set(key, cached);
+
+    return cached;
+  }
+
+  const value = countMatches(db, filters);
+
+  cache.entries.set(key, value);
+
+  if (cache.entries.size > MATCH_COUNT_CACHE_MAX) {
+    const oldest = cache.entries.keys().next().value;
+
+    if (oldest !== undefined) {
+      cache.entries.delete(oldest);
+    }
+  }
+
+  return value;
 }
 
 export function createTargetsService(deps: { db: AppDatabase; clock: Clock }) {
