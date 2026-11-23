@@ -54,7 +54,12 @@ user holds a slot from, so a capture holding the last session offers a send no s
 `sending`, #425), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
 per cooldown, so a paused main thread becomes a log line), the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
 a copy string or key), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
-`x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the host match
+`x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the signed-in event stream
+(`hub.test.ts`: a subscriber receives only rows addressed to that user and never an unscoped row, and a reconnect
+from zero or a very old cursor replays at most the newest 200 rows, #502), the owner alert fan-out (`alerts.test.ts`:
+`alert.raised` is written once per owner and delivered to no regular user, #502), the per-user search limit
+(`rate-limit.test.ts`: one fixed window allows the maximum then refuses with `rate_limited`, and each key counts
+alone, #502), the host match
 (`host-match.test.ts`: a host matches only its own domain or a real subdomain of it, after trimming, lower-casing and
 dropping a trailing root dot, so `evilgreenhouse.io` never matches `greenhouse.io`), the onboarding location plan (the
 open-Posting group-by is planned through the covering `postings_open_location` index, never a table scan or a

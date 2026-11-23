@@ -37,14 +37,18 @@ export function extractSseEvents(buffer: string) {
   return { events, remainder: buffer.slice(complete.length) };
 }
 
-async function openSse(url: string, lastEventId: string | null) {
-  const headers: Record<string, string> = {};
+async function openSse(
+  url: string,
+  lastEventId: string | null,
+  headers: Record<string, string> = {},
+) {
+  const requestHeaders = { ...headers };
 
   if (lastEventId !== null) {
-    headers["Last-Event-ID"] = lastEventId;
+    requestHeaders["Last-Event-ID"] = lastEventId;
   }
 
-  const response = await fetch(url, { headers });
+  const response = await fetch(url, { headers: requestHeaders });
 
   if (!response.ok || response.body === null) {
     return null;
@@ -81,8 +85,12 @@ async function openSse(url: string, lastEventId: string | null) {
   return { readBatch, close };
 }
 
-export async function readOneSseEvent(url: string, lastEventId: string | null) {
-  const stream = await openSse(url, lastEventId);
+export async function readOneSseEvent(
+  url: string,
+  lastEventId: string | null,
+  headers: Record<string, string> = {},
+) {
+  const stream = await openSse(url, lastEventId, headers);
 
   if (stream === null) {
     return null;
@@ -98,8 +106,9 @@ export async function readSseEventUntil(
   url: string,
   lastEventId: string | null,
   matches: (event: SseEvent) => boolean,
+  headers: Record<string, string> = {},
 ) {
-  const stream = await openSse(url, lastEventId);
+  const stream = await openSse(url, lastEventId, headers);
 
   if (stream === null) {
     return null;

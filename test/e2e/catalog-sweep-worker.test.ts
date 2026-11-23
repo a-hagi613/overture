@@ -170,7 +170,7 @@ test("a worker crash mid-sweep restarts it, keeps the server up and retries the 
     const crashedSweepId = await harness.enqueueJob(SWEEP_JOB_KIND);
 
     const alert = readSseEventUntil(
-      `${harness.app.url}/api/events`,
+      `${harness.app.url}/__test__/events`,
       null,
       (event) => alertKindFor(event) === "catalog.worker",
     );

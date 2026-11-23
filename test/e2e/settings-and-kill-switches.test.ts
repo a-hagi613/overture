@@ -17,7 +17,7 @@ const killSwitchesSchema = z.array(killSwitchSchema);
 test("settings and kill switches read their defaults and can be changed", async ({
   appServerUrl,
 }) => {
-  const settingsResponse = await fetch(`${appServerUrl}/api/settings`);
+  const settingsResponse = await fetch(`${appServerUrl}/__test__/settings`);
 
   expect(settingsResponse.ok).toBe(true);
 
@@ -41,15 +41,15 @@ test("settings and kill switches read their defaults and can be changed", async 
 
   expect(afterPut.value).toBe("5");
 
-  const getOneResponse = await fetch(`${appServerUrl}/api/settings/limits.daily_cap`);
+  const afterPutResponse = await fetch(`${appServerUrl}/__test__/settings`);
 
-  expect(getOneResponse.ok).toBe(true);
+  expect(afterPutResponse.ok).toBe(true);
 
-  const getOne = settingSchema.parse(await getOneResponse.json());
+  const settingsAfterPut = settingsSchema.parse(await afterPutResponse.json());
 
-  expect(getOne.value).toBe("5");
+  expect(settingsAfterPut["limits.daily_cap"]).toBe("5");
 
-  const switchesResponse = await fetch(`${appServerUrl}/api/kill-switches`);
+  const switchesResponse = await fetch(`${appServerUrl}/__test__/kill-switches`);
 
   expect(switchesResponse.ok).toBe(true);
 
@@ -65,7 +65,7 @@ test("settings and kill switches read their defaults and can be changed", async 
 
   expect(putSwitchResponse.ok).toBe(true);
 
-  const switchesAfterResponse = await fetch(`${appServerUrl}/api/kill-switches`);
+  const switchesAfterResponse = await fetch(`${appServerUrl}/__test__/kill-switches`);
 
   expect(switchesAfterResponse.ok).toBe(true);
 

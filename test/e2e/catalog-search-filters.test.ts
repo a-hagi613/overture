@@ -170,14 +170,14 @@ test("postings poll records tags from the rules and the filters search them", as
     expect(roleRows.every((row) => row.value === "Sales" && row.source === "rules")).toBe(true);
 
     const remoteSearch = await searchHits(
-      `${harness.app.url}/api/search?q=${encodeURIComponent("Account Executive")}&workplace=remote&limit=10`,
+      `${harness.app.url}/__test__/search?q=${encodeURIComponent("Account Executive")}&workplace=remote&limit=10`,
     );
 
     expect(remoteSearch.hits.length).toBe(1);
     expect(remoteSearch.hits[0]?.title).toBe("Account Executive, Commercial");
 
     const hybridSearch = await searchHits(
-      `${harness.app.url}/api/search?q=${encodeURIComponent("Account Executive")}&workplace=hybrid&limit=10`,
+      `${harness.app.url}/__test__/search?q=${encodeURIComponent("Account Executive")}&workplace=hybrid&limit=10`,
     );
 
     expect(hybridSearch.hits.length).toBe(3);

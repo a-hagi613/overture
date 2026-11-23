@@ -80,7 +80,7 @@ test("duplicate roles across one company's boards share a dedupe key and show on
     expect(sharingKey.length).toBe(2);
 
     const response = await fetch(
-      `${harness.app.url}/api/search?q=${encodeURIComponent(mainJob.title)}&limit=50`,
+      `${harness.app.url}/__test__/search?q=${encodeURIComponent(mainJob.title)}&limit=50`,
     );
 
     const searchResult = searchResponseSchema.parse(await response.json());

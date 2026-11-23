@@ -39,11 +39,19 @@ export type AlertKind = (typeof ALERT_KINDS)[number];
 
 export type AlertDetail = Record<string, string | number | boolean | null>;
 
-function notifyOwners(db: AppDatabase, clock: Clock, kind: AlertKind, detail: AlertDetail) {
-  const owners = db.select({ id: users.id }).from(users).where(eq(users.role, "owner")).all();
+function notifyOwners(
+  db: AppDatabase,
+  clock: Clock,
+  owners: readonly { id: string }[],
+  kind: AlertKind,
+  detail: AlertDetail,
+) {
   const body = JSON.stringify(detail);
+  const payload = JSON.stringify({ kind, detail });
 
   for (const owner of owners) {
+    publishEvent(db, clock, "alert.raised", payload, owner.id);
+
     createNotification(db, clock, {
       userId: owner.id,
       kind: "alert",
@@ -73,7 +81,8 @@ async function pushToPhone(kind: AlertKind, detail: AlertDetail) {
 }
 
 export function raiseAlert(db: AppDatabase, clock: Clock, kind: AlertKind, detail: AlertDetail) {
-  publishEvent(db, clock, "alert.raised", JSON.stringify({ kind, detail }));
-  notifyOwners(db, clock, kind, detail);
+  const owners = db.select({ id: users.id }).from(users).where(eq(users.role, "owner")).all();
+
+  notifyOwners(db, clock, owners, kind, detail);
   void pushToPhone(kind, detail);
 }

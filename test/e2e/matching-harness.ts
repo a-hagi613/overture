@@ -68,6 +68,25 @@ export const basePosting = {
   ],
 };
 
+/**
+ * Creates a verified owner user without mail, for a server whose mail sender is a fixture rather than the sink.
+ * @param appServerUrl The running app server to seed.
+ * @returns An API context with the owner row already created and promoted.
+ */
+export async function seedOwner(appServerUrl: string) {
+  const owner = await apiRequest.newContext({ baseURL: appServerUrl });
+
+  const created = await owner.post("/__test__/users", {
+    data: { email: authTestIdentity.ownerEmail, name: authTestIdentity.ownerName },
+  });
+
+  const { id } = createdSchema.parse(await created.json());
+
+  await owner.post("/__test__/auth/role", { data: { role: "owner", userId: id } });
+
+  return { owner, userId: id };
+}
+
 export async function ownerContextFor(appServerUrl: string) {
   const owner = await apiRequest.newContext({ baseURL: appServerUrl });
 

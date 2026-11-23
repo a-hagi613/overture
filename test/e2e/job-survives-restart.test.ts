@@ -62,7 +62,11 @@ test("a job enqueued before a restart completes after it, running in the real wo
   expect(moveClockResponse.ok).toBe(true);
 
   try {
-    const done = await readSseEventUntil(`${appServer.url}/api/events`, null, isDoneForJob(id));
+    const done = await readSseEventUntil(
+      `${appServer.url}/__test__/events`,
+      null,
+      isDoneForJob(id),
+    );
 
     expect(done).not.toBeNull();
 

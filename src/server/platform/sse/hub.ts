@@ -1,4 +1,4 @@
-import { gt } from "drizzle-orm";
+import { desc, gt } from "drizzle-orm";
 
 import type { AppDatabase, DatabaseWriter } from "../db/client.ts";
 
@@ -8,6 +8,7 @@ import { events } from "../db/schema.ts";
 const POLL_INTERVAL_MS = 1000;
 const PAGE_ROWS = 200;
 const PAGES_PER_PASS = 5;
+const REPLAY_ROW_LIMIT = 200;
 
 export interface EventRow {
   seq: number;
@@ -16,9 +17,20 @@ export interface EventRow {
 }
 
 export interface EventSubscriber {
-  userId: string | null;
+  userId: string;
   lastSeq: number;
   deliver: (row: EventRow) => void;
+}
+
+function boundedReplayFloor(db: AppDatabase, lastSeq: number) {
+  const floor = Number.isFinite(lastSeq) ? Math.max(0, Math.trunc(lastSeq)) : 0;
+
+  const newest =
+    db.select({ seq: events.seq }).from(events).orderBy(desc(events.seq)).limit(1).get()?.seq ?? 0;
+
+  const oldestKept = Math.max(0, newest - REPLAY_ROW_LIMIT);
+
+  return floor < oldestKept ? oldestKept : floor;
 }
 
 function createHub(db: AppDatabase) {
@@ -57,9 +69,11 @@ function createHub(db: AppDatabase) {
 
             subscriber.lastSeq = row.seq;
 
-            if (row.userId === null || row.userId === subscriber.userId) {
-              subscriber.deliver(row);
+            if (row.userId !== subscriber.userId) {
+              continue;
             }
+
+            subscriber.deliver(row);
           }
         }
 
@@ -88,6 +102,7 @@ function createHub(db: AppDatabase) {
   }
 
   function subscribe(subscriber: EventSubscriber) {
+    subscriber.lastSeq = boundedReplayFloor(db, subscriber.lastSeq);
     subscribers.add(subscriber);
 
     timer ??= setInterval(pass, POLL_INTERVAL_MS);

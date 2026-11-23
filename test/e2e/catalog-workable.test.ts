@@ -8,6 +8,7 @@ import { expect, test } from "@playwright/test";
 import { z } from "zod";
 
 import { startAppServer } from "./app-server.ts";
+import { seedOwner } from "./matching-harness.ts";
 import { readSseEventUntil } from "./sse.ts";
 
 import type { AppServer } from "./app-server.ts";
@@ -157,10 +158,13 @@ async function startHarness(outDir: string) {
     R2_ENDPOINT: "",
   });
 
+  const ownerSession = await seedOwner(app.url);
+
   return {
     app,
     outDir,
     close: async () => {
+      await ownerSession.owner.dispose();
       await app.stop();
     },
   };
@@ -229,7 +233,7 @@ async function postingTags(harness: Harness) {
 
 async function search(harness: Harness, query: string) {
   const response = await fetch(
-    `${harness.app.url}/api/search?q=${encodeURIComponent(query)}&limit=50`,
+    `${harness.app.url}/__test__/search?q=${encodeURIComponent(query)}&limit=50`,
   );
 
   return searchResponseSchema.parse(await response.json());
@@ -425,7 +429,7 @@ test("a truncated and stale snapshot alerts and never closes the catalogue", asy
 
     writeTruncatedSnapshot(outDir, "workable/2026-11-21.jsonl.gz", 10);
 
-    const alert = readSseEventUntil(`${harness.app.url}/api/events`, null, (event) => {
+    const alert = readSseEventUntil(`${harness.app.url}/__test__/events`, null, (event) => {
       if (event.event !== "alert.raised") {
         return false;
       }

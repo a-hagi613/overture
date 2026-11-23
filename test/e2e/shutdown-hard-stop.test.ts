@@ -1,4 +1,5 @@
 import { expect, startFreshAppServer, test } from "./app.fixture.ts";
+import { ownerSseSession } from "./sse-auth.ts";
 
 test("an open event stream and a telemetry flush that never settles cannot hold the server past the kill timeout", async ({
   identityServer,
@@ -15,8 +16,12 @@ test("an open event stream and a telemetry flush that never settles cannot hold 
     OTEL_EXPORTER_OTLP_ENDPOINT: `http://127.0.0.1:${String(collector.port)}`,
   });
 
+  const session = await ownerSseSession(server.url);
+
   try {
-    const events = await fetch(`${server.url}/api/events`);
+    const events = await fetch(`${server.url}/api/events`, {
+      headers: { cookie: session.cookie },
+    });
 
     expect(events.status).toBe(200);
 
@@ -26,6 +31,7 @@ test("an open event stream and a telemetry flush that never settles cannot hold 
 
     expect(performance.now() - started).toBeLessThan(5000);
   } finally {
+    await session.dispose();
     await collector.stop(true);
   }
 });
@@ -34,9 +40,12 @@ test("an open event stream does not hold shutdown past the default budget", asyn
   identityServer,
 }) => {
   const server = await startFreshAppServer(identityServer, { KILL_TIMEOUT_MS: "" });
+  const session = await ownerSseSession(server.url);
 
   try {
-    const events = await fetch(`${server.url}/api/events`);
+    const events = await fetch(`${server.url}/api/events`, {
+      headers: { cookie: session.cookie },
+    });
 
     expect(events.status).toBe(200);
 
@@ -50,6 +59,7 @@ test("an open event stream does not hold shutdown past the default budget", asyn
 
     expect(await server.waitForStderr(/shutdown: stopped in \d+ ms/u)).toContain("shutdown");
   } finally {
+    await session.dispose();
     await server.stop();
   }
 });

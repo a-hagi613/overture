@@ -344,7 +344,7 @@ async function waitForNewSend(
   const jobId = created[0] ?? "";
 
   const event = await readSseEventUntil(
-    `${appServerUrl}/api/events`,
+    `${appServerUrl}/__test__/events`,
     null,
     (candidate) =>
       candidate.event === "job.done" &&

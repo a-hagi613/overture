@@ -49,6 +49,8 @@ test("every signed-out route answers the one sign-in code", async ({ contractSer
     "/api/reviews",
     "/api/calendar/feed",
     "/api/account/deletion",
+    "/api/events",
+    "/api/search?q=engineer",
   ];
 
   const writes: { method: "post" | "put"; path: string; data: unknown }[] = [
@@ -84,6 +86,20 @@ test("every signed-out route answers the one sign-in code", async ({ contractSer
   expect(writeResults).toEqual(
     writes.map((write) => ({ code: "sign_in_required", path: write.path, status: 401 })),
   );
+
+  await anonymous.dispose();
+});
+
+test("a removed operational read answers not_found", async ({ contractServer: { url } }) => {
+  const anonymous = await apiRequest.newContext({ baseURL: url });
+
+  const removed = ["/api/settings", "/api/settings/limits.daily_cap", "/api/kill-switches"];
+
+  const statuses = await Promise.all(
+    removed.map(async (path) => ({ path, status: (await anonymous.get(path)).status() })),
+  );
+
+  expect(statuses).toEqual(removed.map((path) => ({ path, status: 404 })));
 
   await anonymous.dispose();
 });

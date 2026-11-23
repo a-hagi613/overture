@@ -426,7 +426,9 @@ test("a 402 from Browser Use pauses dispatch, alerts the owner and is never retr
     expect(attempt?.submitClickedAt).toBeNull();
     expect(harness.fixture.sessions).toHaveLength(0);
 
-    const switches = killSwitchesSchema.parse(await (await owner.get("/api/kill-switches")).json());
+    const switches = killSwitchesSchema.parse(
+      await (await owner.get("/__test__/kill-switches")).json(),
+    );
 
     expect(switches).toContainEqual(
       expect.objectContaining({ enabled: 1, key: "browser_use", scope: "provider" }),

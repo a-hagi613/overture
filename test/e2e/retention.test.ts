@@ -57,7 +57,7 @@ async function jobExists(appServer: { url: string }, id: string) {
 async function topicsUntil(appServer: { url: string }, marker: string) {
   const topics: string[] = [];
 
-  const found = await readSseEventUntil(`${appServer.url}/api/events`, null, (event) => {
+  const found = await readSseEventUntil(`${appServer.url}/__test__/events`, null, (event) => {
     topics.push(event.event);
 
     return event.event === marker;
