@@ -84,7 +84,9 @@ export function InboxWorkspace({ routeThreadId }: { routeThreadId: string | null
 
       {isError ? (
         <Card className="mt-6 flex flex-wrap items-center justify-between gap-4 p-6">
-          <p className="text-sm font-semibold text-foreground">{copy.inbox.loadFailed}</p>
+          <p className="text-sm font-semibold text-foreground" role="alert">
+            {copy.inbox.loadFailed}
+          </p>
           <Button
             onClick={() => {
               void refetch();

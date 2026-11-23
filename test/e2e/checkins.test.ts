@@ -107,7 +107,7 @@ async function openHome(
   const page = await context.newPage();
 
   await page.setViewportSize({ height: 900, width: 1280 });
-  await page.goto(`${appServerUrl}/`);
+  await page.goto(`${appServerUrl}/home`);
   await expect(
     page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
   ).toBeVisible();

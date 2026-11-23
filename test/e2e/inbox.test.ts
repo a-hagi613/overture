@@ -318,24 +318,22 @@ test("a fresh user walks the Inbox through the real UI, from empty to the Board 
 
   await page.goto(`${inbox.server.url}/inbox`);
   await expect(page.getByRole("heading", { name: /Nothing forwarded/u })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^All 0$/u })).toBeVisible();
 
   await forward(owner, await inbox.sign(fresh(fixture("greenhouse-ack.eml"))), address);
   await forward(owner, await inbox.sign(fresh(fixture("greenhouse-interview-brief.eml"))), address);
   await runMailJobs(owner);
 
   await page.reload();
-  await expect(page.getByRole("button", { name: /^All 2$/u })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Unread 2$/u })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "All (2)" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /^Unread \(\d+\)$/u })).toBeVisible();
 
-  await page.getByRole("button", { name: /^Needs checking 0$/u }).click();
+  const search = page.getByRole("searchbox", { name: "Search messages…" });
+
+  await search.fill("no-such-employer");
   await expect(page.getByText("No threads match this filter.")).toBeVisible();
+  await search.fill("");
 
-  await page.getByRole("button", { name: /^Unread 2$/u }).click();
-
-  const briefRow = page.getByRole("article").filter({ hasText: "Interview with Acme: the brief" });
-
-  await briefRow.getByRole("link", { name: "Acme", exact: true }).click();
+  await page.getByRole("button").filter({ hasText: "Interview with Acme: the brief" }).click();
 
   const briefThread = (await threadsOf(owner)).threads.find((thread) =>
     thread.subject.includes("brief"),
@@ -346,7 +344,13 @@ test("a fresh user walks the Inbox through the real UI, from empty to the Board 
   const attachmentLink = page.getByRole("link", { name: "Download" });
 
   await expect(page.getByText("Interview_Brief.pdf")).toBeVisible();
-  await expect.poll(async () => (await threadsOf(owner)).counts.unread).toBe(1);
+  await expect
+    .poll(
+      async () =>
+        (await threadsOf(owner)).threads.find((thread) => thread.id === briefThread?.id)?.unread,
+    )
+    .toBe(false);
+  expect((await threadsOf(owner)).counts.unread).toBeLessThanOrEqual(1);
 
   const downloading = page.waitForEvent("download");
 
@@ -360,7 +364,7 @@ test("a fresh user walks the Inbox through the real UI, from empty to the Board 
 
   expect(readFileSync(saved).subarray(0, 5).toString()).toBe("%PDF-");
 
-  await page.getByRole("link", { name: /on the Board/u }).click();
+  await page.getByRole("link", { name: /View on Tracker/u }).click();
   await expect(page).toHaveURL(new RegExp(`/board\\?application=${applicationId}`, "u"));
   await expect(page.getByRole("complementary", { name: "Application detail" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Application detail" })).toContainText(

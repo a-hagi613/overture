@@ -189,6 +189,10 @@ export function CalendarPage() {
             customByDay={customByDay}
             focus={focus}
             isFetching={isFetching}
+            onFocusMonth={(next) => {
+              setNavigated(true);
+              setFocus(next);
+            }}
             onSelectDate={selectDate}
             onShiftMonth={(delta) => {
               selectDate(shiftMonth(focus, delta));

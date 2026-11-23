@@ -223,7 +223,7 @@ test("the app installs as a PWA and its service worker never caches API response
     .parse(await json(await request.get("/manifest.webmanifest")));
 
   expect(manifest.name).toBe("Overture");
-  expect(manifest.start_url).toBe("/");
+  expect(manifest.start_url).toBe("/home");
   expect(manifest.icons.map((icon) => icon.sizes)).toEqual(
     expect.arrayContaining(["192x192", "512x512"]),
   );

@@ -19,6 +19,7 @@ const cardVariants = cva("rounded-xl border bg-card text-foreground", {
 });
 
 export interface CardProps extends VariantProps<typeof cardVariants> {
+  ariaBusy?: boolean;
   ariaLabel?: string;
   ariaLabelledBy?: string;
   children: ReactNode;
@@ -28,6 +29,7 @@ export interface CardProps extends VariantProps<typeof cardVariants> {
 }
 
 export function Card({
+  ariaBusy,
   ariaLabel,
   ariaLabelledBy,
   children,
@@ -38,6 +40,7 @@ export function Card({
 }: CardProps) {
   return (
     <section
+      aria-busy={ariaBusy}
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledBy}
       className={cn(cardVariants({ variant }), className)}

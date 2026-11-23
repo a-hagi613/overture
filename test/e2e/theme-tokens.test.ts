@@ -17,6 +17,18 @@ const definedColors = new Set(
   ),
 );
 
+const definedTextSizes = new Set(
+  [...stylesheet.matchAll(/--text-(?<name>[a-z0-9-]+)\s*:/gu)]
+    .map((match) => match.groups?.name ?? "")
+    .filter((name) => !name.includes("--")),
+);
+
+const definedShadows = new Set(
+  [...stylesheet.matchAll(/--shadow-(?<name>[a-z0-9-]+)\s*:/gu)].map(
+    (match) => match.groups?.name ?? "",
+  ),
+);
+
 const builtIns = new Set([
   "transparent",
   "current",
@@ -89,7 +101,19 @@ const builtIns = new Set([
 ]);
 
 const utility =
-  /(?<![\w-])(?:text|bg|border|ring|fill|stroke|outline|divide|decoration|from|to|via|shadow)-(?<token>[a-z][a-z0-9-]*)(?![\w[(-]|\/\[)/gu;
+  /(?<![\w-])(?<prefix>text|bg|border|ring|fill|stroke|outline|divide|decoration|from|to|via|shadow)-(?<token>[a-z][a-z0-9-]*)(?![\w[(-]|\/\[)/gu;
+
+function colorTokenFor(prefix: string, token: string) {
+  if (prefix === "border" || prefix === "divide") {
+    return token.replace(/^[tblrxyse]-/u, "");
+  }
+
+  if (prefix === "ring") {
+    return token.replace(/^offset-/u, "");
+  }
+
+  return token;
+}
 
 function offenders() {
   const found: string[] = [];
@@ -98,14 +122,27 @@ function offenders() {
     const source = readFileSync(path, "utf8");
 
     for (const match of source.matchAll(utility)) {
+      const prefix = match.groups?.prefix ?? "";
       const token = match.groups?.token ?? "";
-      const base = token.replace(/-\d+$/u, "");
 
-      if (definedColors.has(token) || builtIns.has(token) || builtIns.has(base)) {
+      if (prefix === "text" && definedTextSizes.has(token)) {
         continue;
       }
 
-      if (/^(?:sh|lift)$/u.test(token) || /^\d+$/u.test(token)) {
+      if (prefix === "shadow" && definedShadows.has(token)) {
+        continue;
+      }
+
+      const colorToken = colorTokenFor(prefix, token);
+      const base = colorToken.replace(/-\d+$/u, "");
+
+      if (
+        definedColors.has(colorToken) ||
+        builtIns.has(token) ||
+        builtIns.has(colorToken) ||
+        builtIns.has(base) ||
+        /^\d+$/u.test(colorToken)
+      ) {
         continue;
       }
 

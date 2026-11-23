@@ -106,7 +106,7 @@ async function tickAndStart(page: Page) {
   await page.getByLabel(/I agree to the/u).check();
   await expect(start).toBeEnabled();
   await start.click();
-  await expect(page).toHaveURL(/\/notifications$/u);
+  await expect(page).toHaveURL(/\/home$/u);
 }
 
 test("forwarded mail arrives, consent gates Start, and the first run waits for 07:00", async ({
@@ -115,12 +115,10 @@ test("forwarded mail arrives, consent gates Start, and the first run waits for 0
 }) => {
   const { context, page, request, userId } = await signedInAtStepFive(browser, onboardingServer);
 
-  await expect(
-    page.getByRole("heading", { level: 2, name: /Forward your job mail/u }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: /Mail forwarding/u })).toBeVisible();
   await expect(page.getByLabel("Your forwarding address")).toHaveValue(/^in-.+@.+/u);
   await expect(page.getByText(/Waiting for a test email/u)).toBeVisible();
-  await expect(page.getByText("Set up one Gmail filter")).toBeVisible();
+  await expect(page.getByText("How to set up forwarding in Gmail")).toBeVisible();
 
   const early = await request.post("/api/onboarding/start");
 
@@ -229,9 +227,7 @@ for (const width of [390, 1280]) {
         globalThis.localStorage.setItem("overture.theme", value);
       }, theme);
       await page.goto(`${onboardingServer.url}/onboarding/forward`);
-      await expect(
-        page.getByRole("heading", { level: 2, name: /Forward your job mail/u }),
-      ).toBeVisible();
+      await expect(page.getByRole("heading", { level: 2, name: /Mail forwarding/u })).toBeVisible();
       await expect(page.getByLabel("Your forwarding address")).toHaveValue(/^in-/u);
 
       const results = await new AxeBuilder({ page }).analyze();

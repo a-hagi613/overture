@@ -89,7 +89,9 @@ export function InboxThreadPane({
   if (isError) {
     return (
       <div className="flex flex-col items-start gap-3 p-6">
-        <p className="text-sm font-semibold text-foreground">{copy.inbox.loadFailed}</p>
+        <p className="text-sm font-semibold text-foreground" role="alert">
+          {copy.inbox.loadFailed}
+        </p>
         <Button
           onClick={() => {
             void refetch();

@@ -231,7 +231,9 @@ test("test@email.com signs in with one click and every main screen is populated"
   await expect(page.getByText("Lumen Orchard").first()).toBeVisible();
 
   await page.goto(`${demoServer.url}/ready`);
-  await expect(page.getByRole("heading", { name: "Ready to send" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { exact: true, level: 1, name: "Ready to send" }),
+  ).toBeVisible();
   await expect(page.getByText("Paper Kite").first()).toBeVisible();
 
   await page.goto(`${demoServer.url}/board`);
