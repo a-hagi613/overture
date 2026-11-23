@@ -1,5 +1,6 @@
 import { useDroppable } from "@dnd-kit/core";
 import { ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
+import type { KeyboardEvent } from "react";
 import { useState } from "react";
 import { Link } from "react-router";
 
@@ -31,9 +32,12 @@ export function TrackerColumn({
   activeDragLane,
   cards,
   droppable,
+  keyboardDragCardId = null,
+  keyboardDragTargetLane = null,
   label,
   lane,
   linkTo,
+  onCardKeyDown,
   onOpen,
   selectedId,
 }: {
@@ -41,9 +45,14 @@ export function TrackerColumn({
   activeDragLane: TrackerLaneKey | null;
   cards: readonly BoardCard[];
   droppable: boolean;
+  keyboardDragCardId?: string | null | undefined;
+  keyboardDragTargetLane?: TrackerLaneKey | null | undefined;
   label: string;
   lane: TrackerLaneKey;
   linkTo: string | null;
+  onCardKeyDown?:
+    | ((card: BoardCard, lane: TrackerLaneKey, event: KeyboardEvent<HTMLButtonElement>) => void)
+    | undefined;
   onOpen: (id: string) => void;
   selectedId: string | null;
 }) {
@@ -55,6 +64,7 @@ export function TrackerColumn({
   });
 
   const isValidDropTarget = droppable && activeDragLane !== null && activeDragLane !== lane;
+  const isKeyboardDropTarget = droppable && keyboardDragTargetLane === lane;
   const visibleCards = cards.slice(0, visibleCount);
   const remaining = Math.max(0, cards.length - visibleCards.length);
   const expanded = visibleCount > INITIAL_VISIBLE && cards.length > INITIAL_VISIBLE;
@@ -62,7 +72,7 @@ export function TrackerColumn({
   return (
     <section
       aria-label={label}
-      className={`flex min-w-0 flex-col rounded-xl border border-t-2 p-3.5 transition ${accentClass} ${laneSurfaceClass(isOver, isValidDropTarget)}`}
+      className={`flex min-w-0 flex-col rounded-xl border border-t-2 p-3.5 transition ${accentClass} ${laneSurfaceClass(isOver || isKeyboardDropTarget, isValidDropTarget || isKeyboardDropTarget)}`}
       data-stage={lane}
       ref={setNodeRef}
     >
@@ -89,8 +99,10 @@ export function TrackerColumn({
           <TrackerCard
             card={card}
             draggable={droppable}
+            isKeyboardDragging={keyboardDragCardId === card.id}
             key={card.id}
             lane={lane}
+            onCardKeyDown={onCardKeyDown}
             onOpen={onOpen}
             selected={selectedId === card.id}
           />

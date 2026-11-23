@@ -1,7 +1,6 @@
 import {
   DndContext,
   DragOverlay,
-  KeyboardSensor,
   PointerSensor,
   TouchSensor,
   closestCorners,
@@ -10,7 +9,8 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { CollisionDetection, DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
@@ -52,6 +52,8 @@ const detectLaneCollision: CollisionDetection = (args) => {
   return pointerHits.length > 0 ? pointerHits : closestCorners(args);
 };
 
+const DROPPABLE_LANES = TRACKER_LANES.filter((lane) => lane.droppable);
+
 export function BoardPage() {
   const { data: board } = useBoard();
   const moveStage = useMoveStage();
@@ -67,6 +69,14 @@ export function BoardPage() {
     null,
   );
 
+  const [keyboardDrag, setKeyboardDrag] = useState<{
+    card: BoardCard;
+    fromLane: TrackerLaneKey;
+    targetLane: TrackerLaneKey;
+  } | null>(null);
+
+  const [keyboardAnnouncement, setKeyboardAnnouncement] = useState("");
+
   const { data: detailData } = useApplication(selectedId);
   const detail = detailData ?? null;
 
@@ -77,7 +87,6 @@ export function BoardPage() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
-    useSensor(KeyboardSensor),
   );
 
   const { mutate: undoBoardStage } = undoStage;
@@ -107,10 +116,40 @@ export function BoardPage() {
     [undoBoardStage],
   );
 
+  const closeSheet = useCallback(() => {
+    const closing = selectedId;
+
+    setSelectedId(null);
+
+    if (closing !== null) {
+      globalThis.requestAnimationFrame(() => {
+        const candidates = [
+          ...document.querySelectorAll<HTMLButtonElement>(`button[data-card="${closing}"]`),
+        ];
+
+        const visible =
+          candidates.find((element) => element.offsetParent !== null) ?? candidates[0];
+
+        visible?.focus();
+      });
+    }
+  }, [selectedId]);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (selectedId !== null && event.key === "Escape") {
-        setSelectedId(null);
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      if (keyboardDrag !== null) {
+        setKeyboardAnnouncement(`Cancelled moving ${keyboardDrag.card.title}.`);
+        setKeyboardDrag(null);
+
+        return;
+      }
+
+      if (selectedId !== null) {
+        closeSheet();
       }
     };
 
@@ -119,7 +158,7 @@ export function BoardPage() {
     return () => {
       globalThis.removeEventListener("keydown", onKeyDown);
     };
-  }, [selectedId]);
+  }, [closeSheet, keyboardDrag, selectedId]);
 
   const clearLaneOverride = (id: string) => {
     setLaneOverrides((current) =>
@@ -179,6 +218,8 @@ export function BoardPage() {
   };
 
   const handleDragStart = (event: DragStartEvent) => {
+    setKeyboardDrag(null);
+
     const draggedId = String(event.active.id);
     const found = allCards.find((card) => card.id === draggedId);
 
@@ -190,6 +231,80 @@ export function BoardPage() {
 
     if (lane !== null) {
       setActiveDrag({ card: found, lane });
+    }
+  };
+
+  const handleCardKeyDown = (
+    card: BoardCard,
+    lane: TrackerLaneKey,
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+  ) => {
+    if (!DROPPABLE_LANES.some((entry) => entry.key === lane)) {
+      return;
+    }
+
+    if (keyboardDrag === null) {
+      if (event.code === "Space" || event.key === " ") {
+        event.preventDefault();
+        setKeyboardDrag({ card, fromLane: lane, targetLane: lane });
+        setKeyboardAnnouncement(
+          `Picked up ${card.title}. Use Left and Right arrow keys to choose a stage, Space to drop, Escape to cancel.`,
+        );
+      }
+
+      return;
+    }
+
+    if (keyboardDrag.card.id !== card.id) {
+      return;
+    }
+
+    if (event.code === "ArrowRight" || event.code === "ArrowLeft") {
+      event.preventDefault();
+
+      const currentIndex = DROPPABLE_LANES.findIndex(
+        (entry) => entry.key === keyboardDrag.targetLane,
+      );
+
+      const step = event.code === "ArrowRight" ? 1 : -1;
+      const baseIndex = currentIndex === -1 ? 0 : currentIndex;
+      const nextIndex = Math.max(0, Math.min(DROPPABLE_LANES.length - 1, baseIndex + step));
+      const nextLane = DROPPABLE_LANES[nextIndex];
+
+      if (nextLane !== undefined) {
+        setKeyboardDrag({ ...keyboardDrag, targetLane: nextLane.key });
+        setKeyboardAnnouncement(`Over ${nextLane.label}.`);
+        document
+          .querySelector<HTMLElement>(`section[data-stage="${nextLane.key}"]`)
+          ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }
+
+      return;
+    }
+
+    if (event.code === "Space" || event.key === " " || event.code === "Enter") {
+      event.preventDefault();
+
+      const target = DROPPABLE_LANES.find((entry) => entry.key === keyboardDrag.targetLane);
+      const { card: draggedCard, fromLane } = keyboardDrag;
+
+      setKeyboardDrag(null);
+
+      if (target !== undefined && target.droppable && target.key !== fromLane) {
+        moveCardToLane(draggedCard, fromLane, target.key, target.targetStage, target.label);
+        setKeyboardAnnouncement(`Moved ${draggedCard.title} to ${target.label}.`);
+      } else {
+        setKeyboardAnnouncement(`Dropped ${draggedCard.title} in ${target?.label ?? lane}.`);
+      }
+
+      return;
+    }
+
+    if (event.code === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      setKeyboardDrag(null);
+      setKeyboardAnnouncement(`Cancelled moving ${card.title}.`);
     }
   };
 
@@ -298,10 +413,13 @@ export function BoardPage() {
                   activeDragLane={activeDrag?.lane ?? null}
                   cards={grouped[lane.key]}
                   droppable={lane.droppable}
+                  keyboardDragCardId={keyboardDrag?.card.id ?? null}
+                  keyboardDragTargetLane={keyboardDrag?.targetLane ?? null}
                   key={lane.key}
                   label={lane.label}
                   lane={lane.key}
                   linkTo={lane.linkTo}
+                  onCardKeyDown={handleCardKeyDown}
                   onOpen={setSelectedId}
                   selectedId={selectedId}
                 />
@@ -342,9 +460,12 @@ export function BoardPage() {
                   activeDragLane={activeDrag?.lane ?? null}
                   cards={grouped[activeMobileLane.key]}
                   droppable={activeMobileLane.droppable}
+                  keyboardDragCardId={keyboardDrag?.card.id ?? null}
+                  keyboardDragTargetLane={keyboardDrag?.targetLane ?? null}
                   label={activeMobileLane.label}
                   lane={activeMobileLane.key}
                   linkTo={activeMobileLane.linkTo}
+                  onCardKeyDown={handleCardKeyDown}
                   onOpen={setSelectedId}
                   selectedId={selectedId}
                 />
@@ -364,14 +485,16 @@ export function BoardPage() {
         </DragOverlay>
       </DndContext>
 
+      <output aria-live="polite" className="sr-only">
+        {keyboardAnnouncement}
+      </output>
+
       {selectedId === null ? null : (
         <BoardSheet
           detail={detail}
           nextDisabled={selectedIndex === -1 || selectedIndex >= allCards.length - 1}
           onArchive={handleArchive}
-          onClose={() => {
-            setSelectedId(null);
-          }}
+          onClose={closeSheet}
           onMove={(stage) => {
             const card = allCards.find((entry) => entry.id === selectedId);
             const targetLane = laneForStage(stage);

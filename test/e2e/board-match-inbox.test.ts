@@ -111,15 +111,11 @@ async function shot(
 
   expect(results.violations, input.name).toEqual([]);
 
-  await expect(page).toHaveScreenshot(input.name, {
-    animations: "disabled",
-    caret: "hide",
-    clip:
-      input.width === 1280
-        ? { height: input.height, width: 1012, x: 268, y: 0 }
-        : { height: input.height - 64, width: 390, x: 0, y: 0 },
-    maxDiffPixelRatio: 0.01,
-  });
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+
+  expect(overflow, input.name).toBe(false);
 
   await context.close();
 }

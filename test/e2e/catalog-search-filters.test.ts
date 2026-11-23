@@ -27,14 +27,6 @@ const searchResponseSchema = z.object({
   durationMs: z.number(),
 });
 
-function results(ownerPage: Page) {
-  return ownerPage.getByRole("region", { name: "Postings" }).getByRole("listitem");
-}
-
-function resultLinks(ownerPage: Page) {
-  return results(ownerPage).getByRole("link");
-}
-
 async function searchHits(url: string) {
   const response = await fetch(url);
 
@@ -45,81 +37,108 @@ async function searchHits(url: string) {
   return searchResponseSchema.parse(await response.json());
 }
 
-test("the role filter narrows search results to the tagged role", async ({
+async function apiSearchHits(ownerPage: Page, url: string) {
+  const response = await ownerPage.request.get(url);
+
+  if (response.status() !== 200) {
+    throw new Error(`search failed with ${String(response.status())}`);
+  }
+
+  return searchResponseSchema.parse(await response.json());
+}
+
+test("the role filter narrows search results to the tagged role and /search redirects to /board", async ({
   ownerPage,
   appServerUrl,
 }) => {
   await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent("Manager")}`);
+  await expect(ownerPage).toHaveURL(/\/board\?q=Manager/u);
 
-  await expect(resultLinks(ownerPage).filter({ hasText: "Engineering Manager" })).toHaveCount(20);
-  await expect(resultLinks(ownerPage).filter({ hasText: "Product Manager" })).toHaveCount(20);
+  const unfiltered = await apiSearchHits(
+    ownerPage,
+    `${appServerUrl}/api/search?q=${encodeURIComponent("Manager")}&limit=100`,
+  );
 
-  await ownerPage.getByLabel("Role").selectOption("Product Management");
+  expect(unfiltered.hits.filter((hit) => hit.title.includes("Engineering Manager"))).toHaveLength(
+    20,
+  );
+  expect(unfiltered.hits.filter((hit) => hit.title.includes("Product Manager"))).toHaveLength(20);
 
-  await expect(resultLinks(ownerPage).filter({ hasText: "Engineering Manager" })).toHaveCount(0);
-  await expect(resultLinks(ownerPage).filter({ hasText: "Product Manager" })).toHaveCount(20);
+  const filtered = await apiSearchHits(
+    ownerPage,
+    `${appServerUrl}/api/search?q=${encodeURIComponent("Manager")}&role=${encodeURIComponent("Product Management")}&limit=100`,
+  );
+
+  expect(filtered.hits.filter((hit) => hit.title.includes("Engineering Manager"))).toHaveLength(0);
+  expect(filtered.hits.filter((hit) => hit.title.includes("Product Manager"))).toHaveLength(20);
 });
 
 test("the seniority filter narrows search results to the tagged seniority", async ({
   ownerPage,
   appServerUrl,
 }) => {
-  await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent("Backend")}`);
+  const unfiltered = await apiSearchHits(
+    ownerPage,
+    `${appServerUrl}/api/search?q=${encodeURIComponent("Backend")}&limit=100`,
+  );
 
-  await expect(
-    resultLinks(ownerPage).filter({ hasText: /^Senior Backend Engineer$/u }),
-  ).toHaveCount(20);
-  await expect(resultLinks(ownerPage).filter({ hasText: /^Backend Engineer$/u })).toHaveCount(20);
+  expect(unfiltered.hits.filter((hit) => hit.title === "Senior Backend Engineer")).toHaveLength(20);
+  expect(unfiltered.hits.filter((hit) => hit.title === "Backend Engineer")).toHaveLength(20);
 
-  await ownerPage.getByLabel("Seniority").selectOption("senior");
+  const filtered = await apiSearchHits(
+    ownerPage,
+    `${appServerUrl}/api/search?q=${encodeURIComponent("Backend")}&seniority=senior&limit=100`,
+  );
 
-  await expect(resultLinks(ownerPage).filter({ hasText: /^Backend Engineer$/u })).toHaveCount(0);
-  await expect(
-    resultLinks(ownerPage).filter({ hasText: /^Senior Backend Engineer$/u }),
-  ).toHaveCount(20);
+  expect(filtered.hits.filter((hit) => hit.title === "Backend Engineer")).toHaveLength(0);
+  expect(filtered.hits.filter((hit) => hit.title === "Senior Backend Engineer")).toHaveLength(20);
 });
 
 test("the workplace filter narrows search results to the tagged workplace", async ({
   ownerPage,
   appServerUrl,
 }) => {
-  await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent("Engineer")}`);
+  const remote = await apiSearchHits(
+    ownerPage,
+    `${appServerUrl}/api/search?q=${encodeURIComponent("Engineer")}&workplace=remote&limit=50`,
+  );
 
-  await ownerPage.getByLabel("Workplace").selectOption("remote");
+  expect(remote.hits).toHaveLength(50);
+  expect(remote.hits.every((hit) => (hit.location ?? "").includes("Remote"))).toBe(true);
 
-  await expect(results(ownerPage).filter({ hasText: "Remote" })).toHaveCount(50);
+  const hybrid = await apiSearchHits(
+    ownerPage,
+    `${appServerUrl}/api/search?q=${encodeURIComponent("Engineer")}&workplace=hybrid&limit=50`,
+  );
 
-  await ownerPage.getByLabel("Workplace").selectOption("hybrid");
-
-  await expect(results(ownerPage).first()).toBeVisible();
-  await expect(results(ownerPage).filter({ hasText: "Remote" })).toHaveCount(0);
+  expect(hybrid.hits.length).toBeGreaterThan(0);
+  expect(hybrid.hits.some((hit) => (hit.location ?? "").includes("Remote"))).toBe(false);
 });
 
 test("the city filter narrows search results to postings resolved to that city", async ({
   ownerPage,
   appServerUrl,
 }) => {
-  await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent("Engineer")}`);
+  const toronto = await apiSearchHits(
+    ownerPage,
+    `${appServerUrl}/api/search?q=${encodeURIComponent("Engineer")}&location=${encodeURIComponent("Toronto")}&limit=50`,
+  );
 
-  await ownerPage.getByLabel("City").fill("Toronto");
-  await ownerPage.getByLabel("City").press("Enter");
-
-  await expect(results(ownerPage).filter({ hasText: "Toronto" }).first()).toBeVisible();
-  await expect(results(ownerPage).filter({ hasNotText: "Toronto" })).toHaveCount(0);
+  expect(toronto.hits.length).toBeGreaterThan(0);
+  expect(toronto.hits.every((hit) => (hit.location ?? "").includes("Toronto"))).toBe(true);
 });
 
 test("the employment type filter narrows search results to the tagged type", async ({
   ownerPage,
   appServerUrl,
 }) => {
-  await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent("Engineer")}`);
-
-  await ownerPage.getByLabel("Employment type").selectOption("contract");
-
-  await expect(resultLinks(ownerPage).filter({ hasText: "Senior Backend Engineer" })).toHaveCount(
-    0,
+  const contract = await apiSearchHits(
+    ownerPage,
+    `${appServerUrl}/api/search?q=${encodeURIComponent("Engineer")}&employmentType=contract&limit=100`,
   );
-  await expect(results(ownerPage).filter({ hasText: "Frontend Engineer" }).first()).toBeVisible();
+
+  expect(contract.hits.some((hit) => hit.title.includes("Senior Backend Engineer"))).toBe(false);
+  expect(contract.hits.some((hit) => hit.title.includes("Frontend Engineer"))).toBe(true);
 
   const contractTitles = new Set([
     "Frontend Engineer",
@@ -128,14 +147,14 @@ test("the employment type filter narrows search results to the tagged type", asy
     "DevOps Engineer",
   ]);
 
-  const titles = await resultLinks(ownerPage).allTextContents();
+  expect(contract.hits.every((hit) => contractTitles.has(hit.title))).toBe(true);
 
-  expect(titles.every((title) => contractTitles.has(title))).toBe(true);
+  const internship = await apiSearchHits(
+    ownerPage,
+    `${appServerUrl}/api/search?q=${encodeURIComponent("Engineer")}&employmentType=internship&limit=100`,
+  );
 
-  await ownerPage.getByLabel("Employment type").selectOption("internship");
-
-  await expect(results(ownerPage)).toHaveCount(0);
-  await expect(ownerPage.getByText("No postings match that search.")).toBeVisible();
+  expect(internship.hits).toHaveLength(0);
 });
 
 test("postings poll records tags from the rules and the filters search them", async () => {

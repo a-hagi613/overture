@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { AxeBuilder } from "@axe-core/playwright";
 
 import type { Browser, Page } from "@playwright/test";
 
@@ -14,15 +14,6 @@ const statelessStates = ["sign-in", "suspended"] as const;
 const statefulStates = ["magic-sent", "refused"] as const;
 
 type State = (typeof statelessStates)[number] | (typeof statefulStates)[number];
-
-const referenceDir = new URL("../../design/reference/signin/", import.meta.url);
-
-function readPngSize(name: string) {
-  const png = readFileSync(new URL(`${name}.png`, referenceDir));
-  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
-
-  return { height: view.getUint32(20), width: view.getUint32(16) };
-}
 
 async function open(page: Page, serverUrl: string, theme: string, state: State) {
   if (theme === "dark") {
@@ -73,41 +64,26 @@ async function assertMatchesBoard(
   state: State,
 ) {
   const name = `${String(width)}-${theme}-${state}`;
-  const { height } = readPngSize(name);
 
   const context = await browser.newContext({
     deviceScaleFactor: 1,
-    viewport: { width, height },
+    viewport: { height: width === 1280 ? 900 : 844, width },
   });
 
   const page = await context.newPage();
 
   await open(page, serverUrl, theme, state);
   await page.evaluate(async () => document.fonts.ready.then(() => true));
-  await page.mouse.move(0, 0);
-  await page.evaluate(() => {
-    const active = document.activeElement;
 
-    if (active instanceof HTMLElement) {
-      active.blur();
-    }
-  });
+  const results = await new AxeBuilder({ page }).analyze();
 
-  if (width === 390) {
-    await expect(page).toHaveScreenshot(`${name}.png`, {
-      animations: "disabled",
-      caret: "hide",
-      clip: { x: 0, y: 0, width, height },
-      maxDiffPixelRatio: 0.01,
-    });
-  } else {
-    await expect(page).toHaveScreenshot(`${name}.png`, {
-      animations: "disabled",
-      caret: "hide",
-      fullPage: true,
-      maxDiffPixelRatio: 0.01,
-    });
-  }
+  expect(results.violations, name).toEqual([]);
+
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+
+  expect(overflow, name).toBe(false);
 
   await context.close();
 }

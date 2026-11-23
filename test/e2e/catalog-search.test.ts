@@ -72,12 +72,27 @@ test("search by title, company, location and department stays under 50 ms on the
   ).toBe(true);
 });
 
-test("the search page lists postings for a query", async ({ ownerPage, appServerUrl }) => {
+test("authenticated /api/search lists matching postings and /search redirects to /board", async ({
+  ownerPage,
+  appServerUrl,
+}) => {
+  const response = await ownerPage.request.get(
+    `${appServerUrl}/api/search?q=${encodeURIComponent(QUERIES.title)}&limit=50`,
+  );
+
+  expect(response.status()).toBe(200);
+
+  const parsed = searchResponseSchema.parse(await response.json());
+
+  expect(parsed.durationMs).toBeLessThan(SEARCH_BUDGET_MS);
+  expect(
+    parsed.hits.some((hit) => hit.title === QUERIES.title && hit.company === "Northwind Systems"),
+  ).toBe(true);
+
   await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent(QUERIES.title)}`);
+  await expect(ownerPage).toHaveURL(/\/board\?q=Senior/u);
+  await expect(ownerPage.getByRole("heading", { level: 1 })).toBeVisible();
 
-  await expect(ownerPage.getByRole("heading", { level: 1, name: "Search" })).toBeVisible();
-
-  await expect(ownerPage.getByText(QUERIES.title).first()).toBeVisible();
-
-  await expect(ownerPage.getByText("Northwind Systems").first()).toBeVisible();
+  await ownerPage.keyboard.press("Control+k");
+  await expect(ownerPage.getByPlaceholder("Search applications, reviews, emails")).toBeVisible();
 });

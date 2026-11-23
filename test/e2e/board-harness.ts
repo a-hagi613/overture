@@ -539,7 +539,7 @@ export async function openBoard(
   await page.goto(`${appServerUrl}/board`);
 
   if (width === 390) {
-    await page.getByRole("tab", { name: /Screening/u }).click();
+    await page.getByRole("tab", { name: /Waiting/u }).click();
     await page.getByRole("tablist", { name: "Stages" }).evaluate((element) => {
       element.scrollLeft = 0;
     });
@@ -547,8 +547,9 @@ export async function openBoard(
 
   if (width === 390) {
     await page
-      .getByRole("tabpanel", { name: "Screening" })
+      .locator('section[aria-label="Waiting"]')
       .getByRole("button", { name: /Senior Backend Engineer/u })
+      .first()
       .click();
 
     return;

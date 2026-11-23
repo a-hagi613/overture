@@ -291,7 +291,7 @@ test("sign out of all devices ends every other session and keeps this one", asyn
 
   await page.goto(`${appServerUrl}/settings`);
   await page.getByRole("button", { name: "Sign out everywhere" }).click();
-  await expect(page.getByText("You are signed out on your other devices.")).toBeVisible();
+  await expect(page.getByText("You are signed out on your other devices.").first()).toBeVisible();
   expect((await verifyAuthState(appServerUrl, request)).sessions).toHaveLength(1);
 
   await otherPage.goto(`${appServerUrl}/board`);
@@ -337,4 +337,10 @@ test("a second sign-in method on the same verified email joins the one account",
   }
 
   expect(state.accounts.map((account) => account.providerId)).toContain("google");
+});
+
+test("the sign-up route renders the account creation form", async ({ page, isolatedAppServer }) => {
+  await page.goto(`${isolatedAppServer.url}/signup`);
+  await expect(page.getByRole("button", { name: "Sign up with Google" })).toBeVisible();
+  await expect(page.getByLabel("Email")).toBeVisible();
 });

@@ -33,7 +33,7 @@ export async function walkOnboardingSteps1To4(page: Page, baseUrl: string) {
   await expect(page.getByLabel("Current job title")).toBeVisible();
   await expect(page.getByText("0 of 0 answered")).toHaveCount(0);
 
-  const workAuth = page.getByLabel(/^Work authorisation in /u);
+  const workAuth = page.getByLabel(/^Work authorization in /u);
   const salary = page.getByLabel(/^Salary expectation in /u);
 
   await expect(workAuth.first()).toBeVisible();
@@ -54,19 +54,19 @@ export async function walkOnboardingSteps1To4(page: Page, baseUrl: string) {
   await page.getByRole("switch").click();
   await expect(page.getByLabel("Gender")).toBeEnabled();
   await page.getByLabel("Gender").selectOption("Woman");
-  await page.getByLabel("How did you hear about us?").fill("A friend");
+  await page.getByLabel(/^How did you hear about us\?/u).fill("A friend");
 
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
-  await expect(page.getByRole("heading", { level: 2, name: /What do you want/u })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
   await page.getByRole("button", { name: "Platform Engineer" }).click();
   await page.getByRole("button", { name: "London" }).click();
   await page.getByRole("button", { exact: true, name: "Remote" }).click();
   await page.getByRole("button", { name: "Senior" }).click();
   await expect(page.getByTestId("targets-match-count")).not.toHaveText("0");
 
-  await page.getByLabel("Salary floor").fill("120,000");
-  await page.getByLabel("Salary floor").blur();
+  await page.getByLabel("Minimum salary").fill("120,000");
+  await page.getByLabel("Minimum salary").blur();
 
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/onboarding\/forward$/u);

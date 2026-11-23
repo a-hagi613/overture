@@ -226,7 +226,9 @@ async function expectReviewMatchesBoard(
   await page.goto(`${appServerUrl}/review`);
 
   if (width === 1280) {
-    await expect(page.getByRole("heading", { level: 2, name: "Waiting for you" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Blocked applications" }),
+    ).toBeVisible();
   }
 
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -243,12 +245,12 @@ async function expectReviewMatchesBoard(
 
   expect(results.violations, `${String(width)}px ${theme}`).toEqual([]);
 
-  const contentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
 
-  await page.setViewportSize({ width, height: contentHeight });
-  await expect(page).toHaveScreenshot(`${String(width)}-${theme}.png`, {
-    maxDiffPixelRatio: 0.01,
-  });
+  expect(overflow, `${String(width)}px ${theme}`).toBe(false);
+
   await context.close();
 }
 

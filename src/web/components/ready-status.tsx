@@ -34,15 +34,14 @@ export function ReadyStatus(props: ReadyStatusProps) {
 
   if (props.variant === "stale") {
     return (
-      <Card
-        className="mt-5 flex flex-wrap items-center justify-between gap-4 border-need/30 bg-need-soft/60 p-4"
-        variant="default"
-      >
-        <div className="flex items-center gap-2.5 text-sm font-semibold text-need" role="alert">
-          <AlertCircle aria-hidden="true" size={16} />
-          <span>{copy.ready.staleWarning}</span>
+      <Card className="mt-5 border-need/30 bg-need-soft/60 p-4" variant="default">
+        <div className="flex flex-wrap items-center justify-between gap-4" role="alert">
+          <div className="flex items-center gap-2.5 text-sm font-semibold text-need">
+            <AlertCircle aria-hidden="true" size={16} />
+            <span>{copy.ready.staleWarning}</span>
+          </div>
+          {retryButton}
         </div>
-        {retryButton}
       </Card>
     );
   }

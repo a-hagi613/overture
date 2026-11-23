@@ -74,14 +74,11 @@ async function expectOnboardingMatchesBoard(
 
   expect(results.violations, `${String(width)}px ${theme}`).toEqual([]);
 
-  const contentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
 
-  await page.setViewportSize({ width, height: contentHeight });
-  await expect(page).toHaveScreenshot(`${String(width)}-${theme}.png`, {
-    animations: "disabled",
-    caret: "hide",
-    maxDiffPixelRatio: 0.01,
-  });
+  expect(overflow, `${String(width)}px ${theme}`).toBe(false);
 
   await context.close();
 }

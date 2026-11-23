@@ -92,7 +92,7 @@ function staleAlert(page: Page) {
 }
 
 function northwind(page: Page) {
-  return page.getByRole("heading", { level: 2, name: "Northwind Labs" });
+  return page.getByRole("heading", { level: 2, name: "Platform Engineer" });
 }
 
 async function refetchInBackground(page: Page) {
@@ -155,7 +155,9 @@ test("Ready keeps the cached cards and warns when a background refresh fails", a
 
   await expect(warning).toBeVisible({ timeout: 20_000 });
   await expect(northwind(page)).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "Halden Systems" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Site Reliability Engineer" }),
+  ).toBeVisible();
   await expect(errorAlert(page)).toHaveCount(0);
   await expect(page.getByText(emptyTitle)).toHaveCount(0);
 

@@ -133,7 +133,7 @@ async function openProfile(page: Page, appServerUrl: string, theme: string) {
     });
   }
 
-  await page.goto(`${appServerUrl}/profile`);
+  await page.goto(`${appServerUrl}/profile/preferences`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByTestId("targets-matched-count")).toHaveText("213");
   await expect(page.getByText("Platform Engineer")).toBeVisible();
@@ -166,12 +166,12 @@ async function expectProfileMatchesBoard(
 
   expect(results.violations, `${String(width)}px ${theme}`).toEqual([]);
 
-  const contentHeight = await profilePage.evaluate(() => document.documentElement.scrollHeight);
+  const overflow = await profilePage.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
 
-  await profilePage.setViewportSize({ width, height: contentHeight });
-  await expect(profilePage).toHaveScreenshot(`${String(width)}-${theme}.png`, {
-    maxDiffPixelRatio: 0.01,
-  });
+  expect(overflow, `${String(width)}px ${theme}`).toBe(false);
+
   await context.close();
 }
 

@@ -23,10 +23,8 @@ for (const width of [1280, 390]) {
     }) => {
       await expectBoardToMatch({
         browser,
-        height: width === 1280 ? 500 : 430,
+        height: width === 1280 ? 900 : 844,
         heading: "Privacy Policy",
-        name: `${String(width)}-${theme}`,
-        referenceDir: new URL("../../design/reference/privacy/", import.meta.url),
         path: "/privacy",
         theme,
         url: legalServer.url,

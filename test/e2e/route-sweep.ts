@@ -56,7 +56,7 @@ export const targets: Target[] = routerPaths.map((path) => ({
 const redirects = new Map(
   [
     ...routeSource.matchAll(
-      /path:\s*"(?<from>[^"]+)"[\s\S]{0,120}?<(?:Navigate replace|PreserveSearchRedirect)\s+to="(?<to>[^"#]+)/gu,
+      /path:\s*"(?<from>[^"]+)"[^}]*?<(?:Navigate replace|PreserveSearchRedirect)\s+to="(?<to>[^"#]+)/gu,
     ),
   ].map((match) => [match.groups?.from ?? "", match.groups?.to ?? ""]),
 );

@@ -327,8 +327,11 @@ test("a rejection and an interview move the card, Undo restores it, and a hand m
   await runMailJobs(owner);
 
   await expect(page.getByText("Moved to Interviewing")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Undo" })).toBeVisible();
   await expect(
-    page.locator(`section[aria-label="Interviewing"] button[data-card="${applicationId}"]`),
+    page
+      .locator(`section[aria-label="Waiting"] button[data-card="${applicationId}"]`)
+      .getByText("Interviewing", { exact: true }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Undo" }).click();
@@ -340,11 +343,13 @@ test("a rejection and an interview move the card, Undo restores it, and a hand m
     (candidate) => candidate.request().method() === "PATCH" && candidate.url().includes("/stage"),
   );
 
-  await moved.dragTo(page.locator('section[aria-label="Screening"]'));
+  await moved.dragTo(page.locator('section[aria-label="Waiting"]'));
   await drag;
 
   await expect(
-    page.locator(`section[aria-label="Screening"] button[data-card="${applicationId}"]`),
+    page
+      .locator(`section[aria-label="Waiting"] button[data-card="${applicationId}"]`)
+      .getByText("Screening", { exact: true }),
   ).toBeVisible();
 
   await forward(

@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { copy } from "../../shared/copy.ts";
 import type { ApplicationDetail, StageKey } from "../lib/board-api.ts";
+import { BoardSentBanner } from "./board-sent-banner.tsx";
 import { BoardSheetActions } from "./board-sheet-actions.tsx";
 import { BoardSheetHeader } from "./board-sheet-header.tsx";
 import { BoardSheetNavigation } from "./board-sheet-navigation.tsx";
@@ -72,6 +73,7 @@ export function BoardSheet(props: {
           >
             <BoardSheetHeader detail={detail} />
             <BoardSheetPills detail={detail} />
+            <BoardSentBanner detail={detail} />
             <BoardSheetActions detail={detail} onArchive={props.onArchive} onMove={props.onMove} />
 
             <Separator className="mt-5" />

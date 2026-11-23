@@ -61,33 +61,47 @@ async function openSeeded(browser: Browser, appServerUrl: string, width: number)
   return { context, page, request };
 }
 
-async function dragCardTo(page: Page, card: ReturnType<Page["locator"]>, stage: string) {
+async function dragCardTo(
+  page: Page,
+  card: ReturnType<Page["locator"]>,
+  target: ReturnType<Page["locator"]>,
+) {
+  const from = await card.boundingBox();
+  const to = await target.boundingBox();
+
+  if (from === null || to === null) {
+    throw new Error("missing drag bounding box");
+  }
+
   const response = page.waitForResponse(
     (candidate) => candidate.request().method() === "PATCH" && candidate.url().includes("/stage"),
   );
 
-  await card.dragTo(page.locator(`section[aria-label="${stage}"]`));
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + Math.min(to.height / 2, 120), { steps: 10 });
+  await page.mouse.up();
   await response;
 }
 
 test("dragging a card on desktop moves it and locks it", async ({ boardServer, browser }) => {
   const { context, page, request } = await openSeeded(browser, boardServer.url, 1280);
-  const card = page.locator('section[aria-label="Queued"] button[data-card]').first();
+  const card = page.locator('section[aria-label="Applied"] button[data-card]').first();
   const id = await card.getAttribute("data-card");
 
   if (id === null) {
-    throw new Error("the queued card has no id");
+    throw new Error("the applied card has no id");
   }
 
-  await dragCardTo(page, card, "Applied");
+  await dragCardTo(page, card, page.locator('section[aria-label="Waiting"]'));
 
-  await expect(page.locator(`section[aria-label="Applied"] button[data-card="${id}"]`)).toHaveCount(
+  await expect(page.locator(`section[aria-label="Waiting"] button[data-card="${id}"]`)).toHaveCount(
     1,
   );
 
   const state = await cardState(request, id);
 
-  expect(state?.stage).toBe("applied");
+  expect(state?.stage).toBe("screening");
   expect(state?.stageLocked).toBe(true);
 
   await context.close();
@@ -96,11 +110,11 @@ test("dragging a card on desktop moves it and locks it", async ({ boardServer, b
 
 test("arrow keys move a card on desktop and lock it", async ({ boardServer, browser }) => {
   const { context, page, request } = await openSeeded(browser, boardServer.url, 1280);
-  const card = page.locator('section[aria-label="Queued"] button[data-card]').nth(1);
+  const card = page.locator('section[aria-label="Applied"] button[data-card]').nth(1);
   const id = await card.getAttribute("data-card");
 
   if (id === null) {
-    throw new Error("the queued card has no id");
+    throw new Error("the applied card has no id");
   }
 
   const response = page.waitForResponse(
@@ -108,12 +122,14 @@ test("arrow keys move a card on desktop and lock it", async ({ boardServer, brow
   );
 
   await card.focus();
+  await page.keyboard.press("Space");
   await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
   await response;
 
   const state = await cardState(request, id);
 
-  expect(state?.stage).toBe("applied");
+  expect(state?.stage).toBe("screening");
   expect(state?.stageLocked).toBe(true);
 
   await context.close();
@@ -138,7 +154,7 @@ test("holding a card on the phone and dropping it on a stage moves and locks it"
     return { height: rect.height, width: rect.width, x: rect.x, y: rect.y };
   });
 
-  const stage = page.locator('button[data-stage="applied"]');
+  const stage = page.getByRole("tab", { name: "Waiting" });
 
   const stageBox = await stage.evaluate((element) => {
     const rect = element.getBoundingClientRect();
@@ -151,7 +167,7 @@ test("holding a card on the phone and dropping it on a stage moves and locks it"
   await page.mouse.down();
   await page.clock.fastForward(300);
   await page.mouse.move(stageBox.x + stageBox.width / 2, stageBox.y + stageBox.height / 2, {
-    steps: 5,
+    steps: 10,
   });
 
   const response = page.waitForResponse(
@@ -163,44 +179,30 @@ test("holding a card on the phone and dropping it on a stage moves and locks it"
 
   const state = await cardState(request, id);
 
-  expect(state?.stage).toBe("applied");
+  expect(state?.stage).toBe("screening");
   expect(state?.stageLocked).toBe(true);
 
   await context.close();
   await request.dispose();
 });
 
-test("swiping the phone column changes the stage", async ({ boardServer, browser }) => {
+test("tapping the phone stage tabs changes the visible lane", async ({ boardServer, browser }) => {
   const { context, page, request } = await openSeeded(browser, boardServer.url, 390);
-  const panel = page.getByRole("tabpanel", { name: "Queued" });
 
-  const box = await panel.evaluate((element) => {
-    const rect = element.getBoundingClientRect();
+  await expect(page.getByRole("tab", { name: "Applied" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator('section[aria-label="Applied"]')).toBeVisible();
 
-    return { height: rect.height, width: rect.width, x: rect.x, y: rect.y };
-  });
+  await page.getByRole("tab", { name: "Waiting" }).click();
+  await expect(page.getByRole("tab", { name: "Waiting" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator('section[aria-label="Waiting"]')).toBeVisible();
 
-  await page.clock.install();
+  await page.getByRole("tab", { name: "Closed" }).click();
+  await expect(page.getByRole("tab", { name: "Closed" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator('section[aria-label="Closed"]')).toBeVisible();
 
-  const swipe = async () => {
-    await page.mouse.move(box.x + box.width / 2, box.y + 40);
-    await page.mouse.down();
-    await page.mouse.move(box.x + box.width / 2 - 120, box.y + 40, { steps: 5 });
-    await page.mouse.up();
-  };
-
-  await swipe();
-
-  await expect(page.getByRole("tab", { name: /Ready/u })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("tabpanel", { name: "Ready" })).toBeVisible();
-
-  await swipe();
-
-  await expect(page.getByRole("tab", { name: /Applied/u })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  await expect(page.getByRole("tabpanel", { name: "Applied" })).toBeVisible();
+  await page.getByRole("tab", { name: "Queued" }).click();
+  await expect(page.getByRole("tab", { name: "Queued" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator('section[aria-label="Queued"]')).toBeVisible();
 
   await context.close();
   await request.dispose();
@@ -367,11 +369,17 @@ async function openCard(
       throw new Error("the selected card is in no stage");
     }
 
-    await page
-      .getByRole("tab", {
-        name: new RegExp(`^${stage.charAt(0).toUpperCase()}${stage.slice(1)}`, "u"),
-      })
-      .click();
+    const mobileTabLabels = new Map<string, string>([
+      ["applied", "Applied"],
+      ["closed", "Closed"],
+      ["interviewing", "Waiting"],
+      ["offer", "Waiting"],
+      ["queued", "Queued"],
+      ["ready", "Ready"],
+      ["screening", "Waiting"],
+    ]);
+
+    await page.getByRole("tab", { name: mobileTabLabels.get(stage) ?? "Applied" }).click();
   }
 
   await page.locator(`button[data-card="${cardId}"]`).filter({ visible: true }).click();
@@ -625,8 +633,9 @@ test("the cover tab is reachable and activatable from the keyboard", async ({
 
   await page.getByRole("tab", { name: "Timeline" }).focus();
 
-  await page.keyboard.press("Tab");
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Answers" })).toBeFocused();
+  await page.keyboard.press("ArrowRight");
 
   await expect(page.getByRole("tab", COVER_TAB)).toBeFocused();
 

@@ -12,7 +12,8 @@ export const buttonVariants = cva(
         outline: "border border-input bg-transparent text-foreground hover:bg-muted",
         ghost:
           "border border-transparent bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
-        destructive: "border border-need bg-need text-primary-ink shadow-sh hover:opacity-90",
+        destructive:
+          "border border-need bg-need text-primary-ink shadow-sh hover:-translate-y-px hover:border-need/85 hover:bg-need/85",
         link: "border-0 bg-transparent px-0 max-md:min-h-11 text-foreground underline decoration-input underline-offset-4 hover:text-signal-text",
       },
       size: {

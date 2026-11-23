@@ -15,13 +15,19 @@ import { dsMono } from "./ui/ds.ts";
 export function TrackerCard({
   card,
   draggable,
+  isKeyboardDragging = false,
   lane,
+  onCardKeyDown,
   onOpen,
   selected,
 }: {
   card: BoardCard;
   draggable: boolean;
+  isKeyboardDragging?: boolean | undefined;
   lane: TrackerLaneKey;
+  onCardKeyDown?:
+    | ((card: BoardCard, lane: TrackerLaneKey, event: KeyboardEvent<HTMLButtonElement>) => void)
+    | undefined;
   onOpen: (id: string) => void;
   selected: boolean;
 }) {
@@ -43,7 +49,7 @@ export function TrackerCard({
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (draggable) {
-      listeners?.onKeyDown?.(event);
+      onCardKeyDown?.(card, lane, event);
     }
   };
 
@@ -53,14 +59,13 @@ export function TrackerCard({
         selected
           ? "border-signal shadow-lift ring-1 ring-signal/30"
           : "border-border shadow-sh hover:border-signal/45 hover:shadow-lift"
-      } ${isDragging ? "opacity-35" : ""}`}
+      } ${isDragging ? "opacity-35" : ""} ${isKeyboardDragging ? "border-signal ring-2 ring-signal/45" : ""}`}
       ref={setNodeRef}
     >
       <button
         aria-describedby={draggable ? attributes["aria-describedby"] : undefined}
         aria-disabled={draggable ? attributes["aria-disabled"] : undefined}
-        aria-label={copy.board.openCard(card.title, card.company)}
-        aria-pressed={draggable ? attributes["aria-pressed"] : undefined}
+        aria-pressed={isKeyboardDragging ? true : undefined}
         aria-roledescription={draggable ? attributes["aria-roledescription"] : undefined}
         className={`block w-full p-4 text-left focus-visible:outline-none ${
           draggable ? "touch-none cursor-grab active:cursor-grabbing" : "cursor-pointer"

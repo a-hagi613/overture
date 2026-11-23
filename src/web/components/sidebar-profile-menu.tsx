@@ -33,6 +33,7 @@ export function SidebarProfileMenu({ wide }: { wide: boolean }) {
         }}
       >
         <Link
+          aria-current={isProfileActive ? "page" : undefined}
           aria-expanded={open}
           aria-haspopup="menu"
           aria-label={copy.nav.profile}
@@ -99,12 +100,13 @@ export function SidebarProfileMenu({ wide }: { wide: boolean }) {
       }}
     >
       <Link
+        aria-current={isProfileActive ? "page" : undefined}
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={copy.nav.profile}
         className={`relative flex min-h-11 items-center gap-3.5 rounded-md border px-3 text-base font-medium transition ${
           isProfileActive
-            ? "border-border bg-card text-foreground shadow-sh"
+            ? "border-border bg-card text-foreground shadow-sh hover:border-input hover:bg-muted"
             : "border-transparent text-foreground hover:bg-muted"
         }`}
         to="/profile/resume"

@@ -99,7 +99,7 @@ export function ReviewDetail({
       </div>
 
       <div className="mt-5">
-        <h3 className={dsEyebrow}>{copy.review.blockedRolesTitle(review.applications.length)}</h3>
+        <p className={dsEyebrow}>{copy.review.blockedRolesTitle(review.applications.length)}</p>
         <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           {review.applications.map((application) => (
             <Card

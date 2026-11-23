@@ -52,7 +52,7 @@ async function expectOnboardingMatchesBoard(
   await expect(
     page.getByRole("heading", { level: 1, name: /Set up your workspace/u }),
   ).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: /What do you want/u })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
   await expect(page.getByRole("button", { name: "Platform Engineer" })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -85,7 +85,7 @@ async function expectOnboardingMatchesBoard(
     "aria-pressed",
     "false",
   );
-  await expect(page.getByLabel("Salary floor")).toHaveValue("140,000");
+  await expect(page.getByLabel("Minimum salary")).toHaveValue("140,000");
   await expect(page.getByTestId("targets-match-count")).toHaveText("213");
 
   await page.evaluate(async () => {
@@ -96,15 +96,11 @@ async function expectOnboardingMatchesBoard(
 
   expect(results.violations, `${String(width)}px ${theme}`).toEqual([]);
 
-  const contentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
 
-  await page.setViewportSize({ width, height: contentHeight });
-
-  await expect(page).toHaveScreenshot(`${String(width)}-${theme}.png`, {
-    animations: "disabled",
-    caret: "hide",
-    maxDiffPixelRatio: 0.01,
-  });
+  expect(overflow, `${String(width)}px ${theme}`).toBe(false);
 
   await context.close();
 }

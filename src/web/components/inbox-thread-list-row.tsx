@@ -77,9 +77,10 @@ export function InboxThreadListRow({
         <span className="mt-0.5 line-clamp-1 block text-xs text-muted-foreground">
           {row.snippet}
         </span>
-        {tag === null ? null : (
-          <span className="mt-1.5 inline-block">
-            <Badge variant={tag.variant}>{tag.label}</Badge>
+        {tag === null && !row.needsChecking ? null : (
+          <span className="mt-1.5 flex flex-wrap gap-1.5">
+            {tag === null ? null : <Badge variant={tag.variant}>{tag.label}</Badge>}
+            {row.needsChecking ? <Badge variant="need">{copy.inbox.unverifiedLabel}</Badge> : null}
           </span>
         )}
       </span>

@@ -66,7 +66,7 @@ test("choices come from open Postings, the count follows them, and the browser z
 
   await page.goto(`${onboardingServer.url}/onboarding/targets`);
 
-  await expect(page.getByRole("heading", { level: 2, name: /What do you want/u })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
 
   await expect(page.getByRole("button", { name: "Platform Engineer" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Product Manager" })).toBeVisible();
@@ -97,8 +97,8 @@ test("choices come from open Postings, the count follows them, and the browser z
 
   await expect(page.getByTestId("targets-match-count")).toHaveText("2");
 
-  await page.getByLabel("Salary floor").fill("120,000");
-  await page.getByLabel("Salary floor").blur();
+  await page.getByLabel("Minimum salary").fill("120,000");
+  await page.getByLabel("Minimum salary").blur();
 
   await expect
     .poll(async () =>
@@ -123,7 +123,7 @@ test("choices come from open Postings, the count follows them, and the browser z
     "aria-pressed",
     "true",
   );
-  await expect(page.getByLabel("Salary floor")).toHaveValue("120,000");
+  await expect(page.getByLabel("Minimum salary")).toHaveValue("120,000");
 
   await page.getByRole("button", { name: "Continue" }).click();
 

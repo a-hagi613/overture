@@ -97,14 +97,25 @@ export function CalendarBoard({
     let numeralStyle = "text-foreground";
 
     if (isToday) {
-      numeralStyle = "bg-signal text-primary-ink";
+      numeralStyle = "bg-signal-text text-primary-ink";
     } else if (isOutside && !isSelected) {
       numeralStyle = "text-muted-foreground";
     }
 
+    const formattedDay = new Intl.DateTimeFormat(copy.home.dateLocale, {
+      day: "numeric",
+      month: "long",
+      weekday: "long",
+      year: "numeric",
+    }).format(props.day.date);
+
+    const dayAriaLabel = `${formattedDay}${firstLabel === null ? "" : `, ${firstLabel}`}${
+      totalEvents > 1 ? `, +${String(totalEvents - 1)} more` : ""
+    }`;
+
     return (
       <button
-        aria-label={props["aria-label"]}
+        aria-label={dayAriaLabel}
         aria-pressed={isSelected}
         className={`flex h-16 w-full cursor-pointer flex-col items-start justify-between rounded-lg border p-1.5 text-left transition md:h-24 md:p-2 ${cellStyle}`}
         data-day={key}
