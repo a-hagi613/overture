@@ -196,6 +196,8 @@
           "src/shared/copy.test.ts",
           "src/shared/dossier.test.ts",
           "src/server/auth/client-ip.test.ts",
+          "src/server/auth/trusted-origins.test.ts",
+          "src/server/host-routing.test.ts",
           "src/server/dispatch/outcomes.test.ts",
           "src/server/platform/db/migration-snapshot.test.ts",
           "src/server/platform/db/catalog-split.test.ts",

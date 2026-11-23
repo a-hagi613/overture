@@ -197,13 +197,7 @@ const ATS_NAMES = ["greenhouse", "lever", "ashby", "workable", "personio"] as co
 
 export { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
 
-export function isAdminHost(hostname: string, adminOrigin: string) {
-  try {
-    return hostname === new URL(adminOrigin).hostname;
-  } catch {
-    return false;
-  }
-}
+export { isAdminHost } from "../host-routing.ts";
 
 export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: AdminDeps) {
   const verifier = createAccessVerifier({

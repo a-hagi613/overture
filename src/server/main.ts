@@ -937,6 +937,16 @@ if (env.ANTHROPIC_API_KEY !== undefined) {
   ensurePrepQueuedForRunningUsers(db, clock);
 }
 
+function requestWithAbsoluteUrl(request: Request) {
+  if (URL.canParse(request.url)) {
+    return request;
+  }
+
+  const path = request.url.startsWith("/") ? request.url : `/${request.url}`;
+
+  return new Request(`http://localhost${path}`, request);
+}
+
 const app = createApp({
   db,
   catalogDb,
@@ -970,7 +980,7 @@ const SHUTDOWN_HARD_EXIT_GRACE_MS = 1000;
 
 const server = Bun.serve({
   port: env.PORT,
-  fetch: app.fetch,
+  fetch: async (request) => app.fetch(requestWithAbsoluteUrl(request)),
   idleTimeout: SERVER_IDLE_TIMEOUT_ABOVE_SSE_HEARTBEAT_SECONDS,
 });
 
