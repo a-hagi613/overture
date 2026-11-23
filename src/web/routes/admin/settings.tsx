@@ -1,35 +1,31 @@
 import { copy } from "../../../shared/copy.ts";
+import { CardTitle } from "../../components/ui/card-title.tsx";
+import { Card } from "../../components/ui/card.tsx";
 import type { KillSwitchRow } from "../../lib/admin-api.ts";
-import { loadKillSwitches, loadSettings } from "../../lib/admin-api.ts";
-import { useAdminResource } from "../../lib/admin-resource.ts";
-import { AdminPageHeading } from "./page-heading.tsx";
+import { loadAdminAlerts, loadKillSwitches, loadSettings } from "../../lib/admin-api.ts";
+import { useAdminResource, useInvalidateAdminQueries } from "../../lib/admin-resource.ts";
+import { ActiveAlertsCard } from "./active-alerts-card.tsx";
 import { AdminGateScreen } from "./gate-screen.tsx";
+import { LaunchReadinessCard } from "./launch-readiness-card.tsx";
 import { NewSwitchLine } from "./new-switch-line.tsx";
+import { AdminPageHeading } from "./page-heading.tsx";
 import { SettingLine } from "./setting-line.tsx";
 import { SwitchLine } from "./switch-line.tsx";
 
 export function AdminSettingsPage() {
-  const settings = useAdminResource(loadSettings);
-  const switches = useAdminResource(loadKillSwitches);
+  const invalidateAdmin = useInvalidateAdminQueries();
+  const settings = useAdminResource(loadSettings, ["settings"]);
+  const switches = useAdminResource(loadKillSwitches, ["kill-switches"]);
+  const alerts = useAdminResource(loadAdminAlerts, ["alerts"]);
 
-  if (settings.refusal !== null) {
+  const refusal = settings.refusal ?? switches.refusal ?? alerts.refusal;
+
+  if (refusal !== null) {
     return (
       <AdminGateScreen
-        code={settings.refusal}
+        code={refusal}
         onPasskeyDone={() => {
-          settings.refresh();
-          switches.refresh();
-        }}
-      />
-    );
-  }
-
-  if (switches.refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={switches.refusal}
-        onPasskeyDone={() => {
-          switches.refresh();
+          invalidateAdmin();
         }}
       />
     );
@@ -42,11 +38,6 @@ export function AdminSettingsPage() {
   const settingsView = settings.data.settings;
   const switchRows: KillSwitchRow[] = switches.data.switches;
 
-  const refreshBoth = () => {
-    settings.refresh();
-    switches.refresh();
-  };
-
   return (
     <>
       <AdminPageHeading
@@ -55,54 +46,40 @@ export function AdminSettingsPage() {
         plain={copy.admin.switchesTitlePlain}
       />
       <div className="mt-7 flex flex-col gap-5">
-        <section
-          aria-labelledby="admin-settings-limits"
-          className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
-        >
-          <h2 id="admin-settings-limits" className="font-serif text-[26px] leading-[1.1]">
-            {copy.admin.settingsHeading}
-          </h2>
+        {alerts.data === null ? null : (
+          <div className="grid gap-5 lg:grid-cols-2">
+            <LaunchReadinessCard allowQuickActions readiness={alerts.data.readiness} />
+            <ActiveAlertsCard alerts={alerts.data} />
+          </div>
+        )}
+        <Card ariaLabelledBy="admin-settings-limits">
+          <CardTitle id="admin-settings-limits">{copy.admin.settingsHeading}</CardTitle>
           <p className="mt-1 text-[12.5px] text-muted-foreground">{copy.admin.settingsIntro}</p>
           <div className="mt-4">
             {Object.entries(settingsView).map(([settingKey, value]) => (
               <SettingLine
-                key={settingKey}
-                onSaved={refreshBoth}
+                key={`${settingKey}:${value}`}
+                onSaved={invalidateAdmin}
                 settingKey={settingKey}
                 value={value}
               />
             ))}
           </div>
-        </section>
-        <section
-          aria-labelledby="admin-kill-switches"
-          className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
-        >
-          <h2 id="admin-kill-switches" className="font-serif text-[26px] leading-[1.1]">
-            {copy.admin.switchesHeading}
-          </h2>
+        </Card>
+        <Card ariaLabelledBy="admin-kill-switches">
+          <CardTitle id="admin-kill-switches">{copy.admin.switchesHeading}</CardTitle>
           <p className="mt-1 text-[12.5px] text-muted-foreground">{copy.admin.switchesIntro}</p>
           <div className="mt-4">
             {switchRows.length === 0 ? (
               <p className="text-[12.5px] text-muted-foreground">{copy.admin.switchEmpty}</p>
             ) : (
               switchRows.map((row) => (
-                <SwitchLine
-                  key={`${row.scope}/${row.key}`}
-                  onChanged={() => {
-                    switches.refresh();
-                  }}
-                  row={row}
-                />
+                <SwitchLine key={`${row.scope}/${row.key}`} onChanged={invalidateAdmin} row={row} />
               ))
             )}
           </div>
-          <NewSwitchLine
-            onChanged={() => {
-              switches.refresh();
-            }}
-          />
-        </section>
+          <NewSwitchLine onChanged={invalidateAdmin} />
+        </Card>
       </div>
     </>
   );

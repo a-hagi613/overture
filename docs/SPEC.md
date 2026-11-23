@@ -1606,7 +1606,9 @@ drawn) in pinned Docker.
 | `src/server/pipeline/reviews.test.ts` | the open Review list reads its rows in one query rather than one per Review (#430) |
 | `src/server/pipeline/send-queue.test.ts` | the next scheduled send is positioned from the earliest send time, ignoring approved Applications that hold no send time, and the sends before it are counted (#430) |
 | `src/server/platform/access/access.test.ts` | a malformed Access cookie or a missing team domain answers 401, never a 500 or an invented issuer |
+| `src/server/platform/admin-alerts.test.ts` | owner alert notifications stay owner-scoped, active kill-switch/dead-job/mail-cap/backup-lag problems surface accurately, acknowledgements are idempotent, and daily-cap/browser-concurrency setting bounds are enforced (#517) |
 | `src/server/platform/alert-detail.test.ts` | a public alert carries the error type and count only, never the arbitrary message that can hold personal data or a token |
+| `src/server/platform/audit/index.test.ts` | admin audit filtering avoids wildcard injection and composite timestamp-id cursors paginate deterministically across tied timestamps (#517) |
 | `src/server/platform/crypto.test.ts` | wrap/unwrap, AAD, shred |
 | `src/server/platform/db/catalog-split.test.ts` | `litestream.yml` replicates only `/data/app.sqlite`, a catalog write transaction never holds `app.sqlite`'s write lock, deleting and recreating `catalog.sqlite` leaves every user and Application row intact, and a closed Posting a crashed sweep never reported is still reconciled (#423) |
 | `src/server/platform/db/hot-path-indexes.test.ts` | the SSE catch-up, event retention, message-by-person, application-by-status and grant-ledger queries are planned through `events_user_seq`, `events_created_at`, `messages_user_created`, `applications_user_status` and `grants_user_starts` (#506) |
