@@ -179,6 +179,10 @@ async function ownerFor(server: AppServer) {
 
   await owner.put("/__test__/settings/jobs.poll_interval_ms", { data: { value: "3600000" } });
 
+  await owner.put("/__test__/settings/limits.send_window", {
+    data: { value: JSON.stringify({ end: "20:00", start: "08:00" }) },
+  });
+
   const start = await owner.post("/api/running", { data: { running: true } });
 
   expect(start.ok()).toBe(true);

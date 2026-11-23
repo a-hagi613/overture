@@ -251,13 +251,6 @@ if (env.ENABLE_TEST_ROUTES) {
 const clock = createClock();
 const random = createRandom();
 
-if (env.ENABLE_TEST_ROUTES && env.TEST_CLOCK_AT_UTC_HOUR !== undefined) {
-  const at = clock.now();
-  const target = Math.floor(at / 86_400_000) * 86_400_000 + env.TEST_CLOCK_AT_UTC_HOUR * 3_600_000;
-
-  clock.setOffset(target - at);
-}
-
 installProcessGuards(db, clock);
 
 const shutdownController = new AbortController();
@@ -353,7 +346,7 @@ if (env.ENABLE_TEST_ROUTES) {
     db,
     clock,
     "limits.send_window",
-    JSON.stringify({ end: "23:59", start: "00:00" }),
+    JSON.stringify({ end: "24:00", start: "00:00" }),
     "system:test",
   );
 }
