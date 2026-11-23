@@ -50,7 +50,7 @@ jobs:
           REQUIRE_CLOUDFLARE_EMAIL_SECRETS: ${{ vars.REQUIRE_CLOUDFLARE_EMAIL_SECRETS }}
         run: |
           set -euo pipefail
-          required="R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET_BACKUPS R2_BUCKET_FILES BETTER_AUTH_SECRET OWNER_EMAIL TURNSTILE_SITE_KEY TURNSTILE_SECRET MASTER_KEY_CURRENT"
+          required="R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET_BACKUPS R2_BUCKET_FILES BETTER_AUTH_SECRET OWNER_EMAIL TURNSTILE_SITE_KEY TURNSTILE_SECRET"
           if [ "${REQUIRE_CLOUDFLARE_EMAIL_SECRETS:-}" = "true" ]; then
             required="$required CLOUDFLARE_EMAIL_API_TOKEN CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_ZONE_ID"
           fi
@@ -63,8 +63,12 @@ jobs:
           done
           # Any versioned master key is accepted by name; the app's boot check enforces that the chain
           # reaches MASTER_KEY_CURRENT, so a fully rotated deployment without MASTER_KEY_V1 still deploys.
+          # MASTER_KEY_CURRENT is optional and defaults to 1 in the app, so it is only required once V1 is gone.
           if ! grep -qE '^MASTER_KEY_V[0-9]+$' <<<"$present"; then
             missing="$missing MASTER_KEY_V<n>"
+          fi
+          if ! grep -qx "MASTER_KEY_CURRENT" <<<"$present" && ! grep -qx "MASTER_KEY_V1" <<<"$present"; then
+            missing="$missing MASTER_KEY_CURRENT"
           fi
           if [ -n "$missing" ]; then
             echo "::error::Fly secrets missing on overture-web:$missing. The app refuses to boot without them; production stays on its current release."
