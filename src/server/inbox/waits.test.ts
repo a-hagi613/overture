@@ -74,3 +74,26 @@ test("aborting a code wait clears the interval and resolves null", async () => {
 
   sqlite.close();
 });
+
+test("a wait created with an already-aborted signal settles at once", async () => {
+  const { clock, db, sqlite } = seeded();
+  const personal = createPersonalCrypto(db, MASTER, 1);
+  const controller = new AbortController();
+
+  controller.abort();
+
+  const startedAt = performance.now();
+
+  const pending = waitForCode(
+    { clock, db, personal },
+    { onAskToPaste: () => undefined, waitId: WAIT_ID },
+    { signal: controller.signal },
+  );
+
+  const settled = await pending;
+
+  expect(settled).toBeNull();
+  expect(performance.now() - startedAt).toBeLessThan(500);
+
+  sqlite.close();
+});

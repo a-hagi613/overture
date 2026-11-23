@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 
 import { openDatabase } from "../../src/server/platform/db/client.ts";
 import { migrateDatabase } from "../../src/server/platform/db/migrate.ts";
-import { adminAudit, grants, ledger, users } from "../../src/server/platform/db/schema.ts";
+import { adminAudit, events, grants, ledger, users } from "../../src/server/platform/db/schema.ts";
 import { createClock } from "../../src/server/platform/ports/clock.ts";
 import type { AdminAuditRow } from "../../src/server/platform/audit/index.ts";
 import { billingUserView } from "../../src/server/billing/admin-view.ts";
@@ -147,6 +147,11 @@ test.describe("refunding a paid period against stripe-mock", () => {
       refundId: outcome.refund.refundId,
     });
     expect(fixture.shipped.map((row) => row.action)).toEqual([REFUND_AUDIT_ACTION]);
+
+    const published = fixture.db.select().from(events).all();
+
+    expect(published.map((row) => row.topic)).toEqual(["billing.updated"]);
+    expect(published[0]?.userId).toBe(fixture.userId);
   });
 
   test("a retry with the same key replays the first refund and never calls Stripe again", async () => {

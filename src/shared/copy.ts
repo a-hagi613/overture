@@ -147,7 +147,7 @@ export const copy = {
       details: "Personal Details",
       preferences: "Job Preferences",
       billing: "Billing",
-      account: "Settings",
+      account: "Account",
       workspaceGroup: "Workspace",
       profileGroup: "Profile",
     },

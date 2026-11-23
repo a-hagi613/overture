@@ -5,6 +5,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import { mailboxes, retiredAddresses, users } from "../platform/db/schema.ts";
 import { clearBlockerIfRecovered } from "../profile/running-state.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
 
 const ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 const ID_LENGTH = 16;
@@ -102,6 +103,7 @@ export function createMailboxService(
         .run();
 
       clearBlockerIfRecovered(db, clock, userId, "no_mailbox");
+      publishEvent(db, clock, "mailbox.updated", JSON.stringify({ mailboxId: id }), userId);
 
       return { id, address: addressOf(localPart), firstForwardedAt: null };
     } catch (error) {
@@ -156,10 +158,28 @@ export function createMailboxService(
   }
 
   function markFirstForwarded(mailboxId: string, at: number) {
+    const before = db
+      .select({ firstForwardedAt: mailboxes.firstForwardedAt, userId: mailboxes.userId })
+      .from(mailboxes)
+      .where(eq(mailboxes.id, mailboxId))
+      .get();
+
+    if (before === undefined || before.firstForwardedAt !== null) {
+      return;
+    }
+
     db.update(mailboxes)
       .set({ firstForwardedAt: new Date(at) })
       .where(and(eq(mailboxes.id, mailboxId), isNull(mailboxes.firstForwardedAt)))
       .run();
+
+    publishEvent(
+      db,
+      clock,
+      "mailbox.updated",
+      JSON.stringify({ firstForwardedAt: at, mailboxId }),
+      before.userId,
+    );
   }
 
   function retireFor(userId: string) {
@@ -174,6 +194,7 @@ export function createMailboxService(
     }
 
     db.delete(mailboxes).where(eq(mailboxes.userId, userId)).run();
+    publishEvent(db, clock, "mailbox.updated", JSON.stringify({ retired: true }), userId);
 
     return true;
   }

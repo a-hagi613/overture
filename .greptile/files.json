@@ -1,0 +1,40 @@
+{
+  "files": [
+    {
+      "path": "GLOSSARY.md",
+      "description": "The product vocabulary: stage names, board lanes, and the words the product never uses. Reviews should check new copy against it."
+    },
+    {
+      "path": "docs/SPEC.md",
+      "description": "The product spec: screens, behaviour, limits and copy. The spec beats the code; a change that contradicts it is a defect."
+    },
+    {
+      "path": "DESIGN.md",
+      "description": "The Ember design system: colour roles, typography tokens, radii, components, motion and accessibility rules for src/web.",
+      "scope": ["src/web/**"]
+    },
+    {
+      "path": "docs/adr/0023-lint-rule-set.md",
+      "description": "The lint, format, typecheck and test rules and why each exists. A change that needs a suppression should be checked against it."
+    },
+    {
+      "path": "src/server/platform/db/schema.ts",
+      "description": "The application database schema, including encrypted columns, status enums and indexes.",
+      "scope": ["src/server/**"]
+    },
+    {
+      "path": "src/server/platform/db/catalog-schema.ts",
+      "description": "The catalog database schema, kept separate from app.sqlite.",
+      "scope": ["src/server/catalog/**", "src/server/platform/db/**"]
+    },
+    {
+      "path": "src/shared/plans.ts",
+      "description": "The prices and quotas of the Week and Month plans and the trial.",
+      "scope": [
+        "src/server/billing/**",
+        "src/server/routes/billing.ts",
+        "src/web/routes/profile-billing.tsx"
+      ]
+    }
+  ]
+}

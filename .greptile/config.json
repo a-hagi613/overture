@@ -1,0 +1,66 @@
+{
+  "autoReview": [],
+  "effort": "auto",
+  "strictness": 2,
+  "commentTypes": ["logic", "syntax"],
+  "statusCheck": false,
+  "statusCommentsEnabled": true,
+  "fixWithAI": true,
+  "ignorePatterns": "bun.lock\ndist/**\ndist-marketing/**\ntest-results/**\ndrizzle/meta/**\ndrizzle-catalog/meta/**\ndesign/reference/**\npublic/**\n**/*.snap",
+  "instructions": "Overture is a single-owner job-application agent: Bun + TypeScript, Hono on Bun, Drizzle ORM over SQLite (app.sqlite + catalog.sqlite, one machine, Litestream), Zod contracts shared between server and web, React 19 + React Query + Tailwind v4 (CSS-first @theme in src/web/styles.css, Ember design system) and Radix/shadcn primitives. Banned in product copy and code: Hold (as a stage), runner, lease, provider, dispatch, attempt, ledger, credit, CAPTCHA, Brain, Hands. The tools are the rules: bun lint, bun fmt --check, bun check, bun test src, bun run build, bun run lint:config and bun run db:verify must pass; never suggest silencing a rule, skipping a test or passing --no-verify as a fix. Ignore generated files, migration snapshots, design reference PNGs and build output.",
+  "rules": [
+    {
+      "id": "db-immediate-transactions",
+      "rule": "Any write that can race another connection must run inside db.transaction(callback, { behavior: \"immediate\" }), with a synchronous callback using .run(), and retryWhenBusy around chunked writers. A db.transaction(async ...) callback is a bug: drizzle/bun-sqlite commits before the awaited writes run. Flag deferred transactions on write paths.",
+      "scope": ["src/server/**"],
+      "severity": "high"
+    },
+    {
+      "id": "user-scoping",
+      "rule": "Every query and mutation that returns or changes a person's data must filter on the session user id from readSession/readSessionUser, never on a client-supplied id. The demo account is read-only: its writes must be refused on the server, not only hidden in the UI.",
+      "scope": ["src/server/**"],
+      "severity": "high"
+    },
+    {
+      "id": "no-rule-weakening",
+      "rule": "A change may not weaken the quality bar: no new oxlint/eslint disable comments, no --no-verify, no skipped, deleted or trivialised tests, no removed assertions, no threshold edited down, no unimplemented stub left behind. If a rule is wrong, it needs an ADR, not a suppression.",
+      "scope": ["**"],
+      "severity": "high"
+    },
+    {
+      "id": "migrations-additive",
+      "rule": "Migrations are additive and one per pull request: create table/index/column only, no drops or renames without an expand/contract plan, and the drizzle/meta journal entry must match the .sql file name and index. A destructive change needs an ADR and a backup/restore step.",
+      "scope": ["drizzle/**", "drizzle-catalog/**", "src/server/platform/db/**"],
+      "severity": "high"
+    },
+    {
+      "id": "billing-money-paths",
+      "rule": "Money paths must be idempotent and must not leak or double-charge: Stripe calls carry an Idempotency-Key, webhook events are claimed once before they write, an attempt's ledger reservation is released on every failure/abort/shutdown path, and a refund or status transition is guarded by the status it expects. Flag any path where a retry or crash can bill twice or strand a reservation.",
+      "scope": [
+        "src/server/billing/**",
+        "src/server/dispatch/**",
+        "src/server/routes/billing.ts",
+        "src/server/routes/admin.ts"
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "secrets-and-pii",
+      "rule": "Never log, return in a response, or persist unencrypted a secret, token, session cookie, Stripe key, or another person's personal data. Server logs go through logInfo/logError, not console. Ciphertext that cannot be opened must degrade to a null/empty result with a logged error, not a 500 that leaks the ciphertext.",
+      "scope": ["src/server/**", "scripts/**"],
+      "severity": "high"
+    },
+    {
+      "id": "ui-tokens-only",
+      "rule": "The web app uses the Ember tokens and the shared primitives in src/web/components/ui only: no raw hex/rgba colours, no arbitrary text sizes on product routes, no off-scale spacing in the strict paths enforced by overture/no-raw-design-styles. Interactive elements need a visible focus ring, a 44px touch target on phones, and an accessible name.",
+      "scope": ["src/web/**"],
+      "severity": "medium"
+    },
+    {
+      "id": "claims-match-code",
+      "rule": "Check the pull request description's claims against the diff: a summary that says a test, guard, header or migration exists must point at one that does. Report documentation drift in docs/SPEC.md, docs/DEPLOY.md, DESIGN.md, GLOSSARY.md or an ADR when behaviour changed without them.",
+      "scope": ["**"],
+      "severity": "medium"
+    }
+  ]
+}

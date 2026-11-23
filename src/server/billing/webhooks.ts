@@ -290,6 +290,13 @@ export function createPaymentsWebhookService(deps: {
         publishEvent(
           db,
           clock,
+          "billing.updated",
+          JSON.stringify({ billing: true }),
+          result.billingUpdatedUserId,
+        );
+        publishEvent(
+          db,
+          clock,
           "home.updated",
           JSON.stringify({ billing: true }),
           result.billingUpdatedUserId,

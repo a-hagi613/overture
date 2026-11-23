@@ -2,7 +2,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 
 import { expect, test } from "./app.fixture.ts";
 
-test("the sidebar Profile submenu opens on hover and navigates to Settings cleanly", async ({
+test("the sidebar Profile submenu opens on hover and navigates to Account cleanly", async ({
   browser,
   appServerUrl,
   ownerStorageState,
@@ -24,14 +24,14 @@ test("the sidebar Profile submenu opens on hover and navigates to Settings clean
   await expect(profileLink).toHaveAttribute("aria-expanded", "true");
 
   await Promise.all(
-    ["Resume & Cover Letter", "Personal Details", "Job Preferences", "Billing", "Settings"].map(
+    ["Resume & Cover Letter", "Personal Details", "Job Preferences", "Billing", "Account"].map(
       async (item) => {
         await expect(aside.getByRole("menuitem", { name: item })).toBeVisible();
       },
     ),
   );
 
-  await aside.getByRole("menuitem", { name: "Settings" }).click();
+  await aside.getByRole("menuitem", { name: "Account" }).click();
   await expect(page).toHaveURL(/\/profile\/account$/u);
   await expect(page.getByRole("heading", { level: 1, name: "Account Settings" })).toBeVisible();
 
