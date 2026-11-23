@@ -515,8 +515,8 @@ fly secrets set \
 
 ### 4. Verify the whole path
 
-The check script is read-only and idempotent. It resolves DNS, probes `https://<host>/admin/api/session` over HTTPS and
-classifies the answer (a Cloudflare Access sign-in redirect or `401 access_required` passes; a `200 text/html` app
+The check script is read-only and idempotent. It resolves DNS, probes `https://<origin>/admin/api/session` over HTTPS
+and classifies the answer (a Cloudflare Access sign-in redirect or `401 access_required` passes; a `200 text/html` app
 shell is the SPA bug), then reads the Fly certificate and secret **names** with `flyctl`. It never reads or prints a
 secret value.
 
@@ -525,9 +525,9 @@ bun run scripts/check-admin-host.ts
 bun run scripts/check-admin-host.ts --json
 ```
 
-Exit `0` means every check passed; exit `1` prints the gaps. Use `--origin https://admin.example.test --no-fly` to check
-a host without Fly access, and `--host` to name the DNS record when it differs from the origin's hostname. The matching
-unit tests run with `bun test scripts/check-admin-host.test.ts`.
+Exit `0` means every check passed; exit `1` prints the gaps. Use `--no-fly` to skip the two Fly reads when `flyctl` is
+unavailable, and `--host` to name the DNS record when it differs from the origin's hostname. The matching unit tests run
+with `bun test scripts/check-admin-host.test.ts`.
 
 Finally sign in as the owner, open `/profile/account` and confirm the **Admin Portal** card, then open `/admin` on
 `tryoverture.com` and confirm the handoff card opens `https://admin.tryoverture.com/admin` through Access and the
