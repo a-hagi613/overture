@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import type { ReactNode } from "react";
 
 import { cn } from "./cn.ts";
@@ -17,7 +17,8 @@ export function SegmentedControl({
   onValueChange: (value: string) => void;
   value: string;
 }) {
-  const context = useMemo(() => ({ onValueChange, value }), [onValueChange, value]);
+  const groupRef = useRef<HTMLFieldSetElement>(null);
+  const context = useMemo(() => ({ groupRef, onValueChange, value }), [onValueChange, value]);
 
   return (
     <fieldset
@@ -26,6 +27,7 @@ export function SegmentedControl({
         "m-0 inline-flex min-w-0 items-center gap-1 rounded-lg border border-border bg-muted p-1 text-muted-foreground",
         className,
       )}
+      ref={groupRef}
     >
       <SegmentedControlContext.Provider value={context}>
         {children}

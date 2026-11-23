@@ -1,5 +1,6 @@
 import { AxeBuilder } from "@axe-core/playwright";
 import { request as apiRequest } from "@playwright/test";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
@@ -32,7 +33,24 @@ const test = appTest.extend<{ uiServer: AppServer }>({
 
 const SHEET = 'dialog[aria-label="Application detail"]';
 const reviewCreatedSchema = z.object({ questionId: z.string(), reviewId: z.string() });
+
+const applicationStageSchema = z.object({
+  application: z.object({ stage: z.string().nullable() }),
+});
+
+const clockSchema = z.object({ now: z.number() });
+
 const WAITING_LABEL = TRACKER_LANES.find((lane) => lane.key === "waiting")?.label ?? "Waiting";
+
+function laneLabel(key: string) {
+  return TRACKER_LANES.find((lane) => lane.key === key)?.label ?? key;
+}
+
+async function storedStage(request: APIRequestContext, id: string) {
+  return applicationStageSchema.parse(
+    await (await request.get(`/api/applications/${encodeURIComponent(id)}`)).json(),
+  ).application.stage;
+}
 
 const REVIEW_WORDS = ["alpha", "beta"] as const;
 
@@ -137,6 +155,16 @@ test("view switches are segmented controls and the detail sheet has real tab pan
   await expect(panel).toHaveAttribute("role", "tabpanel");
   await expect(panel).toHaveAttribute("aria-labelledby", (await timeline.getAttribute("id")) ?? "");
   await expect(panel).toHaveAttribute("tabindex", "0");
+
+  await timeline.focus();
+  await page.keyboard.press("Tab");
+
+  expect(await panel.evaluate((element) => element === globalThis.document.activeElement)).toBe(
+    true,
+  );
+  expect(await panel.evaluate((element) => globalThis.getComputedStyle(element).outlineWidth)).toBe(
+    "2px",
+  );
 
   const sheetAxe = await new AxeBuilder({ page }).include(SHEET).analyze();
 
@@ -243,6 +271,183 @@ test("the Review question and filter live in the URL and Back returns to the pho
   await page.goBack();
   await expect(page.getByRole("heading", { name: second.prompt })).toHaveCount(0);
   await expect(page.getByRole("button", { name: new RegExp(second.company, "u") })).toBeVisible();
+
+  await page.goForward();
+  await expect(page.getByRole("heading", { name: second.prompt })).toBeVisible();
+  await expect(page).toHaveURL(/[?&]question=/u);
+
+  await context.close();
+  await request.dispose();
+});
+
+test("the phone stage tabs move lanes with Arrow, Home and End when each tab is wrapped", async ({
+  uiServer,
+  browser,
+}) => {
+  const request = await apiRequest.newContext({ baseURL: uiServer.url });
+  const userId = await seedBoardOwner(request, uiServer.url);
+
+  await seedTrackerBoard(request, userId);
+
+  const storageState = await request.storageState();
+  const context = await browser.newContext({ storageState, viewport: { height: 844, width: 390 } });
+  const page = await context.newPage();
+
+  await page.goto(`${uiServer.url}/board`);
+
+  const lanes = page.getByRole("group", { name: copy.board.stagesLabel });
+  const lane = (key: string) => lanes.getByRole("button", { name: laneLabel(key), exact: true });
+
+  await expect(lane("applied")).toHaveAttribute("aria-pressed", "true");
+  await lane("applied").focus();
+
+  await page.keyboard.press("ArrowRight");
+  await expect(lane("waiting")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(`section[aria-label="${laneLabel("waiting")}"]`)).toBeVisible();
+
+  await page.keyboard.press("End");
+  await expect(lane("closed")).toBeFocused();
+  await expect(lane("closed")).toHaveAttribute("aria-pressed", "true");
+
+  await page.keyboard.press("Home");
+  await expect(lane("review")).toBeFocused();
+  await expect(lane("review")).toHaveAttribute("aria-pressed", "true");
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(lane("closed")).toHaveAttribute("aria-pressed", "true");
+
+  await context.close();
+  await request.dispose();
+});
+
+test("crossing to the desktop layout closes the phone More sheet and frees the page", async ({
+  uiServer,
+  browser,
+}) => {
+  const request = await apiRequest.newContext({ baseURL: uiServer.url });
+
+  await seedBoardOwner(request, uiServer.url);
+
+  const storageState = await request.storageState();
+  const context = await browser.newContext({ storageState, viewport: { height: 844, width: 390 } });
+  const page = await context.newPage();
+
+  await page.goto(`${uiServer.url}/home`);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  await page.getByRole("button", { name: copy.nav.profilePages.mobileMore }).click();
+
+  const sheet = page.locator('dialog[aria-labelledby="mobile-nav-sheet-title"]');
+
+  await expect(sheet).toBeVisible();
+  expect(await sheet.evaluate((element) => element.matches(":modal"))).toBe(true);
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
+
+  await page.setViewportSize({ height: 900, width: 1280 });
+
+  await expect(sheet).toHaveCount(0);
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
+  await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
+
+  await page.getByRole("button", { name: copy.shell.collapseSidebar }).click();
+  await expect(page.getByRole("button", { name: copy.shell.collapseSidebar })).toHaveCount(0);
+
+  await context.close();
+  await request.dispose();
+});
+
+test("a toast raised while the board sheet is open stays in the top layer and its Undo works", async ({
+  uiServer,
+  browser,
+}) => {
+  const request = await apiRequest.newContext({ baseURL: uiServer.url });
+  const userId = await seedBoardOwner(request, uiServer.url);
+
+  await seedTrackerBoard(request, userId);
+
+  const storageState = await request.storageState();
+  const context = await browser.newContext({ storageState, viewport: { height: 844, width: 390 } });
+  const page = await context.newPage();
+
+  const eventsConnected = page.waitForResponse(
+    (response) => response.url().endsWith("/api/events") && response.status() === 200,
+  );
+
+  await page.goto(`${uiServer.url}/board`);
+  await eventsConnected;
+
+  const card = page.locator('section[aria-label="Applied"] button[data-card]').first();
+  const id = await card.getAttribute("data-card");
+
+  expect(id).not.toBeNull();
+
+  const applicationId = id ?? "";
+
+  await card.click();
+
+  const sheet = page.locator(SHEET);
+
+  await expect(sheet).toBeVisible();
+
+  const moved = await request.patch(
+    `/api/applications/${encodeURIComponent(applicationId)}/stage`,
+    {
+      data: { position: null, stage: "screening" },
+    },
+  );
+
+  expect(moved.ok(), `${String(moved.status())} ${await moved.text()}`).toBe(true);
+  await expect.poll(async () => storedStage(request, applicationId)).toBe("screening");
+
+  const clock = clockSchema.parse(await (await request.get("/__test__/clock")).json());
+
+  const seeded = await request.post("/__test__/applications/events/seed", {
+    data: {
+      applicationId,
+      events: [
+        {
+          at: clock.now + 60_000,
+          detail: "A recruiter asked for your availability. Moved to Screening.",
+          fromValue: "applied",
+          kind: "stage",
+          source: "email",
+          toValue: "screening",
+        },
+      ],
+    },
+  });
+
+  expect(seeded.ok(), `${String(seeded.status())} ${await seeded.text()}`).toBe(true);
+
+  const published = await request.post("/__test__/events/publish", {
+    data: {
+      payload: { applicationId, source: "email", stage: "screening" },
+      topic: "board.moved",
+      userId,
+    },
+  });
+
+  expect(published.ok(), `${String(published.status())} ${await published.text()}`).toBe(true);
+
+  const toast = page.locator("[data-sonner-toast]");
+
+  await expect(toast).toContainText(copy.board.moved(copy.board.columns.screening));
+  expect(await toast.evaluate((element) => element.closest("dialog") !== null)).toBe(true);
+
+  const undo = toast.getByRole("button", { name: copy.board.undo });
+
+  await expect(undo).toBeVisible();
+  await undo.click();
+
+  await expect.poll(async () => storedStage(request, applicationId)).toBe("applied");
+  await expect(toast).toHaveCount(0);
+
+  await page.keyboard.press("Control+k");
+  await expect(page.getByPlaceholder(copy.shell.searchPlaceholder)).toBeVisible();
+  await expect(sheet).toHaveCount(0);
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByPlaceholder(copy.shell.searchPlaceholder)).toHaveCount(0);
 
   await context.close();
   await request.dispose();
@@ -394,9 +599,23 @@ test("the theme flip cross-fades and stays instant under reduced motion", async 
 
   const page = await context.newPage();
 
-  await page.goto(`${uiServer.url}/home`);
+  const homeResponse = await page.goto(`${uiServer.url}/home`);
+
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(page.locator('script[src="/theme-boot.js"]')).toHaveCount(1);
+
+  const bootScripts = page.locator("head script:not([src])");
+
+  await expect(bootScripts).toHaveCount(1);
+  await expect(page.locator('script[src="/theme-boot.js"]')).toHaveCount(0);
+
+  const bootCode = (await bootScripts.first().textContent()) ?? "";
+
+  expect(bootCode).toContain("overture.theme");
+  const servedCsp = homeResponse?.headers()["content-security-policy"] ?? "";
+
+  expect(servedCsp).toContain(
+    `'sha256-${createHash("sha256").update(bootCode, "utf8").digest("base64")}'`,
+  );
 
   const switched = await page.evaluate(() => {
     document.querySelector<HTMLElement>('[role="switch"]')?.click();

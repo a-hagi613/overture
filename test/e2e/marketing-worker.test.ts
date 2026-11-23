@@ -132,6 +132,7 @@ test("the prerendered marketing pages serve while the origin is down", async () 
       expect(page.status, page.path).toBe(200);
       expect(page.html, page.path).toContain('<div id="root"><');
       expect(page.html, page.path).toMatch(/<style>[\s\S]{1000,}<\/style>/u);
+      expect(page.html, page.path).not.toContain("theme-boot.js");
       expect(page.html, page.path).not.toMatch(
         /<link\b[^>]*rel="stylesheet"[^>]*href="\/assets\//u,
       );

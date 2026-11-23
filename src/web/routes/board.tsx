@@ -165,6 +165,10 @@ export function BoardPage() {
 
     if (closing !== null) {
       globalThis.requestAnimationFrame(() => {
+        if (document.querySelector("dialog[open]") !== null) {
+          return;
+        }
+
         const candidates = [
           ...document.querySelectorAll<HTMLButtonElement>(`button[data-card="${closing}"]`),
         ];

@@ -326,9 +326,10 @@ ease-out`; the tokens are in `src/web/styles.css` and `transition` inherits the 
 Never add a bespoke `transition-all` to a UI surface.
 
 The theme toggle cross-fades the surface colours over 180ms (`.theme-switching`, colour properties only,
-so nothing reflows) and removes the class when it ends. A theme is chosen before first paint by the
-synchronous `/theme-boot.js` class set, so a refresh in dark never flashes light. Under
-`prefers-reduced-motion` the blanket reset shortens the cross-fade to an instant change.
+so nothing reflows) and removes the class when it ends. A theme is chosen before first paint by the inline
+`theme-boot` script in `<head>` (admitted by a CSP hash, so it needs no origin request), so a refresh in
+dark never flashes light. Under `prefers-reduced-motion` the blanket reset shortens the cross-fade to an
+instant change.
 
 ### Marketing motion
 
@@ -447,8 +448,9 @@ The URL owns the open panel and the current filter, so refresh, Back and a share
 the Board uses `?card=<application>&filter=<lane>` (the phone stage lane; `application` is read as the
 pre-#545 alias), and Review uses `?question=<review>&filter=<category>`. Opening a card or a question
 pushes one history entry, so Back closes it; closing, stepping to the next card and changing a filter
-replace the current entry so browsing does not fill history. Defaults stay as before: no `filter` means
-all, and no `card`/`question` means no sheet and the first visible review.
+replace the current entry so browsing does not fill history. Defaults stay as before: with no `filter`
+the Board opens on **Applied** and Review shows every category, and no `card`/`question` means no sheet
+and the first visible review or card.
 
 A nav count badge is live product data, never a drawn sample: Ready counts the Applications waiting for
 approval, Review the open Reviews, Inbox the unread employer mail. No badge shows at zero, and the link's
@@ -506,13 +508,16 @@ inside a shadow, never nest a sheet in a card, and never put text directly on th
 |---|---|---|
 | 20 | `z-20` | Sidebar, icon rail, sticky board header |
 | 50 | `z-50` | Phone tab bar, dialogs, command palette, popovers, menus |
-| 60 | `z-60` | Sheet scrim and sheet (detail sheet, code-paste sheet, phone More) |
+| 60 | `z-60` | A sheet panel and its scrim while it is not modal (none ship today) |
 | 70 | `z-70` | Toasts (Sonner) |
 
-Nothing sits above 70. The sheets are native `<dialog>` elements rendered with the `open` attribute, which
-keeps them in the normal document layer at z-60 with the scrim (also z-60, before the panel); `open` does not
-put a dialog in the top layer. A true top-layer modal (`showModal()`, `inert`, a focus trap and Escape
-restoration) is #545 item 3 and is not shipped yet.
+Nothing sits above 70 in the document layer. Every sheet is a native `<dialog>` opened with
+`showModal()`, so the panel and its `::backdrop` scrim live in the browser's top layer, above every
+z-index here and outside it; a z-index cannot cross the top layer. Because a modal `<dialog>` makes the
+rest of the document inert, the shared overlays join it: the Toaster is portaled into the open sheet's
+`<dialog>`, so a toast and its Undo stay visible and clickable while the sheet is open, and ⌘K closes an
+open sheet before the command palette opens. Hiding a sheet with `md:hidden` is not a close: the sheet
+unmounts when the phone More menu crosses to the desktop layout.
 
 ## 9. Patterns
 

@@ -1,6 +1,13 @@
+/**
+ * The inline boot script `<head>` runs before first paint to set the theme class. It is inline so the
+ * marketing landing, which is served from Cloudflare and must survive a Fly outage, never waits on an
+ * origin request. The CSP admits it by this hash; `scripts/theme-boot-csp.test.ts` fails if the two drift.
+ */
+export const THEME_BOOT_SCRIPT_HASH = "sha256-u/CaloeB9iEmoIBLvpcbkLGHBziQNGzLq0ZT8UQstPY=";
+
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
-  "script-src 'self' https://challenges.cloudflare.com",
+  `script-src 'self' '${THEME_BOOT_SCRIPT_HASH}' https://challenges.cloudflare.com`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob:",

@@ -1,5 +1,5 @@
 import { Home, MoreHorizontal, Search, SquareKanban, User } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router";
 
 import type { NavCounts } from "../lib/nav-api.ts";
@@ -8,6 +8,8 @@ import { copy } from "../../shared/copy.ts";
 import { MobileNavSheet } from "./mobile-nav-sheet.tsx";
 import type { MobileSheetKind } from "./mobile-nav-sheet.tsx";
 import { navLabel } from "../lib/nav-api.ts";
+
+const DESKTOP_QUERY = "(min-width: 768px)";
 
 const BOARD_PATHS = new Set(["/board", "/ready", "/review", "/inbox", "/calendar"]);
 
@@ -22,6 +24,22 @@ export function TabBar({
 }) {
   const { pathname } = useLocation();
   const [openSheet, setOpenSheet] = useState<MobileSheetKind | null>(null);
+
+  useEffect(() => {
+    const query = globalThis.matchMedia(DESKTOP_QUERY);
+
+    const onChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setOpenSheet(null);
+      }
+    };
+
+    query.addEventListener("change", onChange);
+
+    return () => {
+      query.removeEventListener("change", onChange);
+    };
+  }, []);
 
   const boardAlerts = counts.ready + counts.review + counts.inboxUnread;
 

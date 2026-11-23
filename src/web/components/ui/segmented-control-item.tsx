@@ -6,15 +6,13 @@ import { SegmentedControlContext } from "./segmented-control-context.ts";
 
 const NAVIGATION_KEYS = new Set(["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp", "End", "Home"]);
 
-function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, group: HTMLElement | null) {
   if (!NAVIGATION_KEYS.has(event.key)) {
     return;
   }
 
   const items = [
-    ...(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
-      "[data-segment]:not(:disabled)",
-    ) ?? []),
+    ...(group?.querySelectorAll<HTMLButtonElement>("[data-segment]:not(:disabled)") ?? []),
   ];
 
   const current = items.indexOf(event.currentTarget);
@@ -70,7 +68,9 @@ export function SegmentedControlItem({
       onClick={() => {
         control?.onValueChange(value);
       }}
-      onKeyDown={handleKeyDown}
+      onKeyDown={(event) => {
+        handleKeyDown(event, control?.groupRef.current ?? null);
+      }}
       tabIndex={selected ? 0 : -1}
       type="button"
     >

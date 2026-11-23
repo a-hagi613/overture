@@ -33,9 +33,9 @@ export function ReviewPage() {
 
   useEffect(() => {
     const onPopState = () => {
-      if (new URLSearchParams(globalThis.location.search).get("question") === null) {
-        setMobileListOpen(true);
-      }
+      const params = new URLSearchParams(globalThis.location.search);
+
+      setMobileListOpen(params.get("question") === null);
     };
 
     globalThis.addEventListener("popstate", onPopState);
