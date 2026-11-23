@@ -100,7 +100,10 @@ async function shot(
 
   if (input.waitForEnabledButtons === true) {
     await page.waitForFunction(
-      () => document.querySelectorAll("main button:disabled").length === 0,
+      () =>
+        [...document.querySelectorAll<HTMLButtonElement>("main button")].every(
+          (button) => !button.disabled && getComputedStyle(button).opacity === "1",
+        ),
       undefined,
       { timeout: 15_000 },
     );
