@@ -36,7 +36,7 @@ import { createAccessVerifier } from "../platform/access/index.ts";
 import { env } from "../config/env.ts";
 import { hasRecentPasskeyAssertion, lastPasskeyAssertionAt } from "../platform/passkey/index.ts";
 import { listAdminAudit, recordAdminAudit, shipAdminAudit } from "../platform/audit/index.ts";
-import { readLlmUsage } from "../platform/llm/usage.ts";
+import { readAdminLlmUsage } from "../platform/llm/usage.ts";
 import { applicationsLeft, balancesPerGrant, grantApplications } from "../billing/ledger.ts";
 import {
   BILLING_FILTERS,
@@ -132,8 +132,35 @@ const llmUsageQuery = z.object({
   limit: z.coerce.number().int().min(1).max(1000).default(100),
 });
 
+const ATTEMPT_OUTCOME_FILTERS = [
+  "all",
+  "completed",
+  "challenge_blocked",
+  "error",
+  "timeout",
+] as const;
+
+const ATTEMPT_OUTCOME_GROUPS = {
+  challenge_blocked: ["captcha_blocked", "blocked"],
+  completed: ["sent"],
+  error: [
+    "provider_error",
+    "crash",
+    "upload_failed",
+    "form_changed",
+    "identity_mismatch",
+    "posting_closed",
+    "duplicate",
+    "needs_review",
+    "unconfirmed",
+    "interrupted",
+  ],
+  timeout: ["timeout", "code_timeout"],
+} as const;
+
 const attemptsQuery = z.object({
   applicationId: z.string().min(1).optional(),
+  outcome: z.enum(ATTEMPT_OUTCOME_FILTERS).default("all"),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
@@ -1194,32 +1221,90 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
   routes.get("/llm-usage", validQuery(llmUsageQuery), (context) => {
     const { purpose, limit } = context.req.valid("query");
 
-    return context.json(readLlmUsage(db, { purpose: purpose ?? null, sinceMs: null, limit }));
+    return context.json(
+      readAdminLlmUsage(db, clock, {
+        expectedModel: env.ANTHROPIC_MODEL,
+        limit,
+        purpose: purpose ?? null,
+      }),
+    );
   });
 
   routes.get("/attempts", validQuery(attemptsQuery), (context) => {
-    const { applicationId, limit } = context.req.valid("query");
+    const { applicationId, outcome, limit } = context.req.valid("query");
+
+    const baseFilter =
+      applicationId === undefined ? undefined : eq(attempts.applicationId, applicationId);
+
+    const outcomeFilter =
+      outcome === "all" ? undefined : inArray(attempts.outcome, ATTEMPT_OUTCOME_GROUPS[outcome]);
+
+    const filters = [baseFilter, outcomeFilter].filter((clause) => clause !== undefined);
+    const whereClause = filters.length === 0 ? undefined : and(...filters);
+
+    const countRows = db
+      .select({ outcome: attempts.outcome, total: count() })
+      .from(attempts)
+      .where(baseFilter)
+      .groupBy(attempts.outcome)
+      .all();
+
+    const counts = {
+      active: 0,
+      all: 0,
+      challenge_blocked: 0,
+      completed: 0,
+      error: 0,
+      timeout: 0,
+    };
+
+    const challengeOutcomes = new Set<string>(ATTEMPT_OUTCOME_GROUPS.challenge_blocked);
+    const completedOutcomes = new Set<string>(ATTEMPT_OUTCOME_GROUPS.completed);
+    const timeoutOutcomes = new Set<string>(ATTEMPT_OUTCOME_GROUPS.timeout);
+
+    for (const row of countRows) {
+      counts.all += row.total;
+
+      if (row.outcome === null) {
+        counts.active += row.total;
+      } else if (completedOutcomes.has(row.outcome)) {
+        counts.completed += row.total;
+      } else if (challengeOutcomes.has(row.outcome)) {
+        counts.challenge_blocked += row.total;
+      } else if (timeoutOutcomes.has(row.outcome)) {
+        counts.timeout += row.total;
+      } else {
+        counts.error += row.total;
+      }
+    }
 
     const rows = db
       .select({
         attempt: attempts,
         ats: applications.ats,
+        companyName: applications.companyName,
         postingTitle: applications.postingTitle,
       })
       .from(attempts)
       .innerJoin(applications, eq(attempts.applicationId, applications.id))
-      .where(applicationId === undefined ? undefined : eq(attempts.applicationId, applicationId))
+      .where(whereClause)
       .orderBy(desc(attempts.startedAt))
       .limit(limit)
       .all();
 
     return context.json({
+      now: clock.now(),
+      counts,
       attempts: rows.map((row) => ({
         applicationId: row.attempt.applicationId,
         ats: row.ats,
         browserMs: row.attempt.browserMs,
+        captchaSeen: row.attempt.captchaSeen,
+        codeUsed: row.attempt.codeUsed,
+        companyName: row.companyName,
         costMicros: row.attempt.costMicros,
         endedAt: row.attempt.endedAt,
+        errorCode: row.attempt.errorCode,
         id: row.attempt.id,
         outcome: row.attempt.outcome,
         postingTitle: row.postingTitle,

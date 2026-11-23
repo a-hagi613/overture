@@ -13,6 +13,8 @@ const themes = ["light", "dark"] as const;
 
 const destinations = [
   { name: "Overview", url: /\/admin$/u },
+  { name: "Attempts", url: /\/admin\/attempts$/u },
+  { name: "LLM spend", url: /\/admin\/llm$/u },
   { name: "Users", url: /\/admin\/users$/u },
   { name: "Invites", url: /\/admin\/invites$/u },
   { name: "Grants", url: /\/admin\/grants$/u },
