@@ -3,11 +3,18 @@ import { and, desc, eq, gte, sql } from "drizzle-orm";
 import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 import { llmUsage } from "../db/schema.ts";
+import { getSetting } from "../settings/index.ts";
 
 export const DAY_MS = 86_400_000;
 
 export function dayStartUtc(atMs: number) {
   return Math.floor(atMs / DAY_MS) * DAY_MS;
+}
+
+export function monthStartUtc(atMs: number) {
+  const date = new Date(atMs);
+
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1);
 }
 
 export interface LlmUsageCall {
@@ -139,6 +146,129 @@ export function readLlmUsage(db: AppDatabase, query: LlmUsageQuery) {
       cachedTokens: rows.reduce((total, row) => total + row.cachedTokens, 0),
       outputTokens: rows.reduce((total, row) => total + row.outputTokens, 0),
       costMicros: rows.reduce((total, row) => total + row.costMicros, 0),
+    },
+  };
+}
+
+function parseMicrosSetting(db: AppDatabase, key: string) {
+  const raw = getSetting(db, key);
+
+  if (raw === null) {
+    return null;
+  }
+
+  const parsed = Number(raw);
+
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;
+}
+
+function parseUsdSettingMicros(db: AppDatabase, key: string) {
+  const raw = getSetting(db, key);
+  const parsed = raw === null ? Number.NaN : Number(raw);
+
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 1_000_000) : 0;
+}
+
+function readTotalsWindow(db: AppDatabase, sinceMs: number | null) {
+  const selection = db
+    .select({
+      calls: sql<number>`count(*)`,
+      inputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)`,
+      cachedTokens: sql<number>`coalesce(sum(${llmUsage.cachedTokens}), 0)`,
+      outputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)`,
+      costMicros: sql<number>`coalesce(sum(${llmUsage.costMicros}), 0)`,
+    })
+    .from(llmUsage);
+
+  const row = (
+    sinceMs === null ? selection : selection.where(gte(llmUsage.createdAt, sinceMs))
+  ).get();
+
+  return {
+    calls: row?.calls ?? 0,
+    inputTokens: row?.inputTokens ?? 0,
+    cachedTokens: row?.cachedTokens ?? 0,
+    outputTokens: row?.outputTokens ?? 0,
+    costMicros: row?.costMicros ?? 0,
+  };
+}
+
+function isExpectedModel(model: string, expectedModel: string) {
+  return model === expectedModel || model.startsWith(`${expectedModel}-`);
+}
+
+export interface AdminLlmUsageQuery {
+  expectedModel: string;
+  limit: number;
+  purpose: string | null;
+}
+
+export function readAdminLlmUsage(db: AppDatabase, clock: Clock, query: AdminLlmUsageQuery) {
+  const now = clock.now();
+  const base = readLlmUsage(db, { purpose: query.purpose, sinceMs: null, limit: query.limit });
+
+  const byPurpose = db
+    .select({
+      purpose: llmUsage.purpose,
+      calls: sql<number>`count(*)`,
+      inputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)`,
+      cachedTokens: sql<number>`coalesce(sum(${llmUsage.cachedTokens}), 0)`,
+      outputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)`,
+      costMicros: sql<number>`coalesce(sum(${llmUsage.costMicros}), 0)`,
+    })
+    .from(llmUsage)
+    .groupBy(llmUsage.purpose)
+    .orderBy(desc(sql`coalesce(sum(${llmUsage.costMicros}), 0)`), desc(sql`count(*)`))
+    .all();
+
+  const modelSelection = db
+    .select({
+      model: llmUsage.model,
+      calls: sql<number>`count(*)`,
+      inputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)`,
+      cachedTokens: sql<number>`coalesce(sum(${llmUsage.cachedTokens}), 0)`,
+      outputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)`,
+      costMicros: sql<number>`coalesce(sum(${llmUsage.costMicros}), 0)`,
+    })
+    .from(llmUsage);
+
+  const modelRows = (
+    query.purpose === null
+      ? modelSelection
+      : modelSelection.where(eq(llmUsage.purpose, query.purpose))
+  )
+    .groupBy(llmUsage.model)
+    .orderBy(desc(sql`coalesce(sum(${llmUsage.costMicros}), 0)`), desc(sql`count(*)`))
+    .all();
+
+  const dailySpendCapMicros =
+    parseMicrosSetting(db, "llm.daily_spend_cap_micros") ??
+    parseUsdSettingMicros(db, "llm.cap_global_day_usd");
+
+  const monthlySpendCapMicros = parseMicrosSetting(db, "llm.monthly_spend_cap_micros");
+
+  return {
+    ...base,
+    now,
+    expectedModel: query.expectedModel,
+    today: readTotalsWindow(db, dayStartUtc(now)),
+    month: readTotalsWindow(db, monthStartUtc(now)),
+    allTime: readTotalsWindow(db, null),
+    byPurpose,
+    byModel: modelRows.map((row) => ({
+      cachedTokens: row.cachedTokens,
+      calls: row.calls,
+      costMicros: row.costMicros,
+      inputTokens: row.inputTokens,
+      model: row.model,
+      outputTokens: row.outputTokens,
+      unexpected: !isExpectedModel(row.model, query.expectedModel),
+    })),
+    caps: {
+      dailySpendCapMicros,
+      monthlySpendCapMicros,
+      userDailyCapMicros: parseUsdSettingMicros(db, "llm.cap_user_day_usd"),
+      taggingDailyCapMicros: parseUsdSettingMicros(db, "llm.cap_tagging_day_usd"),
     },
   };
 }

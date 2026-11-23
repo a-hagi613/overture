@@ -851,3 +851,245 @@ export const reinstateUser = async (id: string, reason: string) =>
     { reason },
     adminSuspendResponseSchema,
   );
+
+export const attemptOutcomeFilterSchema = z.enum([
+  "all",
+  "completed",
+  "challenge_blocked",
+  "error",
+  "timeout",
+]);
+
+export const attemptProviderSchema = z.enum(["browser_use", "kernel", "local"]);
+
+export const attemptOutcomeSchema = z.enum([
+  "sent",
+  "unconfirmed",
+  "captcha_blocked",
+  "code_timeout",
+  "posting_closed",
+  "form_changed",
+  "blocked",
+  "upload_failed",
+  "duplicate",
+  "identity_mismatch",
+  "needs_review",
+  "provider_error",
+  "timeout",
+  "crash",
+  "interrupted",
+]);
+
+export const attemptRowSchema = z.object({
+  applicationId: z.string(),
+  ats: z.string().nullable(),
+  browserMs: z.number().nullable(),
+  captchaSeen: z.boolean(),
+  codeUsed: z.boolean(),
+  companyName: z.string(),
+  costMicros: z.number().nullable(),
+  endedAt: z.number().nullable(),
+  errorCode: z.string().nullable(),
+  id: z.string(),
+  liveUrl: z.string(),
+  outcome: attemptOutcomeSchema.nullable(),
+  postingTitle: z.string(),
+  provider: attemptProviderSchema,
+  providerSessionId: z.string().nullable(),
+  proxyBytes: z.number().nullable(),
+  replayUrl: z.string(),
+  startedAt: z.number(),
+});
+
+export const attemptsCountsSchema = z.object({
+  active: z.number(),
+  all: z.number(),
+  challenge_blocked: z.number(),
+  completed: z.number(),
+  error: z.number(),
+  timeout: z.number(),
+});
+
+export const attemptsResponseSchema = z.object({
+  attempts: z.array(attemptRowSchema),
+  counts: attemptsCountsSchema,
+  now: z.number(),
+});
+
+export const attemptLiveSchema = z.object({
+  liveViewUrl: z.string().nullable(),
+  recordingUrl: z.string().nullable(),
+  status: z.enum(["active", "stopped"]),
+});
+
+export const attemptReplaySchema = z.object({
+  recordingUrl: z.string(),
+});
+
+const attemptUnavailableBodySchema = z.object({
+  error: z.enum(["not_found", "provider_unavailable"]),
+});
+
+export const llmUsageTotalsSchema = z.object({
+  cachedTokens: z.number(),
+  calls: z.number(),
+  costMicros: z.number(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+});
+
+export const llmUsageRowSchema = z.object({
+  cachedTokens: z.number(),
+  costMicros: z.number(),
+  createdAt: z.number(),
+  id: z.string(),
+  inputTokens: z.number(),
+  model: z.string(),
+  outputTokens: z.number(),
+  purpose: z.string(),
+  userId: z.string().nullable(),
+});
+
+export const llmUsagePurposeRowSchema = llmUsageTotalsSchema.extend({
+  purpose: z.string(),
+});
+
+export const llmUsageModelRowSchema = llmUsageTotalsSchema.extend({
+  model: z.string(),
+  unexpected: z.boolean(),
+});
+
+export const llmUsageCapsSchema = z.object({
+  dailySpendCapMicros: z.number(),
+  monthlySpendCapMicros: z.number().nullable(),
+  taggingDailyCapMicros: z.number(),
+  userDailyCapMicros: z.number(),
+});
+
+export const llmUsageResponseSchema = z.object({
+  allTime: llmUsageTotalsSchema,
+  byModel: z.array(llmUsageModelRowSchema),
+  byPurpose: z.array(llmUsagePurposeRowSchema),
+  caps: llmUsageCapsSchema,
+  expectedModel: z.string(),
+  month: llmUsageTotalsSchema,
+  now: z.number(),
+  rows: z.array(llmUsageRowSchema),
+  today: llmUsageTotalsSchema,
+  totals: llmUsageTotalsSchema,
+});
+
+export type AttemptOutcomeFilter = z.infer<typeof attemptOutcomeFilterSchema>;
+
+export type AttemptOutcome = z.infer<typeof attemptOutcomeSchema>;
+
+export type AttemptRow = z.infer<typeof attemptRowSchema>;
+
+export type AttemptsCounts = z.infer<typeof attemptsCountsSchema>;
+
+export type AttemptsResponse = z.infer<typeof attemptsResponseSchema>;
+
+export type AttemptLive = z.infer<typeof attemptLiveSchema>;
+
+export type AttemptReplay = z.infer<typeof attemptReplaySchema>;
+
+export type AttemptViewResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; refusal: AdminRefusalCode }
+  | { ok: false; unavailable: "not_found" | "provider_unavailable" };
+
+export type LlmUsageTotals = z.infer<typeof llmUsageTotalsSchema>;
+
+export type LlmUsageRow = z.infer<typeof llmUsageRowSchema>;
+
+export type LlmUsagePurposeRow = z.infer<typeof llmUsagePurposeRowSchema>;
+
+export type LlmUsageModelRow = z.infer<typeof llmUsageModelRowSchema>;
+
+export type LlmUsageCaps = z.infer<typeof llmUsageCapsSchema>;
+
+export type LlmUsageResponse = z.infer<typeof llmUsageResponseSchema>;
+
+async function adminOptionalView<T>(path: string, schema: z.ZodType<T>) {
+  const response = await fetch(path);
+  const raw: unknown = await response.json();
+  const refusal = refusalBodySchema.safeParse(raw);
+
+  if (!response.ok && refusal.success) {
+    const denied: AttemptViewResult<T> = { ok: false, refusal: refusal.data.error };
+
+    return denied;
+  }
+
+  const unavailable = attemptUnavailableBodySchema.safeParse(raw);
+
+  if (response.status === 404 && unavailable.success) {
+    const missing: AttemptViewResult<T> = { ok: false, unavailable: unavailable.data.error };
+
+    return missing;
+  }
+
+  if (!response.ok) {
+    throw new Error(`The admin request did not go through (${String(response.status)}).`);
+  }
+
+  const loaded: AttemptViewResult<T> = { ok: true, data: schema.parse(raw) };
+
+  return loaded;
+}
+
+export const fetchAdminAttempts = async (
+  input: {
+    applicationId?: string | undefined;
+    limit?: number | undefined;
+    outcome?: AttemptOutcomeFilter | undefined;
+  } = {},
+) => {
+  const search = new URLSearchParams();
+
+  if (input.applicationId !== undefined && input.applicationId.trim().length > 0) {
+    search.set("applicationId", input.applicationId.trim());
+  }
+
+  if (input.outcome !== undefined && input.outcome !== "all") {
+    search.set("outcome", input.outcome);
+  }
+
+  if (input.limit !== undefined) {
+    search.set("limit", String(input.limit));
+  }
+
+  const query = search.toString();
+
+  return adminGet(
+    query.length === 0 ? "/admin/api/attempts" : `/admin/api/attempts?${query}`,
+    attemptsResponseSchema,
+  );
+};
+
+export const fetchAdminAttemptLive = async (id: string) =>
+  adminOptionalView(`/admin/api/attempts/${encodeURIComponent(id)}/live`, attemptLiveSchema);
+
+export const fetchAdminAttemptReplay = async (id: string) =>
+  adminOptionalView(`/admin/api/attempts/${encodeURIComponent(id)}/replay`, attemptReplaySchema);
+
+export const fetchAdminLlmUsage = async (
+  input: { limit?: number | undefined; purpose?: string | undefined } = {},
+) => {
+  const search = new URLSearchParams();
+
+  if (input.purpose !== undefined && input.purpose.trim().length > 0) {
+    search.set("purpose", input.purpose.trim());
+  }
+
+  if (input.limit !== undefined) {
+    search.set("limit", String(input.limit));
+  }
+
+  const query = search.toString();
+
+  return adminGet(
+    query.length === 0 ? "/admin/api/llm-usage" : `/admin/api/llm-usage?${query}`,
+    llmUsageResponseSchema,
+  );
+};
