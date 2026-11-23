@@ -113,9 +113,7 @@
     "overture/no-date-now": [
       "error",
       {
-        "allow": [
-          "src/server/platform/ports/clock.ts"
-        ]
+        "allow": ["src/server/platform/ports/clock.ts"]
       }
     ],
     "overture/no-main-thread-catalog-writes": [
@@ -149,18 +147,13 @@
           "src/server/pipeline/email-notes.test.ts",
           "src/server/pipeline/reviews.test.ts"
         ],
-        "allowRoots": [
-          "test/e2e",
-          "scripts"
-        ]
+        "allowRoots": ["test/e2e", "scripts"]
       }
     ],
     "overture/no-math-random": [
       "error",
       {
-        "allow": [
-          "src/server/platform/ports/random.ts"
-        ]
+        "allow": ["src/server/platform/ports/random.ts"]
       }
     ],
     "overture/no-raw-design-styles": [
@@ -173,9 +166,7 @@
           "src/web/components/landing/company-brands-data.ts",
           "src/web/components/landing/ats-logos.tsx"
         ],
-        "enforceStrictPaths": [
-          "src/web/"
-        ]
+        "enforceStrictPaths": ["src/web/"]
       }
     ],
     "overture/no-unlisted-unit-test": [
@@ -289,15 +280,11 @@
       {
         "patterns": [
           {
-            "group": [
-              "@anthropic-ai/**"
-            ],
+            "group": ["@anthropic-ai/**"],
             "message": "Import the LLM port, not the Anthropic SDK."
           },
           {
-            "group": [
-              "@aws-sdk/**"
-            ],
+            "group": ["@aws-sdk/**"],
             "message": "Import the mail or object-store port, not the AWS SDK."
           }
         ]
@@ -315,10 +302,7 @@
     "eslint/no-useless-assignment": "error",
     "import/export": "error",
     "import/named": "error",
-    "import/consistent-type-specifier-style": [
-      "error",
-      "prefer-top-level"
-    ],
+    "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
     "promise/no-return-in-finally": "error",
     "unicorn/no-useless-iterator-to-array": "error",
     "typescript/no-unnecessary-condition": [
@@ -410,16 +394,11 @@
         "allowInGenericTypeArguments": true
       }
     ],
-    "node/handle-callback-err": [
-      "error",
-      "^(err|error)$"
-    ],
+    "node/handle-callback-err": ["error", "^(err|error)$"],
     "node/no-process-env": [
       "error",
       {
-        "allowedVariables": [
-          "NODE_ENV"
-        ]
+        "allowedVariables": ["NODE_ENV"]
       }
     ],
     "node/no-top-level-await": "off",
@@ -454,10 +433,7 @@
     "eslint/no-magic-numbers": "off",
     "eslint/no-nested-ternary": "error",
     "eslint/no-ternary": "off",
-    "eslint/one-var": [
-      "error",
-      "never"
-    ],
+    "eslint/one-var": ["error", "never"],
     "eslint/prefer-arrow-callback": [
       "error",
       {
@@ -479,13 +455,7 @@
     "import/no-namespace": "error",
     "import/no-nodejs-modules": "off",
     "import/prefer-default-export": "off",
-    "node/callback-return": [
-      "error",
-      [
-        "callback",
-        "cb"
-      ]
-    ],
+    "node/callback-return": ["error", ["callback", "cb"]],
     "node/no-sync": "off",
     "promise/avoid-new": "off",
     "promise/prefer-await-to-callbacks": "off",
@@ -509,9 +479,7 @@
     "unicorn/filename-case": [
       "error",
       {
-        "ignore": [
-          "^\\$"
-        ]
+        "ignore": ["^\\$"]
       }
     ],
     "unicorn/max-nested-calls": "off",
@@ -550,9 +518,7 @@
     "vitest/prefer-lowercase-title": [
       "error",
       {
-        "ignore": [
-          "describe"
-        ]
+        "ignore": ["describe"]
       }
     ],
     "vitest/prefer-mock-promise-shorthand": "error",
@@ -611,10 +577,7 @@
         "checkArrowFunctionBody": false
       }
     ],
-    "typescript/return-await": [
-      "error",
-      "error-handling-correctness-only"
-    ],
+    "typescript/return-await": ["error", "error-handling-correctness-only"],
     "typescript/prefer-nullish-coalescing": [
       "error",
       {
@@ -658,9 +621,7 @@
     "react/jsx-filename-extension": [
       "error",
       {
-        "extensions": [
-          ".tsx"
-        ]
+        "extensions": [".tsx"]
       }
     ],
     "react/jsx-max-depth": [
@@ -695,9 +656,7 @@
       }
     },
     {
-      "files": [
-        "src/server/main.ts"
-      ],
+      "files": ["src/server/main.ts"],
       "rules": {
         "unicorn/no-process-exit": "off"
       }
