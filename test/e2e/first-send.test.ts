@@ -7,7 +7,6 @@ import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
-import { pinSendWindowClock } from "./send-window-clock.ts";
 import type { GreenhouseFixture } from "./greenhouse.fixture.ts";
 
 import { greenhouseBoardUrl } from "../../src/server/pipeline/greenhouse-board-url.ts";
@@ -216,8 +215,6 @@ const blankStreetQuestions = [
 
 async function ownerFor(server: AppServer) {
   const { owner, userId } = await ownerContextFor(server.url);
-
-  await pinSendWindowClock(server);
 
   await owner.put("/__test__/settings/jobs.poll_interval_ms", { data: { value: "3600000" } });
 
@@ -563,7 +560,6 @@ test.fixme("a kill before submit_clicked_at releases the Application, stops its 
   await fetch(`${send.fixture.url}/__fixture__/release`, { method: "POST" });
 
   await send.server.restart();
-  await pinSendWindowClock(send.server);
 
   await expect.poll(() => sessionRecords(send.sessionDirectory).length).toBe(0);
 
@@ -623,7 +619,6 @@ test("a kill after submit_clicked_at goes to Confirming, is never resent, and ke
   await fetch(`${send.fixture.url}/__fixture__/release`, { method: "POST" });
 
   await send.server.restart();
-  await pinSendWindowClock(send.server);
 
   const recovered = await ownerContextFor(send.server.url);
   const [application] = await applicationsOf(recovered.owner, userId);

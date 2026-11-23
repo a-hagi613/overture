@@ -37,6 +37,7 @@ import { migrateCatalogDatabase, migrateDatabase } from "./platform/db/migrate.t
 import { createClock } from "./platform/ports/clock.ts";
 import { createRandom } from "./platform/ports/random.ts";
 import { createEventLoopLagMonitor } from "./platform/event-loop-lag.ts";
+import { setSetting } from "./platform/settings/index.ts";
 import { createBackupMonitor } from "./platform/ports/backup.ts";
 import { installProcessGuards } from "./platform/process-guard.ts";
 import {
@@ -346,6 +347,16 @@ const jobSingletons = [
 ];
 
 recoverStaleLocks(db, clock, jobSingletons);
+
+if (env.ENABLE_TEST_ROUTES) {
+  setSetting(
+    db,
+    clock,
+    "limits.send_window",
+    JSON.stringify({ end: "23:59", start: "00:00" }),
+    "system:test",
+  );
+}
 
 recoverBootRunningJobs(db, clock);
 

@@ -10,7 +10,6 @@ import { dkimSign } from "mailauth";
 import { z } from "zod";
 
 import type { AppServer } from "./app-server.ts";
-import { pinSendWindowClock, setPinnedClockOffset } from "./send-window-clock.ts";
 import type { GreenhouseFixture } from "./greenhouse.fixture.ts";
 
 import { startFreshAppServer, test as appTest } from "./app.fixture.ts";
@@ -250,8 +249,10 @@ async function clockNow(server: AppServer) {
   return clockSchema.parse(await response.json());
 }
 
-async function setClockOffset(server: AppServer, owner: APIRequestContext, deltaMs: number) {
-  await setPinnedClockOffset(server, owner, deltaMs);
+async function setClockOffset(owner: APIRequestContext, offsetMs: number) {
+  const response = await owner.post("/__test__/clock/offset", { data: { offsetMs } });
+
+  expect(response.ok()).toBe(true);
 }
 
 async function postInbound(server: AppServer, raw: string, rcptTo: string) {
@@ -280,8 +281,6 @@ async function runDueJobs(owner: APIRequestContext) {
 
 async function ownerFor(server: AppServer) {
   const { owner, userId } = await ownerContextFor(server.url);
-
-  await pinSendWindowClock(server);
 
   await owner.put("/__test__/settings/jobs.poll_interval_ms", { data: { value: "3600000" } });
 
@@ -650,7 +649,7 @@ test("no code within the limit ends the try before Submit, asks for a paste at f
   const sending = startSend(owner, applicationId);
   const wait = await waitForOpenWait(owner);
 
-  await setClockOffset(codes.server, owner, 6 * 60_000);
+  await setClockOffset(owner, 6 * 60_000);
 
   await expect.poll(async () => (await notificationsOf(owner, userId)).length).toBe(1);
 
@@ -661,7 +660,7 @@ test("no code within the limit ends the try before Submit, asks for a paste at f
   expect(notification?.body).toContain("ten minutes");
   expect((await readWait(owner, wait.id)).resolvedAt).toBeNull();
 
-  await setClockOffset(codes.server, owner, 11 * 60_000);
+  await setClockOffset(owner, 11 * 60_000);
 
   const response = await sending;
 
@@ -720,7 +719,7 @@ test("Home asks for the code at five minutes and the sheet's paste resumes the s
   await expect(early.page.getByTestId("home-code-wait")).toHaveCount(0);
   await early.context.close();
 
-  await setClockOffset(codes.server, owner, 6 * 60_000);
+  await setClockOffset(owner, 6 * 60_000);
 
   await expect.poll(async () => (await notificationsOf(owner, userId)).length).toBe(1);
 
@@ -779,7 +778,7 @@ test("a forwarded code arriving first resolves the wait and the Home card goes a
 
   const wait = await waitForOpenWait(owner);
 
-  await setClockOffset(codes.server, owner, 6 * 60_000);
+  await setClockOffset(owner, 6 * 60_000);
 
   const { context, page } = await openHome(browser, codes, storageState);
 
@@ -814,7 +813,7 @@ test("an expired wait is refused with a clear message and the sheet closes its w
   const sending = startSend(owner, applicationId);
 
   await waitForOpenWait(owner);
-  await setClockOffset(codes.server, owner, 6 * 60_000);
+  await setClockOffset(owner, 6 * 60_000);
 
   const { context, page } = await openHome(browser, codes, storageState);
 
@@ -824,7 +823,7 @@ test("an expired wait is refused with a clear message and the sheet closes its w
 
   await sheet.getByLabel("Verification code").fill(code);
 
-  await setClockOffset(codes.server, owner, 11 * 60_000);
+  await setClockOffset(owner, 11 * 60_000);
   await sheet.getByRole("button", { name: "Submit code" }).click();
 
   await expect(sheet.getByRole("heading", { name: "The code never arrived." })).toBeVisible();
