@@ -722,6 +722,7 @@ export function createDispatcher(deps: DispatcherDeps) {
               },
               waitId: wait.id,
             },
+            signal === undefined ? {} : { signal },
           );
 
           if (resolved === null) {

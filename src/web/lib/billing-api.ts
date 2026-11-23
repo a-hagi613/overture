@@ -27,12 +27,13 @@ async function loadBilling() {
 }
 
 export function useBilling(options?: {
-  refetchInterval?: (data: BillingState | undefined) => number | false;
+  refetchInterval?: (data: BillingState | undefined, polls: number) => number | false;
 }) {
   return useQuery({
     queryFn: loadBilling,
     queryKey: ["billing"],
-    refetchInterval: (query) => options?.refetchInterval?.(query.state.data) ?? false,
+    refetchInterval: (query) =>
+      options?.refetchInterval?.(query.state.data, query.state.dataUpdateCount) ?? false,
     refetchOnWindowFocus: true,
     retry: false,
     staleTime: 0,

@@ -55,7 +55,7 @@ async function expectShellAxeClean(
   await context.close();
 }
 
-test("the shell lists workspace destinations on desktop and navigates to Settings, Inbox, and 404", async ({
+test("the shell lists workspace destinations on desktop and navigates to Account, Inbox, and 404", async ({
   browser,
   appServerUrl,
   ownerStorageState,
@@ -77,7 +77,7 @@ test("the shell lists workspace destinations on desktop and navigates to Setting
   ).toBeHidden();
 
   await sideNav.getByRole("link", { name: "Profile" }).hover();
-  await sideNav.getByRole("menuitem", { name: "Settings" }).click();
+  await sideNav.getByRole("menuitem", { name: "Account" }).click();
   await expect(shellPage).toHaveURL(/\/profile\/account$/u);
   await expect(shellPage.getByRole("heading", { name: "Account and sign-in" })).toBeVisible();
   await expect(shellPage.getByText(authTestIdentity.ownerEmail).first()).toBeVisible();

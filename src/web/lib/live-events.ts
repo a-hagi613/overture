@@ -13,11 +13,21 @@ const LIVE_TOPICS = [
   "notification",
   "code.wait_resolved",
   "calendar.updated",
+  "billing.updated",
+  "mailbox.updated",
+  "profile.updated",
 ] as const;
 
 type LiveTopic = (typeof LIVE_TOPICS)[number];
 
-const TOPIC_QUERY_KEYS: Record<LiveTopic, readonly (readonly string[])[]> = {
+/**
+ * The TanStack Query keys each live topic refreshes.
+ *
+ * A dedicated topic refreshes what it changes. The older aliases stay because
+ * an existing writer still publishes them, so a billing, mailbox or profile
+ * change sent on any of those topics refreshes the same keys either way.
+ */
+export const TOPIC_QUERY_KEYS: Record<LiveTopic, readonly (readonly string[])[]> = {
   "application.updated": [
     ["home"],
     ["nav"],
@@ -28,9 +38,11 @@ const TOPIC_QUERY_KEYS: Record<LiveTopic, readonly (readonly string[])[]> = {
     ["billing"],
   ],
   "board.moved": [["home"], ["nav"], ["board"], ["ready"], ["application"], ["calendar"]],
+  "billing.updated": [["home"], ["nav"], ["ready"], ["billing"]],
   "calendar.updated": [["home"], ["nav"], ["board"], ["calendar"]],
   "code.wait_resolved": [["home"], ["nav"], ["notifications"], ["code-waits"]],
   "home.updated": [["home"], ["nav"], ["ready"], ["billing"]],
+  "mailbox.updated": [["home"], ["nav"], ["mailbox"], ["onboarding-mailbox"]],
   "message.received": [
     ["home"],
     ["nav"],
@@ -40,12 +52,18 @@ const TOPIC_QUERY_KEYS: Record<LiveTopic, readonly (readonly string[])[]> = {
     ["onboarding-mailbox"],
   ],
   notification: [["home"], ["nav"], ["notifications"], ["code-waits"], ["billing"]],
+  "profile.updated": [["home"], ["nav"], ["profile-facts"]],
   "review.created": [["home"], ["nav"], ["reviews"], ["ready"], ["board"]],
   "review.needed": [["home"], ["nav"], ["reviews"], ["ready"], ["board"]],
   "review.resolved": [["home"], ["nav"], ["reviews"], ["ready"], ["board"], ["profile-facts"]],
 };
 
-function isLiveTopic(value: string): value is LiveTopic {
+/**
+ * Whether a live event's name is one the page knows.
+ * @param value The event name from the stream.
+ * @returns True when the name has a query-key map.
+ */
+export function isLiveTopic(value: string): value is LiveTopic {
   return Object.hasOwn(TOPIC_QUERY_KEYS, value);
 }
 

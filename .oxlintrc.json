@@ -409,6 +409,8 @@
           "src/server/platform/sse/stream.test.ts",
           "src/server/storage/database-sizes.test.ts",
           "src/web/lib/admin-resource.test.ts",
+          "src/web/lib/billing-poll.test.ts",
+          "src/web/lib/live-events.test.ts",
           "scripts/check-admin-host.test.ts",
           "scripts/check-production.test.ts",
           "scripts/database-sync-guard.test.ts",

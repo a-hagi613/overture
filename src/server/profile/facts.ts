@@ -8,6 +8,7 @@ import { openOrNull } from "./personal-crypto.ts";
 
 import { facts } from "../platform/db/schema.ts";
 import { isCountryCode } from "../catalog/geo.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
 import {
   FACT_KEYS,
   isCountryScopedFactKey,
@@ -152,7 +153,10 @@ export function createFactService(deps: {
       await db.update(facts).set(values).where(eq(facts.id, row.id));
     }
 
-    return { key, scope, value, source, confirmed, revision };
+    return {
+      changed: row === undefined || !unchanged,
+      record: { key, scope, value, source, confirmed, revision },
+    };
   }
 
   async function upsert(
@@ -163,9 +167,15 @@ export function createFactService(deps: {
     source: FactRecord["source"],
     confirmed: boolean,
   ) {
-    return inWriteOrder(`${userId}\u0000${key}\u0000${scope}`, async () =>
-      write(userId, key, scope, value, source, confirmed),
-    );
+    return inWriteOrder(`${userId}\u0000${key}\u0000${scope}`, async () => {
+      const written = await write(userId, key, scope, value, source, confirmed);
+
+      if (written.changed) {
+        publishEvent(db, clock, "profile.updated", JSON.stringify({ factKey: key, scope }), userId);
+      }
+
+      return written.record;
+    });
   }
 
   return {
@@ -220,6 +230,16 @@ export function createFactService(deps: {
       const removed = db.select({ id: facts.id }).from(facts).where(where).all();
 
       await db.delete(facts).where(where);
+
+      if (removed.length > 0) {
+        publishEvent(
+          db,
+          clock,
+          "profile.updated",
+          JSON.stringify({ factKey: key, removed: removed.length, scope }),
+          userId,
+        );
+      }
 
       return removed.length;
     },

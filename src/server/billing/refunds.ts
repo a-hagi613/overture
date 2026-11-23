@@ -10,6 +10,7 @@ import { NoRefundablePaymentError } from "../platform/ports/payments.ts";
 import type { AdminAuditRow } from "../platform/audit/types.ts";
 import { insertAdminAudit } from "../platform/audit/insert.ts";
 import { retryWhenBusy } from "../platform/db/busy.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
 import { refundGrantApplications } from "./ledger.ts";
 
 export const REFUND_AUDIT_ACTION = "billing.refund";
@@ -266,6 +267,14 @@ export async function refundGrant(
   }
 
   await shipAudit(outcome.auditRow);
+
+  publishEvent(
+    db,
+    clock,
+    "billing.updated",
+    JSON.stringify({ billing: true, refund: outcome.record.refundId }),
+    grant.userId,
+  );
 
   return { kind: "refunded", refund: outcome.record, replayed: false } as const;
 }
