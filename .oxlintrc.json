@@ -399,6 +399,7 @@
           "src/server/platform/sse/hub.test.ts",
           "src/web/lib/admin-resource.test.ts",
           "scripts/check-admin-host.test.ts",
+          "scripts/check-production.test.ts",
           "scripts/database-sync-guard.test.ts",
           "scripts/lint-config-guard.test.ts",
           "scripts/setup-stripe.test.ts",
