@@ -6,7 +6,7 @@
   "statusCheck": false,
   "statusCommentsEnabled": true,
   "fixWithAI": true,
-  "ignorePatterns": "bun.lock\ndist/**\ndist-marketing/**\ntest-results/**\ndrizzle/meta/**\ndrizzle-catalog/meta/**\ndesign/reference/**\npublic/**\n**/*.snap",
+  "ignorePatterns": "bun.lock\ndist/**\ndist-marketing/**\ntest-results/**\ndrizzle/meta/**\ndrizzle-catalog/meta/**\ndesign/reference/**\npublic/**\n**/*.snap\n.agents/**\n.claude/skills/**\nskills-lock.json",
   "instructions": "Overture is a single-owner job-application agent: Bun + TypeScript, Hono on Bun, Drizzle ORM over SQLite (app.sqlite + catalog.sqlite, one machine, Litestream), Zod contracts shared between server and web, React 19 + React Query + Tailwind v4 (CSS-first @theme in src/web/styles.css, Ember design system) and Radix/shadcn primitives. Banned in product copy and code: Hold (as a stage), runner, lease, provider, dispatch, attempt, ledger, credit, CAPTCHA, Brain, Hands. The tools are the rules: bun lint, bun fmt --check, bun check, bun test src, bun run build, bun run lint:config and bun run db:verify must pass; never suggest silencing a rule, skipping a test or passing --no-verify as a fix. Ignore generated files, migration snapshots, design reference PNGs and build output.",
   "rules": [
     {
