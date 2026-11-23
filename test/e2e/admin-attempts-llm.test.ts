@@ -336,6 +336,9 @@ test("admin /admin/attempts renders filters, live view, replay and parses exact 
   await page.getByRole("link", { name: "Inspect live attempts & replay" }).click();
   await expect(page).toHaveURL(/\/admin\/attempts$/u);
 
+  await page.goto(`${captureAppUrl}/admin/attempts`);
+  await expect(page.getByRole("heading", { name: "Live attempts" })).toBeVisible();
+
   const state = await page.context().storageState();
 
   await Promise.all([
@@ -477,6 +480,9 @@ test("admin /admin/llm renders spend caps, purpose/model breakdowns, unexpected 
   await page.goto(`${adminIsolatedAppUrl}/admin/provider-report`);
   await page.getByRole("link", { name: "Inspect LLM spend" }).click();
   await expect(page).toHaveURL(/\/admin\/llm$/u);
+
+  await page.goto(`${adminIsolatedAppUrl}/admin/llm`);
+  await expect(page.getByRole("heading", { name: "LLM spend" })).toBeVisible();
 
   const state = await page.context().storageState();
 
