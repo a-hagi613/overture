@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { eq } from "drizzle-orm";
 
-import { env } from "../src/server/config/env.ts";
+import { masterKeyring } from "../src/server/config/env.ts";
 import { createQuestionCatalog } from "../src/server/catalog/questions.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "../src/server/platform/db/migrate.ts";
 import {
@@ -10,7 +10,6 @@ import {
   openCatalogDatabase,
   openDatabase,
 } from "../src/server/platform/db/client.ts";
-import { parseMasterKey } from "../src/server/platform/crypto.ts";
 import { createClock } from "../src/server/platform/ports/clock.ts";
 import { users } from "../src/server/platform/db/schema.ts";
 import { createPersonalCrypto } from "../src/server/profile/personal-crypto.ts";
@@ -53,11 +52,7 @@ if (owner === undefined) {
   throw new Error(`no user has the email given to --user: ${email}`);
 }
 
-const personal = createPersonalCrypto(
-  db,
-  parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
-  env.MASTER_KEY_CURRENT,
-);
+const personal = createPersonalCrypto(db, masterKeyring);
 
 const catalog = createQuestionCatalog({ catalogDb, db, clock });
 

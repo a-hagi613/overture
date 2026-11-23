@@ -1,6 +1,17 @@
 import { expect, test } from "bun:test";
 
-import { createUserKey, openValue, parseMasterKey, sealValue } from "./crypto.ts";
+import {
+  createUserKey,
+  masterKeyringFor,
+  masterKeyChainProblem,
+  openValue,
+  parseMasterKey,
+  parseMasterKeyring,
+  rewrapUserKey,
+  sealValue,
+  storedUserKeyBlob,
+  storedUserKeyFromBlob,
+} from "./crypto.ts";
 import {
   EXPORT_CHUNK_BYTES,
   createExportWriter,
@@ -10,72 +21,13 @@ import {
 
 const scope = { table: "facts", column: "value_enc", rowId: "fact-1" };
 
-test("seal then open returns the plaintext", async () => {
-  const masterKey = crypto.getRandomValues(new Uint8Array(32));
-  const userKey = await createUserKey(masterKey, 1);
-  const sealed = await sealValue(masterKey, userKey, scope, "secret resume text");
+function keyVersionBytes(fill: number) {
+  return new Uint8Array(32).fill(fill);
+}
 
-  expect(openValue(masterKey, userKey, scope, sealed)).resolves.toBe("secret resume text");
-});
-
-test("ciphertexts carry the format version and never the plaintext", async () => {
-  const masterKey = crypto.getRandomValues(new Uint8Array(32));
-  const userKey = await createUserKey(masterKey, 1);
-  const sealed = await sealValue(masterKey, userKey, scope, "secret resume text");
-
-  expect(sealed.startsWith("v1:1:")).toBe(true);
-  expect(sealed).not.toContain("secret resume text");
-});
-
-test("opening with a different associated data scope fails", async () => {
-  const masterKey = crypto.getRandomValues(new Uint8Array(32));
-  const userKey = await createUserKey(masterKey, 1);
-  const sealed = await sealValue(masterKey, userKey, scope, "secret resume text");
-
-  expect(
-    openValue(masterKey, userKey, { table: "facts", column: "value_enc", rowId: "fact-2" }, sealed),
-  ).rejects.toThrow("operation failed for an operation-specific reason");
-});
-
-test("shredding the user key makes every value unreadable", async () => {
-  const masterKey = crypto.getRandomValues(new Uint8Array(32));
-  const userKey = await createUserKey(masterKey, 1);
-  const sealed = await sealValue(masterKey, userKey, scope, "secret resume text");
-  const shredded = { ...userKey, wrappedDek: "AAAAAAAAAAAAAAAAAAAAAA==" };
-
-  expect(openValue(masterKey, userKey, scope, sealed)).resolves.toBe("secret resume text");
-  expect(openValue(masterKey, shredded, scope, sealed)).rejects.toThrow(
-    "operation failed for an operation-specific reason",
-  );
-});
-
-test("ciphertexts record their key version and reject mismatched keys", async () => {
-  const masterKey = crypto.getRandomValues(new Uint8Array(32));
-  const userKey = await createUserKey(masterKey, 1);
-  const sealed = await sealValue(masterKey, userKey, scope, "secret resume text");
-
-  expect(openValue(masterKey, { ...userKey, keyVersion: 2 }, scope, sealed)).rejects.toThrow(
-    "key version 1",
-  );
-});
-
-test("ciphertexts with a missing or extra segment are refused before any decryption", async () => {
-  const masterKey = crypto.getRandomValues(new Uint8Array(32));
-  const userKey = await createUserKey(masterKey, 1);
-
-  expect(openValue(masterKey, userKey, scope, "v1:1:aaaa:bbbb")).rejects.toThrow(
-    "Unsupported ciphertext",
-  );
-  expect(openValue(masterKey, userKey, scope, "v1:1:aaaa:bbbb:cccc:dddd")).rejects.toThrow(
-    "Unsupported ciphertext",
-  );
-});
-
-test("parseMasterKey rejects keys that are not 32 bytes", () => {
-  expect(() => parseMasterKey("", 1)).toThrow("must decode to 32 bytes");
-  expect(() => parseMasterKey(undefined, 1)).toThrow("not set");
-  expect(parseMasterKey("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", 1)).toHaveLength(32);
-});
+function encodedKey(fill: number) {
+  return Buffer.from(keyVersionBytes(fill)).toString("base64");
+}
 
 async function seal(parts: Uint8Array<ArrayBuffer>[], key: string) {
   const writer = await createExportWriter(key);
@@ -128,6 +80,153 @@ async function open(bytes: Uint8Array<ArrayBuffer>, key: string, step = 4096) {
 }
 
 const exportPlain = new TextEncoder().encode("the resume, the messages and the facts");
+
+test("seal then open returns the plaintext", async () => {
+  const keyring = masterKeyringFor(keyVersionBytes(1));
+  const userKey = await createUserKey(keyring.current.bytes, 1);
+  const sealed = await sealValue(keyring, userKey, scope, "secret resume text");
+
+  expect(openValue(keyring, userKey, scope, sealed)).resolves.toBe("secret resume text");
+});
+
+test("ciphertexts carry the format version and never the plaintext", async () => {
+  const keyring = masterKeyringFor(keyVersionBytes(1));
+  const userKey = await createUserKey(keyring.current.bytes, 1);
+  const sealed = await sealValue(keyring, userKey, scope, "secret resume text");
+
+  expect(sealed.startsWith("v1:1:")).toBe(true);
+  expect(sealed).not.toContain("secret resume text");
+});
+
+test("opening with a different associated data scope fails", async () => {
+  const keyring = masterKeyringFor(keyVersionBytes(1));
+  const userKey = await createUserKey(keyring.current.bytes, 1);
+  const sealed = await sealValue(keyring, userKey, scope, "secret resume text");
+
+  expect(
+    openValue(keyring, userKey, { table: "facts", column: "value_enc", rowId: "fact-2" }, sealed),
+  ).rejects.toThrow("operation failed for an operation-specific reason");
+});
+
+test("shredding the user key makes every value unreadable", async () => {
+  const keyring = masterKeyringFor(keyVersionBytes(1));
+  const userKey = await createUserKey(keyring.current.bytes, 1);
+  const sealed = await sealValue(keyring, userKey, scope, "secret resume text");
+  const shredded = { ...userKey, wrappedDek: "AAAAAAAAAAAAAAAAAAAAAA==" };
+
+  expect(openValue(keyring, userKey, scope, sealed)).resolves.toBe("secret resume text");
+  expect(openValue(keyring, shredded, scope, sealed)).rejects.toThrow(
+    "matches none of the configured master keys",
+  );
+});
+
+test("a re-wrap leaves every ciphertext sealed with the same data key readable", async () => {
+  const v1 = keyVersionBytes(1);
+  const before = masterKeyringFor(v1);
+
+  const during = parseMasterKeyring(
+    { MASTER_KEY_CURRENT: "2", MASTER_KEY_V1: encodedKey(1), MASTER_KEY_V2: encodedKey(2) },
+    2,
+  );
+
+  const userKey = await createUserKey(before.current.bytes, 1);
+  const sealedOld = await sealValue(before, userKey, scope, "sealed under v1");
+
+  const rewrapped = await rewrapUserKey(during, userKey, 2);
+
+  expect(rewrapped.keyVersion).toBe(2);
+
+  expect(openValue(during, rewrapped, scope, sealedOld)).resolves.toBe("sealed under v1");
+
+  const sealedNew = await sealValue(during, rewrapped, scope, "sealed under v2");
+
+  expect(sealedNew.startsWith("v1:2:")).toBe(true);
+  expect(openValue(during, rewrapped, scope, sealedNew)).resolves.toBe("sealed under v2");
+  expect(openValue(during, { ...rewrapped, keyVersion: 1 }, scope, sealedOld)).resolves.toBe(
+    "sealed under v1",
+  );
+
+  const v2Only = parseMasterKeyring({ MASTER_KEY_CURRENT: "2", MASTER_KEY_V2: encodedKey(2) }, 2);
+
+  expect(openValue(v2Only, rewrapped, scope, sealedOld)).resolves.toBe("sealed under v1");
+});
+
+test("a row wrapped under a removed master key cannot be opened", async () => {
+  const userKey = await createUserKey(keyVersionBytes(1), 1);
+  const v2Only = parseMasterKeyring({ MASTER_KEY_CURRENT: "2", MASTER_KEY_V2: encodedKey(2) }, 2);
+
+  expect(openValue(v2Only, userKey, scope, "v1:1:aaaa:bbbb:cccc")).rejects.toThrow(
+    "matches none of the configured master keys",
+  );
+});
+
+test("the stored blob is the iv followed by the wrapped data key", async () => {
+  const keyring = masterKeyringFor(keyVersionBytes(1));
+  const userKey = await createUserKey(keyring.current.bytes, 1);
+  const stored = storedUserKeyFromBlob(storedUserKeyBlob(userKey), userKey.keyVersion);
+
+  expect(stored).toStrictEqual(userKey);
+});
+
+test("ciphertexts with a missing, extra or non-numeric segment are refused before any decryption", async () => {
+  const keyring = masterKeyringFor(keyVersionBytes(1));
+  const userKey = await createUserKey(keyring.current.bytes, 1);
+
+  expect(openValue(keyring, userKey, scope, "v1:1:aaaa:bbbb")).rejects.toThrow(
+    "Unsupported ciphertext",
+  );
+  expect(openValue(keyring, userKey, scope, "v1:1:aaaa:bbbb:cccc:dddd")).rejects.toThrow(
+    "Unsupported ciphertext",
+  );
+  expect(openValue(keyring, userKey, scope, "v1:two:aaaa:bbbb:cccc")).rejects.toThrow(
+    "Unsupported ciphertext",
+  );
+  expect(openValue(keyring, userKey, scope, "v1:0:aaaa:bbbb:cccc")).rejects.toThrow(
+    "Unsupported ciphertext",
+  );
+});
+
+test("parseMasterKey rejects keys that are not 32 bytes", () => {
+  expect(() => parseMasterKey("", 1)).toThrow("must decode to 32 bytes");
+  expect(() => parseMasterKey(undefined, 1)).toThrow("not set");
+  expect(parseMasterKey("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", 1)).toHaveLength(32);
+});
+
+test("MASTER_KEY_CURRENT above one needs every key in the chain", () => {
+  const v1 = encodedKey(1);
+  const v2 = encodedKey(2);
+  const v3 = encodedKey(3);
+
+  expect(masterKeyChainProblem({ MASTER_KEY_V1: v1 }, 1)).toBeUndefined();
+  expect(masterKeyChainProblem({ MASTER_KEY_V1: v1 }, 2)).toContain("MASTER_KEY_V2 is not set");
+  expect(masterKeyChainProblem({ MASTER_KEY_V1: v1, MASTER_KEY_V2: v2 }, 2)).toBeUndefined();
+  expect(masterKeyChainProblem({ MASTER_KEY_V1: v1, MASTER_KEY_V3: v3 }, 3)).toContain(
+    "MASTER_KEY_V2 is missing",
+  );
+  expect(masterKeyChainProblem({ MASTER_KEY_V2: v2 }, 2)).toBeUndefined();
+
+  const ring = parseMasterKeyring({ MASTER_KEY_V1: v1, MASTER_KEY_V2: v2 }, 2);
+
+  expect(ring.current.version).toBe(2);
+  expect(ring.keys.map((key) => key.version)).toEqual([1, 2]);
+  expect(() => parseMasterKeyring({ MASTER_KEY_V1: v1 }, 2)).toThrow("MASTER_KEY_V2 is not set");
+});
+
+test("a pre-staged version above MASTER_KEY_CURRENT is accepted and validated", () => {
+  const ring = parseMasterKeyring(
+    { MASTER_KEY_CURRENT: "1", MASTER_KEY_V1: encodedKey(1), MASTER_KEY_V2: encodedKey(2) },
+    1,
+  );
+
+  expect(ring.current.version).toBe(1);
+  expect(ring.keys.map((key) => key.version)).toEqual([1, 2]);
+  expect(() =>
+    parseMasterKeyring(
+      { MASTER_KEY_CURRENT: "1", MASTER_KEY_V1: encodedKey(1), MASTER_KEY_V2: "not-a-key" },
+      1,
+    ),
+  ).toThrow("MASTER_KEY_V2 must decode to 32 bytes");
+});
 
 test("the sealed archive opens to every part in order", async () => {
   const linkKey = newExportKey();

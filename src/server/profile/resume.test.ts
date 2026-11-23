@@ -18,6 +18,7 @@ import { DEFAULT_ANTHROPIC_MODEL } from "../platform/llm/models.ts";
 import { createClock } from "../platform/ports/clock.ts";
 import { createDiskObjectStore } from "../platform/ports/object-store.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
+import { masterKeyringFor } from "../platform/crypto.ts";
 
 const MASTER = new Uint8Array(32).fill(7);
 
@@ -92,7 +93,7 @@ describe("the resume replacement transaction", () => {
     scratchDirectories.push(directory);
 
     const objects = createDiskObjectStore(directory);
-    const personal = createPersonalCrypto(db, MASTER, 1);
+    const personal = createPersonalCrypto(db, masterKeyringFor(MASTER));
 
     const config = {
       apiKey: undefined,

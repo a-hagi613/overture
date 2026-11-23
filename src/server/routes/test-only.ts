@@ -123,7 +123,6 @@ import { ANSWER_KINDS, QUESTION_FIELD_TYPES, REVIEW_REASONS } from "../../shared
 import { normalizeFieldType, questionVariantHash } from "../catalog/question-normalize.ts";
 import { mapQuestionByRules } from "../catalog/question-rules.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
-import { parseMasterKey } from "../platform/crypto.ts";
 import { CODE_WAIT_TIMEOUT_MS, createCodeWait, wakeCodeWaits } from "../inbox/waits.ts";
 import { ensurePrepQueuedForRunningUsers } from "../pipeline/daily-prep.ts";
 import { newExportKey } from "../../shared/export-crypto.ts";
@@ -131,7 +130,7 @@ import { createMailboxService } from "../inbox/mailboxes.ts";
 import { listExportsOf } from "../export/service.ts";
 import { readLiveCheckResults } from "../live-checks/store.ts";
 import { runAlertDrill } from "../live-checks/alerts.ts";
-import { env } from "../config/env.ts";
+import { env, masterKeyring } from "../config/env.ts";
 import {
   applicationsLeft,
   commitForApplication,
@@ -751,11 +750,7 @@ export function createTestRoutes(
 ) {
   const routes = new Hono();
 
-  const personal = createPersonalCrypto(
-    db,
-    parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
-    env.MASTER_KEY_CURRENT,
-  );
+  const personal = createPersonalCrypto(db, masterKeyring);
 
   const testMailboxes =
     env.INBOUND_HMAC_SECRET === undefined

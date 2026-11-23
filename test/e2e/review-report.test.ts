@@ -20,7 +20,7 @@ import {
   seedCompany,
   seedPosting,
 } from "./matching-harness.ts";
-import { parseMasterKey } from "../../src/server/platform/crypto.ts";
+import { masterKeyringFor, parseMasterKey } from "../../src/server/platform/crypto.ts";
 import { openDatabase } from "../../src/server/platform/db/client.ts";
 import { reviewAuditEvents } from "../../src/server/platform/db/schema.ts";
 import { createPersonalCrypto } from "../../src/server/profile/personal-crypto.ts";
@@ -549,7 +549,10 @@ test("Reviews, auto-answers and sent Snapshots are recorded, and the report read
   );
   expect(report.resolutions).toMatchObject({ answered: 2, autoDismissed: 0, dismissed: 0 });
 
-  const personal = createPersonalCrypto(db, parseMasterKey(authTestIdentity.masterKey, 1), 1);
+  const personal = createPersonalCrypto(
+    db,
+    masterKeyringFor(parseMasterKey(authTestIdentity.masterKey, 1)),
+  );
 
   const audit = await sampleSnapshotAudit(db, personal, { sample: 1, seed: "e2e", since: null });
 

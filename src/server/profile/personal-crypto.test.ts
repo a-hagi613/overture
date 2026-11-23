@@ -4,6 +4,7 @@ import { Buffer } from "node:buffer";
 import { userKeys, users } from "../platform/db/schema.ts";
 import { openCountingDatabase } from "../testing/query-counter.ts";
 import { createPersonalCrypto, openOrNull } from "./personal-crypto.ts";
+import { masterKeyringFor } from "../platform/crypto.ts";
 
 const MASTER = new Uint8Array(32).fill(5);
 
@@ -26,7 +27,7 @@ function freshUsers(ids: readonly string[]) {
       .run();
   }
 
-  const personal = createPersonalCrypto(db, MASTER, 1);
+  const personal = createPersonalCrypto(db, masterKeyringFor(MASTER));
 
   return { counter, db, personal };
 }
@@ -103,7 +104,11 @@ describe("the stored key", () => {
     const { counter, db, personal } = freshUsers(["user-1"]);
     const scope = { column: "value_enc", rowId: "r", table: "facts" } as const;
 
-    const sealed = await createPersonalCrypto(db, MASTER, 1).sealFor("user-1", scope, "value");
+    const sealed = await createPersonalCrypto(db, masterKeyringFor(MASTER)).sealFor(
+      "user-1",
+      scope,
+      "value",
+    );
 
     const inFlight = personal.openFor("user-1", scope, sealed);
 

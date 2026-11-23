@@ -31,6 +31,7 @@ import {
 import { ACCOUNT_ERASE_JOB_KIND, ERASURE_RETRY_DELAY_MS, createAccountEraser } from "./erase.ts";
 import { ACCOUNT_DELETED_NOTICE_JOB_KIND, createDeletionNoticeCrypto } from "./notice.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
+import { masterKeyringFor } from "../platform/crypto.ts";
 
 const USER_ID = "user-erase-1";
 const PROFILE_ID = "vendor-profile-1";
@@ -169,7 +170,7 @@ async function freshAccount() {
   const fixture: AccountFixture = {
     clock,
     db,
-    noticeCrypto: createDeletionNoticeCrypto(new Uint8Array(32).fill(7)),
+    noticeCrypto: createDeletionNoticeCrypto(masterKeyringFor(new Uint8Array(32).fill(7))),
     objects,
     root,
     sqlite,
@@ -203,7 +204,7 @@ function eraserFor(
       "tryoverture.example",
     ),
     objects: deps.objects ?? account.objects,
-    personal: createPersonalCrypto(account.db, new Uint8Array(32).fill(7), 1),
+    personal: createPersonalCrypto(account.db, masterKeyringFor(new Uint8Array(32).fill(7))),
     providers: deps.providers,
     sealNotice: async (notice) => {
       await Promise.resolve();

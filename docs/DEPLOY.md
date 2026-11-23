@@ -53,8 +53,8 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    A provider whose pair is not both set is not registered and its button does not render; the
    emailed sign-in link works on its own. Setting only one name of a pair stops the server at boot.
    Resume and Facts (M1-13) add `MASTER_KEY_V1`, generated with `openssl rand -base64 32`
-   (base64 that decodes to exactly 32 bytes), never rotated without the re-wrap step that
-   re-wraps every user's data key under the new master key.
+   (base64 that decodes to exactly 32 bytes). A rotation to `MASTER_KEY_V2` follows the master-key runbook
+   below: stage the new secret, deploy, dry run, run the re-wrap job, verify, then remove the old secret.
    The synthetic lab (#36) needs nothing new to serve `/lab/*`: `APP_ORIGIN` already names the origin the `lab.run`
    job drives (`LAB_BASE_URL` overrides it). A real reCAPTCHA v3 score needs `LAB_RECAPTCHA_SITE_KEY` and
    `LAB_RECAPTCHA_SECRET` from that site key's admin console; without the secret the lab page reports the challenge
@@ -458,6 +458,81 @@ runs under its own `timeout` and stops the action on a timeout (exit 124) or a n
 Each command's output is appended to the run's step summary under its own heading, and the action finishes
 by checking `https://tryoverture.com/api/health`. The seed files stay in `/data/seed` so a later run
 reuses the verified download; the backfill job itself is picked up by the app's job worker.
+
+## Master-key rotation (owner runbook, issue #541)
+
+Rotating the master key re-wraps every person's data key under a new `MASTER_KEY_V<n>`; it never re-encrypts
+their facts, mail or resumes, because those are sealed with the per-person data key, which does not change.
+The routine is a background job (`maintenance.master-key-rotation`) with a `--dry-run` that only counts. It
+also re-seals a queued deleted-account notice under the current key, so retiring an old key cannot strand the
+erased person's confirmation. The full order matters: deploy the release that accepts the chain, add the new
+secret with the raised version, dry run, run the job, verify, then remove the old secret. Decisions are in
+ADR 0039.
+
+1. **Deploy the release that carries the rotation first** and confirm `https://tryoverture.com/api/health` is
+   green. The release is safe with `MASTER_KEY_CURRENT=1`; the important part is that the running code already
+   accepts the version chain before the secret below restarts the machines. (If you prefer the add-then-deploy
+   order, stage the secrets with `fly secrets set --stage …` and let the deploy apply them.)
+
+2. **Generate the new key and raise the current version in one secret update**:
+
+   ```sh
+   openssl rand -base64 32                       # MASTER_KEY_V2, never copy it into the repo or a log
+   fly secrets set -a overture-web MASTER_KEY_V2=<the value> MASTER_KEY_CURRENT=2
+   ```
+
+   Set both: with `MASTER_KEY_CURRENT=2` the restart needs `MASTER_KEY_V1` and `MASTER_KEY_V2` (the boot
+   check names any missing version), new data keys are wrapped under V2, and reads keep working because the
+   app still holds V1 for rows wrapped under it. Setting the new key without raising the version is refused by
+   the rotation script rather than silently re-wrapping nothing. `fly secrets list -a overture-web` shows both
+   names.
+
+3. **Dry run** — counts the rows that would be re-wrapped, writes nothing, and is safe while the app serves:
+
+   ```sh
+   fly ssh console -a overture-web -C "bun run /app/scripts/rotate-master-key.ts --db /data/app.sqlite --dry-run"
+   ```
+
+   The JSON prints `{"dryRun": true, "remaining": <rows>, "notices": <n>, "rotated": 0, ...}`. A fresh
+   deployment with no accounts reports zero. `notices` counts queued or failed deleted-account notices still
+   sealed under an older key; the live run re-seals them, because a notice holds the erased person's name and
+   address directly under the master key and must not be stranded by retiring the key it used.
+
+4. **Run the job**. Queue it from the machine; the running app's job worker takes it in bounded batches of
+   250 rows, each commit in one immediate transaction, and queues its own next run while rows remain:
+
+   ```sh
+   fly ssh console -a overture-web -C "bun run /app/scripts/rotate-master-key.ts --db /data/app.sqlite --enqueue"
+   ```
+
+   It prints the `bg_jobs` id and `inserted`. Watch it on `/admin/jobs` (kind `maintenance.master-key-rotation`)
+   or in the logs (`master_key.rotation`); each batch writes `master_key.rotate` to `admin_audit` and the last
+   run writes `master_key.rotate.summary`. To run it inline instead (for example on a stopped copy), drop
+   `--enqueue`; it re-wraps until nothing is left and prints the summary. Both paths resume after a crash,
+   because the next run selects only rows still below the current version.
+
+5. **Verify** the job is finished with a second dry run; it must report `remaining: 0` and `notices: 0`. Reads
+   keep working throughout because the app tries the row's version, then `MASTER_KEY_CURRENT`, then every
+   older key.
+
+6. **Check the app** on `/api/health` and open one page that shows a resume and a fact. While `MASTER_KEY_V1`
+   stays configured you can roll back with `fly secrets set -a overture-web MASTER_KEY_CURRENT=1`; rows already
+   re-wrapped under V2 keep opening, and new keys wrap under V1 again. Do not leave it there: run the job
+   again before removing V1.
+
+7. **Remove the old secret** once you are satisfied:
+
+   ```sh
+   fly secrets unset -a overture-web MASTER_KEY_V1
+   ```
+
+   The restart verifies that no `user_keys` row still needs V1. If one does, the process refuses to start
+   instead of serving unreadable values; re-set `MASTER_KEY_V1`, run the job again, and repeat. Keep the
+   `overture-backups` restore window in mind: backups from before the rotation only open with the old key, so
+   keep V1 in your own secret store (never in the repo) for as long as those backups are retained.
+
+The next rotation repeats the same steps with `MASTER_KEY_V3` and `MASTER_KEY_CURRENT=3`; the chain then starts
+at V2, because V1 has been retired.
 
 ## Admin host: `admin.tryoverture.com` (owner runbook)
 

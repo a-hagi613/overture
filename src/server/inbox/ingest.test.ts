@@ -15,6 +15,7 @@ import { mailThreads, users } from "../platform/db/schema.ts";
 import { createClock } from "../platform/ports/clock.ts";
 import { createDiskObjectStore } from "../platform/ports/object-store.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
+import { masterKeyringFor } from "../platform/crypto.ts";
 
 const MASTER = new Uint8Array(32).fill(9);
 const USER_ID = "ingest-rollback-user";
@@ -62,7 +63,7 @@ describe("the inbound mail transaction", () => {
     scratchDirectories.push(directory);
 
     const objects = createDiskObjectStore(directory);
-    const personal = createPersonalCrypto(db, MASTER, 1);
+    const personal = createPersonalCrypto(db, masterKeyringFor(MASTER));
     const mailbox = await mailboxes.ensureFor(USER_ID);
 
     const raw = new TextEncoder().encode(

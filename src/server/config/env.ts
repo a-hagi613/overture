@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { turnstileScriptUrl } from "../../shared/turnstile.ts";
+import { masterKeyChainProblem, parseMasterKeyring } from "../platform/crypto.ts";
+import type { MasterKeyring } from "../platform/crypto.ts";
 import { catalogPathFor } from "../platform/db/client.ts";
 import { DEFAULT_ANTHROPIC_MODEL } from "../platform/llm/models.ts";
 
@@ -100,12 +102,6 @@ const envSchema = z
     LINKEDIN_CLIENT_SECRET: z.string().min(1).optional(),
     OAUTH_GOOGLE_DISCOVERY_URL: z.url().optional(),
     OAUTH_LINKEDIN_DISCOVERY_URL: z.url().optional(),
-    MASTER_KEY_V1: z
-      .string()
-      .trim()
-      .refine((value) => Buffer.from(value, "base64").byteLength === 32, {
-        message: "MASTER_KEY_V1 must decode to 32 bytes",
-      }),
     MASTER_KEY_CURRENT: z.coerce.number().int().min(1).default(1),
     OBJECT_STORE_ROOT: z.string().min(1).default("data/objects"),
     R2_ACCOUNT_ID: z.string().min(1).optional(),
@@ -191,15 +187,6 @@ const envSchema = z
     }
 
     if (value.NODE_ENV === "production") {
-      if (value.MASTER_KEY_CURRENT !== 1) {
-        context.addIssue({
-          code: "custom",
-          message:
-            "MASTER_KEY_CURRENT must be 1: only MASTER_KEY_V1 exists, so a newer current version would break every read.",
-          path: ["MASTER_KEY_CURRENT"],
-        });
-      }
-
       if (value.AUTH_ALLOWED_HOSTS !== undefined) {
         context.addIssue({
           code: "custom",
@@ -316,7 +303,18 @@ const envSchema = z
     }
   });
 
-export const env = envSchema.parse(process.env);
+const checkedEnvSchema = envSchema.superRefine((value, context) => {
+  const problem = masterKeyChainProblem(process.env, value.MASTER_KEY_CURRENT);
+
+  if (problem !== undefined) {
+    context.addIssue({ code: "custom", message: problem, path: ["MASTER_KEY_CURRENT"] });
+  }
+});
+
+export const env = checkedEnvSchema.parse(process.env);
+
+/** The current master key and every older key still configured for the dual-read window. */
+export const masterKeyring: MasterKeyring = parseMasterKeyring(process.env, env.MASTER_KEY_CURRENT);
 
 export const databasePath = env.DATABASE_PATH ?? env.DATABASE_URL;
 

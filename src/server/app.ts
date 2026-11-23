@@ -44,7 +44,7 @@ import { createAdminApi } from "./routes/admin.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
 import { stripUntrustedIpHeaders } from "./auth/client-ip.ts";
 import { crossSiteRefusal } from "./auth/csrf.ts";
-import { env, labEnvironment } from "./config/env.ts";
+import { env, labEnvironment, masterKeyring } from "./config/env.ts";
 import { demoLocked } from "./demo/guard.ts";
 import { createProfileRoutes } from "./routes/profile.ts";
 import { createOnboardingRoutes } from "./routes/onboarding.ts";
@@ -63,7 +63,6 @@ import { createInboxRoutes } from "./routes/inbox.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { createConfiguredBackupStore } from "./platform/object-store.ts";
 import { securityHeaders } from "./security-headers.ts";
-import { parseMasterKey } from "./platform/crypto.ts";
 import { logError } from "./platform/log.ts";
 import { API_ERRORS } from "../shared/api-errors.ts";
 
@@ -210,13 +209,7 @@ export function createApp(deps: AppDependencies) {
     nodeEnv: env.NODE_ENV,
   } satisfies ClientIpConfig;
 
-  const personal =
-    deps.personal ??
-    createPersonalCrypto(
-      deps.db,
-      parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
-      env.MASTER_KEY_CURRENT,
-    );
+  const personal = deps.personal ?? createPersonalCrypto(deps.db, masterKeyring);
 
   const allowedWriteOrigins = [env.APP_ORIGIN, env.ADMIN_ORIGIN].flatMap((origin) =>
     origin === undefined ? [] : [origin],

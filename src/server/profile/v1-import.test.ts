@@ -10,6 +10,7 @@ import { createClock } from "../platform/ports/clock.ts";
 import { users } from "../platform/db/schema.ts";
 import { createFactService } from "./facts.ts";
 import { createPersonalCrypto } from "./personal-crypto.ts";
+import { masterKeyringFor } from "../platform/crypto.ts";
 import { parseV1Export } from "./v1-export.ts";
 import { importV1Facts, mapAnswerBankEntry } from "./v1-import.ts";
 
@@ -43,7 +44,7 @@ function freshImport() {
     })
     .run();
 
-  const personal = createPersonalCrypto(db, new Uint8Array(32).fill(7), 1);
+  const personal = createPersonalCrypto(db, masterKeyringFor(new Uint8Array(32).fill(7)));
   const catalog = createQuestionCatalog({ catalogDb, db, clock });
   const facts = createFactService({ db, clock, personal });
 

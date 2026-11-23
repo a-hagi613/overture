@@ -5,6 +5,7 @@ import { migrateDatabase } from "../platform/db/migrate.ts";
 import { codeWaits, mailboxes, users } from "../platform/db/schema.ts";
 import { createClock } from "../platform/ports/clock.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
+import { masterKeyringFor } from "../platform/crypto.ts";
 import { waitForCode } from "./waits.ts";
 
 const MASTER = new Uint8Array(32).fill(3);
@@ -51,7 +52,7 @@ function seeded() {
 
 test("aborting a code wait clears the interval and resolves null", async () => {
   const { clock, db, sqlite } = seeded();
-  const personal = createPersonalCrypto(db, MASTER, 1);
+  const personal = createPersonalCrypto(db, masterKeyringFor(MASTER));
   const controller = new AbortController();
   let asked = false;
 
@@ -76,7 +77,7 @@ test("aborting a code wait clears the interval and resolves null", async () => {
 
 test("a wait created with an already-aborted signal settles at once", async () => {
   const { clock, db, sqlite } = seeded();
-  const personal = createPersonalCrypto(db, MASTER, 1);
+  const personal = createPersonalCrypto(db, masterKeyringFor(MASTER));
   const controller = new AbortController();
 
   controller.abort();

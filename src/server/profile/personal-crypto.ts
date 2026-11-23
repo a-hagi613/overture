@@ -1,8 +1,13 @@
-import { Buffer } from "node:buffer";
 import { eq } from "drizzle-orm";
 
-import { createUserKey, IV_BYTES, openValue, sealValue } from "../platform/crypto.ts";
-import type { SealScope, StoredUserKey } from "../platform/crypto.ts";
+import {
+  createUserKey,
+  openValue,
+  sealValue,
+  storedUserKeyBlob,
+  storedUserKeyFromBlob,
+} from "../platform/crypto.ts";
+import type { MasterKeyring, SealScope, StoredUserKey } from "../platform/crypto.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import { userKeys } from "../platform/db/schema.ts";
 import { logError } from "../platform/log.ts";
@@ -32,17 +37,14 @@ interface LoadToken {
  * entry. A load that was already in flight when the person was forgotten
  * notices its replaced pending token and returns the key without caching it, so
  * account erasure leaves no decryptable key in memory and no unbounded set of
- * forgotten ids to grow.
+ * forgotten ids to grow. During a master-key rotation `forget` also drops a row
+ * the rotation re-wrapped, so the next read loads the new wrapping.
  * @param db The database the wrapped keys live in.
- * @param masterKey The master key that wraps each person's data key.
- * @param keyVersion The master key version new data keys are wrapped under.
+ * @param keyring The current master key and any older key still in the dual-read window.
  * @returns The per-person seal and open functions.
  */
-export function createPersonalCrypto(
-  db: AppDatabase,
-  masterKey: Uint8Array<ArrayBuffer>,
-  keyVersion: number,
-) {
+export function createPersonalCrypto(db: AppDatabase, keyring: MasterKeyring) {
+  const keyVersion = keyring.current.version;
   const keys = new Map<string, StoredUserKey>();
   const pending = new Map<string, PendingLoad>();
 
@@ -71,13 +73,13 @@ export function createPersonalCrypto(
     const row = rows.at(0);
 
     if (row === undefined) {
-      const created = await createUserKey(masterKey, keyVersion);
+      const created = await createUserKey(keyring.current.bytes, keyVersion);
 
       const inserted = db
         .insert(userKeys)
         .values({
           userId,
-          wrappedDek: dekBlob(created),
+          wrappedDek: storedUserKeyBlob(created),
           masterKeyVersion: keyVersion,
           createdAt: new Date(),
         })
@@ -94,18 +96,18 @@ export function createPersonalCrypto(
         throw new Error("the user key could not be created");
       }
 
-      return cacheIfCurrent(userId, token, {
-        dekIv: winner.wrappedDek.subarray(0, IV_BYTES).toString("base64"),
-        keyVersion: winner.masterKeyVersion,
-        wrappedDek: winner.wrappedDek.subarray(IV_BYTES).toString("base64"),
-      });
+      return cacheIfCurrent(
+        userId,
+        token,
+        storedUserKeyFromBlob(winner.wrappedDek, winner.masterKeyVersion),
+      );
     }
 
-    return cacheIfCurrent(userId, token, {
-      dekIv: row.wrappedDek.subarray(0, IV_BYTES).toString("base64"),
-      keyVersion: row.masterKeyVersion,
-      wrappedDek: row.wrappedDek.subarray(IV_BYTES).toString("base64"),
-    });
+    return cacheIfCurrent(
+      userId,
+      token,
+      storedUserKeyFromBlob(row.wrappedDek, row.masterKeyVersion),
+    );
   }
 
   async function storedKeyFor(userId: string) {
@@ -142,12 +144,12 @@ export function createPersonalCrypto(
     sealFor: async (userId: string, scope: SealScope, plaintext: string) => {
       const stored = await storedKeyFor(userId);
 
-      return sealValue(masterKey, stored, scope, plaintext);
+      return sealValue(keyring, stored, scope, plaintext);
     },
     openFor: async (userId: string, scope: SealScope, sealed: string) => {
       const stored = await storedKeyFor(userId);
 
-      return openValue(masterKey, stored, scope, sealed);
+      return openValue(keyring, stored, scope, sealed);
     },
     forget: (userId: string) => {
       keys.delete(userId);
@@ -174,11 +176,4 @@ export async function openOrNull(input: {
 
     return null;
   }
-}
-
-function dekBlob(created: StoredUserKey) {
-  return Buffer.concat([
-    Buffer.from(created.dekIv, "base64"),
-    Buffer.from(created.wrappedDek, "base64"),
-  ]);
 }

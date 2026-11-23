@@ -9,6 +9,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import { applications, mailThreads, mailboxes, messages, users } from "../platform/db/schema.ts";
 import { companies, companyBoards, postings } from "../platform/db/catalog-schema.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
+import { masterKeyringFor } from "../platform/crypto.ts";
 import type { InboxThreadCounts } from "./threads.ts";
 import { threadCountsOf, threadPageOf, threadViewsOf, unreadThreadCountOf } from "./threads.ts";
 
@@ -60,7 +61,7 @@ function seeded() {
     })
     .run();
 
-  const personal = createPersonalCrypto(db, new Uint8Array(32).fill(3), 1);
+  const personal = createPersonalCrypto(db, masterKeyringFor(new Uint8Array(32).fill(3)));
 
   return { catalogDb: seedCatalogDb, counter, db, personal };
 }
