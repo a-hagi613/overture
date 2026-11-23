@@ -418,6 +418,17 @@ describe("billing webhooks", () => {
       homeEvents.every((row) => homeSchema.parse(JSON.parse(row.payload)).billing === true),
     ).toBe(true);
 
+    const billingEvents = db
+      .select()
+      .from(events)
+      .all()
+      .filter((row) => row.topic === "billing.updated");
+
+    expect(billingEvents).toHaveLength(homeEvents.length);
+    expect(
+      billingEvents.every((row) => homeSchema.parse(JSON.parse(row.payload)).billing === true),
+    ).toBe(true);
+
     sqlite.close();
   });
 });

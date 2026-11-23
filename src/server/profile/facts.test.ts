@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { migrateDatabase } from "../platform/db/migrate.ts";
 import { openDatabase } from "../platform/db/client.ts";
 import { createClock } from "../platform/ports/clock.ts";
-import { users } from "../platform/db/schema.ts";
+import { events, users } from "../platform/db/schema.ts";
 import { createFactService } from "./facts.ts";
 import { createPersonalCrypto } from "./personal-crypto.ts";
 
@@ -39,7 +39,7 @@ function freshFacts() {
 
   const personal = createPersonalCrypto(db, new Uint8Array(32).fill(7), 1);
 
-  return { facts: createFactService({ db, clock, personal }), userId: "user-1" };
+  return { db, facts: createFactService({ db, clock, personal }), userId: "user-1" };
 }
 
 describe("a Fact's scope", () => {
@@ -84,5 +84,34 @@ describe("a Fact's scope", () => {
 
     expect(await facts.remove(userId, "salary_expectation")).toBe(1);
     expect(await facts.list(userId)).toEqual([]);
+  });
+});
+
+describe("a Fact write the other tab must see", () => {
+  test("publishes a profile topic when a Fact changes", async () => {
+    const { db, facts, userId } = freshFacts();
+
+    await facts.save(userId, "work_auth", "Citizen", "CA");
+
+    const published = db.select().from(events).all();
+
+    expect(published.map((row) => row.topic)).toEqual(["profile.updated"]);
+    expect(published[0]?.userId).toBe(userId);
+  });
+
+  test("publishes when a Fact is removed, but not when nothing was stored", async () => {
+    const { db, facts, userId } = freshFacts();
+
+    await facts.save(userId, "work_auth", "Citizen", "CA");
+    expect(await facts.remove(userId, "work_auth", "CA")).toBe(1);
+    expect(await facts.remove(userId, "work_auth", "CA")).toBe(0);
+
+    const published = db
+      .select()
+      .from(events)
+      .all()
+      .filter((row) => row.topic === "profile.updated");
+
+    expect(published).toHaveLength(2);
   });
 });

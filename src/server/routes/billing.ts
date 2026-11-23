@@ -21,6 +21,7 @@ import { currentSubscriptionOf, subscriptionBlocksCheckout } from "../billing/su
 import { createPaymentsWebhookService } from "../billing/webhooks.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { logError } from "../platform/log.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
 import { InvalidWebhookSignatureError } from "../platform/ports/payments.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 
@@ -246,6 +247,14 @@ export function createBillingRoutes(deps: {
     context.header("Cache-Control", "no-store");
 
     if (claim.status === "granted") {
+      publishEvent(
+        db,
+        clock,
+        "billing.updated",
+        JSON.stringify({ billing: true, trial: true }),
+        access.account.id,
+      );
+
       return context.json({ result: "granted", applications: TRIAL_APPLICATIONS });
     }
 

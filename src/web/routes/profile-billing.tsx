@@ -16,6 +16,7 @@ import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
 import { dsBody, dsCardTitle, dsEyebrow } from "../components/ui/ds.ts";
 import { openPortal, startCheckout, useBilling } from "../lib/billing-api.ts";
+import { billingSuccessPollDelay } from "../lib/billing-poll.ts";
 import { renewalText } from "../lib/billing-format.ts";
 import { useHomeData } from "../lib/home-api.ts";
 
@@ -81,7 +82,8 @@ export function ProfileBillingPage() {
     isPending,
     refetch,
   } = useBilling({
-    refetchInterval: (data) => (checkingReturn && (data?.plan ?? null) === null ? 3000 : false),
+    refetchInterval: (data, polls) =>
+      billingSuccessPollDelay(checkingReturn, data?.plan ?? null, polls),
   });
 
   const { data: home } = useHomeData();

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { openDatabase } from "../platform/db/client.ts";
 import { migrateDatabase } from "../platform/db/migrate.ts";
-import { mailboxes, users } from "../platform/db/schema.ts";
+import { events, mailboxes, users } from "../platform/db/schema.ts";
 import { createMailboxService } from "./mailboxes.ts";
 
 const NOW = Date.UTC(2026, 10, 22, 9, 0, 0);
@@ -48,6 +48,45 @@ describe("a mailbox read that must not write", () => {
 
     expect(service.readFor("user-1")).toEqual(created);
     expect(db.select().from(mailboxes).all()).toHaveLength(1);
+
+    sqlite.close();
+  });
+});
+
+describe("a mailbox write the other tab must see", () => {
+  test("publishes when the mailbox is created", async () => {
+    const { db, sqlite } = migrated();
+    const service = createMailboxService(db, { now: () => NOW }, SECRET, DOMAIN);
+
+    await service.ensureFor("user-1");
+
+    const published = db.select().from(events).all();
+
+    expect(published.map((row) => row.topic)).toEqual(["mailbox.updated"]);
+    expect(published[0]?.userId).toBe("user-1");
+
+    sqlite.close();
+  });
+
+  test("publishes when the first forwarded message arrives, and once only", () => {
+    const { db, sqlite } = migrated();
+    const service = createMailboxService(db, { now: () => NOW }, SECRET, DOMAIN);
+
+    db.insert(mailboxes)
+      .values({ createdAt: new Date(NOW), id: "mailbox-1", localPart: "one", userId: "user-1" })
+      .run();
+
+    service.markFirstForwarded("mailbox-1", NOW);
+    service.markFirstForwarded("mailbox-1", NOW + 1000);
+
+    const published = db
+      .select()
+      .from(events)
+      .all()
+      .filter((row) => row.topic === "mailbox.updated");
+
+    expect(published).toHaveLength(1);
+    expect(published[0]?.userId).toBe("user-1");
 
     sqlite.close();
   });
