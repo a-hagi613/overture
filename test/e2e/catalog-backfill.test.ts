@@ -50,7 +50,7 @@ async function clockNow(harness: CatalogHarness) {
 
 async function search(harness: CatalogHarness, query: string) {
   const response = await fetch(
-    `${harness.app.url}/api/search?q=${encodeURIComponent(query)}&limit=50`,
+    `${harness.app.url}/__test__/search?q=${encodeURIComponent(query)}&limit=50`,
   );
 
   return searchResponseSchema.parse(await response.json());

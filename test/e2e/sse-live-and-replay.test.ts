@@ -2,44 +2,61 @@ import { z } from "zod";
 
 import { expect, test } from "./app.fixture.ts";
 import { readSseEventUntil } from "./sse.ts";
+import { ownerSseSession } from "./sse-auth.ts";
 
 const publishOkSchema = z.object({ ok: z.boolean() });
 
 test("a page receives an event live and replays missed events after reconnecting", async ({
   appServerUrl,
 }) => {
-  const publishFirst = await fetch(`${appServerUrl}/__test__/events/publish`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ topic: "home.updated", payload: { kind: "test" } }),
-  });
+  const session = await ownerSseSession(appServerUrl);
 
-  expect(publishFirst.ok).toBe(true);
-  publishOkSchema.parse(await publishFirst.json());
+  try {
+    const publishFirst = await fetch(`${appServerUrl}/__test__/events/publish`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        topic: "home.updated",
+        payload: { kind: "test" },
+        userId: session.userId,
+      }),
+    });
 
-  const firstEvent = await readSseEventUntil(
-    `${appServerUrl}/api/events`,
-    null,
-    (event) => event.event === "home.updated",
-  );
+    expect(publishFirst.ok).toBe(true);
+    publishOkSchema.parse(await publishFirst.json());
 
-  expect(firstEvent).not.toBeNull();
+    const firstEvent = await readSseEventUntil(
+      `${appServerUrl}/api/events`,
+      null,
+      (event) => event.event === "home.updated",
+      { cookie: session.cookie },
+    );
 
-  const firstId = firstEvent?.id ?? "0";
+    expect(firstEvent).not.toBeNull();
 
-  const publishSecond = await fetch(`${appServerUrl}/__test__/events/publish`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ topic: "application.updated", payload: { kind: "replay" } }),
-  });
+    const firstId = firstEvent?.id ?? "0";
 
-  expect(publishSecond.ok).toBe(true);
+    const publishSecond = await fetch(`${appServerUrl}/__test__/events/publish`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        topic: "application.updated",
+        payload: { kind: "replay" },
+        userId: session.userId,
+      }),
+    });
 
-  const replayedEvent = await readSseEventUntil(
-    `${appServerUrl}/api/events`,
-    firstId,
-    (event) => event.event === "application.updated",
-  );
+    expect(publishSecond.ok).toBe(true);
 
-  expect(replayedEvent).not.toBeNull();
+    const replayedEvent = await readSseEventUntil(
+      `${appServerUrl}/api/events`,
+      firstId,
+      (event) => event.event === "application.updated",
+      { cookie: session.cookie },
+    );
+
+    expect(replayedEvent).not.toBeNull();
+  } finally {
+    await session.dispose();
+  }
 });

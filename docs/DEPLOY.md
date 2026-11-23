@@ -563,6 +563,30 @@ Do not open a long manual transaction on the volume while the server runs. The s
 poller and request handlers retry `SQLITE_BUSY` and log it instead of exiting; an unhandled rejection from a
 background loop or timer is logged and alerted (`process.unhandled`), not fatal.
 
+## Compacting a bloated application database (issue #506)
+
+The catalog split (#490) left the pages its old tables used in `/data/app.sqlite`: production measured 1,602 MB with
+1,596 MB of free pages and a 477 MB WAL, while live user rows were about 6 MB, and Litestream replicated every byte.
+Those pages only come back when the file is vacuumed offline. Boot never runs it: a `VACUUM` on a large file would hold
+startup past Fly's health-check grace period.
+
+`scripts/vacuum-app-db.ts` is the maintenance pass. It prints page, freelist, file and WAL sizes, checkpoints
+(`PRAGMA wal_checkpoint(TRUNCATE)`), runs `VACUUM`, checkpoints again and verifies `PRAGMA integrity_check`. It refuses
+to write without `--confirm` and refuses while another process holds the write lock; `--dry-run` only reports. It is
+safe to re-run: a file with no free pages is left alone.
+
+1. Stop the app machine (`fly machine stop <id> -a overture-web`) so neither the server nor Litestream holds the file.
+2. Start a one-off machine on the deployed image with the `data` volume mounted at `/data`, the way the restore drill
+   does (`fly machines run <image> ... --volume data:/data`), and dry-run to record the sizes:
+   `bun run /app/scripts/vacuum-app-db.ts /data/app.sqlite --dry-run`
+3. Run it again with `--confirm` and check the report: `after` has a freelist of 0, a much smaller file, and
+   `integrity_check: ok`.
+4. Destroy the one-off machine, start the app machine, and watch `curl -fsS https://overture-web.fly.dev/api/health`;
+   Litestream uploads the smaller file on its next snapshot.
+
+Do not schedule this script, do not run it while the server is serving, and do not run it against `catalog.sqlite`
+(which is rebuilt from feeds anyway).
+
 ## Restore drill safety
 
 A restore drill must prove the backup is usable without ever running the application on restored

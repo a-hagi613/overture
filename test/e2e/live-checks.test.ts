@@ -18,7 +18,7 @@ import { startAnthropicFixtureServer } from "./anthropic-fixture-server.ts";
 import { startBrowserUseFixture } from "./browser-use-server.fixture.ts";
 import { startTxtDnsServer } from "./dns.fixture.ts";
 import { startIdentityServer } from "./identity-server-test.fixture.ts";
-import { seedBoard, seedCompany, seedPosting } from "./matching-harness.ts";
+import { seedBoard, seedCompany, seedOwner, seedPosting } from "./matching-harness.ts";
 import { readSseEventUntil } from "./sse.ts";
 
 const secret = "live-check-inbound-hmac-secret-0123456789";
@@ -123,6 +123,7 @@ let browserUse: BrowserUseFixture | undefined;
 let dns: Awaited<ReturnType<typeof startTxtDnsServer>> | undefined;
 let formServer: ReturnType<typeof Bun.serve> | undefined;
 let api: APIRequestContext;
+let owner: APIRequestContext | undefined;
 let privateKeyPem = "";
 let submissions = 0;
 
@@ -325,9 +326,14 @@ test.beforeAll(async () => {
   });
 
   api = await apiRequest.newContext({ baseURL: app.url });
+
+  const { owner: ownerContext } = await seedOwner(app.url);
+
+  owner = ownerContext;
 });
 
 test.afterAll(async () => {
+  await owner?.dispose();
   await api.dispose();
   await app?.stop();
   await identity?.stop();
@@ -431,7 +437,7 @@ test("a check message that never comes back fails the mail check and alerts the 
     throw new Error("The mail check did not record a sent message.");
   }
 
-  const alert = readSseEventUntil(`${appUrl()}/api/events`, null, (event) => {
+  const alert = readSseEventUntil(`${appUrl()}/__test__/events`, null, (event) => {
     if (event.event !== "alert.raised") {
       return false;
     }

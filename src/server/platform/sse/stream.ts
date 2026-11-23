@@ -32,7 +32,7 @@ function formatSseMessage(seq: number, topic: string, payload: string) {
 export function createSseStream(
   db: AppDatabase,
   lastEventId: string | null,
-  userId: string | null,
+  userId: string,
   signal: AbortSignal,
 ) {
   const parsed = lastEventId === null ? 0 : Math.trunc(Number(lastEventId));

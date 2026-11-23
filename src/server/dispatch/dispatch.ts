@@ -42,6 +42,7 @@ import { localDayStart } from "../platform/local-time.ts";
 import { approvalProblem, openApprovedPlan } from "../pipeline/approved-plan.ts";
 import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
+import { pauseForBlocker } from "../profile/running-state.ts";
 import { parseSendWindow, planningWindow } from "./planning.ts";
 import { APPLICATION_SEND_JOB_KIND } from "./executor.ts";
 import { browserSessionAvailability, freeSendSlots } from "./browser/session-slots.ts";
@@ -235,6 +236,8 @@ export function createDispatcherTick(deps: DispatchDeps) {
       .get();
 
     if (resume === undefined) {
+      pauseForBlocker(db, clock, userId, "no_resume");
+
       return { block: { reason: "no_resume", scope: "user" }, timeZone: "UTC" };
     }
 
@@ -245,6 +248,8 @@ export function createDispatcherTick(deps: DispatchDeps) {
       .get();
 
     if (mailbox?.status !== "active") {
+      pauseForBlocker(db, clock, userId, "no_mailbox");
+
       return { block: { reason: "no_mailbox", scope: "user" }, timeZone: "UTC" };
     }
 

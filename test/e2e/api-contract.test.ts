@@ -1,4 +1,5 @@
 import { request as apiRequest } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import { z } from "zod";
 
 import type { AppServer } from "./app-server.ts";
@@ -49,6 +50,8 @@ test("every signed-out route answers the one sign-in code", async ({ contractSer
     "/api/reviews",
     "/api/calendar/feed",
     "/api/account/deletion",
+    "/api/events",
+    "/api/search?q=engineer",
   ];
 
   const writes: { method: "post" | "put"; path: string; data: unknown }[] = [
@@ -84,6 +87,20 @@ test("every signed-out route answers the one sign-in code", async ({ contractSer
   expect(writeResults).toEqual(
     writes.map((write) => ({ code: "sign_in_required", path: write.path, status: 401 })),
   );
+
+  await anonymous.dispose();
+});
+
+test("a removed operational read answers not_found", async ({ contractServer: { url } }) => {
+  const anonymous = await apiRequest.newContext({ baseURL: url });
+
+  const removed = ["/api/settings", "/api/settings/limits.daily_cap", "/api/kill-switches"];
+
+  const statuses = await Promise.all(
+    removed.map(async (path) => ({ path, status: (await anonymous.get(path)).status() })),
+  );
+
+  expect(statuses).toEqual(removed.map((path) => ({ path, status: 404 })));
 
   await anonymous.dispose();
 });
@@ -185,6 +202,147 @@ test("the notification list keeps the newest hundred in reading order", async ({
   expect(listed.notifications[0]?.title).toBe("Row 1");
   expect(listed.notifications.at(-1)?.title).toBe("Row 100");
   expect(listed.notifications.some((row) => row.title === "Row 0")).toBe(false);
+
+  await owner.dispose();
+});
+
+const runningStateSchema = z.object({ pauseReason: z.string().nullable(), running: z.boolean() });
+
+const blockedSchema = z.object({ error: z.literal("pause_blocked"), pauseReason: z.string() });
+
+async function homeStateOf(owner: APIRequestContext) {
+  return runningStateSchema.parse(await (await owner.get("/api/home")).json());
+}
+
+async function setPauseReason(owner: APIRequestContext, pauseReason: string) {
+  const response = await owner.post("/__test__/home/pause", {
+    data: { email: authTestIdentity.ownerEmail, pauseReason },
+  });
+
+  expect(response.ok()).toBe(true);
+}
+
+test("Resume starts only from no pause or the person's own pause", async ({
+  contractServer: { url },
+}) => {
+  const { owner } = await ownerContextFor(url);
+
+  const started = await owner.post("/api/running", { data: { running: true } });
+
+  expect(started.status()).toBe(200);
+  expect(runningStateSchema.parse(await started.json())).toEqual({
+    pauseReason: null,
+    running: true,
+  });
+
+  const paused = await owner.post("/api/running", { data: { running: false } });
+
+  expect(paused.status()).toBe(200);
+  expect(await homeStateOf(owner)).toEqual({ pauseReason: "user", running: false });
+
+  expect((await owner.post("/api/running", { data: { running: true } })).status()).toBe(200);
+
+  const holds = [
+    "onboarding",
+    "no_resume",
+    "plan_ended",
+    "payment_failed",
+    "suspended",
+    "no_mailbox",
+  ];
+
+  async function refuseResumeAt(index: number) {
+    const pauseReason = holds[index];
+
+    if (pauseReason === undefined) {
+      return;
+    }
+
+    await setPauseReason(owner, pauseReason);
+
+    const refused = await owner.post("/api/running", { data: { running: true } });
+
+    expect(refused.status()).toBe(409);
+    expect(blockedSchema.parse(await refused.json())).toEqual({
+      error: "pause_blocked",
+      pauseReason,
+    });
+    expect(await homeStateOf(owner)).toEqual({ pauseReason, running: false });
+
+    await refuseResumeAt(index + 1);
+  }
+
+  await refuseResumeAt(0);
+
+  await owner.dispose();
+});
+
+test("Pause never replaces a billing or setup hold", async ({ contractServer: { url } }) => {
+  const { owner } = await ownerContextFor(url);
+
+  expect((await owner.post("/api/running", { data: { running: true } })).status()).toBe(200);
+
+  const holds = ["payment_failed", "plan_ended", "onboarding"];
+
+  async function refusePauseAt(index: number) {
+    const pauseReason = holds[index];
+
+    if (pauseReason === undefined) {
+      return;
+    }
+
+    await setPauseReason(owner, pauseReason);
+
+    const refused = await owner.post("/api/running", { data: { running: false } });
+
+    expect(refused.status()).toBe(409);
+    expect(blockedSchema.parse(await refused.json())).toEqual({
+      error: "pause_blocked",
+      pauseReason,
+    });
+    expect(await homeStateOf(owner)).toEqual({ pauseReason, running: false });
+
+    await refusePauseAt(index + 1);
+  }
+
+  await refusePauseAt(0);
+
+  await owner.dispose();
+});
+
+test("uploading a real resume clears its hold and a spoofed file is refused", async ({
+  contractServer: { url },
+}) => {
+  const { owner } = await ownerContextFor(url);
+
+  const spoofed = await owner.post("/api/profile/resume", {
+    multipart: {
+      file: {
+        buffer: Buffer.from("<!doctype html>not a pdf"),
+        mimeType: "application/pdf",
+        name: "fake.pdf",
+      },
+    },
+  });
+
+  expect(spoofed.status()).toBe(400);
+  expect(await errorOf(spoofed)).toBe("invalid_request");
+
+  expect((await owner.post("/api/running", { data: { running: true } })).status()).toBe(200);
+  await setPauseReason(owner, "no_resume");
+
+  const uploaded = await owner.post("/api/profile/resume", {
+    multipart: {
+      file: {
+        buffer: Buffer.from(readFileSync("test/e2e/fixtures/resume-text.pdf")),
+        mimeType: "application/pdf",
+        name: "resume.pdf",
+      },
+    },
+  });
+
+  expect(uploaded.status()).toBe(201);
+  expect(await homeStateOf(owner)).toEqual({ pauseReason: null, running: true });
 
   await owner.dispose();
 });

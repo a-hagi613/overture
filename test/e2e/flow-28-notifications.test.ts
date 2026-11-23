@@ -329,6 +329,7 @@ test("each event writes one list row and one push, and no push approves anything
   const keys = await subscribe(owner, "https://push.example.test/send/flow-28");
 
   await owner.post("/__test__/mail/clear", { data: {} });
+  await owner.post("/api/running", { data: { running: true } });
   await owner.put("/api/profile/settings", { data: { languages: ["en"], timezone: "UTC" } });
   await moveClockTo(owner, AT);
 

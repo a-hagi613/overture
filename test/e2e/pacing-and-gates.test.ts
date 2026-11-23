@@ -178,13 +178,14 @@ async function ownerFor(server: AppServer) {
   const { owner, userId } = await ownerContextFor(server.url);
 
   await owner.put("/__test__/settings/jobs.poll_interval_ms", { data: { value: "3600000" } });
-  await owner.put("/api/profile/settings", {
-    data: { languages: ["en"], timezone: "UTC" },
-  });
 
   const start = await owner.post("/api/running", { data: { running: true } });
 
   expect(start.ok()).toBe(true);
+
+  await owner.put("/api/profile/settings", {
+    data: { languages: ["en"], timezone: "UTC" },
+  });
 
   return { owner, userId };
 }
@@ -316,6 +317,12 @@ async function applicationsFor(owner: APIRequestContext, userId: string) {
   return applicationsSchema.parse(await response.json()).applications;
 }
 
+const homeRunningSchema = z.object({ pauseReason: z.string().nullable(), running: z.boolean() });
+
+async function homeRunning(owner: APIRequestContext) {
+  return homeRunningSchema.parse(await (await owner.get("/api/home")).json());
+}
+
 async function sendJobIds(owner: APIRequestContext) {
   const response = await owner.get("/__test__/jobs");
 
@@ -344,7 +351,7 @@ async function waitForNewSend(
   const jobId = created[0] ?? "";
 
   const event = await readSseEventUntil(
-    `${appServerUrl}/api/events`,
+    `${appServerUrl}/__test__/events`,
     null,
     (candidate) =>
       candidate.event === "job.done" &&
@@ -355,6 +362,64 @@ async function waitForNewSend(
 
   return jobId;
 }
+
+test("the dispatcher records a missing resume and a missing mailbox on Home", async ({
+  pacing,
+}) => {
+  const { owner, userId } = await ownerFor(pacing.server);
+
+  await moveClockTo(owner, "2026-03-10T12:00:00.000Z");
+
+  const postingId = await seedPostingFor(owner, pacing.fixture.url, "us");
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    scheduledFor: Date.parse("2026-03-10T12:00:00.000Z"),
+    status: "approved",
+    userId,
+  });
+
+  await runJob(owner, "dispatch.tick", "{}");
+
+  expect(await homeRunning(owner)).toEqual({ pauseReason: "no_resume", running: false });
+
+  await uploadResume(owner);
+  expect(await homeRunning(owner)).toEqual({ pauseReason: null, running: true });
+
+  await owner.post("/__test__/applications/status", {
+    data: {
+      applicationId,
+      scheduledFor: Date.parse("2026-03-10T12:00:00.000Z"),
+      status: "approved",
+    },
+  });
+
+  const mailboxId = z
+    .object({ mailboxes: z.array(z.object({ id: z.string() })).min(1) })
+    .parse(
+      await (await owner.get(`/__test__/mailboxes?userId=${encodeURIComponent(userId)}`)).json(),
+    ).mailboxes[0]?.id;
+
+  if (mailboxId === undefined) {
+    throw new Error("the owner has no mailbox");
+  }
+
+  await owner.post(`/__test__/mailboxes/${encodeURIComponent(mailboxId)}/status`, {
+    data: { status: "closed" },
+  });
+  await runJob(owner, "dispatch.tick", "{}");
+
+  expect(await homeRunning(owner)).toEqual({ pauseReason: "no_mailbox", running: false });
+
+  await owner.post(`/__test__/mailboxes/${encodeURIComponent(mailboxId)}/status`, {
+    data: { status: "active" },
+  });
+  await owner.post("/__test__/mailboxes/first-forwarded", { data: { userId } });
+
+  expect(await homeRunning(owner)).toEqual({ pauseReason: null, running: true });
+
+  await owner.dispose();
+});
 
 test("every dispatcher gate blocks a send until it is cleared", async ({ pacing }) => {
   const { owner, userId } = await ownerFor(pacing.server);

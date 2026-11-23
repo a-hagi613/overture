@@ -139,13 +139,17 @@ export const bgJobs = sqliteTable(
   ],
 );
 
-export const events = sqliteTable("events", {
-  seq: integer("seq").primaryKey({ autoIncrement: true }),
-  userId: text("user_id"),
-  topic: text("topic").notNull(),
-  payload: text("payload").notNull(),
-  createdAt: integer("created_at").notNull(),
-});
+export const events = sqliteTable(
+  "events",
+  {
+    seq: integer("seq").primaryKey({ autoIncrement: true }),
+    userId: text("user_id"),
+    topic: text("topic").notNull(),
+    payload: text("payload").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("events_user_seq").on(t.userId, t.seq), index("events_created_at").on(t.createdAt)],
+);
 
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
@@ -545,6 +549,7 @@ export const messages = sqliteTable(
   (t) => [
     uniqueIndex("messages_mailbox_rfc_message_id_unique").on(t.mailboxId, t.rfcMessageId),
     index("messages_thread_created").on(t.threadId, t.createdAt),
+    index("messages_user_created").on(t.userId, t.createdAt),
   ],
 );
 
@@ -760,7 +765,10 @@ export const grants = sqliteTable(
     stripeInvoiceId: text("stripe_invoice_id"),
     createdAt: integer("created_at").notNull(),
   },
-  (t) => [uniqueIndex("grants_stripe_invoice_id_unique").on(t.stripeInvoiceId)],
+  (t) => [
+    uniqueIndex("grants_stripe_invoice_id_unique").on(t.stripeInvoiceId),
+    index("grants_user_starts").on(t.userId, t.startsAt),
+  ],
 );
 
 /**
@@ -867,6 +875,7 @@ export const applications = sqliteTable(
       .where(sql`status = 'sending'`),
     index("applications_user_company").on(t.userId, t.companyId),
     index("applications_user_sent_at").on(t.userId, t.sentAt),
+    index("applications_user_status").on(t.userId, t.status),
   ],
 );
 

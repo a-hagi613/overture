@@ -61,7 +61,7 @@ test("queued startup work waits for the settle window while /api/health keeps an
     expect(performance.now() - healthStarted).toBeLessThan(HEALTH_BUDGET_MS);
 
     expect(
-      await readSseEventUntil(`${server.url}/api/events`, null, isDoneForJob(id)),
+      await readSseEventUntil(`${server.url}/__test__/events`, null, isDoneForJob(id)),
     ).not.toBeNull();
     expect(performance.now() - enqueuedAt).toBeGreaterThanOrEqual(EARLIEST_RUN_MS);
   } finally {

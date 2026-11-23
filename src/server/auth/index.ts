@@ -35,6 +35,7 @@ import {
 } from "./invites.ts";
 import { verifyTurnstile } from "./turnstile-gate.ts";
 import { clientIpHeaders } from "./client-ip.ts";
+import { trustedOriginsFor } from "./trusted-origins.ts";
 import { demoLoginPlugin, DEMO_SESSION_MS } from "./demo-login.ts";
 import { isDemoUser } from "../demo/role.ts";
 
@@ -197,12 +198,11 @@ export function createAuth(
     );
   };
 
-  const trustedOrigins = [
-    ...(env.APP_ORIGIN === undefined ? [] : [env.APP_ORIGIN]),
-    ...(env.AUTH_ALLOWED_HOSTS === undefined
-      ? []
-      : env.AUTH_ALLOWED_HOSTS.map((host) => `http://${host}:*`)),
-  ];
+  const trustedOrigins = trustedOriginsFor({
+    appOrigin: env.APP_ORIGIN,
+    adminOrigin: env.ADMIN_ORIGIN,
+    allowedHosts: env.AUTH_ALLOWED_HOSTS,
+  });
 
   return betterAuth({
     appName: copy.app.name,

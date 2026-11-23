@@ -59,7 +59,7 @@ export const APPLICATION_SEND_JOB_KIND = "application.send";
 export const DISPATCH_RECOVER_JOB_KIND = "dispatch.recover";
 
 const ATTEMPT_LEASE_MS = 15 * 60_000;
-const SESSION_TIMEOUT_MINUTES = 15;
+const SESSION_TIMEOUT_MINUTES = 12;
 const RECOVER_INTERVAL_MS = 60_000;
 const RETRY_DELAY_MS = 6 * 60 * 60_000;
 const USAGE_BACKFILL_WINDOW_MS = 24 * 60 * 60_000;

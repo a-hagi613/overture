@@ -1,5 +1,6 @@
 import { expect, test } from "./app.fixture.ts";
 import { readSseEventUntil } from "./sse.ts";
+import { ownerSseSession } from "./sse-auth.ts";
 
 interface PublishBody {
   topic: string;
@@ -17,48 +18,79 @@ async function publish(appServerUrl: string, body: PublishBody) {
   expect(response.ok).toBe(true);
 }
 
-test("every connected page receives a published event once", async ({ appServerUrl }) => {
-  await publish(appServerUrl, { topic: "fanout.seed", payload: {} });
+test("every connected page of one user receives that user's event once", async ({
+  appServerUrl,
+}) => {
+  const session = await ownerSseSession(appServerUrl);
 
-  const seed = await readSseEventUntil(
-    `${appServerUrl}/api/events`,
-    null,
-    (event) => event.event === "fanout.seed",
-  );
+  try {
+    await publish(appServerUrl, { topic: "fanout.seed", payload: {}, userId: session.userId });
 
-  expect(seed).not.toBeNull();
-
-  const streams = Array.from({ length: 5 }, async () =>
-    readSseEventUntil(
+    const seed = await readSseEventUntil(
       `${appServerUrl}/api/events`,
-      seed?.id ?? "0",
-      (event) => event.event === "fanout.live",
-    ),
-  );
+      null,
+      (event) => event.event === "fanout.seed",
+      { cookie: session.cookie },
+    );
 
-  await publish(appServerUrl, { topic: "fanout.live", payload: {} });
+    expect(seed).not.toBeNull();
 
-  const received = await Promise.all(streams);
+    const streams = Array.from({ length: 5 }, async () =>
+      readSseEventUntil(
+        `${appServerUrl}/api/events`,
+        seed?.id ?? "0",
+        (event) => event.event === "fanout.live",
+        { cookie: session.cookie },
+      ),
+    );
 
-  expect(received.map((event) => event?.event)).toEqual(
-    Array.from({ length: 5 }, () => "fanout.live"),
-  );
-  expect(new Set(received.map((event) => event?.id)).size).toBe(1);
+    await publish(appServerUrl, { topic: "fanout.live", payload: {}, userId: session.userId });
+
+    const received = await Promise.all(streams);
+
+    expect(received.map((event) => event?.event)).toEqual(
+      Array.from({ length: 5 }, () => "fanout.live"),
+    );
+    expect(new Set(received.map((event) => event?.id)).size).toBe(1);
+  } finally {
+    await session.dispose();
+  }
 });
 
-test("a signed-out page never receives an event addressed to a user", async ({ appServerUrl }) => {
-  await publish(appServerUrl, { topic: "fanout.private", payload: {}, userId: "someone-else" });
-  await publish(appServerUrl, { topic: "fanout.public", payload: {} });
+test("a signed-out stream is refused and another user's event never reaches the owner", async ({
+  appServerUrl,
+}) => {
+  const anonymous = await fetch(`${appServerUrl}/api/events`);
 
-  const topics: string[] = [];
+  expect(anonymous.status).toBe(401);
 
-  const found = await readSseEventUntil(`${appServerUrl}/api/events`, null, (event) => {
-    topics.push(event.event);
+  const session = await ownerSseSession(appServerUrl);
 
-    return event.event === "fanout.public";
-  });
+  try {
+    await publish(appServerUrl, {
+      topic: "fanout.private",
+      payload: {},
+      userId: "someone-else",
+    });
+    await publish(appServerUrl, { topic: "fanout.public", payload: {}, userId: session.userId });
 
-  expect(found).not.toBeNull();
-  expect(topics).toContain("fanout.public");
-  expect(topics).not.toContain("fanout.private");
+    const topics: string[] = [];
+
+    const found = await readSseEventUntil(
+      `${appServerUrl}/api/events`,
+      null,
+      (event) => {
+        topics.push(event.event);
+
+        return event.event === "fanout.public";
+      },
+      { cookie: session.cookie },
+    );
+
+    expect(found).not.toBeNull();
+    expect(topics).toContain("fanout.public");
+    expect(topics).not.toContain("fanout.private");
+  } finally {
+    await session.dispose();
+  }
 });

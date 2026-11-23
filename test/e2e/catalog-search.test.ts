@@ -28,7 +28,7 @@ const QUERIES = {
 
 async function searchBy(request: APIRequestContext, appUrl: string, query: string) {
   const response = await request.get(
-    `${appUrl}/api/search?q=${encodeURIComponent(query)}&limit=50`,
+    `${appUrl}/__test__/search?q=${encodeURIComponent(query)}&limit=50`,
   );
 
   if (response.status() !== 200) {

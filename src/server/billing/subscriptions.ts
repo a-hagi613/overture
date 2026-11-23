@@ -12,7 +12,12 @@ type SubscriptionRow = typeof subscriptions.$inferSelect;
 
 const ENDED_STATUSES = new Set(["canceled", "incomplete_expired"]);
 
-function hasEnded(status: string) {
+/**
+ * Whether a Stripe subscription status means the subscription no longer bills.
+ * @param status Stripe's status, stored verbatim.
+ * @returns True for the statuses that end a subscription.
+ */
+export function subscriptionEnded(status: string) {
   return ENDED_STATUSES.has(status);
 }
 
@@ -52,7 +57,7 @@ export function recordSubscription(db: BillingDb, at: number, update: Subscripti
     .where(eq(subscriptions.stripeSubscriptionId, update.stripeSubscriptionId))
     .get();
 
-  if (existing !== undefined && hasEnded(existing.status)) {
+  if (existing !== undefined && subscriptionEnded(existing.status)) {
     return;
   }
 
@@ -115,7 +120,7 @@ export function currentSubscriptionOf(db: AppDatabase, userId: string) {
     .orderBy(desc(subscriptions.updatedAt))
     .all();
 
-  return rows.find((row) => !hasEnded(row.status)) ?? rows[0] ?? null;
+  return rows.find((row) => !subscriptionEnded(row.status)) ?? rows[0] ?? null;
 }
 
 /**

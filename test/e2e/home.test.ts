@@ -184,6 +184,7 @@ test("the Start/Pause switch flips running and the page updates over SSE", async
 test("Queue position and next send time match the planner", async ({ homeServer }) => {
   const { owner, userId } = await ownerContextFor(homeServer.url);
 
+  await owner.post("/api/running", { data: { running: true } });
   await moveClockTo(owner, serverNow);
 
   await Promise.all(

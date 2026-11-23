@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { startAppServer } from "./app-server.ts";
 import { startFeedFixtureServer } from "./feed-fixture-server.ts";
+import { seedOwner } from "./matching-harness.ts";
 import { extractSseEvents } from "./sse.ts";
 
 import type { SseEvent } from "./sse.ts";
@@ -249,12 +250,12 @@ async function waitForJobDone(
 ) {
   const wanted = requiredJobIds;
 
-  const response = await fetch(`${appUrl}/api/events`, {
+  const response = await fetch(`${appUrl}/__test__/events`, {
     headers: { "Last-Event-ID": lastEventId },
   });
 
   if (!response.ok || response.body === null) {
-    throw new Error(`opening the events stream at ${appUrl}/api/events failed`);
+    throw new Error(`opening the events stream at ${appUrl}/__test__/events failed`);
   }
 
   const reader = response.body.getReader();
@@ -328,6 +329,8 @@ export async function startCatalogHarness(
     PERSONIO_FEED_BASE_URL: `${fixture.url}/personio/{token}`,
     ...extraEnvironment,
   });
+
+  const ownerSession = await seedOwner(app.url);
 
   const companyResponse = await postJson(`${app.url}/__test__/catalog/companies`, {
     name: "Fixture Dynamics",
@@ -550,6 +553,7 @@ export async function startCatalogHarness(
     sweepWorkerStatus,
     crashSweepWorker,
     close: async () => {
+      await ownerSession.owner.dispose();
       await app.stop();
       fixture.stop();
     },

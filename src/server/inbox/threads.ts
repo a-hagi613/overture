@@ -1,10 +1,9 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, exists, inArray, isNull, lt, or, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 
-import type { mailThreads } from "../platform/db/schema.ts";
-import { applications, messageAttachments, messages } from "../platform/db/schema.ts";
+import { applications, mailThreads, messageAttachments, messages } from "../platform/db/schema.ts";
 
 type ThreadRow = typeof mailThreads.$inferSelect;
 
@@ -23,6 +22,19 @@ export interface InboxThreadView {
   subject: string;
   title: string | null;
   unread: boolean;
+}
+
+export interface InboxThreadCounts {
+  all: number;
+  needsChecking: number;
+  unread: number;
+}
+
+export interface InboxThreadPage {
+  counts: InboxThreadCounts;
+  nextCursor: number | null;
+  nextCursorId: string | null;
+  threads: InboxThreadView[];
 }
 
 function displayNameOf(from: string) {
@@ -70,6 +82,18 @@ export function messagesByThreadOf(db: AppDatabase, threadIds: readonly string[]
     .all();
 
   return groupBy(rows, (row) => row.threadId);
+}
+
+/**
+ * How many Threads hold at least one unread inbound Message. It mirrors the
+ * `unread` flag of {@link threadViewsOf}, counting a Thread once however many
+ * unread Messages it holds, so the nav badge and the Inbox list agree.
+ * @param db The database to read.
+ * @param userId The person whose Threads to count.
+ * @returns The number of Threads with an unread inbound Message.
+ */
+export function unreadThreadCountOf(db: AppDatabase, userId: string) {
+  return threadCountsOf(db, userId).unread;
 }
 
 /**
@@ -216,4 +240,108 @@ export async function threadViewsOf(input: {
       ),
     ),
   );
+}
+
+/**
+ * The Inbox counts for every Thread a person has, in one SQL statement and without opening a message. Each predicate
+ * mirrors `threadViewOf` exactly: a Thread needs checking when any of its messages failed authentication, and is
+ * unread when any incoming message has no read time.
+ * @param db The database to read.
+ * @param userId The signed-in person.
+ * @returns How many Threads there are in total, waiting on a check, and unread.
+ */
+export function threadCountsOf(db: AppDatabase, userId: string) {
+  const needsChecking = exists(
+    db
+      .select({ found: sql`1` })
+      .from(messages)
+      .where(and(eq(messages.threadId, mailThreads.id), sql`${messages.auth} <> 'pass'`)),
+  );
+
+  const unread = exists(
+    db
+      .select({ found: sql`1` })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.threadId, mailThreads.id),
+          eq(messages.direction, "in"),
+          isNull(messages.readAt),
+        ),
+      ),
+  );
+
+  const row = db
+    .select({
+      all: sql<number>`count(*)`,
+      needsChecking: sql<number>`coalesce(sum(${needsChecking}), 0)`,
+      unread: sql<number>`coalesce(sum(${unread}), 0)`,
+    })
+    .from(mailThreads)
+    .where(eq(mailThreads.userId, userId))
+    .get();
+
+  const counts: InboxThreadCounts = {
+    all: row?.all ?? 0,
+    needsChecking: row?.needsChecking ?? 0,
+    unread: row?.unread ?? 0,
+  };
+
+  return counts;
+}
+
+function cursorBefore(before: number, beforeId: string | undefined) {
+  const at = new Date(before);
+  const older = lt(mailThreads.lastMessageAt, at);
+
+  if (beforeId === undefined) {
+    return older;
+  }
+
+  return or(older, and(eq(mailThreads.lastMessageAt, at), lt(mailThreads.id, beforeId)));
+}
+
+/**
+ * One page of a person's Threads, newest first, with the accurate counts over every Thread they have. The cursor is
+ * `(lastMessageAt, id)`: two Threads can share a second, so the id breaks the tie and a page boundary never skips or
+ * repeats one.
+ * @param input The database, the person, the page size and the cursor (both null for the first page).
+ * @returns The Threads on this page, the counts over all Threads, and the cursor for the next page or null.
+ */
+export async function threadPageOf(input: {
+  before: number | null;
+  beforeId: string | null;
+  db: AppDatabase;
+  limit: number;
+  personal: PersonalCrypto;
+  userId: string;
+}) {
+  const { before, beforeId, db, limit, personal, userId } = input;
+
+  const cursor = before === null ? undefined : cursorBefore(before, beforeId ?? undefined);
+
+  const rows = db
+    .select()
+    .from(mailThreads)
+    .where(
+      cursor === undefined
+        ? eq(mailThreads.userId, userId)
+        : and(eq(mailThreads.userId, userId), cursor),
+    )
+    .orderBy(desc(mailThreads.lastMessageAt), desc(mailThreads.id))
+    .limit(limit + 1)
+    .all();
+
+  const page = rows.slice(0, limit);
+  const last = page.at(-1);
+  const hasMore = rows.length > limit;
+
+  const result: InboxThreadPage = {
+    counts: threadCountsOf(db, userId),
+    nextCursor: hasMore && last !== undefined ? last.lastMessageAt.getTime() : null,
+    nextCursorId: hasMore && last !== undefined ? last.id : null,
+    threads: await threadViewsOf({ db, personal, threads: page, userId }),
+  };
+
+  return result;
 }

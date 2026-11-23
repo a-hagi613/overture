@@ -102,7 +102,7 @@ test("a write lock held past busy_timeout is logged and retried, and the worker 
     expect(health.status).toBe("ok");
     expect(health.database).toBe("ok");
 
-    const done = readSseEventUntil(`${url}/api/events`, null, isDoneForJob(id));
+    const done = readSseEventUntil(`${url}/__test__/events`, null, isDoneForJob(id));
 
     release();
 

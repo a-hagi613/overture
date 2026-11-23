@@ -36,7 +36,7 @@ test("telemetry attributes outside the allowlist are dropped", async ({ appServe
   const { id } = enqueueResponseSchema.parse(await enqueueResponse.json());
 
   const done = await readSseEventUntil(
-    `${appServerUrl}/api/events`,
+    `${appServerUrl}/__test__/events`,
     null,
     (event) => event.event === "job.done" && jobDoneSchema.parse(JSON.parse(event.data)).id === id,
   );

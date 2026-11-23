@@ -177,7 +177,7 @@ refusal is stamped in `reserve_refused_at` and the cap refusal in `refused_at`, 
 The admin overview shows the month's count and says which of the two stops is in force. Tests reach Cloudflare only
 through the fail-closed test interceptor (ADR 0013, 0016).
 M1 keeps encrypted files in Cloudflare R2 (`R2_BUCKET_FILES`) through the R2 object store adapter whenever the bucket and the R2 credentials are set; they are sealed per user. The disk object store on `/data/objects` (`OBJECT_STORE_ROOT`) remains the default for local dev and tests. A half-set R2 files config stops the server at boot. `scripts/move-objects-to-r2.ts` copies the files that were already on the volume and verifies each sha256, and leaves the local files in place for the operator to delete.
-Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set; a half-set pair stops the server at boot and with neither the app boots and runs as in M2. `POST /webhooks/stripe` verifies the `Stripe-Signature` header (HMAC-SHA256 over the timestamped raw body, five-minute window) before it reads or writes any billing row, and a bad or stale signature is refused with 400. `STRIPE_PRICE_WEEK` and `STRIPE_PRICE_MONTH` name the Stripe prices a Checkout session sells; a missing one answers 503 `billing_not_configured` without a Stripe call. What each plan buys is configuration in `src/server/billing/plans.ts`: Week 50 Applications over 7 days, Month 250 over 30 days (ADR 0018); the price itself lives in Stripe and reaches Overture only as a price id. `invoice.paid` grants its period and clears a `plan_ended` or `payment_failed` pause; `invoice.payment_failed` sets `payment_failed` at once, unless the failed invoice's period is older than the subscription's current period, so a stale out-of-order delivery cannot pause a paid user. Each transition writes one `paused` notification (pushed to the user's devices) and one email naming the fix in Settings (`Choose a plan` links to `/settings/billing/plans`, `Update payment` to `/settings/billing`, never the word `failed`), and a repeated event writes nothing twice. A grant's period end is the plan end: after the expiry sweep leaves the user with no unexpired grant, sending pauses with `plan_ended`. The demo account is never paused, granted or notified, and its billing mutations answer `403 demo_locked` before any Stripe call.
+Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set; a half-set pair stops the server at boot and with neither the app boots and runs as in M2. `POST /webhooks/stripe` verifies the `Stripe-Signature` header (HMAC-SHA256 over the timestamped raw body, five-minute window) before it reads or writes any billing row, and a bad or stale signature is refused with 400. `STRIPE_PRICE_WEEK` and `STRIPE_PRICE_MONTH` name the Stripe prices a Checkout session sells; a missing one answers 503 `billing_not_configured` without a Stripe call, and a second Checkout while the account's subscription has not ended answers 409 `plan_active` (with the stored plan and status) before any Stripe call, so nobody is billed twice. What each plan buys is configuration in `src/server/billing/plans.ts`: Week 50 Applications over 7 days, Month 250 over 30 days (ADR 0018); the price itself lives in Stripe and reaches Overture only as a price id. `invoice.paid` grants its period and clears a `plan_ended` or `payment_failed` pause; `invoice.payment_failed` sets `payment_failed` at once, unless the failed invoice's period is older than the subscription's current period, so a stale out-of-order delivery cannot pause a paid user. Each transition writes one `paused` notification (pushed to the user's devices) and one email naming the fix in Settings (`Choose a plan` links to `/settings/billing/plans`, `Update payment` to `/settings/billing`, never the word `failed`), and a repeated event writes nothing twice. A grant's period end is the plan end: after the expiry sweep leaves the user with no unexpired grant, sending pauses with `plan_ended`. The demo account is never paused, granted or notified, and its billing mutations answer `403 demo_locked` before any Stripe call; `GET /api/billing` stays open to it so the showcase Billing screen renders.
 
 ### 3.3 Domains and DNS
 
@@ -229,7 +229,7 @@ src/
 drizzle/             generated migrations
 scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, capture-forms.ts, pull-forms.ts, restore-drill.ts
 test/e2e/           Playwright `*.test.ts` flows, fixture server, interceptor handlers and recordings, `*.test-utils.ts`
-                     (the fifty-five unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
+                     (the fifty-eight unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
 ```
 
@@ -1461,12 +1461,12 @@ hand-written typed clients under `src/web/lib/`; there is no Hono RPC client. A 
 | Session | `GET /api/me` |
 | Health | `GET /api/health` (public, no session: `select 1` plus the cached Litestream replica reading from `backups.status()`, so Fly's check and the sentinel Worker probe answer in milliseconds and never run Litestream) |
 | Shell | `GET /api/nav` (the counts behind the nav badges: Applications in Ready, open Reviews, unread employer mail; a zero hides its badge) |
-| Events | `GET /api/events` (SSE; `Last-Event-ID` replay from `events`; heartbeat 25 s) |
+| Events | `GET /api/events` (SSE; signed-in only, per user: a stream carries just that user's rows and never a row with no owner; `Last-Event-ID` replay is capped to the newest 200 rows, so a reconnect from `0` cannot dump the whole log; heartbeat 25 s) |
 | Home | `GET /api/home` (running and pause reason, applications left, today's sent/remaining, ready-to-send count, queued count + next send time, sent/replies/interviews and a per-day or per-week series for 7D/30D/90D, open Reviews grouped by jobs unlocked, recent authenticated Inbox items, up next, activity, check-ins) · `POST /api/running` `{running}` |
 | Board | `GET /api/board` · `PATCH /api/applications/:id/stage` `{stage, position}` · `POST /api/applications/:id/undo-stage` · `POST /api/applications/:id/withdraw` (before `sending`: Queued, or Skip on a Ready card) |
 | Ready | `GET /api/ready` (Ready and approved cards with their plans, `planSha256`, `changes`, queue position and ETA) · `POST /api/applications/:id/approve` `{planSha256}` · `POST /api/applications/:id/unapprove` · `POST /api/ready/approve` `{items}` (Send all) · `PUT /api/applications/:id/answers/:questionId` (§8.7) |
 | Application | `GET /api/applications/:id` (card + timeline + snapshot "proof": answers with sources, letter with mapped lines, resume hash, and the derived `dossier`: sent-via details, facts trace, and only the "did not happen" lines the stored data proves) |
-| Jobs | `GET /api/search?q&filters` (FTS ≤ 50 ms; filters: `role`, `seniority`, `workplace`, `location` = resolved city, `employmentType`) · `GET /api/postings/:id` (scores on open) · `POST /api/postings/:id/apply` · `PUT /api/postings/:id/state` `{saved|hidden|null}` |
+| Jobs | `GET /api/search?q&filters` (signed-in only, at most 60 requests a minute per user → `429 rate_limited`; FTS ≤ 50 ms; filters: `role`, `seniority`, `workplace`, `location` = resolved city, `employmentType`) · `GET /api/postings/:id` (scores on open) · `POST /api/postings/:id/apply` · `PUT /api/postings/:id/state` `{saved|hidden|null}` |
 | Review | `GET /api/reviews` · `POST /api/reviews/:id/answer` · `POST /api/reviews/:id/dismiss` |
 | Check-ins | `POST /api/checkins/:id` `{answer}` |
 | Support | `POST /api/support` `{category, subject, message}` (5 an hour, mailed to `SUPPORT_EMAIL`) |
@@ -1479,7 +1479,7 @@ hand-written typed clients under `src/web/lib/`; there is no Hono RPC client. A 
 | Onboarding | `POST /api/onboarding/start` (step 5 Start: 409 `consent_required` unless the user has accepted the current consent version through `POST /api/consent/accept`; then marks onboarding finished, clears the `onboarding` pause reason, sets `running`, and queues only the next `prep.run_local_time` run, never a catch-up, so the first run is the next 07:00 local time; `POST /api/onboarding/5` is refused with 409 `start_required`), `GET/PUT /api/onboarding/facts` (the "Your facts" step: the target countries' work authorisation, one salary per currency in use, job title, how you heard, and the EEO opt-in; each save resolves the open Reviews it answers) · `GET/PUT /api/onboarding/targets` (the "What you want" step: the saved Targets, the choices that have open Postings, and the live count) · `PUT /api/onboarding/timezone` (the browser's zone through the seven-day rule) · `GET /api/onboarding` (the step, `onboarded_at`, pause reason, current resume, skip list and whether an invited user must onboard) · `POST /api/onboarding/:step` (records a finished step and returns the state; step 2 refuses without a resume) · `POST /api/onboarding/address/accept` (M2) |
 | Notifications | `GET /api/notifications` (the newest 100 rows in reading order, with `unread` and the server's `now`) · `POST /api/notifications/read` `{id}` · `POST /api/notifications/read-all` · `GET/PUT /api/notifications/preferences` · `GET /api/push` (the VAPID public key, or null when push is off) · `POST /api/push/subscribe` · `POST /api/push/unsubscribe` `{endpoint}` |
 | Settings | `GET/PUT /api/profile/settings` (timezone, languages; threshold and digest arrive with their slices) · `GET /api/account/export` · `POST /api/account/export` · `GET /api/account/export/:id/download` · `GET /api/account/deletion` (email, re-authenticated) · `POST /api/account/reauth/link` (a fresh sign-in link) · `POST /api/account/delete` `{confirm: true}` · `GET /api/support-access` |
-| Billing (M3) | `GET /api/billing` (`enabled`, `customer`, the subscription's `plan`, `status`, `currentPeriodEnd`, `cancelAtPeriodEnd`, `applicationsLeft` and `planApplications`) · `POST /api/billing/checkout` `{plan}` (Checkout returns to `/settings/billing/plans?billing=success|cancelled`) · `POST /api/billing/portal` (returns to `/settings/billing`; plan switches, cancel at period end, payment method and invoices happen there, in Stripe) |
+| Billing (M3) | `GET /api/billing` (`enabled`, `customer`, the subscription's `plan`, `status`, `currentPeriodEnd`, `cancelAtPeriodEnd`, `applicationsLeft` and `planApplications`; the demo account reads it too, so its Billing screen renders) · `POST /api/billing/checkout` `{plan}` (Checkout returns to `/settings/billing/plans?billing=success|cancelled`; a subscription that has not ended answers 409 `plan_active` with its `plan` and `status`, before any Stripe call) · `POST /api/billing/portal` (returns to `/settings/billing`; plan switches, cancel at period end, payment method and invoices happen there, in Stripe) |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `POST /internal/mail/dead-letter` · `GET /internal/mailboxes/:local` |
 | Admin | `/admin/api/session`, `/overview`, `/users` (filtered list), `/users/:id`, `/users/:id/reveal` (POST open, GET current, DELETE close), `/users/:id/suspend`, `/users/:id/reinstate`, `/act-as/:userId`, `/attempts`, `/attempts/:id/live`, `/attempts/:id/replay`, `/fixtures/capture`, `/probes/personio`, `/lab/runs`, `/kill-switches` (`PUT /kill-switches/:scope/:key`), `/settings` (`PUT /settings/:key`), `/grants`, `/billing/users`, `/billing/users/:id`, `/billing/refunds`, `/billing/reconciliation` (M3), `/margin`, `/catalog`, `/tag-imports`, `/llm-usage`, `/invites` (`POST /invites/:id/revoke`), `/mail-health`, `/storage-report`, `/audit`, `/provider-report`, `/live-checks` (GET the recorded results, POST run now) |
 
@@ -1564,12 +1564,13 @@ publishing version 2 leaves version 1 and an already sent Snapshot on version 1 
 
 Plus: route reachability for every page, interactive/layout guards (`interactive-*`, `layout-guards-*`), WCAG AA `axe` checks on every route, and seeded per-screen E2E checks across 390 / 1280 px light and dark (ADR 0037).
 
-### 16.2 Unit tests (fifty-five files, `bun:test`, beside their code)
+### 16.2 Unit tests (sixty-one files, `bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
 | `scripts/database-sync-guard.test.ts` | every `new DatabaseSync` in `src/` or `test/` configures `PRAGMA busy_timeout` or is a documented opt-out |
 | `scripts/lint-config-guard.test.ts` | the `no-unlisted-unit-test` allowlist names every unit test file and no path that does not exist |
+| `scripts/vacuum-app-db.test.ts` | a fragmented `app.sqlite` is compacted to a zero freelist with `integrity_check` ok, a dry run changes nothing, and the script refuses without `--confirm` or while another writer holds the lock (#506) |
 | `scripts/setup-stripe.test.ts` | an existing lookup-key price and the nine-event webhook are reused on a second run, `--rotate-webhook` replaces the endpoint with a fresh secret, and the out-env file (mode `0600`) is the only place a key or signing secret appears |
 | `scripts/workflow-config-guard.test.ts` | every `oven-sh/setup-bun` step pins the version `package.json` requires, so a runner release cannot break a scheduled job |
 | `src/server/account/erase.test.ts` | the erasure plan is written before the user row goes, the confirmation is queued only after both external deletes confirm clean, and a restart resumes the cleanup from the plan (#415) |
@@ -1579,6 +1580,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/billing/summary.test.ts` | the three counters Home shows are answered in two reads rather than six, and a reservation counts against what is left exactly as the separate reads do (#430) |
 | `src/server/billing/webhooks.test.ts` | a pause notice and the jobs a resume queues commit with the Stripe event and roll back with it; a stale out-of-order failure cannot pause a paid user, and a price Overture does not sell grants nothing |
 | `src/server/catalog/answer-derivations.test.ts` | answer derivations |
+| `src/server/catalog/companies-parquet.test.ts` | the pinned `companies.parquet` and manifest sha256 pairs are verified before a seed loads, and a tampered file or manifest is refused |
 | `src/server/catalog/question-normalize.test.ts` | question normalisation |
 | `src/server/catalog/tag-rules.test.ts` | tag rules |
 | `src/server/dispatch/browser/session-slots.test.ts` | the dispatcher's free-send count comes from the same process-wide semaphore every browser user holds a slot from, so a capture holding the last session offers a send no slot (#425) |
@@ -1587,7 +1589,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/dispatch/report.test.ts` | completion and cost divide distinct attempted Applications, so a retry counts once (#417) |
 | `src/server/fixtures/sanitise.test.ts` | a recorded page carries no script, event handler, personal data or token |
 | `src/server/inbox/linked-mail.test.ts` | an Application's linked mail is read in one query rather than one per message (#430) |
-| `src/server/inbox/threads.test.ts` | the Inbox Thread list reads its messages in one query rather than one per Thread (#430) |
+| `src/server/inbox/threads.test.ts` | the Inbox Thread list reads its messages in one query rather than one per Thread, a page walks every Thread once even when timestamps tie, and the counts stay over every Thread rather than the page (#430, #506) |
 | `src/server/matching/applications.test.ts` | an Application copies the Posting's and Company's display fields onto its own row when it is created, keeps them after the catalog rows are deleted, and is not created for a Posting that has already left the catalog (#422) |
 | `src/server/pipeline/answer-plan.test.ts` | a salary Fact kept per currency is chosen only for the currency a question names |
 | `src/server/pipeline/approved-plan.test.ts` | the Ready cards open every approved plan in one query rather than one per card (#430) |
@@ -1599,6 +1601,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/platform/alert-detail.test.ts` | a public alert carries the error type and count only, never the arbitrary message that can hold personal data or a token |
 | `src/server/platform/crypto.test.ts` | wrap/unwrap, AAD, shred |
 | `src/server/platform/db/catalog-split.test.ts` | `litestream.yml` replicates only `/data/app.sqlite`, a catalog write transaction never holds `app.sqlite`'s write lock, deleting and recreating `catalog.sqlite` leaves every user and Application row intact, and a closed Posting a crashed sweep never reported is still reconciled (#423) |
+| `src/server/platform/db/hot-path-indexes.test.ts` | the SSE catch-up, event retention, message-by-person, application-by-status and grant-ledger queries are planned through `events_user_seq`, `events_created_at`, `messages_user_created`, `applications_user_status` and `grants_user_starts` (#506) |
 | `src/server/platform/db/migration-snapshot.test.ts` | migration `0056_snapshot_decouple` backfills the copied display fields onto every existing Application, including readable placeholders when the catalog row is already gone, and leaves `applications`, `matches`, `posting_user_state` and `skip_companies` with no foreign key into `postings` or `companies` (#422) |
 | `src/server/platform/db/restore-check.test.ts` | the restored-database check reads only, refuses outbound calls and leaves `bg_jobs` untouched (#412) |
 | `src/server/platform/event-loop-lag.test.ts` | a late timer tick reports how long the loop was blocked, once per cooldown |
@@ -1615,11 +1618,14 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/platform/ports/replica-listing.test.ts` | the newest replica transaction is read from the first non-empty Litestream level (#281) |
 | `src/server/profile/facts.test.ts` | a Fact's scope is validated against its key |
 | `src/server/profile/onboarding-step.test.ts` | the onboarding step's salary and EEO reading |
+| `src/server/profile/pdf.test.ts` | only the `%PDF-` header in the first kilobyte is accepted, so a spoofed MIME type cannot pass HTML as a resume |
 | `src/server/profile/personal-crypto.test.ts` | the personal key is read once however many values one request opens and seals, each person's key stays apart, a race creates it once, and a read in flight when a person is forgotten does not cache their key again (#430) |
+| `src/server/profile/running-state.test.ts` | Resume and Pause never replace a billing, setup, suspension or dispatcher hold, Pause never hides the reason sending stopped, and only the same no-resume or no-mailbox hold clears when its prerequisite returns |
 | `src/server/profile/target-choices.test.ts` | the onboarding location plan uses the covering `postings_open_location` index (#337) |
 | `src/server/profile/targets.test.ts` | the live match count is cached per normalized filters and catalog revision, a same-connection or sweep-worker write invalidates it, the store is bounded, the count plan probes `posting_tags` by its primary key rather than scanning it, and 25 concurrent filter changes answer under 500ms p95 during catalog writes (#426) |
 | `src/server/profile/time-zone.test.ts` | an empty timezone change takes no write (#430) |
 | `src/server/profile/v1-import.test.ts` | the v1 answer-bank and learned-answer mapping |
+| `src/server/routes/ready.test.ts` | a corrupt or non-list `changes` value degrades to an empty card list rather than a 500 |
 | `src/shared/copy.test.ts` | no canvas annotation is a copy string or key |
 | `src/shared/dossier.test.ts` | the file is sent as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key, and a "did not happen" line appears only when the stored data proves it |
 | `src/shared/host-match.test.ts` | a host matches only its own domain or a real subdomain of it, after trimming, lower-casing and dropping a trailing root dot, so `evilgreenhouse.io` never matches `greenhouse.io` |
@@ -1683,7 +1689,8 @@ sends (§11.4), an inbound message dead-lettered by the mail Worker, a daily bil
 unhandled rejection in a background loop or timer (logged to stderr, alerted at most once a minute). The complete set is
 `ALERT_KINDS` in `platform/alerts.ts`; it also names the browser proxy, network-policy and minutes-trend alerts, the
 dispatch kill switch, a monthly mail-budget stop, an LLM spend stop and a failed live check. The alert path is the
-in-app `alert.raised` event plus a notification for every owner; with `ALERT_NTFY_URL` set, the same alert is pushed
+in-app `alert.raised` event, published once for each owner and never to a regular user, plus a notification for every
+owner; with `ALERT_NTFY_URL` set, the same alert is pushed
 to the owner's phone. No Grafana is provisioned by this repository; dashboards stay with the owner's Grafana account
 and read the OTLP endpoint. `live.check` computes the same thresholds from the app database and machine and records
 each one, and the test-only drill route fires every alert kind. When the disk alert fires, `GET

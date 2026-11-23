@@ -31,7 +31,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for the fifty-five files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
+exist only for the sixty-one files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
 as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key,
 and a "did not happen" line appears only when the stored data proves it), ledger, crypto, planner, the
 restored-database check (a restored file is read
@@ -54,7 +54,12 @@ user holds a slot from, so a capture holding the last session offers a send no s
 `sending`, #425), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
 per cooldown, so a paused main thread becomes a log line), the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
 a copy string or key), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
-`x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the host match
+`x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the signed-in event stream
+(`hub.test.ts`: a subscriber receives only rows addressed to that user and never an unscoped row, and a reconnect
+from zero or a very old cursor replays at most the newest 200 rows, #502), the owner alert fan-out (`alerts.test.ts`:
+`alert.raised` is written once per owner and delivered to no regular user, #502), the per-user search limit
+(`rate-limit.test.ts`: one fixed window allows the maximum then refuses with `rate_limited`, and each key counts
+alone, #502), the host match
 (`host-match.test.ts`: a host matches only its own domain or a real subdomain of it, after trimming, lower-casing and
 dropping a trailing root dot, so `evilgreenhouse.io` never matches `greenhouse.io`), the onboarding location plan (the
 open-Posting group-by is planned through the covering `postings_open_location` index, never a table scan or a
@@ -66,6 +71,10 @@ at the sign-in reserve while sign-in mail and the live check may spend it, each 
 so the reserve alert never hides the cap alert, and the count survives reopening the database, #282), the billing
 pause (a plan end or a failed payment pauses once with its own reason, a successful payment resumes only a billing
 pause, and an in-flight send keeps its reservation across the period end so only a sent Application is charged), the
+running-state transitions (Resume and Pause never replace a billing, setup, suspension or dispatcher hold, and only
+the same no-resume or no-mailbox hold clears when its prerequisite returns), the Ready change list (a corrupt value
+degrades to an empty list rather than a 500), the PDF header check (only `%PDF-` in the first kilobyte passes, so a
+spoofed MIME type cannot pass HTML as a resume), the
 billing webhook's transaction (a pause notice and the planner/prep jobs a resume queues commit with the Stripe event
 and roll back with it, a stale out-of-order failure cannot pause a paid user, and a price Overture does not sell
 grants nothing), the Anthropic model and its batch prices (`models.test.ts`: `ANTHROPIC_MODEL` defaults to the model SPEC §8.6 names,
@@ -99,7 +108,7 @@ whole, so a sender cannot choose how much memory it costs), the unhandled-reject
 error type and count only, never the arbitrary message that can hold personal data or a token), the hot read paths
 (#430: the user key is read once per request however many values it opens and a forget is not undone by a read already
 in flight, the Inbox Thread list and an Application's linked mail read their messages in one query rather than one per
-Thread, the open Review list and a Board's email notes read their rows in one query rather than one per Review or per
+Thread, and a page walks every Thread once even when timestamps tie while the counts stay over every Thread, the open Review list and a Board's email notes read their rows in one query rather than one per Review or per
 Application, the Ready cards open every approved plan in one query rather than one per card, an empty timezone change
 takes no write, and Home's billing strip is one grants read plus one ledger read; each test counts the statements
 through the real drizzle query logger and grows the row count to prove the count stays flat), the live match count
@@ -109,8 +118,13 @@ stays bounded, the count query probes `posting_tags` by its primary key rather t
 filter changes stay under 500ms p95 while catalog writes run, #426), the unit-test
 allowlist (`lint-config-guard.test.ts`: every path the allowlist names exists, and every unit test file in `src/` or
 `scripts/` is named, so a deleted test cannot leave a stale entry), and the workflow Bun pin
-(`workflow-config-guard.test.ts`: every `oven-sh/setup-bun` step pins the version `package.json` requires), and the
-interception canary (`outbound-interception.test.ts`: a fetch or node `https` request to an unmocked host rejects with
+(`workflow-config-guard.test.ts`: every `oven-sh/setup-bun` step pins the version `package.json` requires), the
+hot-path indexes (`hot-path-indexes.test.ts`: the SSE catch-up, event retention, message-by-person,
+application-by-status and grant-ledger queries are planned through `events_user_seq`, `events_created_at`,
+`messages_user_created`, `applications_user_status` and `grants_user_starts`, #506), the application-database
+vacuum (`vacuum-app-db.test.ts`: a fragmented file is compacted to a zero freelist with `integrity_check` ok, a dry
+run changes nothing, and the script refuses without `--confirm` or while another writer holds the lock, #506), and
+the interception canary (`outbound-interception.test.ts`: a fetch or node `https` request to an unmocked host rejects with
 the interceptor's own error while a mocked host still answers, so a request that leaks fails instead of reaching DNS). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
 depend on the runner. The mail count runs the real SQLite file and the real migrations, so the invariant is exercised

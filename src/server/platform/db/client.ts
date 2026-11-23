@@ -43,6 +43,12 @@ export function catalogPathFor(databasePath: string) {
   return databasePath === ":memory:" ? ":memory:" : join(dirname(databasePath), "catalog.sqlite");
 }
 
+function tuneWorkingMemory(sqlite: Database) {
+  sqlite.run("PRAGMA temp_store = MEMORY;");
+  sqlite.run("PRAGMA cache_size = -16384;");
+  sqlite.run("PRAGMA journal_size_limit = 67108864;");
+}
+
 export function openDatabase(path: string, options: { logger?: QueryLogger } = {}) {
   if (path !== ":memory:") {
     mkdirSync(dirname(path), { recursive: true });
@@ -54,6 +60,7 @@ export function openDatabase(path: string, options: { logger?: QueryLogger } = {
   sqlite.run("PRAGMA synchronous = FULL;");
   sqlite.run("PRAGMA foreign_keys = ON;");
   sqlite.run("PRAGMA busy_timeout = 5000;");
+  tuneWorkingMemory(sqlite);
 
   const db = drizzle(sqlite, options.logger === undefined ? {} : { logger: options.logger });
 
@@ -79,6 +86,7 @@ export function openCatalogDatabase(path: string, options: { logger?: QueryLogge
   sqlite.run("PRAGMA synchronous = NORMAL;");
   sqlite.run("PRAGMA foreign_keys = ON;");
   sqlite.run("PRAGMA busy_timeout = 5000;");
+  tuneWorkingMemory(sqlite);
 
   const brand = { [catalogDatabaseBrand]: "catalog" } satisfies CatalogBrand;
   const raw = drizzle(sqlite, options.logger === undefined ? {} : { logger: options.logger });

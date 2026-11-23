@@ -278,6 +278,20 @@ test("a trial upgrade applies at once, a Week switch lands at renewal from its p
       status: "active",
     });
 
+    stripe.clear();
+
+    const secondCheckout = await request.post(`${server.url}/api/billing/checkout`, {
+      data: { plan: "week" },
+    });
+
+    expect(secondCheckout.status()).toBe(409);
+    expect(await secondCheckout.json()).toStrictEqual({
+      error: "plan_active",
+      plan: "month",
+      status: "active",
+    });
+    expect(stripe.requests).toHaveLength(0);
+
     const switchToWeek = subscriptionPayload({
       cancelAtPeriodEnd: false,
       eventId: "evt_e2e_m3_245_switch_week",
@@ -476,13 +490,25 @@ test("a trial upgrade applies at once, a Week switch lands at renewal from its p
 
     expect(portalParams.get("customer")).toBe(CUSTOMER_ID);
     expect(portalParams.get("return_url")).toBe("http://localhost:3000/profile/billing");
+
+    stripe.clear();
+
+    const resubscribe = await request.post(`${server.url}/api/billing/checkout`, {
+      data: { plan: "month" },
+    });
+
+    expect(resubscribe.status()).toBe(200);
+    expect(billingUrlSchema.parse(await resubscribe.json()).url.startsWith("https://")).toBe(true);
+    expect(new URLSearchParams(stripe.requests[0]?.body ?? "").get("line_items[0][price]")).toBe(
+      PRICE_MONTH,
+    );
   } finally {
     await server.stop();
     await stripe.stop();
   }
 });
 
-test("the demo account is refused the plan state, checkout and portal without a Stripe call", async ({
+test("the demo account reads the plan state but is refused checkout and portal without a Stripe call", async ({
   identityServer,
 }) => {
   const stripe = await startStripeMock();
@@ -516,10 +542,18 @@ test("the demo account is refused the plan state, checkout and portal without a 
 
       const portal = await demo.post(`${server.url}/api/billing/portal`);
 
-      expect(state.status()).toBe(403);
+      expect(state.status()).toBe(200);
+      expect(billingStateSchema.parse(await state.json())).toStrictEqual({
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: null,
+        customer: false,
+        enabled: true,
+        plan: null,
+        status: null,
+      });
       expect(checkout.status()).toBe(403);
       expect(portal.status()).toBe(403);
-      expect(await state.json()).toMatchObject({ error: "demo_locked" });
+      expect(await checkout.json()).toMatchObject({ error: "demo_locked" });
       expect(await portal.json()).toMatchObject({ error: "demo_locked" });
       expect(stripe.requests).toHaveLength(0);
     } finally {
