@@ -28,7 +28,7 @@ export function UsageRing() {
           transform="rotate(-90 22 22)"
         />
       </svg>
-      <span className="num absolute inset-0 flex items-center justify-center text-[12px] font-bold">
+      <span className="num absolute inset-0 flex items-center justify-center text-xs font-bold">
         {copy.home.usageCount(left)}
       </span>
     </div>

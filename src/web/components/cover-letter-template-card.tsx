@@ -125,7 +125,7 @@ export function CoverLetterTemplateCard() {
         <div className="mt-5 space-y-3">
           <textarea
             aria-label={cl.title}
-            className="min-h-64 w-full rounded-xl border border-input bg-background p-4 font-serif text-base leading-relaxed text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal"
+            className="min-h-64 w-full rounded-xl border border-input bg-background p-4 font-serif text-base leading-relaxed text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
             onChange={(event) => {
               setDraft(event.target.value);
             }}

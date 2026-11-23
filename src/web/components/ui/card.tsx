@@ -9,7 +9,8 @@ const cardVariants = cva("rounded-xl border bg-card text-foreground", {
     variant: {
       default: "border-border shadow-sh",
       elevated: "border-input shadow-lift",
-      interactive: "border-border shadow-sh transition hover:border-input hover:shadow-lift",
+      interactive:
+        "border-border shadow-sh transition duration-quick ease-out hover:border-input hover:shadow-lift",
       muted: "border-border bg-muted shadow-none",
     },
   },

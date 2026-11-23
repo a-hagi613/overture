@@ -12,6 +12,7 @@ import type {
 import { useAdminResource } from "../../lib/admin-resource.ts";
 import { AdminGateScreen } from "./gate-screen.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 import { BillingReconcile } from "./billing-reconcile.tsx";
 import { BillingStatCard } from "./billing-stat-card.tsx";
 import { BillingTabs } from "./billing-tabs.tsx";
@@ -19,7 +20,7 @@ import { BillingStatePill } from "./billing-format.tsx";
 import { BILLING_FILTER_ORDER, billingPlanLabel, dayOf } from "./billing-labels.ts";
 
 const FILTER_BUTTON =
-  "min-h-11 rounded-md px-3.5 text-[13px] hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
+  "min-h-11 rounded-md px-3.5 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
 
 function periodText(row: BillingUserRow) {
   return row.expiresAt === null
@@ -61,7 +62,7 @@ export function BillingPage() {
     };
   }, [filter, page]);
 
-  const { data, refusal, refresh } = useAdminResource<BillingPageData>(load, [
+  const { data, failed, refusal, refresh } = useAdminResource<BillingPageData>(load, [
     "billing",
     filter,
     page,
@@ -79,7 +80,7 @@ export function BillingPage() {
   }
 
   if (data === null) {
-    return null;
+    return <AdminStatusCard failed={failed} onRetry={refresh} />;
   }
 
   const { pageSize } = data;
@@ -94,9 +95,7 @@ export function BillingPage() {
         lead={copy.admin.billingLead}
         plain={copy.admin.billingTitlePlain}
       />
-      <p className="mt-2 max-w-[60ch] text-[13px] text-muted-foreground">
-        {copy.admin.billingIntro}
-      </p>
+      <p className="mt-2 max-w-[60ch] text-sm text-muted-foreground">{copy.admin.billingIntro}</p>
 
       <BillingTabs current="users" />
 
@@ -154,7 +153,7 @@ export function BillingPage() {
         className="mt-4 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-sh md:hidden"
       >
         {data.users.length === 0 ? (
-          <li className="px-4 py-6 text-[13px] text-muted-foreground">{copy.admin.billingEmpty}</li>
+          <li className="px-4 py-6 text-sm text-muted-foreground">{copy.admin.billingEmpty}</li>
         ) : (
           data.users.map((row) => (
             <li key={row.id} className="px-4 py-3">
@@ -167,19 +166,19 @@ export function BillingPage() {
                     {row.name}
                   </Link>
                   {row.name === row.email ? null : (
-                    <span className="block break-all text-[12px] text-muted-foreground">
+                    <span className="block break-all text-xs text-muted-foreground">
                       {row.email}
                     </span>
                   )}
                 </div>
                 <BillingStatePill state={row.state} />
               </div>
-              <p className="mt-1 text-[13px]">
+              <p className="mt-1 text-sm">
                 {billingPlanLabel(row.plan)}
                 {" · "}
                 {periodText(row)}
               </p>
-              <p className="text-[13px] text-muted-foreground">{usageText(row)}</p>
+              <p className="text-sm text-muted-foreground">{usageText(row)}</p>
             </li>
           ))
         )}
@@ -189,9 +188,9 @@ export function BillingPage() {
         className="mt-4 hidden overflow-x-auto rounded-lg border border-border bg-card shadow-sh md:block"
       >
         <table
-          className={`w-full border-collapse text-left text-[13px] ${data.users.length === 0 ? "" : "min-w-[640px]"}`}
+          className={`w-full border-collapse text-left text-sm ${data.users.length === 0 ? "" : "min-w-[640px]"}`}
         >
-          <thead className="bg-muted text-[12px] text-muted-foreground">
+          <thead className="bg-muted text-xs text-muted-foreground">
             <tr>
               <th scope="col" className="px-4 py-2.5 font-medium">
                 {copy.admin.billingColumnUser}
@@ -228,7 +227,7 @@ export function BillingPage() {
                       {row.name.length > 0 ? row.name : copy.admin.billingUserNameFallback}
                     </Link>
                     {row.name === row.email ? null : (
-                      <span className="block text-[12px] text-muted-foreground">{row.email}</span>
+                      <span className="block text-xs text-muted-foreground">{row.email}</span>
                     )}
                   </td>
                   <td className="px-4 py-3">{billingPlanLabel(row.plan)}</td>
@@ -244,7 +243,7 @@ export function BillingPage() {
         </table>
       </section>
 
-      <div className="mt-3 flex items-center justify-between gap-3 text-[12.5px] text-muted-foreground">
+      <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
         <span>{copy.admin.billingShowing(from, to, data.total)}</span>
         <div className="flex gap-2">
           <button

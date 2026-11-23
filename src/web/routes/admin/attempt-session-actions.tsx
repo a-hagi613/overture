@@ -3,10 +3,10 @@ import type { AttemptRow } from "../../lib/admin-api.ts";
 import { isActiveAttempt } from "./attempts-format.ts";
 
 const ACTION_BUTTON_CLASS =
-  "min-h-11 rounded-md border border-input bg-card px-3 text-[12.5px] font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9";
+  "min-h-11 rounded-md border border-input bg-card px-3 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9";
 
 const LIVE_BUTTON_CLASS =
-  "min-h-11 rounded-md border border-foreground bg-foreground px-3 text-[12.5px] font-semibold text-primary-ink hover:bg-btn-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9";
+  "min-h-11 rounded-md border border-foreground bg-foreground px-3 text-xs font-semibold text-primary-ink hover:bg-btn-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9";
 
 export function AttemptSessionActions({
   attempt,
@@ -19,9 +19,7 @@ export function AttemptSessionActions({
 }) {
   if (attempt.providerSessionId === null) {
     return (
-      <span className="text-[12px] text-muted-foreground">
-        {copy.admin.attemptsActionUnavailable}
-      </span>
+      <span className="text-xs text-muted-foreground">{copy.admin.attemptsActionUnavailable}</span>
     );
   }
 

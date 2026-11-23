@@ -9,8 +9,8 @@ function lineOf(row: AuditRow) {
 export function AuditLine({ row }: { row: AuditRow }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-t border-border py-3 first:border-t-0">
-      <span className="font-mono text-[12.5px] font-semibold">{row.action}</span>
-      <span className="text-[12.5px] text-muted-foreground">{lineOf(row)}</span>
+      <span className="font-mono text-xs font-semibold">{row.action}</span>
+      <span className="text-xs text-muted-foreground">{lineOf(row)}</span>
     </div>
   );
 }

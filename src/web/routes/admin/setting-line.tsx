@@ -22,19 +22,19 @@ export function SettingLine({
 
   return (
     <div className="flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0">
-      <p className="font-mono text-[13px] font-semibold">{settingKey}</p>
+      <p className="font-mono text-sm font-semibold">{settingKey}</p>
       <div className="flex items-center gap-2">
         <label className="sr-only" htmlFor={`setting-${settingKey}`}>
           {copy.admin.settingsValueAria(settingKey)}
         </label>
         <input
-          className="h-9 w-[130px] rounded-md border border-input bg-background px-2.5 text-[13px]"
+          className="h-9 w-[130px] rounded-md border border-input bg-background px-2.5 text-sm"
           id={`setting-${settingKey}`}
           onChange={(event) => setDraft(event.target.value)}
           value={draft}
         />
         <button
-          className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-card px-3 text-[13px] font-semibold hover:bg-muted"
+          className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-card px-3 text-sm font-semibold hover:bg-muted"
           onClick={() => {
             void save();
           }}

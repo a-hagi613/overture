@@ -29,9 +29,9 @@ export function JobTable({
       data-scroll-region
     >
       <table
-        className={`w-full border-collapse text-left text-[13px] ${jobs.length === 0 ? "" : "min-w-[900px]"}`}
+        className={`w-full border-collapse text-left text-sm ${jobs.length === 0 ? "" : "min-w-[900px]"}`}
       >
-        <thead className="bg-muted text-[12px] text-muted-foreground">
+        <thead className="bg-muted text-xs text-muted-foreground">
           <tr>
             <th className="px-4 py-2.5 font-medium" scope="col">
               {copy.admin.jobsColumnJob}
@@ -68,7 +68,7 @@ export function JobTable({
               <tr className="border-t border-border align-top hover:bg-muted/60" key={job.id}>
                 <td className="px-4 py-3">
                   <span className="block font-semibold">{job.kind}</span>
-                  <span className="mt-0.5 block break-all font-mono text-[11.5px] text-muted-foreground">
+                  <span className="mt-0.5 block break-all font-mono text-eyebrow text-muted-foreground">
                     {job.id}
                   </span>
                 </td>
@@ -81,7 +81,7 @@ export function JobTable({
                 <td className="px-4 py-3">
                   <JobTiming job={job} now={now} />
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap font-mono text-[12px]">
+                <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">
                   {adminDayTime(job.updatedAt, now)}
                 </td>
                 <td className="px-4 py-3">

@@ -10,9 +10,10 @@ import { LlmCallLog } from "./llm-call-log.tsx";
 import { formatUsdMicros } from "./llm-format.ts";
 import { LlmSummaryCards } from "./llm-summary-cards.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 
 const NAV_LINK_CLASS =
-  "inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9";
+  "inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9";
 
 export function LlmUsagePage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -26,7 +27,7 @@ export function LlmUsagePage() {
     [purpose],
   );
 
-  const { data, refusal, refresh } = useAdminResource(load, ["llm-usage", purpose]);
+  const { data, failed, refusal, refresh } = useAdminResource(load, ["llm-usage", purpose]);
 
   if (refusal !== null) {
     return (
@@ -40,7 +41,7 @@ export function LlmUsagePage() {
   }
 
   if (data === null) {
-    return null;
+    return <AdminStatusCard failed={failed} onRetry={refresh} />;
   }
 
   const selectPurpose = (nextPurpose: string) => {
@@ -71,7 +72,7 @@ export function LlmUsagePage() {
 
       <LlmSummaryCards view={data} />
 
-      <p className="mt-3 font-mono text-[12px] text-muted-foreground">
+      <p className="mt-3 font-mono text-xs text-muted-foreground">
         {copy.admin.llmCapsFootnote(
           formatUsdMicros(data.caps.userDailyCapMicros),
           formatUsdMicros(data.caps.taggingDailyCapMicros),

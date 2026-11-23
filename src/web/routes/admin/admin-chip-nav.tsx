@@ -10,7 +10,7 @@ export function AdminChipNav() {
         <NavLink end={destination.end} key={destination.to} to={destination.to}>
           {({ isActive }) => (
             <span
-              className={`inline-flex min-h-11 items-center rounded-full border px-3.5 text-[12.5px] font-semibold ${
+              className={`inline-flex min-h-11 items-center rounded-full border px-3.5 text-xs font-semibold ${
                 isActive
                   ? "border-foreground bg-foreground text-card"
                   : "border-input bg-card text-foreground hover:bg-muted"

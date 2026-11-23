@@ -36,14 +36,14 @@ export function LegalShell({ children }: { children: ReactNode }) {
             </p>
             <nav aria-label={copy.legal.footerLinksLabel} className="flex items-center gap-3 pt-1">
               <Link
-                className="font-medium text-foreground underline underline-offset-4 hover:text-signal-text max-md:inline-flex max-md:min-h-11 max-md:items-center"
+                className="font-medium text-foreground underline decoration-input underline-offset-4 hover:decoration-foreground max-md:inline-flex max-md:min-h-11 max-md:items-center"
                 to="/terms"
               >
                 {copy.legal.termsLink}
               </Link>
               <span aria-hidden="true">{copy.legal.footerSeparator.trim()}</span>
               <Link
-                className="font-medium text-foreground underline underline-offset-4 hover:text-signal-text max-md:inline-flex max-md:min-h-11 max-md:items-center"
+                className="font-medium text-foreground underline decoration-input underline-offset-4 hover:decoration-foreground max-md:inline-flex max-md:min-h-11 max-md:items-center"
                 to="/privacy"
               >
                 {copy.legal.privacyLink}

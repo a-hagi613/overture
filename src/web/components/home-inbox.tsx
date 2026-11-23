@@ -37,7 +37,7 @@ export function HomeInbox(props: { now: number; rows: readonly HomeInboxRow[]; z
             >
               <div className="min-w-0 flex-1">
                 <p className="text-sm leading-snug text-foreground">
-                  <span className="font-semibold group-hover:text-signal-text">{row.company}</span>{" "}
+                  <span className="font-semibold group-hover:text-foreground">{row.company}</span>{" "}
                   {row.text}
                 </p>
                 {row.detail === null ? null : (

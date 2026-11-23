@@ -113,7 +113,7 @@ export function TimeLanguageSection() {
 
           <div className="relative w-full shrink-0 sm:w-56">
             <select
-              className="h-10 w-full cursor-pointer appearance-none rounded-md border border-input bg-card pl-3 pr-9 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-10 w-full cursor-pointer appearance-none rounded-md border border-input bg-card pl-3 pr-9 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50"
               disabled={controlsDisabled}
               id="settings-timezone"
               onChange={(event) => {

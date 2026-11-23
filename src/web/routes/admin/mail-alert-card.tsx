@@ -21,10 +21,10 @@ export function MailAlertCard({
 }) {
   return (
     <section className="mt-4 rounded-lg border border-need bg-need-soft px-5 py-4">
-      <h2 className="font-serif text-[19px] leading-[1.2]">
+      <h2 className="font-serif text-base leading-[1.2]">
         {copy.admin.mailAlertHeading(alert.employer)}
       </h2>
-      <p className="mt-1.5 text-[13.5px] leading-relaxed">
+      <p className="mt-1.5 text-sm leading-relaxed">
         {copy.admin.mailAlertBody(alert.sent, alert.employer, since)}
       </p>
       <div className="mt-3 flex flex-wrap gap-2.5">
@@ -36,7 +36,7 @@ export function MailAlertCard({
               ? copy.admin.mailCloseEmployerFor(alert.employer)
               : copy.admin.mailOpenEmployerFor(alert.employer)
           }
-          className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-card px-4 text-[13px] font-semibold hover:bg-muted"
+          className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-card px-4 text-sm font-semibold hover:bg-muted"
           onClick={onToggle}
           type="button"
         >
@@ -48,7 +48,7 @@ export function MailAlertCard({
               ? copy.admin.mailPausedFor(alert.employer)
               : copy.admin.mailPauseEmployerFor(alert.employer)
           }
-          className="inline-flex h-10 items-center justify-center rounded-md border border-need px-4 text-[13px] font-semibold text-need hover:bg-card disabled:opacity-60"
+          className="inline-flex h-10 items-center justify-center rounded-md border border-need px-4 text-sm font-semibold text-need hover:bg-card disabled:opacity-60"
           disabled={employer?.killSwitch?.enabled === true}
           onClick={onPause}
           type="button"
@@ -59,7 +59,7 @@ export function MailAlertCard({
         </button>
       </div>
       {pauseError ? (
-        <p className="mt-2 text-[13px] text-need" role="alert">
+        <p className="mt-2 text-sm text-need" role="alert">
           {copy.admin.mailPauseFailed}
         </p>
       ) : null}

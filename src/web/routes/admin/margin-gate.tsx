@@ -15,7 +15,7 @@ export function MarginGate({ row }: { row: MarginPlanRow }) {
     : copy.admin.marginGateOver(GATE_TEXT);
 
   return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-[12.5px] font-medium ${className}`}>
+    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${className}`}>
       {label}
     </span>
   );

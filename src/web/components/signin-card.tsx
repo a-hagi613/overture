@@ -133,28 +133,41 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
   );
 
   useEffect(() => {
+    let alive = true;
+    const controller = new AbortController();
+
     const load = async () => {
       let key: string | null = null;
       let scriptUrl: string | undefined;
 
       try {
-        const response = await fetch("/api/me", { signal: AbortSignal.timeout(10_000) });
+        const response = await fetch("/api/me", { signal: controller.signal });
 
         if (response.ok) {
           const parsed = meSchema.parse(await response.json());
 
           key = parsed.turnstileSiteKey ?? null;
           scriptUrl = parsed.turnstileScriptUrl;
-          setSocialProviders(parsed.socialProviders);
+
+          if (alive) {
+            setSocialProviders(parsed.socialProviders);
+          }
         }
       } catch {
         key = null;
       }
 
-      setTurnstileConfig({ scriptUrl, siteKey: key });
+      if (alive) {
+        setTurnstileConfig({ scriptUrl, siteKey: key });
+      }
     };
 
     void load();
+
+    return () => {
+      alive = false;
+      controller.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -535,7 +548,7 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
       <p className={SWITCH_CLASS}>
         {isSignUp ? copy.signIn.switchToSignInPrompt : copy.signIn.switchToSignUpPrompt}{" "}
         <Link
-          className="font-semibold text-foreground underline decoration-input underline-offset-4 transition hover:text-signal-text"
+          className="font-semibold text-foreground underline decoration-input underline-offset-4 transition hover:decoration-foreground"
           to={isSignUp ? "/signin" : "/signup"}
         >
           {isSignUp ? copy.signIn.switchToSignInAction : copy.signIn.switchToSignUpAction}

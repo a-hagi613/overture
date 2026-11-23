@@ -35,8 +35,8 @@ export function LlmSummaryCards({ view }: { view: LlmUsageResponse }) {
   return (
     <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <div className="rounded-lg border border-border bg-card p-4 shadow-sh">
-        <p className="text-[12.5px] text-muted-foreground">{copy.admin.llmStatToday}</p>
-        <p className="mt-1 font-serif text-[34px] leading-none tabular-nums">
+        <p className="text-xs text-muted-foreground">{copy.admin.llmStatToday}</p>
+        <p className="mt-1 font-serif text-metric leading-none tabular-nums">
           {formatUsdMicros(view.today.costMicros)}
         </p>
         {dailyMeter === null ? null : (
@@ -51,15 +51,15 @@ export function LlmSummaryCards({ view }: { view: LlmUsageResponse }) {
           </div>
         )}
         <p
-          className={`mt-2 text-[12px] ${dailyMeter?.over === true ? "font-semibold text-need" : "text-muted-foreground"}`}
+          className={`mt-2 text-xs ${dailyMeter?.over === true ? "font-semibold text-need" : "text-muted-foreground"}`}
         >
           {dailyHint}
         </p>
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4 shadow-sh">
-        <p className="text-[12.5px] text-muted-foreground">{copy.admin.llmStatMonth}</p>
-        <p className="mt-1 font-serif text-[34px] leading-none tabular-nums">
+        <p className="text-xs text-muted-foreground">{copy.admin.llmStatMonth}</p>
+        <p className="mt-1 font-serif text-metric leading-none tabular-nums">
           {formatUsdMicros(view.month.costMicros)}
         </p>
         {monthlyMeter === null ? null : (
@@ -74,28 +74,28 @@ export function LlmSummaryCards({ view }: { view: LlmUsageResponse }) {
           </div>
         )}
         <p
-          className={`mt-2 text-[12px] ${monthlyMeter?.over === true ? "font-semibold text-need" : "text-muted-foreground"}`}
+          className={`mt-2 text-xs ${monthlyMeter?.over === true ? "font-semibold text-need" : "text-muted-foreground"}`}
         >
           {monthCapHint(view.month.costMicros, view.caps.monthlySpendCapMicros)}
         </p>
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4 shadow-sh">
-        <p className="text-[12.5px] text-muted-foreground">{copy.admin.llmStatTotal}</p>
-        <p className="mt-1 font-serif text-[34px] leading-none tabular-nums">
+        <p className="text-xs text-muted-foreground">{copy.admin.llmStatTotal}</p>
+        <p className="mt-1 font-serif text-metric leading-none tabular-nums">
           {formatUsdMicros(view.allTime.costMicros)}
         </p>
-        <p className="mt-2 text-[12px] text-muted-foreground">
+        <p className="mt-2 text-xs text-muted-foreground">
           {copy.admin.llmStatTotalCalls(view.allTime.calls)}
         </p>
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4 shadow-sh">
-        <p className="text-[12.5px] text-muted-foreground">{copy.admin.llmStatCacheHit}</p>
-        <p className="mt-1 font-serif text-[34px] leading-none tabular-nums">
+        <p className="text-xs text-muted-foreground">{copy.admin.llmStatCacheHit}</p>
+        <p className="mt-1 font-serif text-metric leading-none tabular-nums">
           {formatCacheHitRate(view.allTime.cachedTokens, view.allTime.inputTokens)}
         </p>
-        <p className="mt-2 text-[12px] text-muted-foreground">{cacheHint}</p>
+        <p className="mt-2 text-xs text-muted-foreground">{cacheHint}</p>
       </div>
     </div>
   );

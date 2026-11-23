@@ -18,12 +18,13 @@ import { AttemptsTable } from "./attempts-table.tsx";
 import { BillingStatCard } from "./billing-stat-card.tsx";
 import { AdminGateScreen } from "./gate-screen.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 
 const FILTER_BUTTON_CLASS =
-  "min-h-11 rounded-md px-3.5 text-[13px] hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9";
+  "min-h-11 rounded-md px-3.5 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9";
 
 const NAV_LINK_CLASS =
-  "inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9";
+  "inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9";
 
 function parseOutcomeFilter(raw: string | null) {
   const parsed = attemptOutcomeFilterSchema.safeParse(raw);
@@ -49,7 +50,11 @@ export function AttemptsPage() {
     [applicationId, outcome],
   );
 
-  const { data, refusal, refresh } = useAdminResource(load, ["attempts", applicationId, outcome]);
+  const { data, failed, refusal, refresh } = useAdminResource(load, [
+    "attempts",
+    applicationId,
+    outcome,
+  ]);
 
   if (refusal !== null) {
     return (
@@ -63,7 +68,7 @@ export function AttemptsPage() {
   }
 
   if (data === null) {
-    return null;
+    return <AdminStatusCard failed={failed} onRetry={refresh} />;
   }
 
   const updateFilters = (nextOutcome: AttemptOutcomeFilter, nextApplicationId: string) => {
@@ -209,10 +214,10 @@ export function AttemptsPage() {
             updateFilters(outcome, applicationInput.current?.value ?? "");
           }}
         >
-          <label className="block text-[12px] font-semibold" htmlFor="admin-attempts-app-id">
+          <label className="block text-xs font-semibold" htmlFor="admin-attempts-app-id">
             {copy.admin.attemptsApplicationFilterLabel}
             <input
-              className="mt-1 block h-11 w-full min-w-[200px] rounded-md border border-input bg-card px-3 font-mono text-[13px] text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground sm:w-64 md:h-10"
+              className="mt-1 block h-11 w-full min-w-[200px] rounded-md border border-input bg-card px-3 font-mono text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground sm:w-64 md:h-10"
               defaultValue={applicationId}
               id="admin-attempts-app-id"
               key={applicationId}
@@ -223,14 +228,14 @@ export function AttemptsPage() {
             />
           </label>
           <button
-            className="min-h-11 rounded-md border border-foreground bg-foreground px-4 text-[13px] font-semibold text-primary-ink hover:bg-btn-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-10"
+            className="min-h-11 rounded-md border border-foreground bg-foreground px-4 text-sm font-semibold text-primary-ink hover:bg-btn-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-10"
             type="submit"
           >
             {copy.admin.attemptsApplicationFilterApply}
           </button>
           {applicationId.length > 0 ? (
             <button
-              className="min-h-11 rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-10"
+              className="min-h-11 rounded-md border border-input bg-card px-3.5 text-sm font-semibold hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-10"
               onClick={() => {
                 updateFilters(outcome, "");
               }}
@@ -257,9 +262,7 @@ export function AttemptsPage() {
         className="mt-4 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-sh md:hidden"
       >
         {data.attempts.length === 0 ? (
-          <li className="px-4 py-6 text-[13px] text-muted-foreground">
-            {copy.admin.attemptsEmpty}
-          </li>
+          <li className="px-4 py-6 text-sm text-muted-foreground">{copy.admin.attemptsEmpty}</li>
         ) : (
           data.attempts.map((attempt) => (
             <AttemptMobileItem

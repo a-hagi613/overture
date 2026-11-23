@@ -75,14 +75,12 @@ export function CatalogPage() {
       {heading}
       <section
         aria-labelledby="admin-catalog-health"
-        className="mt-7 flex flex-col gap-5 rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
+        className="mt-7 flex flex-col gap-5 rounded-lg border border-border bg-card px-6 py-5 shadow-sh"
       >
-        <h2 id="admin-catalog-health" className="font-serif text-[26px] leading-[1.1]">
+        <h2 id="admin-catalog-health" className="font-serif text-card-title leading-[1.1]">
           {copy.admin.catalogSectionHeading}
         </h2>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">
-          {copy.admin.catalogNotDiscovered}
-        </p>
+        <p className="mt-1 text-xs text-muted-foreground">{copy.admin.catalogNotDiscovered}</p>
         <div className="mt-4">
           {view.ats.map((entry) => (
             <CatalogLine
@@ -96,15 +94,15 @@ export function CatalogPage() {
       </section>
       <section
         aria-labelledby="admin-personio-probe"
-        className="mt-7 flex flex-col gap-4 rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
+        className="mt-7 flex flex-col gap-4 rounded-lg border border-border bg-card px-6 py-5 shadow-sh"
       >
-        <h2 id="admin-personio-probe" className="font-serif text-[26px] leading-[1.1]">
+        <h2 id="admin-personio-probe" className="font-serif text-card-title leading-[1.1]">
           {copy.admin.catalogProbeHeading}
         </h2>
-        <p className="text-[12.5px] text-muted-foreground">{copy.admin.catalogProbeLead}</p>
+        <p className="text-xs text-muted-foreground">{copy.admin.catalogProbeLead}</p>
         <div className="flex flex-wrap items-center gap-3">
           <button
-            className="min-h-9 rounded-md border border-border bg-card px-3 text-[13px] font-medium text-foreground shadow-sh hover:bg-muted"
+            className="min-h-9 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground shadow-sh hover:bg-muted"
             disabled={running}
             onClick={() => {
               void runProbe();
@@ -113,12 +111,12 @@ export function CatalogPage() {
           >
             {copy.admin.catalogProbeRun}
           </button>
-          <span aria-live="polite" className="text-[12.5px] text-muted-foreground">
+          <span aria-live="polite" className="text-xs text-muted-foreground">
             {queued ? copy.admin.catalogProbeQueued : ""}
           </span>
         </div>
         {probeRunFailed ? (
-          <p className="text-[12.5px] font-semibold text-need" role="alert">
+          <p className="text-xs font-semibold text-need" role="alert">
             {copy.admin.catalogProbeFailedRun}
           </p>
         ) : null}
@@ -134,19 +132,19 @@ export function CatalogPage() {
         {probe.data === null ? null : (
           <div className="flex flex-col gap-2">
             {probe.data.ranAt === null ? (
-              <p className="text-[12.5px] text-muted-foreground">{copy.admin.catalogProbeEmpty}</p>
+              <p className="text-xs text-muted-foreground">{copy.admin.catalogProbeEmpty}</p>
             ) : (
               <>
-                <p className="text-[12.5px] text-foreground">
+                <p className="text-xs text-foreground">
                   {copy.admin.catalogProbeRanAt(adminDay(probe.data.ranAt))}
                 </p>
                 {summary === null ? null : (
-                  <p className="text-[13px] font-medium text-foreground">
+                  <p className="text-sm font-medium text-foreground">
                     {summary.passed ? copy.admin.catalogProbePassed : copy.admin.catalogProbeFailed}
                   </p>
                 )}
                 {summary === null ? null : (
-                  <p className="text-[12.5px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {copy.admin.catalogProbeSummary(summary)}
                   </p>
                 )}
@@ -154,7 +152,7 @@ export function CatalogPage() {
                   <ul className="mt-1 flex flex-col divide-y divide-border">
                     {probe.data.forms.map((form) => (
                       <li
-                        className="flex flex-wrap items-baseline justify-between gap-2 py-2 text-[12.5px]"
+                        className="flex flex-wrap items-baseline justify-between gap-2 py-2 text-xs"
                         key={`${form.postingId}-${String(form.index)}`}
                       >
                         <span className="min-w-0 break-all text-muted-foreground">{form.url}</span>

@@ -5,6 +5,7 @@ export function Toaster() {
     <SonnerToaster
       closeButton
       position="bottom-right"
+      style={{ zIndex: 70 }}
       toastOptions={{
         classNames: {
           actionButton:

@@ -8,7 +8,7 @@ export interface PendingJobAction {
 }
 
 const ACTION_BUTTON =
-  "min-h-11 rounded-md border border-input bg-card px-3 text-[12.5px] font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:opacity-50 md:min-h-9";
+  "min-h-11 rounded-md border border-input bg-card px-3 text-xs font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:opacity-50 md:min-h-9";
 
 export function JobActions({
   busy,
@@ -38,7 +38,7 @@ export function JobActions({
       <div className="flex flex-wrap items-center gap-2">
         <button
           aria-label={confirmAria}
-          className="min-h-11 rounded-md bg-foreground px-3 text-[12.5px] font-semibold text-card disabled:opacity-50 md:min-h-9"
+          className="min-h-11 rounded-md bg-foreground px-3 text-xs font-semibold text-card disabled:opacity-50 md:min-h-9"
           disabled={busy}
           onClick={() => {
             onAction(job, confirming);
@@ -94,7 +94,7 @@ export function JobActions({
         </button>
       ) : null}
       {retryable || cancellable ? null : (
-        <span className="text-[12px] text-muted-foreground">{copy.admin.reportNone}</span>
+        <span className="text-xs text-muted-foreground">{copy.admin.reportNone}</span>
       )}
     </div>
   );

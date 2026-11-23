@@ -11,6 +11,7 @@ import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle, dsEyebrow } from "./ui/ds.ts";
 import { Input } from "./ui/input.tsx";
+import { SectionSkeleton } from "./section-skeleton.tsx";
 
 const moneyFormat = new Intl.NumberFormat("en-US");
 
@@ -123,6 +124,10 @@ export function TargetsSection() {
     }
 
     setNewLocation(null);
+  }
+
+  if (targetsQuery.isPending) {
+    return <SectionSkeleton />;
   }
 
   return (
@@ -343,7 +348,7 @@ export function TargetsSection() {
           <div className="mt-3 flex max-w-md items-center gap-2.5">
             <select
               aria-label={targets.currencyLabel}
-              className="h-10 w-24 shrink-0 rounded-md border border-input bg-card px-3 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal"
+              className="h-10 w-24 shrink-0 rounded-md border border-input bg-card px-3 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
               onChange={(event) => {
                 update({ salaryCurrency: event.currentTarget.value });
               }}

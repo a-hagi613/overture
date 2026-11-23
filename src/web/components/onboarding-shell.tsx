@@ -33,7 +33,7 @@ export function OnboardingShell({
   }
 
   if (session === null) {
-    return null;
+    return <RouteFallback fullScreen />;
   }
 
   return (

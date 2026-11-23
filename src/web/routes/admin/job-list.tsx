@@ -28,20 +28,20 @@ export function JobList({
       className="mt-2 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-sh md:hidden"
     >
       {jobs.length === 0 ? (
-        <li className="px-4 py-6 text-[13px] text-muted-foreground">{copy.admin.jobsEmpty}</li>
+        <li className="px-4 py-6 text-sm text-muted-foreground">{copy.admin.jobsEmpty}</li>
       ) : (
         jobs.map((job) => (
           <li className="px-4 py-4" key={job.id}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <span className="block break-all font-mono text-[12px] text-muted-foreground">
+                <span className="block break-all font-mono text-xs text-muted-foreground">
                   {job.id}
                 </span>
-                <span className="mt-1 block break-all text-[13.5px] font-semibold">{job.kind}</span>
+                <span className="mt-1 block break-all text-sm font-semibold">{job.kind}</span>
               </div>
               <JobStatusPill status={job.status} />
             </div>
-            <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[12.5px]">
+            <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs">
               <div className="flex gap-1.5">
                 <dt className="text-muted-foreground">{copy.admin.jobsColumnAttempts}</dt>
                 <dd className="font-mono tabular-nums">

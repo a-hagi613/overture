@@ -21,12 +21,12 @@ const FILTER_ORDER = ["open", "in_progress", "resolved", "closed", "all"] as con
 const LIST_LIMIT = 50;
 
 const FILTER_BUTTON =
-  "inline-flex min-h-11 items-center rounded-md px-3.5 text-[13px] hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
+  "inline-flex min-h-11 items-center rounded-md px-3.5 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
 
-const CARD = "rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh";
+const CARD = "rounded-lg border border-border bg-card px-6 py-5 shadow-sh";
 
 const RETRY_BUTTON =
-  "mt-4 min-h-11 rounded-md border border-input bg-card px-4 text-[13px] font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
+  "mt-4 min-h-11 rounded-md border border-input bg-card px-4 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
 
 export function AdminSupportPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -132,7 +132,7 @@ export function AdminSupportPage() {
       <>
         {heading}
         <section aria-labelledby="admin-support-failed" className={`mt-7 ${CARD}`} role="alert">
-          <h2 className="font-serif text-[26px] leading-[1.1]" id="admin-support-failed">
+          <h2 className="font-serif text-card-title leading-[1.1]" id="admin-support-failed">
             {copy.admin.supportLoadFailed}
           </h2>
           <button
@@ -153,7 +153,7 @@ export function AdminSupportPage() {
     return (
       <>
         {heading}
-        <AdminStatusCard failed={false} onRetry={refresh} />
+        <AdminStatusCard failed={loadFailed} onRetry={refresh} />
       </>
     );
   }
@@ -164,9 +164,7 @@ export function AdminSupportPage() {
   return (
     <>
       {heading}
-      <p className="mt-2 max-w-[62ch] text-[13px] text-muted-foreground">
-        {copy.admin.supportIntro}
-      </p>
+      <p className="mt-2 max-w-[62ch] text-sm text-muted-foreground">{copy.admin.supportIntro}</p>
 
       <div className="mt-5">
         <fieldset className="min-w-0">
@@ -193,17 +191,17 @@ export function AdminSupportPage() {
         </fieldset>
       </div>
 
-      <output aria-live="polite" className="mt-3 block min-h-5 text-[12.5px] text-muted-foreground">
+      <output aria-live="polite" className="mt-3 block min-h-5 text-xs text-muted-foreground">
         {actionFailed ? copy.admin.supportActionFailed : (notice ?? "")}
       </output>
 
       <div className="mt-3 grid gap-5 lg:grid-cols-2 lg:items-start">
         <section aria-labelledby="admin-support-list" className={`min-w-0 ${CARD}`}>
           <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h2 className="font-serif text-[26px] leading-[1.1]" id="admin-support-list">
+            <h2 className="font-serif text-card-title leading-[1.1]" id="admin-support-list">
               {copy.admin.supportListHeading}
             </h2>
-            <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="text-eyebrow uppercase tracking-[0.14em] text-muted-foreground">
               {copy.admin.supportOpenCount(data.openCount)}
             </span>
           </div>
@@ -215,19 +213,17 @@ export function AdminSupportPage() {
               selectedId={selectedId}
             />
           </div>
-          <p className="mt-3 text-[12.5px] text-muted-foreground">
+          <p className="mt-3 text-xs text-muted-foreground">
             {copy.admin.supportShowing(data.items.length, data.total)}
           </p>
         </section>
 
         {selected === undefined ? (
           <section aria-labelledby="admin-support-none" className={`min-w-0 ${CARD}`}>
-            <h2 className="font-serif text-[26px] leading-[1.1]" id="admin-support-none">
+            <h2 className="font-serif text-card-title leading-[1.1]" id="admin-support-none">
               {copy.admin.supportNoSelectionHeading}
             </h2>
-            <p className="mt-2 text-[12.5px] text-muted-foreground">
-              {copy.admin.supportSelectPrompt}
-            </p>
+            <p className="mt-2 text-xs text-muted-foreground">{copy.admin.supportSelectPrompt}</p>
           </section>
         ) : (
           <SupportTicketDetail

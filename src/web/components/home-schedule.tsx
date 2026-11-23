@@ -90,7 +90,7 @@ export function HomeSchedule({ now, zone }: { now: number; zone: string }) {
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-semibold text-foreground group-hover:text-signal-text">
+                    <p className="truncate text-sm font-semibold text-foreground group-hover:text-foreground">
                       {item.company}
                     </p>
                     <Badge variant={isToday ? "outline" : "ok"}>

@@ -5,7 +5,8 @@ import type { RouteObject } from "react-router";
 
 import { PreserveSearchRedirect } from "./components/preserve-search-redirect.tsx";
 import { RootLayout } from "./components/root-layout.tsx";
-import { RouteErrorBoundary } from "./components/route-error-boundary.tsx";
+import { RouteErrorElement } from "./components/route-error-element.tsx";
+import { RouteErrorPage } from "./components/route-error-page.tsx";
 import { ConsentPage } from "./routes/consent.tsx";
 import { LandingPage } from "./routes/landing.tsx";
 import { NotFoundPage } from "./routes/not-found.tsx";
@@ -153,7 +154,10 @@ const UserPage = lazyRoute(async () => import("./routes/admin/user.tsx"), "UserP
 const InvitesPage = lazyRoute(async () => import("./routes/admin/invites.tsx"), "InvitesPage");
 const AuditLogPage = lazyRoute(async () => import("./routes/admin/audit.tsx"), "AuditLogPage");
 
-const appShellChildren: RouteObject[] = [
+const withRouteError = (routes: RouteObject[]) =>
+  routes.map((route) => ({ ...route, errorElement: <RouteErrorElement /> }));
+
+const appShellChildren: RouteObject[] = withRouteError([
   { path: "/home", element: <HomePage /> },
   { path: "/ready", element: <ReadyPage /> },
   { path: "/board", element: <BoardPage /> },
@@ -187,9 +191,9 @@ const appShellChildren: RouteObject[] = [
   { path: "/search", element: <PreserveSearchRedirect to="/board" /> },
   { path: "/inbox/address", element: <PreserveSearchRedirect to="/profile/account#forwarding" /> },
   { path: "*", element: <NotFoundPage /> },
-];
+]);
 
-const adminShellChildren: RouteObject[] = [
+const adminShellChildren: RouteObject[] = withRouteError([
   { path: "/admin", element: <OverviewPage /> },
   { path: "/admin/support", element: <AdminSupportPage /> },
   { path: "/admin/jobs", element: <JobsPage /> },
@@ -210,9 +214,9 @@ const adminShellChildren: RouteObject[] = [
   { path: "/admin/users/:id", element: <UserPage /> },
   { path: "/admin/invites", element: <InvitesPage /> },
   { path: "/admin/audit", element: <AuditLogPage /> },
-];
+]);
 
-const publicRoutes: RouteObject[] = [
+const publicRoutes: RouteObject[] = withRouteError([
   { path: "/", element: <LandingPage /> },
   { path: "/pricing", element: <PreserveSearchRedirect to="/#pricing" /> },
   { path: "/signin", element: <SignInPage /> },
@@ -226,15 +230,19 @@ const publicRoutes: RouteObject[] = [
   { path: "/onboarding/targets", element: <OnboardingTargetsPage /> },
   { path: "/onboarding/forward", element: <OnboardingForwardPage /> },
   { path: "/onboarding/trial", element: <OnboardingTrialPage /> },
-];
+]);
 
 export const appRoutes: RouteObject[] = [
   {
     element: <RootLayout />,
-    errorElement: <RouteErrorBoundary />,
+    errorElement: <RouteErrorPage />,
     children: [
-      { element: <AppShell />, children: appShellChildren },
-      { element: <AdminShell />, children: adminShellChildren },
+      { element: <AppShell />, errorElement: <RouteErrorPage />, children: appShellChildren },
+      {
+        element: <AdminShell />,
+        errorElement: <RouteErrorPage />,
+        children: adminShellChildren,
+      },
       ...publicRoutes,
     ],
   },

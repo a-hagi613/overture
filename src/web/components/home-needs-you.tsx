@@ -46,7 +46,7 @@ export function HomeNeedsYou(props: {
             to="/review"
           >
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold leading-snug text-foreground group-hover:text-signal-text">
+              <p className="text-sm font-semibold leading-snug text-foreground group-hover:text-foreground">
                 {review.prompt}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">

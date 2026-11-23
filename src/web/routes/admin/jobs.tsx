@@ -10,6 +10,7 @@ import { JobList } from "./job-list.tsx";
 import type { PendingJobAction } from "./job-actions.tsx";
 import { JobTable } from "./job-table.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 
 const FILTER_ORDER = ["dead", "running", "queued", "failed", "completed", "all"] as const;
 
@@ -23,12 +24,12 @@ const FILTER_LABELS: Record<(typeof FILTER_ORDER)[number], string> = {
 };
 
 const FILTER_BUTTON =
-  "inline-flex min-h-11 items-center gap-2 rounded-md px-3.5 text-[13px] hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
+  "inline-flex min-h-11 items-center gap-2 rounded-md px-3.5 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
 
-const CARD = "rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh";
+const CARD = "rounded-lg border border-border bg-card px-6 py-5 shadow-sh";
 
 const RETRY_BUTTON =
-  "mt-4 min-h-11 rounded-md border border-input bg-card px-4 text-[13px] font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
+  "mt-4 min-h-11 rounded-md border border-input bg-card px-4 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
 
 function filterCount(counts: JobsResponse["counts"], filter: (typeof FILTER_ORDER)[number]) {
   if (filter === "all") {
@@ -67,7 +68,11 @@ export function JobsPage() {
     }
   }, [kind, status]);
 
-  const { data, refusal, refresh } = useAdminResource<JobsLoad>(load, ["jobs", status, kind]);
+  const { data, failed, refusal, refresh } = useAdminResource<JobsLoad>(load, [
+    "jobs",
+    status,
+    kind,
+  ]);
 
   const updateFilter = (nextStatus: JobStatusFilter, nextKind: string) => {
     const params = new URLSearchParams(searchParams);
@@ -140,7 +145,12 @@ export function JobsPage() {
   );
 
   if (data === null) {
-    return null;
+    return (
+      <>
+        {heading}
+        <AdminStatusCard failed={failed} onRetry={refresh} />
+      </>
+    );
   }
 
   if (data.kind === "failed") {
@@ -148,7 +158,7 @@ export function JobsPage() {
       <>
         {heading}
         <section aria-labelledby="admin-jobs-failed" className={`mt-7 ${CARD}`}>
-          <h2 id="admin-jobs-failed" className="font-serif text-[26px] leading-[1.1]">
+          <h2 id="admin-jobs-failed" className="font-serif text-card-title leading-[1.1]">
             {copy.admin.jobsLoadFailed}
           </h2>
           <button
@@ -170,7 +180,7 @@ export function JobsPage() {
   return (
     <>
       {heading}
-      <p className="mt-2 max-w-[62ch] text-[13px] text-muted-foreground">{copy.admin.jobsIntro}</p>
+      <p className="mt-2 max-w-[62ch] text-sm text-muted-foreground">{copy.admin.jobsIntro}</p>
 
       <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
         <fieldset className="min-w-0">
@@ -190,7 +200,7 @@ export function JobsPage() {
                   type="button"
                 >
                   <span>{FILTER_LABELS[filter]}</span>
-                  <span className="font-serif text-[13px] tabular-nums">
+                  <span className="font-serif text-sm tabular-nums">
                     {filterCount(view.counts, filter)}
                   </span>
                 </button>
@@ -198,10 +208,10 @@ export function JobsPage() {
             })}
           </div>
         </fieldset>
-        <label className="flex flex-col gap-1 text-[12px] text-muted-foreground">
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           {copy.admin.jobsKindLabel}
           <select
-            className="min-h-11 rounded-md border border-input bg-card px-3 text-[13px] text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9"
+            className="min-h-11 rounded-md border border-input bg-card px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9"
             onChange={(event) => {
               setKind(event.target.value);
             }}
@@ -217,7 +227,7 @@ export function JobsPage() {
         </label>
       </div>
 
-      <p aria-live="polite" className="mt-3 min-h-5 text-[12.5px] text-muted-foreground">
+      <p aria-live="polite" className="mt-3 min-h-5 text-xs text-muted-foreground">
         {actionFailed ? copy.admin.jobsActionFailed : (notice ?? "")}
       </p>
 
@@ -242,7 +252,7 @@ export function JobsPage() {
         setPending={setPending}
       />
 
-      <p className="mt-3 text-[12.5px] text-muted-foreground">
+      <p className="mt-3 text-xs text-muted-foreground">
         {copy.admin.jobsShowing(view.jobs.length, view.total)}
       </p>
     </>

@@ -38,12 +38,12 @@ export function SystemLiveChecksCard({
   return (
     <section
       aria-labelledby="admin-system-live-checks"
-      className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
+      className="rounded-lg border border-border bg-card px-6 py-5 shadow-sh"
     >
-      <h2 className="font-serif text-[26px] leading-[1.1]" id="admin-system-live-checks">
+      <h2 className="font-serif text-card-title leading-[1.1]" id="admin-system-live-checks">
         {copy.admin.systemLiveChecksHeading}
       </h2>
-      <p className="mt-1.5 max-w-[640px] text-[12.5px] text-muted-foreground">
+      <p className="mt-1.5 max-w-[640px] text-xs text-muted-foreground">
         {copy.admin.systemLiveChecksIntro}
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -57,22 +57,20 @@ export function SystemLiveChecksCard({
         >
           {running ? copy.admin.systemLiveChecksRunning : copy.admin.systemLiveChecksRun}
         </button>
-        <span className="text-[12.5px] text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {view.liveChecks.latestRunAt === null
             ? ""
             : copy.admin.systemLiveChecksLastRun(adminDayTime(view.liveChecks.latestRunAt, now))}
         </span>
-        <output aria-live="polite" className="text-[12.5px] text-muted-foreground">
+        <output aria-live="polite" className="text-xs text-muted-foreground">
           {failed ? copy.admin.systemLiveChecksFailed : (note ?? "")}
         </output>
       </div>
       {view.liveChecks.results.length === 0 ? (
-        <p className="mt-4 text-[12.5px] text-muted-foreground">
-          {copy.admin.systemLiveChecksEmpty}
-        </p>
+        <p className="mt-4 text-xs text-muted-foreground">{copy.admin.systemLiveChecksEmpty}</p>
       ) : (
         <div className="mt-5 overflow-hidden rounded-lg border border-border">
-          <div className="hidden grid-cols-[minmax(0,1.4fr)_90px_100px_140px_minmax(0,1.3fr)] gap-4 border-b border-border bg-muted px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground md:grid">
+          <div className="hidden grid-cols-[minmax(0,1.4fr)_90px_100px_140px_minmax(0,1.3fr)] gap-4 border-b border-border bg-muted px-5 py-3 text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground md:grid">
             <span>{copy.admin.systemColumnCheck}</span>
             <span>{copy.admin.systemColumnResult}</span>
             <span>{copy.admin.systemColumnLatency}</span>

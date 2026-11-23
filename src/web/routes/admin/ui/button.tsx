@@ -38,7 +38,7 @@ export function Button({
       aria-expanded={ariaExpanded}
       aria-label={ariaLabel}
       aria-pressed={ariaPressed}
-      className={`inline-flex min-h-11 items-center justify-center rounded-md px-3.5 text-[13px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:opacity-45 md:min-h-9 ${VARIANT_CLASSES[variant]} ${className}`.trim()}
+      className={`inline-flex min-h-11 items-center justify-center rounded-md px-3.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:opacity-45 md:min-h-9 ${VARIANT_CLASSES[variant]} ${className}`.trim()}
       disabled={disabled}
       onClick={onClick}
       type={type === "submit" ? "submit" : "button"}

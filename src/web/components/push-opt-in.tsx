@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
@@ -35,7 +35,11 @@ export function PushOptIn() {
   const supported = pushSupported();
   const denied = notificationPermission() === "denied";
 
+  const alive = useRef(true);
+
   useEffect(() => {
+    alive.current = true;
+
     void (async () => {
       if (!supported) {
         return;
@@ -44,11 +48,19 @@ export function PushOptIn() {
       try {
         const subscription = await currentPushSubscription();
 
-        setSubscribed(subscription !== null);
+        if (alive.current) {
+          setSubscribed(subscription !== null);
+        }
       } catch {
-        setSubscribed(false);
+        if (alive.current) {
+          setSubscribed(false);
+        }
       }
     })();
+
+    return () => {
+      alive.current = false;
+    };
   }, [supported]);
 
   if (!supported) {

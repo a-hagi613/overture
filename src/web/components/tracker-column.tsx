@@ -85,7 +85,7 @@ export function TrackerColumn({
         </div>
         {linkTo === null ? null : (
           <Link
-            className="inline-flex shrink-0 items-center gap-0.5 text-xs font-semibold text-muted-foreground transition hover:text-signal-text"
+            className="inline-flex shrink-0 items-center gap-0.5 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
             to={linkTo}
           >
             <span>{lane === "ready" ? copy.board.openReady : copy.board.openReview}</span>

@@ -24,7 +24,7 @@ export function CalendarCellBody({ items }: { items: readonly CalendarItem[] }) 
           <CalendarChip block key={entry.id} kind={chipKindOf(entry)} label={entry.company} />
         ))}
         {items.length > shown.length ? (
-          <span className="pl-0.5 text-[11px] font-semibold text-muted-foreground">
+          <span className="pl-0.5 text-eyebrow font-semibold text-muted-foreground">
             {copy.calendar.more(items.length - shown.length)}
           </span>
         ) : null}

@@ -7,6 +7,7 @@ import type { BillingReconciliation } from "../../lib/admin-api.ts";
 import { useAdminResource } from "../../lib/admin-resource.ts";
 import { AdminGateScreen } from "./gate-screen.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 import { BillingStatCard } from "./billing-stat-card.tsx";
 import { BillingTabs } from "./billing-tabs.tsx";
 import { ReconcileBanner } from "./billing-reconcile-banner.tsx";
@@ -16,7 +17,7 @@ import { formatRunDay } from "./billing-reconcile-format.ts";
 const PAYMENTS_ID = "billing-reconcile-payments";
 
 const BUTTON_LINK =
-  "inline-flex min-h-11 items-center rounded-md px-3 text-[13px] font-semibold underline underline-offset-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
+  "inline-flex min-h-11 items-center rounded-md px-3 text-sm font-semibold underline underline-offset-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
 
 interface ReconcileData {
   reconciliation: BillingReconciliation | null;
@@ -40,7 +41,7 @@ export function BillingReconciliationPage() {
     return { data: { reconciliation: result.data.reconciliation }, ok: true as const };
   }, []);
 
-  const { data, refusal, refresh } = useAdminResource<ReconcileData>(load, [
+  const { data, failed, refusal, refresh } = useAdminResource<ReconcileData>(load, [
     "billing-reconciliation",
   ]);
 
@@ -56,7 +57,7 @@ export function BillingReconciliationPage() {
   }
 
   if (data === null) {
-    return null;
+    return <AdminStatusCard failed={failed} onRetry={refresh} />;
   }
 
   const { reconciliation } = data;
@@ -70,7 +71,7 @@ export function BillingReconciliationPage() {
     <>
       <nav
         aria-label={copy.admin.billingReconcileCrumbLabel}
-        className="mt-4 text-[13px] text-muted-foreground"
+        className="mt-4 text-sm text-muted-foreground"
       >
         <span>
           {copy.admin.billingReconcileCrumbAdmin}
@@ -82,7 +83,7 @@ export function BillingReconciliationPage() {
       </nav>
 
       <AdminPageHeading italic="" lead="" plain={copy.admin.billingReconcileTitlePlain} />
-      <p className="mt-2 max-w-[60ch] text-[13px] text-muted-foreground">
+      <p className="mt-2 max-w-[60ch] text-sm text-muted-foreground">
         {reconciliation === null
           ? copy.admin.billingReconcileLeadNone
           : copy.admin.billingReconcileLead(formatRunDay(reconciliation.day))}
@@ -130,16 +131,16 @@ export function BillingReconciliationPage() {
           className="mt-6"
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="billing-reconcile-payments-title" className="text-[15px] font-semibold">
+            <h2 id="billing-reconcile-payments-title" className="text-sm font-semibold">
               {copy.admin.billingReconcilePayments}
             </h2>
-            <p className="text-[12.5px] text-muted-foreground tabular-nums">
+            <p className="text-xs text-muted-foreground tabular-nums">
               {copy.admin.billingReconcileShowing(rows.length, reconciliation.itemsTotal)}
             </p>
           </div>
 
           {onlyMismatches ? (
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-[13px]">
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
               <p>{copy.admin.billingReconcileOnlyMismatches}</p>
               <button
                 type="button"
@@ -155,7 +156,7 @@ export function BillingReconciliationPage() {
 
           <div className="mt-3">
             {rows.length === 0 ? (
-              <p className="rounded-lg border border-border bg-card p-4 text-[13px] text-muted-foreground shadow-sh">
+              <p className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground shadow-sh">
                 {onlyMismatches
                   ? copy.admin.billingReconcileEmptyFiltered
                   : copy.admin.billingReconcileEmptyList}

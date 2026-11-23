@@ -11,8 +11,10 @@ export function GrantLine({ row }: { row: GrantRow }) {
 
   return (
     <div className="flex items-baseline justify-between gap-3 border-t border-border py-3 first:border-t-0">
-      <span className="font-serif text-lg tabular-nums">{copy.home.usageCount(row.quantity)}</span>
-      <span className="text-[12.5px] text-muted-foreground">
+      <span className="font-serif text-base tabular-nums">
+        {copy.home.usageCount(row.quantity)}
+      </span>
+      <span className="text-xs text-muted-foreground">
         {expires === null
           ? copy.admin.grantLine(row.email, when)
           : copy.admin.grantLineWithExpiry(row.email, when, expires)}

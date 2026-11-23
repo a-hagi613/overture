@@ -50,7 +50,7 @@ export function CalendarAgenda({
   return (
     <section aria-labelledby="calendar-agenda" className="mt-5 md:hidden">
       <h2
-        className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+        className="text-eyebrow font-semibold uppercase tracking-[0.12em] text-muted-foreground"
         id="calendar-agenda"
       >
         {copy.calendar.agenda}
@@ -62,10 +62,10 @@ export function CalendarAgenda({
 
         return (
           <div key={key} ref={isToday ? todayRef : undefined}>
-            <h3 className="mt-[18px] text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <h3 className="mt-4 text-eyebrow font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {dayLabel(date)}
               {isToday ? (
-                <b className="ml-1.5 font-serif text-[15px] font-normal normal-case italic tracking-normal text-foreground">
+                <b className="ml-1.5 font-serif text-sm font-normal normal-case italic tracking-normal text-foreground">
                   {copy.calendar.today}
                 </b>
               ) : null}
@@ -96,15 +96,15 @@ export function CalendarAgenda({
                     }}
                     type="button"
                   >
-                    <span className="w-11 flex-none pt-[3px] font-mono text-xs text-muted-foreground">
+                    <span className="w-11 flex-none pt-1 font-mono text-xs text-muted-foreground">
                       {timeOf(entry.at, zone)}
                     </span>
                     <span className="min-w-0 flex-1">
                       <CalendarChip kind={chipKindOf(entry)} />
-                      <span className="mt-[5px] block break-words text-[13.5px] font-semibold">
+                      <span className="mt-1 block break-words text-sm font-semibold">
                         {entry.company}
                       </span>
-                      <span className="mt-0.5 block break-words text-[12.5px] text-muted-foreground">
+                      <span className="mt-0.5 block break-words text-xs text-muted-foreground">
                         {detailOf(entry)}
                       </span>
                     </span>

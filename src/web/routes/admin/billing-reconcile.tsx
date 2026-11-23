@@ -32,12 +32,12 @@ export function BillingReconcile({
     >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 id="billing-reconcile" className="text-[13px] font-semibold">
+          <h2 id="billing-reconcile" className="text-sm font-semibold">
             {copy.admin.billingReconcileHeading}
           </h2>
           {reconciliation === null ? null : (
             <span
-              className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${tones[reconciliation.status]}`}
+              className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-eyebrow font-semibold ${tones[reconciliation.status]}`}
             >
               {reconciliation.status === "clean"
                 ? copy.admin.billingReconcileCleanPill
@@ -45,13 +45,13 @@ export function BillingReconcile({
             </span>
           )}
         </div>
-        <p className="mt-1 text-[13px] text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           {reconciliation === null ? copy.admin.billingReconcileNone : summaryOf(reconciliation)}
         </p>
       </div>
       <Link
         to="/admin/billing/reconciliation"
-        className="inline-flex min-h-11 items-center rounded-md px-3 text-[13px] font-semibold underline underline-offset-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9"
+        className="inline-flex min-h-11 items-center rounded-md px-3 text-sm font-semibold underline underline-offset-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9"
       >
         {copy.admin.billingReconcileOpen}
       </Link>

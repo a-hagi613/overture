@@ -6,6 +6,7 @@ import { copy } from "../shared/copy.ts";
 import { Backdrop } from "./components/backdrop.tsx";
 import { BoardRail } from "./components/board-rail.tsx";
 import { BrandMark } from "./components/brand-mark.tsx";
+import { RouteErrorBoundary } from "./components/route-error-boundary.tsx";
 import { RouteFallback } from "./components/route-fallback.tsx";
 import { SideNav } from "./components/side-nav.tsx";
 import { SidebarSearchButton } from "./components/sidebar-search-button.tsx";
@@ -46,12 +47,8 @@ export function AppShell() {
     }
   }, [isPending, navigate, session]);
 
-  if (isPending) {
-    return <div className="min-h-screen bg-background" />;
-  }
-
-  if (session === null) {
-    return null;
+  if (isPending || session === null) {
+    return <RouteFallback fullScreen />;
   }
 
   const wide = desktop && !railCollapsed;
@@ -133,9 +130,11 @@ export function AppShell() {
           tabIndex={-1}
         >
           <div className="mx-auto w-full max-w-[1440px]">
-            <Suspense fallback={<RouteFallback />}>
-              <Outlet />
-            </Suspense>
+            <RouteErrorBoundary insideShell>
+              <Suspense fallback={<RouteFallback />}>
+                <Outlet />
+              </Suspense>
+            </RouteErrorBoundary>
           </div>
         </main>
         <TabBar

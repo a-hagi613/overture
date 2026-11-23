@@ -51,13 +51,13 @@ export function SystemDatabasesCard({
   return (
     <section
       aria-labelledby="admin-system-databases"
-      className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
+      className="rounded-lg border border-border bg-card px-6 py-5 shadow-sh"
     >
-      <h2 className="font-serif text-[26px] leading-[1.1]" id="admin-system-databases">
+      <h2 className="font-serif text-card-title leading-[1.1]" id="admin-system-databases">
         {copy.admin.systemDatabasesHeading}
       </h2>
       {freelistWarning ? (
-        <output className="mt-3 block rounded-md bg-need-soft p-3 text-[12.5px] font-medium text-need">
+        <output className="mt-3 block rounded-md bg-need-soft p-3 text-xs font-medium text-need">
           {copy.admin.systemFreelistWarning(
             copy.admin.systemMegabytes(
               Math.max(view.databases.app?.freeBytes ?? 0, view.databases.catalog?.freeBytes ?? 0),
@@ -83,15 +83,13 @@ export function SystemDatabasesCard({
         >
           {checkpointing ? copy.admin.systemWalCheckpointRunning : copy.admin.systemWalCheckpoint}
         </button>
-        <output aria-live="polite" className="text-[12.5px] text-muted-foreground">
+        <output aria-live="polite" className="text-xs text-muted-foreground">
           {note ?? ""}
         </output>
       </div>
-      <h3 className="mt-6 font-serif text-[19px] leading-[1.2]">
-        {copy.admin.systemVolumeHeading}
-      </h3>
+      <h3 className="mt-6 font-serif text-base leading-[1.2]">{copy.admin.systemVolumeHeading}</h3>
       {view.volume === null ? (
-        <p className="mt-2 text-[12.5px] text-muted-foreground">{copy.admin.systemVolumeNone}</p>
+        <p className="mt-2 text-xs text-muted-foreground">{copy.admin.systemVolumeNone}</p>
       ) : (
         <div className="mt-2">
           <dl className="max-w-[560px]">
@@ -116,9 +114,7 @@ export function SystemDatabasesCard({
           </div>
         </div>
       )}
-      <h3 className="mt-6 font-serif text-[19px] leading-[1.2]">
-        {copy.admin.systemCatalogHeading}
-      </h3>
+      <h3 className="mt-6 font-serif text-base leading-[1.2]">{copy.admin.systemCatalogHeading}</h3>
       <dl className="mt-1 max-w-[560px]">
         <SystemField label={copy.admin.systemCatalogBoards} value={String(view.catalog.boards)} />
         <SystemField

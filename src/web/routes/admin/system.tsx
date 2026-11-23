@@ -32,8 +32,8 @@ export function SystemPage() {
           lead={copy.admin.systemLead}
           plain={copy.admin.systemTitlePlain}
         />
-        <section className="mt-7 rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh">
-          <output aria-live="polite" className="block text-[13px] text-muted-foreground">
+        <section className="mt-7 rounded-lg border border-border bg-card px-6 py-5 shadow-sh">
+          <output aria-live="polite" className="block text-sm text-muted-foreground">
             {failed ? copy.admin.systemLoadFailed : copy.admin.systemLoading}
           </output>
           {failed ? (

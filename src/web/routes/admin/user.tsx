@@ -16,7 +16,7 @@ import { AdminStatusPill } from "./status-pill.tsx";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const cardClass = "rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh";
+const cardClass = "rounded-lg border border-border bg-card px-6 py-5 shadow-sh";
 
 function grantDaysOf(grant: NonNullable<AdminUserDetail["user"]["grant"]>) {
   if (grant.expiresAt === null) {
@@ -159,7 +159,7 @@ export function UserPage() {
         <div className="min-w-0">
           <nav
             aria-label={copy.admin.billingReconcileCrumbLabel}
-            className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground"
           >
             <Link className="hover:text-foreground" to="/admin/users">
               {copy.admin.userBreadcrumb}
@@ -167,16 +167,14 @@ export function UserPage() {
             <span aria-hidden="true">{copy.admin.breadcrumbSlash}</span>
             <span>{displayName}</span>
           </nav>
-          <p className="mt-1 font-serif text-[15px] italic text-muted-foreground">
+          <p className="mt-1 font-serif text-sm italic text-muted-foreground">
             {copy.admin.userJoined(user.email, adminDay(user.createdAt))}
           </p>
-          <h1 className="mt-0.5 font-serif text-[32px] leading-[1.05] md:text-[42px]">
-            {displayName}
-          </h1>
+          <h1 className="mt-0.5 font-serif text-page-title leading-[1.05]">{displayName}</h1>
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <AdminStatusPill status={user.status} />
             {user.acceptedAt === null ? null : (
-              <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-[11.5px] font-semibold text-muted-foreground">
+              <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-eyebrow font-semibold text-muted-foreground">
                 {copy.admin.userAccepted(adminDay(user.acceptedAt))}
               </span>
             )}
@@ -184,7 +182,7 @@ export function UserPage() {
         </div>
         <div className="flex flex-none items-center gap-2.5">
           <button
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-input bg-card px-3.5 text-[13.5px] font-semibold text-muted-foreground"
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-input bg-card px-3.5 text-sm font-semibold text-muted-foreground"
             disabled
             type="button"
           >
@@ -199,7 +197,7 @@ export function UserPage() {
       </div>
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
         <section aria-labelledby="admin-user-account" className={cardClass}>
-          <h2 className="font-serif text-[26px] leading-[1.1]" id="admin-user-account">
+          <h2 className="font-serif text-card-title leading-[1.1]" id="admin-user-account">
             {copy.admin.accountHeading}
           </h2>
           <dl className="mt-3">
@@ -208,7 +206,7 @@ export function UserPage() {
               <span className="block font-semibold">
                 {user.forwardingAddress ?? copy.admin.accountNoForwarding}
               </span>
-              <span className="mt-0.5 block text-[12px] text-muted-foreground">
+              <span className="mt-0.5 block text-xs text-muted-foreground">
                 {copy.admin.accountForwardingNote}
               </span>
             </AdminAccountItem>
@@ -217,7 +215,7 @@ export function UserPage() {
                 {user.resume?.filename ?? copy.admin.accountNoResume}
               </span>
               {user.resume === null ? null : (
-                <span className="mt-0.5 block text-[12px] text-muted-foreground">
+                <span className="mt-0.5 block text-xs text-muted-foreground">
                   {copy.admin.accountResumeUploaded(adminDay(user.resume.uploadedAt))}
                 </span>
               )}
@@ -231,20 +229,20 @@ export function UserPage() {
           </dl>
         </section>
         <section aria-labelledby="admin-user-grants" className={cardClass}>
-          <h2 className="font-serif text-[26px] leading-[1.1]" id="admin-user-grants">
+          <h2 className="font-serif text-card-title leading-[1.1]" id="admin-user-grants">
             {copy.admin.userGrantsHeading}
           </h2>
           {grant === null ? (
-            <p className="mt-3 text-[12.5px] text-muted-foreground">{copy.admin.grantNoGrant}</p>
+            <p className="mt-3 text-xs text-muted-foreground">{copy.admin.grantNoGrant}</p>
           ) : (
             <>
               <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-[13px] font-semibold">{copy.admin.grantAdminTitle}</span>
+                <span className="text-sm font-semibold">{copy.admin.grantAdminTitle}</span>
                 <span className="flex items-baseline gap-1.5">
-                  <span className="font-serif text-[30px] leading-none tabular-nums">
+                  <span className="font-serif text-card-title leading-none tabular-nums">
                     {grant.remaining}
                   </span>
-                  <span className="text-[12px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     {copy.admin.grantLeftOf(grant.quantity)}
                   </span>
                 </span>
@@ -258,7 +256,7 @@ export function UserPage() {
                   style={{ width: `${usedPercent}%` }}
                 />
               </div>
-              <p className="mt-2 text-[11.5px] leading-relaxed text-muted-foreground">
+              <p className="mt-2 text-eyebrow leading-relaxed text-muted-foreground">
                 {copy.admin.grantSummary(
                   grant.quantity,
                   days ?? 30,
@@ -278,10 +276,10 @@ export function UserPage() {
         </section>
         {user.role === "owner" ? null : (
           <section aria-labelledby="admin-user-suspend" className={`${cardClass} lg:col-span-2`}>
-            <h2 className="font-serif text-[26px] leading-[1.1]" id="admin-user-suspend">
+            <h2 className="font-serif text-card-title leading-[1.1]" id="admin-user-suspend">
               {suspended ? copy.admin.reinstateHeading : copy.admin.suspendHeading}
             </h2>
-            <p className="mt-1.5 max-w-[720px] text-[12.5px] leading-relaxed text-muted-foreground">
+            <p className="mt-1.5 max-w-[720px] text-xs leading-relaxed text-muted-foreground">
               {suspended ? copy.admin.reinstateIntro : copy.admin.suspendIntro}
             </p>
             <form
@@ -292,11 +290,9 @@ export function UserPage() {
               }}
             >
               <label className="block max-w-[620px]">
-                <span className="mb-1 block text-[12px] font-semibold">
-                  {copy.admin.suspendReason}
-                </span>
+                <span className="mb-1 block text-xs font-semibold">{copy.admin.suspendReason}</span>
                 <textarea
-                  className="min-h-[92px] w-full rounded-md border border-input bg-background px-3 py-2 text-[13px]"
+                  className="min-h-[92px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   onChange={(event) => {
                     setReason(event.target.value);
                   }}
@@ -308,14 +304,14 @@ export function UserPage() {
               </label>
               <div className="mt-3 flex flex-wrap gap-2.5">
                 <button
-                  className="inline-flex h-10 items-center justify-center rounded-md border border-need px-4 text-[13.5px] font-semibold text-need hover:bg-need-soft disabled:opacity-60"
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-need px-4 text-sm font-semibold text-need hover:bg-need-soft disabled:opacity-60"
                   disabled={busy || reason.trim().length === 0}
                   type="submit"
                 >
                   {suspended ? copy.admin.reinstateAction : copy.admin.suspendAction}
                 </button>
                 <button
-                  className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-card px-4 text-[13.5px] font-semibold hover:bg-muted"
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-card px-4 text-sm font-semibold hover:bg-muted"
                   onClick={() => {
                     setReason("");
                     setFailed(false);
@@ -326,7 +322,7 @@ export function UserPage() {
                 </button>
               </div>
               {failed ? (
-                <p className="mt-3 text-[12.5px] font-semibold text-need" role="alert">
+                <p className="mt-3 text-xs font-semibold text-need" role="alert">
                   {copy.admin.suspendFailed}
                 </p>
               ) : null}

@@ -10,6 +10,7 @@ import { AdminGateScreen } from "./gate-screen.tsx";
 import { MailAlertCard } from "./mail-alert-card.tsx";
 import { mailColumnLayout, mailPanelId } from "./mail-columns.ts";
 import { MailEmployerRow } from "./mail-employer-row.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 
 const ranges = [
   { days: 7, label: copy.admin.mailRange7 },
@@ -22,7 +23,7 @@ export function MailHealthPage() {
   const [pauseError, setPauseError] = useState<string | null>(null);
 
   const load = useCallback(async () => await loadMailHealth(days), [days]);
-  const { data, refusal, refresh } = useAdminResource(load, ["mail-health", days]);
+  const { data, failed, refusal, refresh } = useAdminResource(load, ["mail-health", days]);
 
   useEffect(() => {
     if (openCompanyId === null) {
@@ -46,7 +47,7 @@ export function MailHealthPage() {
   }
 
   if (data === null) {
-    return null;
+    return <AdminStatusCard failed={failed} onRetry={refresh} />;
   }
 
   const view: MailHealth = data;
@@ -66,10 +67,10 @@ export function MailHealthPage() {
     <>
       <div className="mt-6 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
         <div className="min-w-0">
-          <p className="font-serif text-[15px] italic text-muted-foreground">
+          <p className="font-serif text-sm italic text-muted-foreground">
             {copy.admin.mailLead(view.days)}
           </p>
-          <h1 className="mt-0.5 font-serif text-[32px] leading-[1.05] md:text-[42px]">
+          <h1 className="mt-0.5 font-serif text-page-title leading-[1.05]">
             {copy.admin.mailTitlePlain} <span className="italic">{copy.admin.mailTitleItalic}</span>
           </h1>
         </div>
@@ -81,7 +82,7 @@ export function MailHealthPage() {
             {ranges.map((range) => (
               <button
                 aria-pressed={days === range.days}
-                className={`h-10 px-4 text-[13px] font-semibold ${
+                className={`h-10 px-4 text-sm font-semibold ${
                   days === range.days
                     ? "bg-card text-foreground shadow-sh"
                     : "text-muted-foreground hover:bg-muted"
@@ -106,10 +107,10 @@ export function MailHealthPage() {
 
       {view.domainAlert.active ? (
         <section className="mt-6 rounded-lg border border-need bg-need-soft px-5 py-4">
-          <h2 className="font-serif text-[19px] leading-[1.2]">
+          <h2 className="font-serif text-base leading-[1.2]">
             {copy.admin.mailDomainAlertHeading}
           </h2>
-          <p className="mt-1.5 text-[13.5px] leading-relaxed">
+          <p className="mt-1.5 text-sm leading-relaxed">
             {copy.admin.mailDomainAlertBody(view.domainAlert.sent, adminDay(view.since))}
           </p>
         </section>
@@ -134,7 +135,7 @@ export function MailHealthPage() {
 
       <section className="mt-6 overflow-hidden rounded-lg border border-border bg-card shadow-sh">
         <div
-          className={`hidden gap-4 border-b border-border bg-muted px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground md:grid ${mailColumnLayout}`}
+          className={`hidden gap-4 border-b border-border bg-muted px-5 py-3 text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground md:grid ${mailColumnLayout}`}
         >
           <span>{copy.admin.mailColumnEmployer}</span>
           <span>{copy.admin.mailColumnSent}</span>
@@ -144,7 +145,7 @@ export function MailHealthPage() {
           <span>{copy.admin.mailColumnStatus}</span>
         </div>
         {view.employers.length === 0 ? (
-          <p className="px-5 py-8 text-[12.5px] text-muted-foreground">{copy.admin.mailEmpty}</p>
+          <p className="px-5 py-8 text-xs text-muted-foreground">{copy.admin.mailEmpty}</p>
         ) : (
           view.employers.map((row) => (
             <MailEmployerRow key={row.companyId} open={openCompanyId === row.companyId} row={row} />
@@ -152,14 +153,14 @@ export function MailHealthPage() {
         )}
       </section>
 
-      <p className="mt-4 text-[12.5px] text-muted-foreground">
+      <p className="mt-4 text-xs text-muted-foreground">
         {copy.admin.mailAuthLine(
           view.totals.auth.pass,
           view.totals.auth.fail,
           view.totals.auth.none,
         )}
       </p>
-      <p className="mt-1 text-[12.5px] text-muted-foreground">{copy.admin.mailFootnote}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{copy.admin.mailFootnote}</p>
     </>
   );
 }

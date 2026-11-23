@@ -31,8 +31,8 @@ export function ReconcilePayments({ items }: { items: readonly BillingReconcilia
   return (
     <>
       <div className="hidden overflow-hidden rounded-lg border border-border bg-card shadow-sh md:block">
-        <table className="w-full border-collapse text-left text-[13px]">
-          <thead className="bg-muted text-[12px] text-muted-foreground">
+        <table className="w-full border-collapse text-left text-sm">
+          <thead className="bg-muted text-xs text-muted-foreground">
             <tr>
               <th scope="col" className="px-4 py-2.5 font-medium">
                 {copy.admin.billingReconcileColumnPayment}
@@ -54,7 +54,7 @@ export function ReconcilePayments({ items }: { items: readonly BillingReconcilia
           <tbody>
             {items.map((item) => (
               <tr key={item.id} className="border-t border-border hover:bg-muted/50">
-                <td className="px-4 py-3 font-mono text-[12.5px]" title={item.id}>
+                <td className="px-4 py-3 font-mono text-xs" title={item.id}>
                   {shortPaymentId(item.id)}
                 </td>
                 <td className="px-4 py-3">{ownerLabel(item)}</td>
@@ -73,13 +73,13 @@ export function ReconcilePayments({ items }: { items: readonly BillingReconcilia
         {items.map((item) => (
           <li key={item.id} className="rounded-lg border border-border bg-card p-4 shadow-sh">
             <div className="flex items-start justify-between gap-3">
-              <p className="font-mono text-[12.5px]" title={item.id}>
+              <p className="font-mono text-xs" title={item.id}>
                 {shortPaymentId(item.id)}
               </p>
               <ResultPill result={item.result} />
             </div>
-            <p className="mt-2 text-[13px]">{ownerLabel(item)}</p>
-            <p className="mt-1 text-[12.5px] text-muted-foreground">
+            <p className="mt-2 text-sm">{ownerLabel(item)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
               {`${copy.admin.billingReconcileColumnStripe}: ${stripeLabel(item)} · ${copy.admin.billingReconcileColumnOverture}: ${overtureLabel(item)}`}
             </p>
           </li>

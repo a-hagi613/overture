@@ -37,11 +37,11 @@ export function AdminGateScreen({
 
   return (
     <section className="mt-10 rounded-lg border border-border bg-card p-6 shadow-sh">
-      <h1 className="font-serif text-[26px] leading-[1.1]">{text.heading}</h1>
+      <h1 className="font-serif text-card-title leading-[1.1]">{text.heading}</h1>
       <p className="mt-2 max-w-[60ch] text-sm leading-[1.55] text-muted-foreground">{text.body}</p>
       {code === "sign_in_required" ? (
         <Link
-          className="mt-5 inline-flex h-10 items-center justify-center rounded-md bg-foreground px-4 text-[13.5px] font-semibold text-card hover:opacity-90"
+          className="mt-5 inline-flex h-10 items-center justify-center rounded-md bg-foreground px-4 text-sm font-semibold text-card hover:opacity-90"
           to="/signin"
         >
           {copy.admin.gateSignIn}

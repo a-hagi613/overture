@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { Outlet } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
+import { RouteErrorBoundary } from "./route-error-boundary.tsx";
 import { RouteFallback } from "./route-fallback.tsx";
 
 export function RootLayout() {
@@ -14,9 +15,11 @@ export function RootLayout() {
       >
         {copy.shell.skipToContent}
       </a>
-      <Suspense fallback={<RouteFallback fullScreen />}>
-        <Outlet />
-      </Suspense>
+      <RouteErrorBoundary>
+        <Suspense fallback={<RouteFallback fullScreen />}>
+          <Outlet />
+        </Suspense>
+      </RouteErrorBoundary>
     </>
   );
 }
