@@ -3,9 +3,10 @@
 One-time human steps to go from this repository to a live, backed-up `overture-web`, and how to verify
 each acceptance criterion of [issue #10](https://github.com/a-hagi613/overture/issues/10).
 
-Everything in this document is done by a human; nothing here creates cloud resources automatically.
-No secret value ever appears in this repository: secrets are set with `fly secrets set NAME=VALUE` and
-`gh secret set NAME` from the operator's own terminal, against names only.
+Everything in this document is done by a human or by the repository's manual workflows; nothing here creates cloud
+resources automatically. No secret value ever appears in this repository: secrets are set with `gh secret set NAME`
+and `fly secrets set NAME=VALUE` (the admin-host workflow copies the Cloudflare Access values from repository secrets
+to Fly), against names only.
 
 ## What the repo already provides
 
@@ -20,6 +21,7 @@ No secret value ever appears in this repository: secrets are set with `fly secre
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
 | `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
+| `.github/workflows/ops-admin-host.yml` | `workflow_dispatch` only, for the admin host: `status` (certificate table, Fly secret names only, app status), `add-cert` (idempotent certificate for `admin.tryoverture.com`, then the same report), `set-access-secrets` (pushes the Cloudflare Access values held as repository secrets to Fly, names only afterwards). Fails with a clear message while `FLY_API_TOKEN` is unset |
 | `.github/workflows/vacuum-db.yml` | Weekly (Sundays 05:00 UTC, also `workflow_dispatch` with `dry_run` and `force`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise dry-runs `/data/app.sqlite`, and only when its freelist exceeds 50 MB (or `force` is set) restarts the one machine in maintenance mode, vacuums it, restarts the server and polls `/api/health` |
 | `scripts/check-restored-db.ts` | Restored-database checks, read-only: PRAGMA `integrity_check`, applied-migration count, per-table row counts, untouched `bg_jobs`, zero outbound requests |
 | `scripts/restore-drill.ts` | `DRILL_TARGET=local` (CI round-trip) or `DRILL_TARGET=fly` (throwaway machine drill); never starts the app server |
@@ -547,25 +549,32 @@ visiting `/admin` on `tryoverture.com` shows a handoff card that opens the same 
 the demo account and anonymous visitors never see the link, because `GET /api/me` returns `adminOrigin: null` for
 them (#512).
 
-### 1. DNS and the Fly certificate
+### 1. Add the Fly certificate from the workflow
 
-Point the admin hostname at the app in Cloudflare DNS and keep the record proxied (orange cloud), because Cloudflare
-Access can only gate proxied traffic:
+The box's Fly token cannot see `overture-web`, and no Cloudflare API token is stored in this repository, so this section
+does not run on the box. The repository's `FLY_API_TOKEN` secret can see the app, so the **Ops admin host** workflow
+(`.github/workflows/ops-admin-host.yml`) does the Fly half:
+
+**Actions → Ops admin host → Run workflow → `action: add-cert`**.
+
+The job adds `admin.tryoverture.com` to `overture-web` when it is not there yet (it prints that and continues when it
+is), then prints the certificate table with the validation DNS target, the Fly secret **names** (never values) and the
+app status. Run `action: status` at any time for the same read-only report; it changes nothing.
+
+### 2. Add the Cloudflare DNS record
+
+In the `tryoverture.com` zone add:
 
 | Type | Name | Content | Proxy |
 |---|---|---|---|
 | CNAME | `admin` | `overture-web.fly.dev` | Proxied |
 
-Then ask Fly for a certificate for that hostname and follow the validation record it prints:
+Keep the `admin` record **proxied** (orange cloud), because Cloudflare Access can only gate proxied traffic. If
+`action: status` prints a `DNSValidationTarget` / `DNSValidationInstructions`, follow it exactly: add the record it
+names, and keep a validation record such as `_acme-challenge.admin` **DNS-only** until the certificate is issued (a
+proxied challenge can fail). Re-run `action: status` until `admin.tryoverture.com` shows `Ready`.
 
-```sh
-flyctl certs add admin.tryoverture.com -a overture-web
-flyctl certs show admin.tryoverture.com -a overture-web
-```
-
-Keep the validation record Fly prints in place until `flyctl certs show` reports `Status = Issued`.
-
-### 2. Cloudflare Zero Trust Access
+### 3. Create the Access application and push its values
 
 In **Zero Trust → Access → Applications**, add a self-hosted application for `admin.tryoverture.com` and a single
 `Allow` policy whose `Include` rule is `Emails` with the owner's address. Set the session duration to the working day
@@ -573,25 +582,30 @@ In **Zero Trust → Access → Applications**, add a self-hosted application for
 (`<team>.cloudflareaccess.com`); the JWKS endpoint is
 `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs`.
 
-### 3. Fly secrets (names only)
-
-Set the four names from the operator's terminal; the values come from the Access application above and are never
-committed, printed or copied into this repository:
+Save the values as repository secrets, never in this repository:
 
 ```sh
-fly secrets set \
-  ADMIN_ORIGIN=https://admin.tryoverture.com \
-  CF_ACCESS_TEAM_DOMAIN=<team>.cloudflareaccess.com \
-  CF_ACCESS_AUD=<application-aud-tag> \
-  CF_ACCESS_JWKS_URL=https://<team>.cloudflareaccess.com/cdn-cgi/access/certs \
-  -a overture-web
+gh secret set CF_ACCESS_AUD -R a-hagi613/overture
+gh secret set CF_ACCESS_TEAM_DOMAIN -R a-hagi613/overture
 ```
+
+`CF_ACCESS_JWKS_URL` can replace `CF_ACCESS_TEAM_DOMAIN` when you prefer to pin the full
+`https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` URL.
+
+Then run **Actions → Ops admin host → Run workflow → `action: set-access-secrets`**. It refuses unless
+`CF_ACCESS_AUD` and one of the two JWKS names are repository secrets, masks every value with `::add-mask::`, sets
+`ADMIN_ORIGIN=https://admin.tryoverture.com`, `CF_ACCESS_AUD` and the JWKS source on `overture-web` with
+`flyctl secrets set`, and confirms with `flyctl secrets list` **names only**.
+
+Cloudflare Access gates the host before the app's own owner check and passkey window: without an Access assertion the
+admin API answers `401 access_required`, so never point DNS at the app without the Access application in place.
 
 ### 4. Verify the whole path
 
 The check script is read-only and idempotent. It resolves DNS, probes `https://<origin>/admin/api/session` over HTTPS
 and classifies the answer (a Cloudflare Access sign-in redirect or `401 access_required` passes; a `200 text/html` app
-shell is the SPA bug), then reads the Fly certificate and secret **names** with `flyctl`. It never reads or prints a
+shell is the SPA bug), then reads the Fly certificate and secret **names** with `flyctl`. Run it from a terminal whose
+`flyctl` can see `overture-web` (the box's token cannot; `--no-fly` skips the two Fly reads). It never reads or prints a
 secret value.
 
 ```sh
@@ -603,11 +617,28 @@ bun run scripts/check-admin-host.ts --origin https://admin.example.test --fly-ap
 Exit `0` means every check passed; exit `1` prints the gaps. Use `--no-fly` to skip the two Fly reads when `flyctl` is
 unavailable, `--host` to name the DNS record when it differs from the origin's hostname, `--origin` to check another
 admin origin (it must be `https`), and `--fly-app` to read the certificate and secret names from another Fly app.
-The matching unit tests run with `bun test scripts/check-admin-host.test.ts`.
+Paste the full result on the issue or pull request. The matching unit tests run with
+`bun test scripts/check-admin-host.test.ts`.
 
 Finally sign in as the owner, open `/profile/account` and confirm the **Admin Portal** card, then open `/admin` on
 `tryoverture.com` and confirm the handoff card opens `https://admin.tryoverture.com/admin` through Access and the
 passkey.
+
+### Rollback
+
+The workflow only adds and reports; removal stays with an authenticated operator. To take the admin host out of
+service:
+
+```sh
+flyctl certs remove admin.tryoverture.com -a overture-web
+flyctl secrets unset CF_ACCESS_AUD CF_ACCESS_TEAM_DOMAIN CF_ACCESS_JWKS_URL -a overture-web
+gh secret delete CF_ACCESS_AUD -R a-hagi613/overture
+gh secret delete CF_ACCESS_TEAM_DOMAIN -R a-hagi613/overture
+```
+
+Then delete the `admin` CNAME and any `_acme-challenge` validation record in the Cloudflare DNS zone, and delete the
+Access application. Deleting the DNS record takes the host offline; deleting only the certificate breaks HTTPS. The app
+still refuses requests without an Access assertion (`401 access_required`), but do not leave the host public.
 
 ## After a deploy
 

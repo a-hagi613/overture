@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  findAdminHostWorkflowProblems,
   findBunVersionDrift,
   findVacuumWorkflowProblems,
   readBunVersions,
@@ -180,4 +181,84 @@ test("a maintenance entrypoint without --confirm is reported", () => {
   });
 
   expect(problems.some((problem) => problem.includes("--confirm"))).toBe(true);
+});
+
+function adminHostWorkflow() {
+  return readFileSync(".github/workflows/ops-admin-host.yml", "utf8");
+}
+
+test("the shipped admin-host workflow is manual, bounded and secret-safe", () => {
+  expect(findAdminHostWorkflowProblems({ workflow: adminHostWorkflow() })).toStrictEqual([]);
+});
+
+test("an admin-host workflow on an automatic trigger is reported", () => {
+  const workflow = adminHostWorkflow().replace(
+    "on:\n  workflow_dispatch:",
+    "on:\n  push:\n  workflow_dispatch:",
+  );
+
+  expect(
+    findAdminHostWorkflowProblems({ workflow }).some((problem) =>
+      problem.includes("automatic trigger"),
+    ),
+  ).toBe(true);
+});
+
+test("an admin-host workflow without the FLY_API_TOKEN failure is reported", () => {
+  const workflow = adminHostWorkflow().replace(
+    "            exit 1\n          fi\n\n      - name: Add the certificate",
+    "\n          fi\n\n      - name: Add the certificate",
+  );
+
+  expect(
+    findAdminHostWorkflowProblems({ workflow }).some((problem) =>
+      problem.includes("without FLY_API_TOKEN"),
+    ),
+  ).toBe(true);
+});
+
+test("an admin-host workflow that does not mask the Access AUD is reported", () => {
+  const workflow = adminHostWorkflow().replace('          echo "::add-mask::$CF_ACCESS_AUD"\n', "");
+
+  expect(
+    findAdminHostWorkflowProblems({ workflow }).some((problem) =>
+      problem.includes("mask CF_ACCESS_AUD"),
+    ),
+  ).toBe(true);
+});
+
+test("an admin-host workflow that prints a secret digest is reported", () => {
+  const workflow = adminHostWorkflow().replace(
+    '          flyctl secrets list -a overture-web --json > "$RUNNER_TEMP/secrets.json"',
+    "          flyctl secrets list -a overture-web --json | jq -r '.[].Digest'",
+  );
+
+  expect(
+    findAdminHostWorkflowProblems({ workflow }).some((problem) => problem.includes("digest")),
+  ).toBe(true);
+});
+
+test("an admin-host workflow that sets Fly secrets outside the guarded action is reported", () => {
+  const workflow = adminHostWorkflow().replace(
+    "      - name: Refuse unless the Cloudflare Access values are repository secrets",
+    "      - name: Set anyway\n        run: flyctl secrets set -a overture-web CF_ACCESS_AUD=x\n      - name: Refuse unless the Cloudflare Access values are repository secrets",
+  );
+
+  const problems = findAdminHostWorkflowProblems({ workflow });
+
+  expect(problems.some((problem) => problem.includes("exactly one step"))).toBe(true);
+  expect(problems.some((problem) => problem.includes("set-access-secrets guard"))).toBe(true);
+});
+
+test("an admin-host workflow that echoes an Access value is reported", () => {
+  const workflow = adminHostWorkflow().replace(
+    "          args=(",
+    '          echo "$CF_ACCESS_AUD"\n          args=(',
+  );
+
+  expect(
+    findAdminHostWorkflowProblems({ workflow }).some((problem) =>
+      problem.includes("prints a Cloudflare Access value"),
+    ),
+  ).toBe(true);
 });

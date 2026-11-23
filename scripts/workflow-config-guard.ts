@@ -44,6 +44,137 @@ export function findBunVersionDrift(input: BunVersionDriftInput) {
   return problems;
 }
 
+export interface AdminHostWorkflowInput {
+  readonly workflow: string;
+}
+
+const ADMIN_HOST_ACTIONS = ["status", "add-cert", "set-access-secrets"] as const;
+const ADMIN_HOST_FLYCTL_SHA = "98172f70657cb3e15db199af139be99bd3e61200";
+
+/**
+ * Checks the owner-triggered admin-host workflow stays manual, read-only and secret-safe. The workflow pushes the
+ * Cloudflare Access values to Fly, so an automatic trigger, a widened permission or a printed value would change
+ * production without the owner asking or leak the Access configuration into the job log.
+ * @param input The workflow source.
+ * @returns Every rule the workflow breaks, empty when it is safe.
+ */
+export function findAdminHostWorkflowProblems(input: AdminHostWorkflowInput) {
+  const problems: string[] = [];
+  const source = input.workflow;
+
+  if (!/^on:\s*\n\s+workflow_dispatch:/mu.test(source)) {
+    problems.push("ops-admin-host.yml is not manual: it must run on workflow_dispatch only");
+  }
+
+  if (
+    /^on:\s*(?:push|pull_request|schedule|workflow_run)\b/mu.test(source) ||
+    /^\s{2}(?:push|pull_request|schedule|workflow_run):/mu.test(source)
+  ) {
+    problems.push("ops-admin-host.yml has an automatic trigger; it must stay owner-triggered");
+  }
+
+  for (const action of ADMIN_HOST_ACTIONS) {
+    if (!source.split("\n").some((line) => line.trim() === `- ${action}`)) {
+      problems.push(`ops-admin-host.yml does not offer the ${action} action`);
+    }
+  }
+
+  if (!/default:\s*status/mu.test(source)) {
+    problems.push("ops-admin-host.yml does not default to the read-only status action");
+  }
+
+  if (!/concurrency:\s*\n\s+group:\s*ops-admin-host/mu.test(source)) {
+    problems.push("ops-admin-host.yml does not serialize runs in the ops-admin-host group");
+  }
+
+  if (!/permissions:\s*\n\s+contents:\s*read/mu.test(source)) {
+    problems.push("ops-admin-host.yml does not limit permissions to contents: read");
+  }
+
+  if (!/timeout-minutes:\s*10\b/mu.test(source)) {
+    problems.push("ops-admin-host.yml does not cap the job at 10 minutes");
+  }
+
+  if (!source.includes(`superfly/flyctl-actions/setup-flyctl@${ADMIN_HOST_FLYCTL_SHA}`)) {
+    problems.push("ops-admin-host.yml does not pin the flyctl setup action by commit SHA");
+  }
+
+  const guardAt = source.indexOf("FLY_API_TOKEN repository secret is not set");
+  const nextStepAt = guardAt === -1 ? -1 : source.indexOf("\n      - name:", guardAt);
+
+  const guardStep =
+    guardAt === -1 ? "" : source.slice(guardAt, nextStepAt === -1 ? undefined : nextStepAt);
+
+  if (guardAt === -1) {
+    problems.push("ops-admin-host.yml does not fail clearly when FLY_API_TOKEN is missing");
+  } else if (!guardStep.includes("exit 1")) {
+    problems.push("ops-admin-host.yml continues without FLY_API_TOKEN instead of failing");
+  }
+
+  if (!source.includes("::add-mask::$CF_ACCESS_AUD")) {
+    problems.push("ops-admin-host.yml does not mask CF_ACCESS_AUD before it reaches a command");
+  }
+
+  if (!source.includes("Missing repository secrets")) {
+    problems.push("ops-admin-host.yml does not refuse set-access-secrets while a value is missing");
+  }
+
+  if (
+    !source.includes("flyctl secrets list -a overture-web --json") ||
+    !source.includes("(.name // .Name // empty)")
+  ) {
+    problems.push("ops-admin-host.yml does not reduce flyctl secrets list output to names");
+  }
+
+  if (/\bdigest\b/iu.test(source)) {
+    problems.push("ops-admin-host.yml mentions a secret digest; only names may be read");
+  }
+
+  const setAt = source.indexOf("flyctl secrets set");
+  const gateAt = source.indexOf("inputs.action == 'set-access-secrets'");
+
+  if (setAt === -1) {
+    problems.push("ops-admin-host.yml never sets the Access secrets on Fly");
+  } else if (gateAt === -1 || gateAt > setAt) {
+    problems.push("ops-admin-host.yml sets Fly secrets without the set-access-secrets guard");
+  }
+
+  if ((source.match(/flyctl secrets set/gu) ?? []).length !== 1) {
+    problems.push("ops-admin-host.yml must set Fly secrets in exactly one step");
+  }
+
+  if (!source.includes("ADMIN_ORIGIN=https://admin.tryoverture.com")) {
+    problems.push("ops-admin-host.yml does not set ADMIN_ORIGIN to the admin host");
+  }
+
+  if (!source.includes("certs list -a overture-web --json")) {
+    problems.push("ops-admin-host.yml does not read the certificate list");
+  }
+
+  if (!source.includes('certs add "$hostname" -a overture-web')) {
+    problems.push("ops-admin-host.yml does not add the certificate");
+  }
+
+  if (!source.includes('certs show "$hostname" -a overture-web --json')) {
+    problems.push("ops-admin-host.yml does not read the certificate status and validation target");
+  }
+
+  const printsAccessValue = source
+    .split("\n")
+    .filter((line) => /^\s*(?:echo|printf)\b/u.test(line))
+    .some(
+      (line) =>
+        /\$(?:CF_ACCESS_AUD|CF_ACCESS_TEAM_DOMAIN|CF_ACCESS_JWKS_URL)\b/u.test(line) &&
+        !line.includes("::add-mask::"),
+    );
+
+  if (printsAccessValue) {
+    problems.push("ops-admin-host.yml prints a Cloudflare Access value");
+  }
+
+  return problems;
+}
+
 export interface VacuumWorkflowInput {
   readonly entrypoint: string;
   readonly opsLive: string;
