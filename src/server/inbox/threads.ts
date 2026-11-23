@@ -85,6 +85,18 @@ export function messagesByThreadOf(db: AppDatabase, threadIds: readonly string[]
 }
 
 /**
+ * How many Threads hold at least one unread inbound Message. It mirrors the
+ * `unread` flag of {@link threadViewsOf}, counting a Thread once however many
+ * unread Messages it holds, so the nav badge and the Inbox list agree.
+ * @param db The database to read.
+ * @param userId The person whose Threads to count.
+ * @returns The number of Threads with an unread inbound Message.
+ */
+export function unreadThreadCountOf(db: AppDatabase, userId: string) {
+  return threadCountsOf(db, userId).unread;
+}
+
+/**
  * The employer and title behind each Thread's Application, in one read.
  * @param db The database to read.
  * @param userId The person the Applications belong to.

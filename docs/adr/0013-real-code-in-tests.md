@@ -31,7 +31,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for the fifty-eight files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
+exist only for the sixty-one files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
 as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key,
 and a "did not happen" line appears only when the stored data proves it), ledger, crypto, planner, the
 restored-database check (a restored file is read
@@ -71,6 +71,10 @@ at the sign-in reserve while sign-in mail and the live check may spend it, each 
 so the reserve alert never hides the cap alert, and the count survives reopening the database, #282), the billing
 pause (a plan end or a failed payment pauses once with its own reason, a successful payment resumes only a billing
 pause, and an in-flight send keeps its reservation across the period end so only a sent Application is charged), the
+running-state transitions (Resume and Pause never replace a billing, setup, suspension or dispatcher hold, and only
+the same no-resume or no-mailbox hold clears when its prerequisite returns), the Ready change list (a corrupt value
+degrades to an empty list rather than a 500), the PDF header check (only `%PDF-` in the first kilobyte passes, so a
+spoofed MIME type cannot pass HTML as a resume), the
 billing webhook's transaction (a pause notice and the planner/prep jobs a resume queues commit with the Stripe event
 and roll back with it, a stale out-of-order failure cannot pause a paid user, and a price Overture does not sell
 grants nothing), the Anthropic model and its batch prices (`models.test.ts`: `ANTHROPIC_MODEL` defaults to the model SPEC §8.6 names,

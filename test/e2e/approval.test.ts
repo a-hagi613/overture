@@ -209,11 +209,12 @@ async function ownerFor(server: AppServer) {
   const { owner, userId } = await ownerContextFor(server.url);
 
   await owner.put("/__test__/settings/jobs.poll_interval_ms", { data: { value: "3600000" } });
-  await owner.put("/api/profile/settings", { data: { languages: ["en"], timezone: "UTC" } });
 
   const running = await owner.post("/api/running", { data: { running: true } });
 
   expect(running.ok()).toBe(true);
+
+  await owner.put("/api/profile/settings", { data: { languages: ["en"], timezone: "UTC" } });
 
   return { owner, userId };
 }

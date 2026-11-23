@@ -4,6 +4,7 @@ import { forwardingIdFrom, forwardingLocalPart } from "../../shared/inbound-mail
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import { mailboxes, retiredAddresses, users } from "../platform/db/schema.ts";
+import { clearBlockerIfRecovered } from "../profile/running-state.ts";
 
 const ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 const ID_LENGTH = 16;
@@ -80,6 +81,10 @@ export function createMailboxService(
     const existing = db.select().from(mailboxes).where(eq(mailboxes.userId, userId)).get();
 
     if (existing !== undefined) {
+      if (existing.status === "active") {
+        clearBlockerIfRecovered(db, clock, userId, "no_mailbox");
+      }
+
       return describe(existing);
     }
 
@@ -95,6 +100,8 @@ export function createMailboxService(
           createdAt: new Date(clock.now()),
         })
         .run();
+
+      clearBlockerIfRecovered(db, clock, userId, "no_mailbox");
 
       return { id, address: addressOf(localPart), firstForwardedAt: null };
     } catch (error) {

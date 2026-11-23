@@ -132,10 +132,10 @@ export async function seedProfile(request: APIRequestContext, appServerUrl: stri
     throw new Error("the owner was not created");
   }
 
+  await request.post("/api/running", { data: { running: true } });
   await request.put("/api/profile/settings", {
     data: { languages: ["en"], timezone: TIME_ZONE },
   });
-  await request.post("/api/running", { data: { running: true } });
   await request.put("/__test__/settings/jobs.poll_interval_ms", { data: { value: "3600000" } });
   await request.post("/__test__/ledger/sample", {
     data: { email: authTestIdentity.ownerEmail },
