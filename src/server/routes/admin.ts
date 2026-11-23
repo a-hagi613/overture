@@ -19,6 +19,15 @@ import type { AdminEnv } from "./admin-refusals.ts";
 import { createAdminRevealRoutes } from "./admin-reveal.ts";
 import type { JobActionOutcome } from "../admin/jobs.ts";
 import { cancelAdminJob, JOB_STATUS_FILTERS, listAdminJobs, retryAdminJob } from "../admin/jobs.ts";
+import {
+  adminSupportQuerySchema,
+  listAdminSupport,
+  openSupportTicketCount,
+  replyToSupportTicket,
+  updateAdminSupportTicket,
+} from "../admin/support.ts";
+import { supportReplySchema, supportTicketUpdateSchema } from "../../shared/support.ts";
+import type { MailSender } from "../platform/mail/port.ts";
 
 import {
   applications,
@@ -262,6 +271,7 @@ export interface AdminDeps {
   backups: BackupMonitor;
   databasePath: string;
   degraded: DegradedFlagReader;
+  mail: MailSender;
   objects: ObjectStore;
 }
 
@@ -845,6 +855,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
         total: allSwitches.length,
         enabled: allSwitches.filter((row) => row.enabled === 1).length,
       },
+      openSupportTickets: openSupportTicketCount(db),
       cost: buildCostSummary(db, clock),
       mail: readMailSummary(db, clock.now()),
       audit: audit.map((row) => ({
@@ -862,7 +873,6 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
   routes.get("/jobs", validQuery(jobsQuery), (context) =>
     context.json(listAdminJobs(db, clock, context.req.valid("query"))),
   );
-
   routes.post("/jobs/:id/retry", async (context) => {
     const owner = context.get("owner");
 
@@ -1662,6 +1672,56 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
 
     return context.json({ jobId: job.id });
+  });
+
+  routes.get("/support", validQuery(adminSupportQuerySchema), async (context) =>
+    context.json(
+      await listAdminSupport({ clock, db, personal: deps.personal }, context.req.valid("query")),
+    ),
+  );
+
+  routes.patch("/support/:id", validJson(supportTicketUpdateSchema), async (context) => {
+    context.header("Cache-Control", "private, no-store");
+
+    const owner = context.get("owner");
+
+    const result = await updateAdminSupportTicket(
+      { clock, db, personal: deps.personal },
+      {
+        actorId: owner.userId,
+        id: context.req.param("id"),
+        update: context.req.valid("json"),
+      },
+    );
+
+    return result.outcome === "not_found"
+      ? context.json({ error: "not_found" }, 404)
+      : context.json({ ticket: result.ticket });
+  });
+
+  routes.post("/support/:id/reply", validJson(supportReplySchema), async (context) => {
+    context.header("Cache-Control", "private, no-store");
+
+    const owner = context.get("owner");
+
+    const result = await replyToSupportTicket(
+      { clock, db, mail: deps.mail, personal: deps.personal },
+      {
+        actorId: owner.userId,
+        id: context.req.param("id"),
+        message: context.req.valid("json").message,
+      },
+    );
+
+    if (result.outcome === "not_found") {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    if (result.outcome === "mail_failed") {
+      return context.json({ error: "mail_send_failed", referenceId: result.referenceId }, 502);
+    }
+
+    return context.json({ ok: true, referenceId: result.referenceId });
   });
 
   routes.route("/", createAdminRevealRoutes(db, clock, deps.personal));

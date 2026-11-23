@@ -278,7 +278,7 @@ test("Calendar is in Main navigation and Home opens it", async ({ browser, isola
 
   await expect(tabs.getByRole("link")).toHaveCount(1);
   await tabs.getByRole("button", { name: "Tracker" }).click();
-  await phone.page.getByRole("link", { name: "Calendar" }).click();
+  await phone.page.getByRole("link", { exact: true, name: "Calendar" }).click();
   await expect(phone.page).toHaveURL(/\/calendar/u);
   await phone.context.close();
   await seeded.owner.dispose();

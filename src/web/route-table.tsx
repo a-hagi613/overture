@@ -48,6 +48,7 @@ import { JobsPage } from "./routes/admin/jobs.tsx";
 import { LlmUsagePage } from "./routes/admin/llm.tsx";
 import { OverviewPage } from "./routes/admin/overview.tsx";
 import { ProviderReportPage } from "./routes/admin/provider-report.tsx";
+import { AdminSupportPage } from "./routes/admin/support.tsx";
 import { SystemPage } from "./routes/admin/system.tsx";
 import { UserPage } from "./routes/admin/user.tsx";
 import { UsersPage } from "./routes/admin/users.tsx";
@@ -90,6 +91,7 @@ const appShellChildren: RouteObject[] = [
 
 const adminShellChildren: RouteObject[] = [
   { path: "/admin", element: <OverviewPage /> },
+  { path: "/admin/support", element: <AdminSupportPage /> },
   { path: "/admin/jobs", element: <JobsPage /> },
   { path: "/admin/provider-report", element: <ProviderReportPage /> },
   { path: "/admin/attempts", element: <AttemptsPage /> },

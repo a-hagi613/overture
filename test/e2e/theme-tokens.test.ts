@@ -18,9 +18,11 @@ const definedColors = new Set(
 );
 
 const definedTextSizes = new Set(
-  [...stylesheet.matchAll(/--text-(?<name>[a-z0-9-]+)\s*:/gu)]
-    .map((match) => match.groups?.name ?? "")
-    .filter((name) => !name.includes("--")),
+  [...stylesheet.matchAll(/--text-(?<name>[a-z0-9-]+)\s*:/gu)].flatMap((match) => {
+    const name = match.groups?.name ?? "";
+
+    return name.includes("--") ? [] : [name];
+  }),
 );
 
 const definedShadows = new Set(

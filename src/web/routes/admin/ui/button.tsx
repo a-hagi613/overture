@@ -18,6 +18,7 @@ export function Button({
   className = "",
   disabled = false,
   onClick,
+  type = "button",
   variant = "secondary",
 }: {
   ariaControls?: string;
@@ -28,6 +29,7 @@ export function Button({
   className?: string;
   disabled?: boolean;
   onClick?: () => void;
+  type?: "button" | "submit";
   variant?: ButtonVariant;
 }) {
   return (
@@ -39,7 +41,7 @@ export function Button({
       className={`inline-flex min-h-11 items-center justify-center rounded-md px-3.5 text-[13px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:opacity-45 md:min-h-9 ${VARIANT_CLASSES[variant]} ${className}`.trim()}
       disabled={disabled}
       onClick={onClick}
-      type="button"
+      type={type === "submit" ? "submit" : "button"}
     >
       {children}
     </button>
