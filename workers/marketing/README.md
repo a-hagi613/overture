@@ -12,7 +12,7 @@ or API request ever reaches it.
 | `tryoverture.com/` | `dist-marketing/index.html` |
 
 Every other path on `tryoverture.com` — the app routes in `src/web/route-table.tsx`, `/api/*`,
-`/webhooks/*`, `/assets/*`, `/sw.js`, the manifest and the icons — matches no route here and goes
+`/webhooks/*`, `/assets/*`, `/sw`, the manifest and the icons — matches no route here and goes
 straight to `overture-web` on Fly. ADR 0022 (same-origin SPA) is untouched: the marketing pages share
 the app's origin, and the app's own HTML and assets still come from Fly.
 

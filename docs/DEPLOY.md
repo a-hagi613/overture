@@ -241,7 +241,7 @@ Routes** and confirm only `tryoverture.com/` is listed; delete `tryoverture.com/
 
 Everything else — the app routes in `src/web/route-table.tsx` (`/home` after the rebuild, `/board`, `/inbox`,
 `/profile/…`, …), `/api/*`,
-`/webhooks/*`, `/assets/*`, `/sw.js`, the manifest and the icons — matches no route and goes straight to
+`/webhooks/*`, `/assets/*`, `/sw`, the manifest and the icons — matches no route and goes straight to
 `overture-web` on Fly. ADR 0022 still holds: the marketing pages are on the app's origin, and the app's own HTML and
 assets are still served by Fly.
 
@@ -652,9 +652,11 @@ bun run scripts/check-production.ts
 bun run scripts/check-production.ts --json
 ```
 
-It checks the landing pricing copy, `/api/health`, `/signin`, the security headers, `/sw.js` caching,
+It checks the landing pricing copy, `/api/health`, `/signin`, the security headers, `/sw` caching,
 a missing `/assets/*.js`, the unauthenticated API guards and webhook, the SPA navigation paths, and
-`admin.tryoverture.com` DNS/Access. The check list, the Wave 5 admin-host provisioning steps and a
+`admin.tryoverture.com` DNS/Access. Cloudflare rewrites `Cache-Control` to `max-age=14400` for static `.js`
+files, so the service worker is registered and checked at the extensionless `/sw`; the legacy `/sw.js` is a
+reported `SKIP`. The check list, the Wave 5 admin-host provisioning steps and a
 recorded run are in `docs/research/production-verification-2026-11-23.md`.
 
 ## Verifying the acceptance criteria

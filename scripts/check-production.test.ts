@@ -97,7 +97,7 @@ function healthyTable() {
         { "content-type": "application/json" },
       ),
     "GET /signin": () => response(200, "<!doctype html>", htmlHeaders()),
-    "GET /sw.js": () =>
+    "GET /sw": () =>
       response(200, "self.addEventListener('install', () => {});", {
         "cache-control": "no-cache",
         "content-type": "text/javascript",
@@ -260,6 +260,7 @@ describe("check-production run", () => {
       "headers.frame-options",
       "headers.hsts",
       "sw.cache",
+      "sw.legacy",
       "assets.404",
       "api.stripe-webhook",
       "api.events",
@@ -272,7 +273,8 @@ describe("check-production run", () => {
       "admin.dns",
       "admin.https",
     ]);
-    expect(results.filter((check) => check.status !== "pass")).toEqual([]);
+    expect(results.filter((check) => check.status === "fail")).toEqual([]);
+    expect(results.find((check) => check.name === "sw.legacy")?.status).toBe("skip");
     expect(results.every((check) => check.ms >= 0)).toBe(true);
   });
 
@@ -280,7 +282,7 @@ describe("check-production run", () => {
     const table = {
       ...healthyTable(),
       "GET /": () => response(200, "<h2>Pay only for applications</h2>", landingHeaders),
-      "GET /sw.js": () => response(200, "self.addEventListener('install', () => {});", {}),
+      "GET /sw": () => response(200, "self.addEventListener('install', () => {});", {}),
       "GET /assets/definitely-missing-wave5-check.js": () =>
         response(200, "<!doctype html>", htmlHeaders()),
       "POST /webhooks/stripe": () => response(404, '{"error":"not_found"}'),
@@ -323,6 +325,40 @@ describe("check-production run", () => {
     const results = await runChecks(options, dependencies);
 
     expect(results.find((check) => check.name === "assets.404")?.status).toBe("pass");
+  });
+
+  test("a missing /sw fails while the legacy /sw.js path is skipped", async () => {
+    const table = {
+      ...healthyTable(),
+      "GET /sw": () => response(404, "not found", { "content-type": "text/plain" }),
+    } satisfies StubTable;
+
+    const { dependencies } = stubDependencies(table, [{ address: "203.0.113.1", family: 4 }]);
+    const results = await runChecks(options, dependencies);
+    const legacy = results.find((check) => check.name === "sw.legacy");
+
+    expect(results.find((check) => check.name === "sw.cache")?.status).toBe("fail");
+    expect(legacy?.status).toBe("skip");
+    expect(legacy?.detail).toContain("legacy path, Cloudflare pins .js; new registrations use /sw");
+    expect(exitCodeFor(results)).toBe(1);
+  });
+
+  test("a cacheable /sw fails the check", async () => {
+    const table = {
+      ...healthyTable(),
+      "GET /sw": () =>
+        response(200, "self.addEventListener('install', () => {});", {
+          "cache-control": "max-age=14400",
+          "content-type": "text/javascript",
+        }),
+    } satisfies StubTable;
+
+    const { dependencies } = stubDependencies(table, [{ address: "203.0.113.1", family: 4 }]);
+    const results = await runChecks(options, dependencies);
+    const serviceWorker = results.find((check) => check.name === "sw.cache");
+
+    expect(serviceWorker?.status).toBe("fail");
+    expect(serviceWorker?.detail).toContain('cache-control "max-age=14400"');
   });
 
   test("an unresolvable admin host skips both admin checks with the next step", async () => {

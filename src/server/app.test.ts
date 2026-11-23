@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -13,7 +13,7 @@ Bun.env.TURNSTILE_SECRET ??= "turnstile-secret";
 
 Bun.env.TURNSTILE_SITE_KEY ??= "turnstile-site";
 
-const { staticCacheHeaders, staticResponseFrom } = await import("./app.ts");
+const { serviceWorkerResponse, staticCacheHeaders, staticResponseFrom } = await import("./app.ts");
 
 const scratchDirectories: string[] = [];
 
@@ -75,4 +75,36 @@ test("the cache policy only marks hashed files immutable", () => {
   expect(staticCacheHeaders("/sw.js")).toEqual({ "Cache-Control": "no-cache" });
   expect(staticCacheHeaders("/app-shell.html")).toEqual({ "Cache-Control": "no-cache" });
   expect(staticCacheHeaders("/favicon.ico")).toBeUndefined();
+});
+
+test("the extensionless service worker is served uncached from the build root", async () => {
+  const root = staticRoot();
+
+  writeFileSync(join(root, "sw.js"), "self.addEventListener('install', () => {});");
+
+  const worker = await serviceWorkerResponse(root);
+
+  expect(worker.status).toBe(200);
+  expect(worker.headers.get("Content-Type")).toBe("text/javascript; charset=utf-8");
+  expect(worker.headers.get("Cache-Control")).toBe("no-cache, no-store, must-revalidate");
+  expect(worker.headers.get("Pragma")).toBe("no-cache");
+  expect(worker.headers.get("Service-Worker-Allowed")).toBe("/");
+  expect(worker.headers.get("X-Content-Type-Options")).toBe("nosniff");
+  expect(await worker.text()).toContain("addEventListener");
+});
+
+test("the extensionless service worker answers a plain 404 before a build", async () => {
+  const worker = await serviceWorkerResponse(staticRoot());
+
+  expect(worker.status).toBe(404);
+  expect(worker.headers.get("Content-Type")).toBe("text/plain; charset=utf-8");
+  expect(worker.headers.get("Cache-Control")).toBe("no-store");
+  expect(await worker.text()).toBe("Not found");
+});
+
+test("the app registers the extensionless service worker", () => {
+  const main = readFileSync("src/web/main.tsx", "utf8");
+
+  expect(main).toContain('navigator.serviceWorker.register("/sw", { type: "module" })');
+  expect(main).not.toContain('navigator.serviceWorker.register("/sw.js"');
 });

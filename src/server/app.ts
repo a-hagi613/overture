@@ -160,6 +160,27 @@ export async function staticResponseFrom(root: string, url: string) {
   return null;
 }
 
+export async function serviceWorkerResponse(root: string) {
+  const worker = Bun.file(join(resolve(root), "sw.js"));
+
+  if (!(await worker.exists())) {
+    return new Response("Not found", {
+      headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" },
+      status: 404,
+    });
+  }
+
+  return new Response(worker, {
+    headers: {
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Content-Type": "text/javascript; charset=utf-8",
+      Pragma: "no-cache",
+      "Service-Worker-Allowed": "/",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
 function crossSiteExempt(pathname: string) {
   return (
     pathname.startsWith("/api/auth/") ||
@@ -509,11 +530,15 @@ export function createApp(deps: AppDependencies) {
 
   app.all("/admin/api/*", mainHostAdminApiRefusal);
 
+  app.get("/sw", async () => serviceWorkerResponse(deps.staticRoot));
+
   app.get("*", async (context) => {
     const page = await staticResponseFrom(deps.staticRoot, context.req.url);
 
     return page ?? context.notFound();
   });
+
+  adminHost.get("/sw", async () => serviceWorkerResponse(deps.staticRoot));
 
   adminHost.get("*", async (context) => {
     const page = await staticResponseFrom(deps.staticRoot, context.req.url);
