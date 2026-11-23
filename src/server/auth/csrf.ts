@@ -20,6 +20,10 @@ export function crossSiteRefusal(request: Request, allowedOrigins: readonly stri
     return null;
   }
 
+  if (request.headers.get("sec-fetch-site") === "cross-site") {
+    return crossSiteResponse();
+  }
+
   const origin = request.headers.get("origin");
 
   if (origin === null) {

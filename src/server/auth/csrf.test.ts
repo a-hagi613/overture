@@ -37,6 +37,20 @@ describe("the cross-site write guard", () => {
     expect(refusal?.status).toBe(403);
   });
 
+  test("refuses a write marked cross-site even when Origin looks same-origin", async () => {
+    const refusal = crossSiteRefusal(
+      write({ origin: APP_ORIGIN, "sec-fetch-site": "cross-site" }),
+      [APP_ORIGIN],
+    );
+
+    expect(refusal?.status).toBe(403);
+    expect(await refusal?.json()).toEqual({ error: CROSS_SITE_CODE });
+  });
+
+  test("permits a write the browser marks same-origin", () => {
+    expect(crossSiteRefusal(write({ "sec-fetch-site": "same-origin" }), [APP_ORIGIN])).toBeNull();
+  });
+
   test("refuses a write whose origin is neither allowed nor the request's own origin", async () => {
     const refusal = crossSiteRefusal(write({ origin: "https://evil.example" }), [APP_ORIGIN]);
 
