@@ -83,6 +83,7 @@ export const overviewSchema = z.object({
   users: z.object({ total: z.number(), owners: z.number() }),
   sessions: z.number(),
   killSwitches: z.object({ total: z.number(), enabled: z.number() }),
+  openSupportTickets: z.number(),
   cost: z.object({
     completed: z.number(),
     costGateMicros: z.number(),
@@ -500,6 +501,58 @@ export const mailHealthSchema = z.object({
 
 export type AdminRefusalCode = z.infer<typeof adminRefusalCodeSchema>;
 
+export const supportCategorySchema = z.enum(["account", "billing", "bug", "other"]);
+
+export const supportTicketStatusSchema = z.enum(["open", "in_progress", "resolved", "closed"]);
+
+export const supportStatusFilterSchema = z.enum([
+  "open",
+  "in_progress",
+  "resolved",
+  "closed",
+  "all",
+]);
+
+export const adminSupportTicketSchema = z.object({
+  adminNotes: z.string().nullable(),
+  category: supportCategorySchema,
+  createdAt: z.number(),
+  id: z.string(),
+  message: z.string().nullable(),
+  referenceId: z.string(),
+  resolvedAt: z.number().nullable(),
+  status: supportTicketStatusSchema,
+  subject: z.string(),
+  updatedAt: z.number(),
+  userEmail: z.string(),
+  userId: z.string(),
+  userName: z.string(),
+});
+
+export const adminSupportResponseSchema = z.object({
+  items: z.array(adminSupportTicketSchema),
+  now: z.number(),
+  openCount: z.number(),
+  total: z.number(),
+});
+
+export const adminSupportTicketResponseSchema = z.object({ ticket: adminSupportTicketSchema });
+
+export const adminSupportReplyResponseSchema = z.object({
+  ok: z.literal(true),
+  referenceId: z.string(),
+});
+
+export type SupportCategory = z.infer<typeof supportCategorySchema>;
+
+export type SupportTicketStatus = z.infer<typeof supportTicketStatusSchema>;
+
+export type SupportStatusFilter = z.infer<typeof supportStatusFilterSchema>;
+
+export type AdminSupportTicket = z.infer<typeof adminSupportTicketSchema>;
+
+export type AdminSupportResponse = z.infer<typeof adminSupportResponseSchema>;
+
 export type AdminStatus = z.infer<typeof adminStatusSchema>;
 
 export type AdminPersonRow = z.infer<typeof adminPersonRowSchema>;
@@ -710,10 +763,12 @@ type AdminWriteBody =
   | { value: string }
   | { providers: string[]; pages: string[]; sessionsPerPage: number }
   | { urls?: string[] }
+  | { status: SupportTicketStatus; adminNotes?: string }
+  | { message: string }
   | { id?: string };
 
 async function adminWrite<T>(
-  method: "POST" | "PUT",
+  method: "POST" | "PUT" | "PATCH",
   path: string,
   body: AdminWriteBody | null,
   schema: z.ZodType<T>,
@@ -792,6 +847,34 @@ export const loadAdminAudit = async (input: AdminAuditFilterInput) => {
 
   return adminGet(path, adminAuditPageSchema);
 };
+
+export const loadAdminSupport = async (input: { status: SupportStatusFilter; limit?: number }) => {
+  const search = new URLSearchParams({ status: input.status });
+
+  if (input.limit !== undefined) {
+    search.set("limit", String(input.limit));
+  }
+
+  return adminGet(`/admin/api/support?${search.toString()}`, adminSupportResponseSchema);
+};
+
+export const updateSupportTicket = async (
+  id: string,
+  body: { status: SupportTicketStatus; adminNotes?: string },
+) =>
+  adminWrite(
+    "PATCH",
+    `/admin/api/support/${encodeURIComponent(id)}`,
+    body,
+    adminSupportTicketResponseSchema,
+  );
+
+export const replyToSupportTicket = async (id: string, message: string) =>
+  adminPost(
+    `/admin/api/support/${encodeURIComponent(id)}/reply`,
+    { message },
+    adminSupportReplyResponseSchema,
+  );
 
 export const loadSettings = async () => adminGet("/admin/api/settings", settingsResponseSchema);
 

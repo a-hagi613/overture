@@ -23,6 +23,8 @@ const KNOWN_ACTIONS = [
   "invites.revoke",
   "users.suspend",
   "users.reinstate",
+  "support.update",
+  "support.reply",
   "billing.refund",
   "reveal.open",
   "tag_imports.create",

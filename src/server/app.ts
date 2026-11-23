@@ -171,6 +171,7 @@ export function createApp(deps: AppDependencies) {
     catalogDb: deps.catalogDb,
     databasePath: deps.databasePath,
     degraded: deps.degraded,
+    mail: deps.mail,
     objects: deps.objects,
     payments: deps.payments,
     providers: deps.providers,

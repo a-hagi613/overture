@@ -222,6 +222,7 @@
           "src/server/platform/admin-alerts.test.ts",
           "src/server/platform/alerts.test.ts",
           "src/server/platform/audit/index.test.ts",
+          "src/server/admin/support.test.ts",
           "src/server/platform/rate-limit.test.ts",
           "src/server/platform/sse/hub.test.ts",
           "scripts/database-sync-guard.test.ts",

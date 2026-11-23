@@ -68,6 +68,16 @@ export function OverviewPage() {
         plain={copy.admin.overviewTitlePlain}
       />
       <div className="mt-7 flex flex-col gap-5">
+        {view.openSupportTickets > 0 ? (
+          <p>
+            <Link
+              className="inline-flex min-h-11 items-center rounded-lg border border-signal bg-signal-soft px-3.5 text-[13px] font-semibold text-signal-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9"
+              to="/admin/support?status=open"
+            >
+              {copy.admin.overviewSupportOpen(view.openSupportTickets)}
+            </Link>
+          </p>
+        ) : null}
         {alerts.data === null ? null : (
           <div className="grid gap-5 lg:grid-cols-2">
             <ActiveAlertsCard alerts={alerts.data} />
