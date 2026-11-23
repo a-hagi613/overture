@@ -30,10 +30,12 @@ function storageFor(path: string) {
   }
 
   if (
+    path === "/" ||
+    path === "/pricing" ||
     path === "/signin" ||
+    path === "/signup" ||
     path === "/terms" ||
     path === "/privacy" ||
-    path === "/pricing" ||
     path === "/consent"
   ) {
     return "anonymous";
@@ -57,23 +59,31 @@ const targets: Target[] = routerPaths.map((path) => ({
 }));
 
 const shellPaths = new Set([
-  "/",
+  "/home",
   "/ready",
   "/board",
   "/review",
+  "/calendar",
   "/inbox",
+  "/inbox/:id",
   "/notifications",
   "/profile",
-  "/search",
-  "/settings",
+  "/profile/resume",
+  "/profile/details",
+  "/profile/preferences",
+  "/profile/account",
+  "/profile/billing",
+  "/support",
   "*",
 ]);
 
-const redirectedPaths = new Map([
-  ["/settings/notifications", "/settings"],
-  ["/settings/support", "/settings/support-access"],
-  ["/settings/terms", "/terms"],
-]);
+const redirectedPaths = new Map(
+  [
+    ...routeSource.matchAll(
+      /path:\s*"(?<from>[^"]+)"[^}]*?<(?:Navigate replace|PreserveSearchRedirect)\s+to="(?<to>[^"#]+)/gu,
+    ),
+  ].map((match) => [match.groups?.from ?? "", match.groups?.to ?? ""]),
+);
 
 const FONT_SETTLE_TIMEOUT_MS = 5000;
 
@@ -215,8 +225,8 @@ async function expectSidebarFixed(page: Page, path: string, width: number) {
 
   const metrics = await aside.evaluate((element) => {
     const box = element.getBoundingClientRect();
-    const settingsLinks = [...element.querySelectorAll('a[href="/settings"]')];
-    const bottomLink = settingsLinks.at(-1);
+    const bottomLinks = [...element.querySelectorAll('a[href="/notifications"]')];
+    const bottomLink = bottomLinks.at(-1);
 
     return {
       bottomLinkBottom: bottomLink?.getBoundingClientRect().bottom ?? null,
@@ -229,10 +239,10 @@ async function expectSidebarFixed(page: Page, path: string, width: number) {
   expect(metrics.top, `${path} aside top after scroll`).toBe(0);
   expect(["fixed", "sticky"], `${path} aside position`).toContain(metrics.position);
 
-  if (width < 1280 || path === "/board") {
+  if (width < 1280) {
     expect(metrics.width, `${path} rail width`).toBe(76);
   } else if (width >= 1700) {
-    expect(metrics.width, `${path} sidebar width`).toBe(300);
+    expect(metrics.width, `${path} sidebar width`).toBe(296);
   } else {
     expect(metrics.width, `${path} sidebar width`).toBe(268);
   }
@@ -281,8 +291,8 @@ async function checkTarget(page: Page, target: Target, url: string, width: numbe
 
   await expectNoOverflow(page, target.path);
 
-  if (shellPaths.has(target.path) && width >= 768) {
-    await expectSidebarFixed(page, target.path, width);
+  if (shellPaths.has(expectedPath) && width >= 768) {
+    await expectSidebarFixed(page, expectedPath, width);
   }
 }
 
@@ -316,7 +326,7 @@ const urlsFor = (fixtures: SweepFixtures) => ({
 const startPaths: Record<Storage, string> = {
   admin: "/admin",
   anonymous: "/signin",
-  app: "/",
+  app: "/home",
 };
 
 async function sweepTargets(

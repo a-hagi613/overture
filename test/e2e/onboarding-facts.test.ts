@@ -249,13 +249,13 @@ test("the page saves as the answers change and hides a pill with nothing waiting
 
   await expect(page.getByText("Unlocks 31 queued jobs")).toBeVisible();
 
-  await page.getByLabel("Work authorisation in United States").selectOption("Citizen");
+  await page.getByLabel("Work authorization in United States").selectOption("Citizen");
 
   await expect(page.getByText("Unlocks 23 queued jobs")).toBeVisible();
   await expect(page.getByText("2 of 3 answered")).toBeVisible();
 
-  await page.getByLabel("Work authorisation in Canada").selectOption("Citizen");
-  await page.getByLabel("Work authorisation in United Kingdom").selectOption("Citizen");
+  await page.getByLabel("Work authorization in Canada").selectOption("Citizen");
+  await page.getByLabel("Work authorization in United Kingdom").selectOption("Citizen");
 
   await expect(page.getByText("Unlocks 31 queued jobs")).toHaveCount(0);
   await expect(page.getByText("3 of 3 answered")).toBeVisible();
@@ -267,7 +267,7 @@ test("the page saves as the answers change and hides a pill with nothing waiting
   await page.getByRole("button", { name: "Continue" }).click();
 
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
-  await expect(page.getByRole("heading", { level: 2, name: /What do you want/u })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
 
   await context.close();
 });

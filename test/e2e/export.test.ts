@@ -299,8 +299,8 @@ function unzipJson<T>(archive: Uint8Array, entry: string, schema: z.ZodType<T>) 
 }
 
 async function openExportPage(page: Page, appServerUrl: string) {
-  await page.goto(`${appServerUrl}/settings/export`);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Export your data");
+  await page.goto(`${appServerUrl}/profile/account#account-data`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Account Settings");
 }
 
 test("an export holds only its user's data and downloads from its page", async ({
@@ -349,12 +349,14 @@ test("an export holds only its user's data and downloads from its page", async (
 
   expect(axe.violations).toEqual([]);
 
-  await page.getByRole("button", { name: "Request export" }).click();
+  await page.getByRole("button", { name: "Export data" }).click();
   await expect(page.getByRole("heading", { name: "Request" })).toHaveCount(0);
 
   await waitForReady(owner);
 
-  await expect(page.getByRole("heading", { name: "Ready to download" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download export" })).toBeVisible({
+    timeout: 10_000,
+  });
 
   const state = exportStateSchema.parse(await (await owner.get("/api/account/export")).json());
 
@@ -473,7 +475,7 @@ test("an export holds only its user's data and downloads from its page", async (
   const readyMail = mail.messages.find((sent) => sent.subject === "Your Overture export is ready");
 
   expect(readyMail?.to).toBe(authTestIdentity.ownerEmail);
-  expect(readyMail?.body).toContain("/settings/export");
+  expect(readyMail?.body).toContain("/profile/account");
   expect((await noticeSends(owner)) - noticesBefore).toBe(1);
 
   await context.close();

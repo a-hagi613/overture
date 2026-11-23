@@ -1,6 +1,7 @@
 import { copy } from "../../shared/copy.ts";
 import type { ApplicationDetail, TimelineEvent } from "../lib/board-api.ts";
-import { stamp, stageLabel } from "../lib/board-format.ts";
+import { stageLabel, stamp } from "../lib/board-format.ts";
+import { dsMono } from "./ui/ds.ts";
 
 function statusTitle(value: string) {
   switch (value) {
@@ -150,46 +151,39 @@ export function BoardTimeline({ detail }: { detail: ApplicationDetail }) {
   const items = itemsFor(detail);
 
   if (items.length === 0) {
-    return <p className="text-[13px] text-muted-foreground">{copy.board.timeline.empty}</p>;
+    return <p className="pt-5 text-sm text-muted-foreground">{copy.board.timeline.empty}</p>;
   }
 
   return (
     <div aria-label={copy.board.tabs.timeline} role="tabpanel">
-      <ol className="flex list-none flex-col pt-[18px] md:pt-[22px]">
+      <ol className="flex list-none flex-col pt-5">
         {items.map((item, index) => {
           const accent = ACCENT_TITLES.has(item.title);
           const last = index === items.length - 1;
 
           return (
-            <li className="flex gap-3.5 md:gap-4" key={item.key}>
+            <li className="flex gap-3.5" key={item.key}>
               <div className="flex w-3.5 flex-none flex-col items-center">
                 <span
-                  className="mt-[5px] h-3 w-3 rounded-full border-2"
-                  style={{
-                    background: accent ? "var(--acc)" : "var(--done)",
-                    borderColor: accent ? "var(--accbg)" : "var(--donering)",
-                  }}
+                  className={`mt-1.5 h-3 w-3 rounded-full border-2 ${
+                    accent ? "border-signal-soft bg-signal" : "border-ok-soft bg-ok"
+                  }`}
                 />
-                <span
-                  className="mt-1 w-px flex-1 bg-input"
-                  style={{ display: last ? "none" : "block" }}
-                />
+                {last ? null : <span className="mt-1 w-px flex-1 bg-border" />}
               </div>
-              <div className="min-w-0 flex-1 pb-4 md:pb-5">
+              <div className="min-w-0 flex-1 pb-5">
                 <div className="flex items-baseline justify-between gap-2.5">
                   <h3
-                    className={`serif text-[20px] leading-[1.2] md:text-[22px] ${
-                      accent ? "text-signal-text" : ""
+                    className={`font-serif text-card-title leading-snug ${
+                      accent ? "text-signal-text" : "text-foreground"
                     }`}
                   >
                     {item.title}
                   </h3>
-                  <span className="mono flex-none text-[11px] text-muted-foreground md:text-[11.5px]">
-                    {stamp(item.at, detail.timeZone)}
-                  </span>
+                  <span className={`${dsMono} flex-none`}>{stamp(item.at, detail.timeZone)}</span>
                 </div>
                 {item.body === null ? null : (
-                  <p className="text-[13px] text-muted-foreground [text-wrap:pretty] md:mt-0.5">
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                     <span className={item.short === null ? "" : "md:hidden"}>
                       {item.short ?? item.body}
                     </span>

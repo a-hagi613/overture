@@ -11,10 +11,6 @@
       "pattern": "tryoverture.com/",
       "zone_name": "tryoverture.com",
     },
-    {
-      "pattern": "tryoverture.com/pricing*",
-      "zone_name": "tryoverture.com",
-    },
   ],
   "workers_dev": false,
 }

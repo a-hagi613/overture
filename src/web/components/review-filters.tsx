@@ -3,6 +3,7 @@ import type { ReviewCategory } from "../../shared/questions";
 
 import { copy } from "../../shared/copy.ts";
 import { REVIEW_CATEGORIES } from "../../shared/questions.ts";
+import { Button } from "./ui/button.tsx";
 
 const FILTER_ORDER: readonly (ReviewCategory | "all")[] = ["all", ...REVIEW_CATEGORIES];
 
@@ -38,21 +39,19 @@ export function ReviewFilters({
         const label = category === "all" ? copy.review.all : copy.review.categories[category];
 
         return [
-          <button
-            aria-pressed={selected}
-            className={`inline-flex min-h-9 flex-none items-center gap-2 whitespace-nowrap rounded-full border px-[14px] text-[13px] font-semibold max-md:min-h-11 ${
-              selected
-                ? "border-foreground bg-foreground text-background"
-                : "border-input bg-card text-foreground hover:bg-muted"
-            }`}
+          <Button
+            ariaPressed={selected}
+            className="flex-none rounded-full"
             key={category}
             onClick={() => {
               onChange(category);
             }}
-            type="button"
+            size="sm"
+            variant={selected ? "primary" : "outline"}
           >
-            <span>{label}</span> <b className="text-[11.5px] font-bold opacity-[.78]">{count}</b>
-          </button>,
+            <span>{label}</span>
+            <span className="text-xs opacity-75 tabular-nums">{count}</span>
+          </Button>,
         ];
       })}
     </fieldset>

@@ -39,6 +39,7 @@ const cardSchema = z.object({
   company: z.string(),
   id: z.string(),
   location: z.string().nullable(),
+  logoUrl: z.string().nullable().optional(),
   plan: planSchema.nullable(),
   queuePosition: z.number().nullable(),
   readyAt: z.number().nullable(),

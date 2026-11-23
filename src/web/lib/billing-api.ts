@@ -28,9 +28,10 @@ async function loadBilling() {
 
 export function useBilling(options?: { refetchInterval?: number | false }) {
   return useQuery({
-    queryKey: ["billing"],
     queryFn: loadBilling,
+    queryKey: ["billing"],
     refetchInterval: options?.refetchInterval ?? false,
+    retry: false,
   });
 }
 

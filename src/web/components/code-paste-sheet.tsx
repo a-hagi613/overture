@@ -135,13 +135,13 @@ export function CodePasteSheet({
     <>
       <div
         aria-hidden="true"
-        className="fixed inset-0 z-40 bg-[var(--color-scrim)]"
+        className="fixed inset-0 z-60 bg-[var(--color-scrim)]"
         onClick={onClose}
       />
       <dialog
         aria-labelledby="code-paste-title"
         aria-modal="true"
-        className="board m-0 fixed inset-x-4 bottom-4 z-50 flex max-h-[calc(100dvh-32px)] max-w-none flex-col overflow-y-auto rounded-[16px] border border-border bg-card px-[22px] pt-[13px] pb-6 text-foreground shadow-lift md:inset-x-auto md:inset-y-0 md:right-0 md:bottom-0 w-[520px] max-[1699px]:w-[468px] max-md:w-auto md:rounded-none md:border-y-0 md:border-r-0 md:px-[26px] md:pt-5"
+        className="board m-0 fixed inset-x-4 bottom-4 z-70 flex max-h-[calc(100dvh-32px)] max-w-none flex-col overflow-y-auto rounded-[16px] border border-border bg-card px-[22px] pt-[13px] pb-6 text-foreground shadow-lift md:inset-x-auto md:inset-y-0 md:right-0 md:bottom-0 w-[520px] max-[1699px]:w-[468px] max-md:w-auto md:rounded-none md:border-y-0 md:border-r-0 md:px-[26px] md:pt-5"
         data-testid="code-paste-sheet"
         open
         ref={sheet}
@@ -248,7 +248,7 @@ export function CodePasteSheet({
               ) : (
                 <Link
                   className="inline-flex min-h-11 items-center text-[13px] font-semibold underline decoration-input underline-offset-4 hover:decoration-foreground md:min-h-10"
-                  to="/profile#profile-address"
+                  to="/profile/account"
                 >
                   {copy.codePaste.noCode.secondary}
                 </Link>

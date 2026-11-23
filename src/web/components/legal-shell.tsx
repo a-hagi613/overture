@@ -1,56 +1,49 @@
+import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
 import { Backdrop } from "./backdrop.tsx";
 import { LegalTopBar } from "./legal-top-bar.tsx";
-import { NavGlyph } from "./nav-glyph.tsx";
+import { Button } from "./ui/button.tsx";
+import { Separator } from "./ui/separator.tsx";
 
 export function LegalShell({ children }: { children: ReactNode }) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
+    <div className="relative min-h-screen overflow-x-clip bg-background text-foreground">
       <Backdrop />
-      <div className="relative z-[1] flex min-h-screen flex-col">
+      <div className="relative z-10 flex min-h-screen flex-col">
         <LegalTopBar />
         <main
+          className="mx-auto w-full max-w-3xl flex-1 px-4 pb-12 pt-6 outline-none sm:px-6 md:pt-10"
           id="main-content"
           tabIndex={-1}
-          className="outline-none mx-auto w-full max-w-[636px] px-[18px] pt-[42px] md:pt-[70px]"
         >
-          <Link
-            className="-my-2 -ml-2 inline-flex min-h-11 items-center gap-[7px] rounded-md px-2 py-1 text-[13px] font-medium hover:bg-muted hover:text-foreground"
-            to="/"
-          >
-            <NavGlyph name="back" size={15} />
-            {copy.legal.back}
-          </Link>
+          <Button asChild className="-ml-2 mb-5" size="sm" variant="ghost">
+            <Link to="/">
+              <ArrowLeft aria-hidden="true" size={14} />
+              <span>{copy.legal.back}</span>
+            </Link>
+          </Button>
           {children}
         </main>
-        <footer className="mx-auto mt-[98px] w-full max-w-[716px] px-[18px] pb-[34px]">
-          <div className="border-t border-border pt-[16px]">
-            <p className="font-serif text-[13px] leading-[1.6] text-muted-foreground">
-              {copy.legal.draftNotice}
+        <footer className="mx-auto w-full max-w-3xl px-4 pb-10 sm:px-6">
+          <Separator />
+          <div className="mt-5 space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+            <p>{copy.legal.draftNotice}</p>
+            <p>
+              {`${copy.legal.footerName}${copy.legal.footerSeparator}${copy.legal.footerContact}${copy.legal.footerSeparator}${copy.legal.footerAddress}`}
             </p>
-            <p className="mt-1 font-serif text-[14px] leading-[1.6] text-muted-foreground">
-              {copy.legal.footerName}
-              {copy.legal.footerSeparator}
-              {copy.legal.footerContact}
-              {copy.legal.footerSeparator}
-              {copy.legal.footerAddress}
-            </p>
-            <nav
-              aria-label={copy.legal.footerLinksLabel}
-              className="mt-1 flex items-center gap-[6px] font-serif text-[14px] leading-[1.6] text-muted-foreground"
-            >
+            <nav aria-label={copy.legal.footerLinksLabel} className="flex items-center gap-3 pt-1">
               <Link
-                className="-my-2 inline-flex min-h-11 items-center underline underline-offset-[3px] transition-colors hover:text-foreground"
+                className="font-medium text-foreground underline underline-offset-4 hover:text-signal-text max-md:inline-flex max-md:min-h-11 max-md:items-center"
                 to="/terms"
               >
                 {copy.legal.termsLink}
               </Link>
               <span aria-hidden="true">{copy.legal.footerSeparator.trim()}</span>
               <Link
-                className="-my-2 inline-flex min-h-11 items-center underline underline-offset-[3px] transition-colors hover:text-foreground"
+                className="font-medium text-foreground underline underline-offset-4 hover:text-signal-text max-md:inline-flex max-md:min-h-11 max-md:items-center"
                 to="/privacy"
               >
                 {copy.legal.privacyLink}

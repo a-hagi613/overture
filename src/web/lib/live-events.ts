@@ -14,6 +14,24 @@ const LIVE_TOPICS = [
   "calendar.updated",
 ] as const;
 
+type LiveTopic = (typeof LIVE_TOPICS)[number];
+
+const TOPIC_QUERY_KEYS: Record<LiveTopic, readonly (readonly string[])[]> = {
+  "application.updated": [["home"], ["nav"], ["board"], ["ready"], ["application"], ["calendar"]],
+  "board.moved": [["home"], ["nav"], ["board"], ["ready"], ["application"], ["calendar"]],
+  "calendar.updated": [["home"], ["nav"], ["board"], ["calendar"]],
+  "code.wait_resolved": [["home"], ["nav"], ["notifications"], ["code-waits"]],
+  "home.updated": [["home"], ["nav"], ["ready"]],
+  "message.received": [["home"], ["nav"], ["threads"], ["thread"]],
+  notification: [["home"], ["nav"], ["notifications"], ["code-waits"]],
+  "review.created": [["home"], ["nav"], ["reviews"], ["ready"], ["board"]],
+  "review.resolved": [["home"], ["nav"], ["reviews"], ["ready"], ["board"]],
+};
+
+function isLiveTopic(value: string): value is LiveTopic {
+  return Object.hasOwn(TOPIC_QUERY_KEYS, value);
+}
+
 const boardMovedSchema = z.object({
   applicationId: z.string(),
   fromStage: z.string().nullable().optional(),
@@ -50,25 +68,13 @@ export function useLiveUpdates() {
     const source = new EventSource("/api/events");
 
     const refresh = (event: MessageEvent) => {
-      void queryClient.invalidateQueries({ queryKey: ["home"] });
-      void queryClient.invalidateQueries({ queryKey: ["nav"] });
-
-      if (event.type === "notification" || event.type === "code.wait_resolved") {
-        void queryClient.invalidateQueries({ queryKey: ["notifications"] });
-        void queryClient.invalidateQueries({ queryKey: ["code-waits"] });
-      }
-
-      if (event.type === "review.created" || event.type === "review.resolved") {
-        void queryClient.invalidateQueries({ queryKey: ["reviews"] });
-      }
-
-      if (
-        event.type === "application.updated" ||
-        event.type === "board.moved" ||
-        event.type === "calendar.updated"
-      ) {
-        void queryClient.invalidateQueries({ queryKey: ["board"] });
-        void queryClient.invalidateQueries({ queryKey: ["calendar"] });
+      if (isLiveTopic(event.type)) {
+        for (const queryKey of TOPIC_QUERY_KEYS[event.type]) {
+          void queryClient.invalidateQueries({ queryKey });
+        }
+      } else {
+        void queryClient.invalidateQueries({ queryKey: ["home"] });
+        void queryClient.invalidateQueries({ queryKey: ["nav"] });
       }
 
       if (event.type === "board.moved") {

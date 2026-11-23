@@ -58,7 +58,9 @@ async function expectWelcomeMatchesBoard(
     page.getByRole("heading", { level: 1, name: /Set up your workspace/u }),
   ).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: /Welcome to Overture/u })).toBeVisible();
-  await expect(page.getByText("Overture finds jobs")).toBeVisible();
+  await expect(
+    page.getByText("Here is how Overture prepares and sends applications on your behalf."),
+  ).toBeVisible();
 
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -68,15 +70,11 @@ async function expectWelcomeMatchesBoard(
 
   expect(results.violations, `${String(width)}px ${theme}`).toEqual([]);
 
-  const contentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
 
-  await page.setViewportSize({ height: Math.max(contentHeight, 900), width });
-
-  await expect(page).toHaveScreenshot(`${String(width)}-${theme}.png`, {
-    animations: "disabled",
-    caret: "hide",
-    maxDiffPixelRatio: 0.01,
-  });
+  expect(overflow, `${String(width)}px ${theme}`).toBe(false);
 
   await context.close();
 }

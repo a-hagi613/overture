@@ -31,7 +31,7 @@ test("every response carries the security headers and the app breaks no policy",
 
   await page.goto(`${isolatedAppServer.url}/signin`);
   await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
-  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+  await page.getByRole("button", { name: "Send sign-in link" }).click();
   await expect(page.getByText("Link sent to")).toBeVisible();
 
   expect(violations).toEqual([]);

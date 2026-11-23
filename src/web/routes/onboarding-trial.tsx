@@ -1,11 +1,16 @@
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
+import { toast } from "sonner";
+
+import type { TrialCardState } from "../components/onboarding-trial-card.tsx";
 
 import { copy } from "../../shared/copy.ts";
 import { Backdrop } from "../components/backdrop.tsx";
+import { OnboardingStepHeader } from "../components/onboarding-step-header.tsx";
 import { OnboardingTrialCard } from "../components/onboarding-trial-card.tsx";
-import type { TrialCardState } from "../components/onboarding-trial-card.tsx";
+import { Button } from "../components/ui/button.tsx";
+import { dsBody, dsEyebrow, dsPageTitle } from "../components/ui/ds.ts";
 import { authClient } from "../lib/auth-client.ts";
 import { startCardSetup, verifyTrialCard } from "../lib/trial-api.ts";
 
@@ -14,6 +19,8 @@ const text = copy.onboarding.trial;
 export function OnboardingTrialPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const preview = params.get("preview") === "1";
+  const suffix = preview ? "?preview=1" : "";
   const { data: session, isPending } = authClient.useSession();
   const [state, setState] = useState<TrialCardState>("verify");
   const sessionId = params.get("session");
@@ -27,6 +34,10 @@ export function OnboardingTrialPage() {
 
   const verify = useMutation({
     mutationFn: async () => {
+      if (preview) {
+        return "granted" as const;
+      }
+
       if (!returned) {
         globalThis.location.assign(await startCardSetup());
 
@@ -37,7 +48,11 @@ export function OnboardingTrialPage() {
     },
     onSuccess: async (outcome) => {
       if (outcome === "granted") {
-        await navigate("/notifications");
+        if (preview) {
+          toast.success("Trial verification preview complete.");
+        }
+
+        await navigate("/home");
 
         return;
       }
@@ -55,17 +70,25 @@ export function OnboardingTrialPage() {
   });
 
   return (
-    <div className="board onb min-h-screen overflow-x-clip">
+    <div className="relative min-h-screen overflow-x-clip bg-background text-foreground">
       <Backdrop />
-      <div className="relative z-[1]">
-        <main className="ob outline-none" id="main-content" tabIndex={-1}>
-          <p className="eyebrow">{text.eyebrow}</p>
-          <h1 className="serif hd2 mt-2.5">
-            {text.titlePlain} <span className="italic">{text.titleItalic}</span> {text.titleRest}
+      <div className="relative z-10 flex min-h-screen flex-col">
+        <OnboardingStepHeader />
+        <main
+          className="mx-auto w-full max-w-3xl flex-1 px-4 pb-16 pt-6 outline-none sm:px-6"
+          id="main-content"
+          tabIndex={-1}
+        >
+          <p className={dsEyebrow}>{text.eyebrow}</p>
+          <h1 className={`${dsPageTitle} mt-2`}>
+            {`${text.titlePlain} `}
+            <em className="italic text-signal">{text.titleItalic}</em>
+            {` ${text.titleRest}`}
           </h1>
-          <p className="serif mt-1.5 italic text-muted-foreground">{text.kicker}</p>
-          <div className="mt-5 max-w-[760px]">
+          <p className={`${dsBody} mt-2`}>{text.kicker}</p>
+          <div className="mt-6">
             <OnboardingTrialCard
+              backTo={`/onboarding/forward${suffix}`}
               busy={verify.isPending || restart.isPending}
               error={verify.isError || restart.isError}
               onVerify={state === "verify" ? verify.mutate : restart.mutate}
@@ -73,9 +96,9 @@ export function OnboardingTrialPage() {
             />
           </div>
           <div className="mt-6 flex justify-end">
-            <button className="btn" disabled style={{ minHeight: 44 }} type="button">
+            <Button disabled size="default" variant="primary">
               {text.startButton}
-            </button>
+            </Button>
           </div>
         </main>
       </div>

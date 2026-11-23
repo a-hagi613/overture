@@ -102,7 +102,9 @@ test("a new user uploads a resume, confirms Facts and returns to the step they l
 
   await expect(page.getByText("resume.pdf")).toBeVisible();
   await expect(page.getByText("PDF · 1 page · 1 KB")).toBeVisible();
-  await expect(page.getByText("Kept exactly as you sent it.")).toBeVisible();
+  await expect(
+    page.getByText("Stored unchanged. Employers receive the exact PDF file you upload."),
+  ).toBeVisible();
 
   const skipList = z
     .object({ companies: z.array(z.object({ name: z.string(), reason: z.string() })) })
@@ -127,7 +129,7 @@ test("a new user uploads a resume, confirms Facts and returns to the step they l
   await expect(page).toHaveURL(/\/onboarding\/facts$/u);
 
   await page.getByLabel("Current job title").fill("Staff Platform Engineer");
-  await page.getByLabel("Work authorisation in Canada").selectOption("Citizen");
+  await page.getByLabel("Work authorization in Canada").selectOption("Citizen");
   await page.getByLabel("Salary expectation in CAD").fill("140,000");
   await page.getByLabel("Period for CAD").selectOption("a year");
 
@@ -138,7 +140,7 @@ test("a new user uploads a resume, confirms Facts and returns to the step they l
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
   await page.goto(`${onboardingServer.url}/onboarding/facts`);
   await expect(page.getByLabel("Current job title")).toHaveValue("Staff Platform Engineer");
-  await expect(page.getByLabel("Work authorisation in Canada")).toHaveValue("Citizen");
+  await expect(page.getByLabel("Work authorization in Canada")).toHaveValue("Citizen");
   await expect(page.getByLabel("Salary expectation in CAD")).toHaveValue("140,000");
 
   const state = stateSchema.parse(await (await request.get("/api/onboarding")).json());
@@ -198,7 +200,7 @@ test("an unreadable PDF leads to manual entry on the Facts step", async ({
   await expect(page.getByText("resume-scanned.pdf")).toBeVisible();
   await expect(
     page.getByText(
-      "Overture couldn't read this PDF. Replace it, or continue and type your facts yourself on the next step.",
+      "This PDF could not be parsed automatically. Upload another file, or continue and enter your details manually.",
     ),
   ).toBeVisible();
 
@@ -207,7 +209,7 @@ test("an unreadable PDF leads to manual entry on the Facts step", async ({
   await expect(page.getByLabel("Current job title")).toHaveValue("");
 
   await page.getByLabel("Current job title").fill("Platform Engineer");
-  await page.getByLabel("Work authorisation in Canada").selectOption("Permanent resident");
+  await page.getByLabel("Work authorization in Canada").selectOption("Permanent resident");
   await page.getByLabel("Salary expectation in CAD").fill("120,000");
   await page.getByLabel("Period for CAD").selectOption("a year");
 

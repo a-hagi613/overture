@@ -1,13 +1,9 @@
 import { copy } from "../../shared/copy.ts";
 
 import { BusyIndicator } from "./busy-indicator.tsx";
-import {
-  BTN_PRIMARY,
-  BTN_SECONDARY,
-  INPUT_CLASS,
-  INPUT_ERROR_CLASS,
-  LABEL_CLASS,
-} from "./signin-styles.ts";
+import { LABEL_CLASS } from "./signin-styles.ts";
+import { Button } from "./ui/button.tsx";
+import { Input } from "./ui/input.tsx";
 
 export function SignInForm({
   email,
@@ -15,14 +11,18 @@ export function SignInForm({
   onSubmit,
   pending,
   busy,
+  primary = false,
   refused = false,
+  submitLabel = copy.signIn.magicSubmit,
 }: {
   email: string;
   onEmail: (value: string) => void;
   onSubmit: () => void;
   pending: boolean;
   busy: boolean;
+  primary?: boolean;
   refused?: boolean;
+  submitLabel?: string;
 }) {
   return (
     <form
@@ -36,12 +36,11 @@ export function SignInForm({
         <label className={LABEL_CLASS} htmlFor="signin-email">
           {copy.signIn.emailLabel}
         </label>
-        <input
-          aria-describedby={refused ? "signin-email-error" : undefined}
-          aria-invalid={refused || undefined}
+        <Input
+          ariaDescribedBy={refused ? "signin-email-error" : undefined}
           autoComplete="email"
-          className={refused ? INPUT_ERROR_CLASS : INPUT_CLASS}
           id="signin-email"
+          invalid={refused}
           onInput={(event) => {
             onEmail(event.currentTarget.value);
           }}
@@ -52,21 +51,23 @@ export function SignInForm({
       </div>
       {refused ? (
         <p
-          className="text-left text-[12.5px] font-semibold leading-[1.5] text-need"
+          className="text-left text-xs font-semibold leading-relaxed text-need"
           id="signin-email-error"
         >
           {copy.signIn.refusedField}
         </p>
       ) : null}
-      <button
-        aria-busy={busy || undefined}
-        className={refused ? BTN_PRIMARY : BTN_SECONDARY}
+      <Button
+        ariaBusy={busy}
+        className="w-full"
         disabled={pending}
-        type="submit"
+        size="default"
+        submit
+        variant={refused || primary ? "primary" : "secondary"}
       >
         {busy ? <BusyIndicator /> : null}
-        {copy.signIn.magicSubmit}
-      </button>
+        {submitLabel}
+      </Button>
     </form>
   );
 }

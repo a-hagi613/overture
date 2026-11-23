@@ -105,40 +105,41 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(overflow).toBeLessThanOrEqual(0);
 }
 
-test("the month grid shows each day's chips and the day panel lists them", async ({
+test("the month grid shows each day's events and the day panel lists them", async ({
   browser,
   isolatedAppServer,
 }) => {
   const seeded = await seedMonth(isolatedAppServer);
   const { context, page } = await openCalendar(browser, seeded, { width: 1280 });
 
-  const grid = page.getByRole("list", { name: "November 2026, one day per cell" });
+  const grid = page.getByRole("grid");
 
   await expect(grid).toBeVisible();
-  await expect(grid.getByRole("button")).toHaveCount(42);
-  await expect(grid.getByRole("button", { name: "Tuesday 17 November, 3 sent" })).toBeVisible();
-  await expect(grid.getByRole("button", { name: "Monday 16 November, 1 sent" })).toBeVisible();
-  await expect(grid.getByRole("button", { name: "Wednesday 18 November, nothing" })).toBeVisible();
+  await expect(grid.locator("button[data-day]")).toHaveCount(42);
   await expect(
-    grid.getByRole("button", { name: "Tuesday 17 November, 3 sent" }).locator("[data-chip]"),
-  ).toHaveCount(3);
+    grid.getByRole("button", { name: "Tuesday, November 17, 2026, 3 sent" }),
+  ).toBeVisible();
+  await expect(
+    grid.getByRole("button", { name: "Monday, November 16, 2026, 1 sent" }),
+  ).toBeVisible();
+  await expect(
+    grid.getByRole("button", { name: "Wednesday, November 18, 2026, nothing" }),
+  ).toBeVisible();
 
-  await grid.getByRole("button", { name: "Tuesday 17 November, 3 sent" }).click();
+  await grid.getByRole("button", { name: "Tuesday, November 17, 2026, 3 sent" }).click();
 
   const panel = page.getByRole("complementary", { name: "Day panel" });
 
-  await expect(panel.getByRole("heading", { name: "Tuesday 17 November" })).toBeVisible();
+  await expect(panel.getByRole("heading", { name: "Tue, Nov 17" })).toBeVisible();
   await expect(panel.getByText("3 sent")).toBeVisible();
-  await expect(panel.getByRole("link")).toHaveCount(3);
-  await expect(panel.getByRole("link").first()).toContainText("Halden Systems");
-  await expect(panel.getByRole("link").first()).toContainText("09:12");
+  await expect(panel.getByRole("link", { name: "View on Tracker" })).toHaveCount(3);
+  await expect(panel).toContainText("Halden Systems");
+  await expect(panel).toContainText("09:12");
 
-  await panel.getByRole("link").first().click();
+  await panel.getByRole("link", { name: "View on Tracker" }).first().click();
   await expect(page).toHaveURL(/\/board\?application=/u);
 
   await page.goBack();
-  await page.getByRole("button", { name: "Close day panel" }).click();
-  await expect(page.getByRole("complementary", { name: "Day panel" })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 
   await context.close();
@@ -150,42 +151,43 @@ test("the grid follows the WAI-ARIA keyboard pattern", async ({ browser, isolate
   const { context, page } = await openCalendar(browser, seeded, { width: 1280 });
   const day = (label: string) => page.getByRole("button", { name: label });
 
-  await expect(page.locator("[data-day][tabindex='0']")).toHaveCount(1);
+  await expect(page.locator("button[data-day][tabindex='0']")).toHaveCount(1);
 
-  await day("Tuesday 17 November, 3 sent").focus();
+  await day("Tuesday, November 17, 2026, 3 sent").focus();
   await page.keyboard.press("ArrowRight");
-  await expect(day("Wednesday 18 November, nothing")).toBeFocused();
+  await expect(day("Wednesday, November 18, 2026, nothing")).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(day("Wednesday 25 November, nothing")).toBeFocused();
+  await expect(day("Wednesday, November 25, 2026, nothing")).toBeFocused();
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("ArrowUp");
-  await expect(day("Tuesday 17 November, 3 sent")).toBeFocused();
+  await expect(day("Tuesday, November 17, 2026, 3 sent")).toBeFocused();
   await page.keyboard.press("Home");
-  await expect(day("Monday 16 November, 1 sent")).toBeFocused();
+  await expect(day("Monday, November 16, 2026, 1 sent")).toBeFocused();
   await page.keyboard.press("End");
-  await expect(day("Sunday 22 November, nothing")).toBeFocused();
+  await expect(day("Sunday, November 22, 2026, nothing")).toBeFocused();
 
   await page.keyboard.press("Home");
   await page.keyboard.press("Enter");
   await expect(
     page
       .getByRole("complementary", { name: "Day panel" })
-      .getByRole("heading", { name: "Monday 16 November" }),
+      .getByRole("heading", { name: "Mon, Nov 16" }),
   ).toBeVisible();
-  await expect(day("Monday 16 November, 1 sent")).toHaveAttribute("aria-pressed", "true");
+  await expect(day("Monday, November 16, 2026, 1 sent")).toHaveAttribute("aria-pressed", "true");
 
   await page.keyboard.press("PageDown");
-  await expect(page.getByRole("heading", { name: "December 2026" })).toBeVisible();
+  await expect(page.locator("#calendar-month")).toContainText("December 2026");
   await expect(page).toHaveURL(/month=2026-12/u);
-  await expect(day("Wednesday 16 December, nothing")).toBeFocused();
+  await expect(day("Wednesday, December 16, 2026, nothing")).toBeFocused();
   await page.keyboard.press("PageUp");
-  await expect(page.getByRole("heading", { name: "November 2026" })).toBeVisible();
-  await expect(day("Monday 16 November, 1 sent")).toBeFocused();
+  await expect(page.locator("#calendar-month")).toContainText("November 2026");
+  await expect(day("Monday, November 16, 2026, 1 sent")).toBeFocused();
 
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("ArrowUp");
-  await expect(page.getByRole("heading", { name: "October 2026" })).toBeVisible();
+  await page.keyboard.press("ArrowUp");
+  await expect(page.locator("#calendar-month")).toContainText("October 2026");
 
   await context.close();
   await seeded.owner.dispose();
@@ -199,7 +201,7 @@ test("month buttons, Today and an empty month work, and the empty month says so"
   const { context, page } = await openCalendar(browser, seeded, { width: 1280 });
 
   await page.getByRole("button", { name: "Next month" }).click();
-  await expect(page.getByRole("heading", { name: "December 2026" })).toBeVisible();
+  await expect(page.locator("#calendar-month")).toContainText("December 2026");
   await expect(
     page.getByText("Nothing yet. Applications you send and replies from employers appear here."),
   ).toBeVisible();
@@ -208,13 +210,11 @@ test("month buttons, Today and an empty month work, and the empty month says so"
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Previous month" }).click();
-  await expect(page.getByRole("heading", { name: "November 2026" })).toBeVisible();
+  await expect(page.locator("#calendar-month")).toContainText("November 2026");
   await expect(page.getByText("Nothing yet.")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Today" }).click();
-  await expect(page.getByRole("heading", { level: 2 }).first()).toContainText(
-    String(new Date().getUTCFullYear()),
-  );
+  await expect(page.locator("#calendar-month")).toContainText(String(new Date().getUTCFullYear()));
 
   await context.close();
   await seeded.owner.dispose();
@@ -226,7 +226,7 @@ test("a Stage move shows on the open Calendar without a reload", async ({
 }) => {
   const seeded = await seedMonth(isolatedAppServer);
   const { context, page } = await openCalendar(browser, seeded, { width: 1280 });
-  const before = page.getByRole("button", { name: "Tuesday 17 November, 3 sent" });
+  const before = page.getByRole("button", { name: "Tuesday, November 17, 2026, 3 sent" });
 
   await expect(before).toBeVisible();
   await moveClockTo(seeded.owner, Date.UTC(2026, 10, 17, 12));
@@ -238,30 +238,28 @@ test("a Stage move shows on the open Calendar without a reload", async ({
 
   expect(moved.ok()).toBe(true);
   await expect(
-    page.getByRole("button", { name: "Tuesday 17 November, 3 sent, 1 stage move" }),
+    page.getByRole("button", { name: "Tuesday, November 17, 2026, 3 sent, 1 stage move" }),
   ).toBeVisible();
 
   await context.close();
   await seeded.owner.dispose();
 });
 
-test("Calendar is the seventh destination after Inbox, and Home and Board headers open it", async ({
-  browser,
-  isolatedAppServer,
-}) => {
+test("Calendar is in Main navigation and Home opens it", async ({ browser, isolatedAppServer }) => {
   const seeded = await seedMonth(isolatedAppServer);
-  const side = await openCalendar(browser, seeded, { path: "/", width: 1280 });
+  const side = await openCalendar(browser, seeded, { path: "/home", width: 1280 });
   const nav = side.page.getByRole("navigation", { name: "Main" });
 
   await expect(nav.getByRole("link")).toHaveText([
     /^Home/u,
+    /^Tracker/u,
     /^Ready/u,
-    /^Board/u,
     /^Review/u,
     /^Inbox/u,
     /^Calendar/u,
     /^Profile/u,
-    /^Settings/u,
+    /^Support/u,
+    /^Notifications/u,
   ]);
 
   await nav.getByRole("link", { name: "Calendar" }).click();
@@ -269,24 +267,18 @@ test("Calendar is the seventh destination after Inbox, and Home and Board header
   await expect(nav.getByRole("link", { name: "Calendar" })).toHaveAttribute("aria-current", "page");
   await side.context.close();
 
-  const home = await openCalendar(browser, seeded, { path: "/", width: 1280 });
+  const home = await openCalendar(browser, seeded, { path: "/home", width: 1280 });
 
-  await home.page.getByRole("main").getByRole("link", { name: "Calendar" }).click();
+  await home.page.getByRole("main").getByRole("link", { name: "Open Calendar" }).click();
   await expect(home.page).toHaveURL(/\/calendar/u);
   await home.context.close();
 
-  const board = await openCalendar(browser, seeded, { path: "/board", width: 1280 });
-
-  await board.page.getByRole("main").getByRole("link", { name: "Calendar" }).click();
-  await expect(board.page).toHaveURL(/\/calendar/u);
-  await board.context.close();
-
-  const phone = await openCalendar(browser, seeded, { path: "/", width: 390 });
+  const phone = await openCalendar(browser, seeded, { path: "/home", width: 390 });
   const tabs = phone.page.getByRole("navigation", { name: "Quick sections" });
 
-  await expect(tabs.getByRole("link")).toHaveCount(6);
-  await expect(tabs.getByRole("link", { name: "Calendar" })).toHaveCount(0);
-  await phone.page.getByRole("link", { name: "Calendar" }).click();
+  await expect(tabs.getByRole("link")).toHaveCount(1);
+  await tabs.getByRole("button", { name: "Tracker" }).click();
+  await phone.page.getByRole("link", { exact: true, name: "Calendar" }).click();
   await expect(phone.page).toHaveURL(/\/calendar/u);
   await phone.context.close();
   await seeded.owner.dispose();
@@ -306,46 +298,48 @@ test("the Calendar opens on today in the saved zone when the browser is in anoth
     width: 1280,
   });
 
-  await expect(page.getByRole("button", { name: /^Tuesday 17 November, 3 sent/u })).toBeVisible();
-  await expect(page.locator('[data-day="2026-11-18"]')).toHaveAttribute("aria-current", "date");
-  await expect(page.locator('[data-day="2026-11-18"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: /^Tuesday, November 17, 2026, 3 sent/u }),
+  ).toBeVisible();
+  await expect(page.locator('button[data-day="2026-11-18"]')).toHaveAttribute(
+    "aria-current",
+    "date",
+  );
+  await expect(page.locator('button[data-day="2026-11-18"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(
     page.getByRole("complementary", { name: "Day panel" }).getByRole("heading", { level: 2 }),
-  ).toContainText("Wednesday");
+  ).toContainText("Wed");
 
   await context.close();
   await seeded.owner.dispose();
 });
 
-test("on the phone the agenda lists the days and a tap opens the day sheet", async ({
+test("on the phone the grid and inline day panel show each day's items", async ({
   browser,
   isolatedAppServer,
 }) => {
   const seeded = await seedMonth(isolatedAppServer);
   const { context, page } = await openCalendar(browser, seeded, { width: 390 });
 
-  await expect(page.getByRole("complementary", { name: "Day panel" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Agenda" })).toBeVisible();
-  await expect(page.getByText("3 applications sent")).toBeVisible();
-  await expect(page.getByText("Halden Systems, Northwind Labs, Ferro Cloud")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
-  await page.getByRole("button", { name: "Tuesday 17 November, 3 sent" }).click();
+  await page.getByRole("button", { name: "Tuesday, November 17, 2026, 3 sent" }).click();
 
-  const sheet = page.getByRole("dialog");
+  const panel = page.getByRole("complementary", { name: "Day panel" });
 
-  await expect(sheet.getByRole("heading", { name: "Tuesday 17 November" })).toBeVisible();
-  await expect(sheet.getByRole("link")).toHaveCount(3);
-  await expect(sheet.getByRole("button", { name: "Close day panel" })).toBeFocused();
+  await expect(panel.getByRole("heading", { name: "Tue, Nov 17" })).toBeVisible();
+  await expect(panel.getByRole("link", { name: "View on Tracker" })).toHaveCount(3);
+  await expect(panel).toContainText("Halden Systems");
+  await expect(panel).toContainText("Northwind Labs");
+  await expect(panel).toContainText("Ferro Cloud");
   await expectNoHorizontalOverflow(page);
 
-  await page.keyboard.press("Escape");
-  await expect(sheet).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Tuesday 17 November, 3 sent" })).toBeFocused();
-
-  await page.getByRole("button", { name: "Monday 16 November, 1 sent" }).click();
-  await page.getByRole("button", { name: "Close day panel" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Monday, November 16, 2026, 1 sent" }).click();
+  await expect(panel.getByRole("heading", { name: "Mon, Nov 16" })).toBeVisible();
+  await expect(panel).toContainText("Quill Works");
 
   await context.close();
   await seeded.owner.dispose();
@@ -354,19 +348,19 @@ test("on the phone the agenda lists the days and a tap opens the day sheet", asy
 for (const dark of [false, true]) {
   const theme = dark ? "dark" : "light";
 
-  test(`the phone agenda passes axe and fits the screen in ${theme}`, async ({
+  test(`the phone Calendar passes axe and fits the screen in ${theme}`, async ({
     browser,
     isolatedAppServer,
   }) => {
     const seeded = await seedMonth(isolatedAppServer);
     const { context, page } = await openCalendar(browser, seeded, { dark, width: 390 });
 
-    await expect(page.getByRole("heading", { name: "Agenda" })).toBeVisible();
+    await expect(page.getByRole("grid")).toBeVisible();
     await expectNoHorizontalOverflow(page);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.screenshot({
       fullPage: true,
-      path: join(process.cwd(), `test/e2e/.tmp/calendar-agenda-390-${theme}.png`),
+      path: join(process.cwd(), `test/e2e/.tmp/calendar-phone-390-${theme}.png`),
     });
 
     await context.close();
@@ -374,7 +368,7 @@ for (const dark of [false, true]) {
   });
 }
 
-test("on the phone an empty month and an empty day say so, with no agenda", async ({
+test("on the phone an empty month and an empty day say so", async ({
   browser,
   isolatedAppServer,
 }) => {
@@ -388,15 +382,14 @@ test("on the phone an empty month and an empty day say so, with no agenda", asyn
   await expect(
     page.getByText("Nothing yet. Applications you send and replies from employers appear here."),
   ).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Agenda" })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 
-  await page.locator('[data-day="2026-12-01"]').click();
+  await page.locator('button[data-day="2026-12-01"]').click();
 
-  const sheet = page.getByRole("dialog");
+  const panel = page.getByRole("complementary", { name: "Day panel" });
 
-  await expect(sheet.getByRole("heading", { level: 2 })).toContainText("Tuesday");
-  await expect(sheet.getByText("Nothing on this day.")).toBeVisible();
+  await expect(panel.getByRole("heading", { level: 2 })).toContainText("Tue, Dec 1");
+  await expect(panel.getByText("Nothing on this day.")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
   await context.close();
@@ -431,7 +424,7 @@ test("the Calendar shows its busy state while a month loads and keeps the old gr
   await page.getByRole("button", { name: "Next month" }).click();
   await expect(section).toHaveAttribute("aria-busy", "true");
   gate.resolve(true);
-  await expect(page.getByRole("heading", { name: "December 2026" })).toBeVisible();
+  await expect(page.locator("#calendar-month")).toContainText("December 2026");
   await expect(section).toHaveAttribute("aria-busy", "false");
 
   await context.close();
@@ -469,8 +462,10 @@ test("when the Calendar does not load it says so, and Try again loads it", async
 
   failing = false;
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByRole("heading", { name: "November 2026" })).toBeVisible();
-  await expect(page.getByText("3 applications sent")).toBeVisible();
+  await expect(page.locator("#calendar-month")).toContainText("November 2026");
+  await expect(
+    page.getByRole("button", { name: "Tuesday, November 17, 2026, 3 sent" }),
+  ).toBeVisible();
 
   await context.close();
   await seeded.owner.dispose();
@@ -489,10 +484,8 @@ for (const width of [390, 768, 1280, 1920, 2560]) {
         width,
       });
 
-      await page.getByRole("button", { name: "Tuesday 17 November, 3 sent" }).click();
-      await expect(
-        page.getByRole("heading", { name: "Tuesday 17 November", level: 2 }),
-      ).toBeVisible();
+      await page.getByRole("button", { name: "Tuesday, November 17, 2026, 3 sent" }).click();
+      await expect(page.getByRole("heading", { name: "Tue, Nov 17", level: 2 })).toBeVisible();
 
       const results = await new AxeBuilder({ page }).analyze();
 

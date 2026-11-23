@@ -55,15 +55,27 @@ test("Ready sends only on approval, and Skip, Undo, Send all and Edit work", asy
 
   await page.goto(`${readyServer.url}/ready`);
   await expect(page.getByRole("heading", { level: 1, name: "Ready to send" })).toBeVisible();
-  await expect(page.getByText("2 ready · 1 approved")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Send all" }).getByText("2", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "applications ready to send" }),
+  ).toBeVisible();
+  await expect(page.getByText("1 scheduled")).toBeVisible();
 
-  const northwind = page.locator("article").filter({
-    has: page.getByRole("heading", { level: 2, name: "Northwind Labs" }),
+  const northwind = page
+    .locator('section[aria-label="Applications ready to send"] > section')
+    .filter({
+      has: page.getByRole("heading", { level: 2, name: "Platform Engineer" }),
+    });
+
+  const halden = page.locator('section[aria-label="Applications ready to send"] > section').filter({
+    has: page.getByRole("heading", { level: 2, name: "Site Reliability Engineer" }),
   });
 
-  const halden = page.locator("article").filter({
-    has: page.getByRole("heading", { level: 2, name: "Halden Systems" }),
-  });
+  const northwindScheduled = page
+    .locator('section[aria-label="Scheduled applications"] section')
+    .filter({ hasText: "Northwind Labs" });
 
   const before = await readyOf(request);
 
@@ -125,10 +137,11 @@ test("Ready sends only on approval, and Skip, Undo, Send all and Edit work", asy
       /\/api\/applications\/[^/]+\/approve$/u.test(candidate.url()),
   );
 
-  await northwind.getByRole("button", { name: "Send" }).click();
+  await northwind.getByRole("button", { name: "Send application" }).click();
+  await page.getByRole("button", { name: "Yes, send application" }).click();
   await approved;
-  await expect(northwind.getByText(/^Approved/u)).toBeVisible();
-  await expect(page.getByText("Approved. It sends in its slot.")).toBeVisible();
+  await expect(northwindScheduled.getByText(/^Approved/u)).toBeVisible();
+  await expect(page.getByText("Scheduled to send to Northwind Labs.")).toBeVisible();
 
   const afterSend = await readyOf(request);
 
@@ -140,9 +153,9 @@ test("Ready sends only on approval, and Skip, Undo, Send all and Edit work", asy
       candidate.request().method() === "POST" && candidate.url().includes("/unapprove"),
   );
 
-  await northwind.getByRole("button", { name: "Undo" }).click();
+  await northwindScheduled.getByRole("button", { name: "Undo" }).click();
   await undone;
-  await expect(northwind.getByRole("button", { name: "Send" })).toBeVisible();
+  await expect(northwind.getByRole("button", { name: "Send application" })).toBeVisible();
 
   const afterUndo = await readyOf(request);
 
@@ -154,9 +167,10 @@ test("Ready sends only on approval, and Skip, Undo, Send all and Edit work", asy
       candidate.request().method() === "POST" && candidate.url().endsWith("/api/ready/approve"),
   );
 
-  await page.getByRole("button", { name: "Send all" }).click();
+  await page.getByRole("button", { name: "Send all (1)" }).click();
+  await page.getByRole("button", { name: "Yes, send all (1)" }).click();
   await all;
-  await expect(northwind.getByText(/^Approved/u)).toBeVisible();
+  await expect(northwindScheduled.getByText(/^Approved/u)).toBeVisible();
 
   const afterAll = await readyOf(request);
 

@@ -124,7 +124,7 @@ test("test-only diffs select only the touched test and single-route UI edits sta
   expect(testOnlyPlan.shards).toHaveLength(1);
 
   const boardCardPlan = computePlan({
-    changed: ["src/web/components/board-card.tsx", "design/review/278/home-demo-1280-light.png"],
+    changed: ["src/web/components/tracker-card.tsx", "design/review/278/home-demo-1280-light.png"],
     isMain: false,
     shardCount: 6,
     map,

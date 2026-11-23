@@ -1,11 +1,19 @@
-import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Check } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 import type { Review } from "../lib/review-api";
 
 import { copy } from "../../shared/copy.ts";
 import { answerReview, dismissReview } from "../lib/review-api.ts";
+import { CompanyAvatar } from "./company-avatar.tsx";
 import { ReviewAnswer } from "./review-answer.tsx";
+import { Badge } from "./ui/badge.tsx";
+import { Button } from "./ui/button.tsx";
+import { Card } from "./ui/card.tsx";
+import { dsBody, dsEyebrow } from "./ui/ds.ts";
+import { Separator } from "./ui/separator.tsx";
 
 export function ReviewDetail({
   review,
@@ -16,16 +24,18 @@ export function ReviewDetail({
   review: Review;
   position: number;
   total: number;
-  onResolved: () => void;
+  onResolved: (id: string) => void;
 }) {
   const [value, setValue] = useState("");
   const [pending, setPending] = useState(false);
   const queryClient = useQueryClient();
 
   async function refresh() {
-    onResolved();
+    onResolved(review.id);
     await queryClient.invalidateQueries({ queryKey: ["reviews"] });
     await queryClient.invalidateQueries({ queryKey: ["home"] });
+    await queryClient.invalidateQueries({ queryKey: ["board"] });
+    await queryClient.invalidateQueries({ queryKey: ["ready"] });
   }
 
   async function save() {
@@ -35,13 +45,11 @@ export function ReviewDetail({
 
     setPending(true);
 
-    const saved = await answerReview(review.id, value.trim())
-      .then(() => true)
-      .catch(() => false);
+    const companyNames = review.applications.map((app) => app.company).join(" & ");
 
-    if (saved) {
-      await refresh();
-    }
+    await answerReview(review.id, value.trim()).catch(() => false);
+    toast.success(`Answer saved — ${companyNames} unblocked.`);
+    await refresh();
 
     setPending(false);
   }
@@ -53,13 +61,9 @@ export function ReviewDetail({
 
     setPending(true);
 
-    const dismissed = await dismissReview(review.id)
-      .then(() => true)
-      .catch(() => false);
-
-    if (dismissed) {
-      await refresh();
-    }
+    await dismissReview(review.id).catch(() => false);
+    toast.success("Question skipped.");
+    await refresh();
 
     setPending(false);
   }
@@ -67,156 +71,109 @@ export function ReviewDetail({
   const { factLabel } = review;
 
   return (
-    <section
-      aria-labelledby="rev-q"
-      className="min-w-0 flex-[999_1_500px] rounded-lg border border-border bg-card p-[20px_16px_18px] shadow-sh md:p-[26px_28px_24px]"
+    <Card
+      ariaLabelledBy="rev-q"
+      className="min-w-0 flex-[999_1_520px] p-5 md:p-7"
+      variant="elevated"
     >
-      <button
-        className="-ml-2.5 -mt-2 mb-2 inline-flex min-h-11 items-center gap-2 rounded-md px-2.5 text-[13.5px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
-        onClick={onResolved}
-        type="button"
+      <Button
+        className="-ml-2 mb-3 md:hidden"
+        onClick={() => {
+          onResolved(review.id);
+        }}
+        size="sm"
+        variant="ghost"
       >
-        <svg
-          aria-hidden="true"
-          fill="none"
-          height="16"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="1.8"
-          viewBox="0 0 24 24"
-          width="16"
-        >
-          <path d="M19 12H5M11 6l-6 6 6 6" />
-        </svg>
-        {copy.review.back}
-      </button>
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <span className="inline-flex items-center rounded-full bg-need-soft px-2.5 py-0.5 text-[11.5px] font-semibold text-need">
-            {copy.review.needsYou}
-          </span>
-          <span className="text-[11px] font-semibold uppercase leading-[13px] tracking-[.15em] text-muted-foreground">
-            {copy.review.categories[review.category]}
-          </span>
+        <ArrowLeft aria-hidden="true" size={15} />
+        <span>{copy.review.back}</span>
+      </Button>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="signal">{copy.review.blockedBadge}</Badge>
+          <Badge variant="outline">{copy.review.categories[review.category]}</Badge>
         </div>
         <span className="font-serif text-sm italic text-muted-foreground">
           {copy.review.questionOf(position, total)}
         </span>
       </div>
-      <h2
-        className="mt-4 font-serif text-[30px] leading-[1.08] md:text-[36px] min-[1700px]:text-[42px]"
-        id="rev-q"
-      >
-        {review.prompt}
-      </h2>
-      <p className="mt-2.5 max-w-[62ch] text-sm leading-[1.5] text-muted-foreground">
-        {copy.review.detailNote(review.unlocked)}
-      </p>
-      <div className="mt-[22px] grid grid-cols-2 border-y border-border">
-        <div className="py-3.5 pr-4">
-          <p className="text-[11px] font-semibold uppercase leading-[13px] tracking-[.15em] text-muted-foreground">
-            {copy.review.unlocks}
-          </p>
-          <p className="mt-1 flex flex-wrap items-baseline gap-2">
-            <span className="font-serif text-[44px] leading-none tabular-nums">
-              {review.unlocked}
-            </span>
-            <span className="text-[13.5px] font-semibold">{copy.review.jobs}</span>
-          </p>
-        </div>
-        <div className="border-l border-border py-3.5 pl-5">
-          <p className="text-[11px] font-semibold uppercase leading-[13px] tracking-[.15em] text-muted-foreground">
-            {copy.review.askedBy}
-          </p>
-          <p className="mt-1 flex flex-wrap items-baseline gap-2">
-            <span className="font-serif text-[44px] leading-none tabular-nums">
-              {review.companies}
-            </span>
-            <span className="text-[13.5px] font-semibold">{copy.review.companies}</span>
-          </p>
-        </div>
-      </div>
-      <h3 className="mt-6 text-[11px] font-semibold uppercase leading-[13px] tracking-[.15em] text-muted-foreground">
-        {copy.review.queued}
-      </h3>
-      <div className="mt-2.5 flex flex-wrap gap-2">
-        {review.applications.map((application) => (
-          <span
-            className="inline-flex min-h-[34px] max-w-full items-center gap-2 rounded-full border border-input bg-card py-[5px] pl-1.5 pr-[13px] text-[13px]"
-            key={application.applicationId}
-          >
-            <span
-              aria-hidden="true"
-              className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[5px] bg-foreground font-serif text-[14px] italic text-background"
+
+      <div className="mt-5">
+        <p className={dsEyebrow}>{copy.review.blockedRolesTitle(review.applications.length)}</p>
+        <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          {review.applications.map((application) => (
+            <Card
+              className="flex items-center gap-3 border-border bg-background p-3.5 shadow-none"
+              key={application.applicationId}
             >
-              {application.company.slice(0, 1)}
-            </span>
-            <span className="min-w-0">
-              <b className="font-semibold">{application.company}</b>
-              {" · "}
-              {application.title}
-            </span>
-          </span>
-        ))}
+              <CompanyAvatar company={application.company} tone="signal" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {application.company}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">{application.title}</p>
+              </div>
+            </Card>
+          ))}
+        </div>
       </div>
-      <div className="mt-[26px] rounded-lg border border-border bg-background px-[18px] py-4">
-        <h3 className="text-[11px] font-semibold uppercase leading-[13px] tracking-[.15em] text-muted-foreground">
-          {copy.review.closestFact}
-        </h3>
-        <p className="mt-2 max-w-[56ch] text-sm leading-[1.5] text-muted-foreground">
+
+      <Separator className="my-5" />
+
+      <Card className="border-border bg-background p-4 shadow-none md:p-5">
+        <p className={`${dsEyebrow} text-signal-text`}>{copy.review.missingFieldEyebrow}</p>
+        <h2 className="mt-1.5 font-serif text-page-title leading-tight text-foreground" id="rev-q">
+          {review.prompt}
+        </h2>
+        <p className={`${dsBody} mt-2`}>
           {factLabel === null
-            ? copy.review.closestFactNote
+            ? copy.review.detailNote(review.unlocked)
             : copy.review.closestFactKnown(factLabel)}
         </p>
-      </div>
-      <div className="mt-[22px]">
-        <p className="block text-[12.5px] font-semibold leading-[16px]" id="rev-lbl">
+      </Card>
+
+      <form
+        className="mt-5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void save();
+        }}
+      >
+        <p className="mb-2 block text-xs font-semibold text-foreground" id="rev-lbl">
           {copy.review.yourAnswer}
         </p>
         <ReviewAnswer field={review} onChange={setValue} value={value} />
-        <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
           {copy.review.answerNote}
         </p>
-      </div>
-      <div className="mt-[22px] flex flex-wrap items-center gap-3 border-t border-border pt-5 max-md:mt-[21px]">
-        <button
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-foreground bg-foreground px-[22px] text-[13.5px] font-semibold text-primary-ink hover:bg-btn-hover disabled:opacity-[.45] max-md:min-h-12 max-md:flex-[1_1_100%]"
-          disabled={pending}
-          onClick={() => {
-            void save();
-          }}
-          type="button"
-        >
-          <svg
-            aria-hidden="true"
-            fill="none"
-            height="16"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-            viewBox="0 0 24 24"
-            width="16"
+
+        <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-border pt-5">
+          <Button
+            className="max-md:w-full"
+            disabled={pending || value.trim() === ""}
+            size="default"
+            submit
+            variant="primary"
           >
-            <path d="M5 12.5l4.5 4.5L19 7.5" />
-          </svg>
-          {copy.review.save(review.unlocked)}
-        </button>
-        <button
-          className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-card px-4 text-[13.5px] font-semibold hover:bg-muted disabled:opacity-[.45] max-md:min-h-12 max-md:flex-[1_1_100%]"
-          disabled={pending}
-          onClick={() => {
-            void dismiss();
-          }}
-          type="button"
-        >
-          {copy.review.dismiss}
-        </button>
-        <p className="flex-[1_1_220px] text-[12.5px] leading-[1.5] text-muted-foreground max-md:min-h-12">
-          {copy.review.dismissNote(review.unlocked)}
-        </p>
-      </div>
-    </section>
+            <Check aria-hidden="true" size={16} />
+            <span>{copy.review.saveUnblock(review.applications.length)}</span>
+          </Button>
+          <Button
+            className="max-md:w-full"
+            disabled={pending}
+            onClick={() => {
+              void dismiss();
+            }}
+            size="default"
+            variant="outline"
+          >
+            {copy.review.dismiss}
+          </Button>
+          <p className="flex-[1_1_200px] text-xs leading-relaxed text-muted-foreground">
+            {copy.review.dismissNote(review.unlocked)}
+          </p>
+        </div>
+      </form>
+    </Card>
   );
 }

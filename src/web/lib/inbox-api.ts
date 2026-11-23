@@ -122,7 +122,11 @@ export function useMarkRead() {
   return useMutation({
     mutationFn: markRead,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["threads"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["threads"] }),
+        queryClient.invalidateQueries({ queryKey: ["nav"] }),
+        queryClient.invalidateQueries({ queryKey: ["home"] }),
+      ]);
     },
   });
 }
@@ -138,7 +142,7 @@ async function loadMailbox() {
 }
 
 export function useMailbox() {
-  return useQuery({ queryKey: ["mailbox"], queryFn: loadMailbox });
+  return useQuery({ queryKey: ["mailbox"], queryFn: loadMailbox, retry: false });
 }
 
 export function attachmentHref(id: string) {

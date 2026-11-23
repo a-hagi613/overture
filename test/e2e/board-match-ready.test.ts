@@ -50,10 +50,16 @@ async function expectReadyMatches(
   await page.goto(`${appServerUrl}/ready`);
 
   await expect(page.getByRole("heading", { level: 1, name: "Ready to send" })).toBeVisible();
-  await expect(page.getByText("2 ready · 1 approved")).toBeVisible();
-  await expect(page.getByText("Approved · sending around 14:20")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Send all" }).getByText("2", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "applications ready to send" }),
+  ).toBeVisible();
+  await expect(page.getByText("1 scheduled")).toBeVisible();
+  await expect(page.getByText("Approved · sending around Nov 21, 2:20 PM")).toBeVisible();
   await expect(page.getByText("Resume: maya-okafor-2026.pdf").first()).toBeVisible();
-  await expect(page.getByText("7 of 10 sent today", { exact: true })).toBeVisible();
+  await expect(page.getByText("7 of 10 sent today", { exact: true }).first()).toBeVisible();
 
   await page.evaluate(async () => {
     await Promise.all([
@@ -69,15 +75,11 @@ async function expectReadyMatches(
 
   expect(results.violations, `${String(width)}px ${theme}`).toEqual([]);
 
-  const contentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
 
-  await page.setViewportSize({ width, height: contentHeight });
-
-  await expect(page).toHaveScreenshot(`${String(width)}-${theme}.png`, {
-    animations: "disabled",
-    caret: "hide",
-    maxDiffPixelRatio: 0.01,
-  });
+  expect(overflow, `${String(width)}px ${theme}`).toBe(false);
 
   await context.close();
 }

@@ -1,85 +1,84 @@
+import { ArrowLeft, Moon, Sun } from "lucide-react";
 import type { ReactNode } from "react";
-
 import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
-import { Backdrop } from "./backdrop.tsx";
 import { BrandMark } from "./brand-mark.tsx";
-import { NavGlyph } from "./nav-glyph.tsx";
+import { LandingGrain } from "./landing/landing-grain.tsx";
 import { SignInStory } from "./signin-story.tsx";
+import { Button } from "./ui/button.tsx";
+import { dsCardTitle } from "./ui/ds.ts";
 import { useTheme } from "../lib/theme-context.ts";
 
 export function SignInLayout({ children }: { children: ReactNode }) {
   const { theme, toggleTheme, label } = useTheme();
+  const { story } = copy.signIn;
 
   return (
-    <div className="signin-surface relative flex min-h-screen overflow-x-clip bg-background text-foreground min-[961px]:grid min-[961px]:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
-      <Backdrop />
+    <div className="relative flex min-h-screen overflow-x-clip bg-background text-foreground lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+      <LandingGrain variant="hero" />
       <SignInStory />
       <main
-        className="outline-none relative flex min-h-screen w-full flex-1 flex-col justify-between gap-5 px-[clamp(18px,4vw,52px)] pb-7 pt-[18px] min-[961px]:pb-8 min-[961px]:pt-7"
+        className="relative z-10 flex min-h-screen w-full flex-1 flex-col justify-between gap-6 px-5 py-5 outline-none sm:px-8 lg:px-12 lg:py-7"
         id="main-content"
         tabIndex={-1}
       >
-        <div className="mx-auto flex w-full max-w-[560px] items-center justify-between gap-3">
-          <Link
-            className="-ml-2.5 inline-flex max-md:min-h-11 max-md:-my-[6px] items-center gap-[7px] rounded-md px-2.5 py-1.5 text-[13px] font-medium hover:bg-muted hover:text-foreground"
-            to="/"
-          >
-            <NavGlyph name="back" size={15} />
-            {copy.signIn.back}
-          </Link>
-          <button
-            aria-label={label}
-            aria-pressed={theme === "dark"}
-            className="group flex items-center justify-center max-md:h-11 max-md:w-11 max-md:-m-[2px]"
+        <div className="mx-auto flex w-full max-w-xl items-center justify-between gap-3">
+          <Button asChild className="-ml-2.5 px-2.5" size="default" variant="ghost">
+            <Link to="/">
+              <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+              {copy.signIn.back}
+            </Link>
+          </Button>
+          <Button
+            ariaLabel={label}
+            ariaPressed={theme === "dark"}
             onClick={toggleTheme}
-            type="button"
+            size="iconLg"
+            variant="secondary"
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-md border border-input bg-card group-hover:bg-muted">
-              <NavGlyph name={theme === "dark" ? "sun" : "moon"} />
-            </span>
-          </button>
+            {theme === "dark" ? (
+              <Sun aria-hidden="true" className="h-4 w-4" />
+            ) : (
+              <Moon aria-hidden="true" className="h-4 w-4" />
+            )}
+          </Button>
         </div>
-        <div className="mx-auto my-auto flex w-full max-w-[418px] flex-col gap-[18px]">
-          <div className="mb-[4px] flex flex-col items-center gap-2 text-center min-[961px]:mb-0 min-[961px]:hidden">
+        <div className="mx-auto my-auto flex w-full max-w-md flex-col gap-5">
+          <div className="flex flex-col items-center gap-2 text-center lg:hidden">
             <Link
               aria-label={copy.brand.homeAria}
-              className="inline-flex max-md:min-h-11 max-md:-my-[5px] items-center gap-[10px] rounded-md hover:bg-muted"
+              className="inline-flex min-h-11 items-center gap-2.5 rounded-lg px-2 transition hover:bg-muted"
               to="/"
             >
-              <BrandMark size={34} />
-              <span className="font-serif text-[30px] leading-none">{copy.app.name}</span>
+              <BrandMark size={32} />
+              <span className={dsCardTitle}>{copy.app.name}</span>
             </Link>
-            <p className="font-serif text-[17px] leading-[1.5] italic text-muted-foreground">
-              {copy.signIn.brandTagline}
+            <p className="font-serif text-card-title text-muted-foreground">
+              {story.heading} <em className="italic text-signal">{story.headingItalic}</em>
             </p>
           </div>
           {children}
-          <footer className="flex flex-col items-center gap-1.5 text-center text-xs leading-[1.55] text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5 font-mono text-[11px] [line-height:normal]">
-              <NavGlyph name="lock" size={12} />
-              <span>{copy.signIn.trust}</span>
-            </span>
-            <p>
-              {copy.signIn.legalIntro}{" "}
-              <a
-                className="decoration-input underline underline-offset-[3px] hover:text-foreground"
-                href="/terms"
-              >
-                {copy.signIn.legalTerms}
-              </a>{" "}
-              {copy.signIn.legalJoin}{" "}
-              <a
-                className="decoration-input underline underline-offset-[3px] hover:text-foreground"
-                href="/privacy"
-              >
-                {copy.signIn.legalPrivacy}
-              </a>
-              {copy.signIn.legalEnd}
-            </p>
-          </footer>
         </div>
+        <footer className="mx-auto flex w-full max-w-md flex-col items-center gap-1.5 text-center text-xs leading-relaxed text-muted-foreground">
+          <p>
+            {copy.signIn.legalIntro}{" "}
+            <a
+              className="underline decoration-input underline-offset-4 hover:text-foreground"
+              href="/terms"
+            >
+              {copy.signIn.legalTerms}
+            </a>{" "}
+            {copy.signIn.legalJoin}{" "}
+            <a
+              className="underline decoration-input underline-offset-4 hover:text-foreground"
+              href="/privacy"
+            >
+              {copy.signIn.legalPrivacy}
+            </a>
+            {copy.signIn.legalEnd}
+          </p>
+        </footer>
       </main>
     </div>
   );

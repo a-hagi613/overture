@@ -27,6 +27,13 @@ export const supportRequestSchema = z.object({
 
 export type SupportRequest = z.infer<typeof supportRequestSchema>;
 
+export const supportResponseSchema = z.object({
+  ok: z.literal(true),
+  referenceId: z.string(),
+});
+
+export type SupportResponse = z.infer<typeof supportResponseSchema>;
+
 /**
  * The Admin Portal's triage write: the ticket's new state and the owner's
  * internal note. The note is trimmed, so an empty note clears it.

@@ -1,3 +1,4 @@
+import { ArrowLeft, ArrowRight, Plus, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { Link } from "react-router";
 
@@ -7,10 +8,13 @@ import type { Seniority, Workplace } from "../../shared/tag-taxonomy.ts";
 import type { SkipCompany } from "../lib/profile-api.ts";
 
 import { copy } from "../../shared/copy.ts";
-import { NavGlyph } from "./nav-glyph.tsx";
 import { OnboardingTargetChip } from "./onboarding-target-chip.tsx";
 import { OnboardingTargetChipGroup } from "./onboarding-target-chip-group.tsx";
 import { SourceChip } from "./source-chip.tsx";
+import { Button } from "./ui/button.tsx";
+import { Card } from "./ui/card.tsx";
+import { dsBody, dsCardTitle, dsEyebrow, dsMetric } from "./ui/ds.ts";
+import { Input } from "./ui/input.tsx";
 
 const moneyFormat = new Intl.NumberFormat("en-US");
 
@@ -65,6 +69,7 @@ function floorFromInput(raw: string) {
 export function OnboardingTargetsCard({
   backTo = "/onboarding/facts",
   onContinue,
+  preview = false,
   save,
   saveSkip,
   skipCompanies,
@@ -72,6 +77,7 @@ export function OnboardingTargetsCard({
 }: {
   backTo?: string;
   onContinue: () => Promise<void> | void;
+  preview?: boolean;
   save: (targets: TargetsInput) => Promise<OnboardingTargetsView>;
   saveSkip: (companies: { name: string; domain: string | null }[]) => Promise<{
     companies: SkipCompany[];
@@ -107,6 +113,10 @@ export function OnboardingTargetsCard({
 
       return true;
     } catch {
+      if (preview) {
+        return true;
+      }
+
       setFailed(true);
 
       return false;
@@ -129,7 +139,9 @@ export function OnboardingTargetsCard({
       setCompanies(saved.companies);
       setFailed(false);
     } catch {
-      setFailed(true);
+      if (!preview) {
+        setFailed(true);
+      }
     }
   }
 
@@ -161,23 +173,13 @@ export function OnboardingTargetsCard({
   };
 
   return (
-    <section
-      aria-labelledby="ob-h"
-      className="obd rounded-lg border border-border bg-card shadow-sh"
-    >
-      <h2
-        className="serif"
-        id="ob-h"
-        style={{ fontSize: "clamp(28px, 4vw, 36px)", lineHeight: 1.1 }}
-      >
-        {copy.onboarding.wantTitlePlain}{" "}
-        <span className="italic">{copy.onboarding.wantTitleItalic}</span>
+    <Card ariaLabelledBy="ob-h" className="p-6 md:p-8" variant="elevated">
+      <h2 className={dsCardTitle} id="ob-h">
+        {`${copy.onboarding.wantTitlePlain} ${copy.onboarding.wantTitleItalic}`}
       </h2>
-      <p className="mt-2.5 max-w-[52ch] text-[14.5px] text-muted-foreground">
-        {copy.onboarding.wantIntro}
-      </p>
+      <p className={`${dsBody} mt-2 max-w-xl`}>{copy.onboarding.wantIntro}</p>
 
-      <div className="mt-6">
+      <div className="mt-6 space-y-6">
         <OnboardingTargetChipGroup
           headingId="w-roles"
           label={copy.onboarding.roles}
@@ -195,129 +197,120 @@ export function OnboardingTargetsCard({
             </OnboardingTargetChip>
           ))}
         </OnboardingTargetChipGroup>
-      </div>
 
-      <div className="mt-[26px]">
-        <OnboardingTargetChipGroup headingId="w-loc" label={copy.onboarding.cities}>
-          {locations.map((location) => (
-            <OnboardingTargetChip
-              key={location}
-              on={draft.locations.includes(location)}
-              onClick={() => {
-                void commit({ ...draft, locations: toggle(draft.locations, location) });
-              }}
-            >
-              {location}
-            </OnboardingTargetChip>
-          ))}
-        </OnboardingTargetChipGroup>
-        <form
-          className="mt-3 flex gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
+        <div>
+          <OnboardingTargetChipGroup headingId="w-loc" label={copy.onboarding.cities}>
+            {locations.map((location) => (
+              <OnboardingTargetChip
+                key={location}
+                on={draft.locations.includes(location)}
+                onClick={() => {
+                  void commit({ ...draft, locations: toggle(draft.locations, location) });
+                }}
+              >
+                {location}
+              </OnboardingTargetChip>
+            ))}
+          </OnboardingTargetChipGroup>
+          <form
+            className="mt-3 flex max-w-md gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
 
-            const location = newLocation.trim();
+              const location = newLocation.trim();
 
-            if (location !== "" && !draft.locations.includes(location)) {
-              void commit({ ...draft, locations: [...draft.locations, location] });
-            }
+              if (location !== "" && !draft.locations.includes(location)) {
+                void commit({ ...draft, locations: [...draft.locations, location] });
+              }
 
-            setNewLocation("");
-          }}
-        >
-          <input
-            aria-label={copy.onboarding.addLocationPlaceholder}
-            className="inp"
-            onChange={(event) => {
-              setNewLocation(event.currentTarget.value);
+              setNewLocation("");
             }}
-            placeholder={copy.onboarding.addLocationPlaceholder}
-            style={{ flex: 1, minWidth: 0 }}
-            value={newLocation}
-          />
-          <button className="btn2" style={{ minHeight: 40 }} type="submit">
-            {copy.onboarding.add}
-          </button>
-        </form>
-      </div>
-
-      <div className="mt-[26px] grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-[18px]">
-        <OnboardingTargetChipGroup headingId="w-work" label={copy.onboarding.workplace}>
-          {workplaces.map((workplace) => (
-            <OnboardingTargetChip
-              key={workplace}
-              on={draft.workplaces.includes(workplace)}
-              onClick={() => {
-                void commit({ ...draft, workplaces: toggle(draft.workplaces, workplace) });
+          >
+            <Input
+              ariaLabel={copy.onboarding.addLocationPlaceholder}
+              onChange={(event) => {
+                setNewLocation(event.currentTarget.value);
               }}
-            >
-              {workplaceLabels[workplace]}
-            </OnboardingTargetChip>
-          ))}
-        </OnboardingTargetChipGroup>
-        <OnboardingTargetChipGroup headingId="w-sen" label={copy.onboarding.seniority}>
-          {seniorities.map((seniority) => (
-            <OnboardingTargetChip
-              key={seniority}
-              on={draft.seniorities.includes(seniority)}
-              onClick={() => {
-                void commit({ ...draft, seniorities: toggle(draft.seniorities, seniority) });
-              }}
-            >
-              {seniorityLabels[seniority]}
-            </OnboardingTargetChip>
-          ))}
-        </OnboardingTargetChipGroup>
-      </div>
-
-      <div className="mt-[26px]">
-        <label className="lbl" htmlFor="w-sal">
-          {copy.onboarding.salaryFloor}
-        </label>
-        <div className="flex max-w-[320px] items-center gap-2.5">
-          <input
-            className="inp num"
-            id="w-sal"
-            inputMode="numeric"
-            onBlur={(event) => {
-              commitSalary(event.currentTarget.value);
-            }}
-            onChange={(event) => {
-              setSalary(event.currentTarget.value);
-            }}
-            style={{ flex: 1, minWidth: 0 }}
-            value={salary}
-          />
-          <span className="flex-none text-[13px] text-muted-foreground">
-            {copy.onboarding.salaryFloorUnit}
-          </span>
+              placeholder={copy.onboarding.addLocationPlaceholder}
+              value={newLocation}
+            />
+            <Button size="default" submit variant="secondary">
+              <Plus aria-hidden="true" size={14} />
+              <span>{copy.onboarding.add}</span>
+            </Button>
+          </form>
         </div>
-        <p className="hint mt-1.5">{copy.onboarding.salaryFloorNote}</p>
-      </div>
 
-      <div className="mt-[26px]">
-        <label className="lbl" htmlFor="w-skip">
-          {copy.onboarding.companiesToSkip}
-        </label>
-        {companies.length === 0 ? null : (
-          <div className="mb-2 flex flex-wrap gap-2">
-            {currentEmployer === undefined ? null : (
-              <span className="inline-flex min-h-9 items-center gap-0.5 rounded-full border border-input bg-card px-[13px] text-[13px] font-semibold max-[767px]:min-h-11">
-                {currentEmployer.name}
-                <span className="ml-2">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <OnboardingTargetChipGroup headingId="w-work" label={copy.onboarding.workplace}>
+            {workplaces.map((workplace) => (
+              <OnboardingTargetChip
+                key={workplace}
+                on={draft.workplaces.includes(workplace)}
+                onClick={() => {
+                  void commit({ ...draft, workplaces: toggle(draft.workplaces, workplace) });
+                }}
+              >
+                {workplaceLabels[workplace]}
+              </OnboardingTargetChip>
+            ))}
+          </OnboardingTargetChipGroup>
+          <OnboardingTargetChipGroup headingId="w-sen" label={copy.onboarding.seniority}>
+            {seniorities.map((seniority) => (
+              <OnboardingTargetChip
+                key={seniority}
+                on={draft.seniorities.includes(seniority)}
+                onClick={() => {
+                  void commit({ ...draft, seniorities: toggle(draft.seniorities, seniority) });
+                }}
+              >
+                {seniorityLabels[seniority]}
+              </OnboardingTargetChip>
+            ))}
+          </OnboardingTargetChipGroup>
+        </div>
+
+        <div>
+          <label className={`${dsEyebrow} mb-2 block`} htmlFor="w-sal">
+            {copy.onboarding.salaryFloor}
+          </label>
+          <div className="flex max-w-xs items-center gap-2.5">
+            <Input
+              className="tabular-nums"
+              id="w-sal"
+              inputMode="numeric"
+              onBlur={(event) => {
+                commitSalary(event.currentTarget.value);
+              }}
+              onChange={(event) => {
+                setSalary(event.currentTarget.value);
+              }}
+              value={salary}
+            />
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {copy.onboarding.salaryFloorUnit}
+            </span>
+          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">{copy.onboarding.salaryFloorNote}</p>
+        </div>
+
+        <div>
+          <label className={`${dsEyebrow} mb-2 block`} htmlFor="w-skip">
+            {copy.onboarding.companiesToSkip}
+          </label>
+          {companies.length === 0 ? null : (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {currentEmployer === undefined ? null : (
+                <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-border bg-muted px-3.5 text-xs font-semibold text-foreground">
+                  <span>{currentEmployer.name}</span>
                   <SourceChip variant="dashed">{copy.profile.skipList.currentEmployer}</SourceChip>
                 </span>
-              </span>
-            )}
-            {userCompanies.map((company) => (
-              <span
-                className="inline-flex min-h-9 items-center gap-0.5 rounded-full border border-input bg-card py-0 pr-1 pl-[13px] text-[13px] font-semibold leading-[normal] max-[767px]:min-h-11"
-                key={company.id}
-              >
-                {company.name}
-                <button
-                  aria-label={copy.profile.facts.remove(company.name)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground max-[767px]:h-9 max-[767px]:w-9"
+              )}
+              {userCompanies.map((company) => (
+                <Button
+                  ariaLabel={copy.profile.facts.remove(company.name)}
+                  className="rounded-full"
+                  key={company.id}
                   onClick={() => {
                     void persistCompanies(
                       userCompanies
@@ -325,86 +318,82 @@ export function OnboardingTargetsCard({
                         .map((candidate) => candidate.name),
                     );
                   }}
-                  type="button"
+                  size="sm"
+                  variant="outline"
                 >
-                  <svg
-                    aria-hidden="true"
-                    fill="none"
-                    height="14"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.8"
-                    viewBox="0 0 24 24"
-                    width="14"
-                  >
-                    <path d="M6 6l12 12M18 6L6 18" />
-                  </svg>
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-        <form
-          className="flex max-w-[520px] gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            addCompany();
-          }}
-        >
-          <input
-            aria-label={copy.onboarding.addCompanyPlaceholder}
-            className="inp"
-            id="w-skip"
-            onChange={(event) => {
-              setNewCompany(event.currentTarget.value);
+                  <span>{company.name}</span>
+                  <X aria-hidden="true" size={13} />
+                </Button>
+              ))}
+            </div>
+          )}
+          <form
+            className="flex max-w-md gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              addCompany();
             }}
-            placeholder={copy.onboarding.addCompanyPlaceholder}
-            style={{ flex: 1, minWidth: 0 }}
-            value={newCompany}
-          />
-          <button className="btn2" style={{ minHeight: 40 }} type="submit">
-            {copy.onboarding.add}
-          </button>
-        </form>
-        <p className="hint mt-1.5">{copy.onboarding.companiesToSkipNote}</p>
+          >
+            <Input
+              ariaLabel={copy.onboarding.addCompanyPlaceholder}
+              id="w-skip"
+              onChange={(event) => {
+                setNewCompany(event.currentTarget.value);
+              }}
+              placeholder={copy.onboarding.addCompanyPlaceholder}
+              value={newCompany}
+            />
+            <Button size="default" submit variant="secondary">
+              <Plus aria-hidden="true" size={14} />
+              <span>{copy.onboarding.add}</span>
+            </Button>
+          </form>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {copy.onboarding.companiesToSkipNote}
+          </p>
+        </div>
+
+        <output
+          aria-live="polite"
+          className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-muted p-4"
+        >
+          <span
+            className={`${dsMetric} text-signal-text tabular-nums`}
+            data-testid="targets-match-count"
+          >
+            {String(matched)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-foreground">{copy.onboarding.matchedLabel}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{copy.onboarding.matchedNote}</p>
+          </div>
+        </output>
       </div>
 
-      <output
-        aria-live="polite"
-        className="mt-7 block rounded-[10px] border border-input bg-background px-5 pt-5 pb-[18px]"
-      >
-        <span className="flex flex-wrap items-baseline gap-3">
-          <span className="serif num text-[52px] leading-none" data-testid="targets-match-count">
-            {matched}
-          </span>
-          <span className="text-[14.5px] font-semibold">{copy.onboarding.matchedLabel}</span>
-        </span>
-        <span className="hint mt-1 block">{copy.onboarding.matchedNote}</span>
-      </output>
-
       {failed ? (
-        <p className="hint mt-4 text-[color:var(--need)]" role="alert">
+        <p className="mt-4 text-xs font-semibold text-need" role="alert">
           {copy.onboarding.saveFailed}
         </p>
       ) : null}
 
-      <div className="ftr mt-7 flex items-center justify-between gap-3 border-t border-border pt-5">
-        <Link className="btng" style={{ minHeight: 44 }} to={backTo}>
-          <NavGlyph name="back" size={16} />
-          {copy.onboarding.back}
-        </Link>
-        <button
-          className="btn"
+      <div className="mt-7 flex items-center justify-between gap-3 border-t border-border pt-5">
+        <Button asChild size="default" variant="ghost">
+          <Link to={backTo}>
+            <ArrowLeft aria-hidden="true" size={15} />
+            <span>{copy.onboarding.back}</span>
+          </Link>
+        </Button>
+        <Button
           onClick={() => {
             void continueOn();
           }}
-          style={{ minHeight: 48, padding: "0 26px" }}
-          type="button"
+          size="lg"
+          variant="primary"
         >
-          {copy.onboarding.continue} <NavGlyph name="forward" size={16} />
-        </button>
+          <span>{copy.onboarding.continue}</span>
+          <ArrowRight aria-hidden="true" size={16} />
+        </Button>
       </div>
-    </section>
+    </Card>
   );
 }

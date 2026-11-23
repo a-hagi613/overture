@@ -11,11 +11,13 @@ export function OnboardingFilterStep({
     <li className="flex items-start gap-3">
       <span
         aria-hidden="true"
-        className="mono flex size-[26px] flex-none items-center justify-center rounded-full border-[1.5px] border-input text-[12px]"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-input bg-background font-mono text-xs font-semibold text-foreground"
       >
-        {position}
+        {String(position)}
       </span>
-      <div className="min-w-0 flex-1 pt-[3px] text-[14px]">{children}</div>
+      <div className="min-w-0 flex-1 pt-0.5 text-sm leading-relaxed text-foreground">
+        {children}
+      </div>
     </li>
   );
 }

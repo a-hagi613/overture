@@ -1,23 +1,51 @@
+import {
+  Bell,
+  Calendar,
+  CircleHelp,
+  Home,
+  Inbox,
+  MessageCircle,
+  Send,
+  SquareKanban,
+} from "lucide-react";
 import { NavLink } from "react-router";
 
-import type { NavCounts } from "../lib/nav-api.ts";
+import type { NavCounts, NavKey } from "../lib/nav-api.ts";
 
 import { copy } from "../../shared/copy.ts";
-import { NavGlyph } from "./nav-glyph.tsx";
-import { SettingsMenu } from "./settings-menu.tsx";
 import { NAV_DESTINATIONS, navBadgeClass, navBadgeCount, navLabel } from "../lib/nav-api.ts";
+import { SidebarProfileMenu } from "./sidebar-profile-menu.tsx";
+import { Badge } from "./ui/badge.tsx";
 
-export function SideNav({ counts, showLabels }: { counts: NavCounts; showLabels: boolean }) {
+const NAV_ICONS: Record<Exclude<NavKey, "profile" | "support">, typeof Home> = {
+  board: SquareKanban,
+  calendar: Calendar,
+  home: Home,
+  inbox: Inbox,
+  ready: Send,
+  review: CircleHelp,
+};
+
+export function SideNav({
+  counts,
+  showLabels,
+  unreadNotifications = 0,
+}: {
+  counts: NavCounts;
+  showLabels: boolean;
+  unreadNotifications?: number;
+}) {
   return (
-    <nav aria-label={copy.nav.label} className="flex w-full flex-col gap-[3px]">
+    <nav aria-label={copy.nav.label} className="flex w-full flex-col gap-0.5">
       {NAV_DESTINATIONS.map((destination) => {
         const count = navBadgeCount(counts, destination.glyph);
+        const Icon = NAV_ICONS[destination.glyph];
 
         return (
-          <NavLink key={destination.to} to={destination.to} end={destination.to === "/"}>
+          <NavLink end={destination.to === "/home"} key={destination.to} to={destination.to}>
             {({ isActive }) => (
               <span
-                className={`relative flex min-h-10 items-center gap-3 rounded-md border px-3 text-sm font-medium leading-[21px] ${
+                className={`relative flex min-h-11 items-center gap-3.5 rounded-md border px-3 text-base font-medium transition ${
                   isActive
                     ? "border-border bg-card text-foreground shadow-sh"
                     : "border-transparent text-foreground hover:bg-muted"
@@ -27,10 +55,10 @@ export function SideNav({ counts, showLabels }: { counts: NavCounts; showLabels:
                 {isActive ? (
                   <span
                     aria-hidden="true"
-                    className="absolute -left-px bottom-[9px] top-[9px] w-[3px] rounded-[2px] bg-signal"
+                    className="absolute -left-px bottom-2 top-2 w-0.5 rounded-full bg-signal"
                   />
                 ) : null}
-                <NavGlyph name={destination.glyph} />
+                <Icon aria-hidden="true" className="shrink-0" size={20} />
                 {showLabels ? (
                   <span aria-hidden="true" className="whitespace-nowrap">
                     {copy.nav[destination.glyph]}
@@ -41,11 +69,11 @@ export function SideNav({ counts, showLabels }: { counts: NavCounts; showLabels:
                     aria-hidden="true"
                     className={`${
                       showLabels
-                        ? "ml-auto inline-flex min-w-[20px] px-1.5"
-                        : "absolute right-1 top-[2px] inline-flex min-w-4 px-1"
+                        ? "ml-auto inline-flex min-w-5 px-1.5"
+                        : "absolute right-1 top-0.5 inline-flex min-w-4 px-1"
                     } ${navBadgeClass(
                       destination.glyph,
-                    )} ${showLabels ? "h-5 text-[11.5px]" : "h-4 text-[10px]"} items-center justify-center rounded-full font-bold`}
+                    )} h-5 items-center justify-center rounded-full text-xs font-semibold tabular-nums`}
                     data-nav-badge={destination.glyph}
                   >
                     {count}
@@ -56,7 +84,65 @@ export function SideNav({ counts, showLabels }: { counts: NavCounts; showLabels:
           </NavLink>
         );
       })}
-      <SettingsMenu showLabels={showLabels} />
+      <SidebarProfileMenu wide={showLabels} />
+      <NavLink to="/support">
+        {({ isActive }) => (
+          <span
+            className={`relative flex min-h-11 items-center gap-3.5 rounded-md border px-3 text-base font-medium transition ${
+              isActive
+                ? "border-border bg-card text-foreground shadow-sh"
+                : "border-transparent text-foreground hover:bg-muted"
+            } ${showLabels ? "" : "justify-center"}`}
+          >
+            {isActive ? (
+              <span
+                aria-hidden="true"
+                className="absolute -left-px bottom-2 top-2 w-0.5 rounded-full bg-signal"
+              />
+            ) : null}
+            <MessageCircle aria-hidden="true" className="shrink-0" size={20} />
+            {showLabels ? (
+              <span className="whitespace-nowrap">{copy.nav.support}</span>
+            ) : (
+              <span className="sr-only">{copy.nav.support}</span>
+            )}
+          </span>
+        )}
+      </NavLink>
+      <NavLink to="/notifications">
+        {({ isActive }) => (
+          <span
+            className={`relative flex min-h-11 items-center gap-3.5 rounded-md border px-3 text-base font-medium transition ${
+              isActive
+                ? "border-border bg-card text-foreground shadow-sh"
+                : "border-transparent text-foreground hover:bg-muted"
+            } ${showLabels ? "" : "justify-center"}`}
+          >
+            <span className="sr-only">
+              {unreadNotifications > 0
+                ? copy.shell.notifications(unreadNotifications)
+                : copy.shell.notificationsEmpty}
+            </span>
+            {isActive ? (
+              <span
+                aria-hidden="true"
+                className="absolute -left-px bottom-2 top-2 w-0.5 rounded-full bg-signal"
+              />
+            ) : null}
+            <Bell aria-hidden="true" className="shrink-0" size={20} />
+            {showLabels ? (
+              <span aria-hidden="true" className="whitespace-nowrap">
+                {copy.shell.notificationsEmpty}
+              </span>
+            ) : null}
+            {unreadNotifications > 0 ? (
+              <Badge ariaHidden className="ml-auto tabular-nums" variant="signal">
+                {unreadNotifications}
+              </Badge>
+            ) : null}
+          </span>
+        )}
+      </NavLink>
     </nav>
   );
 }

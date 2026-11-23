@@ -647,16 +647,18 @@ function shellForRoute(urlPath: string) {
   }
 
   if (
-    urlPath === "/" ||
     urlPath === "*" ||
+    urlPath === "/home" ||
     urlPath === "/ready" ||
     urlPath === "/board" ||
     urlPath === "/review" ||
+    urlPath === "/calendar" ||
     urlPath === "/inbox" ||
+    urlPath === "/inbox/:id" ||
     urlPath === "/notifications" ||
     urlPath === "/profile" ||
-    urlPath === "/search" ||
-    urlPath === "/settings"
+    urlPath.startsWith("/profile/") ||
+    urlPath === "/support"
   ) {
     return "app" as const;
   }

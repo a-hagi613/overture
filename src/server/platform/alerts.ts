@@ -57,7 +57,7 @@ function notifyOwners(
       kind: "alert",
       title: `Overture alert: ${kind}`,
       body,
-      url: "/",
+      url: "/home",
     });
   }
 }

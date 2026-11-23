@@ -120,6 +120,10 @@ export function providerName(provider: string) {
       return "Ashby";
     }
 
+    case "browser_use": {
+      return "Overture Auto-Apply";
+    }
+
     case "greenhouse": {
       return "Greenhouse";
     }

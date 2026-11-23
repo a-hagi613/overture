@@ -15,12 +15,13 @@ import { HomeBillingNotice } from "../components/home-billing-notice.tsx";
 import { HomeChart } from "../components/home-chart.tsx";
 import { HomeCheckIn } from "../components/home-checkin.tsx";
 import { HomeCodeWait } from "../components/home-code-wait.tsx";
+import { HomeControlBand } from "../components/home-control-band.tsx";
 import { HomeInbox } from "../components/home-inbox.tsx";
-import { HomeKpis } from "../components/home-kpis.tsx";
 import { HomeNeedsYou } from "../components/home-needs-you.tsx";
 import { HomePauseBanner } from "../components/home-pause-banner.tsx";
 import { HomeQueue } from "../components/home-queue.tsx";
 import { HomeReadyCard } from "../components/home-ready-card.tsx";
+import { HomeSchedule } from "../components/home-schedule.tsx";
 import { HomeStrengthen } from "../components/home-strengthen.tsx";
 import { PageHeader } from "../components/page-header.tsx";
 
@@ -30,27 +31,45 @@ interface OpenSheet {
   wait: CodeWait;
 }
 
-const RANGE_KEYS: readonly HomeRangeKey[] = ["7D", "30D", "90D"];
-
-const DAYS: Record<HomeRangeKey, number> = { "7D": 7, "30D": 30, "90D": 90 };
-
-const RANGE_LABELS: Record<HomeRangeKey, string> = {
-  "7D": copy.home.ranges.d7,
-  "30D": copy.home.ranges.d30,
-  "90D": copy.home.ranges.d90,
-};
-
-function dateLine() {
+function dateLine(zone: string | undefined) {
   const now = new Date();
 
-  const weekday = now.toLocaleDateString(copy.home.dateLocale, { weekday: "long" });
-  const month = now.toLocaleDateString(copy.home.dateLocale, { month: "long" });
+  try {
+    const timeZone = zone === undefined ? undefined : { timeZone: zone };
+    const weekday = now.toLocaleDateString(copy.home.dateLocale, { ...timeZone, weekday: "long" });
+    const month = now.toLocaleDateString(copy.home.dateLocale, { ...timeZone, month: "long" });
+    const day = now.toLocaleDateString(copy.home.dateLocale, { ...timeZone, day: "numeric" });
 
-  return `${weekday}, ${String(now.getDate())} ${month}`;
+    return `${weekday}, ${month} ${day}`;
+  } catch {
+    const weekday = now.toLocaleDateString(copy.home.dateLocale, { weekday: "long" });
+    const month = now.toLocaleDateString(copy.home.dateLocale, { month: "long" });
+
+    return `${weekday}, ${month} ${String(now.getDate())}`;
+  }
 }
 
-function greetingWord() {
-  const hour = new Date().getHours();
+function greetingWord(zone: string | undefined) {
+  const now = new Date();
+  let hour = now.getHours();
+
+  if (zone !== undefined) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        hour12: false,
+        timeZone: zone,
+      }).formatToParts(now);
+
+      const formattedHour = Number(parts.find((part) => part.type === "hour")?.value);
+
+      if (!Number.isNaN(formattedHour)) {
+        hour = formattedHour % 24;
+      }
+    } catch {
+      hour = now.getHours();
+    }
+  }
 
   if (hour < 12) {
     return copy.home.greetingMorning;
@@ -145,18 +164,21 @@ export function HomePage() {
   return (
     <div>
       <PageHeader
-        calendar
-        lead={dateLine()}
+        lead={dateLine(home?.timeZone)}
         titleNode={
           <>
-            {greetingWord()}{" "}
-            <span className="italic">{`${firstName === "" ? copy.app.name : firstName}.`}</span>
+            {greetingWord(home?.timeZone)}{" "}
+            <em className="italic text-signal">{`${firstName === "" ? copy.app.name : firstName}.`}</em>
           </>
         }
       />
-      {home?.pauseReason === null || home?.pauseReason === undefined ? null : (
+
+      {home?.pauseReason === null ||
+      home?.pauseReason === undefined ||
+      home.pauseReason === "user" ? null : (
         <HomePauseBanner reason={home.pauseReason} />
       )}
+
       {wait === null || !asked ? null : (
         <HomeCodeWait
           onNoCode={() => {
@@ -169,54 +191,31 @@ export function HomePage() {
           wait={wait}
         />
       )}
-      {paused || home === undefined ? null : (
-        <HomeBillingNotice
-          applicationsLeft={home.applicationsLeft}
-          endingGrant={home.endingGrant}
-          planApplications={home.planApplications}
-        />
+
+      {home === undefined ? null : (
+        <>
+          <HomeBillingNotice
+            applicationsLeft={home.applicationsLeft}
+            endingGrant={home.endingGrant}
+            planApplications={home.planApplications}
+          />
+          <HomeControlBand home={home} />
+        </>
       )}
-      {paused || home === undefined ? null : <HomeReadyCard ready={home.ready} />}
-      <div className="mt-[30px] flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-serif text-[26px] leading-[1.5]">{copy.home.daySoFar}</h2>
-        <fieldset
-          aria-label={copy.home.rangeLabel}
-          className="m-0 inline-flex min-w-0 gap-0.5 rounded-lg border border-border bg-muted p-[3px]"
-        >
-          {RANGE_KEYS.map((key) => (
-            <button
-              aria-pressed={key === rangeKey}
-              className="group inline-flex max-md:min-h-11 max-md:-my-[5px] items-center"
-              key={key}
-              onClick={() => {
-                setRangeKey(key);
-              }}
-              type="button"
-            >
-              <span
-                className={`inline-flex min-h-[34px] items-center rounded-[5px] px-[15px] text-[12.5px] font-semibold ${
-                  key === rangeKey
-                    ? "bg-card text-foreground shadow-sh"
-                    : "text-muted-foreground group-hover:text-foreground"
-                }`}
-              >
-                {RANGE_LABELS[key]}
-              </span>
-            </button>
-          ))}
-        </fieldset>
-      </div>
+
       {home === undefined || range === null ? null : (
         <>
-          <HomeKpis days={DAYS[rangeKey]} home={home} paused={paused} range={range} />
-          <div className="mt-5 flex flex-wrap items-stretch gap-5">
-            <HomeChart range={range} rangeKey={rangeKey} />
+          <HomeChart onRangeChange={setRangeKey} range={range} rangeKey={rangeKey} />
+
+          <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <HomeReadyCard readyCount={home.ready.ready} />
             <HomeNeedsYou
               applications={home.reviews.applications}
               reviews={home.reviews.list}
               total={home.reviews.total}
             />
           </div>
+
           {paused || home.checkIns.length > 0 ? (
             <div className="mt-5 flex flex-wrap items-stretch gap-5">
               {paused ? (
@@ -229,6 +228,7 @@ export function HomePage() {
               {home.checkIns.length > 0 ? <HomeCheckIn checkIns={home.checkIns} /> : null}
             </div>
           ) : null}
+
           {paused ? (
             <>
               <HomeActivity
@@ -242,9 +242,14 @@ export function HomePage() {
               )}
             </>
           ) : null}
-          <HomeInbox now={home.now} rows={home.recentInbox} zone={home.timeZone} />
+
+          <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <HomeInbox now={home.now} rows={home.recentInbox} zone={home.timeZone} />
+            <HomeSchedule now={home.now} zone={home.timeZone} />
+          </div>
         </>
       )}
+
       {sheet === null ? null : (
         <CodePasteSheet
           error={sheet.error}

@@ -1,8 +1,14 @@
+import { AlertTriangle, CheckCircle2, Download, Paperclip } from "lucide-react";
+
 import type { InboxMessage } from "../lib/inbox-api.ts";
 
 import { copy } from "../../shared/copy.ts";
 import { attachmentHref } from "../lib/inbox-api.ts";
 import { messageStamp } from "../lib/inbox-time.ts";
+import { Badge } from "./ui/badge.tsx";
+import { Button } from "./ui/button.tsx";
+import { Card } from "./ui/card.tsx";
+import { dsEyebrow, dsMono } from "./ui/ds.ts";
 
 function fileSize(bytes: number) {
   if (bytes < 1024) {
@@ -42,60 +48,77 @@ export function InboxMessageBlock(props: {
 
   return (
     <div className={first ? "" : "mt-6 border-t border-border pt-6"}>
-      {first ? null : (
-        <div className="min-w-0">
-          <p className="text-[13px] font-semibold">{message.subject}</p>
-        </div>
-      )}
-      {message.auth === "pass" ? null : (
-        <div
-          className="mt-[18px] rounded-lg border border-need bg-need-soft px-4 py-3.5"
-          role="note"
-        >
-          <p className="text-[14px] leading-[21px] font-bold text-need">
-            {copy.inbox.unverifiedTitle}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="truncate text-sm font-semibold text-foreground">
+            {senderName(message.from)}
           </p>
-          <p className="mt-1 text-[13.5px] text-foreground">{copy.inbox.unverifiedNote}</p>
+          {message.auth === "pass" ? (
+            <CheckCircle2 aria-hidden="true" className="shrink-0 text-ok" size={14} />
+          ) : (
+            <Badge variant="need">{copy.inbox.unverifiedLabel}</Badge>
+          )}
         </div>
+        <span className={dsMono}>{messageStamp(message.createdAt, now, zone)}</span>
+      </div>
+
+      {first ? null : (
+        <p className="mt-1 text-xs font-medium text-muted-foreground">{message.subject}</p>
       )}
-      <p className="mt-4 break-words font-mono text-xs leading-[1.5] text-muted-foreground">
-        {copy.inbox.fromLine(
-          senderName(message.from),
-          messageStamp(message.createdAt, now, zone),
-          message.auth === "pass",
-        )}
-      </p>
-      <div className="mt-3.5 flex flex-col gap-3 text-[14.5px] leading-[1.6]">
+
+      {message.auth === "pass" ? null : (
+        <Card className="mt-3.5 border-need bg-need-soft p-3.5 shadow-none">
+          <div className="flex items-start gap-2.5" role="note">
+            <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0 text-need" size={16} />
+            <div>
+              <p className="text-xs font-semibold text-need">{copy.inbox.unverifiedTitle}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-foreground">
+                {copy.inbox.unverifiedNote}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <div className="mt-4 flex flex-col gap-3 text-sm leading-relaxed text-foreground">
         {paragraphsOf(message.text).map((paragraph, index) => (
           <p className="whitespace-pre-line" key={`${message.id}-${String(index)}`}>
             {paragraph}
           </p>
         ))}
       </div>
+
       {message.attachments.length === 0 ? null : (
-        <div className="mt-[22px] border-t border-border pt-4">
-          <p className="text-[11px] leading-[13px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
-            {copy.inbox.attachments(message.attachments.length)}
-          </p>
-          <div className="mt-2.5 flex flex-col gap-3">
+        <div className="mt-5 border-t border-border pt-4">
+          <p className={dsEyebrow}>{copy.inbox.attachments(message.attachments.length)}</p>
+          <div className="mt-2.5 flex flex-col gap-2">
             {message.attachments.map((attachment) => (
-              <div
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-input bg-background px-3.5 py-3"
+              <Card
+                className="flex flex-wrap items-center justify-between gap-3 bg-background p-3 shadow-none"
                 key={attachment.id}
               >
-                <div className="min-w-0">
-                  <p className="break-words font-mono text-[13.5px]">{attachment.filename}</p>
-                  <p className="text-[12.5px] text-muted-foreground">
-                    {`${formatOf(attachment.mime)} · ${fileSize(attachment.bytes)}`}
-                  </p>
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <Paperclip
+                    aria-hidden="true"
+                    className="shrink-0 text-muted-foreground"
+                    size={15}
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-xs font-medium text-foreground">
+                      {attachment.filename}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {`${formatOf(attachment.mime)} · ${fileSize(attachment.bytes)}`}
+                    </p>
+                  </div>
                 </div>
-                <a
-                  className="inline-flex min-h-9 items-center justify-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold hover:bg-muted"
-                  href={attachmentHref(attachment.id)}
-                >
-                  {copy.inbox.download}
-                </a>
-              </div>
+                <Button asChild size="sm" variant="outline">
+                  <a href={attachmentHref(attachment.id)}>
+                    <Download aria-hidden="true" size={14} />
+                    <span>{copy.inbox.download}</span>
+                  </a>
+                </Button>
+              </Card>
             ))}
           </div>
         </div>

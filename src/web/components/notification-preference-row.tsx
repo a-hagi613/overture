@@ -1,5 +1,5 @@
 import type { NotificationPreferenceKey } from "../../shared/notifications.ts";
-import { PreferenceSwitch } from "./preference-switch.tsx";
+import { Switch } from "./ui/switch.tsx";
 
 export function PreferenceRow({
   checked,
@@ -17,17 +17,17 @@ export function PreferenceRow({
   onToggle: (kind: NotificationPreferenceKey, enabled: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-t border-border py-2.5">
+    <div className="flex items-center justify-between gap-4 border-t border-border py-3 first:border-t-0">
       <div className="min-w-0">
-        <p className="text-sm font-semibold">{label}</p>
-        <p className="text-[12.5px] text-muted-foreground">{detail}</p>
+        <p className="text-sm font-semibold text-foreground">{label}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>
       </div>
-      <PreferenceSwitch
+      <Switch
+        ariaLabel={label}
         checked={checked}
         disabled={disabled}
-        label={label}
-        onToggle={() => {
-          onToggle(id, !checked);
+        onCheckedChange={(next) => {
+          onToggle(id, next);
         }}
       />
     </div>

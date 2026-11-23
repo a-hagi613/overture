@@ -2,6 +2,8 @@ import type { QuestionFieldType } from "../../shared/questions";
 
 import { copy } from "../../shared/copy.ts";
 import { OPTION_FIELD_TYPES } from "../../shared/questions.ts";
+import { Button } from "./ui/button.tsx";
+import { Input } from "./ui/input.tsx";
 
 export interface AnswerField {
   fieldType: QuestionFieldType;
@@ -54,19 +56,15 @@ export function ReviewAnswer({
     return (
       <fieldset
         aria-labelledby={labelledBy}
-        className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0 max-md:-mx-4 max-md:px-4 max-md:py-0.5"
+        className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0"
       >
         {field.options.map((option) => {
           const selected = chosen.includes(option);
 
           return (
-            <button
-              aria-pressed={selected}
-              className={`inline-flex min-h-9 items-center whitespace-nowrap rounded-full border px-[14px] text-[13px] font-semibold max-md:min-h-11 ${
-                selected
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-input bg-card text-foreground hover:bg-muted"
-              }`}
+            <Button
+              ariaPressed={selected}
+              className="rounded-full"
               key={option}
               onClick={() => {
                 if (!multiple) {
@@ -81,10 +79,11 @@ export function ReviewAnswer({
 
                 onChange(next.join(", "));
               }}
-              type="button"
+              size="sm"
+              variant={selected ? "primary" : "outline"}
             >
               {option}
-            </button>
+            </Button>
           );
         })}
       </fieldset>
@@ -93,10 +92,10 @@ export function ReviewAnswer({
 
   if (field.fieldType === "checkbox") {
     return (
-      <label className="flex min-h-11 items-center gap-3 text-[13.5px] font-semibold">
+      <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-foreground">
         <input
           checked={value === "Yes"}
-          className="h-5 w-5 rounded-[5px] border-input accent-foreground"
+          className="h-5 w-5 rounded border-input accent-signal"
           onChange={(event) => {
             onChange(event.target.checked ? "Yes" : "");
           }}
@@ -111,7 +110,7 @@ export function ReviewAnswer({
     return (
       <textarea
         aria-labelledby={labelledBy}
-        className="min-h-24 w-full rounded-md border border-input bg-card p-3 text-[13.5px] text-foreground placeholder:text-muted-foreground"
+        className="min-h-24 w-full rounded-md border border-input bg-card p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal"
         onChange={(event) => {
           onChange(event.target.value);
         }}
@@ -122,9 +121,8 @@ export function ReviewAnswer({
   }
 
   return (
-    <input
-      aria-labelledby={labelledBy}
-      className="h-10 w-full rounded-md border border-input bg-card px-3 text-[13.5px] font-medium text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2"
+    <Input
+      ariaLabel={copy.review.yourAnswer}
       onChange={(event) => {
         onChange(event.target.value);
       }}

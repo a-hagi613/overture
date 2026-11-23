@@ -1,13 +1,14 @@
+import { LogOut } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
-import { BrandMark } from "./brand-mark.tsx";
-import { NavGlyph } from "./nav-glyph.tsx";
 import { authClient } from "../lib/auth-client.ts";
-import { useTheme } from "../lib/theme-context.ts";
+import { BrandMark } from "./brand-mark.tsx";
+import { ThemeToggle } from "./theme-toggle.tsx";
+import { Button } from "./ui/button.tsx";
+import { dsContainer } from "./ui/ds.ts";
 
 export function OnboardingStepHeader() {
-  const { theme, toggleTheme, label } = useTheme();
   const navigate = useNavigate();
 
   const signOut = async () => {
@@ -16,36 +17,29 @@ export function OnboardingStepHeader() {
   };
 
   return (
-    <header className="relative z-[1] flex items-center justify-between gap-3 px-[clamp(16px,4vw,40px)] pb-[18px] pt-[22px]">
+    <header className={`${dsContainer} flex w-full items-center justify-between gap-3 py-5`}>
       <Link
         aria-label={copy.brand.homeAria}
-        className="inline-flex max-md:min-h-11 max-md:-my-[13px] items-center gap-2.5 hover:opacity-80"
+        className="inline-flex items-center gap-2.5 rounded-md transition hover:opacity-80 max-md:min-h-11"
         to="/"
       >
         <BrandMark size={30} />
-        <span className="serif text-[27px] leading-none">{copy.app.name}</span>
+        <span className="font-serif text-card-title leading-none text-foreground">
+          {copy.app.name}
+        </span>
       </Link>
       <div className="flex items-center gap-2">
-        <button
-          aria-label={label}
-          aria-pressed={theme === "dark"}
-          className="ibtn"
-          onClick={toggleTheme}
-          type="button"
-        >
-          <NavGlyph name={theme === "dark" ? "sun" : "moon"} />
-        </button>
-        <button
-          className="btng"
+        <ThemeToggle compact />
+        <Button
           onClick={() => {
             void signOut();
           }}
-          style={{ minHeight: 44 }}
-          type="button"
+          size="sm"
+          variant="ghost"
         >
-          <NavGlyph name="signout" size={16} />
-          {copy.onboarding.signOut}
-        </button>
+          <LogOut aria-hidden="true" size={15} />
+          <span>{copy.onboarding.signOut}</span>
+        </Button>
       </div>
     </header>
   );

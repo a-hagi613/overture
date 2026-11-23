@@ -1,509 +1,532 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
-
-import type { PointerEvent } from "react";
-
-import { copy } from "../../shared/copy.ts";
 import {
-  useBoard,
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  closestCorners,
+  pointerWithin,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import type { CollisionDetection, DragEndEvent, DragStartEvent } from "@dnd-kit/core";
+import { useCallback, useEffect, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useSearchParams } from "react-router";
+import { toast } from "sonner";
+
+import {
+  canMoveApplicationToStage,
+  canWithdrawApplication,
+  isBoardStage,
+} from "../../shared/board.ts";
+import { copy } from "../../shared/copy.ts";
+import { BoardSheet } from "../components/board-sheet.tsx";
+import { PageHeader } from "../components/page-header.tsx";
+import { TrackerColumn } from "../components/tracker-column.tsx";
+import { TrackerMobileTab } from "../components/tracker-mobile-tab.tsx";
+import { TrackerOverlayCard } from "../components/tracker-overlay-card.tsx";
+import { Tabs } from "../components/ui/tabs.tsx";
+import { TabsList } from "../components/ui/tabs-list.tsx";
+import {
   useApplication,
+  useBoard,
   useMoveStage,
   useUndoStage,
   useWithdraw,
 } from "../lib/board-api.ts";
 import type { BoardCard, StageKey } from "../lib/board-api.ts";
-import { stageOf } from "../lib/board-format.ts";
-import { useHomeData, useRunning } from "../lib/home-api.ts";
 import { onBoardMoved } from "../lib/live-events.ts";
-import { BoardColumn } from "../components/board-column.tsx";
-import { BoardMobileHeader } from "../components/board-mobile-header.tsx";
-import { BoardPageHeader } from "../components/board-page-header.tsx";
-import { BoardPhoneCard } from "../components/board-phone-card.tsx";
-import { BoardSheet } from "../components/board-sheet.tsx";
-import { BoardStagePills } from "../components/board-stage-pills.tsx";
+import { useMediaQuery } from "../lib/media-query.ts";
+import {
+  MOBILE_TAB_PREFIX,
+  TRACKER_LANES,
+  groupCardsByLane,
+  isTrackerLaneKey,
+  laneForStage,
+} from "../lib/tracker-lanes.ts";
+import type { TrackerLaneKey } from "../lib/tracker-lanes.ts";
 
-const STAGE_ORDER = [
-  "queued",
-  "ready",
-  "applied",
-  "screening",
-  "interviewing",
-  "offer",
-  "closed",
-] as const;
+const detectLaneCollision: CollisionDetection = (args) => {
+  const pointerHits = pointerWithin(args);
 
-const NEXT_STAGE = {
-  applied: "screening",
-  closed: null,
-  interviewing: "offer",
-  offer: "closed",
-  queued: "applied",
-  ready: null,
-  screening: "interviewing",
-} satisfies Record<StageKey, StageKey | null>;
+  return pointerHits.length > 0 ? pointerHits : closestCorners(args);
+};
 
-const PREVIOUS_STAGE = {
-  applied: "queued",
-  closed: "offer",
-  interviewing: "screening",
-  offer: "interviewing",
-  queued: null,
-  ready: null,
-  screening: "applied",
-} satisfies Record<StageKey, StageKey | null>;
-
-const HOLD_MS = 250;
-
-function nextStage(current: StageKey, direction: -1 | 1) {
-  return direction === 1 ? (NEXT_STAGE[current] ?? null) : (PREVIOUS_STAGE[current] ?? null);
-}
+const DROPPABLE_LANES = TRACKER_LANES.filter((lane) => lane.droppable);
 
 export function BoardPage() {
   const { data: board } = useBoard();
   const moveStage = useMoveStage();
   const undoStage = useUndoStage();
   const withdraw = useWithdraw();
-  const { data: home } = useHomeData();
-  const running = useRunning();
-  const navigate = useNavigate();
+  const isDesktopBoard = useMediaQuery("(min-width: 1024px)");
   const [searchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get("application"));
-  const [mobileStage, setMobileStage] = useState<StageKey>("queued");
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [holdingId, setHoldingId] = useState<string | null>(null);
-  const [hoverStage, setHoverStage] = useState<StageKey | null>(null);
-  const [toast, setToast] = useState<{ message: string; undoId: string | null } | null>(null);
-  const holdTimer = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
-  const toastTimer = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
-  const holdStart = useRef<{ x: number; y: number } | null>(null);
-  const dragCard = useRef<BoardCard | null>(null);
-  const dragging = useRef(false);
-  const held = useRef<string | null>(null);
-  const swipeStart = useRef<{ x: number; y: number } | null>(null);
-  const suppressClick = useRef(false);
+  const [mobileLane, setMobileLane] = useState<TrackerLaneKey>("applied");
+  const [laneOverrides, setLaneOverrides] = useState<Record<string, TrackerLaneKey>>({});
+
+  const [activeDrag, setActiveDrag] = useState<{ card: BoardCard; lane: TrackerLaneKey } | null>(
+    null,
+  );
+
+  const [keyboardDrag, setKeyboardDrag] = useState<{
+    card: BoardCard;
+    fromLane: TrackerLaneKey;
+    targetLane: TrackerLaneKey;
+  } | null>(null);
+
+  const [keyboardAnnouncement, setKeyboardAnnouncement] = useState("");
+
   const { data: detailData } = useApplication(selectedId);
   const detail = detailData ?? null;
 
-  const columns = board?.columns ?? [];
-  const cards = columns.flatMap((column) => column.cards);
-  const selectedIndex = cards.findIndex((card) => card.id === selectedId);
+  const grouped = groupCardsByLane(board, laneOverrides);
+  const allCards = TRACKER_LANES.flatMap((lane) => grouped[lane.key]);
+  const selectedIndex = allCards.findIndex((card) => card.id === selectedId);
 
-  useEffect(
-    () => () => {
-      if (holdTimer.current !== null) {
-        globalThis.clearTimeout(holdTimer.current);
-      }
-
-      if (toastTimer.current !== null) {
-        globalThis.clearTimeout(toastTimer.current);
-      }
-    },
-    [],
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
   );
 
-  const selectedRef = useRef(selectedId);
-
-  useEffect(() => {
-    selectedRef.current = selectedId;
-  }, [selectedId]);
-
-  useEffect(() => {
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        const closedId = selectedRef.current;
-
-        setSelectedId(null);
-
-        if (closedId !== null) {
-          globalThis.requestAnimationFrame(() => {
-            const candidates = document.querySelectorAll<HTMLElement>(
-              `button[data-card="${CSS.escape(closedId)}"]`,
-            );
-
-            [...candidates].find((element) => element.getClientRects().length > 0)?.focus();
-          });
-        }
-      }
-    };
-
-    globalThis.addEventListener("keydown", onKey);
-
-    return () => {
-      globalThis.removeEventListener("keydown", onKey);
-    };
-  }, []);
-
-  const showToast = useCallback((message: string, undoId: string | null = null) => {
-    setToast({ message, undoId });
-
-    if (toastTimer.current !== null) {
-      globalThis.clearTimeout(toastTimer.current);
-    }
-
-    toastTimer.current = globalThis.setTimeout(() => {
-      setToast(null);
-    }, 4000);
-  }, []);
+  const { mutate: undoBoardStage } = undoStage;
 
   useEffect(
     () =>
-      onBoardMoved((event) => {
-        if (event.source !== "email" && event.source !== "system") {
+      onBoardMoved((moved) => {
+        if (moved.stage === null || !isBoardStage(moved.stage)) {
           return;
         }
 
-        const stage = stageOf(event.stage ?? undefined);
+        const label = copy.board.columns[moved.stage];
 
-        if (stage === null) {
-          return;
+        if (moved.source === "email") {
+          toast.success(copy.board.moved(label), {
+            action: {
+              label: copy.board.undo,
+              onClick: () => {
+                undoBoardStage(moved.applicationId);
+              },
+            },
+          });
+        } else if (moved.source === "system") {
+          toast.success(copy.board.moved(label));
         }
-
-        showToast(copy.board.moved(copy.board.columns[stage]), event.applicationId);
       }),
-    [showToast],
+    [undoBoardStage],
   );
 
-  const undoMove = (id: string) => {
-    undoStage.mutate(id, {
-      onSuccess: () => {
-        setToast(null);
-      },
-    });
+  const closeSheet = useCallback(() => {
+    const closing = selectedId;
+
+    setSelectedId(null);
+
+    if (closing !== null) {
+      globalThis.requestAnimationFrame(() => {
+        const candidates = [
+          ...document.querySelectorAll<HTMLButtonElement>(`button[data-card="${closing}"]`),
+        ];
+
+        const visible =
+          candidates.find((element) => element.offsetParent !== null) ?? candidates[0];
+
+        visible?.focus();
+      });
+    }
+  }, [selectedId]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      if (keyboardDrag !== null) {
+        setKeyboardAnnouncement(`Cancelled moving ${keyboardDrag.card.title}.`);
+        setKeyboardDrag(null);
+
+        return;
+      }
+
+      if (selectedId !== null) {
+        closeSheet();
+      }
+    };
+
+    globalThis.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      globalThis.removeEventListener("keydown", onKeyDown);
+    };
+  }, [closeSheet, keyboardDrag, selectedId]);
+
+  const clearLaneOverride = (id: string) => {
+    setLaneOverrides((current) =>
+      Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)),
+    );
   };
 
-  const moveTo = (id: string, stage: StageKey) => {
+  const moveCardToLane = (
+    card: BoardCard,
+    fromLane: TrackerLaneKey,
+    targetLane: TrackerLaneKey,
+    targetStage: StageKey,
+    label: string,
+  ) => {
+    if (fromLane === targetLane && card.stage === targetStage) {
+      return;
+    }
+
+    if (!canMoveApplicationToStage(card.status, targetStage)) {
+      toast.error(copy.board.moveNotAllowed);
+
+      return;
+    }
+
+    setLaneOverrides((current) => ({ ...current, [card.id]: targetLane }));
+
     moveStage.mutate(
-      { id, stage },
+      { id: card.id, stage: targetStage },
       {
+        onError: () => {
+          clearLaneOverride(card.id);
+          toast.error(copy.board.moveFailed);
+        },
         onSuccess: () => {
-          showToast(copy.board.moved(copy.board.columns[stage]));
+          clearLaneOverride(card.id);
+          toast.success(copy.board.movedToLane(card.company, label), {
+            action: {
+              label: copy.board.undo,
+              onClick: () => {
+                setLaneOverrides((current) => ({ ...current, [card.id]: fromLane }));
+
+                undoStage.mutate(card.id, {
+                  onError: () => {
+                    clearLaneOverride(card.id);
+                    toast.error(copy.board.moveFailed);
+                  },
+                  onSuccess: () => {
+                    clearLaneOverride(card.id);
+                  },
+                });
+              },
+            },
+          });
         },
       },
     );
   };
 
-  const move = (card: BoardCard, stage: StageKey) => {
-    if (card.stage !== stage) {
-      moveTo(card.id, stage);
-    }
-  };
+  const handleDragStart = (event: DragStartEvent) => {
+    setKeyboardDrag(null);
 
-  const onKey = (card: BoardCard, direction: -1 | 1) => {
-    if (card.stage === null) {
+    const draggedId = String(event.active.id);
+    const found = allCards.find((card) => card.id === draggedId);
+
+    if (found === undefined) {
       return;
     }
 
-    const target = nextStage(card.stage, direction);
+    const lane = laneOverrides[found.id] ?? laneForStage(found.stage);
 
-    if (target !== null) {
-      move(card, target);
+    if (lane !== null) {
+      setActiveDrag({ card: found, lane });
     }
   };
 
-  const open = (id: string) => {
-    if (suppressClick.current) {
-      suppressClick.current = false;
-
+  const handleCardKeyDown = (
+    card: BoardCard,
+    lane: TrackerLaneKey,
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+  ) => {
+    if (!DROPPABLE_LANES.some((entry) => entry.key === lane)) {
       return;
     }
 
-    const card = cards.find((candidate) => candidate.id === id);
-
-    if (card?.stage !== null && card?.stage !== undefined) {
-      setMobileStage(card.stage);
-    }
-
-    setSelectedId(id);
-  };
-
-  const startDrag = (card: BoardCard, event: PointerEvent<HTMLButtonElement>) => {
-    holdStart.current = { x: event.clientX, y: event.clientY };
-    event.currentTarget.setPointerCapture(event.pointerId);
-
-    if (event.pointerType === "mouse" && globalThis.matchMedia("(min-width: 768px)").matches) {
-      dragCard.current = card;
-
-      return;
-    }
-
-    holdTimer.current = globalThis.setTimeout(() => {
-      held.current = card.id;
-      setHoldingId(card.id);
-      setHoverStage(card.stage);
-    }, HOLD_MS);
-  };
-
-  const moveDrag = (event: PointerEvent<HTMLButtonElement>) => {
-    if (holdStart.current === null) {
-      return;
-    }
-
-    const dx = Math.abs(event.clientX - holdStart.current.x);
-    const dy = Math.abs(event.clientY - holdStart.current.y);
-
-    if (dragCard.current !== null) {
-      if (!dragging.current && (dx > 6 || dy > 6)) {
-        dragging.current = true;
-        setDraggingId(dragCard.current.id);
+    if (keyboardDrag === null) {
+      if (event.code === "Space" || event.key === " ") {
+        event.preventDefault();
+        setKeyboardDrag({ card, fromLane: lane, targetLane: lane });
+        setKeyboardAnnouncement(
+          `Picked up ${card.title}. Use Left and Right arrow keys to choose a stage, Space to drop, Escape to cancel.`,
+        );
       }
 
       return;
     }
 
-    if (holdingId === null) {
-      if ((dx > 10 || dy > 10) && holdTimer.current !== null) {
-        globalThis.clearTimeout(holdTimer.current);
-        holdTimer.current = null;
+    if (keyboardDrag.card.id !== card.id) {
+      return;
+    }
+
+    if (event.code === "ArrowRight" || event.code === "ArrowLeft") {
+      event.preventDefault();
+
+      const currentIndex = DROPPABLE_LANES.findIndex(
+        (entry) => entry.key === keyboardDrag.targetLane,
+      );
+
+      const step = event.code === "ArrowRight" ? 1 : -1;
+      const baseIndex = currentIndex === -1 ? 0 : currentIndex;
+      const nextIndex = Math.max(0, Math.min(DROPPABLE_LANES.length - 1, baseIndex + step));
+      const nextLane = DROPPABLE_LANES[nextIndex];
+
+      if (nextLane !== undefined) {
+        setKeyboardDrag({ ...keyboardDrag, targetLane: nextLane.key });
+        setKeyboardAnnouncement(`Over ${nextLane.label}.`);
+        document
+          .querySelector<HTMLElement>(`section[data-stage="${nextLane.key}"]`)
+          ?.scrollIntoView({ block: "nearest", inline: "nearest" });
       }
 
       return;
     }
 
-    const target = stageOf(
-      document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-stage]")
-        ?.dataset.stage,
+    if (event.code === "Space" || event.key === " " || event.code === "Enter") {
+      event.preventDefault();
+
+      const target = DROPPABLE_LANES.find((entry) => entry.key === keyboardDrag.targetLane);
+      const { card: draggedCard, fromLane } = keyboardDrag;
+
+      setKeyboardDrag(null);
+
+      if (target !== undefined && target.droppable && target.key !== fromLane) {
+        moveCardToLane(draggedCard, fromLane, target.key, target.targetStage, target.label);
+        setKeyboardAnnouncement(`Moved ${draggedCard.title} to ${target.label}.`);
+      } else {
+        setKeyboardAnnouncement(`Dropped ${draggedCard.title} in ${target?.label ?? lane}.`);
+      }
+
+      return;
+    }
+
+    if (event.code === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      setKeyboardDrag(null);
+      setKeyboardAnnouncement(`Cancelled moving ${card.title}.`);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const dragged = activeDrag;
+
+    setActiveDrag(null);
+
+    if (dragged === null || event.over === null) {
+      return;
+    }
+
+    const rawOverId = String(event.over.id);
+
+    const overId = rawOverId.startsWith(MOBILE_TAB_PREFIX)
+      ? rawOverId.slice(MOBILE_TAB_PREFIX.length)
+      : rawOverId;
+
+    if (!isTrackerLaneKey(overId) || overId === dragged.lane) {
+      return;
+    }
+
+    const targetLane = TRACKER_LANES.find((lane) => lane.key === overId);
+
+    if (targetLane === undefined || !targetLane.droppable) {
+      return;
+    }
+
+    moveCardToLane(
+      dragged.card,
+      dragged.lane,
+      targetLane.key,
+      targetLane.targetStage,
+      targetLane.label,
     );
-
-    if (target !== null) {
-      setHoverStage(target);
-    }
   };
 
-  const endDrag = (event: PointerEvent<HTMLButtonElement>) => {
-    if (holdTimer.current !== null) {
-      globalThis.clearTimeout(holdTimer.current);
-      holdTimer.current = null;
-    }
-
-    const target = stageOf(
-      document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-stage]")
-        ?.dataset.stage,
-    );
-
-    const dragged = dragCard.current;
-    const heldCard = held.current;
-
-    if (dragged !== null && dragging.current && target !== null) {
-      move(dragged, target);
-      suppressClick.current = true;
-    }
-
-    if (heldCard !== null) {
-      const card = cards.find((candidate) => candidate.id === heldCard);
-
-      if (card !== undefined && target !== null) {
-        move(card, target);
-      }
-
-      suppressClick.current = true;
-    }
-
-    dragCard.current = null;
-    dragging.current = false;
-    held.current = null;
-    setDraggingId(null);
-    setHoldingId(null);
-    setHoverStage(null);
-    holdStart.current = null;
-  };
-
-  const archive = () => {
+  const handleArchive = () => {
     if (detail === null) {
       return;
     }
 
-    if (detail.application.stage !== "queued") {
-      showToast(copy.board.archiveOnlyQueued);
+    const card = allCards.find((entry) => entry.id === detail.application.id);
+
+    if (card === undefined) {
+      return;
+    }
+
+    if (canWithdrawApplication(card.status)) {
+      setLaneOverrides((current) => ({ ...current, [card.id]: "closed" }));
+      setSelectedId(null);
+
+      withdraw.mutate(card.id, {
+        onError: () => {
+          clearLaneOverride(card.id);
+          toast.error(copy.board.moveFailed);
+        },
+        onSuccess: () => {
+          clearLaneOverride(card.id);
+          toast.success(copy.board.withdrawSuccess(card.company));
+        },
+      });
 
       return;
     }
 
-    withdraw.mutate(detail.application.id, {
-      onSuccess: () => {
-        setSelectedId(null);
-      },
-    });
+    const fromLane = laneOverrides[card.id] ?? laneForStage(card.stage) ?? "applied";
+
+    moveCardToLane(card, fromLane, "closed", "closed", copy.board.lanes.closed);
+    setSelectedId(null);
   };
 
-  const counts: Record<StageKey, number> = {
-    applied: 0,
-    closed: 0,
-    interviewing: 0,
-    offer: 0,
-    queued: 0,
-    ready: 0,
-    screening: 0,
-  };
+  const activeMobileLane =
+    TRACKER_LANES.find((lane) => lane.key === mobileLane) ?? TRACKER_LANES[2];
 
-  for (const stage of STAGE_ORDER) {
-    counts[stage] = columns.find((column) => column.stage === stage)?.cards.length ?? 0;
-  }
-
-  const phoneCards = columns.find((column) => column.stage === mobileStage)?.cards ?? [];
-
-  const stageTotal =
-    (board?.total ?? 0) - (columns.find((column) => column.stage === "ready")?.cards.length ?? 0);
+  const selectedPosition =
+    selectedIndex === -1 ? null : copy.board.sheetPosition(selectedIndex + 1, allCards.length);
 
   return (
-    <div className="board">
-      <div className="hidden flex-1 flex-col pt-[26px] pb-7 pl-8 md:flex">
-        <BoardPageHeader
-          onToggleRunning={() => {
-            running.mutate(home?.running !== true);
-          }}
-          running={home?.running ?? true}
-          total={stageTotal}
-        />
-        {board === undefined || board.total === 0 ? (
-          <div className="mt-7 rounded-lg border border-border bg-card p-6 shadow-sh">
-            <p className="text-sm text-muted-foreground">{copy.board.emptyColumn}</p>
+    <div>
+      <PageHeader
+        lead={copy.board.trackerLead}
+        titleNode={
+          <>
+            {copy.board.trackerTitlePlain}{" "}
+            <em className="italic text-signal">{copy.board.trackerTitleItalic}</em>
+          </>
+        }
+      />
+
+      <DndContext
+        collisionDetection={detectLaneCollision}
+        onDragCancel={() => {
+          setActiveDrag(null);
+        }}
+        onDragEnd={handleDragEnd}
+        onDragStart={handleDragStart}
+        sensors={sensors}
+      >
+        {isDesktopBoard ? (
+          <div className="mt-6 overflow-x-auto pb-3" data-scroll-region>
+            <div className="grid grid-cols-[repeat(5,minmax(264px,1fr))] items-start gap-4">
+              {TRACKER_LANES.map((lane) => (
+                <TrackerColumn
+                  accentClass={lane.accentClass}
+                  activeDragLane={activeDrag?.lane ?? null}
+                  cards={grouped[lane.key]}
+                  droppable={lane.droppable}
+                  keyboardDragCardId={keyboardDrag?.card.id ?? null}
+                  keyboardDragTargetLane={keyboardDrag?.targetLane ?? null}
+                  key={lane.key}
+                  label={lane.label}
+                  lane={lane.key}
+                  linkTo={lane.linkTo}
+                  onCardKeyDown={handleCardKeyDown}
+                  onOpen={setSelectedId}
+                  selectedId={selectedId}
+                />
+              ))}
+            </div>
           </div>
         ) : (
-          <div
-            className="cols mt-[26px] flex flex-1 items-start gap-4 overflow-x-auto pr-8 pt-1 pb-3.5"
-            data-scroll-region
-          >
-            {STAGE_ORDER.map((stage) => (
-              <BoardColumn
-                cards={columns.find((column) => column.stage === stage)?.cards ?? []}
-                draggingId={draggingId}
-                key={stage}
-                onOpen={open}
-                onPointerCancel={endDrag}
-                onPointerDown={startDrag}
-                onPointerMove={moveDrag}
-                onPointerUp={endDrag}
-                onSend={() => {
-                  void navigate("/ready");
-                }}
-                onStageKey={onKey}
-                selectedId={selectedId}
-                stage={stage}
-              />
-            ))}
+          <div className="mt-5">
+            <Tabs
+              onValueChange={(value) => {
+                if (isTrackerLaneKey(value)) {
+                  setMobileLane(value);
+                }
+              }}
+              value={mobileLane}
+            >
+              <TabsList ariaLabel={copy.board.stagesLabel} className="flex w-full gap-1">
+                {TRACKER_LANES.map((lane) => (
+                  <TrackerMobileTab
+                    activeDragLane={activeDrag?.lane ?? null}
+                    droppable={lane.droppable}
+                    key={lane.key}
+                    label={lane.label}
+                    lane={lane.key}
+                  />
+                ))}
+              </TabsList>
+            </Tabs>
+
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              {copy.board.mobileDropHint}
+            </p>
+
+            {activeMobileLane === undefined ? null : (
+              <div className="mt-3">
+                <TrackerColumn
+                  accentClass={activeMobileLane.accentClass}
+                  activeDragLane={activeDrag?.lane ?? null}
+                  cards={grouped[activeMobileLane.key]}
+                  droppable={activeMobileLane.droppable}
+                  keyboardDragCardId={keyboardDrag?.card.id ?? null}
+                  keyboardDragTargetLane={keyboardDrag?.targetLane ?? null}
+                  label={activeMobileLane.label}
+                  lane={activeMobileLane.key}
+                  linkTo={activeMobileLane.linkTo}
+                  onCardKeyDown={handleCardKeyDown}
+                  onOpen={setSelectedId}
+                  selectedId={selectedId}
+                />
+              </div>
+            )}
           </div>
         )}
-      </div>
 
-      <div className="flex h-[calc(100dvh-64px)] flex-col md:hidden">
-        <BoardMobileHeader />
-        <div className="px-5">
-          <p className="serif text-[14px] text-muted-foreground italic">
-            {copy.board.lead(stageTotal)}
-          </p>
-          <h1 className="serif text-[36px] leading-[1.05]">
-            {copy.board.titlePlain} <span className="italic">{copy.board.titleItalic}</span>
-          </h1>
-        </div>
-        <BoardStagePills
-          counts={counts}
-          hoverStage={hoverStage}
-          onSelect={setMobileStage}
-          selected={mobileStage}
-        />
-        <div
-          aria-label={copy.board.columns[mobileStage]}
-          className="mt-3 flex flex-1 touch-pan-y flex-col gap-3 overflow-y-auto px-5 pb-4"
-          onPointerDown={(event) => {
-            swipeStart.current = { x: event.clientX, y: event.clientY };
-          }}
-          onPointerUp={(event) => {
-            const start = swipeStart.current;
-
-            swipeStart.current = null;
-
-            if (start === null || held.current !== null || dragging.current) {
-              return;
-            }
-
-            const dx = event.clientX - start.x;
-            const dy = event.clientY - start.y;
-
-            if (Math.abs(dx) < 60 || Math.abs(dx) <= Math.abs(dy)) {
-              return;
-            }
-
-            suppressClick.current = true;
-            setMobileStage((current) => {
-              const index = STAGE_ORDER.indexOf(current);
-              const next = STAGE_ORDER[index + (dx < 0 ? 1 : -1)];
-
-              return next ?? current;
-            });
-          }}
-          role="tabpanel"
-        >
-          {phoneCards.map((card) => (
-            <BoardPhoneCard
-              card={card}
-              holding={holdingId === card.id}
-              key={card.id}
-              onOpen={() => {
-                open(card.id);
-              }}
-              onPointerCancel={endDrag}
-              onPointerDown={(event) => {
-                startDrag(card, event);
-              }}
-              onPointerMove={moveDrag}
-              onPointerUp={endDrag}
-              selected={selectedId === card.id}
+        <DragOverlay>
+          {activeDrag === null ? null : (
+            <TrackerOverlayCard
+              card={activeDrag.card}
+              compact={!isDesktopBoard}
+              lane={activeDrag.lane}
             />
-          ))}
-        </div>
-      </div>
+          )}
+        </DragOverlay>
+      </DndContext>
+
+      <output aria-live="polite" className="sr-only">
+        {keyboardAnnouncement}
+      </output>
 
       {selectedId === null ? null : (
         <BoardSheet
           detail={detail}
-          nextDisabled={selectedIndex === -1 || selectedIndex >= cards.length - 1}
-          onArchive={archive}
-          onClose={() => {
-            setSelectedId(null);
-          }}
+          nextDisabled={selectedIndex === -1 || selectedIndex >= allCards.length - 1}
+          onArchive={handleArchive}
+          onClose={closeSheet}
           onMove={(stage) => {
-            if (detail !== null) {
-              moveTo(detail.application.id, stage);
+            const card = allCards.find((entry) => entry.id === selectedId);
+            const targetLane = laneForStage(stage);
+
+            if (
+              card !== undefined &&
+              targetLane !== null &&
+              targetLane !== "review" &&
+              targetLane !== "ready"
+            ) {
+              const fromLane = laneOverrides[card.id] ?? laneForStage(card.stage) ?? "applied";
+
+              moveCardToLane(card, fromLane, targetLane, stage, copy.board.columns[stage]);
             }
           }}
           onNext={() => {
-            const next = cards[selectedIndex + 1];
+            const nextCard = allCards[selectedIndex + 1];
 
-            if (next !== undefined) {
-              setSelectedId(next.id);
+            if (nextCard !== undefined) {
+              setSelectedId(nextCard.id);
             }
           }}
           onPrevious={() => {
-            const previous = cards[selectedIndex - 1];
+            const previousCard = allCards[selectedIndex - 1];
 
-            if (previous !== undefined) {
-              setSelectedId(previous.id);
+            if (previousCard !== undefined) {
+              setSelectedId(previousCard.id);
             }
           }}
+          positionLabel={selectedPosition}
           previousDisabled={selectedIndex <= 0}
         />
-      )}
-
-      {toast === null ? null : (
-        <div
-          aria-live="polite"
-          className="fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-md border border-input bg-card py-1 pr-1 pl-4 text-[13px] font-semibold shadow-lift md:bottom-6"
-        >
-          <span>{toast.message}</span>
-          {toast.undoId === null ? null : (
-            <button
-              className="toast-act"
-              onClick={() => {
-                if (toast.undoId !== null) {
-                  undoMove(toast.undoId);
-                }
-              }}
-              type="button"
-            >
-              {copy.board.undo}
-            </button>
-          )}
-        </div>
       )}
     </div>
   );

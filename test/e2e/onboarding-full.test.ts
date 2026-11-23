@@ -54,7 +54,7 @@ test("a brand-new user answers every onboarding step through the UI", async ({
 
   await page.getByLabel(/I agree to the/u).check();
   await page.getByRole("button", { name: "Start" }).click();
-  await expect(page).toHaveURL(/\/notifications$/u);
+  await expect(page).toHaveURL(/\/home$/u);
 
   const started = stateSchema.parse(await (await request.get("/api/onboarding")).json());
 
@@ -110,7 +110,7 @@ test("the What you want step shows a loading, error or empty state, never nothin
   });
 
   const page = await context.newPage();
-  const heading = page.getByRole("heading", { level: 2, name: /What do you want/u });
+  const heading = page.getByRole("heading", { level: 2, name: /Job preferences/u });
 
   const gate = Promise.withResolvers<undefined>();
 

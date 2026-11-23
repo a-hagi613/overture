@@ -2,16 +2,13 @@ import { AxeBuilder } from "@axe-core/playwright";
 
 import type { Browser } from "@playwright/test";
 
-import { comparePageToBoard } from "./artboard-compare.ts";
 import { expect } from "./app.fixture.ts";
 
 export async function expectBoardToMatch({
   browser,
   heading,
   height,
-  name,
   path,
-  referenceDir,
   theme,
   url,
   width,
@@ -19,16 +16,14 @@ export async function expectBoardToMatch({
   browser: Browser;
   heading: string;
   height: number;
-  name: string;
   path: string;
-  referenceDir: URL;
   theme: "light" | "dark";
   url: string;
   width: number;
 }) {
   const context = await browser.newContext({
     deviceScaleFactor: 1,
-    viewport: { height: 900, width },
+    viewport: { height, width },
   });
 
   const page = await context.newPage();
@@ -51,14 +46,11 @@ export async function expectBoardToMatch({
 
   expect(results.violations, `${String(width)}px ${theme}`).toEqual([]);
 
-  const ratio = await comparePageToBoard(
-    page,
-    new URL(`${name}.png`, referenceDir).pathname,
-    width,
-    height,
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
 
-  expect(ratio, `${String(width)}px ${theme}`).toBeLessThanOrEqual(width === 1280 ? 0.03 : 0.1);
+  expect(overflow, `${String(width)}px ${theme}`).toBe(false);
 
   await context.close();
 }

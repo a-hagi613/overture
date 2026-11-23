@@ -341,7 +341,7 @@ test("Settings fits every width without sideways scroll", async ({
         `${appServerUrl}/settings`,
         `Settings at ${String(width)}px`,
       );
-      await expect(page.getByRole("heading", { name: /Your Settings/u })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Account Settings" })).toBeVisible();
 
       await context.close();
     }),

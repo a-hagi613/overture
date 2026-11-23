@@ -288,9 +288,12 @@ function lockState(server: AppServer, userId: string) {
 }
 
 async function openDeletePage(page: Page, appServerUrl: string) {
-  await page.goto(`${appServerUrl}/settings`);
-  await page.getByRole("link", { name: "Delete account", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Delete your account" })).toBeVisible();
+  await page.goto(`${appServerUrl}/settings/delete`);
+  await expect(page).toHaveURL(/\/profile\/account/u);
+  await expect(page.getByRole("heading", { level: 1, name: "Account Settings" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Danger zone" })).toBeVisible();
+  await page.getByRole("button", { name: "Delete account" }).click();
+  await expect(page.getByRole("heading", { name: "This erases everything" })).toBeVisible();
 }
 
 test("a fresh signed-in session still needs a recent sign-in, then deletes everything", async ({
@@ -553,29 +556,37 @@ test("the delete page needs a check, asks for a sign-in link, and shows the eras
     expect(violations).toEqual([]);
 
     await expect(page.getByText("This erases everything")).toBeVisible();
-
-    await page.getByRole("button", { name: "Delete my account" }).click();
-    await expect(page.getByRole("alert")).toHaveText(
-      "Tick the box to confirm you understand what is erased.",
-    );
-    await expect(page.getByText("Erasing your account")).toHaveCount(0);
+    await expect(
+      page.getByText("Deleting needs a fresh sign-in. We email you a link that works once."),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Permanently delete account" })).toHaveCount(0);
 
     await page.getByRole("button", { name: "Email me a sign-in link" }).click();
-    await expect(page.getByText("A sign-in link is on its way.")).toBeVisible();
+    await expect(page.getByText("A sign-in link is on its way.").first()).toBeVisible();
 
     const link = await latestMailLink(harness.server.url, request, authTestIdentity.ownerEmail);
 
     await page.goto(link);
     await requestClockOffset(request, 0);
-    await page.goto(`${harness.server.url}/settings/delete`);
+    await openDeletePage(page, harness.server.url);
 
+    const confirmButton = page.getByRole("button", { name: "Permanently delete account" });
+
+    await expect(confirmButton).toBeDisabled();
     await page.getByLabel("I understand my data is erased").check();
-    await page.getByRole("button", { name: "Delete my account" }).click();
+    await expect(confirmButton).toBeEnabled();
 
+    const deleted = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" && response.url().endsWith("/api/account/delete"),
+    );
+
+    await confirmButton.click();
+
+    const deleteResponse = await deleted;
+
+    expect(deleteResponse.status()).toBe(202);
     await expect(page.getByText("Erasing your account")).toBeVisible();
-    await expect(page.getByText("What arrives when it is done")).toBeVisible();
-    await expect(page.getByText("Hi Maya,")).toBeVisible();
-    await expect(page.getByText("write to admin@tryoverture.com")).toBeVisible();
 
     await context.close();
     await request.dispose();

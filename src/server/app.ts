@@ -52,6 +52,7 @@ import { createMatchingService } from "./matching/score.ts";
 import { dispatchByHost, mainHostAdminApiRefusal } from "./host-routing.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
+import { createWorkspaceSearchRoutes } from "./routes/workspace-search.ts";
 import { createSupportAccessRoutes } from "./routes/support-access.ts";
 import { createSupportRoutes } from "./routes/support.ts";
 import { createAccountRoutes } from "./routes/account.ts";
@@ -309,6 +310,7 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createApplicationRoutes(deps.db, deps.clock, deps.auth, personal));
   app.route("/api", createCheckinRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
   app.route("/api", createCalendarRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
+  app.route("/api", createWorkspaceSearchRoutes({ auth: deps.auth, db: deps.db, personal }));
   app.route("/", createCalendarFeedRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
   app.route(
     "/api",

@@ -28,11 +28,11 @@ const okSchema = z.object({ ok: z.boolean() });
 
 const pauseReasons = [
   {
-    action: "Resume",
-    copy: "Nothing new is sent until you resume.",
+    action: "Resume sending",
+    copy: "Sending is paused. Nothing new will send until you resume.",
     href: null,
     reason: "user",
-    title: "Paused by you.",
+    title: "Sending paused",
   },
   {
     action: "Finish setup",
@@ -44,21 +44,21 @@ const pauseReasons = [
   {
     action: "Upload resume",
     copy: "Overture sends only the exact file you upload, so it needs one first.",
-    href: "/profile#profile-resume",
+    href: "/profile/resume",
     reason: "no_resume",
     title: "No resume on file.",
   },
   {
     action: "Choose a plan",
     copy: "Sending stopped when it ran out. Your queue and history are kept.",
-    href: "/settings/billing/plans",
+    href: "/profile/billing",
     reason: "plan_ended",
     title: "Your plan has ended.",
   },
   {
     action: "Update payment",
     copy: "Sending stays paused until the card is updated.",
-    href: "/settings/billing",
+    href: "/profile/billing",
     reason: "payment_failed",
     title: "Payment didn't go through.",
   },
@@ -72,7 +72,7 @@ const pauseReasons = [
   {
     action: "Set up forwarding",
     copy: "We need your ATS mail forwarded to see replies and confirmations.",
-    href: "/profile#profile-address",
+    href: "/profile/details",
     reason: "no_mailbox",
     title: "Forwarding isn't set up.",
   },
@@ -147,13 +147,16 @@ async function expectPausedHomeMatchesBoard(
     });
   }
 
-  await page.goto(`${appServerUrl}/`);
+  await page.goto(`${appServerUrl}/home`);
 
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
-  await expect(page.getByText("Auto-apply paused")).toBeVisible();
-  await expect(page.getByText("Paused by you.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
-  await expect(page.getByText("Held while sending is paused")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
+  await expect(page.getByText("Sending paused")).toBeVisible();
+  await expect(
+    page.getByText("Sending is paused. Nothing new will send until you resume."),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Resume sending" })).toBeVisible();
   await expect(page.getByText("3rd in line")).toBeVisible();
   await expect(page.getByText("Next send around 14:20 once sending resumes.")).toBeVisible();
   await expect(page.getByText("Weekly check-in")).toBeVisible();
@@ -176,15 +179,11 @@ async function expectPausedHomeMatchesBoard(
 
   expect(results.violations, `${String(width)}px ${theme}`).toEqual([]);
 
-  const contentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
 
-  await page.setViewportSize({ width, height: contentHeight });
-
-  await expect(page).toHaveScreenshot(`${String(width)}-${theme}.png`, {
-    animations: "disabled",
-    caret: "hide",
-    maxDiffPixelRatio: 0.01,
-  });
+  expect(overflow, `${String(width)}px ${theme}`).toBe(false);
 
   await context.close();
 }
@@ -225,10 +224,10 @@ test("every pause reason shows the drawn copy and one fix", async ({ browser, pa
     }
 
     await setPauseReason(request, entry.reason);
-    await page.goto(`${pausedServer.url}/`);
+    await page.goto(`${pausedServer.url}/home`);
 
-    await expect(page.getByText(entry.title)).toBeVisible();
-    await expect(page.getByText(entry.copy)).toBeVisible();
+    await expect(page.getByText(entry.title).first()).toBeVisible();
+    await expect(page.getByText(entry.copy).first()).toBeVisible();
 
     if (entry.href === null) {
       await expect(page.getByRole("button", { name: entry.action })).toBeVisible();

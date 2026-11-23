@@ -1,5 +1,3 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-
 import { AxeBuilder } from "@axe-core/playwright";
 import { request as apiRequest } from "@playwright/test";
 
@@ -24,44 +22,6 @@ const test = appTest.extend<{ boardServer: AppServer }>({
 const PHONE_WIDTH = 390;
 const PHONE_HEIGHT = 844;
 
-async function writePhoneBaseline(browser: Browser, theme: string) {
-  const directory = "test/e2e/.tmp/board-baselines";
-
-  mkdirSync(directory, { recursive: true });
-
-  const source = readFileSync(`design/reference/board/390-${theme}.png`).toString("base64");
-  const cropContext = await browser.newContext();
-  const page = await cropContext.newPage();
-
-  const cropped = await page.evaluate(
-    async (input: { base64: string; height: number; width: number }) => {
-      const image = new Image();
-
-      image.src = `data:image/png;base64,${input.base64}`;
-      await image.decode();
-
-      const canvas = document.createElement("canvas");
-
-      canvas.width = input.width;
-      canvas.height = input.height;
-
-      const context = canvas.getContext("2d");
-
-      if (context === null) {
-        throw new Error("the canvas has no context");
-      }
-
-      context.drawImage(image, 0, 0);
-
-      return canvas.toDataURL("image/png").split(",").at(1) ?? "";
-    },
-    { base64: source, height: PHONE_HEIGHT, width: PHONE_WIDTH },
-  );
-
-  await cropContext.close();
-  writeFileSync(`${directory}/390-${theme}.png`, Buffer.from(cropped, "base64"));
-}
-
 async function expectPhoneBoardMatches(browser: Browser, appServerUrl: string, theme: string) {
   const request = await apiRequest.newContext({ baseURL: appServerUrl });
 
@@ -70,7 +30,6 @@ async function expectPhoneBoardMatches(browser: Browser, appServerUrl: string, t
   const storageState = await request.storageState();
 
   await request.dispose();
-  await writePhoneBaseline(browser, theme);
 
   const context = await browser.newContext({ storageState, timezoneId: "America/Toronto" });
   const page = await context.newPage();
@@ -94,9 +53,9 @@ async function expectPhoneBoardMatches(browser: Browser, appServerUrl: string, t
     page.getByRole("heading", { level: 2, name: "Senior Backend Engineer" }),
   ).toBeVisible();
   await expect(
-    page.getByText("Twenty-nine applications across six stages").filter({ visible: true }),
+    page.getByText("Track every application from match to decision.").filter({ visible: true }),
   ).toBeVisible();
-  await expect(page.getByText("63 left").filter({ visible: true })).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "Stages" })).toBeVisible();
   await page.evaluate(async () => {
     await Promise.all([
       document.fonts.load('400 16px "Plus Jakarta Sans"'),
@@ -111,13 +70,11 @@ async function expectPhoneBoardMatches(browser: Browser, appServerUrl: string, t
 
   expect(results.violations, theme).toEqual([]);
 
-  const contentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
 
-  expect(contentHeight).toBe(PHONE_HEIGHT);
-
-  await expect(page).toHaveScreenshot(`390-${theme}.png`, {
-    maxDiffPixelRatio: 0.01,
-  });
+  expect(overflow, theme).toBe(false);
   await context.close();
 }
 

@@ -1,75 +1,49 @@
+import { ArrowRight, Bell, CircleHelp, Clock, Hash, Mail, Pause, Send } from "lucide-react";
 import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
 import { dateKey, timeText } from "../lib/home-time.ts";
 import type { NotificationRow } from "../lib/notifications-api.ts";
-import { NavGlyph } from "./nav-glyph.tsx";
-
-type GlyphName = Parameters<typeof NavGlyph>[0]["name"];
+import { Button } from "./ui/button.tsx";
+import { dsMono } from "./ui/ds.ts";
 
 const ACTIONS = new Map(Object.entries(copy.notifications.page.actions));
 
-function glyphFor(kind: string) {
+function renderKindIcon(kind: string) {
   switch (kind) {
     case "ready": {
-      return "send";
+      return <Send size={16} />;
     }
 
     case "review": {
-      return "review";
+      return <CircleHelp size={16} />;
     }
 
     case "reply":
     case "interview":
     case "offer": {
-      return "mail";
+      return <Mail size={16} />;
     }
 
     case "stage_move": {
-      return "forward";
+      return <ArrowRight size={16} />;
     }
 
     case "code_wait": {
-      return "hash";
+      return <Hash size={16} />;
     }
 
     case "paused": {
-      return "pause";
+      return <Pause size={16} />;
     }
 
     case "failed":
     case "alert": {
-      return "clock";
+      return <Clock size={16} />;
     }
 
     default: {
-      return "bell";
-    }
-  }
-}
-
-function toneFor(kind: string) {
-  switch (kind) {
-    case "ready": {
-      return "bg-ok-soft text-ok";
-    }
-
-    case "review":
-    case "paused":
-    case "failed":
-    case "alert": {
-      return "bg-need-soft text-need";
-    }
-
-    case "reply":
-    case "interview":
-    case "offer":
-    case "code_wait": {
-      return "bg-signal-soft text-signal-text";
-    }
-
-    default: {
-      return "bg-muted text-foreground";
+      return <Bell size={16} />;
     }
   }
 }
@@ -88,9 +62,7 @@ function stampFor(row: NotificationRow, now: number, zone: string) {
     weekday: "short",
   });
 
-  const date = formatter.format(new Date(row.at));
-
-  return date.replace(",", "");
+  return formatter.format(new Date(row.at)).replace(",", "");
 }
 
 function undoApplicationId(url: string) {
@@ -100,9 +72,6 @@ function undoApplicationId(url: string) {
     return null;
   }
 }
-
-const compactControlClass =
-  "flex h-[34px] items-center justify-center rounded-md border border-input bg-card px-3 group-hover:bg-muted";
 
 export function NotificationItem({
   now,
@@ -120,54 +89,52 @@ export function NotificationItem({
   const label = ACTIONS.get(row.kind) ?? null;
   const undoId = undoApplicationId(row.url);
   const unread = row.readAt === null;
-  const glyph: GlyphName = glyphFor(row.kind);
 
   return (
-    <li className="relative flex gap-3.5 border-t border-border py-4 first:border-t-0">
-      {unread ? (
-        <span
-          aria-hidden="true"
-          className="absolute -left-2.5 top-[22px] block h-[7px] w-[7px] rounded-full bg-signal"
-        />
-      ) : null}
+    <li className="flex items-start gap-3.5 border-t border-border py-4 first:border-t-0">
       <span
-        className={`flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full ${toneFor(row.kind)}`}
+        aria-hidden="true"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-foreground"
       >
-        <NavGlyph name={glyph} size={16} />
+        {renderKindIcon(row.kind)}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3.5 gap-y-1">
-          <p className="text-[14.5px] font-semibold leading-[1.35]">
-            {unread ? <span className="sr-only">{copy.notifications.page.unread} </span> : null}
-            {row.title}
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            {unread ? (
+              <>
+                <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-signal" />
+                <span className="sr-only">{copy.notifications.page.unread}</span>
+              </>
+            ) : null}
+            <span>{row.title}</span>
           </p>
-          <span className="text-xs leading-[18px] text-muted-foreground">
-            {stampFor(row, now, zone)}
-          </span>
+          <span className={dsMono}>{stampFor(row, now, zone)}</span>
         </div>
-        <p className="mt-[3px] text-[13.5px] leading-[1.5] text-muted-foreground">{row.body}</p>
+        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{row.body}</p>
         {label === null ? null : (
-          <div className="mt-2.5 flex gap-2">
+          <div className="mt-3">
             {undoId === null ? (
-              <Link
-                className="group flex items-center justify-center text-[12.5px] font-semibold max-md:-mt-[5px] max-md:-mb-[5px] max-md:h-11"
-                onClick={() => {
-                  onRead(row.id);
-                }}
-                to={row.url}
-              >
-                <span className={compactControlClass}>{label}</span>
-              </Link>
+              <Button asChild size="sm" variant="outline">
+                <Link
+                  onClick={() => {
+                    onRead(row.id);
+                  }}
+                  to={row.url}
+                >
+                  {label}
+                </Link>
+              </Button>
             ) : (
-              <button
-                className="group flex items-center justify-center text-[12.5px] font-semibold max-md:-mt-[5px] max-md:-mb-[5px] max-md:h-11"
+              <Button
                 onClick={() => {
                   onAction(row);
                 }}
-                type="button"
+                size="sm"
+                variant="outline"
               >
-                <span className={compactControlClass}>{label}</span>
-              </button>
+                {label}
+              </Button>
             )}
           </div>
         )}

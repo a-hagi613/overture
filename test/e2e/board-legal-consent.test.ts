@@ -25,8 +25,6 @@ for (const width of [1280, 390]) {
         browser,
         height: width === 1280 ? 900 : 844,
         heading: "What you agree to",
-        name: `${String(width)}-${theme}`,
-        referenceDir: new URL("../../design/reference/consent/", import.meta.url),
         path: "/consent",
         theme,
         url: legalServer.url,

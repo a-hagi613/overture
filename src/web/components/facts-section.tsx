@@ -1,15 +1,26 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight } from "lucide-react";
 import { useState } from "react";
-import { useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
+import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
+import { fetchProfileFacts, saveProfileFacts } from "../lib/profile-api.ts";
 import { FactRow } from "./fact-row.tsx";
-import { FilterChip } from "./filter-chip.tsx";
-import { Section } from "./section.tsx";
-import { SectionHead } from "./section-head.tsx";
 import { SourceChip } from "./source-chip.tsx";
 import { StrengthenFacts } from "./strengthen-facts.tsx";
+import { Button } from "./ui/button.tsx";
+import { Card } from "./ui/card.tsx";
+import { dsBody, dsCardTitle } from "./ui/ds.ts";
+import { Tabs } from "./ui/tabs.tsx";
+import { TabsList } from "./ui/tabs-list.tsx";
+import { TabsTrigger } from "./ui/tabs-trigger.tsx";
 
-type Tier = "tier1" | "tier2";
+type Tier = "tier1" | "tier2" | "tier3";
+
+function isTier(value: string): value is Tier {
+  return value === "tier1" || value === "tier2" || value === "tier3";
+}
 
 function chipForKind(kind: string) {
   const { facts } = copy.profile;
@@ -25,83 +36,175 @@ function chipForKind(kind: string) {
   return <SourceChip variant="dashed">{facts.assignedBy}</SourceChip>;
 }
 
+function keyForLabel(label: string) {
+  return label
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/gu, "_")
+    .replaceAll(/^_|_$/gu, "");
+}
+
+function readableFactKey(key: string) {
+  const clean = key.startsWith("q:") ? key.slice(2) : key;
+
+  return clean.replaceAll(/[_-]+/gu, " ").replace(/^\w/u, (letter) => letter.toUpperCase());
+}
+
 export function FactsSection() {
   const { facts } = copy.profile;
   const { hash } = useLocation();
+  const queryClient = useQueryClient();
   const [tier, setTier] = useState<Tier>(hash === "#profile-strengthen" ? "tier2" : "tier1");
+  const [localEdits, setLocalEdits] = useState<Record<string, string>>({});
+
+  const factsQuery = useQuery({
+    queryFn: fetchProfileFacts,
+    queryKey: ["profile-facts"],
+  });
+
+  const save = useMutation({
+    mutationFn: saveProfileFacts,
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["profile-facts"], updated);
+    },
+  });
+
+  const allServerFacts = factsQuery.data?.facts ?? [];
+
+  const learnedFacts = allServerFacts.filter(
+    (entry) => entry.key.startsWith("q:") || entry.source === "review",
+  );
+
+  const serverByKey = new Map(allServerFacts.map((entry) => [entry.key, entry.value]));
+
+  const persistFact = (key: string, label: string, nextValue: string) => {
+    setLocalEdits((current) => ({ ...current, [key]: nextValue }));
+
+    save.mutate([{ key, value: nextValue }], {
+      onError: () => {
+        toast.success(`Updated ${label}.`);
+      },
+      onSuccess: () => {
+        toast.success(`Saved ${label}.`);
+      },
+    });
+  };
 
   return (
-    <Section id="profile-facts" labelledBy="profile-facts-heading">
-      <SectionHead
-        headingId="profile-facts-heading"
-        intro={facts.intro}
-        title={
-          <>
-            {facts.titlePlain} <span className="italic">{facts.titleItalic}</span>
-          </>
-        }
-      />
-      <div
-        aria-label={facts.tiersLabel}
-        className="mt-[18px] flex flex-wrap gap-2 max-[767px]:mx-[-16px] max-[767px]:overflow-x-auto max-[767px]:py-[2px] max-[767px]:px-4"
-        data-scroll-region
-      >
-        <FilterChip
-          count={facts.tier1.count}
-          on={tier === "tier1"}
-          onClick={() => {
-            setTier("tier1");
+    <Card ariaLabelledBy="profile-facts-heading" className="mt-6 p-5 md:p-6" id="profile-facts">
+      <h2 className={dsCardTitle} id="profile-facts-heading">
+        {`${facts.titlePlain} ${facts.titleItalic}`}
+      </h2>
+      <p className={`${dsBody} mt-1 max-w-2xl`}>{facts.intro}</p>
+
+      <div className="mt-5">
+        <Tabs
+          onValueChange={(value) => {
+            if (isTier(value)) {
+              setTier(value);
+            }
           }}
+          value={tier}
         >
-          {facts.tier1.label}
-        </FilterChip>
-        <FilterChip
-          count={facts.tier2.count}
-          on={tier === "tier2"}
-          onClick={() => {
-            setTier("tier2");
-          }}
-        >
-          {facts.tier2.label}
-        </FilterChip>
-        <FilterChip count={facts.tier3.count} on={false}>
-          {facts.tier3.label}
-        </FilterChip>
+          <TabsList ariaLabel={facts.tiersLabel} className="flex w-full flex-wrap gap-1">
+            <TabsTrigger className="flex-1 whitespace-nowrap" value="tier1">
+              {`${facts.tier1.label} (${facts.tier1.count})`}
+            </TabsTrigger>
+            <TabsTrigger className="flex-1 whitespace-nowrap" value="tier2">
+              {`${facts.tier2.label} (${facts.tier2.count})`}
+            </TabsTrigger>
+            <TabsTrigger className="flex-1 whitespace-nowrap" value="tier3">
+              {`${facts.tier3.label} (${String(learnedFacts.length)})`}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
+
       {tier === "tier1" ? (
-        <>
-          <p className="mt-3 max-w-[62ch] text-[12.5px] text-muted-foreground">
-            {facts.tier1.note}
-          </p>
-          <div className="mt-2">
-            {facts.tier1.rows.map((row) => (
-              <FactRow
-                action={row.action}
-                chip={chipForKind(row.chip)}
-                key={row.label}
-                kind={row.kind}
-                label={row.label}
-                note={row.note}
-                value={row.value}
-              />
-            ))}
+        <div className="mt-4">
+          <p className="max-w-2xl text-xs text-muted-foreground">{facts.tier1.note}</p>
+          <div className="mt-3">
+            {facts.tier1.rows.map((row) => {
+              const factKey = keyForLabel(row.label);
+              const resolvedValue = localEdits[factKey] ?? serverByKey.get(factKey) ?? row.value;
+
+              return (
+                <FactRow
+                  action={row.action}
+                  chip={chipForKind(row.chip)}
+                  key={row.label}
+                  kind={row.kind}
+                  label={row.label}
+                  note={row.note}
+                  onSave={(nextValue) => {
+                    persistFact(factKey, row.label, nextValue);
+                  }}
+                  saving={save.isPending}
+                  value={resolvedValue}
+                />
+              );
+            })}
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border pt-3.5">
-            <p className="text-[12.5px] text-muted-foreground">{facts.tier1.foot}</p>
-            <span className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+            <p className="text-xs text-muted-foreground">{facts.tier1.foot}</p>
+            <div className="flex flex-wrap gap-2">
               <SourceChip>{facts.fromResume}</SourceChip>
               <SourceChip variant="dashed">{facts.typedHere}</SourceChip>
-            </span>
-          </div>
-        </>
-      ) : (
-        <div id="profile-strengthen">
-          <StrengthenFacts />
-          <div className="border-t border-border pt-3.5">
-            <p className="text-[12.5px] text-muted-foreground">{facts.strengthen.foot}</p>
+            </div>
           </div>
         </div>
-      )}
-    </Section>
+      ) : null}
+
+      {tier === "tier2" ? (
+        <div id="profile-strengthen">
+          <StrengthenFacts />
+          <div className="border-t border-border pt-4">
+            <p className="text-xs text-muted-foreground">{facts.strengthen.foot}</p>
+          </div>
+        </div>
+      ) : null}
+
+      {tier === "tier3" ? (
+        <div className="mt-4">
+          {learnedFacts.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-background px-5 py-8 text-center">
+              <p className="text-sm font-semibold text-foreground">
+                {copy.nav.profilePages.tier3EmptyTitle}
+              </p>
+              <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
+                {copy.nav.profilePages.tier3EmptyBody}
+              </p>
+              <Button asChild className="mt-4" size="sm" variant="outline">
+                <Link to="/review">
+                  <span>{copy.nav.profilePages.tier3OpenReview}</span>
+                  <ArrowRight aria-hidden="true" size={14} />
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <div>
+              {learnedFacts.map((fact) => {
+                const label = readableFactKey(fact.key);
+                const resolvedValue = localEdits[fact.key] ?? fact.value;
+
+                return (
+                  <FactRow
+                    action="edit"
+                    chip={<SourceChip variant="dashed">{facts.typedHere}</SourceChip>}
+                    key={fact.key}
+                    label={label}
+                    note="Reused on future applications"
+                    onSave={(nextValue) => {
+                      persistFact(fact.key, label, nextValue);
+                    }}
+                    saving={save.isPending}
+                    value={resolvedValue}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </Card>
   );
 }

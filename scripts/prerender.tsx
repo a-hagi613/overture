@@ -9,7 +9,6 @@ import {
 } from "../src/shared/marketing-paths.ts";
 import { STATIC_ASSET_SECURITY_HEADERS } from "../src/shared/security-headers.ts";
 import { LandingPage } from "../src/web/routes/landing.tsx";
-import { PricingPage } from "../src/web/routes/pricing.tsx";
 
 const rootMarker = '<div id="root"></div>';
 const dist = join(process.cwd(), "dist");
@@ -18,7 +17,6 @@ const shellPath = join(dist, "index.html");
 
 const renderers = new Map<string, () => string>([
   ["/", () => renderToStaticMarkup(<LandingPage />)],
-  ["/pricing", () => renderToStaticMarkup(<PricingPage />)],
 ]);
 
 if (!existsSync(shellPath)) {
@@ -82,5 +80,5 @@ for (const path of PRERENDERED_MARKETING_PATHS) {
 writeFileSync(join(marketingRoot, "_headers"), headersFile());
 
 process.stdout.write(
-  `prerender: wrote dist/index.html, dist/pricing/index.html, dist/app-shell.html, ${MARKETING_BUILD_ROOT}/\n`,
+  `prerender: wrote dist/index.html, dist/app-shell.html, ${MARKETING_BUILD_ROOT}/\n`,
 );

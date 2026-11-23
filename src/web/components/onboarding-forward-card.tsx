@@ -1,23 +1,29 @@
+import { ArrowLeft, Check, CheckCircle2, Copy, Mail } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 
 import { ATS_MAIL_DOMAINS } from "../../shared/ats-mail-domains.ts";
 import { copy } from "../../shared/copy.ts";
-import { NavGlyph } from "./nav-glyph.tsx";
 import { OnboardingFilterStep } from "./onboarding-filter-step.tsx";
+import { Button } from "./ui/button.tsx";
+import { Card } from "./ui/card.tsx";
+import { dsBody, dsCardTitle, dsEyebrow } from "./ui/ds.ts";
+import { Input } from "./ui/input.tsx";
 
 const filterDomains = Object.values(ATS_MAIL_DOMAINS).flat().join(" OR ");
-
 const text = copy.onboarding.forward;
 
 export function OnboardingForwardCard({
   address,
   alreadyAgreed,
+  backTo = "/onboarding/targets",
   forwardingWorks,
   onStart,
 }: {
   address: string;
   alreadyAgreed: boolean;
+  backTo?: string;
   forwardingWorks: boolean;
   onStart: () => Promise<void>;
 }) {
@@ -30,6 +36,7 @@ export function OnboardingForwardCard({
     try {
       await navigator.clipboard.writeText(address);
       setCopied(true);
+      toast.success(text.copied);
     } catch {
       setCopied(false);
     }
@@ -50,105 +57,100 @@ export function OnboardingForwardCard({
   const testMail = `mailto:${address}?subject=${encodeURIComponent(text.testSubject)}`;
 
   return (
-    <section
-      aria-labelledby="ob-h"
-      className="obd rounded-lg border border-border bg-card shadow-sh"
-    >
-      <h2
-        className="serif"
-        id="ob-h"
-        style={{ fontSize: "clamp(28px, 4vw, 36px)", lineHeight: 1.1 }}
-      >
-        {text.titlePlain} <span className="italic">{text.titleItalic}</span>
+    <Card ariaLabelledBy="ob-h" className="p-6 md:p-8" variant="elevated">
+      <h2 className={dsCardTitle} id="ob-h">
+        {`${text.titlePlain} ${text.titleItalic}`}
       </h2>
-      <p className="mt-2.5 max-w-[52ch] text-[14.5px] text-muted-foreground">{text.intro}</p>
+      <p className={`${dsBody} mt-2 max-w-xl`}>{text.intro}</p>
 
       <div className="mt-6">
-        <label className="lbl" htmlFor="w-addr">
+        <label className={`${dsEyebrow} mb-2 block`} htmlFor="w-addr">
           {text.addressLabel}
         </label>
-        <div className="flex flex-wrap items-stretch gap-2">
-          <input
-            className="inp mono"
-            id="w-addr"
-            readOnly
-            style={{ flex: "1 1 260px", fontSize: 13, height: 44, minWidth: 0 }}
-            value={address}
-          />
-          <button
-            aria-label={text.copyLabel}
-            className="btn2"
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Input className="font-mono text-xs" id="w-addr" readOnly value={address} />
+          <Button
+            ariaLabel={text.copyLabel}
+            className="shrink-0"
             onClick={() => {
               void copyAddress();
             }}
-            style={{ minHeight: 44 }}
-            type="button"
+            size="default"
+            variant="secondary"
           >
-            <NavGlyph name="copy" size={16} />
-            {copied ? text.copied : text.copy}
-          </button>
+            {copied ? (
+              <Check aria-hidden="true" size={15} />
+            ) : (
+              <Copy aria-hidden="true" size={15} />
+            )}
+            <span>{copied ? text.copied : text.copy}</span>
+          </Button>
         </div>
-        <p className="hint mt-1.5">{text.addressNote}</p>
+        <p className="mt-1.5 text-xs text-muted-foreground">{text.addressNote}</p>
       </div>
 
-      <div className="mt-[26px]">
-        <h3 className="lbl">{text.filterTitle}</h3>
-        <ol className="mt-3 flex list-none flex-col gap-3.5 p-0">
+      <div className="mt-6">
+        <h3 className={dsEyebrow}>{text.filterTitle}</h3>
+        <ol className="mt-3 flex flex-col gap-3.5">
           <OnboardingFilterStep position={1}>
             <p>
               {text.stepOne.before}
-              <strong>{text.stepOne.bold}</strong>
+              <strong className="font-semibold">{text.stepOne.bold}</strong>
               {text.stepOne.between}
-              <strong>{text.stepOne.boldEnd}</strong>
+              <strong className="font-semibold">{text.stepOne.boldEnd}</strong>
               {text.stepOne.after}
             </p>
           </OnboardingFilterStep>
           <OnboardingFilterStep position={2}>
             <p>
               {text.stepTwo.before}
-              <strong>{text.stepTwo.bold}</strong>
+              <strong className="font-semibold">{text.stepTwo.bold}</strong>
               {text.stepTwo.after}
             </p>
-            <p className="mono mt-2 rounded-md border border-border bg-muted px-3 py-2.5 text-[12px] text-muted-foreground [overflow-wrap:anywhere]">
+            <p className="mt-2 break-all rounded-lg border border-border bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
               {filterDomains}
             </p>
           </OnboardingFilterStep>
           <OnboardingFilterStep position={3}>
             <p>
               {text.stepThree.before}
-              <strong>{text.stepThree.bold}</strong>
+              <strong className="font-semibold">{text.stepThree.bold}</strong>
               {text.stepThree.after}
             </p>
           </OnboardingFilterStep>
         </ol>
       </div>
 
-      <div className="mt-[26px] rounded-[10px] border border-input bg-background px-[18px] pt-[18px] pb-4">
-        <p className="text-[15px] font-semibold">{text.checkTitle}</p>
+      <Card className="mt-6 p-4 shadow-none" variant="muted">
+        <p className="text-sm font-semibold text-foreground">{text.checkTitle}</p>
         {forwardingWorks ? (
-          <output className="okbox mt-3">
-            <span className="mt-px flex-none">
-              <NavGlyph name="check" size={16} />
-            </span>
-            <p className="text-[13.5px] text-foreground">{text.received}</p>
+          <output className="mt-2.5 flex items-center gap-2 text-xs font-medium text-ok">
+            <CheckCircle2 aria-hidden="true" size={15} />
+            <span>{text.received}</span>
           </output>
         ) : (
-          <>
-            <output className="mt-1 block text-[14px] text-muted-foreground">{text.waiting}</output>
-            <a className="btn2 mt-3" href={testMail} style={{ minHeight: 44 }}>
-              {text.sendTest}
-            </a>
-          </>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+            <output className="text-xs text-muted-foreground">{text.waiting}</output>
+            <Button asChild size="sm" variant="outline">
+              <a href={testMail}>
+                <Mail aria-hidden="true" size={14} />
+                <span>{text.sendTest}</span>
+              </a>
+            </Button>
+          </div>
         )}
-        <p className="mt-3.5 border-t border-border pt-3 text-[13px] text-muted-foreground">
+        <p className="mt-3 border-t border-border pt-2.5 text-xs text-muted-foreground">
           {text.skipNote}
         </p>
-      </div>
+      </Card>
 
-      <div className="mt-[26px] flex items-start gap-3">
+      <label
+        className="mt-6 flex cursor-pointer items-start gap-3 rounded-lg border border-input bg-background p-4"
+        htmlFor="w-consent"
+      >
         <input
           checked={agreed}
-          className="mt-0.5 size-5 flex-none cursor-pointer accent-[var(--color-foreground)]"
+          className="mt-0.5 size-4 shrink-0 accent-signal"
           disabled={starting}
           id="w-consent"
           onChange={(event) => {
@@ -156,52 +158,54 @@ export function OnboardingForwardCard({
           }}
           type="checkbox"
         />
-        <label className="cursor-pointer text-[14px] leading-[1.5]" htmlFor="w-consent">
+        <span className="text-sm leading-relaxed text-foreground">
           {text.agreeBefore}
-          <Link className="text-[color:var(--acct)] underline" to="/terms">
+          <Link className="font-medium text-signal-text underline underline-offset-4" to="/terms">
             {text.terms}
           </Link>
           {text.agreeBetween}
-          <Link className="text-[color:var(--acct)] underline" to="/privacy">
+          <Link className="font-medium text-signal-text underline underline-offset-4" to="/privacy">
             {text.privacy}
           </Link>
           {text.agreeAfter}
-        </label>
-      </div>
+        </span>
+      </label>
 
-      <p className="mt-[22px] border-t border-border pt-4 text-[14px]">{text.firstRun}</p>
+      <p className="mt-5 border-t border-border pt-4 text-sm text-muted-foreground">
+        {text.firstRun}
+      </p>
 
       {failed ? (
-        <p className="hint mt-4 text-[color:var(--need)]" role="alert">
+        <p className="mt-3 text-xs font-semibold text-need" role="alert">
           {text.startFailed}
         </p>
       ) : null}
 
-      <div className="ftr mt-5 flex items-center justify-between gap-3 border-t border-border pt-5">
-        <Link className="btng" style={{ minHeight: 44 }} to="/onboarding/targets">
-          <NavGlyph name="back" size={16} />
-          {copy.onboarding.back}
-        </Link>
-        <div className="flex flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-2.5">
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
+        <Button asChild size="default" variant="ghost">
+          <Link to={backTo}>
+            <ArrowLeft aria-hidden="true" size={15} />
+            <span>{copy.onboarding.back}</span>
+          </Link>
+        </Button>
+        <div className="flex flex-1 flex-wrap items-center justify-end gap-4">
           {agreed ? null : (
-            <p className="hint text-right" id="w-why">
+            <p className="text-right text-xs text-muted-foreground" id="w-why">
               {text.tickToStart}
             </p>
           )}
-          <button
-            aria-describedby={agreed ? undefined : "w-why"}
-            className="btn"
+          <Button
             disabled={!agreed || starting}
             onClick={() => {
               void start();
             }}
-            style={{ minHeight: 48, padding: "0 26px" }}
-            type="button"
+            size="lg"
+            variant="primary"
           >
             {starting ? text.starting : text.start}
-          </button>
+          </Button>
         </div>
       </div>
-    </section>
+    </Card>
   );
 }

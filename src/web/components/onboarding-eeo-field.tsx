@@ -17,7 +17,7 @@ export function OnboardingEeoField({
 }) {
   return (
     <div>
-      <label className="lbl" htmlFor={id}>
+      <label className="mb-1.5 block text-xs font-semibold text-foreground" htmlFor={id}>
         {label}
       </label>
       <OnboardingSelectField

@@ -1,16 +1,19 @@
+import { Button } from "./ui/button.tsx";
+
 export function OnboardingTargetChip(props: {
   children: string;
   on: boolean;
   onClick: () => void;
 }) {
   return (
-    <button
-      aria-pressed={props.on}
-      className={`cpx${props.on ? " on" : ""}`}
+    <Button
+      ariaPressed={props.on}
+      className="rounded-full"
       onClick={props.onClick}
-      type="button"
+      size="sm"
+      variant={props.on ? "primary" : "outline"}
     >
       {props.children}
-    </button>
+    </Button>
   );
 }

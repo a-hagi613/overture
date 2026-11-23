@@ -11,22 +11,32 @@ const navCountsSchema = z.object({
 
 export type NavCounts = z.infer<typeof navCountsSchema>;
 
-export type NavKey = "home" | "ready" | "board" | "review" | "inbox" | "calendar" | "profile";
+export type NavKey =
+  | "home"
+  | "board"
+  | "ready"
+  | "review"
+  | "inbox"
+  | "calendar"
+  | "profile"
+  | "support";
 
 export const NAV_DESTINATIONS = [
-  { glyph: "home", to: "/" },
-  { glyph: "ready", to: "/ready" },
+  { glyph: "home", to: "/home" },
   { glyph: "board", to: "/board" },
+  { glyph: "ready", to: "/ready" },
   { glyph: "review", to: "/review" },
   { glyph: "inbox", to: "/inbox" },
   { glyph: "calendar", to: "/calendar" },
-  { glyph: "profile", to: "/profile" },
 ] as const satisfies readonly { glyph: NavKey; to: string }[];
 
-/** The phone tab bar keeps six; Calendar is reached from the Home and Board headers (ADR 0034). */
-export const TAB_DESTINATIONS = NAV_DESTINATIONS.filter(
-  (destination) => destination.glyph !== "calendar",
-);
+export const PROFILE_SUBMENU = [
+  { key: "resume", label: copy.nav.profileMenu.resume, to: "/profile/resume" },
+  { key: "details", label: copy.nav.profileMenu.details, to: "/profile/details" },
+  { key: "preferences", label: copy.nav.profileMenu.preferences, to: "/profile/preferences" },
+  { key: "billing", label: copy.nav.profileMenu.billing, to: "/profile/billing" },
+  { key: "account", label: copy.nav.profileMenu.account, to: "/profile/account" },
+] as const;
 
 export const NO_NAV_COUNTS: NavCounts = { inboxUnread: 0, ready: 0, review: 0 };
 
@@ -40,11 +50,6 @@ async function loadNavCounts() {
   return navCountsSchema.parse(await response.json());
 }
 
-/**
- * Live counts for the shell's nav badges.
- *
- * @returns The counts, all zero until the request lands (which renders no badge).
- */
 export function useNavCounts() {
   const { data } = useQuery({ queryKey: ["nav"], queryFn: loadNavCounts, retry: false });
 

@@ -26,7 +26,7 @@ export async function enableVirtualAuthenticator(page: Page) {
 export async function signInOwnerOnAdmin(page: Page, adminAppUrl: string) {
   await page.goto(`${adminAppUrl}/signin`);
   await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
-  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+  await page.getByRole("button", { name: "Send sign-in link" }).click();
   await page.getByText("Link sent to").waitFor();
 
   const link = await latestMailLink(adminAppUrl, page.request, authTestIdentity.ownerEmail);

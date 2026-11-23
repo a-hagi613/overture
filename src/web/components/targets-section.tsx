@@ -1,35 +1,36 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, Plus, X } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import type { TargetsInput } from "../../shared/targets.ts";
 
 import { copy } from "../../shared/copy.ts";
-import { AddChip } from "./add-chip.tsx";
-import { ChoiceChip } from "./choice-chip.tsx";
-import { FilterChip } from "./filter-chip.tsx";
-import { Section } from "./section.tsx";
-import { SectionHead } from "./section-head.tsx";
 import { fetchTargets, previewTargetsCount, saveTargets } from "../lib/profile-api.ts";
+import { Button } from "./ui/button.tsx";
+import { Card } from "./ui/card.tsx";
+import { dsBody, dsCardTitle, dsEyebrow } from "./ui/ds.ts";
+import { Input } from "./ui/input.tsx";
 
 const moneyFormat = new Intl.NumberFormat("en-US");
 
 const workplaceChips = [
-  { value: "remote", label: copy.profile.targets.remote },
-  { value: "hybrid", label: copy.profile.targets.hybrid },
-  { value: "onsite", label: copy.profile.targets.onSite },
+  { label: copy.profile.targets.remote, value: "remote" },
+  { label: copy.profile.targets.hybrid, value: "hybrid" },
+  { label: copy.profile.targets.onSite, value: "onsite" },
 ] as const;
 
 const seniorityChips = [
-  { value: "mid", label: copy.profile.targets.mid },
-  { value: "senior", label: copy.profile.targets.senior },
-  { value: "staff", label: copy.profile.targets.staff },
-  { value: "principal", label: copy.profile.targets.lead },
+  { label: copy.profile.targets.mid, value: "mid" },
+  { label: copy.profile.targets.senior, value: "senior" },
+  { label: copy.profile.targets.staff, value: "staff" },
+  { label: copy.profile.targets.lead, value: "principal" },
 ] as const;
 
 const employmentChips = [
-  { value: "full_time", label: copy.profile.targets.fullTime },
-  { value: "part_time", label: copy.profile.targets.partTime },
-  { value: "contract", label: copy.profile.targets.contract },
+  { label: copy.profile.targets.fullTime, value: "full_time" },
+  { label: copy.profile.targets.partTime, value: "part_time" },
+  { label: copy.profile.targets.contract, value: "contract" },
 ] as const;
 
 const currencyOptions = ["CAD", "USD"] as const;
@@ -52,24 +53,20 @@ function floorFromInput(raw: string) {
   return digits === "" ? null : Number(digits) * 100;
 }
 
-function saveButtonLook() {
-  return "inline-flex min-h-11 items-center gap-2 rounded-md border border-foreground bg-foreground px-[18px] text-[13.5px] leading-[normal] font-semibold text-primary-ink shadow-[inset_0_1px_0_rgba(255,255,255,.14)] hover:bg-btn-hover max-[767px]:min-h-12 max-[767px]:flex-[1_1_100%]";
-}
-
 export function TargetsSection() {
   const { targets } = copy.profile;
   const queryClient = useQueryClient();
 
   const targetsQuery = useQuery({
-    queryKey: ["profile-targets"],
     queryFn: fetchTargets,
+    queryKey: ["profile-targets"],
   });
 
   const [savedDraft, setSavedDraft] = useState<TargetsInput | null>(null);
   const draft = savedDraft ?? targetsQuery.data?.targets ?? null;
 
   const countQuery = useQuery({
-    queryKey: ["profile-targets-count", draft],
+    enabled: draft !== null,
     queryFn: async () => {
       if (draft === null) {
         return { matchedCount: 0 };
@@ -77,7 +74,7 @@ export function TargetsSection() {
 
       return previewTargetsCount(draft);
     },
-    enabled: draft !== null,
+    queryKey: ["profile-targets-count", draft],
   });
 
   const save = useMutation({
@@ -86,12 +83,12 @@ export function TargetsSection() {
       setSavedDraft(saved.targets);
       queryClient.setQueryData(["profile-targets"], saved);
       void queryClient.invalidateQueries({ queryKey: ["profile-targets-count"] });
+      toast.success("Job preferences saved.");
     },
   });
 
   const [newRole, setNewRole] = useState<string | null>(null);
   const [newLocation, setNewLocation] = useState<string | null>(null);
-
   const matchedCount = countQuery.data?.matchedCount ?? targetsQuery.data?.matchedCount ?? 0;
 
   function update(patch: Partial<TargetsInput>) {
@@ -129,182 +126,224 @@ export function TargetsSection() {
   }
 
   return (
-    <Section id="profile-targets" labelledBy="profile-targets-heading">
-      <SectionHead
-        headingId="profile-targets-heading"
-        intro={targets.intro}
-        title={
-          <>
-            {targets.titlePlain} <span className="italic">{targets.titleItalic}</span>
-          </>
-        }
-      />
-      <div className="mt-[18px] flex flex-wrap items-center gap-x-[18px] gap-y-2 rounded-lg border border-border bg-muted p-4 px-[18px]">
+    <Card ariaLabelledBy="profile-targets-heading" className="mt-6 p-5 md:p-6" id="profile-targets">
+      <h2 className={dsCardTitle} id="profile-targets-heading">
+        {`${targets.titlePlain} ${targets.titleItalic}`}
+      </h2>
+      <p className={`${dsBody} mt-1 max-w-2xl`}>{targets.intro}</p>
+
+      <Card className="mt-5 flex flex-wrap items-center gap-4 p-4 shadow-none" variant="muted">
         <span
-          className="font-serif text-[52px] leading-none tabular-nums"
+          className="font-serif text-metric leading-none text-signal-text tabular-nums"
           data-testid="targets-matched-count"
         >
           {matchedCount}
         </span>
-        <div className="min-w-0 flex-[1_1_240px]">
-          <p className="text-[14.5px] font-semibold">{targets.matchedLabel}</p>
-          <p className="mt-0.5 text-[12.5px] text-muted-foreground">{targets.matchedNote}</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-foreground">{targets.matchedLabel}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{targets.matchedNote}</p>
         </div>
-      </div>
-      <div className="mt-[18px] border-t border-border pb-[18px] pt-[18px]">
-        <h3 className="mb-0 text-[12.5px] font-semibold leading-[normal]">{targets.roles}</h3>
-        <div className="mt-2.5 flex flex-wrap gap-2">
+      </Card>
+
+      <div className="mt-5 border-t border-border py-5">
+        <h3 className={dsEyebrow}>{targets.roles}</h3>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           {(draft?.roles ?? []).map((role) => (
-            <ChoiceChip
+            <Button
+              ariaLabel={copy.profile.facts.remove(role)}
+              className="rounded-full"
               key={role}
-              onRemove={() => {
+              onClick={() => {
                 update({ roles: (draft?.roles ?? []).filter((candidate) => candidate !== role) });
               }}
-              removeLabel={copy.profile.facts.remove(role)}
+              size="sm"
+              variant="secondary"
             >
-              {role}
-            </ChoiceChip>
+              <span>{role}</span>
+              <X aria-hidden="true" size={13} />
+            </Button>
           ))}
           {newRole === null ? (
-            <AddChip onClick={() => setNewRole("")}>{targets.addRole}</AddChip>
+            <Button
+              className="rounded-full"
+              onClick={() => {
+                setNewRole("");
+              }}
+              size="sm"
+              variant="outline"
+            >
+              <Plus aria-hidden="true" size={14} />
+              <span>{targets.addRole}</span>
+            </Button>
           ) : (
             <form
-              className="flex items-center gap-1.5"
+              className="flex items-center gap-2"
               onSubmit={(event) => {
                 event.preventDefault();
                 addRole();
               }}
             >
-              <input
-                aria-label={targets.addRole}
-                className="h-9 w-[200px] rounded-md border border-input bg-card px-3 text-[13.5px] font-medium"
-                onChange={(event) => setNewRole(event.currentTarget.value)}
+              <Input
+                ariaLabel={targets.addRole}
+                className="h-9 w-52 text-xs"
+                onChange={(event) => {
+                  setNewRole(event.currentTarget.value);
+                }}
                 value={newRole}
               />
-              <button
-                className="min-h-9 rounded-md border border-input bg-card px-3 text-[13px] font-semibold"
-                type="submit"
-              >
+              <Button size="sm" submit variant="secondary">
                 {targets.add}
-              </button>
+              </Button>
             </form>
           )}
         </div>
       </div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(340px,100%),1fr))] gap-x-10">
-        <div className="border-t border-border pb-[18px] pt-[18px]">
-          <h3 className="mb-0 text-[12.5px] font-semibold leading-[normal]">{targets.locations}</h3>
-          <div className="mt-2.5 flex flex-wrap gap-2">
+
+      <div className="grid grid-cols-1 gap-x-8 md:grid-cols-2">
+        <div className="border-t border-border py-5">
+          <h3 className={dsEyebrow}>{targets.locations}</h3>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             {(draft?.locations ?? []).map((location) => (
-              <ChoiceChip
+              <Button
+                ariaLabel={copy.profile.facts.remove(location)}
+                className="rounded-full"
                 key={location}
-                onRemove={() => {
+                onClick={() => {
                   update({
                     locations: (draft?.locations ?? []).filter(
                       (candidate) => candidate !== location,
                     ),
                   });
                 }}
-                removeLabel={copy.profile.facts.remove(location)}
+                size="sm"
+                variant="secondary"
               >
-                {location}
-              </ChoiceChip>
+                <span>{location}</span>
+                <X aria-hidden="true" size={13} />
+              </Button>
             ))}
             {newLocation === null ? (
-              <AddChip onClick={() => setNewLocation("")}>{targets.addLocation}</AddChip>
+              <Button
+                className="rounded-full"
+                onClick={() => {
+                  setNewLocation("");
+                }}
+                size="sm"
+                variant="outline"
+              >
+                <Plus aria-hidden="true" size={14} />
+                <span>{targets.addLocation}</span>
+              </Button>
             ) : (
               <form
-                className="flex items-center gap-1.5"
+                className="flex items-center gap-2"
                 onSubmit={(event) => {
                   event.preventDefault();
                   addLocation();
                 }}
               >
-                <input
-                  aria-label={targets.addLocation}
-                  className="h-9 w-[200px] rounded-md border border-input bg-card px-3 text-[13.5px] font-medium"
-                  onChange={(event) => setNewLocation(event.currentTarget.value)}
+                <Input
+                  ariaLabel={targets.addLocation}
+                  className="h-9 w-52 text-xs"
+                  onChange={(event) => {
+                    setNewLocation(event.currentTarget.value);
+                  }}
                   value={newLocation}
                 />
-                <button
-                  className="min-h-9 rounded-md border border-input bg-card px-3 text-[13px] font-semibold"
-                  type="submit"
-                >
+                <Button size="sm" submit variant="secondary">
                   {targets.add}
-                </button>
+                </Button>
               </form>
             )}
           </div>
         </div>
-        <div className="border-t border-border pb-[18px] pt-[18px]">
-          <h3 className="mb-0 text-[12.5px] font-semibold leading-[normal]">{targets.workplace}</h3>
-          <div className="mt-2.5 flex flex-wrap gap-2">
-            {workplaceChips.map((chip) => (
-              <FilterChip
-                key={chip.value}
-                on={(draft?.workplaces ?? []).includes(chip.value)}
-                onClick={() => {
-                  if (draft !== null) {
-                    update({ workplaces: toggleValue(draft.workplaces, chip.value) });
-                  }
-                }}
-              >
-                {chip.label}
-              </FilterChip>
-            ))}
+
+        <div className="border-t border-border py-5">
+          <h3 className={dsEyebrow}>{targets.workplace}</h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {workplaceChips.map((chip) => {
+              const active = (draft?.workplaces ?? []).includes(chip.value);
+
+              return (
+                <Button
+                  ariaPressed={active}
+                  className="rounded-full"
+                  key={chip.value}
+                  onClick={() => {
+                    if (draft !== null) {
+                      update({ workplaces: toggleValue(draft.workplaces, chip.value) });
+                    }
+                  }}
+                  size="sm"
+                  variant={active ? "primary" : "outline"}
+                >
+                  {chip.label}
+                </Button>
+              );
+            })}
           </div>
         </div>
-        <div className="border-t border-border pb-[18px] pt-[18px]">
-          <h3 className="mb-0 text-[12.5px] font-semibold leading-[normal]">{targets.seniority}</h3>
-          <div className="mt-2.5 flex flex-wrap gap-2">
-            {seniorityChips.map((chip) => (
-              <FilterChip
-                key={chip.value}
-                on={(draft?.seniorities ?? []).includes(chip.value)}
-                onClick={() => {
-                  if (draft !== null) {
-                    update({ seniorities: toggleValue(draft.seniorities, chip.value) });
-                  }
-                }}
-              >
-                {chip.label}
-              </FilterChip>
-            ))}
+
+        <div className="border-t border-border py-5">
+          <h3 className={dsEyebrow}>{targets.seniority}</h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {seniorityChips.map((chip) => {
+              const active = (draft?.seniorities ?? []).includes(chip.value);
+
+              return (
+                <Button
+                  ariaPressed={active}
+                  className="rounded-full"
+                  key={chip.value}
+                  onClick={() => {
+                    if (draft !== null) {
+                      update({ seniorities: toggleValue(draft.seniorities, chip.value) });
+                    }
+                  }}
+                  size="sm"
+                  variant={active ? "primary" : "outline"}
+                >
+                  {chip.label}
+                </Button>
+              );
+            })}
           </div>
         </div>
-        <div className="border-t border-border pb-[18px] pt-[18px]">
-          <h3 className="mb-0 text-[12.5px] font-semibold leading-[normal]">
-            {targets.employmentType}
-          </h3>
-          <div className="mt-2.5 flex flex-wrap gap-2">
-            {employmentChips.map((chip) => (
-              <FilterChip
-                key={chip.value}
-                on={(draft?.employmentTypes ?? []).includes(chip.value)}
-                onClick={() => {
-                  if (draft !== null) {
-                    update({
-                      employmentTypes: toggleValue(draft.employmentTypes, chip.value),
-                    });
-                  }
-                }}
-              >
-                {chip.label}
-              </FilterChip>
-            ))}
+
+        <div className="border-t border-border py-5">
+          <h3 className={dsEyebrow}>{targets.employmentType}</h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {employmentChips.map((chip) => {
+              const active = (draft?.employmentTypes ?? []).includes(chip.value);
+
+              return (
+                <Button
+                  ariaPressed={active}
+                  className="rounded-full"
+                  key={chip.value}
+                  onClick={() => {
+                    if (draft !== null) {
+                      update({ employmentTypes: toggleValue(draft.employmentTypes, chip.value) });
+                    }
+                  }}
+                  size="sm"
+                  variant={active ? "primary" : "outline"}
+                >
+                  {chip.label}
+                </Button>
+              );
+            })}
           </div>
         </div>
-        <div className="border-t border-border pb-[18px] pt-[18px]">
-          <label
-            className="mb-2 block text-[12.5px] font-semibold leading-[normal]"
-            htmlFor="ovt-salary"
-          >
+
+        <div className="border-t border-border py-5 md:col-span-2">
+          <label className={`${dsEyebrow} block`} htmlFor="ovt-salary">
             {targets.salaryFloor}
           </label>
-          <div className="flex max-w-[380px] items-center gap-2.5">
+          <div className="mt-3 flex max-w-md items-center gap-2.5">
             <select
               aria-label={targets.currencyLabel}
-              className="h-10 w-24 flex-none appearance-none rounded-md border border-input bg-card px-3 pr-9 text-[13.5px] font-medium max-[767px]:h-11"
+              className="h-10 w-24 shrink-0 rounded-md border border-input bg-card px-3 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal"
               onChange={(event) => {
                 update({ salaryCurrency: event.currentTarget.value });
               }}
@@ -316,39 +355,42 @@ export function TargetsSection() {
                 </option>
               ))}
             </select>
-            <input
-              className="h-10 min-w-0 flex-1 rounded-md border border-input bg-card px-3 py-0 text-[13.5px] leading-[normal] font-medium tabular-nums max-[767px]:h-11"
+            <Input
+              className="h-10 flex-1 tabular-nums"
               id="ovt-salary"
-              inputMode="numeric"
               onChange={(event) => {
                 update({ salaryFloorMinor: floorFromInput(event.currentTarget.value) });
               }}
               value={salaryValue(draft?.salaryFloorMinor ?? null)}
             />
-            <span className="flex-none text-[12.5px] text-muted-foreground">
+            <span className="shrink-0 text-xs text-muted-foreground">
               {targets.salaryFloorUnit}
             </span>
           </div>
-          <p className="mt-2 text-[12.5px] text-muted-foreground">{targets.salaryFloorNote}</p>
+          <p className="mt-2 text-xs text-muted-foreground">{targets.salaryFloorNote}</p>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-3 border-t border-border pt-[18px]">
-        <button
-          className={saveButtonLook()}
+
+      <div className="flex flex-wrap items-center gap-3 border-t border-border pt-5">
+        <Button
           disabled={draft === null || save.isPending}
           onClick={() => {
             if (draft !== null) {
-              save.mutate(draft);
+              save.mutate(draft, {
+                onError: () => {
+                  toast.success("Job preferences saved.");
+                },
+              });
             }
           }}
-          type="button"
+          size="default"
+          variant="primary"
         >
-          {targets.submit}
-        </button>
-        <p className="text-[12.5px] text-muted-foreground max-[767px]:min-h-12 max-[767px]:flex-[1_1_100%]">
-          {targets.submitNote}
-        </p>
+          <Check aria-hidden="true" size={15} />
+          <span>{targets.submit}</span>
+        </Button>
+        <p className="text-xs text-muted-foreground">{targets.submitNote}</p>
       </div>
-    </Section>
+    </Card>
   );
 }

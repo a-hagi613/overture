@@ -1,13 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown } from "lucide-react";
+import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
-import { FilterChip } from "./filter-chip.tsx";
 import { fetchProfileSettings, saveProfileSettings } from "../lib/profile-api.ts";
+import { Button } from "./ui/button.tsx";
+import { Card } from "./ui/card.tsx";
+import { dsCardTitle } from "./ui/ds.ts";
 
 const knownZones = [
-  { value: "America/Toronto", label: copy.settings.timeZoneToronto },
-  { value: "America/Vancouver", label: copy.settings.timeZoneVancouver },
-  { value: "Europe/Berlin", label: copy.settings.timeZoneBerlin },
+  { label: copy.settings.timeZoneToronto, value: "America/Toronto" },
+  { label: copy.settings.timeZoneVancouver, value: "America/Vancouver" },
+  { label: copy.settings.timeZoneBerlin, value: "Europe/Berlin" },
 ] as const;
 
 const languageChips = [
@@ -43,8 +47,8 @@ export function TimeLanguageSection() {
   const queryClient = useQueryClient();
 
   const settingsQuery = useQuery({
-    queryKey: ["profile-settings"],
     queryFn: fetchProfileSettings,
+    queryKey: ["profile-settings"],
   });
 
   const save = useMutation({
@@ -53,6 +57,7 @@ export function TimeLanguageSection() {
       queryClient.setQueryData(["profile-settings"], saved);
       void queryClient.invalidateQueries({ queryKey: ["profile-targets"] });
       void queryClient.invalidateQueries({ queryKey: ["profile-targets-count"] });
+      toast.success("Time and language updated.");
     },
   });
 
@@ -74,38 +79,33 @@ export function TimeLanguageSection() {
   }
 
   return (
-    <section
-      aria-labelledby="settings-time-language"
-      className="flex flex-col rounded-lg border border-border bg-card p-[20px_16px_22px] shadow-sh min-[768px]:p-[24px_28px_26px]"
-      data-testid="settings-time-language"
+    <Card
+      ariaLabelledBy="settings-time-language"
+      className="p-5 md:p-6"
+      dataTestId="settings-time-language"
     >
-      <div>
-        <h2
-          className="font-serif text-[28px] leading-[1.1] tracking-[-0.005em]"
-          id="settings-time-language"
-        >
-          {copy.settings.timeLanguageHeading}
-        </h2>
-      </div>
-      <div className="mt-2.5">
+      <h2 className={dsCardTitle} id="settings-time-language">
+        {copy.settings.timeLanguageHeading}
+      </h2>
+
+      <div className="mt-4 divide-y divide-border">
         <div
-          className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2.5 py-3.5"
+          className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between"
           data-testid="settings-time-zone-row"
         >
-          <div className="min-w-0 flex-[1_1_240px]">
+          <div className="min-w-0 flex-1">
             <label
-              className="block text-sm font-semibold leading-[1.4]"
+              className="block text-sm font-semibold text-foreground"
               htmlFor="settings-timezone"
             >
               {copy.settings.timeZoneLabel}
             </label>
-            <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
-              {copy.settings.timeZoneHint}
-            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{copy.settings.timeZoneHint}</p>
           </div>
-          <div className="relative h-10 w-[230px] flex-none max-[767px]:h-12">
+
+          <div className="relative w-full shrink-0 sm:w-56">
             <select
-              className="h-full w-full appearance-none rounded-md border border-input bg-card pl-3 pr-9 text-[13.5px] font-medium leading-[normal] text-foreground focus-visible:ring-2 focus-visible:ring-foreground"
+              className="h-10 w-full cursor-pointer appearance-none rounded-md border border-input bg-card pl-3 pr-9 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal"
               id="settings-timezone"
               onChange={(event) => {
                 persist(languages, event.currentTarget.value);
@@ -118,50 +118,49 @@ export function TimeLanguageSection() {
                 </option>
               ))}
             </select>
-            <svg
+            <ChevronDown
               aria-hidden="true"
-              className="pointer-events-none absolute right-[11px] top-3 text-muted-foreground max-[767px]:top-4"
-              fill="none"
-              height="16"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.8"
-              viewBox="0 0 24 24"
-              width="16"
-            >
-              <path d="M6 9l6 6 6-6" />
-            </svg>
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              size={15}
+            />
           </div>
         </div>
+
         <div
-          className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2.5 border-t border-border py-3.5"
+          className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between"
           data-testid="settings-posting-languages-row"
         >
-          <div className="min-w-0 flex-[1_1_240px]">
-            <p className="text-sm font-semibold leading-[1.4]" id="settings-posting-languages">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-foreground" id="settings-posting-languages">
               {copy.settings.languagesHeading}
             </p>
-            <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
-              {copy.settings.languagesHint}
-            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{copy.settings.languagesHint}</p>
           </div>
           <fieldset
             aria-labelledby="settings-posting-languages"
-            className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0"
+            className="m-0 flex flex-wrap gap-2 border-0 p-0"
           >
-            {languageChips.map((chip) => (
-              <FilterChip
-                key={chip.code}
-                on={languages.includes(chip.code)}
-                onClick={() => toggleLanguage(chip.code)}
-              >
-                {chip.label}
-              </FilterChip>
-            ))}
+            {languageChips.map((chip) => {
+              const active = languages.includes(chip.code);
+
+              return (
+                <Button
+                  ariaPressed={active}
+                  className="rounded-full"
+                  key={chip.code}
+                  onClick={() => {
+                    toggleLanguage(chip.code);
+                  }}
+                  size="sm"
+                  variant={active ? "primary" : "outline"}
+                >
+                  {chip.label}
+                </Button>
+              );
+            })}
           </fieldset>
         </div>
       </div>
-    </section>
+    </Card>
   );
 }

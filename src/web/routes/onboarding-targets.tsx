@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
 import { OnboardingLoadState } from "../components/onboarding-load-state.tsx";
 import { OnboardingShell } from "../components/onboarding-shell.tsx";
@@ -15,6 +15,9 @@ import { saveSkipCompanies } from "../lib/profile-api.ts";
 
 export function OnboardingTargetsPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const preview = params.get("preview") === "1";
+  const suffix = preview ? "?preview=1" : "";
   const state = useOnboardingState();
   const targets = useOnboardingTargets();
   const save = useSaveOnboardingTargets();
@@ -24,12 +27,16 @@ export function OnboardingTargetsPage() {
   const { mutate: persistTimezone } = saveTimezone;
 
   useEffect(() => {
+    if (preview) {
+      return;
+    }
+
     const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     if (zone !== "") {
       persistTimezone(zone);
     }
-  }, [persistTimezone]);
+  }, [persistTimezone, preview]);
 
   const retry = () => {
     void targets.refetch();
@@ -71,11 +78,15 @@ export function OnboardingTargetsPage() {
   return (
     <OnboardingShell step={4}>
       <OnboardingTargetsCard
-        backTo="/onboarding/facts"
+        backTo={`/onboarding/facts${suffix}`}
         onContinue={async () => {
-          await finish.mutateAsync(4);
-          await navigate("/onboarding/forward");
+          if (!preview) {
+            await finish.mutateAsync(4);
+          }
+
+          await navigate(`/onboarding/forward${suffix}`);
         }}
+        preview={preview}
         save={async (next) => save.mutateAsync(next)}
         saveSkip={saveSkipCompanies}
         skipCompanies={state.data.skipCompanies}

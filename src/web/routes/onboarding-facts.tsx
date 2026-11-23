@@ -1,8 +1,8 @@
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
-import { OnboardingLoadState } from "../components/onboarding-load-state.tsx";
 import { OnboardingFactsCard } from "../components/onboarding-facts-card.tsx";
+import { OnboardingLoadState } from "../components/onboarding-load-state.tsx";
 import { OnboardingShell } from "../components/onboarding-shell.tsx";
 import {
   useFinishOnboardingStep,
@@ -12,6 +12,9 @@ import {
 
 export function OnboardingFactsPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const preview = params.get("preview") === "1";
+  const suffix = preview ? "?preview=1" : "";
   const { data, isFetching, isPending, refetch } = useOnboardingFacts();
   const mutation = useSaveOnboardingFacts();
   const finish = useFinishOnboardingStep();
@@ -28,11 +31,15 @@ export function OnboardingFactsPage() {
         />
       ) : (
         <OnboardingFactsCard
-          backTo="/onboarding/resume"
+          backTo={`/onboarding/resume${suffix}`}
           onContinue={async () => {
-            await finish.mutateAsync(3);
-            await navigate("/onboarding/targets");
+            if (!preview) {
+              await finish.mutateAsync(3);
+            }
+
+            await navigate(`/onboarding/targets${suffix}`);
           }}
+          preview={preview}
           save={async (input) => mutation.mutateAsync(input)}
           view={data}
         />

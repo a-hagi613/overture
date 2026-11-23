@@ -18,13 +18,15 @@ test("the owner signs in from the sign-in screen with an emailed link", async ({
 
   await page.goto(`${appServerUrl}/signin`);
   await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
-  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+  await page.getByRole("button", { name: "Send sign-in link" }).click();
   await expect(page.getByText("Link sent to")).toBeVisible();
 
   const link = await latestMailLink(appServerUrl, page.request, authTestIdentity.ownerEmail);
 
   await page.goto(link);
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
 
   const state = await verifyAuthState(appServerUrl, page.request);
   const owner = state.users.at(-1);
@@ -49,7 +51,9 @@ test("the owner signs in with Google through the local identity server", async (
 
   await expect(googleButton).toBeEnabled();
   await googleButton.click();
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
 
   const state = await verifyAuthState(appServerUrl, page.request);
   const owner = state.users.at(-1);
@@ -77,7 +81,9 @@ test("the owner signs in with the dotless Gmail form of a dotted OWNER_EMAIL", a
 
     await expect(googleButton).toBeEnabled();
     await googleButton.click();
-    await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+    ).toBeVisible();
 
     const state = await verifyAuthState(appServerUrl, page.request);
     const owner = state.users.at(-1);
@@ -104,7 +110,9 @@ test("the owner signs in with LinkedIn through the local identity server", async
 
   await expect(linkedinButton).toBeEnabled();
   await linkedinButton.click();
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
 
   const state = await verifyAuthState(appServerUrl, page.request);
 
@@ -267,19 +275,23 @@ test("sign out of all devices ends every other session and keeps this one", asyn
   const appServerUrl = isolatedAppServer.url;
 
   await signInByMagicLink(page, appServerUrl, request, authTestIdentity.ownerEmail);
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
 
   const otherContext = await browser.newContext();
   const otherPage = await otherContext.newPage();
 
   await signInByMagicLink(otherPage, appServerUrl, request, authTestIdentity.ownerEmail);
-  await expect(otherPage.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    otherPage.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
 
   expect((await verifyAuthState(appServerUrl, request)).sessions).toHaveLength(2);
 
   await page.goto(`${appServerUrl}/settings`);
   await page.getByRole("button", { name: "Sign out everywhere" }).click();
-  await expect(page.getByText("You are signed out on your other devices.")).toBeVisible();
+  await expect(page.getByText("You are signed out on your other devices.").first()).toBeVisible();
   expect((await verifyAuthState(appServerUrl, request)).sessions).toHaveLength(1);
 
   await otherPage.goto(`${appServerUrl}/board`);
@@ -299,7 +311,9 @@ test("a second sign-in method on the same verified email joins the one account",
 
   await identityServer.setPersona(personas.owner("google-owner"));
   await signInByMagicLink(page, appServerUrl, request, authTestIdentity.ownerEmail);
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
 
   const secondContext = await browser.newContext();
   const secondPage = await secondContext.newPage();
@@ -307,7 +321,9 @@ test("a second sign-in method on the same verified email joins the one account",
   await setTurnstileScenario(request, appServerUrl, { action: "signin" });
   await secondPage.goto(`${appServerUrl}/signin`);
   await secondPage.getByRole("button", { name: "Continue with Google" }).click();
-  await expect(secondPage.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    secondPage.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
   await secondContext.close();
 
   const state = await verifyAuthState(appServerUrl, request);
@@ -321,4 +337,10 @@ test("a second sign-in method on the same verified email joins the one account",
   }
 
   expect(state.accounts.map((account) => account.providerId)).toContain("google");
+});
+
+test("the sign-up route renders the account creation form", async ({ page, isolatedAppServer }) => {
+  await page.goto(`${isolatedAppServer.url}/signup`);
+  await expect(page.getByRole("button", { name: "Sign up with Google" })).toBeVisible();
+  await expect(page.getByLabel("Email")).toBeVisible();
 });

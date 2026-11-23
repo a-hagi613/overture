@@ -25,6 +25,7 @@ export const boardCardSchema = z.object({
   company: z.string(),
   id: z.string(),
   location: z.string().nullable(),
+  logoUrl: z.string().nullable().optional(),
   needsYou: z.boolean(),
   note: noteSchema.nullable(),
   position: z.number().nullable(),
@@ -111,6 +112,7 @@ export const applicationDetailSchema = z.object({
     updatedAt: z.number(),
   }),
   company: z.string(),
+  companyLogoUrl: z.string().nullable().optional(),
   dossier: dossierSchema.nullable(),
   mail: z.array(mailThreadSchema),
   match: z

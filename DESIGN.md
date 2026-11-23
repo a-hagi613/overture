@@ -89,11 +89,11 @@ motion:
 
 # Overture design system — Ember
 
-The contract for every screen and every build. Everything below is transcribed from the shipped design
-system boards (Section A, boards 1–3 of the canvas artifact `P3aiZsEXkoUKBrknvvBNJJ`). The canvas is the wireframe:
-**the build matches its boards pixel for pixel.** Where this document and a design-system board disagree on
-appearance, the board wins and this document is corrected. Where a board disagrees with `docs/SPEC.md` on
-product (words, screens, behaviour), the spec wins and the board is redrawn; §13 lists those boards.
+The contract for every screen and every build on Ember v0.2 (token palette, typography, components).
+Per ADR 0037, PR #501's Tailwind v4 + Radix/shadcn rebuild supersedes pixel-for-pixel diffing against
+retired pre-Ember PNGs in `design/reference/`; UI fidelity is enforced via tokens (`overture/no-raw-design-styles`),
+`layout-guards-*`, `interactive-*`, `axe`, and seeded screen E2E tests. Where a board disagrees with
+`docs/SPEC.md` on product (words, screens, behaviour), the spec wins.
 
 Section B of that artifact — the later restatement with neutral paper, Newsreader and Archivo — was an
 experiment that has been **removed**. There is one design, and this is it.

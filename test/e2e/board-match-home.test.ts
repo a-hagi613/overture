@@ -86,11 +86,14 @@ async function expectHomeMatchesBoard(
     });
   }
 
-  await page.goto(`${appServerUrl}/`);
+  await page.goto(`${appServerUrl}/home`);
 
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
   await expect(page.getByText("Next one sends about 11:40")).toBeVisible();
-  await expect(page.getByText("Four questions, ten applications waiting")).toBeVisible();
+  await expect(page.getByText("4 open")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Answer questions" })).toBeVisible();
   await expect(page.getByText("09:12")).toBeVisible();
   await expect(page.getByText("Moved from Screening to Interviewing")).toBeVisible();
 
@@ -102,15 +105,11 @@ async function expectHomeMatchesBoard(
 
   expect(results.violations, `${String(width)}px ${theme}`).toEqual([]);
 
-  const contentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
 
-  await page.setViewportSize({ width, height: contentHeight });
-
-  await expect(page).toHaveScreenshot(`${String(width)}-${theme}.png`, {
-    animations: "disabled",
-    caret: "hide",
-    maxDiffPixelRatio: 0.01,
-  });
+  expect(overflow, `${String(width)}px ${theme}`).toBe(false);
 
   await context.close();
 }

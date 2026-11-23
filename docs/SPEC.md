@@ -1487,9 +1487,10 @@ hand-written typed clients under `src/web/lib/`; there is no Hono RPC client. A 
 | Jobs (`GET /api/matching/up-next` has no screen since #526; the rebuild, ADR 0037, removes the Search page too; `GET /api/search` must not stay signed-out) | `GET /api/search?q&filters` (signed-in only, at most 60 requests a minute per user → `429 rate_limited`; FTS ≤ 50 ms; filters: `role`, `seniority`, `workplace`, `location` = resolved city, `employmentType`) · `GET /api/matching/up-next` (the code-ranked shortlist, still served; opening a card scores it) · `GET /api/postings/:id` (scores on open) · `POST /api/postings/:id/apply` · `PUT /api/postings/:id/state` `{saved|hidden|null}` |
 | Review | `GET /api/reviews` · `POST /api/reviews/:id/answer` · `POST /api/reviews/:id/dismiss` |
 | Check-ins | `POST /api/checkins/:id` `{answer}` |
+| Support | `POST /api/support` `{category, subject, message}` (5 an hour, mailed to `SUPPORT_EMAIL`) |
 | Inbox | `GET /api/threads` · `GET /api/threads/:id` · `GET /api/attachments/:id` · `POST /api/messages/:id/read` · `GET /api/mail/code-waits` · `POST /api/mail/code-waits/:id` (paste a code) |
 | Calendar | `GET /api/calendar?from&to&timezone` (signed in only, `Cache-Control: no-store`; at most 42 days, counted in the `timezone` the browser draws the grid in, which defaults to the user's saved timezone: every Sent Application, Stage move, Check-in and interview date with its job, employer and Stage, ordered by time; the response carries the user's `timeZone` so the client buckets days the same way; no mail body and no answers) · `GET /api/calendar/events?from&to` (signed in: the user's own interviews, follow-ups and reminders; `from`/`to` are inclusive `YYYY-MM-DD` days and arrive together) · `POST /api/calendar/events` `{dayKey, kind, title, company?, time?}` (201; `invalid_request` for an impossible day or a loose time) · `DELETE /api/calendar/events/:id` (404 when the entry is missing or belongs to another user) |
-| Workspace search | `GET /api/workspace/search?q&limit` (signed in only, `Cache-Control: no-store`; `q` trimmed and at most 120 characters, an empty `q` returns four empty lists, `limit` is 1–20 and defaults to 8 per category; case-insensitive substring over the user's own Applications (company, title, location, Stage, status), open Reviews (prompt or category), authenticated inbound mail (sender, company, subject, snippet; `code` mail excluded) and interviews (summary, company, title, location); reads at most the newest 500 messages, 200 Reviews and 200 interviews, and no other user's row, count or decrypted value can enter the response; added by the rebuild, ADR 0037, which is proposed) |
+| Workspace search | `GET /api/workspace/search?q&limit` (signed in only, `Cache-Control: no-store`; `q` trimmed and at most 120 characters, an empty `q` returns four empty lists, `limit` is 1–20 and defaults to 8 per category; case-insensitive substring over the user's own Applications (company, title, location, Stage, status), open Reviews (prompt or category), authenticated inbound mail (sender, company, subject, snippet; `code` mail excluded) and interviews (summary, company, title, location); reads at most the newest 500 messages, 200 Reviews and 200 interviews, and no other user's row, count or decrypted value can enter the response; ADR 0037) |
 | Calendar feed (M4) | `GET /calendar/<token>.ics` (no session: the token in the path is the credential; `text/calendar; charset=utf-8`, `Cache-Control: private, no-store`; 404 for any unknown, rotated or turned-off token, with no other difference; the user's custom calendar events (`calendar_custom_events`) are written beside the Application items) · `GET /api/calendar/feed` (signed in: `{enabled, createdAt, rotatedAt}`, never the token) · `POST /api/calendar/feed/token` (signed in: turns the feed on or rotates it; returns `{path}` once, and the previous token stops working at once) · `DELETE /api/calendar/feed` (signed in: turns it off) |
 | Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET /api/profile/resume` (the current resume and its history) · `GET /api/profile/resume/:id/file` (streams the resume PDF) · `GET/PUT /api/profile/targets` (returns live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/mailbox` (read-only address, `forwardingWorks`, `firstForwardedAt`) · `GET/PUT /api/profile/strengthen` (the Tier 2 Facts that would unlock queued Applications, each with its count; answering saves the Fact and resolves the Reviews it answers) |
 | Consent | `GET /api/consent` (public current version and text; the signed-in user's accepted version and date) · `GET /api/consent/versions` (every published version, newest first) · `POST /api/consent/accept` `{version}` (refuses `version_changed` when a newer version is published) |
@@ -1510,19 +1511,7 @@ removed from a forwarded `.ics` attachment (#296, ADR 0034).
 
 ## 15. Surfaces
 
-Visual design: the canvas artifact `P3aiZsEXkoUKBrknvvBNJJ`, Section A, is the wireframe and the build matches it
-pixel for pixel; `DESIGN.md` is its written contract. Boards that contradict this spec are redrawn before the slice
-that builds them (`DESIGN.md` §13). This section describes the shell after the front-end rebuild (ADR 0037, proposed);
-until it merges, `/` is Home, `Settings` (with `/settings/billing`, `/settings/export`, `/settings/delete` and
-`/settings/support-access`) and `/search` still exist, and `src/web/route-table.tsx` is the truth for the routes. After
-the rebuild the signed-in app lives under `/home` and the other destination paths, and `/` is the public landing page
-for everyone. Six destinations in the sidebar, in this order: **Home, Board, Ready,
-Review, Inbox, Calendar** (Ready added by ADR 0029, Calendar by ADR 0034). **Profile** and **Support** open from the
-profile menu at the foot of the sidebar; Profile has five pages: Resume, Details, Preferences, Account and Billing.
-The sidebar also holds workspace search (⌘K, `GET /api/workspace/search`) and the theme toggle; on the phone a
-bottom tab bar and a menu sheet carry the same destinations. There is no Settings destination: what lived there is on
-Profile → Account and Profile → Billing. Nav badges are live counts — Ready, open Reviews, unread Inbox mail — hidden
-at zero, and the link's accessible name carries the count.
+Visual design: Ember v0.2 palette, typography, and component primitives governed by `DESIGN.md`, ADR 0037, and ADR 0038 (superseding retired pre-Ember PNG pixel diffs in favor of lint-enforced tokens, `layout-guards-*`, `interactive-*`, `axe`, and seeded screen checks). The signed-in app lives under `/home` and the other destination paths, and `/` is the public landing page for everyone. Destinations in the sidebar, in this order: **Home, Board (`/board`), Ready, Review, Inbox, Calendar** (plus Support and Notifications; Profile has five pages: Resume, Details, Preferences, Account and Billing). The sidebar also holds workspace search (⌘K, `GET /api/workspace/search`) and the theme toggle; on the phone a bottom tab bar and a menu sheet (`MobileNavSheet`) carry the same destinations. Nav badges show live counts for Ready, open Reviews, and unread Inbox mail (hidden at zero, and the link's accessible name carries the count).
 
 | Surface | Content | Key states |
 |---|---|---|
@@ -1592,9 +1581,7 @@ differs from the approved plan stops before Submit and returns the Application t
 render for a signed-out visitor (axe clean, reachable from sign-in), the consent card records the accepted version, and
 publishing version 2 leaves version 1 and an already sent Snapshot on version 1 (M2)
 
-Plus: route reachability for every page, axe on every page, and the visual snapshots against `design/reference/` (Home, Board,
-Review, Inbox, the Profile pages, Support and the legal and consent boards × 390 / 1280 px × light/dark; Ready joins them once it is
-drawn) in pinned Docker.
+Plus: route reachability for every page, interactive/layout guards (`interactive-*`, `layout-guards-*`), WCAG AA `axe` checks on every route, and seeded per-screen E2E checks across 390 / 1280 px light and dark (ADR 0038).
 
 ### 16.2 Unit tests (sixty-one files, `bun:test`, beside their code)
 

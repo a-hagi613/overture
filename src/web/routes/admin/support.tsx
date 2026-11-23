@@ -27,7 +27,7 @@ const CARD = "rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-
 const RETRY_BUTTON =
   "mt-4 min-h-11 rounded-md border border-input bg-card px-4 text-[13px] font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
 
-export function SupportPage() {
+export function AdminSupportPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = supportStatusFilterSchema.safeParse(searchParams.get("status"));
   const status: SupportStatusFilter = requested.success ? requested.data : "open";
