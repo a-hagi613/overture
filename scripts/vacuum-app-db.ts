@@ -1,7 +1,15 @@
 import { Database } from "bun:sqlite";
-import { existsSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 
 import { z } from "zod";
+
+import type { DatabaseSizes } from "../src/server/storage/database-sizes.ts";
+
+import { databaseSizesOf, VacuumRefusedError } from "../src/server/storage/database-sizes.ts";
+
+export type { DatabaseSizes } from "../src/server/storage/database-sizes.ts";
+
+export { databaseSizesOf, VacuumRefusedError } from "../src/server/storage/database-sizes.ts";
 
 const checkpointSchema = z.object({
   busy: z.number().int(),
@@ -11,70 +19,12 @@ const checkpointSchema = z.object({
 
 const integrityRowSchema = z.object({ integrity_check: z.string() });
 
-const pragmaRowSchema = z.record(z.string(), z.number().int().nonnegative());
-
-/**
- * What one SQLite database file takes on disk and inside. `freeBytes` is the space a `VACUUM` gives back: pages
- * on the freelist multiplied by the page size.
- */
-export interface DatabaseSizes {
-  fileBytes: number;
-  freeBytes: number;
-  freelistCount: number;
-  pageCount: number;
-  pageSize: number;
-  walBytes: number;
-}
-
 /** The result of a maintenance pass, whether it only inspected or also vacuumed the file. */
 export interface VacuumReport {
   after: DatabaseSizes | null;
   before: DatabaseSizes;
   dryRun: boolean;
   integrityCheck: string | null;
-}
-
-/** A refusal the operator can fix (missing `--confirm`, a held write lock, another connection in the way). */
-export class VacuumRefusedError extends Error {
-  override readonly name = "VacuumRefusedError";
-}
-
-function statBytes(path: string) {
-  return existsSync(path) ? statSync(path).size : 0;
-}
-
-function pragmaNumber(sqlite: Database, pragma: string) {
-  const [value] = Object.values(pragmaRowSchema.parse(sqlite.query(`PRAGMA ${pragma}`).get()));
-
-  if (value === undefined) {
-    throw new VacuumRefusedError(`PRAGMA ${pragma} returned no row`);
-  }
-
-  return value;
-}
-
-/**
- * Reads the sizes of an application database without writing to it. The file and its `-wal` are measured on disk;
- * the page counts come from SQLite itself.
- * @param path The database file to inspect.
- * @param sqlite An open handle to that file.
- * @returns The file, WAL, page and freelist sizes.
- */
-export function databaseSizesOf(path: string, sqlite: Database) {
-  const pageSize = pragmaNumber(sqlite, "page_size");
-  const pageCount = pragmaNumber(sqlite, "page_count");
-  const freelistCount = pragmaNumber(sqlite, "freelist_count");
-
-  const sizes: DatabaseSizes = {
-    fileBytes: statBytes(path),
-    freeBytes: freelistCount * pageSize,
-    freelistCount,
-    pageCount,
-    pageSize,
-    walBytes: statBytes(`${path}-wal`),
-  };
-
-  return sizes;
 }
 
 function assertNoWriter(sqlite: Database) {

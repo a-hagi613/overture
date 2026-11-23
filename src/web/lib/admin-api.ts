@@ -406,6 +406,114 @@ export type KillSwitchRow = z.infer<typeof killSwitchRowSchema>;
 
 export type GrantRow = z.infer<typeof grantRowSchema>;
 
+export const systemDatabaseSizesSchema = z.object({
+  fileBytes: z.number(),
+  freeBytes: z.number(),
+  freelistCount: z.number(),
+  pageCount: z.number(),
+  pageSize: z.number(),
+  walBytes: z.number(),
+});
+
+export const backupReplicationSchema = z.discriminatedUnion("replication", [
+  z.object({ replication: z.literal("unconfigured") }),
+  z.object({ readAgeSeconds: z.number().nullable(), replication: z.literal("unknown") }),
+  z.object({ readAgeSeconds: z.number(), replication: z.literal("unavailable") }),
+  z.object({
+    lagSeconds: z.number(),
+    readAgeSeconds: z.number(),
+    replicaTxid: z.string(),
+    replication: z.literal("ok"),
+  }),
+]);
+
+export const degradedFlagSchema = z.object({
+  degraded: z.literal(true),
+  metrics: z.array(
+    z.object({
+      allowance: z.number(),
+      metric: z.string(),
+      share: z.number(),
+      used: z.number(),
+    }),
+  ),
+  since: z.string(),
+  version: z.literal(1),
+});
+
+export const liveCheckResultSchema = z.object({
+  check: z.string(),
+  detail: z.looseObject({ error: z.string().optional(), skipped: z.string().optional() }),
+  durationMs: z.number(),
+  id: z.string(),
+  ok: z.boolean(),
+  runId: z.string(),
+  startedAt: z.number(),
+});
+
+export const systemReportSchema = z.object({
+  backups: backupReplicationSchema,
+  catalog: z.object({
+    boards: z.number(),
+    bySource: z.array(z.object({ closed: z.number(), open: z.number(), source: z.string() })),
+    closedPostings: z.number(),
+    lastPolledAt: z.number().nullable(),
+    lastSeenAt: z.number().nullable(),
+    openPostings: z.number(),
+  }),
+  databases: z.object({
+    app: systemDatabaseSizesSchema.nullable(),
+    catalog: systemDatabaseSizesSchema.nullable(),
+  }),
+  degraded: degradedFlagSchema.nullable(),
+  generatedAt: z.number(),
+  integrations: z.object({
+    browserProvider: z.enum(["browser_use", "kernel", "local"]).nullable(),
+    cfAccessConfigured: z.boolean(),
+    cloudflareEmailConfigured: z.boolean(),
+    demoLoginEnabled: z.boolean(),
+    ntfyConfigured: z.boolean(),
+    publicSignupEnabled: z.boolean(),
+    stripeMode: z.enum(["live", "test", "unconfigured"]),
+    turnstileConfigured: z.boolean(),
+  }),
+  liveChecks: z.object({
+    latestRunAt: z.number().nullable(),
+    results: z.array(liveCheckResultSchema),
+  }),
+  runtime: z.object({
+    bunVersion: z.string(),
+    heapTotalBytes: z.number(),
+    heapUsedBytes: z.number(),
+    loadAverage: z.tuple([z.number(), z.number(), z.number()]),
+    rssBytes: z.number(),
+    uptimeSeconds: z.number(),
+  }),
+  volume: z
+    .object({
+      freeBytes: z.number(),
+      mount: z.string(),
+      totalBytes: z.number(),
+      usedRatio: z.number(),
+    })
+    .nullable(),
+});
+
+export const systemCheckpointSchema = z.object({
+  afterWalBytes: z.number(),
+  beforeWalBytes: z.number(),
+  busy: z.number(),
+  checkpointed: z.number(),
+});
+
+export const liveChecksRunSchema = z.object({ jobId: z.string() });
+
+export type SystemReport = z.infer<typeof systemReportSchema>;
+
+export type SystemCheckpoint = z.infer<typeof systemCheckpointSchema>;
+
+export type LiveCheckResult = z.infer<typeof liveCheckResultSchema>;
+
 export type MailHealth = z.infer<typeof mailHealthSchema>;
 
 export type MailHealthEmployer = z.infer<typeof mailHealthEmployerSchema>;
@@ -518,6 +626,14 @@ export const runPersonioProbe = async (urls?: string[]) =>
 
 export const loadMailHealth = async (days: number) =>
   adminGet(`/admin/api/mail-health?days=${String(days)}`, mailHealthSchema);
+
+export const loadSystem = async () => adminGet("/admin/api/system", systemReportSchema);
+
+export const runWalCheckpoint = async () =>
+  adminPost("/admin/api/system/checkpoint", null, systemCheckpointSchema);
+
+export const runLiveChecksNow = async () =>
+  adminPost("/admin/api/live-checks/run", null, liveChecksRunSchema);
 
 export const saveSetting = async (settingKey: string, value: string) =>
   adminPut(`/admin/api/settings/${settingKey}`, { value }, settingResponseSchema);

@@ -2,7 +2,12 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { findBunVersionDrift, readBunVersions, readWorkflowStep } from "./workflow-config-guard.ts";
+import {
+  findBunVersionDrift,
+  findVacuumWorkflowProblems,
+  readBunVersions,
+  readWorkflowStep,
+} from "./workflow-config-guard.ts";
 
 const pinned = "1.4.5";
 
@@ -117,4 +122,62 @@ test("every workflow pins the Bun version package.json requires", () => {
   }));
 
   expect(findBunVersionDrift({ pinned: engine, workflows })).toStrictEqual([]);
+});
+
+function vacuumSources() {
+  return {
+    entrypoint: readFileSync("scripts/docker-entrypoint.sh", "utf8"),
+    opsLive: readFileSync(".github/workflows/ops-live.yml", "utf8"),
+    weekly: readFileSync(".github/workflows/vacuum-db.yml", "utf8"),
+  };
+}
+
+test("the shipped vacuum workflows dry-run before they compact, behind a threshold", () => {
+  expect(findVacuumWorkflowProblems(vacuumSources())).toStrictEqual([]);
+});
+
+test("a weekly vacuum that compacts before it dry-runs is reported", () => {
+  const sources = vacuumSources();
+  const planFirst = sources.weekly.indexOf("vacuum-fly.ts plan");
+  const compactAt = sources.weekly.indexOf("vacuum-fly.ts compact");
+  const reordered = `${sources.weekly.slice(0, planFirst)}${sources.weekly.slice(compactAt)}${sources.weekly.slice(planFirst, compactAt)}`;
+
+  expect(
+    findVacuumWorkflowProblems({ ...sources, weekly: reordered }).some((problem) =>
+      problem.includes("dry-runs"),
+    ),
+  ).toBe(true);
+});
+
+test("a weekly vacuum without the Sunday schedule is reported", () => {
+  const sources = vacuumSources();
+
+  const problems = findVacuumWorkflowProblems({
+    ...sources,
+    weekly: sources.weekly.replace('cron: "0 5 * * 0"', 'cron: "0 5 * * 1"'),
+  });
+
+  expect(problems.some((problem) => problem.includes("Sundays"))).toBe(true);
+});
+
+test("a weekly vacuum that ignores its dry_run input is reported", () => {
+  const sources = vacuumSources();
+
+  const problems = findVacuumWorkflowProblems({
+    ...sources,
+    weekly: sources.weekly.replace("inputs.dry_run != 'true'", "inputs.force == 'true'"),
+  });
+
+  expect(problems.some((problem) => problem.includes("dry_run"))).toBe(true);
+});
+
+test("a maintenance entrypoint without --confirm is reported", () => {
+  const sources = vacuumSources();
+
+  const problems = findVacuumWorkflowProblems({
+    ...sources,
+    entrypoint: sources.entrypoint.replace("--confirm", "--dry-run"),
+  });
+
+  expect(problems.some((problem) => problem.includes("--confirm"))).toBe(true);
 });

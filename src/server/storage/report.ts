@@ -134,7 +134,7 @@ async function filesUnder(path: string) {
   } satisfies FileUsage;
 }
 
-async function volumeUsage(databasePath: string) {
+export async function readVolume(databasePath: string) {
   const mount = dirname(resolve(databasePath));
   const fs = await statfs(mount).catch(() => null);
 
@@ -153,7 +153,7 @@ async function volumeUsage(databasePath: string) {
   } satisfies VolumeUsage;
 }
 
-function postingsBySource(db: CatalogDatabase) {
+export function postingsBySource(db: CatalogDatabase) {
   const rows = db
     .select({
       source: postings.ats,
@@ -337,23 +337,48 @@ async function combinedTableBreakdown(paths: readonly string[]) {
   } satisfies TableBreakdown;
 }
 
-export async function buildStorageReport(deps: StorageReportDeps) {
-  const catalogPath =
-    deps.catalogPath === null
-      ? null
-      : (deps.catalogPath ?? join(dirname(resolve(deps.databasePath)), "catalog.sqlite"));
+function catalogPathOf(databasePath: string, catalogPath: string | null | undefined) {
+  return catalogPath === null
+    ? null
+    : (catalogPath ?? join(dirname(resolve(databasePath)), "catalog.sqlite"));
+}
 
-  const [app, catalog, volume, objects] = await Promise.all([
+/**
+ * Reads the database files and the volume that holds them, without listing the object store. The system page uses
+ * this on every visit, so it stays a few filesystem calls.
+ * @param deps The application database path and an optional catalog path.
+ * @returns The application and catalog files (the catalog is `null` before its first write) and the volume.
+ */
+export async function readStorageFiles(deps: {
+  databasePath: string;
+  catalogPath?: string | null;
+}) {
+  const catalogPath = catalogPathOf(deps.databasePath, deps.catalogPath);
+
+  const [app, catalog, volume] = await Promise.all([
     filesUnder(deps.databasePath),
     catalogPath === null ? null : filesUnder(catalogPath),
-    volumeUsage(deps.databasePath),
+    readVolume(deps.databasePath),
+  ]);
+
+  return {
+    databases: { app, catalog: catalog?.present === true ? catalog : null },
+    volume,
+  };
+}
+
+export async function buildStorageReport(deps: StorageReportDeps) {
+  const catalogPath = catalogPathOf(deps.databasePath, deps.catalogPath);
+
+  const [{ databases, volume }, objects] = await Promise.all([
+    readStorageFiles({ catalogPath, databasePath: deps.databasePath }),
     objectUsage(deps.objects, deps.backups),
   ]);
 
   const bySource = postingsBySource(deps.catalogDb);
 
   return {
-    databases: { app, catalog: catalog?.present === true ? catalog : null },
+    databases,
     generatedAt: deps.clock.now(),
     objects,
     postings: {
@@ -364,7 +389,9 @@ export async function buildStorageReport(deps: StorageReportDeps) {
     tables:
       deps.includeTables === true
         ? await combinedTableBreakdown(
-            catalog === null ? [deps.databasePath] : [deps.databasePath, catalogPath ?? ""],
+            databases.catalog === null
+              ? [deps.databasePath]
+              : [deps.databasePath, catalogPath ?? ""],
           )
         : null,
     volume,

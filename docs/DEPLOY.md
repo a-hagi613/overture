@@ -12,14 +12,15 @@ No secret value ever appears in this repository: secrets are set with `fly secre
 | File | Role |
 |---|---|
 | `Dockerfile` | Multi-stage build on Bun 1.4: installs, builds the SPA (`dist/`), ships a slim runtime with Litestream 0.5.18 (checksum-verified) |
-| `scripts/docker-entrypoint.sh` | On start: Litestream restores `/data/app.sqlite` from the replica if it does not exist, then runs `litestream replicate -exec "bun run /app/src/server/main.ts"`; migrations run inside `main.ts`. With `LITESTREAM_RESTORE_ONLY=true` it restores, runs the read-only restored-database check and never starts `main.ts` |
+| `scripts/docker-entrypoint.sh` | On start: Litestream restores `/data/app.sqlite` from the replica if it does not exist, then runs `litestream replicate -exec "bun run /app/src/server/main.ts"`; migrations run inside `main.ts`. With `LITESTREAM_RESTORE_ONLY=true` it restores, runs the read-only restored-database check and never starts `main.ts`. With `VACUUM_ONLY=true` it compacts the application database instead, with Litestream and the server stopped |
 | `litestream.yml` | Continuous replication (1 s sync) to R2 `overture-backups`, nightly snapshot (`interval: 24h`) kept 30 days (`retention: 720h`); the L0 retention check runs every 5 minutes so its ListObjects cost stays bounded (#281) |
 | Deleted accounts in backups | The 35-day lifecycle on `overture-backups` (`app.sqlite/`) and the 30-day snapshot retention are the replay window for an erased account: only keyless ciphertext can come back, because `user_keys` is destroyed first (SPEC §13.2). R2 object deletes are not part of a replay |
 | `fly.toml` | App `overture-web`, region `yyz`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health`; `PUBLIC_SIGNUP_ENABLED = "false"` keeps production invite-only (owner, invited and verified users, and the demo account) until M3 public sign-up ships, while `DEMO_LOGIN_ENABLED = "true"` keeps the demo account |
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`), a `security-and-restore` job (gitleaks over the history, the private-files guard, and the Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations, untouched `bg_jobs`), and the `ci-ok` aggregator every other job feeds |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
-| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets), `live-diagnostics` (runtime names present/missing and integer SQLite counts). Skips with a green notice while `FLY_API_TOKEN` is unset |
+| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
+| `.github/workflows/vacuum-db.yml` | Weekly (Sundays 05:00 UTC, also `workflow_dispatch` with `dry_run` and `force`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise dry-runs `/data/app.sqlite`, and only when its freelist exceeds 50 MB (or `force` is set) restarts the one machine in maintenance mode, vacuums it, restarts the server and polls `/api/health` |
 | `scripts/check-restored-db.ts` | Restored-database checks, read-only: PRAGMA `integrity_check`, applied-migration count, per-table row counts, untouched `bg_jobs`, zero outbound requests |
 | `scripts/restore-drill.ts` | `DRILL_TARGET=local` (CI round-trip) or `DRILL_TARGET=fly` (throwaway machine drill); never starts the app server |
 | `litestream-drill.yml` | Restore-only Litestream config for drills: same bucket, dedicated read-only `R2_DRILL_*` credential |
@@ -575,17 +576,29 @@ startup past Fly's health-check grace period.
 to write without `--confirm` and refuses while another process holds the write lock; `--dry-run` only reports. It is
 safe to re-run: a file with no free pages is left alone.
 
-1. Stop the app machine (`fly machine stop <id> -a overture-web`) so neither the server nor Litestream holds the file.
-2. Start a one-off machine on the deployed image with the `data` volume mounted at `/data`, the way the restore drill
-   does (`fly machines run <image> ... --volume data:/data`), and dry-run to record the sizes:
-   `bun run /app/scripts/vacuum-app-db.ts /data/app.sqlite --dry-run`
-3. Run it again with `--confirm` and check the report: `after` has a freelist of 0, a much smaller file, and
-   `integrity_check: ok`.
-4. Destroy the one-off machine, start the app machine, and watch `curl -fsS https://overture-web.fly.dev/api/health`;
-   Litestream uploads the smaller file on its next snapshot.
+A Fly volume attaches to exactly one machine, even while that machine is stopped, so a second volume-attached machine
+cannot vacuum the live file. `scripts/vacuum-fly.ts` therefore uses the one production machine in a short maintenance
+window:
 
-Do not schedule this script, do not run it while the server is serving, and do not run it against `catalog.sqlite`
-(which is rebuilt from feeds anyway).
+1. `bun run scripts/vacuum-fly.ts plan` runs the dry run over SSH on the running machine and reports its sizes. It
+   never writes.
+2. `bun run scripts/vacuum-fly.ts compact` repeats the dry run and stops there unless the freelist is above 50 MB or
+   `--force` is passed. Then it sets `VACUUM_ONLY=true` on the machine and restarts it; `scripts/docker-entrypoint.sh`
+   fixes the volume's ownership, drops to the `app` user, runs
+   `scripts/vacuum-app-db.ts /data/app.sqlite --confirm`, writes its output and exit code to `/tmp`, and holds the
+   machine open. Litestream and the server never start in that mode.
+3. In a `finally` path the workflow restores the normal environment, restarts the machine, waits for it to start and
+   polls `https://tryoverture.com/api/health` for 120 s. A failed vacuum still restarts the server, and a failed health
+   check fails the job so it alerts instead of serving.
+
+The script verifies `integrity_check` before it reports success, and SQLite leaves the file unchanged when the
+checkpoint stays busy or the vacuum aborts. If a run ever reports a failed integrity check, stop the machine and
+restore from the replica (the same Litestream restore the drill exercises) before serving traffic.
+
+The weekly `vacuum-db.yml` job does this every Sunday at 05:00 UTC; `ops-live.yml` offers the same run as the
+`vacuum-db` action with `force_vacuum`. Both refuse on a release that predates the maintenance mode (deploy `main`
+first), and it runs in the quiet 05:00 UTC slot so a deploy rarely overlaps it. Do not run it against
+`catalog.sqlite` (which is rebuilt from feeds anyway).
 
 ## Restore drill safety
 

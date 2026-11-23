@@ -1,0 +1,80 @@
+name: Vacuum database
+
+on:
+  schedule:
+    - cron: "0 5 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Report the database sizes and stop without compacting"
+        required: false
+        type: boolean
+        default: true
+      force:
+        description: "Compact even when the freelist is below the 50 MB threshold"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: vacuum-db
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  vacuum:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Skip unless FLY_API_TOKEN is set (docs/DEPLOY.md, one-time step 6)
+        id: guard
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::notice::FLY_API_TOKEN is not set yet (docs/DEPLOY.md one-time step 6); skipping the database vacuum."
+            {
+              echo "### Database vacuum skipped"
+              echo ""
+              echo "The \`FLY_API_TOKEN\` repository secret is not set yet (see docs/DEPLOY.md, one-time step 6)."
+              echo "Nothing ran. Once \`gh secret set FLY_API_TOKEN\` is done, the next weekly run compacts the file."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v7
+        if: steps.guard.outputs.skip != 'true'
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        if: steps.guard.outputs.skip != 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.5
+      - run: bun install --frozen-lockfile
+        if: steps.guard.outputs.skip != 'true'
+      - name: Verify the lint configuration
+        if: steps.guard.outputs.skip != 'true'
+        run: bun run lint:config
+      - name: Set up flyctl (superfly/flyctl-actions/setup-flyctl @ master @ 98172f7)
+        if: steps.guard.outputs.skip != 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
+      - name: Dry-run the database sizes on overture-web
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: bun run scripts/vacuum-fly.ts plan
+
+      - name: Compact the application database when its freelist is worth reclaiming
+        if: steps.guard.outputs.skip != 'true' && inputs.dry_run != 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FORCE_VACUUM: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          if [ "${FORCE_VACUUM}" = "true" ]; then
+            bun run scripts/vacuum-fly.ts compact --force
+          else
+            bun run scripts/vacuum-fly.ts compact
+          fi
