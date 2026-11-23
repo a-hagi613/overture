@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 
 import type { AppDatabase } from "./db/client.ts";
 
@@ -17,7 +17,28 @@ Bun.env.TURNSTILE_SECRET ??= "alerts-test-secret";
 
 Bun.env.MASTER_KEY_V1 ??= Buffer.alloc(32, 7).toString("base64");
 
-const { raiseAlert } = await import("./alerts.ts");
+const pushRequests: { body: string; method: string; title: string | null }[] = [];
+
+const ntfy = Bun.serve({
+  port: 0,
+  fetch: async (request) => {
+    const title = request.headers.get("title");
+
+    pushRequests.push({ body: await request.text(), method: request.method, title });
+
+    return title === "Overture alert: health"
+      ? new Response("moved", { headers: { location: "/elsewhere" }, status: 302 })
+      : new Response(null, { status: 204 });
+  },
+});
+
+const ntfyUrl = `http://127.0.0.1:${String(ntfy.port)}/topic`;
+
+afterAll(() => {
+  void ntfy.stop(true);
+});
+
+const { pushToPhone, raiseAlert } = await import("./alerts.ts");
 
 const NOW = Date.UTC(2026, 10, 22, 9, 0, 0);
 
@@ -105,7 +126,7 @@ describe("raising an alert", () => {
       deliver: (row) => topics.push(row.topic),
     });
 
-    raiseAlert(db, clock, "health", { ok: false });
+    raiseAlert(db, clock, "disk", { ok: false });
 
     stop();
 
@@ -115,5 +136,33 @@ describe("raising an alert", () => {
 
     expect(topics).toEqual([]);
     expect(rows).toEqual([]);
+  });
+});
+
+describe("pushing an alert to the owner's phone", () => {
+  test("posts the kind and detail to the configured ntfy topic", async () => {
+    await pushToPhone("llm.spend", { spent: 42 }, ntfyUrl);
+
+    expect(pushRequests.at(-1)).toEqual({
+      body: JSON.stringify({ spent: 42 }),
+      method: "POST",
+      title: "Overture alert: llm.spend",
+    });
+  });
+
+  test("never follows a redirect, so one push is one request", async () => {
+    const before = pushRequests.length;
+
+    await pushToPhone("health", { ok: false }, ntfyUrl);
+
+    expect(pushRequests.length).toBe(before + 1);
+  });
+
+  test("no configured topic sends nothing", async () => {
+    const before = pushRequests.length;
+
+    await pushToPhone("disk", { ok: false }, undefined);
+
+    expect(pushRequests.length).toBe(before);
   });
 });

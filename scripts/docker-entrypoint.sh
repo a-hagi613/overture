@@ -34,7 +34,7 @@ if [ "${VACUUM_ONLY:-false}" = "true" ]; then
   cat "$OUTPUT_FILE"
   printf '%s\n' "$status" > "$READY_FILE"
   echo "maintenance mode: vacuum finished with exit $status; holding the machine open"
-  exec sleep "${VACUUM_KEEPALIVE_SECONDS:-600}"
+  exec sleep "${VACUUM_KEEPALIVE_SECONDS:-1500}"
 fi
 
 if [ "${LITESTREAM_RESTORE_ONLY:-false}" = "true" ]; then

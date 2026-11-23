@@ -165,9 +165,11 @@ export function stripeModeOf(secretKey: string | undefined) {
     return "unconfigured" as const;
   }
 
-  if (secretKey.startsWith("sk_live_")) {
+  if (secretKey.startsWith("sk_live_") || secretKey.startsWith("rk_live_")) {
     return "live" as const;
   }
 
-  return secretKey.startsWith("sk_test_") ? ("test" as const) : ("unconfigured" as const);
+  return secretKey.startsWith("sk_test_") || secretKey.startsWith("rk_test_")
+    ? ("test" as const)
+    : ("unconfigured" as const);
 }

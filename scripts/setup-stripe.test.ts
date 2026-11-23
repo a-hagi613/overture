@@ -450,7 +450,7 @@ test("a first run creates both plans, the webhook and the portal configuration",
     "txcd_10103000",
   ]);
   expect(fake.endpoints).toHaveLength(1);
-  expect(fake.endpoints[0]?.url).toBe("https://tryoverture.com/api/webhooks/stripe");
+  expect(fake.endpoints[0]?.url).toBe("https://tryoverture.com/webhooks/stripe");
   expect(fake.endpoints[0]?.enabled_events).toHaveLength(9);
   expect(fake.endpoints[0]?.enabled_events).toContain("invoice.paid");
   expect(fake.endpoints[0]?.enabled_events).toContain("customer.subscription.updated");

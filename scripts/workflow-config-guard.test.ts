@@ -165,7 +165,7 @@ test("a weekly vacuum that ignores its dry_run input is reported", () => {
 
   const problems = findVacuumWorkflowProblems({
     ...sources,
-    weekly: sources.weekly.replace("inputs.dry_run != 'true'", "inputs.force == 'true'"),
+    weekly: sources.weekly.replace("!inputs.dry_run", "inputs.force == 'true'"),
   });
 
   expect(problems.some((problem) => problem.includes("dry_run"))).toBe(true);

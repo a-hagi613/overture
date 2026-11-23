@@ -43,7 +43,7 @@ async function sendEmail(
   const base = {
     from: config.from,
     to: [to],
-    subject,
+    subject: subject.replaceAll(/[\r\n]+/gu, " ").trim(),
     text: body,
   };
 

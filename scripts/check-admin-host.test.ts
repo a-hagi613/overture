@@ -4,16 +4,22 @@ import type { CheckOptions, CheckResult, ProbeResponse } from "./check-admin-hos
 
 import {
   allChecksPassed,
-  certificateIssued,
+  certificateReady,
   classifyProbe,
+  describeAddresses,
   exitCodeFor,
   humanReport,
   isAccessRedirectLocation,
   jsonReport,
   missingAccessSecrets,
   parseArguments,
+  parseCertificateStatus,
   secretNamesFrom,
 } from "./check-admin-host.ts";
+
+function issuedCertificate(json: string) {
+  return certificateReady(parseCertificateStatus(json));
+}
 
 const options: CheckOptions = {
   fly: false,
@@ -119,6 +125,12 @@ describe("check-admin-host arguments", () => {
       kind: "error",
       message: "--origin must be https: the checks read a production admin host",
     });
+  });
+
+  test("refuses any non-https scheme, not only http", () => {
+    for (const origin of ["ftp://admin.example.test", "wss://admin.example.test"]) {
+      expect(parseArguments(["--origin", origin], "https://x.test").kind).toBe("error");
+    }
   });
 
   test("asks for help without probing", () => {
@@ -246,10 +258,23 @@ describe("check-admin-host Fly output", () => {
   });
 
   test("names the missing Access secrets in a fixed order", () => {
-    expect(missingAccessSecrets(["ADMIN_ORIGIN", "CF_ACCESS_AUD"])).toEqual([
-      "CF_ACCESS_TEAM_DOMAIN",
-      "CF_ACCESS_JWKS_URL",
+    expect(missingAccessSecrets([])).toEqual([
+      "ADMIN_ORIGIN",
+      "CF_ACCESS_AUD",
+      "CF_ACCESS_TEAM_DOMAIN or CF_ACCESS_JWKS_URL",
     ]);
+    expect(missingAccessSecrets(["ADMIN_ORIGIN", "CF_ACCESS_AUD"])).toEqual([
+      "CF_ACCESS_TEAM_DOMAIN or CF_ACCESS_JWKS_URL",
+    ]);
+  });
+
+  test("either JWKS source satisfies the verifier, and neither one leaves it missing", () => {
+    expect(
+      missingAccessSecrets(["ADMIN_ORIGIN", "CF_ACCESS_AUD", "CF_ACCESS_TEAM_DOMAIN"]),
+    ).toEqual([]);
+    expect(missingAccessSecrets(["ADMIN_ORIGIN", "CF_ACCESS_AUD", "CF_ACCESS_JWKS_URL"])).toEqual(
+      [],
+    );
     expect(
       missingAccessSecrets([
         "ADMIN_ORIGIN",
@@ -260,9 +285,60 @@ describe("check-admin-host Fly output", () => {
     ).toEqual([]);
   });
 
-  test("recognises an issued certificate in flyctl output", () => {
-    expect(certificateIssued("Hostname = admin.tryoverture.com\nStatus = Issued\n")).toBe(true);
-    expect(certificateIssued("Status = Not verified\n")).toBe(false);
+  test("an audience without an origin is still missing the origin", () => {
+    expect(missingAccessSecrets(["CF_ACCESS_AUD", "CF_ACCESS_JWKS_URL"])).toEqual(["ADMIN_ORIGIN"]);
+  });
+
+  test("recognises an issued certificate in flyctl's JSON", () => {
+    const issued = JSON.stringify({
+      ClientStatus: "Ready",
+      Configured: true,
+      Hostname: "admin.tryoverture.com",
+      Issued: [{ Serial: "abc", Status: "Issued" }],
+    });
+
+    expect(issuedCertificate(issued)).toBe(true);
+    expect(issuedCertificate(JSON.stringify({ ClientStatus: "Ready", Configured: true }))).toBe(
+      true,
+    );
+    expect(
+      issuedCertificate(JSON.stringify({ ClientStatus: "Ready", Configured: true, Issued: true })),
+    ).toBe(true);
+  });
+
+  test("a pending or unverified certificate is not issued", () => {
+    const pending = JSON.stringify({
+      ClientStatus: "Not verified",
+      Configured: false,
+      Hostname: "admin.tryoverture.com",
+      Issued: [],
+    });
+
+    expect(issuedCertificate(pending)).toBe(false);
+    expect(certificateReady(parseCertificateStatus(pending))).toBe(false);
+  });
+
+  test("a ready status on an unconfigured hostname is not an issued certificate", () => {
+    expect(
+      issuedCertificate(JSON.stringify({ ClientStatus: "Ready", Configured: false, Issued: [] })),
+    ).toBe(false);
+  });
+
+  test("invalid JSON and an unrecognised shape fail with a clean message", () => {
+    expect(() => parseCertificateStatus("Status = Issued\n")).toThrow(/did not print JSON/u);
+    expect(() =>
+      parseCertificateStatus(JSON.stringify({ Hostname: "admin.example.test" })),
+    ).toThrow(/does not recognise/u);
+  });
+
+  test("renders every resolved address and notes an empty answer", () => {
+    expect(
+      describeAddresses([
+        { address: "203.0.113.10", family: 4 },
+        { address: "2001:db8::1", family: 6 },
+      ]),
+    ).toBe("resolves to 203.0.113.10 (IPv4), 2001:db8::1 (IPv6)");
+    expect(describeAddresses([])).toBe("the resolver returned no address");
   });
 });
 

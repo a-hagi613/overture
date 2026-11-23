@@ -1,6 +1,14 @@
 import { expect, test } from "bun:test";
 
-import { compactionDecision, parseDryRunReport } from "./vacuum-fly.ts";
+import {
+  compactionDecision,
+  machineRestartArgs,
+  maintenanceUpdateArgs,
+  parseDryRunReport,
+  READY_TIMEOUT_SECONDS,
+  restoreUpdateArgs,
+  VACUUM_KEEPALIVE_SECONDS,
+} from "./vacuum-fly.ts";
 
 const printed =
   "before: file 1602.0 MB, WAL 477.0 MB, pages 410112 x 4096 B, freelist 408576 pages (1596.0 MB free)\n" +
@@ -38,4 +46,57 @@ test("compactionDecision compacts a file above the threshold, or when forced", (
   expect(compactionDecision({ ...sizes, freeMb: 0 }, { force: true, thresholdMb: 50 })).toBe(
     "compact",
   );
+});
+
+test("both machine updates run non-interactively with --yes", () => {
+  expect(maintenanceUpdateArgs("machine-1")).toStrictEqual([
+    "flyctl",
+    "machines",
+    "update",
+    "machine-1",
+    "-a",
+    "overture-web",
+    "--env",
+    "VACUUM_ONLY=true",
+    "--env",
+    "VACUUM_READY_FILE=/tmp/vacuum-finished",
+    "--env",
+    `VACUUM_KEEPALIVE_SECONDS=${String(VACUUM_KEEPALIVE_SECONDS)}`,
+    "--restart",
+    "no",
+    "--skip-health-checks",
+    "--skip-start",
+    "--yes",
+  ]);
+  expect(restoreUpdateArgs("machine-1")).toStrictEqual([
+    "flyctl",
+    "machines",
+    "update",
+    "machine-1",
+    "-a",
+    "overture-web",
+    "--env",
+    "VACUUM_ONLY=false",
+    "--restart",
+    "on-failure",
+    "--skip-health-checks",
+    "--skip-start",
+    "--yes",
+  ]);
+});
+
+test("the maintenance keepalive outlasts the driver's ready-file wait", () => {
+  expect(VACUUM_KEEPALIVE_SECONDS).toBeGreaterThan(READY_TIMEOUT_SECONDS);
+});
+
+test("the restart command names the app machine and skips its health checks", () => {
+  expect(machineRestartArgs("machine-1")).toStrictEqual([
+    "flyctl",
+    "machines",
+    "restart",
+    "machine-1",
+    "-a",
+    "overture-web",
+    "--skip-health-checks",
+  ]);
 });
