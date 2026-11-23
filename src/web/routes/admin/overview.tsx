@@ -1,9 +1,9 @@
 import { Link } from "react-router";
 
 import { copy } from "../../../shared/copy.ts";
-import { CardHeader } from "../../components/ui/card-header.tsx";
-import { CardTitle } from "../../components/ui/card-title.tsx";
-import { Card } from "../../components/ui/card.tsx";
+import { CardHeader } from "./ui/card-header.tsx";
+import { CardTitle } from "./ui/card-title.tsx";
+import { Card } from "./ui/card.tsx";
 import type { Overview } from "../../lib/admin-api.ts";
 import { loadAdminAlerts, loadOverview } from "../../lib/admin-api.ts";
 import { useAdminResource } from "../../lib/admin-resource.ts";

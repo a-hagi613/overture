@@ -1,5 +1,5 @@
-import { Badge } from "../../components/ui/badge.tsx";
-import type { BadgeTone } from "../../components/ui/badge.tsx";
+import { Badge } from "./ui/badge.tsx";
+import type { BadgeTone } from "./ui/badge.tsx";
 
 export function ReadinessRow({
   badgeLabel,

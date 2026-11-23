@@ -1,11 +1,11 @@
 import { useState } from "react";
 
 import { copy } from "../../../shared/copy.ts";
-import { Badge } from "../../components/ui/badge.tsx";
-import { Button } from "../../components/ui/button.tsx";
-import { CardHeader } from "../../components/ui/card-header.tsx";
-import { CardTitle } from "../../components/ui/card-title.tsx";
-import { Card } from "../../components/ui/card.tsx";
+import { Badge } from "./ui/badge.tsx";
+import { Button } from "./ui/button.tsx";
+import { CardHeader } from "./ui/card-header.tsx";
+import { CardTitle } from "./ui/card-title.tsx";
+import { Card } from "./ui/card.tsx";
 import type { AdminAlertsResponse } from "../../lib/admin-api.ts";
 import { ackAdminAlerts } from "../../lib/admin-api.ts";
 import { useInvalidateAdminQueries } from "../../lib/admin-resource.ts";

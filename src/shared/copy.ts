@@ -2328,7 +2328,8 @@ export const copy = {
     readinessDailyCapValue: (cap: number) => `${String(cap)} / day`,
     readinessBrowserConcurrency: "Browser concurrency",
     readinessBrowserConcurrencyValue: (sessions: number) =>
-      `${String(sessions)} ${plural(sessions, "session", "sessions")}`,
+      sessions === 0 ? "No cap" : `${String(sessions)} ${plural(sessions, "session", "sessions")}`,
+    readinessPresetNoCap: "No cap",
     readinessPublicSignup: "Public sign-up",
     readinessStripeMode: "Stripe mode",
     readinessCfAccess: "Cloudflare Access",
@@ -2346,7 +2347,9 @@ export const copy = {
     readinessStatusPending: "No sends yet",
     readinessPresetDailyAria: (value: number) => `Set daily cap to ${String(value)}`,
     readinessPresetConcurrencyAria: (value: number) =>
-      `Set browser concurrency to ${String(value)}`,
+      value === 0
+        ? "No cap for browser concurrency"
+        : `Set browser concurrency to ${String(value)}`,
     readinessSaveError: "That limit change did not go through.",
     alertsHeading: "Active alerts",
     alertsLead: "Live system checks and recent owner alert notifications.",

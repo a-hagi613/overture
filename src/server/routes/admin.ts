@@ -245,7 +245,6 @@ const ackAlertsBody = z.object({
 });
 
 export interface AdminDeps {
-  backups: BackupMonitor;
   catalogDb: CatalogDatabase;
   providers: BrowserProviderRegistry | null;
   personal: PersonalCrypto;

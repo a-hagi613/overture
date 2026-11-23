@@ -1,8 +1,8 @@
 import { Link } from "react-router";
 
 import { copy } from "../../../shared/copy.ts";
-import { Badge } from "../../components/ui/badge.tsx";
-import { Button } from "../../components/ui/button.tsx";
+import { Badge } from "./ui/badge.tsx";
+import { Button } from "./ui/button.tsx";
 import type { AuditRow } from "../../lib/admin-api.ts";
 
 function formatAuditTimestamp(timestamp: number) {

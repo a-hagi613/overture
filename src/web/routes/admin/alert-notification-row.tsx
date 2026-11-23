@@ -1,6 +1,6 @@
 import { copy } from "../../../shared/copy.ts";
-import { Badge } from "../../components/ui/badge.tsx";
-import { Button } from "../../components/ui/button.tsx";
+import { Badge } from "./ui/badge.tsx";
+import { Button } from "./ui/button.tsx";
 import type { AdminAlertNotification } from "../../lib/admin-api.ts";
 
 function formatAlertTime(timestamp: number) {

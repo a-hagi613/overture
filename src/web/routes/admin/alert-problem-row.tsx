@@ -1,5 +1,5 @@
 import { copy } from "../../../shared/copy.ts";
-import { Badge } from "../../components/ui/badge.tsx";
+import { Badge } from "./ui/badge.tsx";
 import type { AdminAlertProblem } from "../../lib/admin-api.ts";
 
 export function AlertProblemRow({ problem }: { problem: AdminAlertProblem }) {

@@ -1,6 +1,6 @@
 import { copy } from "../../../shared/copy.ts";
-import { CardTitle } from "../../components/ui/card-title.tsx";
-import { Card } from "../../components/ui/card.tsx";
+import { CardTitle } from "./ui/card-title.tsx";
+import { Card } from "./ui/card.tsx";
 import type { KillSwitchRow } from "../../lib/admin-api.ts";
 import { loadAdminAlerts, loadKillSwitches, loadSettings } from "../../lib/admin-api.ts";
 import { useAdminResource, useInvalidateAdminQueries } from "../../lib/admin-resource.ts";

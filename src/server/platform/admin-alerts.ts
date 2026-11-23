@@ -125,7 +125,7 @@ export function validateAdminSettingValue(key: string, value: string) {
 
     const parsed = Number(trimmed);
 
-    return parsed >= 1 && parsed <= 20;
+    return parsed >= 0 && parsed <= 20;
   }
 
   return trimmed.length > 0;
@@ -264,7 +264,7 @@ export function readAdminAlerts(input: {
     alertNtfyConfigured: readinessEnv.alertNtfyConfigured,
     browserConcurrency: getSettingNumber(db, "browser.max_concurrent_sessions", {
       integer: true,
-      minimum: 1,
+      minimum: 0,
     }),
     cfAccessConfigured: readinessEnv.cfAccessConfigured,
     costGate: {

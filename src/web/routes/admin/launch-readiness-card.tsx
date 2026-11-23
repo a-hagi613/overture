@@ -1,10 +1,10 @@
 import { useState } from "react";
 
 import { copy } from "../../../shared/copy.ts";
-import type { BadgeTone } from "../../components/ui/badge.tsx";
-import { CardHeader } from "../../components/ui/card-header.tsx";
-import { CardTitle } from "../../components/ui/card-title.tsx";
-import { Card } from "../../components/ui/card.tsx";
+import type { BadgeTone } from "./ui/badge.tsx";
+import { CardHeader } from "./ui/card-header.tsx";
+import { CardTitle } from "./ui/card-title.tsx";
+import { Card } from "./ui/card.tsx";
 import type { LaunchReadiness } from "../../lib/admin-api.ts";
 import { saveSetting } from "../../lib/admin-api.ts";
 import { useInvalidateAdminQueries } from "../../lib/admin-resource.ts";
@@ -12,7 +12,7 @@ import { ReadinessPresetRow } from "./readiness-preset-row.tsx";
 import { ReadinessRow } from "./readiness-row.tsx";
 
 const DAILY_CAP_PRESETS = [5, 10, 20] as const;
-const CONCURRENCY_PRESETS = [1, 3, 5] as const;
+const CONCURRENCY_PRESETS = [0, 1, 3, 5] as const;
 
 interface BadgeSpec {
   label: string;
@@ -121,6 +121,7 @@ export function LaunchReadinessCard({
               current={readiness.browserConcurrency}
               disabled={busy}
               label={copy.admin.readinessBrowserConcurrency}
+              labelFor={(value) => (value === 0 ? copy.admin.readinessPresetNoCap : String(value))}
               onSelect={(value) => {
                 void applyPreset("browser.max_concurrent_sessions", value);
               }}

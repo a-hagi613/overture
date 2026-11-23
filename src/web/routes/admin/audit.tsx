@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
 
 import { copy } from "../../../shared/copy.ts";
-import { Button } from "../../components/ui/button.tsx";
-import { Card } from "../../components/ui/card.tsx";
+import { Button } from "./ui/button.tsx";
+import { Card } from "./ui/card.tsx";
 import { loadAdminAudit } from "../../lib/admin-api.ts";
 import { useAdminResource } from "../../lib/admin-resource.ts";
 import { AuditEntryRow } from "./audit-entry-row.tsx";
@@ -15,6 +15,9 @@ const KNOWN_ACTIONS = [
   "settings.update",
   "kill_switch.update",
   "alerts.ack",
+  "job.retry",
+  "job.cancel",
+  "system.wal_checkpoint",
   "grants.create",
   "invites.create",
   "invites.revoke",

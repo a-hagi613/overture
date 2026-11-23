@@ -1,10 +1,11 @@
-import { Button } from "../../components/ui/button.tsx";
+import { Button } from "./ui/button.tsx";
 
 export function ReadinessPresetRow({
   ariaFor,
   current,
   disabled,
   label,
+  labelFor,
   onSelect,
   presets,
   valueText,
@@ -13,6 +14,7 @@ export function ReadinessPresetRow({
   current: number;
   disabled: boolean;
   label: string;
+  labelFor?: (value: number) => string;
   onSelect: (value: number) => void;
   presets: readonly number[];
   valueText: string;
@@ -36,7 +38,7 @@ export function ReadinessPresetRow({
             }}
             variant={current === preset ? "primary" : "secondary"}
           >
-            {String(preset)}
+            {labelFor === undefined ? String(preset) : labelFor(preset)}
           </Button>
         ))}
       </div>

@@ -91,12 +91,27 @@ test("launch readiness, active alerts ack, and searchable /admin/audit work end-
   await page.getByRole("button", { name: "Set daily cap to 20" }).click();
   await expect(page.getByText("20 / day")).toBeVisible();
 
+  await page.getByRole("button", { name: "No cap for browser concurrency" }).click();
+  await expect(
+    page
+      .getByRole("region", { name: "Launch readiness" })
+      .getByText("No cap", { exact: true })
+      .first(),
+  ).toBeVisible();
+
   const invalidResponse = await page.request.put(
     `${adminIsolatedAppUrl}/admin/api/settings/limits.daily_cap`,
     { data: { value: "0" } },
   );
 
   expect(invalidResponse.status()).toBe(400);
+
+  const negativeConcurrency = await page.request.put(
+    `${adminIsolatedAppUrl}/admin/api/settings/browser.max_concurrent_sessions`,
+    { data: { value: "-1" } },
+  );
+
+  expect(negativeConcurrency.status()).toBe(400);
 
   const drillResponse = await page.request.post(
     `${adminIsolatedAppServer.url}/__test__/live-checks/drill`,
@@ -129,11 +144,11 @@ test("launch readiness, active alerts ack, and searchable /admin/audit work end-
   await expect(auditList.getByText("alerts.ack")).toBeVisible();
 
   await page.getByLabel("Action").selectOption("settings.update");
-  await expect(auditList.getByText("settings.update")).toBeVisible();
+  await expect(auditList.getByText("settings.update")).toHaveCount(2);
   await expect(auditList.getByText("alerts.ack")).toBeHidden();
 
   await page.getByLabel("Search audit entries").fill("limits.daily_cap");
-  await expect(auditList.getByText("settings.update")).toBeVisible();
+  await expect(auditList.getByText("settings.update")).toHaveCount(1);
 
   await auditList.getByRole("button", { name: "Details for settings.update" }).first().click();
   await expect(auditList.locator("pre").first()).toContainText('"limits.daily_cap"');

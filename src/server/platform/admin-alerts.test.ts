@@ -209,6 +209,7 @@ describe("readAdminAlerts", () => {
 
     setKillSwitch(db, clock, "ats", "personio", false, "cleared", "owner");
     setKillSwitch(db, clock, "ats", "workable", false, "cleared", "owner");
+    setSetting(db, clock, "browser.max_concurrent_sessions", "0", "owner-1");
 
     const cleared = readAdminAlerts({
       backupStatus: { replication: "unconfigured" },
@@ -225,6 +226,7 @@ describe("readAdminAlerts", () => {
     });
 
     expect(cleared.problems).toStrictEqual([]);
+    expect(cleared.readiness.browserConcurrency).toBe(0);
 
     sqlite.close();
   });
@@ -238,9 +240,10 @@ describe("validateAdminSettingValue", () => {
     expect(validateAdminSettingValue("limits.daily_cap", "101")).toBe(false);
     expect(validateAdminSettingValue("limits.daily_cap", "abc")).toBe(false);
 
+    expect(validateAdminSettingValue("browser.max_concurrent_sessions", "0")).toBe(true);
     expect(validateAdminSettingValue("browser.max_concurrent_sessions", "1")).toBe(true);
     expect(validateAdminSettingValue("browser.max_concurrent_sessions", "20")).toBe(true);
-    expect(validateAdminSettingValue("browser.max_concurrent_sessions", "0")).toBe(false);
+    expect(validateAdminSettingValue("browser.max_concurrent_sessions", "-1")).toBe(false);
     expect(validateAdminSettingValue("browser.max_concurrent_sessions", "21")).toBe(false);
 
     expect(validateAdminSettingValue("limits.send_spacing_minutes", "20")).toBe(true);
