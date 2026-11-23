@@ -1,12 +1,21 @@
 import { request as apiRequest } from "@playwright/test";
 
 import { startAccessServer } from "./access-server.ts";
+import { adminPort, expect, startFreshAdminServer, test } from "./admin.fixture.ts";
 import { authTestIdentity } from "./auth.fixture.ts";
-import { expect, test } from "./admin.fixture.ts";
-import { latestMailLink, requestMagicLink } from "./sign-in.ts";
+import { latestMailLink, requestMagicLink, setTurnstileScenario } from "./sign-in.ts";
 import { z } from "zod";
 
-const userStateSchema = z.object({ users: z.array(z.object({ id: z.string() })) });
+const DEMO_EMAIL = "test@email.com";
+
+const userStateSchema = z.object({
+  users: z.array(z.object({ email: z.string(), id: z.string() })),
+});
+
+const meResponseSchema = z.object({
+  adminOwnerEmail: z.string().nullable(),
+  user: z.object({ email: z.string() }).nullable(),
+});
 
 async function ownerCookieHeader(adminUrl: string) {
   const context = await apiRequest.newContext();
@@ -28,6 +37,165 @@ async function ownerCookieHeader(adminUrl: string) {
 
   return header;
 }
+
+test("the admin host sends / to /admin while the main host keeps its landing page", async ({
+  request,
+  adminAppUrl,
+  adminAppServer,
+}) => {
+  const adminRoot = await request.get(`${adminAppUrl}/`, { maxRedirects: 0 });
+
+  expect(adminRoot.status()).toBe(302);
+  expect(adminRoot.headers()["location"]).toBe("/admin");
+
+  const adminRootWithQuery = await request.get(`${adminAppUrl}/?from=profile`, {
+    maxRedirects: 0,
+  });
+
+  expect(adminRootWithQuery.status()).toBe(302);
+  expect(adminRootWithQuery.headers()["location"]).toBe("/admin?from=profile");
+
+  const mainRoot = await request.get(`${adminAppServer.url}/`);
+
+  expect(mainRoot.status()).toBe(200);
+  expect(mainRoot.headers()["content-type"]).toContain("text/html");
+});
+
+test("a signed-in non-owner on the admin host gets the plain owner refusal page", async ({
+  request,
+  adminIsolatedAppServer,
+  adminIsolatedAppUrl,
+}) => {
+  const cookieHeader = await ownerCookieHeader(adminIsolatedAppUrl);
+
+  const state = await request.get(`${adminIsolatedAppServer.url}/__test__/auth/state`);
+  const stateBody = userStateSchema.parse(await state.json());
+  const ownerId = stateBody.users.find((user) => user.email === authTestIdentity.ownerEmail)?.id;
+
+  expect(ownerId).toBeDefined();
+
+  await request.post(`${adminIsolatedAppServer.url}/__test__/auth/role`, {
+    data: { userId: ownerId, role: "user" },
+  });
+
+  const refused = await request.get(`${adminIsolatedAppUrl}/admin`, {
+    headers: { accept: "text/html", cookie: cookieHeader },
+  });
+
+  expect(refused.status()).toBe(403);
+  expect(refused.headers()["content-type"]).toContain("text/html");
+
+  const body = await refused.text();
+
+  expect(body).toContain("The admin portal is for the owner account");
+  expect(body).toContain(`Sign out and use ${authTestIdentity.ownerEmail}.`);
+  expect(body).not.toContain('id="root"');
+});
+
+test("the admin sign-in screen names the owner account and the main host never does", async ({
+  page,
+  request,
+  adminAppUrl,
+  adminAppServer,
+}) => {
+  await page.goto(`${adminAppUrl}/signin`);
+
+  await expect(page.getByText("The owner's portal")).toBeVisible();
+  await expect(page.getByText(`Sign in with ${authTestIdentity.ownerEmail}.`)).toBeVisible();
+  await expect(page.getByRole("button", { name: /Continue with Google/u })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Continue with LinkedIn/u })).toHaveCount(0);
+
+  const adminMe = await request.get(`${adminAppUrl}/api/me`);
+  const mainMe = await request.get(`${adminAppServer.url}/api/me`);
+
+  expect(meResponseSchema.parse(await adminMe.json()).adminOwnerEmail).toBe(
+    authTestIdentity.ownerEmail,
+  );
+  expect(meResponseSchema.parse(await mainMe.json()).adminOwnerEmail).toBeNull();
+});
+
+test("the admin host keeps its own Turnstile host and magic-link session when the app host differs", async ({
+  page,
+  request,
+  identityServer,
+  accessServer,
+}) => {
+  const port = adminPort(3);
+  const appOrigin = `http://127.0.0.1:${String(port)}`;
+  const adminOrigin = `http://localhost:${String(port)}`;
+
+  const server = await startFreshAdminServer(identityServer, accessServer, 3, {
+    ADMIN_ORIGIN: adminOrigin,
+    APP_ORIGIN: appOrigin,
+    DEMO_LOGIN_ENABLED: "true",
+    TURNSTILE_HOSTNAMES: "",
+  });
+
+  try {
+    await setTurnstileScenario(request, adminOrigin, {
+      action: "magiclink",
+      hostname: "localhost",
+    });
+
+    const sent = await requestMagicLink(adminOrigin, request, authTestIdentity.ownerEmail);
+
+    expect(sent.status()).toBe(200);
+
+    const demoHeaders = {
+      "x-captcha-response": authTestIdentity.turnstilePassToken,
+      "x-turnstile-action": "magiclink",
+    };
+
+    const demoOnAdminHost = await request.post(`${adminOrigin}/api/auth/demo/sign-in`, {
+      data: { email: DEMO_EMAIL },
+      headers: { ...demoHeaders, origin: adminOrigin },
+    });
+
+    const demoOnAppHost = await request.post(`${appOrigin}/api/auth/demo/sign-in`, {
+      data: { email: DEMO_EMAIL },
+      headers: { ...demoHeaders, origin: appOrigin },
+    });
+
+    expect(demoOnAdminHost.status()).toBe(404);
+    expect(demoOnAppHost.status()).toBe(200);
+
+    const link = await latestMailLink(adminOrigin, request, authTestIdentity.ownerEmail);
+
+    expect(new URL(link).hostname).toBe("localhost");
+
+    const accessToken = await accessServer.issueToken({ email: authTestIdentity.ownerEmail });
+
+    await page.context().addCookies([
+      {
+        name: "CF_Authorization",
+        value: accessToken,
+        domain: "localhost",
+        path: "/",
+        expires: -1,
+        httpOnly: true,
+        secure: false,
+        sameSite: "Lax",
+      },
+    ]);
+
+    await page.goto(link);
+
+    await expect(page).toHaveURL(`${adminOrigin}/admin`);
+    await expect(page.getByRole("heading", { name: "Assert your passkey" })).toBeVisible();
+
+    const sessionCookie = (await page.context().cookies()).find(
+      (cookie) => cookie.name.includes("session") && cookie.domain.includes("localhost"),
+    );
+
+    expect(sessionCookie).toBeDefined();
+
+    const me = await page.request.get(`${adminOrigin}/api/me`);
+
+    expect(meResponseSchema.parse(await me.json()).user?.email).toBe(authTestIdentity.ownerEmail);
+  } finally {
+    await server.stop();
+  }
+});
 
 test("the admin API is selected by the Host header and refuses requests without an Access credential", async ({
   request,

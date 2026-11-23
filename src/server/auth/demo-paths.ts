@@ -1,5 +1,8 @@
 const demoAllowedAuthPaths = new Set(["/demo/sign-in", "/get-session", "/sign-out"]);
 
+/** The Better Auth endpoint behind the one-click demo sign-in. */
+export const DEMO_SIGN_IN_PATH = "/api/auth/demo/sign-in";
+
 /**
  * Whether a Better Auth endpoint may run for the demo account. The demo account is a read-only visit, so only reading
  * its own session, signing out and the one-click demo sign-in are allowed; every other endpoint, including session

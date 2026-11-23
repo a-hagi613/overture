@@ -15,8 +15,34 @@ const oauthPairs = [
 
 const localHostnames = ["localhost", "127.0.0.1"];
 
-function turnstileDefaultHostnames(appOrigin: string | undefined) {
-  return appOrigin === undefined ? localHostnames : [new URL(appOrigin).hostname];
+/**
+ * The hostnames the Turnstile widget may use when `TURNSTILE_HOSTNAMES` is unset: both origins,
+ * because the owner signs in on the admin host as well as the app host.
+ * @param appOrigin The public app origin, or undefined before it is configured.
+ * @param adminOrigin The admin host origin.
+ * @returns The deduplicated hostname allowlist.
+ */
+export function turnstileDefaultHostnames(appOrigin: string | undefined, adminOrigin: string) {
+  if (appOrigin === undefined) {
+    return localHostnames;
+  }
+
+  return [...new Set([new URL(appOrigin).hostname, new URL(adminOrigin).hostname])];
+}
+
+/**
+ * Resolves the Turnstile allowlist from the configured value or the two origins.
+ * @param configured The `TURNSTILE_HOSTNAMES` value, when set.
+ * @param appOrigin The public app origin, or undefined before it is configured.
+ * @param adminOrigin The admin host origin.
+ * @returns The hostnames the widget may report.
+ */
+export function resolveTurnstileHostnames(
+  configured: readonly string[] | undefined,
+  appOrigin: string | undefined,
+  adminOrigin: string,
+) {
+  return configured ?? turnstileDefaultHostnames(appOrigin, adminOrigin);
 }
 
 const envSchema = z
@@ -196,9 +222,11 @@ const envSchema = z
         });
       }
 
-      const hostnames =
-        value.TURNSTILE_HOSTNAMES ??
-        (value.APP_ORIGIN === undefined ? [] : turnstileDefaultHostnames(value.APP_ORIGIN));
+      const hostnames = resolveTurnstileHostnames(
+        value.TURNSTILE_HOSTNAMES,
+        value.APP_ORIGIN,
+        value.ADMIN_ORIGIN,
+      );
 
       for (const local of localHostnames) {
         if (hostnames.includes(local)) {
@@ -303,7 +331,7 @@ const envSchema = z
     }
   });
 
-const checkedEnvSchema = envSchema.superRefine((value, context) => {
+export const checkedEnvSchema = envSchema.superRefine((value, context) => {
   const problem = masterKeyChainProblem(process.env, value.MASTER_KEY_CURRENT);
 
   if (problem !== undefined) {
@@ -324,8 +352,11 @@ export const databasePath = env.DATABASE_PATH ?? env.DATABASE_URL;
  */
 export const catalogDatabasePath = env.CATALOG_DATABASE_PATH ?? catalogPathFor(databasePath);
 
-export const turnstileHostnames =
-  env.TURNSTILE_HOSTNAMES ?? turnstileDefaultHostnames(env.APP_ORIGIN);
+export const turnstileHostnames = resolveTurnstileHostnames(
+  env.TURNSTILE_HOSTNAMES,
+  env.APP_ORIGIN,
+  env.ADMIN_ORIGIN,
+);
 
 export const labBaseUrl = env.LAB_BASE_URL ?? env.APP_ORIGIN ?? null;
 

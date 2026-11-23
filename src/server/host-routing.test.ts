@@ -1,10 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { Hono } from "hono";
 
+import { copy } from "../shared/copy.ts";
 import {
+  adminOwnerRefusalPage,
+  adminRootLocation,
   dispatchByHost,
   hostnameFromHeader,
   isAdminHost,
+  isAdminPageRequest,
   mainHostAdminApiRefusal,
 } from "./host-routing.ts";
 
@@ -50,6 +54,59 @@ describe("isAdminHost", () => {
 
   test("an unreadable admin origin never matches", () => {
     expect(isAdminHost("admin.tryoverture.com", "not a url")).toBe(false);
+  });
+});
+
+describe("adminRootLocation", () => {
+  test("a bare root goes to the portal", () => {
+    expect(adminRootLocation(new URL("https://admin.tryoverture.com/"))).toBe("/admin");
+  });
+
+  test("the query string is kept and the hash never reaches the server", () => {
+    expect(
+      adminRootLocation(new URL("https://admin.tryoverture.com/?from=profile&tab=users")),
+    ).toBe("/admin?from=profile&tab=users");
+  });
+});
+
+describe("isAdminPageRequest", () => {
+  test("a browser navigation to an admin page is a page request", () => {
+    expect(isAdminPageRequest("GET", "/admin", "text/html,application/xhtml+xml,*/*;q=0.8")).toBe(
+      true,
+    );
+    expect(isAdminPageRequest("GET", "/", "text/html")).toBe(true);
+    expect(isAdminPageRequest("GET", "/signin", "text/html")).toBe(true);
+  });
+
+  test("the admin API, the me API and the test routes are never page requests", () => {
+    expect(isAdminPageRequest("GET", "/admin/api/overview", "text/html")).toBe(false);
+    expect(isAdminPageRequest("GET", "/api/me", "text/html")).toBe(false);
+    expect(isAdminPageRequest("GET", "/__test__/auth/state", "text/html")).toBe(false);
+  });
+
+  test("assets, fetches and writes are not page requests", () => {
+    expect(isAdminPageRequest("GET", "/assets/app-123.js", "*/*")).toBe(false);
+    expect(isAdminPageRequest("GET", "/admin", "*/*")).toBe(false);
+    expect(isAdminPageRequest("POST", "/admin", "text/html")).toBe(false);
+  });
+});
+
+describe("adminOwnerRefusalPage", () => {
+  test("names the owner account with the portal copy", () => {
+    const page = adminOwnerRefusalPage("owner@tryoverture.com");
+
+    expect(page).toContain(copy.admin.ownerRefusalTitle);
+    expect(page).toContain("Sign out and use owner@tryoverture.com.");
+    expect(page).toContain(copy.admin.adminPill);
+    expect(page).toContain("<h1>");
+    expect(page).toContain('lang="en"');
+  });
+
+  test("escapes the owner email instead of rendering it as markup", () => {
+    const page = adminOwnerRefusalPage('<script>alert("x")</script>');
+
+    expect(page).not.toContain("<script>alert");
+    expect(page).toContain("&lt;script&gt;");
   });
 });
 

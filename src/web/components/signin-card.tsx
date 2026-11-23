@@ -20,6 +20,7 @@ import {
 } from "./signin-styles.ts";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
+import { dsEyebrow } from "./ui/ds.ts";
 import { Separator } from "./ui/separator.tsx";
 import { authClient } from "../lib/auth-client.ts";
 import { fetchOnboardingState } from "../lib/onboarding-api.ts";
@@ -41,6 +42,7 @@ const CALLBACK_URL = "/signin";
 
 const meSchema = z.object({
   user: z.unknown().nullable(),
+  adminOwnerEmail: z.string().nullable().default(null),
   turnstileSiteKey: z.string().optional(),
   turnstileScriptUrl: z.string().optional(),
   socialProviders: z.array(z.enum(["google", "linkedin"])).default([]),
@@ -116,6 +118,7 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
   );
 
   const [socialProviders, setSocialProviders] = useState<SocialProvider[]>([]);
+  const [adminOwnerEmail, setAdminOwnerEmail] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const pendingRef = useRef(false);
   const siteKey = turnstileConfig === undefined ? undefined : turnstileConfig.siteKey;
@@ -151,6 +154,7 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
 
           if (alive) {
             setSocialProviders(parsed.socialProviders);
+            setAdminOwnerEmail(parsed.adminOwnerEmail);
           }
         }
       } catch {
@@ -273,7 +277,7 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
     const trimmed = email.trim();
     const headers = { [turnstileTokenHeader]: token, [turnstileActionHeader]: "magiclink" };
 
-    if (isDemoEmail(trimmed)) {
+    if (adminOwnerEmail === null && isDemoEmail(trimmed)) {
       const response = await fetch("/api/auth/demo/sign-in", {
         body: JSON.stringify({ email: trimmed }),
         headers: { ...headers, "content-type": "application/json" },
@@ -490,6 +494,14 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
     <>
       <Card ariaLabelledBy="signin-heading" className={CARD_CLASS} variant="elevated">
         <div className="mb-6 flex flex-col gap-1.5">
+          {adminOwnerEmail === null ? null : (
+            <div className="mb-1 flex flex-col gap-1">
+              <p className={dsEyebrow}>{copy.signIn.adminPortalKicker}</p>
+              <p className="break-words text-sm font-medium leading-relaxed text-foreground">
+                {copy.signIn.adminPortalSignIn(adminOwnerEmail)}
+              </p>
+            </div>
+          )}
           <h1 className={CARD_HEADING} id="signin-heading">
             {cardHeading}
           </h1>

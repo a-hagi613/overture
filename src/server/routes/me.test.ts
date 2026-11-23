@@ -6,6 +6,7 @@ import { mePayload } from "./me-payload.ts";
 
 const config: MeConfig = {
   adminOrigin: "https://admin.tryoverture.com",
+  adminOwnerEmail: null,
   socialProviders: ["google"],
   turnstileScriptUrl: "/turnstile.js",
   turnstileSiteKey: "site-key",
@@ -45,6 +46,19 @@ describe("GET /api/me admin origin scoping", () => {
     for (const role of ["", "Owner", "admin", "owner "]) {
       expect(mePayload(userOf(role), config).adminOrigin).toBeNull();
     }
+  });
+});
+
+describe("GET /api/me owner hint on the admin host", () => {
+  test("the admin host carries the owner email for the sign-in screen", () => {
+    const payload = mePayload(null, { ...config, adminOwnerEmail: "owner@tryoverture.com" });
+
+    expect(payload.adminOwnerEmail).toBe("owner@tryoverture.com");
+  });
+
+  test("every other host carries no owner email", () => {
+    expect(mePayload(userOf("owner"), config).adminOwnerEmail).toBeNull();
+    expect(mePayload(null, config).adminOwnerEmail).toBeNull();
   });
 });
 
