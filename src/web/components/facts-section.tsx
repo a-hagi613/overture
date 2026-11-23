@@ -15,6 +15,7 @@ import { dsBody, dsCardTitle } from "./ui/ds.ts";
 import { Tabs } from "./ui/tabs.tsx";
 import { TabsList } from "./ui/tabs-list.tsx";
 import { TabsTrigger } from "./ui/tabs-trigger.tsx";
+import { SectionSkeleton } from "./section-skeleton.tsx";
 
 type Tier = "tier1" | "tier2" | "tier3";
 
@@ -107,6 +108,10 @@ export function FactsSection() {
       },
     });
   };
+
+  if (factsQuery.isPending) {
+    return <SectionSkeleton />;
+  }
 
   return (
     <Card ariaLabelledBy="profile-facts-heading" className="mt-6 p-5 md:p-6" id="profile-facts">

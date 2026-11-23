@@ -6,6 +6,7 @@ import { loadBillingUser } from "../../lib/admin-api.ts";
 import { useAdminResource } from "../../lib/admin-resource.ts";
 import { AdminGateScreen } from "./gate-screen.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 import { BillingRow } from "./billing-row.tsx";
 import { RefundForm } from "./refund-form.tsx";
 import { billingPlanLabel, periodSpan } from "./billing-labels.ts";
@@ -27,7 +28,7 @@ export function BillingRefundPage() {
   }
 
   if (data === null) {
-    return null;
+    return <AdminStatusCard failed={false} onRetry={refresh} />;
   }
 
   const { user } = data;

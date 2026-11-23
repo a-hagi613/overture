@@ -7,6 +7,7 @@ import type { BillingReconciliation } from "../../lib/admin-api.ts";
 import { useAdminResource } from "../../lib/admin-resource.ts";
 import { AdminGateScreen } from "./gate-screen.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 import { BillingStatCard } from "./billing-stat-card.tsx";
 import { BillingTabs } from "./billing-tabs.tsx";
 import { ReconcileBanner } from "./billing-reconcile-banner.tsx";
@@ -56,7 +57,7 @@ export function BillingReconciliationPage() {
   }
 
   if (data === null) {
-    return null;
+    return <AdminStatusCard failed={false} onRetry={refresh} />;
   }
 
   const { reconciliation } = data;

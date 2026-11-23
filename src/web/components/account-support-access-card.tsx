@@ -3,6 +3,7 @@ import { useSupportAccess } from "../lib/support-access-api.ts";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle, dsMono } from "./ui/ds.ts";
+import { SectionSkeleton } from "./section-skeleton.tsx";
 
 const page = copy.settingsAccount.supportAccessPage;
 
@@ -29,6 +30,10 @@ function stamp(at: number) {
 
 export function AccountSupportAccessCard() {
   const entries = useSupportAccess();
+
+  if (entries.isPending) {
+    return <SectionSkeleton />;
+  }
 
   return (
     <div id="support-access">

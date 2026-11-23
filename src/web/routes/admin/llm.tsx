@@ -10,6 +10,7 @@ import { LlmCallLog } from "./llm-call-log.tsx";
 import { formatUsdMicros } from "./llm-format.ts";
 import { LlmSummaryCards } from "./llm-summary-cards.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 
 const NAV_LINK_CLASS =
   "inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9";
@@ -40,7 +41,7 @@ export function LlmUsagePage() {
   }
 
   if (data === null) {
-    return null;
+    return <AdminStatusCard failed={false} onRetry={refresh} />;
   }
 
   const selectPurpose = (nextPurpose: string) => {

@@ -16,7 +16,8 @@ colors:
   ok: "#3F6B52"
   ok-soft: "#DDE7DE"
   border: "rgba(21,19,17,0.14)"
-  input: "rgba(21,19,17,0.28)"
+  input: "rgba(21,19,17,0.45)"
+  dark-input: "rgba(242,237,228,0.36)"
   overlay: "rgba(21,19,17,0.16)"
   dark-background: "#191714"
   dark-sidebar: "#1E1C19"
@@ -114,7 +115,7 @@ ink feel.
 | `--need` | `--destructive` | `#8E3A2C` | `#E58A78` | Needs you: a Review |
 | `--ok` | — | `#3F6B52` | `#8DBFA2` | Screening, Interviewing, Offer |
 | `--line` | `--border` | `rgba(21,19,17,.14)` | `rgba(242,237,228,.14)` | Hairline, default |
-| `--line2` | `--input` | `rgba(21,19,17,.28)` | `rgba(242,237,228,.26)` | Control outline |
+| `--line2` | `--input` | `rgba(21,19,17,.45)` | `rgba(242,237,228,.36)` | Control outline, 3:1 on the card |
 | `--hl` | — | `rgba(255,255,255,.55)` | `rgba(255,255,255,.04)` | Letterpress highlight under rules |
 | `--accbg` | `--signal-soft` | `rgba(210,86,31,.10)` | `rgba(240,116,58,.16)` | Tinted chip and tray |
 | `--needbg` | `--need-soft` | `#EFD9D3` | `#40261F` | "Needs you" pill background |
@@ -141,6 +142,11 @@ are the only orange states.
 
 Measured on the shipped hexes (text needs 4.5:1, 3:1 at ≥24px):
 
+Control edges meet WCAG 2.2 1.4.11: raising `--input` to `rgba(21,19,17,.45)` light and
+`rgba(242,237,228,.36)` dark takes the edge on the card from 1.9:1 / 2.2:1 to **3.0:1** in both modes.
+That is the one colour change in this rollout. `--line` hairlines stay at `.14` (1.34:1 on the card) on
+purpose: they are decoration and dividers, not the boundary of a control.
+
 | Pair | Light | Dark |
 |---|---|---|
 | ink on bg | 16.0:1 | 15.3:1 |
@@ -154,6 +160,7 @@ Measured on the shipped hexes (text needs 4.5:1, 3:1 at ≥24px):
 | need on card | 7.1:1 | 6.4:1 |
 | ok on card | 5.8:1 | 7.9:1 |
 | card on ink (primary button) | 17.5:1 | 15.3:1 |
+| input edge on card (1.4.11) | 3.0:1 | 3.0:1 |
 
 Charts have no separate palette: the series is `signal`, the grid is `border`, the axis labels are
 `muted-foreground`, and the tooltip is a card. The primary button is ink with paper text in both modes.
@@ -501,9 +508,11 @@ state never pretends to have data.
 ### Error
 
 An error says what happened, what was not sent, and what happens next — in that order. Page-level errors
-use `RouteErrorBoundary` with the page `h1` and a retry action. Section errors stay in the section, use
-`need` for the heading or icon, and carry `role="alert"`. A failed send always states that nothing was
-charged. Never replace the whole page with an error when one card failed.
+use the reusable `RouteErrorCard` — the page `h1`, one sentence, Try again and Back to Home — as the router
+`errorElement` on the root, the app shell, the admin shell and every route, with a class boundary around each
+shell's outlet so a failed lazy chunk shows the card instead of a blank page. Section errors stay in the
+section, use `need` for the heading or icon, and carry `role="alert"`. A failed send always states that
+nothing was charged. Never replace the whole page with an error when one card failed.
 
 ### Form errors and aria-live
 
@@ -553,6 +562,8 @@ state the boundary rather than the marketing line.
   44, toggles 44. Pointer-only desktop controls may be 40. A compact control that must stay 34px
   visually (notification CTAs) is the 44px element, with a -5px top and bottom margin so the row does
   not grow; the painted 34px box is an inner span.
+- **Control edges.** Inputs, selects, textareas, checkboxes and switches draw a 3:1 `--input` edge on the
+  card (WCAG 2.2 1.4.11). `--border` stays a soft hairline because it is decoration, not a control.
 - **Focus.** 2px solid ink ring with a 2–3px offset on every interactive element. Never removed, never
   orange.
 - **Real elements.** `button`, `a`, `input` with a label or `aria-label`. Decorative SVG is
