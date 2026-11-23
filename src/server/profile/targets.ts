@@ -213,6 +213,8 @@ function countMatches(db: CatalogDatabase, filters: MatchFilters) {
 
   const conditions: (SQL | null | undefined)[] = [
     isNull(postings.closedAt),
+    eq(postings.status, "open"),
+    eq(postings.applySupported, true),
     inArray(postings.workplace, filters.workplaces),
     inArray(postings.employmentType, filters.employmentTypes),
     inArray(sql`lower(${postings.language})`, filters.languages),

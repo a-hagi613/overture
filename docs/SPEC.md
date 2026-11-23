@@ -302,8 +302,8 @@ other address only lowered and trimmed) · `session` · `account` (provider: goo
 | Table | Columns |
 |---|---|
 | `companies` | id, name, name_norm, domain NULL, industry NULL, created_at; INDEX(name_norm) |
-| `company_boards` | id, company_id, ats CHECK IN ('greenhouse','lever','ashby','smartrecruiters','recruitee','workable','personio'), board_token, region CHECK IN ('us','eu') DEFAULT 'us' (Lever's US and EU instances are separate boards; Greenhouse has one API), status CHECK IN ('active','empty','gone','disabled'), source CHECK IN ('v1_seed','discovered','import'), etag, last_modified, content_hash, last_polled_at, next_poll_at, backoff_level, consecutive_errors, created_at; UNIQUE(ats,region,board_token) |
-| `postings` | id, board_id, company_id, ats, ats_job_id, url, apply_url, apply_url_norm, title, title_norm, department, location_raw, country_code, region, city, workplace CHECK IN ('remote','hybrid','onsite','unknown'), employment_type CHECK IN ('full_time','part_time','contract','internship','temporary','unknown'), language, salary_min_minor, salary_max_minor, salary_currency, salary_period, posted_at, source_updated_at, first_seen_at, last_seen_at, missing_polls, closed_at, description_gz BLOB NULL, description_hash, feed_content_hash NULL (sha256 of the normalized feed posting; set only for ATSs whose list feed carries the description, Lever, Ashby and Personio; a poll rewrites a posting only when this hash or `source_updated_at` changes), dedupe_key, tag_source CHECK IN ('rules','model','llm','import'), tagged_at, questions_fetched_at; UNIQUE(board_id, ats_job_id); INDEX(apply_url_norm); INDEX(closed_at); INDEX(dedupe_key); INDEX(ats, closed_at, last_seen_at) |
+| `company_boards` | id, company_id, ats (one of the 28 registry keys in `src/shared/ats.ts`; issue #563), board_token, region CHECK IN ('us','eu') DEFAULT 'us' (Lever's US and EU instances are separate boards; Greenhouse has one API), status CHECK IN ('active','empty','gone','disabled'), source CHECK IN ('v1_seed','discovered','import'), etag, last_modified, content_hash, last_polled_at, next_poll_at, backoff_level, consecutive_errors, created_at; UNIQUE(ats,region,board_token) |
+| `postings` | id, board_id, company_id, ats, ats_job_id, requisition_id NULL, url, apply_url, apply_url_norm, title, title_norm, department, team NULL, location_raw, country_code, region, city, workplace CHECK IN ('remote','hybrid','onsite','unknown'), is_remote NULL (`1` = remote, `NULL` = unknown, never on-site; `workplace` stays the normalized read), employment_type CHECK IN ('full_time','part_time','contract','internship','temporary','unknown'), commitment NULL, experience NULL, language, salary_min_minor, salary_max_minor, salary_currency, salary_period, salary_summary NULL, posted_at, application_deadline NULL, source_updated_at, first_seen_at, last_seen_at, missing_polls, closed_at, status CHECK IN ('open','closed') DEFAULT 'open' (moves with `closed_at`), apply_supported (integer boolean DEFAULT 0; `1` only for a board with a deterministic apply adapter), dedupe_key, content_hash NULL, skills_json NULL, description_gz BLOB NULL, description_hash, feed_content_hash NULL (sha256 of the normalized feed posting; set only for ATSs whose list feed carries the description, Lever, Ashby and Personio; a poll rewrites a posting only when this hash or `source_updated_at` changes), tag_source CHECK IN ('rules','model','llm','import'), tagged_at, questions_fetched_at; UNIQUE(board_id, ats_job_id); INDEX(apply_url_norm); INDEX(closed_at); INDEX(dedupe_key); INDEX(ats, closed_at, last_seen_at); INDEX(apply_supported, status); INDEX(company_id, requisition_id) |
 | `workable_ingests` | id, snapshot_key UNIQUE, fetched_at, source_last_modified NULL, rows, content_hash, added, updated, closed, ingested_at; INDEX(ingested_at). One row per ingested Workable snapshot, the row-drop history and the "second pass with no change" guard |
 | `posting_tags` | posting_id, dimension CHECK IN ('role','subrole','seniority'), value, source; PK(posting_id,dimension,value) |
 | `postings_fts` | FTS5(title, company, location, department) (short fields only): self-contained, kept in step with `postings` and `companies` by SQLite triggers (insert, update, delete, company rename); closed Postings leave the index |
@@ -452,7 +452,17 @@ board row's URL decides `eu` at seed time). Discovery runs from `overture-web` d
 | Personio (M2) | one API | `{token}.jobs.personio.de/xml?language=en`; when an English description block is empty, the same board is read with `language=de` and the missing blocks are filled from it; no credentials; a missing board answers 404, and 3xx and 404 both mean `gone`; a posting's page is `{token}.jobs.personio.de/job/{id}` and its apply URL is `{token}.jobs.personio.de/job/{id}/apply?language={en|de}` (the server-rendered form)` | content hash | 2 concurrent, 1 req/s |
 | Workable (M2) | one feed for every customer | `www.workable.com/boards/workable.xml`, gzip required, refreshed hourly, about 831 MiB uncompressed; carries a company display name and an apply shortcode, not a board slug, so it is ingested as a feed keyed by `<referencenumber>` with one `company_boards` row per company display name (the board token is the normalised name), not as a per-company feed. **Stream-parsed, never held in memory.** A daily GitHub Action at 04:00 UTC requests it with `Accept-Encoding: gzip` and `If-Modified-Since` from the previous manifest, streams it once, tags it with the repository's `htmlToText`/`tagPosting` (plus `<experience>` for missing seniority), keeps only Postings that could match the union of active users' Targets, and writes one gzipped JSONL snapshot plus `workable/manifest.json` (fetched-at, source `Last-Modified`, feed and distinct counts, row count and SHA-256 of the JSONL) to R2. The app ingests the latest snapshot at 05:00 UTC from `catalog.workable` in the catalog worker, upserts on `<referencenumber>` (keeping the display name and `https://apply.workable.com/j/<ref>`), stores the snapshot's tags, and closes Postings absent from the snapshot; it never fetches the feed (ADR 0032, `docs/research/workable-feed-ingest.md`). The app writes the Targets union to `workable-targets.json` (values only) for the next pass; Workable's `ats` kill switch is on (traffic off) until #235, whose apply flow reads the form first from `GET https://apply.workable.com/api/v1/jobs/{shortcode}/form` (no account slug, no browser). Alerts fire when the Action fails, a snapshot is older than 26 hours, or the row count drops more than 20 %; the last snapshot stands | `If-Modified-Since` from the previous manifest (the feed returns no `ETag` and no `Content-Length`) | a recorded 300-job trim, passed through the real pass to a disk object store |
 
-SmartRecruiters and Recruitee are not built: the SAP API Policy forbids systematic extraction by AI agents, and Recruitee's Careers API needs a per-company token from 2027-02-10 (ADR 0028). Their values stay in the `company_boards.ats` check only so a later decision needs no table rebuild; no client, sender list or probe exists for them. Pinpoint and Gem are the deferred replacements.
+The 28-key registry (issue #563) is the approved Stapply no-login board set: the five shipped adapters plus Wave 1A's
+17 pure guest-apply boards and Wave 1B's 6 boards whose employer may gate the form behind a login. `ATS_REGISTRY` in
+`src/shared/ats.ts` records each board's wave and whether Overture has a deterministic apply adapter; only the five
+shipped boards are `apply_supported=1` until a later adapter wave ships. Every other key is ingest-only: its Postings
+exist in the catalog but never match a user (§8.1). The values are also in `company_boards.ats` so a later adapter
+needs no table rebuild.
+
+SmartRecruiters and Recruitee are not built as per-board clients: the SAP API Policy forbids systematic extraction by
+AI agents, and Recruitee's Careers API needs a per-company token from 2027-02-10 (ADR 0028). Their Stapply rows are
+still ingested as catalog data; no client, sender list or probe exists for them. Pinpoint and Gem are the deferred
+replacements.
 
 The apply link is the feed's own apply URL (`applyUrl` on Lever and Ashby) when present; the posting URL stays
 `hostedUrl`/`jobUrl`. Greenhouse feeds have no apply URL, and its `absolute_url` may be the employer's own site, so the
@@ -624,7 +634,9 @@ answers snapshot records the derivation key next to the value.
 
 ### 8.1 Candidates (code, free)
 
-A posting is a candidate for a user when all hold: open; tags intersect `targets.roles` (or subroles) and
+A posting is a candidate for a user when all hold: open (`status='open'` and `closed_at IS NULL`) and
+`apply_supported=1` (a board without a deterministic apply adapter never matches; issue #563); tags intersect
+`targets.roles` (or subroles) and
 `seniorities`; workplace ∈ targets; location matches a target location (a remote posting matches when its country
 is a target country, or when it names no country and the user has an unscoped `work_auth=yes` (a country-scoped
 answer is never used for a posting that names no country); a
@@ -635,9 +647,9 @@ ready, approved, sending or confirming, and none sent to it in the last 30 days 
 no sent application to the same `dedupe_key` in the last 60 days; crowd limits not reached (§12); not `hidden`; no kill
 switch on its ATS/employer.
 
-**Live Targets count.** `POST /api/profile/targets/match-count` counts open Postings that pass the candidate
-filters above that depend on the catalog: role and subrole tags, seniority tags, workplace, employment type,
-location and the profile's posting languages. A role target matches when its words intersect the words of a role
+**Live Targets count.** `POST /api/profile/targets/match-count` counts open, apply-supported Postings that pass the
+candidate filters above that depend on the catalog: role and subrole tags, seniority tags, workplace, employment
+type, location and the profile's posting languages. A role target matches when its words intersect the words of a role
 or subrole tag (`Backend` matches `Senior Backend Engineer`); a location target is resolved with the geo dataset
 (§6.1) and matched on country with city or region. The salary floor is applied only when the posting's currency
 equals the floor's; a posting without a salary always counts. FX conversion arrives with matching (M1-16). The

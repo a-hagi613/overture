@@ -15,6 +15,13 @@
       "when": 1795445592622,
       "tag": "0001_breezy_rage",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1795476146416,
+      "tag": "0002_catalog_28_boards",
+      "breakpoints": true
     }
   ]
 }

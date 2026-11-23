@@ -3,6 +3,7 @@ import { and, count, eq, exists, gte, inArray, isNull, notInArray, sql } from "d
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import type { Ats } from "../../shared/ats.ts";
 import type { TargetsInput } from "../../shared/targets.ts";
 
 import { applications, postingUserState, skipCompanies } from "../platform/db/schema.ts";
@@ -43,7 +44,7 @@ export interface CandidatePosting {
   companyId: string;
   companyName: string;
   companyDomain: string | null;
-  ats: "greenhouse" | "lever" | "ashby" | "workable" | "personio";
+  ats: Ats;
   title: string;
   locationRaw: string | null;
   countryCode: string | null;
@@ -57,6 +58,8 @@ export interface CandidatePosting {
   salaryPeriod: "year" | "month" | "hour" | null;
   postedAt: number | null;
   closedAt: number | null;
+  status: "open" | "closed";
+  applySupported: boolean;
   dedupeKey: string;
   tags: { dimension: TagDimension; value: string }[];
 }
@@ -234,6 +237,7 @@ interface FilterContext {
 
 type FilterReason =
   | "closed"
+  | "apply_unsupported"
   | "role"
   | "seniority"
   | "workplace"
@@ -348,6 +352,8 @@ export function createCandidateService(deps: CandidateDeps) {
     salaryPeriod: postings.salaryPeriod,
     postedAt: postings.postedAt,
     closedAt: postings.closedAt,
+    status: postings.status,
+    applySupported: postings.applySupported,
     dedupeKey: postings.dedupeKey,
   };
 
@@ -371,6 +377,8 @@ export function createCandidateService(deps: CandidateDeps) {
       .where(
         and(
           isNull(postings.closedAt),
+          eq(postings.status, "open"),
+          eq(postings.applySupported, true),
           inArray(postings.workplace, targets.workplaces),
           inArray(postings.employmentType, targets.employmentTypes),
           inArray(
@@ -633,9 +641,18 @@ export function createCandidateService(deps: CandidateDeps) {
     context: FilterContext,
     checkApplied: boolean,
   ) {
-    if (posting.closedAt !== null) {
+    if (posting.closedAt !== null || posting.status === "closed") {
       return {
         reason: "closed",
+        locationScore: 0,
+        salaryKnown: false,
+        seniority: 0,
+      } satisfies Verdict;
+    }
+
+    if (!posting.applySupported) {
+      return {
+        reason: "apply_unsupported",
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,

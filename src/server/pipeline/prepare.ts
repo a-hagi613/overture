@@ -7,6 +7,7 @@ import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import { isApplySupportedAts } from "../../shared/ats.ts";
 import type { AnswerKind, QuestionFieldType, ReviewReason } from "../../shared/questions.ts";
 import type { AnswerSource, BlockReason, PlanResolution } from "./answer-plan.ts";
 import type { AnswerUnit, FileFact } from "./answer-value.ts";
@@ -627,7 +628,7 @@ export function createPreparationService(deps: {
       .where(eq(postings.id, application.postingId))
       .get();
 
-    if (row === undefined) {
+    if (row === undefined || !isApplySupportedAts(row.ats)) {
       return [];
     }
 
@@ -725,7 +726,13 @@ export function createPreparationService(deps: {
       return null;
     }
 
-    const row = { ...application, ...postingRow };
+    const { ats } = postingRow;
+
+    if (!isApplySupportedAts(ats)) {
+      return null;
+    }
+
+    const row = { ...application, ...postingRow, ats };
 
     if (!spendGate.allows(row.userId)) {
       logInfo("spend", `preparation skipped for ${applicationId}: no Applications left`);
@@ -1146,7 +1153,13 @@ export function createPreparationService(deps: {
       return null;
     }
 
-    const row = { ...application, ...postingRow };
+    const { ats } = postingRow;
+
+    if (!isApplySupportedAts(ats)) {
+      return null;
+    }
+
+    const row = { ...application, ...postingRow, ats };
 
     const factRows = await factsService.list(row.userId);
     const factIndex = indexFacts(factRows);

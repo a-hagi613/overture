@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
@@ -263,8 +263,112 @@ test("the catalog hot-path indexes exist after every migration", () => {
 
     expect(names).toContain("companies_name_norm");
     expect(names).toContain("company_boards_ats_status_next_poll");
+    expect(names).toContain("postings_apply_supported_status");
+    expect(names).toContain("postings_company_requisition");
   } finally {
     app.sqlite.close();
     catalog.sqlite.close();
+  }
+});
+
+const CATALOG_WINDOW_MIGRATION = "0002_catalog_28_boards";
+
+function catalogMigrationsBeforeWindow() {
+  const directory = mkdtempSync(join(tmpdir(), "catalog-window-migration-"));
+  scratchDirectories.push(directory);
+
+  const journal = z
+    .object({
+      entries: z.array(z.looseObject({ idx: z.number(), tag: z.string(), when: z.number() })),
+      version: z.string(),
+    })
+    .parse(JSON.parse(readFileSync("drizzle-catalog/meta/_journal.json", "utf8")));
+
+  const cutoff = journal.entries.findIndex((entry) => entry.tag === CATALOG_WINDOW_MIGRATION);
+
+  if (cutoff === -1) {
+    throw new Error(`migration ${CATALOG_WINDOW_MIGRATION} is missing from the catalog journal`);
+  }
+
+  const before = journal.entries.slice(0, cutoff);
+
+  cpSync("drizzle-catalog/meta", join(directory, "meta"), { recursive: true });
+
+  for (const entry of before) {
+    cpSync(join("drizzle-catalog", `${entry.tag}.sql`), join(directory, `${entry.tag}.sql`));
+  }
+
+  writeFileSync(
+    join(directory, "meta", "_journal.json"),
+    JSON.stringify({ ...journal, entries: before }, null, 2),
+  );
+
+  return directory;
+}
+
+test("the 0002 migration backfills apply_supported and status on existing postings", () => {
+  const { db, sqlite } = openCatalogDatabase(":memory:");
+
+  try {
+    migrateCatalogDatabase(db, catalogMigrationsBeforeWindow());
+
+    sqlite.run(
+      "insert into companies (id, name, name_norm, created_at) values ('company-1', 'Ferro Cloud', 'ferro cloud', ?)",
+      [NOW],
+    );
+
+    for (const [id, ats] of [
+      ["board-open", "greenhouse"],
+      ["board-closed", "greenhouse"],
+      ["board-unsupported", "smartrecruiters"],
+    ] as const) {
+      sqlite.run(
+        "insert into company_boards (id, company_id, ats, board_token, region, status, source, created_at) values (?, 'company-1', ?, ?, 'us', 'active', 'v1_seed', ?)",
+        [id, ats, id, NOW],
+      );
+    }
+
+    const insertPosting = sqlite.prepare(
+      `insert into postings (id, board_id, company_id, ats, ats_job_id, url, apply_url_norm, title, title_norm,
+         first_seen_at, last_seen_at, closed_at, dedupe_key)
+       values (?, ?, 'company-1', ?, ?, ?, ?, 'Engineer', 'engineer', ?, ?, ?, ?)`,
+    );
+
+    for (const [id, boardId, ats, closedAt] of [
+      ["posting-open", "board-open", "greenhouse", null],
+      ["posting-closed", "board-closed", "greenhouse", NOW],
+      ["posting-unsupported", "board-unsupported", "smartrecruiters", null],
+    ] as const) {
+      const url = `https://example.test/${id}`;
+
+      insertPosting.run(id, boardId, ats, id, url, url, NOW, NOW, closedAt, id);
+    }
+
+    migrateCatalogDatabase(db, "drizzle-catalog");
+
+    const rows = z
+      .array(
+        z.object({
+          applySupported: z.number(),
+          closedAt: z.number().nullable(),
+          id: z.string(),
+          status: z.string(),
+        }),
+      )
+      .parse(
+        sqlite
+          .query(
+            "select id, apply_supported as applySupported, status, closed_at as closedAt from postings order by id",
+          )
+          .all(),
+      );
+
+    expect(rows).toEqual([
+      { applySupported: 1, closedAt: NOW, id: "posting-closed", status: "closed" },
+      { applySupported: 1, closedAt: null, id: "posting-open", status: "open" },
+      { applySupported: 0, closedAt: null, id: "posting-unsupported", status: "open" },
+    ]);
+  } finally {
+    sqlite.close();
   }
 });

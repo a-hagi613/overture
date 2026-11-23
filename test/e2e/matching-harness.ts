@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
 
+import type { Ats } from "../../src/shared/ats.ts";
 import type { AnswerKind } from "../../src/shared/questions.ts";
 
 import { authTestIdentity } from "./auth.fixture.ts";
@@ -115,7 +116,7 @@ export async function seedCompany(request: APIRequestContext, name: string, doma
 export async function seedBoard(
   request: APIRequestContext,
   companyId: string,
-  ats: "greenhouse" | "lever" | "ashby" | "workable" | "personio",
+  ats: Ats,
   boardToken: string,
 ) {
   const response = await request.post("/__test__/catalog/boards", {
@@ -133,7 +134,7 @@ export async function seedPosting(
     atsJobId: string;
     url: string;
     title?: string;
-    ats?: "greenhouse" | "lever" | "ashby" | "workable" | "personio";
+    ats?: Ats;
     workplace?: "remote" | "hybrid" | "onsite" | "unknown";
     employmentType?: string;
     language?: string;

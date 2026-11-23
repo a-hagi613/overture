@@ -235,6 +235,8 @@ function postingValues(row: WorkableSnapshotRow, ref: BoardRef, now: number) {
     lastSeenAt: now,
     missingPolls: 0,
     closedAt: null,
+    status: "open" as const,
+    applySupported: true,
     dedupeKey: dedupeKeyFor({
       companyId: ref.companyId,
       titleNorm,
@@ -252,7 +254,7 @@ function postingValues(row: WorkableSnapshotRow, ref: BoardRef, now: number) {
 function closeAbsentPostings(catalogDb: CatalogDatabase, now: number) {
   return catalogDb
     .update(postings)
-    .set({ closedAt: now })
+    .set({ closedAt: now, status: "closed" })
     .where(
       and(eq(postings.ats, "workable"), isNull(postings.closedAt), lt(postings.lastSeenAt, now)),
     )

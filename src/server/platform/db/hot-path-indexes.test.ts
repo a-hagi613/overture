@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
 import { z } from "zod";
 
-import { openDatabase } from "./client.ts";
-import { migrateDatabase } from "./migrate.ts";
+import { openCatalogDatabase, openDatabase } from "./client.ts";
+import { migrateCatalogDatabase, migrateDatabase } from "./migrate.ts";
 
 const NOW = 1_800_000_000_000;
 const ROWS = 2000;
@@ -224,6 +224,93 @@ test("the retention, audit and session hot paths search their new indexes", () =
     );
 
     expect(jobs).toContain("bg_jobs_status_updated");
+  } finally {
+    db.$client.close();
+  }
+});
+
+test("the catalog candidate and requisition hot paths search their new indexes", () => {
+  const { db, sqlite } = openCatalogDatabase(":memory:");
+
+  migrateCatalogDatabase(db, "drizzle-catalog");
+
+  sqlite.run(
+    "insert into companies (id, name, name_norm, created_at) values ('company-a', 'A', 'a', ?)",
+    [NOW],
+  );
+  sqlite.run(
+    "insert into companies (id, name, name_norm, created_at) values ('company-b', 'B', 'b', ?)",
+    [NOW],
+  );
+  sqlite.run(
+    "insert into company_boards (id, company_id, ats, board_token, region, status, source, created_at) values ('board-a', 'company-a', 'greenhouse', 'a', 'us', 'active', 'v1_seed', ?)",
+    [NOW],
+  );
+  sqlite.run(
+    "insert into company_boards (id, company_id, ats, board_token, region, status, source, created_at) values ('board-b', 'company-b', 'smartrecruiters', 'b', 'us', 'active', 'v1_seed', ?)",
+    [NOW],
+  );
+
+  const insertPosting = sqlite.prepare(
+    `insert into postings (id, board_id, company_id, ats, ats_job_id, requisition_id, url, apply_url_norm,
+       title, title_norm, first_seen_at, last_seen_at, dedupe_key, apply_supported, status)
+     values (?, ?, ?, ?, ?, ?, ?, ?, 'Engineer', 'engineer', ?, ?, ?, ?, ?)`,
+  );
+
+  try {
+    for (let index = 0; index < ROWS; index += 1) {
+      const supportable = index % 5 !== 0;
+      const ats = supportable ? "greenhouse" : "smartrecruiters";
+      const boardId = supportable ? "board-a" : "board-b";
+      const companyId = supportable ? "company-a" : "company-b";
+      const url = `https://example.test/${String(index)}`;
+
+      insertPosting.run(
+        `posting-${String(index)}`,
+        boardId,
+        companyId,
+        ats,
+        String(index),
+        supportable ? `req-${String(index)}` : null,
+        url,
+        url,
+        NOW,
+        NOW,
+        `key-${String(index)}`,
+        supportable ? 1 : 0,
+        index % 7 === 0 ? "closed" : "open",
+      );
+    }
+
+    sqlite.run("ANALYZE");
+
+    const names = z
+      .array(nameSchema)
+      .parse(sqlite.query("select name from sqlite_master where type = 'index'").all())
+      .map((row) => row.name);
+
+    expect(names).toContain("postings_apply_supported_status");
+    expect(names).toContain("postings_company_requisition");
+
+    const unsupported = sqlite
+      .query(
+        "EXPLAIN QUERY PLAN select id from postings where apply_supported = 0 and status = 'closed'",
+      )
+      .all()
+      .map((row) => planSchema.parse(row).detail)
+      .join("\n");
+
+    expect(unsupported).toContain("postings_apply_supported_status");
+
+    const requisition = sqlite
+      .query(
+        "EXPLAIN QUERY PLAN select id from postings where company_id = ? and requisition_id = ?",
+      )
+      .all("company-a", "req-3")
+      .map((row) => planSchema.parse(row).detail)
+      .join("\n");
+
+    expect(requisition).toContain("postings_company_requisition");
   } finally {
     db.$client.close();
   }

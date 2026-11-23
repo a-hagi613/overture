@@ -3,6 +3,7 @@ import { and, count, eq, gte, inArray, isNull, notInArray, sql } from "drizzle-o
 import type { CatalogDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import { companyBoards, postings } from "../platform/db/catalog-schema.ts";
+import { isApplySupportedAts } from "../../shared/ats.ts";
 import { normalizeApplyUrl, normalizeTitle } from "./normalize.ts";
 import { contentHash } from "./content-hash.ts";
 import { dedupeKeyFor } from "./dedupe-key.ts";
@@ -257,7 +258,7 @@ async function closeMissingPostings(db: CatalogDatabase, clock: Clock, boardId: 
 
       return tx
         .update(postings)
-        .set({ closedAt: now })
+        .set({ closedAt: now, status: "closed" })
         .where(inArray(postings.id, chunk))
         .returning({ id: postings.id })
         .all();
@@ -331,6 +332,8 @@ function postingValues(
     lastSeenAt: now,
     missingPolls: 0,
     closedAt: null,
+    status: "open" as const,
+    applySupported: isApplySupportedAts(board.ats),
     dedupeKey,
     descriptionGz: descriptionText === null ? null : gzip(descriptionText),
     descriptionHash: descriptionText === null ? null : contentHash(descriptionText),

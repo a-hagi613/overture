@@ -190,6 +190,8 @@ export function seedTemplateCatalog(db: ReturnType<typeof openCatalogDatabase>["
           lastSeenAt: now,
           missingPolls: 0,
           closedAt: null,
+          status: "open",
+          applySupported: true,
           dedupeKey: `${companyId}|${titleNorm}|${tags.countryCode ?? ""}|${tags.city ?? ""}`,
           descriptionGz,
           descriptionHash: contentHash(descriptionText),

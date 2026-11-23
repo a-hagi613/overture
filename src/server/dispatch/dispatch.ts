@@ -360,7 +360,7 @@ export function createDispatcherTick(deps: DispatchDeps) {
   function skipClosed(candidate: Candidate, now: number) {
     deps.catalogDb
       .update(postings)
-      .set({ closedAt: now })
+      .set({ closedAt: now, status: "closed" })
       .where(and(eq(postings.id, candidate.postingId), isNull(postings.closedAt)))
       .run();
 
