@@ -7,8 +7,9 @@ import { ownerSseSession } from "./sse-auth.ts";
 const publishOkSchema = z.object({ ok: z.boolean() });
 
 test("a page receives an event live and replays missed events after reconnecting", async ({
-  appServerUrl,
+  isolatedAppServer,
 }) => {
+  const appServerUrl = isolatedAppServer.url;
   const session = await ownerSseSession(appServerUrl);
 
   try {

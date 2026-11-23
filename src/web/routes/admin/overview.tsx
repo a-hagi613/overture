@@ -57,6 +57,7 @@ export function OverviewPage() {
 
   const view: Overview = overview.data;
   const jobs = Object.entries(view.jobs);
+  const deadJobs = view.jobs.dead ?? 0;
   const mailStop = mailStopNote(view.mail);
 
   return (
@@ -118,6 +119,16 @@ export function OverviewPage() {
               ))
             )}
           </div>
+          {deadJobs > 0 ? (
+            <p className="mt-3">
+              <Link
+                className="inline-flex min-h-11 items-center rounded-sm text-[12.5px] font-semibold text-signal-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9"
+                to="/admin/jobs?status=dead"
+              >
+                {copy.admin.overviewJobsDead(deadJobs)}
+              </Link>
+            </p>
+          ) : null}
         </Card>
         <Card ariaLabelledBy="admin-overview-cost">
           <CardTitle id="admin-overview-cost">{copy.admin.overviewCost}</CardTitle>

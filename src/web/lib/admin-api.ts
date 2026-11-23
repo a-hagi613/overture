@@ -107,6 +107,66 @@ export const overviewSchema = z.object({
   audit: z.array(auditRowSchema),
 });
 
+export const jobStatusSchema = z.enum(["queued", "running", "failed", "dead", "done"]);
+
+export const jobStatusFilterSchema = z.enum([
+  "all",
+  "queued",
+  "running",
+  "failed",
+  "dead",
+  "completed",
+]);
+
+export const jobRowSchema = z.object({
+  attempts: z.number(),
+  createdAt: z.number(),
+  dedupeKey: z.string().nullable(),
+  id: z.string(),
+  kind: z.string(),
+  lastError: z.string().nullable(),
+  lockedUntil: z.number().nullable(),
+  maxAttempts: z.number(),
+  payloadPreview: z.string(),
+  priority: z.number(),
+  runAt: z.number(),
+  status: jobStatusSchema,
+  updatedAt: z.number(),
+});
+
+export const jobsResponseSchema = z.object({
+  counts: z.object({
+    queued: z.number(),
+    running: z.number(),
+    done: z.number(),
+    failed: z.number(),
+    dead: z.number(),
+    total: z.number(),
+  }),
+  countsByKindStatus: z.array(
+    z.object({
+      kind: z.string(),
+      status: jobStatusSchema,
+      total: z.number(),
+    }),
+  ),
+  kinds: z.array(z.string()),
+  jobs: z.array(jobRowSchema),
+  limit: z.number(),
+  now: z.number(),
+  total: z.number(),
+});
+
+export const jobActionResponseSchema = z.object({ job: jobRowSchema });
+
+export type JobRow = z.infer<typeof jobRowSchema>;
+
+export type JobStatus = z.infer<typeof jobStatusSchema>;
+
+export type JobStatusFilter = z.infer<typeof jobStatusFilterSchema>;
+
+export type JobsResponse = z.infer<typeof jobsResponseSchema>;
+
 export const providerReportRowSchema = z.object({
   ats: z.string(),
   attempted: z.number(),
@@ -734,6 +794,25 @@ export const loadAdminAudit = async (input: AdminAuditFilterInput) => {
 };
 
 export const loadSettings = async () => adminGet("/admin/api/settings", settingsResponseSchema);
+
+export const loadJobs = async (input: { status: JobStatusFilter; kind: string; limit: number }) => {
+  const search = new URLSearchParams({
+    limit: String(input.limit),
+    status: input.status,
+  });
+
+  if (input.kind.length > 0) {
+    search.set("kind", input.kind);
+  }
+
+  return adminGet(`/admin/api/jobs?${search.toString()}`, jobsResponseSchema);
+};
+
+export const retryJob = async (id: string) =>
+  adminPost(`/admin/api/jobs/${encodeURIComponent(id)}/retry`, null, jobActionResponseSchema);
+
+export const cancelJob = async (id: string) =>
+  adminPost(`/admin/api/jobs/${encodeURIComponent(id)}/cancel`, null, jobActionResponseSchema);
 
 export const loadProviderReport = async () =>
   adminGet("/admin/api/provider-report", providerReportSchema);

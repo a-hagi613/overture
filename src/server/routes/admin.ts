@@ -1,5 +1,6 @@
 import { validJson, validQuery } from "./validators.ts";
 import { and, asc, count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import type { Context } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -16,6 +17,8 @@ import { readSession } from "../auth/session.ts";
 import { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
 import type { AdminEnv } from "./admin-refusals.ts";
 import { createAdminRevealRoutes } from "./admin-reveal.ts";
+import type { JobActionOutcome } from "../admin/jobs.ts";
+import { cancelAdminJob, JOB_STATUS_FILTERS, listAdminJobs, retryAdminJob } from "../admin/jobs.ts";
 
 import {
   applications,
@@ -90,6 +93,12 @@ import { checkpointDatabase } from "../storage/database-sizes.ts";
 import { buildSystemReport, stripeModeOf } from "../system/report.ts";
 
 const settingBody = z.object({ value: z.string().min(1) });
+
+const jobsQuery = z.object({
+  kind: z.string().trim().min(1).max(120).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  status: z.enum(JOB_STATUS_FILTERS).default("all"),
+});
 
 const suspendBody = z.object({ reason: z.string().trim().min(1).max(500) });
 
@@ -280,6 +289,18 @@ function integrationsOf() {
 export { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
 
 export { isAdminHost } from "../host-routing.ts";
+
+function jobActionResponse(context: Context<AdminEnv>, result: JobActionOutcome) {
+  if (result.outcome === "not_found") {
+    return context.json({ error: "not_found" }, 404);
+  }
+
+  if (result.outcome === "conflict") {
+    return context.json({ error: result.reason, status: result.status }, 409);
+  }
+
+  return context.json({ job: result.job });
+}
 
 export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: AdminDeps) {
   const verifier = createAccessVerifier({
@@ -836,6 +857,28 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
         detail: row.detail,
       })),
     });
+  });
+
+  routes.get("/jobs", validQuery(jobsQuery), (context) =>
+    context.json(listAdminJobs(db, clock, context.req.valid("query"))),
+  );
+
+  routes.post("/jobs/:id/retry", async (context) => {
+    const owner = context.get("owner");
+
+    return jobActionResponse(
+      context,
+      await retryAdminJob(db, clock, context.req.param("id"), owner.userId),
+    );
+  });
+
+  routes.post("/jobs/:id/cancel", async (context) => {
+    const owner = context.get("owner");
+
+    return jobActionResponse(
+      context,
+      await cancelAdminJob(db, clock, context.req.param("id"), owner.userId),
+    );
   });
 
   routes.get("/storage-report", validQuery(storageReportQuery), async (context) =>
