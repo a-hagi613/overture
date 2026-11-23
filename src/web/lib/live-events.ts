@@ -92,7 +92,12 @@ export function useLiveUpdates() {
     const handleOpen = () => {
       if (hadError) {
         hadError = false;
-        void queryClient.invalidateQueries();
+
+        for (const queryKeys of Object.values(TOPIC_QUERY_KEYS)) {
+          for (const queryKey of queryKeys) {
+            void queryClient.invalidateQueries({ queryKey });
+          }
+        }
       }
     };
 

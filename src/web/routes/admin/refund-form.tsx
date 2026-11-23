@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 
 import { copy } from "../../../shared/copy.ts";
 import { postRefund } from "../../lib/admin-api.ts";
 import type { BillingPeriod } from "../../lib/admin-api.ts";
-import { useInvalidateAdminQueries } from "../../lib/admin-resource.ts";
 import { REFUND_REASON_KEYS } from "./refund-reasons.ts";
 
 type Notice = { kind: "done"; replayed: boolean } | { kind: "error"; message: string } | null;
@@ -20,7 +20,6 @@ function newKey() {
 }
 
 export function RefundForm({ userId, period }: { userId: string; period: BillingPeriod }) {
-  const invalidateAdmin = useInvalidateAdminQueries();
   const [idempotencyKey, setIdempotencyKey] = useState(newKey);
   const [mode, setMode] = useState<"full" | "partial">("full");
   const [amount, setAmount] = useState("");
@@ -74,8 +73,10 @@ export function RefundForm({ userId, period }: { userId: string; period: Billing
         reason,
       });
 
-      invalidateAdmin();
       setNotice({ kind: "done", replayed: result.replayed });
+      toast.success(
+        result.replayed ? copy.admin.billingRefundReplayed : copy.admin.billingRefundDone,
+      );
     } catch {
       setNotice({ kind: "error", message: copy.admin.billingRefundFailed });
     }
