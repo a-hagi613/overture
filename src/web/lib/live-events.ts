@@ -7,6 +7,7 @@ const LIVE_TOPICS = [
   "application.updated",
   "board.moved",
   "review.created",
+  "review.needed",
   "review.resolved",
   "message.received",
   "notification",
@@ -17,15 +18,31 @@ const LIVE_TOPICS = [
 type LiveTopic = (typeof LIVE_TOPICS)[number];
 
 const TOPIC_QUERY_KEYS: Record<LiveTopic, readonly (readonly string[])[]> = {
-  "application.updated": [["home"], ["nav"], ["board"], ["ready"], ["application"], ["calendar"]],
+  "application.updated": [
+    ["home"],
+    ["nav"],
+    ["board"],
+    ["ready"],
+    ["application"],
+    ["calendar"],
+    ["billing"],
+  ],
   "board.moved": [["home"], ["nav"], ["board"], ["ready"], ["application"], ["calendar"]],
   "calendar.updated": [["home"], ["nav"], ["board"], ["calendar"]],
   "code.wait_resolved": [["home"], ["nav"], ["notifications"], ["code-waits"]],
-  "home.updated": [["home"], ["nav"], ["ready"]],
-  "message.received": [["home"], ["nav"], ["threads"], ["thread"]],
-  notification: [["home"], ["nav"], ["notifications"], ["code-waits"]],
+  "home.updated": [["home"], ["nav"], ["ready"], ["billing"]],
+  "message.received": [
+    ["home"],
+    ["nav"],
+    ["threads"],
+    ["thread"],
+    ["mailbox"],
+    ["onboarding-mailbox"],
+  ],
+  notification: [["home"], ["nav"], ["notifications"], ["code-waits"], ["billing"]],
   "review.created": [["home"], ["nav"], ["reviews"], ["ready"], ["board"]],
-  "review.resolved": [["home"], ["nav"], ["reviews"], ["ready"], ["board"]],
+  "review.needed": [["home"], ["nav"], ["reviews"], ["ready"], ["board"]],
+  "review.resolved": [["home"], ["nav"], ["reviews"], ["ready"], ["board"], ["profile-facts"]],
 };
 
 function isLiveTopic(value: string): value is LiveTopic {
@@ -66,6 +83,23 @@ export function useLiveUpdates() {
 
   useEffect(() => {
     const source = new EventSource("/api/events");
+    let hadError = false;
+
+    const handleError = () => {
+      hadError = true;
+    };
+
+    const handleOpen = () => {
+      if (hadError) {
+        hadError = false;
+
+        for (const queryKeys of Object.values(TOPIC_QUERY_KEYS)) {
+          for (const queryKey of queryKeys) {
+            void queryClient.invalidateQueries({ queryKey });
+          }
+        }
+      }
+    };
 
     const refresh = (event: MessageEvent) => {
       if (isLiveTopic(event.type)) {
@@ -92,11 +126,16 @@ export function useLiveUpdates() {
       }
     };
 
+    source.addEventListener("error", handleError);
+    source.addEventListener("open", handleOpen);
+
     for (const topic of LIVE_TOPICS) {
       source.addEventListener(topic, refresh);
     }
 
     return () => {
+      source.removeEventListener("error", handleError);
+      source.removeEventListener("open", handleOpen);
       source.close();
     };
   }, [queryClient]);

@@ -53,13 +53,21 @@ export function TimeLanguageSection() {
 
   const save = useMutation({
     mutationFn: saveProfileSettings,
+    onError: () => {
+      toast.error(copy.settings.notificationsSaveError);
+    },
     onSuccess: (saved) => {
       queryClient.setQueryData(["profile-settings"], saved);
+      void queryClient.invalidateQueries({ queryKey: ["time-language"] });
+      void queryClient.invalidateQueries({ queryKey: ["home"] });
+      void queryClient.invalidateQueries({ queryKey: ["calendar"] });
       void queryClient.invalidateQueries({ queryKey: ["profile-targets"] });
       void queryClient.invalidateQueries({ queryKey: ["profile-targets-count"] });
       toast.success("Time and language updated.");
     },
   });
+
+  const controlsDisabled = settingsQuery.isPending || save.isPending;
 
   const savedZone = settingsQuery.data?.timezone ?? null;
   const pendingZone = settingsQuery.data?.pendingTimezone ?? null;
@@ -105,7 +113,8 @@ export function TimeLanguageSection() {
 
           <div className="relative w-full shrink-0 sm:w-56">
             <select
-              className="h-10 w-full cursor-pointer appearance-none rounded-md border border-input bg-card pl-3 pr-9 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal"
+              className="h-10 w-full cursor-pointer appearance-none rounded-md border border-input bg-card pl-3 pr-9 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={controlsDisabled}
               id="settings-timezone"
               onChange={(event) => {
                 persist(languages, event.currentTarget.value);
@@ -147,6 +156,7 @@ export function TimeLanguageSection() {
                 <Button
                   ariaPressed={active}
                   className="rounded-full"
+                  disabled={controlsDisabled}
                   key={chip.code}
                   onClick={() => {
                     toggleLanguage(chip.code);
@@ -161,6 +171,12 @@ export function TimeLanguageSection() {
           </fieldset>
         </div>
       </div>
+
+      {save.isError ? (
+        <p className="mt-3 text-xs font-semibold text-need" role="alert">
+          {copy.settings.notificationsSaveError}
+        </p>
+      ) : null}
     </Card>
   );
 }

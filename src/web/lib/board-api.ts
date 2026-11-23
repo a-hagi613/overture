@@ -226,8 +226,14 @@ export function useMoveStage() {
   return useMutation({
     mutationFn: moveStage,
     onSuccess: async (_data, variables) => {
-      await client.invalidateQueries({ queryKey: ["board"] });
-      await client.invalidateQueries({ queryKey: ["application", variables.id] });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["board"] }),
+        client.invalidateQueries({ queryKey: ["application", variables.id] }),
+        client.invalidateQueries({ queryKey: ["home"] }),
+        client.invalidateQueries({ queryKey: ["calendar"] }),
+        client.invalidateQueries({ queryKey: ["nav"] }),
+        client.invalidateQueries({ queryKey: ["ready"] }),
+      ]);
     },
   });
 }
@@ -237,8 +243,15 @@ export function useUndoStage() {
 
   return useMutation({
     mutationFn: undoStage,
-    onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ["board"] });
+    onSuccess: async (_data, id) => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["board"] }),
+        client.invalidateQueries({ queryKey: ["application", id] }),
+        client.invalidateQueries({ queryKey: ["home"] }),
+        client.invalidateQueries({ queryKey: ["calendar"] }),
+        client.invalidateQueries({ queryKey: ["nav"] }),
+        client.invalidateQueries({ queryKey: ["ready"] }),
+      ]);
     },
   });
 }
@@ -249,8 +262,14 @@ export function useWithdraw() {
   return useMutation({
     mutationFn: withdrawApplication,
     onSuccess: async (_data, id) => {
-      await client.invalidateQueries({ queryKey: ["board"] });
-      await client.invalidateQueries({ queryKey: ["application", id] });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["board"] }),
+        client.invalidateQueries({ queryKey: ["application", id] }),
+        client.invalidateQueries({ queryKey: ["home"] }),
+        client.invalidateQueries({ queryKey: ["calendar"] }),
+        client.invalidateQueries({ queryKey: ["nav"] }),
+        client.invalidateQueries({ queryKey: ["ready"] }),
+      ]);
     },
   });
 }

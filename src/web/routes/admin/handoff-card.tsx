@@ -1,4 +1,5 @@
 import { ArrowUpRight } from "lucide-react";
+import { useLocation } from "react-router";
 
 import { copy } from "../../../shared/copy.ts";
 import { BrandMark } from "../../components/brand-mark.tsx";
@@ -8,8 +9,8 @@ import { dsBody } from "../../components/ui/ds.ts";
 import { adminHostOf, handoffHref } from "../../lib/me-api.ts";
 
 export function AdminHandoffCard({ adminOrigin }: { adminOrigin: string }) {
-  const { pathname, search } = globalThis.location;
-  const href = handoffHref(adminOrigin, pathname, search);
+  const { hash, pathname, search } = useLocation();
+  const href = handoffHref(adminOrigin, pathname, search, hash);
 
   return (
     <div className="min-h-screen overflow-x-clip bg-background text-foreground">

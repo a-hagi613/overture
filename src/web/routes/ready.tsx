@@ -112,6 +112,8 @@ export function ReadyPage() {
   const refreshLinkedQueries = () => {
     void queryClient.invalidateQueries({ queryKey: ["board"] });
     void queryClient.invalidateQueries({ queryKey: ["home"] });
+    void queryClient.invalidateQueries({ queryKey: ["nav"] });
+    void queryClient.invalidateQueries({ queryKey: ["profile-facts"] });
     void queryClient.invalidateQueries({ queryKey: ["ready"] });
   };
 

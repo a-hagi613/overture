@@ -24,6 +24,7 @@ export interface InputProps {
   onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
   placeholder?: string;
   readOnly?: boolean;
+  required?: boolean;
   type?: "date" | "email" | "number" | "search" | "tel" | "text" | "time" | "url";
   value?: string;
 }
@@ -45,6 +46,7 @@ export function Input({
   onKeyDown,
   placeholder,
   readOnly,
+  required,
   type = "text",
   value,
 }: InputProps) {
@@ -70,6 +72,7 @@ export function Input({
       onKeyDown={onKeyDown}
       placeholder={placeholder}
       readOnly={readOnly}
+      required={required}
       type={type}
       value={value}
     />

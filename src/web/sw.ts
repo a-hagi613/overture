@@ -1,22 +1,20 @@
-import { z } from "zod";
-
-const payloadSchema = z.object({
-  body: z.string().optional(),
-  tag: z.string().optional(),
-  title: z.string().optional(),
-  url: z.string().optional(),
-});
+export interface PushPayload {
+  body?: string | undefined;
+  tag?: string | undefined;
+  title?: string | undefined;
+  url?: string | undefined;
+}
 
 interface ExtendableEventLike {
   waitUntil: (promise: Promise<void>) => void;
 }
 
 interface PushEventLike extends ExtendableEventLike {
-  data: { json: () => object } | null;
+  data: { json: () => PushPayload | null | undefined } | null;
 }
 
 interface NotificationEventLike extends ExtendableEventLike {
-  notification: { close: () => void; data: object };
+  notification: { close: () => void; data: PushPayload | null | undefined };
 }
 
 interface ClientLike {
@@ -29,7 +27,6 @@ declare function addEventListener(
   type: "install" | "activate",
   listener: (event: ExtendableEventLike) => void,
 ): void;
-declare function addEventListener(type: "fetch", listener: (event: Event) => void): void;
 declare function addEventListener(type: "push", listener: (event: PushEventLike) => void): void;
 declare function addEventListener(
   type: "notificationclick",
@@ -58,6 +55,49 @@ declare const registration: {
   ) => Promise<void>;
 };
 
+function optionalString(value: string | undefined) {
+  return Object.prototype.toString.call(value) === "[object String]" ? value : undefined;
+}
+
+function parsePayload(raw: PushPayload | null | undefined) {
+  if (
+    raw === null ||
+    raw === undefined ||
+    Object.prototype.toString.call(raw) !== "[object Object]"
+  ) {
+    return {} satisfies PushPayload;
+  }
+
+  return {
+    body: optionalString(raw.body),
+    tag: optionalString(raw.tag),
+    title: optionalString(raw.title),
+    url: optionalString(raw.url),
+  } satisfies PushPayload;
+}
+
+function readPushPayload(event: PushEventLike) {
+  if (event.data === null) {
+    return {} satisfies PushPayload;
+  }
+
+  try {
+    return parsePayload(event.data.json());
+  } catch {
+    return {} satisfies PushPayload;
+  }
+}
+
+function resolveTargetUrl(rawUrl: string | undefined) {
+  try {
+    const parsed = new URL(rawUrl ?? "/", location.origin);
+
+    return parsed.origin === location.origin ? parsed.href : new URL("/", location.origin).href;
+  } catch {
+    return new URL("/", location.origin).href;
+  }
+}
+
 addEventListener("install", (event) => {
   event.waitUntil(skipWaiting());
 });
@@ -66,13 +106,8 @@ addEventListener("activate", (event) => {
   event.waitUntil(clients.claim());
 });
 
-addEventListener("fetch", (event) => {
-  void event;
-});
-
 addEventListener("push", (event) => {
-  const parsed = payloadSchema.safeParse(event.data?.json() ?? {});
-  const payload = parsed.success ? parsed.data : {};
+  const payload = readPushPayload(event);
 
   event.waitUntil(
     registration.showNotification(payload.title ?? "Overture", {
@@ -88,9 +123,8 @@ addEventListener("push", (event) => {
 addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const data = payloadSchema.safeParse(event.notification.data);
-
-  const target = new URL(data.success ? (data.data.url ?? "/") : "/", location.origin).href;
+  const payload = parsePayload(event.notification.data);
+  const target = resolveTargetUrl(payload.url);
 
   event.waitUntil(
     (async () => {

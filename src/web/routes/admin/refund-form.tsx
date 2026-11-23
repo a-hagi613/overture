@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 
 import { copy } from "../../../shared/copy.ts";
 import { postRefund } from "../../lib/admin-api.ts";
@@ -73,6 +74,9 @@ export function RefundForm({ userId, period }: { userId: string; period: Billing
       });
 
       setNotice({ kind: "done", replayed: result.replayed });
+      toast.success(
+        result.replayed ? copy.admin.billingRefundReplayed : copy.admin.billingRefundDone,
+      );
     } catch {
       setNotice({ kind: "error", message: copy.admin.billingRefundFailed });
     }

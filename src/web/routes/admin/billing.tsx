@@ -61,7 +61,11 @@ export function BillingPage() {
     };
   }, [filter, page]);
 
-  const { data, refusal, refresh } = useAdminResource<BillingPageData>(load);
+  const { data, refusal, refresh } = useAdminResource<BillingPageData>(load, [
+    "billing",
+    filter,
+    page,
+  ]);
 
   if (refusal !== null) {
     return (

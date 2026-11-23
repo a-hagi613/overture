@@ -124,6 +124,7 @@ export function useMarkRead() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["threads"] }),
+        queryClient.invalidateQueries({ queryKey: ["thread"] }),
         queryClient.invalidateQueries({ queryKey: ["nav"] }),
         queryClient.invalidateQueries({ queryKey: ["home"] }),
       ]);
@@ -142,7 +143,13 @@ async function loadMailbox() {
 }
 
 export function useMailbox() {
-  return useQuery({ queryKey: ["mailbox"], queryFn: loadMailbox, retry: false });
+  return useQuery({
+    queryFn: loadMailbox,
+    queryKey: ["mailbox"],
+    refetchOnWindowFocus: true,
+    retry: false,
+    staleTime: 0,
+  });
 }
 
 export function attachmentHref(id: string) {

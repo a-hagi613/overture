@@ -5,6 +5,7 @@ import type { RouteObject } from "react-router";
 
 import { PreserveSearchRedirect } from "./components/preserve-search-redirect.tsx";
 import { RootLayout } from "./components/root-layout.tsx";
+import { RouteErrorBoundary } from "./components/route-error-boundary.tsx";
 import { ConsentPage } from "./routes/consent.tsx";
 import { LandingPage } from "./routes/landing.tsx";
 import { NotFoundPage } from "./routes/not-found.tsx";
@@ -230,6 +231,7 @@ const publicRoutes: RouteObject[] = [
 export const appRoutes: RouteObject[] = [
   {
     element: <RootLayout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       { element: <AppShell />, children: appShellChildren },
       { element: <AdminShell />, children: adminShellChildren },

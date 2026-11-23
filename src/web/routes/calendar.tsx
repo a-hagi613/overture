@@ -12,10 +12,10 @@ import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
 import { dsBody, dsCardTitle } from "../components/ui/ds.ts";
 import { useCalendar } from "../lib/calendar-api.ts";
-import { authClient } from "../lib/auth-client.ts";
 import {
-  loadCustomCalendarEvents,
-  saveCustomCalendarEvents,
+  useCalendarCustomEvents,
+  useCreateCalendarCustomEvent,
+  useDeleteCalendarCustomEvent,
 } from "../lib/calendar-custom-events.ts";
 import type {
   CustomCalendarEvent,
@@ -35,8 +35,6 @@ import { browserZone, currentTime } from "../lib/inbox-time.ts";
 
 export function CalendarPage() {
   const [params, setParams] = useSearchParams();
-  const { data: session } = authClient.useSession();
-  const userId = session?.user.id ?? null;
   const headingId = useId();
   const localZone = browserZone();
   const asked = parseMonthKey(params.get("month"));
@@ -49,13 +47,10 @@ export function CalendarPage() {
   const [navigated, setNavigated] = useState(false);
   const [zoneSynced, setZoneSynced] = useState(localZone);
 
-  const [customState, setCustomState] = useState<{
-    items: CustomCalendarEvent[];
-    owner: string | null;
-  } | null>(null);
-
-  const customEvents =
-    customState?.owner === userId ? customState.items : loadCustomCalendarEvents(userId);
+  const customEventsQuery = useCalendarCustomEvents();
+  const createCustomEvent = useCreateCalendarCustomEvent();
+  const deleteCustomEvent = useDeleteCalendarCustomEvent();
+  const customEvents = customEventsQuery.data ?? [];
 
   const { month, year } = focus;
   const range = monthRange(year, month, localZone);
@@ -113,44 +108,52 @@ export function CalendarPage() {
     time: string;
     title: string;
   }) => {
-    const nextEvent: CustomCalendarEvent = {
-      company: input.company,
-      dayKey: selectedKey,
-      id: `custom-${String(currentTime())}`,
-      kind: input.kind,
-      time: input.time,
-      title: input.title,
-    };
-
-    const next = [...customEvents, nextEvent];
-
-    setCustomState({ items: next, owner: userId });
-    saveCustomCalendarEvents(next, userId);
-    toast.success(copy.calendar.eventAddedToast(nextEvent.title));
+    createCustomEvent.mutate(
+      {
+        company: input.company,
+        dayKey: selectedKey,
+        kind: input.kind,
+        time: input.time,
+        title: input.title,
+      },
+      {
+        onError: () => {
+          toast.error(copy.settings.notificationsSaveError);
+        },
+        onSuccess: (created) => {
+          toast.success(copy.calendar.eventAddedToast(created.title));
+        },
+      },
+    );
   };
 
   const handleDeleteEvent = (target: CustomCalendarEvent) => {
-    const ownerId = userId;
-    const next = customEvents.filter((entry) => entry.id !== target.id);
-
-    setCustomState({ items: next, owner: ownerId });
-    saveCustomCalendarEvents(next, ownerId);
-
-    toast.success(copy.calendar.eventRemovedToast(target.title), {
-      action: {
-        label: copy.board.undo,
-        onClick: () => {
-          setCustomState((current) => {
-            const base =
-              current?.owner === ownerId ? current.items : loadCustomCalendarEvents(ownerId);
-
-            const restored = [...base, target];
-
-            saveCustomCalendarEvents(restored, ownerId);
-
-            return { items: restored, owner: ownerId };
-          });
-        },
+    deleteCustomEvent.mutate(target.id, {
+      onError: () => {
+        toast.error(copy.settings.notificationsSaveError);
+      },
+      onSuccess: () => {
+        toast.success(copy.calendar.eventRemovedToast(target.title), {
+          action: {
+            label: copy.board.undo,
+            onClick: () => {
+              createCustomEvent.mutate(
+                {
+                  company: target.company,
+                  dayKey: target.dayKey,
+                  kind: target.kind,
+                  time: target.time,
+                  title: target.title,
+                },
+                {
+                  onError: () => {
+                    toast.error(copy.settings.notificationsSaveError);
+                  },
+                },
+              );
+            },
+          },
+        });
       },
     });
   };
@@ -169,8 +172,10 @@ export function CalendarPage() {
 
       {isError && data === undefined ? (
         <Card className="mt-6 px-7 py-11 text-center">
-          <h2 className={dsCardTitle}>{copy.calendar.errorTitle}</h2>
-          <p className={`${dsBody} mt-2`}>{copy.calendar.errorBody}</p>
+          <div role="alert">
+            <h2 className={dsCardTitle}>{copy.calendar.errorTitle}</h2>
+            <p className={`${dsBody} mt-2`}>{copy.calendar.errorBody}</p>
+          </div>
           <Button
             className="mt-4"
             onClick={() => {

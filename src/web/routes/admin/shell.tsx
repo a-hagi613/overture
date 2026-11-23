@@ -7,7 +7,7 @@ import { copy } from "../../../shared/copy.ts";
 import { BrandMark } from "../../components/brand-mark.tsx";
 import { NavGlyph } from "../../components/nav-glyph.tsx";
 import { RouteFallback } from "../../components/route-fallback.tsx";
-import { isCrossOrigin, useMe } from "../../lib/me-api.ts";
+import { isCrossOrigin, useMeQuery } from "../../lib/me-api.ts";
 import { AdminChipNav } from "./admin-chip-nav.tsx";
 import { AdminSideNav } from "./admin-nav.tsx";
 import { AdminSideIdentity } from "./admin-side.tsx";
@@ -24,7 +24,12 @@ function ownerHandoffOrigin(me: Me | undefined) {
 }
 
 export function AdminShell() {
-  const me = useMe();
+  const { data: me, isPending } = useMeQuery();
+
+  if (isPending) {
+    return <RouteFallback fullScreen />;
+  }
+
   const handoffOrigin = ownerHandoffOrigin(me);
 
   if (handoffOrigin !== null) {

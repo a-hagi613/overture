@@ -7,6 +7,7 @@ import type { TargetsInput } from "../../shared/targets.ts";
 import { SALARY_PERIOD_WORDS } from "../../shared/onboarding.ts";
 import { EMPLOYMENT_TYPES, SENIORITIES, WORKPLACES } from "../../shared/tag-taxonomy.ts";
 import { targetsInputSchema } from "../../shared/targets.ts";
+import { saveSkipCompanies } from "./profile-api.ts";
 
 const resumeSchema = z.object({
   bytes: z.number(),
@@ -227,7 +228,34 @@ export function useSaveOnboardingTargets() {
 }
 
 export function useSaveOnboardingTimezone() {
-  return useMutation({ mutationFn: saveOnboardingTimezone });
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: saveOnboardingTimezone,
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["profile-settings"] }),
+        client.invalidateQueries({ queryKey: ["time-language"] }),
+        client.invalidateQueries({ queryKey: ["home"] }),
+      ]);
+    },
+  });
+}
+
+export function useSaveOnboardingSkipCompanies() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: saveSkipCompanies,
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["profile-skip-companies"] }),
+        client.invalidateQueries({ queryKey: stateKey }),
+        client.invalidateQueries({ queryKey: targetsKey }),
+        client.invalidateQueries({ queryKey: ["home"] }),
+      ]);
+    },
+  });
 }
 
 const mailboxSchema = z.object({
@@ -265,8 +293,16 @@ export function useStartOnboarding() {
 
   return useMutation({
     mutationFn: startOnboarding,
-    onSuccess: (state) => {
+    onSuccess: async (state) => {
       client.setQueryData(stateKey, state);
+      await Promise.all([
+        client.invalidateQueries({ queryKey: stateKey }),
+        client.invalidateQueries({ queryKey: ["home"] }),
+        client.invalidateQueries({ queryKey: ["nav"] }),
+        client.invalidateQueries({ queryKey: ["billing"] }),
+        client.invalidateQueries({ queryKey: ["consent"] }),
+        client.invalidateQueries({ queryKey: ["consent-versions"] }),
+      ]);
     },
   });
 }

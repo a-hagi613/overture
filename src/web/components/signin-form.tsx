@@ -45,6 +45,7 @@ export function SignInForm({
             onEmail(event.currentTarget.value);
           }}
           placeholder={copy.signIn.emailPlaceholder}
+          required
           type="email"
           value={email}
         />

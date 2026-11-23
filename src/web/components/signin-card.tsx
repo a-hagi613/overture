@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Lock } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
@@ -102,6 +103,7 @@ function presentError(status: number, code: string | undefined) {
 export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) {
   const isSignUp = mode === "signup";
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [search] = useSearchParams();
   const callbackError = search.get("error") ?? "";
   const phaseFromCallback = callbackPhase.get(callbackError);
@@ -164,12 +166,13 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
       const { data } = await authClient.getSession();
 
       if (data !== null) {
+        queryClient.clear();
         void navigate(await nextAfterSignIn(), { replace: true });
       }
     };
 
     void check();
-  }, [navigate, phase]);
+  }, [navigate, phase, queryClient]);
 
   const confirmToken = async (obtainToken: () => Promise<TurnstileTokenResult>) => {
     const result = await obtainToken();
@@ -221,7 +224,13 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
         })
         .catch(() => null);
 
-      if (result !== null && result.error !== null) {
+      if (result?.error === null) {
+        queryClient.clear();
+
+        return;
+      }
+
+      if (result !== null) {
         const next = presentError(result.error.status, result.error.code);
 
         if (result.error.code === "forbidden") {
@@ -265,6 +274,7 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
       }
 
       if (response.ok) {
+        queryClient.clear();
         void navigate(await nextAfterSignIn(), { replace: true });
 
         return;
@@ -289,7 +299,7 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
 
     const result = await authClient.signIn
       .magicLink({
-        email,
+        email: trimmed,
         callbackURL: CALLBACK_URL,
         fetchOptions: {
           headers: { [turnstileTokenHeader]: token, [turnstileActionHeader]: "magiclink" },
@@ -304,6 +314,8 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
     }
 
     if (result.error === null) {
+      queryClient.clear();
+      setEmail(trimmed);
       setPhase("magic-sent");
       setActionError(null);
 
@@ -448,6 +460,11 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
         </div>
         <div data-turnstile="social" ref={socialContainer} />
         <div data-turnstile="magic" ref={magicContainer} />
+        {actionError === null ? null : (
+          <p className="mt-3 text-center text-xs font-semibold text-need" role="alert">
+            {actionError}
+          </p>
+        )}
       </Card>
     );
   }

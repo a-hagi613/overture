@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 const deletionStateSchema = z.object({
@@ -15,6 +16,17 @@ export async function fetchDeletionState() {
   }
 
   return deletionStateSchema.parse(await response.json());
+}
+
+export function useDeletionState(enabled: boolean) {
+  return useQuery({
+    enabled,
+    queryFn: fetchDeletionState,
+    queryKey: ["account-deletion"],
+    refetchOnWindowFocus: true,
+    retry: false,
+    staleTime: 0,
+  });
 }
 
 export async function sendReauthLink() {

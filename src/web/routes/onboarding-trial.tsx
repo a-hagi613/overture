@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ const text = copy.onboarding.trial;
 
 export function OnboardingTrialPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [params] = useSearchParams();
   const preview = params.get("preview") === "1";
   const suffix = preview ? "?preview=1" : "";
@@ -50,6 +51,13 @@ export function OnboardingTrialPage() {
       if (outcome === "granted") {
         if (preview) {
           toast.success("Trial verification preview complete.");
+        } else {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["home"] }),
+            queryClient.invalidateQueries({ queryKey: ["billing"] }),
+            queryClient.invalidateQueries({ queryKey: ["onboarding-state"] }),
+            queryClient.invalidateQueries({ queryKey: ["nav"] }),
+          ]);
         }
 
         await navigate("/home");

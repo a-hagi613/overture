@@ -306,3 +306,32 @@ test("an owner on the main host gets a handoff card that opens the admin host", 
     { theme: "dark", width: 1280 },
   ]);
 });
+
+test("owner handoff preserves hash and never fires main-host /api/admin calls while /api/me is pending", async ({
+  browser,
+  handoffServer,
+}) => {
+  const { context, page } = await openPage(browser);
+
+  await signInAsOwner(page, handoffServer.url);
+
+  const adminApiCalls: string[] = [];
+
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/admin/")) {
+      adminApiCalls.push(request.url());
+    }
+  });
+
+  await page.goto(`${handoffServer.url}/admin/users/unknown-user?status=active#refunds`);
+
+  const open = page.getByRole("link", { name: /Open Admin Portal/u });
+
+  await expect(open).toHaveAttribute(
+    "href",
+    `${HANDOFF_ADMIN_ORIGIN}/admin/users/unknown-user?status=active#refunds`,
+  );
+  expect(adminApiCalls).toEqual([]);
+
+  await context.close();
+});

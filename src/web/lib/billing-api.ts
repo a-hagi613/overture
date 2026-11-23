@@ -26,12 +26,16 @@ async function loadBilling() {
   return billingSchema.parse(await response.json());
 }
 
-export function useBilling(options?: { refetchInterval?: number | false }) {
+export function useBilling(options?: {
+  refetchInterval?: (data: BillingState | undefined) => number | false;
+}) {
   return useQuery({
     queryFn: loadBilling,
     queryKey: ["billing"],
-    refetchInterval: options?.refetchInterval ?? false,
+    refetchInterval: (query) => options?.refetchInterval?.(query.state.data) ?? false,
+    refetchOnWindowFocus: true,
     retry: false,
+    staleTime: 0,
   });
 }
 
