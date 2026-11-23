@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
+import { pinSendWindowClock } from "./send-window-clock.ts";
 import type { GreenhouseFixture } from "./greenhouse.fixture.ts";
 
 import { request as apiRequest } from "@playwright/test";
@@ -96,6 +97,8 @@ const test = appTest.extend<{ outcomes: OutcomeHarness }>({
 
 async function apiRequestFor(server: AppServer) {
   const { owner } = await ownerContextFor(server.url);
+
+  await pinSendWindowClock(server);
 
   return owner;
 }
@@ -241,6 +244,8 @@ const formQuestions = [
 
 async function ownerFor(server: AppServer) {
   const { owner, userId } = await ownerContextFor(server.url);
+
+  await pinSendWindowClock(server);
 
   await owner.put("/__test__/settings/jobs.poll_interval_ms", { data: { value: "3600000" } });
   const running = await owner.post("/api/running", { data: { running: true } });

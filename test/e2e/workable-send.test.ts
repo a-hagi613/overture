@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
+import { pinSendWindowClock } from "./send-window-clock.ts";
 import type { IdentityServer } from "./identity-server-test.fixture.ts";
 import type { WorkableFixture } from "./workable.fixture.ts";
 
@@ -135,6 +136,8 @@ const sponsorshipFact = { key: "sponsorship_required", value: SPONSORSHIP_NO, sc
 
 async function ownerFor(server: AppServer, enableWorkable = true) {
   const { owner, userId } = await ownerContextFor(server.url);
+
+  await pinSendWindowClock(server);
 
   await owner.put("/__test__/settings/jobs.poll_interval_ms", { data: { value: "3600000" } });
 
