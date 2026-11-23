@@ -40,3 +40,12 @@ The five default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready
 ### Domain docs
 
 Single-context: `GLOSSARY.md` and `docs/adr/` at the repository root. See `docs/agents/domain.md`.
+
+### Independent review (Greptile)
+
+Greptile is installed on this repository and runs **on request only** (`.greptile/config.json` sets `autoReview: []`; there are 50 credits a month).
+
+- Ask for a review on anything high-risk or substantial (auth, billing/ledger, migrations, job recovery/shutdown, deploy/CI, shared contracts, cross-cutting refactors over ~300 lines or ~15 files) with `gh pr comment <n> --body "@greptileai review this pull request"`; add `review this at plus` for extra depth. Ask for `apex` only with the orchestrator's approval.
+- Skip it for docs, copy, formatting, version bumps and single-file fixes with tests.
+- Wait for the review, fix P0/P1 before `worker_done`, reply with reasoning for anything intentionally not fixed, and never weaken a rule or test to satisfy it.
+- The full protocol, tiers, waiting times and the spend line are in `docs/agents/greptile-review.md`.
