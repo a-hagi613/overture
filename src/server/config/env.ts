@@ -31,6 +31,7 @@ const envSchema = z
     CATALOG_DATABASE_PATH: z.string().min(1).optional(),
     STATIC_ROOT: z.string().min(1).default("dist"),
     ENABLE_TEST_ROUTES: booleanFromString.default(false),
+    TEST_CLOCK_AT_UTC_HOUR: z.coerce.number().int().min(0).max(23).optional(),
     DEMO_LOGIN_ENABLED: booleanFromString.default(false),
     PUBLIC_SIGNUP_ENABLED: booleanFromString.default(true),
     GREENHOUSE_FEED_BASE_URL: z.string().min(1).optional(),
@@ -170,6 +171,14 @@ const envSchema = z
     FLY_MACHINE_ID: z.string().min(1).optional(),
   })
   .superRefine((value, context) => {
+    if (value.TEST_CLOCK_AT_UTC_HOUR !== undefined && !value.ENABLE_TEST_ROUTES) {
+      context.addIssue({
+        code: "custom",
+        message: "TEST_CLOCK_AT_UTC_HOUR is a test-only clock pin and needs ENABLE_TEST_ROUTES.",
+        path: ["TEST_CLOCK_AT_UTC_HOUR"],
+      });
+    }
+
     if (value.ENABLE_TEST_ROUTES && (value.NODE_ENV === "production" || value.FLY_APP_NAME)) {
       context.addIssue({
         code: "custom",

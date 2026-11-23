@@ -58,3 +58,39 @@ export async function pinSendWindowClock(server: Pick<AppServer, "url">) {
 
   return pinned;
 }
+
+/**
+ * The offset the send-window pin installed for a server, once it has been pinned.
+ * @param server The app server.
+ * @returns The pinned offset in milliseconds, or undefined when never pinned.
+ */
+export function pinnedClockOffset(server: Pick<AppServer, "url">) {
+  return offsets.get(server.url);
+}
+
+/**
+ * Moves the fixture clock to `deltaMs` after the pinned start, rather than replacing the pin with an
+ * absolute offset measured from real time. A test that advances six minutes and later eleven means
+ * "eleven minutes after the wait opened", not "seventeen"; posting an absolute offset would also jump
+ * the clock back into the real hour and outside the send window.
+ * @param server The pinned app server.
+ * @param owner The request context that posts the offset.
+ * @param deltaMs The shift after the pinned start.
+ */
+export async function setPinnedClockOffset(
+  server: Pick<AppServer, "url">,
+  owner: {
+    post: (url: string, options: { data: { offsetMs: number } }) => Promise<{ ok: () => boolean }>;
+  },
+  deltaMs: number,
+) {
+  const base = offsets.get(server.url) ?? 0;
+
+  const response = await owner.post("/__test__/clock/offset", {
+    data: { offsetMs: base + deltaMs },
+  });
+
+  if (!response.ok()) {
+    throw new Error("the fixture clock could not be shifted");
+  }
+}

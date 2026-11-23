@@ -250,6 +250,13 @@ if (env.ENABLE_TEST_ROUTES) {
 const clock = createClock();
 const random = createRandom();
 
+if (env.ENABLE_TEST_ROUTES && env.TEST_CLOCK_AT_UTC_HOUR !== undefined) {
+  const at = clock.now();
+  const target = Math.floor(at / 86_400_000) * 86_400_000 + env.TEST_CLOCK_AT_UTC_HOUR * 3_600_000;
+
+  clock.setOffset(target - at);
+}
+
 installProcessGuards(db, clock);
 
 const shutdownController = new AbortController();
