@@ -17,6 +17,7 @@ import { pauseForBilling, resumeAfterPayment } from "./pause.ts";
 import { periodEndFor } from "./plans.ts";
 import { recordSubscription, storedSubscription } from "./subscriptions.ts";
 import { grants, stripeEvents, users } from "../platform/db/schema.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
 import { wakeEventHub } from "../platform/sse/hub.ts";
 
 /** A verified trial card, keyed by HMAC, read from Stripe before the transaction. */
@@ -159,18 +160,25 @@ export function createPaymentsWebhookService(deps: {
     tx: BillingDb,
     event: PaymentEvent,
     now: number,
-    state: { cancelAtPeriodEnd: boolean | null; defaultStatus: string; status: string | null },
+    state: {
+      cancelAtPeriodEnd: boolean | null;
+      defaultStatus: string;
+      status: string | null;
+      subscriptionEvent: boolean;
+      promoteToActive: boolean;
+    },
   ) {
     const userId = userIdFor(tx, event, storedFor(tx, event));
 
     if (event.subscriptionId === null || userId === null) {
-      return;
+      return null;
     }
 
-    recordSubscription(tx, now, {
+    return recordSubscription(tx, now, {
       ...state,
       currentPeriodEndMs: event.periodEndMs,
       currentPeriodStartMs: event.periodStartMs,
+      eventCreatedAtMs: event.eventCreatedAt,
       plan: planFor(event, planForPriceId),
       stripeSubscriptionId: event.subscriptionId,
       userId,
@@ -180,10 +188,12 @@ export function createPaymentsWebhookService(deps: {
   function recordSubscriptionEvent(tx: BillingDb, event: PaymentEvent, now: number) {
     const ended = event.type === "customer.subscription.deleted";
 
-    record(tx, event, now, {
+    return record(tx, event, now, {
       cancelAtPeriodEnd: ended ? false : event.cancelAtPeriodEnd,
       defaultStatus: ended ? "canceled" : "active",
+      promoteToActive: false,
       status: ended ? "canceled" : event.subscriptionStatus,
+      subscriptionEvent: true,
     });
   }
 
@@ -200,7 +210,12 @@ export function createPaymentsWebhookService(deps: {
           .all();
 
         if (claimed.length === 0) {
-          return { kind: "duplicate" as const, notice: null, resumed: null };
+          return {
+            billingUpdatedUserId: null,
+            kind: "duplicate" as const,
+            notice: null,
+            resumed: null,
+          };
         }
 
         if (LINKING_EVENTS.has(event.type) && event.userId !== null && event.customerId !== null) {
@@ -219,8 +234,10 @@ export function createPaymentsWebhookService(deps: {
           }
         }
 
+        let billingUpdatedUserId: string | null = null;
+
         if (SUBSCRIPTION_EVENTS.has(event.type)) {
-          recordSubscriptionEvent(tx, event, now);
+          billingUpdatedUserId = recordSubscriptionEvent(tx, event, now);
         }
 
         let resumed: string | null = null;
@@ -239,11 +256,14 @@ export function createPaymentsWebhookService(deps: {
             ensurePrepDailyQueued(tx, clock, granted.userId);
           }
 
-          record(tx, event, now, {
-            cancelAtPeriodEnd: null,
-            defaultStatus: "active",
-            status: null,
-          });
+          billingUpdatedUserId =
+            record(tx, event, now, {
+              cancelAtPeriodEnd: null,
+              defaultStatus: "active",
+              promoteToActive: true,
+              status: null,
+              subscriptionEvent: false,
+            }) ?? billingUpdatedUserId;
         }
 
         const notice = event.type === PAYMENT_FAILED_EVENT ? failPayment(tx, event) : null;
@@ -259,11 +279,21 @@ export function createPaymentsWebhookService(deps: {
           .where(eq(stripeEvents.id, event.id))
           .run();
 
-        return { kind: "processed" as const, notice, resumed };
+        return { billingUpdatedUserId, kind: "processed" as const, notice, resumed };
       });
 
       if (result.kind === "duplicate") {
         return "duplicate" as const;
+      }
+
+      if (result.billingUpdatedUserId !== null) {
+        publishEvent(
+          db,
+          clock,
+          "home.updated",
+          JSON.stringify({ billing: true }),
+          result.billingUpdatedUserId,
+        );
       }
 
       if (result.notice !== null) {

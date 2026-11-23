@@ -1583,7 +1583,7 @@ publishing version 2 leaves version 1 and an already sent Snapshot on version 1 
 
 Plus: route reachability for every page, interactive/layout guards (`interactive-*`, `layout-guards-*`), WCAG AA `axe` checks on every route, and seeded per-screen E2E checks across 390 / 1280 px light and dark (ADR 0038).
 
-### 16.2 Unit tests (sixty-one files, `bun:test`, beside their code)
+### 16.2 Unit tests (sixty-five files, `bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
@@ -1595,10 +1595,13 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `scripts/workflow-config-guard.test.ts` | every `oven-sh/setup-bun` step pins the version `package.json` requires, so a runner release cannot break a scheduled job |
 | `src/server/account/erase.test.ts` | the erasure plan is written before the user row goes, the confirmation is queued only after both external deletes confirm clean, and a restart resumes the cleanup from the plan (#415) |
 | `src/server/auth/client-ip.test.ts` | only the header Fly's proxy stamps is believed; a forged `x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key |
+| `src/server/billing/admin-view.test.ts` | the owner's billing list filters and pages in SQL, and its stat counts agree with the page state |
+| `src/server/billing/checkout.test.ts` | concurrent double clicks share one Checkout Session and one Stripe idempotency key, and a linked Customer is reused |
 | `src/server/billing/ledger.test.ts` | balances, idempotency, FIFO expiry |
 | `src/server/billing/pause.test.ts` | a plan end pauses once; a successful payment resumes only a billing pause; an in-flight send keeps its reservation across the period end |
+| `src/server/billing/stripe.test.ts` | a basil invoice reads its subscription from `parent.subscription_details`, a Week to Month proration reads the new plan's line, and a subscription event is not a customer event |
 | `src/server/billing/summary.test.ts` | the three counters Home shows are answered in two reads rather than six, and a reservation counts against what is left exactly as the separate reads do (#430) |
-| `src/server/billing/webhooks.test.ts` | a pause notice and the jobs a resume queues commit with the Stripe event and roll back with it; a stale out-of-order failure cannot pause a paid user, and a price Overture does not sell grants nothing |
+| `src/server/billing/webhooks.test.ts` | a pause notice and the jobs a resume queues commit with the Stripe event and roll back with it; a stale out-of-order failure cannot pause a paid user, a price Overture does not sell grants nothing, an older subscription event cannot regress a newer one, `invoice.paid` promotes a failed status and wakes Home |
 | `src/server/catalog/answer-derivations.test.ts` | answer derivations |
 | `src/server/catalog/companies-parquet.test.ts` | the pinned `companies.parquet` and manifest sha256 pairs are verified before a seed loads, and a tampered file or manifest is refused |
 | `src/server/catalog/question-normalize.test.ts` | question normalisation |
@@ -1615,6 +1618,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/pipeline/approved-plan.test.ts` | the Ready cards open every approved plan in one query rather than one per card (#430) |
 | `src/server/pipeline/email-notes.test.ts` | a Board's email notes are read in one query rather than one per Application (#430) |
 | `src/server/pipeline/personio-form.test.ts` | a Personio form's fields, required stars, documents and unsupported controls are read from its HTML |
+| `src/server/pipeline/prepare-status.test.ts` | a preparation result written after the user approved the Application matches no row, so it never overwrites approved/sending/sent |
 | `src/server/pipeline/reviews.test.ts` | the open Review list reads its rows in one query rather than one per Review (#430) |
 | `src/server/pipeline/send-queue.test.ts` | the next scheduled send is positioned from the earliest send time, ignoring approved Applications that hold no send time, and the sends before it are counted (#430) |
 | `src/server/platform/access/access.test.ts` | a malformed Access cookie or a missing team domain answers 401, never a 500 or an invented issuer |

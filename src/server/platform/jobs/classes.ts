@@ -26,6 +26,33 @@ export const DEFAULT_JOB_CLASS_LIMITS: Readonly<Record<JobClass, number>> = {
 /** The whole worker, across every class, never holds more than this many jobs. */
 export const DEFAULT_MAX_IN_FLIGHT_JOBS = 10;
 
+/** How many browser jobs run when the owner leaves the session cap at zero (uncapped). */
+export const UNCAPPED_BROWSER_JOBS = 12;
+
+/**
+ * The per-class limits for the browser cap the owner set. Zero sessions means
+ * the provider and the box bound browser work, so the lane gets a generous
+ * bound instead of the default three; a configured cap is used exactly.
+ * @param sessionLimit The configured session cap, or null for uncapped.
+ * @returns The limits for every class.
+ */
+export function jobClassLimits(sessionLimit: number | null) {
+  return {
+    ...DEFAULT_JOB_CLASS_LIMITS,
+    browser: sessionLimit ?? UNCAPPED_BROWSER_JOBS,
+  } satisfies Record<JobClass, number>;
+}
+
+/**
+ * The total in-flight bound that leaves room for every class limit, so a
+ * browser cap above the default is not silently cut by the worker-wide bound.
+ * @param limits The per-class limits.
+ * @returns The total jobs one worker may hold.
+ */
+export function maxInFlightFor(limits: Readonly<Record<JobClass, number>>) {
+  return Math.max(DEFAULT_MAX_IN_FLIGHT_JOBS, limits.browser + limits.llm + limits.fast);
+}
+
 /** For the test-only route that must run every due job at once (ADR 0013). */
 export const NO_JOB_CLASS_LIMITS: Readonly<Record<JobClass, number>> = {
   browser: Number.POSITIVE_INFINITY,

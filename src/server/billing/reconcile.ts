@@ -261,7 +261,7 @@ export async function runBillingReconciliation(
       });
     }
 
-    if (!withLedger.has(refund.refundKey)) {
+    if (refund.applicationsStopped > 0 && !withLedger.has(refund.refundKey)) {
       mismatches.push({
         amountCents: refund.amountCents,
         id: refund.refundKey,

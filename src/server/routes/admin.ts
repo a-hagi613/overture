@@ -63,6 +63,10 @@ import {
 } from "../platform/admin-alerts.ts";
 import { readAdminLlmUsage } from "../platform/llm/usage.ts";
 import { applicationsLeft, balancesPerGrant, grantApplications } from "../billing/ledger.ts";
+import { resumeAfterPayment } from "../billing/pause.ts";
+import { enqueuePlannerDay } from "../dispatch/planner.ts";
+import { ensurePrepDailyQueued } from "../pipeline/daily-prep.ts";
+import { logError } from "../platform/log.ts";
 import {
   BILLING_FILTERS,
   BILLING_USERS_PAGE_SIZE,
@@ -135,7 +139,7 @@ const killSwitchBody = z.object({
 
 const grantBody = z.object({
   email: z.email(),
-  expiresInDays: z.number().int().min(0).max(365).nullable(),
+  expiresInDays: z.number().int().min(1).max(365).nullable(),
   idempotencyKey: z.string().min(1),
   quantity: z.number().int().min(1).max(100_000),
 });
@@ -1344,18 +1348,41 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
       userId: user.id,
     });
 
-    if (placed.created) {
-      await recordAdminAudit(db, clock, {
-        actorId: owner.userId,
-        action: "grants.create",
-        detail: {
-          email: user.email,
-          grantId: placed.grantId,
-          quantity,
-        },
-        reason: `Granted ${String(quantity)} Applications from the admin grants page`,
-        targetUserId: user.id,
+    if (!placed.created) {
+      if (placed.entry.userId !== user.id || placed.entry.amount !== quantity) {
+        return context.json({ error: "idempotency_key_reused" }, 422);
+      }
+
+      return context.json({
+        applicationsLeft: applicationsLeft(db, user.id, at),
+        grantId: placed.grantId,
       });
+    }
+
+    await recordAdminAudit(db, clock, {
+      actorId: owner.userId,
+      action: "grants.create",
+      detail: {
+        email: user.email,
+        grantId: placed.grantId,
+        quantity,
+      },
+      reason: `Granted ${String(quantity)} Applications from the admin grants page`,
+      targetUserId: user.id,
+    });
+
+    const pauseReason = db
+      .select({ pauseReason: profiles.pauseReason })
+      .from(profiles)
+      .where(eq(profiles.userId, user.id))
+      .get()?.pauseReason;
+
+    if (
+      pauseReason === "plan_ended" &&
+      resumeAfterPayment(db, clock, { userId: user.id }).resumed
+    ) {
+      enqueuePlannerDay(db, clock, user.id);
+      ensurePrepDailyQueued(db, clock, user.id);
     }
 
     return context.json({
@@ -1395,10 +1422,18 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     const owner = context.get("owner");
     const body = context.req.valid("json");
 
-    const outcome = await refundGrant(
-      { clock, db, payments, shipAudit: shipAdminAudit },
-      { ...body, actorId: owner.userId },
-    );
+    let outcome: Awaited<ReturnType<typeof refundGrant>>;
+
+    try {
+      outcome = await refundGrant(
+        { clock, db, payments, shipAudit: shipAdminAudit },
+        { ...body, actorId: owner.userId },
+      );
+    } catch (error) {
+      logError("billing.refund", error);
+
+      return context.json({ error: "stripe_error" }, 502);
+    }
 
     if (outcome.kind === "refunded") {
       return context.json({ refund: outcome.refund, replayed: outcome.replayed });

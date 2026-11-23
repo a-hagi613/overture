@@ -7,7 +7,18 @@ export const TAGGING_PURPOSES = ["tag_fallback"] as const;
 
 export type LlmCapKind = "user" | "global" | "tagging";
 
+const GLOBAL_DAILY_CAP_KEY = "llm.daily_spend_cap_micros";
+
 export function capMicros(db: AppDatabase, key: string) {
+  if (key === "llm.cap_global_day_usd") {
+    const storedMicros = getSetting(db, GLOBAL_DAILY_CAP_KEY);
+    const micros = storedMicros === null ? Number.NaN : Number(storedMicros);
+
+    if (Number.isFinite(micros) && micros >= 0) {
+      return Math.round(micros);
+    }
+  }
+
   const raw = getSetting(db, key);
   const parsed = raw === null ? Number.NaN : Number(raw);
 

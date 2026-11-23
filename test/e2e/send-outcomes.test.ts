@@ -679,6 +679,8 @@ test("a graceful shutdown before Submit interrupts the send without using a try 
     storageState,
   });
 
+  expect((await homeOf(recovered)).applicationsLeft).toBe(3);
+
   const [application] = await applicationsOf(recovered, userId);
   const attempts = await attemptsOf(recovered, applicationId);
 

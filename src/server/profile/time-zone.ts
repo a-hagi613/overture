@@ -4,7 +4,7 @@ import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { profiles } from "../platform/db/schema.ts";
-import { getSetting } from "../platform/settings/index.ts";
+import { getSettingNumber } from "../platform/settings/index.ts";
 
 const DAY_MS = 24 * 60 * 60_000;
 
@@ -112,7 +112,11 @@ export function createTimeZoneService(deps: { db: AppDatabase; clock: Clock }) {
       };
     }
 
-    const windowDays = Number(getSetting(db, "limits.timezone_change_days"));
+    const windowDays = getSettingNumber(db, "limits.timezone_change_days", {
+      fallback: 7,
+      integer: true,
+      minimum: 1,
+    });
 
     return {
       timezone: state.timezone,

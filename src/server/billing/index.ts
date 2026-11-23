@@ -16,6 +16,9 @@ export function createPayments(clock: Clock) {
   return createStripePayments({
     apiBaseUrl: env.STRIPE_API_BASE_URL,
     clock,
+    planPriceIds: [env.STRIPE_PRICE_WEEK, env.STRIPE_PRICE_MONTH].filter(
+      (priceId): priceId is string => priceId !== undefined,
+    ),
     secretKey,
     webhookSecret,
   });

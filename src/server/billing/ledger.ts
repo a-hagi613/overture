@@ -98,40 +98,43 @@ function entryOf(db: BillingDb, idempotencyKey: string) {
 }
 
 export function grantApplications(db: BillingDb, clock: Clock, input: GrantInput) {
-  return db.transaction((tx) => {
-    const existing = entryOf(tx, input.idempotencyKey);
+  return db.transaction(
+    (tx) => {
+      const existing = entryOf(tx, input.idempotencyKey);
 
-    if (existing !== undefined) {
-      return { created: false, entry: existing, grantId: existing.grantId };
-    }
+      if (existing !== undefined) {
+        return { created: false, entry: existing, grantId: existing.grantId };
+      }
 
-    const at = clock.now();
-    const grantId = crypto.randomUUID();
+      const at = clock.now();
+      const grantId = crypto.randomUUID();
 
-    tx.insert(grants)
-      .values({
-        id: grantId,
+      tx.insert(grants)
+        .values({
+          id: grantId,
+          userId: input.userId,
+          source: input.source,
+          quantity: input.quantity,
+          startsAt: input.startsAt ?? at,
+          expiresAt: input.expiresAt ?? null,
+          stripeInvoiceId: input.stripeInvoiceId ?? null,
+          createdAt: at,
+        })
+        .run();
+
+      const entry = postLedgerEntry(tx, at, {
         userId: input.userId,
-        source: input.source,
-        quantity: input.quantity,
-        startsAt: input.startsAt ?? at,
-        expiresAt: input.expiresAt ?? null,
-        stripeInvoiceId: input.stripeInvoiceId ?? null,
-        createdAt: at,
-      })
-      .run();
+        kind: "grant",
+        amount: input.quantity,
+        grantId,
+        applicationId: null,
+        idempotencyKey: input.idempotencyKey,
+      });
 
-    const entry = postLedgerEntry(tx, at, {
-      userId: input.userId,
-      kind: "grant",
-      amount: input.quantity,
-      grantId,
-      applicationId: null,
-      idempotencyKey: input.idempotencyKey,
-    });
-
-    return { created: true, entry, grantId };
-  });
+      return { created: true, entry, grantId };
+    },
+    { behavior: "immediate" },
+  );
 }
 
 function activeGrantsOf(db: BillingDb, userId: string, at: number) {
@@ -206,7 +209,11 @@ export function billingSummary(db: BillingDb, userId: string, at: number) {
   const left = active.reduce((sum, grant) => sum + (per.get(grant.id)?.available ?? 0), 0);
   const planSize = active.reduce((sum, grant) => sum + grant.quantity, 0);
 
-  const ending = active.find((row) => row.source === "admin" && row.expiresAt !== null);
+  const ending = active.find(
+    (row) =>
+      row.source === "admin" && row.expiresAt !== null && (per.get(row.id)?.available ?? 0) > 0,
+  );
+
   const expiresAt = ending?.expiresAt ?? null;
   const endingLeft = ending === undefined ? 0 : (per.get(ending.id)?.available ?? 0);
 
@@ -449,45 +456,48 @@ export function expireDueGrants(db: BillingDb, clock: Clock, userId: string) {
       continue;
     }
 
-    db.transaction((tx) => {
-      const current = balancesPerGrant(tx, userId);
-      const availableBefore = current.get(grant.id)?.available ?? 0;
+    db.transaction(
+      (tx) => {
+        const current = balancesPerGrant(tx, userId);
+        const availableBefore = current.get(grant.id)?.available ?? 0;
 
-      if (availableBefore <= 0 && (current.get(grant.id)?.reserved ?? 0) <= 0) {
-        return;
-      }
+        if (availableBefore <= 0 && (current.get(grant.id)?.reserved ?? 0) <= 0) {
+          return;
+        }
 
-      const open = reservationPairsOf(tx, userId).filter(
-        (pair) =>
-          pair.closedBy === null &&
-          pair.reserve.grantId === grant.id &&
-          !applicationInFlight(tx, pair.reserve.applicationId),
-      );
+        const open = reservationPairsOf(tx, userId).filter(
+          (pair) =>
+            pair.closedBy === null &&
+            pair.reserve.grantId === grant.id &&
+            !applicationInFlight(tx, pair.reserve.applicationId),
+        );
 
-      for (const pair of open) {
-        postLedgerEntry(tx, at, {
-          userId,
-          kind: "release",
-          amount: pair.reserve.amount,
-          grantId: pair.reserve.grantId,
-          applicationId: pair.reserve.applicationId,
-          idempotencyKey: `expire-release:${pair.reserve.id}`,
-        });
-      }
+        for (const pair of open) {
+          postLedgerEntry(tx, at, {
+            userId,
+            kind: "release",
+            amount: pair.reserve.amount,
+            grantId: pair.reserve.grantId,
+            applicationId: pair.reserve.applicationId,
+            idempotencyKey: `expire-release:${pair.reserve.id}`,
+          });
+        }
 
-      const availableAfter = balancesPerGrant(tx, userId).get(grant.id)?.available ?? 0;
+        const availableAfter = balancesPerGrant(tx, userId).get(grant.id)?.available ?? 0;
 
-      if (availableAfter > 0) {
-        postLedgerEntry(tx, at, {
-          userId,
-          kind: "expire",
-          amount: availableAfter,
-          grantId: grant.id,
-          applicationId: null,
-          idempotencyKey: nextExpireKey(tx, grant.id),
-        });
-      }
-    });
+        if (availableAfter > 0) {
+          postLedgerEntry(tx, at, {
+            userId,
+            kind: "expire",
+            amount: availableAfter,
+            grantId: grant.id,
+            applicationId: null,
+            idempotencyKey: nextExpireKey(tx, grant.id),
+          });
+        }
+      },
+      { behavior: "immediate" },
+    );
 
     expired.push(grant.id);
   }

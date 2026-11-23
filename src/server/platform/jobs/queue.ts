@@ -321,12 +321,17 @@ export function recoverStaleLocks(
   db: AppDatabase,
   clock: Clock,
   singletonKinds: readonly string[] = [],
+  skipIds: readonly string[] = [],
 ) {
   const now = clock.now();
   const conditions = [eq(bgJobs.status, "running"), lt(bgJobs.lockedUntil, now)];
 
   if (singletonKinds.length > 0) {
     conditions.push(notInArray(bgJobs.kind, [...singletonKinds]));
+  }
+
+  if (skipIds.length > 0) {
+    conditions.push(notInArray(bgJobs.id, [...skipIds]));
   }
 
   const stale = db
@@ -338,6 +343,31 @@ export function recoverStaleLocks(
   for (const job of stale) {
     queueAgain(db, clock, job.id, {});
   }
+
+  return stale.length;
+}
+
+/**
+ * Queues every job the previous process left in `running`, whatever its lease
+ * says. A single-machine boot knows no other process holds a lock, so a crash
+ * in the first five minutes of a job's lease (OOM, SIGKILL) does not wedge that
+ * kind until the lease expires or forever when no worker ever reclaims it.
+ * @param db The application database.
+ * @param clock The clock the requeued rows are stamped with.
+ * @returns How many rows were found running at boot.
+ */
+export function recoverBootRunningJobs(db: AppDatabase, clock: Clock) {
+  const running = db
+    .select({ id: bgJobs.id })
+    .from(bgJobs)
+    .where(eq(bgJobs.status, "running"))
+    .all();
+
+  for (const job of running) {
+    queueAgain(db, clock, job.id, {});
+  }
+
+  return running.length;
 }
 
 let enqueueNotify: (() => void) | null = null;

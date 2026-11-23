@@ -14,6 +14,11 @@ export interface CheckoutSessionRequest {
   priceId: string;
   successUrl: string;
   cancelUrl: string;
+  /**
+   * Sent to the provider as its idempotency key, so a double click or a retry
+   * returns the Checkout Session already created instead of a second one.
+   */
+  idempotencyKey: string;
 }
 
 /**
@@ -100,6 +105,12 @@ export interface PaymentEvent {
    * names, for a `customer.subscription.*` event, or null for other events.
    */
   cancelAtPeriodEnd: boolean | null;
+  /**
+   * When Stripe created the event, in epoch milliseconds, or null when the
+   * payload carried no `created`. Out-of-order deliveries compare it against
+   * the newest event already stored, so an older event never regresses state.
+   */
+  eventCreatedAt: number | null;
 }
 
 /**

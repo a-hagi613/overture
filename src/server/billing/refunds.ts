@@ -9,6 +9,7 @@ import { adminAudit, grants } from "../platform/db/schema.ts";
 import { NoRefundablePaymentError } from "../platform/ports/payments.ts";
 import type { AdminAuditRow } from "../platform/audit/types.ts";
 import { insertAdminAudit } from "../platform/audit/insert.ts";
+import { retryWhenBusy } from "../platform/db/busy.ts";
 import { refundGrantApplications } from "./ledger.ts";
 
 export const REFUND_AUDIT_ACTION = "billing.refund";
@@ -110,6 +111,7 @@ export function refundsRecordedBetween(
         ? [
             {
               amountCents: parsed.data.amountCents,
+              applicationsStopped: parsed.data.applicationsStopped,
               at: row.at,
               grantId: parsed.data.grantId,
               refundId: parsed.data.refundId,
@@ -205,47 +207,59 @@ export async function refundGrant(
     throw error;
   }
 
-  const outcome = db.transaction((tx) => {
-    const alreadyRecorded = refundDetailsOf(tx).some((detail) => detail.grantId === grant.id);
+  const outcome = await retryWhenBusy(
+    () =>
+      db.transaction(
+        (tx) => {
+          const alreadyRecorded = refundDetailsOf(tx).some((detail) => detail.grantId === grant.id);
 
-    if (alreadyRecorded) {
-      return { kind: "already_refunded" } as const;
-    }
+          if (alreadyRecorded) {
+            return { kind: "already_refunded" } as const;
+          }
 
-    const row = refundGrantApplications(tx, clock, {
-      grantId: grant.id,
-      idempotencyKey: refundKey,
-      userId: grant.userId,
-    });
+          const row = refundGrantApplications(tx, clock, {
+            grantId: grant.id,
+            idempotencyKey: refundKey,
+            userId: grant.userId,
+          });
 
-    const stopped: RefundRecord = {
-      amountCents: refund.amountCents,
-      applicationsStopped: row === null ? 0 : row.amount,
-      grantId: grant.id,
-      refundId: refund.id,
-      status: refund.status,
-    };
+          tx.update(grants)
+            .set({ expiresAt: Math.min(grant.expiresAt ?? clock.now(), clock.now()) })
+            .where(eq(grants.id, grant.id))
+            .run();
 
-    const stored = insertAdminAudit(tx, clock, {
-      actorId: input.actorId,
-      action: REFUND_AUDIT_ACTION,
-      detail: {
-        amountCents: stopped.amountCents,
-        applicationsStopped: stopped.applicationsStopped,
-        grantId: stopped.grantId,
-        note: input.note,
-        reason: input.reason,
-        refundId: stopped.refundId,
-        refundKey,
-        requestHash,
-        status: stopped.status,
-      },
-      reason: `Refunded ${String(stopped.amountCents)} cents: ${input.reason}`,
-      targetUserId: grant.userId,
-    });
+          const stopped: RefundRecord = {
+            amountCents: refund.amountCents,
+            applicationsStopped: row === null ? 0 : row.amount,
+            grantId: grant.id,
+            refundId: refund.id,
+            status: refund.status,
+          };
 
-    return { auditRow: stored, kind: "refunded", record: stopped } as const;
-  });
+          const stored = insertAdminAudit(tx, clock, {
+            actorId: input.actorId,
+            action: REFUND_AUDIT_ACTION,
+            detail: {
+              amountCents: stopped.amountCents,
+              applicationsStopped: stopped.applicationsStopped,
+              grantId: stopped.grantId,
+              note: input.note,
+              reason: input.reason,
+              refundId: stopped.refundId,
+              refundKey,
+              requestHash,
+              status: stopped.status,
+            },
+            reason: `Refunded ${String(stopped.amountCents)} cents: ${input.reason}`,
+            targetUserId: grant.userId,
+          });
+
+          return { auditRow: stored, kind: "refunded", record: stopped } as const;
+        },
+        { behavior: "immediate" },
+      ),
+    "billing.refund",
+  );
 
   if (outcome.kind === "already_refunded") {
     return outcome;

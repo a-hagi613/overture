@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import { asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -88,52 +88,41 @@ function refundedGrantIds(db: AppDatabase) {
   return refunded;
 }
 
-function matchesFilter(state: BillingState, filter: BillingFilter) {
-  switch (filter) {
-    case "all": {
-      return true;
-    }
+function billingStates(db: AppDatabase, at: number) {
+  const periodExpiry = sql<
+    number | null
+  >`(SELECT coalesce(g.expires_at, -1) FROM grants g WHERE g.user_id = ${users.id} AND g.source = 'period' AND g.starts_at <= ${at} AND (g.expires_at IS NULL OR g.expires_at > ${at}) ORDER BY g.starts_at DESC, g.id DESC LIMIT 1)`;
 
-    case "trial": {
-      return state === "trial";
-    }
+  const hasTrial = sql<boolean>`EXISTS (SELECT 1 FROM grants t WHERE t.user_id = ${users.id} AND t.source = 'trial' AND t.starts_at <= ${at} AND (t.expires_at IS NULL OR t.expires_at > ${at}))`;
 
-    case "paying": {
-      return state === "paying" || state === "ending";
-    }
+  const hasGrants = sql<boolean>`EXISTS (SELECT 1 FROM grants a WHERE a.user_id = ${users.id})`;
 
-    case "paused": {
-      return state === "paused";
-    }
+  const state = sql<BillingState>`CASE
+    WHEN ${profiles.pauseReason} = 'payment_failed' THEN 'paused'
+    WHEN (${periodExpiry}) > 0 THEN
+      CASE WHEN (${periodExpiry}) - ${at} <= ${ENDING_WINDOW_MS} THEN 'ending' ELSE 'paying' END
+    WHEN (${periodExpiry}) = -1 THEN 'paying'
+    WHEN (${hasTrial}) THEN 'trial'
+    WHEN (${hasGrants}) THEN 'ended'
+    ELSE 'none'
+  END`.as("state");
 
-    case "ended": {
-      return state === "ended";
-    }
-
-    default: {
-      return false;
-    }
-  }
-}
-
-function userRowsOf(db: AppDatabase) {
   return db
     .select({
-      id: users.id,
       email: users.email,
+      id: users.id,
       name: users.name,
-      pauseReason: profiles.pauseReason,
+      state,
     })
     .from(users)
     .leftJoin(profiles, eq(profiles.userId, users.id))
-    .where(inArray(users.id, db.selectDistinct({ id: grants.userId }).from(grants)))
-    .orderBy(users.email)
-    .all();
+    .where(hasGrants)
+    .as("billing_states");
 }
 
 /**
  * The billing list for the owner: one row per user with a grant, filtered and
- * paged, with the counts the stat cards show. Card data is never read.
+ * paged in SQL, with the counts the stat cards show. Card data is never read.
  * @param db The application database.
  * @param clock The clock the states are computed against.
  * @param input The filter and the one-based page.
@@ -146,20 +135,64 @@ export function billingUsersPage(
 ) {
   const at = clock.now();
   const refunded = refundedGrantIds(db);
+  const states = billingStates(db, at);
 
-  const summaries = userRowsOf(db).map((row) => {
+  const matching = (() => {
+    switch (input.filter) {
+      case "trial": {
+        return eq(states.state, "trial");
+      }
+
+      case "paying": {
+        return inArray(states.state, ["paying", "ending"]);
+      }
+
+      case "paused": {
+        return eq(states.state, "paused");
+      }
+
+      case "ended": {
+        return eq(states.state, "ended");
+      }
+
+      default: {
+        return sql`1 = 1`;
+      }
+    }
+  })();
+
+  const stateCounts = db
+    .select({ state: states.state, total: count() })
+    .from(states)
+    .groupBy(sql`${states.state}`)
+    .all();
+
+  const countOf = (state: BillingState) =>
+    stateCounts.find((row) => row.state === state)?.total ?? 0;
+
+  const counts = {
+    endingSoon: countOf("ending"),
+    onTrial: countOf("trial"),
+    paused: countOf("paused"),
+    paying: countOf("paying") + countOf("ending"),
+  };
+
+  const total = db.select({ total: count() }).from(states).where(matching).get()?.total ?? 0;
+  const start = (input.page - 1) * BILLING_USERS_PAGE_SIZE;
+
+  const pageRows = db
+    .select()
+    .from(states)
+    .where(matching)
+    .orderBy(asc(states.email))
+    .limit(BILLING_USERS_PAGE_SIZE)
+    .offset(start)
+    .all();
+
+  const page = pageRows.map((row) => {
     const rows = grantsOf(db, row.id);
     const period = rows.find((grant) => grant.source === "period" && isActive(grant, at)) ?? null;
     const trial = rows.find((grant) => grant.source === "trial" && isActive(grant, at)) ?? null;
-
-    const state: BillingState = stateOf({
-      at,
-      hasGrants: rows.length > 0,
-      paused: row.pauseReason === "payment_failed",
-      period,
-      trial,
-    });
-
     const current = period ?? trial;
     const per = current === null ? undefined : balancesPerGrant(db, row.id).get(current.id);
 
@@ -170,7 +203,7 @@ export function billingUsersPage(
       name: displayName(row.name, row.email),
       plan: current === null ? null : planOf(current),
       refunded: current !== null && refunded.has(current.id),
-      state,
+      state: row.state,
       usage:
         current === null
           ? null
@@ -182,23 +215,11 @@ export function billingUsersPage(
     };
   });
 
-  const matching = summaries.filter((summary) => matchesFilter(summary.state, input.filter));
-
-  const counts = {
-    endingSoon: summaries.filter((summary) => summary.state === "ending").length,
-    onTrial: summaries.filter((summary) => summary.state === "trial").length,
-    paused: summaries.filter((summary) => summary.state === "paused").length,
-    paying: summaries.filter((summary) => summary.state === "paying" || summary.state === "ending")
-      .length,
-  };
-
-  const start = (input.page - 1) * BILLING_USERS_PAGE_SIZE;
-
   return {
     counts,
     page: input.page,
-    total: matching.length,
-    users: matching.slice(start, start + BILLING_USERS_PAGE_SIZE),
+    total,
+    users: page,
   };
 }
 
