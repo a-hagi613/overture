@@ -110,9 +110,11 @@ The three non-passes, each with its reason and next step:
 ## Wave 5 admin host: `admin.tryoverture.com`
 
 The admin host is the same process as the app, selected by the `Host` header, gated first by
-Cloudflare Zero Trust Access and then by the app's own owner check and passkey window. Fly CLI on this
-box is currently unauthorized for the prod app and no Cloudflare token is present, so run these steps
-from an authenticated operator terminal, not from the harness.
+Cloudflare Zero Trust Access and then by the app's own owner check and passkey window. The box's Fly
+token is unauthorized for the prod app and no Cloudflare token is present, so the Fly half runs in the
+**Ops admin host** workflow (`.github/workflows/ops-admin-host.yml`, Actions → Ops admin host) with the
+repository's `FLY_API_TOKEN`, and the Cloudflare half stays in the dashboard. docs/DEPLOY.md has the
+current runbook; the manual commands below remain the fallback from an authenticated operator terminal.
 
 ### 1. Cloudflare DNS
 
@@ -124,12 +126,15 @@ In the `tryoverture.com` zone add a proxied (orange cloud) record; Access only g
 
 ### 2. Fly certificate
 
+Run the workflow with `action: add-cert`; it is idempotent and prints the certificate table and the
+validation DNS target. From an authenticated operator terminal the same steps are:
+
 ```sh
 flyctl certs add admin.tryoverture.com -a overture-web
 flyctl certs show admin.tryoverture.com -a overture-web
 ```
 
-Keep Fly's validation record in place until `flyctl certs show` reports `Status = Issued`.
+Keep Fly's validation record in place until the certificate is issued.
 
 ### 3. Cloudflare Access application
 
@@ -139,6 +144,10 @@ address. Session duration: one working day (12 hours). Copy the **Application Au
 and note the team domain (`<team>.cloudflareaccess.com`).
 
 ### 4. Fly secrets (names only, never values in the repo)
+
+Save `CF_ACCESS_AUD` and `CF_ACCESS_TEAM_DOMAIN` as repository secrets, then run the workflow with
+`action: set-access-secrets`; it refuses while either value is missing, masks the values and confirms
+with `flyctl secrets list` names only. The fallback from an authenticated operator terminal is:
 
 ```sh
 fly secrets set \
@@ -161,7 +170,8 @@ bun run scripts/check-admin-host.ts
 ```
 
 Exit `0` means DNS resolves, `/admin/api/session` redirects to Access or answers `401 access_required`,
-Fly holds an issued certificate, and the four secret names are present. It reads secret names only.
+Fly holds an issued certificate, and the required secret names are present (`ADMIN_ORIGIN`,
+`CF_ACCESS_AUD` and a JWKS source). It reads secret names only.
 `--json` gives the machine-readable form, `--no-fly` skips the Fly reads, `--origin`/`--host` point at
 another admin host, and `--fly-app` reads another Fly app.
 

@@ -1,0 +1,213 @@
+name: Ops admin host
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Which admin-host operation to run"
+        required: true
+        type: choice
+        default: status
+        options:
+          - status
+          - add-cert
+          - set-access-secrets
+
+concurrency:
+  group: ops-admin-host
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  admin-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up flyctl (superfly/flyctl-actions/setup-flyctl @ master @ 98172f7)
+        uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
+      - name: Require the FLY_API_TOKEN repository secret
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FLY_API_TOKEN:-}" ]; then
+            echo "::error::The FLY_API_TOKEN repository secret is not set. Add it with gh secret set FLY_API_TOKEN -R a-hagi613/overture (docs/DEPLOY.md, one-time step 6), then re-run this workflow."
+            {
+              echo "### Ops admin host: FLY_API_TOKEN is missing"
+              echo ""
+              echo "The \`FLY_API_TOKEN\` repository secret is not set, so nothing could reach \`overture-web\`."
+              echo "Add it with \`gh secret set FLY_API_TOKEN -R a-hagi613/overture\` (docs/DEPLOY.md, one-time step 6), then re-run."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Add the certificate when it is not on overture-web yet
+        if: inputs.action == 'add-cert'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          hostname="admin.tryoverture.com"
+          if flyctl certs list -a overture-web --json |
+            jq -e --arg hostname "$hostname" 'any(.[]; (.Hostname // .hostname // "") == $hostname)' > /dev/null; then
+            echo "A certificate for ${hostname} is already on overture-web; leaving it in place."
+          else
+            flyctl certs add "$hostname" -a overture-web
+          fi
+
+      - name: Print the certificate, Fly secret names and app status
+        if: (inputs.action == 'status' || inputs.action == 'add-cert')
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          hostname="admin.tryoverture.com"
+          flyctl certs list -a overture-web --json > "$RUNNER_TEMP/certs.json"
+          if ! flyctl certs show "$hostname" -a overture-web --json > "$RUNNER_TEMP/admin-cert.json" 2> "$RUNNER_TEMP/admin-cert.err"; then
+            rm -f "$RUNNER_TEMP/admin-cert.json"
+          fi
+
+          echo "Certificates on overture-web:"
+          jq -r '
+            (["HOSTNAME", "STATUS", "VALIDATION DNS TARGET"] | @tsv),
+            (.[] | [
+              (.Hostname // .hostname // "(unknown)"),
+              (.ClientStatus // .client_status // .Status // .status // "(unknown)"),
+              (.DNSValidationTarget // .DNSValidationInstructions // .dns_validation_target // "(none reported)")
+            ] | @tsv)
+          ' "$RUNNER_TEMP/certs.json" | column -t -s $'\t'
+
+          admin_status="not on the app yet"
+          validation="(none reported)"
+          if [ -s "$RUNNER_TEMP/admin-cert.json" ]; then
+            admin_status="$(jq -r '.ClientStatus // .Status // "unknown"' "$RUNNER_TEMP/admin-cert.json")"
+            validation="$(jq -r '.DNSValidationTarget // .DNSValidationInstructions // "(none reported)"' "$RUNNER_TEMP/admin-cert.json")"
+            echo "${hostname}: ${admin_status}; validation DNS target: ${validation}"
+          else
+            admin_status="$(jq -r --arg hostname "$hostname" 'first(.[] | select((.Hostname // .hostname // "") == $hostname) | (.ClientStatus // .Status // "unknown")) // "not on the app yet"' "$RUNNER_TEMP/certs.json")"
+            validation="$(jq -r --arg hostname "$hostname" 'first(.[] | select((.Hostname // .hostname // "") == $hostname) | (.DNSValidationTarget // .DNSValidationInstructions // "none reported")) // "(none reported)"' "$RUNNER_TEMP/certs.json")"
+            echo "${hostname}: ${admin_status}; validation DNS target: ${validation}"
+            if [ "$admin_status" = "not on the app yet" ]; then
+              echo "Re-run with action=add-cert to add the certificate."
+            fi
+          fi
+
+          flyctl secrets list -a overture-web --json > "$RUNNER_TEMP/secrets.json"
+          all_names="$(jq -r '.[] | (.name // .Name // empty)' "$RUNNER_TEMP/secrets.json")"
+          names="$(grep -E '^(CF_ACCESS_|MASTER_KEY_V|APP_ORIGIN$|ADMIN_ORIGIN$)' <<<"$all_names" | sort || true)"
+          echo "Fly secret names for the admin host (names only; values are never read or printed):"
+          printf '%s\n' "${names:-(none of CF_ACCESS_*, MASTER_KEY_V*, APP_ORIGIN, ADMIN_ORIGIN are set)}"
+
+          echo "App status:"
+          flyctl status -a overture-web
+
+          {
+            echo "### Admin host: \`${hostname}\`"
+            echo ""
+            echo "| Hostname | Status | Validation DNS target |"
+            echo "|---|---|---|"
+            jq -r '.[] | "| \(.Hostname // .hostname // "?") | \(.ClientStatus // .Status // "?") | \(.DNSValidationTarget // .DNSValidationInstructions // "none reported") |"' "$RUNNER_TEMP/certs.json"
+            echo ""
+            echo "Fly secret names matching the admin set:"
+            echo ""
+            echo '```'
+            printf '%s\n' "${names:-(none)}"
+            echo '```'
+            echo ""
+            echo "### Next steps"
+            echo ""
+            echo "1. **Cloudflare DNS**: add \`CNAME admin -> overture-web.fly.dev\` in the \`tryoverture.com\` zone and keep it **proxied** (orange cloud) so Cloudflare Access can gate it."
+            if [ "$validation" != "(none reported)" ]; then
+              echo "   Fly reports this validation instruction; follow it exactly and keep a validation record (for example \`_acme-challenge.admin\`) **DNS-only** until the certificate is issued: \`${validation}\`."
+            fi
+            if [ "$admin_status" = "not on the app yet" ]; then
+              echo "2. **Certificate**: \`${hostname}\` is not on \`overture-web\` yet. Re-run with \`action: add-cert\`."
+            else
+              echo "2. **Certificate**: \`${hostname}\` on \`overture-web\` is **${admin_status}**. Re-run \`action: status\` until Fly reports \`Ready\`."
+            fi
+            echo "3. **Cloudflare Access**: Zero Trust → Access → Applications → Add an application → Self-hosted; domain \`${hostname}\`; one \`Allow\` policy with \`Include → Emails\` = the owner's address; session 12 hours. Copy the **Application Audience (AUD) Tag** and team domain, save them as repository secrets (\`gh secret set CF_ACCESS_AUD\`, \`gh secret set CF_ACCESS_TEAM_DOMAIN\`), then run \`action: set-access-secrets\`."
+            echo "4. **Verify**: \`bun run scripts/check-admin-host.ts\` and paste the result (docs/DEPLOY.md)."
+            echo ""
+            echo "Without the Access application the admin API answers \`401 access_required\`; do not leave the host without it."
+            echo "Rollback: \`flyctl certs remove ${hostname} -a overture-web\`, delete the Cloudflare DNS records, delete the Access application."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Refuse unless the Cloudflare Access values are repository secrets
+        if: inputs.action == 'set-access-secrets'
+        env:
+          CF_ACCESS_AUD: ${{ secrets.CF_ACCESS_AUD }}
+          CF_ACCESS_TEAM_DOMAIN: ${{ secrets.CF_ACCESS_TEAM_DOMAIN }}
+          CF_ACCESS_JWKS_URL: ${{ secrets.CF_ACCESS_JWKS_URL }}
+        run: |
+          set -euo pipefail
+          missing=""
+          if [ -z "${CF_ACCESS_AUD:-}" ]; then
+            missing="${missing} CF_ACCESS_AUD"
+          fi
+          if [ -z "${CF_ACCESS_TEAM_DOMAIN:-}" ] && [ -z "${CF_ACCESS_JWKS_URL:-}" ]; then
+            missing="${missing} (CF_ACCESS_TEAM_DOMAIN or CF_ACCESS_JWKS_URL)"
+          fi
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:${missing}. Add them with gh secret set <NAME> -R a-hagi613/overture, then re-run set-access-secrets (docs/DEPLOY.md, admin host)."
+            {
+              echo "### Ops admin host: Cloudflare Access values are missing"
+              echo ""
+              echo "These repository secrets are not set:${missing}"
+              echo ""
+              echo "Create the Access application first (docs/DEPLOY.md, admin host), then save its AUD tag and team domain with"
+              echo "\`gh secret set CF_ACCESS_AUD\` and \`gh secret set CF_ACCESS_TEAM_DOMAIN\`, and re-run \`set-access-secrets\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Set the Cloudflare Access secrets on overture-web
+        if: inputs.action == 'set-access-secrets'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          CF_ACCESS_AUD: ${{ secrets.CF_ACCESS_AUD }}
+          CF_ACCESS_TEAM_DOMAIN: ${{ secrets.CF_ACCESS_TEAM_DOMAIN }}
+          CF_ACCESS_JWKS_URL: ${{ secrets.CF_ACCESS_JWKS_URL }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$CF_ACCESS_AUD"
+          team="${CF_ACCESS_TEAM_DOMAIN:-}"
+          jwks="${CF_ACCESS_JWKS_URL:-}"
+          if [ -n "$team" ]; then
+            echo "::add-mask::$team"
+          fi
+          if [ -n "$jwks" ]; then
+            echo "::add-mask::$jwks"
+          fi
+          if [ -n "$team" ] && [ -n "$jwks" ] && [ "${jwks%/}" != "https://${team}/cdn-cgi/access/certs" ]; then
+            echo "::error::CF_ACCESS_JWKS_URL does not match CF_ACCESS_TEAM_DOMAIN. Set both for the same Access team, or delete the one this deployment must not use."
+            exit 1
+          fi
+
+          present="$(flyctl secrets list -a overture-web --json | jq -r '.[] | (.name // .Name // empty)')"
+          if [ -n "$team" ] && [ -z "$jwks" ] && grep -qx 'CF_ACCESS_JWKS_URL' <<<"$present"; then
+            echo "Removing the stale CF_ACCESS_JWKS_URL so it cannot override the new team domain."
+            flyctl secrets unset -a overture-web CF_ACCESS_JWKS_URL
+          fi
+          if [ -z "$team" ] && [ -n "$jwks" ] && grep -qx 'CF_ACCESS_TEAM_DOMAIN' <<<"$present"; then
+            echo "Removing the stale CF_ACCESS_TEAM_DOMAIN so it cannot pin the old issuer."
+            flyctl secrets unset -a overture-web CF_ACCESS_TEAM_DOMAIN
+          fi
+
+          args=(
+            "ADMIN_ORIGIN=https://admin.tryoverture.com"
+            "CF_ACCESS_AUD=$CF_ACCESS_AUD"
+          )
+          if [ -n "$team" ]; then
+            args+=("CF_ACCESS_TEAM_DOMAIN=$team")
+          fi
+          if [ -n "$jwks" ]; then
+            args+=("CF_ACCESS_JWKS_URL=$jwks")
+          fi
+          flyctl secrets set -a overture-web "${args[@]}"
+          names="$(flyctl secrets list -a overture-web --json | jq -r '.[] | (.name // .Name // empty)')"
+          filtered="$(grep -E '^(CF_ACCESS_|ADMIN_ORIGIN$)' <<<"$names" | sort || true)"
+          echo "Fly secret names for the admin host after the update (names only; values are never read or printed):"
+          printf '%s\n' "${filtered:-(none)}"
