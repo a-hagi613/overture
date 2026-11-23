@@ -10,12 +10,7 @@ import { applications, mailThreads, mailboxes, messages, users } from "../platfo
 import { companies, companyBoards, postings } from "../platform/db/catalog-schema.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import type { InboxThreadCounts } from "./threads.ts";
-import {
-  threadCountsOf,
-  threadPageOf,
-  threadViewsOf,
-  unreadThreadCountOf,
-} from "./threads.ts";
+import { threadCountsOf, threadPageOf, threadViewsOf, unreadThreadCountOf } from "./threads.ts";
 
 const NOW = 1_795_000_000_000;
 const USER = "inbox-user";
