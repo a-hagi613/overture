@@ -36,6 +36,29 @@ function combinations() {
   );
 }
 
+const CHECKS_PER_BATCH = 4;
+
+const HEADING_TIMEOUT_MS = 15_000;
+
+async function runBatches(
+  browser: Browser,
+  adminIsolatedAppUrl: string,
+  state: Awaited<ReturnType<BrowserContext["storageState"]>>,
+  remaining: readonly AdminGateCheck[],
+) {
+  if (remaining.length === 0) {
+    return;
+  }
+
+  await Promise.all(
+    remaining
+      .slice(0, CHECKS_PER_BATCH)
+      .map(async (check) => checkPage(browser, adminIsolatedAppUrl, state, check)),
+  );
+
+  await runBatches(browser, adminIsolatedAppUrl, state, remaining.slice(CHECKS_PER_BATCH));
+}
+
 async function checkPage(
   browser: Browser,
   adminIsolatedAppUrl: string,
@@ -66,7 +89,7 @@ async function checkPage(
       .or(page.getByRole("heading", { name: "Billing", exact: true }))
       .or(page.getByRole("heading", { name: "Admin audit" }))
       .first(),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: HEADING_TIMEOUT_MS });
 
   const results = await new AxeBuilder({ page }).analyze();
 
@@ -118,9 +141,5 @@ test("the admin pages are axe clean at 390 and 1280 in light and dark", async ({
     sameSite: "Lax",
   });
 
-  await Promise.all(
-    combinations().map(async (check) => {
-      await checkPage(browser, adminIsolatedAppUrl, state, check);
-    }),
-  );
+  await runBatches(browser, adminIsolatedAppUrl, state, combinations());
 });

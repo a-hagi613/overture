@@ -460,6 +460,79 @@ Each command's output is appended to the run's step summary under its own headin
 by checking `https://tryoverture.com/api/health`. The seed files stay in `/data/seed` so a later run
 reuses the verified download; the backfill job itself is picked up by the app's job worker.
 
+## Admin host: `admin.tryoverture.com` (owner runbook)
+
+The Admin Portal is the same process as the app, selected by the `Host` header: a request to
+`admin.tryoverture.com/admin/api/*` reaches the admin API, and any other host gets the normal app. In production the
+admin host sits behind a Cloudflare Zero Trust Access application with a policy for the owner's email only, on top of
+the app's own owner check and the passkey window. The values are already in `src/server/config/env.ts`; this section
+provisions what the deployment needs around them.
+
+Owners reach the portal from the app: the Profile menu and `/profile/account` carry an **Admin Portal** link, and
+visiting `/admin` on `tryoverture.com` shows a handoff card that opens the same path on the admin host. Regular users,
+the demo account and anonymous visitors never see the link, because `GET /api/me` returns `adminOrigin: null` for
+them (#512).
+
+### 1. DNS and the Fly certificate
+
+Point the admin hostname at the app in Cloudflare DNS and keep the record proxied (orange cloud), because Cloudflare
+Access can only gate proxied traffic:
+
+| Type | Name | Content | Proxy |
+|---|---|---|---|
+| CNAME | `admin` | `overture-web.fly.dev` | Proxied |
+
+Then ask Fly for a certificate for that hostname and follow the validation record it prints:
+
+```sh
+flyctl certs add admin.tryoverture.com -a overture-web
+flyctl certs show admin.tryoverture.com -a overture-web
+```
+
+Keep the validation record Fly prints in place until `flyctl certs show` reports `Status = Issued`.
+
+### 2. Cloudflare Zero Trust Access
+
+In **Zero Trust → Access → Applications**, add a self-hosted application for `admin.tryoverture.com` and a single
+`Allow` policy whose `Include` rule is `Emails` with the owner's address. Set the session duration to the working day
+(for example 12 hours). Copy the application's **Application Audience (AUD) Tag** and note the team domain
+(`<team>.cloudflareaccess.com`); the JWKS endpoint is
+`https://<team>.cloudflareaccess.com/cdn-cgi/access/certs`.
+
+### 3. Fly secrets (names only)
+
+Set the four names from the operator's terminal; the values come from the Access application above and are never
+committed, printed or copied into this repository:
+
+```sh
+fly secrets set \
+  ADMIN_ORIGIN=https://admin.tryoverture.com \
+  CF_ACCESS_TEAM_DOMAIN=<team>.cloudflareaccess.com \
+  CF_ACCESS_AUD=<application-aud-tag> \
+  CF_ACCESS_JWKS_URL=https://<team>.cloudflareaccess.com/cdn-cgi/access/certs \
+  -a overture-web
+```
+
+### 4. Verify the whole path
+
+The check script is read-only and idempotent. It resolves DNS, probes `https://<origin>/admin/api/session` over HTTPS
+and classifies the answer (a Cloudflare Access sign-in redirect or `401 access_required` passes; a `200 text/html` app
+shell is the SPA bug), then reads the Fly certificate and secret **names** with `flyctl`. It never reads or prints a
+secret value.
+
+```sh
+bun run scripts/check-admin-host.ts
+bun run scripts/check-admin-host.ts --json
+```
+
+Exit `0` means every check passed; exit `1` prints the gaps. Use `--no-fly` to skip the two Fly reads when `flyctl` is
+unavailable, and `--host` to name the DNS record when it differs from the origin's hostname. The matching unit tests run
+with `bun test scripts/check-admin-host.test.ts`.
+
+Finally sign in as the owner, open `/profile/account` and confirm the **Admin Portal** card, then open `/admin` on
+`tryoverture.com` and confirm the handoff card opens `https://admin.tryoverture.com/admin` through Access and the
+passkey.
+
 ## Verifying the acceptance criteria
 
 - **A merge to `main` deploys `overture-web` and the health route answers in production**

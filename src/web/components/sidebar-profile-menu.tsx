@@ -4,6 +4,7 @@ import { Link, useLocation } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
 import { PROFILE_SUBMENU } from "../lib/nav-api.ts";
+import { AdminPortalMenuItem } from "./admin-portal-menu-item.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsEyebrow } from "./ui/ds.ts";
 
@@ -73,6 +74,13 @@ export function SidebarProfileMenu({ wide }: { wide: boolean }) {
                     </Link>
                   );
                 })}
+                <AdminPortalMenuItem
+                  className="flex min-h-9 items-center rounded-md px-2.5 text-sm font-medium text-foreground transition hover:bg-muted"
+                  onSelect={() => {
+                    setOpen(false);
+                  }}
+                  role="menuitem"
+                />
               </div>
             </Card>
           </div>
@@ -153,6 +161,10 @@ export function SidebarProfileMenu({ wide }: { wide: boolean }) {
               </Link>
             );
           })}
+          <AdminPortalMenuItem
+            className="flex min-h-8 items-center rounded-md border border-transparent px-2.5 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            role="menuitem"
+          />
         </div>
       ) : null}
     </div>

@@ -14,6 +14,7 @@ import type { NavCounts } from "../lib/nav-api.ts";
 
 import { copy } from "../../shared/copy.ts";
 import { PROFILE_SUBMENU } from "../lib/nav-api.ts";
+import { AdminPortalMenuItem } from "./admin-portal-menu-item.tsx";
 import { SidebarThemeToggle } from "./sidebar-theme-toggle.tsx";
 import { Badge } from "./ui/badge.tsx";
 import { Button } from "./ui/button.tsx";
@@ -139,6 +140,7 @@ export function MobileNavSheet({
                   {item.label}
                 </Link>
               ))}
+              <AdminPortalMenuItem className={rowClass(false)} onSelect={onClose} />
             </div>
           ) : null}
 

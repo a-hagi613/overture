@@ -3334,6 +3334,16 @@ export const copy = {
     mailExpandedSwitchOn: (reason: string) => `Kill switch on · ${reason}`,
     mailExpandedSwitchOff: "Kill switch not set",
     adminPill: "Admin, owner only",
+    portalLink: "Admin Portal",
+    portalOpen: "Open Admin Portal",
+    portalExternalNote: "Opens in a new tab on the admin host.",
+    handoffTitle: "The admin opens on its own host",
+    handoffBody:
+      "Admin lives behind Cloudflare Access and a passkey on a host of its own. Open it there, and the same account carries your session over.",
+    handoffNote: (host: string) => `Opens on ${host} with your signed-in session.`,
+    portalCardTitle: "Admin Portal",
+    portalCardBody:
+      "Open the admin console on its own host. It asks for Cloudflare Access and your passkey.",
     passkeyEyebrow: "Passkey",
     passkeyJustNow: "Confirmed just now",
     passkeyMinute: (minutes: number) => `Confirmed ${String(minutes)} minute ago`,
