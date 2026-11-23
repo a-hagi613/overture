@@ -12,9 +12,8 @@ import { StrengthenFacts } from "./strengthen-facts.tsx";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle } from "./ui/ds.ts";
-import { Tabs } from "./ui/tabs.tsx";
-import { TabsList } from "./ui/tabs-list.tsx";
-import { TabsTrigger } from "./ui/tabs-trigger.tsx";
+import { SegmentedControl } from "./ui/segmented-control.tsx";
+import { SegmentedControlItem } from "./ui/segmented-control-item.tsx";
 import { SectionSkeleton } from "./section-skeleton.tsx";
 
 type Tier = "tier1" | "tier2" | "tier3";
@@ -121,7 +120,9 @@ export function FactsSection() {
       <p className={`${dsBody} mt-1 max-w-2xl`}>{facts.intro}</p>
 
       <div className="mt-5">
-        <Tabs
+        <SegmentedControl
+          ariaLabel={facts.tiersLabel}
+          className="flex w-full flex-wrap gap-1"
           onValueChange={(value) => {
             if (isTier(value)) {
               setTier(value);
@@ -129,18 +130,16 @@ export function FactsSection() {
           }}
           value={tier}
         >
-          <TabsList ariaLabel={facts.tiersLabel} className="flex w-full flex-wrap gap-1">
-            <TabsTrigger className="flex-1 whitespace-nowrap" value="tier1">
-              {`${facts.tier1.label} (${facts.tier1.count})`}
-            </TabsTrigger>
-            <TabsTrigger className="flex-1 whitespace-nowrap" value="tier2">
-              {`${facts.tier2.label} (${facts.tier2.count})`}
-            </TabsTrigger>
-            <TabsTrigger className="flex-1 whitespace-nowrap" value="tier3">
-              {`${facts.tier3.label} (${String(learnedFacts.length)})`}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+          <SegmentedControlItem className="flex-1 whitespace-nowrap" value="tier1">
+            {`${facts.tier1.label} (${facts.tier1.count})`}
+          </SegmentedControlItem>
+          <SegmentedControlItem className="flex-1 whitespace-nowrap" value="tier2">
+            {`${facts.tier2.label} (${facts.tier2.count})`}
+          </SegmentedControlItem>
+          <SegmentedControlItem className="flex-1 whitespace-nowrap" value="tier3">
+            {`${facts.tier3.label} (${String(learnedFacts.length)})`}
+          </SegmentedControlItem>
+        </SegmentedControl>
       </div>
 
       {tier === "tier1" ? (

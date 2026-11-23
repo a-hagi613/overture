@@ -55,7 +55,7 @@ async function expectPhoneBoardMatches(browser: Browser, appServerUrl: string, t
   await expect(
     page.getByText("Track every application from match to decision.").filter({ visible: true }),
   ).toBeVisible();
-  await expect(page.getByRole("tablist", { name: "Stages" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Stages" })).toBeVisible();
   await page.evaluate(async () => {
     await Promise.all([
       document.fonts.load('400 16px "Plus Jakarta Sans"'),

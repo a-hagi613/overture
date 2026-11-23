@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -63,6 +63,8 @@ writeFileSync(join(dist, "app-shell.html"), shell);
 rmSync(marketingRoot, { force: true, recursive: true });
 
 mkdirSync(marketingRoot, { recursive: true });
+
+copyFileSync(join(dist, "theme-boot.js"), join(marketingRoot, "theme-boot.js"));
 
 for (const path of PRERENDERED_MARKETING_PATHS) {
   const render = renderers.get(path);

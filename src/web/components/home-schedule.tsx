@@ -86,7 +86,7 @@ export function HomeSchedule({ now, zone }: { now: number; zone: string }) {
               <Link
                 className="group -mx-2 flex flex-1 items-center justify-between gap-4 rounded-lg px-2 py-4 transition hover:bg-muted"
                 key={item.id}
-                to={`/board?application=${encodeURIComponent(item.applicationId)}`}
+                to={`/board?card=${encodeURIComponent(item.applicationId)}`}
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">

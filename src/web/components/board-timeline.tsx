@@ -155,7 +155,7 @@ export function BoardTimeline({ detail }: { detail: ApplicationDetail }) {
   }
 
   return (
-    <div aria-label={copy.board.tabs.timeline} role="tabpanel">
+    <div>
       <ol className="flex list-none flex-col pt-5">
         {items.map((item, index) => {
           const accent = ACCENT_TITLES.has(item.title);

@@ -65,20 +65,20 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
       await page.goto(`${appServerUrl}/home`);
       await expect(page.getByRole("heading", { level: 1, name: greetingHeading })).toBeVisible();
 
-      const lineTab = page.getByRole("tab", { name: "Line" });
-      const barTab = page.getByRole("tab", { name: "Bar" });
+      const lineTab = page.getByRole("button", { name: "Line", exact: true });
+      const barTab = page.getByRole("button", { name: "Bar", exact: true });
 
-      await expect(lineTab).toHaveAttribute("aria-selected", "true");
+      await expect(lineTab).toHaveAttribute("aria-pressed", "true");
       await barTab.click();
-      await expect(barTab).toHaveAttribute("aria-selected", "true");
+      await expect(barTab).toHaveAttribute("aria-pressed", "true");
       await lineTab.click();
-      await expect(lineTab).toHaveAttribute("aria-selected", "true");
+      await expect(lineTab).toHaveAttribute("aria-pressed", "true");
 
       await inSequence(["30D", "90D", "7D"], async (rangeLabel) => {
-        const rangeTab = page.getByRole("tab", { name: rangeLabel });
+        const rangeTab = page.getByRole("button", { name: rangeLabel });
 
         await rangeTab.click();
-        await expect(rangeTab).toHaveAttribute("aria-selected", "true");
+        await expect(rangeTab).toHaveAttribute("aria-pressed", "true");
       });
 
       await expect(page.getByRole("button", { name: /Pause sending|Resume sending/u })).toHaveCount(
@@ -144,10 +144,10 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
           /Tier 1 · Needed to start/u,
         ],
         async (tierName) => {
-          const tab = page.getByRole("tab", { name: tierName });
+          const tab = page.getByRole("button", { name: tierName });
 
           await tab.click();
-          await expect(tab).toHaveAttribute("aria-selected", "true");
+          await expect(tab).toHaveAttribute("aria-pressed", "true");
         },
       );
 
@@ -308,13 +308,13 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
       await page.goto(`${demoServer.url}/inbox`);
       await expect(page.getByRole("heading", { level: 1, name: "Employer Inbox" })).toBeVisible();
 
-      const unreadTab = page.getByRole("tab", { name: /Unread/u });
-      const allTab = page.getByRole("tab", { name: /All/u });
+      const unreadTab = page.getByRole("button", { name: /^Unread \(\d+\)$/u });
+      const allTab = page.getByRole("button", { name: /^All \(\d+\)$/u });
 
       await unreadTab.click();
-      await expect(unreadTab).toHaveAttribute("aria-selected", "true");
+      await expect(unreadTab).toHaveAttribute("aria-pressed", "true");
       await allTab.click();
-      await expect(allTab).toHaveAttribute("aria-selected", "true");
+      await expect(allTab).toHaveAttribute("aria-pressed", "true");
     } finally {
       await context.close();
     }

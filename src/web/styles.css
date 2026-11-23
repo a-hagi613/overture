@@ -246,6 +246,41 @@ canvas {
   }
 }
 
+/*
+ * Native sheets are opened with showModal(), so the browser paints ::backdrop in the top layer.
+ * The scrim values match the old hand-rolled overlay: `--scrim` for the nav and code sheets, 25%
+ * ink with a 1px blur behind the Board detail sheet.
+ */
+dialog::backdrop {
+  background: var(--color-scrim);
+}
+
+dialog[data-sheet-backdrop="lift"]::backdrop {
+  background: color-mix(in srgb, var(--color-foreground) 25%, transparent);
+  backdrop-filter: blur(1px);
+}
+
+/*
+ * The theme toggle applies `.theme-switching` for one 180ms beat, so the surface colours
+ * cross-fade instead of cutting. Only colour properties transition (no layout), and the blanket
+ * reduced-motion reset zeroes the duration below, giving those users the hard cut.
+ */
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition-duration: 180ms !important;
+  transition-property: background-color, border-color, color, fill, stroke !important;
+  transition-timing-function: var(--ease-out) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-switching *,
+  .theme-switching *::before,
+  .theme-switching *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @layer base {
   :focus-visible {
     outline: 2px solid var(--color-foreground);

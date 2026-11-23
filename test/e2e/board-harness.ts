@@ -539,8 +539,8 @@ export async function openBoard(
   await page.goto(`${appServerUrl}/board`);
 
   if (width === 390) {
-    await page.getByRole("tab", { name: /Waiting/u }).click();
-    await page.getByRole("tablist", { name: "Stages" }).evaluate((element) => {
+    await page.getByRole("button", { name: /Waiting/u }).click();
+    await page.getByRole("group", { name: "Stages" }).evaluate((element) => {
       element.scrollLeft = 0;
     });
   }
