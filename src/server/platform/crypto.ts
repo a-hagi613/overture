@@ -106,7 +106,13 @@ export async function openValue(
   scope: SealScope,
   sealed: string,
 ) {
-  const [version, keyVersion, iv, tag, data] = sealed.split(":");
+  const parts = sealed.split(":");
+
+  if (parts.length !== 5) {
+    throw new Error("Unsupported ciphertext: expected v1:{key_version}:{iv}:{tag}:{data}.");
+  }
+
+  const [version, keyVersion, iv, tag, data] = parts;
 
   if (
     version !== "v1" ||

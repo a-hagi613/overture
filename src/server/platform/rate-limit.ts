@@ -12,7 +12,8 @@ export interface FixedWindowLimit {
 }
 
 /**
- * Consumes one request from a fixed-window limit.
+ * Consumes one request from a fixed-window limit. The window starts at the first request and only moves when it has
+ * fully passed, so a steady client can never slide its own window forward and lock itself out.
  * @param db The application database holding the shared `rate_limit` table.
  * @param key What the limit counts, such as `api.search:<userId>`.
  * @param now The current time in milliseconds.
@@ -25,34 +26,39 @@ export function consumeRateLimit(
   now: number,
   limit: FixedWindowLimit,
 ) {
-  const row = db.select().from(rateLimits).where(eq(rateLimits.key, key)).get();
+  return db.transaction(
+    (tx) => {
+      const row = tx.select().from(rateLimits).where(eq(rateLimits.key, key)).get();
 
-  if (row === undefined) {
-    db.insert(rateLimits)
-      .values({ id: crypto.randomUUID(), key, count: 1, lastRequest: now })
-      .onConflictDoNothing()
-      .run();
+      if (row === undefined) {
+        tx.insert(rateLimits)
+          .values({ id: crypto.randomUUID(), key, count: 1, lastRequest: now })
+          .onConflictDoNothing()
+          .run();
 
-    return true;
-  }
+        return true;
+      }
 
-  if (now - row.lastRequest > limit.windowMs) {
-    db.update(rateLimits)
-      .set({ count: 1, lastRequest: now })
-      .where(eq(rateLimits.id, row.id))
-      .run();
+      if (now - row.lastRequest > limit.windowMs) {
+        tx.update(rateLimits)
+          .set({ count: 1, lastRequest: now })
+          .where(eq(rateLimits.id, row.id))
+          .run();
 
-    return true;
-  }
+        return true;
+      }
 
-  if (row.count >= limit.max) {
-    return false;
-  }
+      if (row.count >= limit.max) {
+        return false;
+      }
 
-  db.update(rateLimits)
-    .set({ count: row.count + 1, lastRequest: now })
-    .where(eq(rateLimits.id, row.id))
-    .run();
+      tx.update(rateLimits)
+        .set({ count: row.count + 1 })
+        .where(eq(rateLimits.id, row.id))
+        .run();
 
-  return true;
+      return true;
+    },
+    { behavior: "immediate" },
+  );
 }

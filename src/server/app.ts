@@ -8,6 +8,7 @@ import type { AppDatabase, CatalogDatabase } from "./platform/db/client.ts";
 import type { BackupMonitor } from "./platform/ports/backup.ts";
 import type { DegradedFlagReader } from "./platform/degraded.ts";
 import type { ClientIpConfig } from "./auth/client-ip.ts";
+import type { PersonalCrypto } from "./profile/personal-crypto.ts";
 import type { Auth } from "./auth/index.ts";
 import type { AdjustableClock } from "./platform/ports/clock.ts";
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
@@ -42,6 +43,7 @@ import { createReviewRoutes } from "./routes/reviews.ts";
 import { createAdminApi } from "./routes/admin.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
 import { stripUntrustedIpHeaders } from "./auth/client-ip.ts";
+import { crossSiteRefusal } from "./auth/csrf.ts";
 import { env, labEnvironment } from "./config/env.ts";
 import { demoLocked } from "./demo/guard.ts";
 import { createProfileRoutes } from "./routes/profile.ts";
@@ -91,6 +93,7 @@ export interface AppDependencies {
   exports: ExportService;
   mail: MailSender;
   payments: Payments | null;
+  personal?: PersonalCrypto | undefined;
   /** Aborted on shutdown; long-lived responses (the event stream) end with it. */
   shutdown: AbortSignal;
 }
@@ -134,6 +137,15 @@ async function staticResponseFrom(root: string, url: string) {
   return null;
 }
 
+function crossSiteExempt(pathname: string) {
+  return (
+    pathname.startsWith("/api/auth/") ||
+    pathname === "/api/events" ||
+    pathname.startsWith("/api/webhooks/") ||
+    pathname.startsWith("/api/internal/")
+  );
+}
+
 function jsonError(error: Error, context: Context) {
   if (error instanceof HTTPException) {
     let code: string = API_ERRORS.internal;
@@ -160,10 +172,16 @@ export function createApp(deps: AppDependencies) {
     nodeEnv: env.NODE_ENV,
   } satisfies ClientIpConfig;
 
-  const personal = createPersonalCrypto(
-    deps.db,
-    parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
-    env.MASTER_KEY_CURRENT,
+  const personal =
+    deps.personal ??
+    createPersonalCrypto(
+      deps.db,
+      parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
+      env.MASTER_KEY_CURRENT,
+    );
+
+  const allowedWriteOrigins = [env.APP_ORIGIN, env.ADMIN_ORIGIN].flatMap((origin) =>
+    origin === undefined ? [] : [origin],
   );
 
   const adminApi = createAdminApi(deps.db, deps.clock, deps.auth, {
@@ -190,6 +208,15 @@ export function createApp(deps: AppDependencies) {
     spendGate: deps.spendGate,
   });
 
+  adminHost.use("/admin/api/*", async (context, next) => {
+    const refusal = crossSiteRefusal(context.req.raw, allowedWriteOrigins);
+
+    if (refusal !== null) {
+      return refusal;
+    }
+
+    return next();
+  });
   adminHost.route("/admin/api", adminApi);
   adminHost.all("/api/auth/*", async (context) =>
     deps.auth.handler(stripUntrustedIpHeaders(context.req.raw, clientIpConfig)),
@@ -203,6 +230,22 @@ export function createApp(deps: AppDependencies) {
   app.use("*", securityHeaders(env.NODE_ENV === "production"));
 
   const { mailboxes } = deps;
+
+  app.use("/api/*", async (context, next) => {
+    const { pathname } = new URL(context.req.url);
+
+    if (crossSiteExempt(pathname)) {
+      return next();
+    }
+
+    const refusal = crossSiteRefusal(context.req.raw, allowedWriteOrigins);
+
+    if (refusal !== null) {
+      return refusal;
+    }
+
+    return next();
+  });
 
   app.use("/api/*", async (context, next) => {
     if (context.req.method === "GET" || context.req.method === "HEAD") {
@@ -231,6 +274,7 @@ export function createApp(deps: AppDependencies) {
     "/lab",
     createLabRoutes({
       clock: deps.clock,
+      clientIpConfig,
       environment: labEnvironment,
       recaptchaSecret: env.LAB_RECAPTCHA_SECRET,
       recaptchaVerifyUrl: env.LAB_RECAPTCHA_VERIFY_URL,
@@ -254,7 +298,7 @@ export function createApp(deps: AppDependencies) {
     createApiRoutes(deps.db, deps.catalogDb, deps.clock, deps.auth, { shutdown: deps.shutdown }),
   );
   app.route("/api", createNotificationRoutes(deps.db, deps.clock, deps.auth));
-  app.route("/api", createProfileRoutes(deps));
+  app.route("/api", createProfileRoutes({ ...deps, personal }));
   app.route(
     "/api",
     createAccountRoutes({
@@ -274,6 +318,7 @@ export function createApp(deps: AppDependencies) {
       db: deps.db,
       llm: deps.llm,
       objects: deps.objects,
+      personal,
       reviews: deps.reviews,
       spendGate: deps.spendGate,
     }),
@@ -310,7 +355,10 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createApplicationRoutes(deps.db, deps.clock, deps.auth, personal));
   app.route("/api", createCheckinRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
   app.route("/api", createCalendarRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
-  app.route("/api", createWorkspaceSearchRoutes({ auth: deps.auth, db: deps.db, personal }));
+  app.route(
+    "/api",
+    createWorkspaceSearchRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db, personal }),
+  );
   app.route("/", createCalendarFeedRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
   app.route(
     "/api",

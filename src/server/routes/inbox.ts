@@ -12,6 +12,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import { openOrNull } from "../profile/personal-crypto.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 
 import { mailThreads, messageAttachments, messages } from "../platform/db/schema.ts";
@@ -22,6 +23,7 @@ import {
   threadViewsOf,
 } from "../inbox/threads.ts";
 import { validQuery } from "./validators.ts";
+import { safeFilename } from "../safe-filename.ts";
 
 const MIME_PATTERN = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/iu;
 
@@ -50,15 +52,6 @@ function safeMime(mime: string) {
   return MIME_PATTERN.test(base) ? base : "application/octet-stream";
 }
 
-function safeFilename(filename: string) {
-  const cleaned = filename
-    .replaceAll(/[\p{Cc}"\\]/gu, "")
-    .trim()
-    .slice(0, 180);
-
-  return cleaned === "" ? "attachment" : cleaned;
-}
-
 export function createInboxRoutes(deps: {
   auth: Auth;
   clock: Clock;
@@ -74,31 +67,40 @@ export function createInboxRoutes(deps: {
     attachments: readonly (typeof messageAttachments.$inferSelect)[],
   ) {
     const [subject, from, text] = await Promise.all([
-      personal.openFor(
-        message.userId,
-        { column: "subject_enc", rowId: message.id, table: "messages" },
-        message.subjectEnc,
-      ),
-      personal.openFor(
-        message.userId,
-        { column: "from_enc", rowId: message.id, table: "messages" },
-        message.fromEnc,
-      ),
-      personal.openFor(
-        message.userId,
-        { column: "text_enc", rowId: message.id, table: "messages" },
-        message.textEnc,
-      ),
+      openOrNull({
+        personal,
+        scope: { column: "subject_enc", rowId: message.id, table: "messages" },
+        sealed: message.subjectEnc,
+        userId: message.userId,
+      }),
+      openOrNull({
+        personal,
+        scope: { column: "from_enc", rowId: message.id, table: "messages" },
+        sealed: message.fromEnc,
+        userId: message.userId,
+      }),
+      openOrNull({
+        personal,
+        scope: { column: "text_enc", rowId: message.id, table: "messages" },
+        sealed: message.textEnc,
+        userId: message.userId,
+      }),
     ]);
 
     const opened = await Promise.all(
       attachments.map(async (attachment) => ({
         bytes: attachment.bytes,
-        filename: await personal.openFor(
-          message.userId,
-          { column: "filename_enc", rowId: attachment.id, table: "message_attachments" },
-          attachment.filenameEnc,
-        ),
+        filename:
+          (await openOrNull({
+            personal,
+            scope: {
+              column: "filename_enc",
+              rowId: attachment.id,
+              table: "message_attachments",
+            },
+            sealed: attachment.filenameEnc,
+            userId: message.userId,
+          })) ?? "attachment",
         id: attachment.id,
         mime: attachment.mime,
       })),
@@ -110,11 +112,11 @@ export function createInboxRoutes(deps: {
       classification: message.classification,
       createdAt: message.createdAt.getTime(),
       direction: message.direction,
-      from,
+      from: from ?? "",
       id: message.id,
       readAt: message.readAt?.getTime() ?? null,
-      subject,
-      text,
+      subject: subject ?? "",
+      text: text ?? "",
     };
   }
 
@@ -232,25 +234,32 @@ export function createInboxRoutes(deps: {
       return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
-    const base64 = await personal.openFor(
-      user.id,
-      {
+    const base64 = await openOrNull({
+      personal,
+      scope: {
         column: "body",
         rowId: attachment.message_attachments.objectKey,
         table: "mail_objects",
       },
-      new TextDecoder().decode(stored),
-    );
+      sealed: new TextDecoder().decode(stored),
+      userId: user.id,
+    });
 
-    const filename = await personal.openFor(
-      user.id,
-      {
-        column: "filename_enc",
-        rowId: attachment.message_attachments.id,
-        table: "message_attachments",
-      },
-      attachment.message_attachments.filenameEnc,
-    );
+    if (base64 === null) {
+      return context.json({ error: API_ERRORS.notFound }, 404);
+    }
+
+    const filename =
+      (await openOrNull({
+        personal,
+        scope: {
+          column: "filename_enc",
+          rowId: attachment.message_attachments.id,
+          table: "message_attachments",
+        },
+        sealed: attachment.message_attachments.filenameEnc,
+        userId: user.id,
+      })) ?? "attachment";
 
     const bytes = new Uint8Array(Buffer.from(base64, "base64"));
 

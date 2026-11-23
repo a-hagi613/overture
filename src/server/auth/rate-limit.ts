@@ -48,7 +48,7 @@ export function consumeRateLimit(
     }
 
     tx.update(rateLimits)
-      .set({ count: row.count + 1, lastRequest: now })
+      .set({ count: row.count + 1 })
       .where(eq(rateLimits.key, key))
       .run();
 

@@ -17,6 +17,7 @@ export const turnstileSiteverifyUrl = "https://challenges.cloudflare.com/turnsti
 const siteverifyTimeoutMs = 10_000;
 
 const gatedEndpoints = new Map<string, readonly TurnstileAction[]>([
+  ["/api/auth/sign-in/oauth2", ["signin"]],
   ["/api/auth/sign-in/social", ["signin"]],
   ["/api/auth/sign-in/magic-link", ["magiclink"]],
   ["/api/auth/demo/sign-in", ["magiclink"]],
@@ -38,7 +39,8 @@ function refuse() {
 }
 
 export async function verifyTurnstile(request: Request) {
-  const allowed = gatedEndpoints.get(new URL(request.url).pathname);
+  const pathname = new URL(request.url).pathname.replace(/\/+$/u, "");
+  const allowed = gatedEndpoints.get(pathname);
 
   if (allowed === undefined) {
     return null;

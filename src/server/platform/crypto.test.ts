@@ -59,6 +59,18 @@ test("ciphertexts record their key version and reject mismatched keys", async ()
   );
 });
 
+test("ciphertexts with a missing or extra segment are refused before any decryption", async () => {
+  const masterKey = crypto.getRandomValues(new Uint8Array(32));
+  const userKey = await createUserKey(masterKey, 1);
+
+  expect(openValue(masterKey, userKey, scope, "v1:1:aaaa:bbbb")).rejects.toThrow(
+    "Unsupported ciphertext",
+  );
+  expect(openValue(masterKey, userKey, scope, "v1:1:aaaa:bbbb:cccc:dddd")).rejects.toThrow(
+    "Unsupported ciphertext",
+  );
+});
+
 test("parseMasterKey rejects keys that are not 32 bytes", () => {
   expect(() => parseMasterKey("", 1)).toThrow("must decode to 32 bytes");
   expect(() => parseMasterKey(undefined, 1)).toThrow("not set");

@@ -24,6 +24,7 @@ import {
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import { recordPasskeyAssertion } from "../platform/passkey/index.ts";
 import { isSameMailbox } from "./email.ts";
+import { isDemoAllowedAuthPath } from "./demo-paths.ts";
 import {
   acceptInvite,
   deleteUnverifiedUserWithEmail,
@@ -113,19 +114,6 @@ export const enabledSocialProviders = providerConfigs.map((config) => config.pro
 const ownerEmail = env.OWNER_EMAIL;
 
 const inviteHashSecret = env.BETTER_AUTH_SECRET;
-
-const demoLockedAuthPaths = new Set([
-  "/change-email",
-  "/change-password",
-  "/delete-user",
-  "/delete-user/callback",
-  "/link-social",
-  "/revoke-other-sessions",
-  "/revoke-sessions",
-  "/set-password",
-  "/unlink-account",
-  "/update-user",
-]);
 
 export function isAllowedEmail(email: string) {
   return isSameMailbox(email, ownerEmail);
@@ -255,15 +243,17 @@ export function createAuth(
 
         const { path } = context;
 
-        if (demoLockedAuthPaths.has(path)) {
-          const session = await getSessionFromCtx(context).catch(() => null);
+        if (isDemoAllowedAuthPath(path)) {
+          return;
+        }
 
-          if (session !== null && isDemoUser(db, session.user.id)) {
-            throw new APIError("FORBIDDEN", {
-              code: "demo_locked",
-              message: copy.demo.locked,
-            });
-          }
+        const session = await getSessionFromCtx(context).catch(() => null);
+
+        if (session !== null && isDemoUser(db, session.user.id)) {
+          throw new APIError("FORBIDDEN", {
+            code: "demo_locked",
+            message: copy.demo.locked,
+          });
         }
       }),
       after: createAuthMiddleware(async (context) => {
@@ -307,6 +297,7 @@ export function createAuth(
       customRules: {
         "/sign-in/magic-link": { window: 15 * 60, max: 3 },
         "/demo/sign-in": { window: 15 * 60, max: 3 },
+        "/sign-in/oauth2": { window: 15 * 60, max: 10 },
         "/sign-in/social": { window: 15 * 60, max: 10 },
       },
     },

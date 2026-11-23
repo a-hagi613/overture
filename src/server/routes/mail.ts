@@ -13,6 +13,7 @@ import type { createMailboxService } from "../inbox/mailboxes.ts";
 import { codePatterns } from "../inbox/codes.ts";
 import { resolveCodeWaitWithPaste } from "../inbox/waits.ts";
 import { applications, attempts, codeWaits } from "../platform/db/schema.ts";
+import { isDemoRole } from "../../shared/demo.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 import { CODE_WAIT_ERRORS } from "../../shared/code-wait.ts";
 
@@ -42,7 +43,13 @@ export function createMailRoutes(deps: {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
-    const mailbox = await mailboxes.ensureFor(user.id);
+    const mailbox = isDemoRole(user.role)
+      ? mailboxes.readFor(user.id)
+      : await mailboxes.ensureFor(user.id);
+
+    if (mailbox === null) {
+      return context.json({ address: "", firstForwardedAt: null, forwardingWorks: false });
+    }
 
     return context.json({
       address: mailbox.address,

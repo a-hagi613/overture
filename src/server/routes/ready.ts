@@ -8,6 +8,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 import { readSessionUser } from "../auth/session.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import { openOrNull } from "../profile/personal-crypto.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
 
 import { applicationEvents, applications, facts, matches, resumes } from "../platform/db/schema.ts";
@@ -121,11 +122,13 @@ export function createReadyRoutes(deps: {
       return null;
     }
 
-    const filename = await personal.openFor(
-      userId,
-      { column: "filename_enc", rowId: row.id, table: "resumes" },
-      row.filenameEnc,
-    );
+    const filename =
+      (await openOrNull({
+        personal,
+        scope: { column: "filename_enc", rowId: row.id, table: "resumes" },
+        sealed: row.filenameEnc,
+        userId,
+      })) ?? "resume.pdf";
 
     return { filename, uploadedAt: row.uploadedAt.getTime() };
   }

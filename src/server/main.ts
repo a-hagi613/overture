@@ -572,12 +572,6 @@ const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
     }
   : {};
 
-const mailPersonal = createPersonalCrypto(
-  db,
-  parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
-  env.MASTER_KEY_CURRENT,
-);
-
 const resumes = createResumeService({
   db,
   clock,
@@ -618,7 +612,7 @@ const mailMoves = createMailMoves({
   db,
   degraded: degradedFlag,
   llm: anthropicLlmPort,
-  personal: mailPersonal,
+  personal,
   spendGate,
 });
 
@@ -628,14 +622,14 @@ const interviewCalendar = createInterviewCalendar({
   clock,
   db,
   objects,
-  personal: mailPersonal,
+  personal,
 });
 
 const mailIngest = createMailIngest({
   db,
   clock,
   objects,
-  personal: mailPersonal,
+  personal,
   resolver,
   mailboxes,
   onAuthenticatedMessage: async (input) => {
@@ -673,12 +667,7 @@ const eraser = createAccountEraser({
   db,
   mailboxes,
   objects,
-  personal: {
-    forget: (userId) => {
-      personal.forget(userId);
-      mailPersonal.forget(userId);
-    },
-  },
+  personal,
   providers: browserProviders,
   sealNotice: async (notice) => {
     const payload = await noticeCrypto.seal(notice);
@@ -984,6 +973,7 @@ const app = createApp({
   exports,
   mail: mailSender,
   payments,
+  personal,
   shutdown: shutdownController.signal,
 });
 

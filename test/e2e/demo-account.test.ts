@@ -424,6 +424,72 @@ test("the demo is refused on uploads, preparation and every write with a friendl
   await request.dispose();
 });
 
+test("the demo is refused session listing, revocation, account linking and passkeys", async ({
+  demoServer,
+}) => {
+  const request = await apiRequest.newContext({ baseURL: demoServer.url });
+
+  await signInDemo(request, demoServer.url);
+
+  const session = await request.get(`${demoServer.url}/api/auth/get-session`);
+
+  expect(session.ok()).toBe(true);
+
+  const attempts = [
+    { data: undefined, method: "GET", path: "/api/auth/list-sessions" },
+    { data: { token: "a-session-token" }, method: "POST", path: "/api/auth/revoke-session" },
+    { data: { token: "a-session-token" }, method: "POST", path: "/api/auth/revoke-other-sessions" },
+    { data: {}, method: "POST", path: "/api/auth/revoke-sessions" },
+    { data: undefined, method: "GET", path: "/api/auth/passkey/list-user-passkeys" },
+    { data: undefined, method: "GET", path: "/api/auth/passkey/generate-register-options" },
+  ] as const;
+
+  const responses = await Promise.all(
+    attempts.map(async (attempt) => {
+      const headers = demoSignInHeaders(demoServer.url);
+
+      const response =
+        attempt.data === undefined
+          ? await request.fetch(`${demoServer.url}${attempt.path}`, {
+              headers,
+              method: attempt.method,
+            })
+          : await request.fetch(`${demoServer.url}${attempt.path}`, {
+              data: attempt.data,
+              headers,
+              method: attempt.method,
+            });
+
+      const body = await response.text();
+
+      return { body, path: attempt.path, status: response.status() };
+    }),
+  );
+
+  for (const response of responses) {
+    expect(response.status, `${response.path}: ${response.body}`).toBe(403);
+    expect(response.body, response.path).toContain("demo_locked");
+  }
+
+  await request.dispose();
+});
+
+test("the demo reads its onboarding targets without the visit writing a default", async ({
+  demoServer,
+}) => {
+  const request = await apiRequest.newContext({ baseURL: demoServer.url });
+
+  await signInDemo(request, demoServer.url);
+
+  const first = await request.get(`${demoServer.url}/api/onboarding/targets`);
+  const second = await request.get(`${demoServer.url}/api/onboarding/targets`);
+
+  expect(first.status()).toBe(200);
+  expect(await first.json()).toEqual(await second.json());
+
+  await request.dispose();
+});
+
 test("two visitors keep their demo sessions at the same time", async ({ demoServer }) => {
   const first = await apiRequest.newContext({ baseURL: demoServer.url });
   const second = await apiRequest.newContext({ baseURL: demoServer.url });

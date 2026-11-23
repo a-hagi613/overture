@@ -8,6 +8,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 import { readSession } from "../auth/session.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import { openOrNull } from "../profile/personal-crypto.ts";
 
 import {
   applications,
@@ -574,36 +575,42 @@ export function createApplicationRoutes(
       .where(eq(applicationSnapshots.applicationId, id))
       .get();
 
-    const snapshotView =
+    const answersJson =
       snapshot === undefined
         ? null
+        : await openOrNull({
+            personal,
+            scope: { column: "answers_enc", rowId: id, table: "application_snapshots" },
+            sealed: snapshot.answersEnc,
+            userId,
+          });
+
+    const coverLetterJson =
+      snapshot?.coverLetterEnc === null || snapshot === undefined
+        ? null
+        : await openOrNull({
+            personal,
+            scope: { column: "cover_letter_enc", rowId: id, table: "application_snapshots" },
+            sealed: snapshot.coverLetterEnc,
+            userId,
+          });
+
+    const snapshotView =
+      snapshot === undefined ||
+      answersJson === null ||
+      (snapshot.coverLetterEnc !== null && coverLetterJson === null)
+        ? null
         : {
-            answers: snapshotAnswerSchema.parse(
-              JSON.parse(
-                await personal.openFor(
-                  userId,
-                  { column: "answers_enc", rowId: id, table: "application_snapshots" },
-                  snapshot.answersEnc,
-                ),
-              ),
-            ),
+            answers: snapshotAnswerSchema.parse(JSON.parse(answersJson)),
             approvedAt: snapshot.approvedAt,
             approvedPlanSha256: snapshot.approvedPlanSha256,
             confirmedBy: snapshot.confirmedBy,
             consentVersion: snapshot.consentVersion,
             costMicros: snapshot.costMicros,
             coverLetter:
-              snapshot.coverLetterEnc === null
+              coverLetterJson === null
                 ? null
-                : coverLetterSchema.parse(
-                    JSON.parse(
-                      await personal.openFor(
-                        userId,
-                        { column: "cover_letter_enc", rowId: id, table: "application_snapshots" },
-                        snapshot.coverLetterEnc,
-                      ),
-                    ),
-                  ),
+                : coverLetterSchema.parse(JSON.parse(coverLetterJson)),
             provider: snapshot.provider,
             resumeSha256: snapshot.resumeSha256,
             resume: await resumeFile(userId, snapshot.resumeId),
@@ -743,13 +750,14 @@ export function createApplicationRoutes(
       }
     }
 
-    const text = await personal.openFor(
+    const text = await openOrNull({
+      personal,
+      scope: { column: "text_enc", rowId: row.id, table: "resumes" },
+      sealed: row.textEnc,
       userId,
-      { column: "text_enc", rowId: row.id, table: "resumes" },
-      row.textEnc,
-    );
+    });
 
-    return splitResumeLines(text).filter((line) => cited.has(line.id));
+    return text === null ? [] : splitResumeLines(text).filter((line) => cited.has(line.id));
   }
 
   async function resumeFile(userId: string, resumeId: string) {
@@ -759,11 +767,13 @@ export function createApplicationRoutes(
       return null;
     }
 
-    const filename = await personal.openFor(
-      userId,
-      { column: "filename_enc", rowId: row.id, table: "resumes" },
-      row.filenameEnc,
-    );
+    const filename =
+      (await openOrNull({
+        personal,
+        scope: { column: "filename_enc", rowId: row.id, table: "resumes" },
+        sealed: row.filenameEnc,
+        userId,
+      })) ?? "resume.pdf";
 
     return { bytes: row.bytes, filename, sha256: row.sha256 };
   }

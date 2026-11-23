@@ -53,4 +53,16 @@ describe("a fixed-window per-key rate limit", () => {
 
     sqlite.close();
   });
+
+  test("a steady client can never slide its own window into a lockout", () => {
+    const { db, sqlite } = migrated();
+    const hourly = { windowMs: 60 * 60_000, max: 10 } as const;
+    const gap = 50 * 60_000;
+
+    for (let request = 0; request < 19; request += 1) {
+      expect(consumeRateLimit(db, "api.search:steady", NOW + request * gap, hourly)).toBe(true);
+    }
+
+    sqlite.close();
+  });
 });
