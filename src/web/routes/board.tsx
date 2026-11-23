@@ -27,8 +27,7 @@ import { TrackerMobileTab } from "../components/tracker-mobile-tab.tsx";
 import { TrackerOverlayCard } from "../components/tracker-overlay-card.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
-import { Tabs } from "../components/ui/tabs.tsx";
-import { TabsList } from "../components/ui/tabs-list.tsx";
+import { SegmentedControl } from "../components/ui/segmented-control.tsx";
 import {
   useApplication,
   useBoard,
@@ -68,9 +67,15 @@ export function BoardPage() {
   const undoStage = useUndoStage();
   const withdraw = useWithdraw();
   const isDesktopBoard = useMediaQuery("(min-width: 1024px)");
-  const [searchParams] = useSearchParams();
-  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get("application"));
-  const [mobileLane, setMobileLane] = useState<TrackerLaneKey>("applied");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const cardParam = searchParams.get("card") ?? searchParams.get("application");
+  const selectedId = cardParam === "" ? null : cardParam;
+
+  const laneParam = searchParams.get("filter");
+
+  const mobileLane: TrackerLaneKey =
+    laneParam !== null && isTrackerLaneKey(laneParam) ? laneParam : "applied";
+
   const [laneOverrides, setLaneOverrides] = useState<Record<string, TrackerLaneKey>>({});
 
   const [activeDrag, setActiveDrag] = useState<{ card: BoardCard; lane: TrackerLaneKey } | null>(
@@ -129,10 +134,34 @@ export function BoardPage() {
     [undoBoardStage],
   );
 
+  const writeParam = useCallback(
+    (key: "card" | "filter", value: string | null, replace: boolean) => {
+      const next = new URLSearchParams(searchParams);
+
+      next.delete("application");
+
+      if (value === null || value === "") {
+        next.delete(key);
+      } else {
+        next.set(key, value);
+      }
+
+      setSearchParams(next, { replace });
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const openCard = useCallback(
+    (id: string) => {
+      writeParam("card", id, false);
+    },
+    [writeParam],
+  );
+
   const closeSheet = useCallback(() => {
     const closing = selectedId;
 
-    setSelectedId(null);
+    writeParam("card", null, true);
 
     if (closing !== null) {
       globalThis.requestAnimationFrame(() => {
@@ -146,7 +175,7 @@ export function BoardPage() {
         visible?.focus();
       });
     }
-  }, [selectedId]);
+  }, [selectedId, writeParam]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -368,7 +397,7 @@ export function BoardPage() {
 
     if (canWithdrawApplication(card.status)) {
       setLaneOverrides((current) => ({ ...current, [card.id]: "closed" }));
-      setSelectedId(null);
+      writeParam("card", null, true);
 
       withdraw.mutate(card.id, {
         onError: () => {
@@ -387,7 +416,7 @@ export function BoardPage() {
     const fromLane = laneOverrides[card.id] ?? laneForStage(card.stage) ?? "applied";
 
     moveCardToLane(card, fromLane, "closed", "closed", copy.board.lanes.closed);
-    setSelectedId(null);
+    writeParam("card", null, true);
   };
 
   const activeMobileLane =
@@ -467,7 +496,7 @@ export function BoardPage() {
                     lane={lane.key}
                     linkTo={lane.linkTo}
                     onCardKeyDown={handleCardKeyDown}
-                    onOpen={setSelectedId}
+                    onOpen={openCard}
                     selectedId={selectedId}
                   />
                 ))}
@@ -475,26 +504,26 @@ export function BoardPage() {
             </div>
           ) : (
             <div className="mt-5">
-              <Tabs
+              <SegmentedControl
+                ariaLabel={copy.board.stagesLabel}
+                className="flex w-full gap-1"
                 onValueChange={(value) => {
                   if (isTrackerLaneKey(value)) {
-                    setMobileLane(value);
+                    writeParam("filter", value, true);
                   }
                 }}
                 value={mobileLane}
               >
-                <TabsList ariaLabel={copy.board.stagesLabel} className="flex w-full gap-1">
-                  {TRACKER_LANES.map((lane) => (
-                    <TrackerMobileTab
-                      activeDragLane={activeDrag?.lane ?? null}
-                      droppable={lane.droppable}
-                      key={lane.key}
-                      label={lane.label}
-                      lane={lane.key}
-                    />
-                  ))}
-                </TabsList>
-              </Tabs>
+                {TRACKER_LANES.map((lane) => (
+                  <TrackerMobileTab
+                    activeDragLane={activeDrag?.lane ?? null}
+                    droppable={lane.droppable}
+                    key={lane.key}
+                    label={lane.label}
+                    lane={lane.key}
+                  />
+                ))}
+              </SegmentedControl>
 
               <p className="mt-2 text-center text-xs text-muted-foreground">
                 {copy.board.mobileDropHint}
@@ -513,7 +542,7 @@ export function BoardPage() {
                     lane={activeMobileLane.key}
                     linkTo={activeMobileLane.linkTo}
                     onCardKeyDown={handleCardKeyDown}
-                    onOpen={setSelectedId}
+                    onOpen={openCard}
                     selectedId={selectedId}
                   />
                 </div>
@@ -563,14 +592,14 @@ export function BoardPage() {
             const nextCard = allCards[selectedIndex + 1];
 
             if (nextCard !== undefined) {
-              setSelectedId(nextCard.id);
+              writeParam("card", nextCard.id, true);
             }
           }}
           onPrevious={() => {
             const previousCard = allCards[selectedIndex - 1];
 
             if (previousCard !== undefined) {
-              setSelectedId(previousCard.id);
+              writeParam("card", previousCard.id, true);
             }
           }}
           onRetry={() => {

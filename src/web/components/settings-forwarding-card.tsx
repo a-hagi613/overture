@@ -8,9 +8,8 @@ import { Badge } from "./ui/badge.tsx";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle, dsEyebrow } from "./ui/ds.ts";
-import { Tabs } from "./ui/tabs.tsx";
-import { TabsList } from "./ui/tabs-list.tsx";
-import { TabsTrigger } from "./ui/tabs-trigger.tsx";
+import { SegmentedControl } from "./ui/segmented-control.tsx";
+import { SegmentedControlItem } from "./ui/segmented-control-item.tsx";
 
 type ProviderTab = "gmail" | "outlook";
 
@@ -112,7 +111,8 @@ export function SettingsForwardingCard() {
             <p
               className={dsEyebrow}
             >{`${copy.inbox.addressFilterHeading} ${copy.inbox.addressFilterItalic}`}</p>
-            <Tabs
+            <SegmentedControl
+              ariaLabel="Email provider"
               onValueChange={(value) => {
                 if (value === "gmail" || value === "outlook") {
                   setProvider(value);
@@ -120,11 +120,11 @@ export function SettingsForwardingCard() {
               }}
               value={provider}
             >
-              <TabsList ariaLabel="Email provider">
-                <TabsTrigger value="gmail">{copy.inbox.gmailHeading}</TabsTrigger>
-                <TabsTrigger value="outlook">{copy.inbox.outlookHeading}</TabsTrigger>
-              </TabsList>
-            </Tabs>
+              <SegmentedControlItem value="gmail">{copy.inbox.gmailHeading}</SegmentedControlItem>
+              <SegmentedControlItem value="outlook">
+                {copy.inbox.outlookHeading}
+              </SegmentedControlItem>
+            </SegmentedControl>
           </div>
           <ol className="list-decimal space-y-2 pl-4 text-xs leading-relaxed text-muted-foreground">
             {steps.map((step) => (

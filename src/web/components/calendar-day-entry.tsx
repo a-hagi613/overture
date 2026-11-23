@@ -119,7 +119,7 @@ export function CalendarDayEntry(
             <Badge variant={badge.variant}>{badge.label}</Badge>
             <Link
               className="inline-flex items-center gap-0.5 text-xs font-semibold text-signal-text hover:underline"
-              to={`/board?application=${item.applicationId}`}
+              to={`/board?card=${item.applicationId}`}
             >
               <span>{copy.calendar.viewApplication}</span>
               <ArrowUpRight aria-hidden="true" size={12} />

@@ -178,7 +178,7 @@ export function WorkspaceSearchDialog({
               className={ITEM_CLASS}
               key={app.id}
               onSelect={() => {
-                go(`/board?application=${encodeURIComponent(app.id)}`);
+                go(`/board?card=${encodeURIComponent(app.id)}`);
               }}
               value={`app-${app.id}`}
             >

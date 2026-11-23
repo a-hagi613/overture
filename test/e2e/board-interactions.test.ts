@@ -154,7 +154,7 @@ test("holding a card on the phone and dropping it on a stage moves and locks it"
     return { height: rect.height, width: rect.width, x: rect.x, y: rect.y };
   });
 
-  const stage = page.getByRole("tab", { name: "Waiting" });
+  const stage = page.getByRole("button", { name: "Waiting" });
 
   const stageBox = await stage.evaluate((element) => {
     const rect = element.getBoundingClientRect();
@@ -189,19 +189,32 @@ test("holding a card on the phone and dropping it on a stage moves and locks it"
 test("tapping the phone stage tabs changes the visible lane", async ({ boardServer, browser }) => {
   const { context, page, request } = await openSeeded(browser, boardServer.url, 390);
 
-  await expect(page.getByRole("tab", { name: "Applied" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("group", { name: "Stages" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Applied" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(page.locator('section[aria-label="Applied"]')).toBeVisible();
 
-  await page.getByRole("tab", { name: "Waiting" }).click();
-  await expect(page.getByRole("tab", { name: "Waiting" })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("button", { name: "Waiting" }).click();
+  await expect(page.getByRole("button", { name: "Waiting" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(page.locator('section[aria-label="Waiting"]')).toBeVisible();
 
-  await page.getByRole("tab", { name: "Closed" }).click();
-  await expect(page.getByRole("tab", { name: "Closed" })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("button", { name: "Closed" }).click();
+  await expect(page.getByRole("button", { name: "Closed" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(page.locator('section[aria-label="Closed"]')).toBeVisible();
 
-  await page.getByRole("tab", { name: "Queued" }).click();
-  await expect(page.getByRole("tab", { name: "Queued" })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("button", { name: "Queued" }).click();
+  await expect(page.getByRole("button", { name: "Queued" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(page.locator('section[aria-label="Queued"]')).toBeVisible();
 
   await context.close();
@@ -379,7 +392,7 @@ async function openCard(
       ["screening", "Waiting"],
     ]);
 
-    await page.getByRole("tab", { name: mobileTabLabels.get(stage) ?? "Applied" }).click();
+    await page.getByRole("button", { name: mobileTabLabels.get(stage) ?? "Applied" }).click();
   }
 
   await page.locator(`button[data-card="${cardId}"]`).filter({ visible: true }).click();

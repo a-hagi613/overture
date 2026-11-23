@@ -324,8 +324,8 @@ test("a fresh user walks the Inbox through the real UI, from empty to the Board 
   await runMailJobs(owner);
 
   await page.reload();
-  await expect(page.getByRole("tab", { name: "All (2)" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: /^Unread \(\d+\)$/u })).toBeVisible();
+  await expect(page.getByRole("button", { name: "All (2)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Unread \(\d+\)$/u })).toBeVisible();
 
   const search = page.getByRole("searchbox", { name: "Search messages…" });
 
@@ -365,7 +365,7 @@ test("a fresh user walks the Inbox through the real UI, from empty to the Board 
   expect(readFileSync(saved).subarray(0, 5).toString()).toBe("%PDF-");
 
   await page.getByRole("link", { name: /View on Tracker/u }).click();
-  await expect(page).toHaveURL(new RegExp(`/board\\?application=${applicationId}`, "u"));
+  await expect(page).toHaveURL(new RegExp(`/board\\?card=${applicationId}`, "u"));
   await expect(page.getByRole("dialog", { name: "Application detail" })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Application detail" })).toContainText(
     "Senior Backend Engineer",

@@ -6,9 +6,8 @@ import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
 import { Card } from "../ui/card.tsx";
 import { dsContainer, dsEyebrow, dsSectionHeading } from "../ui/ds.ts";
-import { Tabs } from "../ui/tabs.tsx";
-import { TabsList } from "../ui/tabs-list.tsx";
-import { TabsTrigger } from "../ui/tabs-trigger.tsx";
+import { SegmentedControl } from "../ui/segmented-control.tsx";
+import { SegmentedControlItem } from "../ui/segmented-control-item.tsx";
 import { LANDING_COPY } from "./landing-copy.ts";
 
 type ScreenId = "home" | "board" | "inbox" | "calendar" | "profile";
@@ -91,15 +90,7 @@ export function LandingDashboardPreview() {
       </div>
 
       <Card className="mt-2 overflow-hidden" variant="elevated">
-        <Tabs
-          className="gap-0"
-          onValueChange={(value) => {
-            if (isScreenId(value)) {
-              setActiveScreen(value);
-            }
-          }}
-          value={activeScreen}
-        >
+        <div className="flex flex-col gap-0">
           <div className="relative flex flex-col gap-3 border-b border-border bg-sidebar p-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between lg:px-4 lg:py-2.5">
             <div className="flex flex-col gap-2.5 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3">
               <span className={`${dsEyebrow} inline-flex min-h-11 items-center gap-2 lg:min-h-8`}>
@@ -109,20 +100,26 @@ export function LandingDashboardPreview() {
                 />
                 {LANDING_COPY.preview.viewLabel}
               </span>
-              <TabsList
+              <SegmentedControl
                 ariaLabel="Workspace preview screens"
-                className="grid w-full grid-cols-5 lg:inline-flex lg:w-auto"
+                className="grid w-full grid-cols-5 border-0 bg-transparent p-0 lg:inline-flex lg:w-auto"
+                onValueChange={(value) => {
+                  if (isScreenId(value)) {
+                    setActiveScreen(value);
+                  }
+                }}
+                value={activeScreen}
               >
                 {screens.map((screen) => (
-                  <TabsTrigger
-                    className="min-h-11 border border-transparent px-1.5 text-xs hover:border-border hover:bg-card data-[state=active]:border-signal data-[state=active]:text-signal-text md:min-h-9 lg:min-h-8 lg:px-3.5 lg:text-sm"
+                  <SegmentedControlItem
+                    className="min-h-11 border border-transparent px-1.5 text-xs hover:border-border hover:bg-card data-[state=on]:border-signal data-[state=on]:text-signal-text md:min-h-9 lg:min-h-8 lg:px-3.5 lg:text-sm"
                     key={screen.id}
                     value={screen.id}
                   >
                     {screen.label}
-                  </TabsTrigger>
+                  </SegmentedControlItem>
                 ))}
-              </TabsList>
+              </SegmentedControl>
             </div>
 
             <Button
@@ -140,7 +137,7 @@ export function LandingDashboardPreview() {
               <span>{previewDark ? "Light" : "Dark"}</span>
             </Button>
           </div>
-        </Tabs>
+        </div>
 
         <div className="bg-background">
           <div className="mx-auto w-full max-w-[390px] overflow-hidden bg-background sm:my-4 sm:rounded-xl sm:border sm:border-border sm:shadow-sh lg:hidden">

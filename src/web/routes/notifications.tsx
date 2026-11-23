@@ -9,6 +9,7 @@ import { PushOptIn } from "../components/push-opt-in.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
 import { dsBody, dsCardTitle } from "../components/ui/ds.ts";
+import { useHomeData } from "../lib/home-api.ts";
 import { dateKey } from "../lib/home-time.ts";
 import {
   useMarkAllNotificationsRead,
@@ -17,7 +18,7 @@ import {
 } from "../lib/notifications-api.ts";
 import type { NotificationRow } from "../lib/notifications-api.ts";
 
-const TIME_ZONE = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+const BROWSER_TIME_ZONE = new Intl.DateTimeFormat().resolvedOptions().timeZone;
 const PERIOD = ".";
 
 function undoApplicationId(url: string) {
@@ -30,12 +31,14 @@ function undoApplicationId(url: string) {
 
 export function NotificationsPage() {
   const { data, isError, isPending, refetch } = useNotifications();
+  const home = useHomeData();
   const markAll = useMarkAllNotificationsRead();
   const markRead = useMarkNotificationRead();
   const now = data?.now ?? 0;
   const rows = data?.notifications ?? [];
-  const today = rows.filter((row) => dateKey(row.at, TIME_ZONE) === dateKey(now, TIME_ZONE));
-  const earlier = rows.filter((row) => dateKey(row.at, TIME_ZONE) !== dateKey(now, TIME_ZONE));
+  const timeZone = home.data?.timeZone ?? BROWSER_TIME_ZONE;
+  const today = rows.filter((row) => dateKey(row.at, timeZone) === dateKey(now, timeZone));
+  const earlier = rows.filter((row) => dateKey(row.at, timeZone) !== dateKey(now, timeZone));
 
   const undo = async (row: NotificationRow) => {
     const id = undoApplicationId(row.url);
@@ -164,7 +167,7 @@ export function NotificationsPage() {
                         markRead.mutate(id);
                       }}
                       row={row}
-                      zone={TIME_ZONE}
+                      zone={timeZone}
                     />
                   ))}
                 </ul>
@@ -192,7 +195,7 @@ export function NotificationsPage() {
                         markRead.mutate(id);
                       }}
                       row={row}
-                      zone={TIME_ZONE}
+                      zone={timeZone}
                     />
                   ))}
                 </ul>
