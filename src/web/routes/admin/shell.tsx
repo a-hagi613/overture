@@ -1,15 +1,36 @@
 import { Suspense } from "react";
 import { Outlet } from "react-router";
 
+import type { Me } from "../../lib/me-api.ts";
+
 import { copy } from "../../../shared/copy.ts";
 import { BrandMark } from "../../components/brand-mark.tsx";
 import { NavGlyph } from "../../components/nav-glyph.tsx";
 import { RouteFallback } from "../../components/route-fallback.tsx";
+import { isCrossOrigin, useMe } from "../../lib/me-api.ts";
 import { AdminChipNav } from "./admin-chip-nav.tsx";
 import { AdminSideNav } from "./admin-nav.tsx";
 import { AdminSideIdentity } from "./admin-side.tsx";
+import { AdminHandoffCard } from "./handoff-card.tsx";
+
+function ownerHandoffOrigin(me: Me | undefined) {
+  const adminOrigin = me?.adminOrigin ?? null;
+
+  if (me?.user?.role !== "owner" || adminOrigin === null) {
+    return null;
+  }
+
+  return isCrossOrigin(adminOrigin, globalThis.location.origin) ? adminOrigin : null;
+}
 
 export function AdminShell() {
+  const me = useMe();
+  const handoffOrigin = ownerHandoffOrigin(me);
+
+  if (handoffOrigin !== null) {
+    return <AdminHandoffCard adminOrigin={handoffOrigin} />;
+  }
+
   return (
     <div className="min-h-screen overflow-x-clip bg-background text-foreground">
       <div className="mx-auto flex min-h-screen w-full max-w-[1440px] items-stretch">

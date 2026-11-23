@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { copy } from "../../shared/copy.ts";
+import { AccountAdminCard } from "../components/account-admin-card.tsx";
 import { AccountDeleteDialog } from "../components/account-delete-dialog.tsx";
 import { AccountLegalCard } from "../components/account-legal-card.tsx";
 import { AccountPacingCard } from "../components/account-pacing-card.tsx";
@@ -34,6 +35,8 @@ export function ProfileAccountPage() {
       />
 
       <div className="mt-6 flex flex-col gap-5">
+        <AccountAdminCard />
+
         <div id="forwarding">
           <SettingsForwardingCard />
         </div>
