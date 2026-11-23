@@ -9,7 +9,9 @@ import { PlanCards } from "./plan-cards.tsx";
 import { PlanTable } from "./plan-table.tsx";
 
 export function MarginPage() {
-  const { data, failed, refusal, refresh } = useAdminResource(loadMargin);
+  const { data, failed, refusal, refresh } = useAdminResource(loadMargin, undefined, {
+    resourceId: "margin",
+  });
 
   if (refusal !== null) {
     return (

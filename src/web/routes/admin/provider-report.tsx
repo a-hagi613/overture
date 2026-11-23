@@ -25,7 +25,13 @@ const LAB_PAGES = [
 const inputLabelClass = "block text-[12.5px] font-semibold";
 
 export function ProviderReportPage() {
-  const { data, failed: loadFailed, refusal, refresh } = useAdminResource(loadProviderReport);
+  const {
+    data,
+    failed: loadFailed,
+    refusal,
+    refresh,
+  } = useAdminResource(loadProviderReport, undefined, { resourceId: "provider-report" });
+
   const [sessions, setSessions] = useState("1");
   const [notice, setNotice] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);

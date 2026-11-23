@@ -9,7 +9,9 @@ import { SystemLiveChecksCard } from "./system-live-checks-card.tsx";
 import { SystemRuntimeCard } from "./system-runtime-card.tsx";
 
 export function SystemPage() {
-  const { data, failed, refusal, refresh } = useAdminResource(loadSystem);
+  const { data, failed, refusal, refresh } = useAdminResource(loadSystem, undefined, {
+    resourceId: "system",
+  });
 
   if (refusal !== null) {
     return (

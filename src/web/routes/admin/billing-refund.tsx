@@ -13,7 +13,7 @@ import { billingPlanLabel, periodSpan } from "./billing-labels.ts";
 export function BillingRefundPage() {
   const { id = "" } = useParams();
   const load = useCallback(async () => loadBillingUser(id), [id]);
-  const { data, refusal, refresh } = useAdminResource(load);
+  const { data, refusal, refresh } = useAdminResource(load, ["billing-refund", id]);
 
   if (refusal !== null) {
     return (
