@@ -54,5 +54,5 @@ createRoot(rootElement).render(
 );
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
-  void navigator.serviceWorker.register("/sw.js", { type: "module" });
+  void navigator.serviceWorker.register("/sw", { type: "module" });
 }

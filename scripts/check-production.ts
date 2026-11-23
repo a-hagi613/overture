@@ -440,12 +440,21 @@ function serviceWorkerCheck(outcome: ProbeOutcome) {
       outcome,
       failed(
         outcome,
-        `/sw.js carries cache-control "${cacheControl ?? "none"}" instead of no-cache, so a CDN can pin the service worker`,
+        `/sw carries cache-control "${cacheControl ?? "none"}" instead of no-cache, so a CDN can pin the service worker`,
       ),
     );
   }
 
   return result("sw.cache", outcome, passed(outcome, "200 with cache-control: no-cache"));
+}
+
+function legacyServiceWorkerSkipped() {
+  return {
+    detail: "skipped: legacy path, Cloudflare pins .js; new registrations use /sw",
+    ms: 0,
+    name: "sw.legacy",
+    status: "skip",
+  } satisfies CheckResult;
 }
 
 function missingAssetCheck(outcome: ProbeOutcome) {
@@ -667,7 +676,7 @@ export async function runChecks(
   const health = await probe(dependencies, `${origin}/api/health`, { method: "GET" });
   const signin = await probe(dependencies, `${origin}/signin`, { method: "GET" });
 
-  const serviceWorker = await probe(dependencies, `${origin}/sw.js`, { method: "GET" });
+  const serviceWorker = await probe(dependencies, `${origin}/sw`, { method: "GET" });
 
   const missingAsset = await probe(dependencies, `${origin}${MISSING_ASSET_PATH}`, {
     method: "GET",
@@ -682,6 +691,7 @@ export async function runChecks(
     ...headerChecks(landing),
     hstsCheck(landing, origin),
     serviceWorkerCheck(serviceWorker),
+    legacyServiceWorkerSkipped(),
     missingAssetCheck(missingAsset),
     stripeWebhookCheck(
       await probe(dependencies, `${origin}/webhooks/stripe`, {
