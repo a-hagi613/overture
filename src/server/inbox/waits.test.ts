@@ -77,7 +77,7 @@ test("aborting a code wait clears the interval and resolves null", async () => {
 
 test("a wait created with an already-aborted signal settles at once", async () => {
   const { clock, db, sqlite } = seeded();
-  const personal = createPersonalCrypto(db, MASTER, 1);
+  const personal = createPersonalCrypto(db, masterKeyringFor(MASTER));
   const controller = new AbortController();
 
   controller.abort();
