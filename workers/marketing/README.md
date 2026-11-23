@@ -1,7 +1,8 @@
 # Marketing Worker
 
-The landing (`/`) and pricing (`/pricing`) pages as Workers Static Assets (#284, ADR 0033). The pages
-are prerendered by the main build; this Worker only serves them, and its routes are explicit so no app
+The landing (`/`) as Workers Static Assets (#284, ADR 0033). The front-end rebuild (ADR 0037, proposed) removes the
+`/pricing` page and its route, and pricing becomes the landing's Pricing section; until then `/pricing` is still
+attached. The page is prerendered by the main build; this Worker only serves it, and its routes are explicit so no app
 or API request ever reaches it.
 
 ## Routes
@@ -9,7 +10,6 @@ or API request ever reaches it.
 | Route | Serves |
 |---|---|
 | `tryoverture.com/` | `dist-marketing/index.html` |
-| `tryoverture.com/pricing*` | `dist-marketing/pricing/index.html` |
 
 Every other path on `tryoverture.com` — the app routes in `src/web/route-table.tsx`, `/api/*`,
 `/webhooks/*`, `/assets/*`, `/sw.js`, the manifest and the icons — matches no route here and goes
@@ -18,7 +18,8 @@ the app's origin, and the app's own HTML and assets still come from Fly.
 
 The route list is derived from `src/shared/marketing-paths.ts` by `src/routes.ts`; a change needs the
 matching `routes` entry in `wrangler.jsonc`, and `test/e2e/marketing-worker.test.ts` fails until the
-two agree.
+two agree. Its assertion that `/pricing?utm_source=test` matches a route goes stale once the rebuild (ADR 0037)
+lands and fails until it is removed (audit H8).
 
 ## Assets and invocations
 
@@ -29,14 +30,14 @@ serving when a tripped Workers spending limit blocks script invocations (ADR 003
 file instead of falling through to anything, and `workers_dev` is false so the site is only reachable
 through the zone routes.
 
-`assets.html_handling` is `drop-trailing-slash`: `/pricing` serves `pricing/index.html` directly and
-`/pricing/` redirects to it, which matches the URL the app links to.
+`assets.html_handling` is `drop-trailing-slash`, so a page at `/name` serves `name/index.html` directly
+and `/name/` redirects to it.
 
 `dist-marketing` is written by `scripts/prerender.tsx` after `vite build`:
 
 - one HTML file per page with the built stylesheet inlined, so the page is styled with the origin down;
-- the app's `/assets/*.js` bundle is still referenced for hydration, so a signed-in visitor at `/` gets
-  the app home when Fly is up;
+- the app's `/assets/*.js` bundle is still referenced for hydration; after the rebuild (ADR 0037) a signed-in visitor
+  at `/` gets the landing as well, and the app's Home is `/home`;
 - `_headers`, generated from `src/shared/security-headers.ts`, sends the app's CSP and security headers
   (Workers Static Assets serves static responses without the Hono middleware).
 

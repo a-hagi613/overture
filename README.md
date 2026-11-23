@@ -5,8 +5,11 @@ and shows its work. It finds postings from ATS job feeds, scores them against th
 application from the user's own facts, writes the cover letter, and, once the user approves it, submits it
 through the employer's real ATS form in a managed cloud browser.
 
-The walking skeleton exists: Bun and Hono serve the Vite, React 19 and Tailwind SPA shell, SQLite runs
-through Drizzle with migrations applied at boot, and the health route answers at `/api/health`.
+Bun and Hono serve the API and the Vite, React 19 and Tailwind SPA (shadcn/Radix components, React Query and Zod
+on every response). SQLite runs through Drizzle as two files, `app.sqlite` and `catalog.sqlite` (ADR 0036), with
+migrations applied at boot and Litestream replication; the health route answers at `/api/health`. The app's Home is
+`/` today; the rebuild makes `/` the public landing and moves Home to `/home` (ADR 0037, proposed).
+`docs/SPEC.md` is the product, `DESIGN.md` the look, `GLOSSARY.md` the words and `docs/adr/` the decisions.
 
 ## Architecture
 
