@@ -473,7 +473,7 @@ test("an export holds only its user's data and downloads from its page", async (
   const readyMail = mail.messages.find((sent) => sent.subject === "Your Overture export is ready");
 
   expect(readyMail?.to).toBe(authTestIdentity.ownerEmail);
-  expect(readyMail?.body).toContain("/settings/export");
+  expect(readyMail?.body).toContain("/profile/account");
   expect((await noticeSends(owner)) - noticesBefore).toBe(1);
 
   await context.close();

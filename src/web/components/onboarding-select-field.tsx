@@ -1,3 +1,5 @@
+import { ChevronDown } from "lucide-react";
+
 export function OnboardingSelectField({
   ariaLabel,
   disabled = false,
@@ -16,9 +18,10 @@ export function OnboardingSelectField({
   value: string;
 }) {
   return (
-    <div className="fld">
+    <div className="relative w-full">
       <select
         aria-label={ariaLabel}
+        className="h-10 w-full cursor-pointer appearance-none rounded-md border border-input bg-card pl-3 pr-9 text-sm text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal disabled:cursor-not-allowed disabled:opacity-50"
         disabled={disabled}
         id={id}
         onChange={(event) => {
@@ -33,19 +36,11 @@ export function OnboardingSelectField({
           </option>
         ))}
       </select>
-      <svg
+      <ChevronDown
         aria-hidden="true"
-        fill="none"
-        height={16}
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.8}
-        viewBox="0 0 24 24"
-        width={16}
-      >
-        <path d="M6 9l6 6 6-6" />
-      </svg>
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+        size={15}
+      />
     </div>
   );
 }

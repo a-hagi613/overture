@@ -179,7 +179,7 @@ publicTest.describe("public sign-up with spend protection", () => {
     async ({ page, publicServer, publicUrl }) => {
       await page.goto(`${publicUrl}/signin`);
       await page.getByLabel("Email").fill(NEW_EMAIL);
-      await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+      await page.getByRole("button", { name: "Send sign-in link" }).click();
       await expect(page.getByText("Link sent to")).toBeVisible();
 
       const link = await latestMailLink(publicUrl, page.request, NEW_EMAIL);

@@ -10,10 +10,12 @@ test("the owner signs out of this device from Settings and cannot return to the 
   const appServerUrl = isolatedAppServer.url;
 
   await signInByMagicLink(page, appServerUrl, request, authTestIdentity.ownerEmail);
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
   expect((await verifyAuthState(appServerUrl, request)).sessions).toHaveLength(1);
 
-  await page.goto(`${appServerUrl}/settings`);
+  await page.goto(`${appServerUrl}/profile/account`);
 
   const signOutHere = page.getByRole("button", { exact: true, name: "Sign out" });
 
@@ -32,7 +34,7 @@ test("the owner signs out of this device from Settings and cannot return to the 
   await page.goto(`${appServerUrl}/`);
   await expect(page).toHaveURL(`${appServerUrl}/`);
   await expect(
-    page.getByRole("heading", { level: 1, name: /Overture prepares every application/u }),
+    page.getByRole("heading", { level: 1, name: /The job hunt, handled\./u }),
   ).toBeVisible();
 
   await page.goto(`${appServerUrl}/board`);
@@ -45,7 +47,7 @@ test("the sign-out control is separate from signing out every device", async ({
   isolatedAppServer,
 }) => {
   await signInByMagicLink(page, isolatedAppServer.url, request, authTestIdentity.ownerEmail);
-  await page.goto(`${isolatedAppServer.url}/settings`);
+  await page.goto(`${isolatedAppServer.url}/profile/account`);
 
   await expect(page.getByRole("button", { exact: true, name: "Sign out" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign out everywhere" })).toBeVisible();

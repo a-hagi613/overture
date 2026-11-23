@@ -27,6 +27,7 @@ import {
   facts,
   fxRates,
   grants,
+  interviewEvents,
   ledger,
   liveCheckMail,
   llmBatches,
@@ -272,6 +273,15 @@ const seedMailBody = z.object({
   readAt: z.number().int().nullish(),
   attachments: z.array(seedAttachmentBody).default([]),
   at: z.number().int().nullish(),
+});
+
+const seedInterviewBody = z.object({
+  applicationId: z.string().min(1),
+  endsAt: z.number().int().nullish(),
+  messageId: z.string().min(1),
+  startsAt: z.number().int(),
+  uid: z.string().min(1).max(200),
+  userId: z.string().min(1),
 });
 
 const seedSnapshotBody = z.object({
@@ -2387,6 +2397,29 @@ export function createTestRoutes(
   routes.post("/mail/seed", validJson(seedMailBody), async (context) =>
     context.json(await insertMailRow(context.req.valid("json"))),
   );
+
+  routes.post("/interviews/seed", validJson(seedInterviewBody), (context) => {
+    const { applicationId, endsAt, messageId, startsAt, uid, userId } = context.req.valid("json");
+    const id = crypto.randomUUID();
+
+    db.insert(interviewEvents)
+      .values({
+        applicationId,
+        createdAt: clock.now(),
+        endsAt: endsAt ?? null,
+        id,
+        messageId,
+        sequence: 0,
+        source: "ics",
+        startsAt,
+        tz: null,
+        uid,
+        userId,
+      })
+      .run();
+
+    return context.json({ id });
+  });
 
   routes.post("/snapshots/seed", validJson(seedSnapshotBody), async (context) => {
     const body = context.req.valid("json");

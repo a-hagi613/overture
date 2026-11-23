@@ -1,74 +1,86 @@
+import { ArrowRight, CheckCircle2, FileText, Search } from "lucide-react";
 import { useState } from "react";
 
 import { copy } from "../../shared/copy.ts";
-import { NavGlyph } from "./nav-glyph.tsx";
+import { Button } from "./ui/button.tsx";
+import { Card } from "./ui/card.tsx";
+import { dsBody, dsCardTitle } from "./ui/ds.ts";
 
-const POINT_GLYPHS = ["search", "doc", "check"] as const;
+function renderPointIcon(index: number) {
+  if (index === 0) {
+    return <Search aria-hidden="true" size={18} />;
+  }
+
+  if (index === 1) {
+    return <FileText aria-hidden="true" size={18} />;
+  }
+
+  return <CheckCircle2 aria-hidden="true" size={18} />;
+}
 
 export function OnboardingWelcomeCard({ onContinue }: { onContinue: () => Promise<void> }) {
   const [failed, setFailed] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const continueOn = async () => {
     setFailed(false);
+    setBusy(true);
 
     try {
       await onContinue();
     } catch {
       setFailed(true);
+      setBusy(false);
     }
   };
 
   return (
-    <section
-      aria-labelledby="ob-h"
-      className="obd rounded-lg border border-border bg-card shadow-sh"
-    >
-      <h2
-        className="serif"
-        id="ob-h"
-        style={{ fontSize: "clamp(28px, 4vw, 36px)", lineHeight: 1.1 }}
-      >
-        {copy.onboarding.welcomeTitlePlain}{" "}
-        <span className="italic">{copy.onboarding.welcomeTitleItalic}</span>
+    <Card ariaLabelledBy="ob-h" className="p-6 md:p-8" variant="elevated">
+      <h2 className={dsCardTitle} id="ob-h">
+        {`${copy.onboarding.welcomeTitlePlain} ${copy.onboarding.welcomeTitleItalic}`}
       </h2>
-      <p className="mt-2.5 text-[14.5px] text-muted-foreground">{copy.onboarding.welcomeIntro}</p>
-      <ul className="m-0 mt-[22px] flex list-none flex-col gap-[18px] p-0">
+      <p className={`${dsBody} mt-2`}>{copy.onboarding.welcomeIntro}</p>
+
+      <ul className="mt-6 flex flex-col gap-4">
         {copy.onboarding.welcomePoints.map((point, index) => (
           <li className="flex items-start gap-3.5" key={point.title}>
             <span
               aria-hidden="true"
               className={
                 index === 2
-                  ? "flex h-10 w-10 flex-none items-center justify-center rounded-[10px] border border-border bg-ok-soft text-ok"
-                  : "flex h-10 w-10 flex-none items-center justify-center rounded-[10px] border border-border bg-muted text-foreground"
+                  ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-ok/30 bg-ok-soft text-ok"
+                  : "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-foreground"
               }
             >
-              <NavGlyph name={POINT_GLYPHS[index] ?? "check"} size={18} />
+              {renderPointIcon(index)}
             </span>
             <div className="min-w-0">
-              <p className="text-[15px] font-semibold">{point.title}</p>
-              <p className="mt-0.5 text-[14px] text-muted-foreground">{point.body}</p>
+              <p className="text-sm font-semibold text-foreground">{point.title}</p>
+              <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{point.body}</p>
             </div>
           </li>
         ))}
       </ul>
+
       {failed ? (
-        <p className="hint mt-4 text-[color:var(--need)]" role="alert">
+        <p className="mt-4 text-xs font-semibold text-need" role="alert">
           {copy.onboarding.saveFailed}
         </p>
       ) : null}
-      <div className="ftr mt-7 flex items-center justify-end gap-3 border-t border-border pt-5">
-        <button
-          className="btn"
+
+      <div className="mt-7 flex items-center justify-end border-t border-border pt-5">
+        <Button
+          disabled={busy}
           onClick={() => {
             void continueOn();
           }}
-          style={{ minHeight: 48, padding: "0 26px" }}
-          type="button"
+          size="lg"
+          variant="primary"
         >
-          {copy.onboarding.continue} <NavGlyph name="forward" size={16} />
-        </button>
+          <span>{copy.onboarding.continue}</span>
+          <ArrowRight aria-hidden="true" size={16} />
+        </Button>
       </div>
-    </section>
+    </Card>
   );
 }

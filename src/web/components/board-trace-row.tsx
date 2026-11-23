@@ -1,6 +1,7 @@
 import { copy } from "../../shared/copy.ts";
 import type { TraceRow } from "../../shared/dossier.ts";
 import { SourceChip } from "./source-chip.tsx";
+import { dsEyebrow, dsMono } from "./ui/ds.ts";
 
 export function BoardTraceRow({ row }: { row: TraceRow }) {
   const dashed = row.source === "typed" || row.source === "none";
@@ -12,25 +13,16 @@ export function BoardTraceRow({ row }: { row: TraceRow }) {
 
   return (
     <li className="border-b border-border py-3 first:pt-0 last:border-0">
-      {row.label === null ? null : (
-        <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          {row.label}
-        </p>
-      )}
-      <p className="serif mt-1 text-[19px] leading-[1.3]">{row.text}</p>
-      <div className="mt-1.5">
+      {row.label === null ? null : <p className={dsEyebrow}>{row.label}</p>}
+      <p className="mt-1 font-serif text-card-title leading-snug text-foreground">{row.text}</p>
+      <div className="mt-2">
         <SourceChip variant={dashed ? "dashed" : "solid"}>
           {copy.board.dossier.traceSource[row.source]}
         </SourceChip>
       </div>
-      {factDetail === null ? null : (
-        <p className="mono mt-1.5 text-[11px] text-muted-foreground">{factDetail}</p>
-      )}
+      {factDetail === null ? null : <p className={`${dsMono} mt-1.5`}>{factDetail}</p>}
       {row.resumeLines.map((line) => (
-        <p
-          className="mono mt-1 border-l border-border pl-2 text-[11px] text-muted-foreground"
-          key={line.id}
-        >
+        <p className={`${dsMono} mt-1 border-l-2 border-signal/35 pl-2.5`} key={line.id}>
           {`${line.id} · ${line.text}`}
         </p>
       ))}

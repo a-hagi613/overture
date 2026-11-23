@@ -1,9 +1,11 @@
 import type { LegalBlock } from "../../shared/legal.ts";
 
+import { dsEyebrow } from "./ui/ds.ts";
+
 export function LegalBlockView({ block }: { block: LegalBlock }) {
   if (block.kind === "bullets") {
     return (
-      <ul className="ml-[18px] list-disc space-y-[7px] text-[15px] leading-[1.7] md:leading-[1.6]">
+      <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-foreground">
         {block.items.map((item) => (
           <li key={item}>{item}</li>
         ))}
@@ -13,21 +15,18 @@ export function LegalBlockView({ block }: { block: LegalBlock }) {
 
   if (block.kind === "processors") {
     return (
-      <div>
-        <div className="mt-[18px] hidden grid-cols-[110px_1fr] border-b border-border pb-2 font-mono text-[10.5px] uppercase tracking-[0.1em] text-muted-foreground sm:grid">
+      <div className="mt-3 overflow-hidden rounded-lg border border-border bg-background">
+        <div
+          className={`${dsEyebrow} hidden grid-cols-[140px_1fr] border-b border-border bg-muted px-4 py-2.5 sm:grid`}
+        >
           <span>{block.companyLabel}</span>
           <span>{block.doesLabel}</span>
         </div>
-        <dl>
+        <dl className="divide-y divide-border">
           {block.rows.map((row) => (
-            <div
-              className="border-b border-border py-[13px] sm:grid sm:grid-cols-[110px_1fr] sm:py-[11px]"
-              key={row.name}
-            >
-              <dt className="text-[13.5px] font-semibold leading-[1.5] sm:font-normal">
-                {row.name}
-              </dt>
-              <dd className="mt-0.5 text-[13.5px] leading-[1.55] text-muted-foreground sm:mt-0 sm:text-foreground">
+            <div className="px-4 py-3 sm:grid sm:grid-cols-[140px_1fr] sm:gap-4" key={row.name}>
+              <dt className="text-sm font-semibold text-foreground">{row.name}</dt>
+              <dd className="mt-0.5 text-sm leading-relaxed text-muted-foreground sm:mt-0">
                 {row.does}
               </dd>
             </div>
@@ -39,10 +38,10 @@ export function LegalBlockView({ block }: { block: LegalBlock }) {
 
   if (block.kind === "paragraphWithLink") {
     return (
-      <p className="text-[15px] leading-[1.7] md:leading-[1.6]">
+      <p className="text-sm leading-relaxed text-foreground">
         {block.before}
         <a
-          className="underline decoration-input underline-offset-[3px] transition-colors hover:decoration-foreground"
+          className="font-medium text-signal-text underline underline-offset-4 hover:opacity-80"
           href={block.href}
         >
           {block.link}
@@ -52,5 +51,5 @@ export function LegalBlockView({ block }: { block: LegalBlock }) {
     );
   }
 
-  return <p className="text-[15px] leading-[1.7] md:leading-[1.6]">{block.text}</p>;
+  return <p className="text-sm leading-relaxed text-foreground">{block.text}</p>;
 }

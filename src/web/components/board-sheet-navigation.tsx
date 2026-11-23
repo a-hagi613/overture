@@ -1,83 +1,52 @@
+import { ChevronDown, ChevronUp, X } from "lucide-react";
+
 import { copy } from "../../shared/copy.ts";
-import type { ApplicationDetail } from "../lib/board-api.ts";
+import { Button } from "./ui/button.tsx";
 
 export function BoardSheetNavigation(props: {
-  detail: ApplicationDetail | null;
   nextDisabled: boolean;
   onClose: () => void;
   onNext: () => void;
   onPrevious: () => void;
+  positionLabel: string | null;
   previousDisabled: boolean;
 }) {
   return (
-    <div className="hidden items-center justify-between border-b border-border px-[22px] pt-4 pr-[22px] pb-3.5 pl-[26px] md:flex">
-      <span className="eyebrow">
-        {copy.board.reference(props.detail?.application.id.slice(-4) ?? "")}
+    <div className="flex items-center justify-between border-b border-border bg-sidebar/70 px-5 py-3 md:px-7">
+      <span className="text-xs font-semibold tracking-wide text-muted-foreground tabular-nums">
+        {props.positionLabel ?? ""}
       </span>
-      <span className="flex gap-1.5">
-        <button
-          aria-label={copy.board.previousCard}
-          className="ibtn !h-9 !w-9 border-0 bg-transparent"
+      <div className="flex items-center gap-1">
+        <Button
+          ariaLabel={copy.board.previousCard}
+          className="h-8 w-8"
           disabled={props.previousDisabled}
           onClick={props.onPrevious}
-          type="button"
+          size="icon"
+          variant="ghost"
         >
-          <svg
-            aria-hidden="true"
-            fill="none"
-            height="16"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-            viewBox="0 0 24 24"
-            width="16"
-          >
-            <path d="M6 15l6-6 6 6" />
-          </svg>
-        </button>
-        <button
-          aria-label={copy.board.nextCard}
-          className="ibtn !h-9 !w-9 border-0 bg-transparent"
+          <ChevronUp aria-hidden="true" size={16} />
+        </Button>
+        <Button
+          ariaLabel={copy.board.nextCard}
+          className="h-8 w-8"
           disabled={props.nextDisabled}
           onClick={props.onNext}
-          type="button"
+          size="icon"
+          variant="ghost"
         >
-          <svg
-            aria-hidden="true"
-            fill="none"
-            height="16"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-            viewBox="0 0 24 24"
-            width="16"
-          >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
-        <button
-          aria-label={copy.board.closeDetail}
-          className="ibtn !h-9 !w-9 border-0 bg-transparent"
+          <ChevronDown aria-hidden="true" size={16} />
+        </Button>
+        <Button
+          ariaLabel={copy.board.closeDetail}
+          className="h-8 w-8"
           onClick={props.onClose}
-          type="button"
+          size="icon"
+          variant="ghost"
         >
-          <svg
-            aria-hidden="true"
-            fill="none"
-            height="16"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-            viewBox="0 0 24 24"
-            width="16"
-          >
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
-        </button>
-      </span>
+          <X aria-hidden="true" size={16} />
+        </Button>
+      </div>
     </div>
   );
 }

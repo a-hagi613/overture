@@ -944,6 +944,7 @@ const app = createApp({
   objects,
   llm: anthropicLlmPort,
   spendGate,
+  mail: mailSender,
   mailboxes,
   resolver,
   liveCheckAddress: liveCheckAddressValue,

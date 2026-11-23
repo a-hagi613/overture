@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
 import { OnboardingShell } from "../components/onboarding-shell.tsx";
 import { OnboardingWelcomeCard } from "../components/onboarding-welcome-card.tsx";
@@ -7,12 +7,15 @@ import { useFinishOnboardingStep, useOnboardingState } from "../lib/onboarding-a
 
 export function OnboardingPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const preview = params.get("preview") === "1";
+  const suffix = preview ? "?preview=1" : "";
   const { data: state } = useOnboardingState();
   const finish = useFinishOnboardingStep();
-  const step = state?.step ?? 1;
+  const step = preview ? 1 : (state?.step ?? 1);
 
   useEffect(() => {
-    if (state === undefined) {
+    if (preview || state === undefined) {
       return;
     }
 
@@ -23,17 +26,22 @@ export function OnboardingPage() {
     } else if (state.step === 4) {
       void navigate("/onboarding/targets", { replace: true });
     } else if (state.step >= 5) {
-      void navigate(state.onboardedAt === null ? "/onboarding/forward" : "/", { replace: true });
+      void navigate(state.onboardedAt === null ? "/onboarding/forward" : "/home", {
+        replace: true,
+      });
     }
-  }, [navigate, state]);
+  }, [navigate, preview, state]);
 
   return (
     <OnboardingShell step={1}>
       {step <= 1 ? (
         <OnboardingWelcomeCard
           onContinue={async () => {
-            await finish.mutateAsync(1);
-            await navigate("/onboarding/resume");
+            if (!preview) {
+              await finish.mutateAsync(1);
+            }
+
+            await navigate(`/onboarding/resume${suffix}`);
           }}
         />
       ) : null}

@@ -1,18 +1,25 @@
 import { useEffect, useId, useState } from "react";
 import { useSearchParams } from "react-router";
+import { toast } from "sonner";
 
 import type { CalendarDate } from "../lib/calendar-grid.ts";
 
 import { copy } from "../../shared/copy.ts";
-import { CalendarAgenda } from "../components/calendar-agenda.tsx";
-import { CalendarChip } from "../components/calendar-chip.tsx";
+import { CalendarBoard } from "../components/calendar-board.tsx";
 import { CalendarDayPanel } from "../components/calendar-day-panel.tsx";
-import { CalendarDaySheet } from "../components/calendar-day-sheet.tsx";
-import { CalendarMonthGrid } from "../components/calendar-month-grid.tsx";
-import { NavGlyph } from "../components/nav-glyph.tsx";
 import { PageHeader } from "../components/page-header.tsx";
+import { Button } from "../components/ui/button.tsx";
+import { Card } from "../components/ui/card.tsx";
+import { dsBody, dsCardTitle } from "../components/ui/ds.ts";
 import { useCalendar } from "../lib/calendar-api.ts";
-import { CHIP_KINDS, monthName } from "../lib/calendar-format.ts";
+import {
+  loadCustomCalendarEvents,
+  saveCustomCalendarEvents,
+} from "../lib/calendar-custom-events.ts";
+import type {
+  CustomCalendarEvent,
+  CustomCalendarEventKind,
+} from "../lib/calendar-custom-events.ts";
 import { anchorFocus, initialFocus } from "../lib/calendar-focus.ts";
 import {
   bucketByDay,
@@ -24,14 +31,9 @@ import {
   shiftMonth,
 } from "../lib/calendar-grid.ts";
 import { browserZone, currentTime } from "../lib/inbox-time.ts";
-import { useMediaQuery } from "../lib/media-query.ts";
-
-const NAV_BUTTON =
-  "flex h-11 w-11 items-center justify-center rounded-md border border-input bg-card hover:bg-muted md:h-10 md:w-10";
 
 export function CalendarPage() {
   const [params, setParams] = useSearchParams();
-  const tablet = useMediaQuery("(min-width: 768px)");
   const headingId = useId();
   const localZone = browserZone();
   const asked = parseMonthKey(params.get("month"));
@@ -43,7 +45,8 @@ export function CalendarPage() {
   const [selected, setSelected] = useState<CalendarDate>(focus);
   const [navigated, setNavigated] = useState(false);
   const [zoneSynced, setZoneSynced] = useState(localZone);
-  const [panelOpen, setPanelOpen] = useState(tablet);
+  const [customEvents, setCustomEvents] = useState<CustomCalendarEvent[]>(loadCustomCalendarEvents);
+
   const { month, year } = focus;
   const range = monthRange(year, month, localZone);
   const { data, isError, isFetching, refetch } = useCalendar(range, localZone);
@@ -51,13 +54,6 @@ export function CalendarPage() {
   const today = dateIn(currentTime(), zone);
   const buckets = bucketByDay(data?.items ?? [], zone);
   const monthKey = monthKeyOf(focus);
-
-  const [seenTablet, setSeenTablet] = useState(tablet);
-
-  if (seenTablet !== tablet) {
-    setSeenTablet(tablet);
-    setPanelOpen(tablet);
-  }
 
   if (data !== undefined && data.timeZone !== zoneSynced) {
     setZoneSynced(data.timeZone);
@@ -82,157 +78,68 @@ export function CalendarPage() {
     }
   }, [monthKey, params, setParams]);
 
-  const empty = data?.items.length === 0;
-  const selectedItems = buckets.get(dayKeyOf(selected)) ?? [];
+  const customByDay = new Map<string, CustomCalendarEvent[]>();
 
-  const go = (date: CalendarDate) => {
+  for (const event of customEvents) {
+    const existing = customByDay.get(event.dayKey) ?? [];
+
+    existing.push(event);
+    customByDay.set(event.dayKey, existing);
+  }
+
+  const selectedKey = dayKeyOf(selected);
+  const selectedApiItems = buckets.get(selectedKey) ?? [];
+  const selectedCustomEvents = customByDay.get(selectedKey) ?? [];
+
+  const selectDate = (date: CalendarDate) => {
     setNavigated(true);
     setFocus(date);
     setSelected(date);
   };
 
-  const select = (date: CalendarDate) => {
-    setNavigated(true);
-    setFocus(date);
-    setSelected(date);
-    setPanelOpen(true);
+  const handleAddEvent = (input: {
+    company: string;
+    kind: CustomCalendarEventKind;
+    time: string;
+    title: string;
+  }) => {
+    const nextEvent: CustomCalendarEvent = {
+      company: input.company,
+      dayKey: selectedKey,
+      id: `custom-${String(currentTime())}`,
+      kind: input.kind,
+      time: input.time,
+      title: input.title,
+    };
+
+    const next = [...customEvents, nextEvent];
+
+    setCustomEvents(next);
+    saveCustomCalendarEvents(next);
+    toast.success(copy.calendar.eventAddedToast(nextEvent.title));
   };
 
-  const moveFocus = (date: CalendarDate) => {
-    setNavigated(true);
-    setFocus(date);
-  };
+  const handleDeleteEvent = (target: CustomCalendarEvent) => {
+    const next = customEvents.filter((entry) => entry.id !== target.id);
 
-  const closePanel = () => {
-    setPanelOpen(false);
+    setCustomEvents(next);
+    saveCustomCalendarEvents(next);
 
-    globalThis.requestAnimationFrame(() => {
-      document.querySelector<HTMLElement>(`[data-day="${dayKeyOf(selected)}"]`)?.focus();
+    toast.success(copy.calendar.eventRemovedToast(target.title), {
+      action: {
+        label: copy.board.undo,
+        onClick: () => {
+          setCustomEvents((current) => {
+            const restored = [...current, target];
+
+            saveCustomCalendarEvents(restored);
+
+            return restored;
+          });
+        },
+      },
     });
   };
-
-  const panel = (
-    <CalendarDayPanel
-      date={selected}
-      headingId={headingId}
-      items={selectedItems}
-      onClose={closePanel}
-      today={dayKeyOf(selected) === dayKeyOf(today)}
-      zone={zone}
-    />
-  );
-
-  let body;
-
-  if (isError && data === undefined) {
-    body = (
-      <section className="mt-[18px] rounded-lg border border-border bg-card px-7 py-11 text-center shadow-sh">
-        <h2 className="font-serif text-[26px] leading-[1.1]">{copy.calendar.errorTitle}</h2>
-        <p className="mt-2 text-[14.5px] text-muted-foreground">{copy.calendar.errorBody}</p>
-        <button
-          className="mt-4 inline-flex min-h-10 items-center justify-center rounded-md border border-input bg-card px-4 text-[13.5px] font-semibold hover:bg-muted max-md:min-h-11"
-          onClick={() => {
-            void refetch();
-          }}
-          type="button"
-        >
-          {copy.calendar.retry}
-        </button>
-      </section>
-    );
-  } else {
-    body = (
-      <div className="mt-[18px] flex flex-col gap-5 lg:flex-row lg:items-start">
-        <section
-          aria-busy={isFetching}
-          aria-labelledby="calendar-month"
-          className="min-w-0 flex-1 rounded-lg border border-border bg-card p-4 shadow-sh md:p-5"
-        >
-          <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
-            <h2
-              aria-live="polite"
-              className="font-serif text-[30px] leading-[1.1]"
-              id="calendar-month"
-            >
-              {monthName(month)} <span className="italic">{year}</span>
-            </h2>
-            <div className="flex items-center gap-2">
-              <button
-                className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold hover:bg-muted md:min-h-10"
-                onClick={() => {
-                  go(today);
-                }}
-                type="button"
-              >
-                {copy.calendar.today}
-              </button>
-              <button
-                aria-label={copy.calendar.previousMonth}
-                className={NAV_BUTTON}
-                onClick={() => {
-                  go(shiftMonth(focus, -1));
-                }}
-                type="button"
-              >
-                <NavGlyph name="back" />
-              </button>
-              <button
-                aria-label={copy.calendar.nextMonth}
-                className={NAV_BUTTON}
-                onClick={() => {
-                  go(shiftMonth(focus, 1));
-                }}
-                type="button"
-              >
-                <NavGlyph name="forward" />
-              </button>
-            </div>
-          </div>
-          {empty ? (
-            <output className="mb-3.5 block text-[14px] text-muted-foreground">
-              {copy.calendar.emptyMonth}
-            </output>
-          ) : null}
-          <CalendarMonthGrid
-            buckets={buckets}
-            focus={focus}
-            month={month}
-            onFocusChange={moveFocus}
-            onSelect={select}
-            selected={selected}
-            today={today}
-            year={year}
-          />
-          <ul
-            aria-label={copy.calendar.legendLabel}
-            className="mt-3.5 flex flex-wrap gap-x-5 gap-y-2"
-          >
-            {CHIP_KINDS.map((kind) => (
-              <li key={kind}>
-                <CalendarChip kind={kind} />
-              </li>
-            ))}
-          </ul>
-          <CalendarAgenda
-            buckets={buckets}
-            month={month}
-            onSelect={select}
-            today={today}
-            year={year}
-            zone={zone}
-          />
-        </section>
-        {panelOpen && tablet ? (
-          <aside
-            aria-label={copy.calendar.dayPanel}
-            className="min-w-0 rounded-lg border border-border bg-card p-5 pb-3 shadow-sh lg:sticky lg:top-5 lg:w-80 lg:flex-none"
-          >
-            {panel}
-          </aside>
-        ) : null}
-      </div>
-    );
-  }
 
   return (
     <div>
@@ -240,16 +147,59 @@ export function CalendarPage() {
         lead={copy.calendar.lead}
         titleNode={
           <>
-            {copy.calendar.titlePlain} <span className="italic">{copy.calendar.titleItalic}</span>
+            {copy.calendar.titlePlain}{" "}
+            <em className="italic text-signal">{copy.calendar.titleItalic}</em>
           </>
         }
       />
-      {body}
-      {panelOpen && !tablet ? (
-        <CalendarDaySheet headingId={headingId} onClose={closePanel}>
-          {panel}
-        </CalendarDaySheet>
-      ) : null}
+
+      {isError && data === undefined ? (
+        <Card className="mt-6 px-7 py-11 text-center">
+          <h2 className={dsCardTitle}>{copy.calendar.errorTitle}</h2>
+          <p className={`${dsBody} mt-2`}>{copy.calendar.errorBody}</p>
+          <Button
+            className="mt-4"
+            onClick={() => {
+              void refetch();
+            }}
+            size="default"
+            variant="outline"
+          >
+            {copy.calendar.retry}
+          </Button>
+        </Card>
+      ) : (
+        <div className="mt-6 grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <CalendarBoard
+            buckets={buckets}
+            customByDay={customByDay}
+            focus={focus}
+            isFetching={isFetching}
+            onSelectDate={selectDate}
+            onShiftMonth={(delta) => {
+              selectDate(shiftMonth(focus, delta));
+            }}
+            onToday={() => {
+              selectDate(today);
+            }}
+            selected={selected}
+            today={today}
+          />
+
+          <aside aria-label={copy.calendar.dayPanel} className="min-w-0 lg:sticky lg:top-6">
+            <CalendarDayPanel
+              customEvents={selectedCustomEvents}
+              date={selected}
+              headingId={headingId}
+              items={selectedApiItems}
+              onAddEvent={handleAddEvent}
+              onDeleteEvent={handleDeleteEvent}
+              today={selectedKey === dayKeyOf(today)}
+              zone={zone}
+            />
+          </aside>
+        </div>
+      )}
     </div>
   );
 }

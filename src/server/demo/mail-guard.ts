@@ -45,6 +45,11 @@ export function createDemoSafeMailSender(db: AppDatabase, sender: MailSender) {
         await sender.sendBillingNotice(mail);
       }
     },
+    sendSupportMessage: async (mail) => {
+      if (allowed(mail.to)) {
+        await sender.sendSupportMessage(mail);
+      }
+    },
   };
 
   return guarded;

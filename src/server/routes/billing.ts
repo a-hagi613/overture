@@ -72,8 +72,8 @@ export function createBillingRoutes(deps: {
   const { auth, clock, db, payments, cardFingerprintSecret, appOrigin } = deps;
   const routes = new Hono();
   const baseUrl = appOrigin.replace(/\/+$/u, "");
-  const billingUrl = `${baseUrl}/settings/billing`;
-  const plansUrl = `${billingUrl}/plans`;
+  const billingUrl = `${baseUrl}/profile/billing`;
+  const plansUrl = billingUrl;
 
   async function accountOrRefusal(raw: Request) {
     const account = await readSessionUser(auth, raw.headers);

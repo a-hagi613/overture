@@ -1,48 +1,49 @@
+import { PanelLeftClose } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router";
+import { Link, Outlet, useNavigate } from "react-router";
 
 import { copy } from "../shared/copy.ts";
-import { LandingPage } from "./routes/landing.tsx";
-import { NavGlyph } from "./components/nav-glyph.tsx";
-import { AvatarLink } from "./components/avatar-link.tsx";
-import { BoardRail } from "./components/board-rail.tsx";
 import { Backdrop } from "./components/backdrop.tsx";
+import { BoardRail } from "./components/board-rail.tsx";
 import { BrandMark } from "./components/brand-mark.tsx";
 import { SideNav } from "./components/side-nav.tsx";
+import { SidebarSearchButton } from "./components/sidebar-search-button.tsx";
+import { SidebarThemeToggle } from "./components/sidebar-theme-toggle.tsx";
 import { TabBar } from "./components/tab-bar.tsx";
+import { Button } from "./components/ui/button.tsx";
+import { Separator } from "./components/ui/separator.tsx";
+import { Toaster } from "./components/ui/sonner.tsx";
 import { UsageCard } from "./components/usage.tsx";
+import { WorkspaceSearchDialog } from "./components/workspace-search-dialog.tsx";
 import { authClient } from "./lib/auth-client.ts";
 import { useLiveUpdates } from "./lib/live-events.ts";
 import { useMediaQuery } from "./lib/media-query.ts";
 import { useNavCounts } from "./lib/nav-api.ts";
+import { useUnreadNotificationCount } from "./lib/notifications-api.ts";
 
 const collapsedStorageKey = "overture.rail";
 
 export function AppShell() {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
   const { data: session, isPending } = authClient.useSession();
-  const name = session?.user.name ?? null;
   const navCounts = useNavCounts();
+  const unreadNotifications = useUnreadNotificationCount();
   const desktop = useMediaQuery("(min-width: 1280px)");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const [railCollapsed, setRailCollapsed] = useState(() => {
     const stored = globalThis.localStorage.getItem(collapsedStorageKey);
 
-    return stored === "1" || (stored === null && pathname === "/board");
+    return stored === "1";
   });
 
   useLiveUpdates();
 
   useEffect(() => {
-    if (!isPending && session === null && pathname !== "/") {
+    if (!isPending && session === null) {
       void navigate("/signin");
     }
-  }, [isPending, navigate, pathname, session]);
-
-  if (pathname === "/" && (isPending || session === null)) {
-    return <LandingPage />;
-  }
+  }, [isPending, navigate, session]);
 
   if (isPending) {
     return <div className="min-h-screen bg-background" />;
@@ -65,70 +66,85 @@ export function AppShell() {
   return (
     <div className="relative overflow-x-clip bg-background text-foreground">
       <Backdrop />
-      <div className="relative z-[1] flex min-h-screen flex-col md:flex-row">
+      <div className="relative z-10 flex min-h-screen flex-col md:flex-row">
         {wide ? (
           <aside
-            className="fixed left-0 top-0 z-20 flex h-dvh w-[268px] flex-col gap-[18px] border-r border-border bg-sidebar px-4 pb-[18px] pt-[22px] min-[1700px]:w-[300px]"
+            className="fixed left-0 top-0 z-20 flex h-dvh w-[268px] flex-col gap-2 overflow-visible border-r border-border bg-sidebar px-4 pb-2.5 pt-3.5 min-[1700px]:w-[296px]"
             data-shell-sidebar
           >
             <div className="flex items-center justify-between px-1.5">
               <Link
                 aria-label={copy.brand.homeAria}
-                className="flex items-center gap-2.5 hover:opacity-80"
-                to="/"
+                className="flex items-center gap-2.5 transition hover:opacity-80"
+                to="/home"
               >
                 <BrandMark size={30} />
-                <span className="font-serif text-[27px] leading-none tracking-tight">
+                <span className="font-serif text-card-title leading-none text-foreground">
                   {copy.app.name}
                 </span>
               </Link>
-              <button
-                aria-label={copy.shell.collapseSidebar}
-                className="flex h-[34px] w-[34px] items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              <Button
+                ariaLabel={copy.shell.collapseSidebar}
+                className="h-9 w-9"
                 onClick={toggleRail}
-                type="button"
+                size="icon"
+                variant="ghost"
               >
-                <NavGlyph name="rail" size={18} />
-              </button>
+                <PanelLeftClose aria-hidden="true" className="h-4 w-4" />
+              </Button>
             </div>
-            <hr className="m-0 border-border shadow-[0_1px_0_var(--color-bloom)]" />
-            <div
-              className="-mx-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-1"
-              data-scroll-region
-            >
-              <SideNav counts={navCounts} showLabels />
+            <Separator />
+            <SidebarSearchButton
+              onOpen={() => {
+                setSearchOpen(true);
+              }}
+            />
+            <Separator />
+            <div className="flex flex-1 flex-col">
+              <SideNav counts={navCounts} showLabels unreadNotifications={unreadNotifications} />
             </div>
-            <div className="flex flex-col gap-3.5">
+            <div className="mt-auto flex flex-col gap-1.5">
+              <SidebarThemeToggle />
               <UsageCard />
-              <AvatarLink name={name} wide />
             </div>
           </aside>
         ) : (
-          <BoardRail counts={navCounts} name={name} onExpand={toggleRail} />
+          <BoardRail
+            counts={navCounts}
+            onExpand={toggleRail}
+            onOpenSearch={() => {
+              setSearchOpen(true);
+            }}
+            unreadNotifications={unreadNotifications}
+          />
         )}
         <div
           aria-hidden="true"
           className={
             wide
-              ? "hidden w-[268px] flex-none min-[1700px]:w-[300px] xl:block"
+              ? "hidden w-[268px] flex-none min-[1700px]:w-[296px] xl:block"
               : "hidden w-[76px] flex-none md:block"
           }
         />
         <main
+          className="min-w-0 flex-1 px-4 pb-7 pt-5 outline-none md:px-7 md:pb-10 md:pt-7 min-[1700px]:px-14 min-[1700px]:pt-8"
           id="main-content"
           tabIndex={-1}
-          className={
-            pathname === "/board"
-              ? "min-w-0 flex-1 outline-none"
-              : "min-w-0 flex-1 outline-none px-4 pb-7 pt-[18px] md:px-9 md:pb-10 md:pt-[26px] min-[1700px]:px-16 min-[1700px]:pt-8"
-          }
         >
-          <div className={pathname === "/board" ? undefined : "mx-auto w-full max-w-[1440px]"}>
+          <div className="mx-auto w-full max-w-[1440px]">
             <Outlet />
           </div>
         </main>
-        <TabBar counts={navCounts} />
+        <TabBar
+          counts={navCounts}
+          onOpenSearch={() => {
+            setSearchOpen(true);
+          }}
+          unreadNotifications={unreadNotifications}
+        />
       </div>
+      <WorkspaceSearchDialog onOpenChange={setSearchOpen} open={searchOpen} />
+      <Toaster />
     </div>
   );
 }

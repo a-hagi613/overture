@@ -53,7 +53,7 @@ async function open(page: Page, serverUrl: string, theme: string, state: State) 
   if (state === "refused") {
     await setTurnstileScenario(page.request, serverUrl, { action: "magiclink" });
     await page.getByLabel("Email").fill("sam.reyes@example.com");
-    await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+    await page.getByRole("button", { name: "Send sign-in link" }).click();
     await expect(page.getByText("This email isn't invited yet.")).toBeVisible();
 
     return;
@@ -61,7 +61,7 @@ async function open(page: Page, serverUrl: string, theme: string, state: State) 
 
   await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
   await setTurnstileScenario(page.request, serverUrl, { action: "magiclink" });
-  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+  await page.getByRole("button", { name: "Send sign-in link" }).click();
   await expect(page.getByText("Link sent to")).toBeVisible();
 }
 

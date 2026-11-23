@@ -23,7 +23,9 @@ function storageFor(path: string) {
   }
 
   if (
+    path === "/" ||
     path === "/signin" ||
+    path === "/signup" ||
     path === "/terms" ||
     path === "/privacy" ||
     path === "/consent" ||

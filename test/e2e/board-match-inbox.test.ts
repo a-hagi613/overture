@@ -193,7 +193,7 @@ test("the forwarding address explainer matches the board", async ({ browser, boa
     variants("address").map(async (variant) =>
       shot(browser, boards, {
         ...variant,
-        path: "/inbox/address",
+        path: "/profile/account#email-forwarding",
         waitFor: "Copy address",
       }),
     ),

@@ -44,21 +44,21 @@ const pauseReasons = [
   {
     action: "Upload resume",
     copy: "Overture sends only the exact file you upload, so it needs one first.",
-    href: "/profile#profile-resume",
+    href: "/profile/resume",
     reason: "no_resume",
     title: "No resume on file.",
   },
   {
     action: "Choose a plan",
     copy: "Sending stopped when it ran out. Your queue and history are kept.",
-    href: "/settings/billing/plans",
+    href: "/profile/billing",
     reason: "plan_ended",
     title: "Your plan has ended.",
   },
   {
     action: "Update payment",
     copy: "Sending stays paused until the card is updated.",
-    href: "/settings/billing",
+    href: "/profile/billing",
     reason: "payment_failed",
     title: "Payment didn't go through.",
   },
@@ -72,7 +72,7 @@ const pauseReasons = [
   {
     action: "Set up forwarding",
     copy: "We need your ATS mail forwarded to see replies and confirmations.",
-    href: "/profile#profile-address",
+    href: "/profile/details",
     reason: "no_mailbox",
     title: "Forwarding isn't set up.",
   },
@@ -149,7 +149,9 @@ async function expectPausedHomeMatchesBoard(
 
   await page.goto(`${appServerUrl}/`);
 
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
   await expect(page.getByText("Auto-apply paused")).toBeVisible();
   await expect(page.getByText("Paused by you.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();

@@ -60,13 +60,13 @@ spacing:
 components:
   button-primary:
     background: "foreground"
-    foreground: "card"
+    foreground: "card (light) / background (dark)"
     height: "40px app, 46px landing, 52px landing hero, 48px phone"
     radius: "6px"
   button-secondary:
     background: "card"
     foreground: "foreground"
-    border: "1px solid input"
+    border: "1px solid input (signal + signal-soft on hover)"
     height: "40px app, 44px phone"
   icon-button:
     size: "40px, 44px on phone"
@@ -153,6 +153,7 @@ ink feel.
 | `--accbg` | `--signal-soft` | `rgba(210,86,31,.10)` | `rgba(240,116,58,.16)` | Tinted chip and tray |
 | `--needbg` | `--need-soft` | `#EFD9D3` | `#40261F` | "Needs you" pill background |
 | `--okbg` | `--ok-soft` | `#DDE7DE` | `#25352B` | Status pill background |
+| `--btn` / `--btnink` | `--primary` / `--primary-foreground` | `#151311` / `#FBF8F2` | `#F2EDE4` / `#191714` | Primary button fill and label (`--btnh`: `#3A3631` light, `#FFFBF2` dark) |
 | `--scrim` | `--overlay` | `rgba(21,19,17,.16)` | `rgba(0,0,0,.38)` | Behind sheets |
 
 **Orange marks only the moment Overture acts** — Applying, Submitted, the active step, the travelling
@@ -230,18 +231,23 @@ person's words, mono for every recorded fact (timestamps, file names, hashes, co
 Inline numbers in tables and metadata are mono and tabular. `Yes` in serif beside
 `Saved answer · Used in 23 applications` in sans/mono *is* the product's promise, rendered.
 
-| Role | Size | At 390 | Line height | Tracking |
-|---|---|---|---|---|
-| Hero (serif, italic for one emphasis) | clamp(56px, 6.8vw, 100px), 124 at 1700+ | 56 | .96 | -.022em |
-| Page title (serif) | 42 | 32 | 1.05 | -.005em |
-| Section (serif) | clamp(40px, 4.6vw, 64px) | 40 | 1.02 | -.015em |
-| Band headline (serif) | clamp(34px, 5vw, 72px), 72–92 at 1700+ | 34 | .98 | -.02em |
-| Sub-head (serif) | 28 | 24 | 1.1 | — |
-| Card title (serif) | 26 | 22 | 1.15 | — |
-| Body | 14 | 13.5 | 1.55 | — |
-| Small / hint | 12.5 | 12.5 | 1.5 | — |
-| Eyebrow (caps) | 11 | 11 | 1.2 | .15em |
-| Label (caps) | 10.5 | 10.5 | 1.2 | .14em |
+| Role | Token | Size (Desktop) | Size (390px Mobile) | Line height | Tracking | Italic |
+|---|---|---|---|---|---|---|
+| Hero display (serif) | `text-hero` | clamp(44px, 6vw, 88px) | 44 | 1.06 | -.02em | Final emphasis word only |
+| Section heading (serif) | `text-section` | clamp(32px, 4.2vw, 56px) | 32 | 1.08 | -.015em | Final emphasis word only |
+| Page title (serif) | `text-page-title` | clamp(32px, 3vw, 42px) | 32 | 1.08 | -.01em | Never |
+| Card / item title (serif) | `text-card-title` | clamp(22px, 1.8vw, 26px) | 22 | 1.20 | — | Never |
+| Metric numeral (serif) | `text-metric` | clamp(40px, 3.5vw, 52px) | 40 | 1.00 | — | Never (tabular upright) |
+| Lead / Intro (sans) | `text-base` | 16 | 16 | 1.60 | — | Never |
+| Body (sans) | `text-sm` | 14 | 14 | 1.60 | — | Never |
+| Small / Mono metadata | `text-xs` | 12 | 12 | 1.40 | — | Never |
+| Eyebrow / Micro-label (caps) | `text-eyebrow` | 11 | 11 | 1.20 | .14em | Never |
+
+**Strict typography, component library & mobile rules (enforced by `overture/no-raw-design-styles`):**
+- Every text element uses one of the 9 tokens above — never arbitrary `text-[...px]` or un-tokenized Tailwind scale jumps (`text-lg` through `text-9xl`).
+- Italic serif is reserved **strictly** for the final emphasis word of Hero and Section headings (`h1`/`h2`) — never numerals, step badges, or card titles.
+- **Single-source shadcn/ui & 21st.dev component system (`src/web/components/ui/*`):** Never hand-roll buttons, cards, badges, inputs, tabs, switches, dialogs, command palettes, SVG charts, or calendars from scratch. Compose every screen from the shared primitives (`Button`, `Card`, `Badge`, `Input`, `Switch`, `Separator`, `Tabs`, `ScrollArea`, `ChartArea` via `recharts`, `Calendar` via `react-day-picker`, `CommandDialog` via `cmdk` + Radix Dialog, `AnimatedBeam`, and `lucide-react` icons), styled exclusively with Ember `@theme` tokens.
+- Mobile (`390px`) is a first-class layout target alongside tablet (`768px`), laptop (`1280px`), and widescreen (`1440px+`): metadata lines stack cleanly instead of wrapping mid-phrase, previews swap to native `390px` mobile screens under `lg` (`1024px`), and touch targets stay `≥ 40–44px`.
 
 Uppercase labels are 10.5–11px at `.14–.15em` tracking, and always sit with a larger line that carries
 the meaning — a column header or a card title, never a lone instruction. Display type is set tight

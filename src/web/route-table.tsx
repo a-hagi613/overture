@@ -4,9 +4,9 @@ import type { RouteObject } from "react-router";
 import { BoardPage } from "./routes/board.tsx";
 import { CalendarPage } from "./routes/calendar.tsx";
 import { HomePage } from "./routes/home.tsx";
-import { InboxAddressPage } from "./routes/inbox-address.tsx";
 import { InboxThreadPage } from "./routes/inbox-thread.tsx";
 import { InboxPage } from "./routes/inbox.tsx";
+import { LandingPage } from "./routes/landing.tsx";
 import { NotFoundPage } from "./routes/not-found.tsx";
 import { NotificationsPage } from "./routes/notifications.tsx";
 import { OnboardingPage } from "./routes/onboarding.tsx";
@@ -15,19 +15,17 @@ import { OnboardingForwardPage } from "./routes/onboarding-forward.tsx";
 import { OnboardingResumePage } from "./routes/onboarding-resume.tsx";
 import { OnboardingTargetsPage } from "./routes/onboarding-targets.tsx";
 import { OnboardingTrialPage } from "./routes/onboarding-trial.tsx";
-import { ProfilePage } from "./routes/profile.tsx";
+import { ProfileAccountPage } from "./routes/profile-account.tsx";
+import { ProfileBillingPage } from "./routes/profile-billing.tsx";
+import { ProfileDetailsPage } from "./routes/profile-details.tsx";
+import { ProfilePreferencesPage } from "./routes/profile-preferences.tsx";
+import { ProfileResumePage } from "./routes/profile-resume.tsx";
 import { ReadyPage } from "./routes/ready.tsx";
 import { ReviewPage } from "./routes/review.tsx";
-import { SearchPage } from "./routes/search.tsx";
-import { SettingsBillingPage } from "./routes/settings-billing.tsx";
-import { SettingsBillingPlansPage } from "./routes/settings-billing-plans.tsx";
-import { SettingsDeletePage } from "./routes/settings-delete.tsx";
-import { SettingsExportPage } from "./routes/settings-export.tsx";
-import { SettingsSupportAccessPage } from "./routes/settings-support-access.tsx";
-import { SettingsPage } from "./routes/settings.tsx";
 import { SignInPage } from "./routes/signin.tsx";
+import { SignUpPage } from "./routes/signup.tsx";
+import { SupportPage } from "./routes/support.tsx";
 import { ConsentPage } from "./routes/consent.tsx";
-import { PricingPage } from "./routes/pricing.tsx";
 import { PrivacyPage } from "./routes/privacy.tsx";
 import { TermsPage } from "./routes/terms.tsx";
 import { AppShell } from "./app.tsx";
@@ -49,23 +47,21 @@ import { UserPage } from "./routes/admin/user.tsx";
 import { UsersPage } from "./routes/admin/users.tsx";
 
 const appShellChildren: RouteObject[] = [
-  { path: "/", element: <HomePage /> },
+  { path: "/home", element: <HomePage /> },
   { path: "/ready", element: <ReadyPage /> },
   { path: "/board", element: <BoardPage /> },
   { path: "/review", element: <ReviewPage /> },
   { path: "/calendar", element: <CalendarPage /> },
   { path: "/inbox", element: <InboxPage /> },
-  { path: "/inbox/address", element: <InboxAddressPage /> },
   { path: "/inbox/:id", element: <InboxThreadPage /> },
   { path: "/notifications", element: <NotificationsPage /> },
-  { path: "/profile", element: <ProfilePage /> },
-  { path: "/search", element: <SearchPage /> },
-  { path: "/settings", element: <SettingsPage /> },
-  { path: "/settings/billing", element: <SettingsBillingPage /> },
-  { path: "/settings/billing/plans", element: <SettingsBillingPlansPage /> },
-  { path: "/settings/delete", element: <SettingsDeletePage /> },
-  { path: "/settings/export", element: <SettingsExportPage /> },
-  { path: "/settings/support-access", element: <SettingsSupportAccessPage /> },
+  { path: "/profile", element: <Navigate replace to="/profile/resume" /> },
+  { path: "/profile/resume", element: <ProfileResumePage /> },
+  { path: "/profile/details", element: <ProfileDetailsPage /> },
+  { path: "/profile/preferences", element: <ProfilePreferencesPage /> },
+  { path: "/profile/account", element: <ProfileAccountPage /> },
+  { path: "/profile/billing", element: <ProfileBillingPage /> },
+  { path: "/support", element: <SupportPage /> },
   { path: "*", element: <NotFoundPage /> },
 ];
 
@@ -87,13 +83,11 @@ const adminShellChildren: RouteObject[] = [
 ];
 
 const publicRoutes: RouteObject[] = [
+  { path: "/", element: <LandingPage /> },
   { path: "/signin", element: <SignInPage /> },
+  { path: "/signup", element: <SignUpPage /> },
   { path: "/terms", element: <TermsPage /> },
-  { path: "/settings/terms", element: <Navigate replace to="/terms" /> },
-  { path: "/settings/notifications", element: <Navigate replace to="/settings" /> },
-  { path: "/settings/support", element: <Navigate replace to="/settings/support-access" /> },
   { path: "/privacy", element: <PrivacyPage /> },
-  { path: "/pricing", element: <PricingPage /> },
   { path: "/consent", element: <ConsentPage /> },
   { path: "/onboarding", element: <OnboardingPage /> },
   { path: "/onboarding/resume", element: <OnboardingResumePage /> },

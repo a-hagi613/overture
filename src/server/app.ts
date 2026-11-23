@@ -11,6 +11,7 @@ import type { Auth } from "./auth/index.ts";
 import type { AdjustableClock } from "./platform/ports/clock.ts";
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 import type { LlmPort } from "./platform/ports/llm.ts";
+import type { MailSender } from "./platform/mail/port.ts";
 import type { ObjectStore } from "./platform/ports/object-store.ts";
 import type { Payments } from "./platform/ports/payments.ts";
 import type { PreparationService } from "./pipeline/prepare.ts";
@@ -49,7 +50,9 @@ import { createConsentService } from "./profile/consent.ts";
 import { createMatchingService } from "./matching/score.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
+import { createWorkspaceSearchRoutes } from "./routes/workspace-search.ts";
 import { createSupportAccessRoutes } from "./routes/support-access.ts";
+import { createSupportRoutes } from "./routes/support.ts";
 import { createAccountRoutes } from "./routes/account.ts";
 import { createBillingRoutes, createStripeWebhookRoutes } from "./routes/billing.ts";
 import { createInboxRoutes } from "./routes/inbox.ts";
@@ -73,6 +76,7 @@ export interface AppDependencies {
   objects: ObjectStore;
   llm: LlmPort;
   spendGate: SpendGate;
+  mail: MailSender;
   mailboxes: ReturnType<typeof createMailboxService>;
   resolver: DNSResolver;
   liveCheckAddress: string;
@@ -229,6 +233,16 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createSupportAccessRoutes(deps.db, deps.auth));
   app.route(
     "/api",
+    createSupportRoutes({
+      auth: deps.auth,
+      clock: deps.clock,
+      db: deps.db,
+      mail: deps.mail,
+      supportEmail: env.SUPPORT_EMAIL,
+    }),
+  );
+  app.route(
+    "/api",
     createApiRoutes(deps.db, deps.catalogDb, deps.clock, deps.auth, { shutdown: deps.shutdown }),
   );
   app.route("/api", createNotificationRoutes(deps.db, deps.clock, deps.auth));
@@ -289,6 +303,7 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createApplicationRoutes(deps.db, deps.clock, deps.auth, personal));
   app.route("/api", createCheckinRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
   app.route("/api", createCalendarRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
+  app.route("/api", createWorkspaceSearchRoutes({ auth: deps.auth, db: deps.db, personal }));
   app.route("/", createCalendarFeedRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
   app.route(
     "/api",

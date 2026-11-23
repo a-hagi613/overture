@@ -1,6 +1,31 @@
+import { BarChart3, TrendingUp } from "lucide-react";
+import { useState } from "react";
+
 import type { HomeRange, HomeRangeKey } from "../lib/home-api.ts";
 
 import { copy } from "../../shared/copy.ts";
+import { Badge } from "./ui/badge.tsx";
+import { Card } from "./ui/card.tsx";
+import { ChartArea } from "./ui/chart-area.tsx";
+import { ChartBar } from "./ui/chart-bar.tsx";
+import { dsBody, dsCardTitle } from "./ui/ds.ts";
+import { Tabs } from "./ui/tabs.tsx";
+import { TabsList } from "./ui/tabs-list.tsx";
+import { TabsTrigger } from "./ui/tabs-trigger.tsx";
+
+type ChartStyle = "area" | "bar";
+
+const RANGE_KEYS: readonly HomeRangeKey[] = ["7D", "30D", "90D"];
+
+const RANGE_LABELS: Record<HomeRangeKey, string> = {
+  "7D": copy.home.ranges.d7,
+  "30D": copy.home.ranges.d30,
+  "90D": copy.home.ranges.d90,
+};
+
+function isRangeKey(value: string): value is HomeRangeKey {
+  return value === "7D" || value === "30D" || value === "90D";
+}
 
 function subtitleFor(rangeKey: HomeRangeKey) {
   if (rangeKey === "30D") {
@@ -14,114 +39,104 @@ function subtitleFor(rangeKey: HomeRangeKey) {
   return copy.home.chart.perDay7;
 }
 
-export function HomeChart(props: { range: HomeRange; rangeKey: HomeRangeKey }) {
-  const { range, rangeKey } = props;
-  const counts = range.chart.points.map((point) => point.count);
-  const total = counts.reduce((sum, count) => sum + count, 0);
-  const max = Math.max(0, ...counts);
-  const top = Math.ceil((max + 1) / 4) * 4;
-  const count = counts.length;
+function formatPointLabel(at: number, rangeKey: HomeRangeKey) {
+  const date = new Date(at);
 
-  const points = counts.map((value, index) => {
-    const x = count <= 1 ? 0 : (index / (count - 1)) * 1000;
-    const y = 200 - (value / top) * 200;
+  if (rangeKey === "7D") {
+    return new Intl.DateTimeFormat(copy.home.dateLocale, { weekday: "short" }).format(date);
+  }
 
-    return [x, y] as const;
-  });
+  return new Intl.DateTimeFormat(copy.home.dateLocale, { day: "numeric", month: "short" }).format(
+    date,
+  );
+}
 
-  const line = points
-    .map(([x, y], index) => `${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`)
-    .join(" ");
-
-  const lastPoint = points.at(-1);
-  const lastY = lastPoint === undefined ? 200 : lastPoint[1];
-  const lastTop = `${((lastY / 200) * 100).toFixed(1)}%`;
-  const lastCount = counts.at(-1) ?? 0;
-
-  const lastLabel =
-    range.chart.per === "week"
-      ? copy.home.chart.thisWeek(lastCount)
-      : copy.home.chart.today(lastCount);
-
+export function HomeChart(props: {
+  onRangeChange: (next: HomeRangeKey) => void;
+  range: HomeRange;
+  rangeKey: HomeRangeKey;
+}) {
+  const { onRangeChange, range, rangeKey } = props;
+  const [chartStyle, setChartStyle] = useState<ChartStyle>("area");
+  const total = range.chart.points.reduce((sum, point) => sum + point.count, 0);
   const subtitle = subtitleFor(rangeKey);
-  const level = top / 4;
+
+  const chartData = range.chart.points.map((point, index) => ({
+    label: range.chart.labels[index] ?? formatPointLabel(point.at, rangeKey),
+    value: point.count,
+  }));
 
   return (
-    <section
-      aria-labelledby="home-chart"
-      className="min-w-0 flex-[999_1_480px] rounded-lg border border-border bg-card px-4 pb-[18px] pt-[22px] shadow-sh min-[768px]:px-6"
-    >
-      <div>
-        <h2 className="font-serif text-[26px] leading-[1.5]" id="home-chart">
-          {copy.home.chart.title}
-        </h2>
-        <p className="mt-0.5 text-[12.5px] leading-[1.5] text-muted-foreground">{subtitle}</p>
-      </div>
-      <div className="mt-4 flex gap-2.5">
-        <div className="flex h-[200px] w-[26px] flex-none flex-col items-end justify-between text-[11.5px] tabular-nums text-muted-foreground">
-          <span>{top}</span>
-          <span>{level * 3}</span>
-          <span>{level * 2}</span>
-          <span>{level}</span>
-          <span>{String(0)}</span>
-        </div>
-        <div className="relative h-[200px] min-w-0 flex-1">
-          <svg
-            aria-label={copy.home.chart.aria(subtitle, total)}
-            className="block h-[200px] w-full overflow-visible"
-            preserveAspectRatio="none"
-            role="img"
-            viewBox="0 0 1000 200"
-          >
-            {[0, 50, 100, 150].map((y) => (
-              <line
-                className="stroke-border"
-                key={y}
-                strokeWidth="1"
-                vectorEffect="non-scaling-stroke"
-                x1="0"
-                x2="1000"
-                y1={y}
-                y2={y}
-              />
-            ))}
-            <line
-              className="stroke-input"
-              strokeWidth="1"
-              vectorEffect="non-scaling-stroke"
-              x1="0"
-              x2="1000"
-              y1="200"
-              y2="200"
-            />
-            <path className="fill-signal-soft" d={`${line} L1000 200 L0 200 Z`} stroke="none" />
-            <path
-              className="stroke-signal"
-              d={line}
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2.25"
-              vectorEffect="non-scaling-stroke"
-            />
-          </svg>
-          <div
-            className="absolute right-0 h-[11px] w-[11px] translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] border-signal bg-card"
-            style={{ top: lastTop }}
-          />
-          <div
-            className="absolute right-3.5 -translate-y-[190%] whitespace-nowrap rounded-[5px] bg-foreground px-[9px] py-[3px] text-[12px] font-semibold text-background tabular-nums"
-            style={{ top: lastTop }}
-          >
-            {lastLabel}
+    <Card ariaLabelledBy="home-chart" className="mt-5 flex flex-col p-5 md:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h2 className={dsCardTitle} id="home-chart">
+              {copy.home.chart.title}
+            </h2>
+            <Badge className="tabular-nums" variant="signal">
+              {copy.home.chart.totalBadge(total)}
+            </Badge>
           </div>
+          <p className={`${dsBody} mt-0.5 text-xs`}>{subtitle}</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Tabs
+            onValueChange={(value) => {
+              if (value === "area" || value === "bar") {
+                setChartStyle(value);
+              }
+            }}
+            value={chartStyle}
+          >
+            <TabsList ariaLabel={copy.home.chart.styleLabel}>
+              <TabsTrigger className="gap-1.5 px-2.5" value="area">
+                <TrendingUp aria-hidden="true" size={14} />
+                <span>{copy.home.chart.areaLabel}</span>
+              </TabsTrigger>
+              <TabsTrigger className="gap-1.5 px-2.5" value="bar">
+                <BarChart3 aria-hidden="true" size={14} />
+                <span>{copy.home.chart.barLabel}</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <Tabs
+            onValueChange={(value) => {
+              if (isRangeKey(value)) {
+                onRangeChange(value);
+              }
+            }}
+            value={rangeKey}
+          >
+            <TabsList ariaLabel={copy.home.rangeLabel}>
+              {RANGE_KEYS.map((key) => (
+                <TabsTrigger key={key} value={key}>
+                  {RANGE_LABELS[key]}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
       </div>
-      <div className="ml-9 mt-2 flex justify-between text-[11.5px] tabular-nums text-muted-foreground">
-        {range.chart.labels.map((label) => (
-          <span key={label}>{label}</span>
-        ))}
+
+      <div className="mt-5">
+        {chartStyle === "area" ? (
+          <ChartArea
+            ariaLabel={copy.home.chart.aria(subtitle, total)}
+            className="h-64"
+            data={chartData}
+            unitLabel={copy.home.chart.unit}
+          />
+        ) : (
+          <ChartBar
+            ariaLabel={copy.home.chart.aria(subtitle, total)}
+            data={chartData}
+            unitLabel={copy.home.chart.unit}
+          />
+        )}
       </div>
-    </section>
+    </Card>
   );
 }

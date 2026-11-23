@@ -35,13 +35,15 @@ emailOnlyTest(
     await expect(page.getByRole("button", { name: "Continue with LinkedIn" })).toHaveCount(0);
 
     await page.getByLabel("Email").fill(authTestIdentity.ownerEmail);
-    await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+    await page.getByRole("button", { name: "Send sign-in link" }).click();
     await expect(page.getByText("Link sent to")).toBeVisible();
 
     const link = await latestMailLink(emailOnlyServer.url, request, authTestIdentity.ownerEmail);
 
     await page.goto(link);
-    await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+    ).toBeVisible();
 
     const state = await verifyAuthState(emailOnlyServer.url, request);
 

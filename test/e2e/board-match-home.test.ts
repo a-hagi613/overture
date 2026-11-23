@@ -88,7 +88,9 @@ async function expectHomeMatchesBoard(
 
   await page.goto(`${appServerUrl}/`);
 
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
   await expect(page.getByText("Next one sends about 11:40")).toBeVisible();
   await expect(page.getByText("Four questions, ten applications waiting")).toBeVisible();
   await expect(page.getByText("09:12")).toBeVisible();

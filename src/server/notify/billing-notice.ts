@@ -122,7 +122,7 @@ export async function runBillingNoticeJob(
   }
 
   const pause = copy.home.pauseReasons[input.reason];
-  const path = input.reason === "plan_ended" ? "/settings/billing/plans" : "/settings/billing";
+  const path = "/profile/billing";
   const url = `${deps.appOrigin.replace(/\/+$/u, "")}${path}`;
 
   await deps.mail.sendBillingNotice({

@@ -74,7 +74,7 @@ test("the sign-in screen offers no password, sign-up or reset", async ({
 
   await page.goto(`${url}/signin`);
   await expect(page.getByRole("heading", { level: 1, name: "Sign in to Overture" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Email me a sign-in link" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send sign-in link" })).toBeVisible();
   await expect(page.locator('input[type="password"]')).toHaveCount(0);
   await expect(page.getByText(/password/iu)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Create an account" })).toHaveCount(0);
@@ -92,7 +92,9 @@ test("a magic link signs the owner in and stores no password", async ({
   expect((await requestMagicLink(url, request, authTestIdentity.ownerEmail)).ok()).toBe(true);
 
   await page.goto(await latestMailLink(url, request, authTestIdentity.ownerEmail));
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
 
   const state = await verifyAuthState(url, request);
   const owner = state.users.find((user) => user.email === authTestIdentity.ownerEmail);

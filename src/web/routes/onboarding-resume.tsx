@@ -1,4 +1,5 @@
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
+import { toast } from "sonner";
 
 import { OnboardingLoadState } from "../components/onboarding-load-state.tsx";
 import { OnboardingResumeCard } from "../components/onboarding-resume-card.tsx";
@@ -11,6 +12,9 @@ import {
 
 export function OnboardingResumePage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const preview = params.get("preview") === "1";
+  const suffix = preview ? "?preview=1" : "";
   const { data: state, isFetching, isPending, refetch } = useOnboardingState();
   const upload = useUploadOnboardingResume();
   const finish = useFinishOnboardingStep();
@@ -27,13 +31,23 @@ export function OnboardingResumePage() {
         />
       ) : (
         <OnboardingResumeCard
-          error={upload.isError}
+          backTo={`/onboarding${suffix}`}
+          error={upload.isError && !preview}
           onContinue={async () => {
-            await finish.mutateAsync(2);
-            await navigate("/onboarding/facts");
+            if (!preview) {
+              await finish.mutateAsync(2);
+            }
+
+            await navigate(`/onboarding/facts${suffix}`);
           }}
           onUpload={(file) => {
-            upload.mutate(file);
+            upload.mutate(file, {
+              onError: () => {
+                if (preview) {
+                  toast.info(`Preview mode: ${file.name} selected.`);
+                }
+              },
+            });
           }}
           resume={state.resume}
           uploading={upload.isPending}

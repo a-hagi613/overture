@@ -89,6 +89,9 @@ export function createCloudflareMailSender(config: CloudflareMailConfig) {
     sendBillingNotice: async (mail) => {
       await sendEmail(config, mail.to, mail.subject, mail.body);
     },
+    sendSupportMessage: async (mail) => {
+      await sendEmail(config, mail.to, mail.subject, mail.body);
+    },
   };
 
   return sender;

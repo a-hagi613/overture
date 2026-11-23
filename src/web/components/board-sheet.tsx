@@ -7,8 +7,15 @@ import { BoardSheetHeader } from "./board-sheet-header.tsx";
 import { BoardSheetNavigation } from "./board-sheet-navigation.tsx";
 import { BoardSheetPanel } from "./board-sheet-panel.tsx";
 import type { BoardTab } from "./board-sheet-panel.tsx";
-import { BoardSentBanner } from "./board-sent-banner.tsx";
 import { BoardSheetPills } from "./board-sheet-pills.tsx";
+import { Separator } from "./ui/separator.tsx";
+import { Tabs } from "./ui/tabs.tsx";
+import { TabsList } from "./ui/tabs-list.tsx";
+import { TabsTrigger } from "./ui/tabs-trigger.tsx";
+
+function isBoardTab(value: string): value is BoardTab {
+  return value === "timeline" || value === "answers" || value === "cover";
+}
 
 export function BoardSheet(props: {
   detail: ApplicationDetail | null;
@@ -18,78 +25,80 @@ export function BoardSheet(props: {
   onMove: (stage: StageKey) => void;
   onNext: () => void;
   onPrevious: () => void;
+  positionLabel: string | null;
   previousDisabled: boolean;
 }) {
   const { detail } = props;
   const [tab, setTab] = useState<BoardTab>("timeline");
 
-  const tabButton = (key: BoardTab, label: string) => (
-    <button
-      aria-selected={tab === key}
-      className={`tab ${tab === key ? "on" : ""}`}
-      onClick={() => {
-        setTab(key);
-      }}
-      role="tab"
-      type="button"
-    >
-      {label}
-    </button>
-  );
-
   return (
     <>
-      <div aria-hidden="true" className="fixed inset-0 z-20 bg-[var(--color-scrim)]" />
+      <button
+        aria-label={copy.board.closeDetail}
+        className="fixed inset-0 z-20 bg-foreground/25 backdrop-blur-[1px]"
+        onClick={props.onClose}
+        type="button"
+      />
       <aside
         aria-label={copy.board.sheetLabel}
-        className="board fixed inset-x-0 bottom-0 z-30 flex h-[566px] flex-col overflow-hidden rounded-t-[18px] border-t border-input bg-card max-md:shadow-[0_-24px_50px_-28px_rgba(21,19,17,0.5)] md:inset-y-0 md:left-auto md:right-0 md:h-auto md:w-[468px] md:rounded-none md:border-t-0 md:border-l md:shadow-[-30px_0_60px_-34px_var(--color-scrim)] min-[1700px]:w-[520px]"
+        className="fixed inset-x-0 bottom-0 z-30 flex h-[82dvh] flex-col overflow-hidden rounded-t-2xl border-t border-border bg-card shadow-lift md:inset-y-0 md:left-auto md:right-0 md:h-auto md:w-[500px] md:rounded-none md:border-l md:border-t-0 min-[1700px]:w-[540px]"
       >
         <button
           aria-label={copy.board.grabHandle}
-          className="flex h-11 w-full flex-none items-center justify-center border-0 bg-transparent md:hidden"
+          className="flex h-10 w-full flex-none items-center justify-center md:hidden"
           onClick={props.onClose}
           type="button"
         >
-          <span className="h-[5px] w-11 rounded-[3px] bg-input" />
+          <span className="h-1.5 w-11 rounded-full bg-input" />
         </button>
 
         <BoardSheetNavigation
-          detail={detail}
           nextDisabled={props.nextDisabled}
           onClose={props.onClose}
           onNext={props.onNext}
           onPrevious={props.onPrevious}
+          positionLabel={props.positionLabel}
           previousDisabled={props.previousDisabled}
         />
 
         {detail === null ? (
           <div className="flex flex-1 items-center justify-center px-6">
-            <p className="text-[13px] text-muted-foreground">{copy.board.loadingDetail}</p>
+            <p className="text-sm text-muted-foreground">{copy.board.loadingDetail}</p>
           </div>
         ) : (
           <div
-            className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-6 [&>*]:flex-none md:px-[26px] md:pt-[22px] md:pb-0"
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-8 pt-2 md:px-7 md:pt-6"
             data-scroll-region
           >
             <BoardSheetHeader detail={detail} />
             <BoardSheetPills detail={detail} />
-            <BoardSentBanner detail={detail} />
             <BoardSheetActions detail={detail} onArchive={props.onArchive} onMove={props.onMove} />
-            <div
-              aria-label={copy.board.sectionsLabel}
-              className="hs mt-3.5 -mx-5 flex overflow-x-auto border-b border-border px-5 md:mx-0 md:mt-[22px] md:px-0"
-              data-scroll-region
-              role="tablist"
-            >
-              {tabButton("timeline", copy.board.tabs.timeline)}
-              {tabButton("answers", copy.board.tabs.answers)}
-              {tabButton("cover", copy.board.tabs.cover)}
-              {tabButton("emails", copy.board.tabs.emails)}
+
+            <Separator className="mt-5" />
+
+            <div className="mt-5">
+              <Tabs
+                onValueChange={(value) => {
+                  if (isBoardTab(value)) {
+                    setTab(value);
+                  }
+                }}
+                value={tab}
+              >
+                <TabsList ariaLabel={copy.board.sectionsLabel} className="flex w-full">
+                  <TabsTrigger className="flex-1 whitespace-nowrap px-2.5" value="timeline">
+                    {copy.board.tabs.timeline}
+                  </TabsTrigger>
+                  <TabsTrigger className="flex-1 whitespace-nowrap px-2.5" value="answers">
+                    {copy.board.tabs.answers}
+                  </TabsTrigger>
+                  <TabsTrigger className="flex-none whitespace-nowrap px-3" value="cover">
+                    {copy.board.tabs.cover}
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <BoardSheetPanel detail={detail} tab={tab} />
             </div>
-            <BoardSheetPanel detail={detail} tab={tab} />
-            <p className="serif mt-auto pt-2.5 pb-[18px] text-center text-[14px] text-muted-foreground italic">
-              {`— ${detail.application.id.slice(-4)} —`}
-            </p>
           </div>
         )}
       </aside>

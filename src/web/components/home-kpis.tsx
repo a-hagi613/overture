@@ -1,11 +1,12 @@
 import type { HomeRange, HomeResponse } from "../lib/home-api.ts";
 
 import { copy } from "../../shared/copy.ts";
+import { Card } from "./ui/card.tsx";
+import { dsMetric } from "./ui/ds.ts";
 
 function timeText(at: number, zone: string) {
   return new Intl.DateTimeFormat(copy.home.dateLocale, {
-    hour: "2-digit",
-    hourCycle: "h23",
+    hour: "numeric",
     minute: "2-digit",
     timeZone: zone,
   }).format(new Date(at));
@@ -26,57 +27,39 @@ export function HomeKpis(props: {
 
   const cards = [
     {
-      arrow: range.sentDelta < 0 ? "↓" : "↑",
       delta: copy.home.sentDelta(range.sentDelta, days),
+      deltaTone: range.sentDelta < 0 ? "text-muted-foreground" : "text-ok",
       label: copy.home.kpi.sent,
-      tone: "text-ok",
       value: range.applicationsSent,
     },
     {
-      arrow: "·",
       delta: paused ? copy.home.heldWhilePaused : nextSend,
+      deltaTone: "text-muted-foreground",
       label: copy.home.kpi.queued,
-      tone: "text-muted-foreground",
       value: home.queued,
     },
     {
-      arrow: "↑",
       delta: copy.home.interviewsBooked(range.interviewsBooked),
+      deltaTone: "text-ok",
       label: copy.home.kpi.replies,
-      tone: "text-ok",
       value: range.replies,
     },
     {
-      arrow: "!",
       delta: copy.home.applicationsWait(home.reviews.applications),
+      deltaTone: home.reviews.total > 0 ? "text-need" : "text-muted-foreground",
       label: copy.home.kpi.needsYou,
-      tone: "text-need",
       value: home.reviews.total,
     },
   ];
 
   return (
-    <div className="mt-4 grid grid-cols-2 gap-3 min-[1100px]:grid-cols-4 min-[1100px]:gap-4">
+    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map((card) => (
-        <article
-          className="rounded-lg border border-border bg-card p-[14px_14px_12px] shadow-sh min-[768px]:p-[18px_20px_16px]"
-          key={card.label}
-        >
-          <p className="text-[12.5px] font-medium leading-[1.5] text-muted-foreground">
-            {card.label}
-          </p>
-          <p className="mt-2 font-serif text-[40px] leading-none tabular-nums min-[768px]:text-[56px]">
-            {card.value}
-          </p>
-          <p
-            className={`mt-2.5 flex items-center gap-[5px] text-[12.5px] leading-[1.5] tabular-nums ${card.tone}`}
-          >
-            <span aria-hidden="true" className="text-sm leading-none">
-              {card.arrow}
-            </span>
-            {card.delta}
-          </p>
-        </article>
+        <Card className="flex flex-col justify-between p-5" key={card.label} variant="interactive">
+          <p className="text-xs font-semibold text-muted-foreground">{card.label}</p>
+          <p className={`${dsMetric} mt-3`}>{card.value}</p>
+          <p className={`mt-3 text-xs font-medium ${card.deltaTone}`}>{card.delta}</p>
+        </Card>
       ))}
     </div>
   );

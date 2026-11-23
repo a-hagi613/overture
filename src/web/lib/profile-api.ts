@@ -46,6 +46,36 @@ const profileSettingsSchema = z.object({
   pendingTimezoneAt: z.string().nullable(),
 });
 
+const resumeRecordSchema = z
+  .object({
+    bytes: z.number(),
+    filename: z.string(),
+    id: z.string(),
+    isCurrent: z.boolean(),
+    pages: z.number(),
+    parsedWith: z.enum(["unpdf", "llm"]),
+    sha256: z.string(),
+    unreadable: z.boolean(),
+    uploadedAt: z.string(),
+  })
+  .nullable();
+
+const factRecordSchema = z.object({
+  key: z.string(),
+  revision: z.number().optional(),
+  scope: z.string(),
+  source: z.string().optional(),
+  value: z.string(),
+});
+
+const factsResponseSchema = z.object({
+  facts: z.array(factRecordSchema),
+});
+
+const portalResponseSchema = z.object({
+  url: z.string(),
+});
+
 async function jsonFrom(response: Response) {
   if (!response.ok) {
     throw new Error(`profile request failed: ${String(response.status)}`);
@@ -147,6 +177,59 @@ export async function saveProfileSettings(settings: { languages: string[]; timez
     ),
   );
 }
+
+export async function fetchCurrentResume() {
+  return resumeRecordSchema.parse(await jsonFrom(await fetch("/api/profile/resume")));
+}
+
+export async function uploadResumeFile(file: File) {
+  const form = new FormData();
+
+  form.append("file", file);
+
+  const response = await fetch("/api/profile/resume", {
+    body: form,
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error(`resume upload failed: ${String(response.status)}`);
+  }
+
+  const body: unknown = await response.json();
+
+  return resumeRecordSchema.parse(body);
+}
+
+export function resumeFileUrl(id: string) {
+  return `/api/profile/resume/${encodeURIComponent(id)}/file`;
+}
+
+export async function fetchProfileFacts() {
+  return factsResponseSchema.parse(await jsonFrom(await fetch("/api/profile/facts")));
+}
+
+export async function saveProfileFacts(facts: { key: string; scope?: string; value: string }[]) {
+  return factsResponseSchema.parse(
+    await jsonFrom(
+      await fetch("/api/profile/facts", {
+        body: JSON.stringify({ facts }),
+        headers: { "content-type": "application/json" },
+        method: "PUT",
+      }),
+    ),
+  );
+}
+
+export async function createBillingPortalSession() {
+  return portalResponseSchema.parse(
+    await jsonFrom(await fetch("/api/billing/portal", { method: "POST" })),
+  );
+}
+
+export type ResumeRecordView = z.infer<typeof resumeRecordSchema>;
+
+export type FactRecordView = z.infer<typeof factRecordSchema>;
 
 export type TargetsResponse = z.infer<typeof targetsResponseSchema>;
 

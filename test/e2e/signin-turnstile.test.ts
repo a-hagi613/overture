@@ -9,7 +9,7 @@ import {
 
 const labels = {
   email: "Email",
-  magic: "Email me a sign-in link",
+  magic: "Send sign-in link",
   sent: "Link sent to",
 };
 

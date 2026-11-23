@@ -74,7 +74,9 @@ for (const theme of ["light", "dark"] as const) {
     }
 
     await page.goto(`${appServerUrl}/`);
-    await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+    ).toBeVisible();
     await expect(page.getByText("of 70 on your week plan")).toBeVisible();
     await expect(page.getByText("7 of 10 sent today · resets at midnight")).toBeVisible();
     await page.evaluate(async () => {

@@ -1,3 +1,4 @@
+import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
@@ -5,9 +6,7 @@ import { HeaderControls } from "./header-controls.tsx";
 
 export function PageHeader({
   backLink,
-  calendar = false,
   lead,
-  showRunningSwitch = true,
   titleNode,
 }: {
   backLink?: { href: string; label: string };
@@ -17,31 +16,21 @@ export function PageHeader({
   titleNode: ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-      <div>
-        {backLink === undefined ? (
-          <p className="font-serif text-[15px] italic text-muted-foreground">{lead}</p>
-        ) : (
+    <header className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-6 md:gap-y-4">
+      <div className="min-w-0">
+        {backLink === undefined ? null : (
           <Link
-            className="inline-flex max-md:min-h-11 max-md:-my-[15px] items-center text-[11px] font-semibold uppercase tracking-[1.65px] leading-[normal] text-foreground hover:underline"
+            className="mb-2 inline-flex min-h-8 items-center gap-1.5 text-eyebrow font-semibold uppercase text-muted-foreground transition hover:text-foreground"
             to={backLink.href}
           >
-            {"← "}
+            <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
             {backLink.label}
           </Link>
         )}
-        <h1
-          className={`${backLink === undefined ? "mt-0.5" : "mt-2"} font-serif text-[32px] leading-[1.05] md:text-[42px]`}
-        >
-          {titleNode}
-        </h1>
-        {backLink === undefined ? null : (
-          <p className="mt-1 font-serif text-[15px] italic leading-[1.5] text-muted-foreground">
-            {lead}
-          </p>
-        )}
+        <h1 className="font-serif text-page-title font-normal text-foreground">{titleNode}</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">{lead}</p>
       </div>
-      <HeaderControls calendar={calendar} running={showRunningSwitch} />
+      <HeaderControls />
     </header>
   );
 }

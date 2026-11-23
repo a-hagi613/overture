@@ -212,7 +212,7 @@ test("posting languages and the time zone save from Settings", async ({
 
   const page = await context.newPage();
 
-  await page.goto("/settings");
+  await page.goto("/profile/account");
 
   const french = page.getByRole("button", { name: "French" });
   const timezone = page.getByLabel("Time zone");

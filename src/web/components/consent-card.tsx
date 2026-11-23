@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 
 import type { ConsentState } from "../../shared/consent.ts";
 
 import { copy } from "../../shared/copy.ts";
-import { longDate } from "../lib/consent-format.ts";
 import { useAcceptConsent } from "../lib/consent-api.ts";
+import { longDate } from "../lib/consent-format.ts";
+import { Badge } from "./ui/badge.tsx";
+import { Card } from "./ui/card.tsx";
+import { dsEyebrow, dsPageTitle } from "./ui/ds.ts";
 
 export function ConsentCard({ state }: { state: ConsentState }) {
   const accept = useAcceptConsent();
@@ -23,6 +27,7 @@ export function ConsentCard({ state }: { state: ConsentState }) {
     try {
       await accept.mutateAsync(state.current.version);
       setChecked(true);
+      toast.success(copy.consent.agree);
     } catch {
       setChecked(false);
       setFailed(true);
@@ -30,36 +35,26 @@ export function ConsentCard({ state }: { state: ConsentState }) {
   };
 
   return (
-    <section
-      aria-labelledby="consent-title"
-      className="rounded-lg border border-border bg-card px-[20px] py-[24px] shadow-sh md:px-[28px] md:py-[28px]"
-    >
-      <div className="flex items-center justify-between gap-4">
-        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-          {copy.consent.eyebrow}
-        </p>
-        <span className="rounded-full border border-border px-[13px] py-[3px] font-mono text-[10px] uppercase tracking-[0.12em]">
-          {copy.consent.versionLabel(state.current.version)}
-        </span>
+    <Card ariaLabelledBy="consent-title" className="p-6 md:p-8" variant="elevated">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className={dsEyebrow}>{copy.consent.eyebrow}</p>
+        <Badge variant="outline">{copy.consent.versionLabel(state.current.version)}</Badge>
       </div>
-      <h1
-        className="mt-[22px] font-serif text-[31px] leading-[1.06] tracking-tight md:mt-[14px] md:text-[36px]"
-        id="consent-title"
-      >
+      <h1 className={`${dsPageTitle} mt-3`} id="consent-title">
         {copy.consent.title}
       </h1>
-      <p className="mt-[14px] text-[14px] leading-[1.6] md:text-[14.5px]">{state.current.text}</p>
-      <p className="mt-[14px] text-[14px] leading-[1.6] md:text-[14.5px]">
+      <p className="mt-4 text-sm leading-relaxed text-foreground">{state.current.text}</p>
+      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
         {copy.consent.readNoticeBefore}
         <Link
-          className="underline decoration-input underline-offset-[3px] transition-colors hover:decoration-foreground"
+          className="font-medium text-signal-text underline underline-offset-4 hover:opacity-80"
           to="/terms"
         >
           {copy.legal.termsLink}
         </Link>
         {copy.consent.readNoticeBetween}
         <Link
-          className="underline decoration-input underline-offset-[3px] transition-colors hover:decoration-foreground"
+          className="font-medium text-signal-text underline underline-offset-4 hover:opacity-80"
           to="/privacy"
         >
           {copy.legal.privacyLink}
@@ -67,12 +62,12 @@ export function ConsentCard({ state }: { state: ConsentState }) {
         {copy.consent.readNoticeEnd}
       </p>
       <label
-        className="mt-[22px] flex cursor-pointer md:mt-[18px] items-center gap-[14px] rounded-md border border-input px-[18px] py-[14px]"
+        className="mt-5 flex cursor-pointer items-center gap-3.5 rounded-lg border border-input bg-background px-4 py-3.5 transition hover:border-foreground/40"
         htmlFor="consent-agree"
       >
         <input
           checked={checked}
-          className="size-[17px] flex-none rounded-sm accent-[var(--color-foreground)]"
+          className="size-4 shrink-0 accent-signal"
           disabled={accept.isPending}
           id="consent-agree"
           onChange={() => {
@@ -80,21 +75,19 @@ export function ConsentCard({ state }: { state: ConsentState }) {
           }}
           type="checkbox"
         />
-        <span className="text-[13px] font-semibold md:text-[13.5px]">{copy.consent.agree}</span>
+        <span className="text-sm font-semibold text-foreground">{copy.consent.agree}</span>
       </label>
-      <p className="mt-[20px] text-[12px] leading-[1.6] text-muted-foreground md:mt-[16px] md:text-[12.5px]">
-        {copy.consent.footnote}
-      </p>
+      <p className="mt-4 text-xs leading-relaxed text-muted-foreground">{copy.consent.footnote}</p>
       {state.accepted === null ? null : (
-        <output className="mt-1 block text-[12px] leading-[1.6] text-muted-foreground md:text-[12.5px]">
+        <output className="mt-1.5 block text-xs font-medium text-ok">
           {copy.consent.accepted(state.accepted.version, longDate(state.accepted.at))}
         </output>
       )}
       {failed ? (
-        <p className="mt-1 text-[12px] leading-[1.6] text-need md:text-[12.5px]" role="alert">
+        <p className="mt-1.5 text-xs font-semibold text-need" role="alert">
           {copy.consent.acceptFailed}
         </p>
       ) : null}
-    </section>
+    </Card>
   );
 }

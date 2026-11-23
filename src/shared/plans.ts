@@ -11,14 +11,14 @@ export const TRIAL = {
 
 export const PLANS = {
   week: {
-    applications: 70,
+    applications: 50,
     periodDays: 7,
-    priceUsd: 12,
+    priceUsd: 9.99,
   },
   month: {
-    applications: 300,
+    applications: 250,
     periodDays: 30,
-    priceUsd: 35,
+    priceUsd: 29.99,
   },
 } as const;
 
@@ -37,5 +37,5 @@ export function formatHour(hour: number) {
 }
 
 export function formatUsd(amount: number) {
-  return `$${String(amount)}`;
+  return Number.isInteger(amount) ? `$${String(amount)}` : `$${amount.toFixed(2)}`;
 }

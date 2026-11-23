@@ -3,6 +3,7 @@ import type { SalaryPeriodWord } from "../../shared/onboarding.ts";
 import { copy } from "../../shared/copy.ts";
 import { SALARY_PERIOD_WORDS } from "../../shared/onboarding.ts";
 import { OnboardingSelectField } from "./onboarding-select-field.tsx";
+import { Input } from "./ui/input.tsx";
 
 export interface SalaryDraft {
   amount: string;
@@ -23,11 +24,11 @@ export function OnboardingSalaryRow({
   onChange: (patch: Partial<SalaryDraft>) => void;
 }) {
   return (
-    <>
-      <span className="mono text-[13px] text-muted-foreground">{currency}</span>
-      <input
-        aria-label={copy.onboarding.salaryFor(currency)}
-        className="inp num"
+    <div className="grid grid-cols-[52px_minmax(0,1fr)_172px] items-center gap-2.5">
+      <span className="font-mono text-xs font-semibold text-muted-foreground">{currency}</span>
+      <Input
+        ariaLabel={copy.onboarding.salaryFor(currency)}
+        className="tabular-nums"
         inputMode="numeric"
         onBlur={() => {
           commitAmount(entry.amount);
@@ -51,6 +52,6 @@ export function OnboardingSalaryRow({
         placeholder={copy.onboarding.choose}
         value={entry.period}
       />
-    </>
+    </div>
   );
 }

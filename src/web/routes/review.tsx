@@ -7,14 +7,17 @@ import { PageHeader } from "../components/page-header.tsx";
 import { ReviewDetail } from "../components/review-detail.tsx";
 import { ReviewFilters } from "../components/review-filters.tsx";
 import { ReviewList } from "../components/review-list.tsx";
+import { Card } from "../components/ui/card.tsx";
+import { dsBody, dsCardTitle } from "../components/ui/ds.ts";
 import { useReviews } from "../lib/review-api.ts";
 
 type Filter = ReviewCategory | "all";
 
 export function ReviewPage() {
   const { data } = useReviews();
-  const reviews = data?.reviews ?? [];
-  const totalApplications = data?.totalApplications ?? 0;
+  const [resolvedIds, setResolvedIds] = useState<readonly string[]>([]);
+  const reviews = (data?.reviews ?? []).filter((review) => !resolvedIds.includes(review.id));
+  const totalApplications = reviews.reduce((sum, review) => sum + review.unlocked, 0);
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -30,29 +33,27 @@ export function ReviewPage() {
         lead={copy.review.lead(reviews.length, totalApplications)}
         titleNode={
           <>
-            {copy.review.title} <span className="italic">{copy.review.titleAccent}</span>
+            {copy.review.title} <em className="italic text-signal">{copy.review.titleAccent}</em>
           </>
         }
       />
-      <div className="mt-7 flex flex-wrap items-center justify-between gap-x-5 gap-y-3">
+
+      <div className="mt-6">
         <ReviewFilters active={filter} onChange={setFilter} reviews={reviews} />
-        <p className="font-serif text-sm italic leading-[21px] text-muted-foreground">
-          {copy.review.groupedBy}
-        </p>
       </div>
+
       {selected === null ? (
-        <section className="mt-4 rounded-lg border border-border bg-card p-6 shadow-sh">
-          <h2 className="font-serif text-[26px] leading-[1.15]">{copy.review.emptyTitle}</h2>
-          <p className="mt-2 max-w-[60ch] text-sm leading-[1.55] text-muted-foreground">
-            {copy.review.emptyBody}
-          </p>
-        </section>
+        <Card className="mt-5 p-6">
+          <h2 className={dsCardTitle}>{copy.review.emptyTitle}</h2>
+          <p className={`${dsBody} mt-2 max-w-[60ch]`}>{copy.review.emptyBody}</p>
+        </Card>
       ) : (
-        <div className="mt-4 flex flex-wrap items-start gap-5">
+        <div className="mt-5 flex flex-wrap items-start gap-5">
           <ReviewList onSelect={setSelectedId} reviews={filtered} selectedId={selected.id} />
           <ReviewDetail
             key={selected.id}
-            onResolved={() => {
+            onResolved={(id) => {
+              setResolvedIds((current) => [...current, id]);
               setSelectedId(null);
             }}
             position={position}

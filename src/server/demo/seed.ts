@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -13,6 +13,7 @@ import {
   applicationSnapshots,
   checkins,
   facts,
+  interviewEvents,
   ledger,
   mailThreads,
   mailboxes,
@@ -41,6 +42,7 @@ import { contentHash } from "../catalog/content-hash.ts";
 import { dedupeKeyFor } from "../catalog/dedupe-key.ts";
 import { normalizeApplyUrl, normalizeTitle } from "../catalog/normalize.ts";
 import { questionVariantHash } from "../catalog/question-normalize.ts";
+import { addLocalDays, localDateAt, localTimeOn } from "../platform/local-time.ts";
 import { sealApprovedPlan } from "../pipeline/approved-plan.ts";
 import { minimalPdf } from "./pdf.ts";
 import {
@@ -49,6 +51,7 @@ import {
   DEMO_FACTS,
   DEMO_FORM_QUESTIONS,
   DEMO_INBOX,
+  DEMO_INTERVIEWS,
   DEMO_NOTIFICATIONS,
 } from "./sample-data.ts";
 
@@ -61,6 +64,7 @@ const DEMO_MAILBOX_ID = "demo-mailbox-0001";
 const DEMO_MAIL_LOCAL_PART = "demo-forwarding";
 const DEMO_RESUME_ID = "demo-resume-0001";
 const DEMO_RESUME_FILENAME = "sam-rivera-resume.pdf";
+const DEMO_TIMEZONE = "America/Toronto";
 
 /**
  * Create the demo account and its months of sample data, idempotently. Every
@@ -97,6 +101,8 @@ export async function seedDemoAccount(deps: {
     .get();
 
   if (seeded !== undefined) {
+    seedInterviews({ db, now, userId });
+
     return { userId };
   }
 
@@ -136,6 +142,7 @@ export async function seedDemoAccount(deps: {
 
   await seedApplications({ catalogDb, db, now, personal, userId });
   await seedInbox({ db, now, personal, userId });
+  seedInterviews({ db, now, userId });
   seedNotifications({ db, now, userId });
   seedReviews({ db, now, userId });
   seedCheckins({ db, now, userId });
@@ -255,7 +262,7 @@ function seedProfile(input: { db: AppDatabase; now: number; userId: string }) {
       onboardingStep: 5,
       pauseReason: null,
       running: true,
-      timezone: "America/Toronto",
+      timezone: DEMO_TIMEZONE,
       updatedAt: new Date(now),
       userId,
     })
@@ -810,6 +817,65 @@ async function seedInbox(input: {
         textEnc: row.textEnc,
         threadId: row.threadId,
         toEnc: row.toEnc,
+        userId,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+}
+
+function seedInterviews(input: { db: AppDatabase; now: number; userId: string }) {
+  const { db, now, userId } = input;
+  const ids = DEMO_INTERVIEWS.map((interview) => interview.id);
+
+  const present = db
+    .select({ id: interviewEvents.id })
+    .from(interviewEvents)
+    .where(and(eq(interviewEvents.userId, userId), inArray(interviewEvents.id, ids)))
+    .all();
+
+  if (present.length === ids.length) {
+    return;
+  }
+
+  const today = localDateAt(now, DEMO_TIMEZONE);
+
+  for (const interview of DEMO_INTERVIEWS) {
+    const application = db
+      .select({ id: applications.id })
+      .from(applications)
+      .where(and(eq(applications.id, interview.applicationId), eq(applications.userId, userId)))
+      .get();
+
+    const message = db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(and(eq(messages.id, interview.messageId), eq(messages.userId, userId)))
+      .get();
+
+    if (application === undefined || message === undefined) {
+      continue;
+    }
+
+    const startsAt = localTimeOn(
+      addLocalDays(today, interview.dayOffset),
+      interview.hour,
+      interview.minute,
+      DEMO_TIMEZONE,
+    );
+
+    db.insert(interviewEvents)
+      .values({
+        applicationId: application.id,
+        createdAt: now,
+        endsAt: startsAt + interview.durationMinutes * 60_000,
+        id: interview.id,
+        messageId: message.id,
+        sequence: 0,
+        source: "ics",
+        startsAt,
+        tz: DEMO_TIMEZONE,
+        uid: interview.uid,
         userId,
       })
       .onConflictDoNothing()

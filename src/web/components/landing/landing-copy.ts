@@ -1,0 +1,192 @@
+import {
+  formatHour,
+  formatUsd,
+  PLANS,
+  PUBLIC_ATS,
+  SEND_WINDOW,
+  TRIAL,
+} from "../../../shared/plans.ts";
+
+const sendHours = `${formatHour(SEND_WINDOW.startHour)} to ${formatHour(SEND_WINDOW.endHour)}`;
+const atsSentence = `${PUBLIC_ATS.slice(0, -1).join(", ")} and ${PUBLIC_ATS.at(-1) ?? ""}`;
+
+export const LANDING_COPY = {
+  brand: "Overture",
+  brandAria: "Overture, home",
+  nav: {
+    faq: "FAQ",
+    howItWorks: "How it works",
+    jobBoards: "Job boards",
+    pricing: "Pricing",
+    privacy: "Privacy",
+    signIn: "Sign in",
+    startTrial: "Start free trial",
+    terms: "Terms",
+    theme: "Theme",
+  },
+  hero: {
+    ctaPrimary: "Start free trial",
+    ctaSecondary: "See how it works",
+    headlineItalic: "handled.",
+    headlinePlain: "The job hunt,",
+    lead: "Overture watches company career pages, matches roles to your resume, drafts tailored cover letters and answers, and applies directly on your behalf.",
+    liveCounterSuffix: "jobs applied through Overture",
+  },
+  heroStack: {
+    appliedLabel: "Applied:",
+    appliedStamp: "Applied",
+    ariaLabel:
+      "Global job application cards cycling through daytime sending hours and stamping Applied",
+    postingAsks: "The posting asks",
+    windowAria: "Daytime sending window from 8 am to 8 pm",
+    yourResume: "Your resume",
+  },
+  howItWorks: {
+    badge: "How it works",
+    headingItalic: "applied.",
+    headingPlain: "Three steps from fresh posting to ",
+    step1: {
+      body: "Overture checks thousands of company career pages every minute and pulls new roles straight from employers as soon as they go live.",
+      feedLabel: "Live job feed",
+      foot: "Thousands of companies",
+      refresh: "Refreshing every minute",
+      title: "I. Fresh jobs pulled in continuously",
+    },
+    step2: {
+      badge: "High resume match",
+      body: "Every role is scored against your resume and preferences so only strong matches move forward.",
+      companyMeta: "Shopify · Toronto, ON · Remote · CA$125k–148k",
+      preparing: "Preparing application…",
+      role: "Merchant Operations Manager",
+      score: "94",
+      skills: "E-commerce ops · SLA leadership",
+      title: "II. Matched to your resume",
+    },
+    step3: {
+      answersBadge: "13 form answers completed",
+      appliedBadge: "Applied",
+      body: "Overture fills out the application form with a tailored cover letter and submits it directly on your behalf with confirmation tracking.",
+      confirmed: "Confirmed · 12:18 pm",
+      coverBadge: "Tailored cover letter",
+      meta: "Shopify · Submitted directly via Greenhouse",
+      quote:
+        "“Six years scaling 1,200+ retail accounts at 99.2% on-time dispatch is why Shopify's Merchant Operations role stood out…”",
+      role: "Merchant Operations Manager",
+      title: "III. Applied on your behalf",
+    },
+  },
+  preview: {
+    badge: "Inside the workspace",
+    headingItalic: "one place.",
+    headingPlain: "Every application in ",
+    hint: "Click a tab to explore each screen",
+    viewLabel: "View",
+  },
+  whereItApplies: {
+    appliedBadge: "Applied",
+    badge: "Job boards",
+    diagramAria:
+      "Overture connects directly to Greenhouse, Lever, Ashby, SmartRecruiters, Personio, Workable, Recruitee, and BambooHR",
+    headingItalic: "career pages.",
+    headingPlain: "Direct to company ",
+    hubLabel: "Overture",
+    hubSub: "Direct employer forms",
+    lead: "Connected to every major hiring system across thousands of employers.",
+  },
+  pricing: {
+    badge: "Pricing",
+    headingItalic: "sent.",
+    headingPlain: "Pay only for applications ",
+    free: {
+      badge: "No commitment",
+      bullets: [
+        `${String(TRIAL.applications)} confirmed job applications`,
+        "Tailored cover letter for every role",
+        "Submitted directly on employer career pages",
+      ],
+      cta: "Start free trial",
+      lead: "Try Overture on real openings before you pick a plan.",
+      name: "Free Trial",
+      price: "Free",
+      unit: `/ ${String(TRIAL.applications)} applications`,
+    },
+    week: {
+      badge: "Short sprint",
+      bullets: [
+        `${String(PLANS.week.applications)} confirmed job applications over ${String(PLANS.week.periodDays)} days`,
+        "Everything in Free Trial",
+        "Continuous matching across thousands of companies",
+        "Application tracking and a dedicated employer inbox",
+        "Pause anytime. Failed sends never count.",
+      ],
+      cta: "Choose Weekly",
+      lead: "A focused week of applying with no monthly commitment.",
+      name: "Weekly",
+      price: formatUsd(PLANS.week.priceUsd),
+      unit: `/ ${String(PLANS.week.periodDays)} days`,
+    },
+    month: {
+      badge: "Recommended",
+      bullets: [
+        `${String(PLANS.month.applications)} confirmed job applications over ${String(PLANS.month.periodDays)} days`,
+        "Everything in Weekly with 5× the applications",
+        "40% lower cost per application ($0.12 vs $0.20)",
+        "Interview calendar and instant reply alerts",
+        "Cancel or pause anytime. Failed sends never count.",
+      ],
+      cta: "Choose Monthly",
+      lead: "Our best value for a steady month of job hunting.",
+      name: "Monthly",
+      price: formatUsd(PLANS.month.priceUsd),
+      unit: `/ ${String(PLANS.month.periodDays)} days`,
+    },
+  },
+  faq: {
+    badge: "FAQ",
+    headingItalic: "start.",
+    headingPlain: "Answers before you ",
+    items: [
+      {
+        a: "No. Your resume PDF goes out unchanged with every application. Only the cover letter adapts to each role when one is asked for.",
+        open: true,
+        q: "Does Overture edit my resume?",
+      },
+      {
+        a: `Yes. Every prepared application lands in Ready with its answers and cover letter and resume. Nothing sends until you click Send. Applications go out during daytime hours (${sendHours} local time) spaced at least ${String(SEND_WINDOW.minGapMinutes)} minutes apart.`,
+        open: false,
+        q: "Do I approve applications before they are sent?",
+      },
+      {
+        a: "The application waits in Review instead of guessing. Answer once and it saves to your profile so every waiting application moves to Ready.",
+        open: false,
+        q: "What happens when it's unsure about an answer?",
+      },
+      {
+        a: "Yes. Every card on your Tracker opens a full record with a dated timeline and every form answer plus the cover letter and resume PDF and linked employer emails.",
+        open: false,
+        q: "Can I see what was submitted?",
+      },
+      {
+        a: `Company career pages running ${atsSentence}. Direct employer forms only with no job board aggregators or stale listings.`,
+        open: false,
+        q: "Which job sites does it check?",
+      },
+      {
+        a: "If an application fails to send or cannot be confirmed it never uses one of your applications. You can also pause preparing and sending from Home anytime.",
+        open: false,
+        q: "What if an application fails to send?",
+      },
+    ],
+    lead: "Everything to know about your resume and billing.",
+  },
+  closing: {
+    ctaPrimary: "Start free trial",
+    ctaSecondary: "See the plans",
+    headingItalic: "applying.",
+    headingPlain: "Let Overture handle the ",
+    lead: "Upload your resume once. Overture finds fresh roles and submits tailored applications on your behalf.",
+  },
+  footer: {
+    copyright: "© 2026 Overture",
+  },
+} as const;

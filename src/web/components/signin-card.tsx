@@ -1,5 +1,6 @@
+import { ArrowLeft, Lock } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { z } from "zod";
 
 import { copy } from "../../shared/copy.ts";
@@ -7,17 +8,18 @@ import { isDemoEmail } from "../../shared/demo.ts";
 import { turnstileActionHeader, turnstileTokenHeader } from "../../shared/turnstile.ts";
 import { BusyIndicator } from "./busy-indicator.tsx";
 import { GoogleMark } from "./google-mark.tsx";
-import { NavGlyph } from "./nav-glyph.tsx";
+import { LinkedinMark } from "./linkedin-mark.tsx";
 import { SignInForm } from "./signin-form.tsx";
 import {
   ALERT_CLASS,
-  BTN_GHOST,
-  BTN_SECONDARY,
   CARD_CLASS,
   CARD_DESCRIPTION,
   CARD_HEADING,
   SWITCH_CLASS,
 } from "./signin-styles.ts";
+import { Button } from "./ui/button.tsx";
+import { Card } from "./ui/card.tsx";
+import { Separator } from "./ui/separator.tsx";
 import { authClient } from "../lib/auth-client.ts";
 import { fetchOnboardingState } from "../lib/onboarding-api.ts";
 import { useTurnstile, turnstileFailureMessage } from "../lib/turnstile.ts";
@@ -53,7 +55,7 @@ const callbackPhase = new Map<string, Phase>([
 async function nextAfterSignIn() {
   const onboarding = await fetchOnboardingState().catch(() => null);
 
-  return onboarding?.needsOnboarding === true ? "/onboarding" : "/";
+  return onboarding?.needsOnboarding === true ? "/onboarding" : "/home";
 }
 
 function callbackMessage(code: string) {
@@ -97,7 +99,8 @@ function presentError(status: number, code: string | undefined) {
   return copy.signIn.genericError;
 }
 
-export function SignInCard() {
+export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) {
+  const isSignUp = mode === "signup";
   const navigate = useNavigate();
   const [search] = useSearchParams();
   const callbackError = search.get("error") ?? "";
@@ -325,36 +328,36 @@ export function SignInCard() {
     socialProviders.length === 0 ? null : (
       <>
         {socialProviders.includes("google") ? (
-          <button
-            aria-busy={pending === "google" || undefined}
-            className={BTN_SECONDARY}
+          <Button
+            ariaBusy={pending === "google"}
+            className="w-full"
             disabled={pending !== null}
             onClick={() => {
               void onSocial("google");
             }}
-            type="button"
+            variant="secondary"
           >
-            <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_rgba(21,19,17,0.08)]">
+            <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-pdf ring-1 ring-border">
               <GoogleMark />
             </span>
-            {copy.signIn.google}
-          </button>
+            {isSignUp ? copy.signIn.signUpGoogle : copy.signIn.google}
+          </Button>
         ) : null}
         {socialProviders.includes("linkedin") ? (
-          <button
-            aria-busy={pending === "linkedin" || undefined}
-            className={BTN_SECONDARY}
+          <Button
+            ariaBusy={pending === "linkedin"}
+            className="w-full"
             disabled={pending !== null}
             onClick={() => {
               void onSocial("linkedin");
             }}
-            type="button"
+            variant="secondary"
           >
-            <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded border border-input bg-muted text-[11px] font-bold">
-              {copy.signIn.linkedinBadge}
+            <span className="flex h-6 w-6 flex-none items-center justify-center">
+              <LinkedinMark />
             </span>
-            {copy.signIn.linkedin}
-          </button>
+            {isSignUp ? copy.signIn.signUpLinkedin : copy.signIn.linkedin}
+          </Button>
         ) : null}
       </>
     );
@@ -362,49 +365,38 @@ export function SignInCard() {
   if (phase === "suspended") {
     return (
       <>
-        <section aria-labelledby="signin-heading" className={CARD_CLASS}>
-          <div className="mb-[22px] flex flex-col gap-1.5">
+        <Card ariaLabelledBy="signin-heading" className={CARD_CLASS} variant="elevated">
+          <div className="mb-6 flex flex-col gap-1.5">
             <h1 className={CARD_HEADING} id="signin-heading">
               {copy.signIn.suspendedTitle}
             </h1>
             <p className={CARD_DESCRIPTION}>{copy.signIn.suspendedDescription}</p>
           </div>
           <div className="flex flex-col gap-3">
-            <div
-              className={ALERT_CLASS}
-              role="alert"
-              style={{ background: "var(--color-need-soft)" }}
-            >
-              <span className="mt-0.5 flex-none">
-                <NavGlyph name="lock" size={18} />
-              </span>
+            <div className={ALERT_CLASS} role="alert">
+              <Lock aria-hidden="true" className="mt-0.5 h-4 w-4 flex-none" />
               <div>
-                <strong className="block text-[14.5px] font-bold">
-                  {copy.signIn.suspendedHeading}
-                </strong>
-                <p className="mt-[3px] text-foreground">{copy.signIn.suspendedBody}</p>
+                <strong className="block text-sm font-bold">{copy.signIn.suspendedHeading}</strong>
+                <p className="mt-1 text-foreground">{copy.signIn.suspendedBody}</p>
               </div>
             </div>
-            <p className="text-[13.5px] leading-normal text-foreground">
-              {copy.signIn.suspendedHelp}
-            </p>
-            <a className={BTN_SECONDARY} href="mailto:admin@tryoverture.com">
-              {copy.signIn.suspendedEmail}
-            </a>
+            <p className="text-sm leading-relaxed text-foreground">{copy.signIn.suspendedHelp}</p>
+            <Button asChild className="w-full" variant="secondary">
+              <a href="mailto:admin@tryoverture.com">{copy.signIn.suspendedEmail}</a>
+            </Button>
           </div>
-        </section>
+        </Card>
         <p className={SWITCH_CLASS}>
-          <button
-            className="inline-flex min-h-[44px] items-center gap-2 px-1 font-semibold text-foreground underline underline-offset-[3px]"
+          <Button
             onClick={() => {
               setPhase("form");
               setActionError(null);
             }}
-            type="button"
+            variant="link"
           >
-            <NavGlyph name="back" size={15} />
+            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
             {copy.signIn.back}
-          </button>
+          </Button>
         </p>
       </>
     );
@@ -414,128 +406,124 @@ export function SignInCard() {
     const busyResend = pending === "magic";
 
     return (
-      <section aria-labelledby="signin-heading" className={CARD_CLASS}>
-        <div className="mb-[22px] flex flex-col gap-1.5">
+      <Card ariaLabelledBy="signin-heading" className={CARD_CLASS} variant="elevated">
+        <div className="mb-6 flex flex-col gap-1.5">
           <h1 className={CARD_HEADING} id="signin-heading">
             {copy.signIn.sentTitle}
           </h1>
           <p className={CARD_DESCRIPTION}>{copy.signIn.sentDescription}</p>
         </div>
         <div className="flex flex-col gap-3.5">
-          <output
-            className="rounded-lg px-4 py-[15px] text-[13.5px] leading-normal text-ok"
-            style={{ background: "var(--color-ok-soft)" }}
-          >
+          <output className="rounded-lg bg-ok-soft px-4 py-4 text-sm leading-relaxed text-ok">
             <p className="font-semibold text-foreground">
-              {copy.signIn.sentHeading}{" "}
-              <span className="font-mono text-[13px] [overflow-wrap:anywhere]">{email}</span>
+              {copy.signIn.sentHeading} <span className="break-all font-mono text-xs">{email}</span>
             </p>
-            <p className="mt-1 text-[13px] text-muted-foreground">{copy.signIn.sentDetail}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{copy.signIn.sentDetail}</p>
           </output>
-          <button
-            aria-busy={busyResend || undefined}
-            className={BTN_SECONDARY}
+          <Button
+            ariaBusy={busyResend}
+            className="w-full"
             disabled={pending !== null}
             onClick={() => {
               void onMagic();
             }}
-            type="button"
+            variant="secondary"
           >
             {busyResend ? <BusyIndicator /> : null}
             {copy.signIn.resend}
-          </button>
-          <p className="text-center text-[13.5px] text-muted-foreground">
-            {copy.signIn.resendHint}
-          </p>
-          <button
-            className={`${BTN_GHOST} disabled:cursor-not-allowed disabled:opacity-[.45]`}
+          </Button>
+          <p className="text-center text-sm text-muted-foreground">{copy.signIn.resendHint}</p>
+          <Button
+            className="w-full"
             disabled={pending !== null}
             onClick={() => {
               setPhase("form");
               setEmail("");
               setActionError(null);
             }}
-            type="button"
+            variant="ghost"
           >
             {copy.signIn.changeEmail}
-          </button>
+          </Button>
         </div>
         <div data-turnstile="social" ref={socialContainer} />
         <div data-turnstile="magic" ref={magicContainer} />
-      </section>
+      </Card>
     );
   }
 
   const isRefused = phase === "refused";
+  const cardHeading = isSignUp ? copy.signIn.signUpTitle : copy.signIn.title;
+  const cardDesc = isSignUp ? copy.signIn.signUpDescription : copy.signIn.description;
 
   return (
-    <section aria-labelledby="signin-heading" className={CARD_CLASS}>
-      <div className="mb-[22px] flex flex-col gap-1.5">
-        <h1 className={CARD_HEADING} id="signin-heading">
-          {copy.signIn.title}
-        </h1>
-        <p className={CARD_DESCRIPTION}>
-          {isRefused ? copy.signIn.refusedDescription : copy.signIn.description}
-        </p>
-      </div>
-      <div className="flex flex-col gap-3">
-        {isRefused ? (
-          <div
-            className={ALERT_CLASS}
-            role="alert"
-            style={{ background: "var(--color-need-soft)" }}
-          >
-            <span className="mt-0.5 flex-none">
-              <NavGlyph name="lock" size={18} />
-            </span>
-            <div>
-              <strong className="block text-[14.5px] font-bold">
-                {copy.signIn.refusedHeading}
-              </strong>
-              <p className="mt-[3px] text-foreground">{copy.signIn.refusedBody}</p>
+    <>
+      <Card ariaLabelledBy="signin-heading" className={CARD_CLASS} variant="elevated">
+        <div className="mb-6 flex flex-col gap-1.5">
+          <h1 className={CARD_HEADING} id="signin-heading">
+            {cardHeading}
+          </h1>
+          <p className={CARD_DESCRIPTION}>
+            {isRefused ? copy.signIn.refusedDescription : cardDesc}
+          </p>
+        </div>
+        <div className="flex flex-col gap-3">
+          {isRefused ? (
+            <div className={ALERT_CLASS} role="alert">
+              <Lock aria-hidden="true" className="mt-0.5 h-4 w-4 flex-none" />
+              <div>
+                <strong className="block text-sm font-bold">{copy.signIn.refusedHeading}</strong>
+                <p className="mt-1 text-foreground">{copy.signIn.refusedBody}</p>
+              </div>
             </div>
-          </div>
-        ) : null}
-        {socialButtons}
-        {socialProviders.length === 0 ? null : (
-          <div
-            aria-hidden="true"
-            className="my-[18px] flex items-center gap-3 text-xs leading-[18px] text-muted-foreground"
-          >
-            <hr className="flex-1 border-border" />
-            <span>{isRefused ? copy.signIn.refusedLegend : copy.signIn.magicLegend}</span>
-            <hr className="flex-1 border-border" />
-          </div>
-        )}
-        <SignInForm
-          busy={pending === "magic"}
-          email={email}
-          onEmail={setEmail}
-          onSubmit={() => {
-            void onMagic();
-          }}
-          pending={pending !== null}
-          refused={isRefused}
-        />
-        {isRefused ? null : (
-          <p className="flex items-start gap-[9px] text-pretty text-[12.5px] leading-[1.52] text-muted-foreground">
-            <span className="mt-0.5 flex-none">
-              <NavGlyph name="lock" size={14} />
-            </span>
-            <span>
-              <span className="font-semibold text-foreground">{copy.signIn.allowHeading}</span>{" "}
-              {copy.signIn.allowNote}
-            </span>
+          ) : null}
+          {socialButtons}
+          {socialProviders.length === 0 ? null : (
+            <div
+              aria-hidden="true"
+              className="my-4 flex items-center gap-3 text-xs text-muted-foreground"
+            >
+              <Separator className="flex-1" />
+              <span>{isRefused ? copy.signIn.refusedLegend : copy.signIn.magicLegend}</span>
+              <Separator className="flex-1" />
+            </div>
+          )}
+          <SignInForm
+            busy={pending === "magic"}
+            email={email}
+            onEmail={setEmail}
+            onSubmit={() => {
+              void onMagic();
+            }}
+            pending={pending !== null}
+            primary
+            refused={isRefused}
+            submitLabel={isSignUp ? copy.signIn.signUpMagicSubmit : copy.signIn.magicSubmit}
+          />
+          {isRefused ? null : (
+            <p className="mt-1 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+              <Lock aria-hidden="true" className="h-3.5 w-3.5 flex-none" />
+              <span className="font-medium text-muted-foreground">{copy.signIn.allowHeading}</span>
+            </p>
+          )}
+        </div>
+        <div data-turnstile="social" ref={socialContainer} />
+        <div data-turnstile="magic" ref={magicContainer} />
+        {actionError === null ? null : (
+          <p className="mt-3 text-center text-xs font-semibold text-need" role="alert">
+            {actionError}
           </p>
         )}
-      </div>
-      <div data-turnstile="social" ref={socialContainer} />
-      <div data-turnstile="magic" ref={magicContainer} />
-      {actionError === null ? null : (
-        <p className="mt-3 text-center text-[13px] font-semibold text-need" role="alert">
-          {actionError}
-        </p>
-      )}
-    </section>
+      </Card>
+      <p className={SWITCH_CLASS}>
+        {isSignUp ? copy.signIn.switchToSignInPrompt : copy.signIn.switchToSignUpPrompt}{" "}
+        <Link
+          className="font-semibold text-foreground underline decoration-input underline-offset-4 transition hover:text-signal-text"
+          to={isSignUp ? "/signin" : "/signup"}
+        >
+          {isSignUp ? copy.signIn.switchToSignInAction : copy.signIn.switchToSignUpAction}
+        </Link>
+      </p>
+    </>
   );
 }

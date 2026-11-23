@@ -14,13 +14,24 @@ import { subscriptionKeys, vapidKeyPair } from "./push.fixture.ts";
 import { sinkMailCount } from "./sign-in.ts";
 
 const demoEmail = "test@email.com";
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const homeSchema = z.object({
   activity: z.object({ sent: z.array(z.unknown()) }),
   checkInDue: z.number(),
-  ranges: z.record(z.string(), z.object({ applicationsSent: z.number() })),
+  ranges: z.record(
+    z.string(),
+    z.object({
+      applicationsSent: z.number(),
+      chart: z.object({ points: z.array(z.object({ count: z.number() })) }),
+    }),
+  ),
   ready: z.object({ approved: z.number(), ready: z.number() }),
   reviews: z.object({ total: z.number() }),
+});
+
+const calendarSchema = z.object({
+  items: z.array(z.object({ at: z.number(), kind: z.string() })),
 });
 
 const readySchema = z.object({
@@ -146,8 +157,10 @@ test("test@email.com signs in with one click and every main screen is populated"
 
   await page.goto(`${demoServer.url}/signin`);
   await page.getByLabel("Email").fill(demoEmail);
-  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await page.getByRole("button", { name: "Send sign-in link" }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
 
   const { request } = page;
   const { state, user } = await demoUser(request, demoServer.url);
@@ -222,7 +235,7 @@ test("test@email.com signs in with one click and every main screen is populated"
   await expect(page.getByText("Paper Kite").first()).toBeVisible();
 
   await page.goto(`${demoServer.url}/board`);
-  await expect(page.getByRole("heading", { name: "Your Board" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Job Tracker" })).toBeVisible();
   await expect(page.getByText("Tidepool Analytics").first()).toBeVisible();
 
   await page.goto(`${demoServer.url}/review`);
@@ -232,18 +245,74 @@ test("test@email.com signs in with one click and every main screen is populated"
   ).toBeVisible();
 
   await page.goto(`${demoServer.url}/inbox`);
-  await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Employer Inbox" })).toBeVisible();
 
   await page.goto(`${demoServer.url}/profile`);
-  await expect(page.getByRole("heading", { name: "Your Profile" })).toBeVisible();
+  await expect(page).toHaveURL(/\/profile\/resume$/u);
+  await expect(page.getByRole("heading", { name: "Resume & Cover Letter" })).toBeVisible();
 
   await page.close();
+});
+
+test("the seeded demo account keeps a lively activity curve and its interviews stay idempotent", async ({
+  demoServer,
+}) => {
+  const request = await apiRequest.newContext({ baseURL: demoServer.url });
+
+  await signInDemo(request, demoServer.url);
+
+  const clock = clockSchema.parse(
+    await (await request.get(`${demoServer.url}/__test__/clock`)).json(),
+  );
+
+  const home = homeSchema.parse(await (await request.get(`${demoServer.url}/api/home`)).json());
+
+  const sevenDayPoints = home.ranges["7D"]?.chart.points ?? [];
+
+  expect(sevenDayPoints).toHaveLength(7);
+  expect(sevenDayPoints.every((point) => point.count > 0)).toBe(true);
+
+  const thirtyDayPoints = home.ranges["30D"]?.chart.points ?? [];
+  const ninetyDayPoints = home.ranges["90D"]?.chart.points ?? [];
+
+  expect(thirtyDayPoints.filter((point) => point.count > 0).length).toBeGreaterThanOrEqual(12);
+  expect(ninetyDayPoints.filter((point) => point.count > 0).length).toBeGreaterThanOrEqual(10);
+
+  const todayStart = clock.now - DAY_MS;
+  const tomorrowStart = clock.now + DAY_MS;
+  const fifthDayEnd = clock.now + 6 * DAY_MS;
+
+  const calendarUrl = `${demoServer.url}/api/calendar?from=${encodeURIComponent(new Date(todayStart).toISOString())}&to=${encodeURIComponent(new Date(fifthDayEnd).toISOString())}`;
+  const calendar = calendarSchema.parse(await (await request.get(calendarUrl)).json());
+  const interviews = calendar.items.filter((item) => item.kind === "interview");
+
+  const todayInterviews = interviews.filter(
+    (item) => item.at >= todayStart && item.at < tomorrowStart,
+  );
+
+  const upcomingInterviews = interviews.filter(
+    (item) => item.at >= tomorrowStart && item.at < fifthDayEnd,
+  );
+
+  expect(todayInterviews).toHaveLength(2);
+  expect(upcomingInterviews.length).toBeGreaterThanOrEqual(2);
+
+  const second = await apiRequest.newContext({ baseURL: demoServer.url });
+
+  await signInDemo(second, demoServer.url);
+
+  const again = calendarSchema.parse(await (await second.get(calendarUrl)).json());
+
+  expect(again.items.filter((item) => item.kind === "interview")).toHaveLength(interviews.length);
+
+  await second.dispose();
+  await request.dispose();
 });
 
 test("the demo path is refused when it is switched off", async ({ noDemoServer, page }) => {
   await page.goto(`${noDemoServer.url}/signin`);
   await page.getByLabel("Email").fill(demoEmail);
-  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+  await page.getByRole("button", { name: "Send sign-in link" }).click();
 
   await expect(page.getByText("Invitation only for now.")).toBeVisible();
 
@@ -519,10 +588,12 @@ test("test@email.com signs out of this device from Settings without demo_locked"
 
   await page.goto(`${demoServer.url}/signin`);
   await page.getByLabel("Email").fill(demoEmail);
-  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await page.getByRole("button", { name: "Send sign-in link" }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
 
-  await page.goto(`${demoServer.url}/settings`);
+  await page.goto(`${demoServer.url}/profile/account`);
 
   const signedOut = page.waitForResponse(
     (response) => response.url().endsWith("/api/auth/sign-out") && response.ok(),
@@ -540,7 +611,7 @@ test("test@email.com signs out of this device from Settings without demo_locked"
   await page.goto(`${demoServer.url}/`);
   await expect(page).toHaveURL(`${demoServer.url}/`);
   await expect(
-    page.getByRole("heading", { level: 1, name: /Overture prepares every application/u }),
+    page.getByRole("heading", { level: 1, name: /The job hunt, handled\./u }),
   ).toBeVisible();
 
   await page.goto(`${demoServer.url}/board`);

@@ -63,7 +63,9 @@ async function openHome(page: Page, appServer: AppServer) {
   await page.goto(`${appServer.url}/`);
 
   await navResponse;
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
 }
 
 const destinations = ["Ready", "Review", "Inbox"] as const;

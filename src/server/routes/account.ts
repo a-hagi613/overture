@@ -113,7 +113,7 @@ export function createAccountRoutes(deps: {
     const origin = env.APP_ORIGIN ?? new URL(context.req.url).origin;
 
     await auth.api.signInMagicLink({
-      body: { email: result.user.email, callbackURL: `${origin}/settings/delete` },
+      body: { email: result.user.email, callbackURL: `${origin}/profile/account` },
       headers: context.req.raw.headers,
     });
 

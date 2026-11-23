@@ -196,7 +196,7 @@ async function expectButtonsAreInteractive(page: Page) {
   await expectButtonInteractive(page, page.getByRole("button", { name: "Continue to delete" }));
   await expectButtonInteractive(
     page,
-    page.getByRole("button", { name: "Email me a sign-in link", exact: true }),
+    page.getByRole("button", { name: "Send sign-in link", exact: true }),
   );
   await expectButtonInteractive(page, page.getByRole("button", { name: "Delete my account" }));
 

@@ -113,7 +113,9 @@ test("an invited email joins by magic link, gets one grant of 300, and cannot be
   await signInByMagicLink(page, appUrl, page.request, guestEmail);
   await expect(page.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
   await page.goto(`${appUrl}/`);
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
   await expect(page.getByText("of 300 on your week plan")).toBeVisible();
 
   const state = await verifyAuthState(appUrl, page.request);
@@ -140,7 +142,9 @@ test("an invited email joins by magic link, gets one grant of 300, and cannot be
   await signInByMagicLink(page, appUrl, page.request, guestEmail);
   await expect(page.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
   await page.goto(`${appUrl}/`);
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
   await expect(page.getByText("of 300 on your week plan")).toBeVisible();
 
   expect(
@@ -181,7 +185,9 @@ test("an invite is accepted by Google and by LinkedIn, each granting 300 once", 
   await page.getByRole("button", { name: "Continue with Google" }).click();
   await expect(page.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
   await page.goto(`${appUrl}/`);
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
   await expect(page.getByText("of 300 on your week plan")).toBeVisible();
 
   const linkedInContext = await browser.newContext();
@@ -193,7 +199,9 @@ test("an invite is accepted by Google and by LinkedIn, each granting 300 once", 
   await linkedInPage.getByRole("button", { name: "Continue with LinkedIn" }).click();
   await expect(linkedInPage.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
   await linkedInPage.goto(`${appUrl}/`);
-  await expect(linkedInPage.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await expect(
+    linkedInPage.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
   await expect(linkedInPage.getByText("of 300 on your week plan")).toBeVisible();
 
   await linkedInContext.close();

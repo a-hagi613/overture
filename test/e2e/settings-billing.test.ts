@@ -6,7 +6,6 @@ import { z } from "zod";
 
 import type { APIRequestContext, Browser, Page } from "@playwright/test";
 
-import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, startFreshAppServer, test } from "./app.fixture.ts";
 import {
   appNowSeconds,
@@ -42,7 +41,6 @@ const homeSchema = z.object({
   pauseReason: z.string().nullable(),
 });
 
-const reservationSchema = z.object({ applicationsLeft: z.number() });
 const runDueSchema = z.object({ ran: z.number() });
 const clockSchema = z.object({ now: z.number() });
 
@@ -55,14 +53,23 @@ interface BillingApp {
 
 function invoicePayload(
   template: string,
-  input: { eventId: string; invoiceId: string; ownerId: string; start: number; end: number },
+  input: {
+    eventId: string;
+    invoiceId: string;
+    ownerId: string;
+    plan?: "week" | "month";
+    start: number;
+    end: number;
+  },
 ) {
+  const plan = input.plan ?? "month";
+
   return template
     .replaceAll("__EVENT_ID__", input.eventId)
     .replaceAll("__INVOICE_ID__", input.invoiceId)
     .replaceAll("__USER_ID__", input.ownerId)
-    .replaceAll("__PLAN__", "month")
-    .replaceAll("__PRICE_ID__", BILLING_PRICE_MONTH)
+    .replaceAll("__PLAN__", plan)
+    .replaceAll("__PRICE_ID__", plan === "week" ? BILLING_PRICE_WEEK : BILLING_PRICE_MONTH)
     .replaceAll('"__PERIOD_START__"', String(input.start))
     .replaceAll('"__PERIOD_END__"', String(input.end));
 }
@@ -127,9 +134,10 @@ async function stopBillingApp(app: BillingApp) {
   await app.server.stop();
 }
 
-async function subscribeMonth(app: BillingApp) {
+async function subscribePlan(app: BillingApp, plan: "week" | "month") {
   const now = await appNowSeconds(app.api, app.server.url);
-  const end = now + 30 * DAY_SECONDS;
+  const days = plan === "week" ? 7 : 30;
+  const end = now + days * DAY_SECONDS;
 
   await deliver(
     app.api,
@@ -137,9 +145,9 @@ async function subscribeMonth(app: BillingApp) {
     subscriptionPayload({
       cancelAtPeriodEnd: false,
       end,
-      eventId: "evt_settings_billing_sub_1",
+      eventId: `evt_settings_billing_sub_${plan}_1`,
       ownerId: app.ownerId,
-      plan: "month",
+      plan,
       start: now,
     }),
   );
@@ -149,9 +157,10 @@ async function subscribeMonth(app: BillingApp) {
     app.server.url,
     invoicePayload(paidTemplate, {
       end,
-      eventId: "evt_settings_billing_paid_1",
-      invoiceId: "in_settings_billing_1",
+      eventId: `evt_settings_billing_paid_${plan}_1`,
+      invoiceId: `in_settings_billing_${plan}_1`,
       ownerId: app.ownerId,
+      plan,
       start: now,
     }),
   );
@@ -221,17 +230,17 @@ async function shoot(page: Page, name: string) {
   await page.screenshot({ fullPage: true, path: join(dir, `${name}.png`) });
 }
 
-test.describe("plan and billing in Settings, and the paused and out-of-applications states", () => {
+test.describe("plan and billing in Profile, and the paused states", () => {
   test.setTimeout(240_000);
 
-  test("Settings shows the plan, Applications left and renewal, and hands plan changes and payment to Stripe", async ({
+  test("Billing shows current Month plan, remaining applications, and opens Stripe portal", async ({
     browser,
     identityServer,
   }) => {
     const app = await startBillingApp(identityServer);
 
     try {
-      await subscribeMonth(app);
+      await subscribePlan(app, "month");
 
       const billing = billingSchema.parse(
         await (await app.api.get(`${app.server.url}/api/billing`)).json(),
@@ -242,23 +251,16 @@ test.describe("plan and billing in Settings, and the paused and out-of-applicati
       const { close, page } = await openPage(browser, app, { dark: false, width: 1280 });
 
       try {
-        await page.goto(`${app.server.url}/settings/billing`);
+        await page.goto(`${app.server.url}/profile/billing`);
 
-        await expect(page.getByRole("heading", { name: /Plan/u, level: 1 })).toBeVisible();
-        await expect(page.getByRole("heading", { name: "Your plan" })).toBeVisible();
-        await expect(page.getByText("Month plan")).toBeVisible();
         await expect(
-          page.getByRole("region", { name: "Your plan" }).getByText("300", { exact: true }),
+          page.getByRole("heading", { name: /Plan & Billing/u, level: 1 }),
         ).toBeVisible();
-        await expect(page.getByText("of 300 this period")).toBeVisible();
-        await expect(
-          page.getByRole("region", { name: "Your plan" }).getByText(/^Renews/u),
-        ).toBeVisible();
-        await expect(page.getByRole("button", { name: "Switch to Week at renewal" })).toBeVisible();
-        await expect(page.getByRole("button", { name: "Cancel at period end" })).toBeVisible();
-        await expect(page.getByRole("button", { name: "Manage payment in Stripe" })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Month plan" })).toBeVisible();
+        await expect(page.getByText(/300 of 300 applications left/u)).toBeVisible();
+        await expect(page.getByRole("heading", { name: "You're on the Month plan" })).toBeVisible();
 
-        await page.getByRole("button", { name: "Switch to Week at renewal" }).click();
+        await page.getByRole("button", { name: "Manage billing" }).first().click();
 
         await expect
           .poll(() => app.stripe.requests.some((r) => r.path === "/v1/billing_portal/sessions"))
@@ -266,35 +268,63 @@ test.describe("plan and billing in Settings, and the paused and out-of-applicati
       } finally {
         await close();
       }
-
-      await subscribeCancelAtEnd(app);
-
-      const cancelling = await openPage(browser, app, { dark: false, width: 390 });
-
-      try {
-        await cancelling.page.goto(`${app.server.url}/settings/billing`);
-
-        await expect(cancelling.page.getByText(/Your plan stays on until/u)).toBeVisible();
-        await expect(
-          cancelling.page.getByRole("button", { name: "Cancel at period end" }),
-        ).toHaveCount(0);
-        await expectNoOverflow(cancelling.page, "390px settings billing, cancelling");
-      } finally {
-        await cancelling.close();
-      }
     } finally {
       await stopBillingApp(app);
     }
   });
 
-  test("a failed payment pauses Home, and its fix opens Settings billing", async ({
+  test("Billing offers contextual upgrade from Free to Week and from Week to Month in Stripe", async ({
     browser,
     identityServer,
   }) => {
     const app = await startBillingApp(identityServer);
 
     try {
-      await subscribeMonth(app);
+      const freeView = await openPage(browser, app, { dark: false, width: 1280 });
+
+      try {
+        await freeView.page.goto(`${app.server.url}/profile/billing`);
+
+        await expect(freeView.page.getByRole("heading", { name: "Upgrade to Week" })).toBeVisible();
+        await freeView.page.getByRole("button", { name: "Upgrade to Week in Stripe" }).click();
+
+        await expect
+          .poll(() => app.stripe.requests.some((r) => r.path === "/v1/checkout/sessions"))
+          .toBe(true);
+      } finally {
+        await freeView.close();
+      }
+
+      await subscribePlan(app, "week");
+
+      const weekView = await openPage(browser, app, { dark: false, width: 1280 });
+
+      try {
+        await weekView.page.goto(`${app.server.url}/profile/billing`);
+
+        await expect(weekView.page.getByRole("heading", { name: "Week plan" })).toBeVisible();
+        await expect(
+          weekView.page.getByRole("heading", { name: "Upgrade to Month" }),
+        ).toBeVisible();
+        await expect(
+          weekView.page.getByRole("button", { name: "Upgrade to Month in Stripe" }),
+        ).toBeVisible();
+      } finally {
+        await weekView.close();
+      }
+    } finally {
+      await stopBillingApp(app);
+    }
+  });
+
+  test("a failed payment pauses Home, and its fix opens Profile billing", async ({
+    browser,
+    identityServer,
+  }) => {
+    const app = await startBillingApp(identityServer);
+
+    try {
+      await subscribePlan(app, "month");
 
       const now = await appNowSeconds(app.api, app.server.url);
 
@@ -315,13 +345,15 @@ test.describe("plan and billing in Settings, and the paused and out-of-applicati
       const { close, page } = await openPage(browser, app, { dark: false, width: 1280 });
 
       try {
-        await page.goto(`${app.server.url}/`);
+        await page.goto(`${app.server.url}/home`);
 
         await expect(page.getByText("Payment didn't go through.")).toBeVisible();
         await page.getByRole("link", { name: "Update payment" }).click();
 
-        await expect(page).toHaveURL(/\/settings\/billing$/u);
-        await expect(page.getByRole("heading", { name: "Plan and billing" })).toBeVisible();
+        await expect(page).toHaveURL(/\/profile\/billing$/u);
+        await expect(
+          page.getByRole("heading", { name: /Plan & Billing/u, level: 1 }),
+        ).toBeVisible();
       } finally {
         await close();
       }
@@ -330,7 +362,7 @@ test.describe("plan and billing in Settings, and the paused and out-of-applicati
     }
   });
 
-  test("a plan that has ended pauses Home, and its fix chooses a plan", async ({
+  test("a plan that has ended pauses Home, and its fix opens Profile billing", async ({
     browser,
     identityServer,
   }) => {
@@ -370,81 +402,16 @@ test.describe("plan and billing in Settings, and the paused and out-of-applicati
       const { close, page } = await openPage(browser, app, { dark: true, width: 390 });
 
       try {
-        await page.goto(`${app.server.url}/`);
+        await page.goto(`${app.server.url}/home`);
 
         await expect(page.getByText("Your plan has ended.")).toBeVisible();
         await page.getByRole("link", { name: "Choose a plan" }).click();
 
-        await expect(page).toHaveURL(/\/settings\/billing\/plans$/u);
-        await expect(page.getByRole("heading", { name: "Choose a plan" })).toBeVisible();
-        await expect(page.getByRole("button", { name: "Choose Week" })).toBeVisible();
-        await expect(page.getByRole("button", { name: "Choose Month" })).toBeVisible();
-        await expectNoOverflow(page, "390px choose a plan, dark");
-      } finally {
-        await close();
-      }
-    } finally {
-      await stopBillingApp(app);
-    }
-  });
-
-  test("an invite grant running out shows its Applications left and end date, and then out of Applications", async ({
-    browser,
-    identityServer,
-  }) => {
-    const app = await startBillingApp(identityServer);
-
-    try {
-      const now = await appNowSeconds(app.api, app.server.url);
-      const grantEnd = (now + 37 * DAY_SECONDS) * 1000;
-
-      await app.api.post(`${app.server.url}/__test__/ledger/grant`, {
-        data: {
-          email: authTestIdentity.ownerEmail,
-          expiresAt: grantEnd,
-          idempotencyKey: "grant:settings-billing-invite",
-          quantity: 2,
-          source: "admin",
-        },
-      });
-
-      expect(await homeState(app)).toMatchObject({
-        applicationsLeft: 2,
-        endingGrant: { applicationsLeft: 2, expiresAt: grantEnd },
-      });
-
-      const { close, page } = await openPage(browser, app, { dark: false, width: 1280 });
-
-      try {
-        await page.goto(`${app.server.url}/`);
-
-        await expect(page.getByText("Invite grant running out.")).toBeVisible();
+        await expect(page).toHaveURL(/\/profile\/billing$/u);
         await expect(
-          page.getByText(/Your invite grant has 2 Applications left and ends on/u),
+          page.getByRole("heading", { name: /Plan & Billing/u, level: 1 }),
         ).toBeVisible();
-        await expect(page.getByRole("link", { name: "Choose a plan" })).toBeVisible();
-
-        await inSequence(
-          ["app_settings_billing_1", "app_settings_billing_2"],
-          async (applicationId) => {
-            const reserved = reservationSchema.parse(
-              await (
-                await app.api.post(`${app.server.url}/__test__/ledger/application`, {
-                  data: { applicationId, commit: true, email: authTestIdentity.ownerEmail },
-                })
-              ).json(),
-            );
-
-            expect(reserved.applicationsLeft).toBeGreaterThanOrEqual(0);
-          },
-        );
-
-        await page.reload();
-
-        await expect(page.getByText("Out of Applications.")).toBeVisible();
-        await expect(page.getByText("Invite grant running out.")).toHaveCount(0);
-        await expect(page.getByRole("link", { name: "See the Board" })).toBeVisible();
-        await shoot(page, "home-out-of-applications-1280-light");
+        await expectNoOverflow(page, "390px profile billing, dark");
       } finally {
         await close();
       }
@@ -453,7 +420,7 @@ test.describe("plan and billing in Settings, and the paused and out-of-applicati
     }
   });
 
-  test("Choose a plan shows the Checkout return states and starts Checkout for a plan", async ({
+  test("Billing shows Checkout return banners for cancelled and successful returns", async ({
     browser,
     identityServer,
   }) => {
@@ -463,37 +430,29 @@ test.describe("plan and billing in Settings, and the paused and out-of-applicati
       const { close, page } = await openPage(browser, app, { dark: false, width: 1280 });
 
       try {
-        await page.goto(`${app.server.url}/settings/billing/plans?billing=cancelled`);
+        await page.goto(`${app.server.url}/profile/billing?billing=cancelled`);
 
         await expect(page.getByText("Checkout not finished")).toBeVisible();
         await expect(
           page.getByText("Nothing was charged. Your plan has not changed."),
         ).toBeVisible();
 
-        await page.goto(`${app.server.url}/settings/billing/plans?billing=success`);
+        await page.goto(`${app.server.url}/profile/billing?billing=success`);
 
         await expect(page.getByText("Checking the payment")).toBeVisible();
-
-        await page.goto(`${app.server.url}/settings/billing/plans`);
-        await page.getByRole("button", { name: "Choose Week" }).click();
-
-        await expect
-          .poll(() => app.stripe.requests.some((r) => r.path === "/v1/checkout/sessions"))
-          .toBe(true);
       } finally {
         await close();
       }
 
-      await subscribeMonth(app);
+      await subscribePlan(app, "month");
 
       const returned = await openPage(browser, app, { dark: true, width: 768 });
 
       try {
-        await returned.page.goto(`${app.server.url}/settings/billing/plans?billing=success`);
+        await returned.page.goto(`${app.server.url}/profile/billing?billing=success`);
 
         await expect(returned.page.getByText("Plan started")).toBeVisible();
-        await expect(returned.page.getByText("Month plan on")).toBeVisible();
-        await expectAxeClean(returned.page, "768px plans, dark");
+        await expectAxeClean(returned.page, "768px profile billing, dark");
       } finally {
         await returned.close();
       }
@@ -502,14 +461,14 @@ test.describe("plan and billing in Settings, and the paused and out-of-applicati
     }
   });
 
-  test("every billing and paused page is overflow-free and axe clean from 390 to 2560, in light and dark", async ({
+  test("billing and paused Home pages are overflow-free and axe clean from 390 to 2560, in light and dark", async ({
     browser,
     identityServer,
   }) => {
     const app = await startBillingApp(identityServer);
 
     try {
-      await subscribeMonth(app);
+      await subscribePlan(app, "month");
 
       const now = await appNowSeconds(app.api, app.server.url);
 
@@ -528,18 +487,13 @@ test.describe("plan and billing in Settings, and the paused and out-of-applicati
       const routes = [
         {
           name: "home-paused",
-          path: "/",
+          path: "/home",
           ready: (page: Page) => page.getByText("Payment didn't go through."),
         },
         {
-          name: "settings-billing",
-          path: "/settings/billing",
-          ready: (page: Page) => page.getByRole("heading", { name: "Plan and billing" }),
-        },
-        {
-          name: "billing-plans",
-          path: "/settings/billing/plans",
-          ready: (page: Page) => page.getByRole("heading", { name: "Choose a plan" }),
+          name: "profile-billing",
+          path: "/profile/billing",
+          ready: (page: Page) => page.getByRole("heading", { name: /Plan & Billing/u, level: 1 }),
         },
       ] as const;
 
@@ -569,20 +523,3 @@ test.describe("plan and billing in Settings, and the paused and out-of-applicati
     }
   });
 });
-
-async function subscribeCancelAtEnd(app: BillingApp) {
-  const now = await appNowSeconds(app.api, app.server.url);
-
-  await deliver(
-    app.api,
-    app.server.url,
-    subscriptionPayload({
-      cancelAtPeriodEnd: true,
-      end: now + 30 * DAY_SECONDS,
-      eventId: "evt_settings_billing_cancel_1",
-      ownerId: app.ownerId,
-      plan: "month",
-      start: now,
-    }),
-  );
-}

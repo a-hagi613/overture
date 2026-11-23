@@ -488,7 +488,7 @@ export async function runExportNotifyJob(deps: ExportServiceDeps, exportId: stri
 
   try {
     await deps.mail.sendExportReady({
-      body: copy.mail.exportReadyBody(`${deps.appOrigin.replace(/\/+$/u, "")}/settings/export`),
+      body: copy.mail.exportReadyBody(`${deps.appOrigin.replace(/\/+$/u, "")}/profile/account`),
       subject: copy.mail.exportReadySubject,
       to: user.email,
     });

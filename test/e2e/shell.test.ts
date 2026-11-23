@@ -8,12 +8,12 @@ import { expect, test } from "./app.fixture.ts";
 
 type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
 
-const destinations = ["Home", "Board", "Review", "Inbox", "Profile"];
+const desktopDestinations = ["Home", "Tracker", "Ready", "Review", "Inbox", "Calendar", "Profile"];
 
-async function expectAllDestinations(locator: ReturnType<Page["getByRole"]>) {
+async function expectDesktopDestinations(locator: ReturnType<Page["getByRole"]>) {
   await Promise.all(
-    destinations.map(async (destination) => {
-      await expect(locator.getByRole("link", { name: destination })).toBeVisible();
+    desktopDestinations.map(async (destination) => {
+      await expect(locator.getByRole("link", { name: destination }).first()).toBeVisible();
     }),
   );
 }
@@ -25,8 +25,10 @@ async function openShell(page: Page, appServerUrl: string, theme: string) {
     });
   }
 
-  await page.goto(`${appServerUrl}/`);
-  await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+  await page.goto(`${appServerUrl}/home`);
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+  ).toBeVisible();
 }
 
 async function expectShellAxeClean(
@@ -53,7 +55,7 @@ async function expectShellAxeClean(
   await context.close();
 }
 
-test("the shell lists the five destinations on desktop and opens settings from the avatar", async ({
+test("the shell lists workspace destinations on desktop and navigates to Settings, Inbox, and 404", async ({
   browser,
   appServerUrl,
   ownerStorageState,
@@ -61,30 +63,31 @@ test("the shell lists the five destinations on desktop and opens settings from t
   const desktop = await browser.newContext({ storageState: ownerStorageState });
   const shellPage = await desktop.newPage();
 
-  await shellPage.setViewportSize({ width: 1280, height: 800 });
+  await shellPage.setViewportSize({ width: 1280, height: 900 });
   await openShell(shellPage, appServerUrl, "light");
 
   const sideNav = shellPage.getByRole("navigation", { name: "Main" });
 
   await expect(sideNav).toBeVisible();
-  await expectAllDestinations(sideNav);
+  await expectDesktopDestinations(sideNav);
   await expect(
     shellPage.getByRole("navigation", { name: "Quick sections" }).getByRole("link", {
       name: "Home",
     }),
   ).toBeHidden();
 
-  await sideNav.getByRole("link", { name: "Settings" }).click();
-  await expect(shellPage).toHaveURL(/\/settings/u);
+  await sideNav.getByRole("link", { name: "Profile" }).hover();
+  await sideNav.getByRole("menuitem", { name: "Settings" }).click();
+  await expect(shellPage).toHaveURL(/\/profile\/account$/u);
   await expect(shellPage.getByRole("heading", { name: "Account and sign-in" })).toBeVisible();
   await expect(shellPage.getByText(authTestIdentity.ownerEmail).first()).toBeVisible();
   await expect(shellPage.getByRole("button", { name: "Sign out everywhere" })).toBeVisible();
 
   await shellPage.goto(`${appServerUrl}/inbox`);
-  await expect(shellPage.getByRole("heading", { name: "Inbox" })).toBeVisible();
+  await expect(shellPage.getByRole("heading", { level: 1, name: "Employer Inbox" })).toBeVisible();
 
   await shellPage.goto(`${appServerUrl}/missing-route`);
-  await expect(shellPage.getByRole("heading", { name: "Not found" })).toBeVisible();
+  await expect(shellPage.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
 
   await desktop.close();
 });
@@ -109,10 +112,13 @@ test("the shell shows the phone tab bar at 390 and the desktop rail at 1280", as
   const tabBar = shellPage.getByRole("navigation", { name: "Quick sections" });
 
   await expect(tabBar).toBeVisible();
-  await expectAllDestinations(tabBar);
+  await expect(tabBar.getByRole("link", { name: "Home" })).toBeVisible();
+  await expect(tabBar.getByRole("button", { name: "Tracker" })).toBeVisible();
+  await expect(tabBar.getByRole("button", { name: "Profile" })).toBeVisible();
+  await expect(tabBar.getByRole("button", { name: "More" })).toBeVisible();
   await expect(sideNav).toBeHidden();
 
-  await shellPage.setViewportSize({ width: 1280, height: 800 });
+  await shellPage.setViewportSize({ width: 1280, height: 900 });
   await expect(sideNav).toBeVisible();
   await expect(tabBar).toBeHidden();
 
@@ -138,7 +144,7 @@ test("a keyboard user can skip the shell to the main content", async ({
   const context = await browser.newContext({ storageState: ownerStorageState });
   const shellPage = await context.newPage();
 
-  await shellPage.setViewportSize({ width: 1280, height: 800 });
+  await shellPage.setViewportSize({ width: 1280, height: 900 });
   await openShell(shellPage, appServerUrl, "light");
 
   const skipLink = shellPage.getByRole("link", { name: "Skip to content" });

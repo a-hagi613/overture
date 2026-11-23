@@ -138,7 +138,7 @@ async function loadMailbox() {
 }
 
 export function useMailbox() {
-  return useQuery({ queryKey: ["mailbox"], queryFn: loadMailbox });
+  return useQuery({ queryKey: ["mailbox"], queryFn: loadMailbox, retry: false });
 }
 
 export function attachmentHref(id: string) {

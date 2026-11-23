@@ -560,7 +560,7 @@ test("the delete page needs a check, asks for a sign-in link, and shows the eras
     );
     await expect(page.getByText("Erasing your account")).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+    await page.getByRole("button", { name: "Send sign-in link" }).click();
     await expect(page.getByText("A sign-in link is on its way.")).toBeVisible();
 
     const link = await latestMailLink(harness.server.url, request, authTestIdentity.ownerEmail);

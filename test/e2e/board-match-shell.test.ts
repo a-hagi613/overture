@@ -89,7 +89,9 @@ for (const width of [390, 1280] as const) {
       await page.request.post(`${appServerUrl}/api/running`, { data: { running: true } });
 
       await page.goto(`${appServerUrl}/`);
-      await expect(page.getByRole("heading", { name: "The day so far" })).toBeVisible();
+      await expect(
+        page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
+      ).toBeVisible();
 
       if (width === 1280) {
         await expect(page.getByText("of 70 on your week plan")).toHaveCount(1);

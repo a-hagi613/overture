@@ -1,54 +1,25 @@
+import { ArrowLeft, CreditCard } from "lucide-react";
 import { useEffect, useRef } from "react";
-import type { RefObject } from "react";
 import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
+import { Badge } from "./ui/badge.tsx";
+import { Button } from "./ui/button.tsx";
+import { Card } from "./ui/card.tsx";
+import { dsBody, dsCardTitle } from "./ui/ds.ts";
 
 const text = copy.onboarding.trial;
 
 export type TrialCardState = "verify" | "declined" | "used";
 
-const pillStyle = {
-  verify: { background: "var(--well)", color: "var(--ink)" },
-  declined: { background: "var(--needbg)", color: "var(--need)" },
-  used: { background: "var(--accbg)", color: "var(--acct)" },
-} as const;
-
-function stateHeading({
-  headingRef,
-  pill,
-  state,
-  title,
-}: {
-  headingRef: RefObject<HTMLHeadingElement | null>;
-  pill: string;
-  state: TrialCardState;
-  title: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <h2
-        className="serif"
-        id="ob-h"
-        ref={headingRef}
-        style={{ fontSize: 28, lineHeight: 1.1 }}
-        tabIndex={-1}
-      >
-        {title}
-      </h2>
-      <span className="pill" style={pillStyle[state]}>
-        {pill}
-      </span>
-    </div>
-  );
-}
-
 export function OnboardingTrialCard({
+  backTo = "/onboarding/forward",
   busy,
   error,
   onVerify,
   state,
 }: {
+  backTo?: string;
   busy: boolean;
   error: boolean;
   onVerify: () => void;
@@ -56,103 +27,88 @@ export function OnboardingTrialCard({
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
 
-  const errorLine = error ? (
-    <p className="hint mt-4" role="alert" style={{ color: "var(--need)" }}>
-      {text.loadFailed}
-    </p>
-  ) : null;
-
   useEffect(() => {
     if (state !== "verify") {
       headingRef.current?.focus();
     }
   }, [state]);
 
+  let badgeVariant: "secondary" | "need" | "signal" = "secondary";
+  let pillLabel: string = text.stepPill;
+  let titleText: string = text.verifyTitle;
+  let bodyText: string = text.intro;
+
   if (state === "declined") {
-    return (
-      <section
-        aria-labelledby="ob-h"
-        className="obd rounded-lg border border-border bg-card p-5 shadow-sh"
-      >
-        {stateHeading({
-          headingRef,
-          pill: text.declinedTitle,
-          state: "declined",
-          title: text.declinedTitle,
-        })}
-        <p className="hint mt-3 max-w-[620px]" role="alert">
-          {text.declinedBody}
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2.5">
-          <button
-            className="btn"
-            disabled={busy}
-            onClick={onVerify}
-            style={{ minHeight: 44 }}
-            type="button"
-          >
-            {text.tryAnother}
-          </button>
-          <Link className="btn2" style={{ minHeight: 44 }} to="/settings/billing">
-            {text.choosePlan}
-          </Link>
-        </div>
-        {errorLine}
-      </section>
-    );
+    badgeVariant = "need";
+    pillLabel = text.declinedTitle;
+    titleText = text.declinedTitle;
+    bodyText = text.declinedBody;
+  } else if (state === "used") {
+    badgeVariant = "signal";
+    pillLabel = text.usedTitle;
+    titleText = text.usedHeading;
+    bodyText = text.usedBody;
   }
 
-  if (state === "used") {
-    return (
-      <section
-        aria-labelledby="ob-h"
-        className="obd rounded-lg border border-border bg-card p-5 shadow-sh"
-      >
-        {stateHeading({ headingRef, pill: text.usedTitle, state: "used", title: text.usedHeading })}
-        <p className="hint mt-3 max-w-[620px]" role="alert">
-          {text.usedBody}
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2.5">
-          <Link className="btn2" style={{ minHeight: 44 }} to="/settings/billing">
-            {text.choosePlan}
-          </Link>
-          <button
-            className="btn2"
-            disabled={busy}
-            onClick={onVerify}
-            style={{ minHeight: 44 }}
-            type="button"
-          >
-            {text.anotherCard}
-          </button>
-        </div>
-        {errorLine}
-      </section>
+  let actions = (
+    <>
+      <Button disabled={busy} onClick={onVerify} size="lg" variant="primary">
+        <CreditCard aria-hidden="true" size={16} />
+        <span>{busy ? text.verifying : text.verifyButton}</span>
+      </Button>
+      <Button asChild size="default" variant="ghost">
+        <Link to={backTo}>
+          <ArrowLeft aria-hidden="true" size={15} />
+          <span>{text.backButton}</span>
+        </Link>
+      </Button>
+    </>
+  );
+
+  if (state === "declined") {
+    actions = (
+      <>
+        <Button disabled={busy} onClick={onVerify} size="default" variant="primary">
+          {text.tryAnother}
+        </Button>
+        <Button asChild size="default" variant="secondary">
+          <Link to="/profile/billing">{text.choosePlan}</Link>
+        </Button>
+      </>
+    );
+  } else if (state === "used") {
+    actions = (
+      <>
+        <Button asChild size="default" variant="primary">
+          <Link to="/profile/billing">{text.choosePlan}</Link>
+        </Button>
+        <Button disabled={busy} onClick={onVerify} size="default" variant="secondary">
+          {text.anotherCard}
+        </Button>
+      </>
     );
   }
 
   return (
-    <section
-      aria-labelledby="ob-h"
-      className="obd rounded-lg border border-border bg-card p-5 shadow-sh"
-    >
-      {stateHeading({ headingRef, pill: text.stepPill, state: "verify", title: text.verifyTitle })}
-      <p className="hint mt-3 max-w-[620px]">{text.intro}</p>
-      <div className="mt-4 flex flex-wrap gap-2.5">
-        <button
-          className="btn"
-          disabled={busy}
-          onClick={onVerify}
-          style={{ minHeight: 44 }}
-          type="button"
-        >
-          {busy ? text.verifying : text.verifyButton}
-        </button>
-        <Link className="btng" style={{ minHeight: 44 }} to="/onboarding/forward">
-          {text.backButton}
-        </Link>
+    <Card ariaLabelledBy="ob-h" className="p-6 md:p-8" variant="elevated">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className={dsCardTitle} id="ob-h" ref={headingRef} tabIndex={-1}>
+          {titleText}
+        </h2>
+        <Badge variant={badgeVariant}>{pillLabel}</Badge>
       </div>
-      {errorLine}
-    </section>
+
+      <p className={`${dsBody} mt-3 max-w-xl`} role={state === "verify" ? undefined : "alert"}>
+        {bodyText}
+      </p>
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">{actions}</div>
+
+      {error ? (
+        <p className="mt-4 text-xs font-semibold text-need" role="alert">
+          {text.loadFailed}
+        </p>
+      ) : null}
+    </Card>
   );
 }

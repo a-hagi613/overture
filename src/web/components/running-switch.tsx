@@ -7,7 +7,7 @@ export function RunningSwitch() {
   const running = data?.running ?? false;
 
   return (
-    <div className="flex h-10 items-center gap-3 rounded-md border border-input bg-card pl-3.5 pr-1.5">
+    <div className="order-4 flex h-10 w-full items-center justify-between gap-3 rounded-md border border-input bg-card pl-3.5 pr-1.5 md:order-none md:w-auto">
       <span className="flex items-center gap-2 text-[13px] font-medium">
         <span
           aria-hidden="true"

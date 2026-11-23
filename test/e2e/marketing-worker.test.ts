@@ -75,7 +75,7 @@ test("the Worker attaches only the prerendered marketing paths", () => {
     expect(matchesMarketingRoute(path), path).toBe(true);
   }
 
-  expect(matchesMarketingRoute("/pricing?utm_source=test")).toBe(true);
+  expect(matchesMarketingRoute("/pricing")).toBe(false);
 });
 
 test("no app or API path reaches the marketing Worker", () => {

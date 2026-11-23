@@ -104,7 +104,7 @@ const todayRows = [
     kind: "paused",
     read: true,
     title: "Payment didn’t go through.",
-    url: "/settings",
+    url: "/profile/account",
   },
   {
     at: at(15, 0),

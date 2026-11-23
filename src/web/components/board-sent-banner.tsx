@@ -1,7 +1,9 @@
+import { CheckCircle2 } from "lucide-react";
+
 import { copy } from "../../shared/copy.ts";
 import type { ApplicationDetail } from "../lib/board-api.ts";
 import { providerName, stamp } from "../lib/board-format.ts";
-import { BoardMark } from "./board-mark.tsx";
+import { Card } from "./ui/card.tsx";
 
 export function BoardSentBanner({ detail }: { detail: ApplicationDetail }) {
   const { dossier } = detail;
@@ -18,22 +20,22 @@ export function BoardSentBanner({ detail }: { detail: ApplicationDetail }) {
       : copy.board.dossier.sentConfirmedPage;
 
   return (
-    <section
-      aria-label={copy.board.dossier.sentLabel}
-      className="mt-3.5 flex gap-3 rounded-md border border-border bg-card p-3 md:mt-[18px]"
+    <Card
+      ariaLabel={copy.board.dossier.sentLabel}
+      className="mt-4 flex items-start gap-3 border-ok/25 bg-ok-soft/45 p-3.5 shadow-none"
     >
-      <BoardMark kind="check" />
-      <div>
-        <p className="mono text-[12.5px] text-foreground">
+      <CheckCircle2 aria-hidden="true" className="mt-0.5 shrink-0 text-ok" size={18} />
+      <div className="min-w-0">
+        <p className="font-mono text-xs font-semibold text-foreground">
           {copy.board.dossier.sentVia(
             providerName(sentVia.provider),
             stamp(sentVia.submittedAt, detail.timeZone),
           )}
         </p>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
           {`${copy.board.dossier.sentOnce} ${confirmed}`}
         </p>
       </div>
-    </section>
+    </Card>
   );
 }

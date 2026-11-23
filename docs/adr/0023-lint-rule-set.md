@@ -92,6 +92,7 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
   background path that prunes the catalog outside the sweep, nulling old closed descriptions and deleting old closed
   Postings in bounded chunks. `src/server/platform/jobs/retention.test.ts` is listed for the same reason: it seeds
   fictional Postings to prove the prune's age, chunk and cascade rules and that no Application row changes.
+- **No raw CSS or off-scale design styles in `src/web/`.** `overture/no-raw-design-styles` forbids importing extra raw `.css` files (only `src/web/main.tsx` may import `./styles.css`), forbids hardcoded hex/rgb/hsl colors outside explicit third-party brand logo SVG files (`allowBrandFiles`), and on every strict path (`enforceStrictPaths`) forbids inline design `style={{ ... }}` properties and off-scale arbitrary Tailwind font-size/spacing tokens (`text-[...px]`, `p-[...px]`, etc.), keeping every rebuilt screen locked to Tailwind CSS and the `DESIGN.md` `@theme` tokens.
 - **The off-list and every scoped override are checked.** CI fails if the rules turned off in the configuration
   differ from the table below, if an override turns a rule down or changes its options without appearing in the
   "Rules off in one folder only" table, or if that table lists an override that does not exist. The same
