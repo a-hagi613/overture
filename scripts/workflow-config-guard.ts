@@ -88,7 +88,7 @@ export function findVacuumWorkflowProblems(input: VacuumWorkflowInput) {
     problems.push("vacuum-db.yml compacts before it dry-runs the sizes");
   }
 
-  if (!input.weekly.includes("inputs.dry_run != 'true'")) {
+  if (!input.weekly.includes("!inputs.dry_run")) {
     problems.push("vacuum-db.yml does not skip compaction when dry_run is true");
   }
 

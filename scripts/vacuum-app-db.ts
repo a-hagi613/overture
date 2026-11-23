@@ -27,6 +27,20 @@ export interface VacuumReport {
   integrityCheck: string | null;
 }
 
+/**
+ * Opens the read-only handle a dry run reads the sizes through. A busy timeout lets the read wait behind a live
+ * checkpoint or writer instead of failing at once with `SQLITE_BUSY`.
+ * @param path The database file to open, never for writing.
+ * @returns The open handle; the caller closes it.
+ */
+export function openReadOnlyDatabase(path: string) {
+  const sqlite = new Database(path, { readonly: true });
+
+  sqlite.run("PRAGMA busy_timeout = 5000;");
+
+  return sqlite;
+}
+
 function assertNoWriter(sqlite: Database) {
   sqlite.run("PRAGMA busy_timeout = 0;");
 
@@ -81,7 +95,7 @@ export function vacuumAppDatabase(path: string, options: { confirm: boolean; dry
   }
 
   if (dryRun) {
-    const readonly = new Database(path, { readonly: true });
+    const readonly = openReadOnlyDatabase(path);
 
     try {
       const report: VacuumReport = {

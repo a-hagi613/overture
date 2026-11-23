@@ -103,7 +103,7 @@ Stage is what is stored and what a move writes; the Board groups the seven into 
 _Avoid_: column, phase, Hold
 
 **Board lane**:
-One of the five columns the Board shows after the rebuild (ADR 0037, proposed; seven Stage columns before it), each
+One of the five columns the Board shows (ADR 0037; seven Stage columns before it), each
 grouping Stages: Queued, Ready, Applied, Waiting (Screening, Interviewing and Offer) and Closed. A lane is a view:
 dropping a card on a lane writes one Stage, and only after the server accepts the move.
 _Avoid_: On hold, Hold, column (as the object)

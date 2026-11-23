@@ -198,22 +198,24 @@ record, then exits 0 only when every record verifies.
 
 ### 3. Turn the guards on
 
-The guards are gated so they never block anything before the owner pays. Turn both switches on after the script
-prints `verdict: verified`:
+The deploy guard is gated so it never blocks anything before the owner turns it on. Once the script prints
+`verdict: verified`, set the GitHub Actions variable:
 
 ```sh
-fly secrets set REQUIRE_EMAIL_SENDING=true -a overture-web
 gh variable set REQUIRE_EMAIL_SENDING -b true -R a-hagi613/overture
 ```
 
-- The **deploy guard** in `.github/workflows/deploy.yml` runs `onboard-email-sending.ts --check` on the running
+- The **deploy guard** in `.github/workflows/deploy.yml` reads the GitHub Actions repository variable
+  `vars.REQUIRE_EMAIL_SENDING` and runs `onboard-email-sending.ts --check` on the running
   release before every deploy. While the switch is off it prints a warning and the deploy continues; with the switch
   on it refuses the deploy with a clear message when the sending domain is missing, disabled or its records do not
   verify. The SSH check is bounded by `timeout 45s`, so a down or unresponsive machine counts as "not ready" instead
   of holding the `deploy-main` concurrency group open; the failure step then prints `flyctl status` and the last 120
   log lines of `overture-web` so the container boot or health failure is visible without opening the dashboard.
-- The **live-check guard** is the `mail.sending` result in the daily `mail` check group. While the switch is off it
-  records `status: "gated"` and does not alert. With the switch on it verifies the domain and all four records and
+- The **live-check guard** is the `mail.sending` result in the daily `mail` check group. It reads the app's runtime
+  switch, which `fly.toml` already sets with `[env] REQUIRE_EMAIL_SENDING = "true"`; do not also set it with
+  `fly secrets set`, because a secret overrides `[env]` and the repo would stop showing what runs. While the switch is
+  off it records `status: "gated"` and does not alert. With the switch on it verifies the domain and all four records and
   fails (with the owner's alert path) when they do not pass. The same group then sends the check message to the
   reserved `live-check@tryoverture.com`, which is not the owner's address, and expects it back through Email Routing.
 
@@ -225,9 +227,8 @@ minutes; re-run `--check` until it prints `verdict: ready`.
 
 The landing (`/`) is prerendered by the main build and deployed as Workers Static Assets (`workers/marketing`,
 [#284](https://github.com/a-hagi613/overture/issues/284), ADR 0033). Cloudflare attaches the Worker to one explicit
-route on `tryoverture.com` and no others. The front-end rebuild (ADR 0037, proposed) removes the `/pricing` page and
-its `tryoverture.com/pricing*` route, and pricing becomes the landing's Pricing section; until it lands, that route is
-still attached. The route list comes from `src/shared/marketing-paths.ts` through `workers/marketing/src/routes.ts`.
+route on `tryoverture.com` and no others. The front-end rebuild (ADR 0037) shipped in #501: it removed the `/pricing`
+page and its `tryoverture.com/pricing*` route, and pricing is now the landing's Pricing section. The route list comes from `src/shared/marketing-paths.ts` through `workers/marketing/src/routes.ts`.
 
 | Route | Serves |
 |---|---|
@@ -340,13 +341,11 @@ with `openssl rand -hex 32` only when the app does not have one. The script's `S
 
 Both products are created with `tax_code=txcd_10103000` (SaaS, personal use), which Stripe Managed Payments requires.
 
-The webhook endpoint is `https://tryoverture.com/api/webhooks/stripe` and subscribes to the nine events
+The webhook endpoint is `https://tryoverture.com/webhooks/stripe` and subscribes to the nine events
 `src/server/billing/webhooks.ts` handles. The billing portal configuration cancels at period end, updates payment
 methods, shows invoice history and switches a subscription between the Week and Month prices with
-`proration_behavior=none`; it returns to `https://tryoverture.com/settings/billing` and links the site's privacy and
-terms pages. The rebuild moves Billing to `/profile/billing` (ADR 0037, proposed): when its change lands the app's
-portal sessions pass `return_url` `/profile/billing`, and the configuration's default return URL in
-`scripts/setup-stripe.ts` must stop naming `/settings/billing`; change it and re-run the script then (audit H5).
+`proration_behavior=none`; it returns to `https://tryoverture.com/profile/billing` and links the site's privacy and
+terms pages (ADR 0037: Billing lives under Profile).
 
 A second run reuses the active lookup-key prices, keeps the existing webhook (its secret is not rotated) and verifies
 the portal configuration, so no duplicate product, price or endpoint appears. `rotate_webhook=true` deletes the old
@@ -523,11 +522,13 @@ secret value.
 ```sh
 bun run scripts/check-admin-host.ts
 bun run scripts/check-admin-host.ts --json
+bun run scripts/check-admin-host.ts --origin https://admin.example.test --fly-app another-app
 ```
 
 Exit `0` means every check passed; exit `1` prints the gaps. Use `--no-fly` to skip the two Fly reads when `flyctl` is
-unavailable, and `--host` to name the DNS record when it differs from the origin's hostname. The matching unit tests run
-with `bun test scripts/check-admin-host.test.ts`.
+unavailable, `--host` to name the DNS record when it differs from the origin's hostname, `--origin` to check another
+admin origin (it must be `https`), and `--fly-app` to read the certificate and secret names from another Fly app.
+The matching unit tests run with `bun test scripts/check-admin-host.test.ts`.
 
 Finally sign in as the owner, open `/profile/account` and confirm the **Admin Portal** card, then open `/admin` on
 `tryoverture.com` and confirm the handoff card opens `https://admin.tryoverture.com/admin` through Access and the

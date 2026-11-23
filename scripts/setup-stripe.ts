@@ -576,7 +576,7 @@ export async function runStripeSetup(options: StripeSetupOptions) {
   };
 
   const origin = options.appOrigin.replace(/\/+$/u, "");
-  const webhookUrl = `${origin}/api/webhooks/stripe`;
+  const webhookUrl = `${origin}/webhooks/stripe`;
 
   const webhook = await ensureWebhook(
     clientOptions,

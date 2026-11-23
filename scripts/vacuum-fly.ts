@@ -11,7 +11,13 @@ const OUTPUT_FILE = "/tmp/vacuum-output.txt";
 const DEFAULT_THRESHOLD_MB = 50;
 const HEALTH_URL = "https://tryoverture.com/api/health";
 const HEALTH_ATTEMPTS = 24;
-const READY_TIMEOUT_MS = 20 * 60_000;
+
+/** The longest the driver waits for the vacuum's ready file; the machine's keepalive must outlast it. */
+export const READY_TIMEOUT_SECONDS = 20 * 60;
+const READY_TIMEOUT_MS = READY_TIMEOUT_SECONDS * 1000;
+
+/** The maintenance container's keepalive, longer than `READY_TIMEOUT_SECONDS` so Fly cannot stop it mid-vacuum. */
+export const VACUUM_KEEPALIVE_SECONDS = 1500;
 
 const clock = createClock();
 
@@ -303,7 +309,7 @@ async function waitForReady(machineId: string, deadline: number) {
 
   if (clock.now() >= deadline) {
     throw new Error(
-      `the vacuum did not finish within 20 minutes on ${machineId}; run ` +
+      `the vacuum did not finish within ${String(READY_TIMEOUT_SECONDS / 60)} minutes on ${machineId}; run ` +
         `"flyctl logs -a ${APP} --machine ${machineId}" for its output`,
     );
   }
@@ -329,8 +335,43 @@ function readMaintenanceReport(machineId: string) {
   process.stdout.write(output);
 }
 
-function restoreMachine(machineId: string) {
-  run([
+/**
+ * The `flyctl machines update` arguments that turn a machine into the vacuum container.
+ *
+ * `--yes` makes the destructive update non-interactive and the keepalive leaves the container running long enough
+ * for the driver's ready-file wait, so Fly cannot stop it in the middle of a VACUUM.
+ * @param machineId The app machine to switch into maintenance mode.
+ * @returns The full command, including `flyctl`.
+ */
+export function maintenanceUpdateArgs(machineId: string) {
+  return [
+    "flyctl",
+    "machines",
+    "update",
+    machineId,
+    "-a",
+    APP,
+    "--env",
+    "VACUUM_ONLY=true",
+    "--env",
+    `VACUUM_READY_FILE=${READY_FILE}`,
+    "--env",
+    `VACUUM_KEEPALIVE_SECONDS=${String(VACUUM_KEEPALIVE_SECONDS)}`,
+    "--restart",
+    "no",
+    "--skip-health-checks",
+    "--skip-start",
+    "--yes",
+  ];
+}
+
+/**
+ * The `flyctl machines update` arguments that put the app machine back on its image.
+ * @param machineId The app machine to restore.
+ * @returns The full command, including `flyctl`.
+ */
+export function restoreUpdateArgs(machineId: string) {
+  return [
     "flyctl",
     "machines",
     "update",
@@ -343,9 +384,22 @@ function restoreMachine(machineId: string) {
     "on-failure",
     "--skip-health-checks",
     "--skip-start",
-  ]);
+    "--yes",
+  ];
+}
 
-  run(["flyctl", "machines", "restart", machineId, "-a", APP, "--skip-health-checks"]);
+/**
+ * The `flyctl machines restart` arguments the driver uses in both directions.
+ * @param machineId The app machine to restart.
+ * @returns The full command, including `flyctl`.
+ */
+export function machineRestartArgs(machineId: string) {
+  return ["flyctl", "machines", "restart", machineId, "-a", APP, "--skip-health-checks"];
+}
+
+function restoreMachine(machineId: string) {
+  runOrThrow(restoreUpdateArgs(machineId));
+  runOrThrow(machineRestartArgs(machineId));
   waitForState(machineId, "started");
 }
 
@@ -353,24 +407,9 @@ async function compact(machine: Machine) {
   let vacuumError: string | null = null;
 
   try {
-    runOrThrow([
-      "flyctl",
-      "machines",
-      "update",
-      machine.id,
-      "-a",
-      APP,
-      "--env",
-      "VACUUM_ONLY=true",
-      "--env",
-      `VACUUM_READY_FILE=${READY_FILE}`,
-      "--restart",
-      "no",
-      "--skip-health-checks",
-      "--skip-start",
-    ]);
+    runOrThrow(maintenanceUpdateArgs(machine.id));
 
-    runOrThrow(["flyctl", "machines", "restart", machine.id, "-a", APP, "--skip-health-checks"]);
+    runOrThrow(machineRestartArgs(machine.id));
 
     waitForState(machine.id, "started");
     await waitForReady(machine.id, clock.now() + READY_TIMEOUT_MS);

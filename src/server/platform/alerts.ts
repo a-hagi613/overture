@@ -6,6 +6,7 @@ import type { Clock } from "./ports/clock.ts";
 import { env } from "../config/env.ts";
 import { createNotification } from "../notify/notifications.ts";
 import { users } from "./db/schema.ts";
+import { logError } from "./log.ts";
 import { publishEvent } from "./sse/stream.ts";
 
 export const ALERT_KINDS = [
@@ -62,13 +63,24 @@ function notifyOwners(
   }
 }
 
-async function pushToPhone(kind: AlertKind, detail: AlertDetail) {
-  if (env.ALERT_NTFY_URL === undefined) {
+const ALERT_PUSH_TIMEOUT_MS = 10_000;
+
+/**
+ * Pushes one alert to the owner's phone. A hung ntfy connection must never wedge the caller or leak its socket, so the
+ * request never follows a redirect and gives up after ten seconds; the response body is cancelled because only the
+ * status matters. A refused or non-2xx push is logged so a broken alert path stays visible.
+ * @param kind The alert kind, used as the push title.
+ * @param detail The allowlisted detail, sent as the push body.
+ */
+export async function pushToPhone(kind: AlertKind, detail: AlertDetail) {
+  const url = env.ALERT_NTFY_URL;
+
+  if (url === undefined) {
     return;
   }
 
-  await Promise.allSettled([
-    fetch(env.ALERT_NTFY_URL, {
+  try {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "content-type": "text/plain",
@@ -76,8 +88,21 @@ async function pushToPhone(kind: AlertKind, detail: AlertDetail) {
         tags: "warning",
       },
       body: JSON.stringify(detail),
-    }),
-  ]);
+      redirect: "manual",
+      signal: AbortSignal.timeout(ALERT_PUSH_TIMEOUT_MS),
+    });
+
+    await response.body?.cancel();
+
+    if (!response.ok) {
+      logError(
+        "alerts.push",
+        new Error(`ntfy answered HTTP ${String(response.status)} for ${kind}`),
+      );
+    }
+  } catch (error) {
+    logError("alerts.push", error);
+  }
 }
 
 export function raiseAlert(db: AppDatabase, clock: Clock, kind: AlertKind, detail: AlertDetail) {

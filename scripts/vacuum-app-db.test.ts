@@ -6,9 +6,10 @@ import { join } from "node:path";
 
 import { z } from "zod";
 
-import { VacuumRefusedError, vacuumAppDatabase } from "./vacuum-app-db.ts";
+import { VacuumRefusedError, openReadOnlyDatabase, vacuumAppDatabase } from "./vacuum-app-db.ts";
 
 const freelistSchema = z.object({ freelist_count: z.number().int().nonnegative() });
+const busyTimeoutSchema = z.object({ timeout: z.number().int().positive() });
 
 function scratchDatabase() {
   const directory = mkdtempSync(join(tmpdir(), "vacuum-app-db-"));
@@ -89,6 +90,24 @@ test("vacuum-app-db refuses to write without --confirm", () => {
   try {
     expect(() => vacuumAppDatabase(path, { confirm: false })).toThrow(VacuumRefusedError);
     expect(() => vacuumAppDatabase(path, { confirm: false })).toThrow(/--confirm/u);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("the dry run's read-only handle waits on a busy database instead of failing at once", () => {
+  const { directory, path } = scratchDatabase();
+
+  try {
+    const readonly = openReadOnlyDatabase(path);
+
+    try {
+      expect(busyTimeoutSchema.parse(readonly.query("PRAGMA busy_timeout;").get()).timeout).toBe(
+        5000,
+      );
+    } finally {
+      readonly.close();
+    }
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }

@@ -6,13 +6,12 @@ const DEFAULT_ADMIN_ORIGIN = "https://admin.tryoverture.com";
 const DEFAULT_FLY_APP = "overture-web";
 const PROBE_PATH = "/admin/api/session";
 const PROBE_TIMEOUT_MS = 12_000;
+const DNS_TIMEOUT_MS = 10_000;
+const FLYCTL_TIMEOUT_MS = 30_000;
 
-const ACCESS_SECRET_NAMES = [
-  "ADMIN_ORIGIN",
-  "CF_ACCESS_AUD",
-  "CF_ACCESS_TEAM_DOMAIN",
-  "CF_ACCESS_JWKS_URL",
-] as const;
+const REQUIRED_ACCESS_SECRETS = ["ADMIN_ORIGIN", "CF_ACCESS_AUD"] as const;
+const JWKS_ACCESS_SECRETS = ["CF_ACCESS_TEAM_DOMAIN", "CF_ACCESS_JWKS_URL"] as const;
+const JWKS_SECRET_ALTERNATIVE = "CF_ACCESS_TEAM_DOMAIN or CF_ACCESS_JWKS_URL";
 
 const ACCESS_HOST = "cloudflareaccess.com";
 const secretNamePattern = /^[A-Z][A-Z0-9_]*$/u;
@@ -144,7 +143,7 @@ export function parseArguments(args: readonly string[], defaultOrigin: string) {
     } satisfies ParsedArguments;
   }
 
-  if (parsedOrigin.data.startsWith("http://")) {
+  if (new URL(parsedOrigin.data).protocol !== "https:") {
     return {
       kind: "error",
       message: "--origin must be https: the checks read a production admin host",
@@ -264,22 +263,74 @@ export function secretNamesFrom(output: string) {
 
 /**
  * Names the Cloudflare Access secrets that are missing from Fly.
+ *
+ * `ADMIN_ORIGIN` and `CF_ACCESS_AUD` are always required; the JWKS source is one of `CF_ACCESS_TEAM_DOMAIN` or
+ * `CF_ACCESS_JWKS_URL`, matching `accessJwksUrlFromEnv` in `src/server/platform/access/index.ts`.
  * @param present The secret names Fly reports.
- * @returns The required names that are absent.
+ * @returns The required names that are absent, with the JWKS pair named as one alternative.
  */
 export function missingAccessSecrets(present: readonly string[]) {
   const available = new Set(present);
+  const missing: string[] = REQUIRED_ACCESS_SECRETS.filter((name) => !available.has(name));
 
-  return ACCESS_SECRET_NAMES.filter((name) => !available.has(name));
+  if (!JWKS_ACCESS_SECRETS.some((name) => available.has(name))) {
+    missing.push(JWKS_SECRET_ALTERNATIVE);
+  }
+
+  return missing;
+}
+
+const certificateStatusSchema = z.looseObject({
+  ClientStatus: z.string(),
+  Configured: z.boolean().optional(),
+  Issued: z.union([z.boolean(), z.array(z.unknown())]).optional(),
+  Status: z.string().optional(),
+});
+
+export type CertificateStatus = z.infer<typeof certificateStatusSchema>;
+
+/**
+ * Reads the structured `flyctl certs show --json` answer. Any noise or an unrecognised shape is an error the caller
+ * reports, never a silent guess about the certificate.
+ * @param output The command's stdout.
+ * @returns The certificate status Fly printed.
+ */
+export function parseCertificateStatus(output: string) {
+  let json: unknown;
+
+  try {
+    json = JSON.parse(output.trim());
+  } catch {
+    throw new Error(
+      "flyctl certs show did not print JSON; run `flyctl certs show <host> -a <app> --json` by hand to see why",
+    );
+  }
+
+  const parsed = certificateStatusSchema.safeParse(json);
+
+  if (!parsed.success) {
+    throw new Error(
+      "flyctl certs show printed a certificate shape this check does not recognise; run `flyctl certs show <host> -a <app> --json` by hand",
+    );
+  }
+
+  return parsed.data;
 }
 
 /**
- * Whether `flyctl certs show` reports an issued certificate.
- * @param output The command's combined output.
- * @returns True when Fly says the certificate is issued.
+ * Whether `flyctl certs show --json` reports an issued, configured certificate.
+ * @param status The parsed certificate status.
+ * @returns True when Fly says the certificate is ready.
  */
-export function certificateIssued(output: string) {
-  return /\bIssued\b/u.test(output) || /"is\.[A-Za-z0-9]+\.acm-validations\.aws"/u.test(output);
+export function certificateReady(status: CertificateStatus) {
+  const issuedCertificates = Array.isArray(status.Issued)
+    ? status.Issued.length > 0
+    : status.Issued === true;
+
+  return (
+    status.Configured !== false &&
+    (status.ClientStatus === "Ready" || status.Status === "Ready" || issuedCertificates)
+  );
 }
 
 /**
@@ -340,14 +391,47 @@ export function exitCodeFor(results: readonly CheckResult[]) {
   return allChecksPassed(results) ? 0 : 1;
 }
 
+/**
+ * Renders the addresses a DNS lookup returned, in the resolver's order.
+ * @param addresses The resolved addresses from `lookup(host, { all: true })`.
+ * @returns One `address (IPv4/6)` list, or a note that the resolver returned none.
+ */
+export function describeAddresses(addresses: readonly { address: string; family: number }[]) {
+  if (addresses.length === 0) {
+    return "the resolver returned no address";
+  }
+
+  return `resolves to ${addresses
+    .map((resolved) => `${resolved.address} (IPv${String(resolved.family)})`)
+    .join(", ")}`;
+}
+
+async function lookupWithin(host: string, timeoutMs: number) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`the DNS lookup did not answer within ${String(timeoutMs / 1000)} s`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([lookup(host, { all: true }), timeout]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
+}
+
 async function dnsCheck(host: string) {
   try {
-    const { address, family } = await lookup(host);
+    const addresses = await lookupWithin(host, DNS_TIMEOUT_MS);
 
     return {
-      detail: `resolves to ${address} (IPv${String(family)})`,
+      detail: describeAddresses(addresses),
       name: "dns",
-      status: "pass",
+      status: addresses.length > 0 ? "pass" : "fail",
     } satisfies CheckResult;
   } catch (error) {
     return {
@@ -389,6 +473,7 @@ function runFlyctl(args: readonly string[]) {
     cmd: ["flyctl", ...args],
     stderr: "pipe",
     stdout: "pipe",
+    timeout: FLYCTL_TIMEOUT_MS,
   });
 
   return {
@@ -415,8 +500,7 @@ function certCheck(options: CheckOptions) {
     } satisfies CheckResult;
   }
 
-  const result = runFlyctl(["certs", "show", options.host, "-a", options.flyApp]);
-  const output = `${result.stdout}${result.stderr}`;
+  const result = runFlyctl(["certs", "show", options.host, "-a", options.flyApp, "--json"]);
 
   if (result.exitCode !== 0) {
     return {
@@ -426,15 +510,25 @@ function certCheck(options: CheckOptions) {
     } satisfies CheckResult;
   }
 
-  const issued = certificateIssued(output);
+  let status: CertificateStatus;
 
-  const status: CheckStatus = issued ? "pass" : "fail";
+  try {
+    status = parseCertificateStatus(result.stdout);
+  } catch (error) {
+    return {
+      detail: error instanceof Error ? error.message : String(error),
+      name: "cert",
+      status: "fail",
+    } satisfies CheckResult;
+  }
 
-  const detail = issued
+  const ready = certificateReady(status);
+
+  const detail = ready
     ? `Fly holds an issued certificate for ${options.host}`
-    : `Fly has no issued certificate for ${options.host}`;
+    : `Fly reports the certificate for ${options.host} as ${status.ClientStatus}, not issued yet`;
 
-  return { detail, name: "cert", status } satisfies CheckResult;
+  return { detail, name: "cert", status: ready ? "pass" : "fail" } satisfies CheckResult;
 }
 
 function secretsCheck(options: CheckOptions) {
@@ -469,8 +563,8 @@ function secretsCheck(options: CheckOptions) {
 
   const detail =
     missing.length === 0
-      ? `Fly has all ${String(ACCESS_SECRET_NAMES.length)} Access secret names`
-      : `Fly is missing ${missing.join(", ")}`;
+      ? "Fly has ADMIN_ORIGIN, CF_ACCESS_AUD and a Cloudflare Access JWKS source (CF_ACCESS_TEAM_DOMAIN or CF_ACCESS_JWKS_URL)"
+      : `Fly is missing ${missing.join(", ")}; the Access verifier needs ADMIN_ORIGIN, CF_ACCESS_AUD and at least one of CF_ACCESS_TEAM_DOMAIN or CF_ACCESS_JWKS_URL`;
 
   return { detail, name: "secrets", status } satisfies CheckResult;
 }

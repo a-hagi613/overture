@@ -22,7 +22,12 @@ export type SupportStatusFilter = (typeof SUPPORT_STATUS_FILTERS)[number];
 export const supportRequestSchema = z.object({
   category: z.enum(SUPPORT_CATEGORIES).default("other"),
   message: z.string().trim().min(1).max(5000),
-  subject: z.string().trim().min(1).max(200),
+  subject: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .refine((value) => !/[\r\n]/u.test(value), "subject must not contain line breaks"),
 });
 
 export type SupportRequest = z.infer<typeof supportRequestSchema>;

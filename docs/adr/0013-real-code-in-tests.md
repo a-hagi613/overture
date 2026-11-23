@@ -129,7 +129,12 @@ compaction driver (`vacuum-fly.test.ts`: the dry run's printed sizes parse into 
 and a file whose freelist is below the 50 MB threshold is skipped unless the operator forces the run, so the weekly
 job cannot stop the app for nothing), the compaction workflows (`workflow-config-guard.test.ts`: the ops action and
 the Sunday job dry-run before they compact, the manual job honours its `dry_run` input, and the maintenance
-entrypoint runs the script with `--confirm`), and
+entrypoint runs the script with `--confirm`), the support request schema (`support.test.ts`: a subject carrying a
+carriage return or line feed is refused before any mail is built, and the subject and message are trimmed), the mail
+subject sanitiser (`cloudflare.test.ts`: a support subject with line breaks is flattened to one line with its
+`Reply-To` kept, driven through a loopback Email Sending endpoint so the real sender runs), the system report's Stripe
+mode (`report.test.ts`: a restricted `rk_live_`/`rk_test_` key names the same live/test mode as an `sk_` key, and any
+other key is unconfigured), and
 the interception canary (`outbound-interception.test.ts`: a fetch or node `https` request to an unmocked host rejects with
 the interceptor's own error while a mocked host still answers, so a request that leaks fails instead of reaching DNS). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
