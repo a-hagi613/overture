@@ -3340,7 +3340,7 @@ export const copy = {
     handoffTitle: "The admin opens on its own host",
     handoffBody:
       "Admin lives behind Cloudflare Access and a passkey on a host of its own. Open it there, and the same account carries your session over.",
-    handoffNote: (host: string) => `This tab stays on the app. The portal opens at ${host}/admin.`,
+    handoffNote: (host: string) => `Opens on ${host} with your signed-in session.`,
     portalCardTitle: "Admin Portal",
     portalCardBody:
       "Open the admin console on its own host. It asks for Cloudflare Access and your passkey.",

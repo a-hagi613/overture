@@ -8,6 +8,7 @@ import {
   classifyProbe,
   exitCodeFor,
   humanReport,
+  isAccessRedirectLocation,
   jsonReport,
   missingAccessSecrets,
   parseArguments,
@@ -126,6 +127,27 @@ describe("check-admin-host arguments", () => {
 });
 
 describe("check-admin-host probe classification", () => {
+  test("only an https Cloudflare Access host is a sign-in redirect", () => {
+    for (const location of [
+      "https://overture.cloudflareaccess.com/cdn-cgi/access/login",
+      "https://cloudflareaccess.com/cdn-cgi/access/login",
+    ]) {
+      expect(isAccessRedirectLocation(location), location).toBe(true);
+    }
+
+    for (const location of [
+      "https://evil.example/?next=cloudflareaccess.com",
+      "https://cloudflareaccess.com.evil.example/login",
+      "http://overture.cloudflareaccess.com/cdn-cgi/access/login",
+      "not a url",
+      "",
+    ]) {
+      expect(isAccessRedirectLocation(location), location).toBe(false);
+    }
+
+    expect(isAccessRedirectLocation(null)).toBe(false);
+  });
+
   test("a Cloudflare Access redirect passes", () => {
     const result = classifyProbe(
       probeOf({

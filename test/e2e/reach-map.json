@@ -2958,6 +2958,7 @@
         "src/web/components/nav-glyph.tsx",
         "src/web/components/notification-preference-row.tsx",
         "src/web/components/page-header.tsx",
+        "src/web/components/route-fallback.tsx",
         "src/web/components/settings-calendar-feed.tsx",
         "src/web/components/settings-forwarding-card.tsx",
         "src/web/components/settings-notifications.tsx",

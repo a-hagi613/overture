@@ -49,6 +49,31 @@ export type ParsedArguments =
 
 const sessionErrorSchema = z.object({ error: z.string().optional() });
 
+/**
+ * Whether a redirect target is a Cloudflare Access sign-in page.
+ *
+ * The redirect only passes for an `https` URL on the Cloudflare Access host,
+ * never for a lookalike host or a query string that merely mentions it.
+ * @param location The `Location` header, or null when there was none.
+ * @returns True when the target is the Cloudflare Access host.
+ */
+export function isAccessRedirectLocation(location: string | null) {
+  if (location === null) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(location);
+
+    return (
+      parsed.protocol === "https:" &&
+      (parsed.hostname === ACCESS_HOST || parsed.hostname.endsWith(`.${ACCESS_HOST}`))
+    );
+  } catch {
+    return false;
+  }
+}
+
 function optionsFrom(origin: string, host: string, json: boolean, fly: boolean, flyApp: string) {
   const url = new URL(origin);
 
@@ -166,7 +191,7 @@ export function classifyProbe(response: ProbeResponse | null, failure: string) {
   const { bodyText, contentType, location, status } = response;
 
   if (status >= 300 && status < 400) {
-    const accessRedirect = location?.includes(ACCESS_HOST) === true;
+    const accessRedirect = isAccessRedirectLocation(location);
 
     return {
       detail: accessRedirect
