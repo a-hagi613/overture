@@ -51,7 +51,8 @@ deleted with its tags, questions and FTS entry in bounded chunks, while a Postin
 points at is held and no Application row or snapshot changes, #424), the browser session alignment
 (`session-slots.test.ts`: the dispatcher's free-send count comes from the same process-wide semaphore every browser
 user holds a slot from, so a capture holding the last session offers a send no slot and no Application waits in
-`sending`, #425), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
+`sending`, and an unset, zero or negative `browser.max_concurrent_sessions` caps nothing while a positive value still
+queues, #425, #515), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
 per cooldown, so a paused main thread becomes a log line), the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
 a copy string or key), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
 `x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the signed-in event stream

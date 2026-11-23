@@ -16,6 +16,7 @@ const themes = ["light", "dark"];
 
 const adminPaths = [
   "/admin",
+  "/admin/jobs",
   "/admin/settings",
   "/admin/catalog",
   "/admin/grants",

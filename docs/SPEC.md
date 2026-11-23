@@ -936,9 +936,10 @@ bound: the planner gives it the first free slot at or after that time inside a w
 
 Job `dispatch.tick` every 15 s claims at most `free_slots` Applications in `approved` (never `ready`) that pass
 every gate below, in order. `free_slots` is the smaller of `session_cap − active_sends` and the sessions free right
-now in the process-wide browser semaphore: `session_cap` is `browser.max_concurrent_sessions`, the cap every send
-holds a slot from, and a capture, probe or lab run holding a slot leaves one fewer send free, so no Application is
-claimed to wait in `sending`. `active_sends` is the number of distinct Applications with send work in flight: those
+now in the process-wide browser semaphore: `session_cap` is `browser.max_concurrent_sessions` when it holds a
+positive integer, while the default `0` means no cap and the provider and the box bound concurrency instead. A
+capture, probe or lab run holding a slot leaves one fewer send free when a cap is set, so no Application is claimed
+to wait in `sending`. `active_sends` is the number of distinct Applications with send work in flight: those
 in `sending`, plus those with an `application.send` job still `queued` or `running` (a job waiting in the session-slot
 queue is `running` while its Application is still `approved`). An Application becomes `sending` only after it holds
 one of those slots, so a send that is queued or waiting for a browser already counts against the cap and `sending`
@@ -1161,10 +1162,11 @@ this capture path only when the plain read cannot see the form; the path that ra
 form is complete in the server-rendered HTML, so its fill proof needs no browser read at all; `fixtures.capture`
 accepts `personio` for the capture job and the daily forms check reads it without a browser (§16.4).
 Every browser session, whether a capture, the early cloud probe or a dispatch send, takes a slot from one
-process-wide semaphore sized by `browser.max_concurrent_sessions` (default 3). That one setting is both the semaphore
-and the dispatcher's in-flight send cap (§9.3); a send takes its slot before it marks the Application `sending`, and a
-send that is queued or still waiting for its slot counts against that cap. A
-capture that cannot get a slot waits without failing or spending an attempt. A 429 from the provider's create-session call is retried with backoff or the
+process-wide semaphore sized by `browser.max_concurrent_sessions` (default `0`, no cap; a positive integer sets an
+optional cap). That one setting is both the semaphore and the dispatcher's in-flight send cap (§9.3); with no cap the
+semaphore grants every caller a slot and the dispatcher's free-send count is bounded only by the Applications due. A
+send takes its slot before it marks the Application `sending`, and a send that is queued or still waiting for its slot
+counts against that cap. A capture that cannot get a slot waits without failing or spending an attempt. A 429 from the provider's create-session call is retried with backoff or the
 `Retry-After` delay and does not spend an attempt, and a `goto` that times out is retried once.
 On production the same job is queued from the machine with
 `bun run scripts/capture-forms.ts --ats <ats> --url <apply_url> [--url <apply_url> …]`; the running worker picks it
@@ -1296,7 +1298,7 @@ body, sender or attachment, so the admin never sees message content.
 | `llm.cap_user_day_usd` / `llm.cap_global_day_usd` / `llm.cap_tagging_day_usd` | 0.25 / 10 / 1 | 0011, 0017 |
 | `mail.monthly_cap` / `mail.sign_in_reserve` | 2700 / 270 (sends a UTC month, and the share kept for sign-in mail and the live check) | 0033 |
 | `browser.provider` | `browser_use` | 0003 |
-| `browser.max_concurrent_sessions` | 3 (the browser semaphore and the dispatcher's in-flight send cap) | 0003 |
+| `browser.max_concurrent_sessions` | 0, no cap (the browser semaphore and the dispatcher's in-flight send cap; a positive integer sets an optional cap) | 0003 |
 | `checkin.after_days` / `checkin.close_after_days` | 21 / 45 | 0012 |
 | `jobs.poll_interval_ms` / `jobs.batch_size` | 15000 / 10 (how often the job worker looks, and how many due jobs it claims) | — |
 | `catalog.sweep_max_boards` | 20 (boards claimed per ATS in one sweep, so a batch finishes inside its claim) | — |
@@ -1421,6 +1423,16 @@ body, sender or attachment, so the admin never sees message content.
   it never blocks live WAL writes; without it the route copies nothing. A missing `catalog.sqlite` or an unconfigured
   R2 bucket is reported as absent, never as an error. `bun run scripts/storage-report.ts --db <path>
   [--objects-root <dir>] [--tables]` prints the same report as JSON and opens the database read-only.
+- `GET /admin/api/jobs?status=queued|running|failed|dead|completed|all&kind=…&limit=1…200` (default 50)
+  powers the Background jobs page (`/admin/jobs`): it returns the counts by status, the count per kind and status,
+  the known kinds, and the recent `bg_jobs` rows ordered by `updatedAt` descending. A row carries its id, kind,
+  status, priority, attempts, `maxAttempts`, run and lock times, `lastError`, dedupe key, created and updated times,
+  and a redacted payload summary that names the top-level fields and their shapes only, never an address, token,
+  answer or message. `POST /admin/api/jobs/:id/retry` puts a `dead` or `failed` job back in the queue with zero
+  attempts, a fresh run time and no error, and `POST /admin/api/jobs/:id/cancel` takes a `queued` or `dead` job out
+  of the queue as `failed`; both act in one transaction, refuse a `running` or `done` job (and a retry whose dedupe
+  key now has a queued row) with `409`, and write `admin_audit` as `job.retry` or `job.cancel`. The Overview's
+  Background jobs card links to `/admin/jobs?status=dead` when the dead count is above zero.
 - `POST /admin/api/tag-imports` mounts the hiring.cafe import seam (§6.3.6) behind the same gate;
   `PUT /admin/api/settings/:key` and `PUT /admin/api/kill-switches/:scope/:key` are the admin's other write
   surfaces. `GET /admin/api/llm-usage` returns the recorded LLM usage and cost, filterable by `purpose`.
@@ -1483,7 +1495,7 @@ hand-written typed clients under `src/web/lib/`; there is no Hono RPC client. A 
 | Support | `POST /api/support` `{category, subject, message}` (signed in, never the demo account; sealed into `support_tickets` for the Support Queue, mailed to `SUPPORT_EMAIL` with the sender as `Reply-To`; 201 `{ok, referenceId}`, 429 `rate_limited` past ten an hour, 502 `mail_send_failed` when the mail fails while the ticket stays recorded) |
 | Billing (M3) | `GET /api/billing` (`enabled`, `customer`, the subscription's `plan`, `status`, `currentPeriodEnd`, `cancelAtPeriodEnd`, `applicationsLeft` and `planApplications`; the demo account reads it too, so its Billing screen renders) · `POST /api/billing/checkout` `{plan}` (Checkout returns to `/settings/billing/plans?billing=success|cancelled`; a subscription that has not ended answers 409 `plan_active` with its `plan` and `status`, before any Stripe call) · `POST /api/billing/portal` (returns to `/settings/billing`; plan switches, cancel at period end, payment method and invoices happen there, in Stripe) |
 | Webhooks | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `POST /internal/mail/dead-letter` · `GET /internal/mailboxes/:local` |
-| Admin | `/admin/api/session`, `/overview`, `/users` (filtered list), `/users/:id`, `/users/:id/reveal` (POST open, GET current, DELETE close), `/users/:id/suspend`, `/users/:id/reinstate`, `/act-as/:userId`, `/attempts`, `/attempts/:id/live`, `/attempts/:id/replay`, `/fixtures/capture`, `/probes/personio`, `/lab/runs`, `/kill-switches` (`PUT /kill-switches/:scope/:key`), `/settings` (`PUT /settings/:key`), `/grants`, `/billing/users`, `/billing/users/:id`, `/billing/refunds`, `/billing/reconciliation` (M3), `/margin`, `/catalog`, `/tag-imports`, `/llm-usage`, `/invites` (`POST /invites/:id/revoke`), `/mail-health`, `/storage-report`, `/audit`, `/provider-report`, `/live-checks` (GET the recorded results, POST run now) |
+| Admin | `/admin/api/session`, `/overview`, `/users` (filtered list), `/users/:id`, `/users/:id/reveal` (POST open, GET current, DELETE close), `/users/:id/suspend`, `/users/:id/reinstate`, `/act-as/:userId`, `/attempts`, `/attempts/:id/live`, `/attempts/:id/replay`, `/fixtures/capture`, `/probes/personio`, `/lab/runs`, `/kill-switches` (`PUT /kill-switches/:scope/:key`), `/settings` (`PUT /settings/:key`), `/grants`, `/billing/users`, `/billing/users/:id`, `/billing/refunds`, `/billing/reconciliation` (M3), `/margin`, `/catalog`, `/jobs` (`POST /jobs/:id/retry`, `POST /jobs/:id/cancel`), `/tag-imports`, `/llm-usage`, `/invites` (`POST /invites/:id/revoke`), `/mail-health`, `/storage-report`, `/audit`, `/provider-report`, `/live-checks` (GET the recorded results, POST run now) |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
 `home.updated`, `notification`, `calendar.updated`. TanStack Query invalidates by topic. The Calendar invalidates on
@@ -1591,7 +1603,7 @@ drawn) in pinned Docker.
 | `src/server/catalog/companies-parquet.test.ts` | the pinned `companies.parquet` and manifest sha256 pairs are verified before a seed loads, and a tampered file or manifest is refused |
 | `src/server/catalog/question-normalize.test.ts` | question normalisation |
 | `src/server/catalog/tag-rules.test.ts` | tag rules |
-| `src/server/dispatch/browser/session-slots.test.ts` | the dispatcher's free-send count comes from the same process-wide semaphore every browser user holds a slot from, so a capture holding the last session offers a send no slot (#425) |
+| `src/server/dispatch/browser/session-slots.test.ts` | the dispatcher's free-send count comes from the same process-wide semaphore every browser user holds a slot from, so a capture holding the last session offers a send no slot (#425); an unset, zero or negative `browser.max_concurrent_sessions` caps nothing, so concurrent sessions run without queueing, while a positive value still queues (#515) |
 | `src/server/dispatch/outcomes.test.ts` | a Confirming Application is charged only by the one unambiguous receipt; a replayed message never commits a second credit (#413) |
 | `src/server/dispatch/planner.test.ts` | window, spacing, DST |
 | `src/server/dispatch/report.test.ts` | completion and cost divide distinct attempted Applications, so a retry counts once (#417) |
@@ -1667,8 +1679,8 @@ Main deploys only when every job passes.
 ### 16.4 Daily live checks (ADR 0013)
 
 Job `live.check` runs daily on `overture-web` and on demand from admin (`POST /admin/api/live-checks`). Its form
-captures go through the same `acquireBrowserSession` cap as applications (`browser.max_concurrent_sessions`, default
-3). Each check records pass/fail and its duration in `live_check_results`; a failure raises the owner's alert path
+captures go through the same `acquireBrowserSession` slot as applications (`browser.max_concurrent_sessions`, default
+`0`, no cap). Each check records pass/fail and its duration in `live_check_results`; a failure raises the owner's alert path
 and none submits an application or touches a user:
 
 | Check | What is real | Also refreshes |

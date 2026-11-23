@@ -533,9 +533,20 @@ const billingNoticeJobHandlers: JobHandlers = {
   },
 };
 
+const retriedTestJobs = new Set<string>();
+
 const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
   ? {
       "test.ping": async (payload) => {
+        await Promise.resolve(payload);
+      },
+      "test.retryable": async (payload) => {
+        if (!retriedTestJobs.has(payload)) {
+          retriedTestJobs.add(payload);
+
+          throw new Error("the test job failed once");
+        }
+
         await Promise.resolve(payload);
       },
       "test.otel": async (payload) => {

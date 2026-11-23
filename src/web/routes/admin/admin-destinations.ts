@@ -8,6 +8,7 @@ export const adminDestinations = [
     label: copy.admin.navProviderReport,
     to: "/admin/provider-report",
   },
+  { end: false, glyph: "hash", label: copy.admin.navJobs, to: "/admin/jobs" },
   { end: true, glyph: "clock", label: copy.admin.navAttempts, to: "/admin/attempts" },
   { end: true, glyph: "sliders", label: copy.admin.navLlmSpend, to: "/admin/llm" },
   { end: false, glyph: "users", label: copy.admin.navUsers, to: "/admin/users" },

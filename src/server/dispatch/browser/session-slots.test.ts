@@ -8,6 +8,8 @@ import {
   browserSessionAvailability,
   configureBrowserSessionLimitFromSetting,
   freeSendSlots,
+  MAX_CONCURRENT_SESSIONS_SETTING,
+  maxConcurrentSessionsFromSetting,
 } from "./session-slots.ts";
 
 const NOW = Date.UTC(2026, 10, 22, 9, 0, 0);
@@ -41,6 +43,37 @@ describe("the browser session semaphore", () => {
       limit: 2,
       waiting: 0,
     });
+  });
+
+  test("an unset or zero setting means no cap, so sessions run concurrently", async () => {
+    configured(0);
+
+    expect(browserSessionAvailability()).toEqual({
+      active: 0,
+      available: null,
+      limit: null,
+      waiting: 0,
+    });
+
+    const releases = await Promise.all([
+      acquireBrowserSession(),
+      acquireBrowserSession(),
+      acquireBrowserSession(),
+      acquireBrowserSession(),
+    ]);
+
+    expect(browserSessionAvailability()).toEqual({
+      active: 4,
+      available: null,
+      limit: null,
+      waiting: 0,
+    });
+
+    for (const release of releases) {
+      release();
+    }
+
+    expect(browserSessionAvailability().active).toBe(0);
   });
 
   test("a waiting send holds no slot, counts as waiting, and leaves cleanly when interrupted", async () => {
@@ -97,6 +130,28 @@ describe("the browser session semaphore", () => {
   });
 });
 
+describe("the browser setting", () => {
+  test("a missing, zero or negative value means no cap, while a positive value caps", () => {
+    const { db } = openDatabase(":memory:");
+
+    migrateDatabase(db, "drizzle");
+
+    expect(maxConcurrentSessionsFromSetting(db)).toBeNull();
+
+    setSetting(db, clock, MAX_CONCURRENT_SESSIONS_SETTING, "0", "test");
+    expect(maxConcurrentSessionsFromSetting(db)).toBeNull();
+
+    setSetting(db, clock, MAX_CONCURRENT_SESSIONS_SETTING, "-2", "test");
+    expect(maxConcurrentSessionsFromSetting(db)).toBeNull();
+
+    setSetting(db, clock, MAX_CONCURRENT_SESSIONS_SETTING, "4", "test");
+    expect(maxConcurrentSessionsFromSetting(db)).toBe(4);
+
+    setSetting(db, clock, MAX_CONCURRENT_SESSIONS_SETTING, "0", "test");
+    configureBrowserSessionLimitFromSetting(db);
+  });
+});
+
 describe("free send slots", () => {
   test("a slot held by a capture is not offered to a send", () => {
     const availability = { active: 3, available: 0, limit: 3, waiting: 0 };
@@ -108,5 +163,11 @@ describe("free send slots", () => {
     expect(freeSendSlots(0, { active: 1, available: 2, limit: 3, waiting: 0 })).toBe(2);
     expect(freeSendSlots(2, { active: 1, available: 2, limit: 3, waiting: 0 })).toBe(1);
     expect(freeSendSlots(4, { active: 0, available: 3, limit: 3, waiting: 0 })).toBe(0);
+  });
+
+  test("an uncapped semaphore offers every due send", () => {
+    expect(freeSendSlots(0, { active: 7, available: null, limit: null, waiting: 0 })).toBe(
+      Number.MAX_SAFE_INTEGER,
+    );
   });
 });

@@ -45,6 +45,7 @@ import { BillingRefundPage } from "./routes/admin/billing-refund.tsx";
 import { BillingReconciliationPage } from "./routes/admin/billing-reconciliation.tsx";
 import { InvitesPage } from "./routes/admin/invites.tsx";
 import { AttemptsPage } from "./routes/admin/attempts.tsx";
+import { JobsPage } from "./routes/admin/jobs.tsx";
 import { LlmUsagePage } from "./routes/admin/llm.tsx";
 import { OverviewPage } from "./routes/admin/overview.tsx";
 import { ProviderReportPage } from "./routes/admin/provider-report.tsx";
@@ -75,6 +76,7 @@ const appShellChildren: RouteObject[] = [
 
 const adminShellChildren: RouteObject[] = [
   { path: "/admin", element: <OverviewPage /> },
+  { path: "/admin/jobs", element: <JobsPage /> },
   { path: "/admin/provider-report", element: <ProviderReportPage /> },
   { path: "/admin/attempts", element: <AttemptsPage /> },
   { path: "/admin/llm", element: <LlmUsagePage /> },
