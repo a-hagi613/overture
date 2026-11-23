@@ -50,12 +50,14 @@ export type ParsedArguments =
 const sessionErrorSchema = z.object({ error: z.string().optional() });
 
 function optionsFrom(origin: string, host: string, json: boolean, fly: boolean, flyApp: string) {
+  const url = new URL(origin);
+
   return {
     fly,
     flyApp,
-    host: host === "" ? new URL(origin).hostname : host,
+    host: host === "" ? url.hostname : host,
     json,
-    origin,
+    origin: url.origin,
   };
 }
 

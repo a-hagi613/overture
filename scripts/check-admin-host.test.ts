@@ -86,6 +86,20 @@ describe("check-admin-host arguments", () => {
     }
   });
 
+  test("an origin with a path is reduced to its origin", () => {
+    const parsed = parseArguments(
+      ["--origin", "https://admin.example.test/ignored"],
+      "https://x.test",
+    );
+
+    expect(parsed.kind).toBe("options");
+
+    if (parsed.kind === "options") {
+      expect(parsed.options.origin).toBe("https://admin.example.test");
+      expect(parsed.options.host).toBe("admin.example.test");
+    }
+  });
+
   test("refuses a flag without a value, an unknown flag and a non-URL origin", () => {
     for (const args of [
       ["--origin"],
