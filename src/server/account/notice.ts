@@ -1,7 +1,13 @@
 import { Buffer } from "node:buffer";
+import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 
+import type { AppDatabase } from "../platform/db/client.ts";
+import type { Clock } from "../platform/ports/clock.ts";
 import type { MasterKey, MasterKeyring } from "../platform/crypto.ts";
+
+import { retryWhenBusy } from "../platform/db/busy.ts";
+import { bgJobs } from "../platform/db/schema.ts";
 
 const noticeSchema = z.object({ name: z.string(), to: z.string() });
 
@@ -86,3 +92,76 @@ export function createDeletionNoticeCrypto(keyring: MasterKeyring) {
 }
 
 export const ACCOUNT_DELETED_NOTICE_JOB_KIND = "account.deleted.notice";
+
+export interface NoticeResealInput {
+  db: AppDatabase;
+  clock: Clock;
+  dryRun?: boolean;
+  keyring: MasterKeyring;
+}
+
+/**
+ * Re-seals every pending deleted-account notice under the current master key. The notice holds
+ * the erased person's name and address directly under the master key, not under a user key, so a
+ * notice queued before a rotation would otherwise be stranded when its old key is retired.
+ * @param input The database, clock, keyring and whether to only count.
+ * @returns How many notices still held an older key (all of them are re-sealed unless dry run).
+ */
+export async function resealPendingNotices(input: NoticeResealInput) {
+  const { db, clock, keyring } = input;
+
+  const currentOnly = createDeletionNoticeCrypto({
+    current: keyring.current,
+    keys: [keyring.current],
+  });
+
+  const withOlder = createDeletionNoticeCrypto(keyring);
+
+  const pending = db
+    .select({ id: bgJobs.id, payload: bgJobs.payload })
+    .from(bgJobs)
+    .where(and(eq(bgJobs.kind, ACCOUNT_DELETED_NOTICE_JOB_KIND), ne(bgJobs.status, "done")))
+    .all();
+
+  const resealed = await Promise.all(
+    pending.map(async (row) => {
+      try {
+        await currentOnly.open(row.payload);
+
+        return null;
+      } catch {
+        try {
+          const notice = await withOlder.open(row.payload);
+
+          return { id: row.id, payload: await withOlder.seal(notice) };
+        } catch {
+          return null;
+        }
+      }
+    }),
+  );
+
+  const updates = resealed.filter((row) => row !== null);
+
+  if (input.dryRun === true || updates.length === 0) {
+    return updates.length;
+  }
+
+  await retryWhenBusy(
+    () =>
+      db.transaction(
+        (tx) => {
+          for (const row of updates) {
+            tx.update(bgJobs)
+              .set({ payload: row.payload, updatedAt: clock.now() })
+              .where(and(eq(bgJobs.id, row.id), eq(bgJobs.kind, ACCOUNT_DELETED_NOTICE_JOB_KIND)))
+              .run();
+          }
+        },
+        { behavior: "immediate" },
+      ),
+    "notice.reseal",
+  );
+
+  return updates.length;
+}

@@ -463,11 +463,18 @@ reuses the verified download; the backfill job itself is picked up by the app's 
 
 Rotating the master key re-wraps every person's data key under a new `MASTER_KEY_V<n>`; it never re-encrypts
 their facts, mail or resumes, because those are sealed with the per-person data key, which does not change.
-The routine is a background job (`maintenance.master-key-rotation`) with a `--dry-run` that only counts. The
-full order matters: add the new secret, deploy, dry run, run the job, verify, then remove the old secret.
-Decisions are in ADR 0039.
+The routine is a background job (`maintenance.master-key-rotation`) with a `--dry-run` that only counts. It
+also re-seals a queued deleted-account notice under the current key, so retiring an old key cannot strand the
+erased person's confirmation. The full order matters: deploy the release that accepts the chain, add the new
+secret with the raised version, dry run, run the job, verify, then remove the old secret. Decisions are in
+ADR 0039.
 
-1. **Generate the new key and raise the current version in one secret update**:
+1. **Deploy the release that carries the rotation first** and confirm `https://tryoverture.com/api/health` is
+   green. The release is safe with `MASTER_KEY_CURRENT=1`; the important part is that the running code already
+   accepts the version chain before the secret below restarts the machines. (If you prefer the add-then-deploy
+   order, stage the secrets with `fly secrets set --stage …` and let the deploy apply them.)
+
+2. **Generate the new key and raise the current version in one secret update**:
 
    ```sh
    openssl rand -base64 32                       # MASTER_KEY_V2, never copy it into the repo or a log
@@ -477,11 +484,8 @@ Decisions are in ADR 0039.
    Set both: with `MASTER_KEY_CURRENT=2` the restart needs `MASTER_KEY_V1` and `MASTER_KEY_V2` (the boot
    check names any missing version), new data keys are wrapped under V2, and reads keep working because the
    app still holds V1 for rows wrapped under it. Setting the new key without raising the version is refused by
-   the rotation script rather than silently re-wrapping nothing.
-
-2. **Deploy** the release that carries the rotation (if it is not already live), then confirm
-   `https://tryoverture.com/api/health` is green. `fly secrets list -a overture-web` shows `MASTER_KEY_V1` and
-   `MASTER_KEY_V2` by name only.
+   the rotation script rather than silently re-wrapping nothing. `fly secrets list -a overture-web` shows both
+   names.
 
 3. **Dry run** — counts the rows that would be re-wrapped, writes nothing, and is safe while the app serves:
 
@@ -489,8 +493,10 @@ Decisions are in ADR 0039.
    fly ssh console -a overture-web -C "bun run /app/scripts/rotate-master-key.ts --db /data/app.sqlite --dry-run"
    ```
 
-   The JSON prints `{"dryRun": true, "remaining": <rows>, "rotated": 0, ...}`. A fresh deployment with no
-   accounts reports `remaining: 0`.
+   The JSON prints `{"dryRun": true, "remaining": <rows>, "notices": <n>, "rotated": 0, ...}`. A fresh
+   deployment with no accounts reports zero. `notices` counts queued or failed deleted-account notices still
+   sealed under an older key; the live run re-seals them, because a notice holds the erased person's name and
+   address directly under the master key and must not be stranded by retiring the key it used.
 
 4. **Run the job**. Queue it from the machine; the running app's job worker takes it in bounded batches of
    250 rows, each commit in one immediate transaction, and queues its own next run while rows remain:
@@ -505,8 +511,9 @@ Decisions are in ADR 0039.
    `--enqueue`; it re-wraps until nothing is left and prints the summary. Both paths resume after a crash,
    because the next run selects only rows still below the current version.
 
-5. **Verify** the job is finished with a second dry run; it must report `remaining: 0`. Reads keep working
-   throughout because the app tries the row's version, then `MASTER_KEY_CURRENT`, then every older key.
+5. **Verify** the job is finished with a second dry run; it must report `remaining: 0` and `notices: 0`. Reads
+   keep working throughout because the app tries the row's version, then `MASTER_KEY_CURRENT`, then every
+   older key.
 
 6. **Check the app** on `/api/health` and open one page that shows a resume and a fact. While `MASTER_KEY_V1`
    stays configured you can roll back with `fly secrets set -a overture-web MASTER_KEY_CURRENT=1`; rows already

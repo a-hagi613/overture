@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 
 import type { MasterKeyring } from "../platform/crypto.ts";
 
+import { ACCOUNT_DELETED_NOTICE_JOB_KIND, createDeletionNoticeCrypto } from "../account/notice.ts";
 import {
   createUserKey,
   masterKeyringFor,
@@ -133,6 +134,7 @@ describe("the master-key rotation", () => {
     expect(summary).toStrictEqual({
       batches: 2,
       dryRun: false,
+      notices: 0,
       remaining: 0,
       rotated: 3,
       toVersion: 2,
@@ -161,6 +163,7 @@ describe("the master-key rotation", () => {
     expect(again).toStrictEqual({
       batches: 0,
       dryRun: false,
+      notices: 0,
       remaining: 0,
       rotated: 0,
       toVersion: 2,
@@ -189,6 +192,7 @@ describe("the master-key rotation", () => {
     expect(first).toStrictEqual({
       batches: 1,
       dryRun: false,
+      notices: 0,
       remaining: 3,
       rotated: 2,
       toVersion: 2,
@@ -203,6 +207,7 @@ describe("the master-key rotation", () => {
     expect(second).toStrictEqual({
       batches: 2,
       dryRun: false,
+      notices: 0,
       remaining: 0,
       rotated: 3,
       toVersion: 2,
@@ -233,6 +238,7 @@ describe("the master-key rotation", () => {
     expect(summary).toStrictEqual({
       batches: 0,
       dryRun: true,
+      notices: 0,
       remaining: 3,
       rotated: 0,
       toVersion: 2,
@@ -267,6 +273,74 @@ describe("the master-key rotation", () => {
     expect(runMasterKeyRotation({ clock, db, dryRun: true, keyring: staged })).rejects.toThrow(
       "MASTER_KEY_V2 is configured but MASTER_KEY_CURRENT is 1",
     );
+
+    sqlite.close();
+  });
+
+  test("pending deleted-account notices are re-sealed before the old key is retired", async () => {
+    const { db, sqlite } = await seeded(1);
+    const clock = createClock();
+
+    const notice = await createDeletionNoticeCrypto(masterKeyringFor(v1)).seal({
+      name: "Maya Okafor",
+      to: "maya@example.test",
+    });
+
+    db.insert(bgJobs)
+      .values({
+        createdAt: NOW,
+        id: "notice-1",
+        kind: ACCOUNT_DELETED_NOTICE_JOB_KIND,
+        maxAttempts: 5,
+        payload: notice,
+        runAt: NOW,
+        status: "queued",
+        updatedAt: NOW,
+      })
+      .run();
+
+    const summary = await runMasterKeyRotation({ clock, db, keyring: during });
+
+    expect(summary.notices).toBe(1);
+
+    const job = db.select().from(bgJobs).where(eq(bgJobs.id, "notice-1")).get();
+
+    expect(job?.payload).not.toBe(notice);
+    expect(await createDeletionNoticeCrypto(after).open(job?.payload ?? "")).toStrictEqual({
+      name: "Maya Okafor",
+      to: "maya@example.test",
+    });
+
+    sqlite.close();
+  });
+
+  test("a dry run counts a pending notice and leaves its payload alone", async () => {
+    const { db, sqlite } = await seeded(1);
+    const clock = createClock();
+
+    const notice = await createDeletionNoticeCrypto(masterKeyringFor(v1)).seal({
+      name: "Maya Okafor",
+      to: "maya@example.test",
+    });
+
+    db.insert(bgJobs)
+      .values({
+        createdAt: NOW,
+        id: "notice-1",
+        kind: ACCOUNT_DELETED_NOTICE_JOB_KIND,
+        maxAttempts: 5,
+        payload: notice,
+        runAt: NOW,
+        status: "queued",
+        updatedAt: NOW,
+      })
+      .run();
+
+    const summary = await runMasterKeyRotation({ clock, db, dryRun: true, keyring: during });
+
+    expect(summary.notices).toBe(1);
+    expect(db.select().from(bgJobs).where(eq(bgJobs.id, "notice-1")).get()?.payload).toBe(notice);
+    expect(auditRows(db)).toHaveLength(0);
 
     sqlite.close();
   });

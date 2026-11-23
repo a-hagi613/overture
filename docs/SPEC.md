@@ -1363,8 +1363,9 @@ body, sender or attachment, so the admin never sees message content.
   batch, recording `master_key_version` and writing `master_key.rotate` per batch plus one
   `master_key.rotate.summary` to `admin_audit`; a crash resumes at the rows still below the current version, and
   `--dry-run` only counts. Reads try the row's version, `MASTER_KEY_CURRENT`, then every older configured key.
-  The operator order — set `MASTER_KEY_V2` with `MASTER_KEY_CURRENT=2`, deploy, dry run, run the job, verify,
-  then remove `MASTER_KEY_V1` — is in `docs/DEPLOY.md`.
+  A pending deleted-account notice, sealed directly under the master key, is re-sealed under the current key in
+  the same run. The operator order — deploy the release that accepts the chain, set `MASTER_KEY_V2` with
+  `MASTER_KEY_CURRENT=2`, dry run, run the job, verify, then remove `MASTER_KEY_V1` — is in `docs/DEPLOY.md`.
 - Encrypted: all `_enc` columns, resume files, mail HTML and attachments, exports.
 - **Delete account** (Profile → Account → Delete account, re-auth): a signed-in session must have been created by a fresh sign-in (an
   emailed link, or Google or LinkedIn) in the last 15 minutes. The page offers "Email me a sign-in link"; there is no password check (ADR 0035).

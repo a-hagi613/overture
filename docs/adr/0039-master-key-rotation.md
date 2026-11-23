@@ -33,10 +33,16 @@ version stopped production at boot. The Wave 4 audit found this the highest-risk
    (`maintenance.master-key-rotation`), says how many rows it re-wrapped and how many are left, writes
    `master_key.rotate` per batch and one `master_key.rotate.summary` to `admin_audit`, and queues its next run
    when it stops at its batch bound. `--dry-run` only counts.
-6. **Secrets move together, then retire from the bottom.** `MASTER_KEY_V2` and `MASTER_KEY_CURRENT=2` are set
-   in one secret update (V1 stays), the rotation re-wraps the rows still on V1, and `MASTER_KEY_V1` is removed
-   once the job reports no rows left. Retiring a secret before its rows are re-wrapped stops boot with the key
-   name and row count. `docs/DEPLOY.md` carries the operator runbook.
+6. **Notices are re-sealed, not left behind.** The deleted-account notice holds the erased person's name and
+   address directly under the master key, not under a user key, so a run also re-seals every pending
+   (`queued`, `running`, `failed` or `dead`) notice under the current key. Without that, retiring the old key
+   after the last `user_keys` row rotated would strand a notice that `admin_audit` and the erasure plan still
+   expect to send.
+7. **Secrets move together, then retire from the bottom.** The release that accepts the chain is deployed
+   first, then `MASTER_KEY_V2` and `MASTER_KEY_CURRENT=2` are set in one secret update (V1 stays), the rotation
+   re-wraps the rows still on V1 and re-seals notices, and `MASTER_KEY_V1` is removed once the job reports no
+   rows or notices left. Retiring a secret before its rows are re-wrapped stops boot with the key name and row
+   count. `docs/DEPLOY.md` carries the operator runbook.
 
 ## Considered Options
 

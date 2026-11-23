@@ -6,6 +6,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { MasterKeyring } from "../platform/crypto.ts";
 
 import { recordAdminAudit } from "../platform/audit/index.ts";
+import { resealPendingNotices } from "../account/notice.ts";
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import { userKeys } from "../platform/db/schema.ts";
 import { rewrapUserKey, storedUserKeyBlob, storedUserKeyFromBlob } from "../platform/crypto.ts";
@@ -45,6 +46,8 @@ export interface MasterKeyRotationOptions {
 export interface MasterKeyRotationSummary {
   batches: number;
   dryRun: boolean;
+  /** Pending deleted-account notices that held an older key (re-sealed unless dry run). */
+  notices: number;
   /** Rows still wrapped under a version below the current one when the run stopped. */
   remaining: number;
   rotated: number;
@@ -83,14 +86,17 @@ export async function runMasterKeyRotation(options: MasterKeyRotationOptions) {
   const before = remainingNow();
 
   if (options.dryRun === true) {
+    const notices = await resealPendingNotices({ db, clock, dryRun: true, keyring });
+
     logInfo(
       "master_key.rotation",
-      `dry run: ${String(before)} row(s) would be re-wrapped under MASTER_KEY_V${String(toVersion)}`,
+      `dry run: ${String(before)} row(s) would be re-wrapped under MASTER_KEY_V${String(toVersion)} and ${String(notices)} pending notice(s) would be re-sealed`,
     );
 
     const counted: MasterKeyRotationSummary = {
       batches: 0,
       dryRun: true,
+      notices,
       remaining: before,
       rotated: 0,
       toVersion,
@@ -189,23 +195,25 @@ export async function runMasterKeyRotation(options: MasterKeyRotationOptions) {
 
   await rotateBatch(1);
 
+  const notices = await resealPendingNotices({ db, clock, keyring });
   const remaining = remainingNow();
 
   await recordAdminAudit(db, clock, {
     action: "master_key.rotate.summary",
     actorId: options.actorId ?? SYSTEM_ACTOR,
-    detail: { batches, remaining, rotated, toVersion },
-    reason: `A master-key rotation run re-wrapped ${String(rotated)} row(s) under MASTER_KEY_V${String(toVersion)}.`,
+    detail: { batches, notices, remaining, rotated, toVersion },
+    reason: `A master-key rotation run re-wrapped ${String(rotated)} row(s) under MASTER_KEY_V${String(toVersion)} and re-sealed ${String(notices)} notice(s).`,
   });
 
   logInfo(
     "master_key.rotation",
-    `re-wrapped ${String(rotated)} row(s) under MASTER_KEY_V${String(toVersion)} in ${String(batches)} batch(es); ${String(remaining)} left`,
+    `re-wrapped ${String(rotated)} row(s) under MASTER_KEY_V${String(toVersion)} in ${String(batches)} batch(es); ${String(remaining)} left; re-sealed ${String(notices)} notice(s)`,
   );
 
   const summary: MasterKeyRotationSummary = {
     batches,
     dryRun: false,
+    notices,
     remaining,
     rotated,
     toVersion,
