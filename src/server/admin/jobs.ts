@@ -5,6 +5,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { recordAdminAudit } from "../platform/audit/index.ts";
+import { retryWhenBusy } from "../platform/db/busy.ts";
 import { bgJobs } from "../platform/db/schema.ts";
 import { notifyQueueWake } from "../platform/jobs/queue.ts";
 
@@ -230,45 +231,52 @@ function missingJob() {
  * @returns Whether the job was retried, missing or refused.
  */
 export async function retryAdminJob(db: AppDatabase, clock: Clock, id: string, actorId: string) {
-  const result = db.transaction((tx) => {
-    const row = tx.select().from(bgJobs).where(eq(bgJobs.id, id)).get();
+  const result = await retryWhenBusy(
+    () =>
+      db.transaction(
+        (tx) => {
+          const row = tx.select().from(bgJobs).where(eq(bgJobs.id, id)).get();
 
-    if (row === undefined) {
-      return { kind: "missing" } as const;
-    }
+          if (row === undefined) {
+            return { kind: "missing" } as const;
+          }
 
-    if (row.status !== "dead" && row.status !== "failed") {
-      return { kind: "conflict", reason: "not_retryable", status: row.status } as const;
-    }
+          if (row.status !== "dead" && row.status !== "failed") {
+            return { kind: "conflict", reason: "not_retryable", status: row.status } as const;
+          }
 
-    if (row.dedupeKey !== null) {
-      const duplicate = tx
-        .select({ id: bgJobs.id })
-        .from(bgJobs)
-        .where(and(eq(bgJobs.dedupeKey, row.dedupeKey), eq(bgJobs.status, "queued")))
-        .get();
+          if (row.dedupeKey !== null) {
+            const duplicate = tx
+              .select({ id: bgJobs.id })
+              .from(bgJobs)
+              .where(and(eq(bgJobs.dedupeKey, row.dedupeKey), eq(bgJobs.status, "queued")))
+              .get();
 
-      if (duplicate !== undefined) {
-        return { kind: "conflict", reason: "duplicate_queued", status: row.status } as const;
-      }
-    }
+            if (duplicate !== undefined) {
+              return { kind: "conflict", reason: "duplicate_queued", status: row.status } as const;
+            }
+          }
 
-    const now = clock.now();
+          const now = clock.now();
 
-    tx.update(bgJobs)
-      .set({
-        attempts: 0,
-        lastError: null,
-        lockedUntil: null,
-        runAt: now,
-        status: "queued",
-        updatedAt: now,
-      })
-      .where(eq(bgJobs.id, id))
-      .run();
+          tx.update(bgJobs)
+            .set({
+              attempts: 0,
+              lastError: null,
+              lockedUntil: null,
+              runAt: now,
+              status: "queued",
+              updatedAt: now,
+            })
+            .where(eq(bgJobs.id, id))
+            .run();
 
-    return { kind: "retried", previousStatus: row.status } as const;
-  });
+          return { kind: "retried", previousStatus: row.status } as const;
+        },
+        { behavior: "immediate" },
+      ),
+    "admin.jobs.retry",
+  );
 
   if (result.kind === "missing") {
     return missingJob();
@@ -314,29 +322,36 @@ export async function retryAdminJob(db: AppDatabase, clock: Clock, id: string, a
  * @returns Whether the job was cancelled, missing or refused.
  */
 export async function cancelAdminJob(db: AppDatabase, clock: Clock, id: string, actorId: string) {
-  const result = db.transaction((tx) => {
-    const row = tx.select().from(bgJobs).where(eq(bgJobs.id, id)).get();
+  const result = await retryWhenBusy(
+    () =>
+      db.transaction(
+        (tx) => {
+          const row = tx.select().from(bgJobs).where(eq(bgJobs.id, id)).get();
 
-    if (row === undefined) {
-      return { kind: "missing" } as const;
-    }
+          if (row === undefined) {
+            return { kind: "missing" } as const;
+          }
 
-    if (row.status !== "queued" && row.status !== "dead") {
-      return { kind: "conflict", reason: "not_cancellable", status: row.status } as const;
-    }
+          if (row.status !== "queued" && row.status !== "dead") {
+            return { kind: "conflict", reason: "not_cancellable", status: row.status } as const;
+          }
 
-    tx.update(bgJobs)
-      .set({
-        lastError: "Cancelled from the admin jobs page.",
-        lockedUntil: null,
-        status: "failed",
-        updatedAt: clock.now(),
-      })
-      .where(eq(bgJobs.id, id))
-      .run();
+          tx.update(bgJobs)
+            .set({
+              lastError: "Cancelled from the admin jobs page.",
+              lockedUntil: null,
+              status: "failed",
+              updatedAt: clock.now(),
+            })
+            .where(eq(bgJobs.id, id))
+            .run();
 
-    return { kind: "cancelled", previousStatus: row.status } as const;
-  });
+          return { kind: "cancelled", previousStatus: row.status } as const;
+        },
+        { behavior: "immediate" },
+      ),
+    "admin.jobs.cancel",
+  );
 
   if (result.kind === "missing") {
     return missingJob();

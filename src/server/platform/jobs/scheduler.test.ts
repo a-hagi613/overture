@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { getEventListeners } from "node:events";
 
+import { eq } from "drizzle-orm";
+
 import { migrateDatabase } from "../db/migrate.ts";
 import { openDatabase } from "../db/client.ts";
+import { bgJobs } from "../db/schema.ts";
+import { setSetting } from "../settings/index.ts";
 import { enqueueJob, registerEnqueueNotify } from "./queue.ts";
 import { startJobWorker, waitForWake } from "./scheduler.ts";
 
@@ -72,6 +76,9 @@ describe("waitForWake", () => {
 describe("the job worker's class limits", () => {
   test("stalled browser jobs do not block a fast notification job", async () => {
     const db = migrated();
+
+    setSetting(db, clock, "browser.max_concurrent_sessions", "3", "test");
+
     const controller = new AbortController();
     const started: string[] = [];
     const stalled = Promise.withResolvers<undefined>();
@@ -127,5 +134,85 @@ describe("the job worker's class limits", () => {
     stalled.resolve(undefined);
 
     await worker.drain(1000);
+  });
+
+  test("uncapped browser sessions are not throttled to the default three", async () => {
+    const db = migrated();
+    const controller = new AbortController();
+    const fiveStarted = Promise.withResolvers<undefined>();
+    const stalled = Promise.withResolvers<undefined>();
+    let started = 0;
+
+    const worker = startJobWorker(
+      db,
+      clock,
+      {
+        "fixtures.capture": async () => {
+          started += 1;
+
+          if (started === 5) {
+            fiveStarted.resolve(undefined);
+          }
+
+          await stalled.promise;
+        },
+      },
+      controller.signal,
+      (notify) => {
+        registerEnqueueNotify(notify);
+      },
+    );
+
+    for (let index = 0; index < 5; index += 1) {
+      enqueueJob(db, clock, "fixtures.capture", "{}", { runAt: NOW - 10 + index });
+    }
+
+    await fiveStarted.promise;
+
+    expect(started).toBe(5);
+
+    controller.abort();
+    stalled.resolve(undefined);
+
+    await worker.drain(1000);
+  });
+
+  test("the worker reclaims a stale running job that is not a singleton", async () => {
+    const db = migrated();
+    const controller = new AbortController();
+    const ran = Promise.withResolvers<undefined>();
+
+    const worker = startJobWorker(
+      db,
+      clock,
+      {
+        "push.notify": async () => {
+          ran.resolve(undefined);
+
+          await Promise.resolve();
+        },
+      },
+      controller.signal,
+      (notify) => {
+        registerEnqueueNotify(notify);
+      },
+    );
+
+    const { id } = enqueueJob(db, clock, "push.notify", "{}", { runAt: NOW });
+
+    db.update(bgJobs)
+      .set({ attempts: 1, lockedUntil: NOW - 1, status: "running" })
+      .where(eq(bgJobs.id, id))
+      .run();
+
+    await ran.promise;
+
+    controller.abort();
+
+    await worker.drain(1000);
+
+    const row = db.select().from(bgJobs).where(eq(bgJobs.id, id)).get();
+
+    expect(row?.status).toBe("done");
   });
 });

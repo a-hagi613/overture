@@ -53,6 +53,7 @@ import {
   openReviewsForApplication,
 } from "./review-store.ts";
 import { recordAutoAnswer } from "./review-events.ts";
+import { PREPARABLE_STATUSES, updatePreparableApplication } from "./preparable-status.ts";
 import { stageForStatus } from "./stage.ts";
 
 const optionsSchema = z.array(z.string());
@@ -96,8 +97,6 @@ function employerNames(facts: ReadonlyMap<string, string>) {
 
   return names.filter((name) => name !== "");
 }
-
-const PREPARABLE_STATUSES = ["preparing", "needs_review", "ready"] as const;
 
 interface StoredSentence {
   sentence: string;
@@ -686,13 +685,15 @@ export function createPreparationService(deps: {
         status: applications.status,
       })
       .from(applications)
-      .where(eq(applications.id, applicationId))
+      .where(
+        and(
+          eq(applications.id, applicationId),
+          inArray(applications.status, [...PREPARABLE_STATUSES]),
+        ),
+      )
       .get();
 
-    if (
-      application === undefined ||
-      !PREPARABLE_STATUSES.some((status) => status === application.status)
-    ) {
+    if (application === undefined) {
       return null;
     }
 
@@ -736,17 +737,14 @@ export function createPreparationService(deps: {
       (row.ats === "workable" || row.ats === "personio") &&
       isKillSwitchEnabled(db, "ats", row.ats)
     ) {
-      db.update(applications)
-        .set({
-          status: "skipped",
-          statusReason: "ats_not_enabled",
-          stage: null,
-          updatedAt: clock.now(),
-        })
-        .where(eq(applications.id, applicationId))
-        .run();
+      const updated = updatePreparableApplication(db, applicationId, {
+        status: "skipped",
+        statusReason: "ats_not_enabled",
+        stage: null,
+        updatedAt: clock.now(),
+      });
 
-      return { status: "skipped" as const, blocked: 0 };
+      return updated ? { status: "skipped" as const, blocked: 0 } : null;
     }
 
     const resume = db
@@ -925,26 +923,34 @@ export function createPreparationService(deps: {
       unsupportedReason = "form_unsupported";
     }
 
+    if (unsupportedReason !== null) {
+      const skipped = updatePreparableApplication(db, applicationId, {
+        status: "skipped",
+        statusReason: unsupportedReason,
+        stage: null,
+        updatedAt: clock.now(),
+      });
+
+      if (!skipped) {
+        return null;
+      }
+
+      syncReviews({
+        applicationId,
+        ats: row.ats,
+        userId: row.userId,
+        blocked: [],
+      });
+
+      return { status: "skipped" as const, blocked: 0 };
+    }
+
     syncReviews({
       applicationId,
       ats: row.ats,
       userId: row.userId,
-      blocked: unsupportedReason === null ? blocked : [],
+      blocked,
     });
-
-    if (unsupportedReason !== null) {
-      db.update(applications)
-        .set({
-          status: "skipped",
-          statusReason: unsupportedReason,
-          stage: null,
-          updatedAt: clock.now(),
-        })
-        .where(eq(applications.id, applicationId))
-        .run();
-
-      return { status: "skipped" as const, blocked: 0 };
-    }
 
     for (const question of questionRows) {
       const resolution = resolutions.get(question.questionId);
@@ -966,20 +972,22 @@ export function createPreparationService(deps: {
     }
 
     const status = blocked.length === 0 ? "ready" : "needs_review";
+    let changed = true;
 
     if (status !== row.status) {
       const now = clock.now();
 
-      db.update(applications)
-        .set({
-          status,
-          statusReason: status === "needs_review" ? "unknown_question" : null,
-          stage: stageForStatus(status),
-          readyAt: status === "ready" ? now : null,
-          updatedAt: now,
-        })
-        .where(eq(applications.id, applicationId))
-        .run();
+      changed = updatePreparableApplication(db, applicationId, {
+        status,
+        statusReason: status === "needs_review" ? "unknown_question" : null,
+        stage: stageForStatus(status),
+        readyAt: status === "ready" ? now : null,
+        updatedAt: now,
+      });
+    }
+
+    if (!changed) {
+      return null;
     }
 
     if (status === "ready" && row.status !== "ready") {

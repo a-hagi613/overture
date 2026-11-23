@@ -31,7 +31,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for the sixty-one files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
+exist only for the sixty-five files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
 as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key,
 and a "did not happen" line appears only when the stored data proves it), ledger, crypto, planner, the
 restored-database check (a restored file is read
@@ -77,8 +77,13 @@ the same no-resume or no-mailbox hold clears when its prerequisite returns), the
 degrades to an empty list rather than a 500), the PDF header check (only `%PDF-` in the first kilobyte passes, so a
 spoofed MIME type cannot pass HTML as a resume), the
 billing webhook's transaction (a pause notice and the planner/prep jobs a resume queues commit with the Stripe event
-and roll back with it, a stale out-of-order failure cannot pause a paid user, and a price Overture does not sell
-grants nothing), the Anthropic model and its batch prices (`models.test.ts`: `ANTHROPIC_MODEL` defaults to the model SPEC §8.6 names,
+and roll back with it, a stale out-of-order failure cannot pause a paid user, a price Overture does not sell
+grants nothing, an older subscription event cannot regress a newer one, and `invoice.paid` promotes a failed status
+and wakes Home), the Stripe adapter's line choice (a basil invoice reads its subscription from
+`parent.subscription_details` and a Week to Month proration reads the new plan's line), the checkout coordinator
+(concurrent double clicks share one Checkout Session and one Stripe idempotency key), the admin billing list (the
+owner's filter and page run in SQL and the stat counts agree with the page), the preparation status guard (a result
+written after the user approved the Application matches no row instead of overwriting a newer status), the Anthropic model and its batch prices (`models.test.ts`: `ANTHROPIC_MODEL` defaults to the model SPEC §8.6 names,
 a dated 5.5 model id is priced from the exact 5.5 row rather than the 4.5 haiku prefix, and a model with no price row
 is refused, #387), the Personio form reader (a server-rendered form's fields, required star, documents and
 unsupported controls are read without a browser), the provider and cost report (completion and cost divide

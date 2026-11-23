@@ -12,6 +12,8 @@ type SubscriptionRow = typeof subscriptions.$inferSelect;
 
 const ENDED_STATUSES = new Set(["canceled", "incomplete_expired"]);
 
+const PROMOTABLE_STATUSES = new Set(["past_due", "unpaid", "incomplete"]);
+
 /**
  * Whether a Stripe subscription status means the subscription no longer bills.
  * @param status Stripe's status, stored verbatim.
@@ -19,6 +21,17 @@ const ENDED_STATUSES = new Set(["canceled", "incomplete_expired"]);
  */
 export function subscriptionEnded(status: string) {
   return ENDED_STATUSES.has(status);
+}
+
+/**
+ * Whether a stored subscription should stop a new Checkout. A status that has
+ * ended does not, and neither does `incomplete`, which never became a plan; any
+ * other status means the user already has the plan Checkout would buy.
+ * @param status Stripe's status, stored verbatim.
+ * @returns True when a Checkout would duplicate a plan the user already has.
+ */
+export function subscriptionBlocksCheckout(status: string) {
+  return status !== "incomplete" && !subscriptionEnded(status);
 }
 
 /**
@@ -38,6 +51,12 @@ export interface SubscriptionUpdate {
   cancelAtPeriodEnd: boolean | null;
   /** The status a new row takes when the event names none and none is stored. */
   defaultStatus: string;
+  /** When Stripe created the event, in epoch milliseconds, or null when unknown. */
+  eventCreatedAtMs: number | null;
+  /** Whether this is a `customer.subscription.*` event whose payload may be older than the stored row. */
+  subscriptionEvent: boolean;
+  /** Whether a successful invoice payment should promote a failed status to active. */
+  promoteToActive: boolean;
 }
 
 /**
@@ -45,10 +64,14 @@ export interface SubscriptionUpdate {
  * row on the first event and never moving it to another user. The plan comes
  * from the price the event names first, so a subscription switched to another
  * Stripe price grants and reads the new plan's quota even while the metadata
- * on that subscription still names the old one.
+ * on that subscription still names the old one. A `customer.subscription.*`
+ * event Stripe created before the stored row's newest event is a stale
+ * delivery, so it never regresses the status or period; an `invoice.paid`
+ * promotes a failed status because the payment settled what it had failed.
  * @param db The database or transaction that claims the event.
  * @param at When the event was processed, in epoch milliseconds.
  * @param update What the event names, each field null when it names none.
+ * @returns The subscription row's owner, or null when nothing was stored.
  */
 export function recordSubscription(db: BillingDb, at: number, update: SubscriptionUpdate) {
   const existing = db
@@ -58,13 +81,22 @@ export function recordSubscription(db: BillingDb, at: number, update: Subscripti
     .get();
 
   if (existing !== undefined && subscriptionEnded(existing.status)) {
-    return;
+    return null;
+  }
+
+  if (
+    existing !== undefined &&
+    update.subscriptionEvent &&
+    update.eventCreatedAtMs !== null &&
+    update.eventCreatedAtMs < existing.updatedAt
+  ) {
+    return null;
   }
 
   const plan = update.plan ?? existing?.plan ?? null;
 
   if (plan === null) {
-    return;
+    return null;
   }
 
   const currentPeriodStart = update.currentPeriodStartMs ?? existing?.currentPeriodStart ?? at;
@@ -74,22 +106,27 @@ export function recordSubscription(db: BillingDb, at: number, update: Subscripti
     existing?.currentPeriodEnd ??
     periodEndFor(plan, currentPeriodStart);
 
+  const storedStatus = existing?.status ?? null;
+
+  const promoted =
+    update.promoteToActive && storedStatus !== null && PROMOTABLE_STATUSES.has(storedStatus);
+
   const row: SubscriptionRow = {
     cancelAtPeriodEnd: update.cancelAtPeriodEnd ?? existing?.cancelAtPeriodEnd ?? false,
     currentPeriodEnd,
     currentPeriodStart,
     id: existing?.id ?? crypto.randomUUID(),
     plan,
-    status: update.status ?? existing?.status ?? update.defaultStatus,
+    status: update.status ?? (promoted ? "active" : (storedStatus ?? update.defaultStatus)),
     stripeSubscriptionId: update.stripeSubscriptionId,
-    updatedAt: at,
+    updatedAt: Math.max(existing?.updatedAt ?? 0, update.eventCreatedAtMs ?? at),
     userId: existing?.userId ?? update.userId,
   };
 
   if (existing === undefined) {
     db.insert(subscriptions).values(row).run();
 
-    return;
+    return row.userId;
   }
 
   db.update(subscriptions)
@@ -103,6 +140,8 @@ export function recordSubscription(db: BillingDb, at: number, update: Subscripti
     })
     .where(eq(subscriptions.id, row.id))
     .run();
+
+  return row.userId;
 }
 
 /**

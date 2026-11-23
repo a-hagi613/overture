@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 
 import { openDatabase } from "../platform/db/client.ts";
 import { migrateDatabase } from "../platform/db/migrate.ts";
@@ -8,6 +9,7 @@ import { createClock } from "../platform/ports/clock.ts";
 import type { PaymentEvent } from "../platform/ports/payments.ts";
 import {
   bgJobs,
+  events,
   grants,
   notifications,
   profiles,
@@ -78,6 +80,7 @@ function event(overrides: Partial<PaymentEvent> & Pick<PaymentEvent, "id" | "typ
   return {
     cancelAtPeriodEnd: null,
     customerId: "cus_1",
+    eventCreatedAt: null,
     invoiceId: null,
     mode: null,
     periodEndMs: null,
@@ -325,6 +328,95 @@ describe("billing webhooks", () => {
     expect(
       db.select().from(stripeEvents).where(eq(stripeEvents.id, paid.id)).get()?.processedAt,
     ).not.toBeNull();
+
+    sqlite.close();
+  });
+
+  test("an older subscription event never regresses a newer status or period", () => {
+    const { at, db, sqlite, webhooks } = freshWebhooks();
+
+    expect(
+      webhooks.handle(
+        event({
+          eventCreatedAt: at,
+          id: "evt_sub_newer",
+          periodEndMs: at + 30 * DAY_MS,
+          periodStartMs: at,
+          priceId: MONTH_PRICE,
+          subscriptionStatus: "active",
+          type: "customer.subscription.updated",
+        }),
+      ),
+    ).toBe("processed");
+
+    expect(
+      webhooks.handle(
+        event({
+          eventCreatedAt: at - 10 * 60_000,
+          id: "evt_sub_older",
+          periodEndMs: at + 5 * DAY_MS,
+          periodStartMs: at - 25 * DAY_MS,
+          priceId: MONTH_PRICE,
+          subscriptionStatus: "past_due",
+          type: "customer.subscription.updated",
+        }),
+      ),
+    ).toBe("processed");
+
+    const [row] = db.select().from(subscriptions).all();
+
+    expect(row?.status).toBe("active");
+    expect(row?.currentPeriodEnd).toBe(at + 30 * DAY_MS);
+    expect(row?.updatedAt).toBe(at);
+
+    sqlite.close();
+  });
+
+  test("invoice.paid promotes a past_due subscription to active and wakes Home", () => {
+    const { at, db, sqlite, webhooks } = freshWebhooks();
+
+    expect(
+      webhooks.handle(
+        event({
+          eventCreatedAt: at - 60_000,
+          id: "evt_sub_past_due",
+          periodEndMs: at + 30 * DAY_MS,
+          periodStartMs: at,
+          priceId: MONTH_PRICE,
+          subscriptionStatus: "past_due",
+          type: "customer.subscription.updated",
+        }),
+      ),
+    ).toBe("processed");
+
+    expect(
+      webhooks.handle(
+        event({
+          eventCreatedAt: at,
+          id: "evt_invoice_paid_promote",
+          invoiceId: "in_promote",
+          periodEndMs: at + 60 * DAY_MS,
+          periodStartMs: at + 30 * DAY_MS,
+          priceId: MONTH_PRICE,
+          type: "invoice.paid",
+        }),
+      ),
+    ).toBe("processed");
+
+    expect(db.select().from(subscriptions).all()[0]?.status).toBe("active");
+
+    const homeEvents = db
+      .select()
+      .from(events)
+      .all()
+      .filter((row) => row.topic === "home.updated");
+
+    const homeSchema = z.object({ billing: z.boolean().optional() });
+
+    expect(homeEvents.length).toBeGreaterThanOrEqual(2);
+    expect(
+      homeEvents.every((row) => homeSchema.parse(JSON.parse(row.payload)).billing === true),
+    ).toBe(true);
 
     sqlite.close();
   });

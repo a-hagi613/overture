@@ -14,6 +14,7 @@ import { getAllKillSwitches, getSettingNumber } from "./settings/index.ts";
 const ALERT_LIST_LIMIT = 50;
 const MAIL_WARN_RATIO = 0.8;
 const INTEGER_TEXT = /^\d+$/u;
+const DECIMAL_TEXT = /^\d+(?:\.\d+)?$/u;
 
 const alertDetailSchema = z.record(
   z.string(),
@@ -126,6 +127,24 @@ export function validateAdminSettingValue(key: string, value: string) {
     const parsed = Number(trimmed);
 
     return parsed >= 0 && parsed <= 20;
+  }
+
+  if (key === "limits.timezone_change_days") {
+    if (!INTEGER_TEXT.test(trimmed)) {
+      return false;
+    }
+
+    const parsed = Number(trimmed);
+
+    return parsed >= 1 && parsed <= 365;
+  }
+
+  if (key === "llm.daily_spend_cap_micros" || key === "llm.monthly_spend_cap_micros") {
+    return INTEGER_TEXT.test(trimmed);
+  }
+
+  if (key.startsWith("llm.cap_")) {
+    return DECIMAL_TEXT.test(trimmed);
   }
 
   return trimmed.length > 0;

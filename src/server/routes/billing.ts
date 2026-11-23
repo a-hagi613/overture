@@ -15,8 +15,9 @@ import {
 } from "../billing/card-fingerprint.ts";
 import { applicationsLeft, planApplications } from "../billing/ledger.ts";
 import { planForPriceId, stripePriceId } from "../billing/index.ts";
-import { stripeCustomerIdFor } from "../billing/customers.ts";
-import { currentSubscriptionOf, subscriptionEnded } from "../billing/subscriptions.ts";
+import { createCheckoutCoordinator } from "../billing/checkout.ts";
+import { linkStripeCustomer, stripeCustomerIdFor } from "../billing/customers.ts";
+import { currentSubscriptionOf, subscriptionBlocksCheckout } from "../billing/subscriptions.ts";
 import { createPaymentsWebhookService } from "../billing/webhooks.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { logError } from "../platform/log.ts";
@@ -74,6 +75,7 @@ export function createBillingRoutes(deps: {
   const baseUrl = appOrigin.replace(/\/+$/u, "");
   const billingUrl = `${baseUrl}/profile/billing`;
   const plansUrl = billingUrl;
+  const checkout = payments === null ? null : createCheckoutCoordinator({ clock, db, payments });
 
   async function signedInAccount(raw: Request) {
     const account = await readSessionUser(auth, raw.headers);
@@ -132,13 +134,13 @@ export function createBillingRoutes(deps: {
       return access.refusal;
     }
 
-    if (payments === null) {
+    if (checkout === null) {
       return context.json({ error: "billing_disabled" }, 503);
     }
 
     const existing = currentSubscriptionOf(db, access.account.id);
 
-    if (existing !== null && !subscriptionEnded(existing.status)) {
+    if (existing !== null && subscriptionBlocksCheckout(existing.status)) {
       return context.json(
         { error: "plan_active", plan: existing.plan, status: existing.status },
         409,
@@ -152,9 +154,8 @@ export function createBillingRoutes(deps: {
     }
 
     try {
-      const session = await payments.createCheckoutSession({
+      const session = await checkout.create({
         cancelUrl: `${plansUrl}?billing=cancelled`,
-        customerId: stripeCustomerIdFor(db, access.account.id),
         email: access.account.email,
         plan: context.req.valid("json").plan,
         priceId,
@@ -227,6 +228,14 @@ export function createBillingRoutes(deps: {
 
     if (card === null || card.userId !== access.account.id) {
       return context.json({ error: "card_not_verified" }, 402);
+    }
+
+    if (card.customerId !== null) {
+      linkStripeCustomer(db, {
+        at: clock.now(),
+        stripeCustomerId: card.customerId,
+        userId: access.account.id,
+      });
     }
 
     const claim = claimTrialCard(db, clock, {

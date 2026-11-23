@@ -8,7 +8,13 @@ import { migrateDatabase } from "../db/migrate.ts";
 import { openDatabase } from "../db/client.ts";
 import { bgJobs } from "../db/schema.ts";
 import { DEFAULT_MAX_IN_FLIGHT_JOBS } from "./classes.ts";
-import { claimDueJobsQuery, claimJobsToRun, enqueueJob } from "./queue.ts";
+import {
+  claimDueJobsQuery,
+  claimJobsToRun,
+  enqueueJob,
+  recoverBootRunningJobs,
+  recoverStaleLocks,
+} from "./queue.ts";
 
 const NOW = Date.UTC(2026, 10, 22, 9, 0, 0);
 
@@ -148,5 +154,55 @@ describe("the bg_jobs claim query", () => {
       expect(queryPlan).toContain("bg_jobs_claim_due");
       expect(queryPlan).not.toMatch(/SCAN bg_jobs\b/u);
     }
+  });
+});
+
+describe("recovering locks", () => {
+  test("boot requeues every running job even inside its lease", () => {
+    const { db } = migrated();
+    const { id } = enqueueAt(db, "application.send", NOW);
+
+    db.update(bgJobs)
+      .set({ attempts: 1, lockedUntil: NOW + 300_000, status: "running" })
+      .where(eq(bgJobs.id, id))
+      .run();
+
+    expect(recoverBootRunningJobs(db, clock)).toBe(1);
+
+    const row = db.select().from(bgJobs).where(eq(bgJobs.id, id)).get();
+
+    expect(row?.status).toBe("queued");
+    expect(row?.lockedUntil).toBeNull();
+    expect(row?.attempts).toBe(1);
+  });
+
+  test("the periodic sweep skips the ids the worker still holds", () => {
+    const { db } = migrated();
+    const kept = enqueueAt(db, "fixtures.capture", NOW);
+    const stale = enqueueAt(db, "live.check", NOW);
+
+    for (const id of [kept.id, stale.id]) {
+      db.update(bgJobs)
+        .set({ attempts: 1, lockedUntil: NOW - 1, status: "running" })
+        .where(eq(bgJobs.id, id))
+        .run();
+    }
+
+    expect(recoverStaleLocks(db, clock, [], [kept.id])).toBe(1);
+    expect(db.select().from(bgJobs).where(eq(bgJobs.id, kept.id)).get()?.status).toBe("running");
+    expect(db.select().from(bgJobs).where(eq(bgJobs.id, stale.id)).get()?.status).toBe("queued");
+  });
+
+  test("a sweep only reclaims locks that have expired", () => {
+    const { db } = migrated();
+    const fresh = enqueueAt(db, "fixtures.capture", NOW);
+
+    db.update(bgJobs)
+      .set({ attempts: 1, lockedUntil: NOW + 1, status: "running" })
+      .where(eq(bgJobs.id, fresh.id))
+      .run();
+
+    expect(recoverStaleLocks(db, clock)).toBe(0);
+    expect(db.select().from(bgJobs).where(eq(bgJobs.id, fresh.id)).get()?.status).toBe("running");
   });
 });

@@ -1,16 +1,4 @@
-import {
-  and,
-  asc,
-  count,
-  eq,
-  gte,
-  inArray,
-  isNotNull,
-  isNull,
-  lte,
-  notInArray,
-  sql,
-} from "drizzle-orm";
+import { and, asc, count, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 
 import { z } from "zod";
 
@@ -270,52 +258,103 @@ export function createDispatcherTick(deps: DispatchDeps) {
     return { block: null, timeZone };
   }
 
-  function postingBlock(candidate: Candidate, now: number) {
-    const hourlyLimit = settingNumber(db, `limits.ats_hourly.${candidate.ats}`, 120);
-
+  function atsHourlyUsed(ats: DispatchAts, now: number) {
     const recent = db
       .select({ total: count() })
       .from(attempts)
       .innerJoin(applications, eq(attempts.applicationId, applications.id))
-      .where(and(eq(applications.ats, candidate.ats), gte(attempts.startedAt, now - HOUR_MS)))
+      .where(and(eq(applications.ats, ats), gte(attempts.startedAt, now - HOUR_MS)))
       .get();
 
-    if ((recent?.total ?? 0) >= hourlyLimit) {
-      return { reason: "ats_hourly", scope: "posting" } satisfies Block;
-    }
+    return recent?.total ?? 0;
+  }
 
+  function crowdPostingUsed(postingId: string) {
     const crowdPosting = db
       .select({ total: count() })
       .from(applications)
       .where(
         and(
-          eq(applications.postingId, candidate.postingId),
-          notInArray(applications.status, ["failed", "skipped", "withdrawn"]),
+          eq(applications.postingId, postingId),
+          inArray(applications.status, ["sending", "confirming", "sent"]),
         ),
       )
       .get();
 
-    if ((crowdPosting?.total ?? 0) >= settingNumber(db, "limits.crowd_per_posting", 20)) {
-      return { reason: "crowd_posting", scope: "posting" } satisfies Block;
-    }
+    return crowdPosting?.total ?? 0;
+  }
 
+  function crowdEmployerUsed(companyId: string, now: number) {
     const crowdEmployer = db
       .select({ total: count() })
       .from(applications)
       .where(
         and(
-          eq(applications.companyId, candidate.companyId),
+          eq(applications.companyId, companyId),
           eq(applications.status, "sent"),
           gte(applications.sentAt, now - WEEK_MS),
         ),
       )
       .get();
 
-    if ((crowdEmployer?.total ?? 0) >= settingNumber(db, "limits.crowd_per_employer_week", 50)) {
+    return crowdEmployer?.total ?? 0;
+  }
+
+  interface TickHeadroom {
+    atsHourly: Map<string, number>;
+    crowdPosting: Map<string, number>;
+    crowdEmployer: Map<string, number>;
+  }
+
+  function headroomFor(ats: DispatchAts, now: number, headroom: TickHeadroom) {
+    const used = headroom.atsHourly.get(ats) ?? atsHourlyUsed(ats, now);
+
+    headroom.atsHourly.set(ats, used);
+
+    return used;
+  }
+
+  function postingBlock(candidate: Candidate, now: number, headroom: TickHeadroom) {
+    const hourlyLimit = settingNumber(db, `limits.ats_hourly.${candidate.ats}`, 120);
+
+    if (headroomFor(candidate.ats, now, headroom) >= hourlyLimit) {
+      return { reason: "ats_hourly", scope: "posting" } satisfies Block;
+    }
+
+    const postingUsed =
+      headroom.crowdPosting.get(candidate.postingId) ?? crowdPostingUsed(candidate.postingId);
+
+    headroom.crowdPosting.set(candidate.postingId, postingUsed);
+
+    if (postingUsed >= settingNumber(db, "limits.crowd_per_posting", 20)) {
+      return { reason: "crowd_posting", scope: "posting" } satisfies Block;
+    }
+
+    const employerUsed =
+      headroom.crowdEmployer.get(candidate.companyId) ??
+      crowdEmployerUsed(candidate.companyId, now);
+
+    headroom.crowdEmployer.set(candidate.companyId, employerUsed);
+
+    if (employerUsed >= settingNumber(db, "limits.crowd_per_employer_week", 50)) {
       return { reason: "crowd_employer", scope: "posting" } satisfies Block;
     }
 
     return null;
+  }
+
+  function takeHeadroom(candidate: Candidate, headroom: TickHeadroom) {
+    headroom.atsHourly.set(candidate.ats, (headroom.atsHourly.get(candidate.ats) ?? 0) + 1);
+
+    headroom.crowdPosting.set(
+      candidate.postingId,
+      (headroom.crowdPosting.get(candidate.postingId) ?? 0) + 1,
+    );
+
+    headroom.crowdEmployer.set(
+      candidate.companyId,
+      (headroom.crowdEmployer.get(candidate.companyId) ?? 0) + 1,
+    );
   }
 
   function skipClosed(candidate: Candidate, now: number) {
@@ -519,6 +558,12 @@ export function createDispatcherTick(deps: DispatchDeps) {
     const window = parseSendWindow(getSetting(db, "limits.send_window"));
     const eligible: Candidate[] = [];
 
+    const headroom: TickHeadroom = {
+      atsHourly: new Map(),
+      crowdEmployer: new Map(),
+      crowdPosting: new Map(),
+    };
+
     for (const userId of userIds) {
       if (freeSlots === 0) {
         break;
@@ -560,7 +605,7 @@ export function createDispatcherTick(deps: DispatchDeps) {
         continue;
       }
 
-      if (postingBlock(candidate, now) !== null) {
+      if (postingBlock(candidate, now, headroom) !== null) {
         summary.blocked += 1;
 
         continue;
@@ -636,6 +681,13 @@ export function createDispatcherTick(deps: DispatchDeps) {
         continue;
       }
 
+      if (postingBlock(candidate, now, headroom) !== null) {
+        summary.blocked += 1;
+
+        continue;
+      }
+
+      takeHeadroom(candidate, headroom);
       sendable.push(candidate);
       freeSlots -= 1;
     }

@@ -31,7 +31,11 @@ import { createRandom } from "./platform/ports/random.ts";
 import { createEventLoopLagMonitor } from "./platform/event-loop-lag.ts";
 import { createBackupMonitor } from "./platform/ports/backup.ts";
 import { installProcessGuards } from "./platform/process-guard.ts";
-import { recoverStaleLocks, registerEnqueueNotify } from "./platform/jobs/queue.ts";
+import {
+  recoverBootRunningJobs,
+  recoverStaleLocks,
+  registerEnqueueNotify,
+} from "./platform/jobs/queue.ts";
 import { RetryLaterError } from "./platform/jobs/retry.ts";
 import {
   ensureRetentionQueued,
@@ -325,6 +329,8 @@ const jobSingletons = [
 ];
 
 recoverStaleLocks(db, clock, jobSingletons);
+
+recoverBootRunningJobs(db, clock);
 
 ensureCheckinSweepQueued(db, clock);
 

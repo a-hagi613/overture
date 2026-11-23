@@ -145,6 +145,7 @@ function nonEmpty(value: string | null | undefined) {
 }
 
 const lineSchema = z.object({
+  amount: z.number().optional(),
   current_period_end: z.number().optional(),
   current_period_start: z.number().optional(),
   period: z
@@ -158,11 +159,13 @@ const lineSchema = z.object({
     })
     .nullable()
     .optional(),
+  proration: z.boolean().nullable().optional(),
 });
 
 const eventSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),
+  created: z.number().int().optional(),
   data: z.object({
     object: z.object({
       id: z.string().optional(),
@@ -184,7 +187,13 @@ const eventSchema = z.object({
       parent: z
         .object({
           subscription_details: z
-            .object({ metadata: metadataSchema.nullable().optional() })
+            .object({
+              metadata: metadataSchema.nullable().optional(),
+              subscription: z
+                .union([z.string(), z.object({ id: z.string() }).transform((named) => named.id)])
+                .nullable()
+                .optional(),
+            })
             .nullable()
             .optional(),
         })
@@ -265,14 +274,53 @@ function priceIdOf(line: z.infer<typeof lineSchema>) {
   return line.pricing?.price_details?.price ?? line.price?.id ?? null;
 }
 
+function lineEnd(line: z.infer<typeof lineSchema>) {
+  return line.period?.end ?? line.current_period_end ?? 0;
+}
+
+function planLineOf(lines: readonly z.infer<typeof lineSchema>[], planPriceIds: readonly string[]) {
+  const priced = lines.filter((line) => priceIdOf(line) !== null);
+  const [firstPriced] = priced;
+
+  if (firstPriced === undefined) {
+    return null;
+  }
+
+  const configured = priced.filter((line) => {
+    const priceId = priceIdOf(line);
+
+    return priceId !== null && planPriceIds.includes(priceId);
+  });
+
+  const billable = priced.filter((line) => line.proration !== true && (line.amount ?? 0) > 0);
+  const configuredFirst = configured.length > 0 ? configured : billable;
+  const pool = configuredFirst.length > 0 ? configuredFirst : priced;
+  const [head] = pool;
+
+  if (head === undefined) {
+    return null;
+  }
+
+  let best = head;
+
+  for (const line of pool) {
+    if (lineEnd(line) > lineEnd(best)) {
+      best = line;
+    }
+  }
+
+  return best;
+}
+
 function subscriptionIdOf(object: z.infer<typeof eventSchema>["data"]["object"], type: string) {
   return (
     nonEmpty(object.subscription) ??
+    nonEmpty(object.parent?.subscription_details?.subscription) ??
     (type.startsWith("customer.subscription.") ? (object.id ?? null) : null)
   );
 }
 
-function eventFrom(parsed: z.infer<typeof eventSchema>) {
+function eventFrom(parsed: z.infer<typeof eventSchema>, planPriceIds: readonly string[]) {
   const { object } = parsed.data;
   const subscriptionEvent = parsed.type.startsWith("customer.subscription.");
 
@@ -283,11 +331,15 @@ function eventFrom(parsed: z.infer<typeof eventSchema>) {
     object.client_reference_id ?? subscriptionMetadata?.user_id ?? object.metadata?.user_id,
   );
 
-  const customerId = object.customer ?? (parsed.type.startsWith("customer.") ? object.id : null);
+  const customerEvent =
+    parsed.type === "customer.created" ||
+    parsed.type === "customer.updated" ||
+    parsed.type === "customer.deleted";
+
+  const customerId = object.customer ?? (customerEvent ? object.id : null);
   const lines = [...(object.lines?.data ?? []), ...(object.items?.data ?? [])];
   let periodEndSeconds = subscriptionEvent ? (object.current_period_end ?? 0) : 0;
   let periodStartSeconds = subscriptionEvent ? (object.current_period_start ?? 0) : 0;
-  let priceId: string | null = null;
 
   for (const line of lines) {
     periodEndSeconds = Math.max(
@@ -300,20 +352,22 @@ function eventFrom(parsed: z.infer<typeof eventSchema>) {
       line.period?.start ?? 0,
       line.current_period_start ?? 0,
     );
-    priceId ??= priceIdOf(line);
   }
+
+  const planLine = planLineOf(lines, planPriceIds);
 
   const isSession = parsed.type.startsWith("checkout.session.");
 
   const event: PaymentEvent = {
     cancelAtPeriodEnd: subscriptionEvent ? (object.cancel_at_period_end ?? false) : null,
     customerId: customerId ?? null,
+    eventCreatedAt: parsed.created === undefined ? null : parsed.created * 1000,
     id: parsed.id,
     invoiceId: parsed.type.startsWith("invoice.") ? (object.id ?? null) : null,
     periodEndMs: periodEndSeconds > 0 ? periodEndSeconds * 1000 : null,
     periodStartMs: periodStartSeconds > 0 ? periodStartSeconds * 1000 : null,
     plan: planOf(object.metadata?.plan) ?? planOf(subscriptionMetadata?.plan),
-    priceId,
+    priceId: planLine === null ? null : priceIdOf(planLine),
     mode: object.mode ?? null,
     sessionId: isSession ? (object.id ?? null) : null,
     subscriptionId: subscriptionIdOf(object, parsed.type),
@@ -331,6 +385,8 @@ export interface StripePaymentsConfig {
   apiBaseUrl: string;
   clock: Clock;
   toleranceSeconds?: number;
+  /** The Stripe price ids Overture sells, so an invoice's plan line wins over a proration credit. */
+  planPriceIds?: readonly string[];
 }
 
 export function createStripePayments(config: StripePaymentsConfig) {
@@ -449,7 +505,7 @@ export function createStripePayments(config: StripePaymentsConfig) {
       throw new InvalidWebhookSignatureError("The Stripe webhook body is not an event.");
     }
 
-    return eventFrom(parsed.data);
+    return eventFrom(parsed.data, config.planPriceIds ?? []);
   }
 
   const payments: Payments = {
@@ -473,7 +529,9 @@ export function createStripePayments(config: StripePaymentsConfig) {
         form.set("customer", request.customerId);
       }
 
-      const session = checkoutSessionSchema.parse(await postForm("/v1/checkout/sessions", form));
+      const session = checkoutSessionSchema.parse(
+        await postForm("/v1/checkout/sessions", form, request.idempotencyKey),
+      );
 
       return { id: session.id, url: session.url };
     },

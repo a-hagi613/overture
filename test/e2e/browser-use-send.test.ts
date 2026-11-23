@@ -194,6 +194,10 @@ async function readyApplication(
 ) {
   const { owner, userId } = await ownerContextFor(harness.server.url);
 
+  const running = await owner.post("/api/running", { data: { running: true } });
+
+  expect(running.ok()).toBe(true);
+
   await owner.put("/api/profile/facts", { data: { facts } });
 
   const upload = await owner.post("/api/profile/resume", {

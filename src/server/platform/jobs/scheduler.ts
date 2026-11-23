@@ -2,9 +2,16 @@ import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 import type { ClaimedJob, JobHandlers } from "./queue.ts";
 
-import { claimJobsToRun, requeueWithoutConsumingAttempt, runClaimedJob } from "./queue.ts";
+import {
+  claimJobsToRun,
+  recoverStaleLocks,
+  requeueWithoutConsumingAttempt,
+  runClaimedJob,
+} from "./queue.ts";
+import { jobClassLimits, maxInFlightFor } from "./classes.ts";
 import { logError } from "../log.ts";
 import { getSetting } from "../settings/index.ts";
+import { maxConcurrentSessionsFromSetting } from "../../dispatch/browser/session-slots.ts";
 
 const DEFAULT_POLL_INTERVAL_MS = 15_000;
 const DEFAULT_BATCH_SIZE = 10;
@@ -189,10 +196,18 @@ export function startJobWorker(
       return;
     }
 
+    const inFlightIds = [...inFlight].map((entry) => entry.id);
+
+    recoverStaleLocks(db, clock, [], inFlightIds);
+
+    const limits = jobClassLimits(maxConcurrentSessionsFromSetting(db));
+
     const claimed = claimJobsToRun(db, clock, {
       batchSize: readBatchSize(db),
       busyKinds: busyKinds(),
+      classLimits: limits,
       inFlightKinds: inFlightKinds(),
+      maxInFlight: maxInFlightFor(limits),
       singletonKinds,
     });
 

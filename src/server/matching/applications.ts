@@ -108,7 +108,8 @@ export function createApplication(
 
   const id = crypto.randomUUID();
 
-  db.insert(applications)
+  const inserted = db
+    .insert(applications)
     .values({
       ...display,
       id,
@@ -125,9 +126,15 @@ export function createApplication(
       updatedAt: at,
     })
     .onConflictDoNothing()
-    .run();
+    .returning({ id: applications.id })
+    .all()
+    .at(0);
 
-  return id;
+  if (inserted !== undefined) {
+    return inserted.id;
+  }
+
+  return applicationFor(db, input.userId, input.postingId)?.id ?? null;
 }
 
 export function activeApplicationCompanies(db: AppDatabase, userId: string) {

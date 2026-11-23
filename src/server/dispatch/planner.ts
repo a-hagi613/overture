@@ -118,7 +118,6 @@ export function createPlanner(deps: PlannerDeps) {
 
     const target = planningWindow(now, timeZone, window);
     const todayStart = localDayStart(now, timeZone);
-    const usage = target.dayStart === todayStart ? dailyUsageSince(db, userId, target.dayStart) : 0;
 
     const approved = db
       .select({
@@ -141,20 +140,25 @@ export function createPlanner(deps: PlannerDeps) {
 
     const replan = firstNeedsSlot === -1 ? [] : approved.slice(firstNeedsSlot);
 
-    const keptInTarget = kept.filter(
-      (application) =>
-        application.scheduledFor !== null &&
-        application.scheduledFor >= target.dayStart &&
-        application.scheduledFor < target.nextDayStart,
-    );
-
     const keptSlots = kept.flatMap((application) =>
       application.scheduledFor === null ? [] : [application.scheduledFor],
     );
 
     const latestKept = keptSlots.length === 0 ? 0 : Math.max(...keptSlots);
 
-    const remaining = Math.max(0, dailyCap - usage - keptInTarget.length);
+    const referenceWindow = planningWindow(Math.max(now, latestKept), timeZone, window);
+
+    const usage =
+      referenceWindow.dayStart === todayStart ? dailyUsageSince(db, userId, todayStart) : 0;
+
+    const keptInReference = kept.filter(
+      (application) =>
+        application.scheduledFor !== null &&
+        application.scheduledFor >= referenceWindow.dayStart &&
+        application.scheduledFor < referenceWindow.nextDayStart,
+    );
+
+    const remaining = Math.max(0, dailyCap - usage - keptInReference.length);
 
     const staleSlots = replan.filter((application) => application.scheduledFor !== null);
 

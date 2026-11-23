@@ -184,6 +184,10 @@ async function ownerFor(server: AppServer) {
 
   await owner.put("/__test__/settings/jobs.poll_interval_ms", { data: { value: "3600000" } });
 
+  const running = await owner.post("/api/running", { data: { running: true } });
+
+  expect(running.ok()).toBe(true);
+
   return { owner, userId };
 }
 

@@ -148,6 +148,11 @@ async function ownerFor(server: AppServer) {
   const { owner, userId } = await ownerContextFor(server.url);
 
   await owner.put("/__test__/settings/jobs.poll_interval_ms", { data: { value: "3600000" } });
+
+  const running = await owner.post("/api/running", { data: { running: true } });
+
+  expect(running.ok()).toBe(true);
+
   await owner.put("/__test__/kill-switches/ats/personio", {
     data: { enabled: false, reason: "personio send test" },
   });

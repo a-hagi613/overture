@@ -23,9 +23,15 @@ import type { Outcomes } from "./outcomes.ts";
 
 import { applications, attempts, profiles, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
-import { releaseForApplication, reserveForApplication } from "../billing/ledger.ts";
+import {
+  dailyUsageSince,
+  releaseForApplication,
+  reserveForApplication,
+} from "../billing/ledger.ts";
 import { getSetting, isKillSwitchEnabled, setKillSwitch } from "../platform/settings/index.ts";
 import { raiseAlert } from "../platform/alerts.ts";
+import { retryWhenBusy } from "../platform/db/busy.ts";
+import { localDayStart } from "../platform/local-time.ts";
 import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 import { ProviderUnavailableError } from "./browser/provider.ts";
@@ -51,8 +57,15 @@ import { publishEvent } from "../platform/sse/stream.ts";
 import { copy } from "../../shared/copy.ts";
 import { recordApplicationEvent } from "./outcomes.ts";
 import { acquireBrowserSession } from "./browser/session-slots.ts";
-import { nextSendSlot as nextSlotInWindow, parseSendWindow } from "./planning.ts";
+import { nextSendSlot as nextSlotInWindow, parseSendWindow, planningWindow } from "./planning.ts";
 import { openApprovedPlan } from "../pipeline/approved-plan.ts";
+
+class ReservationRefusedError extends Error {
+  constructor() {
+    super("no application credit is available");
+    this.name = "ReservationRefusedError";
+  }
+}
 
 export const APPLICATION_SEND_JOB_KIND = "application.send";
 
@@ -450,68 +463,125 @@ export function createDispatcher(deps: DispatcherDeps) {
     }
   }
 
-  async function attemptWithSlot(applicationId: string, provider: BrowserProvider) {
-    const at = clock.now();
-
-    const claimed = db
-      .update(applications)
-      .set({
-        attempts: sql`${applications.attempts} + 1`,
-        status: "sending",
-        statusReason: null,
-        updatedAt: at,
-      })
-      .where(and(eq(applications.id, applicationId), eq(applications.status, "approved")))
-      .returning({ attempts: applications.attempts, userId: applications.userId })
-      .all()
-      .at(0);
-
-    if (claimed === undefined) {
-      return false;
-    }
-
+  async function claimAndReserve(applicationId: string, provider: BrowserProvider) {
     const attemptId = crypto.randomUUID();
 
-    const reserved = reserveForApplication(db, clock, {
-      applicationId,
-      idempotencyKey: `reserve:${attemptId}`,
-      userId: claimed.userId,
-    });
+    try {
+      return await retryWhenBusy(
+        () =>
+          db.transaction(
+            (tx) => {
+              const at = clock.now();
 
-    if (!reserved.reserved) {
-      db.update(applications)
-        .set({
-          attempts: sql`max(${applications.attempts} - 1, 0)`,
-          status: "approved",
-          updatedAt: clock.now(),
-        })
-        .where(eq(applications.id, applicationId))
-        .run();
+              const row = tx
+                .select({
+                  attempts: applications.attempts,
+                  role: users.role,
+                  running: profiles.running,
+                  suspendedAt: users.suspendedAt,
+                  timezone: profiles.timezone,
+                  userId: applications.userId,
+                })
+                .from(applications)
+                .innerJoin(users, eq(users.id, applications.userId))
+                .leftJoin(profiles, eq(profiles.userId, applications.userId))
+                .where(and(eq(applications.id, applicationId), eq(applications.status, "approved")))
+                .get();
 
+              if (
+                row === undefined ||
+                row.running !== true ||
+                row.suspendedAt !== null ||
+                row.role === "demo"
+              ) {
+                return null;
+              }
+
+              const timeZone = row.timezone ?? "UTC";
+              const window = planningWindow(at, timeZone, sendWindow(db));
+
+              if (at < window.start || at >= window.end) {
+                return null;
+              }
+
+              const dailyCap = settingNumber(db, "limits.daily_cap", 10);
+
+              if (dailyUsageSince(tx, row.userId, localDayStart(at, timeZone)) >= dailyCap) {
+                return null;
+              }
+
+              const claimed = tx
+                .update(applications)
+                .set({
+                  attempts: sql`${applications.attempts} + 1`,
+                  status: "sending",
+                  statusReason: null,
+                  updatedAt: at,
+                })
+                .where(and(eq(applications.id, applicationId), eq(applications.status, "approved")))
+                .returning({ attempts: applications.attempts, userId: applications.userId })
+                .all()
+                .at(0);
+
+              if (claimed === undefined) {
+                return null;
+              }
+
+              const reserved = reserveForApplication(tx, clock, {
+                applicationId,
+                idempotencyKey: `reserve:${attemptId}`,
+                userId: claimed.userId,
+              });
+
+              if (!reserved.reserved) {
+                throw new ReservationRefusedError();
+              }
+
+              tx.insert(attempts)
+                .values({
+                  applicationId,
+                  browserMs: null,
+                  captchaSeen: false,
+                  codeUsed: false,
+                  costMicros: null,
+                  endedAt: null,
+                  id: attemptId,
+                  leaseUntil: at + ATTEMPT_LEASE_MS,
+                  n: claimed.attempts,
+                  outcome: null,
+                  provider: provider.id,
+                  providerSessionId: null,
+                  proxyBytes: null,
+                  startedAt: at,
+                  submitClickedAt: null,
+                  submitResponseStatus: null,
+                  userId: claimed.userId,
+                })
+                .run();
+
+              return { attempts: claimed.attempts, attemptId, userId: claimed.userId };
+            },
+            { behavior: "immediate" },
+          ),
+        "dispatch.claim",
+      );
+    } catch (error) {
+      if (error instanceof ReservationRefusedError) {
+        return null;
+      }
+
+      throw error;
+    }
+  }
+
+  async function attemptWithSlot(applicationId: string, provider: BrowserProvider) {
+    const claimed = await claimAndReserve(applicationId, provider);
+
+    if (claimed === null) {
       return false;
     }
 
-    db.insert(attempts)
-      .values({
-        applicationId,
-        browserMs: null,
-        captchaSeen: false,
-        codeUsed: false,
-        costMicros: null,
-        endedAt: null,
-        id: attemptId,
-        leaseUntil: at + ATTEMPT_LEASE_MS,
-        n: claimed.attempts,
-        outcome: null,
-        provider: provider.id,
-        providerSessionId: null,
-        proxyBytes: null,
-        startedAt: at,
-        submitClickedAt: null,
-        submitResponseStatus: null,
-        userId: claimed.userId,
-      })
-      .run();
+    const { attemptId } = claimed;
 
     activeAttempts.add(attemptId);
 
@@ -892,6 +962,7 @@ export function createDispatcher(deps: DispatcherDeps) {
           outcome: isShuttingDown() ? "unconfirmed" : "crash",
         });
       } else if (isShuttingDown()) {
+        releaseAttempt(applicationId, claimed.userId, attemptId);
         requestInterrupt(applicationId, claimed.userId, clock.now());
         updateAttempt(attemptId, { endedAt: clock.now(), outcome: "interrupted" });
       } else {
