@@ -1,14 +1,15 @@
 import { copy } from "../../../shared/copy.ts";
 import { loadMargin } from "../../lib/admin-api.ts";
 import { useAdminResource } from "../../lib/admin-resource.ts";
-import { AdminGateScreen } from "./gate-screen.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 import { BesideCard } from "./beside-card.tsx";
 import { BillingTabs } from "./billing-tabs.tsx";
+import { AdminGateScreen } from "./gate-screen.tsx";
 import { PlanCards } from "./plan-cards.tsx";
 import { PlanTable } from "./plan-table.tsx";
 
 export function MarginPage() {
-  const { data, refusal, refresh } = useAdminResource(loadMargin);
+  const { data, failed, refusal, refresh } = useAdminResource(loadMargin);
 
   if (refusal !== null) {
     return (
@@ -21,12 +22,8 @@ export function MarginPage() {
     );
   }
 
-  if (data === null) {
-    return null;
-  }
-
-  return (
-    <div className="pb-12">
+  const header = (
+    <>
       <p className="mt-6 text-[12.5px] text-muted-foreground">{copy.admin.billingCrumb}</p>
       <p className="mt-4 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
         {copy.admin.marginEyebrow}
@@ -37,6 +34,21 @@ export function MarginPage() {
       <p className="mt-2 text-[15px] text-muted-foreground">{copy.admin.marginLead}</p>
 
       <BillingTabs current="margin" />
+    </>
+  );
+
+  if (failed || data === null) {
+    return (
+      <div className="pb-12">
+        {header}
+        <AdminStatusCard failed={failed} onRetry={refresh} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="pb-12">
+      {header}
 
       <section aria-labelledby="margin-plans" className="mt-7">
         <div className="flex items-baseline justify-between gap-3">

@@ -264,3 +264,44 @@ for (const width of [1280, 390]) {
     });
   }
 }
+
+test("mobile Review Back returns to the list without hiding the active question", async ({
+  browser,
+  reviewServer,
+}) => {
+  const request = await apiRequest.newContext({ baseURL: reviewServer.url });
+  const userId = await seedOwner(request, reviewServer.url);
+
+  await seedReviewBoard(request, userId);
+
+  const storageState = await request.storageState();
+
+  await request.dispose();
+
+  const context = await browser.newContext({ storageState });
+  const page = await context.newPage();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${reviewServer.url}/review`);
+
+  const firstPrompt = "Are you comfortable with a weekly on-call rotation?";
+
+  const firstPromptButton = page.getByRole("button", {
+    name: /Are you comfortable with a weekly on-call rotation\?/u,
+  });
+
+  await expect(page.getByRole("heading", { level: 2, name: firstPrompt })).toBeVisible();
+  await expect(page.getByText("Four questions, ten applications waiting")).toBeVisible();
+
+  await page.getByRole("button", { name: "All questions" }).click();
+
+  await expect(page.getByRole("heading", { level: 2, name: "Blocked applications" })).toBeVisible();
+  await expect(page.getByText("Four questions, ten applications waiting")).toBeVisible();
+  await expect(firstPromptButton).toBeVisible();
+
+  await firstPromptButton.click();
+
+  await expect(page.getByRole("heading", { level: 2, name: firstPrompt })).toBeVisible();
+
+  await context.close();
+});

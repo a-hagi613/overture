@@ -33,12 +33,15 @@ export function SkipSection() {
   const currentEmployer = companies.find((company) => company.reason === "current_employer");
   const userCompanies = companies.filter((company) => company.reason === "user");
 
-  function persist(names: string[]) {
+  function persist(names: string[], onSucceeded?: () => void) {
     save.mutate(
       names.map((name) => ({ domain: null, name })),
       {
         onError: () => {
-          toast.success("Skip list updated.");
+          toast.error(copy.profile.saveFailed);
+        },
+        onSuccess: () => {
+          onSucceeded?.();
         },
       },
     );
@@ -47,12 +50,13 @@ export function SkipSection() {
   function addCompany() {
     const name = companyName.trim();
 
-    if (name === "") {
+    if (name === "" || save.isPending) {
       return;
     }
 
-    persist([...userCompanies.map((company) => company.name), name]);
-    setCompanyName("");
+    persist([...userCompanies.map((company) => company.name), name], () => {
+      setCompanyName("");
+    });
   }
 
   return (
@@ -73,6 +77,7 @@ export function SkipSection() {
           <Button
             ariaLabel={copy.profile.facts.remove(company.name)}
             className="rounded-full"
+            disabled={save.isPending}
             key={company.id}
             onClick={() => {
               persist(
@@ -106,7 +111,7 @@ export function SkipSection() {
           placeholder={list.addLabel}
           value={companyName}
         />
-        <Button size="default" submit variant="secondary">
+        <Button disabled={save.isPending} size="default" submit variant="secondary">
           <Plus aria-hidden="true" size={15} />
           <span>{list.add}</span>
         </Button>

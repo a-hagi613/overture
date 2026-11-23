@@ -8,6 +8,7 @@ import {
   SquareKanban,
   X,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { Link } from "react-router";
 
 import type { NavCounts } from "../lib/nav-api.ts";
@@ -18,7 +19,6 @@ import { AdminPortalMenuItem } from "./admin-portal-menu-item.tsx";
 import { SidebarThemeToggle } from "./sidebar-theme-toggle.tsx";
 import { Badge } from "./ui/badge.tsx";
 import { Button } from "./ui/button.tsx";
-import { Card } from "./ui/card.tsx";
 import { dsEyebrow } from "./ui/ds.ts";
 import { Separator } from "./ui/separator.tsx";
 
@@ -56,30 +56,89 @@ export function MobileNavSheet({
   unreadNotifications: number;
 }) {
   const title = sheetTitleFor(kind);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const node = dialogRef.current;
+    const opener = document.activeElement;
+
+    const focusable = () =>
+      [
+        ...(node?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? []),
+      ].filter((item) => item.offsetParent !== null);
+
+    focusable().at(0)?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const items = focusable();
+      const first = items.at(0);
+      const last = items.at(-1);
+
+      if (items.length === 0 || first === undefined || last === undefined) {
+        return;
+      }
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    globalThis.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      globalThis.removeEventListener("keydown", onKeyDown);
+
+      if (opener instanceof HTMLElement) {
+        opener.focus();
+      }
+    };
+  }, []);
 
   return (
-    <div
-      className="fixed inset-0 z-40 flex flex-col justify-end bg-scrim pb-16 md:hidden"
-      onClick={onClose}
-      role="presentation"
-    >
-      <Card
-        ariaLabel={title}
-        className="mx-3 mb-2 max-h-[75dvh] overflow-y-auto p-4"
-        variant="elevated"
+    <>
+      <button
+        aria-label={copy.ready.dismiss}
+        className="fixed inset-0 z-40 bg-scrim md:hidden"
+        onClick={onClose}
+        type="button"
+      />
+      <dialog
+        aria-labelledby="mobile-nav-sheet-title"
+        aria-modal="true"
+        className="fixed inset-x-3 bottom-[72px] top-auto z-40 m-0 max-h-[75dvh] w-auto max-w-none overflow-y-auto rounded-xl border border-input bg-card p-4 text-foreground shadow-lift md:hidden"
+        open
+        ref={dialogRef}
       >
-        <div
-          className="flex flex-col gap-3"
-          onClick={(event) => {
-            event.stopPropagation();
-          }}
-          role="presentation"
-        >
+        <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <p className={dsEyebrow}>{title}</p>
+            <h2 className={dsEyebrow} id="mobile-nav-sheet-title">
+              {title}
+            </h2>
             <Button
               ariaLabel={copy.ready.dismiss}
-              className="h-8 w-8"
+              className="h-11 w-11"
               onClick={onClose}
               size="icon"
               variant="ghost"
@@ -112,7 +171,11 @@ export function MobileNavSheet({
                   </Badge>
                 ) : null}
               </Link>
-              <Link className={rowClass(pathname === "/inbox")} onClick={onClose} to="/inbox">
+              <Link
+                className={rowClass(pathname === "/inbox" || pathname.startsWith("/inbox/"))}
+                onClick={onClose}
+                to="/inbox"
+              >
                 <Inbox aria-hidden="true" size={18} />
                 <span className="flex-1">{copy.nav.inbox}</span>
                 {counts.inboxUnread > 0 ? (
@@ -166,7 +229,7 @@ export function MobileNavSheet({
             </div>
           ) : null}
         </div>
-      </Card>
-    </div>
+      </dialog>
+    </>
   );
 }

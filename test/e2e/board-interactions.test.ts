@@ -218,7 +218,7 @@ test("archiving a queued card removes it from the Board", async ({ boardServer, 
   }
 
   await card.click();
-  await expect(page.locator('aside[aria-label="Application detail"] h2')).toBeVisible();
+  await expect(page.locator('dialog[aria-label="Application detail"] h2')).toBeVisible();
 
   const response = page.waitForResponse(
     (candidate) => candidate.request().method() === "POST" && candidate.url().includes("/withdraw"),
@@ -245,7 +245,7 @@ const boardSchema = z.object({
 
 type Variant = "traced" | "untraced" | "mismatch" | "email" | "empty";
 
-const SHEET = 'aside[aria-label="Application detail"]';
+const SHEET = 'dialog[aria-label="Application detail"]';
 const SCREENSHOT_DIR = process.env["DOSSIER_SCREENSHOT_DIR"] ?? null;
 const COVER_TAB = { name: "Cover letter & resume" } as const;
 
@@ -477,7 +477,7 @@ for (const [width, scheme] of [
 
     await page.evaluate(() => {
       document
-        .querySelector("aside[aria-label='Application detail'] [data-scroll-region]")
+        .querySelector("dialog[aria-label='Application detail'] [data-scroll-region]")
         ?.scrollTo(0, 0);
     });
     await captureSheet(page, base);

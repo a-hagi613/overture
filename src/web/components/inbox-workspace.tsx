@@ -180,7 +180,7 @@ export function InboxWorkspace({ routeThreadId }: { routeThreadId: string | null
           ) : null}
 
           {showReaderPane ? (
-            <section className="flex min-h-0 flex-col bg-card">
+            <section className="flex min-h-0 min-w-0 flex-col bg-card">
               <InboxThreadPane
                 now={now}
                 onBack={() => {

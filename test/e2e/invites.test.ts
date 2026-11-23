@@ -116,7 +116,7 @@ test("an invited email joins by magic link, gets one grant of 300, and cannot be
   await expect(
     page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
   ).toBeVisible();
-  await expect(page.getByText("of 300 on your week plan")).toBeVisible();
+  await expect(page.getByText("of 300 on your plan")).toBeVisible();
 
   const state = await verifyAuthState(appUrl, page.request);
   const guest = state.users.find((user) => user.email === guestEmail);
@@ -145,7 +145,7 @@ test("an invited email joins by magic link, gets one grant of 300, and cannot be
   await expect(
     page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
   ).toBeVisible();
-  await expect(page.getByText("of 300 on your week plan")).toBeVisible();
+  await expect(page.getByText("of 300 on your plan")).toBeVisible();
 
   expect(
     (await listGrants(admin.page, adminIsolatedAppUrl)).filter(
@@ -188,7 +188,7 @@ test("an invite is accepted by Google and by LinkedIn, each granting 300 once", 
   await expect(
     page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
   ).toBeVisible();
-  await expect(page.getByText("of 300 on your week plan")).toBeVisible();
+  await expect(page.getByText("of 300 on your plan")).toBeVisible();
 
   const linkedInContext = await browser.newContext();
   const linkedInPage = await linkedInContext.newPage();
@@ -202,7 +202,7 @@ test("an invite is accepted by Google and by LinkedIn, each granting 300 once", 
   await expect(
     linkedInPage.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
   ).toBeVisible();
-  await expect(linkedInPage.getByText("of 300 on your week plan")).toBeVisible();
+  await expect(linkedInPage.getByText("of 300 on your plan")).toBeVisible();
 
   await linkedInContext.close();
 

@@ -25,6 +25,8 @@ import { PageHeader } from "../components/page-header.tsx";
 import { TrackerColumn } from "../components/tracker-column.tsx";
 import { TrackerMobileTab } from "../components/tracker-mobile-tab.tsx";
 import { TrackerOverlayCard } from "../components/tracker-overlay-card.tsx";
+import { Button } from "../components/ui/button.tsx";
+import { Card } from "../components/ui/card.tsx";
 import { Tabs } from "../components/ui/tabs.tsx";
 import { TabsList } from "../components/ui/tabs-list.tsx";
 import {
@@ -55,7 +57,13 @@ const detectLaneCollision: CollisionDetection = (args) => {
 const DROPPABLE_LANES = TRACKER_LANES.filter((lane) => lane.droppable);
 
 export function BoardPage() {
-  const { data: board } = useBoard();
+  const {
+    data: board,
+    isError: boardError,
+    isPending: boardPending,
+    refetch: refetchBoard,
+  } = useBoard();
+
   const moveStage = useMoveStage();
   const undoStage = useUndoStage();
   const withdraw = useWithdraw();
@@ -77,7 +85,12 @@ export function BoardPage() {
 
   const [keyboardAnnouncement, setKeyboardAnnouncement] = useState("");
 
-  const { data: detailData } = useApplication(selectedId);
+  const {
+    data: detailData,
+    isError: detailError,
+    refetch: refetchDetail,
+  } = useApplication(selectedId);
+
   const detail = detailData ?? null;
 
   const grouped = groupCardsByLane(board, laneOverrides);
@@ -395,95 +408,130 @@ export function BoardPage() {
         }
       />
 
-      <DndContext
-        collisionDetection={detectLaneCollision}
-        onDragCancel={() => {
-          setActiveDrag(null);
-        }}
-        onDragEnd={handleDragEnd}
-        onDragStart={handleDragStart}
-        sensors={sensors}
-      >
-        {isDesktopBoard ? (
-          <div className="mt-6 overflow-x-auto pb-3" data-scroll-region>
-            <div className="grid grid-cols-[repeat(5,minmax(264px,1fr))] items-start gap-4">
-              {TRACKER_LANES.map((lane) => (
-                <TrackerColumn
-                  accentClass={lane.accentClass}
-                  activeDragLane={activeDrag?.lane ?? null}
-                  cards={grouped[lane.key]}
-                  droppable={lane.droppable}
-                  keyboardDragCardId={keyboardDrag?.card.id ?? null}
-                  keyboardDragTargetLane={keyboardDrag?.targetLane ?? null}
-                  key={lane.key}
-                  label={lane.label}
-                  lane={lane.key}
-                  linkTo={lane.linkTo}
-                  onCardKeyDown={handleCardKeyDown}
-                  onOpen={setSelectedId}
-                  selectedId={selectedId}
-                />
-              ))}
+      {boardPending ? (
+        <Card ariaBusy className="mt-6 p-6">
+          <div className="animate-pulse space-y-3">
+            <span className="sr-only">{copy.shell.loadingPage}</span>
+            <div className="h-5 w-1/4 rounded bg-muted" />
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+              <div className="h-64 rounded bg-muted" />
+              <div className="h-64 rounded bg-muted" />
+              <div className="h-64 rounded bg-muted" />
+              <div className="h-64 rounded bg-muted" />
+              <div className="h-64 rounded bg-muted" />
             </div>
           </div>
-        ) : (
-          <div className="mt-5">
-            <Tabs
-              onValueChange={(value) => {
-                if (isTrackerLaneKey(value)) {
-                  setMobileLane(value);
-                }
-              }}
-              value={mobileLane}
-            >
-              <TabsList ariaLabel={copy.board.stagesLabel} className="flex w-full gap-1">
+        </Card>
+      ) : null}
+
+      {boardError ? (
+        <Card className="mt-6 flex flex-wrap items-center justify-between gap-4 p-6">
+          <p className="text-sm font-semibold text-foreground" role="alert">
+            {copy.board.loadFailed}
+          </p>
+          <Button
+            onClick={() => {
+              void refetchBoard();
+            }}
+            size="sm"
+            variant="outline"
+          >
+            {copy.inbox.retry}
+          </Button>
+        </Card>
+      ) : null}
+
+      {!boardPending && !boardError ? (
+        <DndContext
+          collisionDetection={detectLaneCollision}
+          onDragCancel={() => {
+            setActiveDrag(null);
+          }}
+          onDragEnd={handleDragEnd}
+          onDragStart={handleDragStart}
+          sensors={sensors}
+        >
+          {isDesktopBoard ? (
+            <div className="mt-6 overflow-x-auto pb-3" data-scroll-region>
+              <div className="grid grid-cols-[repeat(5,minmax(264px,1fr))] items-start gap-4">
                 {TRACKER_LANES.map((lane) => (
-                  <TrackerMobileTab
+                  <TrackerColumn
+                    accentClass={lane.accentClass}
                     activeDragLane={activeDrag?.lane ?? null}
+                    cards={grouped[lane.key]}
                     droppable={lane.droppable}
+                    keyboardDragCardId={keyboardDrag?.card.id ?? null}
+                    keyboardDragTargetLane={keyboardDrag?.targetLane ?? null}
                     key={lane.key}
                     label={lane.label}
                     lane={lane.key}
+                    linkTo={lane.linkTo}
+                    onCardKeyDown={handleCardKeyDown}
+                    onOpen={setSelectedId}
+                    selectedId={selectedId}
                   />
                 ))}
-              </TabsList>
-            </Tabs>
-
-            <p className="mt-2 text-center text-xs text-muted-foreground">
-              {copy.board.mobileDropHint}
-            </p>
-
-            {activeMobileLane === undefined ? null : (
-              <div className="mt-3">
-                <TrackerColumn
-                  accentClass={activeMobileLane.accentClass}
-                  activeDragLane={activeDrag?.lane ?? null}
-                  cards={grouped[activeMobileLane.key]}
-                  droppable={activeMobileLane.droppable}
-                  keyboardDragCardId={keyboardDrag?.card.id ?? null}
-                  keyboardDragTargetLane={keyboardDrag?.targetLane ?? null}
-                  label={activeMobileLane.label}
-                  lane={activeMobileLane.key}
-                  linkTo={activeMobileLane.linkTo}
-                  onCardKeyDown={handleCardKeyDown}
-                  onOpen={setSelectedId}
-                  selectedId={selectedId}
-                />
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          ) : (
+            <div className="mt-5">
+              <Tabs
+                onValueChange={(value) => {
+                  if (isTrackerLaneKey(value)) {
+                    setMobileLane(value);
+                  }
+                }}
+                value={mobileLane}
+              >
+                <TabsList ariaLabel={copy.board.stagesLabel} className="flex w-full gap-1">
+                  {TRACKER_LANES.map((lane) => (
+                    <TrackerMobileTab
+                      activeDragLane={activeDrag?.lane ?? null}
+                      droppable={lane.droppable}
+                      key={lane.key}
+                      label={lane.label}
+                      lane={lane.key}
+                    />
+                  ))}
+                </TabsList>
+              </Tabs>
 
-        <DragOverlay>
-          {activeDrag === null ? null : (
-            <TrackerOverlayCard
-              card={activeDrag.card}
-              compact={!isDesktopBoard}
-              lane={activeDrag.lane}
-            />
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                {copy.board.mobileDropHint}
+              </p>
+
+              {activeMobileLane === undefined ? null : (
+                <div className="mt-3">
+                  <TrackerColumn
+                    accentClass={activeMobileLane.accentClass}
+                    activeDragLane={activeDrag?.lane ?? null}
+                    cards={grouped[activeMobileLane.key]}
+                    droppable={activeMobileLane.droppable}
+                    keyboardDragCardId={keyboardDrag?.card.id ?? null}
+                    keyboardDragTargetLane={keyboardDrag?.targetLane ?? null}
+                    label={activeMobileLane.label}
+                    lane={activeMobileLane.key}
+                    linkTo={activeMobileLane.linkTo}
+                    onCardKeyDown={handleCardKeyDown}
+                    onOpen={setSelectedId}
+                    selectedId={selectedId}
+                  />
+                </div>
+              )}
+            </div>
           )}
-        </DragOverlay>
-      </DndContext>
+
+          <DragOverlay>
+            {activeDrag === null ? null : (
+              <TrackerOverlayCard
+                card={activeDrag.card}
+                compact={!isDesktopBoard}
+                lane={activeDrag.lane}
+              />
+            )}
+          </DragOverlay>
+        </DndContext>
+      ) : null}
 
       <output aria-live="polite" className="sr-only">
         {keyboardAnnouncement}
@@ -492,6 +540,7 @@ export function BoardPage() {
       {selectedId === null ? null : (
         <BoardSheet
           detail={detail}
+          error={detailError}
           nextDisabled={selectedIndex === -1 || selectedIndex >= allCards.length - 1}
           onArchive={handleArchive}
           onClose={closeSheet}
@@ -523,6 +572,9 @@ export function BoardPage() {
             if (previousCard !== undefined) {
               setSelectedId(previousCard.id);
             }
+          }}
+          onRetry={() => {
+            void refetchDetail();
           }}
           positionLabel={selectedPosition}
           previousDisabled={selectedIndex <= 0}

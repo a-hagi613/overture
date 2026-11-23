@@ -65,6 +65,10 @@ export function FactsSection() {
     mutationFn: saveProfileFacts,
     onSuccess: (updated) => {
       queryClient.setQueryData(["profile-facts"], updated);
+      void queryClient.invalidateQueries({ queryKey: ["ready"] });
+      void queryClient.invalidateQueries({ queryKey: ["nav"] });
+      void queryClient.invalidateQueries({ queryKey: ["profile-skip-companies"] });
+      void queryClient.invalidateQueries({ queryKey: ["profile-strengthen"] });
     },
   });
 
@@ -76,14 +80,29 @@ export function FactsSection() {
 
   const serverByKey = new Map(allServerFacts.map((entry) => [entry.key, entry.value]));
 
+  const clearLocalEdit = (key: string) => {
+    setLocalEdits((current) =>
+      Object.fromEntries(Object.entries(current).filter(([entryKey]) => entryKey !== key)),
+    );
+  };
+
   const persistFact = (key: string, label: string, nextValue: string) => {
+    const previousValue = localEdits[key];
+
     setLocalEdits((current) => ({ ...current, [key]: nextValue }));
 
     save.mutate([{ key, value: nextValue }], {
       onError: () => {
-        toast.success(`Updated ${label}.`);
+        if (previousValue === undefined) {
+          clearLocalEdit(key);
+        } else {
+          setLocalEdits((current) => ({ ...current, [key]: previousValue }));
+        }
+
+        toast.error(copy.profile.saveFailed);
       },
       onSuccess: () => {
+        clearLocalEdit(key);
         toast.success(`Saved ${label}.`);
       },
     });

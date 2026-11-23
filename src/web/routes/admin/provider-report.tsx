@@ -5,6 +5,7 @@ import { copy } from "../../../shared/copy.ts";
 import type { ProviderReport } from "../../lib/admin-api.ts";
 import { loadProviderReport, runLab } from "../../lib/admin-api.ts";
 import { useAdminResource } from "../../lib/admin-resource.ts";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 import { AdminGateScreen } from "./gate-screen.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
 import { ReportLabRow } from "./report-lab-row.tsx";
@@ -24,7 +25,7 @@ const LAB_PAGES = [
 const inputLabelClass = "block text-[12.5px] font-semibold";
 
 export function ProviderReportPage() {
-  const { data, refusal, refresh } = useAdminResource(loadProviderReport);
+  const { data, failed: loadFailed, refusal, refresh } = useAdminResource(loadProviderReport);
   const [sessions, setSessions] = useState("1");
   const [notice, setNotice] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -41,8 +42,21 @@ export function ProviderReportPage() {
     );
   }
 
-  if (data === null) {
-    return null;
+  const heading = (
+    <AdminPageHeading
+      italic={copy.admin.reportTitleItalic}
+      lead={copy.admin.reportLead}
+      plain={copy.admin.reportTitlePlain}
+    />
+  );
+
+  if (loadFailed || data === null) {
+    return (
+      <>
+        {heading}
+        <AdminStatusCard failed={loadFailed} onRetry={refresh} />
+      </>
+    );
   }
 
   const view: ProviderReport = data;
@@ -71,11 +85,7 @@ export function ProviderReportPage() {
 
   return (
     <>
-      <AdminPageHeading
-        italic={copy.admin.reportTitleItalic}
-        lead={copy.admin.reportLead}
-        plain={copy.admin.reportTitlePlain}
-      />
+      {heading}
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
           className="inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"

@@ -1,8 +1,11 @@
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
+import { OnboardingLoadState } from "../components/onboarding-load-state.tsx";
 import { OnboardingShell } from "../components/onboarding-shell.tsx";
 import { OnboardingWelcomeCard } from "../components/onboarding-welcome-card.tsx";
+import { RouteFallback } from "../components/route-fallback.tsx";
+import { authClient } from "../lib/auth-client.ts";
 import { useFinishOnboardingStep, useOnboardingState } from "../lib/onboarding-api.ts";
 
 export function OnboardingPage() {
@@ -10,9 +13,9 @@ export function OnboardingPage() {
   const [params] = useSearchParams();
   const preview = params.get("preview") === "1";
   const suffix = preview ? "?preview=1" : "";
-  const { data: state } = useOnboardingState();
+  const { data: session, isPending: sessionPending } = authClient.useSession();
+  const { data: state, isError, isFetching, refetch } = useOnboardingState();
   const finish = useFinishOnboardingStep();
-  const step = preview ? 1 : (state?.step ?? 1);
 
   useEffect(() => {
     if (preview || state === undefined) {
@@ -32,19 +35,49 @@ export function OnboardingPage() {
     }
   }, [navigate, preview, state]);
 
+  if (!sessionPending && session === null) {
+    return <OnboardingShell step={1}>{null}</OnboardingShell>;
+  }
+
+  if (sessionPending) {
+    return <RouteFallback fullScreen />;
+  }
+
+  if (!preview && state === undefined) {
+    if (isError) {
+      return (
+        <OnboardingShell step={1}>
+          <OnboardingLoadState
+            onRetry={() => {
+              void refetch();
+            }}
+            retrying={isFetching}
+            state="error"
+          />
+        </OnboardingShell>
+      );
+    }
+
+    return <RouteFallback fullScreen />;
+  }
+
+  const step = preview ? 1 : (state?.step ?? 1);
+
+  if (step > 1) {
+    return <RouteFallback fullScreen />;
+  }
+
   return (
     <OnboardingShell step={1}>
-      {step <= 1 ? (
-        <OnboardingWelcomeCard
-          onContinue={async () => {
-            if (!preview) {
-              await finish.mutateAsync(1);
-            }
+      <OnboardingWelcomeCard
+        onContinue={async () => {
+          if (!preview) {
+            await finish.mutateAsync(1);
+          }
 
-            await navigate(`/onboarding/resume${suffix}`);
-          }}
-        />
-      ) : null}
+          await navigate(`/onboarding/resume${suffix}`);
+        }}
+      />
     </OnboardingShell>
   );
 }

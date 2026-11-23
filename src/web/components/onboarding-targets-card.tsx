@@ -92,6 +92,7 @@ export function OnboardingTargetsCard({
   const [newCompany, setNewCompany] = useState("");
   const [companies, setCompanies] = useState(skipCompanies);
   const [failed, setFailed] = useState(false);
+  const [continuing, setContinuing] = useState(false);
   const sequence = useRef(0);
 
   const currency = draft.salaryCurrency ?? view.currencies[0] ?? "CAD";
@@ -167,8 +168,22 @@ export function OnboardingTargetsCard({
   }
 
   const continueOn = async () => {
-    if (await commit(draft)) {
-      await onContinue();
+    if (continuing) {
+      return;
+    }
+
+    setContinuing(true);
+    setFailed(false);
+
+    try {
+      if (await commit(draft)) {
+        await onContinue();
+      } else {
+        setContinuing(false);
+      }
+    } catch {
+      setFailed(true);
+      setContinuing(false);
     }
   };
 
@@ -384,6 +399,8 @@ export function OnboardingTargetsCard({
           </Link>
         </Button>
         <Button
+          ariaBusy={continuing}
+          disabled={continuing}
           onClick={() => {
             void continueOn();
           }}

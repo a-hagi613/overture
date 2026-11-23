@@ -81,14 +81,18 @@ export function CoverLetterTemplateCard() {
       return;
     }
 
+    const previousSaved = localSaved;
+
     setLocalSaved(trimmed);
-    setEditing(false);
 
     save.mutate(trimmed, {
       onError: () => {
-        toast.success(cl.savedToast);
+        setLocalSaved(previousSaved);
+        toast.error(cl.saveFailedToast);
       },
       onSuccess: () => {
+        setLocalSaved(null);
+        setEditing(false);
         toast.success(cl.savedToast);
       },
     });

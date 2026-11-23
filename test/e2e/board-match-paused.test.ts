@@ -72,7 +72,7 @@ const pauseReasons = [
   {
     action: "Set up forwarding",
     copy: "We need your ATS mail forwarded to see replies and confirmations.",
-    href: "/profile/details",
+    href: "/profile/account#email-forwarding",
     reason: "no_mailbox",
     title: "Forwarding isn't set up.",
   },
