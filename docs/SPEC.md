@@ -1184,15 +1184,21 @@ stopping before Submit. The developer machine never drives a browser against a r
 ### 11.1 Inbound
 
 1. Email Routing on `tryoverture.com` sends the catch-all to the Email Worker (ADR 0028); literal rules such as
-   `hello@` keep forwarding to the owner. The Worker drops an address whose MAC does not verify, forwards Gmail and
-   Outlook forwarding-confirmation messages to the owner's verified destination, drops mail whose original sender is
-   not in the ATS mail domain list, and enqueues the raw MIME with the envelope on the `overture-inbound-mail` Queue
-   (`INBOUND_QUEUE`). A message whose queue body would exceed the 128 KB Queue limit — every message over 128 KB, and
-   any message whose base64 body plus envelope does not fit — is written to R2 `overture-inbound-mail-spill` under
-   `spill/{reference}.eml` first, and the queue carries that pointer instead of the body. Email Workers accept
-   messages up to 25 MiB. The reserved local part `live-check@tryoverture.com` belongs to no user: the Worker enqueues
-   it without the ATS-sender filter, and the endpoint verifies its DKIM/DMARC and records the result for the daily
-   live check (§16.4).
+   `hello@` keep forwarding to the owner. The Worker accepts a managed address whose MAC verifies
+   (`in-{id}-{mac}@tryoverture.com`) and an apex alias (`<handle>@<ALIAS_EMAIL_DOMAIN>`, WS-5b), rejecting reserved
+   system local parts and forged `in-` addresses. A managed address keeps the ATS-sender filter; an alias enqueues
+   every message and copies ATS mail and threaded employer replies to the owner's verified destination. The copy goes
+   through the `send_email` binding from `notify@notify.tryoverture.com` with `Reply-To` set to the original sender and
+   only allow-listed headers (`In-Reply-To`, `References`, `Thread-Index`, `Thread-Topic` and `X-*`, at most 20 named
+   headers and 16 KB in total). A copy over 4 MiB leaves its attachments in encrypted R2 under `mail-attachments/` and
+   links to the Inbox instead. `message.forward()` is never used, because Cloudflare caps it at 200 verified
+   destinations per account. Gmail and Outlook forwarding-confirmation messages go to the owner the same way. The
+   Worker enqueues the raw MIME with the envelope on the `overture-inbound-mail` Queue (`INBOUND_QUEUE`). A message
+   whose queue body would exceed the 128 KB Queue limit — every message over 128 KB, and any message whose base64 body
+   plus envelope does not fit — is written to R2 `overture-inbound-mail-spill` under `spill/{reference}.eml` first, and
+   the queue carries that pointer instead of the body. Email Workers accept messages up to 25 MiB. The reserved local
+   part `live-check@tryoverture.com` belongs to no user: the Worker enqueues it without the ATS-sender filter, and the
+   endpoint verifies its DKIM/DMARC and records the result for the daily live check (§16.4).
 2. A queue consumer in the same Worker signs the raw MIME with HMAC-SHA256 under `INBOUND_HMAC_SECRET` over a
    timestamp and the body (5-minute replay window) and POSTs it with the envelope to `POST /internal/mail/inbound`.
    A 2xx acks the message and deletes its spilled R2 object; a network error, `5xx`, `408`, `425` or `429` retries it
@@ -1237,13 +1243,14 @@ suppression list and delivery-event webhooks of the old design are not built; a 
 
 Overture's own mail (magic links, verification, the daily recap email, receipts) leaves `no-reply@tryoverture.com` through
 Cloudflare Email Sending (ADR 0028, `docs/research/cloudflare-email-sending.md`); SES and Resend are no longer used.
-Sending to anyone but the owner needs Workers Paid ($5 a month) and `tryoverture.com` onboarded as a sending domain. The
-idempotent operator script `scripts/onboard-email-sending.ts` does the onboarding and checks the bounce MX, SPF, DKIM and
-DMARC records; `--dry-run` calls nothing that writes and `--check` is the read-only form. A deploy guard runs `--check`
-before deploying and a live-check guard (`mail.sending`) runs it daily; both are gated by `REQUIRE_EMAIL_SENDING`, so
-they warn while the switch is off and refuse the deploy or alert the owner once the owner turns it on. The live mail
-check then sends to the reserved non-owner `live-check@tryoverture.com`. The switch is one command once the plan is
-paid (docs/DEPLOY.md, M2-02).
+The inbound Worker sends its forwarding copies from `notify@notify.tryoverture.com` through the same service.
+Sending to anyone but the owner needs Workers Paid ($5 a month) and `tryoverture.com` and `notify.tryoverture.com`
+onboarded as sending domains. The idempotent operator script `scripts/onboard-email-sending.ts` does the onboarding
+and checks the bounce MX, SPF, DKIM and DMARC records; `--dry-run` calls nothing that writes and `--check` is the
+read-only form. A deploy guard runs `--check` before deploying and a live-check guard (`mail.sending`) runs it daily;
+both are gated by `REQUIRE_EMAIL_SENDING`, so they warn while the switch is off and refuse the deploy or alert the
+owner once the owner turns it on. The live mail check then sends to the reserved non-owner
+`live-check@tryoverture.com`. The switch is one command once the plan is paid (docs/DEPLOY.md, M2-02).
 
 ### 11.3 Classification
 

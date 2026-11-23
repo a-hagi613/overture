@@ -1,3 +1,5 @@
+import { Buffer } from "node:buffer";
+
 import { parseInboundQueueBody } from "../../src/shared/inbound-queue.ts";
 
 import type { InboundQueueMessage } from "../../src/shared/inbound-queue.ts";
@@ -5,6 +7,7 @@ import type {
   InboundMailEnv,
   InboundQueueMessageHandle,
   InboundSpillBucket,
+  OutboundEmail,
 } from "../../workers/inbound-mail/src/env.ts";
 
 export {
@@ -40,6 +43,22 @@ export function fakeInboundQueue() {
       send: async (message: InboundQueueMessage) => {
         await Promise.resolve();
         sent.push(message);
+      },
+    },
+  };
+}
+
+export function fakeInboundEmail() {
+  const sent: OutboundEmail[] = [];
+
+  return {
+    sent,
+    email: {
+      send: async (message: OutboundEmail) => {
+        await Promise.resolve();
+        sent.push(message);
+
+        return { messageId: crypto.randomUUID() };
       },
     },
   };
@@ -83,13 +102,17 @@ export function inboundTestEnvironment(
   origin: string,
   queue: ReturnType<typeof fakeInboundQueue>,
   spill: ReturnType<typeof fakeInboundSpill>,
+  email: ReturnType<typeof fakeInboundEmail> = fakeInboundEmail(),
 ) {
   return {
     INBOUND_HMAC_SECRET: inboundTestSecret,
     OVERTURE_ORIGIN: origin,
     OWNER_FORWARD_TO: inboundTestOwner,
+    ALIAS_EMAIL_DOMAIN: "tryoverture.com",
+    FORWARD_FROM: "notify@notify.tryoverture.com",
     INBOUND_QUEUE: queue.queue,
     INBOUND_SPILL: spill.bucket,
+    INBOUND_EMAIL: email.email,
   } satisfies InboundMailEnv;
 }
 
@@ -162,4 +185,34 @@ export function paddedMime(raw: Uint8Array<ArrayBuffer>, extraBytes: number) {
   combined.set(padding, raw.byteLength);
 
   return combined;
+}
+
+export function mimeWithAttachment(contentBytes: number) {
+  const base64 = Buffer.alloc(contentBytes, 7).toString("base64");
+
+  return new TextEncoder().encode(
+    [
+      'From: "Greenhouse" <no-reply@us.greenhouse-mail.io>',
+      'To: "Ada Chen" <ada.chen.4k@tryoverture.com>',
+      "Subject: Offer letter for Senior Product Engineer",
+      "Date: Wed, 18 Nov 2026 15:04:05 +0000",
+      "Message-ID: <offer-letter@us.greenhouse-mail.io>",
+      "MIME-Version: 1.0",
+      'Content-Type: multipart/mixed; boundary="overture-test-boundary"',
+      "",
+      "--overture-test-boundary",
+      'Content-Type: text/plain; charset="utf-8"',
+      "",
+      "Please find your offer letter attached.",
+      "",
+      "--overture-test-boundary",
+      'Content-Type: application/pdf; name="offer-letter.pdf"',
+      'Content-Disposition: attachment; filename="offer-letter.pdf"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      base64,
+      "--overture-test-boundary--",
+      "",
+    ].join("\r\n"),
+  );
 }

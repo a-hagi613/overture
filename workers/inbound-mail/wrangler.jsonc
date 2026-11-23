@@ -7,7 +7,15 @@
   },
   "vars": {
     "OVERTURE_ORIGIN": "https://tryoverture.com",
+    "ALIAS_EMAIL_DOMAIN": "tryoverture.com",
+    "FORWARD_FROM": "notify@notify.tryoverture.com",
   },
+  "send_email": [
+    {
+      "name": "INBOUND_EMAIL",
+      "allowed_sender_addresses": ["notify@notify.tryoverture.com"],
+    },
+  ],
   "queues": {
     "producers": [
       {
