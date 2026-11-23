@@ -253,8 +253,14 @@ test("the catalog candidate and requisition hot paths search their new indexes",
 
   const insertPosting = sqlite.prepare(
     `insert into postings (id, board_id, company_id, ats, ats_job_id, requisition_id, url, apply_url_norm,
-       title, title_norm, first_seen_at, last_seen_at, dedupe_key, apply_supported, status)
-     values (?, ?, ?, ?, ?, ?, ?, ?, 'Engineer', 'engineer', ?, ?, ?, ?, ?)`,
+       title, title_norm, location_raw, country_code, city, language, workplace, employment_type,
+       first_seen_at, last_seen_at, dedupe_key, apply_supported, status)
+     values (?, ?, ?, ?, ?, ?, ?, ?, 'Engineer', 'engineer', 'Remote', 'US', 'Austin', 'en', 'remote',
+       'full_time', ?, ?, ?, ?, ?)`,
+  );
+
+  const insertTag = sqlite.prepare(
+    "insert into posting_tags (posting_id, dimension, value, source) values (?, ?, ?, 'rules')",
   );
 
   try {
@@ -280,6 +286,8 @@ test("the catalog candidate and requisition hot paths search their new indexes",
         supportable ? 1 : 0,
         index % 7 === 0 ? "closed" : "open",
       );
+      insertTag.run(`posting-${String(index)}`, "role", "Engineer");
+      insertTag.run(`posting-${String(index)}`, "seniority", "senior");
     }
 
     sqlite.run("ANALYZE");
@@ -292,15 +300,24 @@ test("the catalog candidate and requisition hot paths search their new indexes",
     expect(names).toContain("postings_apply_supported_status");
     expect(names).toContain("postings_company_requisition");
 
-    const unsupported = sqlite
+    const candidate = sqlite
       .query(
-        "EXPLAIN QUERY PLAN select id from postings where apply_supported = 0 and status = 'closed'",
+        `EXPLAIN QUERY PLAN select p.id from postings p
+           inner join companies c on c.id = p.company_id
+         where p.closed_at is null and p.status = 'open' and p.apply_supported = 1
+           and p.workplace in ('remote') and p.employment_type in ('full_time')
+           and lower(p.language) in ('en')
+           and exists (select 1 from posting_tags t where t.posting_id = p.id
+             and t.dimension in ('role', 'subrole') and t.value in ('Engineer'))
+           and exists (select 1 from posting_tags t2 where t2.posting_id = p.id
+             and t2.dimension = 'seniority' and t2.value in ('senior'))`,
       )
       .all()
       .map((row) => planSchema.parse(row).detail)
       .join("\n");
 
-    expect(unsupported).toContain("postings_apply_supported_status");
+    expect(candidate).toContain("postings_apply_supported_status");
+    expect(candidate).not.toMatch(/SCAN p\b/u);
 
     const requisition = sqlite
       .query(
