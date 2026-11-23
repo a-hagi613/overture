@@ -490,6 +490,18 @@ test("a trial upgrade applies at once, a Week switch lands at renewal from its p
 
     expect(portalParams.get("customer")).toBe(CUSTOMER_ID);
     expect(portalParams.get("return_url")).toBe("http://localhost:3000/settings/billing");
+
+    stripe.clear();
+
+    const resubscribe = await request.post(`${server.url}/api/billing/checkout`, {
+      data: { plan: "month" },
+    });
+
+    expect(resubscribe.status()).toBe(200);
+    expect(billingUrlSchema.parse(await resubscribe.json()).url.startsWith("https://")).toBe(true);
+    expect(new URLSearchParams(stripe.requests[0]?.body ?? "").get("line_items[0][price]")).toBe(
+      PRICE_MONTH,
+    );
   } finally {
     await server.stop();
     await stripe.stop();

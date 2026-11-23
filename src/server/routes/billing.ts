@@ -98,7 +98,7 @@ export function createBillingRoutes(deps: {
       return { refusal: locked };
     }
 
-    return { account: access.account };
+    return access;
   }
 
   routes.get("/billing", async (context) => {
@@ -132,6 +132,10 @@ export function createBillingRoutes(deps: {
       return access.refusal;
     }
 
+    if (payments === null) {
+      return context.json({ error: "billing_disabled" }, 503);
+    }
+
     const existing = currentSubscriptionOf(db, access.account.id);
 
     if (existing !== null && !subscriptionEnded(existing.status)) {
@@ -139,10 +143,6 @@ export function createBillingRoutes(deps: {
         { error: "plan_active", plan: existing.plan, status: existing.status },
         409,
       );
-    }
-
-    if (payments === null) {
-      return context.json({ error: "billing_disabled" }, 503);
     }
 
     const priceId = stripePriceId(context.req.valid("json").plan);
