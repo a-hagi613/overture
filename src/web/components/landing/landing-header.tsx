@@ -1,5 +1,5 @@
 import { Menu, Moon, Sun, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useTheme } from "../../lib/theme-context.ts";
 import { BrandMark } from "../brand-mark.tsx";
@@ -27,6 +27,20 @@ export function LandingHeader() {
   const closeMenu = () => {
     setMenuOpen(false);
   };
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (menuOpen && event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+
+    globalThis.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      globalThis.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
 
   const themeIcons = (
     <>

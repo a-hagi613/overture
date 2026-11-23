@@ -1,4 +1,5 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { UseQueryOptions } from "@tanstack/react-query";
 
 import type { AdminRefusalCode, AdminResult } from "./admin-api.ts";
 
@@ -56,9 +57,14 @@ export function useInvalidateAdminQueries() {
   };
 }
 
+export interface AdminResourceOptions {
+  keepPreviousData?: boolean;
+}
+
 export function useAdminResource<T>(
   load: () => Promise<AdminResult<T>>,
   queryKey?: readonly unknown[],
+  options?: AdminResourceOptions,
 ) {
   const queryClient = useQueryClient();
 
@@ -67,11 +73,17 @@ export function useAdminResource<T>(
       ? [ADMIN_QUERY_ROOT, "fn", loaderKeyOf(load)]
       : [ADMIN_QUERY_ROOT, ...queryKey];
 
-  const query = useQuery<AdminResult<T>>({
+  const queryOptions: UseQueryOptions<AdminResult<T>> = {
     queryFn: load,
     queryKey: fullKey,
     retry: shouldRetryAdminQuery,
-  });
+  };
+
+  if (options?.keepPreviousData === true) {
+    queryOptions.placeholderData = keepPreviousData;
+  }
+
+  const query = useQuery(queryOptions);
 
   const data = query.data?.ok === true ? query.data.data : null;
   const refusal = query.data?.ok === false ? query.data.refusal : null;

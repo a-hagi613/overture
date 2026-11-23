@@ -281,7 +281,7 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
         .getByRole("button", { name: /Tidepool Analytics/u })
         .first()
         .click();
-      await expect(page.getByRole("complementary", { name: "Application detail" })).toBeVisible();
+      await expect(page.getByRole("dialog", { name: "Application detail" })).toBeVisible();
       await expect(page.getByRole("tab", { name: "Timeline" })).toBeVisible();
       await page.keyboard.press("Escape");
 

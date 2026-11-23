@@ -22,12 +22,16 @@ async function fetchWorkspaceSearch(query: string) {
   const response = await fetch(`/api/workspace/search?${params.toString()}`);
 
   if (!response.ok) {
-    return EMPTY_RESULT;
+    throw new Error(`The workspace search request failed (${String(response.status)}).`);
   }
 
   const parsed = workspaceSearchResponse.safeParse(await response.json());
 
-  return parsed.success ? parsed.data : EMPTY_RESULT;
+  if (!parsed.success) {
+    throw new Error("The workspace search response could not be read.");
+  }
+
+  return parsed.data;
 }
 
 export function useWorkspaceSearch(query: string, enabled: boolean) {

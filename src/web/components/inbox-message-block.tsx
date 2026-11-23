@@ -82,7 +82,10 @@ export function InboxMessageBlock(props: {
 
       <div className="mt-4 flex flex-col gap-3 text-sm leading-relaxed text-foreground">
         {paragraphsOf(message.text).map((paragraph, index) => (
-          <p className="whitespace-pre-line" key={`${message.id}-${String(index)}`}>
+          <p
+            className="min-w-0 whitespace-pre-line break-words"
+            key={`${message.id}-${String(index)}`}
+          >
             {paragraph}
           </p>
         ))}

@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, CheckCircle2, FileText, Info, Upload } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router";
 
 import type { OnboardingState } from "../lib/onboarding-api.ts";
@@ -48,9 +48,27 @@ export function OnboardingResumeCard({
   uploading: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const [continuing, setContinuing] = useState(false);
+  const [continueFailed, setContinueFailed] = useState(false);
 
   const choose = () => {
     input.current?.click();
+  };
+
+  const continueOn = async () => {
+    if (continuing || resume === null || uploading) {
+      return;
+    }
+
+    setContinuing(true);
+    setContinueFailed(false);
+
+    try {
+      await onContinue();
+    } catch {
+      setContinueFailed(true);
+      setContinuing(false);
+    }
   };
 
   return (
@@ -151,6 +169,11 @@ export function OnboardingResumeCard({
             {copy.onboarding.resumeUploadFailed}
           </p>
         ) : null}
+        {continueFailed ? (
+          <p className="mt-3 text-xs font-semibold text-need" role="alert">
+            {copy.onboarding.saveFailed}
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-7 flex items-center justify-between gap-3 border-t border-border pt-5">
@@ -161,9 +184,10 @@ export function OnboardingResumeCard({
           </Link>
         </Button>
         <Button
-          disabled={resume === null || uploading}
+          ariaBusy={continuing}
+          disabled={resume === null || uploading || continuing}
           onClick={() => {
-            void onContinue();
+            void continueOn();
           }}
           size="lg"
           variant="primary"

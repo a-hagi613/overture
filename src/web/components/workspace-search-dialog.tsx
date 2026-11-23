@@ -4,6 +4,7 @@ import {
   Briefcase,
   Calendar,
   CircleHelp,
+  CreditCard,
   FileText,
   Home,
   Inbox,
@@ -33,6 +34,7 @@ const QUICK_LINKS = [
   { icon: FileText, label: copy.nav.profileMenu.resume, to: "/profile/resume" },
   { icon: User, label: copy.nav.profileMenu.details, to: "/profile/details" },
   { icon: SlidersHorizontal, label: copy.nav.profileMenu.preferences, to: "/profile/preferences" },
+  { icon: CreditCard, label: copy.nav.profileMenu.billing, to: "/profile/billing" },
   { icon: Settings, label: copy.nav.profileMenu.account, to: "/profile/account" },
   { icon: MessageCircle, label: copy.nav.support, to: "/support" },
   { icon: Bell, label: copy.shell.notificationsEmpty, to: "/notifications" },
@@ -74,7 +76,7 @@ export function WorkspaceSearchDialog({
   }, [open, query]);
 
   const activeQuery = !open || query.trim() === "" ? "" : debouncedQuery;
-  const { data, isFetching } = useWorkspaceSearch(activeQuery, open);
+  const { data, isError, isFetching } = useWorkspaceSearch(activeQuery, open);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -157,7 +159,13 @@ export function WorkspaceSearchDialog({
         </p>
       ) : null}
 
-      {trimmed !== "" && !searchPending && totalResults === 0 ? (
+      {trimmed !== "" && !searchPending && isError ? (
+        <p className="px-3 py-6 text-center text-sm font-medium text-need" role="alert">
+          {copy.shell.searchError}
+        </p>
+      ) : null}
+
+      {trimmed !== "" && !searchPending && !isError && totalResults === 0 ? (
         <p className="px-3 py-6 text-center text-sm text-muted-foreground">
           {copy.shell.searchEmpty}
         </p>
@@ -179,7 +187,9 @@ export function WorkspaceSearchDialog({
                 <p className="truncate font-semibold">{app.company}</p>
                 <p className="truncate text-xs text-muted-foreground">{app.title}</p>
               </div>
-              {app.stage === null ? null : <Badge variant="secondary">{app.stage}</Badge>}
+              {app.stage === null ? null : (
+                <Badge variant="secondary">{copy.stages[app.stage]}</Badge>
+              )}
             </Command.Item>
           ))}
         </Command.Group>

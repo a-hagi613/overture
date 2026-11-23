@@ -107,7 +107,7 @@ export function SupportPage() {
           >
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted px-4 py-3">
               <span className="text-xs font-semibold text-muted-foreground">{sp.fromLabel}</span>
-              <span className={dsMono}>
+              <span className={`${dsMono} min-w-0 break-all`}>
                 {userName === "" ? userEmail : `${userName} · ${userEmail}`}
               </span>
             </div>
@@ -117,6 +117,7 @@ export function SupportPage() {
               <div className="flex flex-wrap gap-2">
                 {CATEGORIES.map((item) => (
                   <Button
+                    ariaPressed={category === item.id}
                     key={item.id}
                     onClick={() => {
                       setCategory(item.id);

@@ -378,7 +378,7 @@ export function TargetsSection() {
             if (draft !== null) {
               save.mutate(draft, {
                 onError: () => {
-                  toast.success("Job preferences saved.");
+                  toast.error(copy.profile.saveFailed);
                 },
               });
             }

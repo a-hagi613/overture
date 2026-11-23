@@ -67,7 +67,7 @@ export function TrackerCard({
         aria-disabled={draggable ? attributes["aria-disabled"] : undefined}
         aria-pressed={isKeyboardDragging ? true : undefined}
         aria-roledescription={draggable ? attributes["aria-roledescription"] : undefined}
-        className={`block w-full p-4 text-left focus-visible:outline-none ${
+        className={`block w-full rounded-xl p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal ${
           draggable ? "touch-none cursor-grab active:cursor-grabbing" : "cursor-pointer"
         }`}
         data-card={card.id}

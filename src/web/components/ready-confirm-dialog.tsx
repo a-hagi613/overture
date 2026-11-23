@@ -59,7 +59,7 @@ export function ReadyConfirmDialog({
             <Title className={dsCardTitle}>{text.title}</Title>
             <Button
               ariaLabel={copy.codePaste.close}
-              className="h-8 w-8 shrink-0"
+              className="h-11 w-11 shrink-0"
               onClick={onCancel}
               size="icon"
               variant="ghost"

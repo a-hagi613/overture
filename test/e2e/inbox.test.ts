@@ -366,8 +366,8 @@ test("a fresh user walks the Inbox through the real UI, from empty to the Board 
 
   await page.getByRole("link", { name: /View on Tracker/u }).click();
   await expect(page).toHaveURL(new RegExp(`/board\\?application=${applicationId}`, "u"));
-  await expect(page.getByRole("complementary", { name: "Application detail" })).toBeVisible();
-  await expect(page.getByRole("complementary", { name: "Application detail" })).toContainText(
+  await expect(page.getByRole("dialog", { name: "Application detail" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Application detail" })).toContainText(
     "Senior Backend Engineer",
   );
 

@@ -82,6 +82,7 @@ export function OnboardingFactsCard({
 }) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(view));
   const [failed, setFailed] = useState(false);
+  const [continuing, setContinuing] = useState(false);
 
   const commit = async (next: Draft) => {
     setDraft(next);
@@ -115,8 +116,22 @@ export function OnboardingFactsCard({
   ).length;
 
   const continueOn = async () => {
-    if (await commit(draft)) {
-      await onContinue();
+    if (continuing) {
+      return;
+    }
+
+    setContinuing(true);
+    setFailed(false);
+
+    try {
+      if (await commit(draft)) {
+        await onContinue();
+      } else {
+        setContinuing(false);
+      }
+    } catch {
+      setFailed(true);
+      setContinuing(false);
     }
   };
 
@@ -346,6 +361,8 @@ export function OnboardingFactsCard({
           </Link>
         </Button>
         <Button
+          ariaBusy={continuing}
+          disabled={continuing}
           onClick={() => {
             void continueOn();
           }}

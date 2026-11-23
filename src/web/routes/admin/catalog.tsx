@@ -4,14 +4,16 @@ import { copy } from "../../../shared/copy.ts";
 import { loadCatalog, loadPersonioProbe, runPersonioProbe } from "../../lib/admin-api.ts";
 import { useAdminResource } from "../../lib/admin-resource.ts";
 import { adminDay } from "../../lib/admin-date.ts";
-import { AdminPageHeading } from "./page-heading.tsx";
-import { AdminGateScreen } from "./gate-screen.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 import { CatalogLine } from "./catalog-line.tsx";
+import { AdminGateScreen } from "./gate-screen.tsx";
+import { AdminPageHeading } from "./page-heading.tsx";
 
 export function CatalogPage() {
-  const { data, refusal, refresh } = useAdminResource(loadCatalog);
+  const { data, failed, refusal, refresh } = useAdminResource(loadCatalog);
   const probe = useAdminResource(loadPersonioProbe);
   const [queued, setQueued] = useState(false);
+  const [probeRunFailed, setProbeRunFailed] = useState(false);
   const [running, setRunning] = useState(false);
 
   if (refusal !== null) {
@@ -25,37 +27,46 @@ export function CatalogPage() {
     );
   }
 
-  if (data === null) {
-    return null;
+  const heading = (
+    <AdminPageHeading
+      italic={copy.admin.catalogTitleItalic}
+      lead={copy.admin.catalogLead}
+      plain={copy.admin.catalogTitlePlain}
+    />
+  );
+
+  if (failed || data === null) {
+    return (
+      <>
+        {heading}
+        <AdminStatusCard failed={failed} onRetry={refresh} />
+      </>
+    );
   }
 
   const view = data;
 
   const runProbe = async () => {
     setRunning(true);
+    setProbeRunFailed(false);
 
-    await runPersonioProbe()
-      .then(() => {
-        setQueued(true);
-        probe.refresh();
+    try {
+      await runPersonioProbe();
+      setQueued(true);
+      probe.refresh();
+    } catch {
+      setQueued(false);
+      setProbeRunFailed(true);
+    }
 
-        return true;
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        setRunning(false);
-      });
+    setRunning(false);
   };
 
   const summary = probe.data?.summary ?? null;
 
   return (
     <>
-      <AdminPageHeading
-        italic={copy.admin.catalogTitleItalic}
-        lead={copy.admin.catalogLead}
-        plain={copy.admin.catalogTitlePlain}
-      />
+      {heading}
       <section
         aria-labelledby="admin-catalog-health"
         className="mt-7 flex flex-col gap-5 rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
@@ -100,6 +111,20 @@ export function CatalogPage() {
             {queued ? copy.admin.catalogProbeQueued : ""}
           </span>
         </div>
+        {probeRunFailed ? (
+          <p className="text-[12.5px] font-semibold text-need" role="alert">
+            {copy.admin.catalogProbeFailedRun}
+          </p>
+        ) : null}
+        {probe.failed ? (
+          <AdminStatusCard
+            className="mt-2"
+            failed
+            onRetry={() => {
+              probe.refresh();
+            }}
+          />
+        ) : null}
         {probe.data === null ? null : (
           <div className="flex flex-col gap-2">
             {probe.data.ranAt === null ? (

@@ -8,6 +8,7 @@ import type { Overview } from "../../lib/admin-api.ts";
 import { loadAdminAlerts, loadOverview } from "../../lib/admin-api.ts";
 import { useAdminResource } from "../../lib/admin-resource.ts";
 import { ActiveAlertsCard } from "./active-alerts-card.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 import { AuditLine } from "./audit-line.tsx";
 import { AdminGateScreen } from "./gate-screen.tsx";
 import { LaunchReadinessCard } from "./launch-readiness-card.tsx";
@@ -51,8 +52,27 @@ export function OverviewPage() {
     );
   }
 
-  if (overview.data === null) {
-    return null;
+  const heading = (
+    <AdminPageHeading
+      italic={copy.admin.overviewTitleItalic}
+      lead={copy.admin.overviewLead}
+      plain={copy.admin.overviewTitlePlain}
+    />
+  );
+
+  if (overview.failed || overview.data === null) {
+    return (
+      <>
+        {heading}
+        <AdminStatusCard
+          failed={overview.failed}
+          onRetry={() => {
+            overview.refresh();
+            alerts.refresh();
+          }}
+        />
+      </>
+    );
   }
 
   const view: Overview = overview.data;
@@ -62,11 +82,7 @@ export function OverviewPage() {
 
   return (
     <>
-      <AdminPageHeading
-        italic={copy.admin.overviewTitleItalic}
-        lead={copy.admin.overviewLead}
-        plain={copy.admin.overviewTitlePlain}
-      />
+      {heading}
       <div className="mt-7 flex flex-col gap-5">
         {view.openSupportTickets > 0 ? (
           <p>
@@ -77,6 +93,15 @@ export function OverviewPage() {
               {copy.admin.overviewSupportOpen(view.openSupportTickets)}
             </Link>
           </p>
+        ) : null}
+        {alerts.failed ? (
+          <AdminStatusCard
+            className=""
+            failed
+            onRetry={() => {
+              alerts.refresh();
+            }}
+          />
         ) : null}
         {alerts.data === null ? null : (
           <div className="grid gap-5 lg:grid-cols-2">

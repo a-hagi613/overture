@@ -19,7 +19,9 @@ export function ConsentPage() {
       ) : null}
       {consent.isError ? (
         <Card className="p-6" variant="muted">
-          <p className="text-sm text-muted-foreground">{copy.consent.unavailable}</p>
+          <p className="text-sm text-muted-foreground" role="alert">
+            {copy.consent.unavailable}
+          </p>
         </Card>
       ) : null}
       {consent.data === undefined ? null : <ConsentCard state={consent.data} />}

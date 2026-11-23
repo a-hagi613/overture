@@ -24,7 +24,9 @@ export function TabBar({
   const [openSheet, setOpenSheet] = useState<MobileSheetKind | null>(null);
 
   const boardAlerts = counts.ready + counts.review + counts.inboxUnread;
-  const boardActive = openSheet === "board" || BOARD_PATHS.has(pathname);
+
+  const boardActive =
+    openSheet === "board" || BOARD_PATHS.has(pathname) || pathname.startsWith("/inbox/");
 
   const profileActive = openSheet === "profile" || pathname.startsWith("/profile");
 

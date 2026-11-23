@@ -16,11 +16,15 @@ import { dsBody, dsEyebrow } from "./ui/ds.ts";
 import { Separator } from "./ui/separator.tsx";
 
 export function ReviewDetail({
+  hiddenOnMobile = false,
+  onBack,
   review,
   position,
   total,
   onResolved,
 }: {
+  hiddenOnMobile?: boolean;
+  onBack: () => void;
   review: Review;
   position: number;
   total: number;
@@ -32,10 +36,14 @@ export function ReviewDetail({
 
   async function refresh() {
     onResolved(review.id);
-    await queryClient.invalidateQueries({ queryKey: ["reviews"] });
-    await queryClient.invalidateQueries({ queryKey: ["home"] });
-    await queryClient.invalidateQueries({ queryKey: ["board"] });
-    await queryClient.invalidateQueries({ queryKey: ["ready"] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["reviews"] }),
+      queryClient.invalidateQueries({ queryKey: ["home"] }),
+      queryClient.invalidateQueries({ queryKey: ["board"] }),
+      queryClient.invalidateQueries({ queryKey: ["ready"] }),
+      queryClient.invalidateQueries({ queryKey: ["nav"] }),
+      queryClient.invalidateQueries({ queryKey: ["profile-facts"] }),
+    ]);
   }
 
   async function save() {
@@ -47,9 +55,13 @@ export function ReviewDetail({
 
     const companyNames = review.applications.map((app) => app.company).join(" & ");
 
-    await answerReview(review.id, value.trim()).catch(() => false);
-    toast.success(`Answer saved — ${companyNames} unblocked.`);
-    await refresh();
+    try {
+      await answerReview(review.id, value.trim());
+      toast.success(`Answer saved — ${companyNames} unblocked.`);
+      await refresh();
+    } catch {
+      toast.error(copy.review.saveFailed);
+    }
 
     setPending(false);
   }
@@ -61,9 +73,13 @@ export function ReviewDetail({
 
     setPending(true);
 
-    await dismissReview(review.id).catch(() => false);
-    toast.success("Question skipped.");
-    await refresh();
+    try {
+      await dismissReview(review.id);
+      toast.success("Question skipped.");
+      await refresh();
+    } catch {
+      toast.error(copy.review.dismissFailed);
+    }
 
     setPending(false);
   }
@@ -73,14 +89,16 @@ export function ReviewDetail({
   return (
     <Card
       ariaLabelledBy="rev-q"
-      className="min-w-0 flex-[999_1_520px] p-5 md:p-7"
+      className={
+        hiddenOnMobile
+          ? "min-w-0 flex-[999_1_520px] p-5 max-md:hidden md:p-7"
+          : "min-w-0 flex-[999_1_520px] p-5 md:p-7"
+      }
       variant="elevated"
     >
       <Button
-        className="-ml-2 mb-3 md:hidden"
-        onClick={() => {
-          onResolved(review.id);
-        }}
+        className="-ml-2 mb-3 max-md:min-h-11 md:hidden"
+        onClick={onBack}
         size="sm"
         variant="ghost"
       >

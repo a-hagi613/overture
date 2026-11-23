@@ -10,6 +10,7 @@ import {
   updateSupportTicket,
 } from "../../lib/admin-api.ts";
 import { useAdminResource, useInvalidateAdminQueries } from "../../lib/admin-resource.ts";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 import { AdminGateScreen } from "./gate-screen.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
 import { SupportTicketDetail } from "./support-ticket-detail.tsx";
@@ -118,10 +119,6 @@ export function AdminSupportPage() {
     );
   }
 
-  if (data === null) {
-    return null;
-  }
-
   const heading = (
     <AdminPageHeading
       italic={copy.admin.supportTitleItalic}
@@ -134,7 +131,7 @@ export function AdminSupportPage() {
     return (
       <>
         {heading}
-        <section aria-labelledby="admin-support-failed" className={`mt-7 ${CARD}`}>
+        <section aria-labelledby="admin-support-failed" className={`mt-7 ${CARD}`} role="alert">
           <h2 className="font-serif text-[26px] leading-[1.1]" id="admin-support-failed">
             {copy.admin.supportLoadFailed}
           </h2>
@@ -148,6 +145,15 @@ export function AdminSupportPage() {
             {copy.admin.supportTryAgain}
           </button>
         </section>
+      </>
+    );
+  }
+
+  if (data === null) {
+    return (
+      <>
+        {heading}
+        <AdminStatusCard failed={false} onRetry={refresh} />
       </>
     );
   }

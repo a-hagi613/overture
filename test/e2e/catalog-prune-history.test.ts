@@ -220,7 +220,7 @@ test("Board, Ready, Inbox and the cost report keep reading user history after th
 
   await page.locator(`section[aria-label="Applied"] button[data-card="${sentId}"]`).click();
 
-  const sheet = page.locator('aside[aria-label="Application detail"]');
+  const sheet = page.locator('dialog[aria-label="Application detail"]');
 
   await expect(sheet.getByRole("heading", { level: 2 })).toHaveText(TITLE);
   await expect(sheet.getByText(COMPANY).first()).toBeVisible();

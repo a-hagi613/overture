@@ -29,7 +29,7 @@ function undoApplicationId(url: string) {
 }
 
 export function NotificationsPage() {
-  const { data } = useNotifications();
+  const { data, isError, isPending, refetch } = useNotifications();
   const markAll = useMarkAllNotificationsRead();
   const markRead = useMarkNotificationRead();
   const now = data?.now ?? 0;
@@ -44,20 +44,24 @@ export function NotificationsPage() {
       return;
     }
 
-    const response = await fetch(`/api/applications/${id}/undo-stage`, { method: "POST" });
+    try {
+      const response = await fetch(`/api/applications/${id}/undo-stage`, { method: "POST" });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        toast.error(copy.notifications.push.failed);
+
+        return;
+      }
+
+      markRead.mutate(row.id);
+      toast.success("Stage move undone.");
+    } catch {
       toast.error(copy.notifications.push.failed);
-
-      return;
     }
-
-    markRead.mutate(row.id);
-    toast.success("Stage move undone.");
   };
 
-  const empty = data !== undefined && rows.length === 0;
-  const populated = data !== undefined && rows.length > 0;
+  const empty = !isPending && !isError && rows.length === 0;
+  const populated = !isPending && !isError && rows.length > 0;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -73,8 +77,13 @@ export function NotificationsPage() {
         />
         {populated && data.unread > 0 ? (
           <Button
+            ariaBusy={markAll.isPending}
+            disabled={markAll.isPending}
             onClick={() => {
               markAll.mutate(undefined, {
+                onError: () => {
+                  toast.error(copy.notifications.push.failed);
+                },
                 onSuccess: () => {
                   toast.success("All notifications marked as read.");
                 },
@@ -88,6 +97,34 @@ export function NotificationsPage() {
           </Button>
         ) : null}
       </div>
+
+      {isPending ? (
+        <Card ariaBusy className="mt-6 p-6">
+          <div className="animate-pulse space-y-3">
+            <span className="sr-only">{copy.shell.loadingPage}</span>
+            <div className="h-5 w-1/3 rounded bg-muted" />
+            <div className="h-16 w-full rounded bg-muted" />
+            <div className="h-16 w-full rounded bg-muted" />
+          </div>
+        </Card>
+      ) : null}
+
+      {isError ? (
+        <Card className="mt-6 flex flex-wrap items-center justify-between gap-4 p-6">
+          <p className="text-sm font-semibold text-foreground" role="alert">
+            {copy.notifications.page.loadFailed}
+          </p>
+          <Button
+            onClick={() => {
+              void refetch();
+            }}
+            size="sm"
+            variant="outline"
+          >
+            {copy.inbox.retry}
+          </Button>
+        </Card>
+      ) : null}
 
       {empty ? (
         <Card

@@ -6,7 +6,9 @@ import { NavGlyph } from "../../components/nav-glyph.tsx";
 import { ThemeToggle } from "../../components/theme-toggle.tsx";
 import type { AdminRefusalCode, AdminStatus, AdminUsersResponse } from "../../lib/admin-api.ts";
 import { loadUsers } from "../../lib/admin-api.ts";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 import { AdminGateScreen } from "./gate-screen.tsx";
+import { AdminPageHeading } from "./page-heading.tsx";
 import { UserRow } from "./user-row.tsx";
 
 const filters = [
@@ -31,17 +33,24 @@ export function UsersPage() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<AdminUsersResponse | null>(null);
   const [refusal, setRefusal] = useState<AdminRefusalCode | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const request = useMemo(() => ({ page, q: query, status }), [page, query, status]);
 
   const refresh = async () => {
-    const result = await loadUsers(request);
+    setLoadFailed(false);
 
-    if (result.ok) {
-      setData(result.data);
-      setRefusal(null);
-    } else {
-      setRefusal(result.refusal);
+    try {
+      const result = await loadUsers(request);
+
+      if (result.ok) {
+        setData(result.data);
+        setRefusal(null);
+      } else {
+        setRefusal(result.refusal);
+      }
+    } catch {
+      setLoadFailed(true);
     }
   };
 
@@ -49,21 +58,29 @@ export function UsersPage() {
     let alive = true;
 
     const load = async () => {
-      const result = await loadUsers({
-        page: request.page,
-        q: request.q,
-        status: request.status,
-      });
+      setLoadFailed(false);
 
-      if (!alive) {
-        return;
-      }
+      try {
+        const result = await loadUsers({
+          page: request.page,
+          q: request.q,
+          status: request.status,
+        });
 
-      if (result.ok) {
-        setData(result.data);
-        setRefusal(null);
-      } else {
-        setRefusal(result.refusal);
+        if (!alive) {
+          return;
+        }
+
+        if (result.ok) {
+          setData(result.data);
+          setRefusal(null);
+        } else {
+          setRefusal(result.refusal);
+        }
+      } catch {
+        if (alive) {
+          setLoadFailed(true);
+        }
       }
     };
 
@@ -86,7 +103,21 @@ export function UsersPage() {
   }
 
   if (data === null) {
-    return null;
+    return (
+      <>
+        <AdminPageHeading
+          italic={copy.admin.usersTitleItalic}
+          lead={copy.admin.usersLead}
+          plain={copy.admin.usersTitlePlain}
+        />
+        <AdminStatusCard
+          failed={loadFailed}
+          onRetry={() => {
+            void refresh();
+          }}
+        />
+      </>
+    );
   }
 
   const { counts } = data;
@@ -158,6 +189,15 @@ export function UsersPage() {
           </button>
         ))}
       </div>
+      {loadFailed ? (
+        <AdminStatusCard
+          className="mt-5"
+          failed
+          onRetry={() => {
+            void refresh();
+          }}
+        />
+      ) : null}
       <section className="mt-6 overflow-hidden rounded-lg border border-border bg-card shadow-sh">
         <div className="hidden grid-cols-[minmax(0,1.6fr)_110px_1fr_1.05fr_1.1fr_24px] gap-4 border-b border-border bg-muted px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground md:grid">
           <span>{copy.admin.usersColumnUser}</span>

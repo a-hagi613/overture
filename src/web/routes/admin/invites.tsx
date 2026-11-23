@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { copy } from "../../../shared/copy.ts";
 import type { AdminRefusalCode, InvitesResponse } from "../../lib/admin-api.ts";
 import { createInvite, loadInvites, revokeInvite } from "../../lib/admin-api.ts";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 import { AdminGateScreen } from "./gate-screen.tsx";
 import { InviteSection } from "./invite-section.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
@@ -10,19 +11,26 @@ import { AdminPageHeading } from "./page-heading.tsx";
 export function InvitesPage() {
   const [data, setData] = useState<InvitesResponse | null>(null);
   const [refusal, setRefusal] = useState<AdminRefusalCode | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
   const refresh = async () => {
-    const result = await loadInvites();
+    setLoadFailed(false);
 
-    if (result.ok) {
-      setData(result.data);
-      setRefusal(null);
-    } else {
-      setRefusal(result.refusal);
+    try {
+      const result = await loadInvites();
+
+      if (result.ok) {
+        setData(result.data);
+        setRefusal(null);
+      } else {
+        setRefusal(result.refusal);
+      }
+    } catch {
+      setLoadFailed(true);
     }
   };
 
@@ -30,17 +38,25 @@ export function InvitesPage() {
     let alive = true;
 
     const load = async () => {
-      const result = await loadInvites();
+      setLoadFailed(false);
 
-      if (!alive) {
-        return;
-      }
+      try {
+        const result = await loadInvites();
 
-      if (result.ok) {
-        setData(result.data);
-        setRefusal(null);
-      } else {
-        setRefusal(result.refusal);
+        if (!alive) {
+          return;
+        }
+
+        if (result.ok) {
+          setData(result.data);
+          setRefusal(null);
+        } else {
+          setRefusal(result.refusal);
+        }
+      } catch {
+        if (alive) {
+          setLoadFailed(true);
+        }
       }
     };
 
@@ -62,8 +78,18 @@ export function InvitesPage() {
     );
   }
 
-  if (data === null) {
-    return null;
+  if (loadFailed || data === null) {
+    return (
+      <>
+        <AdminPageHeading italic="" lead="" plain={copy.admin.invitesTitlePlain} />
+        <AdminStatusCard
+          failed={loadFailed}
+          onRetry={() => {
+            void refresh();
+          }}
+        />
+      </>
+    );
   }
 
   const pending = data.invites.filter((row) => row.status === "pending");

@@ -24,12 +24,20 @@ export function StrengthenFacts() {
   const save = useMutation({
     mutationFn: async (fact: { key: string; value: string }) =>
       saveStrengthen(fact.key, fact.value),
-    onSuccess: async (saved) => {
+    onSuccess: async (saved, variables) => {
       queryClient.setQueryData(["profile-strengthen"], saved);
-      setDrafts({});
-      await queryClient.invalidateQueries({ queryKey: ["home"] });
-      await queryClient.invalidateQueries({ queryKey: ["reviews"] });
-      await queryClient.invalidateQueries({ queryKey: ["profile-facts"] });
+      setDrafts((current) =>
+        Object.fromEntries(
+          Object.entries(current).filter(([entryKey]) => entryKey !== variables.key),
+        ),
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["home"] }),
+        queryClient.invalidateQueries({ queryKey: ["reviews"] }),
+        queryClient.invalidateQueries({ queryKey: ["profile-facts"] }),
+        queryClient.invalidateQueries({ queryKey: ["ready"] }),
+        queryClient.invalidateQueries({ queryKey: ["nav"] }),
+      ]);
     },
   });
 
@@ -42,8 +50,12 @@ export function StrengthenFacts() {
 
     setPendingKey(fact.key);
 
-    await save.mutateAsync({ key: fact.key, value }).catch(() => undefined);
-    toast.success(`Saved ${fact.label}.`);
+    try {
+      await save.mutateAsync({ key: fact.key, value });
+      toast.success(`Saved ${fact.label}.`);
+    } catch {
+      toast.error(copy.profile.saveFailed);
+    }
 
     setPendingKey(null);
   }

@@ -5,6 +5,7 @@ import type { KillSwitchRow } from "../../lib/admin-api.ts";
 import { loadAdminAlerts, loadKillSwitches, loadSettings } from "../../lib/admin-api.ts";
 import { useAdminResource, useInvalidateAdminQueries } from "../../lib/admin-resource.ts";
 import { ActiveAlertsCard } from "./active-alerts-card.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 import { AdminGateScreen } from "./gate-screen.tsx";
 import { LaunchReadinessCard } from "./launch-readiness-card.tsx";
 import { NewSwitchLine } from "./new-switch-line.tsx";
@@ -31,8 +32,23 @@ export function AdminSettingsPage() {
     );
   }
 
-  if (settings.data === null || switches.data === null) {
-    return null;
+  const heading = (
+    <AdminPageHeading
+      italic={copy.admin.switchesTitleItalic}
+      lead={copy.admin.switchesLead}
+      plain={copy.admin.switchesTitlePlain}
+    />
+  );
+
+  const loadFailed = settings.failed || switches.failed;
+
+  if (loadFailed || settings.data === null || switches.data === null) {
+    return (
+      <>
+        {heading}
+        <AdminStatusCard failed={loadFailed} onRetry={invalidateAdmin} />
+      </>
+    );
   }
 
   const settingsView = settings.data.settings;
@@ -40,11 +56,7 @@ export function AdminSettingsPage() {
 
   return (
     <>
-      <AdminPageHeading
-        italic={copy.admin.switchesTitleItalic}
-        lead={copy.admin.switchesLead}
-        plain={copy.admin.switchesTitlePlain}
-      />
+      {heading}
       <div className="mt-7 flex flex-col gap-5">
         {alerts.data === null ? null : (
           <div className="grid gap-5 lg:grid-cols-2">

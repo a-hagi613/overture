@@ -24,6 +24,8 @@ import { HomeReadyCard } from "../components/home-ready-card.tsx";
 import { HomeSchedule } from "../components/home-schedule.tsx";
 import { HomeStrengthen } from "../components/home-strengthen.tsx";
 import { PageHeader } from "../components/page-header.tsx";
+import { Button } from "../components/ui/button.tsx";
+import { Card } from "../components/ui/card.tsx";
 
 interface OpenSheet {
   error: string | null;
@@ -82,7 +84,14 @@ export function HomePage() {
   const { data: session } = authClient.useSession();
   const name = session === null ? "" : session.user.name;
   const firstName = name === "" ? "" : firstNameOf(name);
-  const { data: home } = useHomeData();
+
+  const {
+    data: home,
+    isError: homeError,
+    isPending: homePending,
+    refetch: refetchHome,
+  } = useHomeData();
+
   const { data: codeWaits } = useCodeWaits();
   const paste = usePasteCode();
   const [rangeKey, setRangeKey] = useState<HomeRangeKey>("7D");
@@ -191,6 +200,43 @@ export function HomePage() {
           wait={wait}
         />
       )}
+
+      {homePending ? (
+        <div aria-busy="true" className="mt-6 space-y-5">
+          <span className="sr-only">{copy.shell.loadingPage}</span>
+          <Card className="p-6">
+            <div className="animate-pulse space-y-3">
+              <div className="h-5 w-1/3 rounded bg-muted" />
+              <div className="h-20 w-full rounded bg-muted" />
+            </div>
+          </Card>
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <Card className="p-6">
+              <div className="h-32 animate-pulse rounded bg-muted" />
+            </Card>
+            <Card className="p-6">
+              <div className="h-32 animate-pulse rounded bg-muted" />
+            </Card>
+          </div>
+        </div>
+      ) : null}
+
+      {homeError ? (
+        <Card className="mt-6 flex flex-wrap items-center justify-between gap-4 p-6">
+          <p className="text-sm font-semibold text-foreground" role="alert">
+            {copy.home.loadFailed}
+          </p>
+          <Button
+            onClick={() => {
+              void refetchHome();
+            }}
+            size="sm"
+            variant="outline"
+          >
+            {copy.inbox.retry}
+          </Button>
+        </Card>
+      ) : null}
 
       {home === undefined ? null : (
         <>

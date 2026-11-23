@@ -319,6 +319,7 @@ export const copy = {
     searchShortcutKey: "K",
     searchQuickJump: "Quick navigation",
     searchLoading: "Searching your workspace...",
+    searchError: "Search is unavailable right now. Try again in a moment.",
     searchEmpty: "No matching applications, reviews, emails, or interviews.",
     searchGroups: {
       apps: "Applications",
@@ -534,7 +535,7 @@ export const copy = {
       ].join("\n"),
     exportReadySubject: "Your Overture export is ready",
     exportReadyBody: (url: string) =>
-      `Your Overture export is ready to download.\n\nOpen Profile \u2192 Account in Overture and choose Download export. The link is valid for 24 hours, then the archive is deleted.\n\n${url}\n\nIf you didn't ask for this, write to admin@tryoverture.com.\n`,
+      `Your Overture export is ready to download.\n\nOpen Profile \u2192 Settings in Overture and choose Download export. The link is valid for 24 hours, then the archive is deleted.\n\n${url}\n\nIf you didn't ask for this, write to admin@tryoverture.com.\n`,
     supportSubject: (referenceId: string, subject: string) => `[${referenceId}] ${subject}`,
     supportReplySubject: (referenceId: string, subject: string) =>
       `[Ref: ${referenceId}] Re: ${subject}`,
@@ -570,6 +571,7 @@ export const copy = {
   },
   stages: {
     queued: "Queued",
+    ready: "Ready",
     applied: "Applied",
     screening: "Screening",
     interviewing: "Interviewing",
@@ -578,6 +580,7 @@ export const copy = {
   },
   home: {
     title: "Home",
+    loadFailed: "Home could not be loaded right now.",
     dateLocale: "en-US",
     greetingMorning: "Good morning,",
     greetingAfternoon: "Good afternoon,",
@@ -585,7 +588,25 @@ export const copy = {
     applicationsLeft: "Applications left",
     sentToday: "Sent today",
     usageCount: String,
-    usagePlan: (plan: number) => `of ${String(plan)} on your week plan`,
+    usagePlan: (plan: number, planKind?: "week" | "month" | "trial" | "free" | null) => {
+      if (planKind === "week") {
+        return `of ${String(plan)} on your week plan`;
+      }
+
+      if (planKind === "month") {
+        return `of ${String(plan)} on your month plan`;
+      }
+
+      if (planKind === "trial") {
+        return `of ${String(plan)} on your free trial`;
+      }
+
+      if (planKind === "free") {
+        return `of ${String(plan)} on your free plan`;
+      }
+
+      return `of ${String(plan)} on your plan`;
+    },
     usageSentToday: (sent: number, cap: number) =>
       `${String(sent)} of ${String(cap)} sent today · resets at midnight`,
     usageSentTodayShort: (sent: number, cap: number) =>
@@ -640,7 +661,7 @@ export const copy = {
       resumedToast: "Sending resumed.",
       resumeErrorToast: "Could not update sending status. Try again.",
       runningTitle: "Sending is active",
-      viewBoard: "View Board",
+      viewBoard: "View Tracker",
       windowNote: "Sends 8 am – 8 pm local time",
     },
     schedule: {
@@ -661,7 +682,7 @@ export const copy = {
       title: "Out of Applications.",
       copy: "Approved Applications wait for your next period or a new plan. Nothing is sent without an Application left. Ready Applications stay ready.",
       choosePlan: "Choose a plan",
-      seeBoard: "See the Board",
+      seeBoard: "See the Tracker",
     },
     grantEnding: {
       title: "Invite grant running out.",
@@ -896,7 +917,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "You can cancel at any time from Settings, which opens the Stripe customer portal. Cancelling stops the next renewal. Your current period keeps running to its end, and its remaining applications stay usable until then. If you move between Week and Month, the new plan starts at your next renewal, not straight away.",
+              text: "You can cancel at any time from Profile \u2192 Settings, which opens the Stripe customer portal. Cancelling stops the next renewal. Your current period keeps running to its end, and its remaining applications stay usable until then. If you move between Week and Month, the new plan starts at your next renewal, not straight away.",
             },
           ],
         },
@@ -921,7 +942,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "Each application you approve records the version of the consent text you agreed to. You can read every version in your Settings.",
+              text: "Each application you approve records the version of the consent text you agreed to. You can read every version in Profile \u2192 Settings.",
             },
           ],
         },
@@ -939,7 +960,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "We may suspend an account that breaks these terms or puts other people at risk. You can stop using Overture at any time and delete your account from Settings.",
+              text: "We may suspend an account that breaks these terms or puts other people at risk. You can stop using Overture at any time and delete your account from Profile \u2192 Settings.",
             },
           ],
         },
@@ -1072,7 +1093,7 @@ export const copy = {
             {
               kind: "paragraphWithLink",
               before:
-                "You can export your data and delete your account from Settings. For anything else, write to ",
+                "You can export your data and delete your account from Profile \u2192 Settings. For anything else, write to ",
               after: ".",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
@@ -1228,7 +1249,7 @@ export const copy = {
     allCount: (count: number) => `All ${String(count)}`,
     attachments: (count: number) => `Attachments (${String(count)})`,
     backToInbox: "← Inbox",
-    boardLink: (title: string) => `${title}, on the Board →`,
+    boardLink: (title: string) => `${title}, on the Tracker →`,
     codeUsed: "Code used",
     unverifiedLabel: "Couldn't verify sender",
     download: "Download",
@@ -1597,6 +1618,7 @@ export const copy = {
   },
   profile: {
     sectionsLabel: "Profile sections",
+    saveFailed: "Could not save your changes right now. Try again.",
     lead: "The facts Overture applies with",
     titlePlain: "Your",
     titleItalic: "Profile",
@@ -1881,7 +1903,7 @@ export const copy = {
       approvedAll: (count: number) =>
         `${String(count)} ${plural(count, "application", "applications")} scheduled to send.`,
       unapproved: "Back in Ready. Nothing is sent until you press Send.",
-      skipped: "Skipped. It left the Board.",
+      skipped: "Skipped. It left the Tracker.",
       saved: "Answer saved.",
       planChanged: "The plan changed. The card reloaded; review it and press Send again.",
       refused: (count: number) =>
@@ -1974,8 +1996,10 @@ export const copy = {
     openPosting: "Open original posting",
     moveStage: "Move stage",
     archive: "Archive",
-    archiveNote: "Archiving withdraws this application. It leaves the Board.",
+    archiveNote: "Archiving withdraws this application. It leaves the Tracker.",
     archiveOnlyQueued: "Only a queued application can be archived.",
+    loadFailed: "The Tracker could not be loaded right now.",
+    detailLoadFailed: "This application could not be loaded right now.",
     sectionsLabel: "Application sections",
     tabs: {
       timeline: "Timeline",
@@ -2125,6 +2149,9 @@ export const copy = {
         ? "Dismissing skips this application. It leaves the Tracker."
         : `Dismissing skips these ${String(count)} applications. They leave the Tracker.`,
     back: "All questions",
+    loadFailed: "Review questions could not be loaded right now.",
+    saveFailed: "Could not save your answer right now. Try again.",
+    dismissFailed: "Could not skip this question right now. Try again.",
     emptyTitle: "Nothing is waiting for you",
     emptyBody: "When a form asks something your Facts cannot answer, it waits here.",
     categories: {
@@ -2357,6 +2384,7 @@ export const copy = {
   notifications: {
     page: {
       title: "Notifications",
+      loadFailed: "Notifications could not be loaded right now.",
       today: "Today",
       earlier: "Earlier",
       markAll: "Mark all as read",
@@ -2402,7 +2430,7 @@ export const copy = {
     stageMove: {
       title: (stage: string) => `Moved to ${stage}`,
       body: (input: { company: string; title: string; stage: string }) =>
-        `${input.title} at ${input.company} is now in ${input.stage}. Open the Board to undo it.`,
+        `${input.title} at ${input.company} is now in ${input.stage}. Open the Tracker to undo it.`,
       url: "/board",
       kind: "stage_move",
     },
@@ -2447,7 +2475,7 @@ export const copy = {
     noResponse: {
       title: "Closed as No response",
       body: (input: { company: string; title: string }) =>
-        `${input.title} at ${input.company} had no reply after 45 days, so it moved to Closed. Open the Board to undo it.`,
+        `${input.title} at ${input.company} had no reply after 45 days, so it moved to Closed. Open the Tracker to undo it.`,
       url: "/board",
       kind: "stage_move",
     },
@@ -2477,7 +2505,7 @@ export const copy = {
       titleItalic: "never arrived.",
       body:
         "The verification code never arrived, so nothing was sent. The Application ends here and can be " +
-        "tried again later from Board.",
+        "tried again later from Tracker.",
       pill: "Window closed",
       primary: "Back to Home",
       secondary: "Open Board",
@@ -2498,7 +2526,7 @@ export const copy = {
     timeLeft: "Time left",
     invalid: "Enter the 8-character code from the email.",
     errors: {
-      expired: "That wait has closed, so nothing was sent. Try the Application again from Board.",
+      expired: "That wait has closed, so nothing was sent. Try the Application again from Tracker.",
       notFound: "That wait is no longer open.",
       failed: "The code did not go through. Try again.",
     },
@@ -3071,6 +3099,7 @@ export const copy = {
       "Reads up to twenty open Personio forms over plain HTTP, without a browser and without submitting.",
     catalogProbeRun: "Run the probe",
     catalogProbeQueued: "The probe is queued. Refresh to see its results.",
+    catalogProbeFailedRun: "Could not start the Personio probe right now.",
     catalogProbeEmpty: "No Personio form has been probed yet.",
     catalogProbePassed: "The probe passes.",
     catalogProbeFailed: "The probe does not pass yet.",
@@ -3554,5 +3583,8 @@ export const copy = {
     systemLoading: "Reading the system report…",
     systemLoadFailed: "The system report could not load.",
     systemRetry: "Try again",
+    loading: "Loading…",
+    loadFailed: "This section could not be loaded right now.",
+    retry: "Try again",
   },
 } as const;

@@ -256,7 +256,7 @@ export function CodePasteSheet({
             </>
           ) : (
             <>
-              <Link className={PRIMARY} onClick={onClose} to="/">
+              <Link className={PRIMARY} onClick={onClose} to="/home">
                 {copy.codePaste.expired.primary}
               </Link>
               <Link className={SECONDARY} to="/board">

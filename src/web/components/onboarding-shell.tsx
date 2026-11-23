@@ -7,6 +7,7 @@ import { authClient } from "../lib/auth-client.ts";
 import { Backdrop } from "./backdrop.tsx";
 import { OnboardingStepHeader } from "./onboarding-step-header.tsx";
 import { OnboardingStepRail } from "./onboarding-step-rail.tsx";
+import { RouteFallback } from "./route-fallback.tsx";
 import { dsBody, dsPageTitle } from "./ui/ds.ts";
 
 export function OnboardingShell({
@@ -26,6 +27,14 @@ export function OnboardingShell({
       void navigate("/signin");
     }
   }, [navigate, session, isPending]);
+
+  if (isPending) {
+    return <RouteFallback fullScreen />;
+  }
+
+  if (session === null) {
+    return null;
+  }
 
   return (
     <div className="relative min-h-screen overflow-x-clip bg-background text-foreground">

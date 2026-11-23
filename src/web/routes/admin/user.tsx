@@ -8,7 +8,9 @@ import type { AdminRefusalCode, AdminUserDetail } from "../../lib/admin-api.ts";
 import { loadUser, reinstateUser, suspendUser } from "../../lib/admin-api.ts";
 import { adminDay, adminDayTime } from "../../lib/admin-date.ts";
 import { AdminAccountItem } from "./account-item.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 import { AdminGateScreen } from "./gate-screen.tsx";
+import { AdminPageHeading } from "./page-heading.tsx";
 import { AdminStatRow } from "./stat-row.tsx";
 import { AdminStatusPill } from "./status-pill.tsx";
 
@@ -32,6 +34,7 @@ export function UserPage() {
   const { id } = useParams();
   const [data, setData] = useState<AdminUserDetail | null>(null);
   const [refusal, setRefusal] = useState<AdminRefusalCode | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -39,13 +42,19 @@ export function UserPage() {
   const request = useMemo(() => ({ id: id ?? "" }), [id]);
 
   const refresh = async () => {
-    const result = await loadUser(request.id);
+    setLoadFailed(false);
 
-    if (result.ok) {
-      setData(result.data);
-      setRefusal(null);
-    } else {
-      setRefusal(result.refusal);
+    try {
+      const result = await loadUser(request.id);
+
+      if (result.ok) {
+        setData(result.data);
+        setRefusal(null);
+      } else {
+        setRefusal(result.refusal);
+      }
+    } catch {
+      setLoadFailed(true);
     }
   };
 
@@ -53,17 +62,25 @@ export function UserPage() {
     let alive = true;
 
     const load = async () => {
-      const result = await loadUser(request.id);
+      setLoadFailed(false);
 
-      if (!alive) {
-        return;
-      }
+      try {
+        const result = await loadUser(request.id);
 
-      if (result.ok) {
-        setData(result.data);
-        setRefusal(null);
-      } else {
-        setRefusal(result.refusal);
+        if (!alive) {
+          return;
+        }
+
+        if (result.ok) {
+          setData(result.data);
+          setRefusal(null);
+        } else {
+          setRefusal(result.refusal);
+        }
+      } catch {
+        if (alive) {
+          setLoadFailed(true);
+        }
       }
     };
 
@@ -85,8 +102,18 @@ export function UserPage() {
     );
   }
 
-  if (data === null) {
-    return null;
+  if (loadFailed || data === null) {
+    return (
+      <>
+        <AdminPageHeading italic="" lead="" plain={copy.admin.userBreadcrumb} />
+        <AdminStatusCard
+          failed={loadFailed}
+          onRetry={() => {
+            void refresh();
+          }}
+        />
+      </>
+    );
   }
 
   const { user } = data;
@@ -130,7 +157,10 @@ export function UserPage() {
     <>
       <div className="mt-6 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
-          <nav className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+          <nav
+            aria-label={copy.admin.billingReconcileCrumbLabel}
+            className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground"
+          >
             <Link className="hover:text-foreground" to="/admin/users">
               {copy.admin.userBreadcrumb}
             </Link>

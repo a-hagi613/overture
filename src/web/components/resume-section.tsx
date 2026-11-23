@@ -73,9 +73,13 @@ export function ResumeSection() {
   const upload = useMutation({
     mutationFn: uploadResumeFile,
     onSuccess: (saved) => {
+      setLocalPreview(null);
       queryClient.setQueryData(["profile-resume"], saved);
       void queryClient.invalidateQueries({ queryKey: ["profile-facts"] });
       void queryClient.invalidateQueries({ queryKey: ["home"] });
+      void queryClient.invalidateQueries({ queryKey: ["ready"] });
+      void queryClient.invalidateQueries({ queryKey: ["nav"] });
+      void queryClient.invalidateQueries({ queryKey: ["profile-strengthen"] });
       toast.success("Resume uploaded and saved.");
     },
   });
@@ -122,7 +126,8 @@ export function ResumeSection() {
 
     upload.mutate(file, {
       onError: () => {
-        toast.success(`Loaded ${file.name} for preview.`);
+        setLocalPreview(null);
+        toast.error(copy.onboarding.resumeUploadFailed);
       },
     });
   };
