@@ -595,7 +595,9 @@ gh secret set CF_ACCESS_TEAM_DOMAIN -R a-hagi613/overture
 Then run **Actions → Ops admin host → Run workflow → `action: set-access-secrets`**. It refuses unless
 `CF_ACCESS_AUD` and one of the two JWKS names are repository secrets, masks every value with `::add-mask::`, sets
 `ADMIN_ORIGIN=https://admin.tryoverture.com`, `CF_ACCESS_AUD` and the JWKS source on `overture-web` with
-`flyctl secrets set`, and confirms with `flyctl secrets list` **names only**.
+`flyctl secrets set`, and confirms with `flyctl secrets list` **names only**. It removes the stale JWKS source when you
+switch from `CF_ACCESS_JWKS_URL` to `CF_ACCESS_TEAM_DOMAIN` (and the reverse), and refuses when both are set but name
+different teams.
 
 Cloudflare Access gates the host before the app's own owner check and passkey window: without an Access assertion the
 admin API answers `401 access_required`, so never point DNS at the app without the Access application in place.

@@ -96,8 +96,8 @@ jobs:
           fi
 
           flyctl secrets list -a overture-web --json > "$RUNNER_TEMP/secrets.json"
-          names="$(jq -r '.[] | (.name // .Name // empty)' "$RUNNER_TEMP/secrets.json" |
-            grep -E '^(CF_ACCESS_|MASTER_KEY_V|APP_ORIGIN$|ADMIN_ORIGIN$)' | sort || true)"
+          all_names="$(jq -r '.[] | (.name // .Name // empty)' "$RUNNER_TEMP/secrets.json")"
+          names="$(grep -E '^(CF_ACCESS_|MASTER_KEY_V|APP_ORIGIN$|ADMIN_ORIGIN$)' <<<"$all_names" | sort || true)"
           echo "Fly secret names for the admin host (names only; values are never read or printed):"
           printf '%s\n' "${names:-(none of CF_ACCESS_*, MASTER_KEY_V*, APP_ORIGIN, ADMIN_ORIGIN are set)}"
 
@@ -173,24 +173,41 @@ jobs:
         run: |
           set -euo pipefail
           echo "::add-mask::$CF_ACCESS_AUD"
-          if [ -n "${CF_ACCESS_TEAM_DOMAIN:-}" ]; then
-            echo "::add-mask::$CF_ACCESS_TEAM_DOMAIN"
+          team="${CF_ACCESS_TEAM_DOMAIN:-}"
+          jwks="${CF_ACCESS_JWKS_URL:-}"
+          if [ -n "$team" ]; then
+            echo "::add-mask::$team"
           fi
-          if [ -n "${CF_ACCESS_JWKS_URL:-}" ]; then
-            echo "::add-mask::$CF_ACCESS_JWKS_URL"
+          if [ -n "$jwks" ]; then
+            echo "::add-mask::$jwks"
           fi
+          if [ -n "$team" ] && [ -n "$jwks" ] && [ "${jwks%/}" != "https://${team}/cdn-cgi/access/certs" ]; then
+            echo "::error::CF_ACCESS_JWKS_URL does not match CF_ACCESS_TEAM_DOMAIN. Set both for the same Access team, or delete the one this deployment must not use."
+            exit 1
+          fi
+
+          present="$(flyctl secrets list -a overture-web --json | jq -r '.[] | (.name // .Name // empty)')"
+          if [ -n "$team" ] && [ -z "$jwks" ] && grep -qx 'CF_ACCESS_JWKS_URL' <<<"$present"; then
+            echo "Removing the stale CF_ACCESS_JWKS_URL so it cannot override the new team domain."
+            flyctl secrets unset -a overture-web CF_ACCESS_JWKS_URL
+          fi
+          if [ -z "$team" ] && [ -n "$jwks" ] && grep -qx 'CF_ACCESS_TEAM_DOMAIN' <<<"$present"; then
+            echo "Removing the stale CF_ACCESS_TEAM_DOMAIN so it cannot pin the old issuer."
+            flyctl secrets unset -a overture-web CF_ACCESS_TEAM_DOMAIN
+          fi
+
           args=(
             "ADMIN_ORIGIN=https://admin.tryoverture.com"
             "CF_ACCESS_AUD=$CF_ACCESS_AUD"
           )
-          if [ -n "${CF_ACCESS_TEAM_DOMAIN:-}" ]; then
-            args+=("CF_ACCESS_TEAM_DOMAIN=$CF_ACCESS_TEAM_DOMAIN")
+          if [ -n "$team" ]; then
+            args+=("CF_ACCESS_TEAM_DOMAIN=$team")
           fi
-          if [ -n "${CF_ACCESS_JWKS_URL:-}" ]; then
-            args+=("CF_ACCESS_JWKS_URL=$CF_ACCESS_JWKS_URL")
+          if [ -n "$jwks" ]; then
+            args+=("CF_ACCESS_JWKS_URL=$jwks")
           fi
           flyctl secrets set -a overture-web "${args[@]}"
+          names="$(flyctl secrets list -a overture-web --json | jq -r '.[] | (.name // .Name // empty)')"
+          filtered="$(grep -E '^(CF_ACCESS_|ADMIN_ORIGIN$)' <<<"$names" | sort || true)"
           echo "Fly secret names for the admin host after the update (names only; values are never read or printed):"
-          flyctl secrets list -a overture-web --json |
-            jq -r '.[] | (.name // .Name // empty)' |
-            grep -E '^(CF_ACCESS_|ADMIN_ORIGIN$)' | sort || true
+          printf '%s\n' "${filtered:-(none)}"

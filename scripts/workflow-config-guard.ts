@@ -87,8 +87,20 @@ export function findAdminHostWorkflowProblems(input: AdminHostWorkflowInput) {
     problems.push("ops-admin-host.yml does not serialize runs in the ops-admin-host group");
   }
 
-  if (!/permissions:\s*\n\s+contents:\s*read/mu.test(source)) {
-    problems.push("ops-admin-host.yml does not limit permissions to contents: read");
+  const permissionsAt = source.indexOf("\npermissions:");
+  const jobsAt = source.indexOf("\njobs:");
+
+  const permissionBlock =
+    permissionsAt === -1 || jobsAt === -1 || jobsAt < permissionsAt
+      ? []
+      : source
+          .slice(permissionsAt, jobsAt)
+          .split("\n")
+          .map((line) => line.trim())
+          .filter((line) => line !== "" && line !== "permissions:");
+
+  if (permissionBlock.length !== 1 || permissionBlock[0] !== "contents: read") {
+    problems.push("ops-admin-host.yml does not limit permissions to contents: read alone");
   }
 
   if (!/timeout-minutes:\s*10\b/mu.test(source)) {
@@ -131,11 +143,17 @@ export function findAdminHostWorkflowProblems(input: AdminHostWorkflowInput) {
   }
 
   const setAt = source.indexOf("flyctl secrets set");
-  const gateAt = source.indexOf("inputs.action == 'set-access-secrets'");
+  const setStepAt = setAt === -1 ? -1 : source.lastIndexOf("\n      - name:", setAt);
+  const setStepEnd = setAt === -1 ? -1 : source.indexOf("\n      - name:", setAt);
+
+  const setStep =
+    setAt === -1
+      ? ""
+      : source.slice(setStepAt === -1 ? 0 : setStepAt, setStepEnd === -1 ? undefined : setStepEnd);
 
   if (setAt === -1) {
     problems.push("ops-admin-host.yml never sets the Access secrets on Fly");
-  } else if (gateAt === -1 || gateAt > setAt) {
+  } else if (!setStep.includes("if: inputs.action == 'set-access-secrets'")) {
     problems.push("ops-admin-host.yml sets Fly secrets without the set-access-secrets guard");
   }
 
@@ -164,7 +182,7 @@ export function findAdminHostWorkflowProblems(input: AdminHostWorkflowInput) {
     .filter((line) => /^\s*(?:echo|printf)\b/u.test(line))
     .some(
       (line) =>
-        /\$(?:CF_ACCESS_AUD|CF_ACCESS_TEAM_DOMAIN|CF_ACCESS_JWKS_URL)\b/u.test(line) &&
+        /\$\{?(?:CF_ACCESS_AUD|CF_ACCESS_TEAM_DOMAIN|CF_ACCESS_JWKS_URL)\b/u.test(line) &&
         !line.includes("::add-mask::"),
     );
 

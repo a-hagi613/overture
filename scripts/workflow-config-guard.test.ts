@@ -262,3 +262,45 @@ test("an admin-host workflow that echoes an Access value is reported", () => {
     ),
   ).toBe(true);
 });
+
+test("an admin-host workflow without the set-access-secrets gate on the set step is reported", () => {
+  const workflow = adminHostWorkflow().replace(
+    "      - name: Set the Cloudflare Access secrets on overture-web\n        if: inputs.action == 'set-access-secrets'\n        env:",
+    "      - name: Set the Cloudflare Access secrets on overture-web\n        env:",
+  );
+
+  expect(
+    findAdminHostWorkflowProblems({ workflow }).some((problem) =>
+      problem.includes("without the set-access-secrets guard"),
+    ),
+  ).toBe(true);
+});
+
+test("an admin-host workflow with an extra permission is reported", () => {
+  const workflow = adminHostWorkflow().replace(
+    "permissions:\n  contents: read",
+    "permissions:\n  contents: read\n  issues: write",
+  );
+
+  expect(
+    findAdminHostWorkflowProblems({ workflow }).some((problem) =>
+      problem.includes("contents: read alone"),
+    ),
+  ).toBe(true);
+});
+
+test("an admin-host workflow that echoes a braced Access value is reported", () => {
+  const dollar = "$";
+  const braced = `${dollar}{CF_ACCESS_AUD}`;
+
+  const workflow = adminHostWorkflow().replace(
+    "          args=(",
+    `          echo "${braced}"\n          args=(`,
+  );
+
+  expect(
+    findAdminHostWorkflowProblems({ workflow }).some((problem) =>
+      problem.includes("prints a Cloudflare Access value"),
+    ),
+  ).toBe(true);
+});
