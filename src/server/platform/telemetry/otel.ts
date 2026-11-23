@@ -12,7 +12,7 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import type { LogRecordExporter, ReadableLogRecord } from "@opentelemetry/sdk-logs";
 import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
-import type { Context } from "@opentelemetry/api";
+import type { Attributes, Context } from "@opentelemetry/api";
 import type {
   ReadableSpan,
   Span,
@@ -28,6 +28,22 @@ import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic
 import type { ExportResult } from "@opentelemetry/core";
 
 export { trace } from "@opentelemetry/api";
+
+export const METRIC_EXPORT_INTERVAL_MILLIS = 60_000;
+
+export const BATCH_PROCESSOR_LIMITS = {
+  maxQueueSize: 2048,
+  maxExportBatchSize: 512,
+  scheduledDelayMillis: 5000,
+  exportTimeoutMillis: 5000,
+} as const;
+
+export const OTEL_METRIC_ATTRIBUTE_DENYLIST = new Set([
+  "http.url",
+  "job.id",
+  "sse.user_id",
+  "admin.target_user_id",
+]);
 
 export const OTEL_ATTRIBUTE_ALLOWLIST = new Set([
   "service.name",
@@ -56,6 +72,42 @@ export const OTEL_ATTRIBUTE_ALLOWLIST = new Set([
   "otel.status_description",
 ]);
 
+export function stripUrlQueryAndFragment(url: string) {
+  const queryIndex = url.indexOf("?");
+  const fragmentIndex = url.indexOf("#");
+
+  if (queryIndex === -1 && fragmentIndex === -1) {
+    return url;
+  }
+
+  const cutIndex =
+    queryIndex === -1 || fragmentIndex === -1
+      ? Math.max(queryIndex, fragmentIndex)
+      : Math.min(queryIndex, fragmentIndex);
+
+  return url.slice(0, cutIndex);
+}
+
+function redactAndStripUrl(attributes: Attributes) {
+  for (const key of Object.keys(attributes)) {
+    if (!OTEL_ATTRIBUTE_ALLOWLIST.has(key)) {
+      attributes[key] = "[redacted]";
+
+      continue;
+    }
+
+    if (key !== "http.url") {
+      continue;
+    }
+
+    const value = attributes[key]?.toString();
+
+    if (value !== undefined) {
+      attributes[key] = stripUrlQueryAndFragment(value);
+    }
+  }
+}
+
 class RedactingSpanProcessor implements SpanProcessor {
   private readonly inner: SpanProcessor;
 
@@ -68,11 +120,7 @@ class RedactingSpanProcessor implements SpanProcessor {
   }
 
   onEnd(span: ReadableSpan) {
-    for (const key of Object.keys(span.attributes)) {
-      if (!OTEL_ATTRIBUTE_ALLOWLIST.has(key)) {
-        span.attributes[key] = "[redacted]";
-      }
-    }
+    redactAndStripUrl(span.attributes);
 
     this.inner.onEnd(span);
   }
@@ -95,11 +143,7 @@ class RedactingLogExporter implements LogRecordExporter {
 
   export(logRecords: ReadableLogRecord[], resultCallback: (result: ExportResult) => void) {
     for (const record of logRecords) {
-      for (const key of Object.keys(record.attributes)) {
-        if (!OTEL_ATTRIBUTE_ALLOWLIST.has(key)) {
-          record.attributes[key] = "[redacted]";
-        }
-      }
+      redactAndStripUrl(record.attributes);
     }
 
     this.inner.export(logRecords, resultCallback);
@@ -193,7 +237,7 @@ export function startTelemetry(options: {
   const innerSpanProcessor =
     options.simpleExport === true
       ? new SimpleSpanProcessor(traceExporter)
-      : new BatchSpanProcessor(traceExporter);
+      : new BatchSpanProcessor(traceExporter, BATCH_PROCESSOR_LIMITS);
 
   const sdk = new NodeSDK({
     resource,
@@ -201,10 +245,12 @@ export function startTelemetry(options: {
     metricReaders: [
       new PeriodicExportingMetricReader({
         exporter: metricExporter,
-        exportIntervalMillis: 30_000,
+        exportIntervalMillis: METRIC_EXPORT_INTERVAL_MILLIS,
       }),
     ],
-    logRecordProcessors: [new BatchLogRecordProcessor({ exporter: logExporter })],
+    logRecordProcessors: [
+      new BatchLogRecordProcessor({ exporter: logExporter, ...BATCH_PROCESSOR_LIMITS }),
+    ],
     textMapPropagator: new CompositePropagator({
       propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
     }),
