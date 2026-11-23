@@ -25,6 +25,7 @@ const meUserSchema = z.object({
 
 const meSchema = z.object({
   adminOrigin: httpUrlSchema.nullable(),
+  adminOwnerEmail: z.string().nullable().default(null),
   socialProviders: z.array(z.string()).default([]),
   turnstileScriptUrl: z.string().optional(),
   turnstileSiteKey: z.string().optional(),

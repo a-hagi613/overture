@@ -194,12 +194,21 @@ export function createAuth(
 
   return betterAuth({
     appName: copy.app.name,
-    baseURL: env.APP_ORIGIN ?? {
-      allowedHosts: env.AUTH_ALLOWED_HOSTS?.map((host) => `${host}:*`) ?? [
-        "127.0.0.1:*",
-        "localhost:*",
-      ],
-    },
+    baseURL:
+      env.APP_ORIGIN === undefined
+        ? {
+            allowedHosts: env.AUTH_ALLOWED_HOSTS?.map((host) => `${host}:*`) ?? [
+              "127.0.0.1:*",
+              "localhost:*",
+            ],
+          }
+        : {
+            allowedHosts: [
+              ...new Set([new URL(env.APP_ORIGIN).host, new URL(env.ADMIN_ORIGIN).host]),
+            ],
+            fallback: env.APP_ORIGIN,
+            protocol: new URL(env.APP_ORIGIN).protocol === "https:" ? "https" : "http",
+          },
     trustedOrigins,
     advanced: {
       ipAddress: {

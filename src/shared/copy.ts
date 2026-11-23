@@ -340,6 +340,9 @@ export const copy = {
   signIn: {
     brandTagline: "The job hunt, handled.",
     back: "Back to Overture",
+    adminPortalKicker: "The owner's portal",
+    adminPortalSignIn: (email: string) => `Sign in with ${email}.`,
+    adminPortalSignInNeutral: "Sign in with the owner account.",
     title: "Sign in to Overture",
     signUpTitle: "Create your account",
     sentTitle: "Check your email",
@@ -3303,8 +3306,10 @@ export const copy = {
     gateSignInTitle: "The admin needs you signed in",
     gateSignInBody: "Sign in with the owner's account, then come back to this screen.",
     gateSignIn: "Sign in",
-    gateOwnerTitle: "Only the owner has the keys",
-    gateOwnerBody: "This account is not the owner, so the admin area refuses it.",
+    gateOwnerTitle: "The admin portal is for the owner account",
+    gateOwnerBody: "Sign in with the owner account, or sign out and try again.",
+    ownerRefusalTitle: "The admin portal is for the owner account",
+    ownerRefusalBody: (email: string) => `Sign out and use ${email}.`,
     gatePasskeyTitle: "Assert your passkey",
     gatePasskeyBody:
       "Overture asks for a passkey assertion before the admin opens, within 12 hours.",

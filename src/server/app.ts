@@ -44,6 +44,7 @@ import { createAdminApi } from "./routes/admin.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
 import { stripUntrustedIpHeaders } from "./auth/client-ip.ts";
 import { crossSiteRefusal } from "./auth/csrf.ts";
+import { DEMO_SIGN_IN_PATH } from "./auth/demo-paths.ts";
 import { env, labEnvironment, masterKeyring } from "./config/env.ts";
 import { demoLocked } from "./demo/guard.ts";
 import { createProfileRoutes } from "./routes/profile.ts";
@@ -51,7 +52,13 @@ import { createOnboardingRoutes } from "./routes/onboarding.ts";
 import { createConsentRoutes } from "./routes/consent.ts";
 import { createConsentService } from "./profile/consent.ts";
 import { createMatchingService } from "./matching/score.ts";
-import { dispatchByHost, mainHostAdminApiRefusal } from "./host-routing.ts";
+import {
+  adminOwnerRefusalPage,
+  adminRootLocation,
+  dispatchByHost,
+  isAdminPageRequest,
+  mainHostAdminApiRefusal,
+} from "./host-routing.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
 import { createWorkspaceSearchRoutes } from "./routes/workspace-search.ts";
@@ -279,8 +286,43 @@ export function createApp(deps: AppDependencies) {
   });
   adminHost.route("/admin/api", adminApi);
   adminHost.route("/api", createMeRoutes(deps.auth));
-  adminHost.all("/api/auth/*", async (context) =>
-    deps.auth.handler(stripUntrustedIpHeaders(context.req.raw, clientIpConfig)),
+  adminHost.all("/api/auth/*", async (context) => {
+    if (new URL(context.req.url).pathname === DEMO_SIGN_IN_PATH) {
+      return context.json({ error: API_ERRORS.notFound }, 404);
+    }
+
+    return deps.auth.handler(stripUntrustedIpHeaders(context.req.raw, clientIpConfig));
+  });
+
+  adminHost.use("*", async (context, next) => {
+    const { pathname } = new URL(context.req.url);
+
+    if (!isAdminPageRequest(context.req.method, pathname, context.req.header("accept") ?? "")) {
+      return next();
+    }
+
+    const session = await readSession(deps.auth, context.req.raw.headers);
+
+    if (session === null) {
+      return next();
+    }
+
+    if (session.user.role !== "owner") {
+      return new Response(adminOwnerRefusalPage(env.OWNER_EMAIL), {
+        headers: { "Cache-Control": "no-store", "Content-Type": "text/html; charset=utf-8" },
+        status: 403,
+      });
+    }
+
+    if (pathname === "/signin" || pathname === "/signup") {
+      return context.redirect("/admin", 302);
+    }
+
+    return next();
+  });
+
+  adminHost.get("/", (context) =>
+    context.redirect(adminRootLocation(new URL(context.req.url)), 302),
   );
 
   const app = new Hono();

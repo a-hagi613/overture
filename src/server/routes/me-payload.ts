@@ -8,6 +8,7 @@ export interface MeUser {
 
 export interface MeConfig {
   adminOrigin: string;
+  adminOwnerEmail: string | null;
   socialProviders: readonly string[];
   turnstileScriptUrl: string;
   turnstileSiteKey: string;
@@ -36,6 +37,7 @@ export function mePayload(user: MeUser | null, config: MeConfig) {
             role: user.role,
           },
     adminOrigin: user?.role === "owner" ? config.adminOrigin : null,
+    adminOwnerEmail: config.adminOwnerEmail,
     socialProviders: config.socialProviders,
     turnstileScriptUrl: config.turnstileScriptUrl,
     turnstileSiteKey: config.turnstileSiteKey,

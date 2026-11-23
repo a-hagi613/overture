@@ -48,7 +48,10 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    With `R2_BUCKET_FILES` set the app stores encrypted resumes and mail in R2, and a half-set R2 files config (the
    bucket without the three credentials, or the credentials partly set) stops the server at boot.
    Sign-in (M1-06) adds `BETTER_AUTH_SECRET` (at least 16 random characters), `OWNER_EMAIL`,
-   `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` (a Turnstile widget for `tryoverture.com`), and optionally `TURNSTILE_HOSTNAMES` (defaults to the `APP_ORIGIN` hostname; never localhost or 127.0.0.1 in production).
+   `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` (a Turnstile widget for `tryoverture.com`), and optionally
+   `TURNSTILE_HOSTNAMES` (defaults to the `APP_ORIGIN` and `ADMIN_ORIGIN` hostnames, so both
+   `tryoverture.com` and `admin.tryoverture.com` must be allowed on the widget; never localhost or 127.0.0.1 in
+   production).
    The OAuth clients are optional until they exist, one pair at a time: `GOOGLE_CLIENT_ID` with
    `GOOGLE_CLIENT_SECRET`, and `LINKEDIN_CLIENT_ID` with `LINKEDIN_CLIENT_SECRET` (redirect URIs
    `https://tryoverture.com/api/auth/oauth2/callback/google` and `…/oauth2/callback/linkedin`).
@@ -544,10 +547,24 @@ admin host sits behind a Cloudflare Zero Trust Access application with a policy 
 the app's own owner check and the passkey window. The values are already in `src/server/config/env.ts`; this section
 provisions what the deployment needs around them.
 
-Owners reach the portal from the app: the Profile menu and `/profile/account` carry an **Admin Portal** link, and
-visiting `/admin` on `tryoverture.com` shows a handoff card that opens the same path on the admin host. Regular users,
-the demo account and anonymous visitors never see the link, because `GET /api/me` returns `adminOrigin: null` for
-them (#512).
+There are two ways in:
+
+1. **From the app, the normal route.** Sign in at `https://tryoverture.com` with the owner account, open the
+   **Profile** menu and choose **Admin Portal**. The same link is on `/profile/account`. It opens
+   `https://admin.tryoverture.com/admin` in a new tab. Regular users, the demo account and anonymous visitors never
+   see it, because `GET /api/me` returns `adminOrigin: null` for them (#512).
+2. **Straight to the admin host.** Go to `https://admin.tryoverture.com/admin`; a bare
+   `https://admin.tryoverture.com/` redirects there. Cloudflare Access asks for the owner's email first, then the app
+   asks you to sign in with the owner account, and the first visit asks you to add a passkey (later visits ask for the
+   passkey again only once the last assertion is more than 12 hours old).
+
+Only the owner account enters. A test or demo account cannot enter by design: the Access policy names the owner's
+email, the session must carry the `owner` role, the one-click demo sign-in endpoint is refused on the admin host, and
+a signed-in non-owner gets a plain page naming the owner account instead of the portal. The admin host serves its own
+sign-in: magic links are verified and their session cookie is set on `admin.tryoverture.com`. Social sign-in buttons
+are hidden there because the Google and LinkedIn clients register the `tryoverture.com` callback only. The Turnstile
+widget must allow both hosts; `TURNSTILE_HOSTNAMES` defaults to the `APP_ORIGIN` and `ADMIN_ORIGIN` hostnames when it
+is unset.
 
 ### 1. Add the Fly certificate from the workflow
 
@@ -624,7 +641,8 @@ Paste the full result on the issue or pull request. The matching unit tests run 
 
 Finally sign in as the owner, open `/profile/account` and confirm the **Admin Portal** card, then open `/admin` on
 `tryoverture.com` and confirm the handoff card opens `https://admin.tryoverture.com/admin` through Access and the
-passkey.
+passkey. Open `https://admin.tryoverture.com/` on its own and confirm it lands on `/admin` rather than the public
+landing page.
 
 ### Rollback
 

@@ -203,6 +203,7 @@
           "src/server/catalog/companies-parquet.test.ts",
           "src/server/catalog/question-normalize.test.ts",
           "src/server/catalog/tag-rules.test.ts",
+          "src/server/config/env.test.ts",
           "src/server/dispatch/browser/session-slots.test.ts",
           "src/server/dispatch/outcomes.test.ts",
           "src/server/dispatch/planner.test.ts",
