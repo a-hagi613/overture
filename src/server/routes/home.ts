@@ -8,6 +8,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 import { readSessionUser } from "../auth/session.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import { openOrNull } from "../profile/personal-crypto.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
 
 import { billingSummary, committedSince } from "../billing/ledger.ts";
@@ -440,17 +441,21 @@ export function createHomeRoutes(deps: {
 
     return Promise.all(
       rows.map(async (row) => {
-        const subject = await personal.openFor(
-          userId,
-          { column: "subject_enc", rowId: row.id, table: "messages" },
-          row.subjectEnc,
-        );
+        const subject =
+          (await openOrNull({
+            personal,
+            scope: { column: "subject_enc", rowId: row.id, table: "messages" },
+            sealed: row.subjectEnc,
+            userId,
+          })) ?? "";
 
-        const from = await personal.openFor(
-          userId,
-          { column: "from_enc", rowId: row.id, table: "messages" },
-          row.fromEnc,
-        );
+        const from =
+          (await openOrNull({
+            personal,
+            scope: { column: "from_enc", rowId: row.id, table: "messages" },
+            sealed: row.fromEnc,
+            userId,
+          })) ?? "";
 
         const event = row.applicationId === null ? undefined : latestEvent.get(row.applicationId);
 

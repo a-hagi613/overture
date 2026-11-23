@@ -191,6 +191,24 @@ const envSchema = z
     }
 
     if (value.NODE_ENV === "production") {
+      if (value.MASTER_KEY_CURRENT !== 1) {
+        context.addIssue({
+          code: "custom",
+          message:
+            "MASTER_KEY_CURRENT must be 1: only MASTER_KEY_V1 exists, so a newer current version would break every read.",
+          path: ["MASTER_KEY_CURRENT"],
+        });
+      }
+
+      if (value.AUTH_ALLOWED_HOSTS !== undefined) {
+        context.addIssue({
+          code: "custom",
+          message:
+            "AUTH_ALLOWED_HOSTS must be empty in production: APP_ORIGIN names the only allowed host.",
+          path: ["AUTH_ALLOWED_HOSTS"],
+        });
+      }
+
       const hostnames =
         value.TURNSTILE_HOSTNAMES ??
         (value.APP_ORIGIN === undefined ? [] : turnstileDefaultHostnames(value.APP_ORIGIN));

@@ -3,11 +3,14 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import type { Auth } from "../auth/index.ts";
+import type { Clock } from "../platform/ports/clock.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 
 import { readSession } from "../auth/session.ts";
 import { reviewCategory } from "../catalog/question-normalize.ts";
+import { openOrNull } from "../profile/personal-crypto.ts";
+import { consumeRateLimit } from "../platform/rate-limit.ts";
 import {
   applications,
   applicationSnapshots,
@@ -36,6 +39,8 @@ const MAX_QUERY_LENGTH = 120;
 const EMAIL_SCAN_LIMIT = 500;
 const REVIEW_SCAN_LIMIT = 200;
 const INTERVIEW_SCAN_LIMIT = 200;
+const WORKSPACE_SEARCH_LIMIT = 30;
+const WORKSPACE_SEARCH_WINDOW_MS = 60_000;
 
 const searchQuery = z.object({
   limit: z.coerce.number().int().min(1).max(MAX_LIMIT).default(DEFAULT_LIMIT),
@@ -66,10 +71,11 @@ function emptyResponse(query: string) {
  */
 export function createWorkspaceSearchRoutes(deps: {
   auth: Auth;
+  clock: Clock;
   db: AppDatabase;
   personal: PersonalCrypto;
 }) {
-  const { auth, db, personal } = deps;
+  const { auth, clock, db, personal } = deps;
   const routes = new Hono();
 
   function applicationResults(userId: string, needle: string, limit: number) {
@@ -203,30 +209,39 @@ export function createWorkspaceSearchRoutes(deps: {
     const opened = await Promise.all(
       rows.map(async (row) => {
         const [from, subject, snippet] = await Promise.all([
-          personal.openFor(
+          openOrNull({
+            personal,
+            scope: { column: "from_enc", rowId: row.id, table: "messages" },
+            sealed: row.fromEnc,
             userId,
-            { column: "from_enc", rowId: row.id, table: "messages" },
-            row.fromEnc,
-          ),
-          personal.openFor(
+          }),
+          openOrNull({
+            personal,
+            scope: { column: "subject_enc", rowId: row.id, table: "messages" },
+            sealed: row.subjectEnc,
             userId,
-            { column: "subject_enc", rowId: row.id, table: "messages" },
-            row.subjectEnc,
-          ),
-          personal.openFor(
+          }),
+          openOrNull({
+            personal,
+            scope: { column: "snippet_enc", rowId: row.id, table: "messages" },
+            sealed: row.snippetEnc,
             userId,
-            { column: "snippet_enc", rowId: row.id, table: "messages" },
-            row.snippetEnc,
-          ),
+          }),
         ]);
 
-        return { from, row, snippet, subject };
+        return from === null || subject === null || snippet === null
+          ? null
+          : { from, row, snippet, subject };
       }),
     );
 
     const results: EmailResult[] = [];
 
     for (const entry of opened) {
+      if (entry === null) {
+        continue;
+      }
+
       if (!contains([entry.from, entry.subject, entry.snippet, entry.row.company], needle)) {
         continue;
       }
@@ -309,13 +324,23 @@ export function createWorkspaceSearchRoutes(deps: {
 
     context.header("Cache-Control", "no-store");
 
+    const userId = session.user.id;
+
+    const allowed = consumeRateLimit(db, `api.workspace-search:${userId}`, clock.now(), {
+      max: WORKSPACE_SEARCH_LIMIT,
+      windowMs: WORKSPACE_SEARCH_WINDOW_MS,
+    });
+
+    if (!allowed) {
+      return context.json({ error: API_ERRORS.rateLimited }, 429);
+    }
+
     const { limit, q } = context.req.valid("query");
 
     if (q === "") {
       return context.json(emptyResponse(q));
     }
 
-    const userId = session.user.id;
     const needle = q.toLowerCase();
 
     const emails = await emailResults(userId, needle, limit);

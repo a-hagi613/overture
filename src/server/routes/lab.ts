@@ -4,7 +4,9 @@ import type { Context } from "hono";
 import { z } from "zod";
 
 import type { Clock } from "../platform/ports/clock.ts";
+import type { ClientIpConfig } from "../auth/client-ip.ts";
 
+import { clientIp } from "../auth/client-ip.ts";
 import { logInfo } from "../platform/log.ts";
 import { createScoreLimiter } from "../lab/limit.ts";
 import { labScript, labStylesheet } from "../lab/client.ts";
@@ -37,6 +39,7 @@ export const LAB_CONTENT_SECURITY_POLICY = [
 
 export interface LabRouteDeps {
   clock: Clock;
+  clientIpConfig?: ClientIpConfig | undefined;
   environment: LabPageEnvironment;
   recaptchaSecret: string | undefined;
   recaptchaVerifyUrl: string;
@@ -76,17 +79,25 @@ const style = (body: string) =>
 
 const SCORE_LIMIT = 30;
 const SCORE_WINDOW_MS = 60_000;
+const SCORE_LIMITER_MAX_KEYS = 5000;
+const SHARED_CLIENT_KEY = "shared";
 
-const clientKey = (context: Context) =>
-  context.req.header("cf-connecting-ip") ??
-  context.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
-  "local";
+const untrustedClientIpConfig = {
+  flyAppName: undefined,
+  nodeEnv: "production",
+} satisfies ClientIpConfig;
 
 export function createLabRoutes(deps: LabRouteDeps) {
   const routes = new Hono();
 
+  const clientIpConfig = deps.clientIpConfig ?? untrustedClientIpConfig;
+
+  const clientKey = (context: Context) =>
+    clientIp(context.req.raw, clientIpConfig) ?? SHARED_CLIENT_KEY;
+
   const scoreLimiter = createScoreLimiter({
     limit: SCORE_LIMIT,
+    maxKeys: SCORE_LIMITER_MAX_KEYS,
     now: () => deps.clock.now(),
     windowMs: SCORE_WINDOW_MS,
   });
@@ -131,8 +142,9 @@ export function createLabRoutes(deps: LabRouteDeps) {
 
   routes.post("/recaptcha/score", validJson(scoreBody), async (context) => {
     const origin = context.req.header("origin");
+    const crossSite = context.req.header("sec-fetch-site") === "cross-site";
 
-    if (origin !== undefined && origin !== new URL(context.req.url).origin) {
+    if (crossSite || (origin !== undefined && origin !== new URL(context.req.url).origin)) {
       return context.json({ reason: "cross_origin", score: null, success: false }, 403);
     }
 

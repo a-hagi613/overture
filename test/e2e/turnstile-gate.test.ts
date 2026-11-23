@@ -104,6 +104,44 @@ test("a request with no token or an over-long token is refused before verificati
   expect(await sinkMailCount(isolatedAppServer.url, request)).toBe(0);
 });
 
+test("the generic OAuth sign-in path needs a sign-in token", async ({
+  request,
+  isolatedAppServer,
+}) => {
+  const url = `${isolatedAppServer.url}/api/auth/sign-in/oauth2`;
+  const data = { callbackURL: "/signin", providerId: "google" };
+
+  const missing = await request.post(url, {
+    data,
+    headers: { "x-turnstile-action": "signin", origin: isolatedAppServer.url },
+  });
+
+  const wrongAction = await request.post(url, {
+    data,
+    headers: {
+      "x-captcha-response": authTestIdentity.turnstilePassToken,
+      "x-turnstile-action": "magiclink",
+      origin: isolatedAppServer.url,
+    },
+  });
+
+  expect(missing.status()).toBe(403);
+  expect(wrongAction.status()).toBe(403);
+});
+
+test("a trailing slash cannot skip the bot check on a gated endpoint", async ({
+  request,
+  isolatedAppServer,
+}) => {
+  const response = await request.post(`${isolatedAppServer.url}/api/auth/sign-in/magic-link/`, {
+    data: { callbackURL: "/signin", email: authTestIdentity.ownerEmail },
+    headers: { origin: isolatedAppServer.url },
+  });
+
+  expect(response.status()).toBe(403);
+  expect(await sinkMailCount(isolatedAppServer.url, request)).toBe(0);
+});
+
 test("a valid token for the surface's action still sends the sign-in link", async ({
   request,
   isolatedAppServer,
@@ -211,4 +249,68 @@ appTest("a Fly machine refuses to boot with the test routes enabled", async () =
 
   expect(outcome.code).not.toBe(0);
   expect(outcome.stderr).toContain("ENABLE_TEST_ROUTES must not be true in production or on Fly.");
+});
+
+appTest("production refuses to boot with AUTH_ALLOWED_HOSTS set", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "overture-e2e-allowedhosts-"));
+
+  const child = spawn("bun", ["run", "src/server/main.ts"], {
+    env: {
+      ...serverEnvironment({
+        NODE_ENV: "production",
+        APP_ORIGIN: "https://tryoverture.com",
+        AUTH_ALLOWED_HOSTS: "localhost",
+        TURNSTILE_HOSTNAMES: "tryoverture.com",
+      }),
+      DATABASE_URL: join(directory, "overture.db"),
+    },
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+
+  const outcome = await new Promise<{ code: number | null; stderr: string }>((resolve) => {
+    let stderr = "";
+
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    child.once("exit", (code) => {
+      resolve({ code, stderr });
+    });
+  });
+
+  expect(outcome.code).not.toBe(0);
+  expect(outcome.stderr).toContain("AUTH_ALLOWED_HOSTS must be empty in production");
+});
+
+appTest("production refuses to boot with a master key version above one", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "overture-e2e-masterkey-"));
+
+  const child = spawn("bun", ["run", "src/server/main.ts"], {
+    env: {
+      ...serverEnvironment({
+        NODE_ENV: "production",
+        APP_ORIGIN: "https://tryoverture.com",
+        MASTER_KEY_CURRENT: "2",
+        TURNSTILE_HOSTNAMES: "tryoverture.com",
+      }),
+      DATABASE_URL: join(directory, "overture.db"),
+    },
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+
+  const outcome = await new Promise<{ code: number | null; stderr: string }>((resolve) => {
+    let stderr = "";
+
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    child.once("exit", (code) => {
+      resolve({ code, stderr });
+    });
+  });
+
+  expect(outcome.code).not.toBe(0);
+  expect(outcome.stderr).toContain("MASTER_KEY_CURRENT must be 1");
 });

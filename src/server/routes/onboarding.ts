@@ -17,6 +17,7 @@ import { createLanguagesService } from "../profile/languages.ts";
 import { createOnboardingProgressService } from "../profile/onboarding-progress.ts";
 import { createOnboardingStepService } from "../profile/onboarding-step.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
+import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { createResumeService } from "../profile/resume.ts";
 import { createSkipCompanyService } from "../profile/skip-companies.ts";
 import type { TargetChoices } from "../profile/target-choices.ts";
@@ -25,6 +26,7 @@ import { createTargetChoicesCache } from "../profile/target-choices.ts";
 import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
 import { env } from "../config/env.ts";
 import { demoLocked } from "../demo/guard.ts";
+import { isDemoRole } from "../../shared/demo.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
 import {
   ONBOARDING_STEP_COUNT,
@@ -49,16 +51,19 @@ export function createOnboardingRoutes(deps: {
   auth: Auth;
   llm: LlmPort;
   objects: ObjectStore;
+  personal?: PersonalCrypto | undefined;
   reviews: ReviewService;
   spendGate?: SpendGate | undefined;
 }) {
   const { db, clock, auth, llm, objects, reviews: reviewService } = deps;
 
-  const personal = createPersonalCrypto(
-    db,
-    parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
-    env.MASTER_KEY_CURRENT,
-  );
+  const personal =
+    deps.personal ??
+    createPersonalCrypto(
+      db,
+      parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
+      env.MASTER_KEY_CURRENT,
+    );
 
   const targetsService = createTargetsService({ db, clock });
   const languagesService = createLanguagesService({ db, clock });
@@ -95,31 +100,46 @@ export function createOnboardingRoutes(deps: {
     reviewService,
   });
 
-  async function ensureLanguages(userId: string) {
+  async function ensureLanguages(userId: string, readOnly: boolean) {
     const { languages } = await languagesService.read(userId);
 
     if (languages.length > 0) {
       return languages;
     }
 
+    if (readOnly) {
+      return ["en"];
+    }
+
     return languagesService.saveLanguages(userId, { languages: ["en"] });
   }
 
-  async function targetsView(userId: string) {
-    const languages = await ensureLanguages(userId);
+  async function targetsView(userId: string, readOnly: boolean) {
+    const languages = await ensureLanguages(userId, readOnly);
     const choices = choicesCache.read();
-    let saved = await targetsService.read(userId);
+    const saved = await targetsService.read(userId);
     const employmentTypes = defaultEmploymentTypes(choices);
 
+    let { targets } = saved;
+
     if (saved.targets.employmentTypes.length === 0 && employmentTypes.length > 0) {
-      saved = await targetsService.save(userId, { ...saved.targets, employmentTypes });
+      if (readOnly) {
+        targets = { ...saved.targets, employmentTypes };
+      } else {
+        const { targets: stored } = await targetsService.save(userId, {
+          ...saved.targets,
+          employmentTypes,
+        });
+
+        targets = stored;
+      }
     }
 
     return {
       choices,
       currencies: (await step.read(userId, { inferCountries: false })).currencies,
-      matchedCount: countMatchingPostings(deps.catalogDb, saved.targets, languages),
-      targets: saved.targets,
+      matchedCount: countMatchingPostings(deps.catalogDb, targets, languages),
+      targets,
     };
   }
 
@@ -218,7 +238,7 @@ export function createOnboardingRoutes(deps: {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
-    return context.json(await targetsView(account.id));
+    return context.json(await targetsView(account.id, isDemoRole(account.role)));
   });
 
   routes.put("/onboarding/targets", validJson(targetsInputSchema), async (context) => {
@@ -230,7 +250,7 @@ export function createOnboardingRoutes(deps: {
 
     await targetsService.save(account.id, context.req.valid("json"));
 
-    return context.json(await targetsView(account.id));
+    return context.json(await targetsView(account.id, false));
   });
 
   routes.put("/onboarding/timezone", validJson(onboardingTimezoneInputSchema), async (context) => {
@@ -240,7 +260,7 @@ export function createOnboardingRoutes(deps: {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
-    const languages = await ensureLanguages(account.id);
+    const languages = await ensureLanguages(account.id, false);
 
     return context.json(
       await languagesService.save(account.id, {

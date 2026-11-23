@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PersonalCrypto } from "./personal-crypto.ts";
+import { openOrNull } from "./personal-crypto.ts";
 
 import { facts } from "../platform/db/schema.ts";
 import { isCountryCode } from "../catalog/geo.ts";
@@ -115,11 +116,12 @@ export function createFactService(deps: {
 
     const unchanged =
       row !== undefined &&
-      (await personal.openFor(
+      (await openOrNull({
+        personal,
+        scope: { table: "facts", column: "value_enc", rowId: row.id },
+        sealed: row.valueEnc,
         userId,
-        { table: "facts", column: "value_enc", rowId: row.id },
-        row.valueEnc,
-      )) === value;
+      })) === value;
 
     const revision = row === undefined || !unchanged ? (row?.revision ?? 0) + 1 : row.revision;
     const rowId = row?.id ?? crypto.randomUUID();
@@ -172,11 +174,13 @@ export function createFactService(deps: {
 
       const records = await Promise.all(
         rows.map(async (row) => {
-          const value = await personal.openFor(
-            userId,
-            { table: "facts", column: "value_enc", rowId: row.id },
-            row.valueEnc,
-          );
+          const value =
+            (await openOrNull({
+              personal,
+              scope: { table: "facts", column: "value_enc", rowId: row.id },
+              sealed: row.valueEnc,
+              userId,
+            })) ?? "";
 
           return {
             key: row.key,

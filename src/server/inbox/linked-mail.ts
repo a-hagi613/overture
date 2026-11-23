@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import { openOrNull } from "../profile/personal-crypto.ts";
 
 import { mailThreads } from "../platform/db/schema.ts";
 import { messagesByThreadOf } from "./threads.ts";
@@ -34,42 +35,47 @@ export async function linkedMailOf(input: {
 
   return Promise.all(
     threads.map(async (thread) => {
-      const subject = await personal.openFor(
-        userId,
-        { column: "subject_enc", rowId: thread.id, table: "mail_threads" },
-        thread.subjectEnc,
-      );
+      const subject =
+        (await openOrNull({
+          personal,
+          scope: { column: "subject_enc", rowId: thread.id, table: "mail_threads" },
+          sealed: thread.subjectEnc,
+          userId,
+        })) ?? "";
 
       const rows = messagesByThread.get(thread.id) ?? [];
 
       const items = await Promise.all(
         rows.map(async (message) => {
           const [from, snippet, messageSubject] = await Promise.all([
-            personal.openFor(
+            openOrNull({
+              personal,
+              scope: { column: "from_enc", rowId: message.id, table: "messages" },
+              sealed: message.fromEnc,
               userId,
-              { column: "from_enc", rowId: message.id, table: "messages" },
-              message.fromEnc,
-            ),
-            personal.openFor(
+            }),
+            openOrNull({
+              personal,
+              scope: { column: "snippet_enc", rowId: message.id, table: "messages" },
+              sealed: message.snippetEnc,
               userId,
-              { column: "snippet_enc", rowId: message.id, table: "messages" },
-              message.snippetEnc,
-            ),
-            personal.openFor(
+            }),
+            openOrNull({
+              personal,
+              scope: { column: "subject_enc", rowId: message.id, table: "messages" },
+              sealed: message.subjectEnc,
               userId,
-              { column: "subject_enc", rowId: message.id, table: "messages" },
-              message.subjectEnc,
-            ),
+            }),
           ]);
 
           return {
             at: message.createdAt.getTime(),
             classification: message.classification,
             direction: message.direction,
-            from,
+            from: from ?? "",
             id: message.id,
-            snippet,
-            subject: messageSubject,
+            snippet: snippet ?? "",
+            subject: messageSubject ?? "",
           };
         }),
       );

@@ -5,6 +5,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import { openOrNull } from "../profile/personal-crypto.ts";
 import type { MailSender } from "../platform/mail/port.ts";
 import type { ZipEntry } from "./zip.ts";
 
@@ -221,11 +222,12 @@ function recoverStalePreparing(deps: ExportServiceDeps, row: AccountExportRow) {
 async function stateOf(deps: ExportServiceDeps, row: AccountExportRow) {
   const key =
     row.status === "ready"
-      ? await deps.personal.openFor(
-          row.userId,
-          { column: "key_enc", rowId: row.id, table: "account_exports" },
-          row.keyEnc,
-        )
+      ? await openOrNull({
+          personal: deps.personal,
+          scope: { column: "key_enc", rowId: row.id, table: "account_exports" },
+          sealed: row.keyEnc,
+          userId: row.userId,
+        })
       : null;
 
   return {
@@ -364,11 +366,20 @@ export async function runExportBuildJob(deps: ExportServiceDeps, exportId: strin
     return;
   }
 
-  const key = await deps.personal.openFor(
-    row.userId,
-    { column: "key_enc", rowId: row.id, table: "account_exports" },
-    row.keyEnc,
-  );
+  const key = await openOrNull({
+    personal: deps.personal,
+    scope: { column: "key_enc", rowId: row.id, table: "account_exports" },
+    sealed: row.keyEnc,
+    userId: row.userId,
+  });
+
+  if (key === null) {
+    failPreparingExport(deps, exportId, "The export could not be read.");
+
+    await deps.objects.delete(objectKey);
+
+    return;
+  }
 
   try {
     const entries = exportEntries(

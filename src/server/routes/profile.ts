@@ -14,8 +14,10 @@ import type { SpendGate } from "../billing/spend.ts";
 import { env } from "../config/env.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { parseMasterKey } from "../platform/crypto.ts";
+import { safeFilename } from "../safe-filename.ts";
 import { createFactService } from "../profile/facts.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
+import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { createResumeService, MAX_RESUME_BYTES } from "../profile/resume.ts";
 import { hasPdfMagicBytes } from "../profile/pdf.ts";
 import { clearBlockerIfRecovered } from "../profile/running-state.ts";
@@ -67,16 +69,19 @@ export function createProfileRoutes(deps: {
   auth: Auth;
   objects: ObjectStore;
   llm: LlmPort;
+  personal?: PersonalCrypto | undefined;
   reviews: ReviewService;
   spendGate?: SpendGate | undefined;
 }) {
   const { db, clock, auth, objects, llm } = deps;
 
-  const personal = createPersonalCrypto(
-    db,
-    parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
-    env.MASTER_KEY_CURRENT,
-  );
+  const personal =
+    deps.personal ??
+    createPersonalCrypto(
+      db,
+      parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
+      env.MASTER_KEY_CURRENT,
+    );
 
   const resumesService = createResumeService({
     db,
@@ -190,8 +195,10 @@ export function createProfileRoutes(deps: {
 
     return new Response(file.bytes, {
       headers: {
+        "cache-control": "private, no-store",
+        "content-disposition": `attachment; filename="${safeFilename(file.filename, "resume.pdf")}"`,
         "content-type": "application/pdf",
-        "content-disposition": `attachment; filename="${file.filename}"`,
+        "x-content-type-options": "nosniff",
       },
     });
   });

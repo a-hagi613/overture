@@ -2,6 +2,7 @@ import { and, asc, desc, eq, exists, inArray, isNull, lt, or, sql } from "drizzl
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
+import { openOrNull } from "../profile/personal-crypto.ts";
 
 import { applications, mailThreads, messageAttachments, messages } from "../platform/db/schema.ts";
 
@@ -161,35 +162,39 @@ async function threadViewOf(
   const latest = rows.at(-1);
 
   const subject =
-    latest === undefined
-      ? await personal.openFor(
-          thread.userId,
-          { column: "subject_enc", rowId: thread.id, table: "mail_threads" },
-          thread.subjectEnc,
-        )
-      : await personal.openFor(
-          thread.userId,
-          { column: "subject_enc", rowId: latest.id, table: "messages" },
-          latest.subjectEnc,
-        );
+    (latest === undefined
+      ? await openOrNull({
+          personal,
+          scope: { column: "subject_enc", rowId: thread.id, table: "mail_threads" },
+          sealed: thread.subjectEnc,
+          userId: thread.userId,
+        })
+      : await openOrNull({
+          personal,
+          scope: { column: "subject_enc", rowId: latest.id, table: "messages" },
+          sealed: latest.subjectEnc,
+          userId: thread.userId,
+        })) ?? "";
 
   const from =
     latest === undefined
       ? ""
-      : await personal.openFor(
-          thread.userId,
-          { column: "from_enc", rowId: latest.id, table: "messages" },
-          latest.fromEnc,
-        );
+      : ((await openOrNull({
+          personal,
+          scope: { column: "from_enc", rowId: latest.id, table: "messages" },
+          sealed: latest.fromEnc,
+          userId: thread.userId,
+        })) ?? "");
 
   const snippet =
     latest === undefined
       ? ""
-      : await personal.openFor(
-          thread.userId,
-          { column: "snippet_enc", rowId: latest.id, table: "messages" },
-          latest.snippetEnc,
-        );
+      : ((await openOrNull({
+          personal,
+          scope: { column: "snippet_enc", rowId: latest.id, table: "messages" },
+          sealed: latest.snippetEnc,
+          userId: thread.userId,
+        })) ?? "");
 
   return {
     applicationId: thread.applicationId,

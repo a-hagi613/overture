@@ -7,6 +7,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PersonalCrypto } from "./personal-crypto.ts";
+import { openOrNull } from "./personal-crypto.ts";
 import type { SpendGate } from "../billing/spend.ts";
 
 import { resumes } from "../platform/db/schema.ts";
@@ -93,13 +94,21 @@ export function createResumeService(deps: {
   }
 
   async function toRecord(userId: string, row: typeof resumes.$inferSelect) {
-    const filename = await personal.openFor(
-      userId,
-      resumeScope(row.id, "filename_enc"),
-      row.filenameEnc,
-    );
+    const filename =
+      (await openOrNull({
+        personal,
+        scope: resumeScope(row.id, "filename_enc"),
+        sealed: row.filenameEnc,
+        userId,
+      })) ?? "resume.pdf";
 
-    const text = await personal.openFor(userId, resumeScope(row.id, "text_enc"), row.textEnc);
+    const text =
+      (await openOrNull({
+        personal,
+        scope: resumeScope(row.id, "text_enc"),
+        sealed: row.textEnc,
+        userId,
+      })) ?? "";
 
     return {
       id: row.id,
@@ -193,13 +202,24 @@ export function createResumeService(deps: {
       return null;
     }
 
-    const base64 = await personal.openFor(userId, resumeScope(row.id, "bytes"), decodeUtf8(stored));
-
-    const filename = await personal.openFor(
+    const base64 = await openOrNull({
+      personal,
+      scope: resumeScope(row.id, "bytes"),
+      sealed: decodeUtf8(stored),
       userId,
-      resumeScope(row.id, "filename_enc"),
-      row.filenameEnc,
-    );
+    });
+
+    if (base64 === null) {
+      return null;
+    }
+
+    const filename =
+      (await openOrNull({
+        personal,
+        scope: resumeScope(row.id, "filename_enc"),
+        sealed: row.filenameEnc,
+        userId,
+      })) ?? "resume.pdf";
 
     return { bytes: bytesFromBase64(base64), filename };
   }

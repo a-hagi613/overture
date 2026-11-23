@@ -74,9 +74,12 @@ export function createAccountRoutes(deps: {
       return;
     }
 
-    const count = now - row.lastRequest > REAUTH_WINDOW_MS ? 1 : row.count + 1;
+    const inWindow = now - row.lastRequest <= REAUTH_WINDOW_MS;
 
-    db.update(rateLimits).set({ count, lastRequest: now }).where(eq(rateLimits.id, row.id)).run();
+    db.update(rateLimits)
+      .set(inWindow ? { count: row.count + 1 } : { count: 1, lastRequest: now })
+      .where(eq(rateLimits.id, row.id))
+      .run();
   }
 
   routes.get("/account/deletion", async (context) => {

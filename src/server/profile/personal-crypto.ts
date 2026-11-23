@@ -5,6 +5,7 @@ import { createUserKey, IV_BYTES, openValue, sealValue } from "../platform/crypt
 import type { SealScope, StoredUserKey } from "../platform/crypto.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import { userKeys } from "../platform/db/schema.ts";
+import { logError } from "../platform/log.ts";
 
 const KEY_CACHE_USERS = 1000;
 
@@ -15,12 +16,23 @@ export interface PersonalCrypto {
   forget: (userId: string) => void;
 }
 
+interface PendingLoad {
+  promise: Promise<StoredUserKey>;
+  token: LoadToken;
+}
+
+interface LoadToken {
+  readonly kind: "personal-key-load";
+}
+
 /**
  * Seals and opens a person's values with their wrapped data key. The wrapped
  * key is read once and kept for the process, keyed by person, because it never
  * changes for them; the cache holds at most 1000 people and `forget` drops an
- * entry, and stops an in-flight load from caching it again, so account erasure
- * leaves no decryptable key in memory.
+ * entry. A load that was already in flight when the person was forgotten
+ * notices its replaced pending token and returns the key without caching it, so
+ * account erasure leaves no decryptable key in memory and no unbounded set of
+ * forgotten ids to grow.
  * @param db The database the wrapped keys live in.
  * @param masterKey The master key that wraps each person's data key.
  * @param keyVersion The master key version new data keys are wrapped under.
@@ -32,14 +44,9 @@ export function createPersonalCrypto(
   keyVersion: number,
 ) {
   const keys = new Map<string, StoredUserKey>();
-  const pending = new Map<string, Promise<StoredUserKey>>();
-  const forgotten = new Set<string>();
+  const pending = new Map<string, PendingLoad>();
 
   function remember(userId: string, stored: StoredUserKey) {
-    if (forgotten.has(userId)) {
-      return stored;
-    }
-
     if (!keys.has(userId) && keys.size >= KEY_CACHE_USERS) {
       const oldest = keys.keys().next().value;
 
@@ -54,7 +61,11 @@ export function createPersonalCrypto(
     return stored;
   }
 
-  async function readOrCreateKey(userId: string) {
+  function cacheIfCurrent(userId: string, token: LoadToken, stored: StoredUserKey) {
+    return pending.get(userId)?.token === token ? remember(userId, stored) : stored;
+  }
+
+  async function readOrCreateKey(userId: string, token: LoadToken) {
     const rows = await db.select().from(userKeys).where(eq(userKeys.userId, userId)).limit(1);
 
     const row = rows.at(0);
@@ -83,14 +94,14 @@ export function createPersonalCrypto(
         throw new Error("the user key could not be created");
       }
 
-      return remember(userId, {
+      return cacheIfCurrent(userId, token, {
         dekIv: winner.wrappedDek.subarray(0, IV_BYTES).toString("base64"),
         keyVersion: winner.masterKeyVersion,
         wrappedDek: winner.wrappedDek.subarray(IV_BYTES).toString("base64"),
       });
     }
 
-    return remember(userId, {
+    return cacheIfCurrent(userId, token, {
       dekIv: row.wrappedDek.subarray(0, IV_BYTES).toString("base64"),
       keyVersion: row.masterKeyVersion,
       wrappedDek: row.wrappedDek.subarray(IV_BYTES).toString("base64"),
@@ -101,28 +112,30 @@ export function createPersonalCrypto(
     const cached = keys.get(userId);
 
     if (cached !== undefined) {
-      return remember(userId, cached);
+      return cached;
     }
 
     const inFlight = pending.get(userId);
 
     if (inFlight !== undefined) {
-      return inFlight;
+      return inFlight.promise;
     }
 
-    const loading = loadAndForget(userId);
+    const token: LoadToken = { kind: "personal-key-load" };
 
-    pending.set(userId, loading);
+    const loading = (async () => {
+      try {
+        return await readOrCreateKey(userId, token);
+      } finally {
+        if (pending.get(userId)?.token === token) {
+          pending.delete(userId);
+        }
+      }
+    })();
+
+    pending.set(userId, { promise: loading, token });
 
     return loading;
-  }
-
-  async function loadAndForget(userId: string) {
-    try {
-      return await readOrCreateKey(userId);
-    } finally {
-      pending.delete(userId);
-    }
   }
 
   return {
@@ -139,9 +152,28 @@ export function createPersonalCrypto(
     forget: (userId: string) => {
       keys.delete(userId);
       pending.delete(userId);
-      forgotten.add(userId);
     },
   } satisfies PersonalCrypto;
+}
+
+/**
+ * Opens one sealed value, turning a tampered or unreadable ciphertext into `null` with a log line instead of a 500.
+ * @param input The person, the value's scope and the sealed text.
+ * @returns The plaintext, or null when it cannot be opened.
+ */
+export async function openOrNull(input: {
+  personal: PersonalCrypto;
+  scope: SealScope;
+  sealed: string;
+  userId: string;
+}) {
+  try {
+    return await input.personal.openFor(input.userId, input.scope, input.sealed);
+  } catch (error) {
+    logError("crypto.open", error);
+
+    return null;
+  }
 }
 
 function dekBlob(created: StoredUserKey) {

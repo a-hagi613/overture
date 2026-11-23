@@ -121,6 +121,12 @@ export function createMailboxService(
     }
   }
 
+  function readFor(userId: string) {
+    const existing = db.select().from(mailboxes).where(eq(mailboxes.userId, userId)).get();
+
+    return existing === undefined ? null : describe(existing);
+  }
+
   async function byForwardingAddress(address: string) {
     const [localPart = "", addressHost = ""] = address.trim().toLowerCase().split("@");
 
@@ -193,6 +199,7 @@ export function createMailboxService(
     byForwardingAddress,
     byId,
     markFirstForwarded,
+    readFor,
     retireFor,
   };
 }

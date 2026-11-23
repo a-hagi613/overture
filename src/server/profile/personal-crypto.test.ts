@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { Buffer } from "node:buffer";
 
 import { userKeys, users } from "../platform/db/schema.ts";
 import { openCountingDatabase } from "../testing/query-counter.ts";
-import { createPersonalCrypto } from "./personal-crypto.ts";
+import { createPersonalCrypto, openOrNull } from "./personal-crypto.ts";
 
 const MASTER = new Uint8Array(32).fill(5);
 
@@ -127,5 +128,27 @@ describe("the stored key", () => {
 
     expect(await personal.openFor("user-1", scope, sealed)).toBe("value");
     expect(keyReads(counter)).toBe(2);
+  });
+});
+
+function flipped(base64: string) {
+  const bytes = Buffer.from(base64, "base64");
+
+  bytes[0] = ((bytes[0] ?? 0) + 1) % 256;
+
+  return bytes.toString("base64");
+}
+
+describe("a tampered value", () => {
+  test("is refused by openFor and becomes null through openOrNull", async () => {
+    const { personal } = freshUsers(["user-1"]);
+    const scope = { column: "value_enc", rowId: "r", table: "facts" } as const;
+
+    const sealed = await personal.sealFor("user-1", scope, "a private answer");
+    const [version, keyVersion, iv, tag, data] = sealed.split(":");
+    const tampered = [version, keyVersion, iv, tag, flipped(data ?? "")].join(":");
+
+    expect(personal.openFor("user-1", scope, tampered)).rejects.toThrow();
+    expect(await openOrNull({ personal, scope, sealed: tampered, userId: "user-1" })).toBeNull();
   });
 });
