@@ -106,6 +106,13 @@ test("the hot-path indexes exist after every migration", () => {
       "messages_user_created",
       "applications_user_status",
       "grants_user_starts",
+      "admin_audit_at",
+      "admin_audit_target_user_at",
+      "application_events_user_kind_at",
+      "attempts_started_at",
+      "bg_jobs_status_updated",
+      "llm_usage_created_at",
+      "session_user_id",
     ]) {
       expect(names).toContain(index);
     }
@@ -167,6 +174,56 @@ test("the messages, applications and grants hot paths search their new indexes",
     );
 
     expect(grants).toContain("grants_user_starts");
+  } finally {
+    db.$client.close();
+  }
+});
+
+test("the retention, audit and session hot paths search their new indexes", () => {
+  const { db, sqlite } = seeded();
+
+  try {
+    const audit = planOf(sqlite, "select id from admin_audit order by at desc limit 20");
+    expect(audit).toContain("admin_audit_at");
+
+    const auditTarget = planOf(
+      sqlite,
+      "select id from admin_audit where target_user_id = ? order by at desc limit 20",
+      "user-a",
+    );
+
+    expect(auditTarget).toContain("admin_audit_target_user_at");
+
+    const events = planOf(
+      sqlite,
+      "select id from application_events where user_id = ? and kind = ? order by at",
+      "user-a",
+      "status",
+    );
+
+    expect(events).toContain("application_events_user_kind_at");
+
+    const usage = planOf(
+      sqlite,
+      "select id from llm_usage where created_at > ? order by created_at",
+      "1",
+    );
+
+    expect(usage).toContain("llm_usage_created_at");
+
+    const attempts = planOf(sqlite, "select id from attempts where started_at < ?", "1");
+    expect(attempts).toContain("attempts_started_at");
+
+    const sessions = planOf(sqlite, "select id from session where user_id = ?", "user-a");
+    expect(sessions).toContain("session_user_id");
+
+    const jobs = planOf(
+      sqlite,
+      "select id from bg_jobs where status = 'done' and updated_at < ?",
+      "1",
+    );
+
+    expect(jobs).toContain("bg_jobs_status_updated");
   } finally {
     db.$client.close();
   }

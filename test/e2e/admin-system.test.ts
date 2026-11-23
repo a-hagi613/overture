@@ -110,6 +110,8 @@ const auditSchema = z.object({
 function sizesOracle(path: string) {
   const database = new Database(path, { readonly: true });
 
+  database.run("PRAGMA busy_timeout = 5000;");
+
   try {
     return {
       freelistCount: z
@@ -128,6 +130,8 @@ function sizesOracle(path: string) {
 
 function boardCountOracle(path: string) {
   const database = new Database(path, { readonly: true });
+
+  database.run("PRAGMA busy_timeout = 5000;");
 
   try {
     return z

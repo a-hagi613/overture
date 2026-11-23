@@ -10,6 +10,12 @@ const PAGE_ROWS = 200;
 const PAGES_PER_PASS = 5;
 const REPLAY_ROW_LIMIT = 200;
 
+/** One browser may hold a handful of tabs; more than this is a leak or an attack. */
+export const SSE_USER_SUBSCRIBER_CAP = 10;
+
+/** The whole process stops accepting streams well before its file descriptors run out. */
+export const SSE_GLOBAL_SUBSCRIBER_CAP = 500;
+
 export interface EventRow {
   seq: number;
   topic: string;
@@ -102,6 +108,22 @@ function createHub(db: AppDatabase) {
   }
 
   function subscribe(subscriber: EventSubscriber) {
+    if (subscribers.size >= SSE_GLOBAL_SUBSCRIBER_CAP) {
+      return null;
+    }
+
+    let mine = 0;
+
+    for (const existing of subscribers) {
+      if (existing.userId === subscriber.userId) {
+        mine += 1;
+      }
+    }
+
+    if (mine >= SSE_USER_SUBSCRIBER_CAP) {
+      return null;
+    }
+
     subscriber.lastSeq = boundedReplayFloor(db, subscriber.lastSeq);
     subscribers.add(subscriber);
 

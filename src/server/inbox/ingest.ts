@@ -242,47 +242,54 @@ export function createMailIngest(deps: {
 
     const createdAt = new Date(clock.now());
 
-    await db.transaction(async (tx) => {
-      if (parentThread === undefined) {
-        await tx.insert(mailThreads).values({
-          id: threadId,
-          userId: mailbox.userId,
-          applicationId: null,
-          subjectEnc: threadSubjectEnc,
-          employerStarted: true,
-          lastMessageAt: createdAt,
-        });
-      } else {
-        await tx
-          .update(mailThreads)
-          .set({ lastMessageAt: createdAt })
-          .where(eq(mailThreads.id, threadId));
-      }
+    db.transaction(
+      (tx) => {
+        if (parentThread === undefined) {
+          tx.insert(mailThreads)
+            .values({
+              id: threadId,
+              userId: mailbox.userId,
+              applicationId: null,
+              subjectEnc: threadSubjectEnc,
+              employerStarted: true,
+              lastMessageAt: createdAt,
+            })
+            .run();
+        } else {
+          tx.update(mailThreads)
+            .set({ lastMessageAt: createdAt })
+            .where(eq(mailThreads.id, threadId))
+            .run();
+        }
 
-      await tx.insert(messages).values({
-        id,
-        threadId,
-        userId: mailbox.userId,
-        mailboxId: mailbox.id,
-        direction: "in",
-        rfcMessageId: messageId,
-        inReplyTo: parsed.inReplyTo ?? null,
-        senderDomain,
-        auth,
-        fromEnc,
-        toEnc,
-        subjectEnc,
-        textEnc,
-        htmlObjectKey,
-        snippetEnc,
-        classification,
-        createdAt,
-      });
+        tx.insert(messages)
+          .values({
+            id,
+            threadId,
+            userId: mailbox.userId,
+            mailboxId: mailbox.id,
+            direction: "in",
+            rfcMessageId: messageId,
+            inReplyTo: parsed.inReplyTo ?? null,
+            senderDomain,
+            auth,
+            fromEnc,
+            toEnc,
+            subjectEnc,
+            textEnc,
+            htmlObjectKey,
+            snippetEnc,
+            classification,
+            createdAt,
+          })
+          .run();
 
-      if (attachmentRows.length > 0) {
-        await tx.insert(messageAttachments).values(attachmentRows);
-      }
-    });
+        if (attachmentRows.length > 0) {
+          tx.insert(messageAttachments).values(attachmentRows).run();
+        }
+      },
+      { behavior: "immediate" },
+    );
 
     await objects.delete(job.objectKey);
 

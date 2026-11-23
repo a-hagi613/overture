@@ -50,17 +50,21 @@ export const users = sqliteTable(
   (table) => [uniqueIndex("users_mailbox_unique").on(table.mailbox)],
 );
 
-export const sessions = sqliteTable("session", {
-  id: text("id").primaryKey(),
-  userId: cascadeUserId(),
-  token: text("token").notNull().unique(),
-  expiresAt: timestamp("expires_at").notNull(),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  reauthAt: timestamp("reauth_at"),
-  createdAt: timestamp("created_at").notNull(),
-  updatedAt: timestamp("updated_at").notNull(),
-});
+export const sessions = sqliteTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    token: text("token").notNull().unique(),
+    expiresAt: timestamp("expires_at").notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    reauthAt: timestamp("reauth_at"),
+    createdAt: timestamp("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull(),
+  },
+  (t) => [index("session_user_id").on(t.userId)],
+);
 
 export const accounts = sqliteTable(
   "account",
@@ -138,6 +142,7 @@ export const bgJobs = sqliteTable(
     index("bg_jobs_claim_due")
       .on(t.status, t.runAt)
       .where(sql`status IN ('queued', 'running')`),
+    index("bg_jobs_status_updated").on(t.status, t.updatedAt),
   ],
 );
 
@@ -185,15 +190,22 @@ export const passkeyAssertions = sqliteTable("passkey_assertions", {
   assertedAt: integer("asserted_at").notNull(),
 });
 
-export const adminAudit = sqliteTable("admin_audit", {
-  id: text("id").primaryKey(),
-  at: integer("at").notNull(),
-  actorId: text("actor_id").notNull(),
-  action: text("action").notNull(),
-  targetUserId: text("target_user_id"),
-  reason: text("reason").notNull(),
-  detail: text("detail").notNull(),
-});
+export const adminAudit = sqliteTable(
+  "admin_audit",
+  {
+    id: text("id").primaryKey(),
+    at: integer("at").notNull(),
+    actorId: text("actor_id").notNull(),
+    action: text("action").notNull(),
+    targetUserId: text("target_user_id"),
+    reason: text("reason").notNull(),
+    detail: text("detail").notNull(),
+  },
+  (t) => [
+    index("admin_audit_at").on(t.at),
+    index("admin_audit_target_user_at").on(t.targetUserId, t.at),
+  ],
+);
 
 export const killSwitches = sqliteTable(
   "kill_switches",
@@ -289,17 +301,21 @@ export const questionVariants = sqliteTable("question_variants", {
     .references(() => questions.id, { onDelete: "cascade" }),
 });
 
-export const llmUsage = sqliteTable("llm_usage", {
-  id: text("id").primaryKey(),
-  userId: text("user_id"),
-  purpose: text("purpose").notNull(),
-  model: text("model").notNull(),
-  inputTokens: integer("input_tokens").notNull(),
-  cachedTokens: integer("cached_tokens").notNull(),
-  outputTokens: integer("output_tokens").notNull(),
-  costMicros: integer("cost_micros").notNull(),
-  createdAt: integer("created_at").notNull(),
-});
+export const llmUsage = sqliteTable(
+  "llm_usage",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id"),
+    purpose: text("purpose").notNull(),
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull(),
+    cachedTokens: integer("cached_tokens").notNull(),
+    outputTokens: integer("output_tokens").notNull(),
+    costMicros: integer("cost_micros").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("llm_usage_created_at").on(t.createdAt)],
+);
 
 export const llmBatches = sqliteTable(
   "llm_batches",
@@ -934,7 +950,10 @@ export const applicationEvents = sqliteTable(
     source: text("source", { enum: ["system", "user", "email", "checkin", "admin"] }).notNull(),
     detail: text("detail"),
   },
-  (t) => [index("application_events_application_at").on(t.applicationId, t.at)],
+  (t) => [
+    index("application_events_application_at").on(t.applicationId, t.at),
+    index("application_events_user_kind_at").on(t.userId, t.kind, t.at),
+  ],
 );
 
 export const interviewEvents = sqliteTable(
@@ -1007,6 +1026,7 @@ export const attempts = sqliteTable(
   },
   (t) => [
     index("attempts_application").on(t.applicationId, t.startedAt),
+    index("attempts_started_at").on(t.startedAt),
     index("attempts_user_lease").on(t.userId, t.leaseUntil),
   ],
 );

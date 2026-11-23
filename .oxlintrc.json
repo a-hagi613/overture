@@ -340,6 +340,7 @@
           "src/server/profile/facts.test.ts",
           "src/server/profile/onboarding-step.test.ts",
           "src/server/profile/pdf.test.ts",
+          "src/server/profile/resume.test.ts",
           "src/server/profile/running-state.test.ts",
           "src/server/profile/target-choices.test.ts",
           "src/server/profile/targets.test.ts",
@@ -381,6 +382,9 @@
           "src/server/inbox/linked-mail.test.ts",
           "src/server/inbox/mailboxes.test.ts",
           "src/server/inbox/threads.test.ts",
+          "src/server/inbox/ingest.test.ts",
+          "src/server/inbox/waits.test.ts",
+          "src/server/app.test.ts",
           "src/server/pipeline/approved-plan.test.ts",
           "src/server/pipeline/email-notes.test.ts",
           "src/server/pipeline/reviews.test.ts",
@@ -397,6 +401,8 @@
           "src/server/admin/support.test.ts",
           "src/server/platform/rate-limit.test.ts",
           "src/server/platform/sse/hub.test.ts",
+          "src/server/platform/sse/stream.test.ts",
+          "src/server/storage/database-sizes.test.ts",
           "src/web/lib/admin-resource.test.ts",
           "scripts/check-admin-host.test.ts",
           "scripts/database-sync-guard.test.ts",
@@ -786,6 +792,12 @@
       ],
       "rules": {
         "node/no-process-env": "off"
+      }
+    },
+    {
+      "files": ["src/server/main.ts"],
+      "rules": {
+        "unicorn/no-process-exit": "off"
       }
     }
   ]

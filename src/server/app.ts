@@ -100,7 +100,18 @@ export interface AppDependencies {
 
 export { hostnameFromHeader } from "./host-routing.ts";
 
-async function staticResponseFrom(root: string, url: string) {
+function adminHostSharesMainHostname() {
+  try {
+    return (
+      new URL(env.APP_ORIGIN ?? "http://localhost:3000").hostname ===
+      new URL(env.ADMIN_ORIGIN).hostname
+    );
+  } catch {
+    return false;
+  }
+}
+
+export async function staticResponseFrom(root: string, url: string) {
   const { pathname } = new URL(url);
   const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/u, "");
   const resolvedRoot = resolve(root);
@@ -117,7 +128,18 @@ async function staticResponseFrom(root: string, url: string) {
   const match = found.find((candidate) => candidate !== null);
 
   if (match !== undefined) {
-    return new Response(Bun.file(match));
+    const headers = staticCacheHeaders(pathname);
+
+    return headers === undefined
+      ? new Response(Bun.file(match))
+      : new Response(Bun.file(match), { headers });
+  }
+
+  if (isHashedAssetPath(pathname)) {
+    return new Response("Not found", {
+      headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" },
+      status: 404,
+    });
   }
 
   const shells = await Promise.all(
@@ -131,7 +153,9 @@ async function staticResponseFrom(root: string, url: string) {
   const shell = shells.find((candidate) => candidate !== null);
 
   if (shell !== undefined) {
-    return new Response(shell, { headers: { "content-type": "text/html; charset=utf-8" } });
+    return new Response(shell, {
+      headers: { "Cache-Control": "no-cache", "content-type": "text/html; charset=utf-8" },
+    });
   }
 
   return null;
@@ -144,6 +168,20 @@ function crossSiteExempt(pathname: string) {
     pathname.startsWith("/api/webhooks/") ||
     pathname.startsWith("/api/internal/")
   );
+}
+
+export function isHashedAssetPath(pathname: string) {
+  return pathname.startsWith("/assets/") || pathname === "/sw.js";
+}
+
+export function staticCacheHeaders(pathname: string) {
+  if (pathname.startsWith("/assets/")) {
+    return { "Cache-Control": "public, max-age=31536000, immutable" };
+  }
+
+  const revalidate = pathname === "/sw.js" || pathname === "/" || pathname.endsWith(".html");
+
+  return revalidate ? { "Cache-Control": "no-cache" } : undefined;
 }
 
 function jsonError(error: Error, context: Context) {
@@ -199,6 +237,14 @@ export function createApp(deps: AppDependencies) {
 
   const adminHost = new Hono();
 
+  adminHost.use("/admin/api/*", async (context, next) => {
+    await next();
+
+    if (!context.res.headers.has("Cache-Control")) {
+      context.res.headers.set("Cache-Control", "private, no-store");
+    }
+  });
+
   const matching = createMatchingService({
     db: deps.db,
     catalogDb: deps.catalogDb,
@@ -218,6 +264,7 @@ export function createApp(deps: AppDependencies) {
     return next();
   });
   adminHost.route("/admin/api", adminApi);
+  adminHost.route("/api", createMeRoutes(deps.auth));
   adminHost.all("/api/auth/*", async (context) =>
     deps.auth.handler(stripUntrustedIpHeaders(context.req.raw, clientIpConfig)),
   );
@@ -228,6 +275,20 @@ export function createApp(deps: AppDependencies) {
   adminHost.onError(jsonError);
 
   app.use("*", securityHeaders(env.NODE_ENV === "production"));
+
+  const splitHosts = !adminHostSharesMainHostname();
+
+  if (splitHosts) {
+    app.use("*", dispatchByHost(adminHost, env.ADMIN_ORIGIN));
+  }
+
+  app.use("/api/*", async (context, next) => {
+    await next();
+
+    if (!context.res.headers.has("Cache-Control")) {
+      context.res.headers.set("Cache-Control", "private, no-store");
+    }
+  });
 
   const { mailboxes } = deps;
 
@@ -432,24 +493,26 @@ export function createApp(deps: AppDependencies) {
   );
 
   if (deps.testRoutes) {
-    app.route(
-      "/__test__",
-      createTestRoutes(
-        deps.db,
-        deps.catalogDb,
-        deps.clock,
-        deps.jobHandlers,
-        deps.singletonJobKinds,
-        deps.preparation,
-        deps.catalogWorker,
-        deps.objects,
-      ),
+    const testRoutes = createTestRoutes(
+      deps.db,
+      deps.catalogDb,
+      deps.clock,
+      deps.jobHandlers,
+      deps.singletonJobKinds,
+      deps.preparation,
+      deps.catalogWorker,
+      deps.objects,
     );
+
+    app.route("/__test__", testRoutes);
+    adminHost.route("/__test__", testRoutes);
   }
 
   app.all("/api/*", (context) => context.json({ error: API_ERRORS.notFound }, 404));
 
-  app.use("*", dispatchByHost(adminHost, env.ADMIN_ORIGIN));
+  if (!splitHosts) {
+    app.use("*", dispatchByHost(adminHost, env.ADMIN_ORIGIN));
+  }
 
   app.all("/admin/api/*", mainHostAdminApiRefusal);
 

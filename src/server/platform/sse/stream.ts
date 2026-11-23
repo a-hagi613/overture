@@ -38,12 +38,23 @@ export function createSseStream(
   const parsed = lastEventId === null ? 0 : Math.trunc(Number(lastEventId));
   const encoder = new TextEncoder();
 
-  return new ReadableStream({
+  let cleanup: (() => void) | null = null;
+  const state = { rejected: false };
+
+  const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
       let unsubscribe: (() => void) | null = null;
+      let stopped = false;
 
-      function cleanup() {
+      function stop() {
+        if (stopped) {
+          return;
+        }
+
+        stopped = true;
+        signal.removeEventListener("abort", stop);
+
         unsubscribe?.();
         unsubscribe = null;
 
@@ -57,19 +68,17 @@ export function createSseStream(
         } catch {}
       }
 
+      cleanup = stop;
+
       function sendChunk(text: string) {
         try {
           controller.enqueue(encoder.encode(text));
         } catch {
-          cleanup();
+          stop();
         }
       }
 
-      signal.addEventListener("abort", cleanup);
-
-      heartbeatTimer = setInterval(() => {
-        sendChunk(`: heartbeat\n\n`);
-      }, HEARTBEAT_INTERVAL_MS);
+      signal.addEventListener("abort", stop, { once: true });
 
       unsubscribe = subscribeToEvents(db, {
         userId,
@@ -78,6 +87,22 @@ export function createSseStream(
           sendChunk(formatSseMessage(row.seq, row.topic, row.payload));
         },
       });
+
+      if (unsubscribe === null) {
+        state.rejected = true;
+        stop();
+
+        return;
+      }
+
+      heartbeatTimer = setInterval(() => {
+        sendChunk(`: heartbeat\n\n`);
+      }, HEARTBEAT_INTERVAL_MS);
+    },
+    cancel() {
+      cleanup?.();
     },
   });
+
+  return state.rejected ? null : stream;
 }

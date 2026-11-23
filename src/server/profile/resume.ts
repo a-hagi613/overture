@@ -269,14 +269,17 @@ export function createResumeService(deps: {
         uploadedAt,
       } satisfies typeof resumes.$inferInsert;
 
-      await db.transaction(async (tx) => {
-        await tx
-          .update(resumes)
-          .set({ isCurrent: false })
-          .where(and(eq(resumes.userId, userId), eq(resumes.isCurrent, true)));
+      db.transaction(
+        (tx) => {
+          tx.update(resumes)
+            .set({ isCurrent: false })
+            .where(and(eq(resumes.userId, userId), eq(resumes.isCurrent, true)))
+            .run();
 
-        await tx.insert(resumes).values(values);
-      });
+          tx.insert(resumes).values(values).run();
+        },
+        { behavior: "immediate" },
+      );
 
       const rows = await db.select().from(resumes).where(eq(resumes.id, id)).limit(1);
 

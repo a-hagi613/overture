@@ -1,4 +1,4 @@
-import { and, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 
 import type { AppDatabase, CatalogDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
@@ -18,6 +18,7 @@ const RETENTION_INTERVAL_MS = HOUR_MS;
 const EVENT_RETENTION_MS = DAY_MS;
 const DONE_JOB_RETENTION_MS = 7 * DAY_MS;
 const DEAD_JOB_RETENTION_MS = 30 * DAY_MS;
+const ADMIN_CANCELLED_JOB_ERROR = "Cancelled from the admin jobs page.";
 
 const ATTEMPT_RETENTION_MS = 180 * DAY_MS;
 const LLM_BATCH_RETENTION_MS = 30 * DAY_MS;
@@ -184,40 +185,64 @@ async function pruneClosedPostings(
   const pruneChunk: (
     chunk: number,
     total: number,
-  ) => Promise<{ deleted: number; held: number; capped: boolean }> = async (chunk, total) => {
+    cursor: { closedAt: number; id: string } | null,
+  ) => Promise<{ deleted: number; held: number; capped: boolean }> = async (
+    chunk,
+    total,
+    cursor,
+  ) => {
     if (chunk >= limits.maxChunks) {
       return { capped: true, deleted: total, held: held.size };
     }
 
     const candidates = catalogDb
-      .select({ id: postings.id })
+      .select({ closedAt: postings.closedAt, id: postings.id })
       .from(postings)
-      .where(and(isNotNull(postings.closedAt), lt(postings.closedAt, closedBefore)))
-      .orderBy(postings.closedAt)
+      .where(
+        and(
+          isNotNull(postings.closedAt),
+          lt(postings.closedAt, closedBefore),
+          cursor === null
+            ? undefined
+            : or(
+                gt(postings.closedAt, cursor.closedAt),
+                and(eq(postings.closedAt, cursor.closedAt), gt(postings.id, cursor.id)),
+              ),
+        ),
+      )
+      .orderBy(asc(postings.closedAt), asc(postings.id))
       .limit(limits.chunkRows)
-      .all()
-      .map((row) => row.id);
+      .all();
 
     if (candidates.length === 0) {
       return { capped: false, deleted: total, held: held.size };
     }
 
-    const deletable = candidates.filter((id) => !unsent.has(id));
+    const deletable = candidates.flatMap((row) => (unsent.has(row.id) ? [] : [row.id]));
 
-    for (const id of candidates) {
-      if (unsent.has(id)) {
-        held.add(id);
+    for (const row of candidates) {
+      if (unsent.has(row.id)) {
+        held.add(row.id);
       }
     }
 
-    if (deletable.length === 0) {
-      return { capped: false, deleted: total, held: held.size };
+    const removed =
+      deletable.length === 0
+        ? 0
+        : await retryWhenBusy(
+            () => deletePostingsChunk(catalogDb, deletable),
+            "retention.catalog.postings",
+          );
+
+    const last = candidates.at(-1);
+
+    if (last === undefined) {
+      return { capped: false, deleted: total + removed, held: held.size };
     }
 
-    const removed = await retryWhenBusy(
-      () => deletePostingsChunk(catalogDb, deletable),
-      "retention.catalog.postings",
-    );
+    if (last.closedAt === null) {
+      return { capped: false, deleted: total + removed, held: held.size };
+    }
 
     if (candidates.length < limits.chunkRows) {
       return { capped: false, deleted: total + removed, held: held.size };
@@ -225,10 +250,10 @@ async function pruneClosedPostings(
 
     await yieldToEventLoop();
 
-    return pruneChunk(chunk + 1, total + removed);
+    return pruneChunk(chunk + 1, total + removed, { closedAt: last.closedAt, id: last.id });
   };
 
-  return pruneChunk(0, 0);
+  return pruneChunk(0, 0, null);
 }
 
 /**
@@ -306,6 +331,12 @@ export async function runRetention(
     sql`status = 'done' AND updated_at < ${now - DONE_JOB_RETENTION_MS}`,
   );
 
+  const cancelledJobs = await deleteInChunks(
+    db,
+    "bg_jobs",
+    sql`status = 'failed' AND last_error = ${ADMIN_CANCELLED_JOB_ERROR} AND updated_at < ${now - DONE_JOB_RETENTION_MS}`,
+  );
+
   const deadJobs = await deleteInChunks(
     db,
     "bg_jobs",
@@ -320,7 +351,7 @@ export async function runRetention(
 
   const catalog = await pruneCatalog(db, catalogDb, clock, limits);
 
-  return { attempts, deadJobs, doneJobs, events, llmBatches, ...catalog };
+  return { attempts, cancelledJobs, deadJobs, doneJobs, events, llmBatches, ...catalog };
 }
 
 export function ensureRetentionQueued(db: AppDatabase, clock: Clock) {

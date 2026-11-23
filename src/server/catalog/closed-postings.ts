@@ -8,6 +8,8 @@ import { applications } from "../platform/db/schema.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { skipClosedPostingApplications } from "./posting-close.ts";
 
+const POSTING_CHUNK = 400;
+
 /**
  * The closed Postings that still have an unsent Application. A worker that crashed after closing a Posting never
  * delivered its ids, so each sweep reconciles from the catalog instead of trusting the summary alone.
@@ -26,20 +28,23 @@ export function closedPostingsWithUnsentApplications(db: AppDatabase, catalogDb:
     return [];
   }
 
-  return catalogDb
-    .select({ id: postings.id })
-    .from(postings)
-    .where(
-      and(
-        inArray(
-          postings.id,
-          rows.map((row) => row.postingId),
-        ),
-        isNotNull(postings.closedAt),
-      ),
-    )
-    .all()
-    .map((row) => row.id);
+  const postingIds = rows.map((row) => row.postingId);
+  const closed: string[] = [];
+
+  for (let offset = 0; offset < postingIds.length; offset += POSTING_CHUNK) {
+    const chunk = postingIds.slice(offset, offset + POSTING_CHUNK);
+
+    closed.push(
+      ...catalogDb
+        .select({ id: postings.id })
+        .from(postings)
+        .where(and(inArray(postings.id, chunk), isNotNull(postings.closedAt)))
+        .all()
+        .map((row) => row.id),
+    );
+  }
+
+  return closed;
 }
 
 /**

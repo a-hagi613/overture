@@ -132,6 +132,8 @@ function seededRestoredDatabase() {
 function jobStates(path: string) {
   const sqlite = new Database(path, { readonly: true });
 
+  sqlite.run("PRAGMA busy_timeout = 5000;");
+
   try {
     return sqlite.query("select id, status, attempts, locked_until from bg_jobs order by id").all();
   } finally {
@@ -184,6 +186,7 @@ describe("the restored-database check", () => {
     const path = scratchDatabasePath();
     const sqlite = new Database(path);
 
+    sqlite.run("PRAGMA busy_timeout = 5000;");
     sqlite.run("create table placeholder (id text primary key)");
     sqlite.close();
 
@@ -207,6 +210,7 @@ describe("the restored-database check", () => {
     const before = readJobSnapshot(path);
     const sqlite = new Database(path);
 
+    sqlite.run("PRAGMA busy_timeout = 5000;");
     sqlite.run(
       "update bg_jobs set status = 'running', attempts = attempts + 1 where id = 'job-send'",
     );

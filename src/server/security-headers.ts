@@ -20,7 +20,9 @@ export function securityHeaders(production: boolean) {
     }
 
     for (const [name, value] of Object.entries(BASE_SECURITY_HEADERS)) {
-      context.res.headers.set(name, value);
+      if (!context.res.headers.has(name)) {
+        context.res.headers.set(name, value);
+      }
     }
 
     if (production) {

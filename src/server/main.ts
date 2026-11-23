@@ -193,8 +193,8 @@ const sdk = startTelemetry({
   simpleExport: env.OTEL_SIMPLE_EXPORT,
 });
 
-const { db } = openDatabase(databasePath);
-const { db: catalogDb } = openCatalogDatabase(catalogDatabasePath);
+const { db, sqlite: appSqlite } = openDatabase(databasePath);
+const { db: catalogDb, sqlite: catalogSqlite } = openCatalogDatabase(catalogDatabasePath);
 
 createEventLoopLagMonitor({
   onLag: (lagMs) => {
@@ -1038,7 +1038,22 @@ function handleShutdown(signal: string) {
       logError("shutdown", error);
     } finally {
       await Promise.race([stopTelemetry(), quietGrace(budgetMs)]);
+
+      try {
+        appSqlite.close();
+      } catch (error) {
+        logError("shutdown", error);
+      }
+
+      try {
+        catalogSqlite.close();
+      } catch (error) {
+        logError("shutdown", error);
+      }
+
+      clearTimeout(hardExitTimer);
       logInfo("shutdown", `stopped in ${String(Math.round(performance.now() - startedAt))} ms`);
+      process.exit(0);
     }
   })();
 }

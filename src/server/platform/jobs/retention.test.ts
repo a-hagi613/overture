@@ -8,7 +8,7 @@ import type { AppDatabase, CatalogDatabase } from "../db/client.ts";
 
 import { openCatalogDatabase, openDatabase } from "../db/client.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "../db/migrate.ts";
-import { applications, users } from "../db/schema.ts";
+import { applications, bgJobs, users } from "../db/schema.ts";
 import {
   companies,
   companyBoards,
@@ -293,6 +293,77 @@ describe("bounded catalog pruning", () => {
     expect(third.postingsCapped).toBe(false);
     expect(postingRow(catalog, "recent-closed")).toBeDefined();
     expect(postingRow(catalog, "open")).toBeDefined();
+  });
+});
+
+describe("held postings never stall catalog cleanup", () => {
+  test("the keyset cursor moves past the oldest held Postings and deletes later ones", async () => {
+    const { app, catalog } = fresh();
+
+    seedPosting(catalog, { closedAt: NOW - 100 * DAY_MS, id: "held-a" });
+    seedPosting(catalog, { closedAt: NOW - 100 * DAY_MS, id: "held-b" });
+    seedPosting(catalog, { closedAt: NOW - 95 * DAY_MS, id: "gone-a" });
+    seedPosting(catalog, { closedAt: NOW - 95 * DAY_MS, id: "gone-b" });
+
+    seedApplication(app, { id: "application-a", postingId: "held-a", status: "approved" });
+    seedApplication(app, { id: "application-b", postingId: "held-b", status: "approved" });
+
+    const summary = await runRetention(app, catalog, clock, { chunkRows: 2, maxChunks: 4 });
+
+    expect(summary.postingsDeleted).toBe(2);
+    expect(summary.postingsHeld).toBe(2);
+    expect(summary.postingsCapped).toBe(false);
+    expect(postingRow(catalog, "held-a")).toBeDefined();
+    expect(postingRow(catalog, "held-b")).toBeDefined();
+    expect(postingRow(catalog, "gone-a")).toBeUndefined();
+    expect(postingRow(catalog, "gone-b")).toBeUndefined();
+  });
+});
+
+describe("finished job retention", () => {
+  test("deletes an admin-cancelled failed job but keeps a genuine failure", async () => {
+    const { app, catalog } = fresh();
+
+    app
+      .insert(bgJobs)
+      .values([
+        {
+          attempts: 1,
+          createdAt: NOW - 20 * DAY_MS,
+          id: "job-cancelled",
+          kind: "application.send",
+          lastError: "Cancelled from the admin jobs page.",
+          maxAttempts: 1,
+          payload: "{}",
+          runAt: NOW - 20 * DAY_MS,
+          status: "failed",
+          updatedAt: NOW - 20 * DAY_MS,
+        },
+        {
+          attempts: 1,
+          createdAt: NOW - 20 * DAY_MS,
+          id: "job-failed",
+          kind: "application.send",
+          lastError: "the form changed",
+          maxAttempts: 1,
+          payload: "{}",
+          runAt: NOW - 20 * DAY_MS,
+          status: "failed",
+          updatedAt: NOW - 20 * DAY_MS,
+        },
+      ])
+      .run();
+
+    const summary = await runRetention(app, catalog, clock);
+
+    expect(summary.cancelledJobs).toBe(1);
+    expect(
+      app
+        .select({ id: bgJobs.id })
+        .from(bgJobs)
+        .all()
+        .map((row) => row.id),
+    ).toEqual(["job-failed"]);
   });
 });
 

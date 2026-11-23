@@ -27,6 +27,8 @@ if (databasePath === undefined || outPath === undefined) {
 
 const sqlite = new Database(databasePath, { readonly: true });
 
+sqlite.run("PRAGMA busy_timeout = 5000;");
+
 function hasTable(name: string) {
   return (
     sqlite

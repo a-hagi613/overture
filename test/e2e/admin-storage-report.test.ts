@@ -120,6 +120,8 @@ async function postJson(appUrl: string, path: string, body: JsonValue) {
 function postingsBySource(databasePath: string) {
   const database = new Database(catalogDatabasePathFor(databasePath), { readonly: true });
 
+  database.run("PRAGMA busy_timeout = 5000;");
+
   try {
     return postingsOracleSchema.parse(
       database
@@ -322,6 +324,7 @@ test("the admin storage report attributes bytes by database, prefix and table wi
   const catalogPath = join(databasePath, "..", "catalog.sqlite");
   const catalog = new Database(catalogPath, { create: true });
 
+  catalog.run("PRAGMA busy_timeout = 5000;");
   catalog.run("create table catalog_postings (id integer primary key, ats text)");
   catalog.close();
 

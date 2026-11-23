@@ -123,6 +123,8 @@ function parseJobsIfPresent(sqlite: Database) {
 export function readJobSnapshot(path: string) {
   const sqlite = new Database(path, { readonly: true });
 
+  sqlite.run("PRAGMA busy_timeout = 5000;");
+
   try {
     return parseJobsIfPresent(sqlite);
   } finally {
@@ -284,6 +286,7 @@ export function verifyRestoredDatabase(path: string, options: RestoreCheckOption
     const sqlite = new Database(path, { readonly: true });
 
     try {
+      sqlite.run("pragma busy_timeout = 5000");
       sqlite.run("pragma query_only = on");
 
       return inspect(sqlite, path, options, guard.calls);

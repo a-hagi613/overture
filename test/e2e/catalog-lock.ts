@@ -8,6 +8,8 @@ if (catalogPath === undefined) {
 
 const database = new Database(catalogPath);
 
+database.run("PRAGMA busy_timeout = 5000;");
+
 database.run("BEGIN IMMEDIATE");
 
 database.run("update postings set missing_polls = missing_polls + 1");

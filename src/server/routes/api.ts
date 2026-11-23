@@ -107,9 +107,13 @@ export function createApiRoutes(
     const lastEventId = context.req.header("Last-Event-ID") ?? null;
     const abortController = new AbortController();
 
-    context.req.raw.signal.addEventListener("abort", () => {
-      abortController.abort();
-    });
+    context.req.raw.signal.addEventListener(
+      "abort",
+      () => {
+        abortController.abort();
+      },
+      { once: true },
+    );
 
     const signal =
       options.shutdown === undefined
@@ -117,6 +121,10 @@ export function createApiRoutes(
         : AbortSignal.any([abortController.signal, options.shutdown]);
 
     const stream = createSseStream(db, lastEventId, session.user.id, signal);
+
+    if (stream === null) {
+      return context.json({ error: API_ERRORS.rateLimited }, 429);
+    }
 
     return new Response(stream, {
       headers: {
