@@ -121,6 +121,10 @@ export async function classifyWithLlm(
 
   for (const call of calls) {
     recordLlmUsage(deps.db, deps.clock, {
+      batch:
+        call.batchRecordId === undefined
+          ? undefined
+          : { customId: call.customId, recordId: call.batchRecordId },
       userId: input.userId,
       purpose: EMAIL_CLASSIFY_PURPOSE,
       model: call.model,

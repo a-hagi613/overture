@@ -18,6 +18,8 @@ export function monthStartUtc(atMs: number) {
 }
 
 export interface LlmUsageCall {
+  /** The durable batch and call this row bills, so a resumed or repeated run records it once. */
+  batch?: { customId: string; recordId: string } | undefined;
   userId: string | null;
   purpose: string;
   model: string;
@@ -30,7 +32,10 @@ export interface LlmUsageCall {
 export function recordLlmUsage(db: AppDatabase, clock: Clock, call: LlmUsageCall) {
   db.insert(llmUsage)
     .values({
-      id: crypto.randomUUID(),
+      id:
+        call.batch === undefined
+          ? crypto.randomUUID()
+          : `llm-usage:${call.batch.recordId}:${call.batch.customId}`,
       userId: call.userId,
       purpose: call.purpose,
       model: call.model,
@@ -40,6 +45,7 @@ export function recordLlmUsage(db: AppDatabase, clock: Clock, call: LlmUsageCall
       costMicros: call.costMicros,
       createdAt: clock.now(),
     })
+    .onConflictDoNothing()
     .run();
 }
 
