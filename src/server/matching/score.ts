@@ -258,6 +258,10 @@ export function createMatchingService(deps: MatchDeps) {
 
     for (const call of calls) {
       recordLlmUsage(db, clock, {
+        batch:
+          call.batchRecordId === undefined
+            ? undefined
+            : { customId: call.customId, recordId: call.batchRecordId },
         userId,
         purpose: SCORE_PURPOSE,
         model: call.model,

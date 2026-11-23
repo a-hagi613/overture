@@ -109,6 +109,10 @@ function storedResults(record: LlmBatchRecord) {
   return storedResultsSchema.parse(JSON.parse(record.results));
 }
 
+function withBatch<T extends { customId: string }>(recordId: string, calls: readonly T[]) {
+  return calls.map((call) => ({ ...call, batchRecordId: recordId }));
+}
+
 export function parseLlmBatchPollPayload(payload: string) {
   return pollPayloadSchema.parse(JSON.parse(payload));
 }
@@ -220,7 +224,7 @@ export function createDurableBatches(options: DurableBatchOptions) {
       const applied = applyLlmBatchResultsOnce(db, clock, record.id, JSON.stringify(calls));
 
       if (!applied) {
-        return { kind: "applied", calls: storedResults(load(record.id)) };
+        return { kind: "applied", calls: withBatch(record.id, storedResults(load(record.id))) };
       }
 
       logInfo(
@@ -228,7 +232,7 @@ export function createDurableBatches(options: DurableBatchOptions) {
         `applied ${String(calls.length)} results for batch ${batch.id} (${record.id})`,
       );
 
-      return { kind: "applied", calls };
+      return { kind: "applied", calls: withBatch(record.id, calls) };
     } catch (error) {
       if (error instanceof BatchGoneError) {
         return { kind: "failed", message: fail(record.id, error.message) };
@@ -288,7 +292,7 @@ export function createDurableBatches(options: DurableBatchOptions) {
     if (record.resultAppliedAt !== null) {
       settle(recordId);
 
-      return storedResults(record);
+      return withBatch(record.id, storedResults(record));
     }
 
     if (record.status === "failed") {
@@ -332,7 +336,7 @@ export function createDurableBatches(options: DurableBatchOptions) {
     if (record.resultAppliedAt !== null) {
       settle(record.id);
 
-      return storedResults(record);
+      return withBatch(record.id, storedResults(record));
     }
 
     if (record.batchId === null) {

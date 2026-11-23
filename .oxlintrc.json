@@ -363,6 +363,7 @@
           "src/server/platform/llm/models.test.ts",
           "src/server/platform/llm/batch-store.test.ts",
           "src/server/platform/llm/anthropic-batches.test.ts",
+          "src/server/platform/llm/usage.test.ts",
           "src/shared/copy.test.ts",
           "src/shared/dossier.test.ts",
           "src/shared/support.test.ts",

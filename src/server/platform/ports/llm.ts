@@ -23,6 +23,8 @@ export interface LlmRequest {
 }
 
 export interface LlmBatchCall {
+  /** The recorded durable batch that produced this call, which makes its usage row idempotent. */
+  batchRecordId?: string | undefined;
   customId: string;
   result: { ok: true; value: unknown } | { ok: false; error: string };
   model: string;

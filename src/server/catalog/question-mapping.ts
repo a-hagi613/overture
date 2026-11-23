@@ -127,6 +127,10 @@ export async function mapQuestionsWithLlm(
 
   for (const call of calls) {
     recordLlmUsage(deps.db, deps.clock, {
+      batch:
+        call.batchRecordId === undefined
+          ? undefined
+          : { customId: call.customId, recordId: call.batchRecordId },
       userId: null,
       purpose: QUESTION_MAPPING_PURPOSE,
       model: call.model,
