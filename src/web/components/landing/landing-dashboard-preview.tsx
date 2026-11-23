@@ -53,8 +53,8 @@ export function LandingDashboardPreview() {
       id="dashboard-preview"
     >
       <div className="mx-auto max-w-2xl text-center">
-        <Badge asChild size="eyebrow" variant="signal">
-          <a href="#dashboard-preview">{LANDING_COPY.preview.badge}</a>
+        <Badge size="eyebrow" variant="signal">
+          {LANDING_COPY.preview.badge}
         </Badge>
         <h2 className={`${dsSectionHeading} mt-4`} id="dashboard-preview-title">
           {LANDING_COPY.preview.headingPlain}
@@ -102,7 +102,7 @@ export function LandingDashboardPreview() {
         >
           <div className="relative flex flex-col gap-3 border-b border-border bg-sidebar p-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between lg:px-4 lg:py-2.5">
             <div className="flex flex-col gap-2.5 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3">
-              <span className={`${dsEyebrow} inline-flex min-h-8 items-center gap-2`}>
+              <span className={`${dsEyebrow} inline-flex min-h-11 items-center gap-2 lg:min-h-8`}>
                 <span
                   aria-hidden="true"
                   className="h-2 w-2 rounded-full bg-signal animate-hint-pulse"
@@ -115,7 +115,7 @@ export function LandingDashboardPreview() {
               >
                 {screens.map((screen) => (
                   <TabsTrigger
-                    className="min-h-9 border border-transparent px-1.5 text-xs hover:border-border hover:bg-card data-[state=active]:border-signal data-[state=active]:text-signal-text lg:min-h-8 lg:px-3.5 lg:text-sm"
+                    className="min-h-11 border border-transparent px-1.5 text-xs hover:border-border hover:bg-card data-[state=active]:border-signal data-[state=active]:text-signal-text md:min-h-9 lg:min-h-8 lg:px-3.5 lg:text-sm"
                     key={screen.id}
                     value={screen.id}
                   >

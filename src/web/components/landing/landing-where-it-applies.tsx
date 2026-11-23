@@ -39,8 +39,8 @@ export function LandingWhereItApplies() {
     >
       <div className={`${dsContainer} pt-16 sm:pt-24`}>
         <div className="mx-auto max-w-2xl text-center">
-          <Badge asChild size="eyebrow" variant="signal">
-            <a href="#where-it-applies">{LANDING_COPY.whereItApplies.badge}</a>
+          <Badge size="eyebrow" variant="signal">
+            {LANDING_COPY.whereItApplies.badge}
           </Badge>
           <h2 className={`${dsBandHeading} mt-4 text-band-ink`} id="where-it-applies-title">
             {LANDING_COPY.whereItApplies.headingPlain}

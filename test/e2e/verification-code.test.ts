@@ -695,7 +695,7 @@ async function openHome(
   const context = await browser.newContext({ baseURL: codes.server.url, storageState });
   const page = await context.newPage();
 
-  await page.goto(`${codes.server.url}/`);
+  await page.goto(`${codes.server.url}/home`);
 
   return { context, page };
 }

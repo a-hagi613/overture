@@ -1,13 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Pause, Play } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link } from "react-router";
 import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
 import type { HomeResponse } from "../lib/home-api.ts";
 import { useRunning } from "../lib/home-api.ts";
-import { PAUSE_FIX_PATH } from "../lib/pause-paths.ts";
 import { Badge } from "./ui/badge.tsx";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
@@ -110,18 +108,8 @@ export function HomeControlBand({ home }: { home: HomeResponse }) {
         <span>{running ? copy.home.control.pauseAction : copy.home.control.resumeAction}</span>
       </Button>
     );
-  } else if (pauseReason === "suspended") {
-    controlAction = (
-      <Button asChild size="lg" variant="primary">
-        <a href="mailto:hello@tryoverture.com">{copy.home.pauseReasons.suspended.fix}</a>
-      </Button>
-    );
   } else {
-    controlAction = (
-      <Button asChild size="lg" variant="primary">
-        <Link to={PAUSE_FIX_PATH[pauseReason]}>{copy.home.pauseReasons[pauseReason].fix}</Link>
-      </Button>
-    );
+    controlAction = null;
   }
 
   return (

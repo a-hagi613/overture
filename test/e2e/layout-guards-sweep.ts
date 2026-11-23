@@ -31,6 +31,7 @@ function storageFor(path: string) {
 
   if (
     path === "/" ||
+    path === "/pricing" ||
     path === "/signin" ||
     path === "/signup" ||
     path === "/terms" ||
@@ -76,7 +77,13 @@ const shellPaths = new Set([
   "*",
 ]);
 
-const redirectedPaths = new Map([["/profile", "/profile/resume"]]);
+const redirectedPaths = new Map(
+  [
+    ...routeSource.matchAll(
+      /path:\s*"(?<from>[^"]+)"[\s\S]{0,120}?<(?:Navigate replace|PreserveSearchRedirect)\s+to="(?<to>[^"#]+)/gu,
+    ),
+  ].map((match) => [match.groups?.from ?? "", match.groups?.to ?? ""]),
+);
 
 const FONT_SETTLE_TIMEOUT_MS = 5000;
 
@@ -284,8 +291,8 @@ async function checkTarget(page: Page, target: Target, url: string, width: numbe
 
   await expectNoOverflow(page, target.path);
 
-  if (shellPaths.has(target.path) && width >= 768) {
-    await expectSidebarFixed(page, target.path, width);
+  if (shellPaths.has(expectedPath) && width >= 768) {
+    await expectSidebarFixed(page, expectedPath, width);
   }
 }
 

@@ -120,7 +120,7 @@ test("the live count updates as targets are edited, and Save stores them", async
   const context = await browser.newContext({ baseURL: appServerUrl, storageState });
   const page = await context.newPage();
 
-  await page.goto("/profile");
+  await page.goto("/profile/preferences");
   await expect(page.getByTestId("targets-matched-count")).toHaveText("1");
 
   await page.getByRole("button", { name: "Hybrid" }).click();
@@ -170,7 +170,7 @@ test("the skip list is prefilled from the resume, and companies add and remove",
   const context = await browser.newContext({ baseURL: appServerUrl, storageState });
   const page = await context.newPage();
 
-  await page.goto("/profile");
+  await page.goto("/profile/preferences");
 
   const skip = page.locator("#profile-skip");
 

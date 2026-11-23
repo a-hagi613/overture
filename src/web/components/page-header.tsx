@@ -1,16 +1,18 @@
 import { ArrowLeft } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { Link } from "react-router";
 
 import { HeaderControls } from "./header-controls.tsx";
 
 export function PageHeader({
   backLink,
+  headingRef,
   lead,
   titleNode,
 }: {
   backLink?: { href: string; label: string };
   calendar?: boolean;
+  headingRef?: RefObject<HTMLHeadingElement | null>;
   lead: string;
   showRunningSwitch?: boolean;
   titleNode: ReactNode;
@@ -27,7 +29,13 @@ export function PageHeader({
             {backLink.label}
           </Link>
         )}
-        <h1 className="font-serif text-page-title font-normal text-foreground">{titleNode}</h1>
+        <h1
+          className="font-serif text-page-title font-normal text-foreground outline-none"
+          ref={headingRef}
+          tabIndex={headingRef === undefined ? undefined : -1}
+        >
+          {titleNode}
+        </h1>
         <p className="mt-1.5 text-sm text-muted-foreground">{lead}</p>
       </div>
       <HeaderControls />

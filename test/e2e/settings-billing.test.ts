@@ -256,7 +256,7 @@ test.describe("plan and billing in Profile, and the paused states", () => {
         await expect(
           page.getByRole("heading", { name: /Plan & Billing/u, level: 1 }),
         ).toBeVisible();
-        await expect(page.getByRole("heading", { name: "Month plan" })).toBeVisible();
+        await expect(page.getByRole("heading", { exact: true, name: "Month plan" })).toBeVisible();
         await expect(page.getByText(/250 of 250 applications left/u)).toBeVisible();
         await expect(page.getByRole("heading", { name: "You're on the Month plan" })).toBeVisible();
 

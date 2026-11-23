@@ -14,7 +14,11 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
-import { canMoveApplicationToStage, canWithdrawApplication } from "../../shared/board.ts";
+import {
+  canMoveApplicationToStage,
+  canWithdrawApplication,
+  isBoardStage,
+} from "../../shared/board.ts";
 import { copy } from "../../shared/copy.ts";
 import { BoardSheet } from "../components/board-sheet.tsx";
 import { PageHeader } from "../components/page-header.tsx";
@@ -76,14 +80,31 @@ export function BoardPage() {
     useSensor(KeyboardSensor),
   );
 
+  const { mutate: undoBoardStage } = undoStage;
+
   useEffect(
     () =>
       onBoardMoved((moved) => {
-        if (moved.stage !== null && isTrackerLaneKey(moved.stage)) {
-          toast.success(copy.board.moved(copy.board.lanes[moved.stage]));
+        if (moved.stage === null || !isBoardStage(moved.stage)) {
+          return;
+        }
+
+        const label = copy.board.columns[moved.stage];
+
+        if (moved.source === "email") {
+          toast.success(copy.board.moved(label), {
+            action: {
+              label: copy.board.undo,
+              onClick: () => {
+                undoBoardStage(moved.applicationId);
+              },
+            },
+          });
+        } else if (moved.source === "system") {
+          toast.success(copy.board.moved(label));
         }
       }),
-    [],
+    [undoBoardStage],
   );
 
   useEffect(() => {

@@ -27,7 +27,7 @@ export function ReadyStatus(props: ReadyStatusProps) {
   }
 
   const retryButton = (
-    <Button disabled={props.busy} onClick={props.onRetry} size="sm" variant="secondary">
+    <Button disabled={props.busy} onClick={props.onRetry} size="default" variant="secondary">
       {props.busy ? copy.ready.retrying : copy.ready.retry}
     </Button>
   );

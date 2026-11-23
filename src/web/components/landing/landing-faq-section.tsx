@@ -9,8 +9,8 @@ export function LandingFaqSection() {
     <section aria-labelledby="faq-title" className={`${dsContainer} py-16 sm:py-24`} id="faq">
       <div className="grid grid-cols-1 items-start gap-x-20 gap-y-8 lg:grid-cols-12">
         <div className="lg:col-span-4">
-          <Badge asChild size="eyebrow" variant="signal">
-            <a href="#faq">{LANDING_COPY.faq.badge}</a>
+          <Badge size="eyebrow" variant="signal">
+            {LANDING_COPY.faq.badge}
           </Badge>
           <h2 className={`${dsSectionHeading} mt-4`} id="faq-title">
             {LANDING_COPY.faq.headingPlain}
@@ -27,7 +27,7 @@ export function LandingFaqSection() {
               key={item.q}
               open={item.open}
             >
-              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 py-6 [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 py-6 transition hover:text-signal-text [&::-webkit-details-marker]:hidden">
                 <span className={dsCardTitle}>{item.q}</span>
                 <Plus
                   aria-hidden="true"

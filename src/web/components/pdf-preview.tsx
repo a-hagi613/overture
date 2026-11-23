@@ -1,6 +1,7 @@
 import { FileText } from "lucide-react";
 
 import { copy } from "../../shared/copy.ts";
+import { safePdfUrl } from "../lib/pdf-url.ts";
 
 export function PdfPreview({
   filename,
@@ -11,11 +12,12 @@ export function PdfPreview({
   pages: number | null;
   pdfUrl: string | null;
 }) {
+  const safeUrl = safePdfUrl(pdfUrl);
   const pageLabel = pages === null || pages <= 0 ? "PDF preview" : `Page 1 of ${String(pages)}`;
 
   return (
     <div className="rounded-xl border border-border bg-muted p-4">
-      {pdfUrl === null ? (
+      {safeUrl === null ? (
         <div className="flex aspect-[8.5/11] w-full flex-col items-center justify-center gap-3 rounded-lg border border-border bg-card px-6 text-center shadow-sh">
           <FileText aria-hidden="true" className="text-muted-foreground" size={32} />
           <p className="font-mono text-xs font-medium text-foreground">
@@ -30,7 +32,7 @@ export function PdfPreview({
           <object
             aria-label={filename ?? "Resume PDF preview"}
             className="h-full w-full"
-            data={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+            data={`${safeUrl}#toolbar=0&navpanes=0&scrollbar=0`}
             type="application/pdf"
           >
             <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
@@ -40,7 +42,7 @@ export function PdfPreview({
               </p>
               <a
                 className="text-xs font-medium text-signal-text underline underline-offset-4"
-                href={pdfUrl}
+                href={safeUrl}
                 rel="noreferrer"
                 target="_blank"
               >

@@ -13,14 +13,14 @@ export const buttonVariants = cva(
         ghost:
           "border border-transparent bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
         destructive: "border border-need bg-need text-primary-ink shadow-sh hover:opacity-90",
-        link: "border-0 bg-transparent px-0 text-foreground underline decoration-input underline-offset-4 hover:text-signal-text",
+        link: "border-0 bg-transparent px-0 max-md:min-h-11 text-foreground underline decoration-input underline-offset-4 hover:text-signal-text",
       },
       size: {
-        xs: "min-h-8 px-3 text-xs",
-        sm: "min-h-9 px-3.5 text-xs",
+        xs: "min-h-8 max-md:min-h-11 px-3 text-xs",
+        sm: "min-h-9 max-md:min-h-11 px-3.5 text-xs",
         default: "min-h-11 px-5 text-sm",
         lg: "min-h-12 px-6 text-sm sm:min-h-13 sm:px-7 sm:text-base",
-        icon: "h-10 w-10 p-0",
+        icon: "h-10 w-10 max-md:h-11 max-md:w-11 p-0",
         iconLg: "h-11 w-11 p-0",
       },
     },

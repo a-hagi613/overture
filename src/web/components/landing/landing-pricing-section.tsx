@@ -22,8 +22,8 @@ export function LandingPricingSection() {
     >
       <div className={`${dsContainer} py-16 sm:py-24`}>
         <div className="mx-auto max-w-2xl text-center">
-          <Badge asChild size="eyebrow" variant="signal">
-            <a href="#pricing">{LANDING_COPY.pricing.badge}</a>
+          <Badge size="eyebrow" variant="signal">
+            {LANDING_COPY.pricing.badge}
           </Badge>
           <h2 className={`${dsSectionHeading} mt-4`} id="pricing-title">
             {LANDING_COPY.pricing.headingPlain}

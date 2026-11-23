@@ -39,7 +39,11 @@ export function LandingHeader() {
     <header
       className={`${dsContainer} relative z-20 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 pb-4 pt-5 sm:pb-5 sm:pt-6`}
     >
-      <a aria-label={LANDING_COPY.brandAria} className="inline-flex items-center gap-3" href="#top">
+      <a
+        aria-label={LANDING_COPY.brandAria}
+        className="inline-flex items-center gap-3 rounded-md transition hover:opacity-80 max-md:min-h-11"
+        href="#top"
+      >
         <BrandMark size={32} />
         <span className="font-serif text-card-title leading-none tracking-tight text-foreground">
           {LANDING_COPY.brand}

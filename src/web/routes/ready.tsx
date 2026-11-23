@@ -49,6 +49,8 @@ export function ReadyPage() {
   const unapprove = useUnapprove();
   const editAnswer = useEditAnswer();
 
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const recoveringRef = useRef(false);
   const skipTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -59,6 +61,13 @@ export function ReadyPage() {
   const [editing, setEditing] = useState<{ applicationId: string; questionId: string } | null>(
     null,
   );
+
+  useEffect(() => {
+    if (recoveringRef.current && !isFetching) {
+      recoveringRef.current = false;
+      headingRef.current?.focus();
+    }
+  }, [isFetching]);
 
   useEffect(
     () => () => {
@@ -96,6 +105,7 @@ export function ReadyPage() {
   const fill = dailyCap === 0 ? 0 : Math.min(100, Math.round((sentToday / dailyCap) * 100));
 
   const retry = () => {
+    recoveringRef.current = true;
     void refetch();
   };
 
@@ -245,6 +255,7 @@ export function ReadyPage() {
   return (
     <div>
       <PageHeader
+        headingRef={headingRef}
         lead={copy.ready.lead}
         titleNode={
           <>

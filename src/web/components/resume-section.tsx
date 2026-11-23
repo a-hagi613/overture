@@ -11,6 +11,7 @@ import {
   resumeFileUrl,
   uploadResumeFile,
 } from "../lib/profile-api.ts";
+import { safePdfUrl } from "../lib/pdf-url.ts";
 import { PdfPreview } from "./pdf-preview.tsx";
 import { Badge } from "./ui/badge.tsx";
 import { Button } from "./ui/button.tsx";
@@ -86,7 +87,9 @@ export function ResumeSection() {
   const uploadedText = current === null ? "" : formatUploadedDate(current.uploadedAt);
   const factsCount = factsQuery.data?.facts.length ?? 0;
 
-  const pdfUrl = localPreview?.url ?? (current === null ? null : resumeFileUrl(current.id));
+  const pdfUrl = safePdfUrl(
+    localPreview?.url ?? (current === null ? null : resumeFileUrl(current.id)),
+  );
 
   const metaParts = [
     bytes === null ? null : formatBytes(bytes),

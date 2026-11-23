@@ -279,7 +279,7 @@ export function LandingHeroStack({ compact = false }: { compact?: boolean }) {
             </span>
             <Button
               ariaLabel={paused ? "Play application cycle" : "Pause application cycle"}
-              className="h-9 w-9 rounded-full"
+              className="h-11 w-11 rounded-full md:h-9 md:w-9"
               onClick={togglePaused}
               size="icon"
               title={paused ? "Play" : "Pause"}

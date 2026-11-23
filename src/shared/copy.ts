@@ -203,7 +203,6 @@ export const copy = {
       billingTopPlanBody:
         "You have our highest allowance of 250 applications every 30 days. Manage renewals, payment methods, or invoices anytime in Stripe.",
       billingStripeNote: "Billing portal is available once Stripe is connected.",
-      billingSwitchInStripe: "Switch in Stripe",
       billingCheckoutNote: "Stripe checkout is unavailable in this environment.",
       billingManageStripe: "Manage billing",
       billingTrialPlan: "Free trial",

@@ -97,6 +97,7 @@ export function TabBar({
             <span
               aria-hidden="true"
               className="absolute right-4 top-2 h-2 w-2 rounded-full bg-signal"
+              data-nav-badge-dot="board"
             />
           ) : null}
         </button>

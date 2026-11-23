@@ -248,11 +248,7 @@ export function ProfileBillingPage() {
                 size="lg"
                 variant="primary"
               >
-                <span>
-                  {switchInStripe
-                    ? bp.billingSwitchInStripe
-                    : bp.billingUpgradeAction(upgradeTarget.name)}
-                </span>
+                <span>{bp.billingUpgradeAction(upgradeTarget.name)}</span>
                 {switchInStripe ? (
                   <ExternalLink aria-hidden="true" size={16} />
                 ) : (

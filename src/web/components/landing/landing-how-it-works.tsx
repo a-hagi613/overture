@@ -89,8 +89,8 @@ export function LandingHowItWorks() {
       id="how-it-works"
     >
       <div className="mx-auto max-w-2xl text-center">
-        <Badge asChild size="eyebrow" variant="signal">
-          <a href="#how-it-works">{LANDING_COPY.howItWorks.badge}</a>
+        <Badge size="eyebrow" variant="signal">
+          {LANDING_COPY.howItWorks.badge}
         </Badge>
         <h2 className={`${dsSectionHeading} mt-4`} id="how-it-works-title">
           {LANDING_COPY.howItWorks.headingPlain}

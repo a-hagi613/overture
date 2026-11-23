@@ -96,18 +96,28 @@ export function MobileNavSheet({
               <Link className={rowClass(pathname === "/ready")} onClick={onClose} to="/ready">
                 <Send aria-hidden="true" size={18} />
                 <span className="flex-1">{copy.nav.ready}</span>
-                {counts.ready > 0 ? <Badge variant="ok">{counts.ready}</Badge> : null}
+                {counts.ready > 0 ? (
+                  <Badge variant="ok">
+                    <span data-nav-badge="ready">{counts.ready}</span>
+                  </Badge>
+                ) : null}
               </Link>
               <Link className={rowClass(pathname === "/review")} onClick={onClose} to="/review">
                 <CircleHelp aria-hidden="true" size={18} />
                 <span className="flex-1">{copy.nav.review}</span>
-                {counts.review > 0 ? <Badge variant="need">{counts.review}</Badge> : null}
+                {counts.review > 0 ? (
+                  <Badge variant="need">
+                    <span data-nav-badge="review">{counts.review}</span>
+                  </Badge>
+                ) : null}
               </Link>
               <Link className={rowClass(pathname === "/inbox")} onClick={onClose} to="/inbox">
                 <Inbox aria-hidden="true" size={18} />
                 <span className="flex-1">{copy.nav.inbox}</span>
                 {counts.inboxUnread > 0 ? (
-                  <Badge variant="secondary">{counts.inboxUnread}</Badge>
+                  <Badge variant="secondary">
+                    <span data-nav-badge="inbox">{counts.inboxUnread}</span>
+                  </Badge>
                 ) : null}
               </Link>
               <Link className={rowClass(pathname === "/calendar")} onClick={onClose} to="/calendar">

@@ -20,13 +20,13 @@ function toJsDate(date: CalendarDate) {
 }
 
 const DAY_PICKER_CLASSES = {
-  day: "p-0.5 align-top",
+  day: "p-px sm:p-0.5 align-top",
   month: "w-full",
   month_caption: "hidden",
   month_grid: "w-full table-fixed border-collapse",
   months: "w-full",
   nav: "hidden",
-  outside: "opacity-40",
+  outside: "",
   week: "",
   weekday: "pb-2 text-center font-mono text-xs font-medium uppercase text-muted-foreground",
   weekdays: "",
@@ -80,15 +80,26 @@ export function CalendarBoard({
     const totalEvents = apiEvents.length + customEvents.length;
     const isSelected = key === selectedKey;
     const isToday = key === todayKey;
+    const isOutside = Boolean(props.modifiers.outside);
 
     const firstLabel = customEvents[0]?.title ?? apiEvents[0]?.company ?? null;
 
-    let cellStyle = "border-border bg-background text-foreground hover:border-input hover:bg-muted";
+    let cellStyle = isOutside
+      ? "border-border/70 bg-muted/40 text-muted-foreground hover:border-input hover:bg-muted"
+      : "border-border bg-background text-foreground hover:border-input hover:bg-muted";
 
     if (isSelected) {
       cellStyle = "border-signal bg-card text-foreground ring-1 ring-signal shadow-sh";
     } else if (isToday) {
       cellStyle = "border-signal/60 bg-card text-foreground";
+    }
+
+    let numeralStyle = "text-foreground";
+
+    if (isToday) {
+      numeralStyle = "bg-signal text-primary-ink";
+    } else if (isOutside && !isSelected) {
+      numeralStyle = "text-muted-foreground";
     }
 
     return (
@@ -104,9 +115,7 @@ export function CalendarBoard({
       >
         <div className="flex w-full items-center justify-between gap-1">
           <span
-            className={`inline-flex h-6 w-6 items-center justify-center rounded-md text-xs font-semibold tabular-nums ${
-              isToday ? "bg-signal text-primary-ink" : "text-foreground"
-            }`}
+            className={`inline-flex h-6 w-6 items-center justify-center rounded-md text-xs font-semibold tabular-nums ${numeralStyle}`}
           >
             {cellDate.day}
           </span>
@@ -139,7 +148,7 @@ export function CalendarBoard({
   };
 
   return (
-    <Card ariaLabelledBy="calendar-month" className="min-w-0 p-4 md:p-6" variant="elevated">
+    <Card ariaLabelledBy="calendar-month" className="min-w-0 p-2 sm:p-4 md:p-6" variant="elevated">
       <div className="mb-4 flex items-center justify-between gap-3">
         <CalendarDatePickerPopover
           month={monthDate}
@@ -155,7 +164,7 @@ export function CalendarBoard({
           </Button>
           <Button
             ariaLabel={copy.calendar.previousMonth}
-            className="h-9 w-9"
+            className="md:h-9 md:w-9"
             onClick={() => {
               onShiftMonth(-1);
             }}
@@ -166,7 +175,7 @@ export function CalendarBoard({
           </Button>
           <Button
             ariaLabel={copy.calendar.nextMonth}
-            className="h-9 w-9"
+            className="md:h-9 md:w-9"
             onClick={() => {
               onShiftMonth(1);
             }}

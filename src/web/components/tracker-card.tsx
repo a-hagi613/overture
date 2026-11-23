@@ -54,7 +54,6 @@ export function TrackerCard({
           ? "border-signal shadow-lift ring-1 ring-signal/30"
           : "border-border shadow-sh hover:border-signal/45 hover:shadow-lift"
       } ${isDragging ? "opacity-35" : ""}`}
-      data-card={card.id}
       ref={setNodeRef}
     >
       <button
@@ -66,6 +65,7 @@ export function TrackerCard({
         className={`block w-full p-4 text-left focus-visible:outline-none ${
           draggable ? "touch-none cursor-grab active:cursor-grabbing" : "cursor-pointer"
         }`}
+        data-card={card.id}
         onClick={() => {
           onOpen(card.id);
         }}

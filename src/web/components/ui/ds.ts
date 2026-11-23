@@ -35,4 +35,4 @@ export const dsBtnSecondaryLg = buttonVariants({ size: "lg", variant: "secondary
 export const dsIconBtn = buttonVariants({ size: "iconLg", variant: "outline" });
 
 export const dsNavLink =
-  "whitespace-nowrap py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground";
+  "whitespace-nowrap py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground max-md:inline-flex max-md:min-h-11 max-md:items-center";

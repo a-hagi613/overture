@@ -102,10 +102,10 @@ export function NotificationItem({
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
             {unread ? (
-              <span
-                aria-label={copy.notifications.page.unread}
-                className="h-2 w-2 shrink-0 rounded-full bg-signal"
-              />
+              <>
+                <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-signal" />
+                <span className="sr-only">{copy.notifications.page.unread}</span>
+              </>
             ) : null}
             <span>{row.title}</span>
           </p>

@@ -1492,10 +1492,7 @@ removed from a forwarded `.ics` attachment (#296, ADR 0034).
 
 ## 15. Surfaces
 
-Visual design: the canvas artifact `P3aiZsEXkoUKBrknvvBNJJ`, Section A, is the wireframe and the build matches it
-pixel for pixel; `DESIGN.md` is its written contract. Boards that contradict this spec are redrawn before the slice
-that builds them (`DESIGN.md` §13). Seven destinations on desktop, in this order: **Home, Ready, Board, Review, Inbox, Calendar,
-Profile** (Ready added by ADR 0029, Calendar by ADR 0034; the phone tab bar keeps six and reaches Calendar from the Home and Board headers); Settings from the avatar; desktop hover submenus; phone bottom tab bar; sub-sections are list pages on phone. Nav badges are live counts — Ready, open Reviews, unread Inbox mail — hidden at zero, and the link's accessible name carries the count.
+Visual design: Ember v0.2 palette, typography, and component primitives governed by `DESIGN.md` and ADR 0037 (superseding retired pre-Ember PNG pixel diffs in favor of lint-enforced tokens, `layout-guards-*`, `interactive-*`, `axe`, and seeded screen checks). Destinations on desktop: **Home, Tracker (`/board`), Ready, Review, Inbox, Calendar, Profile** (plus Support and Notifications; Profile sub-pages at `/profile/{resume,details,preferences,billing,account}`). Nav badges show live counts for Ready, open Reviews, and unread Inbox mail (desktop rail/sidebar badges and phone `MobileNavSheet` counts, hidden at zero).
 
 | Surface | Content | Key states |
 |---|---|---|
@@ -1565,9 +1562,7 @@ differs from the approved plan stops before Submit and returns the Application t
 render for a signed-out visitor (axe clean, reachable from sign-in), the consent card records the accepted version, and
 publishing version 2 leaves version 1 and an already sent Snapshot on version 1 (M2)
 
-Plus: route reachability for every page, axe on every page, and the visual snapshots against `design/reference/` (Home, Board,
-Review, Inbox, Profile, Settings and the legal and consent boards × 390 / 1280 px × light/dark; Ready joins them once it is
-drawn) in pinned Docker.
+Plus: route reachability for every page, interactive/layout guards (`interactive-*`, `layout-guards-*`), WCAG AA `axe` checks on every route, and seeded per-screen E2E checks across 390 / 1280 px light and dark (ADR 0037).
 
 ### 16.2 Unit tests (fifty-five files, `bun:test`, beside their code)
 
