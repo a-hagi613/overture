@@ -48,6 +48,7 @@ test("every signed-out route answers the one sign-in code", async ({ contractSer
     "/api/threads",
     "/api/reviews",
     "/api/calendar/feed",
+    "/api/calendar/events",
     "/api/account/deletion",
     "/api/events",
     "/api/search?q=engineer",
@@ -58,6 +59,11 @@ test("every signed-out route answers the one sign-in code", async ({ contractSer
     { data: { answer: "still_waiting" }, method: "post", path: "/api/checkins/checkin-1" },
     { data: { running: true }, method: "post", path: "/api/running" },
     { data: { state: "saved" }, method: "put", path: "/api/postings/posting-1/state" },
+    {
+      data: { category: "other", message: "Question", subject: "Help" },
+      method: "post",
+      path: "/api/support",
+    },
   ];
 
   const readResults = await Promise.all(

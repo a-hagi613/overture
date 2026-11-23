@@ -7,6 +7,8 @@ import type { Auth } from "../auth/index.ts";
 import { readSessionUser } from "../auth/session.ts";
 import { calendarItemsOf } from "../calendar/items.ts";
 import type { CalendarItemView } from "../calendar/items.ts";
+import { listCalendarCustomEvents } from "../calendar/custom-events.ts";
+import type { CalendarCustomEventView } from "../calendar/custom-events.ts";
 import { renderIcsCalendar } from "../calendar/ics.ts";
 import {
   feedStatusOf,
@@ -14,7 +16,7 @@ import {
   revokeFeedToken,
   userIdForFeedToken,
 } from "../calendar/feed.ts";
-import { localDateAt } from "../platform/local-time.ts";
+import { localDateAt, zonedTimeToEpoch } from "../platform/local-time.ts";
 import { createTimeZoneService } from "../profile/time-zone.ts";
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -51,6 +53,57 @@ function icsEventOf(item: CalendarItemView, timeZone: string, stampAt: number) {
     stampAt,
     summary: `${label}: ${item.title} at ${item.company}`,
     uid: `${item.id}@overture`,
+  };
+}
+
+const CUSTOM_KIND_LABEL = {
+  followup: "Follow-up",
+  interview: "Interview",
+  reminder: "Reminder",
+} as const;
+
+function pad(value: number, width: number) {
+  return String(value).padStart(width, "0");
+}
+
+function dayKeyOf(parts: { year: number; month: number; day: number }) {
+  return `${pad(parts.year, 4)}-${pad(parts.month, 2)}-${pad(parts.day, 2)}`;
+}
+
+function icsEventOfCustomEvent(event: CalendarCustomEventView, timeZone: string, stampAt: number) {
+  const [year, month, day] = event.dayKey.split("-").map(Number);
+  const label = CUSTOM_KIND_LABEL[event.kind];
+  const company = event.company === "" ? "" : ` at ${event.company}`;
+  const summary = `${label}: ${event.title}${company}`;
+  const uid = `custom:${event.id}@overture`;
+
+  if (year === undefined || month === undefined || day === undefined) {
+    return null;
+  }
+
+  if (event.time === null) {
+    return {
+      start: { day, kind: "date" as const, month, year },
+      stampAt,
+      summary,
+      uid,
+    };
+  }
+
+  const [hour, minute] = event.time.split(":").map(Number);
+
+  if (hour === undefined || minute === undefined) {
+    return null;
+  }
+
+  return {
+    start: {
+      at: zonedTimeToEpoch({ day, month, year }, hour, minute, timeZone),
+      kind: "datetime" as const,
+    },
+    stampAt,
+    summary,
+    uid,
   };
 }
 
@@ -137,7 +190,19 @@ export function createCalendarFeedRoutes(deps: { auth: Auth; clock: Clock; db: A
       now + FEED_FUTURE_DAYS * DAY_MS,
     );
 
-    const body = renderIcsCalendar(items.map((item) => icsEventOf(item, timeZone, now)));
+    const customEvents = listCalendarCustomEvents(db, userId, {
+      from: dayKeyOf(localDateAt(now - FEED_PAST_DAYS * DAY_MS, timeZone)),
+      to: dayKeyOf(localDateAt(now + FEED_FUTURE_DAYS * DAY_MS, timeZone)),
+    });
+
+    const events = [
+      ...items.map((item) => icsEventOf(item, timeZone, now)),
+      ...customEvents
+        .map((event) => icsEventOfCustomEvent(event, timeZone, now))
+        .filter((event) => event !== null),
+    ];
+
+    const body = renderIcsCalendar(events);
 
     return context.body(body, 200, {
       ...headers,

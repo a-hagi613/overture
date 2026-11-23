@@ -960,6 +960,7 @@ const app = createApp({
   catalogWorker,
   eraser,
   exports,
+  mail: mailSender,
   payments,
   shutdown: shutdownController.signal,
 });

@@ -33,14 +33,29 @@ function failureDetail(body: z.infer<typeof sendEmailResponseSchema>) {
   return messages.length > 0 ? messages.join("; ") : "no error detail";
 }
 
-async function sendEmail(config: CloudflareMailConfig, to: string, subject: string, body: string) {
+async function sendEmail(
+  config: CloudflareMailConfig,
+  to: string,
+  subject: string,
+  body: string,
+  replyTo?: string,
+) {
+  const base = {
+    from: config.from,
+    to: [to],
+    subject,
+    text: body,
+  };
+
+  const payload = replyTo === undefined ? base : { ...base, reply_to: replyTo };
+
   const response = await fetch(cloudflareSendEmailUrl(config.baseUrl, config.accountId), {
     method: "POST",
     headers: {
       authorization: `Bearer ${config.apiToken}`,
       "content-type": "application/json",
     },
-    body: JSON.stringify({ from: config.from, to: [to], subject, text: body }),
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
   });
 
@@ -88,6 +103,9 @@ export function createCloudflareMailSender(config: CloudflareMailConfig) {
     },
     sendBillingNotice: async (mail) => {
       await sendEmail(config, mail.to, mail.subject, mail.body);
+    },
+    sendSupport: async (mail) => {
+      await sendEmail(config, mail.to, mail.subject, mail.body, mail.replyTo);
     },
   };
 

@@ -21,6 +21,7 @@ import type { CatalogSweepWorker } from "./catalog/sweep-worker-runner.ts";
 import type { AccountEraser } from "./account/erase.ts";
 import type { ExportService } from "./export/service.ts";
 import type { SpendGate } from "./billing/spend.ts";
+import type { MailSender } from "./platform/mail/port.ts";
 
 import { readSession } from "./auth/session.ts";
 import { createHealthRoutes } from "./routes/health.ts";
@@ -50,6 +51,7 @@ import { createMatchingService } from "./matching/score.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
 import { createSupportAccessRoutes } from "./routes/support-access.ts";
+import { createSupportRoutes } from "./routes/support.ts";
 import { createAccountRoutes } from "./routes/account.ts";
 import { createBillingRoutes, createStripeWebhookRoutes } from "./routes/billing.ts";
 import { createInboxRoutes } from "./routes/inbox.ts";
@@ -83,6 +85,7 @@ export interface AppDependencies {
   catalogWorker: CatalogSweepWorker;
   eraser: AccountEraser;
   exports: ExportService;
+  mail: MailSender;
   payments: Payments | null;
   /** Aborted on shutdown; long-lived responses (the event stream) end with it. */
   shutdown: AbortSignal;
@@ -229,6 +232,16 @@ export function createApp(deps: AppDependencies) {
   app.route("/api", createSupportAccessRoutes(deps.db, deps.auth));
   app.route(
     "/api",
+    createSupportRoutes({
+      auth: deps.auth,
+      clock: deps.clock,
+      db: deps.db,
+      mail: deps.mail,
+      personal,
+    }),
+  );
+  app.route(
+    "/api",
     createApiRoutes(deps.db, deps.catalogDb, deps.clock, deps.auth, { shutdown: deps.shutdown }),
   );
   app.route("/api", createNotificationRoutes(deps.db, deps.clock, deps.auth));
@@ -269,7 +282,6 @@ export function createApp(deps: AppDependencies) {
       auth: deps.auth,
       clock: deps.clock,
       db: deps.db,
-      matching,
       personal,
       reviews: deps.reviews,
     }),

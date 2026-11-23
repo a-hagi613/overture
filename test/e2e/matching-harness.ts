@@ -33,10 +33,11 @@ export const homeSchema = z.object({
   sentToday: z.number(),
   dailyCap: z.number(),
   remainingToday: z.number(),
-  upNext: z.array(upNextSchema),
 });
 
-export type Home = z.infer<typeof homeSchema>;
+export const upNextSchemaList = z.object({ items: z.array(upNextSchema) });
+
+export type Home = z.infer<typeof homeSchema> & { upNext: UpNext[] };
 
 export type UpNext = z.infer<typeof upNextSchema>;
 
@@ -204,7 +205,17 @@ export async function grantApplications(request: APIRequestContext, quantity: nu
 }
 
 export async function homeFor(owner: APIRequestContext) {
-  return homeSchema.parse(await (await owner.get("/api/home")).json());
+  const response = await owner.get("/api/home");
+
+  expect(response.ok()).toBe(true);
+
+  const home = homeSchema.parse(await response.json());
+
+  const candidates = upNextSchemaList.parse(
+    await (await owner.get("/api/matching/up-next")).json(),
+  );
+
+  return { ...home, upNext: candidates.items };
 }
 
 const jobStatusSchema = z.object({ status: z.string() });
