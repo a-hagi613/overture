@@ -4,6 +4,7 @@ import { openCountingDatabase } from "../testing/query-counter.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import { applications, mailThreads, mailboxes, messages, users } from "../platform/db/schema.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
+import { masterKeyringFor } from "../platform/crypto.ts";
 import { linkedMailOf } from "./linked-mail.ts";
 
 const NOW = 1_795_000_000_000;
@@ -49,7 +50,11 @@ function seeded() {
     })
     .run();
 
-  return { counter, db, personal: createPersonalCrypto(db, new Uint8Array(32).fill(8), 1) };
+  return {
+    counter,
+    db,
+    personal: createPersonalCrypto(db, masterKeyringFor(new Uint8Array(32).fill(8))),
+  };
 }
 
 async function addThread(

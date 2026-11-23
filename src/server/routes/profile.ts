@@ -11,9 +11,8 @@ import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
 import type { SpendGate } from "../billing/spend.ts";
 
-import { env } from "../config/env.ts";
+import { masterKeyring } from "../config/env.ts";
 import { demoLocked } from "../demo/guard.ts";
-import { parseMasterKey } from "../platform/crypto.ts";
 import { safeFilename } from "../safe-filename.ts";
 import { createFactService } from "../profile/facts.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
@@ -75,13 +74,7 @@ export function createProfileRoutes(deps: {
 }) {
   const { db, clock, auth, objects, llm } = deps;
 
-  const personal =
-    deps.personal ??
-    createPersonalCrypto(
-      db,
-      parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
-      env.MASTER_KEY_CURRENT,
-    );
+  const personal = deps.personal ?? createPersonalCrypto(db, masterKeyring);
 
   const resumesService = createResumeService({
     db,

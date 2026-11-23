@@ -1,8 +1,7 @@
-import { catalogDatabasePath, databasePath, env } from "../src/server/config/env.ts";
+import { catalogDatabasePath, databasePath, env, masterKeyring } from "../src/server/config/env.ts";
 import { seedDemoAccount } from "../src/server/demo/seed.ts";
 import { openCatalogDatabase, openDatabase } from "../src/server/platform/db/client.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "../src/server/platform/db/migrate.ts";
-import { parseMasterKey } from "../src/server/platform/crypto.ts";
 import { createClock } from "../src/server/platform/ports/clock.ts";
 import { createDiskObjectStore } from "../src/server/platform/ports/object-store.ts";
 import { createR2ObjectStore } from "../src/server/platform/ports/r2-object-store.ts";
@@ -16,11 +15,7 @@ migrateDatabase(db, "drizzle");
 
 migrateCatalogDatabase(catalogDb, "drizzle-catalog");
 
-const personal = createPersonalCrypto(
-  db,
-  parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
-  env.MASTER_KEY_CURRENT,
-);
+const personal = createPersonalCrypto(db, masterKeyring);
 
 const objects =
   env.R2_ACCOUNT_ID !== undefined &&

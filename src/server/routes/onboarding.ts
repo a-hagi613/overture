@@ -24,10 +24,9 @@ import type { TargetChoices } from "../profile/target-choices.ts";
 
 import { createTargetChoicesCache } from "../profile/target-choices.ts";
 import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
-import { env } from "../config/env.ts";
+import { env, masterKeyring } from "../config/env.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { isDemoRole } from "../../shared/demo.ts";
-import { parseMasterKey } from "../platform/crypto.ts";
 import {
   ONBOARDING_STEP_COUNT,
   onboardingFactsInputSchema,
@@ -57,13 +56,7 @@ export function createOnboardingRoutes(deps: {
 }) {
   const { db, clock, auth, llm, objects, reviews: reviewService } = deps;
 
-  const personal =
-    deps.personal ??
-    createPersonalCrypto(
-      db,
-      parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
-      env.MASTER_KEY_CURRENT,
-    );
+  const personal = deps.personal ?? createPersonalCrypto(db, masterKeyring);
 
   const targetsService = createTargetsService({ db, clock });
   const languagesService = createLanguagesService({ db, clock });

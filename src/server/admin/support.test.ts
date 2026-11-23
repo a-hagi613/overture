@@ -7,6 +7,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import { adminAudit, supportTickets, users } from "../platform/db/schema.ts";
 import { openCountingDatabase } from "../testing/query-counter.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
+import { masterKeyringFor } from "../platform/crypto.ts";
 
 Bun.env.BETTER_AUTH_SECRET ??= "admin-support-test-secret-0123456789";
 
@@ -56,7 +57,7 @@ function fresh() {
     })
     .run();
 
-  const personal = createPersonalCrypto(db, MASTER, 1);
+  const personal = createPersonalCrypto(db, masterKeyringFor(MASTER));
 
   return { db, personal };
 }

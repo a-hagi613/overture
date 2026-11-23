@@ -2,9 +2,17 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { createApp } from "./app.ts";
+import {
+  assertMasterKeyCoverage,
+  enqueueMasterKeyRotation,
+  MASTER_KEY_ROTATION_JOB_BATCHES,
+  MASTER_KEY_ROTATION_JOB_KIND,
+  masterKeyRotationPayloadSchema,
+  runMasterKeyRotation,
+} from "./admin/key-rotation.ts";
 import { createAuth } from "./auth/index.ts";
 import type { AuthOptions } from "./auth/index.ts";
-import { catalogDatabasePath, databasePath, env, labBaseUrl } from "./config/env.ts";
+import { catalogDatabasePath, databasePath, env, labBaseUrl, masterKeyring } from "./config/env.ts";
 import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
 import { MailCapExceededError } from "./platform/mail/errors.ts";
 import { createPayments } from "./billing/index.ts";
@@ -77,7 +85,6 @@ import {
 } from "./platform/llm/durable-batches.ts";
 import { createDegradedFlag } from "./platform/degraded.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
-import { parseMasterKey } from "./platform/crypto.ts";
 import { createGreenhouseQuestionSource } from "./catalog/greenhouse-questions.ts";
 import { createPreparationService } from "./pipeline/prepare.ts";
 import {
@@ -213,6 +220,8 @@ migrateDatabase(db, "drizzle");
 
 migrateCatalogDatabase(catalogDb, "drizzle-catalog");
 
+assertMasterKeyCoverage(db, masterKeyring);
+
 const catalogBoards = catalogDb
   .select({ one: sql`1` })
   .from(companyBoards)
@@ -326,6 +335,7 @@ const jobSingletons = [
   RETENTION_JOB_KIND,
   EXPORT_BUILD_JOB_KIND,
   APPLY_FAILURES_JOB_KIND,
+  MASTER_KEY_ROTATION_JOB_KIND,
 ];
 
 recoverStaleLocks(db, clock, jobSingletons);
@@ -393,11 +403,7 @@ const tagDeps = {
   llm: anthropicLlmPort,
 };
 
-const personal = createPersonalCrypto(
-  db,
-  parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
-  env.MASTER_KEY_CURRENT,
-);
+const personal = createPersonalCrypto(db, masterKeyring);
 
 if (env.DEMO_LOGIN_ENABLED) {
   const demo = await seedDemoAccount({ catalogDb, clock, db, objects, personal });
@@ -664,9 +670,7 @@ const mailJobHandlers: JobHandlers = {
 
 const browserProviders = createBrowserProvider(env, clock, db);
 
-const noticeCrypto = createDeletionNoticeCrypto(
-  parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
-);
+const noticeCrypto = createDeletionNoticeCrypto(masterKeyring);
 
 const eraser = createAccountEraser({
   clock,
@@ -861,6 +865,25 @@ const retentionJobHandlers: JobHandlers = {
   },
 };
 
+const masterKeyRotationJobHandlers: JobHandlers = {
+  [MASTER_KEY_ROTATION_JOB_KIND]: async (payload: string) => {
+    const { dryRun } = masterKeyRotationPayloadSchema.parse(JSON.parse(payload));
+
+    const summary = await runMasterKeyRotation({
+      db,
+      clock,
+      dryRun,
+      keyring: masterKeyring,
+      maxBatches: MASTER_KEY_ROTATION_JOB_BATCHES,
+      onRotated: (userId) => personal.forget(userId),
+    });
+
+    if (!dryRun && summary.remaining > 0) {
+      enqueueMasterKeyRotation(db, clock, { dryRun: false });
+    }
+  },
+};
+
 const reconcileJobHandlers: JobHandlers =
   payments === null
     ? {}
@@ -902,6 +925,7 @@ const allJobHandlers: JobHandlers = {
   ...liveCheckJobHandlers,
   ...accountJobHandlers,
   ...exportJobHandlers,
+  ...masterKeyRotationJobHandlers,
   ...testJobHandlers,
 };
 

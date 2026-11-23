@@ -149,7 +149,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Public sign-up (M3) | whether an unknown email may sign up without an invite; on from M3 | `PUBLIC_SIGNUP_ENABLED` (default `true`; `false` restores the M2 invite-only gate) | public-sign-up e2e with the Turnstile stub; the invite-only suites set it `false` |
 | Grafana Cloud | logs/metrics/traces | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | local LGTM docker |
 | Web Push | notifications | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | real adapter; push endpoints via the test interceptor |
-| Master key | envelope encryption | `MASTER_KEY_V1` (32 bytes base64), `MASTER_KEY_CURRENT=1` | fixed test key |
+| Master key | envelope encryption | `MASTER_KEY_V1..V<n>` (each 32 bytes base64) and `MASTER_KEY_CURRENT=n`; the chain is contiguous and rotation re-wraps every user key (ADR 0039, `docs/DEPLOY.md`) | fixed test key |
 | Google + LinkedIn (OIDC) | OAuth sign-in providers | `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID` with `LINKEDIN_CLIENT_SECRET`; each pair optional, both or neither (a half-set pair stops boot); an unset pair leaves that provider unregistered and hidden | local OIDC identity server; discovery URLs overridable via `OAUTH_GOOGLE_DISCOVERY_URL`, `OAUTH_LINKEDIN_DISCOVERY_URL` |
 | Auth | better-auth sessions | `BETTER_AUTH_SECRET`, `AUTH_ALLOWED_HOSTS` | local test secret and loopback hosts |
 | App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com` (forwarding addresses), `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `CATALOG_DATABASE_PATH=/data/catalog.sqlite` (defaults to `catalog.sqlite` beside the application file), `MAIL_FROM`, `SUPPORT_EMAIL`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `LAB_BASE_URL` (defaults to `APP_ORIGIN`), `ALERT_NTFY_URL` (optional) | |
@@ -1355,6 +1355,16 @@ body, sender or attachment, so the admin never sees message content.
 - Envelope encryption: per-user 256-bit DEK, wrapped with AES-256-GCM under `MASTER_KEY_v{n}`; ported from v1
   (`docs/SALVAGE.md`). Ciphertext format `v1:{key_version}:{iv}:{tag}:{data}`; associated data =
   `table:column:row_id`.
+- **Master-key rotation** (ADR 0039, issue #541): `MASTER_KEY_CURRENT=n` requires a contiguous `MASTER_KEY_V<k>`
+  chain from the lowest configured version to `n`; a missing version, or a `user_keys` row still wrapped under an
+  unconfigured key, stops boot with the key name and row count. The `maintenance.master-key-rotation` admin job
+  re-wraps each `user_keys.wrapped_dek` under the current key (the DEK itself never changes, so sealed values stay
+  readable) in bounded batches of 250 rows, one `{ behavior: "immediate" }` transaction and `retryWhenBusy` per
+  batch, recording `master_key_version` and writing `master_key.rotate` per batch plus one
+  `master_key.rotate.summary` to `admin_audit`; a crash resumes at the rows still below the current version, and
+  `--dry-run` only counts. Reads try the row's version, `MASTER_KEY_CURRENT`, then every older configured key.
+  The operator order — set `MASTER_KEY_V2` with `MASTER_KEY_CURRENT=2`, deploy, dry run, run the job, verify,
+  then remove `MASTER_KEY_V1` — is in `docs/DEPLOY.md`.
 - Encrypted: all `_enc` columns, resume files, mail HTML and attachments, exports.
 - **Delete account** (Profile → Account → Delete account, re-auth): a signed-in session must have been created by a fresh sign-in (an
   emailed link, or Google or LinkedIn) in the last 15 minutes. The page offers "Email me a sign-in link"; there is no password check (ADR 0035).

@@ -2,8 +2,7 @@ import { chmodSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-import { env } from "../src/server/config/env.ts";
-import { parseMasterKey } from "../src/server/platform/crypto.ts";
+import { masterKeyring } from "../src/server/config/env.ts";
 import { createClock } from "../src/server/platform/ports/clock.ts";
 import { openDatabase } from "../src/server/platform/db/client.ts";
 import { createPersonalCrypto } from "../src/server/profile/personal-crypto.ts";
@@ -78,11 +77,7 @@ const { db } = openDatabase(databasePath);
 
 const report = buildReviewReport(db, { since });
 
-const personal = createPersonalCrypto(
-  db,
-  parseMasterKey(env.MASTER_KEY_V1, env.MASTER_KEY_CURRENT),
-  env.MASTER_KEY_CURRENT,
-);
+const personal = createPersonalCrypto(db, masterKeyring);
 
 const audit = await sampleSnapshotAudit(db, personal, { sample, seed, since });
 

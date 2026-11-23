@@ -22,6 +22,7 @@ import {
 } from "../billing/ledger.ts";
 import { sealApprovedPlan } from "../pipeline/approved-plan.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
+import { masterKeyringFor } from "../platform/crypto.ts";
 
 import { createOutcomes } from "./outcomes.ts";
 
@@ -33,7 +34,12 @@ function startInMemoryOutcomes() {
   migrateDatabase(db, "drizzle");
 
   const clock = createClock();
-  const personal = createPersonalCrypto(db, crypto.getRandomValues(new Uint8Array(32)), 1);
+
+  const personal = createPersonalCrypto(
+    db,
+    masterKeyringFor(crypto.getRandomValues(new Uint8Array(32))),
+  );
+
   const outcomes = createOutcomes({ db, clock, personal });
   const userId = "user-1";
   const instant = clock.now();

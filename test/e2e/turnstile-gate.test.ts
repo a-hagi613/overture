@@ -283,7 +283,7 @@ appTest("production refuses to boot with AUTH_ALLOWED_HOSTS set", async () => {
   expect(outcome.stderr).toContain("AUTH_ALLOWED_HOSTS must be empty in production");
 });
 
-appTest("production refuses to boot with a master key version above one", async () => {
+appTest("production refuses to boot when the current master key version has no key", async () => {
   const directory = mkdtempSync(join(tmpdir(), "overture-e2e-masterkey-"));
 
   const child = spawn("bun", ["run", "src/server/main.ts"], {
@@ -312,5 +312,41 @@ appTest("production refuses to boot with a master key version above one", async 
   });
 
   expect(outcome.code).not.toBe(0);
-  expect(outcome.stderr).toContain("MASTER_KEY_CURRENT must be 1");
+  expect(outcome.stderr).toContain("MASTER_KEY_V2 is not set");
 });
+
+appTest(
+  "production refuses to boot when a version in the master-key chain is missing",
+  async () => {
+    const directory = mkdtempSync(join(tmpdir(), "overture-e2e-masterkey-gap-"));
+
+    const child = spawn("bun", ["run", "src/server/main.ts"], {
+      env: {
+        ...serverEnvironment({
+          NODE_ENV: "production",
+          APP_ORIGIN: "https://tryoverture.com",
+          MASTER_KEY_CURRENT: "3",
+          MASTER_KEY_V3: Buffer.alloc(32, 9).toString("base64"),
+          TURNSTILE_HOSTNAMES: "tryoverture.com",
+        }),
+        DATABASE_URL: join(directory, "overture.db"),
+      },
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+
+    const outcome = await new Promise<{ code: number | null; stderr: string }>((resolve) => {
+      let stderr = "";
+
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk: string) => {
+        stderr += chunk;
+      });
+      child.once("exit", (code) => {
+        resolve({ code, stderr });
+      });
+    });
+
+    expect(outcome.code).not.toBe(0);
+    expect(outcome.stderr).toContain("MASTER_KEY_V2 is missing");
+  },
+);

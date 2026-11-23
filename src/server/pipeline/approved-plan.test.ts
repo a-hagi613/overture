@@ -5,6 +5,7 @@ import { openCountingDatabase } from "../testing/query-counter.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import { applications, users } from "../platform/db/schema.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
+import { masterKeyringFor } from "../platform/crypto.ts";
 import { openApprovedPlans, sealApprovedPlan } from "./approved-plan.ts";
 
 import type { SendPlan } from "./send-plan.ts";
@@ -47,7 +48,11 @@ function seeded() {
     })
     .run();
 
-  return { counter, db, personal: createPersonalCrypto(db, new Uint8Array(32).fill(6), 1) };
+  return {
+    counter,
+    db,
+    personal: createPersonalCrypto(db, masterKeyringFor(new Uint8Array(32).fill(6))),
+  };
 }
 
 async function addApproved(

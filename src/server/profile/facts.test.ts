@@ -6,6 +6,7 @@ import { createClock } from "../platform/ports/clock.ts";
 import { users } from "../platform/db/schema.ts";
 import { createFactService } from "./facts.ts";
 import { createPersonalCrypto } from "./personal-crypto.ts";
+import { masterKeyringFor } from "../platform/crypto.ts";
 
 async function rejectionOf(promise: Promise<unknown>) {
   try {
@@ -37,7 +38,7 @@ function freshFacts() {
     })
     .run();
 
-  const personal = createPersonalCrypto(db, new Uint8Array(32).fill(7), 1);
+  const personal = createPersonalCrypto(db, masterKeyringFor(new Uint8Array(32).fill(7)));
 
   return { facts: createFactService({ db, clock, personal }), userId: "user-1" };
 }
