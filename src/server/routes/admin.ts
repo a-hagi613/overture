@@ -37,7 +37,18 @@ import { DEFAULT_IMPORT_SOURCE, importTags, readTagImports } from "../catalog/ta
 import { createAccessVerifier } from "../platform/access/index.ts";
 import { env } from "../config/env.ts";
 import { hasRecentPasskeyAssertion, lastPasskeyAssertionAt } from "../platform/passkey/index.ts";
-import { listAdminAudit, recordAdminAudit, shipAdminAudit } from "../platform/audit/index.ts";
+import {
+  listAdminAudit,
+  parseAuditCursor,
+  queryAdminAudit,
+  recordAdminAudit,
+  shipAdminAudit,
+} from "../platform/audit/index.ts";
+import {
+  acknowledgeAdminAlerts,
+  readAdminAlerts,
+  validateAdminSettingValue,
+} from "../platform/admin-alerts.ts";
 import { readAdminLlmUsage } from "../platform/llm/usage.ts";
 import { applicationsLeft, balancesPerGrant, grantApplications } from "../billing/ledger.ts";
 import {
@@ -212,6 +223,25 @@ const personioProbeSummarySchema = z.object({
   unreadable: z.number(),
   unsupported: z.number(),
   passed: z.boolean(),
+});
+
+const auditQuery = z.object({
+  action: z.string().trim().optional(),
+  actorId: z.string().trim().optional(),
+  before: z
+    .string()
+    .trim()
+    .refine((value) => value.length === 0 || parseAuditCursor(value) !== null, {
+      message: "Invalid audit cursor",
+    })
+    .optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  q: z.string().trim().optional(),
+  targetUserId: z.string().trim().optional(),
+});
+
+const ackAlertsBody = z.object({
+  id: z.string().trim().min(1).optional(),
 });
 
 export interface AdminDeps {
@@ -864,6 +894,10 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     const { key } = context.req.param();
     const { value } = context.req.valid("json");
 
+    if (!validateAdminSettingValue(key, value)) {
+      return context.json({ error: "invalid_setting_value" }, 400);
+    }
+
     const owner = context.get("owner");
 
     const before = getSetting(db, key);
@@ -983,20 +1017,67 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     return context.json({ jobId: job.id });
   });
 
-  routes.get("/audit", (context) => {
-    const audit = listAdminAudit(db, 100);
+  routes.get("/audit", validQuery(auditQuery), (context) => {
+    const query = context.req.valid("query");
+    const page = queryAdminAudit(db, query);
+
+    const entries = page.entries.map((row) => ({
+      id: row.id,
+      at: row.at.getTime(),
+      actorId: row.actorId,
+      action: row.action,
+      targetUserId: row.targetUserId,
+      reason: row.reason,
+      detail: row.detail,
+    }));
 
     return context.json({
-      audit: audit.map((row) => ({
-        id: row.id,
-        at: row.at.getTime(),
-        actorId: row.actorId,
-        action: row.action,
-        targetUserId: row.targetUserId,
-        reason: row.reason,
-        detail: row.detail,
-      })),
+      audit: entries,
+      entries,
+      nextCursor: page.nextCursor,
     });
+  });
+
+  routes.get("/alerts", (context) => {
+    const owner = context.get("owner");
+
+    return context.json(
+      readAdminAlerts({
+        backupStatus: deps.backups.status(),
+        clock,
+        db,
+        ownerUserId: owner.userId,
+        readinessEnv: {
+          alertNtfyConfigured: env.ALERT_NTFY_URL !== undefined,
+          cfAccessConfigured:
+            env.CF_ACCESS_AUD !== undefined && env.CF_ACCESS_TEAM_DOMAIN !== undefined,
+          publicSignupEnabled: env.PUBLIC_SIGNUP_ENABLED,
+          stripeSecretKey: env.STRIPE_SECRET_KEY,
+          stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
+        },
+      }),
+    );
+  });
+
+  routes.post("/alerts/ack", validJson(ackAlertsBody), async (context) => {
+    const owner = context.get("owner");
+    const { id } = context.req.valid("json");
+    const outcome = acknowledgeAdminAlerts(db, clock, owner.userId, id);
+
+    await recordAdminAudit(db, clock, {
+      actorId: owner.userId,
+      action: "alerts.ack",
+      detail: {
+        acknowledged: outcome.acknowledged,
+        notificationId: id ?? null,
+      },
+      reason:
+        id === undefined
+          ? "Acknowledged all unread owner alerts"
+          : "Acknowledged owner alert notification",
+    });
+
+    return context.json(outcome);
   });
 
   routes.post("/tag-imports", validJson(tagImportBody), async (context) => {

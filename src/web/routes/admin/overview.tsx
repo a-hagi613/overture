@@ -1,12 +1,17 @@
 import { Link } from "react-router";
 
 import { copy } from "../../../shared/copy.ts";
+import { CardHeader } from "./ui/card-header.tsx";
+import { CardTitle } from "./ui/card-title.tsx";
+import { Card } from "./ui/card.tsx";
 import type { Overview } from "../../lib/admin-api.ts";
-import { loadOverview } from "../../lib/admin-api.ts";
+import { loadAdminAlerts, loadOverview } from "../../lib/admin-api.ts";
 import { useAdminResource } from "../../lib/admin-resource.ts";
+import { ActiveAlertsCard } from "./active-alerts-card.tsx";
 import { AuditLine } from "./audit-line.tsx";
-import { AdminPageHeading } from "./page-heading.tsx";
 import { AdminGateScreen } from "./gate-screen.tsx";
+import { LaunchReadinessCard } from "./launch-readiness-card.tsx";
+import { AdminPageHeading } from "./page-heading.tsx";
 
 function gateState(cost: Overview["cost"]) {
   if (cost.completed === 0) {
@@ -29,24 +34,28 @@ function mailStopNote(mail: Overview["mail"]) {
 }
 
 export function OverviewPage() {
-  const { data, refusal, refresh } = useAdminResource(loadOverview);
+  const overview = useAdminResource(loadOverview, ["overview"]);
+  const alerts = useAdminResource(loadAdminAlerts, ["alerts"]);
+
+  const refusal = overview.refusal ?? alerts.refusal;
 
   if (refusal !== null) {
     return (
       <AdminGateScreen
         code={refusal}
         onPasskeyDone={() => {
-          refresh();
+          overview.refresh();
+          alerts.refresh();
         }}
       />
     );
   }
 
-  if (data === null) {
+  if (overview.data === null) {
     return null;
   }
 
-  const view: Overview = data;
+  const view: Overview = overview.data;
   const jobs = Object.entries(view.jobs);
   const mailStop = mailStopNote(view.mail);
 
@@ -58,13 +67,14 @@ export function OverviewPage() {
         plain={copy.admin.overviewTitlePlain}
       />
       <div className="mt-7 flex flex-col gap-5">
-        <section
-          aria-labelledby="admin-overview-state"
-          className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
-        >
-          <h2 id="admin-overview-state" className="font-serif text-[26px] leading-[1.1]">
-            {copy.admin.overviewJobs}
-          </h2>
+        {alerts.data === null ? null : (
+          <div className="grid gap-5 lg:grid-cols-2">
+            <ActiveAlertsCard alerts={alerts.data} />
+            <LaunchReadinessCard readiness={alerts.data.readiness} />
+          </div>
+        )}
+        <Card ariaLabelledBy="admin-overview-state">
+          <CardTitle id="admin-overview-state">{copy.admin.overviewJobs}</CardTitle>
           <dl className="mt-4 flex flex-wrap gap-8">
             <div>
               <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -108,14 +118,9 @@ export function OverviewPage() {
               ))
             )}
           </div>
-        </section>
-        <section
-          aria-labelledby="admin-overview-cost"
-          className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
-        >
-          <h2 id="admin-overview-cost" className="font-serif text-[26px] leading-[1.1]">
-            {copy.admin.overviewCost}
-          </h2>
+        </Card>
+        <Card ariaLabelledBy="admin-overview-cost">
+          <CardTitle id="admin-overview-cost">{copy.admin.overviewCost}</CardTitle>
           <p className="mt-2 text-[12.5px] text-muted-foreground">{copy.admin.overviewCostIntro}</p>
           <dl className="mt-4 flex flex-wrap gap-8">
             <div>
@@ -172,19 +177,14 @@ export function OverviewPage() {
               {copy.admin.overviewInspectLlm}
             </Link>
           </div>
-        </section>
-        <section
-          aria-labelledby="admin-overview-mail"
-          className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
-        >
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 id="admin-overview-mail" className="font-serif text-[26px] leading-[1.1]">
-              {copy.admin.overviewMail}
-            </h2>
-            <span className="text-[11px] text-muted-foreground uppercase tracking-[0.14em]">
+        </Card>
+        <Card ariaLabelledBy="admin-overview-mail">
+          <CardHeader>
+            <CardTitle id="admin-overview-mail">{copy.admin.overviewMail}</CardTitle>
+            <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
               {view.mail.month}
             </span>
-          </div>
+          </CardHeader>
           <dl className="mt-4 flex flex-wrap gap-8">
             <div>
               <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -217,14 +217,17 @@ export function OverviewPage() {
           {mailStop === null ? null : (
             <p className="mt-1 text-[12.5px] font-semibold text-foreground">{mailStop}</p>
           )}
-        </section>
-        <section
-          aria-labelledby="admin-overview-audit"
-          className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
-        >
-          <h2 id="admin-overview-audit" className="font-serif text-[26px] leading-[1.1]">
-            {copy.admin.overviewAudit}
-          </h2>
+        </Card>
+        <Card ariaLabelledBy="admin-overview-audit">
+          <CardHeader>
+            <CardTitle id="admin-overview-audit">{copy.admin.overviewAudit}</CardTitle>
+            <Link
+              className="inline-flex min-h-11 items-center rounded-md px-2.5 text-[13px] font-semibold underline underline-offset-2 hover:bg-muted md:min-h-9"
+              to="/admin/audit"
+            >
+              {copy.admin.overviewAuditAll}
+            </Link>
+          </CardHeader>
           <div className="mt-4">
             {view.audit.length === 0 ? (
               <p className="text-[12.5px] text-muted-foreground">{copy.admin.overviewAuditEmpty}</p>
@@ -232,7 +235,7 @@ export function OverviewPage() {
               view.audit.map((row) => <AuditLine key={row.id} row={row} />)
             )}
           </div>
-        </section>
+        </Card>
       </div>
     </>
   );

@@ -33,6 +33,7 @@ import { TermsPage } from "./routes/terms.tsx";
 import { AppShell } from "./app.tsx";
 import { RootLayout } from "./components/root-layout.tsx";
 import { AdminShell } from "./routes/admin/shell.tsx";
+import { AuditLogPage } from "./routes/admin/audit.tsx";
 import { AdminSettingsPage } from "./routes/admin/settings.tsx";
 import { CatalogPage } from "./routes/admin/catalog.tsx";
 import { MailHealthPage } from "./routes/admin/mail-health.tsx";
@@ -90,6 +91,7 @@ const adminShellChildren: RouteObject[] = [
   { path: "/admin/users", element: <UsersPage /> },
   { path: "/admin/users/:id", element: <UserPage /> },
   { path: "/admin/invites", element: <InvitesPage /> },
+  { path: "/admin/audit", element: <AuditLogPage /> },
 ];
 
 const publicRoutes: RouteObject[] = [

@@ -1,31 +1,11 @@
-import { useEffect, useState } from "react";
-
 import { copy } from "../../../shared/copy.ts";
 import { passkeyAgeText } from "../../lib/admin-date.ts";
 import { loadAdminSession } from "../../lib/admin-api.ts";
-import type { AdminSession } from "../../lib/admin-api.ts";
+import { useAdminResource } from "../../lib/admin-resource.ts";
 import { initialsOf } from "../../lib/identity.ts";
 
 export function AdminSideIdentity() {
-  const [data, setData] = useState<AdminSession | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-
-    const load = async () => {
-      const result = await loadAdminSession();
-
-      if (alive && result.ok) {
-        setData(result.data);
-      }
-    };
-
-    void load();
-
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const { data } = useAdminResource(loadAdminSession, ["session"]);
 
   if (data === null) {
     return null;

@@ -18,4 +18,5 @@ export const adminDestinations = [
   { end: false, glyph: "grid", label: copy.admin.navCatalog, to: "/admin/catalog" },
   { end: false, glyph: "sliders", label: copy.admin.navSystem, to: "/admin/system" },
   { end: false, glyph: "send", label: copy.admin.navMailHealth, to: "/admin/mail-health" },
+  { end: false, glyph: "doc", label: copy.admin.navAudit, to: "/admin/audit" },
 ] as const;

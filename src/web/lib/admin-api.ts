@@ -17,6 +17,66 @@ export const auditRowSchema = z.object({
   detail: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
 });
 
+export const adminAuditPageSchema = z.object({
+  entries: z.array(auditRowSchema),
+  nextCursor: z.string().nullable(),
+});
+
+export const adminAlertProblemSchema = z.object({
+  code: z.enum([
+    "kill_switch_active",
+    "dead_jobs",
+    "mail_cap_reached",
+    "mail_reserve_reached",
+    "mail_cap_near",
+    "backup_unavailable",
+    "backup_lag",
+    "health_degraded",
+  ]),
+  detail: z.string(),
+  id: z.string(),
+  severity: z.enum(["critical", "warning"]),
+  title: z.string(),
+});
+
+export const adminAlertNotificationSchema = z.object({
+  body: z.string(),
+  createdAt: z.number(),
+  detail: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).nullable(),
+  id: z.string(),
+  readAt: z.number().nullable(),
+  title: z.string(),
+  url: z.string(),
+});
+
+export const launchReadinessSchema = z.object({
+  alertNtfyConfigured: z.boolean(),
+  browserConcurrency: z.number(),
+  cfAccessConfigured: z.boolean(),
+  costGate: z.object({
+    completed: z.number(),
+    costGateMet: z.boolean().nullable(),
+    costGateMicros: z.number(),
+    costMicrosPerCompleted: z.number().nullable(),
+  }),
+  dailyCap: z.number(),
+  publicSignupEnabled: z.boolean(),
+  stripeMode: z.enum(["live", "test", "disabled"]),
+});
+
+export const adminAlertsResponseSchema = z.object({
+  notifications: z.array(adminAlertNotificationSchema),
+  now: z.number(),
+  problems: z.array(adminAlertProblemSchema),
+  readiness: launchReadinessSchema,
+  unreadCount: z.number(),
+});
+
+export const ackAlertsResponseSchema = z.object({
+  acknowledged: z.number(),
+  readAt: z.number(),
+});
+
 export const overviewSchema = z.object({
   now: z.number(),
   jobs: z.record(z.string(), z.number()),
@@ -402,6 +462,16 @@ export type LabReportRow = z.infer<typeof labReportRowSchema>;
 
 export type AuditRow = z.infer<typeof auditRowSchema>;
 
+export type AdminAuditPage = z.infer<typeof adminAuditPageSchema>;
+
+export type AdminAlertProblem = z.infer<typeof adminAlertProblemSchema>;
+
+export type AdminAlertNotification = z.infer<typeof adminAlertNotificationSchema>;
+
+export type LaunchReadiness = z.infer<typeof launchReadinessSchema>;
+
+export type AdminAlertsResponse = z.infer<typeof adminAlertsResponseSchema>;
+
 export type KillSwitchRow = z.infer<typeof killSwitchRowSchema>;
 
 export type GrantRow = z.infer<typeof grantRowSchema>;
@@ -524,6 +594,16 @@ const refusalBodySchema = z.object({
   error: adminRefusalCodeSchema,
 });
 
+export class AdminHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`The admin request did not go through (${String(status)}).`);
+    this.name = "AdminHttpError";
+    this.status = status;
+  }
+}
+
 async function adminRequest<T>(response: Response, schema: z.ZodType<T>) {
   const raw: unknown = await response.json();
   const refusal = refusalBodySchema.safeParse(raw);
@@ -535,7 +615,7 @@ async function adminRequest<T>(response: Response, schema: z.ZodType<T>) {
   }
 
   if (!response.ok) {
-    throw new Error(`The admin request did not go through (${String(response.status)}).`);
+    throw new AdminHttpError(response.status);
   }
 
   const loaded: AdminResult<T> = { ok: true, data: schema.parse(raw) };
@@ -569,7 +649,8 @@ type AdminWriteBody =
   | { reason: string }
   | { value: string }
   | { providers: string[]; pages: string[]; sessionsPerPage: number }
-  | { urls?: string[] };
+  | { urls?: string[] }
+  | { id?: string };
 
 async function adminWrite<T>(
   method: "POST" | "PUT",
@@ -604,6 +685,53 @@ async function adminPut<T>(path: string, body: AdminWriteBody, schema: z.ZodType
 }
 
 export const loadOverview = async () => adminGet("/admin/api/overview", overviewSchema);
+
+export const loadAdminAlerts = async () => adminGet("/admin/api/alerts", adminAlertsResponseSchema);
+
+export const ackAdminAlerts = async (id?: string) =>
+  adminPost("/admin/api/alerts/ack", id === undefined ? {} : { id }, ackAlertsResponseSchema);
+
+export interface AdminAuditFilterInput {
+  action?: string;
+  actorId?: string;
+  targetUserId?: string;
+  q?: string;
+  limit?: number;
+  before?: string | null;
+}
+
+export const loadAdminAudit = async (input: AdminAuditFilterInput) => {
+  const search = new URLSearchParams();
+
+  if (input.action !== undefined && input.action.trim().length > 0) {
+    search.set("action", input.action.trim());
+  }
+
+  if (input.actorId !== undefined && input.actorId.trim().length > 0) {
+    search.set("actorId", input.actorId.trim());
+  }
+
+  if (input.targetUserId !== undefined && input.targetUserId.trim().length > 0) {
+    search.set("targetUserId", input.targetUserId.trim());
+  }
+
+  if (input.q !== undefined && input.q.trim().length > 0) {
+    search.set("q", input.q.trim());
+  }
+
+  if (input.limit !== undefined) {
+    search.set("limit", String(input.limit));
+  }
+
+  if (input.before !== undefined && input.before !== null && input.before.trim().length > 0) {
+    search.set("before", input.before.trim());
+  }
+
+  const query = search.toString();
+  const path = query.length === 0 ? "/admin/api/audit" : `/admin/api/audit?${query}`;
+
+  return adminGet(path, adminAuditPageSchema);
+};
 
 export const loadSettings = async () => adminGet("/admin/api/settings", settingsResponseSchema);
 
