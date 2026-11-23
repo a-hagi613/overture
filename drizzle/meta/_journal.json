@@ -407,6 +407,13 @@
       "when": 1795492400000,
       "tag": "0057_catalog_split",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "6",
+      "when": 1795492500000,
+      "tag": "0058_steep_killmonger",
+      "breakpoints": true
     }
   ]
 }

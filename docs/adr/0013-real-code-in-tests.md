@@ -31,7 +31,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for the fifty-five files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
+exist only for the fifty-eight files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
 as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key,
 and a "did not happen" line appears only when the stored data proves it), ledger, crypto, planner, the
 restored-database check (a restored file is read
@@ -99,7 +99,7 @@ whole, so a sender cannot choose how much memory it costs), the unhandled-reject
 error type and count only, never the arbitrary message that can hold personal data or a token), the hot read paths
 (#430: the user key is read once per request however many values it opens and a forget is not undone by a read already
 in flight, the Inbox Thread list and an Application's linked mail read their messages in one query rather than one per
-Thread, the open Review list and a Board's email notes read their rows in one query rather than one per Review or per
+Thread, and a page walks every Thread once even when timestamps tie while the counts stay over every Thread, the open Review list and a Board's email notes read their rows in one query rather than one per Review or per
 Application, the Ready cards open every approved plan in one query rather than one per card, an empty timezone change
 takes no write, and Home's billing strip is one grants read plus one ledger read; each test counts the statements
 through the real drizzle query logger and grows the row count to prove the count stays flat), the live match count
@@ -109,8 +109,13 @@ stays bounded, the count query probes `posting_tags` by its primary key rather t
 filter changes stay under 500ms p95 while catalog writes run, #426), the unit-test
 allowlist (`lint-config-guard.test.ts`: every path the allowlist names exists, and every unit test file in `src/` or
 `scripts/` is named, so a deleted test cannot leave a stale entry), and the workflow Bun pin
-(`workflow-config-guard.test.ts`: every `oven-sh/setup-bun` step pins the version `package.json` requires), and the
-interception canary (`outbound-interception.test.ts`: a fetch or node `https` request to an unmocked host rejects with
+(`workflow-config-guard.test.ts`: every `oven-sh/setup-bun` step pins the version `package.json` requires), the
+hot-path indexes (`hot-path-indexes.test.ts`: the SSE catch-up, event retention, message-by-person,
+application-by-status and grant-ledger queries are planned through `events_user_seq`, `events_created_at`,
+`messages_user_created`, `applications_user_status` and `grants_user_starts`, #506), the application-database
+vacuum (`vacuum-app-db.test.ts`: a fragmented file is compacted to a zero freelist with `integrity_check` ok, a dry
+run changes nothing, and the script refuses without `--confirm` or while another writer holds the lock, #506), and
+the interception canary (`outbound-interception.test.ts`: a fetch or node `https` request to an unmocked host rejects with
 the interceptor's own error while a mocked host still answers, so a request that leaks fails instead of reaching DNS). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
 depend on the runner. The mail count runs the real SQLite file and the real migrations, so the invariant is exercised

@@ -229,7 +229,7 @@ src/
 drizzle/             generated migrations
 scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, capture-forms.ts, pull-forms.ts, restore-drill.ts
 test/e2e/           Playwright `*.test.ts` flows, fixture server, interceptor handlers and recordings, `*.test-utils.ts`
-                     (the fifty-five unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
+                     (the fifty-eight unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
 ```
 
@@ -1567,12 +1567,13 @@ Plus: route reachability for every page, axe on every page, and the visual snaps
 Review, Inbox, Profile, Settings and the legal and consent boards × 390 / 1280 px × light/dark; Ready joins them once it is
 drawn) in pinned Docker.
 
-### 16.2 Unit tests (fifty-five files, `bun:test`, beside their code)
+### 16.2 Unit tests (fifty-eight files, `bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
 | `scripts/database-sync-guard.test.ts` | every `new DatabaseSync` in `src/` or `test/` configures `PRAGMA busy_timeout` or is a documented opt-out |
 | `scripts/lint-config-guard.test.ts` | the `no-unlisted-unit-test` allowlist names every unit test file and no path that does not exist |
+| `scripts/vacuum-app-db.test.ts` | a fragmented `app.sqlite` is compacted to a zero freelist with `integrity_check` ok, a dry run changes nothing, and the script refuses without `--confirm` or while another writer holds the lock (#506) |
 | `scripts/setup-stripe.test.ts` | an existing lookup-key price and the nine-event webhook are reused on a second run, `--rotate-webhook` replaces the endpoint with a fresh secret, and the out-env file (mode `0600`) is the only place a key or signing secret appears |
 | `scripts/workflow-config-guard.test.ts` | every `oven-sh/setup-bun` step pins the version `package.json` requires, so a runner release cannot break a scheduled job |
 | `src/server/account/erase.test.ts` | the erasure plan is written before the user row goes, the confirmation is queued only after both external deletes confirm clean, and a restart resumes the cleanup from the plan (#415) |
@@ -1582,6 +1583,7 @@ drawn) in pinned Docker.
 | `src/server/billing/summary.test.ts` | the three counters Home shows are answered in two reads rather than six, and a reservation counts against what is left exactly as the separate reads do (#430) |
 | `src/server/billing/webhooks.test.ts` | a pause notice and the jobs a resume queues commit with the Stripe event and roll back with it; a stale out-of-order failure cannot pause a paid user, and a price Overture does not sell grants nothing |
 | `src/server/catalog/answer-derivations.test.ts` | answer derivations |
+| `src/server/catalog/companies-parquet.test.ts` | the pinned `companies.parquet` and manifest sha256 pairs are verified before a seed loads, and a tampered file or manifest is refused |
 | `src/server/catalog/question-normalize.test.ts` | question normalisation |
 | `src/server/catalog/tag-rules.test.ts` | tag rules |
 | `src/server/dispatch/browser/session-slots.test.ts` | the dispatcher's free-send count comes from the same process-wide semaphore every browser user holds a slot from, so a capture holding the last session offers a send no slot (#425) |
@@ -1590,7 +1592,7 @@ drawn) in pinned Docker.
 | `src/server/dispatch/report.test.ts` | completion and cost divide distinct attempted Applications, so a retry counts once (#417) |
 | `src/server/fixtures/sanitise.test.ts` | a recorded page carries no script, event handler, personal data or token |
 | `src/server/inbox/linked-mail.test.ts` | an Application's linked mail is read in one query rather than one per message (#430) |
-| `src/server/inbox/threads.test.ts` | the Inbox Thread list reads its messages in one query rather than one per Thread (#430) |
+| `src/server/inbox/threads.test.ts` | the Inbox Thread list reads its messages in one query rather than one per Thread, a page walks every Thread once even when timestamps tie, and the counts stay over every Thread rather than the page (#430, #506) |
 | `src/server/matching/applications.test.ts` | an Application copies the Posting's and Company's display fields onto its own row when it is created, keeps them after the catalog rows are deleted, and is not created for a Posting that has already left the catalog (#422) |
 | `src/server/pipeline/answer-plan.test.ts` | a salary Fact kept per currency is chosen only for the currency a question names |
 | `src/server/pipeline/approved-plan.test.ts` | the Ready cards open every approved plan in one query rather than one per card (#430) |
@@ -1602,6 +1604,7 @@ drawn) in pinned Docker.
 | `src/server/platform/alert-detail.test.ts` | a public alert carries the error type and count only, never the arbitrary message that can hold personal data or a token |
 | `src/server/platform/crypto.test.ts` | wrap/unwrap, AAD, shred |
 | `src/server/platform/db/catalog-split.test.ts` | `litestream.yml` replicates only `/data/app.sqlite`, a catalog write transaction never holds `app.sqlite`'s write lock, deleting and recreating `catalog.sqlite` leaves every user and Application row intact, and a closed Posting a crashed sweep never reported is still reconciled (#423) |
+| `src/server/platform/db/hot-path-indexes.test.ts` | the SSE catch-up, event retention, message-by-person, application-by-status and grant-ledger queries are planned through `events_user_seq`, `events_created_at`, `messages_user_created`, `applications_user_status` and `grants_user_starts` (#506) |
 | `src/server/platform/db/migration-snapshot.test.ts` | migration `0056_snapshot_decouple` backfills the copied display fields onto every existing Application, including readable placeholders when the catalog row is already gone, and leaves `applications`, `matches`, `posting_user_state` and `skip_companies` with no foreign key into `postings` or `companies` (#422) |
 | `src/server/platform/db/restore-check.test.ts` | the restored-database check reads only, refuses outbound calls and leaves `bg_jobs` untouched (#412) |
 | `src/server/platform/event-loop-lag.test.ts` | a late timer tick reports how long the loop was blocked, once per cooldown |
