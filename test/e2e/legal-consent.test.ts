@@ -178,7 +178,7 @@ test("the consent is versioned, the accepted version is on the profile, and olde
 
   expect(settingsResults.violations).toEqual([]);
 
-  await page.getByRole("link", { name: "Open" }).first().click();
+  await page.locator("#legal").getByRole("link", { exact: true, name: "Open" }).first().click();
 
   await expect(page).toHaveURL(/\/terms$/u);
 
