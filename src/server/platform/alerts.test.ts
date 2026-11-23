@@ -97,9 +97,9 @@ describe("raising an alert", () => {
       deliver: () => undefined,
     });
 
-    stopFlush();
-    stopOwner();
-    stopMember();
+    stopFlush?.();
+    stopOwner?.();
+    stopMember?.();
 
     expect(ownerTopics).toContain("alert.raised");
     expect(memberTopics).toEqual([]);
@@ -128,7 +128,7 @@ describe("raising an alert", () => {
 
     raiseAlert(db, clock, "disk", { ok: false });
 
-    stop();
+    stop?.();
 
     const rows = db.select().from(events).all();
 

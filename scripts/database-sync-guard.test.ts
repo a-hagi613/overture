@@ -60,9 +60,32 @@ test("an opt-out for one file does not excuse another", () => {
   expect(problems).toHaveLength(1);
 });
 
-test("files without a DatabaseSync handle are not reported", () => {
+test("a bun:sqlite handle without a busy timeout is reported too", () => {
   const problems = findUnguardedDatabaseSyncHandles([
-    { path: "src/server/platform/db/client.ts", source: "const sqlite = new Database(path);\n" },
+    {
+      path: "src/server/offline.ts",
+      source: "const sqlite = new Database(path);\n",
+    },
+  ]);
+
+  expect(problems).toHaveLength(1);
+  expect(problems[0]).toContain("SQLite handle");
+});
+
+test("allows a bun:sqlite handle that configures busy_timeout", () => {
+  const problems = findUnguardedDatabaseSyncHandles([
+    {
+      path: "src/server/offline.ts",
+      source: 'const sqlite = new Database(path);\nsqlite.run("PRAGMA busy_timeout = 5000;");\n',
+    },
+  ]);
+
+  expect(problems).toStrictEqual([]);
+});
+
+test("files without a SQLite handle are not reported", () => {
+  const problems = findUnguardedDatabaseSyncHandles([
+    { path: "src/server/app.ts", source: "const app = new Hono();\n" },
   ]);
 
   expect(problems).toStrictEqual([]);

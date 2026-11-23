@@ -47,7 +47,7 @@ import {
 } from "../platform/db/schema.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags, readTagImports } from "../catalog/tag-import.ts";
 import { createAccessVerifier } from "../platform/access/index.ts";
-import { env } from "../config/env.ts";
+import { catalogDatabasePath, env } from "../config/env.ts";
 import { hasRecentPasskeyAssertion, lastPasskeyAssertionAt } from "../platform/passkey/index.ts";
 import {
   listAdminAudit,
@@ -95,7 +95,7 @@ import {
   INVITE_GRANT_DAYS_KEY,
   INVITE_GRANT_QUANTITY_KEY,
 } from "../auth/invites.ts";
-import { isSameMailbox } from "../auth/email.ts";
+import { isSameMailbox, normaliseEmail } from "../auth/email.ts";
 import { readMailHealth } from "../inbox/health.ts";
 import { buildStorageReport } from "../storage/report.ts";
 import { checkpointDatabase } from "../storage/database-sizes.ts";
@@ -119,6 +119,56 @@ const usersQuery = z.object({
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const USERS_PAGE_SIZE = 5;
+
+const usersPageRowSchema = z.object({
+  createdAtMs: z.number(),
+  email: z.string().nullable(),
+  id: z.string(),
+  kind: z.enum(["invite", "user"]),
+  name: z.string().nullable(),
+  status: z.enum(["active", "invited", "suspended"]),
+});
+
+const usersCountRowSchema = z.object({
+  status: z.enum(["active", "invited", "suspended"]),
+  total: z.number(),
+});
+
+interface AdminPersonRow {
+  acceptedAt: number | null;
+  createdAt: number;
+  email: string | null;
+  grant: { expiresAt: number | null; quantity: number; startsAt: number } | null;
+  grantsLeft: number | null;
+  id: string;
+  inviteAt: number | null;
+  kind: "invite" | "user";
+  lastActiveAt: number | null;
+  name: string | null;
+  status: "active" | "invited" | "suspended";
+}
+
+function peopleCte(needle: string, matchingInviteIds: readonly string[]) {
+  const pattern = `%${needle}%`;
+
+  const search =
+    needle.length === 0
+      ? sql`1 = 1`
+      : sql`(lower(name) LIKE ${pattern} OR lower(email) LIKE ${pattern})`;
+
+  return sql`with people as (
+    select 'user' as kind, id, created_at * 1000 as createdAtMs, email, name,
+      case when suspended_at is null then 'active' else 'suspended' end as status
+    from users
+    where ${search}
+    union all
+    select 'invite' as kind, id, created_at * 1000 as createdAtMs, null as email, null as name,
+      'invited' as status
+    from invites
+    where accepted_at is null and revoked_at is null
+      and id in (select value from json_each(${JSON.stringify(matchingInviteIds)}))
+  )`;
+}
 
 function readStringList(value: string) {
   try {
@@ -280,10 +330,9 @@ const ATS_NAMES = ["greenhouse", "lever", "ashby", "workable", "personio"] as co
 function integrationsOf() {
   return {
     browserProvider: env.BROWSER_PROVIDER ?? null,
-    cfAccessConfigured:
-      env.CF_ACCESS_JWKS_URL !== undefined &&
-      env.CF_ACCESS_TEAM_DOMAIN !== undefined &&
-      env.CF_ACCESS_AUD !== undefined,
+    cfAccessConfigured: Boolean(
+      env.CF_ACCESS_AUD && (env.CF_ACCESS_TEAM_DOMAIN || env.CF_ACCESS_JWKS_URL),
+    ),
     cloudflareEmailConfigured:
       env.CLOUDFLARE_EMAIL_API_TOKEN !== undefined &&
       env.CLOUDFLARE_ACCOUNT_ID !== undefined &&
@@ -512,34 +561,88 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     const now = clock.now();
     const needle = q.toLowerCase();
 
-    const members = db.select().from(users).orderBy(desc(users.createdAt)).all();
-
     const pendingInvites = db
       .select()
       .from(invites)
       .where(and(isNull(invites.acceptedAt), isNull(invites.revokedAt)))
       .all();
 
-    const people: {
-      acceptedAt: number | null;
-      createdAt: number;
-      email: string | null;
-      grant: { expiresAt: number | null; quantity: number; startsAt: number } | null;
-      grantsLeft: number | null;
-      id: string;
-      inviteAt: number | null;
-      kind: "invite" | "user";
-      lastActiveAt: number | null;
-      name: string | null;
-      status: "active" | "invited" | "suspended";
-    }[] = members.map((member) => {
-      const invite = acceptedInviteFor(member.id);
-      const adminGrant = adminGrantFor(member.id);
+    const inviteViews = await Promise.all(
+      pendingInvites.map(async (invite) => ({
+        invite,
+        view: await invitationView(invite, owner.userId),
+      })),
+    );
 
-      return {
+    const inviteById = new Map(inviteViews.map((entry) => [entry.invite.id, entry]));
+
+    const matchingInviteIds = inviteViews.flatMap(({ invite, view }) =>
+      needle.length === 0 || (view.email ?? "").toLowerCase().includes(needle) ? [invite.id] : [],
+    );
+
+    const pageRows = z.array(usersPageRowSchema).parse(
+      db.all(
+        sql`${peopleCte(needle, matchingInviteIds)}
+          select kind, id, createdAtMs, email, name, status from people
+          where ${status === "all" ? sql`1 = 1` : sql`status = ${status}`}
+          order by createdAtMs desc, id asc
+          limit ${USERS_PAGE_SIZE} offset ${(page - 1) * USERS_PAGE_SIZE}`,
+      ),
+    );
+
+    const totalByStatus = new Map(
+      z
+        .array(usersCountRowSchema)
+        .parse(
+          db.all(
+            sql`${peopleCte(needle, matchingInviteIds)}
+              select status, count(*) as total from people group by status`,
+          ),
+        )
+        .map((row) => [row.status, row.total]),
+    );
+
+    const counts = {
+      active: totalByStatus.get("active") ?? 0,
+      all: [...totalByStatus.values()].reduce((sum, total) => sum + total, 0),
+      invited: totalByStatus.get("invited") ?? 0,
+      suspended: totalByStatus.get("suspended") ?? 0,
+    };
+
+    const rows: AdminPersonRow[] = [];
+
+    for (const row of pageRows) {
+      if (row.kind === "invite") {
+        const entry = inviteById.get(row.id);
+
+        if (entry === undefined) {
+          continue;
+        }
+
+        rows.push({
+          acceptedAt: null,
+          createdAt: entry.view.createdAt,
+          email: entry.view.email,
+          grant: null,
+          grantsLeft: null,
+          id: `invite:${entry.invite.id}`,
+          inviteAt: entry.view.createdAt,
+          kind: "invite",
+          lastActiveAt: null,
+          name: null,
+          status: "invited",
+        });
+
+        continue;
+      }
+
+      const invite = acceptedInviteFor(row.id);
+      const adminGrant = adminGrantFor(row.id);
+
+      rows.push({
         acceptedAt: invite?.acceptedAt?.getTime() ?? null,
-        createdAt: member.createdAt.getTime(),
-        email: member.email,
+        createdAt: row.createdAtMs,
+        email: row.email,
         grant:
           adminGrant === null
             ? null
@@ -548,71 +651,23 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
                 quantity: adminGrant.quantity,
                 startsAt: adminGrant.startsAt,
               },
-        grantsLeft: applicationsLeft(db, member.id, now),
-        id: member.id,
+        grantsLeft: applicationsLeft(db, row.id, now),
+        id: row.id,
         inviteAt: invite?.createdAt.getTime() ?? null,
         kind: "user",
-        lastActiveAt: lastActivityAt(member.id),
-        name: member.name,
-        status: member.suspendedAt === null ? "active" : "suspended",
-      };
-    });
-
-    const invitedPeople = await Promise.all(
-      pendingInvites.map(async (invite) => {
-        const view = await invitationView(invite, owner.userId);
-
-        return {
-          acceptedAt: null,
-          createdAt: view.createdAt,
-          email: view.email,
-          grant: null,
-          grantsLeft: null,
-          id: `invite:${invite.id}`,
-          inviteAt: view.createdAt,
-          kind: "invite" as const,
-          lastActiveAt: null,
-          name: null,
-          status: "invited" as const,
-        };
-      }),
-    );
-
-    const everyone = [...people, ...invitedPeople].toSorted(
-      (left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id),
-    );
-
-    const counts = {
-      active: everyone.filter((person) => person.status === "active").length,
-      all: everyone.length,
-      invited: everyone.filter((person) => person.status === "invited").length,
-      suspended: everyone.filter((person) => person.status === "suspended").length,
-    };
-
-    const filtered = everyone.filter((person) => {
-      if (status !== "all" && person.status !== status) {
-        return false;
-      }
-
-      if (needle.length === 0) {
-        return true;
-      }
-
-      return (
-        (person.name ?? "").toLowerCase().includes(needle) ||
-        (person.email ?? "").toLowerCase().includes(needle)
-      );
-    });
-
-    const start = (page - 1) * USERS_PAGE_SIZE;
+        lastActiveAt: lastActivityAt(row.id),
+        name: row.name,
+        status: row.status,
+      });
+    }
 
     return context.json({
       counts,
       now,
       page,
       pageSize: USERS_PAGE_SIZE,
-      rows: filtered.slice(start, start + USERS_PAGE_SIZE),
-      total: filtered.length,
+      rows,
+      total: status === "all" ? counts.all : (totalByStatus.get(status) ?? 0),
     });
   });
 
@@ -921,15 +976,15 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
   routes.post("/system/checkpoint", async (context) => {
     const owner = context.get("owner");
-    const report = checkpointDatabase(deps.databasePath);
+    const report = checkpointDatabase(catalogDatabasePath);
 
     await recordAdminAudit(db, clock, {
       actorId: owner.userId,
       action: "system.wal_checkpoint",
       reason:
         report.busy === 0
-          ? "Truncated the application database WAL from the system page"
-          : "The WAL checkpoint stayed busy; another connection is reading the database",
+          ? "Truncated the catalog database WAL from the system page; Litestream owns app.sqlite"
+          : "The catalog WAL checkpoint stayed busy; another connection is reading the database",
       detail: {
         afterWalBytes: report.afterWalBytes,
         beforeWalBytes: report.beforeWalBytes,
@@ -1186,8 +1241,8 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     const currentUser = db
       .select({ email: users.email })
       .from(users)
-      .all()
-      .find((row) => isSameMailbox(row.email, email));
+      .where(eq(users.mailbox, normaliseEmail(email)))
+      .get();
 
     if (currentUser !== undefined) {
       return context.json({ error: "user_exists" }, 409);

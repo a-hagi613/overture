@@ -158,81 +158,86 @@ export function reserveMailSend(db: AppDatabase, clock: Clock, category: MailCat
   const now = clock.now();
   const month = monthKey(now);
 
-  return db.transaction((tx) => {
-    const budget = mailBudget(tx);
-    const current = readMailUsage(tx, month);
-    const reason = limitReason(budget, current, category);
+  return db.transaction(
+    (tx) => {
+      const budget = mailBudget(tx);
+      const current = readMailUsage(tx, month);
+      const reason = limitReason(budget, current, category);
 
-    if (reason !== null) {
-      const firstReserveRefusal = reason === "sign_in_reserve" && current.reserveRefusedAt === null;
-      const firstCapRefusal = reason === "monthly_cap" && current.refusedAt === null;
+      if (reason !== null) {
+        const firstReserveRefusal =
+          reason === "sign_in_reserve" && current.reserveRefusedAt === null;
 
-      const usage = {
-        ...current,
-        reserveRefusedAt: firstReserveRefusal ? now : current.reserveRefusedAt,
-        refusedAt: firstCapRefusal ? now : current.refusedAt,
-      };
+        const firstCapRefusal = reason === "monthly_cap" && current.refusedAt === null;
 
-      if (firstReserveRefusal || firstCapRefusal) {
-        tx.insert(mailUsage)
-          .values({
-            month,
-            refusedAt: usage.refusedAt,
-            reserveRefusedAt: usage.reserveRefusedAt,
-          })
-          .onConflictDoUpdate({
-            set: { refusedAt: usage.refusedAt, reserveRefusedAt: usage.reserveRefusedAt },
-            target: mailUsage.month,
-          })
-          .run();
+        const usage = {
+          ...current,
+          reserveRefusedAt: firstReserveRefusal ? now : current.reserveRefusedAt,
+          refusedAt: firstCapRefusal ? now : current.refusedAt,
+        };
+
+        if (firstReserveRefusal || firstCapRefusal) {
+          tx.insert(mailUsage)
+            .values({
+              month,
+              refusedAt: usage.refusedAt,
+              reserveRefusedAt: usage.reserveRefusedAt,
+            })
+            .onConflictDoUpdate({
+              set: { refusedAt: usage.refusedAt, reserveRefusedAt: usage.reserveRefusedAt },
+              target: mailUsage.month,
+            })
+            .run();
+        }
+
+        return {
+          reason,
+          budget,
+          usage,
+          warningRaised: false,
+          firstReserveRefusal,
+          firstCapRefusal,
+        } satisfies MailSendDecision;
       }
 
-      return {
-        reason,
-        budget,
-        usage,
-        warningRaised: false,
-        firstReserveRefusal,
-        firstCapRefusal,
-      } satisfies MailSendDecision;
-    }
+      const next = {
+        ...current,
+        auth: current.auth + (category === "auth" ? 1 : 0),
+        system: current.system + (category === "system" ? 1 : 0),
+        notice: current.notice + (category === "notice" ? 1 : 0),
+        total: current.total + 1,
+      };
 
-    const next = {
-      ...current,
-      auth: current.auth + (category === "auth" ? 1 : 0),
-      system: current.system + (category === "system" ? 1 : 0),
-      notice: current.notice + (category === "notice" ? 1 : 0),
-      total: current.total + 1,
-    };
+      const warningRaised = next.total >= budget.warningAt && current.warnedAt === null;
 
-    const warningRaised = next.total >= budget.warningAt && current.warnedAt === null;
-
-    tx.insert(mailUsage)
-      .values({
-        authSends: next.auth,
-        month,
-        noticeSends: next.notice,
-        systemSends: next.system,
-        warnedAt: warningRaised ? now : current.warnedAt,
-      })
-      .onConflictDoUpdate({
-        set: {
+      tx.insert(mailUsage)
+        .values({
           authSends: next.auth,
+          month,
           noticeSends: next.notice,
           systemSends: next.system,
           warnedAt: warningRaised ? now : current.warnedAt,
-        },
-        target: mailUsage.month,
-      })
-      .run();
+        })
+        .onConflictDoUpdate({
+          set: {
+            authSends: next.auth,
+            noticeSends: next.notice,
+            systemSends: next.system,
+            warnedAt: warningRaised ? now : current.warnedAt,
+          },
+          target: mailUsage.month,
+        })
+        .run();
 
-    return {
-      reason: null,
-      budget,
-      usage: { ...next, warnedAt: warningRaised ? now : current.warnedAt },
-      warningRaised,
-      firstReserveRefusal: false,
-      firstCapRefusal: false,
-    } satisfies MailSendDecision;
-  });
+      return {
+        reason: null,
+        budget,
+        usage: { ...next, warnedAt: warningRaised ? now : current.warnedAt },
+        warningRaised,
+        firstReserveRefusal: false,
+        firstCapRefusal: false,
+      } satisfies MailSendDecision;
+    },
+    { behavior: "immediate" },
+  );
 }

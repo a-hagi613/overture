@@ -10,6 +10,7 @@ import { isKillSwitchEnabled } from "../platform/settings/index.ts";
 import { targets, users, workableIngests } from "../platform/db/schema.ts";
 import { companies, companyBoards, postings } from "../platform/db/catalog-schema.ts";
 import { contentHash } from "./content-hash.ts";
+import { retryWhenBusy } from "../platform/db/busy.ts";
 import { dedupeKeyFor } from "./dedupe-key.ts";
 import { normalizeApplyUrl, normalizeTitle } from "./normalize.ts";
 import type { workableIngestReportSchema } from "./sweep-worker-protocol.ts";
@@ -271,36 +272,54 @@ async function writeRows(
   async function writeChunk(offset: number) {
     const chunk = rows.slice(offset, offset + INGEST_CHUNK);
 
-    catalogDb.transaction((tx) => {
-      for (const row of chunk) {
-        const ref = ensureBoard(tx, now, cache, row);
+    const delta = await retryWhenBusy(() => {
+      const chunkCounts = { added: 0, updated: 0 };
 
-        const values = postingValues(row, ref, now);
+      try {
+        catalogDb.transaction(
+          (tx) => {
+            for (const row of chunk) {
+              const ref = ensureBoard(tx, now, cache, row);
 
-        const existing = tx
-          .select({ id: postings.id })
-          .from(postings)
-          .where(and(eq(postings.boardId, ref.boardId), eq(postings.atsJobId, row.reference)))
-          .get();
+              const values = postingValues(row, ref, now);
 
-        let postingId: string;
+              const existing = tx
+                .select({ id: postings.id })
+                .from(postings)
+                .where(and(eq(postings.boardId, ref.boardId), eq(postings.atsJobId, row.reference)))
+                .get();
 
-        if (existing === undefined) {
-          postingId = crypto.randomUUID();
+              let postingId: string;
 
-          tx.insert(postings)
-            .values({ id: postingId, firstSeenAt: now, ...values })
-            .run();
-          counts.added += 1;
-        } else {
-          postingId = existing.id;
-          tx.update(postings).set(values).where(eq(postings.id, postingId)).run();
-          counts.updated += 1;
-        }
+              if (existing === undefined) {
+                postingId = crypto.randomUUID();
 
-        writePostingTags(tx, postingId, tagWrites(row), now);
+                tx.insert(postings)
+                  .values({ id: postingId, firstSeenAt: now, ...values })
+                  .run();
+                chunkCounts.added += 1;
+              } else {
+                postingId = existing.id;
+                tx.update(postings).set(values).where(eq(postings.id, postingId)).run();
+                chunkCounts.updated += 1;
+              }
+
+              writePostingTags(tx, postingId, tagWrites(row), now);
+            }
+          },
+          { behavior: "immediate" },
+        );
+      } catch (error) {
+        cache.clear();
+
+        throw error;
       }
-    });
+
+      return chunkCounts;
+    }, "catalog.workable.ingest");
+
+    counts.added += delta.added;
+    counts.updated += delta.updated;
 
     const next = offset + chunk.length;
 
@@ -382,20 +401,25 @@ export async function runWorkableIngest(deps: WorkableIngestDeps) {
   }
 
   if (previous !== undefined && previous.contentHash === manifest.contentHash) {
-    db.insert(workableIngests)
-      .values({
-        id: crypto.randomUUID(),
-        snapshotKey: manifest.snapshot,
-        fetchedAt: Date.parse(manifest.fetchedAt),
-        sourceLastModified: manifest.sourceLastModified,
-        rows: manifest.rows,
-        contentHash: manifest.contentHash,
-        added: 0,
-        updated: 0,
-        closed: 0,
-        ingestedAt: now,
-      })
-      .run();
+    db.transaction(
+      (tx) => {
+        tx.insert(workableIngests)
+          .values({
+            id: crypto.randomUUID(),
+            snapshotKey: manifest.snapshot,
+            fetchedAt: Date.parse(manifest.fetchedAt),
+            sourceLastModified: manifest.sourceLastModified,
+            rows: manifest.rows,
+            contentHash: manifest.contentHash,
+            added: 0,
+            updated: 0,
+            closed: 0,
+            ingestedAt: now,
+          })
+          .run();
+      },
+      { behavior: "immediate" },
+    );
 
     return report({
       outcome: "unchanged",
@@ -424,20 +448,25 @@ export async function runWorkableIngest(deps: WorkableIngestDeps) {
   const counts = await writeRows(catalogDb, now, rows);
   const closedPostingIds = dropped ? [] : closeAbsentPostings(catalogDb, now);
 
-  db.insert(workableIngests)
-    .values({
-      id: crypto.randomUUID(),
-      snapshotKey: manifest.snapshot,
-      fetchedAt: Date.parse(manifest.fetchedAt),
-      sourceLastModified: manifest.sourceLastModified,
-      rows: manifest.rows,
-      contentHash: manifest.contentHash,
-      added: counts.added,
-      updated: counts.updated,
-      closed: closedPostingIds.length,
-      ingestedAt: now,
-    })
-    .run();
+  db.transaction(
+    (tx) => {
+      tx.insert(workableIngests)
+        .values({
+          id: crypto.randomUUID(),
+          snapshotKey: manifest.snapshot,
+          fetchedAt: Date.parse(manifest.fetchedAt),
+          sourceLastModified: manifest.sourceLastModified,
+          rows: manifest.rows,
+          contentHash: manifest.contentHash,
+          added: counts.added,
+          updated: counts.updated,
+          closed: closedPostingIds.length,
+          ingestedAt: now,
+        })
+        .run();
+    },
+    { behavior: "immediate" },
+  );
 
   return report({
     outcome: "ingested",

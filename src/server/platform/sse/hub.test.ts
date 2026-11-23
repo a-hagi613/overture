@@ -5,7 +5,7 @@ import type { AppDatabase } from "../db/client.ts";
 import { openDatabase } from "../db/client.ts";
 import { migrateDatabase } from "../db/migrate.ts";
 import { events } from "../db/schema.ts";
-import { subscribeToEvents } from "./hub.ts";
+import { SSE_GLOBAL_SUBSCRIBER_CAP, SSE_USER_SUBSCRIBER_CAP, subscribeToEvents } from "./hub.ts";
 
 const NOW = Date.UTC(2026, 10, 22, 9, 0, 0);
 
@@ -37,7 +37,7 @@ describe("subscribing to the event hub", () => {
       deliver: (row) => topics.push(row.topic),
     });
 
-    unsubscribe();
+    unsubscribe?.();
     sqlite.close();
 
     expect(topics).toEqual(["mine.first"]);
@@ -57,7 +57,7 @@ describe("subscribing to the event hub", () => {
       deliver: (row) => topics.push(row.topic),
     });
 
-    unsubscribe();
+    unsubscribe?.();
     sqlite.close();
 
     expect(topics).toEqual([]);
@@ -78,7 +78,7 @@ describe("subscribing to the event hub", () => {
       deliver: (row) => topics.push(row.topic),
     });
 
-    unsubscribe();
+    unsubscribe?.();
     sqlite.close();
 
     expect(topics).toHaveLength(200);
@@ -101,7 +101,7 @@ describe("subscribing to the event hub", () => {
       deliver: (row) => topics.push(row.topic),
     });
 
-    unsubscribe();
+    unsubscribe?.();
     sqlite.close();
 
     expect(topics).toHaveLength(200);
@@ -123,7 +123,7 @@ describe("subscribing to the event hub", () => {
       deliver: (row) => topics.push(row.topic),
     });
 
-    unsubscribe();
+    unsubscribe?.();
     sqlite.close();
 
     expect(topics).toEqual([
@@ -138,5 +138,63 @@ describe("subscribing to the event hub", () => {
       "row-499",
       "row-500",
     ]);
+  });
+
+  test("refuses more than the per-user stream cap", () => {
+    const { db, sqlite } = migrated();
+    const stops: (() => void)[] = [];
+
+    for (let index = 0; index < SSE_USER_SUBSCRIBER_CAP; index += 1) {
+      const stop = subscribeToEvents(db, {
+        userId: "user-a",
+        lastSeq: 0,
+        deliver: () => undefined,
+      });
+
+      expect(stop).not.toBeNull();
+
+      if (stop !== null) {
+        stops.push(stop);
+      }
+    }
+
+    expect(
+      subscribeToEvents(db, { userId: "user-a", lastSeq: 0, deliver: () => undefined }),
+    ).toBeNull();
+
+    for (const stop of stops) {
+      stop();
+    }
+
+    sqlite.close();
+  });
+
+  test("refuses more than the global stream cap", () => {
+    const { db, sqlite } = migrated();
+    const stops: (() => void)[] = [];
+
+    for (let index = 0; index < SSE_GLOBAL_SUBSCRIBER_CAP; index += 1) {
+      const stop = subscribeToEvents(db, {
+        userId: `user-${String(index)}`,
+        lastSeq: 0,
+        deliver: () => undefined,
+      });
+
+      expect(stop).not.toBeNull();
+
+      if (stop !== null) {
+        stops.push(stop);
+      }
+    }
+
+    expect(
+      subscribeToEvents(db, { userId: "one-more", lastSeq: 0, deliver: () => undefined }),
+    ).toBeNull();
+
+    for (const stop of stops) {
+      stop();
+    }
+
+    sqlite.close();
   });
 });

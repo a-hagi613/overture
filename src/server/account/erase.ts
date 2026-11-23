@@ -169,34 +169,37 @@ export function createAccountEraser(deps: AccountEraserDeps) {
     const vendorProfiles = rememberProfiles(userId);
     const now = clock.now();
 
-    db.transaction((tx) => {
-      tx.insert(accountErasures)
-        .values({
-          createdAt: new Date(now),
-          lastError: null,
-          noticeName: account.name,
-          noticeTo: account.email,
-          objectPrefixes: JSON.stringify([...objectPrefixesFor(userId)]),
-          updatedAt: new Date(now),
-          userDeletedAt: new Date(now),
-          userId,
-          vendorProfiles: JSON.stringify(vendorProfiles),
-        })
-        .run();
+    db.transaction(
+      (tx) => {
+        tx.insert(accountErasures)
+          .values({
+            createdAt: new Date(now),
+            lastError: null,
+            noticeName: account.name,
+            noticeTo: account.email,
+            objectPrefixes: JSON.stringify([...objectPrefixesFor(userId)]),
+            updatedAt: new Date(now),
+            userDeletedAt: new Date(now),
+            userId,
+            vendorProfiles: JSON.stringify(vendorProfiles),
+          })
+          .run();
 
-      mailboxes.retireFor(userId);
+        mailboxes.retireFor(userId);
 
-      tx.delete(userKeys).where(eq(userKeys.userId, userId)).run();
-      tx.delete(events).where(eq(events.userId, userId)).run();
-      tx.delete(llmUsage).where(eq(llmUsage.userId, userId)).run();
-      tx.delete(calendarCustomEvents).where(eq(calendarCustomEvents.userId, userId)).run();
-      tx.delete(supportTickets).where(eq(supportTickets.userId, userId)).run();
-      tx.delete(settings)
-        .where(eq(settings.key, notificationPreferencesKey(userId)))
-        .run();
+        tx.delete(userKeys).where(eq(userKeys.userId, userId)).run();
+        tx.delete(events).where(eq(events.userId, userId)).run();
+        tx.delete(llmUsage).where(eq(llmUsage.userId, userId)).run();
+        tx.delete(calendarCustomEvents).where(eq(calendarCustomEvents.userId, userId)).run();
+        tx.delete(supportTickets).where(eq(supportTickets.userId, userId)).run();
+        tx.delete(settings)
+          .where(eq(settings.key, notificationPreferencesKey(userId)))
+          .run();
 
-      tx.delete(users).where(eq(users.id, userId)).run();
-    });
+        tx.delete(users).where(eq(users.id, userId)).run();
+      },
+      { behavior: "immediate" },
+    );
 
     personal.forget(userId);
 

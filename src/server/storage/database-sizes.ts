@@ -34,7 +34,20 @@ export interface CheckpointReport {
 
 /** A refusal the operator can fix (missing `--confirm`, a held write lock, another connection in the way). */
 export class VacuumRefusedError extends Error {
-  override readonly name = "VacuumRefusedError";
+  override readonly name: string = "VacuumRefusedError";
+}
+
+/**
+ * A live `wal_checkpoint(TRUNCATE)` on `app.sqlite` would race Litestream's replicator and can truncate the WAL out
+ * from under it. Litestream checkpoints that file itself; compaction happens offline (`scripts/vacuum-app-db.ts`).
+ */
+export class LitestreamCheckpointRefusedError extends VacuumRefusedError {
+  override readonly name: string = "LitestreamCheckpointRefusedError";
+}
+
+export interface CheckpointOptions {
+  /** True for a file Litestream replicates; a live TRUNCATE is then refused. */
+  readonly replicated?: boolean;
 }
 
 function statBytes(path: string) {
@@ -101,9 +114,16 @@ export function readDatabaseSizes(path: string) {
  * Truncates a database's write-ahead log. It takes the ordinary write path, so a reader that keeps a transaction
  * open answers `busy: 1` and the log is left intact rather than the request failing.
  * @param path The database file whose WAL should be checkpointed.
+ * @param options `replicated` refuses a live truncate on `app.sqlite`, which Litestream owns.
  * @returns The WAL bytes before and after, and SQLite's busy and checkpointed page counts.
  */
-export function checkpointDatabase(path: string) {
+export function checkpointDatabase(path: string, options: CheckpointOptions = {}) {
+  if (options.replicated === true) {
+    throw new LitestreamCheckpointRefusedError(
+      "app.sqlite is replicated by Litestream, which owns its WAL checkpointing; a live TRUNCATE checkpoint is refused. Compact the file offline with scripts/vacuum-app-db.ts.",
+    );
+  }
+
   const beforeWalBytes = statBytes(`${path}-wal`);
   const sqlite = new Database(path);
 

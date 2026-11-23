@@ -19,14 +19,18 @@ import { ATS_VALUES } from "../../../shared/ats.ts";
  * application table never has a foreign key back into this file. `posting_questions.question_id` names a `questions`
  * row in `app.sqlite` for the same reason: the join happens in code, never in SQL.
  */
-export const companies = sqliteTable("companies", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  nameNorm: text("name_norm").notNull(),
-  domain: text("domain"),
-  industry: text("industry"),
-  createdAt: integer("created_at").notNull(),
-});
+export const companies = sqliteTable(
+  "companies",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    nameNorm: text("name_norm").notNull(),
+    domain: text("domain"),
+    industry: text("industry"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("companies_name_norm").on(t.nameNorm)],
+);
 
 export const companyBoards = sqliteTable(
   "company_boards",
@@ -56,6 +60,7 @@ export const companyBoards = sqliteTable(
   },
   (t) => [
     uniqueIndex("company_boards_ats_region_board_token_unique").on(t.ats, t.region, t.boardToken),
+    index("company_boards_ats_status_next_poll").on(t.ats, t.status, t.nextPollAt),
   ],
 );
 

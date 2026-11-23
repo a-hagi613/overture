@@ -251,3 +251,20 @@ describe("the catalog split", () => {
     recreated.sqlite.close();
   });
 });
+
+test("the catalog hot-path indexes exist after every migration", () => {
+  const { app, catalog } = scratchDatabase();
+
+  try {
+    const names = z
+      .array(z.object({ name: z.string() }))
+      .parse(catalog.sqlite.query("select name from sqlite_master where type = 'index'").all())
+      .map((row) => row.name);
+
+    expect(names).toContain("companies_name_norm");
+    expect(names).toContain("company_boards_ats_status_next_poll");
+  } finally {
+    app.sqlite.close();
+    catalog.sqlite.close();
+  }
+});

@@ -62,8 +62,10 @@ interface CodeWaitResolution {
 export async function waitForCode(
   deps: { db: AppDatabase; clock: Clock; personal: PersonalCrypto },
   input: { waitId: string; onAskToPaste: () => void },
+  options: { signal?: AbortSignal } = {},
 ) {
   const { db, clock, personal } = deps;
+  const { signal } = options;
 
   const wait = db.select().from(codeWaits).where(eq(codeWaits.id, input.waitId)).get();
 
@@ -87,6 +89,7 @@ export async function waitForCode(
       }
 
       settled = true;
+      signal?.removeEventListener("abort", onAbort);
 
       if (timer !== null) {
         clearInterval(timer);
@@ -94,6 +97,10 @@ export async function waitForCode(
 
       unsubscribe?.();
       resolve(result);
+    }
+
+    function onAbort() {
+      finish(null);
     }
 
     async function check() {
@@ -138,6 +145,14 @@ export async function waitForCode(
     unsubscribe = onCodeWaitChanged(waitId, () => {
       void check();
     });
+
+    if (signal?.aborted === true) {
+      finish(null);
+
+      return;
+    }
+
+    signal?.addEventListener("abort", onAbort, { once: true });
 
     timer = setInterval(() => {
       void check();
