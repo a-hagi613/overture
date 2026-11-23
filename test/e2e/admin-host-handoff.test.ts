@@ -60,6 +60,13 @@ async function signInAsOwner(page: Page, url: string) {
   return page.request.storageState();
 }
 
+async function openPage(browser: Browser) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  return { context, page };
+}
+
 async function expectNoHorizontalOverflow(page: Page, label: string) {
   const overflow = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,
@@ -144,60 +151,73 @@ async function checkHandoffViewports(
 }
 
 test("the owner sees the Admin Portal link in the Profile menu and on the account page", async ({
-  appServerUrl,
-  ownerPage: page,
+  browser,
+  handoffServer,
 }) => {
-  await page.goto(`${appServerUrl}/profile/account`);
+  const { context, page } = await openPage(browser);
+
+  await signInAsOwner(page, handoffServer.url);
+  await page.goto(`${handoffServer.url}/profile/account`);
 
   const accountLink = page.getByRole("link", { name: /Open Admin Portal/u });
 
   await expect(accountLink).toBeVisible();
-  await expect(accountLink).toHaveAttribute("href", "https://admin.tryoverture.com/admin");
+  await expect(accountLink).toHaveAttribute("href", `${HANDOFF_ADMIN_ORIGIN}/admin`);
 
   await page.getByRole("link", { name: "Profile", exact: true }).first().hover();
 
   const menuItem = page.getByRole("menuitem", { name: /Admin Portal/u });
 
   await expect(menuItem).toBeVisible();
-  await expect(menuItem).toHaveAttribute("href", "https://admin.tryoverture.com/admin");
+  await expect(menuItem).toHaveAttribute("href", `${HANDOFF_ADMIN_ORIGIN}/admin`);
 
-  const me = await meOf(page, appServerUrl);
+  const me = await meOf(page, handoffServer.url);
 
   expect(me.user?.role).toBe("owner");
-  expect(me.adminOrigin).toBe("https://admin.tryoverture.com");
+  expect(me.adminOrigin).toBe(HANDOFF_ADMIN_ORIGIN);
+
+  await context.close();
 });
 
 test("the owner's account card is axe clean and overflow-free at phone and desktop widths", async ({
-  appServerUrl,
-  ownerPage: page,
+  browser,
+  handoffServer,
 }) => {
+  const { context, page } = await openPage(browser);
+
+  await signInAsOwner(page, handoffServer.url);
+
   await page.setViewportSize({ height: 844, width: 390 });
-  await page.goto(`${appServerUrl}/profile/account`);
+  await page.goto(`${handoffServer.url}/profile/account`);
   await expect(page.getByRole("link", { name: /Open Admin Portal/u })).toBeVisible();
 
   await expectRegionAxeClean(page, "#admin-portal", "account card at 390px");
   await expectNoHorizontalOverflow(page, "account card at 390px");
 
   await page.setViewportSize({ height: 844, width: 1280 });
-  await page.goto(`${appServerUrl}/profile/account`);
+  await page.goto(`${handoffServer.url}/profile/account`);
   await expect(page.getByRole("link", { name: /Open Admin Portal/u })).toBeVisible();
 
   await expectRegionAxeClean(page, "#admin-portal", "account card at 1280px");
   await expectNoHorizontalOverflow(page, "account card at 1280px");
+
+  await context.close();
 });
 
-test("a regular user never sees the Admin Portal link", async ({ appServerUrl, page }) => {
-  const { owner } = await ownerContextFor(appServerUrl);
+test("a regular user never sees the Admin Portal link", async ({ browser, handoffServer }) => {
+  const { owner } = await ownerContextFor(handoffServer.url);
 
   await owner.post("/__test__/users", { data: { email: REGULAR_EMAIL, name: "Regular User" } });
   await owner.dispose();
 
-  await signInWithMagicLink(page, appServerUrl, REGULAR_EMAIL);
+  const { context, page } = await openPage(browser);
 
-  const me = await meOf(page, appServerUrl);
+  await signInWithMagicLink(page, handoffServer.url, REGULAR_EMAIL);
+
+  const me = await meOf(page, handoffServer.url);
 
   const state = authStateSchema.parse(
-    await (await page.request.get(`${appServerUrl}/__test__/auth/state`)).json(),
+    await (await page.request.get(`${handoffServer.url}/__test__/auth/state`)).json(),
   );
 
   const role = state.users.find((user) => user.email === REGULAR_EMAIL)?.role;
@@ -206,7 +226,7 @@ test("a regular user never sees the Admin Portal link", async ({ appServerUrl, p
   expect(me.user?.role).toBe("user");
   expect(me.adminOrigin).toBeNull();
 
-  await page.goto(`${appServerUrl}/profile/account`);
+  await page.goto(`${handoffServer.url}/profile/account`);
   await expect(page.getByRole("heading", { name: "Account", exact: false }).first()).toBeVisible();
 
   await expect(page.getByText("Admin Portal", { exact: true })).toHaveCount(0);
@@ -214,10 +234,12 @@ test("a regular user never sees the Admin Portal link", async ({ appServerUrl, p
   await page.getByRole("link", { name: "Profile", exact: true }).first().hover();
 
   await expect(page.getByRole("menuitem", { name: /Admin Portal/u })).toHaveCount(0);
+
+  await context.close();
 });
 
 test("the demo account never sees the Admin Portal link", async ({ browser, demoServer }) => {
-  const page = await browser.newPage();
+  const { context, page } = await openPage(browser);
 
   await page.goto(`${demoServer.url}/signin`);
   await page.getByLabel("Email").fill(DEMO_EMAIL);
@@ -237,7 +259,7 @@ test("the demo account never sees the Admin Portal link", async ({ browser, demo
   await expect(page.getByText("Admin Portal", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Admin Portal/u })).toHaveCount(0);
 
-  await page.context().close();
+  await context.close();
 });
 
 test("an anonymous visitor on the main host keeps the admin gate, not the handoff", async ({
@@ -256,7 +278,7 @@ test("an owner on the main host gets a handoff card that opens the admin host", 
   browser,
   handoffServer,
 }) => {
-  const page = await browser.newPage();
+  const { context, page } = await openPage(browser);
 
   const state = await signInAsOwner(page, handoffServer.url);
 
@@ -275,7 +297,7 @@ test("an owner on the main host gets a handoff card that opens the admin host", 
   await expect(page.getByRole("navigation", { name: "Admin sections" })).toHaveCount(0);
   await expect(page.getByText(/admin\.example\.test/u).first()).toBeVisible();
 
-  await page.context().close();
+  await context.close();
 
   await checkHandoffViewports(browser, state, handoffServer.url, [
     { theme: "light", width: 390 },
