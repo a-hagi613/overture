@@ -259,6 +259,10 @@ export function billingUserView(db: AppDatabase, clock: Clock, userId: string) {
   const refunded = refundedGrantIds(db);
   const period = rows.find((grant) => grant.source === "period" && isActive(grant, at)) ?? null;
   const trial = rows.find((grant) => grant.source === "trial" && isActive(grant, at)) ?? null;
+
+  const refundedPeriod =
+    period ?? rows.find((grant) => grant.source === "period" && refunded.has(grant.id)) ?? null;
+
   const paused = user.pauseReason === "payment_failed";
 
   const describeGrant = (grant: GrantRow) => {
@@ -278,7 +282,7 @@ export function billingUserView(db: AppDatabase, clock: Clock, userId: string) {
   };
 
   return {
-    current: period === null ? null : describeGrant(period),
+    current: refundedPeriod === null ? null : describeGrant(refundedPeriod),
     email: user.email,
     id: user.id,
     name: displayName(user.name, user.email),
