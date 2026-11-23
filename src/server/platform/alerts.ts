@@ -49,7 +49,7 @@ function notifyOwners(db: AppDatabase, clock: Clock, kind: AlertKind, detail: Al
       kind: "alert",
       title: `Overture alert: ${kind}`,
       body,
-      url: "/",
+      url: "/home",
     });
   }
 }

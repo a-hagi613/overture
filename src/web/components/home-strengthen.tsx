@@ -19,7 +19,7 @@ export function HomeStrengthen({ missing }: { missing: number }) {
         <p className={`${dsBody} mt-1.5`}>{copy.home.strengthen.note}</p>
       </div>
       <Button asChild size="default" variant="primary">
-        <Link to="/profile#profile-strengthen">{copy.home.strengthen.action}</Link>
+        <Link to="/profile/details#profile-strengthen">{copy.home.strengthen.action}</Link>
       </Button>
     </Card>
   );

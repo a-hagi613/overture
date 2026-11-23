@@ -22,7 +22,7 @@ export function HomeBillingNotice(props: {
     return (
       <Card
         ariaLabelledBy="home-grant"
-        className="mb-6 flex flex-wrap items-center justify-between gap-x-5 gap-y-3 border-signal/35 bg-signal-soft px-5 py-3.5"
+        className="mt-5 flex flex-wrap items-center justify-between gap-x-5 gap-y-3 border-signal/35 bg-signal-soft px-5 py-3.5"
       >
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold text-signal-text" id="home-grant">
@@ -43,7 +43,7 @@ export function HomeBillingNotice(props: {
     return (
       <Card
         ariaLabelledBy="home-out"
-        className="mb-6 flex flex-wrap items-center justify-between gap-x-5 gap-y-3 border-need bg-need-soft px-5 py-4"
+        className="mt-5 flex flex-wrap items-center justify-between gap-x-5 gap-y-3 border-need bg-need-soft px-5 py-4"
       >
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold text-need" id="home-out">

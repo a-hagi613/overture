@@ -1,15 +1,18 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
-import type { Context } from "hono";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { MailSender } from "../platform/mail/port.ts";
 import type { Auth } from "../auth/index.ts";
 
+import { API_ERRORS } from "../../shared/api-errors.ts";
 import { supportRequestSchema, supportResponseSchema } from "../../shared/support.ts";
 import type { SupportRequest } from "../../shared/support.ts";
 import { consumeRateLimit } from "../auth/rate-limit.ts";
+import { readSessionUser } from "../auth/session.ts";
+import { demoLocked } from "../demo/guard.ts";
+import { logError } from "../platform/log.ts";
+import { validJson } from "./validators.ts";
 
 const HOUR_MS = 60 * 60_000;
 const MAX_REQUESTS_PER_HOUR = 5;
@@ -26,12 +29,6 @@ export interface SupportRouteDeps {
   clock: Clock;
   mail: MailSender;
   supportEmail: string;
-}
-
-async function readSession(auth: Auth, context: Context) {
-  const session = await auth.api.getSession({ headers: context.req.raw.headers }).catch(() => null);
-
-  return session?.user ?? null;
 }
 
 function composeSupportBody(user: SupportUser, request: SupportRequest, referenceId: string) {
@@ -54,11 +51,17 @@ export function createSupportRoutes(deps: SupportRouteDeps) {
 
   const routes = new Hono();
 
-  routes.post("/support", zValidator("json", supportRequestSchema), async (context) => {
-    const user = await readSession(auth, context);
+  routes.post("/support", validJson(supportRequestSchema), async (context) => {
+    const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
-      return context.json({ error: "sign_in_required" }, 401);
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    const locked = demoLocked(user.role);
+
+    if (locked !== null) {
+      return locked;
     }
 
     const allowed = consumeRateLimit(
@@ -77,11 +80,18 @@ export function createSupportRoutes(deps: SupportRouteDeps) {
     const subject = `[Overture Support - ${request.category}] ${request.subject.replaceAll(/\s+/gu, " ")}`;
     const referenceId = crypto.randomUUID();
 
-    await mail.sendSupportMessage({
-      to: supportEmail,
-      subject,
-      body: composeSupportBody(user, request, referenceId),
-    });
+    try {
+      await mail.sendSupportMessage({
+        to: supportEmail,
+        replyTo: user.email,
+        subject,
+        body: composeSupportBody(user, request, referenceId),
+      });
+    } catch (error) {
+      logError("support.send", error);
+
+      return context.json({ error: "mail_send_failed" }, 502);
+    }
 
     const response = supportResponseSchema.parse({
       ok: true,

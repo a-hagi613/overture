@@ -79,7 +79,7 @@ export function createBillingPauseNotice(
     body: pause.copy,
     kind: "paused",
     title: pause.title,
-    url: "/",
+    url: "/profile/billing",
     userId: input.userId,
   });
 

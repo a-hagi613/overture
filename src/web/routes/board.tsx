@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
-import { canMoveApplicationToStage } from "../../shared/board.ts";
+import { canMoveApplicationToStage, canWithdrawApplication } from "../../shared/board.ts";
 import { copy } from "../../shared/copy.ts";
 import { BoardSheet } from "../components/board-sheet.tsx";
 import { PageHeader } from "../components/page-header.tsx";
@@ -23,7 +23,13 @@ import { TrackerMobileTab } from "../components/tracker-mobile-tab.tsx";
 import { TrackerOverlayCard } from "../components/tracker-overlay-card.tsx";
 import { Tabs } from "../components/ui/tabs.tsx";
 import { TabsList } from "../components/ui/tabs-list.tsx";
-import { useApplication, useBoard, useMoveStage, useUndoStage } from "../lib/board-api.ts";
+import {
+  useApplication,
+  useBoard,
+  useMoveStage,
+  useUndoStage,
+  useWithdraw,
+} from "../lib/board-api.ts";
 import type { BoardCard, StageKey } from "../lib/board-api.ts";
 import { onBoardMoved } from "../lib/live-events.ts";
 import { useMediaQuery } from "../lib/media-query.ts";
@@ -46,6 +52,7 @@ export function BoardPage() {
   const { data: board } = useBoard();
   const moveStage = useMoveStage();
   const undoStage = useUndoStage();
+  const withdraw = useWithdraw();
   const isDesktopBoard = useMediaQuery("(min-width: 1024px)");
   const [searchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get("application"));
@@ -93,6 +100,12 @@ export function BoardPage() {
     };
   }, [selectedId]);
 
+  const clearLaneOverride = (id: string) => {
+    setLaneOverrides((current) =>
+      Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)),
+    );
+  };
+
   const moveCardToLane = (
     card: BoardCard,
     fromLane: TrackerLaneKey,
@@ -104,26 +117,44 @@ export function BoardPage() {
       return;
     }
 
+    if (!canMoveApplicationToStage(card.status, targetStage)) {
+      toast.error(copy.board.moveNotAllowed);
+
+      return;
+    }
+
     setLaneOverrides((current) => ({ ...current, [card.id]: targetLane }));
 
-    const backendAllowed = canMoveApplicationToStage(card.status, targetStage);
+    moveStage.mutate(
+      { id: card.id, stage: targetStage },
+      {
+        onError: () => {
+          clearLaneOverride(card.id);
+          toast.error(copy.board.moveFailed);
+        },
+        onSuccess: () => {
+          clearLaneOverride(card.id);
+          toast.success(copy.board.movedToLane(card.company, label), {
+            action: {
+              label: copy.board.undo,
+              onClick: () => {
+                setLaneOverrides((current) => ({ ...current, [card.id]: fromLane }));
 
-    toast.success(copy.board.movedToLane(card.company, label), {
-      action: {
-        label: copy.board.undo,
-        onClick: () => {
-          setLaneOverrides((current) => ({ ...current, [card.id]: fromLane }));
-
-          if (backendAllowed) {
-            undoStage.mutate(card.id);
-          }
+                undoStage.mutate(card.id, {
+                  onError: () => {
+                    clearLaneOverride(card.id);
+                    toast.error(copy.board.moveFailed);
+                  },
+                  onSuccess: () => {
+                    clearLaneOverride(card.id);
+                  },
+                });
+              },
+            },
+          });
         },
       },
-    });
-
-    if (backendAllowed) {
-      moveStage.mutate({ id: card.id, stage: targetStage });
-    }
+    );
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -183,6 +214,24 @@ export function BoardPage() {
     const card = allCards.find((entry) => entry.id === detail.application.id);
 
     if (card === undefined) {
+      return;
+    }
+
+    if (canWithdrawApplication(card.status)) {
+      setLaneOverrides((current) => ({ ...current, [card.id]: "closed" }));
+      setSelectedId(null);
+
+      withdraw.mutate(card.id, {
+        onError: () => {
+          clearLaneOverride(card.id);
+          toast.error(copy.board.moveFailed);
+        },
+        onSuccess: () => {
+          clearLaneOverride(card.id);
+          toast.success(copy.board.withdrawSuccess(card.company));
+        },
+      });
+
       return;
     }
 

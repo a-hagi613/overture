@@ -61,7 +61,7 @@ interface LabRunSummary {
   sessions: LabRunSession[];
 }
 
-interface Driven {
+export interface Driven {
   outcome: LabOutcome;
   challengeSeen: boolean;
   codeAsked: boolean;
@@ -200,7 +200,12 @@ async function driveForm(page: Page, baseUrl: string, ats: LabFormAts) {
   } satisfies Driven;
 }
 
-async function drivePage(page: Page, baseUrl: string, key: string, challenge: "pass" | "blocked") {
+export async function drivePage(
+  page: Page,
+  baseUrl: string,
+  key: string,
+  challenge: "pass" | "blocked",
+) {
   const definition = labPage(key);
 
   if (definition === null) {
@@ -323,7 +328,7 @@ function recordUnconfigured(deps: LabRunDeps, runId: string, key: string, provid
   return session;
 }
 
-async function series<T>(count: number, run: (index: number) => Promise<T>) {
+export async function series<T>(count: number, run: (index: number) => Promise<T>) {
   const results: T[] = [];
 
   const next = async (index: number) => {

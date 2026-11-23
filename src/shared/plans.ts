@@ -36,6 +36,12 @@ export function formatHour(hour: number) {
   return `${String(hour).padStart(2, "0")}:00`;
 }
 
+/**
+ * Formats a price for the marketing and legal pages: a whole dollar amount
+ * stays whole (`$3`) and a decimal price keeps its cents (`$9.99`).
+ * @param amount The price in dollars.
+ * @returns The formatted dollar amount.
+ */
 export function formatUsd(amount: number) {
   return Number.isInteger(amount) ? `$${String(amount)}` : `$${amount.toFixed(2)}`;
 }

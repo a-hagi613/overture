@@ -246,7 +246,7 @@ test.describe("plan and billing in Profile, and the paused states", () => {
         await (await app.api.get(`${app.server.url}/api/billing`)).json(),
       );
 
-      expect(billing).toMatchObject({ applicationsLeft: 300, plan: "month" });
+      expect(billing).toMatchObject({ applicationsLeft: 250, plan: "month" });
 
       const { close, page } = await openPage(browser, app, { dark: false, width: 1280 });
 
@@ -257,7 +257,7 @@ test.describe("plan and billing in Profile, and the paused states", () => {
           page.getByRole("heading", { name: /Plan & Billing/u, level: 1 }),
         ).toBeVisible();
         await expect(page.getByRole("heading", { name: "Month plan" })).toBeVisible();
-        await expect(page.getByText(/300 of 300 applications left/u)).toBeVisible();
+        await expect(page.getByText(/250 of 250 applications left/u)).toBeVisible();
         await expect(page.getByRole("heading", { name: "You're on the Month plan" })).toBeVisible();
 
         await page.getByRole("button", { name: "Manage billing" }).first().click();

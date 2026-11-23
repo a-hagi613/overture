@@ -17869,6 +17869,7 @@
         "src/server/platform/mail/sending-domain.ts",
         "src/server/platform/mail/sink.ts",
         "src/server/platform/outbound-guard.ts",
+        "src/server/platform/outbound-interception.ts",
         "src/server/platform/passkey/index.ts",
         "src/server/platform/ports/clock.ts",
         "src/server/platform/ports/payments.ts",
@@ -26644,13 +26645,6 @@
         "test/e2e/s3-server.ts",
         "test/e2e/template-databases.ts"
       ]
-    },
-    "test/e2e/msw-canary.test.ts": {
-      "full": false,
-      "paths": [],
-      "routes": [],
-      "designs": [],
-      "modules": []
     },
     "test/e2e/nav-badges.test.ts": {
       "full": false,

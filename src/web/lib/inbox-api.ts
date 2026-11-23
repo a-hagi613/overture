@@ -122,7 +122,11 @@ export function useMarkRead() {
   return useMutation({
     mutationFn: markRead,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["threads"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["threads"] }),
+        queryClient.invalidateQueries({ queryKey: ["nav"] }),
+        queryClient.invalidateQueries({ queryKey: ["home"] }),
+      ]);
     },
   });
 }

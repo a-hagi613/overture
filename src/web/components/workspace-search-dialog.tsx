@@ -44,6 +44,8 @@ const ITEM_CLASS =
 const GROUP_HEADING_CLASS =
   "[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:text-eyebrow [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:text-muted-foreground";
 
+const SEARCH_DEBOUNCE_MS = 250;
+
 export function WorkspaceSearchDialog({
   onOpenChange,
   open,
@@ -53,7 +55,26 @@ export function WorkspaceSearchDialog({
 }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const { data, isFetching } = useWorkspaceSearch(query, open);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    if (open && query.trim() !== "") {
+      timer = globalThis.setTimeout(() => {
+        setDebouncedQuery(query);
+      }, SEARCH_DEBOUNCE_MS);
+    }
+
+    return () => {
+      if (timer !== null) {
+        globalThis.clearTimeout(timer);
+      }
+    };
+  }, [open, query]);
+
+  const activeQuery = !open || query.trim() === "" ? "" : debouncedQuery;
+  const { data, isFetching } = useWorkspaceSearch(activeQuery, open);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -79,10 +100,12 @@ export function WorkspaceSearchDialog({
   const go = (to: string) => {
     onOpenChange(false);
     setQuery("");
+    setDebouncedQuery("");
     void navigate(to);
   };
 
   const trimmed = query.trim();
+  const searchPending = isFetching || (trimmed !== "" && activeQuery.trim() !== trimmed);
   const apps = data?.applications ?? [];
   const reviews = data?.reviews ?? [];
   const emails = data?.emails ?? [];
@@ -97,6 +120,7 @@ export function WorkspaceSearchDialog({
 
         if (!next) {
           setQuery("");
+          setDebouncedQuery("");
         }
       }}
       onValueChange={setQuery}
@@ -127,13 +151,13 @@ export function WorkspaceSearchDialog({
         </Command.Group>
       ) : null}
 
-      {trimmed !== "" && isFetching && totalResults === 0 ? (
+      {trimmed !== "" && searchPending && totalResults === 0 ? (
         <p className="px-3 py-6 text-center text-sm text-muted-foreground">
           {copy.shell.searchLoading}
         </p>
       ) : null}
 
-      {trimmed !== "" && !isFetching && totalResults === 0 ? (
+      {trimmed !== "" && !searchPending && totalResults === 0 ? (
         <p className="px-3 py-6 text-center text-sm text-muted-foreground">
           {copy.shell.searchEmpty}
         </p>

@@ -49,7 +49,7 @@ const test = appTest.extend<{ demoServer: AppServer }>({
 });
 
 test.describe("core workspace flows on the rebuilt Ember UI", () => {
-  test("Home dashboard toggles Auto-apply, switches Line/Bar chart and 7D/30D/90D ranges", async ({
+  test("Home dashboard gates sending during onboarding, switches Line/Bar chart and 7D/30D/90D ranges", async ({
     browser,
     appServerUrl,
     ownerStorageState,
@@ -81,18 +81,10 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
         await expect(rangeTab).toHaveAttribute("aria-selected", "true");
       });
 
-      const controlButton = page.getByRole("button", {
-        name: /Pause auto-apply|Resume auto-apply/u,
-      });
-
-      await expect(controlButton).toBeVisible();
-      const initialText = (await controlButton.textContent()) ?? "";
-
-      await controlButton.click();
-      await expect(controlButton).not.toHaveText(initialText);
-
-      await controlButton.click();
-      await expect(controlButton).toHaveText(initialText);
+      await expect(page.getByRole("button", { name: /Pause sending|Resume sending/u })).toHaveCount(
+        0,
+      );
+      await expect(page.getByRole("link", { name: "Finish setup" }).first()).toBeVisible();
 
       const results = await new AxeBuilder({ page }).analyze();
 

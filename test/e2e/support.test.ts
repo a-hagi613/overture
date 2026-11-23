@@ -175,3 +175,18 @@ appTest(
     await request.dispose();
   },
 );
+
+appTest("support returns 502 when mail delivery fails", async ({ isolatedAppServer }) => {
+  const request = await signInAsOwner(isolatedAppServer.url);
+
+  await request.post("/__test__/mail/fail-next", { data: { count: 1 } });
+
+  const response = await request.post("/api/support", { data: validRequest });
+
+  expect(response.status()).toBe(502);
+  expect(z.object({ error: z.string() }).parse(await response.json()).error).toBe(
+    "mail_send_failed",
+  );
+
+  await request.dispose();
+});

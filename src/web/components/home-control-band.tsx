@@ -1,10 +1,13 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Pause, Play } from "lucide-react";
+import type { ReactNode } from "react";
+import { Link } from "react-router";
 import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
 import type { HomeResponse } from "../lib/home-api.ts";
 import { useRunning } from "../lib/home-api.ts";
+import { PAUSE_FIX_PATH } from "../lib/pause-paths.ts";
 import { Badge } from "./ui/badge.tsx";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
@@ -18,8 +21,17 @@ function timeText(at: number, zone: string) {
   }).format(new Date(at));
 }
 
-function statusDetailFor(running: boolean, nextSendAt: number | null, zone: string) {
+function statusDetailFor(
+  running: boolean,
+  pauseReason: HomeResponse["pauseReason"],
+  nextSendAt: number | null,
+  zone: string,
+) {
   if (!running) {
+    if (pauseReason !== null && pauseReason !== "user") {
+      return copy.home.pauseReasons[pauseReason].copy;
+    }
+
     return copy.home.control.pausedDetail;
   }
 
@@ -33,11 +45,12 @@ function statusDetailFor(running: boolean, nextSendAt: number | null, zone: stri
 export function HomeControlBand({ home }: { home: HomeResponse }) {
   const queryClient = useQueryClient();
   const runningMutation = useRunning();
-  const { dailyCap, nextSendAt, running, sentToday, timeZone } = home;
+  const { dailyCap, nextSendAt, pauseReason, running, sentToday, timeZone } = home;
   const pct = dailyCap > 0 ? Math.min(100, Math.round((sentToday / dailyCap) * 100)) : 0;
-  const statusDetail = statusDetailFor(running, nextSendAt, timeZone);
+  const statusDetail = statusDetailFor(running, pauseReason, nextSendAt, timeZone);
+  const canToggleRunning = running || pauseReason === null || pauseReason === "user";
 
-  const applyRunningState = (next: boolean) => {
+  const applyRunningState = (next: boolean, reason: HomeResponse["pauseReason"]) => {
     queryClient.setQueryData<HomeResponse>(["home"], (current) => {
       if (current === undefined) {
         return current;
@@ -45,29 +58,71 @@ export function HomeControlBand({ home }: { home: HomeResponse }) {
 
       return {
         ...current,
-        pauseReason: next ? null : "user",
+        pauseReason: reason,
         running: next,
       };
     });
   };
 
   const toggleRunning = (next: boolean) => {
-    const previous = running;
+    const previousRunning = running;
+    const previousReason = pauseReason;
 
-    applyRunningState(next);
+    applyRunningState(next, next ? null : "user");
 
-    toast.success(next ? copy.home.control.resumedToast : copy.home.control.pausedToast, {
-      action: {
-        label: copy.board.undo,
-        onClick: () => {
-          applyRunningState(previous);
-          runningMutation.mutate(previous);
-        },
+    runningMutation.mutate(next, {
+      onError: () => {
+        applyRunningState(previousRunning, previousReason);
+        toast.error(copy.home.control.resumeErrorToast);
+      },
+      onSuccess: () => {
+        toast.success(next ? copy.home.control.resumedToast : copy.home.control.pausedToast, {
+          action: {
+            label: copy.board.undo,
+            onClick: () => {
+              applyRunningState(previousRunning, previousReason);
+              runningMutation.mutate(previousRunning, {
+                onError: () => {
+                  applyRunningState(next, next ? null : "user");
+                  toast.error(copy.home.control.resumeErrorToast);
+                },
+              });
+            },
+          },
+        });
       },
     });
-
-    runningMutation.mutate(next);
   };
+
+  let controlAction: ReactNode;
+
+  if (canToggleRunning) {
+    controlAction = (
+      <Button
+        disabled={runningMutation.isPending}
+        onClick={() => {
+          toggleRunning(!running);
+        }}
+        size="lg"
+        variant={running ? "secondary" : "primary"}
+      >
+        {running ? <Pause aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
+        <span>{running ? copy.home.control.pauseAction : copy.home.control.resumeAction}</span>
+      </Button>
+    );
+  } else if (pauseReason === "suspended") {
+    controlAction = (
+      <Button asChild size="lg" variant="primary">
+        <a href="mailto:hello@tryoverture.com">{copy.home.pauseReasons.suspended.fix}</a>
+      </Button>
+    );
+  } else {
+    controlAction = (
+      <Button asChild size="lg" variant="primary">
+        <Link to={PAUSE_FIX_PATH[pauseReason]}>{copy.home.pauseReasons[pauseReason].fix}</Link>
+      </Button>
+    );
+  }
 
   return (
     <Card
@@ -94,17 +149,7 @@ export function HomeControlBand({ home }: { home: HomeResponse }) {
           <p className={`${dsBody} mt-1`}>{statusDetail}</p>
         </div>
 
-        <Button
-          disabled={runningMutation.isPending}
-          onClick={() => {
-            toggleRunning(!running);
-          }}
-          size="lg"
-          variant={running ? "secondary" : "primary"}
-        >
-          {running ? <Pause aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
-          <span>{running ? copy.home.control.pauseAction : copy.home.control.resumeAction}</span>
-        </Button>
+        {controlAction}
       </div>
 
       <div className="mt-5 flex items-center gap-3 border-t border-border pt-4">

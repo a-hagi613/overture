@@ -154,14 +154,14 @@ test("the Start/Pause switch flips running and the page updates over SSE", async
   const page = await context.newPage();
 
   await page.clock.setFixedTime(new Date(2026, 10, 17, 11, 0, 0));
-  await page.goto(`${homeServer.url}/`);
+  await page.goto(`${homeServer.url}/home`);
 
-  await expect(page.getByText("Auto-apply running")).toBeVisible();
+  await expect(page.getByText("Sending active")).toBeVisible();
 
-  await page.getByRole("button", { name: "Pause auto-apply" }).click();
+  await page.getByRole("button", { name: "Pause sending" }).click();
 
-  await expect(page.getByText("Auto-apply paused")).toBeVisible();
-  await expect(page.getByText("Paused by you.")).toBeVisible();
+  await expect(page.getByText("Sending paused")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sending is paused" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
 
   const paused = await request.get("/api/home");
@@ -170,11 +170,11 @@ test("the Start/Pause switch flips running and the page updates over SSE", async
 
   await page.getByRole("button", { name: "Resume" }).click();
 
-  await expect(page.getByText("Auto-apply running")).toBeVisible();
+  await expect(page.getByText("Sending active")).toBeVisible();
 
   await request.post("/api/running", { data: { running: false } });
 
-  await expect(page.getByText("Auto-apply paused")).toBeVisible();
+  await expect(page.getByText("Sending paused")).toBeVisible();
   await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
 
   await context.close();

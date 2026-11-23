@@ -152,7 +152,7 @@ async function expectPausedHomeMatchesBoard(
   await expect(
     page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
   ).toBeVisible();
-  await expect(page.getByText("Auto-apply paused")).toBeVisible();
+  await expect(page.getByText("Sending paused")).toBeVisible();
   await expect(page.getByText("Paused by you.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
   await expect(page.getByText("Held while sending is paused")).toBeVisible();

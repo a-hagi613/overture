@@ -1,10 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, Send } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
 import { PageHeader } from "../components/page-header.tsx";
+import { ReadyApprovedList } from "../components/ready-approved-list.tsx";
 import { ReadyCard } from "../components/ready-card.tsx";
 import { ReadyConfirmDialog } from "../components/ready-confirm-dialog.tsx";
 import type { ReadyConfirmTarget } from "../components/ready-confirm-dialog.tsx";
@@ -20,11 +21,13 @@ import {
   useEditAnswer,
   useReady,
   useSkipReady,
+  useUnapprove,
 } from "../lib/ready-api.ts";
 import type { ReadyAnswer, ReadyCard as ReadyCardData } from "../lib/ready-api.ts";
 
 const INITIAL_VISIBLE = 4;
 const PAGE_STEP = 6;
+const SKIP_DELAY_MS = 5000;
 
 function errorCode(error: Error) {
   return error instanceof ReadyApiError ? error.code : "request_failed";
@@ -43,7 +46,10 @@ export function ReadyPage() {
   const approve = useApprove();
   const approveAll = useApproveAll();
   const skip = useSkipReady();
+  const unapprove = useUnapprove();
   const editAnswer = useEditAnswer();
+
+  const skipTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -54,12 +60,28 @@ export function ReadyPage() {
     null,
   );
 
+  useEffect(
+    () => () => {
+      for (const [id, timer] of skipTimers.current) {
+        globalThis.clearTimeout(timer);
+        void fetch(`/api/applications/${encodeURIComponent(id)}/withdraw`, {
+          keepalive: true,
+          method: "POST",
+        });
+      }
+
+      skipTimers.current.clear();
+    },
+    [],
+  );
+
   const rawCards = ready?.cards ?? [];
 
   const pendingCards = rawCards.filter(
     (card) => card.status === "ready" && !removedIds.includes(card.id),
   );
 
+  const approvedCards = rawCards.filter((card) => card.status === "approved");
   const sendableCards = pendingCards.filter((card) => card.plan !== null);
   const visibleCards = pendingCards.slice(0, visibleCount);
   const remaining = Math.max(0, pendingCards.length - visibleCards.length);
@@ -69,7 +91,7 @@ export function ReadyPage() {
   const failedToLoad = isError && ready === undefined;
   const confirmedEmpty = isSuccess && pendingCards.length === 0;
 
-  const sentToday = (home?.sentToday ?? 0) + removedIds.length;
+  const sentToday = home?.sentToday ?? 0;
   const dailyCap = home?.dailyCap ?? 10;
   const fill = dailyCap === 0 ? 0 : Math.min(100, Math.round((sentToday / dailyCap) * 100));
 
@@ -99,12 +121,18 @@ export function ReadyPage() {
       }
 
       setRemovedIds((current) => [...current, card.id]);
-      toast.success(copy.ready.toast.sentTo(card.company));
 
       approve.mutate(
         { id: card.id, planSha256 },
         {
-          onSuccess: refreshLinkedQueries,
+          onError: (error) => {
+            setRemovedIds((current) => current.filter((id) => id !== card.id));
+            handleEditFailure(error);
+          },
+          onSuccess: () => {
+            toast.success(copy.ready.toast.sentTo(card.company));
+            refreshLinkedQueries();
+          },
         },
       );
 
@@ -119,31 +147,85 @@ export function ReadyPage() {
       return;
     }
 
-    setRemovedIds((current) => [...current, ...batch.map((card) => card.id)]);
-    toast.success(copy.ready.toast.approvedAll(batch.length));
+    const batchIds = batch.map((card) => card.id);
+
+    setRemovedIds((current) => [...current, ...batchIds]);
 
     approveAll.mutate(
       batch.map((card) => ({ id: card.id, planSha256: card.plan?.planSha256 ?? "" })),
       {
-        onSuccess: refreshLinkedQueries,
+        onError: (error) => {
+          setRemovedIds((current) => current.filter((id) => !batchIds.includes(id)));
+          handleEditFailure(error);
+        },
+        onSuccess: (result) => {
+          const refusedIds = result.refused.map((entry) => entry.id);
+
+          if (refusedIds.length > 0) {
+            setRemovedIds((current) => current.filter((id) => !refusedIds.includes(id)));
+            toast.error(copy.ready.toast.refused(refusedIds.length));
+          }
+
+          if (result.approved.length > 0) {
+            toast.success(copy.ready.toast.approvedAll(result.approved.length));
+          }
+
+          refreshLinkedQueries();
+        },
       },
     );
   };
 
   const skipCard = (card: ReadyCardData) => {
-    setRemovedIds((current) => [...current, card.id]);
+    const existingTimer = skipTimers.current.get(card.id);
 
-    toast.success(`Skipped ${card.company}.`, {
+    if (existingTimer !== undefined) {
+      globalThis.clearTimeout(existingTimer);
+    }
+
+    setRemovedIds((current) => (current.includes(card.id) ? current : [...current, card.id]));
+
+    const timer = globalThis.setTimeout(() => {
+      skipTimers.current.delete(card.id);
+
+      skip.mutate(card.id, {
+        onError: () => {
+          setRemovedIds((current) => current.filter((id) => id !== card.id));
+          toast.error(copy.ready.toast.failed);
+        },
+        onSuccess: refreshLinkedQueries,
+      });
+    }, SKIP_DELAY_MS);
+
+    skipTimers.current.set(card.id, timer);
+
+    toast.success(copy.ready.toast.skippedCompany(card.company), {
       action: {
         label: copy.board.undo,
         onClick: () => {
+          const pendingTimer = skipTimers.current.get(card.id);
+
+          if (pendingTimer !== undefined) {
+            globalThis.clearTimeout(pendingTimer);
+            skipTimers.current.delete(card.id);
+          }
+
           setRemovedIds((current) => current.filter((id) => id !== card.id));
         },
       },
     });
+  };
 
-    skip.mutate(card.id, {
-      onSuccess: refreshLinkedQueries,
+  const unapproveCard = (card: ReadyCardData) => {
+    unapprove.mutate(card.id, {
+      onError: () => {
+        toast.error(copy.ready.toast.failed);
+      },
+      onSuccess: () => {
+        setRemovedIds((current) => current.filter((id) => id !== card.id));
+        toast.success(copy.ready.toast.unapproved);
+        refreshLinkedQueries();
+      },
     });
   };
 
@@ -295,6 +377,15 @@ export function ReadyPage() {
             </Button>
           ) : null}
         </section>
+      ) : null}
+
+      {approvedCards.length > 0 ? (
+        <ReadyApprovedList
+          busy={unapprove.isPending}
+          cards={approvedCards}
+          onUnapprove={unapproveCard}
+          zone={home?.timeZone ?? "UTC"}
+        />
       ) : null}
 
       <ReadyConfirmDialog

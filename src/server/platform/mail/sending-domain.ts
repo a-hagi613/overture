@@ -65,6 +65,12 @@ export interface SendingDnsRecord {
   type: string | null;
 }
 
+interface NormalizedSendingDnsRecord {
+  content: string;
+  name: string;
+  type: string | null;
+}
+
 export type EmailSendingPlan = "entitled" | "not-entitled" | "unknown";
 
 export interface EmailSendingRecordCheck {
@@ -83,6 +89,8 @@ export interface EmailSendingReadiness {
   returnPathDomain: string | null;
   dkimSelector: string | null;
   records: EmailSendingRecordCheck[];
+  /** Record types and names as Cloudflare returned them; never record content. */
+  receivedSummary?: string;
   error: string | null;
 }
 
@@ -214,7 +222,74 @@ export async function readSendingRecords(config: EmailSendingConfig, zoneId: str
   );
 }
 
-function txtRecords(records: SendingDnsRecord[], name: string) {
+const TRAILING_DOT = /\.$/u;
+const LEADING_MX_PRIORITY = /^\d+\s+/u;
+
+function normalizeDomain(domain: string) {
+  return domain.trim().toLowerCase().replace(TRAILING_DOT, "");
+}
+
+function normalizeRecordType(type: string | null) {
+  return type?.trim().toUpperCase() ?? null;
+}
+
+function normalizeRecordName(domain: string, name: string | null) {
+  const normalized = (name ?? "").trim().toLowerCase().replace(TRAILING_DOT, "");
+
+  if (normalized === "") {
+    return "";
+  }
+
+  if (normalized === domain || normalized.endsWith(`.${domain}`)) {
+    return normalized;
+  }
+
+  return `${normalized}.${domain}`;
+}
+
+function normalizeTxtContent(content: string | null) {
+  const trimmed = (content ?? "").trim();
+
+  if (!trimmed.startsWith('"')) {
+    return trimmed;
+  }
+
+  const chunks = [...trimmed.matchAll(/"(?<chunk>[^"]*)"/gu)].map(
+    (match) => match.groups?.chunk ?? "",
+  );
+
+  return chunks.length === 0 ? trimmed : chunks.join("");
+}
+
+function normalizeMxContent(content: string | null) {
+  return (content ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(LEADING_MX_PRIORITY, "")
+    .replace(TRAILING_DOT, "");
+}
+
+function normalizeRecord(domain: string, record: SendingDnsRecord) {
+  const type = normalizeRecordType(record.type);
+
+  let content: string;
+
+  if (type === "TXT") {
+    content = normalizeTxtContent(record.content);
+  } else if (type === "MX") {
+    content = normalizeMxContent(record.content);
+  } else {
+    content = (record.content ?? "").trim();
+  }
+
+  return {
+    content,
+    name: normalizeRecordName(domain, record.name),
+    type,
+  } satisfies NormalizedSendingDnsRecord;
+}
+
+function txtRecords(records: NormalizedSendingDnsRecord[], name: string) {
   return records.filter((record) => record.type === "TXT" && record.name === name);
 }
 
@@ -223,34 +298,42 @@ export function verifySendingRecords(
   subdomain: SendingSubdomain,
   records: SendingDnsRecord[],
 ) {
-  const bounceName = subdomain.returnPathDomain ?? `cf-bounce.${domain}`;
-  const dkimName = `${subdomain.dkimSelector ?? "cf-bounce"}._domainkey.${domain}`;
-  const dmarcName = `_dmarc.${domain}`;
+  const normalizedDomain = normalizeDomain(domain);
+  const normalized = records.map((record) => normalizeRecord(normalizedDomain, record));
 
-  const mx = records.filter((record) => record.type === "MX" && record.name === bounceName);
-
-  const mxOk =
-    mx.length > 0 && mx.every((record) => (record.content ?? "").endsWith(".mx.cloudflare.net"));
-
-  const spf = txtRecords(records, bounceName).filter((record) =>
-    (record.content ?? "").startsWith("v=spf1"),
+  const bounceName = normalizeRecordName(
+    normalizedDomain,
+    subdomain.returnPathDomain ?? `cf-bounce.${normalizedDomain}`,
   );
 
-  const spfOk = spf.some((record) =>
-    (record.content ?? "").includes("include:_spf.mx.cloudflare.net"),
+  const dkimName = normalizeRecordName(
+    normalizedDomain,
+    `${subdomain.dkimSelector ?? "cf-bounce"}._domainkey.${normalizedDomain}`,
   );
 
-  const dkim = txtRecords(records, dkimName).filter((record) =>
-    (record.content ?? "").startsWith("v=DKIM1"),
+  const dmarcName = normalizeRecordName(normalizedDomain, `_dmarc.${normalizedDomain}`);
+
+  const mx = normalized.filter((record) => record.type === "MX" && record.name === bounceName);
+
+  const mxOk = mx.length > 0 && mx.every((record) => record.content.endsWith(".mx.cloudflare.net"));
+
+  const spf = txtRecords(normalized, bounceName).filter((record) =>
+    record.content.startsWith("v=spf1"),
   );
 
-  const dkimOk = dkim.some((record) => (record.content ?? "").includes("p="));
+  const spfOk = spf.some((record) => record.content.includes("include:_spf.mx.cloudflare.net"));
 
-  const dmarc = txtRecords(records, dmarcName).filter((record) =>
-    (record.content ?? "").includes("v=DMARC1"),
+  const dkim = txtRecords(normalized, dkimName).filter((record) =>
+    record.content.startsWith("v=DKIM1"),
   );
 
-  const dmarcOk = dmarc.some((record) => (record.content ?? "").includes("p=reject"));
+  const dkimOk = dkim.some((record) => record.content.includes("p="));
+
+  const dmarc = txtRecords(normalized, dmarcName).filter((record) =>
+    record.content.includes("v=DMARC1"),
+  );
+
+  const dmarcOk = dmarc.some((record) => record.content.includes("p=reject"));
 
   const checks: EmailSendingRecordCheck[] = [
     {
@@ -286,6 +369,12 @@ export function verifySendingRecords(
   ];
 
   return checks;
+}
+
+function recordSummary(records: SendingDnsRecord[]) {
+  return records
+    .map((record) => `${record.type?.trim().toUpperCase() ?? "?"} ${record.name ?? "?"}`)
+    .join("; ");
 }
 
 function failedReadiness(config: EmailSendingConfig, plan: EmailSendingPlan, error: string) {
@@ -389,6 +478,7 @@ export async function readEmailSendingReadiness(config: EmailSendingConfig) {
     returnPathDomain: subdomain.returnPathDomain,
     dkimSelector: subdomain.dkimSelector,
     records: checks,
+    receivedSummary: recordSummary(records),
     error:
       failing.length === 0
         ? null

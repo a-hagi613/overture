@@ -1,6 +1,7 @@
 import { Archive, Check, ChevronDown, ExternalLink } from "lucide-react";
 import { useState } from "react";
 
+import { canMoveApplicationToStage } from "../../shared/board.ts";
 import { copy } from "../../shared/copy.ts";
 import { STAGE_KEYS } from "../lib/board-api.ts";
 import type { ApplicationDetail, StageKey } from "../lib/board-api.ts";
@@ -46,15 +47,19 @@ export function BoardSheetActions(props: {
             <div role="menu">
               {STAGE_KEYS.map((stage) => {
                 const isCurrent = stage === props.detail.application.stage;
+                const allowed = canMoveApplicationToStage(props.detail.application.status, stage);
+                let itemStyle = "text-foreground hover:bg-muted";
+
+                if (isCurrent) {
+                  itemStyle = "bg-signal-soft text-signal-text";
+                } else if (!allowed) {
+                  itemStyle = "cursor-not-allowed text-muted-foreground opacity-50";
+                }
 
                 return (
                   <button
-                    className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-sm font-medium transition ${
-                      isCurrent
-                        ? "bg-signal-soft text-signal-text"
-                        : "text-foreground hover:bg-muted"
-                    }`}
-                    disabled={isCurrent}
+                    className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-sm font-medium transition ${itemStyle}`}
+                    disabled={isCurrent || !allowed}
                     key={stage}
                     onClick={() => {
                       setMenuOpen(false);

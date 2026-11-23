@@ -11,6 +11,7 @@ import { useHomeData } from "../lib/home-api.ts";
 import { CodePasteSheet } from "../components/code-paste-sheet.tsx";
 import type { CodePasteMode } from "../components/code-paste-sheet.tsx";
 import { HomeActivity } from "../components/home-activity.tsx";
+import { HomeBillingNotice } from "../components/home-billing-notice.tsx";
 import { HomeChart } from "../components/home-chart.tsx";
 import { HomeCheckIn } from "../components/home-checkin.tsx";
 import { HomeCodeWait } from "../components/home-code-wait.tsx";
@@ -30,16 +31,45 @@ interface OpenSheet {
   wait: CodeWait;
 }
 
-function dateLine() {
+function dateLine(zone: string | undefined) {
   const now = new Date();
-  const weekday = now.toLocaleDateString(copy.home.dateLocale, { weekday: "long" });
-  const month = now.toLocaleDateString(copy.home.dateLocale, { month: "long" });
 
-  return `${weekday}, ${month} ${String(now.getDate())}`;
+  try {
+    const timeZone = zone === undefined ? undefined : { timeZone: zone };
+    const weekday = now.toLocaleDateString(copy.home.dateLocale, { ...timeZone, weekday: "long" });
+    const month = now.toLocaleDateString(copy.home.dateLocale, { ...timeZone, month: "long" });
+    const day = now.toLocaleDateString(copy.home.dateLocale, { ...timeZone, day: "numeric" });
+
+    return `${weekday}, ${month} ${day}`;
+  } catch {
+    const weekday = now.toLocaleDateString(copy.home.dateLocale, { weekday: "long" });
+    const month = now.toLocaleDateString(copy.home.dateLocale, { month: "long" });
+
+    return `${weekday}, ${month} ${String(now.getDate())}`;
+  }
 }
 
-function greetingWord() {
-  const hour = new Date().getHours();
+function greetingWord(zone: string | undefined) {
+  const now = new Date();
+  let hour = now.getHours();
+
+  if (zone !== undefined) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        hour12: false,
+        timeZone: zone,
+      }).formatToParts(now);
+
+      const formattedHour = Number(parts.find((part) => part.type === "hour")?.value);
+
+      if (!Number.isNaN(formattedHour)) {
+        hour = formattedHour % 24;
+      }
+    } catch {
+      hour = now.getHours();
+    }
+  }
 
   if (hour < 12) {
     return copy.home.greetingMorning;
@@ -134,10 +164,10 @@ export function HomePage() {
   return (
     <div>
       <PageHeader
-        lead={dateLine()}
+        lead={dateLine(home?.timeZone)}
         titleNode={
           <>
-            {greetingWord()}{" "}
+            {greetingWord(home?.timeZone)}{" "}
             <em className="italic text-signal">{`${firstName === "" ? copy.app.name : firstName}.`}</em>
           </>
         }
@@ -162,7 +192,16 @@ export function HomePage() {
         />
       )}
 
-      {home === undefined ? null : <HomeControlBand home={home} />}
+      {home === undefined ? null : (
+        <>
+          <HomeBillingNotice
+            applicationsLeft={home.applicationsLeft}
+            endingGrant={home.endingGrant}
+            planApplications={home.planApplications}
+          />
+          <HomeControlBand home={home} />
+        </>
+      )}
 
       {home === undefined || range === null ? null : (
         <>

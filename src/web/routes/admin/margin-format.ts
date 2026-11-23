@@ -23,6 +23,10 @@ export function formatPercent(ratio: number) {
   return `${String(Math.round(ratio * 100))}%`;
 }
 
+export function priceLabel(row: MarginPlanRow) {
+  return row.priceMicros === 0 ? formatUsd(0, 0) : formatUsd(row.priceMicros, 2);
+}
+
 export function costLabel(row: MarginPlanRow) {
   return row.costMicrosPerCompleted === null
     ? copy.admin.marginNotMeasured

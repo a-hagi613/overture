@@ -2,8 +2,10 @@ import { useState } from "react";
 
 import { copy } from "../../shared/copy.ts";
 import { AccountDeleteDialog } from "../components/account-delete-dialog.tsx";
+import { AccountLegalCard } from "../components/account-legal-card.tsx";
 import { AccountPacingCard } from "../components/account-pacing-card.tsx";
 import { AccountSessionsCard } from "../components/account-sessions-card.tsx";
+import { AccountSupportAccessCard } from "../components/account-support-access-card.tsx";
 import { PageHeader } from "../components/page-header.tsx";
 import { SettingsCalendarFeed } from "../components/settings-calendar-feed.tsx";
 import { SettingsForwardingCard } from "../components/settings-forwarding-card.tsx";
@@ -32,7 +34,9 @@ export function ProfileAccountPage() {
       />
 
       <div className="mt-6 flex flex-col gap-5">
-        <SettingsForwardingCard />
+        <div id="forwarding">
+          <SettingsForwardingCard />
+        </div>
 
         <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
           <SettingsNotifications />
@@ -45,6 +49,11 @@ export function ProfileAccountPage() {
         </div>
 
         <AccountPacingCard />
+
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
+          <AccountSupportAccessCard />
+          <AccountLegalCard />
+        </div>
 
         <Card ariaLabelledBy="account-danger" className="border-need/40 p-5 md:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

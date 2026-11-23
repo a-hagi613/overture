@@ -17,9 +17,19 @@ export type CustomCalendarEvent = z.infer<typeof customEventSchema>;
 
 export type CustomCalendarEventKind = CustomCalendarEvent["kind"];
 
-export function loadCustomCalendarEvents() {
+function storageKeyFor(userId: string | null) {
+  return userId === null || userId === "" ? null : `${STORAGE_KEY}:${userId}`;
+}
+
+export function loadCustomCalendarEvents(userId: string | null) {
+  const key = storageKeyFor(userId);
+
+  if (key === null) {
+    return [] satisfies CustomCalendarEvent[];
+  }
+
   try {
-    const raw = globalThis.localStorage.getItem(STORAGE_KEY);
+    const raw = globalThis.localStorage.getItem(key);
 
     if (raw === null) {
       return [] satisfies CustomCalendarEvent[];
@@ -33,9 +43,18 @@ export function loadCustomCalendarEvents() {
   }
 }
 
-export function saveCustomCalendarEvents(events: readonly CustomCalendarEvent[]) {
+export function saveCustomCalendarEvents(
+  events: readonly CustomCalendarEvent[],
+  userId: string | null,
+) {
+  const key = storageKeyFor(userId);
+
+  if (key === null) {
+    return false;
+  }
+
   try {
-    globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    globalThis.localStorage.setItem(key, JSON.stringify(events));
 
     return true;
   } catch {

@@ -9,6 +9,7 @@ import { InboxPage } from "./routes/inbox.tsx";
 import { LandingPage } from "./routes/landing.tsx";
 import { NotFoundPage } from "./routes/not-found.tsx";
 import { NotificationsPage } from "./routes/notifications.tsx";
+import { PreserveSearchRedirect } from "./components/preserve-search-redirect.tsx";
 import { OnboardingPage } from "./routes/onboarding.tsx";
 import { OnboardingFactsPage } from "./routes/onboarding-facts.tsx";
 import { OnboardingForwardPage } from "./routes/onboarding-forward.tsx";
@@ -62,6 +63,23 @@ const appShellChildren: RouteObject[] = [
   { path: "/profile/account", element: <ProfileAccountPage /> },
   { path: "/profile/billing", element: <ProfileBillingPage /> },
   { path: "/support", element: <SupportPage /> },
+  { path: "/settings", element: <PreserveSearchRedirect to="/profile/account" /> },
+  { path: "/settings/billing", element: <PreserveSearchRedirect to="/profile/billing" /> },
+  { path: "/settings/billing/plans", element: <PreserveSearchRedirect to="/profile/billing" /> },
+  {
+    path: "/settings/export",
+    element: <PreserveSearchRedirect to="/profile/account#account-data" />,
+  },
+  {
+    path: "/settings/delete",
+    element: <PreserveSearchRedirect to="/profile/account#account-danger" />,
+  },
+  {
+    path: "/settings/support-access",
+    element: <PreserveSearchRedirect to="/profile/account#support-access" />,
+  },
+  { path: "/search", element: <PreserveSearchRedirect to="/board" /> },
+  { path: "/inbox/address", element: <PreserveSearchRedirect to="/profile/account#forwarding" /> },
   { path: "*", element: <NotFoundPage /> },
 ];
 
@@ -84,6 +102,7 @@ const adminShellChildren: RouteObject[] = [
 
 const publicRoutes: RouteObject[] = [
   { path: "/", element: <LandingPage /> },
+  { path: "/pricing", element: <PreserveSearchRedirect to="/#pricing" /> },
   { path: "/signin", element: <SignInPage /> },
   { path: "/signup", element: <SignUpPage /> },
   { path: "/terms", element: <TermsPage /> },

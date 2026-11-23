@@ -11,8 +11,8 @@ export interface PlanDefinition {
 }
 
 export const PLAN_DEFINITIONS: Record<BillingPlan, PlanDefinition> = {
-  month: { applications: 300, periodDays: 30 },
-  week: { applications: 70, periodDays: 7 },
+  month: { applications: 250, periodDays: 30 },
+  week: { applications: 50, periodDays: 7 },
 };
 
 const DAY_MS = 24 * 60 * 60_000;

@@ -12,6 +12,7 @@ import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
 import { dsBody, dsCardTitle } from "../components/ui/ds.ts";
 import { useCalendar } from "../lib/calendar-api.ts";
+import { authClient } from "../lib/auth-client.ts";
 import {
   loadCustomCalendarEvents,
   saveCustomCalendarEvents,
@@ -34,6 +35,8 @@ import { browserZone, currentTime } from "../lib/inbox-time.ts";
 
 export function CalendarPage() {
   const [params, setParams] = useSearchParams();
+  const { data: session } = authClient.useSession();
+  const userId = session?.user.id ?? null;
   const headingId = useId();
   const localZone = browserZone();
   const asked = parseMonthKey(params.get("month"));
@@ -45,7 +48,14 @@ export function CalendarPage() {
   const [selected, setSelected] = useState<CalendarDate>(focus);
   const [navigated, setNavigated] = useState(false);
   const [zoneSynced, setZoneSynced] = useState(localZone);
-  const [customEvents, setCustomEvents] = useState<CustomCalendarEvent[]>(loadCustomCalendarEvents);
+
+  const [customState, setCustomState] = useState<{
+    items: CustomCalendarEvent[];
+    owner: string | null;
+  } | null>(null);
+
+  const customEvents =
+    customState?.owner === userId ? customState.items : loadCustomCalendarEvents(userId);
 
   const { month, year } = focus;
   const range = monthRange(year, month, localZone);
@@ -114,27 +124,31 @@ export function CalendarPage() {
 
     const next = [...customEvents, nextEvent];
 
-    setCustomEvents(next);
-    saveCustomCalendarEvents(next);
+    setCustomState({ items: next, owner: userId });
+    saveCustomCalendarEvents(next, userId);
     toast.success(copy.calendar.eventAddedToast(nextEvent.title));
   };
 
   const handleDeleteEvent = (target: CustomCalendarEvent) => {
+    const ownerId = userId;
     const next = customEvents.filter((entry) => entry.id !== target.id);
 
-    setCustomEvents(next);
-    saveCustomCalendarEvents(next);
+    setCustomState({ items: next, owner: ownerId });
+    saveCustomCalendarEvents(next, ownerId);
 
     toast.success(copy.calendar.eventRemovedToast(target.title), {
       action: {
         label: copy.board.undo,
         onClick: () => {
-          setCustomEvents((current) => {
-            const restored = [...current, target];
+          setCustomState((current) => {
+            const base =
+              current?.owner === ownerId ? current.items : loadCustomCalendarEvents(ownerId);
 
-            saveCustomCalendarEvents(restored);
+            const restored = [...base, target];
 
-            return restored;
+            saveCustomCalendarEvents(restored, ownerId);
+
+            return { items: restored, owner: ownerId };
           });
         },
       },

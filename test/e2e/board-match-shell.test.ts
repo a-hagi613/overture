@@ -96,7 +96,7 @@ for (const width of [390, 1280] as const) {
       if (width === 1280) {
         await expect(page.getByText("of 70 on your week plan")).toHaveCount(1);
       } else {
-        await expect(page.getByText("Auto-apply running").first()).toBeVisible();
+        await expect(page.getByText("Sending active").first()).toBeVisible();
       }
 
       await page.evaluate(async () => {

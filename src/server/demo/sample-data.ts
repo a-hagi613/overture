@@ -681,7 +681,7 @@ export const DEMO_NOTIFICATIONS: readonly {
     kind: "reply",
     read: false,
     title: "Saffron Works replied",
-    url: "/",
+    url: "/home",
   },
   {
     atDaysAgo: 12,
@@ -705,6 +705,6 @@ export const DEMO_NOTIFICATIONS: readonly {
     kind: "checkin",
     read: true,
     title: "How did Lumen Orchard go?",
-    url: "/",
+    url: "/home",
   },
 ];

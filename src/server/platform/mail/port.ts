@@ -43,6 +43,7 @@ export interface OutboundBillingNoticeMail {
 
 export interface OutboundSupportMail {
   to: string;
+  replyTo?: string;
   subject: string;
   body: string;
 }

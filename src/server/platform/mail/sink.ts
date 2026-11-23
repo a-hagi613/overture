@@ -120,6 +120,8 @@ export function createSinkMailSender(clock: Clock) {
       await Promise.resolve();
     },
     sendSupportMessage: async (mail) => {
+      failIfAsked();
+
       const sent = {
         id: randomUUID(),
         to: mail.to,

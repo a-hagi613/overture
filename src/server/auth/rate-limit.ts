@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import { eq } from "drizzle-orm";
 
@@ -6,9 +6,6 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { rateLimits } from "../platform/db/schema.ts";
-import { normaliseEmail } from "./email.ts";
-
-export type EmailRateLimitBucket = "sign-in" | "sign-up" | "reset";
 
 /**
  * Counts one use per key. The row is reset when its window has passed.
@@ -57,32 +54,4 @@ export function consumeRateLimit(
 
     return true;
   });
-}
-
-/**
- * Counts one auth attempt per email address. The key is an HMAC so the table
- * never holds an address, and the row is reset when its window has passed.
- * @param db The application database.
- * @param clock The injectable clock.
- * @param secret The HMAC key (the auth secret).
- * @param bucket Which auth surface this limit belongs to.
- * @param email The address the attempt was made with.
- * @param windowMs The width of the window.
- * @param max How many attempts fit in the window.
- * @returns Whether this attempt is inside the limit.
- */
-export function consumeEmailRateLimit(
-  db: AppDatabase,
-  clock: Clock,
-  secret: string,
-  bucket: EmailRateLimitBucket,
-  email: string,
-  windowMs: number,
-  max: number,
-) {
-  const digest = createHmac("sha256", secret)
-    .update(`auth-email:${bucket}:${normaliseEmail(email)}`)
-    .digest("hex");
-
-  return consumeRateLimit(db, clock, `auth-email:${bucket}:${digest}`, windowMs, max);
 }

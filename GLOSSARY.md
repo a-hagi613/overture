@@ -88,7 +88,7 @@ How many more Applications the user's plan allows; one is used only when an Appl
 _Avoid_: credit, allowance, quota
 
 **Plan**:
-The paid recurring allowance: Week ($12, 70 applications over 7 days) or Month ($35, 300 applications over 30 days).
+The paid recurring allowance: Week ($9.99, 50 applications over 7 days) or Month ($29.99, 250 applications over 30 days).
 It renews until cancelled, unused applications expire at the end of the period, and a failed Application is never charged.
 _Avoid_: tier, subscription level
 
@@ -177,7 +177,7 @@ _Avoid_: download, data dump, archive
 ## Plans and billing
 
 **Plan**:
-What the user pays for: Week gives 70 Applications over 7 days and Month gives 300 over 30 days, both renewing until
+What the user pays for: Week gives 50 Applications over 7 days and Month gives 250 over 30 days, both renewing until
 cancelled; the trial gives 3 once (ADR 0018).
 _Avoid_: subscription tier, package, level
 

@@ -248,7 +248,7 @@ export function CodePasteSheet({
               ) : (
                 <Link
                   className="inline-flex min-h-11 items-center text-[13px] font-semibold underline decoration-input underline-offset-4 hover:decoration-foreground md:min-h-10"
-                  to="/profile#profile-address"
+                  to="/profile/account"
                 >
                   {copy.codePaste.noCode.secondary}
                 </Link>

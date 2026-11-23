@@ -81,7 +81,6 @@
     "landmines-testing/no-flake-masking": "error",
     "landmines-testing/no-test-doubles": "error",
     "landmines-testing/no-unsignaled-poll": "error",
-    "landmines-testing/strict-msw": "error",
     "landmines-style/no-comments": [
       "error",
       {
@@ -214,10 +213,8 @@
           "src/web/components/board-sheet-navigation.tsx",
           "src/web/components/board-sheet-header.tsx",
           "src/web/components/board-sheet-pills.tsx",
-          "src/web/components/board-sheet-match.tsx",
           "src/web/components/board-sheet-actions.tsx",
           "src/web/components/board-sheet-panel.tsx",
-          "src/web/components/board-sent-banner.tsx",
           "src/web/components/board-timeline.tsx",
           "src/web/components/board-answers.tsx",
           "src/web/components/board-cover.tsx",
@@ -291,7 +288,6 @@
           "src/web/components/usage.tsx",
           "src/web/components/workspace-search-dialog.tsx",
           "src/web/components/home-control-band.tsx",
-          "src/web/components/home-kpis.tsx",
           "src/web/components/home-chart.tsx",
           "src/web/components/home-needs-you.tsx",
           "src/web/components/home-ready-card.tsx",
@@ -311,10 +307,13 @@
           "src/web/components/signin-story.tsx",
           "src/web/components/signin-card.tsx",
           "src/web/components/signin-form.tsx",
-          "src/web/components/sample-stage.tsx",
           "src/web/components/receipt-head.tsx",
           "src/web/components/receipt-ask-row.tsx",
-          "src/web/components/score-ring.tsx"
+          "src/web/components/score-ring.tsx",
+          "src/web/components/ready-approved-list.tsx",
+          "src/web/components/account-support-access-card.tsx",
+          "src/web/components/account-legal-card.tsx",
+          "src/web/components/preserve-search-redirect.tsx"
         ]
       }
     ],
@@ -334,6 +333,7 @@
           "src/server/catalog/tag-rules.test.ts",
           "src/server/catalog/question-normalize.test.ts",
           "src/server/catalog/answer-derivations.test.ts",
+          "src/server/catalog/companies-parquet.test.ts",
           "src/server/fixtures/sanitise.test.ts",
           "src/server/profile/v1-import.test.ts",
           "src/server/profile/facts.test.ts",
@@ -344,6 +344,7 @@
           "src/server/pipeline/personio-form.test.ts",
           "src/server/platform/mail/budget.test.ts",
           "src/server/platform/outbound-guard.test.ts",
+          "src/server/platform/outbound-interception.test.ts",
           "src/server/platform/db/restore-check.test.ts",
           "src/server/platform/ports/replica-listing.test.ts",
           "src/server/platform/jobs/queue.test.ts",
@@ -375,6 +376,7 @@
           "src/shared/host-match.test.ts",
           "scripts/database-sync-guard.test.ts",
           "scripts/lint-config-guard.test.ts",
+          "scripts/setup-stripe.test.ts",
           "scripts/workflow-config-guard.test.ts"
         ]
       }

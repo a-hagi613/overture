@@ -278,7 +278,7 @@ test("a failed payment pauses with its own copy, a push and an email, and a paid
       result: "processed",
     });
     expect(await homeState(request, server.url)).toMatchObject({
-      applicationsLeft: 300,
+      applicationsLeft: 250,
       pauseReason: null,
       running: true,
     });
@@ -307,7 +307,7 @@ test("a failed payment pauses with its own copy, a push and an email, and a paid
     expect(notices[0]).toMatchObject({
       body: "Sending stays paused until the card is updated.",
       title: "Payment didn't go through.",
-      url: "/",
+      url: "/profile/billing",
     });
 
     await runDue(request, server.url);
@@ -325,7 +325,7 @@ test("a failed payment pauses with its own copy, a push and an email, and a paid
     expect(emails[0]?.subject).toBe("Your Overture payment didn't go through");
     expect(emails[0]?.body).toContain("Sending stays paused until the card is updated.");
     expect(emails[0]?.body).toContain("Update payment");
-    expect(emails[0]?.body).toContain(`${BILLING_APP_ORIGIN}/settings`);
+    expect(emails[0]?.body).toContain(`${BILLING_APP_ORIGIN}/profile/billing`);
     expect(emails[0]?.body).not.toContain("failed");
 
     const pushes = pushRequestsSchema.parse(
@@ -460,7 +460,7 @@ test("the end of a plan pauses and lets an in-flight send finish, charged only i
       "confirming",
     );
 
-    expect(await homeState(request, server.url)).toMatchObject({ applicationsLeft: 298 });
+    expect(await homeState(request, server.url)).toMatchObject({ applicationsLeft: 248 });
 
     const clock = z
       .object({ now: z.number() })
@@ -484,7 +484,7 @@ test("the end of a plan pauses and lets an in-flight send finish, charged only i
     expect(notices[0]).toMatchObject({
       body: "Sending stopped when it ran out. Your queue and history are kept.",
       title: "Your plan has ended.",
-      url: "/",
+      url: "/profile/billing",
     });
 
     const heldApp = await seedApplication(
@@ -530,12 +530,12 @@ test("the end of a plan pauses and lets an in-flight send finish, charged only i
     expect(emails[0]?.subject).toBe("Your Overture plan has ended");
     expect(emails[0]?.body).toContain("Your plan has ended.");
     expect(emails[0]?.body).toContain("Choose a plan");
-    expect(emails[0]?.body).toContain(`${BILLING_APP_ORIGIN}/settings`);
+    expect(emails[0]?.body).toContain(`${BILLING_APP_ORIGIN}/profile/billing`);
 
     const afterExpiry = await billingState(request, server.url, ownerId);
 
     expect(afterExpiry.ledger.filter((row) => row.kind === "release")).toHaveLength(0);
-    expect(afterExpiry.ledger.find((row) => row.kind === "expire")?.amount).toBe(298);
+    expect(afterExpiry.ledger.find((row) => row.kind === "expire")?.amount).toBe(248);
 
     await catalog.post(`${server.url}/__test__/applications/status`, {
       data: { applicationId: sentApp, status: "sent" },
@@ -576,7 +576,7 @@ test("the end of a plan pauses and lets an in-flight send finish, charged only i
     const settled = await billingState(request, server.url, ownerId);
     const expireRows = settled.ledger.filter((row) => row.kind === "expire");
 
-    expect(expireRows.reduce((sum, row) => sum + row.amount, 0)).toBe(299);
+    expect(expireRows.reduce((sum, row) => sum + row.amount, 0)).toBe(249);
     expect(settled.applicationsLeft).toBe(0);
 
     const resume = await deliver(
@@ -593,7 +593,7 @@ test("the end of a plan pauses and lets an in-flight send finish, charged only i
 
     expect(webhookResultSchema.parse(await resume.json())).toStrictEqual({ result: "processed" });
     expect(await homeState(request, server.url)).toMatchObject({
-      applicationsLeft: 300,
+      applicationsLeft: 250,
       pauseReason: null,
       running: true,
     });

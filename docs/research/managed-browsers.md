@@ -44,7 +44,7 @@ CDP means `chromium.connectOverCDP(wsUrl)` from `playwright-core`. Every vendor 
 | **Notte** | yes | residential $10/GB; BYO $0.20/GB on Startup ($100) | included | included | "Personas" | not checked | 15/120/300 min max; 5/25/100 concurrent | **$0.01/h** browser (rounding policy **unverified**), $10/GB | $0.031; $0.003–0.004 own | $0.152 | $20 / $92 / $915; own proxy ~$177–222 at 30k | young; the browser rate looks like a loss leader |
 | **Rebrowser** | not stated on the pricing page (**unverified**) | BYO free on all plans | detection on Starter, solver on Business+ | "unique device fingerprints" | 5–500 persistent profiles | not checked | **1 / 5 / 20 / 100 concurrent** | $0.17–0.50/h; plans $49–999 | ~$0.009–0.025 + own proxy | ~$0.03–0.08 + own | concurrency forces Business ($499) at 30k | concurrency tiers make it expensive |
 | **Airtop** | yes (default context only) | integrated proxy; custom on Professional | not stated | not stated | yes | yes | 3/30/100 concurrent | credits; CPU-time and proxy rates unpublished | not computable | – | – | agent-first; dropped |
-| **Cloudflare Browser Run** | Browser Sessions (CDP) | **none listed** | none listed | – | – | – | 10 concurrent incl., then $2 each | $0.09/h | (no residential IP) | – | – | Cloudflare IPs; poor fit |
+| **Cloudflare Browser Run** | Browser Sessions (CDP); Live View and Human in the Loop | **none listed** (no proxy page in the docs index; all egress is Cloudflare IPs, no rotation) | none listed | – | – | – | 10 concurrent incl., then $2 each; 60 s idle close, `keep_alive` up to 20 min | $0.09/h after 10 h | $0.0164 with no proxy; $0.0319 with a $5/GB proxy (see #288) | – | – | always identified as bot traffic; dropped in #288 |
 | **Zyte API** | **no** (actions API) | – | – | – | – | – | – | $1.01–16.08 per 1k rendered responses | – | – | – | dropped: no CDP, no uploads |
 | **Decodo (Smartproxy)** | **no CDP browser product found** | proxies only | – | – | – | – | – | – | – | – | – | dropped as a browser; usable as a proxy |
 
@@ -53,6 +53,16 @@ Notes on the arithmetic:
 - Monthly figures use the cheapest plan that fits plus overage at the listed rate. Browserbase at 3,000 applications: Developer $20 + 50 h × $0.12 + 8 GB × $12 = $122. At 30,000: Startup $99 + 1,000 h × $0.10 + 85 GB × $10 = $1,049.
 - "Own proxy" variants assume the vendor does not meter BYO-proxy bandwidth. Steel says so explicitly ("no Steel bandwidth charge"). Anchor and Notte charge $0.20/GB. For Browserbase it is **unverified**.
 - Kernel's monthly figures assume headful at $0.48/h. Headless at $0.06/h would be about $90 at 30,000 applications, but Kernel itself warns that "Some bot detectors may detect headless mode", and live view and replays are unavailable headless.
+
+**Cloudflare Browser Run, re-checked and dropped (2026-11-22, issue #288).** Browser Run's Sessions (CDP) can be driven by
+`chromium.connectOverCDP` from any machine, and it now documents Live View and Human in the Loop, so the human-takeover
+gap is narrower than the row first recorded. The row is still a drop: the documentation index has no proxy page, the FAQ
+says every request leaves from Cloudflare IP ranges with no rotation, and the automatic headers
+(`cf-biso-devtools`, `cf-brapi-devtools`, `Signature*`) cannot be removed, so the vendor itself says the traffic is always
+identified as bot traffic. At the recorded 9 min 16 s and 2.71 MB (`docs/research/cost-m1.md` §2.1) that is $0.0164 per
+completed application with no proxy and $0.0319 with a proxy at Browser Use's $5/GB, and it has no solver for the visible
+challenges the send path turns into `captcha_blocked`. The lab probe, the header identity and the arithmetic are in
+`docs/research/cloudflare-paid-plan.md` §6 and reproducible with `bun run scripts/measure-browser-run-lab.ts`.
 
 ---
 

@@ -4,17 +4,10 @@ import { Link } from "react-router";
 import type { PauseReason } from "../../shared/copy.ts";
 
 import { copy } from "../../shared/copy.ts";
+import { PAUSE_FIX_PATH } from "../lib/pause-paths.ts";
 import { useRunning } from "../lib/home-api.ts";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
-
-const FIX_PATH: Record<Exclude<PauseReason, "suspended" | "user">, string> = {
-  no_mailbox: "/profile/details",
-  no_resume: "/profile/resume",
-  onboarding: "/onboarding",
-  payment_failed: "/profile/billing",
-  plan_ended: "/profile/billing",
-};
 
 export function HomePauseBanner({ reason }: { reason: PauseReason }) {
   const entry = copy.home.pauseReasons[reason];
@@ -45,7 +38,7 @@ export function HomePauseBanner({ reason }: { reason: PauseReason }) {
   } else {
     fix = (
       <Button asChild size="sm" variant="primary">
-        <Link to={FIX_PATH[reason]}>{entry.fix}</Link>
+        <Link to={PAUSE_FIX_PATH[reason]}>{entry.fix}</Link>
       </Button>
     );
   }

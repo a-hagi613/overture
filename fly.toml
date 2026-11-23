@@ -17,7 +17,15 @@ DATABASE_PATH = "/data/app.sqlite"
 CATALOG_DATABASE_PATH = "/data/catalog.sqlite"
 OBJECT_STORE_ROOT = "/data/objects"
 LITESTREAM_CONFIG_PATH = "/etc/litestream.yml"
+# Production stays invite-only until M3 public sign-up ships: the owner,
+# existing and invited users, and the demo account may sign in; anyone else is
+# refused.
+PUBLIC_SIGNUP_ENABLED = "false"
 DEMO_LOGIN_ENABLED = "true"
+# Cloudflare Email Sending is onboarded on tryoverture.com, so the deploy guard
+# and the daily `mail.sending` live check verify the sending domain actively
+# instead of staying gated.
+REQUIRE_EMAIL_SENDING = "true"
 
 [http_service]
 internal_port = 3000

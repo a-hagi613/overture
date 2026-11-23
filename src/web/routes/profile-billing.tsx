@@ -76,6 +76,7 @@ export function ProfileBillingPage() {
   const applicationsLeft = billing?.applicationsLeft ?? home?.applicationsLeft ?? 0;
   const planApplications = billing?.planApplications ?? home?.planApplications ?? 0;
   const upgradeTarget = nextUpgradePlan(activePlan);
+  const switchInStripe = activePlan !== null && billing?.status !== "canceled";
 
   const renewal =
     billing?.currentPeriodEnd === null || billing?.currentPeriodEnd === undefined
@@ -234,15 +235,29 @@ export function ProfileBillingPage() {
               </div>
               <Button
                 className="shrink-0 self-start sm:self-auto"
-                disabled={upgrading}
+                disabled={switchInStripe ? openingPortal : upgrading}
                 onClick={() => {
+                  if (switchInStripe) {
+                    void handleOpenStripe();
+
+                    return;
+                  }
+
                   void handleUpgrade(upgradeTarget.id);
                 }}
                 size="lg"
                 variant="primary"
               >
-                <span>{bp.billingUpgradeAction(upgradeTarget.name)}</span>
-                <ArrowUpRight aria-hidden="true" size={16} />
+                <span>
+                  {switchInStripe
+                    ? bp.billingSwitchInStripe
+                    : bp.billingUpgradeAction(upgradeTarget.name)}
+                </span>
+                {switchInStripe ? (
+                  <ExternalLink aria-hidden="true" size={16} />
+                ) : (
+                  <ArrowUpRight aria-hidden="true" size={16} />
+                )}
               </Button>
             </div>
           </Card>
