@@ -365,6 +365,19 @@ export const copy = {
     exportReadyBody: (url: string) =>
       `Your Overture export is ready to download.\n\nOpen Settings in Overture and choose Download export. The link is valid for 24 hours, then the archive is deleted.\n\n${url}\n\nIf you didn't ask for this, write to admin@tryoverture.com.\n`,
     supportSubject: (referenceId: string, subject: string) => `[${referenceId}] ${subject}`,
+    supportReplySubject: (referenceId: string, subject: string) =>
+      `[Ref: ${referenceId}] Re: ${subject}`,
+    supportReplyBody: (message: string, referenceId: string) =>
+      [
+        "Hello,",
+        "",
+        message,
+        "",
+        `Your reference is ${referenceId}. Reply to this email if anything is still unclear.`,
+        "",
+        "Overture support",
+        "",
+      ].join("\n"),
     supportBody: (input: {
       referenceId: string;
       category: string;
@@ -2234,6 +2247,7 @@ export const copy = {
     navLabel: "Admin sections",
     navOverview: "Overview",
     navAudit: "Audit log",
+    navSupport: "Support",
     navSwitches: "Kill switches & settings",
     navCatalog: "Catalog health",
     navSystem: "System",
@@ -2380,6 +2394,72 @@ export const copy = {
     auditDetailHide: "Hide details",
     auditDetailShowAria: (action: string) => `Details for ${action}`,
     auditDetailHideAria: (action: string) => `Hide details for ${action}`,
+    overviewSupportOpen: (count: number) =>
+      count === 1
+        ? "1 open support ticket · open the Support queue"
+        : `${String(count)} open support tickets · open the Support queue`,
+    supportTitlePlain: "Support",
+    supportTitleItalic: "queue",
+    supportLead: "Every ticket people send us, with the message, our notes and a reply",
+    supportIntro:
+      "Move a ticket through its states, keep an internal note only the team sees, and reply to the person by email. The reply quotes the ticket's reference.",
+    supportFilterLabel: "Filter tickets by status",
+    supportListHeading: "Tickets",
+    supportOpenCount: (count: number) =>
+      count === 1 ? "1 open ticket" : `${String(count)} open tickets`,
+    supportNoSelectionHeading: "No ticket selected",
+    supportFilters: {
+      open: "Open",
+      in_progress: "In progress",
+      resolved: "Resolved",
+      closed: "Closed",
+      all: "All",
+    },
+    supportCategories: {
+      account: "Account",
+      billing: "Billing",
+      bug: "Bug",
+      other: "Other",
+    },
+    supportStatus: {
+      open: "Open",
+      in_progress: "In progress",
+      resolved: "Resolved",
+      closed: "Closed",
+    },
+    supportEmpty: "No tickets match this filter.",
+    supportLoadFailed: "The support tickets could not be loaded.",
+    supportTryAgain: "Try again",
+    supportShowing: (shown: number, total: number) =>
+      shown === total
+        ? `Showing ${String(shown)} ${plural(shown, "ticket", "tickets")}`
+        : `Showing ${String(shown)} of ${String(total)} tickets`,
+    supportSelectPrompt: "Choose a ticket to read it.",
+    supportAuthor: (name: string, email: string) => `${name} · ${email}`,
+    supportOpened: (when: string) => `Opened ${when}`,
+    supportReference: (referenceId: string) => `Reference ${referenceId}`,
+    supportOpenUser: "Open the person",
+    supportMessageHeading: "The message",
+    supportUndecryptable:
+      "This message could not be decrypted. The ticket still needs an answer, so reply or follow up another way.",
+    supportNotesHeading: "Internal notes",
+    supportNotesLabel: "Internal note",
+    supportNotesPlaceholder: "Only the team can see this.",
+    supportNotesSave: "Save note",
+    supportStatusHeading: "Status",
+    supportStatusNow: (status: string) => `Currently ${status.toLowerCase()}.`,
+    supportMarkInProgress: "Mark in progress",
+    supportResolve: "Resolve",
+    supportClose: "Close",
+    supportReplyHeading: "Reply to the person",
+    supportReplyLabel: "Reply",
+    supportReplyPlaceholder: "Write the reply that will be emailed to them.",
+    supportReplySend: "Send reply",
+    supportReplySent: "The reply was sent.",
+    supportUpdateSaved: "The ticket was updated.",
+    supportActionFailed: "That change did not go through. Reload and try again.",
+    supportMailFailed: "The reply could not be sent. The ticket was left unchanged.",
+    supportTicketAria: (referenceId: string) => `Open ticket ${referenceId}`,
     readinessHeading: "Launch readiness",
     readinessLead: "Core limits, security gates and alerting controls before opening wider.",
     readinessDailyCap: "Daily cap",

@@ -107,6 +107,9 @@ export function createCloudflareMailSender(config: CloudflareMailConfig) {
     sendSupport: async (mail) => {
       await sendEmail(config, mail.to, mail.subject, mail.body, mail.replyTo);
     },
+    sendSupportReply: async (mail) => {
+      await sendEmail(config, mail.to, mail.subject, mail.body);
+    },
   };
 
   return sender;

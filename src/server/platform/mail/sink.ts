@@ -142,6 +142,23 @@ export function createSinkMailSender(clock: Clock) {
 
       await Promise.resolve();
     },
+    sendSupportReply: async (mail) => {
+      failIfAsked();
+
+      const sent = {
+        id: randomUUID(),
+        to: mail.to,
+        from: env.MAIL_FROM,
+        subject: mail.subject,
+        body: mail.body,
+        replyTo: null,
+        sentAt: clock.now(),
+      };
+
+      captured.push(sent);
+
+      await Promise.resolve();
+    },
   };
 
   return sender;

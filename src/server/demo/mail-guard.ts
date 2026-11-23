@@ -48,6 +48,9 @@ export function createDemoSafeMailSender(db: AppDatabase, sender: MailSender) {
     sendSupport: async (mail) => {
       await sender.sendSupport(mail);
     },
+    sendSupportReply: async (mail) => {
+      await sender.sendSupportReply(mail);
+    },
   };
 
   return guarded;

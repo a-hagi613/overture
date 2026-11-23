@@ -50,6 +50,12 @@ export interface OutboundSupportMail {
   replyTo: string;
 }
 
+export interface OutboundSupportReplyMail {
+  to: string;
+  subject: string;
+  body: string;
+}
+
 export interface MailSender {
   sendMagicLink: (mail: OutboundMagicLinkMail) => Promise<void>;
   sendCheck: (mail: OutboundCheckMail) => Promise<void>;
@@ -58,4 +64,5 @@ export interface MailSender {
   sendExportReady: (mail: OutboundExportReadyMail) => Promise<void>;
   sendBillingNotice: (mail: OutboundBillingNoticeMail) => Promise<void>;
   sendSupport: (mail: OutboundSupportMail) => Promise<void>;
+  sendSupportReply: (mail: OutboundSupportReplyMail) => Promise<void>;
 }
