@@ -138,6 +138,7 @@
           "src/server/dispatch/report.test.ts",
           "src/server/platform/db/migration-snapshot.test.ts",
           "src/server/platform/db/catalog-split.test.ts",
+          "src/server/platform/db/hot-path-indexes.test.ts",
           "src/server/platform/jobs/retention.test.ts",
           "src/server/matching/applications.test.ts",
           "src/server/inbox/linked-mail.test.ts",
@@ -198,6 +199,7 @@
           "src/server/dispatch/outcomes.test.ts",
           "src/server/platform/db/migration-snapshot.test.ts",
           "src/server/platform/db/catalog-split.test.ts",
+          "src/server/platform/db/hot-path-indexes.test.ts",
           "src/server/matching/applications.test.ts",
           "src/server/platform/access/access.test.ts",
           "src/server/platform/alert-detail.test.ts",
@@ -215,6 +217,7 @@
           "scripts/database-sync-guard.test.ts",
           "scripts/lint-config-guard.test.ts",
           "scripts/setup-stripe.test.ts",
+          "scripts/vacuum-app-db.test.ts",
           "scripts/workflow-config-guard.test.ts"
         ]
       }

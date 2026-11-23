@@ -1,7 +1,8 @@
 import { Buffer } from "node:buffer";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
+import { z } from "zod";
 
 import type { Auth } from "../auth/index.ts";
 
@@ -14,9 +15,34 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 
 import { mailThreads, messageAttachments, messages } from "../platform/db/schema.ts";
-import { attachmentsByMessageOf, messagesByThreadOf, threadViewsOf } from "../inbox/threads.ts";
+import {
+  attachmentsByMessageOf,
+  messagesByThreadOf,
+  threadPageOf,
+  threadViewsOf,
+} from "../inbox/threads.ts";
+import { validQuery } from "./validators.ts";
 
 const MIME_PATTERN = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/iu;
+
+const DEFAULT_THREADS_LIMIT = 50;
+const MAX_THREADS_LIMIT = 200;
+
+/**
+ * The Thread list's optional paging. `before` is a millisecond cursor on `lastMessageAt`; `beforeId` breaks a tie
+ * between Threads that share it, so a page boundary never skips or repeats a Thread. A cursor without an id still
+ * works, for clients that only kept the timestamp.
+ */
+export const threadsQuerySchema = z
+  .object({
+    before: z.coerce.number().int().nonnegative().optional(),
+    beforeId: z.string().min(1).max(200).optional(),
+    limit: z.coerce.number().int().min(1).max(MAX_THREADS_LIMIT).default(DEFAULT_THREADS_LIMIT),
+  })
+  .refine((query) => query.beforeId === undefined || query.before !== undefined, {
+    message: "beforeId needs before",
+    path: ["beforeId"],
+  });
 
 function safeMime(mime: string) {
   const base = mime.split(";")[0]?.trim() ?? "";
@@ -97,30 +123,25 @@ export function createInboxRoutes(deps: {
     context.header("Cache-Control", "no-store");
   });
 
-  routes.get("/threads", async (context) => {
+  routes.get("/threads", validQuery(threadsQuerySchema), async (context) => {
     const user = await readSessionUser(auth, context.req.raw.headers);
 
     if (user === null) {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
-    const threads = db
-      .select()
-      .from(mailThreads)
-      .where(eq(mailThreads.userId, user.id))
-      .orderBy(desc(mailThreads.lastMessageAt))
-      .all();
+    const query = context.req.valid("query");
 
-    const rows = await threadViewsOf({ db, personal, threads, userId: user.id });
-
-    return context.json({
-      counts: {
-        all: rows.length,
-        needsChecking: rows.filter((row) => row.needsChecking).length,
-        unread: rows.filter((row) => row.unread).length,
-      },
-      threads: rows,
-    });
+    return context.json(
+      await threadPageOf({
+        before: query.before ?? null,
+        beforeId: query.beforeId ?? null,
+        db,
+        limit: query.limit,
+        personal,
+        userId: user.id,
+      }),
+    );
   });
 
   routes.get("/threads/:id", async (context) => {

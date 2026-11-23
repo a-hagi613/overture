@@ -104,6 +104,13 @@ const threadsSchema = z.object({
   threads: z.array(threadSchema),
 });
 
+const invalidRequestSchema = z.object({ error: z.literal("invalid_request") });
+
+const threadPageSchema = threadsSchema.extend({
+  nextCursor: z.number().nullable(),
+  nextCursorId: z.string().nullable(),
+});
+
 const messageSchema = z.object({
   attachments: z.array(
     z.object({ bytes: z.number(), filename: z.string(), id: z.string(), mime: z.string() }),
@@ -476,5 +483,61 @@ test("threads and attachments are scoped to their user", async ({ inbox }) => {
   expect((await anonymous.get("/api/threads")).status()).toBe(401);
 
   await anonymous.dispose();
+  await owner.dispose();
+});
+
+test("the Thread list pages through a large Inbox and keeps the counts over every Thread", async ({
+  inbox,
+}) => {
+  const { owner, userId } = await ownerContextFor(inbox.server.url);
+
+  const bulk = await owner.post("/__test__/mail/bulk", {
+    data: { bodyBytes: 256, count: 60, userId },
+  });
+
+  expect(bulk.ok()).toBe(true);
+
+  const first = threadPageSchema.parse(await (await owner.get("/api/threads")).json());
+
+  expect(first.threads).toHaveLength(50);
+  expect(first.nextCursor).not.toBeNull();
+  expect(first.nextCursorId).not.toBeNull();
+  expect(first.counts).toEqual({ all: 60, needsChecking: 0, unread: 60 });
+
+  const cursor = (page: typeof first) =>
+    `?limit=7&before=${String(page.nextCursor)}&beforeId=${encodeURIComponent(page.nextCursorId ?? "")}`;
+
+  const second = threadPageSchema.parse(
+    await (await owner.get(`/api/threads${cursor(first)}`)).json(),
+  );
+
+  const third = threadPageSchema.parse(
+    await (await owner.get(`/api/threads${cursor(second)}`)).json(),
+  );
+
+  expect(second.threads).toHaveLength(7);
+  expect(second.counts).toEqual(first.counts);
+  expect(third.threads).toHaveLength(3);
+  expect(third.counts).toEqual(first.counts);
+  expect(third.nextCursor).toBeNull();
+
+  const seen = [first, second, third].flatMap((page) => page.threads.map((thread) => thread.id));
+
+  expect(seen).toHaveLength(60);
+  expect(new Set(seen).size).toBe(60);
+
+  const rejected = await Promise.all(
+    ["?limit=0", "?limit=201", "?limit=many", "?beforeId=thread-1"].map(async (query) => {
+      const response = await owner.get(`/api/threads${query}`);
+
+      return { body: invalidRequestSchema.parse(await response.json()), status: response.status() };
+    }),
+  );
+
+  for (const result of rejected) {
+    expect(result.status).toBe(400);
+    expect(result.body.error).toBe("invalid_request");
+  }
+
   await owner.dispose();
 });

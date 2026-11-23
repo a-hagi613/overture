@@ -9,7 +9,8 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import { applications, mailThreads, mailboxes, messages, users } from "../platform/db/schema.ts";
 import { companies, companyBoards, postings } from "../platform/db/catalog-schema.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
-import { threadViewsOf } from "./threads.ts";
+import type { InboxThreadCounts } from "./threads.ts";
+import { threadCountsOf, threadPageOf, threadViewsOf } from "./threads.ts";
 
 const NOW = 1_795_000_000_000;
 const USER = "inbox-user";
@@ -68,7 +69,7 @@ async function addThread(
   db: AppDatabase,
   catalogDbToSeed: typeof seedCatalogDb,
   personal: ReturnType<typeof createPersonalCrypto>,
-  input: { application: boolean; index: number; unread: boolean },
+  input: { application: boolean; failAuth?: boolean; index: number; unread: boolean },
 ) {
   const at = NOW - input.index * 60_000;
   const threadId = `thread-${String(input.index)}`;
@@ -173,7 +174,7 @@ async function addThread(
         direction: message.direction,
         rfcMessageId: `<${message.messageId}@example.test>`,
         senderDomain: "example.test",
-        auth: "pass",
+        auth: input.failAuth === true ? "fail" : "pass",
         fromEnc: message.fromEnc,
         toEnc: message.toEnc,
         subjectEnc: message.subjectEnc,
@@ -190,6 +191,38 @@ async function addThread(
 function threadsOf(db: AppDatabase) {
   return db.select().from(mailThreads).orderBy(mailThreads.lastMessageAt).all();
 }
+
+interface ThreadPageOfTest {
+  counts: InboxThreadCounts;
+  ids: string[];
+}
+
+const threadPages: (
+  db: AppDatabase,
+  personal: ReturnType<typeof createPersonalCrypto>,
+  limit: number,
+  cursor: { before: number | null; beforeId: string | null },
+  pages: readonly ThreadPageOfTest[],
+) => Promise<ThreadPageOfTest[]> = async (db, personal, limit, cursor, pages) => {
+  const page = await threadPageOf({ ...cursor, db, limit, personal, userId: USER });
+
+  const collected = [
+    ...pages,
+    { counts: page.counts, ids: page.threads.map((thread) => thread.id) },
+  ];
+
+  if (page.nextCursor === null || page.nextCursorId === null) {
+    return collected;
+  }
+
+  return threadPages(
+    db,
+    personal,
+    limit,
+    { before: page.nextCursor, beforeId: page.nextCursorId },
+    collected,
+  );
+};
 
 describe("the Inbox thread list", () => {
   test("keeps one set of statements however many Threads the person has", async () => {
@@ -264,6 +297,62 @@ describe("the Inbox thread list", () => {
     const second = views.find((view) => view.id === "thread-1");
 
     expect(second).toMatchObject({ company: "Hiring Team 1", title: null, unread: false });
+  });
+
+  test("pages every Thread once and keeps the counts over all of them", async () => {
+    const { catalogDb, db, personal } = seeded();
+
+    await Promise.all(
+      Array.from({ length: 9 }, async (_unused, index) =>
+        addThread(db, catalogDb, personal, {
+          application: index % 3 === 0,
+          failAuth: index % 4 === 1,
+          index,
+          unread: index % 5 === 0,
+        }),
+      ),
+    );
+
+    const views = await threadViewsOf({ db, personal, threads: threadsOf(db), userId: USER });
+
+    const expected = {
+      all: views.length,
+      needsChecking: views.filter((view) => view.needsChecking).length,
+      unread: views.filter((view) => view.unread).length,
+    };
+
+    expect(threadCountsOf(db, USER)).toEqual(expected);
+
+    const pages = await threadPages(db, personal, 2, { before: null, beforeId: null }, []);
+    const seen = pages.flatMap((page) => page.ids);
+
+    for (const page of pages) {
+      expect(page.counts).toEqual(expected);
+    }
+
+    expect(seen).toHaveLength(9);
+    expect(new Set(seen).size).toBe(9);
+    expect(seen).toEqual(views.map((view) => view.id).toReversed());
+  });
+
+  test("breaks a shared timestamp by Thread id so a page boundary loses nothing", async () => {
+    const { catalogDb, db, personal } = seeded();
+
+    await Promise.all(
+      Array.from({ length: 3 }, async (_unused, index) =>
+        addThread(db, catalogDb, personal, { application: false, index, unread: false }),
+      ),
+    );
+
+    db.update(mailThreads)
+      .set({ lastMessageAt: new Date(NOW) })
+      .run();
+
+    const pages = await threadPages(db, personal, 1, { before: null, beforeId: null }, []);
+    const seen = pages.flatMap((page) => page.ids);
+
+    expect(seen).toHaveLength(3);
+    expect(new Set(seen).size).toBe(3);
   });
 
   test("keeps the employer and title after the catalog drops the Posting and Company", async () => {
