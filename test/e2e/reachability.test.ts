@@ -14,7 +14,7 @@ test("the health route is reachable, and a visitor at / sees the public landing,
   await page.goto(appServerUrl);
   await expect(page).toHaveURL(`${appServerUrl}/`);
   await expect(
-    page.getByRole("heading", { level: 1, name: /Overture prepares every application/u }),
+    page.getByRole("heading", { level: 1, name: /The job hunt,\s*handled\./u }),
   ).toBeVisible();
 
   await page.goto(`${appServerUrl}/signin`);
