@@ -11,12 +11,14 @@ import type { PreparationService } from "./prepare.ts";
 import { addLocalDays, localDateAt, localPartsAt, localTimeOn } from "../platform/local-time.ts";
 import { applications, bgJobs, profiles, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
-import { getSetting } from "../platform/settings/index.ts";
+import { getStoredSetting } from "../platform/settings/index.ts";
 import { effectiveTimeZone } from "../profile/time-zone.ts";
 import { enqueueReadyNotify } from "../notify/ready-recap.ts";
 
 export const PREP_DAILY_JOB_KIND = "prep.daily";
 export const DEFAULT_PREP_RUN_MINUTES = 7 * 60;
+export const PREP_STAGGER_START_MINUTES = 5 * 60;
+export const PREP_STAGGER_WINDOW_MINUTES = 150;
 
 const TIME_PATTERN = /^(?<hours>\d{1,2}):(?<minutes>\d{2})$/u;
 
@@ -77,6 +79,40 @@ export function parsePrepRunMinutes(raw: string | null) {
   return hours * 60 + minutes;
 }
 
+/**
+ * A stable rolling hash over the user id: a cheap 32-bit-style value with no
+ * database column, no randomness and no clock input, so a user's morning slot
+ * survives restarts.
+ * @param text The user id.
+ * @returns A deterministic non-negative integer.
+ */
+export function stableSlotHash(text: string) {
+  const prime = 2_147_483_647;
+  let hash = 0;
+
+  for (const char of text) {
+    hash = (hash * 33 + (char.codePointAt(0) ?? 0)) % prime;
+  }
+
+  return hash;
+}
+
+/**
+ * The local minute a user's daily preparation starts. Without an explicit
+ * `prep.run_local_time` it is `05:00 + stableSlotHash(userId) % 150`, spreading
+ * the morning window over 05:00-07:30; a stored admin value overrides it.
+ * @param userId The user whose slot is wanted.
+ * @param storedRunLocalTime The raw setting, or null when it was never saved.
+ * @returns Minutes after local midnight.
+ */
+export function prepRunMinutesFor(userId: string, storedRunLocalTime: string | null) {
+  if (storedRunLocalTime !== null) {
+    return parsePrepRunMinutes(storedRunLocalTime);
+  }
+
+  return PREP_STAGGER_START_MINUTES + (stableSlotHash(userId) % PREP_STAGGER_WINDOW_MINUTES);
+}
+
 export function nextPrepRunAt(now: number, timeZone: string, runMinutes: number) {
   const today = localDateAt(now, timeZone);
   const todayAt = localTimeOn(today, Math.trunc(runMinutes / 60), runMinutes % 60, timeZone);
@@ -117,7 +153,8 @@ function enqueueRun(
 
 /**
  * Keep one run scheduled per user per local day: today's run (now, if its time
- * has passed and it has not run yet) and tomorrow's at `prep.run_local_time`.
+ * has passed and it has not run yet) and tomorrow's at the user's staggered
+ * morning slot (`prep.run_local_time` when an admin set it).
  * @param db The application database.
  * @param clock The clock the schedule is read from.
  * @param userId The user to schedule.
@@ -125,7 +162,7 @@ function enqueueRun(
 export function ensurePrepDailyQueued(db: DatabaseWriter, clock: Clock, userId: string) {
   const now = clock.now();
   const timeZone = effectiveTimeZone(db, userId, now);
-  const runMinutes = parsePrepRunMinutes(getSetting(db, "prep.run_local_time"));
+  const runMinutes = prepRunMinutesFor(userId, getStoredSetting(db, "prep.run_local_time"));
   const today = localDateAt(now, timeZone);
   const todayAt = localTimeOn(today, Math.trunc(runMinutes / 60), runMinutes % 60, timeZone);
 
@@ -162,8 +199,9 @@ export function ensurePrepDailyQueued(db: DatabaseWriter, clock: Clock, userId: 
 }
 
 /**
- * Schedule only the next run at `prep.run_local_time`, never a catch-up for
- * today. Onboarding's Start uses it: pressing Start must not launch a run.
+ * Schedule only the next run at the user's staggered morning slot, never a
+ * catch-up for today. Onboarding's Start uses it: pressing Start must not launch
+ * a run.
  * @param db The application database.
  * @param clock The clock the schedule is read from.
  * @param userId The user to schedule.
@@ -172,7 +210,7 @@ export function ensurePrepDailyQueued(db: DatabaseWriter, clock: Clock, userId: 
 export function ensurePrepNextQueued(db: AppDatabase, clock: Clock, userId: string) {
   const now = clock.now();
   const timeZone = effectiveTimeZone(db, userId, now);
-  const runMinutes = parsePrepRunMinutes(getSetting(db, "prep.run_local_time"));
+  const runMinutes = prepRunMinutesFor(userId, getStoredSetting(db, "prep.run_local_time"));
   const runAt = nextPrepRunAt(now, timeZone, runMinutes);
 
   enqueueRun(db, clock, userId, runAt, dedupeKeyFor(userId, runAt, timeZone), runAt);

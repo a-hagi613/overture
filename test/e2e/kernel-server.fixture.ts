@@ -13,6 +13,7 @@ const createSchema = z.object({
   profile: z.object({ id: z.string(), save_changes: z.boolean() }).optional(),
   proxy: z.unknown().optional(),
   start_replay: z.boolean().optional(),
+  stealth: z.boolean().optional(),
   tags: z.record(z.string(), z.string()).optional(),
   timeout_seconds: z.number().int().positive().optional(),
 });
@@ -24,6 +25,8 @@ interface KernelSessionState {
   attemptId: string | null;
   profileId: string | null;
   deleted: boolean;
+  headless: boolean;
+  stealth: boolean;
   chromium: LocalChromium;
   createdAt: string;
 }
@@ -45,15 +48,15 @@ const view = (session: KernelSessionState) => ({
   cdp_ws_url: session.chromium.cdpUrl,
   created_at: session.createdAt,
   deleted_at: session.deleted ? new Date().toISOString() : undefined,
-  headless: false,
-  memory: "8GiB",
+  headless: session.headless,
+  memory: session.headless ? "1GiB" : "8GiB",
   profile:
     session.profileId === null
       ? undefined
       : { id: session.profileId, created_at: session.createdAt },
   region: "us-east",
   session_id: session.id,
-  stealth: true,
+  stealth: session.stealth,
   tags: session.attemptId === null ? {} : { attemptId: session.attemptId, purpose: "application" },
   timeout_seconds: 900,
   usage: { uptime_ms: recordedUptimeMs },
@@ -124,8 +127,10 @@ export function startKernelFixture() {
           chromium,
           createdAt: new Date().toISOString(),
           deleted: false,
+          headless: parsed.data.headless ?? false,
           id: crypto.randomUUID(),
           profileId: parsed.data.profile?.id ?? null,
+          stealth: parsed.data.stealth ?? false,
         };
 
         sessions.push(session);

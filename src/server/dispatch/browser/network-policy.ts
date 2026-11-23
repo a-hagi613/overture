@@ -21,10 +21,11 @@ export interface ProxyTrimNetworkPolicy extends NetworkPolicyInput {
 
 /**
  * The proxy-level twin of `applySendProxyTrim`. A network policy decides by
- * domain, not by resource type, so it mirrors the tracker host list; fonts and
- * media stay a Playwright-only block because a domain policy cannot tell a font
- * from a script. CAPTCHA hosts are allowed explicitly and removed from the
- * block list, so a drift in the two lists can never lock a solver out.
+ * domain, not by resource type, so it mirrors the tracker host list; fonts,
+ * images and media stay a Playwright-only block because a domain policy cannot
+ * tell a font or a logo from a script. CAPTCHA hosts are allowed explicitly and
+ * removed from the block list, so a drift in the two lists can never lock a
+ * solver out.
  * @returns The policy to create or keep up to date.
  */
 export function proxyTrimNetworkPolicy() {

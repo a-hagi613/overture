@@ -62,6 +62,18 @@ export function getSetting(db: Pick<AppDatabase, "select">, key: string) {
   return row?.value ?? DEFAULT_LOOKUP.get(key) ?? null;
 }
 
+/**
+ * The stored value of a setting, without its registry default. It separates an
+ * admin override from an unset key, which `getSetting` cannot: prep staggering
+ * must apply only when `prep.run_local_time` was set explicitly.
+ * @param db The application database.
+ * @param key The setting key.
+ * @returns The stored value, or null when nothing was ever saved.
+ */
+export function getStoredSetting(db: Pick<AppDatabase, "select">, key: string) {
+  return db.select().from(settings).where(eq(settings.key, key)).get()?.value ?? null;
+}
+
 export interface SettingNumberOptions {
   /** Returned when the stored value is missing, not finite, or below `minimum`. */
   fallback?: number;

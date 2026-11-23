@@ -290,7 +290,7 @@ test("402 and 403 pause the provider instead of being retried", async () => {
   await expectProviderUnavailable(403, "forbidden");
 });
 
-test("a send session trims fonts, media and tracker hosts and keeps images, scripts and captchas", async () => {
+test("a send session trims fonts, images, media and tracker hosts and keeps CAPTCHA images, scripts and challenges", async () => {
   const harness = startHarness();
   const weight = startProxyWeightFixture();
 
@@ -454,6 +454,8 @@ test("a Kernel session reports uptime and cost, and its unmeasured proxy stays u
 
     await expect(usesCdp(remote.cdpUrl)).resolves.toBe("provider test");
     expect(remote.liveViewUrl).not.toBeNull();
+    expect(harness.kernel.sessions.at(0)?.headless).toBe(true);
+    expect(harness.kernel.sessions.at(0)?.stealth).toBe(false);
 
     const usage = await remote.close();
 

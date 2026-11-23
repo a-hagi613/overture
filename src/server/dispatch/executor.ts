@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
 import { chromium } from "playwright-core";
 import { z } from "zod";
 
@@ -34,7 +34,7 @@ import { retryWhenBusy } from "../platform/db/busy.ts";
 import { localDayStart } from "../platform/local-time.ts";
 import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
-import { ProviderUnavailableError } from "./browser/provider.ts";
+import { ProviderUnavailableError, browserModeForAttempt } from "./browser/provider.ts";
 import { applySendProxyTrim } from "./browser/proxy-trim.ts";
 import { runAshbyAttempt } from "./ats/ashby.ts";
 import type { AshbyRun } from "./ats/ashby.ts";
@@ -253,6 +253,24 @@ export function createDispatcher(deps: DispatcherDeps) {
       .orderBy(desc(attempts.startedAt))
       .limit(1)
       .get();
+  }
+
+  function previousOutcome(applicationId: string, attemptId: string) {
+    const row = db
+      .select({ outcome: attempts.outcome })
+      .from(attempts)
+      .where(
+        and(
+          eq(attempts.applicationId, applicationId),
+          ne(attempts.id, attemptId),
+          isNotNull(attempts.outcome),
+        ),
+      )
+      .orderBy(desc(attempts.startedAt))
+      .limit(1)
+      .get();
+
+    return row?.outcome ?? null;
   }
 
   function releaseAttempt(applicationId: string, userId: string, attemptId: string) {
@@ -661,6 +679,7 @@ export function createDispatcher(deps: DispatcherDeps) {
       browser = await provider.open({
         attemptId,
         country: proxyCountry,
+        mode: browserModeForAttempt(provider.id, previousOutcome(applicationId, attemptId)),
         profileId: await provider.ensureProfile(plan.userId, proxyCountry),
         timeoutMinutes: SESSION_TIMEOUT_MINUTES,
       });
