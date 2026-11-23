@@ -62,7 +62,7 @@ export function BillingPage() {
     };
   }, [filter, page]);
 
-  const { data, refusal, refresh } = useAdminResource<BillingPageData>(load, [
+  const { data, failed, refusal, refresh } = useAdminResource<BillingPageData>(load, [
     "billing",
     filter,
     page,
@@ -80,7 +80,7 @@ export function BillingPage() {
   }
 
   if (data === null) {
-    return <AdminStatusCard failed={false} onRetry={refresh} />;
+    return <AdminStatusCard failed={failed} onRetry={refresh} />;
   }
 
   const { pageSize } = data;

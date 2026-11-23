@@ -40,7 +40,7 @@ export function LlmBreakdowns({
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
         <section
           aria-labelledby="admin-llm-by-purpose"
-          className="rounded-lg border border-border bg-card p-[20px_22px] shadow-sh"
+          className="rounded-lg border border-border bg-card px-5 py-5 shadow-sh"
         >
           <h2 className="font-serif text-card-title leading-[1.1]" id="admin-llm-by-purpose">
             {copy.admin.llmByPurposeHeading}
@@ -63,7 +63,7 @@ export function LlmBreakdowns({
 
         <section
           aria-labelledby="admin-llm-by-model"
-          className="rounded-lg border border-border bg-card p-[20px_22px] shadow-sh"
+          className="rounded-lg border border-border bg-card px-5 py-5 shadow-sh"
         >
           <h2 className="font-serif text-card-title leading-[1.1]" id="admin-llm-by-model">
             {copy.admin.llmByModelHeading}

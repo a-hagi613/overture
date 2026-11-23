@@ -27,7 +27,7 @@ export function LlmUsagePage() {
     [purpose],
   );
 
-  const { data, refusal, refresh } = useAdminResource(load, ["llm-usage", purpose]);
+  const { data, failed, refusal, refresh } = useAdminResource(load, ["llm-usage", purpose]);
 
   if (refusal !== null) {
     return (
@@ -41,7 +41,7 @@ export function LlmUsagePage() {
   }
 
   if (data === null) {
-    return <AdminStatusCard failed={false} onRetry={refresh} />;
+    return <AdminStatusCard failed={failed} onRetry={refresh} />;
   }
 
   const selectPurpose = (nextPurpose: string) => {

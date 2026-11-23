@@ -75,7 +75,7 @@ export function CatalogPage() {
       {heading}
       <section
         aria-labelledby="admin-catalog-health"
-        className="mt-7 flex flex-col gap-5 rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
+        className="mt-7 flex flex-col gap-5 rounded-lg border border-border bg-card px-6 py-5 shadow-sh"
       >
         <h2 id="admin-catalog-health" className="font-serif text-card-title leading-[1.1]">
           {copy.admin.catalogSectionHeading}
@@ -94,7 +94,7 @@ export function CatalogPage() {
       </section>
       <section
         aria-labelledby="admin-personio-probe"
-        className="mt-7 flex flex-col gap-4 rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
+        className="mt-7 flex flex-col gap-4 rounded-lg border border-border bg-card px-6 py-5 shadow-sh"
       >
         <h2 id="admin-personio-probe" className="font-serif text-card-title leading-[1.1]">
           {copy.admin.catalogProbeHeading}

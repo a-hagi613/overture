@@ -19,7 +19,14 @@ test("every arbitrary font-size utility is off the nine typography tokens", () =
 });
 
 test("arbitrary spacing utilities are off the 4px scale", () => {
-  for (const token of ["p-[13px]", "gap-[7px]", "mt-[2rem]", "px-[26px]"]) {
+  for (const token of [
+    "p-[13px]",
+    "gap-[7px]",
+    "mt-[2rem]",
+    "px-[26px]",
+    "p-[22px_24px_18px]",
+    "px-[22px_24px]",
+  ]) {
     expect(findOffScaleDesignToken(`flex ${token}`)).toBe(token);
   }
 });

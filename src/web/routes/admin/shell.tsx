@@ -64,7 +64,7 @@ export function AdminShell() {
           className="min-w-0 flex-1 outline-none px-4 pb-10 pt-4 md:px-8 md:pt-6"
         >
           <AdminChipNav />
-          <RouteErrorBoundary>
+          <RouteErrorBoundary insideShell>
             <Suspense fallback={<RouteFallback />}>
               <Outlet />
             </Suspense>

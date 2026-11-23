@@ -47,7 +47,7 @@ export function GrantsPage() {
       {heading}
       <section
         aria-labelledby="admin-grants"
-        className="mt-7 rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
+        className="mt-7 rounded-lg border border-border bg-card px-6 py-5 shadow-sh"
       >
         <h2 id="admin-grants" className="font-serif text-card-title leading-[1.1]">
           {copy.admin.grantsHeading}

@@ -14,7 +14,7 @@ import { billingPlanLabel, dayOf, periodSpan } from "./billing-labels.ts";
 export function BillingUserPage() {
   const { id = "" } = useParams();
   const load = useCallback(async () => loadBillingUser(id), [id]);
-  const { data, refusal, refresh } = useAdminResource(load, ["billing-user", id]);
+  const { data, failed, refusal, refresh } = useAdminResource(load, ["billing-user", id]);
 
   if (refusal !== null) {
     return (
@@ -28,7 +28,7 @@ export function BillingUserPage() {
   }
 
   if (data === null) {
-    return <AdminStatusCard failed={false} onRetry={refresh} />;
+    return <AdminStatusCard failed={failed} onRetry={refresh} />;
   }
 
   const { user } = data;

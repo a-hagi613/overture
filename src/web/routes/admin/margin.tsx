@@ -68,7 +68,7 @@ export function MarginPage() {
 
       <section
         aria-labelledby="margin-how"
-        className="mt-6 rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
+        className="mt-6 rounded-lg border border-border bg-card px-6 py-5 shadow-sh"
       >
         <h2 id="margin-how" className="font-serif text-card-title leading-tight">
           {copy.admin.marginHowTitle}

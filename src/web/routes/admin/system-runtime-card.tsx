@@ -119,7 +119,7 @@ export function SystemRuntimeCard({ view }: { view: SystemReport }) {
   return (
     <section
       aria-labelledby="admin-system-runtime"
-      className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
+      className="rounded-lg border border-border bg-card px-6 py-5 shadow-sh"
     >
       <h2 className="font-serif text-card-title leading-[1.1]" id="admin-system-runtime">
         {copy.admin.systemRuntimeHeading}

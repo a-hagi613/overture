@@ -16,7 +16,7 @@ import { AdminStatusPill } from "./status-pill.tsx";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const cardClass = "rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh";
+const cardClass = "rounded-lg border border-border bg-card px-6 py-5 shadow-sh";
 
 function grantDaysOf(grant: NonNullable<AdminUserDetail["user"]["grant"]>) {
   if (grant.expiresAt === null) {

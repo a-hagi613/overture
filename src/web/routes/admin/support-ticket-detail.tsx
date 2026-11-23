@@ -38,7 +38,7 @@ export function SupportTicketDetail({
   return (
     <section
       aria-labelledby="admin-support-detail"
-      className="min-w-0 rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
+      className="min-w-0 rounded-lg border border-border bg-card px-6 py-5 shadow-sh"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">

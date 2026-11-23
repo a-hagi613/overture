@@ -16,8 +16,8 @@ colors:
   ok: "#3F6B52"
   ok-soft: "#DDE7DE"
   border: "rgba(21,19,17,0.14)"
-  input: "rgba(21,19,17,0.45)"
-  dark-input: "rgba(242,237,228,0.36)"
+  input: "rgba(21,19,17,0.46)"
+  dark-input: "rgba(242,237,228,0.37)"
   overlay: "rgba(21,19,17,0.16)"
   dark-background: "#191714"
   dark-sidebar: "#1E1C19"
@@ -115,7 +115,7 @@ ink feel.
 | `--need` | `--destructive` | `#8E3A2C` | `#E58A78` | Needs you: a Review |
 | `--ok` | — | `#3F6B52` | `#8DBFA2` | Screening, Interviewing, Offer |
 | `--line` | `--border` | `rgba(21,19,17,.14)` | `rgba(242,237,228,.14)` | Hairline, default |
-| `--line2` | `--input` | `rgba(21,19,17,.45)` | `rgba(242,237,228,.36)` | Control outline, 3:1 on the card |
+| `--line2` | `--input` | `rgba(21,19,17,.46)` | `rgba(242,237,228,.37)` | Control outline, 3.05:1 / 3.11:1 on the card |
 | `--hl` | — | `rgba(255,255,255,.55)` | `rgba(255,255,255,.04)` | Letterpress highlight under rules |
 | `--accbg` | `--signal-soft` | `rgba(210,86,31,.10)` | `rgba(240,116,58,.16)` | Tinted chip and tray |
 | `--needbg` | `--need-soft` | `#EFD9D3` | `#40261F` | "Needs you" pill background |
@@ -142,8 +142,8 @@ are the only orange states.
 
 Measured on the shipped hexes (text needs 4.5:1, 3:1 at ≥24px):
 
-Control edges meet WCAG 2.2 1.4.11: raising `--input` to `rgba(21,19,17,.45)` light and
-`rgba(242,237,228,.36)` dark takes the edge on the card from 1.9:1 / 2.2:1 to **3.0:1** in both modes.
+Control edges meet WCAG 2.2 1.4.11: raising `--input` to `rgba(21,19,17,.46)` light and
+`rgba(242,237,228,.37)` dark takes the edge on the card from 1.9:1 / 2.2:1 to **3.05:1** and **3.11:1**.
 That is the one colour change in this rollout. `--line` hairlines stay at `.14` (1.34:1 on the card) on
 purpose: they are decoration and dividers, not the boundary of a control.
 
@@ -160,7 +160,7 @@ purpose: they are decoration and dividers, not the boundary of a control.
 | need on card | 7.1:1 | 6.4:1 |
 | ok on card | 5.8:1 | 7.9:1 |
 | card on ink (primary button) | 17.5:1 | 15.3:1 |
-| input edge on card (1.4.11) | 3.0:1 | 3.0:1 |
+| input edge on card (1.4.11) | 3.05:1 | 3.11:1 |
 
 Charts have no separate palette: the series is `signal`, the grid is `border`, the axis labels are
 `muted-foreground`, and the tooltip is a card. The primary button is ink with paper text in both modes.
@@ -420,8 +420,8 @@ full-contrast ink text; 12px between the two buttons. Under 860px the nav collap
 and a 44px menu button; the sheet rises 8px over .4s and holds the links, Theme and Sign in. The menu
 button carries `aria-expanded` and a label that changes between Open menu and Close menu.
 
-Sidebar items: active = card surface, hairline, a 2px ink marker on the left edge (top edge in the tab
-bar). The sidebar holds, top to bottom: the lockup and a collapse button, Search (⌘K), the six
+Sidebar items: active = card surface, hairline, a 2px `signal` marker on the left edge (top edge in
+the tab bar) — the active nav marker is one of the four sanctioned orange uses (§2). The sidebar holds, top to bottom: the lockup and a collapse button, Search (⌘K), the six
 destinations (Home, Board, Ready, Review, Inbox, Calendar), the Profile menu (Resume, Details,
 Preferences, Account, Billing), Support and Notifications, then the theme toggle and the usage card. Under
 1280, or when collapsed on desktop (remembered per browser), the sidebar becomes a 76px icon rail; under
@@ -456,7 +456,7 @@ Every interactive component draws all seven states. If a state does not apply, i
 | Ghost / link | transparent, muted text | well fill, ink text (link: ink underline) | 2px ink ring | well fill | 45% opacity | — | `aria-busy` |
 | Field | card fill, 48 high, `input` border | no hover change | 2px ink ring, 2px offset | caret only | 45% opacity, `not-allowed` | `need` border + 1px `need` ring, message via `aria-describedby` | `aria-busy`, read-only value |
 | Card (interactive) | card, hairline, `shadow-sh` | `shadow-lift`, `foreground/30` border | ring on the inner control | selected: ink ring 1px | — | — | `aria-busy` on the card |
-| Nav item | muted text | well, ink text | 2px ink ring | current: card surface + 2px ink marker | — | — | — |
+| Nav item | muted text | well, ink text | 2px ink ring | current: card surface + 2px `signal` marker | — | — | — |
 | Tab | muted text | card/60, ink text | 2px ink ring | selected: card, ink text, shadow | 45% opacity, no pointer | — | — |
 | Switch | well track, card thumb | `muted-foreground` border | 2px ink ring | on: ink track, thumb translates 16px | 45% opacity | — | — |
 
@@ -487,7 +487,10 @@ inside a shadow, never nest a sheet in a card, and never put text directly on th
 | 60 | `z-60` | Sheet scrim and sheet (detail sheet, code-paste sheet, phone More) |
 | 70 | `z-70` | Toasts (Sonner) |
 
-Nothing sits above 70. Native `<dialog>` sheets use the top layer and do not need a z-index.
+Nothing sits above 70. The sheets are native `<dialog>` elements rendered with the `open` attribute, which
+keeps them in the normal document layer at z-60 with the scrim (also z-60, before the panel); `open` does not
+put a dialog in the top layer. A true top-layer modal (`showModal()`, `inert`, a focus trap and Escape
+restoration) is #545 item 3 and is not shipped yet.
 
 ## 9. Patterns
 
@@ -562,8 +565,9 @@ state the boundary rather than the marketing line.
   44, toggles 44. Pointer-only desktop controls may be 40. A compact control that must stay 34px
   visually (notification CTAs) is the 44px element, with a -5px top and bottom margin so the row does
   not grow; the painted 34px box is an inner span.
-- **Control edges.** Inputs, selects, textareas, checkboxes and switches draw a 3:1 `--input` edge on the
-  card (WCAG 2.2 1.4.11). `--border` stays a soft hairline because it is decoration, not a control.
+- **Control edges.** Inputs, selects, textareas, checkboxes and switches draw a `--input` edge of 3.05:1
+  light and 3.11:1 dark on the card (WCAG 2.2 1.4.11). `--border` stays a soft hairline because it is
+  decoration, not a control.
 - **Focus.** 2px solid ink ring with a 2–3px offset on every interactive element. Never removed, never
   orange.
 - **Real elements.** `button`, `a`, `input` with a label or `aria-label`. Decorative SVG is

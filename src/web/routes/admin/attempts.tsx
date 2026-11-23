@@ -50,7 +50,11 @@ export function AttemptsPage() {
     [applicationId, outcome],
   );
 
-  const { data, refusal, refresh } = useAdminResource(load, ["attempts", applicationId, outcome]);
+  const { data, failed, refusal, refresh } = useAdminResource(load, [
+    "attempts",
+    applicationId,
+    outcome,
+  ]);
 
   if (refusal !== null) {
     return (
@@ -64,7 +68,7 @@ export function AttemptsPage() {
   }
 
   if (data === null) {
-    return <AdminStatusCard failed={false} onRetry={refresh} />;
+    return <AdminStatusCard failed={failed} onRetry={refresh} />;
   }
 
   const updateFilters = (nextOutcome: AttemptOutcomeFilter, nextApplicationId: string) => {

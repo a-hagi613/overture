@@ -23,7 +23,7 @@ const LIST_LIMIT = 50;
 const FILTER_BUTTON =
   "inline-flex min-h-11 items-center rounded-md px-3.5 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
 
-const CARD = "rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh";
+const CARD = "rounded-lg border border-border bg-card px-6 py-5 shadow-sh";
 
 const RETRY_BUTTON =
   "mt-4 min-h-11 rounded-md border border-input bg-card px-4 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
@@ -153,7 +153,7 @@ export function AdminSupportPage() {
     return (
       <>
         {heading}
-        <AdminStatusCard failed={false} onRetry={refresh} />
+        <AdminStatusCard failed={loadFailed} onRetry={refresh} />
       </>
     );
   }

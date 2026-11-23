@@ -12,7 +12,7 @@ export function Card({
   return (
     <section
       aria-labelledby={ariaLabelledBy}
-      className={`rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh ${className}`.trim()}
+      className={`rounded-lg border border-border bg-card px-6 py-5 shadow-sh ${className}`.trim()}
     >
       {children}
     </section>

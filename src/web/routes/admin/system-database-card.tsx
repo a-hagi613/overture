@@ -10,7 +10,7 @@ export function SystemDatabaseCard({
   sizes: SystemReport["databases"]["app"];
 }) {
   return (
-    <div className="min-w-0 rounded-lg border border-border bg-background p-[18px_20px]">
+    <div className="min-w-0 rounded-lg border border-border bg-background px-5 py-4">
       <h3 className="font-mono text-sm font-semibold">{name}</h3>
       {sizes === null ? (
         <p className="mt-2 text-xs text-muted-foreground">{copy.admin.systemDatabaseMissing}</p>

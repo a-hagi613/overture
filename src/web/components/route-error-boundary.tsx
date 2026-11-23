@@ -3,8 +3,11 @@ import type { ReactElement } from "react";
 
 import { RouteErrorCard } from "./route-error-card.tsx";
 
-export class RouteErrorBoundary extends Component<{ children: ReactElement }, { failed: boolean }> {
-  constructor(props: { children: ReactElement }) {
+export class RouteErrorBoundary extends Component<
+  { children: ReactElement; insideShell?: boolean },
+  { failed: boolean }
+> {
+  constructor(props: { children: ReactElement; insideShell?: boolean }) {
     super(props);
     this.state = { failed: false };
   }
@@ -17,6 +20,7 @@ export class RouteErrorBoundary extends Component<{ children: ReactElement }, { 
     if (this.state.failed) {
       return (
         <RouteErrorCard
+          insideShell={this.props.insideShell === true}
           onRetry={() => {
             globalThis.location.reload();
           }}

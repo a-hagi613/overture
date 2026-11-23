@@ -135,7 +135,7 @@ export function InvitesPage() {
       />
       <section
         aria-labelledby="admin-invite-form"
-        className="mt-6 rounded-lg border border-border bg-card p-[22px_24px] shadow-sh"
+        className="mt-6 rounded-lg border border-border bg-card px-6 py-5 shadow-sh"
       >
         <h2 className="font-serif text-card-title leading-[1.1]" id="admin-invite-form">
           {copy.admin.inviteFormHeading}

@@ -130,7 +130,7 @@ export function AppShell() {
           tabIndex={-1}
         >
           <div className="mx-auto w-full max-w-[1440px]">
-            <RouteErrorBoundary>
+            <RouteErrorBoundary insideShell>
               <Suspense fallback={<RouteFallback />}>
                 <Outlet />
               </Suspense>

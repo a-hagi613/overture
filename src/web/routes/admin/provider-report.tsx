@@ -135,7 +135,7 @@ export function ProviderReportPage() {
             ))}
           </ul>
         )}
-        <div className="mt-5 rounded-lg border border-border bg-card p-[18px_20px] shadow-sh">
+        <div className="mt-5 rounded-lg border border-border bg-card px-5 py-4 shadow-sh">
           <h3 className="font-serif text-base leading-[1.2]">{copy.admin.reportLabRunHeading}</h3>
           <p className="mt-1.5 text-xs text-muted-foreground">{copy.admin.reportLabRunIntro}</p>
           <div className="mt-4 flex flex-wrap items-end gap-3">

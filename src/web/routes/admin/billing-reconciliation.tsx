@@ -41,7 +41,7 @@ export function BillingReconciliationPage() {
     return { data: { reconciliation: result.data.reconciliation }, ok: true as const };
   }, []);
 
-  const { data, refusal, refresh } = useAdminResource<ReconcileData>(load, [
+  const { data, failed, refusal, refresh } = useAdminResource<ReconcileData>(load, [
     "billing-reconciliation",
   ]);
 
@@ -57,7 +57,7 @@ export function BillingReconciliationPage() {
   }
 
   if (data === null) {
-    return <AdminStatusCard failed={false} onRetry={refresh} />;
+    return <AdminStatusCard failed={failed} onRetry={refresh} />;
   }
 
   const { reconciliation } = data;
