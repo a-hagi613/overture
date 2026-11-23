@@ -51,6 +51,7 @@ import {
   sessions,
   stripeEvents,
   subscriptions,
+  supportTickets,
   tagImports,
   users,
 } from "../platform/db/schema.ts";
@@ -2443,10 +2444,34 @@ export function createTestRoutes(
       from: sent.from,
       subject: sent.subject,
       body: sent.body,
+      replyTo: sent.replyTo,
       sentAt: sent.sentAt,
     }));
 
     return context.json({ messages: captured });
+  });
+
+  routes.get("/support-tickets", validQuery(userQuery), (context) => {
+    const { userId } = context.req.valid("query");
+
+    const tickets = db
+      .select()
+      .from(supportTickets)
+      .where(eq(supportTickets.userId, userId))
+      .orderBy(asc(supportTickets.createdAt))
+      .all()
+      .map((ticket) => ({
+        category: ticket.category,
+        createdAt: ticket.createdAt,
+        hasMessage: ticket.messageEnc.length > 0,
+        id: ticket.id,
+        referenceId: ticket.referenceId,
+        status: ticket.status,
+        subject: ticket.subject,
+        userId: ticket.userId,
+      }));
+
+    return context.json({ tickets });
   });
 
   routes.post("/mail/clear", (context) => {

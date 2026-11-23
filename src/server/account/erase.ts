@@ -15,12 +15,14 @@ import {
   accountErasures,
   bgJobs,
   browserProfiles,
+  calendarCustomEvents,
   events,
   llmUsage,
   mailboxes as mailboxRows,
   profiles,
   sessions,
   settings,
+  supportTickets,
   userKeys,
   users,
 } from "../platform/db/schema.ts";
@@ -187,6 +189,8 @@ export function createAccountEraser(deps: AccountEraserDeps) {
       tx.delete(userKeys).where(eq(userKeys.userId, userId)).run();
       tx.delete(events).where(eq(events.userId, userId)).run();
       tx.delete(llmUsage).where(eq(llmUsage.userId, userId)).run();
+      tx.delete(calendarCustomEvents).where(eq(calendarCustomEvents.userId, userId)).run();
+      tx.delete(supportTickets).where(eq(supportTickets.userId, userId)).run();
       tx.delete(settings)
         .where(eq(settings.key, notificationPreferencesKey(userId)))
         .run();

@@ -16,6 +16,8 @@ import { API_ERRORS } from "../../shared/api-errors.ts";
 
 const stateBody = z.object({ state: z.enum(["saved", "hidden"]).nullable() });
 
+const UP_NEXT_LIMIT = 6;
+
 export function createMatchingRoutes(deps: {
   db: AppDatabase;
   catalogDb: CatalogDatabase;
@@ -26,6 +28,18 @@ export function createMatchingRoutes(deps: {
   const { db, catalogDb, clock, auth, matching } = deps;
 
   const routes = new Hono();
+
+  routes.get("/matching/up-next", async (context) => {
+    context.header("Cache-Control", "private, no-store");
+
+    const account = await readSessionUser(auth, context.req.raw.headers);
+
+    if (account === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    return context.json({ items: await matching.upNext(account.id, UP_NEXT_LIMIT) });
+  });
 
   routes.get("/postings/:id", async (context) => {
     const account = await readSessionUser(auth, context.req.raw.headers);

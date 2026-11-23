@@ -13,6 +13,7 @@ import {
   applicationEvents,
   applicationSnapshots,
   applications,
+  calendarCustomEvents,
   facts,
   mailThreads,
   mailboxes,
@@ -21,6 +22,7 @@ import {
   profiles,
   resumes,
   skipCompanies,
+  supportTickets,
   targets,
   users,
 } from "../platform/db/schema.ts";
@@ -322,6 +324,68 @@ export function* exportEntries(deps: ExportArchiveDeps, userId: string) {
       );
 
       yield* jsonArray(serialized);
+    })(),
+  );
+
+  yield textEntry(
+    "calendar-events.json",
+    (async function* calendarEventsDocument() {
+      const rows = db
+        .select()
+        .from(calendarCustomEvents)
+        .where(eq(calendarCustomEvents.userId, userId))
+        .orderBy(asc(calendarCustomEvents.dayKey), asc(calendarCustomEvents.id))
+        .all();
+
+      yield* jsonArray(
+        rows.map((row) =>
+          JSON.stringify({
+            id: row.id,
+            dayKey: row.dayKey,
+            kind: row.kind,
+            title: row.title,
+            company: row.company,
+            time: row.time,
+            createdAt: iso(row.createdAt),
+            updatedAt: iso(row.updatedAt),
+          }),
+        ),
+      );
+    })(),
+  );
+
+  yield textEntry(
+    "support-tickets.json",
+    (async function* supportTicketsDocument() {
+      const rows = db
+        .select()
+        .from(supportTickets)
+        .where(eq(supportTickets.userId, userId))
+        .orderBy(asc(supportTickets.createdAt), asc(supportTickets.id))
+        .all();
+
+      yield* jsonArray(
+        await Promise.all(
+          rows.map(async (row) =>
+            JSON.stringify({
+              id: row.id,
+              referenceId: row.referenceId,
+              category: row.category,
+              subject: row.subject,
+              message: await personal.openFor(
+                userId,
+                { column: "message_enc", rowId: row.id, table: "support_tickets" },
+                row.messageEnc,
+              ),
+              status: row.status,
+              userId: row.userId,
+              createdAt: iso(row.createdAt),
+              updatedAt: iso(row.updatedAt),
+              resolvedAt: iso(row.resolvedAt),
+            }),
+          ),
+        ),
+      );
     })(),
   );
 

@@ -76,6 +76,26 @@ async function seedUpNext(server: AppServer) {
   return { ids, owner };
 }
 
+test("/api/home carries no Up next work; the candidates have their own endpoint", async ({
+  matching,
+}) => {
+  const { owner } = await ownerContextFor(matching.server.url);
+
+  const home = await owner.get("/api/home");
+
+  expect(home.ok()).toBe(true);
+  expect(await home.json()).not.toHaveProperty("upNext");
+
+  const candidates = await owner.get("/api/matching/up-next");
+
+  expect(candidates.ok()).toBe(true);
+  expect(z.object({ items: z.array(z.unknown()) }).parse(await candidates.json()).items).toEqual(
+    [],
+  );
+
+  await owner.dispose();
+});
+
 test("Up next lists code-ranked candidates, and opening one sets its score and Strong match", async ({
   matching,
 }) => {

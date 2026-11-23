@@ -7,7 +7,6 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 import { readSessionUser } from "../auth/session.ts";
-import type { MatchingService } from "../matching/score.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
 
@@ -34,7 +33,6 @@ import { publishEvent } from "../platform/sse/stream.ts";
 import { copy, failedReasonText } from "../../shared/copy.ts";
 import { TIER_1_FACT_KEYS, TIER_2_FACT_KEYS } from "../../shared/facts.ts";
 
-const UP_NEXT_LIMIT = 6;
 const MAX_REVIEW_ROWS = 4;
 const MAX_INBOX_ROWS = 4;
 const REVIEW_HIDDEN_COMPANIES = 2;
@@ -262,11 +260,10 @@ export function createHomeRoutes(deps: {
   db: AppDatabase;
   clock: Clock;
   auth: Auth;
-  matching: MatchingService;
   personal: PersonalCrypto;
   reviews: ReviewService;
 }) {
-  const { db, clock, auth, matching, personal, reviews } = deps;
+  const { db, clock, auth, personal, reviews } = deps;
 
   const routes = new Hono();
   const zones = createTimeZoneService({ db, clock });
@@ -671,7 +668,6 @@ export function createHomeRoutes(deps: {
       sentToday,
       strengthen: strengthenOf(userId),
       timeZone: zone,
-      upNext: await matching.upNext(userId, UP_NEXT_LIMIT),
     });
   });
 
