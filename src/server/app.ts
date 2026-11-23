@@ -377,6 +377,8 @@ export function createApp(deps: AppDependencies) {
     );
   }
 
+  app.all("/api/*", (context) => context.json({ error: API_ERRORS.notFound }, 404));
+
   app.use("*", async (context, next) => {
     const hostHeader = context.req.header("host") ?? "";
     const { hostname } = new URL(`http://${hostHeader}`);

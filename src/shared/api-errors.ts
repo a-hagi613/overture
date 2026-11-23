@@ -9,5 +9,6 @@ export const API_ERRORS = {
   internal: "internal_error",
   invalidRequest: "invalid_request",
   notFound: "not_found",
+  rateLimited: "rate_limited",
   signInRequired: "sign_in_required",
 } as const;

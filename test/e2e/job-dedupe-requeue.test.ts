@@ -41,7 +41,9 @@ test("requeueing a job whose key has a queued row leaves one queued row and no r
 
   const firstId = await enqueue(url);
 
-  expect(await readSseEventUntil(`${url}/api/events`, null, isStartedFor(firstId))).not.toBeNull();
+  expect(
+    await readSseEventUntil(`${url}/__test__/events`, null, isStartedFor(firstId)),
+  ).not.toBeNull();
 
   await enqueue(url);
 

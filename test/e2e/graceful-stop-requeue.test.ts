@@ -56,7 +56,7 @@ test("SIGTERM requeues an in-flight job without consuming an attempt, and it com
     const { id } = enqueueResponseSchema.parse(await enqueueResponse.json());
 
     const started = await readSseEventUntil(
-      `${appServer.url}/api/events`,
+      `${appServer.url}/__test__/events`,
       null,
       isStartedForJob(id),
     );
@@ -90,7 +90,11 @@ test("SIGTERM requeues an in-flight job without consuming an attempt, and it com
     expect(releaseResponse.ok).toBe(true);
     okSchema.parse(await releaseResponse.json());
 
-    const done = await readSseEventUntil(`${appServer.url}/api/events`, null, isDoneForJob(id));
+    const done = await readSseEventUntil(
+      `${appServer.url}/__test__/events`,
+      null,
+      isDoneForJob(id),
+    );
 
     expect(done).not.toBeNull();
 

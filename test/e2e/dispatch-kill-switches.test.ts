@@ -90,7 +90,7 @@ async function seedReadyApplication(owner: APIRequestContext, userId: string) {
 }
 
 async function killSwitchAlert(appServerUrl: string, scope: string) {
-  return readSseEventUntil(`${appServerUrl}/api/events`, null, (event: SseEvent) => {
+  return readSseEventUntil(`${appServerUrl}/__test__/events`, null, (event: SseEvent) => {
     if (event.event !== "alert.raised") {
       return false;
     }
@@ -114,7 +114,7 @@ async function runWatch(owner: APIRequestContext) {
 }
 
 async function switchesOf(owner: APIRequestContext) {
-  const response = await owner.get("/api/kill-switches");
+  const response = await owner.get("/__test__/kill-switches");
 
   return switchSchema.parse(await response.json());
 }

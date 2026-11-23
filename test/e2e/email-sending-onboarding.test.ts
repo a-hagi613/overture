@@ -381,7 +381,7 @@ test("the live check is gated before the switch, then verifies the sending domai
     expect(payload.to).toEqual(["live-check@tryoverture.com"]);
     expect(payload.to).not.toContain(authTestIdentity.ownerEmail);
 
-    const alert = readSseEventUntil(`${app.url}/api/events`, null, (event) => {
+    const alert = readSseEventUntil(`${app.url}/__test__/events`, null, (event) => {
       if (event.event !== "alert.raised") {
         return false;
       }

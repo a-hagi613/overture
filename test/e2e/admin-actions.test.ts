@@ -14,6 +14,8 @@ const killSwitchRowSchema = z.object({
   scope: z.string(),
 });
 
+const settingsSchema = z.record(z.string(), z.string());
+
 test("a settings change from admin takes effect", async ({
   page,
   adminIsolatedAppServer,
@@ -29,11 +31,11 @@ test("a settings change from admin takes effect", async ({
 
   await expect(input).toHaveValue("5");
 
-  const applied = await page.request.get(
-    `${adminIsolatedAppServer.url}/api/settings/limits.daily_cap`,
+  const settings = settingsSchema.parse(
+    await (await page.request.get(`${adminIsolatedAppServer.url}/__test__/settings`)).json(),
   );
 
-  expect(await applied.json()).toEqual({ key: "limits.daily_cap", value: "5" });
+  expect(settings["limits.daily_cap"]).toBe("5");
 });
 
 test("a kill switch set from admin takes effect and shows on catalog health", async ({
@@ -53,7 +55,9 @@ test("a kill switch set from admin takes effect and shows on catalog health", as
     killSwitchRowSchema
       .array()
       .parse(
-        await (await page.request.get(`${adminIsolatedAppServer.url}/api/kill-switches`)).json(),
+        await (
+          await page.request.get(`${adminIsolatedAppServer.url}/__test__/kill-switches`)
+        ).json(),
       )
       .find((row) => row.scope === "ats" && row.key === "greenhouse");
 

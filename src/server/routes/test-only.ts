@@ -1,6 +1,6 @@
 import { validJson, validQuery } from "./validators.ts";
 import { Buffer } from "node:buffer";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -38,6 +38,7 @@ import {
   messages,
   consentVersions,
   customers,
+  events as eventLog,
   notifications,
   planCache,
   profiles,
@@ -69,9 +70,15 @@ import { ensureApplyFailuresQueued } from "../notify/failure-digest.ts";
 import { createNotification } from "../notify/notifications.ts";
 import { NOTIFICATION_KINDS } from "../../shared/notifications.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
-import { setSetting, setKillSwitch } from "../platform/settings/index.ts";
+import {
+  getAllKillSwitches,
+  getAllSettings,
+  setKillSwitch,
+  setSetting,
+} from "../platform/settings/index.ts";
 import { createConsentService } from "../profile/consent.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
+import { searchQuerySchema, searchResponse } from "./api.ts";
 import { clearSinkMail, failNextSinkMail, listSinkMail } from "../platform/mail/sink.ts";
 import {
   clearCloudflareEmailRequests,
@@ -1343,6 +1350,8 @@ export function createTestRoutes(
     return context.json({ ok: true });
   });
 
+  routes.get("/settings", (context) => context.json(getAllSettings(db)));
+
   routes.put("/settings/:key", validJson(settingBody), async (context) => {
     const { key } = context.req.param();
     const { value } = context.req.valid("json");
@@ -1353,6 +1362,8 @@ export function createTestRoutes(
 
     return context.json({ key, value });
   });
+
+  routes.get("/kill-switches", (context) => context.json(getAllKillSwitches(db)));
 
   routes.put("/kill-switches/:scope/:key", validJson(killSwitchBody), (context) => {
     const { scope, key } = context.req.param();
@@ -1376,6 +1387,77 @@ export function createTestRoutes(
 
     return context.json({ ok: true });
   });
+
+  routes.get("/events", (context) => {
+    const header = context.req.header("Last-Event-ID") ?? null;
+    const parsed = header === null ? 0 : Math.trunc(Number(header));
+    const encoder = new TextEncoder();
+
+    let cursor = Number.isNaN(parsed) ? 0 : parsed;
+
+    const stream = new ReadableStream({
+      start(controller) {
+        let closed = false;
+        let timer: ReturnType<typeof setInterval> | null = null;
+
+        function close() {
+          if (closed) {
+            return;
+          }
+
+          closed = true;
+
+          if (timer !== null) {
+            clearInterval(timer);
+          }
+
+          try {
+            controller.close();
+          } catch {}
+        }
+
+        function flush() {
+          if (closed) {
+            return;
+          }
+
+          try {
+            for (const row of db
+              .select()
+              .from(eventLog)
+              .where(gt(eventLog.seq, cursor))
+              .orderBy(eventLog.seq)
+              .all()) {
+              cursor = row.seq;
+              controller.enqueue(
+                encoder.encode(
+                  `id:${String(row.seq)}\nevent:${row.topic}\ndata:${row.payload}\n\n`,
+                ),
+              );
+            }
+          } catch {
+            close();
+          }
+        }
+
+        timer = setInterval(flush, 50);
+        context.req.raw.signal.addEventListener("abort", close);
+        flush();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  });
+
+  routes.get("/search", validQuery(searchQuerySchema), (context) =>
+    context.json(searchResponse(catalogDb, context.req.valid("query"))),
+  );
 
   routes.get("/telemetry/spans", (context) => {
     const spans = getTestSpans().map((span) => ({

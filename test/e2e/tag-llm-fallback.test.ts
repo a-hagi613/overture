@@ -265,7 +265,7 @@ test("over the tagging cap nothing is sent until the next day", async () => {
 
     expect(waitingRows.length).toBe(0);
 
-    const alert = await readSseEventUntil(`${harness.app.url}/api/events`, "", (event) => {
+    const alert = await readSseEventUntil(`${harness.app.url}/__test__/events`, "", (event) => {
       if (event.event !== "alert.raised") {
         return false;
       }
@@ -305,7 +305,7 @@ test("over the tagging cap nothing is sent until the next day", async () => {
     await fetch(`${harness.app.url}/__test__/jobs/run-due`, { method: "POST" });
 
     const tagJobDone = await readSseEventUntil(
-      `${harness.app.url}/api/events`,
+      `${harness.app.url}/__test__/events`,
       "",
       (event) =>
         event.event === "job.done" &&

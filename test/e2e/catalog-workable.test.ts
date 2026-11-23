@@ -229,7 +229,7 @@ async function postingTags(harness: Harness) {
 
 async function search(harness: Harness, query: string) {
   const response = await fetch(
-    `${harness.app.url}/api/search?q=${encodeURIComponent(query)}&limit=50`,
+    `${harness.app.url}/__test__/search?q=${encodeURIComponent(query)}&limit=50`,
   );
 
   return searchResponseSchema.parse(await response.json());
@@ -425,7 +425,7 @@ test("a truncated and stale snapshot alerts and never closes the catalogue", asy
 
     writeTruncatedSnapshot(outDir, "workable/2026-11-21.jsonl.gz", 10);
 
-    const alert = readSseEventUntil(`${harness.app.url}/api/events`, null, (event) => {
+    const alert = readSseEventUntil(`${harness.app.url}/__test__/events`, null, (event) => {
       if (event.event !== "alert.raised") {
         return false;
       }

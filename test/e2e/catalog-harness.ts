@@ -249,12 +249,12 @@ async function waitForJobDone(
 ) {
   const wanted = requiredJobIds;
 
-  const response = await fetch(`${appUrl}/api/events`, {
+  const response = await fetch(`${appUrl}/__test__/events`, {
     headers: { "Last-Event-ID": lastEventId },
   });
 
   if (!response.ok || response.body === null) {
-    throw new Error(`opening the events stream at ${appUrl}/api/events failed`);
+    throw new Error(`opening the events stream at ${appUrl}/__test__/events failed`);
   }
 
   const reader = response.body.getReader();

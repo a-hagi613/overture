@@ -431,7 +431,7 @@ test("a check message that never comes back fails the mail check and alerts the 
     throw new Error("The mail check did not record a sent message.");
   }
 
-  const alert = readSseEventUntil(`${appUrl()}/api/events`, null, (event) => {
+  const alert = readSseEventUntil(`${appUrl()}/__test__/events`, null, (event) => {
     if (event.event !== "alert.raised") {
       return false;
     }

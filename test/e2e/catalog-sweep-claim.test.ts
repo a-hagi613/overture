@@ -109,7 +109,7 @@ function sweepEventLabel(event: SseEvent, sweepIds: string[]) {
 async function waitForSweepsDone(harness: CatalogHarness, sweepIds: string[]) {
   const settled = new Set<string>();
 
-  await readSseEventUntil(`${harness.app.url}/api/events`, null, (event) => {
+  await readSseEventUntil(`${harness.app.url}/__test__/events`, null, (event) => {
     const id = doneFor(event);
 
     if (id !== null && sweepIds.includes(id)) {
@@ -123,7 +123,7 @@ async function waitForSweepsDone(harness: CatalogHarness, sweepIds: string[]) {
 async function sweepTimeline(harness: CatalogHarness, sweepIds: string[]) {
   const timeline: string[] = [];
 
-  await readSseEventUntil(`${harness.app.url}/api/events`, "", (event) => {
+  await readSseEventUntil(`${harness.app.url}/__test__/events`, "", (event) => {
     const label = sweepEventLabel(event, sweepIds);
 
     if (label !== null && !timeline.includes(label)) {
@@ -316,7 +316,7 @@ test("a crashed poll's board is held by its claim and polled again once the clai
     const inFlightRequestPath = harness.fixture.nextRequest();
     const crashedSweepId = await enqueueSweep(harness);
 
-    await readSseEventUntil(`${harness.app.url}/api/events`, null, (event) =>
+    await readSseEventUntil(`${harness.app.url}/__test__/events`, null, (event) =>
       event.event === "job.started"
         ? jobDoneSchema.parse(JSON.parse(event.data)).id === crashedSweepId
         : false,
