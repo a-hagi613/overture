@@ -9,7 +9,15 @@ import { appRoutes } from "./route-table.tsx";
 
 const router = createBrowserRouter(appRoutes);
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      staleTime: 15_000,
+    },
+  },
+});
+
 const rootElement = document.querySelector("#root");
 
 if (rootElement === null) {

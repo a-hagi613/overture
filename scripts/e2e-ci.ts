@@ -8,6 +8,9 @@ const importPattern =
 
 const bindingPattern = /import\s+(?<clause>[^;]+?)\s+from\s+["'](?<specifier>[^"']+)["']/gu;
 
+const lazyBindingPattern =
+  /\bconst\s+(?<name>[A-Za-z_$][\w$]*)\s*=\s*(?:React\.)?(?:lazyRoute|lazy)\([^;]{0,240}?import\(\s*["'](?<specifier>[^"']+)["']\s*\)/gu;
+
 const routeMountPattern = /\.route\(\s*"(?<prefix>[^"]+)"\s*,\s*(?<target>[A-Za-z0-9_]+)/gu;
 
 const routeDeclarationPattern =
@@ -292,10 +295,10 @@ function closureFrom(graph: Map<string, string[]>, roots: readonly string[]) {
   return seen;
 }
 
-function importBindings(file: string) {
+export function extractImportBindings(text: string) {
   const bindings = new Map<string, string>();
 
-  for (const match of textOf(file).matchAll(bindingPattern)) {
+  for (const match of text.matchAll(bindingPattern)) {
     const clause = match.groups?.clause?.trim();
     const specifier = match.groups?.specifier;
 
@@ -333,7 +336,20 @@ function importBindings(file: string) {
     }
   }
 
+  for (const match of text.matchAll(lazyBindingPattern)) {
+    const name = match.groups?.name;
+    const specifier = match.groups?.specifier;
+
+    if (name !== undefined && specifier !== undefined) {
+      bindings.set(name, specifier);
+    }
+  }
+
   return bindings;
+}
+
+function importBindings(file: string) {
+  return extractImportBindings(textOf(file));
 }
 
 function declarationStarts(text: string, includeIndentedHelpers: boolean) {

@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { Outlet } from "react-router";
 
 import { copy } from "../../../shared/copy.ts";
 import { BrandMark } from "../../components/brand-mark.tsx";
 import { NavGlyph } from "../../components/nav-glyph.tsx";
+import { RouteFallback } from "../../components/route-fallback.tsx";
 import { AdminChipNav } from "./admin-chip-nav.tsx";
 import { AdminSideNav } from "./admin-nav.tsx";
 import { AdminSideIdentity } from "./admin-side.tsx";
@@ -35,7 +37,9 @@ export function AdminShell() {
           className="min-w-0 flex-1 outline-none px-4 pb-10 pt-4 md:px-[31px] md:pt-[26px]"
         >
           <AdminChipNav />
-          <Outlet />
+          <Suspense fallback={<RouteFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

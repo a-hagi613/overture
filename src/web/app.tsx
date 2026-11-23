@@ -1,11 +1,12 @@
 import { PanelLeftClose } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router";
 
 import { copy } from "../shared/copy.ts";
 import { Backdrop } from "./components/backdrop.tsx";
 import { BoardRail } from "./components/board-rail.tsx";
 import { BrandMark } from "./components/brand-mark.tsx";
+import { RouteFallback } from "./components/route-fallback.tsx";
 import { SideNav } from "./components/side-nav.tsx";
 import { SidebarSearchButton } from "./components/sidebar-search-button.tsx";
 import { SidebarThemeToggle } from "./components/sidebar-theme-toggle.tsx";
@@ -132,7 +133,9 @@ export function AppShell() {
           tabIndex={-1}
         >
           <div className="mx-auto w-full max-w-[1440px]">
-            <Outlet />
+            <Suspense fallback={<RouteFallback />}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
         <TabBar
