@@ -19,13 +19,13 @@ const filters = [
 ] as const;
 
 const buttonClass =
-  "inline-flex h-10 flex-none items-center justify-center rounded-md border border-foreground bg-foreground px-4 text-[13.5px] font-semibold text-card hover:opacity-90";
+  "inline-flex h-10 flex-none items-center justify-center rounded-md border border-foreground bg-foreground px-4 text-sm font-semibold text-card hover:opacity-90";
 
 const chipClass =
-  "inline-flex min-h-8 items-center rounded-full border px-3.5 text-[12.5px] font-semibold";
+  "inline-flex min-h-8 items-center rounded-full border px-3.5 text-xs font-semibold";
 
 const pageButtonClass =
-  "inline-flex h-9 min-w-[92px] items-center justify-center rounded-md border border-input bg-card px-3 text-[12.5px] font-semibold disabled:opacity-50";
+  "inline-flex h-9 min-w-[92px] items-center justify-center rounded-md border border-input bg-card px-3 text-xs font-semibold disabled:opacity-50";
 
 export function UsersPage() {
   const [status, setStatus] = useState<AdminStatus>("all");
@@ -135,10 +135,8 @@ export function UsersPage() {
     <>
       <div className="mt-6 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
         <div className="min-w-0">
-          <p className="font-serif text-[15px] italic text-muted-foreground">
-            {copy.admin.usersLead}
-          </p>
-          <h1 className="mt-0.5 font-serif text-[32px] leading-[1.05] md:text-[42px]">
+          <p className="font-serif text-sm italic text-muted-foreground">{copy.admin.usersLead}</p>
+          <h1 className="mt-0.5 font-serif text-page-title leading-[1.05]">
             {copy.admin.usersTitlePlain}{" "}
             <span className="italic">{copy.admin.usersTitleItalic}</span>
           </h1>
@@ -150,7 +148,7 @@ export function UsersPage() {
             </span>
             <input
               aria-label={copy.admin.usersSearch}
-              className="min-w-0 flex-1 bg-transparent py-1 text-[13.5px] outline-0 placeholder:text-muted-foreground"
+              className="min-w-0 flex-1 bg-transparent py-1 text-sm outline-0 placeholder:text-muted-foreground"
               onChange={(event) => {
                 setQuery(event.target.value);
                 setPage(1);
@@ -199,7 +197,7 @@ export function UsersPage() {
         />
       ) : null}
       <section className="mt-6 overflow-hidden rounded-lg border border-border bg-card shadow-sh">
-        <div className="hidden grid-cols-[minmax(0,1.6fr)_110px_1fr_1.05fr_1.1fr_24px] gap-4 border-b border-border bg-muted px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground md:grid">
+        <div className="hidden grid-cols-[minmax(0,1.6fr)_110px_1fr_1.05fr_1.1fr_24px] gap-4 border-b border-border bg-muted px-5 py-3 text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground md:grid">
           <span>{copy.admin.usersColumnUser}</span>
           <span>{copy.admin.usersColumnStatus}</span>
           <span>{copy.admin.usersColumnInvite}</span>
@@ -208,14 +206,14 @@ export function UsersPage() {
           <span />
         </div>
         {data.rows.length === 0 ? (
-          <p className="px-5 py-8 text-[12.5px] text-muted-foreground">
+          <p className="px-5 py-8 text-xs text-muted-foreground">
             {copy.admin.usersShowing(0, data.total)}
           </p>
         ) : (
           data.rows.map((row) => <UserRow key={row.id} now={data.now} row={row} />)
         )}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/40 px-5 py-4">
-          <p className="text-[12.5px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {copy.admin.usersShowing(firstRow, data.total)}
           </p>
           <div className="flex gap-2.5">

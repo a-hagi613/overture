@@ -41,32 +41,32 @@ export function MailEmployerRow({ open, row }: { open: boolean; row: MailHealthE
       >
         <div className="min-w-0">
           <AdminCellLabel label={copy.admin.mailColumnEmployer} />
-          <p className="truncate text-[13.5px] font-semibold">{row.employer}</p>
-          <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+          <p className="truncate text-sm font-semibold">{row.employer}</p>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
             <span className="sr-only">{copy.admin.mailColumnAts} </span>
             {copy.admin.mailAtsList(row.ats)}
           </p>
         </div>
         <div className="mt-3 md:mt-0">
           <AdminCellLabel label={copy.admin.mailColumnSent} />
-          <span className="text-[13px] tabular-nums">{row.sent}</span>
+          <span className="text-sm tabular-nums">{row.sent}</span>
         </div>
         <div className="mt-3 md:mt-0">
           <AdminCellLabel label={copy.admin.mailColumnReplies} />
-          <span className="text-[13px] tabular-nums">{row.replies}</span>
+          <span className="text-sm tabular-nums">{row.replies}</span>
         </div>
         <div className="mt-3 md:mt-0">
           <AdminCellLabel label={copy.admin.mailColumnBounces} />
-          <span className="text-[13px] tabular-nums">{row.bounces}</span>
+          <span className="text-sm tabular-nums">{row.bounces}</span>
         </div>
         <div className="mt-3 md:mt-0">
           <AdminCellLabel label={copy.admin.mailColumnReplyRate} />
-          <span className="text-[13px] tabular-nums">{rateText(row)}</span>
+          <span className="text-sm tabular-nums">{rateText(row)}</span>
         </div>
         <div className="mt-3 md:mt-0">
           <AdminCellLabel label={copy.admin.mailColumnStatus} />
           <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${statusTone(row.status)}`}
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-eyebrow font-semibold ${statusTone(row.status)}`}
           >
             {statusLabel(row)}
           </span>
@@ -77,11 +77,11 @@ export function MailEmployerRow({ open, row }: { open: boolean; row: MailHealthE
         hidden={!open}
         id={mailPanelId(row.companyId)}
       >
-        <p className="text-[13px]">{copy.admin.mailExpandedApplications(row.applications)}</p>
-        <p className="mt-1 text-[13px]">
+        <p className="text-sm">{copy.admin.mailExpandedApplications(row.applications)}</p>
+        <p className="mt-1 text-sm">
           {copy.admin.mailAuthLine(row.auth.pass, row.auth.fail, row.auth.none)}
         </p>
-        <p className="mt-1 text-[13px] text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           {row.killSwitch === null
             ? copy.admin.mailExpandedSwitchOff
             : copy.admin.mailExpandedSwitchOn(row.killSwitch.reason)}

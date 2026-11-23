@@ -2,7 +2,7 @@ import { Link } from "react-router";
 
 import { copy } from "../../../shared/copy.ts";
 
-const TAB_BASE = "flex min-h-[44px] items-center rounded-md px-3 text-[13px]";
+const TAB_BASE = "flex min-h-[44px] items-center rounded-md px-3 text-sm";
 const TAB_CURRENT = `${TAB_BASE} bg-card font-medium text-foreground shadow-sh hover:bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground`;
 const TAB_LINK = `${TAB_BASE} text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground`;
 const TAB_PENDING = `${TAB_BASE} text-muted-foreground`;

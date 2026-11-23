@@ -4,7 +4,7 @@ import { formatRunDay } from "./billing-reconcile-format.ts";
 import { ReconcileIcon } from "./billing-reconcile-icon.tsx";
 
 const BUTTON =
-  "inline-flex min-h-11 items-center rounded-md bg-foreground px-4 text-[13px] font-semibold text-card hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
+  "inline-flex min-h-11 items-center rounded-md bg-foreground px-4 text-sm font-semibold text-card hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
 
 export function ReconcileBanner({
   reconciliation,
@@ -21,12 +21,10 @@ export function ReconcileBanner({
       >
         <ReconcileIcon kind="info" />
         <div>
-          <h2 id="reconcile-banner-title" className="text-[14px] font-semibold">
+          <h2 id="reconcile-banner-title" className="text-sm font-semibold">
             {copy.admin.billingReconcileBannerNoneTitle}
           </h2>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            {copy.admin.billingReconcileNone}
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">{copy.admin.billingReconcileNone}</p>
         </div>
       </section>
     );
@@ -42,10 +40,10 @@ export function ReconcileBanner({
           <ReconcileIcon kind="check" />
         </span>
         <div>
-          <h2 id="reconcile-banner-title" className="text-[14px] font-semibold">
+          <h2 id="reconcile-banner-title" className="text-sm font-semibold">
             {copy.admin.billingReconcileBannerCleanTitle(formatRunDay(reconciliation.day))}
           </h2>
-          <p className="mt-1 text-[13px] text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             {copy.admin.billingReconcileBannerCleanBody(
               reconciliation.stripeInvoices,
               reconciliation.stripeRefunds,
@@ -63,10 +61,10 @@ export function ReconcileBanner({
     >
       <ReconcileIcon kind="warning" />
       <div className="min-w-0">
-        <h2 id="reconcile-banner-title" className="text-[14px] font-semibold">
+        <h2 id="reconcile-banner-title" className="text-sm font-semibold">
           {copy.admin.billingReconcileBannerMismatchTitle(reconciliation.mismatchTotal)}
         </h2>
-        <p className="mt-1 text-[13px] text-foreground">
+        <p className="mt-1 text-sm text-foreground">
           {copy.admin.billingReconcileBannerMismatchBody}
         </p>
         <button type="button" onClick={onReview} className={`${BUTTON} mt-3`}>

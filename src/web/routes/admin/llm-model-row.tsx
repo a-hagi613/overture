@@ -7,20 +7,20 @@ export function LlmModelRow({ row }: { row: LlmUsageModelRow }) {
     <li className="border-t border-border py-3 first:border-t-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[13px] font-semibold">{row.model}</span>
+          <span className="font-mono text-sm font-semibold">{row.model}</span>
           <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-eyebrow font-semibold ${
               row.unexpected ? "bg-need-soft text-need" : "bg-ok-soft text-ok"
             }`}
           >
             {row.unexpected ? copy.admin.llmModelUnexpectedBadge : copy.admin.llmModelExpectedBadge}
           </span>
         </div>
-        <span className="font-mono text-[13px] font-semibold tabular-nums">
+        <span className="font-mono text-sm font-semibold tabular-nums">
           {formatUsdMicros(row.costMicros)}
         </span>
       </div>
-      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[12px] tabular-nums text-muted-foreground">
+      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs tabular-nums text-muted-foreground">
         <span>{copy.admin.llmStatTotalCalls(row.calls)}</span>
         <span>
           {copy.admin.llmCacheHitInline(formatCacheHitRate(row.cachedTokens, row.inputTokens))}

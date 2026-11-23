@@ -7,7 +7,7 @@ export function PageNote({ tone, children }: { tone: "need" | "muted"; children:
   } as const;
 
   return (
-    <div className={`mt-5 rounded-md border px-4 py-3 text-[13px] leading-relaxed ${tones[tone]}`}>
+    <div className={`mt-5 rounded-md border px-4 py-3 text-sm leading-relaxed ${tones[tone]}`}>
       {children}
     </div>
   );

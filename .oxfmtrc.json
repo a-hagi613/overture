@@ -6,6 +6,8 @@
     "README.md",
     "DESIGN.md",
     "src/server/catalog/tag-data/**",
-    "tools/oxlint/anti-slop/vendor/**"
+    "tools/oxlint/anti-slop/vendor/**",
+    ".claude/**",
+    ".agents/**"
   ]
 }

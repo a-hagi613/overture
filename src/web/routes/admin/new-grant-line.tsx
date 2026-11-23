@@ -26,13 +26,13 @@ export function NewGrantLine({ onChanged }: { onChanged: () => void }) {
       <div className="flex flex-wrap items-end gap-2">
         <div>
           <label
-            className="block text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+            className="block text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground"
             htmlFor="grant-email"
           >
             {copy.admin.grantEmailLabel}
           </label>
           <input
-            className="mt-1 h-9 w-[220px] rounded-md border border-input bg-background px-2.5 text-[13px]"
+            className="mt-1 h-9 w-[220px] rounded-md border border-input bg-background px-2.5 text-sm"
             id="grant-email"
             onChange={(event) => setEmail(event.target.value)}
             value={email}
@@ -40,13 +40,13 @@ export function NewGrantLine({ onChanged }: { onChanged: () => void }) {
         </div>
         <div>
           <label
-            className="block text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+            className="block text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground"
             htmlFor="grant-quantity"
           >
             {copy.admin.grantQuantityLabel}
           </label>
           <input
-            className="mt-1 h-9 w-[110px] rounded-md border border-input bg-background px-2.5 text-[13px]"
+            className="mt-1 h-9 w-[110px] rounded-md border border-input bg-background px-2.5 text-sm"
             id="grant-quantity"
             inputMode="numeric"
             onChange={(event) => setQuantity(event.target.value)}
@@ -55,13 +55,13 @@ export function NewGrantLine({ onChanged }: { onChanged: () => void }) {
         </div>
         <div>
           <label
-            className="block text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+            className="block text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground"
             htmlFor="grant-days"
           >
             {copy.admin.grantDaysLabel}
           </label>
           <input
-            className="mt-1 h-9 w-[110px] rounded-md border border-input bg-background px-2.5 text-[13px]"
+            className="mt-1 h-9 w-[110px] rounded-md border border-input bg-background px-2.5 text-sm"
             id="grant-days"
             inputMode="numeric"
             onChange={(event) => setDays(event.target.value)}
@@ -70,7 +70,7 @@ export function NewGrantLine({ onChanged }: { onChanged: () => void }) {
         </div>
       </div>
       <button
-        className="inline-flex h-9 items-center justify-center rounded-md bg-foreground px-3.5 text-[13px] font-semibold text-card hover:opacity-90"
+        className="inline-flex h-9 items-center justify-center rounded-md bg-foreground px-3.5 text-sm font-semibold text-card hover:opacity-90"
         disabled={!ready}
         onClick={() => {
           void grant();

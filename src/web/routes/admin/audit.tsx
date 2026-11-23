@@ -130,11 +130,11 @@ export function AuditLogPage() {
       <Card className="mt-6">
         <div className="grid gap-3 md:grid-cols-[1fr_200px_200px_auto] md:items-end">
           <label className="block min-w-0">
-            <span className="mb-1 block text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="mb-1 block text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               {copy.admin.auditSearchLabel}
             </span>
             <input
-              className="h-11 w-full rounded-md border border-input bg-background px-3 text-[13.5px] md:h-10"
+              className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm md:h-10"
               onChange={(event) => {
                 setQueryText(event.target.value);
                 resetPagination();
@@ -145,11 +145,11 @@ export function AuditLogPage() {
             />
           </label>
           <label className="block min-w-0">
-            <span className="mb-1 block text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="mb-1 block text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               {copy.admin.auditActionLabel}
             </span>
             <select
-              className="h-11 w-full rounded-md border border-input bg-background px-2.5 text-[13px] md:h-10"
+              className="h-11 w-full rounded-md border border-input bg-background px-2.5 text-sm md:h-10"
               onChange={(event) => {
                 setAction(event.target.value);
                 resetPagination();
@@ -165,11 +165,11 @@ export function AuditLogPage() {
             </select>
           </label>
           <label className="block min-w-0">
-            <span className="mb-1 block text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="mb-1 block text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               {copy.admin.auditTargetUserLabel}
             </span>
             <input
-              className="h-11 w-full rounded-md border border-input bg-background px-3 text-[13px] md:h-10"
+              className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm md:h-10"
               onChange={(event) => {
                 setTargetUserId(event.target.value);
                 resetPagination();
@@ -211,7 +211,7 @@ export function AuditLogPage() {
           className="mt-5 overflow-hidden rounded-lg border border-border bg-card shadow-sh"
         >
           {data.entries.length === 0 ? (
-            <p className="px-5 py-8 text-[13px] text-muted-foreground">{copy.admin.auditEmpty}</p>
+            <p className="px-5 py-8 text-sm text-muted-foreground">{copy.admin.auditEmpty}</p>
           ) : (
             <ul>
               {data.entries.map((row) => (
@@ -227,7 +227,7 @@ export function AuditLogPage() {
             </ul>
           )}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/40 px-4 py-3.5 md:px-5">
-            <p className="font-mono text-[12.5px] text-muted-foreground tabular-nums">
+            <p className="font-mono text-xs text-muted-foreground tabular-nums">
               {copy.admin.auditCount(data.entries.length, pageIndex + 1)}
             </p>
             <div className="flex gap-2">

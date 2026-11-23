@@ -21,8 +21,8 @@ export function AttemptsTable({
       className="mt-4 hidden overflow-x-auto rounded-lg border border-border bg-card shadow-sh md:block"
       data-scroll-region=""
     >
-      <table className="w-full min-w-[780px] border-collapse text-left text-[13px]">
-        <thead className="bg-muted text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+      <table className="w-full min-w-[780px] border-collapse text-left text-sm">
+        <thead className="bg-muted text-eyebrow font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           <tr>
             <th className="px-4 py-2.5" scope="col">
               {copy.admin.attemptsColumnPosting}

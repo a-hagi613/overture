@@ -87,7 +87,7 @@ export function OverviewPage() {
         {view.openSupportTickets > 0 ? (
           <p>
             <Link
-              className="inline-flex min-h-11 items-center rounded-lg border border-signal bg-signal-soft px-3.5 text-[13px] font-semibold text-signal-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9"
+              className="inline-flex min-h-11 items-center rounded-lg border border-signal bg-signal-soft px-3.5 text-sm font-semibold text-signal-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9"
               to="/admin/support?status=open"
             >
               {copy.admin.overviewSupportOpen(view.openSupportTickets)}
@@ -113,42 +113,42 @@ export function OverviewPage() {
           <CardTitle id="admin-overview-state">{copy.admin.overviewJobs}</CardTitle>
           <dl className="mt-4 flex flex-wrap gap-8">
             <div>
-              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <dt className="text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {copy.admin.overviewUsers}
               </dt>
-              <dd className="font-serif text-3xl tabular-nums">{view.users.total}</dd>
+              <dd className="font-serif text-metric tabular-nums">{view.users.total}</dd>
             </div>
             <div>
-              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <dt className="text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {copy.admin.overviewOwners}
               </dt>
-              <dd className="font-serif text-3xl tabular-nums">{view.users.owners}</dd>
+              <dd className="font-serif text-metric tabular-nums">{view.users.owners}</dd>
             </div>
             <div>
-              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <dt className="text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {copy.admin.overviewSessions}
               </dt>
-              <dd className="font-serif text-3xl tabular-nums">{view.sessions}</dd>
+              <dd className="font-serif text-metric tabular-nums">{view.sessions}</dd>
             </div>
             <div>
-              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <dt className="text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {copy.admin.overviewSwitches}
               </dt>
-              <dd className="font-serif text-3xl tabular-nums">{view.killSwitches.enabled}</dd>
+              <dd className="font-serif text-metric tabular-nums">{view.killSwitches.enabled}</dd>
             </div>
           </dl>
           <div className="mt-5">
             {jobs.length === 0 ? (
-              <p className="text-[12.5px] text-muted-foreground">{copy.admin.overviewJobsEmpty}</p>
+              <p className="text-xs text-muted-foreground">{copy.admin.overviewJobsEmpty}</p>
             ) : (
               jobs.map(([status, total]) => (
                 <div
                   className="flex items-baseline justify-between gap-3 border-t border-border py-3 first:border-t-0"
                   key={status}
                 >
-                  <span className="font-mono text-[13px] font-semibold">{status}</span>
-                  <span className="text-[12.5px] text-muted-foreground">
-                    <span className="font-serif text-lg tabular-nums">{total}</span>
+                  <span className="font-mono text-sm font-semibold">{status}</span>
+                  <span className="text-xs text-muted-foreground">
+                    <span className="font-serif text-base tabular-nums">{total}</span>
                   </span>
                 </div>
               ))
@@ -157,7 +157,7 @@ export function OverviewPage() {
           {deadJobs > 0 ? (
             <p className="mt-3">
               <Link
-                className="inline-flex min-h-11 items-center rounded-sm text-[12.5px] font-semibold text-signal-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9"
+                className="inline-flex min-h-11 items-center rounded-sm text-xs font-semibold text-signal-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9"
                 to="/admin/jobs?status=dead"
               >
                 {copy.admin.overviewJobsDead(deadJobs)}
@@ -167,29 +167,29 @@ export function OverviewPage() {
         </Card>
         <Card ariaLabelledBy="admin-overview-cost">
           <CardTitle id="admin-overview-cost">{copy.admin.overviewCost}</CardTitle>
-          <p className="mt-2 text-[12.5px] text-muted-foreground">{copy.admin.overviewCostIntro}</p>
+          <p className="mt-2 text-xs text-muted-foreground">{copy.admin.overviewCostIntro}</p>
           <dl className="mt-4 flex flex-wrap gap-8">
             <div>
-              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <dt className="text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {copy.admin.overviewCostCompleted}
               </dt>
-              <dd className="font-serif text-3xl tabular-nums">{view.cost.completed}</dd>
+              <dd className="font-serif text-metric tabular-nums">{view.cost.completed}</dd>
             </div>
             <div>
-              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <dt className="text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {copy.admin.overviewCostProxy}
               </dt>
-              <dd className="font-serif text-3xl tabular-nums">
+              <dd className="font-serif text-metric tabular-nums">
                 {view.cost.proxyMbPerCompleted === null
                   ? "—"
                   : `${view.cost.proxyMbPerCompleted.toFixed(2)} MB`}
               </dd>
             </div>
             <div>
-              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <dt className="text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {copy.admin.overviewCostPerApplication}
               </dt>
-              <dd className="font-serif text-3xl tabular-nums">
+              <dd className="font-serif text-metric tabular-nums">
                 {view.cost.costMicrosPerCompleted === null
                   ? "—"
                   : copy.admin.overviewCostGate(
@@ -199,25 +199,25 @@ export function OverviewPage() {
               </dd>
             </div>
           </dl>
-          <p className="mt-4 text-[12.5px] text-muted-foreground">{gateState(view.cost)}</p>
-          <p className="mt-1 text-[12.5px] text-muted-foreground">
+          <p className="mt-4 text-xs text-muted-foreground">{gateState(view.cost)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             {view.cost.proxyTrend ? copy.admin.overviewCostTrend : copy.admin.overviewCostNoTrend}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
-              className="inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-[12.5px] font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
+              className="inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
               to="/admin/provider-report"
             >
               {copy.admin.overviewOpenReport}
             </Link>
             <Link
-              className="inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-[12.5px] font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
+              className="inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
               to="/admin/attempts"
             >
               {copy.admin.overviewInspectAttempts}
             </Link>
             <Link
-              className="inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-[12.5px] font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
+              className="inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
               to="/admin/llm"
             >
               {copy.admin.overviewInspectLlm}
@@ -227,48 +227,48 @@ export function OverviewPage() {
         <Card ariaLabelledBy="admin-overview-mail">
           <CardHeader>
             <CardTitle id="admin-overview-mail">{copy.admin.overviewMail}</CardTitle>
-            <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="text-eyebrow uppercase tracking-[0.14em] text-muted-foreground">
               {view.mail.month}
             </span>
           </CardHeader>
           <dl className="mt-4 flex flex-wrap gap-8">
             <div>
-              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <dt className="text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {copy.admin.overviewMailSent}
               </dt>
-              <dd className="font-serif text-3xl tabular-nums">
+              <dd className="font-serif text-metric tabular-nums">
                 {view.mail.total.toLocaleString("en-US")}
               </dd>
             </div>
             <div>
-              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <dt className="text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {copy.admin.overviewMailCap}
               </dt>
-              <dd className="font-serif text-3xl tabular-nums">
+              <dd className="font-serif text-metric tabular-nums">
                 {view.mail.cap.toLocaleString("en-US")}
               </dd>
             </div>
             <div>
-              <dt className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <dt className="text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {copy.admin.overviewMailReserve}
               </dt>
-              <dd className="font-serif text-3xl tabular-nums">
+              <dd className="font-serif text-metric tabular-nums">
                 {view.mail.reserve.toLocaleString("en-US")}
               </dd>
             </div>
           </dl>
-          <p className="mt-4 text-[12.5px] text-muted-foreground">
+          <p className="mt-4 text-xs text-muted-foreground">
             {copy.admin.overviewMailNote(view.mail.cap, view.mail.reserve)}
           </p>
           {mailStop === null ? null : (
-            <p className="mt-1 text-[12.5px] font-semibold text-foreground">{mailStop}</p>
+            <p className="mt-1 text-xs font-semibold text-foreground">{mailStop}</p>
           )}
         </Card>
         <Card ariaLabelledBy="admin-overview-audit">
           <CardHeader>
             <CardTitle id="admin-overview-audit">{copy.admin.overviewAudit}</CardTitle>
             <Link
-              className="inline-flex min-h-11 items-center rounded-md px-2.5 text-[13px] font-semibold underline underline-offset-2 hover:bg-muted md:min-h-9"
+              className="inline-flex min-h-11 items-center rounded-md px-2.5 text-sm font-semibold underline underline-offset-2 hover:bg-muted md:min-h-9"
               to="/admin/audit"
             >
               {copy.admin.overviewAuditAll}
@@ -276,7 +276,7 @@ export function OverviewPage() {
           </CardHeader>
           <div className="mt-4">
             {view.audit.length === 0 ? (
-              <p className="text-[12.5px] text-muted-foreground">{copy.admin.overviewAuditEmpty}</p>
+              <p className="text-xs text-muted-foreground">{copy.admin.overviewAuditEmpty}</p>
             ) : (
               view.audit.map((row) => <AuditLine key={row.id} row={row} />)
             )}

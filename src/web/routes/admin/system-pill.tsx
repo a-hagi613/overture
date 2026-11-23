@@ -9,7 +9,7 @@ const tones: Record<SystemTone, string> = {
 export function SystemPill({ label, tone }: { label: string; tone: SystemTone }) {
   return (
     <span
-      className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${tones[tone]}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-eyebrow font-semibold ${tones[tone]}`}
     >
       {label}
     </span>

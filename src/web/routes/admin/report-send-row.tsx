@@ -17,12 +17,12 @@ export function ReportSendRow(props: { row: ProviderReportRow }) {
   return (
     <li className="rounded-lg border border-border bg-card p-[18px_20px] shadow-sh">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 className="font-serif text-[19px] leading-[1.2]">
+        <h3 className="font-serif text-base leading-[1.2]">
           {copy.admin.reportBrowserName(row.provider)}
         </h3>
-        <span className="text-[12.5px] text-muted-foreground">{row.ats}</span>
+        <span className="text-xs text-muted-foreground">{row.ats}</span>
         {row.proxyTrend ? (
-          <span className="rounded-full bg-need-soft px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-need">
+          <span className="rounded-full bg-need-soft px-2.5 py-1 text-eyebrow font-semibold uppercase tracking-[0.1em] text-need">
             {copy.admin.overviewCostTrend}
           </span>
         ) : null}

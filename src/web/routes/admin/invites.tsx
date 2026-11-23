@@ -137,10 +137,10 @@ export function InvitesPage() {
         aria-labelledby="admin-invite-form"
         className="mt-6 rounded-lg border border-border bg-card p-[22px_24px] shadow-sh"
       >
-        <h2 className="font-serif text-[24px] leading-[1.1]" id="admin-invite-form">
+        <h2 className="font-serif text-card-title leading-[1.1]" id="admin-invite-form">
           {copy.admin.inviteFormHeading}
         </h2>
-        <p className="mt-1.5 max-w-[640px] text-[12.5px] leading-relaxed text-muted-foreground">
+        <p className="mt-1.5 max-w-[640px] text-xs leading-relaxed text-muted-foreground">
           {copy.admin.inviteFormIntro}
         </p>
         <form
@@ -151,11 +151,11 @@ export function InvitesPage() {
           }}
         >
           <label className="min-w-[240px] flex-[0_1_420px]">
-            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <span className="mb-1 block text-eyebrow font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {copy.admin.inviteEmailLabel}
             </span>
             <input
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-[13.5px]"
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               onChange={(event) => {
                 setEmail(event.target.value);
               }}
@@ -165,7 +165,7 @@ export function InvitesPage() {
             />
           </label>
           <button
-            className="inline-flex h-10 items-center justify-center rounded-md border border-foreground bg-foreground px-4 text-[13.5px] font-semibold text-card hover:opacity-90 disabled:opacity-60"
+            className="inline-flex h-10 items-center justify-center rounded-md border border-foreground bg-foreground px-4 text-sm font-semibold text-card hover:opacity-90 disabled:opacity-60"
             disabled={busy || !email.includes("@")}
             type="submit"
           >
@@ -173,13 +173,13 @@ export function InvitesPage() {
           </button>
         </form>
         {failed ? (
-          <p className="mt-3 text-[12.5px] font-semibold text-need" role="alert">
+          <p className="mt-3 text-xs font-semibold text-need" role="alert">
             {copy.admin.inviteCreateFailed}
           </p>
         ) : null}
       </section>
       {empty ? (
-        <p className="mt-6 text-[12.5px] text-muted-foreground">{copy.admin.invitesEmpty}</p>
+        <p className="mt-6 text-xs text-muted-foreground">{copy.admin.invitesEmpty}</p>
       ) : null}
       {pending.length === 0 ? null : (
         <InviteSection

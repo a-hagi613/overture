@@ -91,7 +91,7 @@ export function RefundForm({ userId, period }: { userId: string; period: Billing
 
   if (notice?.kind === "done") {
     return (
-      <output className="mt-4 block rounded-md bg-ok-soft px-3 py-2.5 text-[13px] text-ok">
+      <output className="mt-4 block rounded-md bg-ok-soft px-3 py-2.5 text-sm text-ok">
         {notice.replayed ? copy.admin.billingRefundReplayed : copy.admin.billingRefundDone}
       </output>
     );
@@ -106,9 +106,7 @@ export function RefundForm({ userId, period }: { userId: string; period: Billing
       }}
     >
       <fieldset className="space-y-2">
-        <legend className="text-[12.5px] font-semibold">
-          {copy.admin.billingRefundAmountLabel}
-        </legend>
+        <legend className="text-xs font-semibold">{copy.admin.billingRefundAmountLabel}</legend>
         <div className="flex min-h-11 items-start gap-3 rounded-md border border-input p-3 hover:bg-muted">
           <input
             id="refund-full"
@@ -122,8 +120,8 @@ export function RefundForm({ userId, period }: { userId: string; period: Billing
             }}
           />
           <label htmlFor="refund-full" className="cursor-pointer">
-            <span className="block text-[13px] font-semibold">{copy.admin.billingRefundFull}</span>
-            <span className="block text-[12px] text-muted-foreground">
+            <span className="block text-sm font-semibold">{copy.admin.billingRefundFull}</span>
+            <span className="block text-xs text-muted-foreground">
               {copy.admin.billingRefundFullHint}
             </span>
           </label>
@@ -142,10 +140,8 @@ export function RefundForm({ userId, period }: { userId: string; period: Billing
           />
           <div className="min-w-0 flex-1">
             <label htmlFor="refund-partial" className="cursor-pointer">
-              <span className="block text-[13px] font-semibold">
-                {copy.admin.billingRefundPartial}
-              </span>
-              <span className="block text-[12px] text-muted-foreground">
+              <span className="block text-sm font-semibold">{copy.admin.billingRefundPartial}</span>
+              <span className="block text-xs text-muted-foreground">
                 {copy.admin.billingRefundPartialHint}
               </span>
             </label>
@@ -158,7 +154,7 @@ export function RefundForm({ userId, period }: { userId: string; period: Billing
                   setAmount(event.target.value);
                   edited();
                 }}
-                className="mt-2 h-11 w-full rounded-md border border-input bg-background px-2.5 text-[13px] md:h-9"
+                className="mt-2 h-11 w-full rounded-md border border-input bg-background px-2.5 text-sm md:h-9"
               />
             ) : null}
           </div>
@@ -166,7 +162,7 @@ export function RefundForm({ userId, period }: { userId: string; period: Billing
       </fieldset>
 
       <div>
-        <label htmlFor="refund-reason" className="block text-[12.5px] font-semibold">
+        <label htmlFor="refund-reason" className="block text-xs font-semibold">
           {copy.admin.billingRefundReasonLabel}
         </label>
         <select
@@ -176,7 +172,7 @@ export function RefundForm({ userId, period }: { userId: string; period: Billing
             setReason(event.target.value);
             edited();
           }}
-          className="mt-1.5 h-11 w-full rounded-md border border-input bg-background px-2.5 text-[13px] md:h-9"
+          className="mt-1.5 h-11 w-full rounded-md border border-input bg-background px-2.5 text-sm md:h-9"
         >
           <option value="">{copy.admin.billingRefundReasonPlaceholder}</option>
           {REFUND_REASON_KEYS.map((key) => (
@@ -188,7 +184,7 @@ export function RefundForm({ userId, period }: { userId: string; period: Billing
       </div>
 
       <div>
-        <label htmlFor="refund-note" className="block text-[12.5px] font-semibold">
+        <label htmlFor="refund-note" className="block text-xs font-semibold">
           {copy.admin.billingRefundNoteLabel}
         </label>
         <textarea
@@ -200,25 +196,25 @@ export function RefundForm({ userId, period }: { userId: string; period: Billing
             setNote(event.target.value);
             edited();
           }}
-          className="mt-1.5 w-full rounded-md border border-input bg-background px-2.5 py-2 text-[13px]"
+          className="mt-1.5 w-full rounded-md border border-input bg-background px-2.5 py-2 text-sm"
         />
-        <p className="mt-1 text-[12px] text-muted-foreground">{copy.admin.billingRefundNoteHint}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{copy.admin.billingRefundNoteHint}</p>
       </div>
 
       <div className="rounded-md bg-muted px-4 py-3">
-        <p className="text-[13px] font-semibold">{copy.admin.billingRefundWhatHappens}</p>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">
+        <p className="text-sm font-semibold">{copy.admin.billingRefundWhatHappens}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
           {copy.admin.billingRefundWhatHappensBody}
         </p>
       </div>
 
       {problem === null ? null : (
-        <p role="alert" className="text-[13px] text-need">
+        <p role="alert" className="text-sm text-need">
           {problem}
         </p>
       )}
       {notice?.kind === "error" ? (
-        <p role="alert" className="text-[13px] text-need">
+        <p role="alert" className="text-sm text-need">
           {notice.message}
         </p>
       ) : null}
@@ -227,13 +223,13 @@ export function RefundForm({ userId, period }: { userId: string; period: Billing
         <button
           type="submit"
           disabled={submitting}
-          className="inline-flex min-h-11 items-center rounded-md bg-foreground px-4 text-[13px] font-semibold text-card hover:opacity-90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9"
+          className="inline-flex min-h-11 items-center rounded-md bg-foreground px-4 text-sm font-semibold text-card hover:opacity-90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9"
         >
           {copy.admin.billingRefundSubmit}
         </button>
         <Link
           to={`/admin/billing/users/${encodeURIComponent(userId)}`}
-          className="inline-flex min-h-11 items-center px-3 text-[13px] underline md:min-h-9"
+          className="inline-flex min-h-11 items-center px-3 text-sm underline md:min-h-9"
         >
           {copy.admin.billingRefundCancel}
         </Link>

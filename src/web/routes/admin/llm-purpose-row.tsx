@@ -19,7 +19,7 @@ export function LlmPurposeRow({
         <button
           aria-label={copy.admin.llmFilterByPurpose(row.purpose)}
           aria-pressed={selected}
-          className={`min-h-11 rounded-md px-2.5 text-left font-mono text-[13px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9 ${
+          className={`min-h-11 rounded-md px-2.5 text-left font-mono text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9 ${
             selected ? "bg-foreground text-primary-ink" : "bg-card text-foreground hover:bg-muted"
           }`}
           onClick={() => {
@@ -29,11 +29,11 @@ export function LlmPurposeRow({
         >
           {row.purpose}
         </button>
-        <span className="font-mono text-[13px] font-semibold tabular-nums">
+        <span className="font-mono text-sm font-semibold tabular-nums">
           {formatUsdMicros(row.costMicros)}
         </span>
       </div>
-      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 px-2.5 font-mono text-[12px] tabular-nums text-muted-foreground">
+      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 px-2.5 font-mono text-xs tabular-nums text-muted-foreground">
         <span>{copy.admin.llmStatTotalCalls(row.calls)}</span>
         <span>
           {copy.admin.llmCacheHitInline(formatCacheHitRate(row.cachedTokens, row.inputTokens))}

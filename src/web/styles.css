@@ -56,6 +56,11 @@
   --color-band-muted: rgba(251, 248, 242, 0.74);
   --color-band-line: rgba(251, 248, 242, 0.42);
   --ease-ember: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --duration-quick: 150ms;
+  --duration-base: 200ms;
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: var(--ease-out);
   --animate-seg-r: ov-seg-r 1.2s var(--ease-ember) infinite, ov-seg-op 1.2s linear infinite;
   --animate-seg-l: ov-seg-l 1.2s var(--ease-ember) infinite, ov-seg-op 1.2s linear infinite;
   --animate-seg-d: ov-seg-d 1.2s var(--ease-ember) infinite, ov-seg-op 1.2s linear infinite;
@@ -348,7 +353,7 @@ canvas {
   background: var(--btn);
   color: var(--btnink);
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   font-weight: 600;
   border: 1px solid var(--btn);
   cursor: pointer;
@@ -391,7 +396,7 @@ canvas {
   background: var(--card);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   font-weight: 600;
   border: 1px solid var(--line2);
   cursor: pointer;
@@ -409,7 +414,7 @@ canvas {
   background: none;
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   text-decoration: underline;
   cursor: pointer;
@@ -429,7 +434,7 @@ canvas {
 .board .eyebrow {
   line-height: normal;
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: var(--text-eyebrow);
   font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
@@ -444,7 +449,7 @@ canvas {
   padding: 3px 11px;
   border-radius: 999px;
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
   border: 1px solid var(--line2);
   background: var(--bg);
@@ -500,7 +505,7 @@ canvas {
   top: 11px;
   bottom: 11px;
   width: 3px;
-  border-radius: 2px;
+  border-radius: 999px;
   background: var(--acc);
 }
 
@@ -512,7 +517,7 @@ canvas {
   height: 17px;
   padding: 0 4px;
   border-radius: 9px;
-  font-size: 10.5px;
+  font-size: var(--text-eyebrow);
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -539,7 +544,7 @@ canvas {
   outline: 0;
   background: transparent;
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--ink);
 }
@@ -596,7 +601,7 @@ canvas {
   background: transparent;
   color: var(--mut);
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -625,7 +630,7 @@ canvas {
   background: var(--card);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -646,7 +651,7 @@ canvas {
 
 .board .stg b {
   font-weight: 700;
-  font-size: 12px;
+  font-size: var(--text-xs);
   opacity: 0.75;
 }
 
@@ -658,9 +663,9 @@ canvas {
   background: transparent;
   color: var(--mut);
   font-family: var(--font-sans);
-  font-size: 11.5px;
+  font-size: var(--text-eyebrow);
   font-weight: 600;
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
   display: inline-flex;
@@ -690,7 +695,7 @@ canvas {
   padding: 1px 9px;
   border-radius: 999px;
   font-family: var(--font-sans);
-  font-size: 11.5px;
+  font-size: var(--text-eyebrow);
   font-weight: 600;
   border: 1px solid transparent;
   white-space: nowrap;
@@ -761,7 +766,7 @@ canvas {
   .ready .btn2 {
     min-height: 34px;
     padding: 0 14px;
-    font-size: 13px;
+    font-size: var(--text-sm);
   }
 }
 
@@ -770,7 +775,7 @@ canvas {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: var(--text-sm);
   line-height: 1.5;
   position: relative;
   overflow: hidden;
@@ -778,7 +783,7 @@ canvas {
 }
 
 .onb .hd2 {
-  font-size: clamp(34px, 5vw, 46px);
+  font-size: var(--text-page-title);
   line-height: 1.05;
 }
 
@@ -828,7 +833,7 @@ canvas {
   gap: 8px;
   cursor: pointer;
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   line-height: normal;
   border-radius: 8px;
@@ -850,7 +855,7 @@ canvas {
   font-family: var(--font-serif);
   font-style: italic;
   font-weight: 400;
-  font-size: 17px;
+  font-size: var(--text-base);
   line-height: normal;
   color: var(--mut);
 }
@@ -894,7 +899,7 @@ canvas {
   display: block;
   width: 100%;
   height: 4px;
-  border-radius: 2px;
+  border-radius: 4px;
   background: var(--line2);
 }
 
@@ -925,7 +930,7 @@ canvas {
   gap: 6px;
   padding: 36px 24px;
   border: 1.5px dashed var(--line2);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--well);
   text-align: center;
 }
@@ -942,7 +947,7 @@ canvas {
   background: transparent;
   color: var(--mut);
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   font-weight: 600;
   border: 1px solid transparent;
   cursor: pointer;
@@ -976,7 +981,7 @@ canvas {
   background: var(--card);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 11.5px;
+  font-size: var(--text-eyebrow);
   font-weight: 600;
   line-height: normal;
   white-space: nowrap;
@@ -988,7 +993,7 @@ canvas {
   padding: 2px 10px;
   border-radius: 999px;
   font-family: var(--font-sans);
-  font-size: 11.5px;
+  font-size: var(--text-eyebrow);
   font-weight: 600;
   line-height: normal;
   white-space: nowrap;
@@ -1007,7 +1012,7 @@ canvas {
 .onb .lbl {
   display: block;
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: var(--text-xs);
   font-weight: 600;
   line-height: normal;
   color: var(--ink);
@@ -1019,7 +1024,7 @@ canvas {
 }
 
 .onb .hint {
-  font-size: 12.5px;
+  font-size: var(--text-xs);
   color: var(--mut);
   line-height: 1.5;
 }
@@ -1029,7 +1034,7 @@ canvas {
   border-radius: 8px;
   background: var(--well);
   border: 1px solid var(--line);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
 }
 
 .onb .req {
@@ -1038,7 +1043,7 @@ canvas {
   gap: 5px;
   margin-left: 8px;
   font-family: var(--font-sans);
-  font-size: 10px;
+  font-size: var(--text-eyebrow);
   font-weight: 600;
   line-height: normal;
   letter-spacing: 0.12em;
@@ -1073,7 +1078,7 @@ canvas {
   background: var(--card);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   font-weight: 600;
   line-height: normal;
   cursor: pointer;
@@ -1098,7 +1103,7 @@ canvas {
   background: var(--card);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   font-weight: 500;
   line-height: normal;
 }
@@ -1129,7 +1134,7 @@ canvas {
   background: var(--card);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   font-weight: 500;
   line-height: normal;
   cursor: pointer;
@@ -1211,8 +1216,10 @@ canvas {
     background 0.18s;
 }
 
-.onb .sw2:not(.on):hover .trk {
-  background: var(--line2);
+@media (hover: hover) and (pointer: fine) {
+  .onb .sw2:not(.on):hover .trk {
+    background: var(--line2);
+  }
 }
 
 .onb .sw2.on .trk {
@@ -1278,7 +1285,7 @@ canvas {
   }
 
   .onb .hd2 {
-    font-size: 30px !important;
+    font-size: var(--text-page-title) !important;
   }
 
   .onb .wa {

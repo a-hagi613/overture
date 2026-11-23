@@ -39,7 +39,7 @@ const discoverySystems = ["Greenhouse", "Lever", "Ashby", "Personio", "Workable"
 export function LandingStepFeedCard({ active }: { active: boolean }) {
   const cardClass = active
     ? "relative z-10 flex h-full min-w-0 flex-col gap-4 border-signal p-4 transition duration-300 -translate-y-0.5 shadow-lift sm:p-5"
-    : "relative z-10 flex h-full min-w-0 flex-col gap-4 p-4 transition duration-300 hover:-translate-y-0.5 hover:border-signal sm:p-5";
+    : "relative z-10 flex h-full min-w-0 flex-col gap-4 p-4 transition duration-300 hover:-translate-y-0.5 hover:border-foreground/30 sm:p-5";
 
   return (
     <Card className={cardClass}>

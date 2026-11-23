@@ -29,12 +29,12 @@ export function AuditEntryRow({
             <Badge className="font-mono" tone="neutral">
               {row.action}
             </Badge>
-            <span className="font-mono text-[12px] text-muted-foreground tabular-nums">
+            <span className="font-mono text-xs text-muted-foreground tabular-nums">
               {formatAuditTimestamp(row.at)}
             </span>
           </div>
-          {row.reason.length > 0 ? <p className="mt-1.5 text-[13.5px]">{row.reason}</p> : null}
-          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[12px] text-muted-foreground">
+          {row.reason.length > 0 ? <p className="mt-1.5 text-sm">{row.reason}</p> : null}
+          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-muted-foreground">
             <span>{copy.admin.auditActorLabel(row.actorId)}</span>
             {row.targetUserId === null ? null : (
               <Link
@@ -62,7 +62,7 @@ export function AuditEntryRow({
       </div>
       {expanded ? (
         <pre
-          className="mt-3 overflow-x-auto rounded-md border border-border bg-background p-3 font-mono text-[12px] leading-relaxed text-foreground"
+          className="mt-3 overflow-x-auto rounded-md border border-border bg-background p-3 font-mono text-xs leading-relaxed text-foreground"
           data-scroll-region
           id={detailId}
         >

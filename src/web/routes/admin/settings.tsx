@@ -66,7 +66,7 @@ export function AdminSettingsPage() {
         )}
         <Card ariaLabelledBy="admin-settings-limits">
           <CardTitle id="admin-settings-limits">{copy.admin.settingsHeading}</CardTitle>
-          <p className="mt-1 text-[12.5px] text-muted-foreground">{copy.admin.settingsIntro}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{copy.admin.settingsIntro}</p>
           <div className="mt-4">
             {Object.entries(settingsView).map(([settingKey, value]) => (
               <SettingLine
@@ -80,10 +80,10 @@ export function AdminSettingsPage() {
         </Card>
         <Card ariaLabelledBy="admin-kill-switches">
           <CardTitle id="admin-kill-switches">{copy.admin.switchesHeading}</CardTitle>
-          <p className="mt-1 text-[12.5px] text-muted-foreground">{copy.admin.switchesIntro}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{copy.admin.switchesIntro}</p>
           <div className="mt-4">
             {switchRows.length === 0 ? (
-              <p className="text-[12.5px] text-muted-foreground">{copy.admin.switchEmpty}</p>
+              <p className="text-xs text-muted-foreground">{copy.admin.switchEmpty}</p>
             ) : (
               switchRows.map((row) => (
                 <SwitchLine key={`${row.scope}/${row.key}`} onChanged={invalidateAdmin} row={row} />

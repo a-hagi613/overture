@@ -101,7 +101,7 @@ export function LandingWhereItApplies() {
               >
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute -inset-4 rounded-3xl border border-band-line animate-hub-pulse"
+                  className="pointer-events-none absolute -inset-4 rounded-2xl border border-band-line animate-hub-pulse"
                 />
                 <OvertureHubMark />
               </div>

@@ -10,11 +10,11 @@ export function BesideCard({ report }: { report: MarginReport }) {
       aria-labelledby="margin-beside"
       className="mt-6 rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
     >
-      <h2 id="margin-beside" className="font-serif text-[22px] leading-tight">
+      <h2 id="margin-beside" className="font-serif text-card-title leading-tight">
         {copy.admin.marginBesideHeading}
       </h2>
-      <p className="mt-2 text-[13.5px] text-muted-foreground">{copy.admin.marginBesideBody}</p>
-      <dl className="mt-4 grid gap-3 text-[14px] sm:grid-cols-3">
+      <p className="mt-2 text-sm text-muted-foreground">{copy.admin.marginBesideBody}</p>
+      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
         <div>
           <dt className="text-muted-foreground">{copy.admin.marginBesideInfra}</dt>
           <dd className="tabular-nums">{formatUsd(beside.fixedInfraMicrosPerMonth, 2)}</dd>

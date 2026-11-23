@@ -1,16 +1,15 @@
 ---
 name: Overture
 description: A job-search agent that applies to roles for you, and shows its work.
-source: Claude artifact P3aiZsEXkoUKBrknvvBNJJ — Section A, boards 1–3 (design system)
 colors:
   background: "#F3EEE4"
   sidebar: "#ECE6DA"
   card: "#FBF8F2"
-  muted: "#E9E3D8"
+  well: "#E9E3D8"
   foreground: "#151311"
   muted-foreground: "#5E5850"
   signal: "#D2561F"
-  signal-text: "#A9431A"
+  signal-text: "#933712"
   signal-soft: "rgba(210,86,31,0.10)"
   need: "#8E3A2C"
   need-soft: "#EFD9D3"
@@ -22,11 +21,11 @@ colors:
   dark-background: "#191714"
   dark-sidebar: "#1E1C19"
   dark-card: "#221F1C"
-  dark-muted: "#2A2723"
+  dark-well: "#2A2723"
   dark-foreground: "#F2EDE4"
   dark-muted-foreground: "#ADA69B"
   dark-signal: "#F0743A"
-  dark-signal-text: "#F37D44"
+  dark-signal-text: "#FB9462"
   dark-need: "#E58A78"
   dark-need-soft: "#40261F"
   dark-ok: "#8DBFA2"
@@ -36,7 +35,7 @@ typography:
     family: "Instrument Serif"
     weights: [400]
     fallback: "Newsreader, Georgia"
-    use: "display, headings, big numerals, scores"
+    use: "display, page and card titles, big numerals, scores, the owner's words"
   ui:
     family: "Plus Jakarta Sans"
     weights: [400, 500, 600, 700]
@@ -47,62 +46,28 @@ typography:
     weights: [400]
     fallback: "ui-monospace"
     use: "timestamps, counts, file names, 'via Greenhouse' — never paragraphs"
-rounded:
-  xs: "2px"
-  sm: "5px"
-  md: "6px"
-  lg: "8px"
-  xl: "10px"
-  card: "12px"
-  pill: "999px"
-spacing:
-  base: "4px"
-components:
-  button-primary:
-    background: "foreground"
-    foreground: "card (light) / background (dark)"
-    height: "40px app, 46px landing, 52px landing hero, 48px phone"
-    radius: "6px"
-  button-secondary:
-    background: "card"
-    foreground: "foreground"
-    border: "1px solid input (signal + signal-soft on hover)"
-    height: "40px app, 44px phone"
-  icon-button:
-    size: "40px, 44px on phone"
-  field:
-    height: "40px"
-    radius: "6px"
-    border: "1px solid input"
-    focus: "2px solid foreground, 2px offset"
-  grain:
-    light-max-opacity: 0.24
-    dark-max-opacity: 0.15
-    default: 0.5
-motion:
-  easing: "cubic-bezier(.2,.7,.2,1)"
-  ui-duration: "400–700ms"
-  travel: "≤12px"
-  rotation: "≤6deg"
-  tick: "800ms"
 ---
 
 # Overture design system — Ember
 
-The contract for every screen and every build on Ember v0.2 (token palette, typography, components).
-Per ADR 0037, PR #501's Tailwind v4 + Radix/shadcn rebuild supersedes pixel-for-pixel diffing against
-retired pre-Ember PNGs in `design/reference/`; UI fidelity is enforced via tokens (`overture/no-raw-design-styles`),
-`layout-guards-*`, `interactive-*`, `axe`, and seeded screen E2E tests. Where a board disagrees with
-`docs/SPEC.md` on product (words, screens, behaviour), the spec wins.
+The contract for every screen and every build on Ember v0.2: the palette, the nine typography tokens, the
+components and the rules that make a screen look like Overture. **DESIGN.md is the single source of truth for
+visual identity.** `docs/SPEC.md` is the source of truth for product — words, screens and behaviour. The installed
+agent skills are engineering and UX guardrails; they never override this file's tokens or identity. Where a skill
+and this file disagree on look, this file wins.
+
+Per ADR 0037, PR #501's Tailwind v4 + Radix/shadcn rebuild supersedes pixel-for-pixel diffing against retired
+pre-Ember PNGs in `design/reference/`; UI fidelity is enforced through tokens (`overture/no-raw-design-styles`),
+`layout-guards-*`, `interactive-*`, `axe`, and seeded screen E2E tests.
 
 Section B of that artifact — the later restatement with neutral paper, Newsreader and Archivo — was an
 experiment that has been **removed**. There is one design, and this is it.
 
-Product vocabulary, screens and behaviour come from `docs/SPEC.md`. This file governs how the
-product looks. Until §13's redraws land, boards that still say `Hold`, show the old nav (Job Board, Holds, Answer Bank) or a Live Tab are
-read as `Queued`/`Review` and the destinations in `docs/SPEC.md` §15 (six in the sidebar since ADR 0037: Home,
-Board, Ready, Review, Inbox, Calendar; Profile and Support open from the profile menu); their *visual treatment* is
-what is fixed here.
+Product vocabulary, screens and behaviour come from `docs/SPEC.md`. The working list of boards still to draw or
+redraw is `docs/research/boards-status.md`; boards that still say `Hold`, show the old nav (Job Board, Holds,
+Answer Bank) or a Live Tab are read as `Queued`/`Review` and the destinations in `docs/SPEC.md` §15 (six in the
+sidebar since ADR 0037: Home, Board, Ready, Review, Inbox, Calendar; Profile and Support open from the profile
+menu); their *visual treatment* is what is fixed here.
 
 ---
 
@@ -145,7 +110,7 @@ ink feel.
 | `--ink` | `--foreground, --primary, --ring` | `#151311` | `#F2EDE4` | Text, primary button, focus ring |
 | `--mut` | `--muted-foreground` | `#5E5850` | `#ADA69B` | Secondary text |
 | `--acc` | `--signal` | `#D2561F` | `#F0743A` | Orange: fills, strokes, large text |
-| `--acct` | `--signal-text` | `#A9431A` | `#F37D44` | Orange for small text |
+| `--acct` | `--signal-text` | `#933712` | `#FB9462` | Orange for small text |
 | `--need` | `--destructive` | `#8E3A2C` | `#E58A78` | Needs you: a Review |
 | `--ok` | — | `#3F6B52` | `#8DBFA2` | Screening, Interviewing, Offer |
 | `--line` | `--border` | `rgba(21,19,17,.14)` | `rgba(242,237,228,.14)` | Hairline, default |
@@ -157,21 +122,22 @@ ink feel.
 | `--btn` / `--btnink` | `--primary` / `--primary-foreground` | `#151311` / `#FBF8F2` | `#F2EDE4` / `#191714` | Primary button fill and label (`--btnh`: `#3A3631` light, `#FFFBF2` dark) |
 | `--scrim` | `--overlay` | `rgba(21,19,17,.16)` | `rgba(0,0,0,.38)` | Behind sheets |
 
-**Orange marks only the moment Overture acts** — Applying, Submitted, the active step, the travelling
-dot, the Applied tray, the logo stroke. Not links, not hover, not focus, not decoration. Small orange
-text uses `--acct`, never `--acc`, because `--acc` is 3.6:1 on paper.
+**Orange marks only live, current or in-flight state.** It is the moment Overture acts — Applying,
+Submitted, the travelling dot, the Applied tray, the logo stroke. In app chrome it has exactly four
+standing exceptions: nav count badges, the active nav marker, the one italic emphasis word of an app page
+title, and the Applied lane. Transient indicators — an unread dot, the current onboarding step, a running
+meter, a drop target, today in the Calendar — use the same orange while they are live. Orange is never a
+hover colour, never a link colour and never a focus ring. Small orange text uses `--acct`, never `--acc`,
+because `--acc` is 3.6:1 on paper.
+
+The Board's first lane is **Queued**, with the ink rule (decided 2026-11-23, audit M6). The five lanes and
+their rules are Queued `ink`, Ready `ok`, Applied `acc`, Waiting (Screening · Interviewing · Offer) `ok`,
+Closed `mut`. Queued is ink because most of it needs nothing from the user; a Queued card waiting on a
+Review carries the red "Needs you" pill instead. App chrome — selected cards, active tabs, meters, KPI
+numerals — uses ink, never orange.
 
 Statuses differ in lightness as well as hue. "Needs you" (a Review) is the only red. Applied and Submitted
-are the only orange states. The Board shows five lanes that group the seven Stages (ADR 0037, Glossary **Board
-lane**); lane rules: Queued `ink`, Ready `ok`, Applied `acc`, Waiting (Screening · Interviewing · Offer) `ok`,
-Closed `mut`. Queued is ink because most of it needs nothing from the user; a Queued card waiting on a Review
-carries the red "Needs you" pill instead. App chrome — selected cards, active tabs, meters, KPI numerals — uses
-ink, never orange.
-
-The 2026-11-23 rebuild breaks this rule in three places that are not yet decided (ADR 0037, open items): the
-first Board lane is labelled "On hold" (a banned word) with an orange rule, nav count badges are orange, and the
-active nav marker is orange. The one italic emphasis word of a page title is orange too; that one is accepted
-(§3).
+are the only orange states.
 
 Measured on the shipped hexes (text needs 4.5:1, 3:1 at ≥24px):
 
@@ -182,43 +148,21 @@ Measured on the shipped hexes (text needs 4.5:1, 3:1 at ≥24px):
 | mut on bg | 6.1:1 | 7.4:1 |
 | mut on card | 6.6:1 | 6.8:1 |
 | mut on well | 5.5:1 | 6.2:1 |
-| acct on bg (small text) | 5.2:1 | 6.7:1 |
-| acct on card | 5.7:1 | 6.1:1 |
+| acct on bg (small text) | 6.5:1 | 8.1:1 |
+| acct on card | 7.1:1 | 7.4:1 |
 | acc on bg (large text, strokes) | 3.6:1 | 6.2:1 |
 | need on card | 7.1:1 | 6.4:1 |
 | ok on card | 5.8:1 | 7.9:1 |
-| bg on ink (primary button) | 16.0:1 | 15.3:1 |
+| card on ink (primary button) | 17.5:1 | 15.3:1 |
 
-Chart colours: `--chart-1` signal, `--chart-2` ink, `--chart-3` ok, `--chart-4` muted-foreground,
-`--chart-5` need. The primary button is ink with paper text in both modes.
+Charts have no separate palette: the series is `signal`, the grid is `border`, the axis labels are
+`muted-foreground`, and the tooltip is a card. The primary button is ink with paper text in both modes.
 
 ### Sign-in dark ground
 
-The sign-in surfaces (`/signin`: sign-in, magic-sent, refused and suspended) in dark mode use the ground of the redrawn sign-in boards (`design/reference/source/w5-signin.dc.html`, the `.ov.dark` block, and the #203 sign-in states), not the Ember dark above (ADR 0027). They are a scoped token set, `.dark .signin-surface` in `src/web/styles.css`; every other screen keeps the dark column of the table. Light mode is unchanged. The reference pack for the new states is `design/reference/signin/` at 390 and 1280, with `sign-in` redrawn without the password field (ADR 0035).
-
-| CSS variable | Sign-in dark (canvas) | Ember dark (other screens) |
-|---|---|---|
-| `--bg` | `#12110F` | `#191714` |
-| `--bg2` | `#181614` | `#1E1C19` |
-| `--card` | `#1B1916` | `#221F1C` |
-| `--well` | `#24211D` | `#2A2723` |
-| `--ink` | `#F2EDE4` | `#F2EDE4` |
-| `--mut` | `#A39C92` | `#ADA69B` |
-| `--line` | `rgba(242,237,228,.12)` | `rgba(242,237,228,.14)` |
-| `--line2` | `rgba(242,237,228,.24)` | `rgba(242,237,228,.26)` |
-| `--hl` | `rgba(255,255,255,.035)` | `rgba(255,255,255,.04)` |
-| `--bloom` | `rgba(255,255,255,.04)` | `rgba(255,255,255,.04)` |
-| `--acc`, `--acct` | `#F0743A` | `#F0743A`, `#F37D44` |
-| `--need`, `--needbg` | `#E58A78`, `#3A211C` | `#E58A78`, `#40261F` |
-| `--ok`, `--okbg` | `#8DBFA2`, `#1F2E26` | `#8DBFA2`, `#25352B` |
-| primary button text | `#12110F` | `#221F1C` (card) |
-| `--btnh` (primary hover) | `#FFFBF2` | `#FFFBF2` |
-| `--sh` | `0 1px 0 rgba(0,0,0,.45), 0 12px 26px -20px rgba(0,0,0,.9)` | `0 1px 0 rgba(0,0,0,.4), 0 12px 26px -20px rgba(0,0,0,.8)` |
-| `--lift` | `0 1px 0 rgba(0,0,0,.5), 0 30px 60px -26px rgba(0,0,0,.92)` | `0 1px 0 rgba(0,0,0,.5), 0 30px 60px -26px rgba(0,0,0,.92)` |
-
-The canvas's `--btnink`, `--btnh`, `--sh` and `--lift` map to the scoped `--color-primary-ink`,
-`--color-btn-hover`, `--shadow-sh` and `--shadow-lift`. Tokens the sign-in surface does not draw (`--accbg`,
-`--okbg` as a chip, `--scrim`, `--gridln`, `--focus`) are left out.
+The sign-in surfaces in dark mode use their own scoped token set, `.dark .signin-surface` in
+`src/web/styles.css`, rather than the Ember dark above (ADR 0027). Every other screen keeps the dark column
+of the table. Light mode is unchanged. Read the shipped values from that block; it is the only copy.
 
 ## 3. Typography
 
@@ -238,6 +182,8 @@ person's words, mono for every recorded fact (timestamps, file names, hashes, co
 Inline numbers in tables and metadata are mono and tabular. `Yes` in serif beside
 `Saved answer · Used in 23 applications` in sans/mono *is* the product's promise, rendered.
 
+**Nine tokens. Every text element uses one of them.**
+
 | Role | Token | Size (Desktop) | Size (390px Mobile) | Line height | Tracking | Italic |
 |---|---|---|---|---|---|---|
 | Hero display (serif) | `text-hero` | clamp(44px, 6vw, 88px) | 44 | 1.06 | -.02em | Final emphasis word only |
@@ -245,37 +191,40 @@ Inline numbers in tables and metadata are mono and tabular. `Yes` in serif besid
 | Page title (serif) | `text-page-title` | clamp(32px, 3vw, 42px) | 32 | 1.08 | -.01em | Final emphasis word only, `text-signal` |
 | Card / item title (serif) | `text-card-title` | clamp(22px, 1.8vw, 26px) | 22 | 1.20 | — | Never |
 | Metric numeral (serif) | `text-metric` | clamp(40px, 3.5vw, 52px) | 40 | 1.00 | — | Never (tabular upright) |
-| Lead / Intro (sans) | `text-base` | 16 | 16 | 1.60 | — | Never |
-| Body (sans) | `text-sm` | 14 | 14 | 1.60 | — | Never |
-| Small / Mono metadata | `text-xs` | 12 | 12 | 1.40 | — | Never |
+| Lead / Intro (sans) | `text-base` | 16 | 16 | 1.50 | — | Never |
+| Body (sans) | `text-sm` | 14 | 14 | 1.43 | — | Never |
+| Small / Mono metadata | `text-xs` | 12 | 12 | 1.33 | — | Never |
 | Eyebrow / Micro-label (caps) | `text-eyebrow` | 11 | 11 | 1.20 | .14em | Never |
 
+`text-page-title` is the app page-title token: `dsPageTitle` in `src/web/components/ui/ds.ts` uses it, and
+every app route heading uses `dsPageTitle` or `PageHeader`. `text-section` is only for landing and marketing
+surfaces. `text-hero` is only for the landing hero.
+
 **Strict typography, component library & mobile rules (enforced by `overture/no-raw-design-styles`):**
-- Every text element uses one of the 9 tokens above — never arbitrary `text-[...px]` or un-tokenized Tailwind scale jumps (`text-lg` through `text-9xl`).
+- Every text element uses one of the 9 tokens above — never arbitrary `text-[...px]` or `text-[...rem]`, and never un-tokenized Tailwind scale jumps (`text-lg` through `text-9xl`). The rule covers all of `src/web`, routes and admin included.
+- Line height comes from the token; add a Tailwind `leading-*` utility only where a denser or looser block genuinely needs it (a card title over two lines, display type on the landing). Never set a raw `leading-[…]` in new code.
 - Italic serif is reserved **strictly** for the final emphasis word of Hero, Section and page headings (`h1`/`h2`) — never numerals, step badges, or card titles. In the app the page title's emphasis word is `italic text-signal` ("Good morning, *Sam.*", "Ready to *send*"); it is the only orange type in app chrome (ADR 0037).
 - **Single-source shadcn/ui & 21st.dev component system (`src/web/components/ui/*`):** Never hand-roll buttons, cards, badges, inputs, tabs, switches, dialogs, command palettes, SVG charts, or calendars from scratch. Compose every screen from the shared primitives (`Button`, `Card`, `Badge`, `Input`, `Switch`, `Separator`, `Tabs`, `ScrollArea`, `ChartArea` via `recharts`, `Calendar` via `react-day-picker`, `CommandDialog` via `cmdk` + Radix Dialog, `AnimatedBeam`, and `lucide-react` icons), styled exclusively with Ember `@theme` tokens.
 - Mobile (`390px`) is a first-class layout target alongside tablet (`768px`), laptop (`1280px`), and widescreen (`1440px+`): metadata lines stack cleanly instead of wrapping mid-phrase, previews swap to native `390px` mobile screens under `lg` (`1024px`), and touch targets stay `≥ 40–44px`.
 
-Uppercase labels are 10.5–11px at `.14–.15em` tracking, and always sit with a larger line that carries
-the meaning — a column header or a card title, never a lone instruction. Display type is set tight
+Uppercase labels are 11px at `.14em` tracking, and always sit with a larger line that carries the
+meaning — a column header or a card title, never a lone instruction. Display type is set tight
 (1.02–1.15); body never is.
 
 ## 4. Space and layout
 
-A 4px base. Every gap, padding and margin on the boards is a multiple of 4 (a few 2 and 6px optical
-nudges aside).
+A 4px base. Every gap, padding and margin is a multiple of 4 (a few 2 and 6px optical nudges aside).
 
 | Element | Value |
 |---|---|
-| Landing container | max 1200 · 1440 from 1700 |
-| Landing side padding | clamp(20px, 4vw, 48px) |
-| Landing hero | 2 columns, gap 56/64, min column 400 |
-| Bento | 12 columns · gap 28 · row gap 64 · rows 424 424 420 330 |
-| Connector | 1160 design units, scales to 1400 |
-| Home content | padding 26/36 · 18/16 at 390 · 32/64 at 1920 |
+| Container | max 1200 · 1440 from 1700 |
+| Side padding | 20 · 32 from `sm` · 48 from `lg` |
+| App main padding | 16 sides / 20 top / 28 bottom at 390 · 28 / 28 from 768 · 56 from 1700 |
+| App content max | 1440 |
 | Sidebar / rail | 268 · 296 from 1700 · rail 76 |
 | Board lane | five lanes, min 264 each, share the width (`repeat(5, minmax(264px, 1fr))`) |
-| Sheet | 468 · 520 at 1920 · bottom sheet 566 high at 390 |
+| Sheet | 468 · 520 from 1700; the Board detail sheet is 500 · 540 |
+| Phone sheet | 82dvh, bottom sheet with a 44×5 grab handle |
 | Home grid | one column · two from 1024 (`lg`) |
 
 Section rhythm on the landing is space, not dividers: 96px above and below, 88–120 on the hero, how it
@@ -283,33 +232,35 @@ works and the band. The band is the only full-bleed colour change. Texture booke
 closing band plus footer as one block. Everything between sits on solid paper.
 
 Media queries are on the viewport: 480 (hide Sign in), 700 (nav row, tray labels), 767/768 (app phone
-layout, rail), 900 (connector becomes lists), 1099/1100 (bento and KPI), 1279/1280 (sidebar), 1700
-(large screens).
+layout, rail), 1099/1100 (KPI), 1279/1280 (sidebar), 1700 (large screens).
 
 | Width | What happens |
 |---|---|
-| 390 | Phone. Landing one column, hero stacked, bento and band as vertical lists, nav on a second row. App: sidebar hidden, bottom tab bar (Home, Board, Search, Profile, More). Home: one column. Board: lane tabs, card stack, bottom sheet |
-| 768 | Landing stacks the hero; bento single column (max 600). App: 76px icon rail replaces the sidebar; board columns scroll in their own box |
-| 1024 | Hero two columns again; connector scales with its container; bento still one column to 1099. App: icon rail; Home cards two across |
+| 390 | Phone. Landing one column, hero stacked, nav on a second row. App: sidebar hidden, bottom tab bar (Home, Board, Search, Profile, More). Home: one column. Board: lane tabs, card stack, bottom sheet |
+| 768 | Landing stacks the hero. App: 76px icon rail replaces the sidebar; board columns scroll in their own box |
+| 1024 | Hero two columns again. App: icon rail; Home cards two across |
 | 1280 | Full 268px sidebar returns. Landing and app on the desktop layout at 1200 max |
-| 1440 | Reference width. Container 1200 (padding 48). Bento on a 12-column grid with the path; sheet 468 over the board |
-| 1920 | From 1700: container 1440, hero visual zoomed 1.18, connector 1400, display to 124. App: sidebar 296, main padding 56, content max 1440, sheet 520 |
+| 1440 | Reference width. Container 1200 (padding 48). Sheet 468 over the board |
+| 1920 | From 1700: container 1440, sidebar 296, main padding 56, content max 1440, sheet 520 |
 
 ## 5. Shape and depth
 
 Flat paper with fine ink lines. Depth comes from hairlines and a soft contact shadow — never glow,
 blur or gradient.
 
-| Radius | Where |
-|---|---|
-| 2px | Stamp, sheets in a pile, kbd |
-| 5px | Segmented option, small monogram |
-| 6px | Buttons, fields, icon buttons, nav items |
-| 7px | Logo square (of 32) |
-| 10px | Cards, panels, job cards, big monogram |
-| 12px | Hero stack cards, bento tiles, connector tiles, phone job cards |
-| 16px top | Phone bottom sheet |
-| 999px | Pills, stage pills, count badges |
+Radius is Tailwind's scale, nothing else:
+
+| Radius | Utility | Where |
+|---|---|---|
+| 4px | `rounded-sm` | Inline chips, markers, small marks |
+| 6px | `rounded-md` | Buttons, fields, icon buttons, tabs, badges |
+| 8px | `rounded-lg` | Small containers, inner panels, sheet sections |
+| 12px | `rounded-xl` | Cards, panels, board lanes, sheets, toasts, job cards |
+| 16px | `rounded-2xl` | Landing tiles and stack cards, the phone bottom sheet's top |
+| 999px | `rounded-full` | Pills, count badges, switches, circular monograms |
+
+The one documented radius exception is the phone bottom sheet's 16px top radius (`rounded-t-2xl`).
+The logo square's 7px is brand art, not a UI radius.
 
 Line weights: `1px solid line` for card edges, dividers, table rows (with a 1px highlight beneath on
 paper — letterpress). `1px solid line2` for controls and outlines. `1px dashed` for *not from the
@@ -320,7 +271,7 @@ tab underline and the selected-card ring.
 Shadows: none on page, sidebar and wells. Cards carry `0 1px 0 rgba(21,19,17,.10),
 0 12px 24px -18px rgba(21,19,17,.38)`; lifted surfaces `0 1px 0 rgba(21,19,17,.10),
 0 28px 56px -26px rgba(21,19,17,.46)`; sheets `-30px 0 60px -34px rgba(21,19,17,.5)` (side) or
-`0 -24px 50px -28px` (bottom).
+`0 -24px 50px -28px` (bottom). Dark mode swaps the ink in every shadow for black.
 
 **Grain.** An SVG `feTurbulence` filter (fractalNoise, baseFrequency .85, three octaves) tinted by a
 colour matrix, on a full-bleed layer that ignores the pointer. Light grain is warm grey (.30 .25 .20),
@@ -346,12 +297,36 @@ used for icons except the check beside Submitted.
 
 ## 7. Motion
 
-Slow and paper-like. Elegant, never playful. The orange dot is the only live mark.
+Two kinds of motion, with two rulebooks. Do not borrow one for the other.
+
+### UI motion
+
+The interface answers instantly and gets out of the way. Every UI transition is 120–200ms, ease-out, and
+moves no more than 2px (1px on hover lift, 2px on press). Exits are faster than entrances: a thing that
+leaves gets the short end of the range. No spring, no bounce, no overshoot, no delayed decoration.
+
+| Property | Value |
+|---|---|
+| In / out | 120–200ms (`--duration-quick` 150ms, `--duration-base` 200ms) |
+| Easing | `--ease-out: cubic-bezier(.2,.7,.2,1)`; Tailwind `ease-out`, the default transition curve |
+| Travel | ≤2px for UI; sheets, modals and toasts may travel further |
+| Hover | Only under `@media (hover: hover) and (pointer: fine)`; Tailwind's `hover:` variant already guards this |
+| Reduced motion | Static: transitions and keyframes resolve to their finished state |
+| Limit | No UI transition longer than 300ms. A modal, sheet or toast may use its entrance/exit budget |
+
+The primitives (`Button`, `Card`, `Badge`, `Tabs`, `Switch`, nav links) use `transition duration-quick
+ease-out`; the tokens are in `src/web/styles.css` and `transition` inherits the ease-out curve by default.
+Never add a bespoke `transition-all` to a UI surface.
+
+### Marketing motion
+
+The landing choreography is the exception: 400–700ms, paper-like, elegant, never playful. The orange dot
+is the only live mark.
 
 | Property | Value |
 |---|---|
 | Easing | `cubic-bezier(.2,.7,.2,1)` |
-| UI duration | 400–700ms (stamp .5s, tray .5s, card .7s, marker .7s, summary .6s, chevron .4s) |
+| Duration | 400–700ms (stamp .5s, tray .5s, card .7s, marker .7s, summary .6s, chevron .4s) |
 | Travel | ≤12px for reveals (stamp 6, summary 10) |
 | Rotation | ≤6° (stack offsets 1.6–2.6, glide 4, stamp 3) |
 | Tick | 800ms state timer drives every loop |
@@ -360,11 +335,11 @@ Slow and paper-like. Elegant, never playful. The orange dot is the only live mar
 The four choreographed surfaces, so nobody re-invents them:
 
 1. **Sorting stack** (landing hero) — each card is one job resolving at a timestamp inside the user's
-   08:00–20:00 sending window, at least 20 minutes after the last. Top card lifts 6px, shadow deepens, evidence rows draw in, receipt strip unfolds (.5s), the
-   Applying stamp presses in (1.04→1 scale, 0→1 opacity, −3°), then the card glides left into the
-   Applied count. A non-fit lifts, fades in its one-line reason, glides right, muted. Cards behind sit
-   smaller and dimmer. The tally ticks; at 8 pm the day's summary settles on top for ~5s. 34 ticks per
-   loop.
+   08:00–20:00 sending window, at least 20 minutes after the last. Top card lifts 6px, shadow deepens,
+   evidence rows draw in, receipt strip unfolds (.5s), the Applying stamp presses in (1.04→1 scale, 0→1
+   opacity, −3°), then the card glides left into the Applied count. A non-fit lifts, fades in its one-line
+   reason, glides right, muted. Cards behind sit smaller and dimmer. The tally ticks; at 8 pm the day's
+   summary settles on top for ~5s. 34 ticks per loop.
 2. **Travelling dot** (Where it applies) — connectors flow toward the hub (dashed stroke, 1.8s per dash
    period). The orange dot runs to each tile in turn, the tile border turns orange (no glow), a
    "Submitted" tag shows ~1.5s, the counter ticks. A faint breathing ring (4.6s) marks the active hub.
@@ -404,28 +379,33 @@ The rebuild's stack (Radix dialog, popover, scroll-area, separator, slot, switch
 `sonner`, `motion`, `recharts`, `react-day-picker`, `@dnd-kit/core`, `class-variance-authority`, `clsx`,
 `tailwind-merge`) is recorded in ADR 0037.
 
-**Buttons.** Primary is ink with paper text, hover lightens to muted (dark: to near-white). Heights 40
-in the app, 46 on the landing, 52 in the hero, 48 on phone; icon button 40/44. Radius 6. Ghost
-(transparent, muted text, well on hover) is for low-priority actions. Disabled is .45 opacity, no
-hover, `not-allowed`, drawn for every variant.
+**Buttons.** Primary is ink with paper text, hover lightens to muted (dark: to near-white). Default is
+44px high (`min-h-11`); the scale is xs 32, sm 36, default 44, lg 48 (52 from `sm`); icon buttons are 40,
+icon-lg 44, and every phone control grows to 44–48. Radius 6. Secondary is the card surface with the
+input outline; its hover is the well and the ink — `hover:bg-muted hover:text-foreground` with a
+`foreground/30` border, never orange. Ghost (transparent, muted text, well on hover) is for low-priority
+actions. Link is underlined ink. Disabled is .45 opacity, no hover, `not-allowed`, drawn for every
+variant. Loading keeps the label, sets `aria-busy`, and disables the control; there is no spinner.
 
-**Fields.** Height 40, radius 6, 1px `line2`, card fill; focus is the 2px ink ring. Always paired with
-a visible label or an `aria-label`. Select is a field with a chevron opening a popover list on a card
-surface with lift shadow; the current value is bold with a check, the hovered row sits on well.
+**Fields.** Height 48, radius 6, 1px `line2`, card fill; focus is the 2px ink ring with a 2px offset.
+Always paired with a visible label or an `aria-label`. Select is a field with a chevron opening a popover
+list on a card surface with lift shadow; the current value is bold with a check, the hovered row sits on
+well. Invalid adds a `need` border and a 1px `need` ring, plus a message tied with `aria-describedby`.
 
-**Chips, pills, badges.** 999 radius, 600 weight, 11–12px. Status pills tint a surface (`need-soft`,
+**Chips, pills, badges.** `rounded-full`, 600 weight, 11–12px. Status pills tint a surface (`need-soft`,
 `ok-soft`, `accbg`); the plain pill is outline on paper. Source tags: solid ink outline = from the
 resume, dashed = from saved answers. The Applying stamp is the only rotated element (−3°, uppercase,
 orange outline).
 
 **Cards.** Monogram tile (ink, serif italic first letter), company, age; role in serif; location;
 hairline; Match score in italic serif with the note on the right. The same component on the board, the
-phone and the landing, enlarged.
+phone and the landing, enlarged. Interactive cards lift their shadow and move their border to
+`foreground/30` on hover; no colour.
 
 **Tabs.** Active = ink text + 2px ink underline. Phone stage tabs are pills, not tabs.
 
-**Sheet.** Desktop side sheet 468 wide (520 at 1920); phone bottom sheet 566 high with a 44×5 grab
-handle. Same content, different chrome.
+**Sheet.** Desktop side sheet 468 wide (520 at 1700+; the Board detail sheet 500/540); phone bottom sheet
+82dvh with a 44×5 grab handle and the documented 16px top radius. Same content, different chrome.
 
 **Navigation.** Right side of the landing reads Sign in, Start free, a 28px hairline, then the theme
 icon — so the toggle is a utility, not a third call to action. Sign in is a 44px outline button with
@@ -433,38 +413,123 @@ full-contrast ink text; 12px between the two buttons. Under 860px the nav collap
 and a 44px menu button; the sheet rises 8px over .4s and holds the links, Theme and Sign in. The menu
 button carries `aria-expanded` and a label that changes between Open menu and Close menu.
 
-Sidebar items: active = card surface, hairline, a 2px marker on the left edge (top edge in the tab bar); the
-build draws it orange (§2). The sidebar holds, top to bottom: the lockup and a collapse button, Search (⌘K), the
-six destinations (Home, Board, Ready, Review, Inbox, Calendar), the Profile menu (Resume, Details, Preferences,
-Account, Billing), Support and Notifications, then the theme toggle and the usage card. Under 1280, or when collapsed on desktop (remembered per
-browser), the sidebar becomes a 76px icon rail; under 768 a 64px tab bar with Home, Board, Search, Profile and
-More, where More opens a sheet with the other destinations. There is no Settings destination: account and billing
-are Profile pages (ADR 0037).
+Sidebar items: active = card surface, hairline, a 2px ink marker on the left edge (top edge in the tab
+bar). The sidebar holds, top to bottom: the lockup and a collapse button, Search (⌘K), the six
+destinations (Home, Board, Ready, Review, Inbox, Calendar), the Profile menu (Resume, Details,
+Preferences, Account, Billing), Support and Notifications, then the theme toggle and the usage card. Under
+1280, or when collapsed on desktop (remembered per browser), the sidebar becomes a 76px icon rail; under
+768 a 64px tab bar with Home, Board, Search, Profile and More, where More opens a sheet with the other
+destinations. There is no Settings destination: account and billing are Profile pages (ADR 0037).
 
 A nav count badge is live product data, never a drawn sample: Ready counts the Applications waiting for
 approval, Review the open Reviews, Inbox the unread employer mail. No badge shows at zero, and the link's
-accessible name carries the count ("Review, 4 waiting"). The board's 2 / 4 / 3 are sample counts for the
-drawn example, not copy.
+accessible name carries the count ("Review, 4 waiting"). The board's sample counts are sample data, not
+copy.
 
-**Toasts.** Card surface, `line2` border, lift shadow, radius 8, 340 wide, bottom right (top on phone).
-A toast reports something that happened: the orange check only when Overture acted, `need` colours when it
-needs you, neutral otherwise. One ghost action at most. Enters with a 6px rise over .5s, leaves in 4s.
+**Toasts.** Card surface, `line2` border, lift shadow, radius 12, 356 wide (Sonner's default), bottom right (top on phone),
+z-70. A toast reports something that happened: the orange check only when Overture acted, `need` colours
+when it needs you, neutral otherwise. One ghost action at most. Enters with a 6px rise over 300ms, leaves
+in 4s. Loading toasts use the same surface and an `aria-live` region.
 
 **Hero stack card.** Ink monogram tile; role in serif (clamp 21–31); company; Match as a thin ring (2.5
 stroke, ink for fits, muted for non-fits) with the italic score in the centre; one mono line for city,
 work mode, salary; two evidence rows joining the posting's ask (muted) to the matching resume fact
 (ink) with a dotted hairline; a receipt strip that unfolds for fits or the one-line reason for non-fits.
-Radius 12, lift shadow, 24 padding, no inner boxes. A deck of three sits behind at 12/−10/8px offsets
+Radius 16, lift shadow, 24 padding, no inner boxes. A deck of three sits behind at 12/−10/8px offsets
 and 2.2/−2.6/1.6°.
 
-**Two composition rules matter more than the inventory:**
+### Component states
+
+Every interactive component draws all seven states. If a state does not apply, it is `—`, not absent.
+
+| Component | Default | Hover | Focus | Active / pressed | Disabled | Invalid | Loading |
+|---|---|---|---|---|---|---|---|
+| Primary button | ink fill, paper label, `shadow-sh` | fill `btn-hover`, −1px lift | 2px ink ring, 2px offset | ink fill, 1px press | 45% opacity, `not-allowed`, no hover | — | `aria-busy`, label kept, disabled |
+| Secondary button | card fill, `input` border | well fill, ink text, `foreground/30` border | 2px ink ring | well fill, 1px press | 45% opacity, no hover | — | `aria-busy`, label kept |
+| Ghost / link | transparent, muted text | well fill, ink text (link: ink underline) | 2px ink ring | well fill | 45% opacity | — | `aria-busy` |
+| Field | card fill, 48 high, `input` border | no hover change | 2px ink ring, 2px offset | caret only | 45% opacity, `not-allowed` | `need` border + 1px `need` ring, message via `aria-describedby` | `aria-busy`, read-only value |
+| Card (interactive) | card, hairline, `shadow-sh` | `shadow-lift`, `foreground/30` border | ring on the inner control | selected: ink ring 1px | — | — | `aria-busy` on the card |
+| Nav item | muted text | well, ink text | 2px ink ring | current: card surface + 2px ink marker | — | — | — |
+| Tab | muted text | card/60, ink text | 2px ink ring | selected: card, ink text, shadow | 45% opacity, no pointer | — | — |
+| Switch | well track, card thumb | `muted-foreground` border | 2px ink ring | on: ink track, thumb translates 16px | 45% opacity | — | — |
+
+### Tables and lists
+
+Tables are paper, not dashboards: a 1px hairline under the header row and between body rows, no zebra,
+no vertical rules. The header is `text-eyebrow` uppercase tracked, muted. Cells are `text-sm`; every
+number — counts, money, percentages, durations — is mono or tabular-nums so columns align. A row that
+opens gets the well on hover and an ink focus ring on its control. On the phone a table becomes a list of
+cards or definition rows; it never scrolls horizontally as a table.
+
+Lists reuse the card or row primitives: title line, one metadata line, one trailing control. Empty lists
+are empty states, not a table with one blank row.
+
+### Nested surfaces
+
+A card may sit on the well, and a well may sit on a card: paper on paper on paper. Three levels is the
+limit. Each level changes exactly one cue — the well is the darker fill, the card is paper with a
+hairline and `shadow-sh`, the innermost strip drops the shadow and keeps the border. Never nest a shadow
+inside a shadow, never nest a sheet in a card, and never put text directly on the grain.
+
+### Z-index layers
+
+| Layer | z | What lives there |
+|---|---|---|
+| 20 | `z-20` | Sidebar, icon rail, sticky board header |
+| 50 | `z-50` | Phone tab bar, dialogs, command palette, popovers, menus |
+| 60 | `z-60` | Sheet scrim and sheet (detail sheet, code-paste sheet, phone More) |
+| 70 | `z-70` | Toasts (Sonner) |
+
+Nothing sits above 70. Native `<dialog>` sheets use the top layer and do not need a z-index.
+
+## 9. Patterns
+
+### Loading
+
+Loading is a skeleton of the real layout on the well, `animate-pulse`, never a spinner and never a blank
+page. The skeleton keeps the page's landmarks and heading so the screen does not jump when data lands.
+Slow operations (a PDF render, a batch send) keep their control visible, set `aria-busy`, and show the
+one-line progress copy in the card. A route-level load uses `RouteFallback`, which keeps the shell.
+
+### Empty
+
+Every list, board, table and inbox has a designed empty state: a card title in `dsCardTitle`, one
+sentence of what would be here, and exactly one primary action that fills it. No illustrations, no
+invented samples. Sample data on the landing or a demo account is labelled "Sample data"; a product empty
+state never pretends to have data.
+
+### Error
+
+An error says what happened, what was not sent, and what happens next — in that order. Page-level errors
+use `RouteErrorBoundary` with the page `h1` and a retry action. Section errors stay in the section, use
+`need` for the heading or icon, and carry `role="alert"`. A failed send always states that nothing was
+charged. Never replace the whole page with an error when one card failed.
+
+### Form errors and aria-live
+
+Every field has a visible label (or an `aria-label`). An invalid field sets `aria-invalid`, adds
+`aria-describedby` pointing at the message, and the message is `role="alert"` with `need` text. The
+first invalid field receives focus on submit. Form-level errors sit above the actions and use
+`role="alert"`. Toasts are an `aria-live="polite"` region (Sonner), validation summaries and destructive
+confirmations are `assertive`; no message is carried by colour alone — it always has words.
+
+### When there is no board
+
+If a screen has no canvas board, build it from this document and the shared primitives: the tokens, the
+page-title/card-title roles, the 4px grid, the component states above, and the closest existing screen as
+a pattern. Do not invent a new colour, radius, size or motion value to fill the gap, and do not copy a
+board's labels or captions as product copy. Record the missing board in `docs/research/boards-status.md`
+in the same pull request. When a board and this document disagree on look, this document wins; when either
+disagrees with `docs/SPEC.md` on product, the spec wins.
+
+### Two composition rules matter more than the inventory
 
 1. **Provenance is a component.** Any answer carries its source in a chip — `From your resume`,
    `From your saved answers`, `Typed here`. It is never optional decoration.
 2. **Honesty blocks are fixed.** Every reply carries `What Overture did`. Every dossier carries the
    receipt strip. Every failure says what was not sent **and** that nothing was charged.
 
-## 9. Voice
+## 10. Voice
 
 Plain and direct. Short, neutral sentences. Say what Overture does and what you control.
 
@@ -477,7 +542,7 @@ No hype, no superlatives, no exclamation points, no emoji, no invented metrics, 
 failure says what happened, what was not sent, and what happens next. Where a policy could be misread,
 state the boundary rather than the marketing line.
 
-## 10. Accessibility
+## 11. Accessibility
 
 - **Contrast.** 4.5:1 minimum for all text, including 11px grey labels; 3:1 from 24px. Small orange
   text always uses `signal-text`.
@@ -495,7 +560,7 @@ state the boundary rather than the marketing line.
 - **Theme control.** A real button with a state-aware label: "Switch to dark mode" / "Switch to light
   mode".
 - **Motion.** Reduced-motion users get the static state of every animation. No motion is needed to
-  understand anything. Nothing flashes.
+  understand anything. Nothing flashes. UI motion follows §7.
 - **Language and order.** Plain words, one `h1` per page, headings in order, reading order matching
   visual order.
 - **Landmarks and skip link.** Every route has exactly one visible `main` (`id="main-content"`) and one
@@ -508,27 +573,27 @@ state the boundary rather than the marketing line.
 
 ---
 
-## 11. What we keep even though the linter flags it
+## 12. What we keep even though the linter flags it
 
-`impeccable detect` scores this canvas at 524 findings. We are not chasing that number, and this section
-records why so it is not re-litigated every time the tool runs.
+`impeccable detect` scores the canvas, not the build, and its rules mix defects with taste. We do not
+chase the score, and this section records why so it is not re-litigated every time the tool runs.
 
 The distinction: **the detector is authoritative on defects and advisory on taste.** Contrast, tap
 targets, heading order and overflow are defects — they are fixed, and the boards measure clean on all
 four. Everything below is a style rule derived from what large numbers of generated sites do. Applying
 them here removes the qualities that make this look authored rather than assembled.
 
-| Flag | Count | Why we keep it |
-|---|---|---|
-| `nested-cards` | 75 | Board columns and specimen sheets exist to show nesting. Flattening a specimen stops it being a specimen |
-| `overused-font` | 50 | A face is not slop because other people use it; slop is using it with no rule. Ours is semantic and written down: serif is a person's words, mono is a machine's fact, sans is the interface. A distinctive face with a weak rule reads worse than a common face with a strong one |
-| `cream-palette` | 18 | The paper *is* the metaphor. A job hunt is paperwork, applications, letters. A cool grey ground turns this into a dashboard |
-| `italic-serif-display` | 13 | Italic marks the owner's own voice — a signal, not a gradient. It appears where a person is speaking, and since ADR 0037 on the one emphasis word of a heading (§3) |
-| `undersized-ui-text` | 7 | 10.5–11px tracked caps are a print convention for column headers and status pills, always paired with a larger line, always at 4.5:1. The remaining hits are a PDF mock rendered at page scale |
-| `numbered-section-labels` | 6 | `fig. 1`, `01 ·` are a canvas device only: the boards read as a plate book, while the app ships no fig, folio or section-number labels (#307) |
-| `tight-leading` | 4 | Display type is set at 1.02–1.15 by design; body stays at 1.55 and is never flagged |
-| `pulsing-dot` | 3 | The one live mark in the system, with a static state under `prefers-reduced-motion` |
-| `hero-eyebrow-chip` | 3 | A tracked-caps kicker above an `h1` is a masthead convention and carries real categorisation |
+| Flag | Why we keep it |
+|---|---|
+| `nested-cards` | Board columns and specimen sheets exist to show nesting. Flattening a specimen stops it being a specimen |
+| `overused-font` | A face is not slop because other people use it; slop is using it with no rule. Ours is semantic and written down: serif is a person's words, mono is a machine's fact, sans is the interface. A distinctive face with a weak rule reads worse than a common face with a strong one |
+| `cream-palette` | The paper *is* the metaphor. A job hunt is paperwork, applications, letters. A cool grey ground turns this into a dashboard |
+| `italic-serif-display` | Italic marks the owner's own voice — a signal, not a gradient. It appears where a person is speaking, and since ADR 0037 on the one emphasis word of a heading (§3) |
+| `undersized-ui-text` | 11px tracked caps are a print convention for column headers and status pills, always paired with a larger line, always at 4.5:1. The remaining hits are a PDF mock rendered at page scale |
+| `numbered-section-labels` | `fig. 1`, `01 ·` are a canvas device only: the boards read as a plate book, while the app ships no fig, folio or section-number labels (#307) |
+| `tight-leading` | Display type is set at 1.02–1.15 by design; body stays at 1.5 and is never flagged |
+| `pulsing-dot` | The one live mark in the system, with a static state under `prefers-reduced-motion` |
+| `hero-eyebrow-chip` | A tracked-caps kicker above an `h1` is a masthead convention and carries real categorisation |
 
 What we refuse in **both** directions: we do not add gradients, glows, glass, decorative card stacks (the
 landing hero's sorting stack is the one sanctioned stack), floating orbs,
@@ -541,7 +606,7 @@ Two things survive any restyle, and they are the difference between authored and
 - every colour in the palette has one job, and orange has exactly one;
 - every number on screen is traceable to something the product actually knows.
 
-## 12. Brand assets
+## 13. Brand assets
 
 Drawn at true pixel size on the Brand assets board.
 
@@ -559,33 +624,8 @@ Drawn at true pixel size on the Brand assets board.
 | `logo-horizontal-{paper,ink}.svg` | vector | Mark beside wordmark, min 96px wide |
 | `logo-stacked-{paper,ink}.svg` | vector | Mark over wordmark, min 56px wide |
 
-## 13. Boards to redraw
+## 14. Boards
 
-Product changes since the boards were drawn. Each is redrawn on the canvas before the slice that builds that
-screen, then built to match. Visual treatment stays; words, structure and behaviour follow `docs/SPEC.md`.
-
-| Board | Change |
-|---|---|
-| Every app board | **Redrawn and built on Home, Ready, Board, Review, Profile, Settings, Notifications and Inbox; card detail is still to do. Since the 2026-11-23 rebuild (ADR 0037) the built shell leads the boards: six sidebar destinations (Home, Board, Ready, Review, Inbox, Calendar), the Profile menu with five pages, Support, ⌘K search, a collapsible sidebar, and a phone tab bar of Home, Board, Search, Profile and More. Every app board needs the new shell redrawn.** Before that: seven destinations on desktop in this order: Home, Ready, Board, Review, Inbox, Calendar, Profile (Ready added by ADR 0029, Calendar by ADR 0034; the phone tab bar keeps six), Settings from the avatar; no "Job Board", "Holds", "Answer Bank", "Activity", "Personal workspace"; one "Applications left" figure, no "Match Scores" counter; `--hold` tokens renamed `--need` |
-| Job Board | **Redrawn and built as Board; rebuilt on 2026-11-23 as five lanes (Queued, Ready, Applied, Waiting, Closed) that group the seven Stages, with drag between lanes (ADR 0037). Redraw the Board boards to five lanes; the build's first-lane label "On hold" is a banned word and is not to be drawn.** Queued replaces Hold as the first column, ink rule; red "Needs you" pill on cards waiting on a Review. The Ready column sits between Queued and Applied with the green rule (ADR 0029): cards show "Ready to send" with a Send button until approved, then their send time, and hold Sending and Checking with the employer until confirmed sent |
-| Ready | **New, drawn and built (ADR 0029, `w5-ready`, #195).** The Ready destination, heading "Ready to send": approval cards with the job, employer, resume file, every answer as it will be typed with its source, the cover letter and what changed; Send, Skip, Edit an answer; approved cards with their send time and Undo; "Send all"; empty and all-approved states; phone and desktop |
-| Holds | **Redrawn as Review (file `w5-holds`).** Becomes Review: open questions grouped by jobs unlocked |
-| Answer Bank, Resume | **Redrawn: folded into Profile.** Fold into Profile: resume, facts by tier, targets with live count, skip list, job-search address |
-| Settings | **Folded into Profile by the 2026-11-23 rebuild (ADR 0037): Profile → Account (notifications, export, delete, legal, sign out) and Profile → Billing. The support access log has no screen yet (audit H7). Redraw these as Profile pages.** Before that: **Redrawn; the legal card (Terms, Privacy, the consent version you agreed to) is added by #214.** No approval mode (approval is not a setting: every send is approved, ADR 0029), no "Overnight window", no user-set company limit or daily caps, no UTC reset; the fixed limits explained (10 a day, 08:00–20:00 local, one company per 30 days, reset at local midnight). **Account pages drawn (`d207-*`):** Notifications, Export, Delete account, Support access, Terms and privacy, as five tabs under Settings; **Export is built (#224)**, the rest follow their tickets |
-| Onboarding 1–4 | **Welcome/Sign in and Resume drawn and built (`w5-onb`, #215), Your facts drawn and built (`w5-onb-questions`, #128); What you want and Forwarding & start are drawn and build in #216 and #217.** Five steps: Sign in · Resume · Your facts · What you want · Forward ATS mail (the filter guide and the paste fallback) + consent + trial + Start; invited sign-in states are drawn with Sign In; no "Connect inbox", no Gmail, no "Memory Base" |
-| Sign In | **Google, LinkedIn and an emailed link only; no password, sign-up, forgot or reset screens (ADR 0035).** Dark uses the sign-in dark ground (§2, ADR 0027) |
-| Product states | **Pause reasons drawn on Home (`w5-home-paused`, #157).** No Gmail connect states; add `confirming` ("Checking with the employer"), each pause reason, out of applications |
-| Billing (M3, #240) | **Drawn at 1280 and 390, light and dark, in `design/reference/{settings-billing,onb-trial,billing-plans,home-paused-billing,out-of-applications}` (sources `design/reference/source/w5-settings-billing`, `w5-onb-trial`, `w5-billing-plans`, `w5-home-paused-billing`, `w5-out-of-applications`).** Settings **Plan and billing** (`/settings/billing`, now Profile → Billing at `/profile/billing`, ADR 0037) was the sixth tab of `SettingsAccountTabs`: current plan with Applications left and renewal, Week or Month switch at renewal, cancel at period end, Stripe portal and invoices. **Onboarding step 6** (`/onboarding/trial`, after step 5): verify a card for 3 free Applications, one per card; card declined; card already used. **Choose a plan** with the Checkout return states (started, not finished, checking the payment). **Home paused** for "Plan ended" and "Payment didn't go through", each with its fix. **Out of Applications** and the **invited M2 grant running out** (the grant's Applications left and end date). Copy uses the glossary words only and no banned words. Not yet on the canvas: see the PR for the publish status |
-| Calendar | **Drawn (#292, `w5-calendar-month`, `w5-calendar-empty`, `w5-calendar-entry`) and built (#294; phone agenda, empty and dark states #295, with the agenda opening on today and the Calendar busy while a month loads).** A month grid with Sent, Stage move, Offer, Closed, Check-in and Interview chips and a day panel on desktop; a compact grid, agenda and day bottom sheet on the phone; the Calendar button sits in the Home and Board headers. The canvas is the reference at 390 and 1280, light and dark. The `w5-calendar-*` boards live on canvas v125 and are not yet exported to `design/reference/source/`; the Home and Board header baselines in `test/e2e/chrome-baselines/` were refreshed from the rendered shell to include the Calendar button. Interview items arrive with #296 (`.ics` parser); the Interview chip styling is in place until then |
-| Code paste | **New, drawn with the M2 Inbox boards (#205) and built (#223).** Home's "needs a code" card, shown five minutes into a verification-code wait with the countdown to expiry, and the paste sheet in its four states (waiting, still waiting, window closed, code accepted). Results and the address it points at follow the spec; the canvas is the reference in `design/reference/code-wait/` and `design/reference/code-paste/` at 390 and 1280, light and dark |
-| Ready email | **New, drawn and built (ADR 0029, `w5-ready-email`, #196).** One Recap per daily preparation run: the new Ready Applications by employer and job title, how many Reviews are open, one link to the Ready page, no answers and no send button |
-| Daily digest | Morning summary of **yesterday** (sends between 08:00 and 20:00); "Needs you", not "Hold" |
-| M2 boards | **Built or drawn (ADR 0030), one ticket each on #6:** onboarding What you want and Forwarding & start (drawn as `onbw-4` and `onbw-5`); **Inbox drawn and built (#218, `w5-inbox-*`): threads, message, attachments, "Couldn't verify sender", empty and address explainer; the code-paste prompt drawn and built (#205, #223), see the Code paste row, and the Profile forwarding-address card in #230**; **notifications drawn and built (`d206-notifications`, #221): the in-app list with unread state and Mark all as read, and the header bell**; push copy, the recap and auto-move drawn (`d206-push`, `d206-recap`, `d206-auto-move`), with the pushes, the recap email and the auto-move toast built by #222, #196 and #219; Settings account pages (notifications, **export drawn and built (#224)**, support access log; **Delete account drawn and built (#225) to `design/reference/settings-delete`**); **admin people screens (users, invites, user detail and suspension) drawn and built (#226) to `design/reference/{users,invites,user}`; Mail health drawn (`w5-admin-mail-health`) and built (#229) to `design/reference/mail-health`; Reveal, audit and ATS probe status still to build (#227)**; sign-in invite and password states; **Terms, Privacy and the consent card drawn and built (`d203`, #214), with the Settings legal card** |
-| Landing | **Redrawn (#239): boards `lp-1280` and `lp-1280-dark` (1280), `w5-landing-phone` and `lp-390-dark` (390) on the canvas Landing page, reference in `design/reference/landing/`.** Daytime sends (08:00–20:00); card verified for the trial (no "No credit card"); five ATSes, no Workday; no glow on the travelling-dot tiles |
-| Pricing | **The `/pricing` page was removed by the 2026-11-23 rebuild (ADR 0037); pricing lives in the landing's Pricing section, at Week $9.99 for 50 and Month $29.99 for 250 (`src/shared/plans.ts`). The boards below are history.** Drawn (#239): boards `pricing-1280`, `pricing-1280-dark`, `pricing-390`, `pricing-390-dark` on the canvas Pricing page, reference in `design/reference/pricing/`.** Trial (card verified, 3 applications once per card), Week $12 for 70 over 7 days, Month $35 for 300 over 30 days; "Never charged for failure"; Terms and Privacy in the footer |
-| Built without a board (2026-11-23, ADR 0037) | **To draw from the build:** Profile → Resume, Details, Preferences, Account and Billing; Support (`/support`); sign-up (`/signup`); the ⌘K workspace search dialog; Home's control band (Pause or Resume and today's sends against the daily limit); the phone More sheet; the landing's dashboard preview. **Not to draw as built:** the landing's live counter and company-logo strip (invented figures and real employers' marks, audit B1) and the "On hold" lane label (audit M6) |
-| Landing 1440 and 1920 (`w5-landing`, `lp-1440-dark`, `lp-1920`, `lp-1920-dark`) | **Still the pre-ADR-0028 wording (Workday, "No credit card"). Not in scope for #239; to be removed from the canvas in the page.** |
-| Live Tab (3 boards) | Deleted: users never see a browser |
-| Mobile reference | Deleted, already marked to retire |
-| Admin billing (#241) | **Drawn on the canvas (`P3aiZsEXkoUKBrknvvBNJJ`, version 140) at 1280 and 390, light and dark, as `bill-users-*` (per-user billing: trial, renewals, expiry, payment-failure pause), `bill-refund-*` (refund with a required reason and audit note), `bill-recon-*` (daily Stripe and Overture records reconciliation with the mismatch alert) and `bill-margin-*` (cost and margin per Application per plan).** Each board carries the admin shell with a Billing item in the sidebar and a chip nav under 1024 px. Sample data only, labelled. Reference captures in `design/reference/billing/{users,refund,reconciliation,margin}`, sources in `design/reference/source/billing/`. The app build is M3 and not started; the copy avoids the banned words, so the reconciliation reads "Overture records", not "ledger" |
-| New | Review; **drawn on Home (`w5-home-paused`, #157): check-in, strengthen-profile prompt, queue position, activity and the `Couldn't apply` card.** **Home's Ready card ("2 ready to send · 1 approved", opens Ready) — drawn on Home (`w5-home`, #195).** **Admin people screens drawn (#208) and built (#226) from `design/reference/{users,invites,user}`; Mail health drawn (`w5-admin-mail-health`) and built (#229) to `design/reference/mail-health`; Reveal, audit and ATS probe status still to draw.** The M1 admin (overview, kill switches & settings, catalog health; M1-12) is built from the Settings board's components and this document's tokens, and the people screens are checked by axe and reachability rather than pixels for now; pricing and billing (M3) |
+The list of boards still to draw or redraw lives in `docs/research/boards-status.md`. This document
+governs how the product looks; that file tracks the canvas work. A screen with no board is built from
+this document and the shared primitives, and the gap is added there in the same pull request.

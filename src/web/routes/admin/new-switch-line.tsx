@@ -23,13 +23,13 @@ export function NewSwitchLine({ onChanged }: { onChanged: () => void }) {
       <div className="flex flex-wrap items-end gap-2">
         <div>
           <label
-            className="block text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+            className="block text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground"
             htmlFor="switch-scope"
           >
             {copy.admin.switchScopeLabel}
           </label>
           <select
-            className="mt-1 h-9 rounded-md border border-input bg-background px-2 text-[13px]"
+            className="mt-1 h-9 rounded-md border border-input bg-background px-2 text-sm"
             id="switch-scope"
             onChange={(event) => setScope(event.target.value)}
             value={scope}
@@ -43,13 +43,13 @@ export function NewSwitchLine({ onChanged }: { onChanged: () => void }) {
         </div>
         <div>
           <label
-            className="block text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+            className="block text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground"
             htmlFor="switch-name"
           >
             {copy.admin.switchKeyLabel}
           </label>
           <input
-            className="mt-1 h-9 w-[160px] rounded-md border border-input bg-background px-2.5 text-[13px]"
+            className="mt-1 h-9 w-[160px] rounded-md border border-input bg-background px-2.5 text-sm"
             id="switch-name"
             onChange={(event) => setKey(event.target.value)}
             value={key}
@@ -57,13 +57,13 @@ export function NewSwitchLine({ onChanged }: { onChanged: () => void }) {
         </div>
         <div>
           <label
-            className="block text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+            className="block text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground"
             htmlFor="switch-reason"
           >
             {copy.admin.switchReasonLabel}
           </label>
           <input
-            className="mt-1 h-9 w-[220px] rounded-md border border-input bg-background px-2.5 text-[13px]"
+            className="mt-1 h-9 w-[220px] rounded-md border border-input bg-background px-2.5 text-sm"
             id="switch-reason"
             onChange={(event) => setReason(event.target.value)}
             value={reason}
@@ -71,7 +71,7 @@ export function NewSwitchLine({ onChanged }: { onChanged: () => void }) {
         </div>
       </div>
       <button
-        className="inline-flex h-9 items-center justify-center rounded-md bg-foreground px-3.5 text-[13px] font-semibold text-card hover:opacity-90"
+        className="inline-flex h-9 items-center justify-center rounded-md bg-foreground px-3.5 text-sm font-semibold text-card hover:opacity-90"
         disabled={key.length === 0}
         onClick={() => {
           void add();

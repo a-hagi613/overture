@@ -4,16 +4,16 @@ import { copy } from "../../shared/copy.ts";
 
 export function CodePasteHeader({ onClose, wait }: { onClose: () => void; wait: CodeWait }) {
   return (
-    <div className="relative flex items-start gap-[13px] pr-11 md:pr-9">
+    <div className="relative flex items-start gap-3 pr-11 md:pr-9">
       <div
         aria-hidden="true"
-        className="serif flex h-[46px] w-[46px] flex-none items-center justify-center rounded-[9px] bg-foreground text-[27px] italic text-background"
+        className="serif flex h-[46px] w-[46px] flex-none items-center justify-center rounded-lg bg-foreground text-card-title italic text-background"
       >
         {wait.company.slice(0, 1)}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[12.5px] leading-5 font-medium text-muted-foreground">{wait.company}</p>
-        <h2 className="serif mt-px text-[30px] leading-[1.05]">{wait.title}</h2>
+        <p className="text-xs leading-5 font-medium text-muted-foreground">{wait.company}</p>
+        <h2 className="serif mt-px text-card-title leading-[1.05]">{wait.title}</h2>
       </div>
       <button
         aria-label={copy.codePaste.close}

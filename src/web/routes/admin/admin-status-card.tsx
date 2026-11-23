@@ -20,7 +20,7 @@ export function AdminStatusCard({
   if (failed) {
     return (
       <Card className={className}>
-        <p className="text-[13.5px] font-semibold text-foreground" role="alert">
+        <p className="text-sm font-semibold text-foreground" role="alert">
           {errorMessage}
         </p>
         <div className="mt-4">
@@ -35,7 +35,7 @@ export function AdminStatusCard({
   return (
     <Card className={className}>
       <output aria-busy="true" aria-live="polite" className="block space-y-3">
-        <span className="block text-[13px] text-muted-foreground">{loadingMessage}</span>
+        <span className="block text-sm text-muted-foreground">{loadingMessage}</span>
         <span aria-hidden="true" className="block h-4 w-2/3 animate-pulse rounded bg-muted" />
         <span aria-hidden="true" className="block h-10 w-full animate-pulse rounded bg-muted" />
       </output>

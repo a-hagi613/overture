@@ -11,11 +11,9 @@ export function SystemDatabaseCard({
 }) {
   return (
     <div className="min-w-0 rounded-lg border border-border bg-background p-[18px_20px]">
-      <h3 className="font-mono text-[14px] font-semibold">{name}</h3>
+      <h3 className="font-mono text-sm font-semibold">{name}</h3>
       {sizes === null ? (
-        <p className="mt-2 text-[12.5px] text-muted-foreground">
-          {copy.admin.systemDatabaseMissing}
-        </p>
+        <p className="mt-2 text-xs text-muted-foreground">{copy.admin.systemDatabaseMissing}</p>
       ) : (
         <dl className="mt-3">
           <SystemField

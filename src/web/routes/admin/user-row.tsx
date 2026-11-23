@@ -49,9 +49,9 @@ export function UserRow({ now, row }: { now: number; row: AdminPersonRow }) {
       to={to}
     >
       <span className="block min-w-0">
-        <span className="block truncate text-[13.5px] font-semibold">{name}</span>
+        <span className="block truncate text-sm font-semibold">{name}</span>
         {email === null ? null : (
-          <span className="mt-0.5 block truncate text-[12.5px] text-muted-foreground">{email}</span>
+          <span className="mt-0.5 block truncate text-xs text-muted-foreground">{email}</span>
         )}
       </span>
       <span className="mt-3 block md:mt-0">
@@ -60,20 +60,20 @@ export function UserRow({ now, row }: { now: number; row: AdminPersonRow }) {
       </span>
       <span className="mt-3 block md:mt-0">
         <AdminCellLabel label={copy.admin.usersColumnInvite} />
-        <span className="text-[12.5px]">{inviteText(row)}</span>
+        <span className="text-xs">{inviteText(row)}</span>
       </span>
       <span className="mt-3 block md:mt-0">
         <AdminCellLabel label={copy.admin.usersColumnGrants} />
-        <span className="block text-[12.5px]">
+        <span className="block text-xs">
           {row.grantsLeft === null ? copy.admin.grantsNone : copy.admin.grantsLeft(row.grantsLeft)}
         </span>
-        <span className="mt-0.5 block text-[11.5px] text-muted-foreground">
+        <span className="mt-0.5 block text-eyebrow text-muted-foreground">
           {grantDetail(row, now)}
         </span>
       </span>
       <span className="mt-3 block md:mt-0">
         <AdminCellLabel label={copy.admin.usersColumnLastActivity} />
-        <span className="text-[12.5px]">
+        <span className="text-xs">
           {row.lastActiveAt === null
             ? copy.admin.lastActivityNever
             : adminDayTime(row.lastActiveAt, now)}

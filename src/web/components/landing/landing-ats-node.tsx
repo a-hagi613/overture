@@ -9,7 +9,7 @@ import { LANDING_COPY } from "./landing-copy.ts";
 const atsNodeTile =
   "relative z-10 flex h-14 w-14 flex-none items-center justify-center rounded-2xl border bg-band-bg transition duration-300 sm:h-16 sm:w-16";
 
-const atsLogoFrame = "block h-full w-full overflow-hidden rounded-[15px]";
+const atsLogoFrame = "block h-full w-full overflow-hidden rounded-2xl";
 
 export function LandingAtsNode({
   active,

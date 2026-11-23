@@ -1,6 +1,8 @@
 import { definePlugin, defineRule } from "@oxlint/plugins";
 import { z } from "zod";
 
+import { findOffScaleDesignToken } from "../../../scripts/design-scale-guard.ts";
+
 const disableDirectivePatterns = [
   /^oxlint-disable(?:-next-line|-line)?(?:\s|$)/u,
   /^oxlint-enable(?:\s|$)/u,
@@ -322,9 +324,6 @@ const COLOR_ATTR_NAMES = new Set([
 const RAW_COLOR_PATTERN = /(?:#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\()/u;
 const RAW_COLOR_TW_PATTERN = /\b(?:bg|text|border|ring|stroke|fill)-\[(?:#|rgba?\(|hsla?\()/u;
 
-const OFF_SCALE_TW_PATTERN =
-  /\b(?:(?:text|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap)-\[\d+(?:\.\d+)?px\]|text-(?:lg|[2-9]?xl))\b/u;
-
 const stringSchema = z.string();
 
 function matchesAnyPrefix(filename: string, prefixes: string[]) {
@@ -385,13 +384,13 @@ const noRawDesignStyles = defineRule({
       }
 
       if (isStrict) {
-        const offScale = OFF_SCALE_TW_PATTERN.exec(text);
+        const offScale = findOffScaleDesignToken(text);
 
         if (offScale !== null) {
           context.report({
             node,
             messageId: "offScaleArbitrary",
-            data: { token: offScale[0] },
+            data: { token: offScale },
           });
         }
       }

@@ -7,8 +7,8 @@ import { costLabel, formatUsd, marginLabel, priceLabel } from "./margin-format.t
 export function PlanTable({ rows }: { rows: MarginPlanRow[] }) {
   return (
     <div className="hidden overflow-hidden rounded-lg border border-border bg-card shadow-sh lg:block">
-      <table className="w-full text-left text-[14px]">
-        <thead className="bg-sidebar text-[12.5px] text-muted-foreground">
+      <table className="w-full text-left text-sm">
+        <thead className="bg-sidebar text-xs text-muted-foreground">
           <tr>
             <th scope="col" className="px-5 py-4 font-normal">
               {copy.admin.marginColumnPlan}

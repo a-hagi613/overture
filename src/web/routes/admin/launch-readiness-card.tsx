@@ -96,9 +96,9 @@ export function LaunchReadinessCard({
       <CardHeader>
         <CardTitle id="admin-launch-readiness">{copy.admin.readinessHeading}</CardTitle>
       </CardHeader>
-      <p className="mt-1.5 text-[12.5px] text-muted-foreground">{copy.admin.readinessLead}</p>
+      <p className="mt-1.5 text-xs text-muted-foreground">{copy.admin.readinessLead}</p>
       {saveError ? (
-        <p className="mt-3 text-[12.5px] font-semibold text-need" role="alert">
+        <p className="mt-3 text-xs font-semibold text-need" role="alert">
           {copy.admin.readinessSaveError}
         </p>
       ) : null}

@@ -58,7 +58,7 @@ export function TrackerCard({
       className={`group rounded-xl border bg-card text-left transition ${
         selected
           ? "border-signal shadow-lift ring-1 ring-signal/30"
-          : "border-border shadow-sh hover:border-signal/45 hover:shadow-lift"
+          : "border-border shadow-sh hover:border-foreground/30 hover:shadow-lift"
       } ${isDragging ? "opacity-35" : ""} ${isKeyboardDragging ? "border-signal ring-2 ring-signal/45" : ""}`}
       ref={setNodeRef}
     >
@@ -67,7 +67,7 @@ export function TrackerCard({
         aria-disabled={draggable ? attributes["aria-disabled"] : undefined}
         aria-pressed={isKeyboardDragging ? true : undefined}
         aria-roledescription={draggable ? attributes["aria-roledescription"] : undefined}
-        className={`block w-full rounded-xl p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal ${
+        className={`block w-full rounded-xl p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${
           draggable ? "touch-none cursor-grab active:cursor-grabbing" : "cursor-pointer"
         }`}
         data-card={card.id}
@@ -87,13 +87,13 @@ export function TrackerCard({
           {draggable ? (
             <GripVertical
               aria-hidden="true"
-              className="shrink-0 text-muted-foreground/60 transition group-hover:text-signal-text"
+              className="shrink-0 text-muted-foreground/60 transition group-hover:text-foreground"
               size={16}
             />
           ) : null}
         </div>
 
-        <h3 className="mt-3 line-clamp-2 min-h-[2.75rem] font-serif text-card-title leading-snug text-foreground transition group-hover:text-signal-text">
+        <h3 className="mt-3 line-clamp-2 min-h-[2.75rem] font-serif text-card-title leading-snug text-foreground transition group-hover:text-foreground">
           {card.title}
         </h3>
 

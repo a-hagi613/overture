@@ -9,7 +9,7 @@ import { SupportStatusBadge } from "./support-status-badge.tsx";
 import { Button } from "./ui/button.tsx";
 
 const TEXT_INPUT =
-  "w-full rounded-md border border-input bg-background px-3 py-2 text-[13px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
+  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
 
 const TEXT_MAX = 5000;
 
@@ -42,19 +42,19 @@ export function SupportTicketDetail({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          <p className="text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             {copy.admin.supportReference(ticket.referenceId)}
           </p>
           <h2
-            className="mt-1 break-words font-serif text-[26px] leading-[1.1]"
+            className="mt-1 break-words font-serif text-card-title leading-[1.1]"
             id="admin-support-detail"
           >
             {ticket.subject}
           </h2>
-          <p className="mt-1.5 break-words text-[12.5px] text-muted-foreground">
+          <p className="mt-1.5 break-words text-xs text-muted-foreground">
             {copy.admin.supportAuthor(ticket.userName, ticket.userEmail)}
           </p>
-          <p className="text-[12.5px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {copy.admin.supportOpened(adminDayTime(ticket.createdAt, now))}
           </p>
         </div>
@@ -66,26 +66,26 @@ export function SupportTicketDetail({
 
       <p className="mt-3">
         <Link
-          className="inline-flex min-h-11 items-center rounded-sm text-[12.5px] font-semibold underline underline-offset-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
+          className="inline-flex min-h-11 items-center rounded-sm text-xs font-semibold underline underline-offset-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
           to={`/admin/users/${encodeURIComponent(ticket.userId)}`}
         >
           {copy.admin.supportOpenUser}
         </Link>
       </p>
 
-      <h3 className="mt-4 text-[13px] font-semibold">{copy.admin.supportMessageHeading}</h3>
+      <h3 className="mt-4 text-sm font-semibold">{copy.admin.supportMessageHeading}</h3>
       {ticket.message === null ? (
-        <p className="mt-2 rounded-md border border-border bg-muted p-3 text-[12.5px] text-muted-foreground">
+        <p className="mt-2 rounded-md border border-border bg-muted p-3 text-xs text-muted-foreground">
           {copy.admin.supportUndecryptable}
         </p>
       ) : (
-        <p className="mt-2 whitespace-pre-wrap break-words rounded-md border border-border bg-background p-3 text-[13px] leading-relaxed">
+        <p className="mt-2 whitespace-pre-wrap break-words rounded-md border border-border bg-background p-3 text-sm leading-relaxed">
           {ticket.message}
         </p>
       )}
 
-      <h3 className="mt-5 text-[13px] font-semibold">{copy.admin.supportStatusHeading}</h3>
-      <p className="mt-1 text-[12.5px] text-muted-foreground">
+      <h3 className="mt-5 text-sm font-semibold">{copy.admin.supportStatusHeading}</h3>
+      <p className="mt-1 text-xs text-muted-foreground">
         {copy.admin.supportStatusNow(copy.admin.supportStatus[ticket.status])}
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
@@ -122,7 +122,7 @@ export function SupportTicketDetail({
         ) : null}
       </div>
 
-      <h3 className="mt-5 text-[13px] font-semibold">{copy.admin.supportNotesHeading}</h3>
+      <h3 className="mt-5 text-sm font-semibold">{copy.admin.supportNotesHeading}</h3>
       <form
         className="mt-2"
         onSubmit={(event) => {
@@ -131,9 +131,7 @@ export function SupportTicketDetail({
         }}
       >
         <label className="block min-w-0">
-          <span className="mb-1 block text-[12px] font-semibold">
-            {copy.admin.supportNotesLabel}
-          </span>
+          <span className="mb-1 block text-xs font-semibold">{copy.admin.supportNotesLabel}</span>
           <textarea
             className={`${TEXT_INPUT} min-h-[92px]`}
             maxLength={TEXT_MAX}
@@ -151,7 +149,7 @@ export function SupportTicketDetail({
         </div>
       </form>
 
-      <h3 className="mt-5 text-[13px] font-semibold">{copy.admin.supportReplyHeading}</h3>
+      <h3 className="mt-5 text-sm font-semibold">{copy.admin.supportReplyHeading}</h3>
       <form
         className="mt-2"
         onSubmit={(event) => {
@@ -160,9 +158,7 @@ export function SupportTicketDetail({
         }}
       >
         <label className="block min-w-0">
-          <span className="mb-1 block text-[12px] font-semibold">
-            {copy.admin.supportReplyLabel}
-          </span>
+          <span className="mb-1 block text-xs font-semibold">{copy.admin.supportReplyLabel}</span>
           <textarea
             className={`${TEXT_INPUT} min-h-[110px]`}
             maxLength={TEXT_MAX}

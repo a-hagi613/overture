@@ -535,7 +535,7 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
       <p className={SWITCH_CLASS}>
         {isSignUp ? copy.signIn.switchToSignInPrompt : copy.signIn.switchToSignUpPrompt}{" "}
         <Link
-          className="font-semibold text-foreground underline decoration-input underline-offset-4 transition hover:text-signal-text"
+          className="font-semibold text-foreground underline decoration-input underline-offset-4 transition hover:decoration-foreground"
           to={isSignUp ? "/signin" : "/signup"}
         >
           {isSignUp ? copy.signIn.switchToSignInAction : copy.signIn.switchToSignUpAction}

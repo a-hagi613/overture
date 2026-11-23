@@ -93,7 +93,7 @@ export function BoardSheet(props: {
     <>
       <button
         aria-label={copy.board.closeDetail}
-        className="fixed inset-0 z-[55] bg-foreground/25 backdrop-blur-[1px]"
+        className="fixed inset-0 z-60 bg-foreground/25 backdrop-blur-[1px]"
         onClick={onClose}
         type="button"
       />

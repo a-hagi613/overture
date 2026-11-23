@@ -22,15 +22,15 @@ export function ReadinessPresetRow({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border py-3 first:border-t-0">
       <div className="min-w-0">
-        <p className="text-[13.5px] font-semibold">{label}</p>
-        <p className="font-mono text-[12px] text-muted-foreground tabular-nums">{valueText}</p>
+        <p className="text-sm font-semibold">{label}</p>
+        <p className="font-mono text-xs text-muted-foreground tabular-nums">{valueText}</p>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         {presets.map((preset) => (
           <Button
             ariaLabel={ariaFor(preset)}
             ariaPressed={current === preset}
-            className="min-w-11 px-2.5 font-mono text-[12.5px] md:min-w-9"
+            className="min-w-11 px-2.5 font-mono text-xs md:min-w-9"
             disabled={disabled}
             key={preset}
             onClick={() => {

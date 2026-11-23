@@ -121,7 +121,7 @@ export function SystemRuntimeCard({ view }: { view: SystemReport }) {
       aria-labelledby="admin-system-runtime"
       className="rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
     >
-      <h2 className="font-serif text-[26px] leading-[1.1]" id="admin-system-runtime">
+      <h2 className="font-serif text-card-title leading-[1.1]" id="admin-system-runtime">
         {copy.admin.systemRuntimeHeading}
       </h2>
       <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-4">
@@ -143,12 +143,12 @@ export function SystemRuntimeCard({ view }: { view: SystemReport }) {
         />
         <SystemStat label={copy.admin.systemBunVersion} value={view.runtime.bunVersion} />
       </dl>
-      <p className="mt-5 flex flex-wrap items-center gap-2 text-[12.5px]">
+      <p className="mt-5 flex flex-wrap items-center gap-2 text-xs">
         <SystemPill label={copy.admin.systemLitestream} tone={backupTone(view.backups)} />
         <span className="text-muted-foreground">{backupLine(view.backups)}</span>
       </p>
-      <p className="mt-2 text-[12.5px] text-muted-foreground">{degradedText(view)}</p>
-      <h3 className="mt-6 font-serif text-[19px] leading-[1.2]">
+      <p className="mt-2 text-xs text-muted-foreground">{degradedText(view)}</p>
+      <h3 className="mt-6 font-serif text-base leading-[1.2]">
         {copy.admin.systemIntegrationsHeading}
       </h3>
       <ul className="mt-3 grid list-none grid-cols-1 gap-x-8 gap-y-0 p-0 sm:grid-cols-2">
@@ -157,7 +157,7 @@ export function SystemRuntimeCard({ view }: { view: SystemReport }) {
             className="flex min-w-0 items-center justify-between gap-3 border-t border-border py-2.5"
             key={row.label}
           >
-            <span className="text-[12.5px] text-muted-foreground">{row.label}</span>
+            <span className="text-xs text-muted-foreground">{row.label}</span>
             <SystemPill label={row.value} tone={row.tone} />
           </li>
         ))}

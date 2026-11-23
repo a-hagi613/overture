@@ -52,9 +52,9 @@ export function ActiveAlertsCard({ alerts }: { alerts: AdminAlertsResponse }) {
           </Button>
         ) : null}
       </CardHeader>
-      <p className="mt-1.5 text-[12.5px] text-muted-foreground">{copy.admin.alertsLead}</p>
+      <p className="mt-1.5 text-xs text-muted-foreground">{copy.admin.alertsLead}</p>
       {ackError ? (
-        <p className="mt-3 text-[12.5px] font-semibold text-need" role="alert">
+        <p className="mt-3 text-xs font-semibold text-need" role="alert">
           {copy.admin.alertsAckError}
         </p>
       ) : null}
@@ -62,7 +62,7 @@ export function ActiveAlertsCard({ alerts }: { alerts: AdminAlertsResponse }) {
         {alerts.problems.length === 0 ? (
           <div className="flex items-center gap-2.5 rounded-md border border-border bg-background px-3.5 py-2.5">
             <Badge tone="ok">{copy.admin.alertsAllClear}</Badge>
-            <p className="text-[12.5px] text-muted-foreground">{copy.admin.alertsNoProblems}</p>
+            <p className="text-xs text-muted-foreground">{copy.admin.alertsNoProblems}</p>
           </div>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -74,9 +74,7 @@ export function ActiveAlertsCard({ alerts }: { alerts: AdminAlertsResponse }) {
       </div>
       <div className="mt-5">
         {alerts.notifications.length === 0 ? (
-          <p className="text-[12.5px] text-muted-foreground">
-            {copy.admin.alertsEmptyNotifications}
-          </p>
+          <p className="text-xs text-muted-foreground">{copy.admin.alertsEmptyNotifications}</p>
         ) : (
           <ul>
             {alerts.notifications.map((notification) => (
