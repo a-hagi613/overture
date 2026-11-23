@@ -301,10 +301,10 @@ export async function seedBoardOwner(request: APIRequestContext, appServerUrl: s
     throw new Error(`home probe failed: ${String(homeProbe.status())} ${await homeProbe.text()}`);
   }
 
+  await request.post("/api/running", { data: { running: true } });
   await request.put("/api/profile/settings", {
     data: { languages: ["en"], timezone: TIME_ZONE },
   });
-  await request.post("/api/running", { data: { running: true } });
 
   const state = await verifyAuthState(appServerUrl, request);
   const owner = state.users.find((user) => user.email === authTestIdentity.ownerEmail);

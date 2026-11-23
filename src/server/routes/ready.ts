@@ -51,14 +51,18 @@ interface ReadyCardRow {
   status: string;
 }
 
-function changesOf(value: string | null) {
+export function changesOf(value: string | null) {
   if (value === null) {
     return [];
   }
 
-  const parsed = z.array(z.string()).safeParse(JSON.parse(value));
+  try {
+    const parsed = z.array(z.string()).safeParse(JSON.parse(value));
 
-  return parsed.success ? parsed.data : [];
+    return parsed.success ? parsed.data : [];
+  } catch {
+    return [];
+  }
 }
 
 function answersOf(plan: SendPlan, factSources: ReadonlyMap<string, string>) {

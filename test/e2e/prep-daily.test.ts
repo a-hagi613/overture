@@ -220,6 +220,7 @@ test("a 07:00 run fills exactly the free Ready slots, sends one recap, and does 
   await owner.post("/__test__/mail/clear", { data: {} });
   await clearCatalog(owner);
   await grantApplications(owner, 70);
+  await owner.post("/__test__/profile/running", { data: { running: true, userId } });
   await owner.put("/api/profile/settings", { data: { languages: ["en"], timezone: "UTC" } });
   await configureMatching(owner);
 
@@ -401,6 +402,7 @@ test("the next day's run stops at the unapproved Ready Applications and sends no
   await owner.post("/__test__/mail/clear", { data: {} });
   await clearCatalog(owner);
   await grantApplications(owner, 70);
+  await owner.post("/__test__/profile/running", { data: { running: true, userId } });
   await owner.put("/api/profile/settings", { data: { languages: ["en"], timezone: "UTC" } });
   await configureMatching(owner);
 

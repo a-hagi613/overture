@@ -17,6 +17,8 @@ import { parseMasterKey } from "../platform/crypto.ts";
 import { createFactService } from "../profile/facts.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { createResumeService, MAX_RESUME_BYTES } from "../profile/resume.ts";
+import { hasPdfMagicBytes } from "../profile/pdf.ts";
+import { clearBlockerIfRecovered } from "../profile/running-state.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createSkipCompanyService } from "../profile/skip-companies.ts";
 import { createStrengthenService } from "../profile/strengthen.ts";
@@ -122,12 +124,25 @@ export function createProfileRoutes(deps: {
       return context.json({ error: API_ERRORS.invalidRequest, issues: parsed.error.issues }, 400);
     }
 
+    const bytes = new Uint8Array(await parsed.data.file.arrayBuffer());
+
+    if (!hasPdfMagicBytes(bytes)) {
+      return context.json(
+        {
+          error: API_ERRORS.invalidRequest,
+          issues: [{ message: "Only PDF resumes are accepted" }],
+        },
+        400,
+      );
+    }
+
     const upload = await resumesService.upload(account.id, {
       name: parsed.data.file.name === "" ? "resume.pdf" : parsed.data.file.name,
-      bytes: new Uint8Array(await parsed.data.file.arrayBuffer()),
+      bytes,
     });
 
     const prefilled = await factsService.prefillFromResume(account.id, upload.text);
+    clearBlockerIfRecovered(db, clock, account.id, "no_resume");
 
     const employer = prefilled.find((fact) => fact.key === "current_employer");
 

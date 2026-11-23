@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, eq, isNull, or, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Auth } from "../auth/index.ts";
@@ -7,7 +7,8 @@ import type { Auth } from "../auth/index.ts";
 import { readSessionUser } from "../auth/session.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
 
-import { applications, messages } from "../platform/db/schema.ts";
+import { applications } from "../platform/db/schema.ts";
+import { unreadThreadCountOf } from "../inbox/threads.ts";
 
 export function createNavRoutes(deps: { auth: Auth; db: AppDatabase; reviews: ReviewService }) {
   const { auth, db, reviews } = deps;
@@ -29,22 +30,8 @@ export function createNavRoutes(deps: { auth: Auth; db: AppDatabase; reviews: Re
       .where(and(eq(applications.userId, user.id), eq(applications.status, "ready")))
       .get();
 
-    const inboxUnread = db
-      .select({ total: sql<number>`count(*)` })
-      .from(messages)
-      .where(
-        and(
-          eq(messages.userId, user.id),
-          eq(messages.direction, "in"),
-          eq(messages.auth, "pass"),
-          isNull(messages.readAt),
-          or(isNull(messages.classification), sql`${messages.classification} IS NOT 'code'`),
-        ),
-      )
-      .get();
-
     return context.json({
-      inboxUnread: inboxUnread?.total ?? 0,
+      inboxUnread: unreadThreadCountOf(db, user.id),
       ready: ready?.total ?? 0,
       review: reviews.list(user.id).length,
     });

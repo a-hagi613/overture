@@ -27,6 +27,7 @@ import { enqueuePlannerDay } from "../dispatch/planner.ts";
 import { ensurePrepDailyQueued } from "../pipeline/daily-prep.ts";
 import { dueCheckins } from "../pipeline/checkins.ts";
 import { notifyPaused } from "../notify/events.ts";
+import { pauseByUser, resumeByUser } from "../profile/running-state.ts";
 import { parseSendWindow } from "../dispatch/planning.ts";
 import { nextSendAtOf, sendQueueOf } from "../pipeline/send-queue.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
@@ -686,23 +687,11 @@ export function createHomeRoutes(deps: {
     }
 
     const { running } = context.req.valid("json");
-    const now = clock.now();
-    const pauseReason = running ? null : "user";
+    const result = running ? resumeByUser(db, clock, user.id) : pauseByUser(db, clock, user.id);
 
-    db.insert(profiles)
-      .values({
-        createdAt: new Date(now),
-        languages: "[]",
-        pauseReason,
-        running,
-        updatedAt: new Date(now),
-        userId: user.id,
-      })
-      .onConflictDoUpdate({
-        target: profiles.userId,
-        set: { pauseReason, running, updatedAt: new Date(now) },
-      })
-      .run();
+    if (!result.ok) {
+      return context.json({ error: "pause_blocked", pauseReason: result.reason }, 409);
+    }
 
     if (running) {
       enqueuePlannerDay(db, clock, user.id);
@@ -713,7 +702,7 @@ export function createHomeRoutes(deps: {
 
     publishEvent(db, clock, "home.updated", JSON.stringify({ running }), user.id);
 
-    return context.json({ pauseReason, running });
+    return context.json({ pauseReason: running ? null : "user", running });
   });
 
   return routes;

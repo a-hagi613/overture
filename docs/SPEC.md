@@ -1567,7 +1567,7 @@ Plus: route reachability for every page, axe on every page, and the visual snaps
 Review, Inbox, Profile, Settings and the legal and consent boards × 390 / 1280 px × light/dark; Ready joins them once it is
 drawn) in pinned Docker.
 
-### 16.2 Unit tests (fifty-eight files, `bun:test`, beside their code)
+### 16.2 Unit tests (sixty-one files, `bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
@@ -1621,11 +1621,14 @@ drawn) in pinned Docker.
 | `src/server/platform/ports/replica-listing.test.ts` | the newest replica transaction is read from the first non-empty Litestream level (#281) |
 | `src/server/profile/facts.test.ts` | a Fact's scope is validated against its key |
 | `src/server/profile/onboarding-step.test.ts` | the onboarding step's salary and EEO reading |
+| `src/server/profile/pdf.test.ts` | only the `%PDF-` header in the first kilobyte is accepted, so a spoofed MIME type cannot pass HTML as a resume |
 | `src/server/profile/personal-crypto.test.ts` | the personal key is read once however many values one request opens and seals, each person's key stays apart, a race creates it once, and a read in flight when a person is forgotten does not cache their key again (#430) |
+| `src/server/profile/running-state.test.ts` | Resume and Pause never replace a billing, setup, suspension or dispatcher hold, Pause never hides the reason sending stopped, and only the same no-resume or no-mailbox hold clears when its prerequisite returns |
 | `src/server/profile/target-choices.test.ts` | the onboarding location plan uses the covering `postings_open_location` index (#337) |
 | `src/server/profile/targets.test.ts` | the live match count is cached per normalized filters and catalog revision, a same-connection or sweep-worker write invalidates it, the store is bounded, the count plan probes `posting_tags` by its primary key rather than scanning it, and 25 concurrent filter changes answer under 500ms p95 during catalog writes (#426) |
 | `src/server/profile/time-zone.test.ts` | an empty timezone change takes no write (#430) |
 | `src/server/profile/v1-import.test.ts` | the v1 answer-bank and learned-answer mapping |
+| `src/server/routes/ready.test.ts` | a corrupt or non-list `changes` value degrades to an empty card list rather than a 500 |
 | `src/shared/copy.test.ts` | no canvas annotation is a copy string or key |
 | `src/shared/dossier.test.ts` | the file is sent as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key, and a "did not happen" line appears only when the stored data proves it |
 | `src/shared/host-match.test.ts` | a host matches only its own domain or a real subdomain of it, after trimming, lower-casing and dropping a trailing root dot, so `evilgreenhouse.io` never matches `greenhouse.io` |

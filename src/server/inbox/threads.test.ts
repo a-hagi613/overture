@@ -10,7 +10,12 @@ import { applications, mailThreads, mailboxes, messages, users } from "../platfo
 import { companies, companyBoards, postings } from "../platform/db/catalog-schema.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import type { InboxThreadCounts } from "./threads.ts";
-import { threadCountsOf, threadPageOf, threadViewsOf } from "./threads.ts";
+import {
+  threadCountsOf,
+  threadPageOf,
+  threadViewsOf,
+  unreadThreadCountOf,
+} from "./threads.ts";
 
 const NOW = 1_795_000_000_000;
 const USER = "inbox-user";
@@ -262,6 +267,51 @@ describe("the Inbox thread list", () => {
     expect(twelve).toHaveLength(12);
     expect(counter.count()).toBe(statementsForThree);
     expect(statementsForThree).toBeLessThanOrEqual(4);
+  });
+
+  test("counts a Thread once however many unread Messages it holds", async () => {
+    const { catalogDb, db, personal } = seeded();
+
+    await addThread(db, catalogDb, personal, { application: false, index: 0, unread: true });
+    await addThread(db, catalogDb, personal, { application: false, index: 1, unread: false });
+
+    const messageId = "msg-0-second-unread";
+
+    const scope = (column: string) => ({ column, rowId: messageId, table: "messages" });
+
+    const [fromEnc, toEnc, subjectEnc, textEnc, snippetEnc] = await Promise.all([
+      personal.sealFor(USER, scope("from_enc"), "Hiring Team <hiring@example.test>"),
+      personal.sealFor(USER, scope("to_enc"), "inbox@example.test"),
+      personal.sealFor(USER, scope("subject_enc"), "Another reply"),
+      personal.sealFor(USER, scope("text_enc"), "The second unread body"),
+      personal.sealFor(USER, scope("snippet_enc"), "The second unread body"),
+    ]);
+
+    db.insert(messages)
+      .values({
+        auth: "pass",
+        classification: "screening",
+        createdAt: new Date(NOW + 2000),
+        direction: "in",
+        fromEnc,
+        id: messageId,
+        mailboxId: "mailbox-1",
+        readAt: null,
+        rfcMessageId: `<${messageId}@example.test>`,
+        senderDomain: "example.test",
+        snippetEnc,
+        subjectEnc,
+        textEnc,
+        threadId: "thread-0",
+        toEnc,
+        userId: USER,
+      })
+      .run();
+
+    const views = await threadViewsOf({ db, personal, threads: threadsOf(db), userId: USER });
+
+    expect(views.filter((view) => view.unread)).toHaveLength(1);
+    expect(unreadThreadCountOf(db, USER)).toBe(1);
   });
 
   test("reads the latest message, the employer and the unread flag for every Thread", async () => {
