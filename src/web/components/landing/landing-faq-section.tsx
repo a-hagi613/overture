@@ -27,7 +27,7 @@ export function LandingFaqSection() {
               key={item.q}
               open={item.open}
             >
-              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 py-6 transition hover:text-signal-text [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 py-6 transition hover:underline [&::-webkit-details-marker]:hidden">
                 <span className={dsCardTitle}>{item.q}</span>
                 <Plus
                   aria-hidden="true"

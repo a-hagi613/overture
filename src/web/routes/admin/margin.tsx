@@ -26,14 +26,12 @@ export function MarginPage() {
 
   const header = (
     <>
-      <p className="mt-6 text-[12.5px] text-muted-foreground">{copy.admin.billingCrumb}</p>
-      <p className="mt-4 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+      <p className="mt-6 text-xs text-muted-foreground">{copy.admin.billingCrumb}</p>
+      <p className="mt-4 text-eyebrow uppercase tracking-[0.12em] text-muted-foreground">
         {copy.admin.marginEyebrow}
       </p>
-      <h1 className="mt-1 font-serif text-[40px] leading-[1.05] lg:text-[52px]">
-        {copy.admin.marginTitle}
-      </h1>
-      <p className="mt-2 text-[15px] text-muted-foreground">{copy.admin.marginLead}</p>
+      <h1 className="mt-1 font-serif text-page-title leading-[1.05]">{copy.admin.marginTitle}</h1>
+      <p className="mt-2 text-sm text-muted-foreground">{copy.admin.marginLead}</p>
 
       <BillingTabs current="margin" />
     </>
@@ -54,17 +52,17 @@ export function MarginPage() {
 
       <section aria-labelledby="margin-plans" className="mt-7">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 id="margin-plans" className="font-serif text-[26px] leading-tight">
+          <h2 id="margin-plans" className="font-serif text-card-title leading-tight">
             {copy.admin.marginPlanHeading}
           </h2>
-          <span className="text-[13px] text-muted-foreground">{copy.admin.marginWindow}</span>
+          <span className="text-sm text-muted-foreground">{copy.admin.marginWindow}</span>
         </div>
         <div className="mt-4">
           <PlanTable rows={data.plans} />
           <PlanCards rows={data.plans} />
         </div>
         {data.completed === 0 ? (
-          <p className="mt-3 text-[13px] text-muted-foreground">{copy.admin.marginNoData}</p>
+          <p className="mt-3 text-sm text-muted-foreground">{copy.admin.marginNoData}</p>
         ) : null}
       </section>
 
@@ -72,10 +70,10 @@ export function MarginPage() {
         aria-labelledby="margin-how"
         className="mt-6 rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
       >
-        <h2 id="margin-how" className="font-serif text-[22px] leading-tight">
+        <h2 id="margin-how" className="font-serif text-card-title leading-tight">
           {copy.admin.marginHowTitle}
         </h2>
-        <p className="mt-2 text-[13.5px] text-muted-foreground">{copy.admin.marginHowBody}</p>
+        <p className="mt-2 text-sm text-muted-foreground">{copy.admin.marginHowBody}</p>
       </section>
 
       <BesideCard report={data} />

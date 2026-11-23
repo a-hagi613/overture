@@ -10,13 +10,13 @@ import { CodePasteHeader } from "./code-paste-header.tsx";
 export type CodePasteMode = "waiting" | "no_code" | "expired" | "accepted";
 
 const PRIMARY =
-  "inline-flex min-h-10 max-[767px]:min-h-11 flex-none cursor-pointer items-center justify-center rounded-md border border-foreground bg-foreground px-[18px] text-[13px] font-semibold text-primary-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] hover:bg-btn-hover disabled:opacity-60";
+  "inline-flex min-h-10 max-[767px]:min-h-11 flex-none cursor-pointer items-center justify-center rounded-md border border-foreground bg-foreground px-5 text-sm font-semibold text-primary-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] hover:bg-btn-hover disabled:opacity-60";
 
 const SECONDARY =
-  "inline-flex min-h-10 max-[767px]:min-h-11 flex-none cursor-pointer items-center justify-center rounded-md border border-input bg-card px-[18px] text-[13px] font-semibold hover:bg-muted";
+  "inline-flex min-h-10 max-[767px]:min-h-11 flex-none cursor-pointer items-center justify-center rounded-md border border-input bg-card px-5 text-sm font-semibold hover:bg-muted";
 
 const PILL =
-  "inline-flex items-center rounded-full px-[11px] py-[3px] text-[11.5px] font-semibold leading-normal";
+  "inline-flex items-center rounded-full px-3 py-1 text-eyebrow font-semibold leading-normal";
 
 function stateCopy(mode: CodePasteMode, company: string) {
   switch (mode) {
@@ -141,7 +141,7 @@ export function CodePasteSheet({
       <dialog
         aria-labelledby="code-paste-title"
         aria-modal="true"
-        className="board m-0 fixed inset-x-4 bottom-4 z-70 flex max-h-[calc(100dvh-32px)] max-w-none flex-col overflow-y-auto rounded-[16px] border border-border bg-card px-[22px] pt-[13px] pb-6 text-foreground shadow-lift md:inset-x-auto md:inset-y-0 md:right-0 md:bottom-0 w-[520px] max-[1699px]:w-[468px] max-md:w-auto md:rounded-none md:border-y-0 md:border-r-0 md:px-[26px] md:pt-5"
+        className="board m-0 fixed inset-x-4 bottom-4 z-60 flex max-h-[calc(100dvh-32px)] max-w-none flex-col overflow-y-auto rounded-[16px] border border-border bg-card px-6 pt-3 pb-6 text-foreground shadow-lift md:inset-x-auto md:inset-y-0 md:right-0 md:bottom-0 w-[520px] max-[1699px]:w-[468px] max-md:w-auto md:rounded-none md:border-y-0 md:border-r-0 md:px-7 md:pt-5"
         data-testid="code-paste-sheet"
         open
         ref={sheet}
@@ -158,11 +158,11 @@ export function CodePasteSheet({
         <CodePasteHeader onClose={onClose} wait={wait} />
 
         {typing ? (
-          <p className="mt-[22px] text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
+          <p className="mt-6 text-eyebrow font-semibold tracking-[0.15em] text-muted-foreground uppercase">
             {copy.codePaste.eyebrow}
           </p>
         ) : (
-          <p className="mt-[14px] flex flex-wrap gap-2">
+          <p className="mt-4 flex flex-wrap gap-2">
             <span className={`${PILL} ${closed ? "bg-need-soft text-need" : "bg-ok-soft text-ok"}`}>
               {closed ? copy.codePaste.expired.pill : copy.codePaste.accepted.pill}
             </span>
@@ -174,21 +174,21 @@ export function CodePasteSheet({
           </p>
         )}
 
-        <h3 className="serif mt-[22px] text-[26px] leading-[1.15]" id="code-paste-title">
+        <h3 className="serif mt-6 text-card-title leading-[1.15]" id="code-paste-title">
           {entry.titlePlain} <span className="italic">{entry.titleItalic}</span>
         </h3>
 
-        <p className="mt-[30px] text-[13.5px] leading-[1.55] text-muted-foreground">{entry.body}</p>
+        <p className="mt-8 text-sm leading-[1.55] text-muted-foreground">{entry.body}</p>
 
         {finished ? null : (
-          <div className="mt-[18px]">
-            <label className="text-[12.5px] font-semibold" htmlFor="code-paste-code">
+          <div className="mt-4">
+            <label className="text-xs font-semibold" htmlFor="code-paste-code">
               {copy.codePaste.label}
             </label>
             <input
               aria-describedby={invalid || shownError !== null ? "code-paste-error" : undefined}
               autoComplete="one-time-code"
-              className={`mono mt-2 h-[50px] w-full rounded-md border border-input px-[13px] text-[15px] tracking-[0.3em] uppercase placeholder:normal-case placeholder:tracking-[0.28em] placeholder:text-muted-foreground focus:border-foreground ${
+              className={`mono mt-2 h-[50px] w-full rounded-md border border-input px-3 text-sm tracking-[0.3em] uppercase placeholder:normal-case placeholder:tracking-[0.28em] placeholder:text-muted-foreground focus:border-foreground ${
                 closed ? "bg-muted text-muted-foreground" : "bg-card"
               }`}
               disabled={closed}
@@ -208,11 +208,9 @@ export function CodePasteSheet({
             />
             {closed ? null : (
               <>
-                <div className="mt-[17px] flex items-baseline justify-between gap-3">
-                  <span className="text-[12.5px] text-muted-foreground">
-                    {copy.codePaste.timeLeft}
-                  </span>
-                  <span className="mono text-[12.5px]">{clockText(remaining)}</span>
+                <div className="mt-4 flex items-baseline justify-between gap-3">
+                  <span className="text-xs text-muted-foreground">{copy.codePaste.timeLeft}</span>
+                  <span className="mono text-xs">{clockText(remaining)}</span>
                 </div>
                 <div aria-hidden="true" className="mt-2 h-[3px] w-full rounded-full bg-muted">
                   <span
@@ -226,16 +224,12 @@ export function CodePasteSheet({
         )}
 
         {invalid || shownError !== null ? (
-          <p
-            className="mt-2 text-[12.5px] leading-[1.5] text-need"
-            id="code-paste-error"
-            role="alert"
-          >
+          <p className="mt-2 text-xs leading-[1.5] text-need" id="code-paste-error" role="alert">
             {invalid ? copy.codePaste.invalid : shownError}
           </p>
         ) : null}
 
-        <div className="mt-[22px] flex flex-wrap items-center gap-2.5">
+        <div className="mt-6 flex flex-wrap items-center gap-2.5">
           {typing ? (
             <>
               <button className={PRIMARY} disabled={pending} onClick={submit} type="button">
@@ -247,7 +241,7 @@ export function CodePasteSheet({
                 </button>
               ) : (
                 <Link
-                  className="inline-flex min-h-11 items-center text-[13px] font-semibold underline decoration-input underline-offset-4 hover:decoration-foreground md:min-h-10"
+                  className="inline-flex min-h-11 items-center text-sm font-semibold underline decoration-input underline-offset-4 hover:decoration-foreground md:min-h-10"
                   to="/profile/account"
                 >
                   {copy.codePaste.noCode.secondary}

@@ -22,7 +22,7 @@ const LAB_PAGES = [
   "form:ashby",
 ] as const;
 
-const inputLabelClass = "block text-[12.5px] font-semibold";
+const inputLabelClass = "block text-xs font-semibold";
 
 export function ProviderReportPage() {
   const {
@@ -94,25 +94,25 @@ export function ProviderReportPage() {
       {heading}
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
-          className="inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
+          className="inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
           to="/admin/attempts"
         >
           {copy.admin.reportInspectAttempts}
         </Link>
         <Link
-          className="inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
+          className="inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
           to="/admin/llm"
         >
           {copy.admin.reportInspectLlm}
         </Link>
       </div>
       <section aria-labelledby="admin-report-sends" className="mt-7">
-        <h2 className="font-serif text-[26px] leading-[1.1]" id="admin-report-sends">
+        <h2 className="font-serif text-card-title leading-[1.1]" id="admin-report-sends">
           {copy.admin.reportSendHeading}
         </h2>
-        <p className="mt-1.5 text-[12.5px] text-muted-foreground">{copy.admin.reportSendIntro}</p>
+        <p className="mt-1.5 text-xs text-muted-foreground">{copy.admin.reportSendIntro}</p>
         {view.providers.length === 0 ? (
-          <p className="mt-4 text-[12.5px] text-muted-foreground">{copy.admin.reportSendEmpty}</p>
+          <p className="mt-4 text-xs text-muted-foreground">{copy.admin.reportSendEmpty}</p>
         ) : (
           <ul className="mt-4 flex list-none flex-col gap-3 p-0">
             {view.providers.map((row) => (
@@ -122,12 +122,12 @@ export function ProviderReportPage() {
         )}
       </section>
       <section aria-labelledby="admin-report-lab" className="mt-8">
-        <h2 className="font-serif text-[26px] leading-[1.1]" id="admin-report-lab">
+        <h2 className="font-serif text-card-title leading-[1.1]" id="admin-report-lab">
           {copy.admin.reportLabHeading}
         </h2>
-        <p className="mt-1.5 text-[12.5px] text-muted-foreground">{copy.admin.reportLabIntro}</p>
+        <p className="mt-1.5 text-xs text-muted-foreground">{copy.admin.reportLabIntro}</p>
         {view.lab.length === 0 ? (
-          <p className="mt-4 text-[12.5px] text-muted-foreground">{copy.admin.reportLabEmpty}</p>
+          <p className="mt-4 text-xs text-muted-foreground">{copy.admin.reportLabEmpty}</p>
         ) : (
           <ul className="mt-4 flex list-none flex-col gap-3 p-0">
             {view.lab.map((row) => (
@@ -136,15 +136,13 @@ export function ProviderReportPage() {
           </ul>
         )}
         <div className="mt-5 rounded-lg border border-border bg-card p-[18px_20px] shadow-sh">
-          <h3 className="font-serif text-[19px] leading-[1.2]">{copy.admin.reportLabRunHeading}</h3>
-          <p className="mt-1.5 text-[12.5px] text-muted-foreground">
-            {copy.admin.reportLabRunIntro}
-          </p>
+          <h3 className="font-serif text-base leading-[1.2]">{copy.admin.reportLabRunHeading}</h3>
+          <p className="mt-1.5 text-xs text-muted-foreground">{copy.admin.reportLabRunIntro}</p>
           <div className="mt-4 flex flex-wrap items-end gap-3">
             <label className={inputLabelClass} htmlFor="admin-lab-sessions">
               {copy.admin.reportLabSessionsLabel}
               <input
-                className="mt-1 block h-10 w-28 rounded-md border border-input bg-card px-3 text-[13px] tabular-nums"
+                className="mt-1 block h-10 w-28 rounded-md border border-input bg-card px-3 text-sm tabular-nums"
                 id="admin-lab-sessions"
                 inputMode="numeric"
                 max={200}
@@ -157,7 +155,7 @@ export function ProviderReportPage() {
               />
             </label>
             <button
-              className="h-10 rounded-md border border-input bg-card px-4 text-[13px] font-semibold hover:bg-muted disabled:opacity-60"
+              className="h-10 rounded-md border border-input bg-card px-4 text-sm font-semibold hover:bg-muted disabled:opacity-60"
               disabled={running}
               onClick={() => {
                 void start();
@@ -167,7 +165,7 @@ export function ProviderReportPage() {
               {copy.admin.reportLabRun}
             </button>
           </div>
-          <output aria-live="polite" className="mt-3 block text-[12.5px] text-muted-foreground">
+          <output aria-live="polite" className="mt-3 block text-xs text-muted-foreground">
             {failed ? copy.admin.reportLabFailed : (notice ?? "")}
           </output>
         </div>

@@ -23,11 +23,11 @@ export function AttemptMobileItem({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-semibold leading-snug">{attempt.postingTitle}</p>
-          <p className="mt-0.5 text-[12.5px] text-muted-foreground">{attempt.companyName}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{attempt.companyName}</p>
         </div>
         <AttemptOutcomeBadge attempt={attempt} />
       </div>
-      <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 font-mono text-[12px] tabular-nums text-muted-foreground">
+      <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 font-mono text-xs tabular-nums text-muted-foreground">
         <span>{attempt.ats ?? copy.admin.attemptsAtsUnknown}</span>
         <span>{copy.admin.reportBrowserName(attempt.provider)}</span>
         <span>{formatAttemptDuration(attempt.browserMs)}</span>
@@ -37,7 +37,7 @@ export function AttemptMobileItem({
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <button
-          className="min-h-11 rounded-md px-2 font-mono text-[11.5px] text-muted-foreground underline-offset-2 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+          className="min-h-11 rounded-md px-2 font-mono text-eyebrow text-muted-foreground underline-offset-2 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
           onClick={() => {
             onFilterApplication(attempt.applicationId);
           }}

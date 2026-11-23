@@ -30,7 +30,7 @@ export function ReadyCard(props: {
   return (
     <Card
       ariaLabelledBy={`ready-${card.id}`}
-      className="overflow-hidden transition hover:border-signal/35"
+      className="overflow-hidden transition hover:border-foreground/25"
       id={`card-${card.id}`}
       variant="default"
     >

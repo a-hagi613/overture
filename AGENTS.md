@@ -21,6 +21,13 @@ The issue you are working on and its parent, `GLOSSARY.md`, `docs/SPEC.md`, `DES
 `docs/adr/` that touch your area. The issue and the spec beat the code; a gap in the spec is raised on the issue,
 not guessed.
 
+## UI work
+
+`DESIGN.md` is the single source of truth for visual identity, and `.claude/rules/ui.md` records the order of
+authority: `docs/SPEC.md` for product, `DESIGN.md` for look, installed skills as guardrails that never override a
+token or identity rule. Every text element uses one of the nine typography tokens; the lint rule enforces it across
+`src/web`.
+
 ## Work
 
 - One issue, one branch from `main`, one pull request with `Closes #<n>`. Merge only on green CI.

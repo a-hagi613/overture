@@ -9,10 +9,10 @@ export function ReportLabRow(props: { row: LabReportRow }) {
   return (
     <li className="rounded-lg border border-border bg-card p-[18px_20px] shadow-sh">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 className="font-serif text-[19px] leading-[1.2]">
+        <h3 className="font-serif text-base leading-[1.2]">
           {copy.admin.reportBrowserName(row.provider)}
         </h3>
-        <span className="text-[12.5px] text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {copy.admin.reportLabPageName(row.page)}
         </span>
       </div>

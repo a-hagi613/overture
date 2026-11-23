@@ -42,9 +42,7 @@ export function BillingRefundPage() {
           lead={copy.admin.billingRefundLead}
           plain={copy.admin.billingRefundTitlePlain}
         />
-        <p className="mt-5 text-[13px] text-muted-foreground">
-          {copy.admin.billingUserNotRefundable}
-        </p>
+        <p className="mt-5 text-sm text-muted-foreground">{copy.admin.billingUserNotRefundable}</p>
         <Link to={back} className="mt-3 inline-block underline">
           {copy.admin.billingRefundBack}
         </Link>
@@ -56,7 +54,7 @@ export function BillingRefundPage() {
     <>
       <nav
         aria-label={copy.admin.billingUserCrumbRoot}
-        className="mt-4 text-[13px] text-muted-foreground"
+        className="mt-4 text-sm text-muted-foreground"
       >
         <Link to="/admin/billing" className="underline underline-offset-2">
           {copy.admin.billingUserCrumbRoot}
@@ -71,7 +69,7 @@ export function BillingRefundPage() {
         lead={copy.admin.billingRefundLead}
         plain={copy.admin.billingRefundTitlePlain}
       />
-      <p className="mt-2 max-w-[62ch] text-[13px] text-muted-foreground">
+      <p className="mt-2 max-w-[62ch] text-sm text-muted-foreground">
         {copy.admin.billingRefundIntro}
       </p>
 
@@ -80,7 +78,7 @@ export function BillingRefundPage() {
           aria-labelledby="refund-payment"
           className="h-fit rounded-lg border border-border bg-card p-5 shadow-sh"
         >
-          <h2 id="refund-payment" className="font-serif text-[22px] leading-tight">
+          <h2 id="refund-payment" className="font-serif text-card-title leading-tight">
             {copy.admin.billingUserPaymentHeading}
           </h2>
           <dl className="mt-3">
@@ -101,7 +99,7 @@ export function BillingRefundPage() {
           aria-labelledby="refund-form"
           className="rounded-lg border border-border bg-card p-5 shadow-sh"
         >
-          <h2 id="refund-form" className="font-serif text-[22px] leading-tight">
+          <h2 id="refund-form" className="font-serif text-card-title leading-tight">
             {copy.admin.billingRefundTitlePlain} {copy.admin.billingRefundTitleItalic}
           </h2>
           <RefundForm period={period} userId={user.id} />

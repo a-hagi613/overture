@@ -43,7 +43,7 @@ export function HomeReadyCard({ readyCount }: { readyCount: number }) {
             >
               <CompanyAvatar company={card.company} logoUrl={card.logoUrl} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold leading-snug text-foreground group-hover:text-signal-text">
+                <p className="truncate text-sm font-semibold leading-snug text-foreground group-hover:text-foreground">
                   {role}
                 </p>
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">

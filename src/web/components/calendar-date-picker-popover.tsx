@@ -34,7 +34,7 @@ export function CalendarDatePickerPopover({
     >
       <Trigger asChild>
         <button
-          className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-1 text-left transition hover:border-border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal md:min-h-0"
+          className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-1 text-left transition hover:border-border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground md:min-h-0"
           id="calendar-month"
           type="button"
         >

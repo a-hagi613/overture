@@ -15,14 +15,14 @@ export function SwitchLine({ row, onChanged }: { row: KillSwitchRow; onChanged: 
   return (
     <div className="flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0">
       <div className="min-w-0">
-        <p className="font-mono text-[13px] font-semibold">{`${row.scope}/${row.key}`}</p>
-        <p className="text-[12.5px] text-muted-foreground">
+        <p className="font-mono text-sm font-semibold">{`${row.scope}/${row.key}`}</p>
+        <p className="text-xs text-muted-foreground">
           {on ? copy.admin.switchOn : copy.admin.switchOff}
           {row.reason.length > 0 ? ` · ${row.reason}` : ""}
         </p>
       </div>
       <button
-        className="inline-flex h-9 flex-none items-center justify-center rounded-md border border-input bg-card px-3 text-[13px] font-semibold hover:bg-muted"
+        className="inline-flex h-9 flex-none items-center justify-center rounded-md border border-input bg-card px-3 text-sm font-semibold hover:bg-muted"
         onClick={() => {
           void flip();
         }}

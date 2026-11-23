@@ -49,13 +49,13 @@ export function GrantsPage() {
         aria-labelledby="admin-grants"
         className="mt-7 rounded-lg border border-border bg-card p-[22px_24px_18px] shadow-sh"
       >
-        <h2 id="admin-grants" className="font-serif text-[26px] leading-[1.1]">
+        <h2 id="admin-grants" className="font-serif text-card-title leading-[1.1]">
           {copy.admin.grantsHeading}
         </h2>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">{copy.admin.grantsIntro}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{copy.admin.grantsIntro}</p>
         <div className="mt-4">
           {rows.length === 0 ? (
-            <p className="text-[12.5px] text-muted-foreground">{copy.admin.grantEmpty}</p>
+            <p className="text-xs text-muted-foreground">{copy.admin.grantEmpty}</p>
           ) : (
             rows.map((row) => <GrantLine key={row.id} row={row} />)
           )}

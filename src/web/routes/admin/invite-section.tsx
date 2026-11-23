@@ -86,9 +86,9 @@ export function InviteSection({
 
   return (
     <section className="mt-7" aria-label={heading}>
-      <h2 className="font-serif text-[24px] leading-[1.1]">{heading}</h2>
+      <h2 className="font-serif text-card-title leading-[1.1]">{heading}</h2>
       <div className="mt-3 overflow-hidden rounded-lg border border-border bg-card shadow-sh">
-        <div className="hidden grid-cols-[minmax(0,1.7fr)_110px_1fr_1fr] gap-4 border-b border-border bg-muted px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground md:grid">
+        <div className="hidden grid-cols-[minmax(0,1.7fr)_110px_1fr_1fr] gap-4 border-b border-border bg-muted px-5 py-3 text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground md:grid">
           <span>{copy.admin.inviteColumnEmail}</span>
           <span>{copy.admin.inviteColumnState}</span>
           <span>{copy.admin.inviteColumnDate}</span>
@@ -99,28 +99,28 @@ export function InviteSection({
             className="border-t border-border px-5 py-4 first:border-t-0 md:grid md:grid-cols-[minmax(0,1.7fr)_110px_1fr_1fr] md:items-center md:gap-4 md:py-3.5"
             key={row.id}
           >
-            <span className="block text-[13.5px] font-semibold">
+            <span className="block text-sm font-semibold">
               {row.email ?? copy.admin.inviteNone}
             </span>
             <span className="mt-2 block md:mt-0">
-              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground md:hidden">
+              <span className="mb-1 block text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground md:hidden">
                 {copy.admin.inviteColumnState}
               </span>
               <AdminStatusPill status={mode} />
             </span>
             <span className="mt-2 block md:mt-0">
-              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground md:hidden">
+              <span className="mb-1 block text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground md:hidden">
                 {copy.admin.inviteColumnDate}
               </span>
-              <span className="text-[12.5px]">{dateText(row, mode)}</span>
+              <span className="text-xs">{dateText(row, mode)}</span>
             </span>
             <span className="mt-2 block md:mt-0">
-              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground md:hidden">
+              <span className="mb-1 block text-eyebrow font-semibold uppercase tracking-[0.14em] text-muted-foreground md:hidden">
                 {fourthLabel(mode)}
               </span>
               {mode === "pending" ? (
                 <button
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-need px-3 max-md:h-11 text-[12.5px] font-semibold text-need hover:bg-need-soft disabled:opacity-60"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-need px-3 max-md:h-11 text-xs font-semibold text-need hover:bg-need-soft disabled:opacity-60"
                   disabled={busyId === row.id}
                   onClick={() => {
                     onRevoke(row.id);
@@ -130,7 +130,7 @@ export function InviteSection({
                   {copy.admin.inviteRevoke}
                 </button>
               ) : (
-                <span className="text-[12.5px]">{fourthText(row, mode)}</span>
+                <span className="text-xs">{fourthText(row, mode)}</span>
               )}
             </span>
           </div>

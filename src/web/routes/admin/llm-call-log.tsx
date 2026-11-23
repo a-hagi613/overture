@@ -19,16 +19,16 @@ export function LlmCallLog({
   return (
     <section aria-labelledby="admin-llm-recent-heading" className="mt-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-serif text-[24px] leading-[1.1]" id="admin-llm-recent-heading">
+        <h2 className="font-serif text-card-title leading-[1.1]" id="admin-llm-recent-heading">
           {copy.admin.llmRecentHeading}
         </h2>
         {activePurpose.length > 0 ? (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-muted px-3 py-1 font-mono text-[12px] text-foreground">
+            <span className="rounded-full bg-muted px-3 py-1 font-mono text-xs text-foreground">
               {copy.admin.llmFilterActive(activePurpose)}
             </span>
             <button
-              className="min-h-11 rounded-md border border-input bg-card px-3.5 text-[12.5px] font-semibold hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
+              className="min-h-11 rounded-md border border-input bg-card px-3.5 text-xs font-semibold hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
               onClick={onClearPurpose}
               type="button"
             >
@@ -43,9 +43,7 @@ export function LlmCallLog({
         className="mt-3 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-sh md:hidden"
       >
         {rows.length === 0 ? (
-          <li className="px-4 py-6 text-[13px] text-muted-foreground">
-            {copy.admin.llmRecentEmpty}
-          </li>
+          <li className="px-4 py-6 text-sm text-muted-foreground">{copy.admin.llmRecentEmpty}</li>
         ) : (
           rows.map((row) => (
             <LlmCallMobileItem expectedModel={expectedModel} key={row.id} now={now} row={row} />
@@ -57,8 +55,8 @@ export function LlmCallLog({
         className="mt-3 hidden overflow-x-auto rounded-lg border border-border bg-card shadow-sh md:block"
         data-scroll-region=""
       >
-        <table className="w-full min-w-[720px] border-collapse text-left text-[13px]">
-          <thead className="bg-muted text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+          <thead className="bg-muted text-eyebrow font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             <tr>
               <th className="px-4 py-2.5" scope="col">
                 {copy.admin.llmRecentColumnTime}

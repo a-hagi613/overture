@@ -81,7 +81,7 @@ export function ReadyAnswersPanel({
                   {freeText ? (
                     <textarea
                       aria-label={copy.ready.editLabel(answer.label)}
-                      className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal"
+                      className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
                       onChange={(event) => {
                         setDraft(event.target.value);
                       }}

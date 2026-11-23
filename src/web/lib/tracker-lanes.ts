@@ -19,7 +19,7 @@ export const TRACKER_LANES: readonly {
   targetStage: StageKey;
 }[] = [
   {
-    accentClass: "border-t-signal",
+    accentClass: "border-t-foreground",
     droppable: false,
     key: "review",
     label: copy.board.lanes.review,

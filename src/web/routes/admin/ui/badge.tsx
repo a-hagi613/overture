@@ -20,7 +20,7 @@ export function Badge({
 }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${TONE_CLASSES[tone]} ${className}`.trim()}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-eyebrow font-semibold ${TONE_CLASSES[tone]} ${className}`.trim()}
     >
       {children}
     </span>

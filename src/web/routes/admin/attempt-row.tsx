@@ -22,9 +22,9 @@ export function AttemptTableRow({
     <tr className="border-t border-border align-top hover:bg-muted/60">
       <td className="px-4 py-3">
         <p className="font-semibold leading-snug">{attempt.postingTitle}</p>
-        <p className="mt-0.5 text-[12px] text-muted-foreground">{attempt.companyName}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{attempt.companyName}</p>
         <button
-          className="mt-1 rounded-sm font-mono text-[11px] text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+          className="mt-1 rounded-sm font-mono text-eyebrow text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
           onClick={() => {
             onFilterApplication(attempt.applicationId);
           }}
@@ -33,26 +33,26 @@ export function AttemptTableRow({
           {copy.admin.attemptsApplicationPrefix(attempt.applicationId.slice(0, 12))}
         </button>
       </td>
-      <td className="px-3 py-3 font-mono text-[12px]">
+      <td className="px-3 py-3 font-mono text-xs">
         {attempt.ats ?? copy.admin.attemptsAtsUnknown}
       </td>
-      <td className="px-3 py-3 text-[12.5px]">{copy.admin.reportBrowserName(attempt.provider)}</td>
+      <td className="px-3 py-3 text-xs">{copy.admin.reportBrowserName(attempt.provider)}</td>
       <td className="px-3 py-3">
         <AttemptOutcomeBadge attempt={attempt} />
         {attempt.errorCode === null ? null : (
-          <p className="mt-1 font-mono text-[11px] text-muted-foreground">{attempt.errorCode}</p>
+          <p className="mt-1 font-mono text-eyebrow text-muted-foreground">{attempt.errorCode}</p>
         )}
       </td>
-      <td className="px-3 py-3 font-mono text-[12px] tabular-nums">
+      <td className="px-3 py-3 font-mono text-xs tabular-nums">
         {formatAttemptDuration(attempt.browserMs)}
       </td>
-      <td className="px-3 py-3 font-mono text-[12px] tabular-nums">
+      <td className="px-3 py-3 font-mono text-xs tabular-nums">
         {formatProxyTraffic(attempt.proxyBytes)}
       </td>
-      <td className="px-3 py-3 font-mono text-[12px] tabular-nums">
+      <td className="px-3 py-3 font-mono text-xs tabular-nums">
         {formatAttemptCost(attempt.costMicros)}
       </td>
-      <td className="px-3 py-3 font-mono text-[12px] tabular-nums text-muted-foreground">
+      <td className="px-3 py-3 font-mono text-xs tabular-nums text-muted-foreground">
         {adminDayTime(attempt.startedAt, now)}
       </td>
       <td className="px-4 py-3">

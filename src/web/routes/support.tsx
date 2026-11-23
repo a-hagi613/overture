@@ -159,7 +159,7 @@ export function SupportPage() {
                 {sp.messageLabel}
               </label>
               <textarea
-                className="min-h-36 w-full rounded-md border border-input bg-card px-3.5 py-2.5 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal"
+                className="min-h-36 w-full rounded-md border border-input bg-card px-3.5 py-2.5 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
                 id="support-message"
                 onChange={(event) => {
                   setMessage(event.currentTarget.value);

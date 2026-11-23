@@ -10,22 +10,22 @@ export function PlanCards({ rows }: { rows: MarginPlanRow[] }) {
       {rows.map((row) => (
         <li key={row.plan} className="p-5">
           <div className="flex items-start justify-between gap-3">
-            <h3 className="font-serif text-[22px]">
+            <h3 className="font-serif text-card-title">
               {copy.admin.marginPlanName[row.plan]}
               {copy.admin.marginSeparator}
               {priceLabel(row)}
             </h3>
             <MarginGate row={row} />
           </div>
-          <p className="mt-2 text-[13.5px] text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             {copy.admin.marginApplicationsCount(row.applications)}
           </p>
-          <p className="mt-1 text-[13.5px]">
+          <p className="mt-1 text-sm">
             {copy.admin.marginShortCost} {costLabel(row)}
             {copy.admin.marginSeparator}
             {copy.admin.marginShortRevenue} {formatUsd(row.revenueMicrosPerApplication, 3)}
           </p>
-          <p className="mt-1 text-[13.5px]">
+          <p className="mt-1 text-sm">
             {copy.admin.marginShortMargin} {marginLabel(row)}
           </p>
           <div className="mt-3">

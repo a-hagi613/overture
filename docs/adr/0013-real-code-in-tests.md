@@ -123,10 +123,13 @@ case or duplicates, a same-connection write and a sweep-worker connection's WAL 
 stays bounded, the count query probes `posting_tags` by its primary key rather than scanning it, and 25 interleaved
 filter changes stay under 500ms p95 while catalog writes run, #426), the unit-test
 allowlist (`lint-config-guard.test.ts`: every path the allowlist names exists, and every unit test file in `src/` or
-`scripts/` is named, so a deleted test cannot leave a stale entry), the live topic map and the billing poll cap
-(`src/web/lib/live-events.test.ts` and `src/web/lib/billing-poll.test.ts`: every dedicated topic — billing, mailbox
-and profile — refreshes its own queries while its older alias keeps working, and the Checkout-return poll stops when
-the plan arrives, when the page was not a Checkout return, or at its cap), and the workflow Bun pin
+`scripts/` is named, so a deleted test cannot leave a stale entry), the design-token lint pattern
+(`design-scale-guard.test.ts`: every arbitrary `text-[…px]`/`text-[…rem]`, `text-lg`…`text-9xl` and off-scale
+spacing utility is rejected, while the nine typography tokens, the 4px scale and layout widths pass), the live topic
+map and the billing poll cap (`src/web/lib/live-events.test.ts` and `src/web/lib/billing-poll.test.ts`: every
+dedicated topic — billing, mailbox and profile — refreshes its own queries while its older alias keeps working, and
+the Checkout-return poll stops when the plan arrives, when the page was not a Checkout return, or at its cap), and
+the workflow Bun pin
 (`workflow-config-guard.test.ts`: every `oven-sh/setup-bun` step pins the version `package.json` requires), the
 hot-path indexes (`hot-path-indexes.test.ts`: the SSE catch-up, event retention, message-by-person,
 application-by-status and grant-ledger queries are planned through `events_user_seq`, `events_created_at`,

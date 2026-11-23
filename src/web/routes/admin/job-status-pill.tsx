@@ -20,7 +20,7 @@ const STATUS_LABELS: Record<JobStatus, string> = {
 export function JobStatusPill({ status }: { status: JobStatus }) {
   return (
     <span
-      className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${STATUS_TONES[status]}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-eyebrow font-semibold ${STATUS_TONES[status]}`}
     >
       {STATUS_LABELS[status]}
     </span>

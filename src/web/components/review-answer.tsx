@@ -110,7 +110,7 @@ export function ReviewAnswer({
     return (
       <textarea
         aria-labelledby={labelledBy}
-        className="min-h-24 w-full rounded-md border border-input bg-card p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal"
+        className="min-h-24 w-full rounded-md border border-input bg-card p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
         onChange={(event) => {
           onChange(event.target.value);
         }}

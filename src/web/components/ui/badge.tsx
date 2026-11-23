@@ -14,7 +14,7 @@ export interface BadgeProps extends VariantProps<typeof badgeVariants> {
 }
 
 const interactiveBadgeClass =
-  "cursor-pointer transition hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2";
+  "cursor-pointer transition duration-quick ease-out hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2";
 
 export function Badge({
   ariaHidden,

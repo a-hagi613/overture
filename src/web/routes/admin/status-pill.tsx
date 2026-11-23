@@ -29,7 +29,7 @@ const labels: Record<AdminStatusKey, string> = {
 export function AdminStatusPill({ status }: { status: AdminStatusKey }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${tones[status]}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-eyebrow font-semibold ${tones[status]}`}
     >
       {labels[status]}
     </span>
