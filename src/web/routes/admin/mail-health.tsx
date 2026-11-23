@@ -22,7 +22,7 @@ export function MailHealthPage() {
   const [pauseError, setPauseError] = useState<string | null>(null);
 
   const load = useCallback(async () => await loadMailHealth(days), [days]);
-  const { data, refusal, refresh } = useAdminResource(load);
+  const { data, refusal, refresh } = useAdminResource(load, ["mail-health", days]);
 
   useEffect(() => {
     if (openCompanyId === null) {

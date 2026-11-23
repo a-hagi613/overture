@@ -10,8 +10,14 @@ import { AdminGateScreen } from "./gate-screen.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
 
 export function CatalogPage() {
-  const { data, failed, refusal, refresh } = useAdminResource(loadCatalog);
-  const probe = useAdminResource(loadPersonioProbe);
+  const { data, failed, refusal, refresh } = useAdminResource(loadCatalog, undefined, {
+    resourceId: "catalog",
+  });
+
+  const probe = useAdminResource(loadPersonioProbe, undefined, {
+    resourceId: "catalog-personio-probe",
+  });
+
   const [queued, setQueued] = useState(false);
   const [probeRunFailed, setProbeRunFailed] = useState(false);
   const [running, setRunning] = useState(false);

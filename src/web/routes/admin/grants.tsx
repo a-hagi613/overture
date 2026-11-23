@@ -8,7 +8,9 @@ import { NewGrantLine } from "./new-grant-line.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
 
 export function GrantsPage() {
-  const { data, failed, refusal, refresh } = useAdminResource(loadGrants);
+  const { data, failed, refusal, refresh } = useAdminResource(loadGrants, undefined, {
+    resourceId: "grants",
+  });
 
   if (refusal !== null) {
     return (

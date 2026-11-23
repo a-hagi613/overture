@@ -26,7 +26,7 @@ export function LlmUsagePage() {
     [purpose],
   );
 
-  const { data, refusal, refresh } = useAdminResource(load);
+  const { data, refusal, refresh } = useAdminResource(load, ["llm-usage", purpose]);
 
   if (refusal !== null) {
     return (

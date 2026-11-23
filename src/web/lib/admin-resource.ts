@@ -37,6 +37,27 @@ function loaderKeyOf(load: AnyAdminLoader) {
   return assigned;
 }
 
+/**
+ * The React Query key for one admin resource. An explicit query key carries the page's filters; a static page names
+ * its resource instead, so every render and remount of that page reuses the same cache entry. Only a caller with
+ * neither falls back to the loader's function identity.
+ * @param load The loader the page calls.
+ * @param queryKey The page's explicit key, including any filter or route parameter.
+ * @param resourceId A stable id for a page that always loads the same resource.
+ * @returns The React Query key for that resource.
+ */
+export function adminResourceQueryKey(
+  load: AnyAdminLoader,
+  queryKey?: readonly unknown[],
+  resourceId?: string,
+) {
+  if (queryKey !== undefined) {
+    return [ADMIN_QUERY_ROOT, ...queryKey];
+  }
+
+  return [ADMIN_QUERY_ROOT, "fn", resourceId ?? loaderKeyOf(load)];
+}
+
 function shouldRetryAdminQuery(failureCount: number, error: Error) {
   if (failureCount >= 2) {
     return false;
@@ -59,6 +80,8 @@ export function useInvalidateAdminQueries() {
 
 export interface AdminResourceOptions {
   keepPreviousData?: boolean;
+  /** A stable id for a page that always loads the same resource, so a remount reuses its cache. */
+  resourceId?: string;
 }
 
 export function useAdminResource<T>(
@@ -68,10 +91,7 @@ export function useAdminResource<T>(
 ) {
   const queryClient = useQueryClient();
 
-  const fullKey: readonly unknown[] =
-    queryKey === undefined
-      ? [ADMIN_QUERY_ROOT, "fn", loaderKeyOf(load)]
-      : [ADMIN_QUERY_ROOT, ...queryKey];
+  const fullKey = adminResourceQueryKey(load, queryKey, options?.resourceId);
 
   const queryOptions: UseQueryOptions<AdminResult<T>> = {
     queryFn: load,

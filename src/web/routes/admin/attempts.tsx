@@ -49,7 +49,7 @@ export function AttemptsPage() {
     [applicationId, outcome],
   );
 
-  const { data, refusal, refresh } = useAdminResource(load);
+  const { data, refusal, refresh } = useAdminResource(load, ["attempts", applicationId, outcome]);
 
   if (refusal !== null) {
     return (
