@@ -38,6 +38,7 @@ const test = appTest.extend<{ send: SendHarness }>({
       const sessionDirectory = join(directory, "browsers");
 
       const server = await startFreshAppServer(identityServer, {
+        TEST_CLOCK_AT_UTC_HOUR: "10",
         BROWSER_PROVIDER: "local",
         BROWSER_SESSION_DIR: sessionDirectory,
         GREENHOUSE_BOARD_BASE_URL: fixture.url,

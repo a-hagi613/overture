@@ -57,6 +57,7 @@ const startLeverHarness = async (identityServer: IdentityServer, site: LeverSite
   const sessionDirectory = join(directory, "browsers");
 
   const server = await startFreshAppServer(identityServer, {
+    TEST_CLOCK_AT_UTC_HOUR: "10",
     BROWSER_PROVIDER: "local",
     BROWSER_SESSION_DIR: sessionDirectory,
     LEVER_JOBS_BASE_URL: fixture.url,

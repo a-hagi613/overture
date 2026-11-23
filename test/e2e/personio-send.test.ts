@@ -113,6 +113,7 @@ async function startHarness(
   });
 
   const server = await startFreshAppServer(identityServer, {
+    TEST_CLOCK_AT_UTC_HOUR: "10",
     BROWSER_PROVIDER: "local",
     BROWSER_SESSION_DIR: join(directory, "browsers"),
   });

@@ -174,6 +174,7 @@ async function startHarness(
     GREENHOUSE_BOARD_BASE_URL: greenhouse.url,
     OBJECT_STORE_ROOT: join(directory, "objects"),
     SEND_HARD_TIMEOUT_MS: String(hardTimeoutMs),
+    TEST_CLOCK_AT_UTC_HOUR: "10",
   } satisfies Record<string, string>;
 
   const server = await startFreshAppServer(identityServer, environment);

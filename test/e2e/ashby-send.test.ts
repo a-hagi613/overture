@@ -64,6 +64,7 @@ const startAshbyHarness = async (identityServer: IdentityServer, site: AshbySite
   const sessionDirectory = join(directory, "browsers");
 
   const server = await startFreshAppServer(identityServer, {
+    TEST_CLOCK_AT_UTC_HOUR: "10",
     BROWSER_PROVIDER: "local",
     BROWSER_SESSION_DIR: sessionDirectory,
     ASHBY_JOBS_BASE_URL: fixture.url,

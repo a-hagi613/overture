@@ -42,6 +42,7 @@ const test = appTest.extend<{ stripe: StripeHarness }>({
       const directory = mkdtempSync(join(tmpdir(), "overture-stripe-send-"));
 
       const server = await startFreshAppServer(identityServer, {
+        TEST_CLOCK_AT_UTC_HOUR: "10",
         ANTHROPIC_API_KEY: "test-anthropic-key",
         ANTHROPIC_BASE_URL: anthropic.url,
         BROWSER_PROVIDER: "local",
