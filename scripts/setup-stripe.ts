@@ -431,7 +431,7 @@ function portalForm(plans: readonly PlanIds[], origin: string) {
   const form = new URLSearchParams({
     "business_profile[privacy_policy_url]": `${origin}/privacy`,
     "business_profile[terms_of_service_url]": `${origin}/terms`,
-    default_return_url: `${origin}/settings/billing`,
+    default_return_url: `${origin}/profile/billing`,
     "features[invoice_history][enabled]": "true",
     "features[payment_method_update][enabled]": "true",
     "features[subscription_cancel][enabled]": "true",
@@ -459,7 +459,7 @@ function portalMatches(
 
   if (
     !configuration.active ||
-    configuration.default_return_url !== `${origin}/settings/billing` ||
+    configuration.default_return_url !== `${origin}/profile/billing` ||
     configuration.business_profile.privacy_policy_url !== `${origin}/privacy` ||
     configuration.business_profile.terms_of_service_url !== `${origin}/terms` ||
     !features.invoice_history.enabled ||

@@ -16,7 +16,7 @@ import {
 import { applicationsLeft, planApplications } from "../billing/ledger.ts";
 import { planForPriceId, stripePriceId } from "../billing/index.ts";
 import { stripeCustomerIdFor } from "../billing/customers.ts";
-import { currentSubscriptionOf } from "../billing/subscriptions.ts";
+import { currentSubscriptionOf, subscriptionEnded } from "../billing/subscriptions.ts";
 import { createPaymentsWebhookService } from "../billing/webhooks.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { logError } from "../platform/log.ts";
@@ -75,24 +75,34 @@ export function createBillingRoutes(deps: {
   const billingUrl = `${baseUrl}/settings/billing`;
   const plansUrl = `${billingUrl}/plans`;
 
-  async function accountOrRefusal(raw: Request) {
+  async function signedInAccount(raw: Request) {
     const account = await readSessionUser(auth, raw.headers);
 
     if (account === null) {
       return { refusal: Response.json({ error: API_ERRORS.signInRequired }, { status: 401 }) };
     }
 
-    const locked = demoLocked(account.role);
+    return { account };
+  }
+
+  async function accountOrRefusal(raw: Request) {
+    const access = await signedInAccount(raw);
+
+    if ("refusal" in access) {
+      return access;
+    }
+
+    const locked = demoLocked(access.account.role);
 
     if (locked !== null) {
       return { refusal: locked };
     }
 
-    return { account };
+    return { account: access.account };
   }
 
   routes.get("/billing", async (context) => {
-    const access = await accountOrRefusal(context.req.raw);
+    const access = await signedInAccount(context.req.raw);
 
     if ("refusal" in access) {
       return access.refusal;
@@ -120,6 +130,15 @@ export function createBillingRoutes(deps: {
 
     if ("refusal" in access) {
       return access.refusal;
+    }
+
+    const existing = currentSubscriptionOf(db, access.account.id);
+
+    if (existing !== null && !subscriptionEnded(existing.status)) {
+      return context.json(
+        { error: "plan_active", plan: existing.plan, status: existing.status },
+        409,
+      );
     }
 
     if (payments === null) {

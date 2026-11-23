@@ -255,10 +255,13 @@ test("a signed event is processed once, a replay and bad signatures change nothi
 
       const demoPortal = await demo.post(`${server.url}/api/billing/portal`);
 
-      expect(demoStatus.status()).toBe(403);
+      expect(demoStatus.status()).toBe(200);
+      expect(billingStatusSchema.parse(await demoStatus.json())).toStrictEqual({
+        customer: false,
+        enabled: true,
+      });
       expect(demoCheckout.status()).toBe(403);
       expect(demoPortal.status()).toBe(403);
-      expect(await demoStatus.json()).toMatchObject({ error: "demo_locked" });
       expect(await demoCheckout.json()).toMatchObject({ error: "demo_locked" });
       expect(await demoPortal.json()).toMatchObject({ error: "demo_locked" });
       expect(stripe.requests).toHaveLength(0);
