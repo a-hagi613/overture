@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { startAppServer } from "./app-server.ts";
 import { startFeedFixtureServer } from "./feed-fixture-server.ts";
+import { seedOwner } from "./matching-harness.ts";
 import { extractSseEvents } from "./sse.ts";
 
 import type { SseEvent } from "./sse.ts";
@@ -329,6 +330,8 @@ export async function startCatalogHarness(
     ...extraEnvironment,
   });
 
+  const ownerSession = await seedOwner(app.url);
+
   const companyResponse = await postJson(`${app.url}/__test__/catalog/companies`, {
     name: "Fixture Dynamics",
     domain: "fixture.example",
@@ -550,6 +553,7 @@ export async function startCatalogHarness(
     sweepWorkerStatus,
     crashSweepWorker,
     close: async () => {
+      await ownerSession.owner.dispose();
       await app.stop();
       fixture.stop();
     },

@@ -8,6 +8,7 @@ import { expect, test } from "@playwright/test";
 import { z } from "zod";
 
 import { startAppServer } from "./app-server.ts";
+import { seedOwner } from "./matching-harness.ts";
 import { readSseEventUntil } from "./sse.ts";
 
 import type { AppServer } from "./app-server.ts";
@@ -157,10 +158,13 @@ async function startHarness(outDir: string) {
     R2_ENDPOINT: "",
   });
 
+  const ownerSession = await seedOwner(app.url);
+
   return {
     app,
     outDir,
     close: async () => {
+      await ownerSession.owner.dispose();
       await app.stop();
     },
   };

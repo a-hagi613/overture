@@ -1399,6 +1399,7 @@ export function createTestRoutes(
       start(controller) {
         let closed = false;
         let timer: ReturnType<typeof setInterval> | null = null;
+        let heartbeat: ReturnType<typeof setInterval> | null = null;
 
         function close() {
           if (closed) {
@@ -1409,6 +1410,10 @@ export function createTestRoutes(
 
           if (timer !== null) {
             clearInterval(timer);
+          }
+
+          if (heartbeat !== null) {
+            clearInterval(heartbeat);
           }
 
           try {
@@ -1441,6 +1446,15 @@ export function createTestRoutes(
         }
 
         timer = setInterval(flush, 50);
+        heartbeat = setInterval(() => {
+          if (!closed) {
+            try {
+              controller.enqueue(encoder.encode(": heartbeat\n\n"));
+            } catch {
+              close();
+            }
+          }
+        }, 5000);
         context.req.raw.signal.addEventListener("abort", close);
         flush();
       },

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, startFreshAppServer, test } from "./app.fixture.ts";
 import { serverEnvironment } from "./app-server.ts";
+import { seedOwner } from "./matching-harness.ts";
 import { readSseEventUntil } from "./sse.ts";
 
 const token = "e2e-cloudflare-email-api-token";
@@ -356,6 +357,8 @@ test("the live check is gated before the switch, then verifies the sending domai
     E2E_EMAIL_SENDING_SCENARIO: "ready",
   });
 
+  const ownerSession = await seedOwner(app.url);
+
   try {
     await request.post(`${app.url}/__test__/cloudflare-email/clear`);
     await runLiveCheck(app.url, request, ["mail"]);
@@ -414,6 +417,7 @@ test("the live check is gated before the switch, then verifies the sending domai
     expect(await alert).not.toBeNull();
     expect(sends(await cloudflareRequests(app.url, request))).toHaveLength(1);
   } finally {
+    await ownerSession.owner.dispose();
     await app.stop();
   }
 });
