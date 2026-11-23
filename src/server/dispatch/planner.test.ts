@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { localDateAt, localPartsAt, zonedTimeToEpoch } from "../platform/local-time.ts";
-import { DEFAULT_SEND_WINDOW, parseSendWindow, planSlots } from "./planning.ts";
+import { DEFAULT_SEND_WINDOW, nextSendSlot, parseSendWindow, planSlots } from "./planning.ts";
 
 const SPACING_MS = 20 * 60_000;
 
@@ -31,6 +31,14 @@ describe("parseSendWindow", () => {
     expect(parseSendWindow("{not json")).toEqual(DEFAULT_SEND_WINDOW);
     expect(parseSendWindow('{"start":"20:00","end":"08:00"}')).toEqual(DEFAULT_SEND_WINDOW);
     expect(parseSendWindow(null)).toEqual(DEFAULT_SEND_WINDOW);
+  });
+
+  test("reads a whole-day window that ends at midnight", () => {
+    const window = parseSendWindow('{"start":"00:00","end":"24:00"}');
+    const lastMinute = Date.UTC(2026, 2, 10, 23, 59);
+
+    expect(window).toEqual({ endMinutes: 24 * 60, startMinutes: 0 });
+    expect(nextSendSlot(lastMinute, "UTC", window)).toBe(lastMinute);
   });
 });
 

@@ -365,7 +365,10 @@ Accounts: `issued`, `available`, `reserved`, `used`, `expired`. The same no-UPDA
 per `(user_id, grant_id, account)`. Reserve draws from the grant expiring soonest. "Applications left" =
 Σ available over unexpired grants. Daily usage = reservations made in the user's current local day that are still
 reserved or committed (a release counts against the day its reservation was made, never against today). No separate
-counters table. Expiry: `expire` moves only `available`; a reservation held on a grant that expires is released
+counters table. A grant that has carried a reserve, commit or release counts as started even when a restarted
+process's clock reads before its `starts_at`, and a release is paired with its reservation by insertion order, not
+`created_at`, so a hard kill cannot un-start the grant the crashed attempt was spending from or leave that
+reservation open. Expiry: `expire` moves only `available`; a reservation held on a grant that expires is released
 and expired in the same transaction (`release` then `expire`), so it never returns to spendable. The one
 exception is a send already in flight (`sending` or `confirming`): its reservation stays across the period end,
 so a confirmed send commits and is charged for what was sent, and a failed or unconfirmed one releases and is

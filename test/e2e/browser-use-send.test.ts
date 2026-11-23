@@ -6,7 +6,6 @@ import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
-import { pinSendWindowClock } from "./send-window-clock.ts";
 import type { IdentityServer } from "./identity-server-test.fixture.ts";
 import type { BrowserUseFixture, BrowserUseFixtureOptions } from "./browser-use-server.fixture.ts";
 import type { GreenhouseFixture } from "./greenhouse.fixture.ts";
@@ -194,8 +193,6 @@ async function readyApplication(
   extraQuestions: readonly SeedQuestion[] = [],
 ) {
   const { owner, userId } = await ownerContextFor(harness.server.url);
-
-  await pinSendWindowClock(harness.server);
 
   const running = await owner.post("/api/running", { data: { running: true } });
 

@@ -382,6 +382,148 @@ describe("the ledger", () => {
     sqlite.close();
   });
 
+  test("leaves a credit spendable when a crash restart reads the clock behind the ledger", () => {
+    const { clock, db, sqlite, userId } = freshLedger();
+
+    const granted = grantApplications(db, clock, {
+      idempotencyKey: "grant:1",
+      quantity: 3,
+      source: "admin",
+      userId,
+    });
+
+    const first = reserveForApplication(db, clock, {
+      applicationId: "app-1",
+      idempotencyKey: "reserve:attempt-1",
+      userId,
+    });
+
+    expect(first.reserved).toBe(true);
+
+    clock.setOffset(-5000);
+
+    const released = releaseForApplication(db, clock, {
+      applicationId: "app-1",
+      idempotencyKey: "release:attempt-1",
+      userId,
+    });
+
+    expect(released.released).toBe(true);
+
+    const again = reserveForApplication(db, clock, {
+      applicationId: "app-1",
+      idempotencyKey: "reserve:attempt-2",
+      userId,
+    });
+
+    expect(again.reserved).toBe(true);
+    expect(again.reserved && again.grantId).toBe(granted.grantId);
+
+    const committed = commitForApplication(db, clock, {
+      applicationId: "app-1",
+      idempotencyKey: "commit:attempt-2",
+      userId,
+    });
+
+    expect(committed.committed).toBe(true);
+    expect(ledgerBalances(db, userId)).toStrictEqual({
+      available: 2,
+      expired: 0,
+      issued: -3,
+      reserved: 0,
+      used: 1,
+    });
+    expect(applicationsLeft(db, userId, clock.now())).toBe(2);
+    expect(committedSince(db, userId, clock.now() - 10_000)).toBe(1);
+
+    sqlite.close();
+  });
+
+  test("pairs a release with its reservation across a clock that reads behind it", () => {
+    const { clock, db, sqlite, userId } = freshLedger();
+    const at = clock.now();
+
+    const granted = grantApplications(db, clock, {
+      expiresAt: at + 10_000,
+      idempotencyKey: "grant:1",
+      quantity: 3,
+      source: "period",
+      startsAt: at,
+      userId,
+    });
+
+    reserveForApplication(db, clock, {
+      applicationId: "app-1",
+      idempotencyKey: "reserve:attempt-1",
+      userId,
+    });
+
+    clock.setOffset(-5000);
+
+    releaseForApplication(db, clock, {
+      applicationId: "app-1",
+      idempotencyKey: "release:attempt-1",
+      userId,
+    });
+
+    expect(
+      commitForApplication(db, clock, {
+        applicationId: "app-1",
+        idempotencyKey: "commit:attempt-1",
+        userId,
+      }).committed,
+    ).toBe(false);
+    expect(dailyUsageSince(db, userId, at - 1000)).toBe(0);
+
+    clock.setOffset(20_000);
+
+    expect(expireDueGrants(db, clock, userId)).toStrictEqual([granted.grantId]);
+
+    const rows = db.select().from(ledger).where(eq(ledger.userId, userId)).all();
+
+    expect(rows.filter((row) => row.idempotencyKey.startsWith("expire-release:"))).toStrictEqual(
+      [],
+    );
+    expect(balancesPerGrant(db, userId).get(granted.grantId)).toStrictEqual({
+      available: 0,
+      expired: 3,
+      issued: -3,
+      reserved: 0,
+      used: 0,
+    });
+
+    sqlite.close();
+  });
+
+  test("keeps a grant that has never been spent locked until its start", () => {
+    const { clock, db, sqlite, userId } = freshLedger();
+    const at = clock.now();
+
+    grantApplications(db, clock, {
+      idempotencyKey: "grant:future",
+      quantity: 3,
+      source: "period",
+      startsAt: at + 60_000,
+      userId,
+    });
+
+    expect(applicationsLeft(db, userId, at)).toBe(0);
+    expect(planApplications(db, userId, at)).toBe(0);
+    expect(
+      reserveForApplication(db, clock, {
+        applicationId: "app-1",
+        idempotencyKey: "reserve:attempt-1",
+        userId,
+      }).reserved,
+    ).toBe(false);
+
+    clock.setOffset(60_001);
+
+    expect(applicationsLeft(db, userId, clock.now())).toBe(3);
+
+    sqlite.close();
+  });
+
   test("counts daily usage against the day each reservation was made", () => {
     const { clock, db, sqlite, userId } = freshLedger();
     const at = clock.now();
