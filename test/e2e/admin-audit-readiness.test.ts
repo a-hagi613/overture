@@ -121,6 +121,7 @@ test("launch readiness, active alerts ack, and searchable /admin/audit work end-
 
   await page.getByRole("link", { name: "View full audit log" }).click();
   await expect(page).toHaveURL(/\/admin\/audit$/u);
+  await page.goto(`${adminIsolatedAppUrl}/admin/audit`);
   await expect(page.getByRole("heading", { name: "Admin audit" })).toBeVisible();
 
   const auditList = page.getByRole("region", { name: "Audit log" });
