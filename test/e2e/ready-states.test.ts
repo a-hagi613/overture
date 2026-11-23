@@ -2,6 +2,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { request as apiRequest } from "@playwright/test";
+import { z } from "zod";
 
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
@@ -14,7 +15,10 @@ type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
 interface Seeded {
   server: AppServer;
   storageState: StorageState;
+  userId: string;
 }
+
+const sessionSchema = z.object({ user: z.object({ id: z.string() }) });
 
 const test = appTest.extend<object, { seededReady: Seeded; seededEmpty: Seeded }>({
   seededReady: [
@@ -25,8 +29,12 @@ const test = appTest.extend<object, { seededReady: Seeded; seededEmpty: Seeded }
       await seedReady(request, server.url);
       const storageState = await request.storageState();
 
+      const session = sessionSchema.parse(
+        await (await request.get("/api/auth/get-session")).json(),
+      );
+
       await request.dispose();
-      await provide({ server, storageState });
+      await provide({ server, storageState, userId: session.user.id });
       await server.stop();
     },
     { scope: "worker" },
@@ -39,8 +47,12 @@ const test = appTest.extend<object, { seededReady: Seeded; seededEmpty: Seeded }
       await seedProfile(request, server.url);
       const storageState = await request.storageState();
 
+      const session = sessionSchema.parse(
+        await (await request.get("/api/auth/get-session")).json(),
+      );
+
       await request.dispose();
-      await provide({ server, storageState });
+      await provide({ server, storageState, userId: session.user.id });
       await server.stop();
     },
     { scope: "worker" },
@@ -95,10 +107,23 @@ function northwind(page: Page) {
   return page.getByRole("heading", { level: 2, name: "Platform Engineer" });
 }
 
-async function refetchInBackground(page: Page) {
-  await page.evaluate(() => {
-    globalThis.dispatchEvent(new Event("visibilitychange"));
+async function gotoReadyWithEvents(page: Page, url: string) {
+  const eventsConnected = page.waitForResponse(
+    (response) => response.url().endsWith("/api/events") && response.status() === 200,
+  );
+
+  await page.goto(url);
+  await eventsConnected;
+}
+
+async function refetchInBackground(seeded: Seeded) {
+  const response = await fetch(`${seeded.server.url}/__test__/events/publish`, {
+    body: JSON.stringify({ payload: {}, topic: "home.updated", userId: seeded.userId }),
+    headers: { "content-type": "application/json" },
+    method: "POST",
   });
+
+  expect(response.ok).toBe(true);
 }
 
 test("Ready shows a loading status, then a retryable error that recovers on Retry", async ({
@@ -145,11 +170,11 @@ test("Ready keeps the cached cards and warns when a background refresh fails", a
 }) => {
   const { context, page } = await openReady(browser, seededReady.storageState, 1280, "light");
 
-  await page.goto(`${seededReady.server.url}/ready`);
+  await gotoReadyWithEvents(page, `${seededReady.server.url}/ready`);
   await expect(northwind(page)).toBeVisible();
 
   await page.route(readyApi, async (route) => route.fulfill({ status: 500 }));
-  await refetchInBackground(page);
+  await refetchInBackground(seededReady);
 
   const warning = staleAlert(page);
 
@@ -201,11 +226,11 @@ test("keyboard Enter on Try again in the stale warning returns focus to the Read
 }) => {
   const { context, page } = await openReady(browser, seededReady.storageState, 1280, "light");
 
-  await page.goto(`${seededReady.server.url}/ready`);
+  await gotoReadyWithEvents(page, `${seededReady.server.url}/ready`);
   await expect(northwind(page)).toBeVisible();
 
   await page.route(readyApi, async (route) => route.fulfill({ status: 500 }));
-  await refetchInBackground(page);
+  await refetchInBackground(seededReady);
 
   const warning = staleAlert(page);
 
@@ -231,7 +256,7 @@ test("a retry that fails again settles focus on the heading, and a later refresh
   const heading = page.getByRole("heading", { level: 1, name: "Ready to send" });
 
   await page.route(readyApi, async (route) => route.fulfill({ status: 500 }));
-  await page.goto(`${seededReady.server.url}/ready`);
+  await gotoReadyWithEvents(page, `${seededReady.server.url}/ready`);
 
   const alert = errorAlert(page);
 
@@ -251,7 +276,7 @@ test("a retry that fails again settles focus on the heading, and a later refresh
   await expect(heading).not.toBeFocused();
 
   await page.unroute(readyApi);
-  await refetchInBackground(page);
+  await refetchInBackground(seededReady);
 
   await expect(alert).toHaveCount(0);
   await expect(northwind(page)).toBeVisible();
@@ -300,10 +325,10 @@ for (const theme of themes) {
           await page.goto(pageUrl);
           await expect(errorAlert(page)).toBeVisible({ timeout: 20_000 });
         } else if (state === "stale") {
-          await page.goto(pageUrl);
+          await gotoReadyWithEvents(page, pageUrl);
           await expect(northwind(page)).toBeVisible();
           await page.route(readyApi, async (route) => route.fulfill({ status: 500 }));
-          await refetchInBackground(page);
+          await refetchInBackground(seeded);
           await expect(staleAlert(page)).toBeVisible({ timeout: 20_000 });
         } else {
           await page.goto(pageUrl);

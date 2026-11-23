@@ -309,6 +309,7 @@ export const copy = {
     settings: "Settings",
     collapseSidebar: "Collapse sidebar",
     expandSidebar: "Expand sidebar",
+    loadingPage: "Loading page…",
     skipToContent: "Skip to content",
     searchLabel: "Search",
     searchCompact: "Search...",

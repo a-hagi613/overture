@@ -29,6 +29,35 @@ export default defineConfig(({ mode }) => {
       rolldownOptions: {
         input: { main: "index.html", sw: "src/web/sw.ts" },
         output: {
+          codeSplitting: {
+            groups: [
+              {
+                name: "react-vendor",
+                priority: 40,
+                test: /node_modules\/(?:react|react-dom|scheduler|react-router|clsx)\//u,
+              },
+              {
+                name: "charts",
+                priority: 30,
+                test: /node_modules\/(?:recharts|d3-[^/]+|victory-vendor|recharts-scale)\//u,
+              },
+              {
+                name: "dnd",
+                priority: 30,
+                test: /node_modules\/@dnd-kit\//u,
+              },
+              {
+                name: "motion",
+                priority: 30,
+                test: /node_modules\/(?:motion|motion-dom|motion-utils|framer-motion)\//u,
+              },
+              {
+                name: "radix",
+                priority: 25,
+                test: /node_modules\/@radix-ui\//u,
+              },
+            ],
+          },
           entryFileNames: (chunk) => (chunk.name === "sw" ? "sw.js" : "assets/[name]-[hash].js"),
         },
       },

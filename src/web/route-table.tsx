@@ -1,57 +1,156 @@
+import { lazy } from "react";
+import type { ComponentType } from "react";
 import { Navigate } from "react-router";
 import type { RouteObject } from "react-router";
 
-import { BoardPage } from "./routes/board.tsx";
-import { CalendarPage } from "./routes/calendar.tsx";
-import { HomePage } from "./routes/home.tsx";
-import { InboxThreadPage } from "./routes/inbox-thread.tsx";
-import { InboxPage } from "./routes/inbox.tsx";
+import { PreserveSearchRedirect } from "./components/preserve-search-redirect.tsx";
+import { RootLayout } from "./components/root-layout.tsx";
+import { ConsentPage } from "./routes/consent.tsx";
 import { LandingPage } from "./routes/landing.tsx";
 import { NotFoundPage } from "./routes/not-found.tsx";
-import { NotificationsPage } from "./routes/notifications.tsx";
-import { PreserveSearchRedirect } from "./components/preserve-search-redirect.tsx";
-import { OnboardingPage } from "./routes/onboarding.tsx";
-import { OnboardingFactsPage } from "./routes/onboarding-facts.tsx";
-import { OnboardingForwardPage } from "./routes/onboarding-forward.tsx";
-import { OnboardingResumePage } from "./routes/onboarding-resume.tsx";
-import { OnboardingTargetsPage } from "./routes/onboarding-targets.tsx";
-import { OnboardingTrialPage } from "./routes/onboarding-trial.tsx";
-import { ProfileAccountPage } from "./routes/profile-account.tsx";
-import { ProfileBillingPage } from "./routes/profile-billing.tsx";
-import { ProfileDetailsPage } from "./routes/profile-details.tsx";
-import { ProfilePreferencesPage } from "./routes/profile-preferences.tsx";
-import { ProfileResumePage } from "./routes/profile-resume.tsx";
-import { ReadyPage } from "./routes/ready.tsx";
-import { ReviewPage } from "./routes/review.tsx";
+import { PrivacyPage } from "./routes/privacy.tsx";
 import { SignInPage } from "./routes/signin.tsx";
 import { SignUpPage } from "./routes/signup.tsx";
-import { SupportPage } from "./routes/support.tsx";
-import { ConsentPage } from "./routes/consent.tsx";
-import { PrivacyPage } from "./routes/privacy.tsx";
 import { TermsPage } from "./routes/terms.tsx";
-import { AppShell } from "./app.tsx";
-import { RootLayout } from "./components/root-layout.tsx";
-import { AdminShell } from "./routes/admin/shell.tsx";
-import { AuditLogPage } from "./routes/admin/audit.tsx";
-import { AdminSettingsPage } from "./routes/admin/settings.tsx";
-import { CatalogPage } from "./routes/admin/catalog.tsx";
-import { MailHealthPage } from "./routes/admin/mail-health.tsx";
-import { GrantsPage } from "./routes/admin/grants.tsx";
-import { MarginPage } from "./routes/admin/margin.tsx";
-import { BillingPage } from "./routes/admin/billing.tsx";
-import { BillingUserPage } from "./routes/admin/billing-user.tsx";
-import { BillingRefundPage } from "./routes/admin/billing-refund.tsx";
-import { BillingReconciliationPage } from "./routes/admin/billing-reconciliation.tsx";
-import { InvitesPage } from "./routes/admin/invites.tsx";
-import { AttemptsPage } from "./routes/admin/attempts.tsx";
-import { JobsPage } from "./routes/admin/jobs.tsx";
-import { LlmUsagePage } from "./routes/admin/llm.tsx";
-import { OverviewPage } from "./routes/admin/overview.tsx";
-import { ProviderReportPage } from "./routes/admin/provider-report.tsx";
-import { AdminSupportPage } from "./routes/admin/support.tsx";
-import { SystemPage } from "./routes/admin/system.tsx";
-import { UserPage } from "./routes/admin/user.tsx";
-import { UsersPage } from "./routes/admin/users.tsx";
+
+function lazyRoute<TKey extends string>(
+  load: () => Promise<Record<TKey, ComponentType>>,
+  exportName: TKey,
+) {
+  return lazy(async () => {
+    const loaded = await load();
+
+    return { default: loaded[exportName] };
+  });
+}
+
+const AppShell = lazyRoute(async () => import("./app.tsx"), "AppShell");
+const AdminShell = lazyRoute(async () => import("./routes/admin/shell.tsx"), "AdminShell");
+
+const HomePage = lazyRoute(async () => import("./routes/home.tsx"), "HomePage");
+const BoardPage = lazyRoute(async () => import("./routes/board.tsx"), "BoardPage");
+const ReadyPage = lazyRoute(async () => import("./routes/ready.tsx"), "ReadyPage");
+const ReviewPage = lazyRoute(async () => import("./routes/review.tsx"), "ReviewPage");
+const CalendarPage = lazyRoute(async () => import("./routes/calendar.tsx"), "CalendarPage");
+const InboxPage = lazyRoute(async () => import("./routes/inbox.tsx"), "InboxPage");
+
+const InboxThreadPage = lazyRoute(
+  async () => import("./routes/inbox-thread.tsx"),
+  "InboxThreadPage",
+);
+
+const NotificationsPage = lazyRoute(
+  async () => import("./routes/notifications.tsx"),
+  "NotificationsPage",
+);
+
+const ProfileResumePage = lazyRoute(
+  async () => import("./routes/profile-resume.tsx"),
+  "ProfileResumePage",
+);
+
+const ProfileDetailsPage = lazyRoute(
+  async () => import("./routes/profile-details.tsx"),
+  "ProfileDetailsPage",
+);
+
+const ProfilePreferencesPage = lazyRoute(
+  async () => import("./routes/profile-preferences.tsx"),
+  "ProfilePreferencesPage",
+);
+
+const ProfileAccountPage = lazyRoute(
+  async () => import("./routes/profile-account.tsx"),
+  "ProfileAccountPage",
+);
+
+const ProfileBillingPage = lazyRoute(
+  async () => import("./routes/profile-billing.tsx"),
+  "ProfileBillingPage",
+);
+
+const SupportPage = lazyRoute(async () => import("./routes/support.tsx"), "SupportPage");
+
+const OnboardingPage = lazyRoute(async () => import("./routes/onboarding.tsx"), "OnboardingPage");
+
+const OnboardingResumePage = lazyRoute(
+  async () => import("./routes/onboarding-resume.tsx"),
+  "OnboardingResumePage",
+);
+
+const OnboardingFactsPage = lazyRoute(
+  async () => import("./routes/onboarding-facts.tsx"),
+  "OnboardingFactsPage",
+);
+
+const OnboardingTargetsPage = lazyRoute(
+  async () => import("./routes/onboarding-targets.tsx"),
+  "OnboardingTargetsPage",
+);
+
+const OnboardingForwardPage = lazyRoute(
+  async () => import("./routes/onboarding-forward.tsx"),
+  "OnboardingForwardPage",
+);
+
+const OnboardingTrialPage = lazyRoute(
+  async () => import("./routes/onboarding-trial.tsx"),
+  "OnboardingTrialPage",
+);
+
+const OverviewPage = lazyRoute(async () => import("./routes/admin/overview.tsx"), "OverviewPage");
+
+const AdminSupportPage = lazyRoute(
+  async () => import("./routes/admin/support.tsx"),
+  "AdminSupportPage",
+);
+
+const JobsPage = lazyRoute(async () => import("./routes/admin/jobs.tsx"), "JobsPage");
+
+const ProviderReportPage = lazyRoute(
+  async () => import("./routes/admin/provider-report.tsx"),
+  "ProviderReportPage",
+);
+
+const AttemptsPage = lazyRoute(async () => import("./routes/admin/attempts.tsx"), "AttemptsPage");
+const LlmUsagePage = lazyRoute(async () => import("./routes/admin/llm.tsx"), "LlmUsagePage");
+
+const AdminSettingsPage = lazyRoute(
+  async () => import("./routes/admin/settings.tsx"),
+  "AdminSettingsPage",
+);
+
+const CatalogPage = lazyRoute(async () => import("./routes/admin/catalog.tsx"), "CatalogPage");
+const SystemPage = lazyRoute(async () => import("./routes/admin/system.tsx"), "SystemPage");
+
+const MailHealthPage = lazyRoute(
+  async () => import("./routes/admin/mail-health.tsx"),
+  "MailHealthPage",
+);
+
+const GrantsPage = lazyRoute(async () => import("./routes/admin/grants.tsx"), "GrantsPage");
+const MarginPage = lazyRoute(async () => import("./routes/admin/margin.tsx"), "MarginPage");
+const BillingPage = lazyRoute(async () => import("./routes/admin/billing.tsx"), "BillingPage");
+
+const BillingReconciliationPage = lazyRoute(
+  async () => import("./routes/admin/billing-reconciliation.tsx"),
+  "BillingReconciliationPage",
+);
+
+const BillingUserPage = lazyRoute(
+  async () => import("./routes/admin/billing-user.tsx"),
+  "BillingUserPage",
+);
+
+const BillingRefundPage = lazyRoute(
+  async () => import("./routes/admin/billing-refund.tsx"),
+  "BillingRefundPage",
+);
+
+const UsersPage = lazyRoute(async () => import("./routes/admin/users.tsx"), "UsersPage");
+const UserPage = lazyRoute(async () => import("./routes/admin/user.tsx"), "UserPage");
+const InvitesPage = lazyRoute(async () => import("./routes/admin/invites.tsx"), "InvitesPage");
+const AuditLogPage = lazyRoute(async () => import("./routes/admin/audit.tsx"), "AuditLogPage");
 
 const appShellChildren: RouteObject[] = [
   { path: "/home", element: <HomePage /> },

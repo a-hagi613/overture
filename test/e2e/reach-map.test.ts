@@ -6,6 +6,7 @@ import { expect, test } from "@playwright/test";
 import {
   buildReachMap,
   computePlan,
+  extractImportBindings,
   requestedPathsFromText,
   routeMatches,
 } from "../../scripts/e2e-ci.ts";
@@ -16,7 +17,27 @@ const webRouteEntryPattern =
 const importBindingPattern =
   /import\s+\{\s*(?<name>[A-Za-z0-9_]+)\s*\}\s+from\s+"(?<specifier>[^"]+)"/gu;
 
+const lazyRouteBindingPattern =
+  /\bconst\s+(?<name>[A-Za-z0-9_]+)\s*=\s*(?:React\.)?(?:lazyRoute|lazy)\([^;]{0,240}?import\(\s*"(?<specifier>[^"]+)"\s*\)/gu;
+
 test("every route in src/web/route-table.tsx maps to at least one browser test", () => {
+  const sampleBindings = extractImportBindings(
+    [
+      'import { LandingPage } from "./routes/landing.tsx";',
+      'const HomePage = lazyRoute(() => import("./routes/home.tsx"), "HomePage");',
+      "const BillingReconciliationPage = lazyRoute(",
+      '  () => import("./routes/admin/billing-reconciliation.tsx"),',
+      '  "BillingReconciliationPage",',
+      ");",
+    ].join("\n"),
+  );
+
+  expect(sampleBindings.get("LandingPage")).toBe("./routes/landing.tsx");
+  expect(sampleBindings.get("HomePage")).toBe("./routes/home.tsx");
+  expect(sampleBindings.get("BillingReconciliationPage")).toBe(
+    "./routes/admin/billing-reconciliation.tsx",
+  );
+
   const map = buildReachMap();
   const mainSource = readFileSync("src/web/route-table.tsx", "utf8");
   const bindings = new Map<string, string>();
@@ -29,6 +50,21 @@ test("every route in src/web/route-table.tsx maps to at least one browser test",
       bindings.set(name, specifier);
     }
   }
+
+  for (const match of mainSource.matchAll(lazyRouteBindingPattern)) {
+    const name = match.groups?.name;
+    const specifier = match.groups?.specifier;
+
+    if (name !== undefined && specifier !== undefined) {
+      bindings.set(name, specifier);
+    }
+  }
+
+  expect(bindings.get("HomePage")).toBe("./routes/home.tsx");
+  expect(bindings.get("OnboardingResumePage")).toBe("./routes/onboarding-resume.tsx");
+  expect(bindings.get("BillingReconciliationPage")).toBe(
+    "./routes/admin/billing-reconciliation.tsx",
+  );
 
   const unmappedRoutes: string[] = [];
 

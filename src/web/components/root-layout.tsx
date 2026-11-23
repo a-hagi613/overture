@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import { Outlet } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
+import { RouteFallback } from "./route-fallback.tsx";
 
 export function RootLayout() {
   return (
@@ -12,7 +14,9 @@ export function RootLayout() {
       >
         {copy.shell.skipToContent}
       </a>
-      <Outlet />
+      <Suspense fallback={<RouteFallback fullScreen />}>
+        <Outlet />
+      </Suspense>
     </>
   );
 }
