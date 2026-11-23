@@ -287,14 +287,17 @@ test("a paid month grants 250, a replay grants once, expiry releases then expire
 
     stripe.clear();
 
-    const week = await request.post(`${server.url}/api/billing/checkout`, {
+    const secondCheckout = await request.post(`${server.url}/api/billing/checkout`, {
       data: { plan: "week" },
     });
 
-    expect(week.status()).toBe(200);
-    expect(new URLSearchParams(stripe.requests[0]?.body ?? "").get("line_items[0][price]")).toBe(
-      BILLING_PRICE_WEEK,
-    );
+    expect(secondCheckout.status()).toBe(409);
+    expect(await secondCheckout.json()).toStrictEqual({
+      error: "plan_active",
+      plan: "month",
+      status: "active",
+    });
+    expect(stripe.requests).toHaveLength(0);
   } finally {
     await server.stop();
     await stripe.stop();

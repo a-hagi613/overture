@@ -496,7 +496,7 @@ test("the portal configuration uses the documented Stripe form keys", async () =
   );
   expect(form.has("features[subscription_update][products][0][prices][0][price]")).toBe(false);
   expect(form.get("features[subscription_update][proration_behavior]")).toBe("none");
-  expect(form.get("default_return_url")).toBe("https://tryoverture.com/settings/billing");
+  expect(form.get("default_return_url")).toBe("https://tryoverture.com/profile/billing");
   expect(form.get("business_profile[privacy_policy_url]")).toBe("https://tryoverture.com/privacy");
   expect(form.get("business_profile[terms_of_service_url]")).toBe("https://tryoverture.com/terms");
 });
