@@ -37,7 +37,7 @@ import { createCalendarFeedRoutes } from "./routes/calendar-feed.ts";
 import { createReadyRoutes } from "./routes/ready.ts";
 import { createMatchingRoutes } from "./routes/matching.ts";
 import { createReviewRoutes } from "./routes/reviews.ts";
-import { createAdminApi, isAdminHost } from "./routes/admin.ts";
+import { createAdminApi } from "./routes/admin.ts";
 import { createTestRoutes } from "./routes/test-only.ts";
 import { stripUntrustedIpHeaders } from "./auth/client-ip.ts";
 import { env, labEnvironment } from "./config/env.ts";
@@ -47,6 +47,7 @@ import { createOnboardingRoutes } from "./routes/onboarding.ts";
 import { createConsentRoutes } from "./routes/consent.ts";
 import { createConsentService } from "./profile/consent.ts";
 import { createMatchingService } from "./matching/score.ts";
+import { dispatchByHost, mainHostAdminApiRefusal } from "./host-routing.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createMailRoutes } from "./routes/mail.ts";
 import { createSupportAccessRoutes } from "./routes/support-access.ts";
@@ -87,6 +88,8 @@ export interface AppDependencies {
   /** Aborted on shutdown; long-lived responses (the event stream) end with it. */
   shutdown: AbortSignal;
 }
+
+export { hostnameFromHeader } from "./host-routing.ts";
 
 async function staticResponseFrom(root: string, url: string) {
   const { pathname } = new URL(url);
@@ -379,16 +382,9 @@ export function createApp(deps: AppDependencies) {
 
   app.all("/api/*", (context) => context.json({ error: API_ERRORS.notFound }, 404));
 
-  app.use("*", async (context, next) => {
-    const hostHeader = context.req.header("host") ?? "";
-    const { hostname } = new URL(`http://${hostHeader}`);
+  app.use("*", dispatchByHost(adminHost, env.ADMIN_ORIGIN));
 
-    if (isAdminHost(hostname, env.ADMIN_ORIGIN)) {
-      return adminHost.fetch(context.req.raw);
-    }
-
-    return next();
-  });
+  app.all("/admin/api/*", mainHostAdminApiRefusal);
 
   app.get("*", async (context) => {
     const page = await staticResponseFrom(deps.staticRoot, context.req.url);

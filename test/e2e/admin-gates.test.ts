@@ -41,7 +41,17 @@ test("the admin API is selected by the Host header and refuses requests without 
 
   const onAppHost = await request.get(`${adminAppServer.url}/admin/api/overview`);
 
-  expect(onAppHost.headers()["content-type"]).toContain("text/html");
+  expect(onAppHost.status()).toBe(401);
+  expect(onAppHost.headers()["content-type"]).toContain("application/json");
+  expect(await onAppHost.json()).toEqual({ error: "access_required" });
+});
+
+test("a malformed Host header does not crash the app", async ({ request, adminAppServer }) => {
+  const response = await request.get(`${adminAppServer.url}/api/health`, {
+    headers: { host: "bad host" },
+  });
+
+  expect(response.status()).toBe(200);
 });
 
 test("the admin API fails closed on an Access cookie that is not valid encoding", async ({
