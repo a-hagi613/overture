@@ -138,6 +138,10 @@ async function ownerFor(server: AppServer, enableWorkable = true) {
 
   await owner.put("/__test__/settings/jobs.poll_interval_ms", { data: { value: "3600000" } });
 
+  const running = await owner.post("/api/running", { data: { running: true } });
+
+  expect(running.ok()).toBe(true);
+
   if (enableWorkable) {
     await owner.put("/__test__/kill-switches/ats/workable", {
       data: { enabled: false, reason: "the fixture probe passed" },

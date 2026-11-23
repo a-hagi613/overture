@@ -291,6 +291,10 @@ async function preparingApplication(
 ) {
   const { owner, userId } = await ownerContextFor(stripe.server.url);
 
+  const running = await owner.post("/api/running", { data: { running: true } });
+
+  expect(running.ok()).toBe(true);
+
   await uploadResume(owner);
   await saveFacts(owner);
   await saveTargets(owner);
