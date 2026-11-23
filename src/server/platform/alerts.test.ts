@@ -32,7 +32,7 @@ const ntfy = Bun.serve({
   },
 });
 
-Bun.env.ALERT_NTFY_URL = `http://127.0.0.1:${String(ntfy.port)}/topic`;
+const ntfyUrl = `http://127.0.0.1:${String(ntfy.port)}/topic`;
 
 afterAll(() => {
   void ntfy.stop(true);
@@ -141,7 +141,7 @@ describe("raising an alert", () => {
 
 describe("pushing an alert to the owner's phone", () => {
   test("posts the kind and detail to the configured ntfy topic", async () => {
-    await pushToPhone("llm.spend", { spent: 42 });
+    await pushToPhone("llm.spend", { spent: 42 }, ntfyUrl);
 
     expect(pushRequests.at(-1)).toEqual({
       body: JSON.stringify({ spent: 42 }),
@@ -153,8 +153,16 @@ describe("pushing an alert to the owner's phone", () => {
   test("never follows a redirect, so one push is one request", async () => {
     const before = pushRequests.length;
 
-    await pushToPhone("health", { ok: false });
+    await pushToPhone("health", { ok: false }, ntfyUrl);
 
     expect(pushRequests.length).toBe(before + 1);
+  });
+
+  test("no configured topic sends nothing", async () => {
+    const before = pushRequests.length;
+
+    await pushToPhone("disk", { ok: false }, undefined);
+
+    expect(pushRequests.length).toBe(before);
   });
 });

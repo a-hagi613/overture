@@ -71,10 +71,13 @@ const ALERT_PUSH_TIMEOUT_MS = 10_000;
  * status matters. A refused or non-2xx push is logged so a broken alert path stays visible.
  * @param kind The alert kind, used as the push title.
  * @param detail The allowlisted detail, sent as the push body.
+ * @param url The ntfy topic to post to; defaults to the configured `ALERT_NTFY_URL`, and no URL sends nothing.
  */
-export async function pushToPhone(kind: AlertKind, detail: AlertDetail) {
-  const url = env.ALERT_NTFY_URL;
-
+export async function pushToPhone(
+  kind: AlertKind,
+  detail: AlertDetail,
+  url: string | undefined = env.ALERT_NTFY_URL,
+) {
   if (url === undefined) {
     return;
   }
