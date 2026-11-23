@@ -123,7 +123,12 @@ hot-path indexes (`hot-path-indexes.test.ts`: the SSE catch-up, event retention,
 application-by-status and grant-ledger queries are planned through `events_user_seq`, `events_created_at`,
 `messages_user_created`, `applications_user_status` and `grants_user_starts`, #506), the application-database
 vacuum (`vacuum-app-db.test.ts`: a fragmented file is compacted to a zero freelist with `integrity_check` ok, a dry
-run changes nothing, and the script refuses without `--confirm` or while another writer holds the lock, #506), and
+run changes nothing, and the script refuses without `--confirm` or while another writer holds the lock, #506), the
+compaction driver (`vacuum-fly.test.ts`: the dry run's printed sizes parse into file, WAL, freelist and page numbers,
+and a file whose freelist is below the 50 MB threshold is skipped unless the operator forces the run, so the weekly
+job cannot stop the app for nothing), the compaction workflows (`workflow-config-guard.test.ts`: the ops action and
+the Sunday job dry-run before they compact, the manual job honours its `dry_run` input, and the maintenance
+entrypoint runs the script with `--confirm`), and
 the interception canary (`outbound-interception.test.ts`: a fetch or node `https` request to an unmocked host rejects with
 the interceptor's own error while a mocked host still answers, so a request that leaks fails instead of reaching DNS). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not

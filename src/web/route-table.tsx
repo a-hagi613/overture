@@ -45,6 +45,7 @@ import { BillingReconciliationPage } from "./routes/admin/billing-reconciliation
 import { InvitesPage } from "./routes/admin/invites.tsx";
 import { OverviewPage } from "./routes/admin/overview.tsx";
 import { ProviderReportPage } from "./routes/admin/provider-report.tsx";
+import { SystemPage } from "./routes/admin/system.tsx";
 import { UserPage } from "./routes/admin/user.tsx";
 import { UsersPage } from "./routes/admin/users.tsx";
 
@@ -74,6 +75,7 @@ const adminShellChildren: RouteObject[] = [
   { path: "/admin/provider-report", element: <ProviderReportPage /> },
   { path: "/admin/settings", element: <AdminSettingsPage /> },
   { path: "/admin/catalog", element: <CatalogPage /> },
+  { path: "/admin/system", element: <SystemPage /> },
   { path: "/admin/mail-health", element: <MailHealthPage /> },
   { path: "/admin/grants", element: <GrantsPage /> },
   { path: "/admin/billing/margin", element: <MarginPage /> },

@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 
 import type { AppDatabase, CatalogDatabase } from "./platform/db/client.ts";
 import type { BackupMonitor } from "./platform/ports/backup.ts";
+import type { DegradedFlagReader } from "./platform/degraded.ts";
 import type { ClientIpConfig } from "./auth/client-ip.ts";
 import type { Auth } from "./auth/index.ts";
 import type { AdjustableClock } from "./platform/ports/clock.ts";
@@ -69,6 +70,7 @@ export interface AppDependencies {
   clock: AdjustableClock;
   backups: BackupMonitor;
   databasePath: string;
+  degraded: DegradedFlagReader;
   staticRoot: string;
   testRoutes: boolean;
   jobHandlers: JobHandlers;
@@ -165,8 +167,10 @@ export function createApp(deps: AppDependencies) {
 
   const adminApi = createAdminApi(deps.db, deps.clock, deps.auth, {
     backupObjects: createConfiguredBackupStore(),
+    backups: deps.backups,
     catalogDb: deps.catalogDb,
     databasePath: deps.databasePath,
+    degraded: deps.degraded,
     objects: deps.objects,
     payments: deps.payments,
     providers: deps.providers,

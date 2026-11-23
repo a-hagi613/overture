@@ -952,6 +952,7 @@ const app = createApp({
   catalogDb,
   clock,
   databasePath,
+  degraded: degradedFlag,
   staticRoot: env.STATIC_ROOT,
   testRoutes: env.ENABLE_TEST_ROUTES,
   jobHandlers: allJobHandlers,

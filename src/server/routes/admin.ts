@@ -5,6 +5,8 @@ import { z } from "zod";
 
 import type { Auth } from "../auth/index.ts";
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
+import type { BackupMonitor } from "../platform/ports/backup.ts";
+import type { DegradedFlagReader } from "../platform/degraded.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
@@ -73,6 +75,8 @@ import {
 import { isSameMailbox } from "../auth/email.ts";
 import { readMailHealth } from "../inbox/health.ts";
 import { buildStorageReport } from "../storage/report.ts";
+import { checkpointDatabase } from "../storage/database-sizes.ts";
+import { buildSystemReport, stripeModeOf } from "../system/report.ts";
 
 const settingBody = z.object({ value: z.string().min(1) });
 
@@ -189,11 +193,32 @@ export interface AdminDeps {
   personal: PersonalCrypto;
   payments: Payments | null;
   backupObjects: ObjectStore | null;
+  backups: BackupMonitor;
   databasePath: string;
+  degraded: DegradedFlagReader;
   objects: ObjectStore;
 }
 
 const ATS_NAMES = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
+
+function integrationsOf() {
+  return {
+    browserProvider: env.BROWSER_PROVIDER ?? null,
+    cfAccessConfigured:
+      env.CF_ACCESS_JWKS_URL !== undefined &&
+      env.CF_ACCESS_TEAM_DOMAIN !== undefined &&
+      env.CF_ACCESS_AUD !== undefined,
+    cloudflareEmailConfigured:
+      env.CLOUDFLARE_EMAIL_API_TOKEN !== undefined &&
+      env.CLOUDFLARE_ACCOUNT_ID !== undefined &&
+      env.CLOUDFLARE_ZONE_ID !== undefined,
+    demoLoginEnabled: env.DEMO_LOGIN_ENABLED,
+    ntfyConfigured: env.ALERT_NTFY_URL !== undefined,
+    publicSignupEnabled: env.PUBLIC_SIGNUP_ENABLED,
+    stripeMode: stripeModeOf(env.STRIPE_SECRET_KEY),
+    turnstileConfigured: env.TURNSTILE_SITE_KEY.length > 0 && env.TURNSTILE_SECRET.length > 0,
+  };
+}
 
 export { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
 
@@ -769,6 +794,42 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
       }),
     ),
   );
+
+  routes.get("/system", async (context) =>
+    context.json(
+      await buildSystemReport({
+        backups: deps.backups,
+        catalogDb: deps.catalogDb,
+        clock,
+        databasePath: deps.databasePath,
+        db,
+        degraded: deps.degraded,
+        integrations: integrationsOf(),
+      }),
+    ),
+  );
+
+  routes.post("/system/checkpoint", async (context) => {
+    const owner = context.get("owner");
+    const report = checkpointDatabase(deps.databasePath);
+
+    await recordAdminAudit(db, clock, {
+      actorId: owner.userId,
+      action: "system.wal_checkpoint",
+      reason:
+        report.busy === 0
+          ? "Truncated the application database WAL from the system page"
+          : "The WAL checkpoint stayed busy; another connection is reading the database",
+      detail: {
+        afterWalBytes: report.afterWalBytes,
+        beforeWalBytes: report.beforeWalBytes,
+        busy: report.busy,
+        checkpointed: report.checkpointed,
+      },
+    });
+
+    return context.json(report);
+  });
 
   routes.get("/settings", (context) => context.json({ settings: getAllSettings(db) }));
 
@@ -1350,19 +1411,26 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
   routes.get("/live-checks", (context) => context.json({ results: readLiveCheckResults(db, 100) }));
 
-  routes.post("/live-checks", async (context) => {
-    const owner = context.get("owner");
+  async function runLiveChecksNow(actorId: string) {
     const job = enqueueLiveCheckNow(db, clock);
 
     await recordAdminAudit(db, clock, {
-      actorId: owner.userId,
+      actorId,
       action: "live-checks.run",
       reason: "Run the daily live checks now",
       detail: { jobId: job.id },
     });
 
-    return context.json({ jobId: job.id });
-  });
+    return job.id;
+  }
+
+  routes.post("/live-checks", async (context) =>
+    context.json({ jobId: await runLiveChecksNow(context.get("owner").userId) }),
+  );
+
+  routes.post("/live-checks/run", async (context) =>
+    context.json({ jobId: await runLiveChecksNow(context.get("owner").userId) }),
+  );
 
   routes.post("/fixtures/capture", validJson(captureBody), async (context) => {
     if (deps.providers === null) {
