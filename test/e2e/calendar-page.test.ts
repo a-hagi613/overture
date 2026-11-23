@@ -535,3 +535,38 @@ test("the Calendar needs a session", async ({ browser, isolatedAppServer }) => {
   await expect(page).toHaveURL(/\/signin/u);
   await context.close();
 });
+
+test("custom calendar events persist through /api/calendar/events across reloads", async ({
+  browser,
+  isolatedAppServer,
+}) => {
+  const seeded = await seedMonth(isolatedAppServer);
+  const { context, page } = await openCalendar(browser, seeded, { width: 1280 });
+
+  await page.getByRole("button", { name: "Tuesday, November 17, 2026, 3 sent" }).click();
+
+  const panel = page.getByRole("complementary", { name: "Day panel" });
+
+  await panel.getByRole("button", { name: "Add event" }).click();
+  await panel.getByLabel("Event title").fill("System design interview");
+  await panel.getByLabel("Company").fill("Stripe");
+  await panel.getByRole("button", { name: "Save event" }).click();
+
+  await expect(panel.getByText("System design interview")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("grid")).toBeVisible();
+  await page.locator('button[data-day="2026-11-17"]').click();
+  await expect(panel.getByText("System design interview")).toBeVisible();
+
+  await panel.getByRole("button", { name: "Remove event" }).click();
+  await expect(panel.getByText("System design interview")).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.getByRole("grid")).toBeVisible();
+  await page.locator('button[data-day="2026-11-17"]').click();
+  await expect(panel.getByText("System design interview")).toHaveCount(0);
+
+  await context.close();
+  await seeded.owner.dispose();
+});

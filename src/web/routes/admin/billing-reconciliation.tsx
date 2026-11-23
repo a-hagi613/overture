@@ -40,7 +40,9 @@ export function BillingReconciliationPage() {
     return { data: { reconciliation: result.data.reconciliation }, ok: true as const };
   }, []);
 
-  const { data, refusal, refresh } = useAdminResource<ReconcileData>(load);
+  const { data, refusal, refresh } = useAdminResource<ReconcileData>(load, [
+    "billing-reconciliation",
+  ]);
 
   if (refusal !== null) {
     return (

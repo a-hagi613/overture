@@ -15,6 +15,8 @@ export function AccountSessionsCard({ email }: { email: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [signedOutOthers, setSignedOutOthers] = useState(false);
+  const [revokingOthers, setRevokingOthers] = useState(false);
+  const [revokeError, setRevokeError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -58,12 +60,28 @@ export function AccountSessionsCard({ email }: { email: string }) {
   };
 
   const revokeOthers = async () => {
-    const result = await authClient.revokeOtherSessions();
+    setRevokingOthers(true);
+    setRevokeError(null);
 
-    if (result.error === null) {
-      setSignedOutOthers(true);
-      toast.success(copy.settings.signedOutMessage);
+    try {
+      const result = await authClient.revokeOtherSessions();
+
+      if (result.error === null) {
+        setSignedOutOthers(true);
+        toast.success(copy.settings.signedOutMessage);
+        setRevokingOthers(false);
+
+        return;
+      }
+
+      setRevokeError(copy.settings.signOutThisError);
+      toast.error(copy.settings.signOutThisError);
+    } catch {
+      setRevokeError(copy.settings.signOutThisError);
+      toast.error(copy.settings.signOutThisError);
     }
+
+    setRevokingOthers(false);
   };
 
   const signOutHere = async () => {
@@ -73,10 +91,13 @@ export function AccountSessionsCard({ email }: { email: string }) {
       const result = await authClient.signOut();
 
       if (result.error === null) {
+        queryClient.clear();
         await navigate("/signin");
 
         return;
       }
+
+      toast.error(copy.settings.signOutThisError);
     } catch {
       toast.error(copy.settings.signOutThisError);
     }
@@ -99,7 +120,7 @@ export function AccountSessionsCard({ email }: { email: string }) {
       <h2 className={dsCardTitle} id="account-data">
         {copy.settings.accountHeading}
       </h2>
-      <p className="mt-1 font-mono text-xs text-muted-foreground">{email}</p>
+      <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{email}</p>
       <div className="mt-4 divide-y divide-border">
         <div className="flex items-center justify-between gap-4 py-3.5 first:pt-0">
           <div className="min-w-0">
@@ -145,15 +166,22 @@ export function AccountSessionsCard({ email }: { email: string }) {
             <p className="text-xs text-muted-foreground">
               {signedOutOthers ? copy.settings.signedOutMessage : copy.settings.signOutAllDetail}
             </p>
+            {revokeError === null ? null : (
+              <p className="mt-1 text-xs font-semibold text-need" role="alert">
+                {revokeError}
+              </p>
+            )}
           </div>
           <Button
+            ariaBusy={revokingOthers}
+            disabled={revokingOthers}
             onClick={() => {
               void revokeOthers();
             }}
             size="sm"
             variant="secondary"
           >
-            {copy.settings.signOutAllButton}
+            {revokingOthers ? copy.settings.signOutThisPending : copy.settings.signOutAllButton}
           </Button>
         </div>
       </div>

@@ -8,10 +8,10 @@ import {
   useFinishOnboardingStep,
   useOnboardingState,
   useOnboardingTargets,
+  useSaveOnboardingSkipCompanies,
   useSaveOnboardingTargets,
   useSaveOnboardingTimezone,
 } from "../lib/onboarding-api.ts";
-import { saveSkipCompanies } from "../lib/profile-api.ts";
 
 export function OnboardingTargetsPage() {
   const navigate = useNavigate();
@@ -21,6 +21,7 @@ export function OnboardingTargetsPage() {
   const state = useOnboardingState();
   const targets = useOnboardingTargets();
   const save = useSaveOnboardingTargets();
+  const saveSkip = useSaveOnboardingSkipCompanies();
   const saveTimezone = useSaveOnboardingTimezone();
   const finish = useFinishOnboardingStep();
 
@@ -88,7 +89,7 @@ export function OnboardingTargetsPage() {
         }}
         preview={preview}
         save={async (next) => save.mutateAsync(next)}
-        saveSkip={saveSkipCompanies}
+        saveSkip={async (companies) => saveSkip.mutateAsync(companies)}
         skipCompanies={state.data.skipCompanies}
         view={targets.data}
       />

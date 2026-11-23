@@ -1,17 +1,20 @@
-import { ArrowUpRight, Check, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ExternalLink } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
+import type { BillingUpgradeOption } from "../components/billing-upgrade-card.tsx";
 import type { BillingPlan } from "../lib/billing-api.ts";
 
 import { copy } from "../../shared/copy.ts";
 import { PLANS } from "../../shared/plans.ts";
+import { BillingUpgradeCard } from "../components/billing-upgrade-card.tsx";
 import { PageHeader } from "../components/page-header.tsx";
 import { Badge } from "../components/ui/badge.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
-import { dsBody, dsCardTitle, dsEyebrow, dsMetric } from "../components/ui/ds.ts";
+import { dsBody, dsCardTitle, dsEyebrow } from "../components/ui/ds.ts";
 import { openPortal, startCheckout, useBilling } from "../lib/billing-api.ts";
 import { renewalText } from "../lib/billing-format.ts";
 import { useHomeData } from "../lib/home-api.ts";
@@ -32,51 +35,90 @@ function currentPlanLabel(plan: BillingPlan | null, totalApps: number) {
   return copy.nav.profilePages.billingNoPlan;
 }
 
-function nextUpgradePlan(activePlan: BillingPlan | null) {
+function upgradePlansFor(activePlan: BillingPlan | null) {
   if (activePlan === "month") {
-    return null;
+    return [] satisfies readonly BillingUpgradeOption[];
   }
+
+  const monthOption: BillingUpgradeOption = {
+    detail: copy.billingPlans.monthDetail,
+    featured: true,
+    id: "month",
+    name: copy.billingPlans.monthName,
+    per: copy.billingPlans.monthUnit,
+    price: copy.billingPlans.monthPrice,
+    title: copy.nav.profilePages.billingUpgradeMonthTitle,
+  };
 
   if (activePlan === "week") {
-    return {
-      detail: copy.billingPlans.monthDetail,
-      id: "month" as const,
-      name: copy.billingPlans.monthName,
-      per: copy.billingPlans.monthUnit,
-      price: copy.billingPlans.monthPrice,
-      title: copy.nav.profilePages.billingUpgradeMonthTitle,
-    };
+    return [monthOption] satisfies readonly BillingUpgradeOption[];
   }
 
-  return {
+  const weekOption: BillingUpgradeOption = {
     detail: copy.billingPlans.weekDetail,
-    id: "week" as const,
+    featured: false,
+    id: "week",
     name: copy.billingPlans.weekName,
     per: copy.billingPlans.weekUnit,
     price: copy.billingPlans.weekPrice,
     title: copy.nav.profilePages.billingUpgradeWeekTitle,
   };
+
+  return [weekOption, monthOption] satisfies readonly BillingUpgradeOption[];
 }
 
 export function ProfileBillingPage() {
   const [params] = useSearchParams();
+  const queryClient = useQueryClient();
   const returned = params.get("billing");
   const checkingReturn = returned === "success";
   const bp = copy.nav.profilePages;
 
-  const { data: billing } = useBilling({
-    refetchInterval: checkingReturn ? 3000 : false,
+  const {
+    data: billing,
+    isError,
+    isFetching,
+    isPending,
+    refetch,
+  } = useBilling({
+    refetchInterval: (data) => (checkingReturn && (data?.plan ?? null) === null ? 3000 : false),
   });
 
   const { data: home } = useHomeData();
-  const [upgrading, setUpgrading] = useState(false);
+  const [upgradingPlan, setUpgradingPlan] = useState<BillingPlan | null>(null);
   const [openingPortal, setOpeningPortal] = useState(false);
 
   const activePlan = billing?.plan ?? null;
   const applicationsLeft = billing?.applicationsLeft ?? home?.applicationsLeft ?? 0;
   const planApplications = billing?.planApplications ?? home?.planApplications ?? 0;
-  const upgradeTarget = nextUpgradePlan(activePlan);
+  const upgradeOptions = upgradePlansFor(activePlan);
   const switchInStripe = activePlan !== null && billing?.status !== "canceled";
+
+  const billingSignature =
+    billing === undefined
+      ? null
+      : `${String(billing.plan)}:${String(billing.status)}:${String(billing.applicationsLeft)}:${String(billing.planApplications)}`;
+
+  const previousSignatureRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (billingSignature === null) {
+      return;
+    }
+
+    const changed =
+      previousSignatureRef.current !== null && previousSignatureRef.current !== billingSignature;
+
+    const returnedWithPlan =
+      previousSignatureRef.current === null && checkingReturn && activePlan !== null;
+
+    if (changed || returnedWithPlan) {
+      void queryClient.invalidateQueries({ queryKey: ["home"] });
+      void queryClient.invalidateQueries({ queryKey: ["nav"] });
+    }
+
+    previousSignatureRef.current = billingSignature;
+  }, [activePlan, billingSignature, checkingReturn, queryClient]);
 
   const renewal =
     billing?.currentPeriodEnd === null || billing?.currentPeriodEnd === undefined
@@ -84,7 +126,7 @@ export function ProfileBillingPage() {
       : renewalText(billing.currentPeriodEnd);
 
   const handleUpgrade = async (plan: BillingPlan) => {
-    setUpgrading(true);
+    setUpgradingPlan(plan);
 
     try {
       globalThis.location.assign(await startCheckout(plan));
@@ -94,7 +136,7 @@ export function ProfileBillingPage() {
       toast.info(bp.billingCheckoutNote);
     }
 
-    setUpgrading(false);
+    setUpgradingPlan(null);
   };
 
   const handleOpenStripe = async () => {
@@ -149,50 +191,64 @@ export function ProfileBillingPage() {
         </Card>
       ) : null}
 
-      <div className="mt-6 flex flex-col gap-5">
-        <Card ariaLabelledBy="billing-current-heading" className="p-6" variant="elevated">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0 flex-1">
-              <p className={dsEyebrow}>{bp.billingCurrentPlan}</p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
-                <h2 className={dsCardTitle} id="billing-current-heading">
-                  {currentPlanLabel(activePlan, planApplications)}
-                </h2>
-                {activePlan !== null || planApplications > 0 ? (
-                  <Badge variant="ok">{bp.billingActiveBadge}</Badge>
-                ) : null}
-              </div>
-              <p className={`${dsBody} mt-1.5 tabular-nums`}>
-                {planApplications > 0
-                  ? bp.billingRemaining(applicationsLeft, planApplications)
-                  : copy.settingsBilling.noPlanDetail}
-                {renewal === null ? "" : ` · ${copy.settingsBilling.renews} ${renewal}`}
-              </p>
-            </div>
-            <Button
-              className="shrink-0 self-start sm:self-auto"
-              disabled={openingPortal}
-              onClick={() => {
-                void handleOpenStripe();
-              }}
-              size="default"
-              variant="secondary"
-            >
-              <span>{bp.billingManageStripe}</span>
-              <ExternalLink aria-hidden="true" size={14} />
-            </Button>
+      {isPending ? (
+        <output
+          aria-busy="true"
+          className="mt-6 block animate-pulse space-y-5"
+          data-testid="billing-loading"
+        >
+          <span className="sr-only">{copy.settingsBilling.loading}</span>
+          <div aria-hidden="true" className="h-32 rounded-xl border border-border bg-card" />
+          <div aria-hidden="true" className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="h-48 rounded-xl border border-border bg-card" />
+            <div className="h-48 rounded-xl border border-border bg-card" />
           </div>
-        </Card>
+        </output>
+      ) : null}
 
-        {upgradeTarget === null ? (
-          <Card ariaLabelledBy="billing-top-heading" className="p-6">
-            <p className={dsEyebrow}>{bp.billingCurrentPlan}</p>
-            <h2 className={`${dsCardTitle} mt-1.5`} id="billing-top-heading">
-              {bp.billingTopPlanTitle}
-            </h2>
-            <p className={`${dsBody} mt-1.5 max-w-2xl`}>{bp.billingTopPlanBody}</p>
-            <div className="mt-5">
+      {!isPending && isError && billing === undefined ? (
+        <Card className="mt-6 p-6" variant="elevated">
+          <div role="alert">
+            <h2 className={dsCardTitle}>{copy.settingsBilling.unavailable}</h2>
+            <p className={`${dsBody} mt-1.5`}>{copy.calendar.errorBody}</p>
+          </div>
+          <Button
+            className="mt-4"
+            disabled={isFetching}
+            onClick={() => {
+              void refetch();
+            }}
+            size="default"
+            variant="outline"
+          >
+            {copy.calendar.retry}
+          </Button>
+        </Card>
+      ) : null}
+
+      {!isPending && billing !== undefined ? (
+        <div className="mt-6 flex flex-col gap-5">
+          <Card ariaLabelledBy="billing-current-heading" className="p-6" variant="elevated">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <p className={dsEyebrow}>{bp.billingCurrentPlan}</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
+                  <h2 className={dsCardTitle} id="billing-current-heading">
+                    {currentPlanLabel(activePlan, planApplications)}
+                  </h2>
+                  {activePlan !== null || planApplications > 0 ? (
+                    <Badge variant="ok">{bp.billingActiveBadge}</Badge>
+                  ) : null}
+                </div>
+                <p className={`${dsBody} mt-1.5 tabular-nums`}>
+                  {planApplications > 0
+                    ? bp.billingRemaining(applicationsLeft, planApplications)
+                    : copy.settingsBilling.noPlanDetail}
+                  {renewal === null ? "" : ` · ${copy.settingsBilling.renews} ${renewal}`}
+                </p>
+              </div>
               <Button
+                className="shrink-0 self-start sm:self-auto"
                 disabled={openingPortal}
                 onClick={() => {
                   void handleOpenStripe();
@@ -205,60 +261,56 @@ export function ProfileBillingPage() {
               </Button>
             </div>
           </Card>
-        ) : (
-          <Card
-            ariaLabelledBy="billing-upgrade-heading"
-            className="border-signal/60 p-6"
-            variant="elevated"
-          >
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <p className={dsEyebrow}>{bp.billingUpgradeEyebrow}</p>
-                  <Badge variant="signal">{bp.billingPopularBadge}</Badge>
-                </div>
-                <h2 className={`${dsCardTitle} mt-1.5`} id="billing-upgrade-heading">
-                  {upgradeTarget.title}
-                </h2>
-                <div className="mt-3 flex items-baseline gap-1.5 tabular-nums">
-                  <span className={dsMetric}>{upgradeTarget.price}</span>
-                  <span className="text-sm text-muted-foreground">{upgradeTarget.per}</span>
-                </div>
-                <p className="mt-3 flex items-start gap-2 text-sm text-foreground">
-                  <Check
-                    aria-hidden="true"
-                    className="mt-0.5 shrink-0 text-signal-text"
-                    size={16}
-                  />
-                  <span>{upgradeTarget.detail}</span>
-                </p>
-              </div>
-              <Button
-                className="shrink-0 self-start sm:self-auto"
-                disabled={switchInStripe ? openingPortal : upgrading}
-                onClick={() => {
-                  if (switchInStripe) {
+
+          {upgradeOptions.length === 0 ? (
+            <Card ariaLabelledBy="billing-top-heading" className="p-6">
+              <p className={dsEyebrow}>{bp.billingCurrentPlan}</p>
+              <h2 className={`${dsCardTitle} mt-1.5`} id="billing-top-heading">
+                {bp.billingTopPlanTitle}
+              </h2>
+              <p className={`${dsBody} mt-1.5 max-w-2xl`}>{bp.billingTopPlanBody}</p>
+              <div className="mt-5">
+                <Button
+                  disabled={openingPortal}
+                  onClick={() => {
                     void handleOpenStripe();
+                  }}
+                  size="default"
+                  variant="secondary"
+                >
+                  <span>{bp.billingManageStripe}</span>
+                  <ExternalLink aria-hidden="true" size={14} />
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <div
+              className={
+                upgradeOptions.length > 1 ? "grid grid-cols-1 gap-5 md:grid-cols-2" : "space-y-5"
+              }
+            >
+              {upgradeOptions.map((option) => (
+                <BillingUpgradeCard
+                  busy={upgradingPlan === option.id}
+                  disabled={switchInStripe ? openingPortal : upgradingPlan !== null}
+                  key={option.id}
+                  onSelect={() => {
+                    if (switchInStripe) {
+                      void handleOpenStripe();
 
-                    return;
-                  }
+                      return;
+                    }
 
-                  void handleUpgrade(upgradeTarget.id);
-                }}
-                size="lg"
-                variant="primary"
-              >
-                <span>{bp.billingUpgradeAction(upgradeTarget.name)}</span>
-                {switchInStripe ? (
-                  <ExternalLink aria-hidden="true" size={16} />
-                ) : (
-                  <ArrowUpRight aria-hidden="true" size={16} />
-                )}
-              </Button>
+                    void handleUpgrade(option.id);
+                  }}
+                  option={option}
+                  switchInStripe={switchInStripe}
+                />
+              ))}
             </div>
-          </Card>
-        )}
-      </div>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

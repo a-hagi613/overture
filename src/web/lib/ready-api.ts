@@ -149,8 +149,10 @@ function useInvalidateReady() {
     await Promise.all([
       client.invalidateQueries({ queryKey: ["ready"] }),
       client.invalidateQueries({ queryKey: ["home"] }),
+      client.invalidateQueries({ queryKey: ["nav"] }),
       client.invalidateQueries({ queryKey: ["board"] }),
       client.invalidateQueries({ queryKey: ["application"] }),
+      client.invalidateQueries({ queryKey: ["profile-facts"] }),
     ]);
   };
 }

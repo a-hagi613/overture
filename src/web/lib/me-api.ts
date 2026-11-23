@@ -1,6 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
+function parseHttpUrl(raw: string) {
+  try {
+    const parsed = new URL(raw);
+
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+const httpUrlSchema = z.string().refine((value) => parseHttpUrl(value) !== null, {
+  message: "Must be an http or https URL.",
+});
+
 const meUserSchema = z.object({
   email: z.string(),
   emailVerified: z.boolean(),
@@ -10,7 +24,7 @@ const meUserSchema = z.object({
 });
 
 const meSchema = z.object({
-  adminOrigin: z.url().nullable(),
+  adminOrigin: httpUrlSchema.nullable(),
   socialProviders: z.array(z.string()).default([]),
   turnstileScriptUrl: z.string().optional(),
   turnstileSiteKey: z.string().optional(),
@@ -34,18 +48,24 @@ async function loadMe() {
 }
 
 /**
- * The signed-in session as `GET /api/me` reports it.
- * @returns The session payload, or undefined while it is loading or unreadable.
+ * Full query state for `GET /api/me`, including pending status before session resolution.
+ * @returns The React Query result for `/api/me`.
  */
-export function useMe() {
-  const { data } = useQuery({
+export function useMeQuery() {
+  return useQuery({
     queryFn: loadMe,
     queryKey: ME_QUERY_KEY,
     retry: false,
     staleTime: ME_STALE_TIME_MS,
   });
+}
 
-  return data;
+/**
+ * The signed-in session as `GET /api/me` reports it.
+ * @returns The session payload, or undefined while it is loading or unreadable.
+ */
+export function useMe() {
+  return useMeQuery().data;
 }
 
 /**
@@ -62,7 +82,9 @@ export function adminPortalHref(me: Me | undefined) {
     return null;
   }
 
-  return `${new URL(me.adminOrigin).origin}/admin`;
+  const parsed = parseHttpUrl(me.adminOrigin);
+
+  return parsed === null ? null : `${parsed.origin}/admin`;
 }
 
 /**
@@ -72,18 +94,25 @@ export function adminPortalHref(me: Me | undefined) {
  * @returns True when the two do not share an origin.
  */
 export function isCrossOrigin(href: string, pageOrigin: string) {
-  return new URL(href).origin !== pageOrigin;
+  const parsed = parseHttpUrl(href);
+
+  return parsed !== null && parsed.origin !== pageOrigin;
 }
 
 /**
- * The admin handoff target: the admin host with the page's own path and query.
+ * The admin handoff target: the admin host with the page's own path, query and hash.
  * @param adminOrigin The admin host from `GET /api/me`.
  * @param pathname The current pathname.
  * @param search The current query string, including its leading `?`.
+ * @param hash Optional hash fragment, including its leading `#`.
  * @returns The absolute URL the handoff card links to.
  */
-export function handoffHref(adminOrigin: string, pathname: string, search: string) {
-  return `${new URL(adminOrigin).origin}${pathname}${search}`;
+export function handoffHref(adminOrigin: string, pathname: string, search: string, hash = "") {
+  const parsed = parseHttpUrl(adminOrigin);
+
+  return parsed === null
+    ? `${pathname}${search}${hash}`
+    : `${parsed.origin}${pathname}${search}${hash}`;
 }
 
 /**
@@ -92,5 +121,7 @@ export function handoffHref(adminOrigin: string, pathname: string, search: strin
  * @returns The hostname shown to the owner.
  */
 export function adminHostOf(adminOrigin: string) {
-  return new URL(adminOrigin).host;
+  const parsed = parseHttpUrl(adminOrigin);
+
+  return parsed === null ? adminOrigin : parsed.host;
 }

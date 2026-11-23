@@ -1,12 +1,11 @@
 import { Content, Description, Overlay, Portal, Root, Title } from "@radix-ui/react-dialog";
-import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { copy } from "../../shared/copy.ts";
-import { fetchDeletionState, requestDeletion, sendReauthLink } from "../lib/account-api.ts";
+import { requestDeletion, sendReauthLink, useDeletionState } from "../lib/account-api.ts";
 import { Button } from "./ui/button.tsx";
 import { dsBody, dsCardTitle } from "./ui/ds.ts";
 
@@ -25,12 +24,7 @@ export function AccountDeleteDialog({
   onOpenChange: (open: boolean) => void;
   open: boolean;
 }) {
-  const state = useQuery({
-    enabled: open,
-    queryFn: fetchDeletionState,
-    queryKey: ["account-deletion"],
-    retry: false,
-  });
+  const state = useDeletionState(open);
 
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -87,6 +81,91 @@ export function AccountDeleteDialog({
     onOpenChange(false);
   };
 
+  let statusContent = (
+    <div className="rounded-lg border border-border bg-muted p-3.5 text-xs leading-relaxed text-muted-foreground">
+      {linkSent ? copy.deleteAccount.linkSent : copy.deleteAccount.reauthBody}
+    </div>
+  );
+
+  if (state.isPending) {
+    statusContent = (
+      <output
+        aria-busy="true"
+        className="block rounded-lg border border-border bg-muted p-3.5 text-xs text-muted-foreground"
+      >
+        {copy.onboarding.loading}
+      </output>
+    );
+  } else if (state.isError) {
+    statusContent = (
+      <div
+        className="rounded-lg border border-need/40 bg-need-soft p-3.5 text-xs text-need"
+        role="alert"
+      >
+        <p className="font-semibold">{copy.deleteAccount.errors.unauthorised}</p>
+        <Button
+          className="mt-2.5"
+          disabled={state.isFetching}
+          onClick={() => {
+            void state.refetch();
+          }}
+          size="sm"
+          variant="outline"
+        >
+          {copy.calendar.retry}
+        </Button>
+      </div>
+    );
+  } else if (reauthenticated) {
+    statusContent = (
+      <label
+        className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-muted p-3.5 text-sm text-foreground"
+        htmlFor="account-delete-confirm"
+      >
+        <input
+          checked={checked}
+          className="mt-0.5 size-4 shrink-0 accent-need"
+          id="account-delete-confirm"
+          onChange={(event) => {
+            setChecked(event.currentTarget.checked);
+          }}
+          type="checkbox"
+        />
+        <span>{copy.deleteAccount.confirmCheckbox}</span>
+      </label>
+    );
+  }
+
+  let primaryAction = null;
+
+  if (!state.isPending && !state.isError) {
+    primaryAction = reauthenticated ? (
+      <Button
+        disabled={busy || !checked}
+        onClick={() => {
+          void handleDelete();
+        }}
+        size="default"
+        variant="destructive"
+      >
+        {busy
+          ? copy.nav.profilePages.deleteDialogDeleting
+          : copy.nav.profilePages.deleteDialogConfirm}
+      </Button>
+    ) : (
+      <Button
+        disabled={busy}
+        onClick={() => {
+          void handleSendReauth();
+        }}
+        size="default"
+        variant="destructive"
+      >
+        {busy ? copy.nav.profilePages.deleteDialogSending : copy.deleteAccount.sendLink}
+      </Button>
+    );
+  }
+
   return (
     <Root onOpenChange={onOpenChange} open={open}>
       <Portal>
@@ -99,7 +178,7 @@ export function AccountDeleteDialog({
             </div>
             <Button
               ariaLabel={copy.codePaste.close}
-              className="h-8 w-8 shrink-0"
+              className="h-11 w-11 shrink-0"
               onClick={() => {
                 onOpenChange(false);
               }}
@@ -117,27 +196,7 @@ export function AccountDeleteDialog({
               {copy.settings.deleteDetail}
             </p>
 
-            {reauthenticated ? (
-              <label
-                className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-muted p-3.5 text-sm text-foreground"
-                htmlFor="account-delete-confirm"
-              >
-                <input
-                  checked={checked}
-                  className="mt-0.5 size-4 shrink-0 accent-need"
-                  id="account-delete-confirm"
-                  onChange={(event) => {
-                    setChecked(event.currentTarget.checked);
-                  }}
-                  type="checkbox"
-                />
-                <span>{copy.deleteAccount.confirmCheckbox}</span>
-              </label>
-            ) : (
-              <div className="rounded-lg border border-border bg-muted p-3.5 text-xs leading-relaxed text-muted-foreground">
-                {linkSent ? copy.deleteAccount.linkSent : copy.deleteAccount.reauthBody}
-              </div>
-            )}
+            {statusContent}
 
             {error === null ? null : (
               <p className="text-xs font-semibold text-need" role="alert">
@@ -156,31 +215,7 @@ export function AccountDeleteDialog({
             >
               {copy.nav.profilePages.deleteDialogCancel}
             </Button>
-            {reauthenticated ? (
-              <Button
-                disabled={busy || !checked}
-                onClick={() => {
-                  void handleDelete();
-                }}
-                size="default"
-                variant="destructive"
-              >
-                {busy
-                  ? copy.nav.profilePages.deleteDialogDeleting
-                  : copy.nav.profilePages.deleteDialogConfirm}
-              </Button>
-            ) : (
-              <Button
-                disabled={busy}
-                onClick={() => {
-                  void handleSendReauth();
-                }}
-                size="default"
-                variant="destructive"
-              >
-                {busy ? copy.nav.profilePages.deleteDialogSending : copy.deleteAccount.sendLink}
-              </Button>
-            )}
+            {primaryAction}
           </div>
         </Content>
       </Portal>

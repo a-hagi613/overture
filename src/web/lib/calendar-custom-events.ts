@@ -1,63 +1,117 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
-const STORAGE_KEY = "overture.calendar.custom-events.v1";
+import { CALENDAR_CUSTOM_EVENT_KINDS } from "../../shared/calendar-events.ts";
 
 const customEventSchema = z.object({
   company: z.string(),
   dayKey: z.string(),
   id: z.string(),
-  kind: z.enum(["interview", "followup", "reminder"]),
-  time: z.string(),
+  kind: z.enum(CALENDAR_CUSTOM_EVENT_KINDS),
+  time: z
+    .string()
+    .nullable()
+    .transform((value) => value ?? ""),
   title: z.string(),
 });
 
-const customEventListSchema = z.array(customEventSchema);
+const listResponseSchema = z.object({
+  events: z.array(customEventSchema),
+});
+
+const createResponseSchema = z.object({
+  event: customEventSchema,
+});
 
 export type CustomCalendarEvent = z.infer<typeof customEventSchema>;
 
 export type CustomCalendarEventKind = CustomCalendarEvent["kind"];
 
-function storageKeyFor(userId: string | null) {
-  return userId === null || userId === "" ? null : `${STORAGE_KEY}:${userId}`;
+export interface CreateCustomCalendarEventInput {
+  company: string;
+  dayKey: string;
+  kind: CustomCalendarEventKind;
+  time: string;
+  title: string;
 }
 
-export function loadCustomCalendarEvents(userId: string | null) {
-  const key = storageKeyFor(userId);
+export const CALENDAR_CUSTOM_EVENTS_KEY = ["calendar", "custom-events"] as const;
 
-  if (key === null) {
-    return [] satisfies CustomCalendarEvent[];
+async function jsonFrom(response: Response) {
+  if (!response.ok) {
+    throw new Error(`The calendar event request did not go through (${String(response.status)}).`);
   }
 
-  try {
-    const raw = globalThis.localStorage.getItem(key);
+  const body: unknown = await response.json();
 
-    if (raw === null) {
-      return [] satisfies CustomCalendarEvent[];
-    }
-
-    const parsed = customEventListSchema.safeParse(JSON.parse(raw));
-
-    return parsed.success ? parsed.data : ([] satisfies CustomCalendarEvent[]);
-  } catch {
-    return [] satisfies CustomCalendarEvent[];
-  }
+  return body;
 }
 
-export function saveCustomCalendarEvents(
-  events: readonly CustomCalendarEvent[],
-  userId: string | null,
-) {
-  const key = storageKeyFor(userId);
+export async function fetchCustomCalendarEvents() {
+  const body = listResponseSchema.parse(await jsonFrom(await fetch("/api/calendar/events")));
 
-  if (key === null) {
-    return false;
-  }
+  return body.events;
+}
 
-  try {
-    globalThis.localStorage.setItem(key, JSON.stringify(events));
+export async function createCustomCalendarEvent(input: CreateCustomCalendarEventInput) {
+  const trimmedTime = input.time.trim();
 
-    return true;
-  } catch {
-    return false;
-  }
+  const body = createResponseSchema.parse(
+    await jsonFrom(
+      await fetch("/api/calendar/events", {
+        body: JSON.stringify({
+          company: input.company.trim(),
+          dayKey: input.dayKey,
+          kind: input.kind,
+          time: trimmedTime === "" ? null : trimmedTime,
+          title: input.title.trim(),
+        }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      }),
+    ),
+  );
+
+  return body.event;
+}
+
+export async function deleteCustomCalendarEvent(id: string) {
+  await jsonFrom(
+    await fetch(`/api/calendar/events/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  );
+}
+
+export function useCalendarCustomEvents() {
+  return useQuery({
+    queryFn: fetchCustomCalendarEvents,
+    queryKey: CALENDAR_CUSTOM_EVENTS_KEY,
+  });
+}
+
+export function useCreateCalendarCustomEvent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createCustomCalendarEvent,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["calendar"] }),
+        queryClient.invalidateQueries({ queryKey: ["home"] }),
+      ]);
+    },
+  });
+}
+
+export function useDeleteCalendarCustomEvent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteCustomCalendarEvent,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["calendar"] }),
+        queryClient.invalidateQueries({ queryKey: ["home"] }),
+      ]);
+    },
+  });
 }
