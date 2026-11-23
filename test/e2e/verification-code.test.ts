@@ -10,6 +10,7 @@ import { dkimSign } from "mailauth";
 import { z } from "zod";
 
 import type { AppServer } from "./app-server.ts";
+import { pinSendWindowClock } from "./send-window-clock.ts";
 import type { GreenhouseFixture } from "./greenhouse.fixture.ts";
 
 import { startFreshAppServer, test as appTest } from "./app.fixture.ts";
@@ -281,6 +282,8 @@ async function runDueJobs(owner: APIRequestContext) {
 
 async function ownerFor(server: AppServer) {
   const { owner, userId } = await ownerContextFor(server.url);
+
+  await pinSendWindowClock(server);
 
   await owner.put("/__test__/settings/jobs.poll_interval_ms", { data: { value: "3600000" } });
 

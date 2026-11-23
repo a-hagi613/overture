@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
+import { pinSendWindowClock } from "./send-window-clock.ts";
 import type { AnthropicFixtureServer } from "./anthropic-fixture-server.ts";
 import type { FeedFixtureServer } from "./feed-fixture-server.ts";
 import type { GreenhouseFixture } from "./greenhouse.fixture.ts";
@@ -290,6 +291,8 @@ async function preparingApplication(
   mutation: string | null,
 ) {
   const { owner, userId } = await ownerContextFor(stripe.server.url);
+
+  await pinSendWindowClock(stripe.server);
 
   const running = await owner.post("/api/running", { data: { running: true } });
 
