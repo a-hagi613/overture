@@ -73,8 +73,9 @@ async function shot(
     name: string;
     path: string;
     theme: "dark" | "light";
-    width: number;
     waitFor: string;
+    waitForEnabledButtons?: boolean;
+    width: number;
   },
 ) {
   const context = await browser.newContext({
@@ -96,6 +97,14 @@ async function shot(
 
   await page.goto(`${boards.server.url}${input.path}`);
   await expect(page.getByText(input.waitFor).filter({ visible: true }).first()).toBeVisible();
+
+  if (input.waitForEnabledButtons === true) {
+    await page.waitForFunction(
+      () => document.querySelectorAll("main button:disabled").length === 0,
+      undefined,
+      { timeout: 15_000 },
+    );
+  }
 
   await page.evaluate(async () => {
     await Promise.all([
@@ -191,6 +200,7 @@ test("the forwarding address explainer matches the board", async ({ browser, boa
         ...variant,
         path: "/profile/account#email-forwarding",
         waitFor: "Copy address",
+        waitForEnabledButtons: true,
       }),
     ),
   );
