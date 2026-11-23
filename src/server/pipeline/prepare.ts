@@ -14,6 +14,7 @@ import type { QuestionSource } from "../catalog/greenhouse-questions.ts";
 import type { GroundedAnswer } from "./open-text.ts";
 import type { PostingPlace } from "../catalog/answer-derivations.ts";
 import type { FormReadPath, PlainFormReader } from "./form-read.ts";
+import type { LoginWallEvidence, LoginWallFormRead } from "./login-wall.ts";
 
 import {
   applicationAnswers,
@@ -26,7 +27,8 @@ import { companies, companyBoards, postings } from "../platform/db/catalog-schem
 
 import type { FormQuestion, SendPlan, SendPlanField } from "./send-plan.ts";
 import { createFactService } from "../profile/facts.ts";
-import { createPlainFormReader } from "./form-read.ts";
+import { createPlainFormReader, isLoginWallRead } from "./form-read.ts";
+import { LOGIN_WALL_REASON } from "./login-wall.ts";
 import { createPlanCache } from "./plan-cache.ts";
 import { guardPosting } from "./guard/posting-guard.ts";
 import { createOpenTextService, isCoverLetterQuestion } from "./open-text.ts";
@@ -256,7 +258,7 @@ export function createPreparationService(deps: {
     atsJobId: string;
     applyUrl: string | null;
     url: string;
-  }) => Promise<{ questions: FormQuestion[]; formSignature: string } | null>;
+  }) => Promise<{ questions: FormQuestion[]; formSignature: string } | LoginWallFormRead | null>;
 }) {
   const {
     db,
@@ -382,7 +384,7 @@ export function createPreparationService(deps: {
     questionsFetchedAt: number | null;
   }) {
     if (posting.questionsFetchedAt !== null) {
-      return;
+      return null;
     }
 
     const recordQuestions = async (
@@ -438,110 +440,121 @@ export function createPreparationService(deps: {
 
     if (posting.ats === "greenhouse") {
       if (source === null) {
-        return;
+        return null;
       }
 
       const atsQuestions = await source.fetchQuestions(posting.boardToken, posting.atsJobId);
       const inputs = questionInputsFromAts(atsQuestions, [posting.companyName]);
 
       await recordQuestions(inputs);
+
+      return null;
+    }
+
+    const target = {
+      applyUrl: posting.applyUrl,
+      ats: posting.ats,
+      atsJobId: posting.atsJobId,
+      boardToken: posting.boardToken,
+      region: posting.boardRegion,
+      url: posting.url,
+    };
+
+    let questions: FormQuestion[] = [];
+    let formSignature = "";
+    let readPath: FormReadPath = "browser";
+    let loginWall: LoginWallEvidence | null = null;
+    const plain = await plainFormReader.read(target);
+
+    if (isLoginWallRead(plain)) {
+      loginWall = plain.evidence;
+    } else if (plain !== null && plain.questions.length > 0) {
+      ({ questions, formSignature, path: readPath } = plain);
     } else {
-      const target = {
-        applyUrl: posting.applyUrl,
-        ats: posting.ats,
-        atsJobId: posting.atsJobId,
-        boardToken: posting.boardToken,
-        region: posting.boardRegion,
-        url: posting.url,
-      };
+      const captured = captureForm === undefined ? null : await captureForm(target);
 
-      let questions: FormQuestion[] = [];
-      let formSignature = "";
-      let readPath: FormReadPath = "browser";
-      const plain = await plainFormReader.read(target);
-
-      if (plain !== null && plain.questions.length > 0) {
-        ({ questions, formSignature, path: readPath } = plain);
-      } else {
-        const captured = captureForm === undefined ? null : await captureForm(target);
-
-        if (captured !== null && captured.questions.length > 0) {
-          ({ formSignature, questions } = captured);
-          readPath = "browser";
-        }
+      if (captured !== null && "loginWall" in captured) {
+        loginWall = captured.evidence;
+      } else if (captured !== null && captured.questions.length > 0) {
+        ({ formSignature, questions } = captured);
+        readPath = "browser";
       }
+    }
 
-      if (questions.length === 0 || formSignature === "") {
-        throw new Error(
-          `form_unreadable: ${posting.ats} ${posting.atsJobId} returned no questions; the Application stays in preparation`,
-        );
-      }
+    if (loginWall !== null) {
+      return loginWall;
+    }
 
-      const cached = planCache.get(posting.ats, formSignature);
+    if (questions.length === 0 || formSignature === "") {
+      throw new Error(
+        `form_unreadable: ${posting.ats} ${posting.atsJobId} returned no questions; the Application stays in preparation`,
+      );
+    }
 
-      const matched = cached === null ? null : planCache.match(questions, cached.plan.questions);
+    const cached = planCache.get(posting.ats, formSignature);
 
-      let usedCache = false;
+    const matched = cached === null ? null : planCache.match(questions, cached.plan.questions);
 
-      if (cached !== null && matched !== null) {
-        const alive =
-          matched.length === 0
-            ? []
-            : db
-                .select({ id: questionsTable.id })
-                .from(questionsTable)
-                .where(
-                  inArray(
-                    questionsTable.id,
-                    matched.map((entry) => entry.questionId),
-                  ),
-                )
-                .all();
+    let usedCache = false;
 
-        if (alive.length === matched.length) {
-          catalog.savePostingQuestions(
-            posting.postingId,
-            matched.map((entry) => ({
-              fieldName: entry.fieldName === "" ? null : entry.fieldName,
-              options: entry.options,
-              position: entry.position,
-              questionId: entry.questionId,
-              required: entry.required,
-            })),
-          );
-          planCache.recordHit(cached.id);
-          usedCache = true;
-        } else {
-          planCache.recordFailure(cached.id);
-        }
-      } else if (cached !== null) {
-        planCache.recordFailure(cached.id);
-      }
+    if (cached !== null && matched !== null) {
+      const alive =
+        matched.length === 0
+          ? []
+          : db
+              .select({ id: questionsTable.id })
+              .from(questionsTable)
+              .where(
+                inArray(
+                  questionsTable.id,
+                  matched.map((entry) => entry.questionId),
+                ),
+              )
+              .all();
 
-      if (!usedCache) {
-        const entries = await recordQuestions(
-          questions.map((question) => ({
-            fieldName: question.fieldName === "" ? null : question.fieldName,
-            fieldType: question.fieldType,
-            options: question.options,
-            required: question.required,
-            text: question.label,
-          })),
-        );
-
-        planCache.put(posting.ats, formSignature, {
-          questions: entries.map((entry, position) => ({
-            fieldName: entry.fieldName ?? "",
-            fieldType: questions[position]?.fieldType ?? "text",
-            label: questions[position]?.label ?? "",
+      if (alive.length === matched.length) {
+        catalog.savePostingQuestions(
+          posting.postingId,
+          matched.map((entry) => ({
+            fieldName: entry.fieldName === "" ? null : entry.fieldName,
             options: entry.options,
-            position,
+            position: entry.position,
             questionId: entry.questionId,
             required: entry.required,
           })),
-          readPath,
-        });
+        );
+        planCache.recordHit(cached.id);
+        usedCache = true;
+      } else {
+        planCache.recordFailure(cached.id);
       }
+    } else if (cached !== null) {
+      planCache.recordFailure(cached.id);
+    }
+
+    if (!usedCache) {
+      const entries = await recordQuestions(
+        questions.map((question) => ({
+          fieldName: question.fieldName === "" ? null : question.fieldName,
+          fieldType: question.fieldType,
+          options: question.options,
+          required: question.required,
+          text: question.label,
+        })),
+      );
+
+      planCache.put(posting.ats, formSignature, {
+        questions: entries.map((entry, position) => ({
+          fieldName: entry.fieldName ?? "",
+          fieldType: questions[position]?.fieldType ?? "text",
+          label: questions[position]?.label ?? "",
+          options: entry.options,
+          position,
+          questionId: entry.questionId,
+          required: entry.required,
+        })),
+        readPath,
+      });
     }
 
     catalogDb
@@ -549,6 +562,8 @@ export function createPreparationService(deps: {
       .set({ questionsFetchedAt: clock.now() })
       .where(eq(postings.id, posting.postingId))
       .run();
+
+    return null;
   }
 
   function syncReviews(input: {
@@ -747,6 +762,24 @@ export function createPreparationService(deps: {
       return updated ? { status: "skipped" as const, blocked: 0 } : null;
     }
 
+    const loginWall = await loadQuestions(row);
+
+    if (loginWall !== null) {
+      logInfo(
+        "prepare",
+        `application ${applicationId} skipped: ${LOGIN_WALL_REASON} (${loginWall.markers.join(", ")})`,
+      );
+
+      const skipped = updatePreparableApplication(db, applicationId, {
+        status: "skipped",
+        statusReason: LOGIN_WALL_REASON,
+        stage: null,
+        updatedAt: clock.now(),
+      });
+
+      return skipped ? { status: "skipped" as const, blocked: 0 } : null;
+    }
+
     const resume = db
       .select({ id: resumes.id, textEnc: resumes.textEnc })
       .from(resumes)
@@ -761,8 +794,6 @@ export function createPreparationService(deps: {
             { table: "resumes", column: "text_enc", rowId: resume.id },
             resume.textEnc,
           );
-
-    await loadQuestions(row);
 
     const factRows = await factsService.list(row.userId);
     const factValues = indexFacts(factRows);

@@ -11,6 +11,8 @@ import { readAshbyQuestions } from "../dispatch/ats/ashby.ts";
 import { readWorkableQuestions } from "../dispatch/ats/workable.ts";
 import { readLeverQuestions } from "../dispatch/ats/lever.ts";
 import { readPersonioQuestions } from "../dispatch/ats/personio.ts";
+import type { LoginWallEvidence } from "../pipeline/login-wall.ts";
+import { detectLoginWall } from "../pipeline/login-wall.ts";
 import { assetExtension, formSignature, sanitiseFormHtml } from "./sanitise.ts";
 
 export const ATS_NAMES = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
@@ -38,6 +40,18 @@ export class FormNotRenderedError extends Error {
       `no_form_rendered: no ${ats} application form field appeared within ${String(FORM_RENDER_TIMEOUT_MS / 1000)}s; nothing was saved`,
     );
     this.name = "FormNotRenderedError";
+  }
+}
+
+/** The page was a mandatory login gate, so no form wait or retry runs. */
+export class LoginWallError extends Error {
+  readonly code = "login_wall";
+  readonly evidence: LoginWallEvidence;
+
+  constructor(evidence: LoginWallEvidence) {
+    super(`login_wall: the page is behind a mandatory login gate (${evidence.markers.join(", ")})`);
+    this.name = "LoginWallError";
+    this.evidence = evidence;
   }
 }
 
@@ -179,6 +193,17 @@ async function withFormPage<T>(
       const page = context.pages()[0] ?? (await context.newPage());
 
       await loadPage(page, applyUrl, deps.gotoTimeoutMs ?? GOTO_TIMEOUT_MS);
+
+      const verdict = detectLoginWall({
+        finalUrl: page.url(),
+        html: await page.content(),
+        requestedUrl: applyUrl,
+      });
+
+      if (verdict.wall) {
+        throw new LoginWallError(verdict.evidence);
+      }
+
       await waitForForm(page, ats);
 
       const raw = await page.content();

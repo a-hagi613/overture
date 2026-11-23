@@ -8,6 +8,8 @@ import type { QuestionFieldType } from "../../shared/questions.ts";
 import { formSignature, sanitiseFormHtml } from "../fixtures/sanitise.ts";
 import { LEVER_FIELD_TYPES, LEVER_SKIP_NAMES } from "../dispatch/ats/lever.ts";
 import { assertNoLiveTraffic, LiveServiceRequestError } from "../platform/outbound-guard.ts";
+import type { LoginWallFormRead } from "./login-wall.ts";
+import { detectLoginWall } from "./login-wall.ts";
 import { personioApplyUrl, readPersonioFormHtml } from "./personio-form.ts";
 
 export const FORM_READ_PATHS = [
@@ -25,6 +27,19 @@ export interface PlainFormReadResult {
   formSignature: string;
   path: "lever_html" | "ashby_graphql" | "workable_form" | "personio_html";
   unhandled?: string[];
+}
+
+export type FormReadResult = PlainFormReadResult | LoginWallFormRead;
+
+/**
+ * Whether a plain form read stopped at a login gate instead of an application
+ * form, so callers can tell a wall apart from a page with no form.
+ *
+ * @param read the read outcome, or null when nothing could be read
+ * @returns true when the page was a mandatory login gate
+ */
+export function isLoginWallRead(read: FormReadResult | null): read is LoginWallFormRead {
+  return read !== null && "loginWall" in read;
 }
 
 export interface FormReadTarget {
@@ -709,6 +724,22 @@ function ashbyGraphqlUrl(baseUrl: string) {
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
+async function htmlPageRead(
+  requestedUrl: string,
+  response: Response,
+  parse: (html: string) => PlainFormReadResult | Promise<PlainFormReadResult>,
+) {
+  const finalUrl = response.url === "" ? requestedUrl : response.url;
+  const html = response.ok ? await response.text() : null;
+  const verdict = detectLoginWall({ finalUrl, html, requestedUrl });
+
+  if (verdict.wall) {
+    return { evidence: verdict.evidence, loginWall: true } satisfies LoginWallFormRead;
+  }
+
+  return html === null ? null : await parse(html);
+}
+
 export function createPlainFormReader(
   options: {
     ashbyBaseUrl?: string | undefined;
@@ -757,11 +788,7 @@ export function createPlainFormReader(
       signal: AbortSignal.timeout(timeoutMs),
     });
 
-    if (!response.ok) {
-      return null;
-    }
-
-    return readLeverFormHtml(await response.text());
+    return htmlPageRead(url, response, readLeverFormHtml);
   }
 
   async function ashby(input: FormReadTarget) {
@@ -819,11 +846,7 @@ export function createPlainFormReader(
       signal: AbortSignal.timeout(timeoutMs),
     });
 
-    if (!response.ok) {
-      return null;
-    }
-
-    return readPersonioFormHtml(await response.text());
+    return htmlPageRead(url, response, readPersonioFormHtml);
   }
 
   return {

@@ -9,6 +9,7 @@ import { readLeverQuestions } from "../../src/server/dispatch/ats/lever.ts";
 import { readWorkableQuestions } from "../../src/server/dispatch/ats/workable.ts";
 import {
   createPlainFormReader,
+  isLoginWallRead,
   readLeverFormHtml,
   readWorkableFormResponse,
 } from "../../src/server/pipeline/form-read.ts";
@@ -305,8 +306,12 @@ test("the Workable plain reader fetches the shortcode form endpoint without a br
       url: `${fixture.url}/j/WK-1001`,
     });
 
-    expect(parsed?.path).toBe("workable_form");
-    expect(parsed?.questions.map((question) => question.fieldName)).toEqual([
+    expect(isLoginWallRead(parsed)).toBe(false);
+
+    const form = isLoginWallRead(parsed) ? null : parsed;
+
+    expect(form?.path).toBe("workable_form");
+    expect(form?.questions.map((question) => question.fieldName)).toEqual([
       "firstname",
       "lastname",
       "email",

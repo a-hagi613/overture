@@ -14,7 +14,7 @@ import { env } from "../config/env.ts";
 import { recordLiveCheckResult } from "../live-checks/store.ts";
 import { postings } from "../platform/db/catalog-schema.ts";
 
-import { createPlainFormReader } from "../pipeline/form-read.ts";
+import { createPlainFormReader, isLoginWallRead } from "../pipeline/form-read.ts";
 
 export const PERSONIO_PROBE_JOB_KIND = "probe.personio";
 
@@ -218,7 +218,13 @@ export async function runPersonioProbe(deps: PersonioProbeDeps) {
         }),
       );
 
-      if (read !== null) {
+      if (isLoginWallRead(read)) {
+        result = {
+          ...result,
+          outcome: "unreadable",
+          unhandled: read.evidence.markers.map((marker) => `login_wall:${marker}`),
+        };
+      } else if (read !== null) {
         const unhandled = "unhandled" in read ? read.unhandled : [];
 
         result = {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { createPlainFormReader } from "./form-read.ts";
+import { createPlainFormReader, isLoginWallRead } from "./form-read.ts";
 import { personioApplyUrl, readPersonioFormHtml } from "./personio-form.ts";
 
 const PAGE = `<!doctype html>
@@ -206,7 +206,10 @@ describe("the plain Personio form read", () => {
     });
 
     expect(requested).toEqual(["https://acme.jobs.personio.de/job/12345/apply"]);
-    expect(read?.path).toBe("personio_html");
-    expect(read?.questions.length).toBeGreaterThan(0);
+
+    const form = isLoginWallRead(read) ? null : read;
+
+    expect(form?.path).toBe("personio_html");
+    expect(form?.questions.length).toBeGreaterThan(0);
   });
 });
