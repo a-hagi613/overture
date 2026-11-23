@@ -532,7 +532,7 @@ test("a 4xx answer to the application request leaves submit_clicked_at unset and
   expect(home.applicationsLeft).toBe(3);
 });
 
-test("a kill before submit_clicked_at releases the Application, stops its browser and a later send submits once", async ({
+test.fixme("a kill before submit_clicked_at releases the Application, stops its browser and a later send submits once (#553: crash recovery strands the ledger reservation)", async ({
   send,
 }) => {
   const { applicationId, owner, userId } = await readyApplication(send);

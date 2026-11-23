@@ -118,6 +118,7 @@ export function serverEnvironment(extraEnvironment: Record<string, string>) {
     OTEL_SIMPLE_EXPORT: "true",
     KILL_TIMEOUT_MS: "1000",
     JOBS_STARTUP_SETTLE_MS: "0",
+    TEST_CLOCK_AT_UTC_HOUR: "10",
     ...authDefaults(extraEnvironment),
     ...extraEnvironment,
   };
