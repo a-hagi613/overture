@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, exists, gt, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
 
 import type { Clock } from "../platform/ports/clock.ts";
@@ -137,6 +137,21 @@ export function grantApplications(db: BillingDb, clock: Clock, input: GrantInput
   );
 }
 
+function grantHasBeenSpent(db: BillingDb, userId: string) {
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(ledger)
+      .where(
+        and(
+          eq(ledger.userId, userId),
+          eq(ledger.grantId, grants.id),
+          inArray(ledger.kind, ["commit", "release", "reserve"]),
+        ),
+      ),
+  );
+}
+
 function activeGrantsOf(db: BillingDb, userId: string, at: number) {
   return db
     .select()
@@ -144,7 +159,7 @@ function activeGrantsOf(db: BillingDb, userId: string, at: number) {
     .where(
       and(
         eq(grants.userId, userId),
-        lte(grants.startsAt, at),
+        or(lte(grants.startsAt, at), grantHasBeenSpent(db, userId)),
         or(isNull(grants.expiresAt), gt(grants.expiresAt, at)),
       ),
     )
@@ -237,7 +252,7 @@ function reservationPairsOf(db: BillingDb, userId: string) {
     .select()
     .from(ledger)
     .where(and(eq(ledger.userId, userId), inArray(ledger.kind, ["commit", "release", "reserve"])))
-    .orderBy(asc(ledger.createdAt), sql`rowid`)
+    .orderBy(sql`rowid`)
     .all();
 
   const open = new Map<string, ReservationsOf>();
