@@ -534,6 +534,21 @@ Finally sign in as the owner, open `/profile/account` and confirm the **Admin Po
 `tryoverture.com` and confirm the handoff card opens `https://admin.tryoverture.com/admin` through Access and the
 passkey.
 
+## After a deploy
+
+Once the **Deploy** workflow on `main` is green, check the public surface with the read-only harness
+(plain HTTPS, no Fly or Cloudflare credential, exit `1` on any `FAIL`):
+
+```sh
+bun run scripts/check-production.ts
+bun run scripts/check-production.ts --json
+```
+
+It checks the landing pricing copy, `/api/health`, `/signin`, the security headers, `/sw.js` caching,
+a missing `/assets/*.js`, the unauthenticated API guards and webhook, the SPA navigation paths, and
+`admin.tryoverture.com` DNS/Access. The check list, the Wave 5 admin-host provisioning steps and a
+recorded run are in `docs/research/production-verification-2026-11-23.md`.
+
 ## Verifying the acceptance criteria
 
 - **A merge to `main` deploys `overture-web` and the health route answers in production**
