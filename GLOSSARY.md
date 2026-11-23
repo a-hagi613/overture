@@ -52,7 +52,7 @@ _Avoid_: state, progress
 
 **Ready**:
 An Application Overture has fully prepared that waits for the user's Approval before anything is sent. Also the
-destination that lists them ("Ready to send") and the Board column that holds an Application from Ready until it is
+destination that lists them ("Ready to send") and the Board lane that holds an Application from Ready until it is
 confirmed sent.
 _Avoid_: pending, draft, awaiting approval
 
@@ -60,7 +60,7 @@ _Avoid_: pending, draft, awaiting approval
 The user pressing Send on a Ready Application. It freezes the exact job, resume file, answers and letter that will be
 sent, and is the user's consent for that one application. It can be undone until sending starts, and anything that
 changes its plan (a Fact or resume it used, an answered Review) returns it to Ready with what changed.
-_Avoid_: confirmation, sign-off, go-ahead
+_Avoid_: confirmation, sign-off, go-ahead, auto-apply (nothing is sent without one, ADR 0029)
 
 **Approved**:
 The Status after Approval and before sending: the Application waits for its time to send within the daily limits.
@@ -87,16 +87,6 @@ _Avoid_: failed (in copy), error
 How many more Applications the user's plan allows; one is used only when an Application is confirmed sent.
 _Avoid_: credit, allowance, quota
 
-**Plan**:
-The paid recurring allowance: Week ($9.99, 50 applications over 7 days) or Month ($29.99, 250 applications over 30 days).
-It renews until cancelled, unused applications expire at the end of the period, and a failed Application is never charged.
-_Avoid_: tier, subscription level
-
-**Free trial**:
-Three applications at no charge, once per card. The card is verified with no charge, and a keyed fingerprint that is
-not linked to the user stops a second trial.
-_Avoid_: free plan, demo
-
 **Snapshot**:
 The permanent record of exactly what one sent Application said: answers with their sources, the letter, the resume file and the consent.
 _Avoid_: receipt, log
@@ -108,8 +98,15 @@ _Avoid_: feed download, Workable cache
 ## The Board
 
 **Stage**:
-Where an Application stands with the employer, shown as a Board column: Queued, Ready, Applied, Screening, Interviewing, Offer, Closed.
+Where an Application stands with the employer: Queued, Ready, Applied, Screening, Interviewing, Offer, Closed. The
+Stage is what is stored and what a move writes; the Board groups the seven into five Board lanes.
 _Avoid_: column, phase, Hold
+
+**Board lane**:
+One of the five columns the Board shows after the rebuild (ADR 0037, proposed; seven Stage columns before it), each
+grouping Stages: Queued, Ready, Applied, Waiting (Screening, Interviewing and Offer) and Closed. A lane is a view:
+dropping a card on a lane writes one Stage, and only after the server accepts the move.
+_Avoid_: On hold, Hold, column (as the object)
 
 **Queued**:
 The first Stage: the Application is being prepared or waiting on a Review.
@@ -129,10 +126,6 @@ _Avoid_: Hold, review item, question (as the object)
 The label on anything blocked on the user's answer: an open Review, or a Queued card blocked by one. A Ready card
 waits for Approval and is labelled Ready, not Needs you.
 _Avoid_: action required, blocked
-
-**Free trial**:
-Three Applications, once per card, for a card verified with Stripe. Nothing is charged. The card is kept as an HMAC of its fingerprint, so it cannot start a second trial even after its account is deleted.
-_Avoid_: credit, promo, bonus, free plan
 
 **Paid work**:
 Any step that calls the LLM or a cloud browser: scoring, preparation, form reads, resume text extraction, email
@@ -177,9 +170,16 @@ _Avoid_: download, data dump, archive
 ## Plans and billing
 
 **Plan**:
-What the user pays for: Week gives 50 Applications over 7 days and Month gives 250 over 30 days, both renewing until
-cancelled; the trial gives 3 once (ADR 0018).
-_Avoid_: subscription tier, package, level
+What the user pays for: Week ($9.99, 50 Applications over 7 days) or Month ($29.99, 250 Applications over 30 days),
+both renewing until cancelled; the Free trial gives 3 once (ADR 0018). Unused Applications expire at the end of the
+period, and a failed Application is never charged. The prices and counts live in `src/shared/plans.ts`.
+_Avoid_: tier, subscription tier, subscription level, package, level
+
+**Free trial**:
+Three Applications at no charge, once per card, for a card verified with Stripe. Nothing is charged. The card is kept
+only as an HMAC of its fingerprint, not linked to the user, so it cannot start a second trial even after its account
+is deleted.
+_Avoid_: free plan, demo, credit, promo, bonus
 
 **Period grant**:
 The Applications one paid period makes available. It expires at the period's end, so unused ones do not roll over,

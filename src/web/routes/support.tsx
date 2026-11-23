@@ -14,10 +14,10 @@ import { Separator } from "../components/ui/separator.tsx";
 import { authClient } from "../lib/auth-client.ts";
 
 const CATEGORIES: readonly { id: SupportCategory; label: string }[] = [
-  { id: "general", label: copy.nav.supportPage.categories.general },
+  { id: "account", label: copy.nav.supportPage.categories.account },
   { id: "billing", label: copy.nav.supportPage.categories.billing },
-  { id: "applications", label: copy.nav.supportPage.categories.applications },
   { id: "bug", label: copy.nav.supportPage.categories.bug },
+  { id: "other", label: copy.nav.supportPage.categories.other },
 ];
 
 export function SupportPage() {
@@ -26,7 +26,7 @@ export function SupportPage() {
   const userEmail = session?.user.email ?? "";
   const sp = copy.nav.supportPage;
 
-  const [category, setCategory] = useState<SupportCategory>("general");
+  const [category, setCategory] = useState<SupportCategory>("account");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);

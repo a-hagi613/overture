@@ -51,13 +51,14 @@ deleted with its tags, questions and FTS entry in bounded chunks, while a Postin
 points at is held and no Application row or snapshot changes, #424), the browser session alignment
 (`session-slots.test.ts`: the dispatcher's free-send count comes from the same process-wide semaphore every browser
 user holds a slot from, so a capture holding the last session offers a send no slot and no Application waits in
-`sending`, #425), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
+`sending`, and an unset, zero or negative `browser.max_concurrent_sessions` caps nothing while a positive value still
+queues, #425, #515), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
 per cooldown, so a paused main thread becomes a log line), the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
 a copy string or key), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
 `x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the signed-in event stream
 (`hub.test.ts`: a subscriber receives only rows addressed to that user and never an unscoped row, and a reconnect
 from zero or a very old cursor replays at most the newest 200 rows, #502), the owner alert fan-out (`alerts.test.ts`:
-`alert.raised` is written once per owner and delivered to no regular user, #502), the per-user search limit
+`alert.raised` is written once per owner and delivered to no regular user, #502), the admin alerts feed and launch readiness snapshot (`admin-alerts.test.ts`: owner alert notifications stay owner-scoped, active kill-switch/dead-job/mail-cap/backup-lag problems surface accurately, acknowledgements are idempotent, and daily-cap/browser-concurrency setting bounds are enforced, #517), the searchable admin audit log (`audit/index.test.ts`: action/actor/targetUserId/text filters avoid wildcard injection and composite timestamp-id cursors paginate deterministically across tied timestamps, #517), the per-user search limit
 (`rate-limit.test.ts`: one fixed window allows the maximum then refuses with `rate_limited`, and each key counts
 alone, #502), the host match
 (`host-match.test.ts`: a host matches only its own domain or a real subdomain of it, after trimming, lower-casing and
@@ -123,7 +124,12 @@ hot-path indexes (`hot-path-indexes.test.ts`: the SSE catch-up, event retention,
 application-by-status and grant-ledger queries are planned through `events_user_seq`, `events_created_at`,
 `messages_user_created`, `applications_user_status` and `grants_user_starts`, #506), the application-database
 vacuum (`vacuum-app-db.test.ts`: a fragmented file is compacted to a zero freelist with `integrity_check` ok, a dry
-run changes nothing, and the script refuses without `--confirm` or while another writer holds the lock, #506), and
+run changes nothing, and the script refuses without `--confirm` or while another writer holds the lock, #506), the
+compaction driver (`vacuum-fly.test.ts`: the dry run's printed sizes parse into file, WAL, freelist and page numbers,
+and a file whose freelist is below the 50 MB threshold is skipped unless the operator forces the run, so the weekly
+job cannot stop the app for nothing), the compaction workflows (`workflow-config-guard.test.ts`: the ops action and
+the Sunday job dry-run before they compact, the manual job honours its `dry_run` input, and the maintenance
+entrypoint runs the script with `--confirm`), and
 the interception canary (`outbound-interception.test.ts`: a fetch or node `https` request to an unmocked host rejects with
 the interceptor's own error while a mocked host still answers, so a request that leaks fails instead of reaching DNS). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not

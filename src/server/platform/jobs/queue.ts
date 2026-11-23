@@ -346,6 +346,16 @@ export function registerEnqueueNotify(notify: () => void) {
   enqueueNotify = notify;
 }
 
+/**
+ * Wakes the job worker after a job is made runnable outside `enqueueJob`, such as an
+ * owner's retry of a dead job.
+ */
+export function notifyQueueWake() {
+  if (enqueueNotify !== null) {
+    enqueueNotify();
+  }
+}
+
 function queuedDuplicateOf(db: AppDatabase, id: string, dedupeKey: string) {
   return db
     .select({ id: bgJobs.id })

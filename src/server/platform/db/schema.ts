@@ -11,8 +11,10 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+import { CALENDAR_CUSTOM_EVENT_KINDS } from "../../../shared/calendar-events.ts";
 import { CHECKIN_ANSWERS } from "../../../shared/checkins.ts";
 import { ATS_VALUES } from "../../../shared/ats.ts";
+import { SUPPORT_CATEGORIES, SUPPORT_TICKET_STATUSES } from "../../../shared/support.ts";
 
 const timestamp = (name: string) => integer(name, { mode: "timestamp" });
 
@@ -1232,5 +1234,52 @@ export const calendarFeedTokens = sqliteTable(
   (t) => [
     uniqueIndex("calendar_feed_tokens_user_unique").on(t.userId),
     uniqueIndex("calendar_feed_tokens_hash_unique").on(t.tokenHash),
+  ],
+);
+
+/**
+ * One interview, follow-up or reminder a person adds to their own Calendar (H6). It is scoped to the user, so it
+ * never leaks to another account on the same browser, and it reaches every device, the `.ics` feed and the export.
+ * `day_key` is a local `YYYY-MM-DD` the grid draws; `time` is a local `HH:MM`, or null for an all-day entry.
+ */
+export const calendarCustomEvents = sqliteTable(
+  "calendar_custom_events",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    dayKey: text("day_key").notNull(),
+    kind: text("kind", { enum: CALENDAR_CUSTOM_EVENT_KINDS }).notNull(),
+    title: text("title").notNull(),
+    company: text("company").notNull().default(""),
+    time: text("time"),
+    createdAt: timestamp("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull(),
+  },
+  (t) => [index("calendar_custom_events_user_day").on(t.userId, t.dayKey)],
+);
+
+/**
+ * One support request, kept for the Admin Portal Support Queue (ADM-2, M5). The message is sealed with the person's
+ * key like every other body they write; the subject, category and status are read by admins. `reference_id` is the
+ * short id the person sees and quotes.
+ */
+export const supportTickets = sqliteTable(
+  "support_tickets",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    referenceId: text("reference_id").notNull().unique(),
+    category: text("category", { enum: SUPPORT_CATEGORIES }).notNull().default("other"),
+    subject: text("subject").notNull(),
+    messageEnc: text("message_enc").notNull(),
+    status: text("status", { enum: SUPPORT_TICKET_STATUSES }).notNull().default("open"),
+    adminNotes: text("admin_notes"),
+    createdAt: timestamp("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull(),
+    resolvedAt: timestamp("resolved_at"),
+  },
+  (t) => [
+    index("support_tickets_user_created").on(t.userId, t.createdAt),
+    index("support_tickets_status_created").on(t.status, t.createdAt),
   ],
 );

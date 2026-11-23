@@ -2,191 +2,216 @@ import { request as apiRequest } from "@playwright/test";
 import { z } from "zod";
 
 import type { APIRequestContext } from "@playwright/test";
+import type { AppServer } from "./app-server.ts";
 
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
-import { clearSinkMail, latestMailLink, requestMagicLink, verifyAuthState } from "./sign-in.ts";
+import { ownerContextFor } from "./matching-harness.ts";
 
-const supportResponseSchema = z.object({
-  ok: z.literal(true),
-  referenceId: z.string().min(1),
+const demoEmail = "test@email.com";
+
+const test = appTest.extend<{ supportServer: AppServer }>({
+  supportServer: [
+    async ({ identityServer }, provide) => {
+      const server = await startFreshAppServer(identityServer, { DEMO_LOGIN_ENABLED: "true" });
+
+      await provide(server);
+      await server.stop();
+    },
+    { scope: "test" },
+  ],
 });
 
-const sinkMailSchema = z.object({
+const supportResponseSchema = z.object({ ok: z.literal(true), referenceId: z.string() });
+
+const errorSchema = z.object({ error: z.string() });
+
+const validationErrorSchema = z.object({
+  error: z.literal("invalid_request"),
+  issues: z.array(z.unknown()).min(1),
+});
+
+const ticketsSchema = z.object({
+  tickets: z.array(
+    z.object({
+      category: z.string(),
+      hasMessage: z.boolean(),
+      referenceId: z.string(),
+      status: z.string(),
+      subject: z.string(),
+      userId: z.string(),
+    }),
+  ),
+});
+
+const mailSchema = z.object({
   messages: z.array(
     z.object({
-      body: z.string(),
+      replyTo: z.string().nullable(),
       subject: z.string(),
       to: z.string(),
     }),
   ),
 });
 
-const validRequest = {
-  category: "bug",
-  subject: "Sending stops at the review step",
-  message: "Every time I approve a card the app returns to the review screen.",
-} as const;
+const ONE_HOUR_MS = 60 * 60_000;
 
-async function signInAsOwner(appServerUrl: string) {
-  const request = await apiRequest.newContext({ baseURL: appServerUrl });
-
-  await requestMagicLink(appServerUrl, request, authTestIdentity.ownerEmail);
-
-  const link = await latestMailLink(appServerUrl, request, authTestIdentity.ownerEmail);
-
-  await request.get(link);
-  await request.post("/__test__/user/name", {
-    data: { email: authTestIdentity.ownerEmail, name: authTestIdentity.ownerName },
-  });
-  await clearSinkMail(appServerUrl, request);
-
-  return request;
-}
-
-async function ownerIdOf(request: APIRequestContext, appServerUrl: string) {
-  const state = await verifyAuthState(appServerUrl, request);
-  const owner = state.users.find((user) => user.email === authTestIdentity.ownerEmail);
-
-  if (owner === undefined) {
-    throw new Error("The signed-in owner is missing from the auth state.");
+async function repeat(times: number, attempt: () => Promise<void>) {
+  if (times === 0) {
+    return;
   }
 
-  return owner.id;
+  await attempt();
+  await repeat(times - 1, attempt);
 }
 
-async function sinkMail(request: APIRequestContext) {
-  const response = await request.get("/__test__/mail");
+async function ticketsFor(request: APIRequestContext, userId: string) {
+  const path = `/__test__/support-tickets?userId=${encodeURIComponent(userId)}`;
 
-  return sinkMailSchema.parse(await response.json()).messages;
+  return ticketsSchema.parse(await (await request.get(path)).json()).tickets;
 }
 
-appTest("support refuses an unauthenticated request", async ({ isolatedAppServer }) => {
-  const request = await apiRequest.newContext({ baseURL: isolatedAppServer.url });
+async function mailFor(request: APIRequestContext) {
+  return mailSchema.parse(await (await request.get("/__test__/mail")).json()).messages;
+}
 
-  const response = await request.post("/api/support", { data: validRequest });
+async function signInDemo(request: APIRequestContext, url: string) {
+  const response = await request.post(`${url}/api/auth/demo/sign-in`, {
+    data: { email: demoEmail },
+    headers: {
+      "x-captcha-response": authTestIdentity.turnstilePassToken,
+      "x-turnstile-action": "magiclink",
+      origin: url,
+    },
+  });
 
-  expect(response.status()).toBe(401);
-  expect(await sinkMail(request)).toEqual([]);
+  expect(response.ok()).toBe(true);
+}
 
-  await request.dispose();
-});
+test("a support request is stored for the queue and mailed with the sender as Reply-To", async ({
+  supportServer,
+}) => {
+  const { owner, userId } = await ownerContextFor(supportServer.url);
 
-appTest(
-  "support rejects an invalid category, subject or message",
-  async ({ isolatedAppServer }) => {
-    const request = await signInAsOwner(isolatedAppServer.url);
-
-    const invalidBodies = [
-      { ...validRequest, category: "other" },
-      { ...validRequest, subject: "ab" },
-      { ...validRequest, message: "too short" },
-    ];
-
-    const statuses = await Promise.all(
-      invalidBodies.map(async (data) => {
-        const response = await request.post("/api/support", { data });
-
-        return response.status();
-      }),
-    );
-
-    expect(statuses).toEqual([400, 400, 400]);
-
-    expect(await sinkMail(request)).toEqual([]);
-
-    await request.dispose();
-  },
-);
-
-appTest("support emails the message with the user's details", async ({ isolatedAppServer }) => {
-  const request = await signInAsOwner(isolatedAppServer.url);
-  const userId = await ownerIdOf(request, isolatedAppServer.url);
-
-  const response = await request.post("/api/support", { data: validRequest });
+  const response = await owner.post("/api/support", {
+    data: {
+      category: "billing",
+      message: "I was charged twice for the same week. Could you check it?",
+      subject: "Charged twice",
+    },
+  });
 
   expect(response.status()).toBe(201);
 
   const body = supportResponseSchema.parse(await response.json());
 
-  expect(body.ok).toBe(true);
+  expect(body.referenceId).toMatch(/^SUP-[0-9A-F]{8}$/u);
 
-  const messages = await sinkMail(request);
+  const tickets = await ticketsFor(owner, userId);
 
-  expect(messages).toHaveLength(1);
+  expect(tickets).toEqual([
+    {
+      category: "billing",
+      hasMessage: true,
+      referenceId: body.referenceId,
+      status: "open",
+      subject: "Charged twice",
+      userId,
+    },
+  ]);
 
-  const [message] = messages;
-
-  expect(message?.to).toBe("hello@tryoverture.com");
-  expect(message?.subject).toBe(`[Overture Support - bug] ${validRequest.subject}`);
-  expect(message?.body).toContain(`Reference: ${body.referenceId}`);
-  expect(message?.body).toContain(`User ID: ${userId}`);
-  expect(message?.body).toContain(`Name: ${authTestIdentity.ownerName}`);
-  expect(message?.body).toContain(`Email: ${authTestIdentity.ownerEmail}`);
-  expect(message?.body).toContain("Category: bug");
-  expect(message?.body).toContain(`Subject: ${validRequest.subject}`);
-  expect(message?.body).toContain(validRequest.message);
-
-  await request.dispose();
-});
-
-appTest("support delivers to the configured support address", async ({ identityServer }) => {
-  const server = await startFreshAppServer(identityServer, {
-    SUPPORT_EMAIL: "support@example.com",
-  });
-
-  try {
-    const request = await signInAsOwner(server.url);
-
-    const response = await request.post("/api/support", { data: validRequest });
-
-    expect(response.status()).toBe(201);
-
-    const [message] = await sinkMail(request);
-
-    expect(message?.to).toBe("support@example.com");
-
-    await request.dispose();
-  } finally {
-    await server.stop();
-  }
-});
-
-appTest(
-  "support allows five messages an hour and then returns 429",
-  async ({ isolatedAppServer }) => {
-    const request = await signInAsOwner(isolatedAppServer.url);
-
-    const statuses = await Promise.all(
-      Array.from({ length: 5 }, async () => {
-        const response = await request.post("/api/support", { data: validRequest });
-
-        return response.status();
-      }),
-    );
-
-    expect(statuses).toEqual([201, 201, 201, 201, 201]);
-
-    const refused = await request.post("/api/support", { data: validRequest });
-
-    expect(refused.status()).toBe(429);
-    expect(await sinkMail(request)).toHaveLength(5);
-
-    await request.dispose();
-  },
-);
-
-appTest("support returns 502 when mail delivery fails", async ({ isolatedAppServer }) => {
-  const request = await signInAsOwner(isolatedAppServer.url);
-
-  await request.post("/__test__/mail/fail-next", { data: { count: 1 } });
-
-  const response = await request.post("/api/support", { data: validRequest });
-
-  expect(response.status()).toBe(502);
-  expect(z.object({ error: z.string() }).parse(await response.json()).error).toBe(
-    "mail_send_failed",
+  const messages = (await mailFor(owner)).filter(
+    (message) => message.to === "admin@tryoverture.com",
   );
 
-  await request.dispose();
+  expect(messages).toHaveLength(1);
+  expect(messages[0]?.replyTo).toBe(authTestIdentity.ownerEmail);
+  expect(messages[0]?.subject).toBe(`[${body.referenceId}] Charged twice`);
+
+  await owner.dispose();
+});
+
+test("an invalid body answers the shared invalid_request shape", async ({ supportServer }) => {
+  const { owner } = await ownerContextFor(supportServer.url);
+
+  const response = await owner.post("/api/support", {
+    data: { category: "billing" },
+  });
+
+  expect(response.status()).toBe(400);
+  validationErrorSchema.parse(await response.json());
+
+  await owner.dispose();
+});
+
+test("the demo account cannot open a support ticket", async ({ supportServer }) => {
+  const demo = await apiRequest.newContext({ baseURL: supportServer.url });
+
+  await signInDemo(demo, supportServer.url);
+
+  const response = await demo.post("/api/support", {
+    data: { category: "other", message: "Demo question", subject: "Demo" },
+  });
+
+  expect(response.status()).toBe(403);
+  expect(errorSchema.parse(await response.json()).error).toBe("demo_locked");
+  expect(await mailFor(demo)).toHaveLength(0);
+
+  await demo.dispose();
+});
+
+test("a mail failure answers 502 but keeps the ticket for the queue", async ({ supportServer }) => {
+  const { owner, userId } = await ownerContextFor(supportServer.url);
+
+  await owner.post("/__test__/mail/clear");
+  await owner.post("/__test__/mail/fail-next", { data: { count: 1 } });
+
+  const failed = await owner.post("/api/support", {
+    data: { category: "bug", message: "The Calendar lost my event.", subject: "Lost event" },
+  });
+
+  expect(failed.status()).toBe(502);
+
+  const failedBody = z
+    .object({ error: z.literal("mail_send_failed"), referenceId: z.string() })
+    .parse(await failed.json());
+
+  expect(failedBody.referenceId).toMatch(/^SUP-/u);
+
+  const tickets = await ticketsFor(owner, userId);
+
+  expect(tickets).toHaveLength(1);
+  expect(tickets[0]?.referenceId).toBe(failedBody.referenceId);
+  expect(await mailFor(owner)).toHaveLength(0);
+
+  await owner.dispose();
+});
+
+test("the support limit refuses the eleventh request in an hour", async ({ supportServer }) => {
+  const { owner } = await ownerContextFor(supportServer.url);
+
+  await repeat(10, async () => {
+    const response = await owner.post("/api/support", {
+      data: { category: "other", message: "A question", subject: "Question" },
+    });
+
+    expect(response.status()).toBe(201);
+  });
+
+  const refused = await owner.post("/api/support", {
+    data: { category: "other", message: "One more", subject: "Question" },
+  });
+
+  expect(refused.status()).toBe(429);
+  expect(errorSchema.parse(await refused.json()).error).toBe("rate_limited");
+
+  await owner.post("/__test__/clock/offset", { data: { offsetMs: ONE_HOUR_MS + 1000 } });
+
+  const nextWindow = await owner.post("/api/support", {
+    data: { category: "other", message: "Next hour", subject: "Question" },
+  });
+
+  expect(nextWindow.status()).toBe(201);
+
+  await owner.dispose();
 });

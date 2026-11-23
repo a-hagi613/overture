@@ -381,13 +381,16 @@
           "src/server/profile/time-zone.test.ts",
           "src/server/routes/ready.test.ts",
           "src/shared/host-match.test.ts",
+          "src/server/platform/admin-alerts.test.ts",
           "src/server/platform/alerts.test.ts",
+          "src/server/platform/audit/index.test.ts",
           "src/server/platform/rate-limit.test.ts",
           "src/server/platform/sse/hub.test.ts",
           "scripts/database-sync-guard.test.ts",
           "scripts/lint-config-guard.test.ts",
           "scripts/setup-stripe.test.ts",
           "scripts/vacuum-app-db.test.ts",
+          "scripts/vacuum-fly.test.ts",
           "scripts/workflow-config-guard.test.ts"
         ]
       }

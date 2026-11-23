@@ -40,10 +40,14 @@ async function sendEmail(
   body: string,
   replyTo?: string,
 ) {
-  const payload =
-    replyTo === undefined
-      ? { from: config.from, to: [to], subject, text: body }
-      : { from: config.from, reply_to: replyTo, to: [to], subject, text: body };
+  const base = {
+    from: config.from,
+    to: [to],
+    subject,
+    text: body,
+  };
+
+  const payload = replyTo === undefined ? base : { ...base, reply_to: replyTo };
 
   const response = await fetch(cloudflareSendEmailUrl(config.baseUrl, config.accountId), {
     method: "POST",
@@ -100,7 +104,7 @@ export function createCloudflareMailSender(config: CloudflareMailConfig) {
     sendBillingNotice: async (mail) => {
       await sendEmail(config, mail.to, mail.subject, mail.body);
     },
-    sendSupportMessage: async (mail) => {
+    sendSupport: async (mail) => {
       await sendEmail(config, mail.to, mail.subject, mail.body, mail.replyTo);
     },
   };

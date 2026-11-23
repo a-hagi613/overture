@@ -16,6 +16,7 @@ const themes = ["light", "dark"];
 
 const adminPaths = [
   "/admin",
+  "/admin/jobs",
   "/admin/settings",
   "/admin/catalog",
   "/admin/grants",
@@ -23,7 +24,10 @@ const adminPaths = [
   "/admin/invites",
   "/admin/mail-health",
   "/admin/provider-report",
+  "/admin/attempts",
+  "/admin/llm",
   "/admin/billing",
+  "/admin/audit",
 ];
 
 function combinations() {
@@ -57,7 +61,10 @@ async function checkPage(
       .or(page.getByRole("heading", { name: "Invites", exact: true }))
       .or(page.getByRole("heading", { name: "Mail health" }))
       .or(page.getByRole("heading", { name: "The provider report" }))
+      .or(page.getByRole("heading", { name: "Live attempts" }))
+      .or(page.getByRole("heading", { name: "LLM spend" }))
       .or(page.getByRole("heading", { name: "Billing", exact: true }))
+      .or(page.getByRole("heading", { name: "Admin audit" }))
       .first(),
   ).toBeVisible();
 

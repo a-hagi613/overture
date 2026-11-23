@@ -1,10 +1,13 @@
 import { validJson, validQuery } from "./validators.ts";
 import { and, asc, count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import type { Context } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
 
 import type { Auth } from "../auth/index.ts";
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
+import type { BackupMonitor } from "../platform/ports/backup.ts";
+import type { DegradedFlagReader } from "../platform/degraded.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
@@ -14,6 +17,8 @@ import { readSession } from "../auth/session.ts";
 import { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
 import type { AdminEnv } from "./admin-refusals.ts";
 import { createAdminRevealRoutes } from "./admin-reveal.ts";
+import type { JobActionOutcome } from "../admin/jobs.ts";
+import { cancelAdminJob, JOB_STATUS_FILTERS, listAdminJobs, retryAdminJob } from "../admin/jobs.ts";
 
 import {
   applications,
@@ -35,8 +40,19 @@ import { DEFAULT_IMPORT_SOURCE, importTags, readTagImports } from "../catalog/ta
 import { createAccessVerifier } from "../platform/access/index.ts";
 import { env } from "../config/env.ts";
 import { hasRecentPasskeyAssertion, lastPasskeyAssertionAt } from "../platform/passkey/index.ts";
-import { listAdminAudit, recordAdminAudit, shipAdminAudit } from "../platform/audit/index.ts";
-import { readLlmUsage } from "../platform/llm/usage.ts";
+import {
+  listAdminAudit,
+  parseAuditCursor,
+  queryAdminAudit,
+  recordAdminAudit,
+  shipAdminAudit,
+} from "../platform/audit/index.ts";
+import {
+  acknowledgeAdminAlerts,
+  readAdminAlerts,
+  validateAdminSettingValue,
+} from "../platform/admin-alerts.ts";
+import { readAdminLlmUsage } from "../platform/llm/usage.ts";
 import { applicationsLeft, balancesPerGrant, grantApplications } from "../billing/ledger.ts";
 import {
   BILLING_FILTERS,
@@ -73,8 +89,16 @@ import {
 import { isSameMailbox } from "../auth/email.ts";
 import { readMailHealth } from "../inbox/health.ts";
 import { buildStorageReport } from "../storage/report.ts";
+import { checkpointDatabase } from "../storage/database-sizes.ts";
+import { buildSystemReport, stripeModeOf } from "../system/report.ts";
 
 const settingBody = z.object({ value: z.string().min(1) });
+
+const jobsQuery = z.object({
+  kind: z.string().trim().min(1).max(120).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  status: z.enum(JOB_STATUS_FILTERS).default("all"),
+});
 
 const suspendBody = z.object({ reason: z.string().trim().min(1).max(500) });
 
@@ -132,8 +156,35 @@ const llmUsageQuery = z.object({
   limit: z.coerce.number().int().min(1).max(1000).default(100),
 });
 
+const ATTEMPT_OUTCOME_FILTERS = [
+  "all",
+  "completed",
+  "challenge_blocked",
+  "error",
+  "timeout",
+] as const;
+
+const ATTEMPT_OUTCOME_GROUPS = {
+  challenge_blocked: ["captcha_blocked", "blocked"],
+  completed: ["sent"],
+  error: [
+    "provider_error",
+    "crash",
+    "upload_failed",
+    "form_changed",
+    "identity_mismatch",
+    "posting_closed",
+    "duplicate",
+    "needs_review",
+    "unconfirmed",
+    "interrupted",
+  ],
+  timeout: ["timeout", "code_timeout"],
+} as const;
+
 const attemptsQuery = z.object({
   applicationId: z.string().min(1).optional(),
+  outcome: z.enum(ATTEMPT_OUTCOME_FILTERS).default("all"),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
@@ -183,21 +234,73 @@ const personioProbeSummarySchema = z.object({
   passed: z.boolean(),
 });
 
+const auditQuery = z.object({
+  action: z.string().trim().optional(),
+  actorId: z.string().trim().optional(),
+  before: z
+    .string()
+    .trim()
+    .refine((value) => value.length === 0 || parseAuditCursor(value) !== null, {
+      message: "Invalid audit cursor",
+    })
+    .optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  q: z.string().trim().optional(),
+  targetUserId: z.string().trim().optional(),
+});
+
+const ackAlertsBody = z.object({
+  id: z.string().trim().min(1).optional(),
+});
+
 export interface AdminDeps {
   catalogDb: CatalogDatabase;
   providers: BrowserProviderRegistry | null;
   personal: PersonalCrypto;
   payments: Payments | null;
   backupObjects: ObjectStore | null;
+  backups: BackupMonitor;
   databasePath: string;
+  degraded: DegradedFlagReader;
   objects: ObjectStore;
 }
 
 const ATS_NAMES = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
 
+function integrationsOf() {
+  return {
+    browserProvider: env.BROWSER_PROVIDER ?? null,
+    cfAccessConfigured:
+      env.CF_ACCESS_JWKS_URL !== undefined &&
+      env.CF_ACCESS_TEAM_DOMAIN !== undefined &&
+      env.CF_ACCESS_AUD !== undefined,
+    cloudflareEmailConfigured:
+      env.CLOUDFLARE_EMAIL_API_TOKEN !== undefined &&
+      env.CLOUDFLARE_ACCOUNT_ID !== undefined &&
+      env.CLOUDFLARE_ZONE_ID !== undefined,
+    demoLoginEnabled: env.DEMO_LOGIN_ENABLED,
+    ntfyConfigured: env.ALERT_NTFY_URL !== undefined,
+    publicSignupEnabled: env.PUBLIC_SIGNUP_ENABLED,
+    stripeMode: stripeModeOf(env.STRIPE_SECRET_KEY),
+    turnstileConfigured: env.TURNSTILE_SITE_KEY.length > 0 && env.TURNSTILE_SECRET.length > 0,
+  };
+}
+
 export { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
 
 export { isAdminHost } from "../host-routing.ts";
+
+function jobActionResponse(context: Context<AdminEnv>, result: JobActionOutcome) {
+  if (result.outcome === "not_found") {
+    return context.json({ error: "not_found" }, 404);
+  }
+
+  if (result.outcome === "conflict") {
+    return context.json({ error: result.reason, status: result.status }, 409);
+  }
+
+  return context.json({ job: result.job });
+}
 
 export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: AdminDeps) {
   const verifier = createAccessVerifier({
@@ -756,6 +859,28 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     });
   });
 
+  routes.get("/jobs", validQuery(jobsQuery), (context) =>
+    context.json(listAdminJobs(db, clock, context.req.valid("query"))),
+  );
+
+  routes.post("/jobs/:id/retry", async (context) => {
+    const owner = context.get("owner");
+
+    return jobActionResponse(
+      context,
+      await retryAdminJob(db, clock, context.req.param("id"), owner.userId),
+    );
+  });
+
+  routes.post("/jobs/:id/cancel", async (context) => {
+    const owner = context.get("owner");
+
+    return jobActionResponse(
+      context,
+      await cancelAdminJob(db, clock, context.req.param("id"), owner.userId),
+    );
+  });
+
   routes.get("/storage-report", validQuery(storageReportQuery), async (context) =>
     context.json(
       await buildStorageReport({
@@ -770,11 +895,51 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     ),
   );
 
+  routes.get("/system", async (context) =>
+    context.json(
+      await buildSystemReport({
+        backups: deps.backups,
+        catalogDb: deps.catalogDb,
+        clock,
+        databasePath: deps.databasePath,
+        db,
+        degraded: deps.degraded,
+        integrations: integrationsOf(),
+      }),
+    ),
+  );
+
+  routes.post("/system/checkpoint", async (context) => {
+    const owner = context.get("owner");
+    const report = checkpointDatabase(deps.databasePath);
+
+    await recordAdminAudit(db, clock, {
+      actorId: owner.userId,
+      action: "system.wal_checkpoint",
+      reason:
+        report.busy === 0
+          ? "Truncated the application database WAL from the system page"
+          : "The WAL checkpoint stayed busy; another connection is reading the database",
+      detail: {
+        afterWalBytes: report.afterWalBytes,
+        beforeWalBytes: report.beforeWalBytes,
+        busy: report.busy,
+        checkpointed: report.checkpointed,
+      },
+    });
+
+    return context.json(report);
+  });
+
   routes.get("/settings", (context) => context.json({ settings: getAllSettings(db) }));
 
   routes.put("/settings/:key", validJson(settingBody), async (context) => {
     const { key } = context.req.param();
     const { value } = context.req.valid("json");
+
+    if (!validateAdminSettingValue(key, value)) {
+      return context.json({ error: "invalid_setting_value" }, 400);
+    }
 
     const owner = context.get("owner");
 
@@ -895,20 +1060,67 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     return context.json({ jobId: job.id });
   });
 
-  routes.get("/audit", (context) => {
-    const audit = listAdminAudit(db, 100);
+  routes.get("/audit", validQuery(auditQuery), (context) => {
+    const query = context.req.valid("query");
+    const page = queryAdminAudit(db, query);
+
+    const entries = page.entries.map((row) => ({
+      id: row.id,
+      at: row.at.getTime(),
+      actorId: row.actorId,
+      action: row.action,
+      targetUserId: row.targetUserId,
+      reason: row.reason,
+      detail: row.detail,
+    }));
 
     return context.json({
-      audit: audit.map((row) => ({
-        id: row.id,
-        at: row.at.getTime(),
-        actorId: row.actorId,
-        action: row.action,
-        targetUserId: row.targetUserId,
-        reason: row.reason,
-        detail: row.detail,
-      })),
+      audit: entries,
+      entries,
+      nextCursor: page.nextCursor,
     });
+  });
+
+  routes.get("/alerts", (context) => {
+    const owner = context.get("owner");
+
+    return context.json(
+      readAdminAlerts({
+        backupStatus: deps.backups.status(),
+        clock,
+        db,
+        ownerUserId: owner.userId,
+        readinessEnv: {
+          alertNtfyConfigured: env.ALERT_NTFY_URL !== undefined,
+          cfAccessConfigured:
+            env.CF_ACCESS_AUD !== undefined && env.CF_ACCESS_TEAM_DOMAIN !== undefined,
+          publicSignupEnabled: env.PUBLIC_SIGNUP_ENABLED,
+          stripeSecretKey: env.STRIPE_SECRET_KEY,
+          stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
+        },
+      }),
+    );
+  });
+
+  routes.post("/alerts/ack", validJson(ackAlertsBody), async (context) => {
+    const owner = context.get("owner");
+    const { id } = context.req.valid("json");
+    const outcome = acknowledgeAdminAlerts(db, clock, owner.userId, id);
+
+    await recordAdminAudit(db, clock, {
+      actorId: owner.userId,
+      action: "alerts.ack",
+      detail: {
+        acknowledged: outcome.acknowledged,
+        notificationId: id ?? null,
+      },
+      reason:
+        id === undefined
+          ? "Acknowledged all unread owner alerts"
+          : "Acknowledged owner alert notification",
+    });
+
+    return context.json(outcome);
   });
 
   routes.post("/tag-imports", validJson(tagImportBody), async (context) => {
@@ -1194,32 +1406,90 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
   routes.get("/llm-usage", validQuery(llmUsageQuery), (context) => {
     const { purpose, limit } = context.req.valid("query");
 
-    return context.json(readLlmUsage(db, { purpose: purpose ?? null, sinceMs: null, limit }));
+    return context.json(
+      readAdminLlmUsage(db, clock, {
+        expectedModel: env.ANTHROPIC_MODEL,
+        limit,
+        purpose: purpose ?? null,
+      }),
+    );
   });
 
   routes.get("/attempts", validQuery(attemptsQuery), (context) => {
-    const { applicationId, limit } = context.req.valid("query");
+    const { applicationId, outcome, limit } = context.req.valid("query");
+
+    const baseFilter =
+      applicationId === undefined ? undefined : eq(attempts.applicationId, applicationId);
+
+    const outcomeFilter =
+      outcome === "all" ? undefined : inArray(attempts.outcome, ATTEMPT_OUTCOME_GROUPS[outcome]);
+
+    const filters = [baseFilter, outcomeFilter].filter((clause) => clause !== undefined);
+    const whereClause = filters.length === 0 ? undefined : and(...filters);
+
+    const countRows = db
+      .select({ outcome: attempts.outcome, total: count() })
+      .from(attempts)
+      .where(baseFilter)
+      .groupBy(attempts.outcome)
+      .all();
+
+    const counts = {
+      active: 0,
+      all: 0,
+      challenge_blocked: 0,
+      completed: 0,
+      error: 0,
+      timeout: 0,
+    };
+
+    const challengeOutcomes = new Set<string>(ATTEMPT_OUTCOME_GROUPS.challenge_blocked);
+    const completedOutcomes = new Set<string>(ATTEMPT_OUTCOME_GROUPS.completed);
+    const timeoutOutcomes = new Set<string>(ATTEMPT_OUTCOME_GROUPS.timeout);
+
+    for (const row of countRows) {
+      counts.all += row.total;
+
+      if (row.outcome === null) {
+        counts.active += row.total;
+      } else if (completedOutcomes.has(row.outcome)) {
+        counts.completed += row.total;
+      } else if (challengeOutcomes.has(row.outcome)) {
+        counts.challenge_blocked += row.total;
+      } else if (timeoutOutcomes.has(row.outcome)) {
+        counts.timeout += row.total;
+      } else {
+        counts.error += row.total;
+      }
+    }
 
     const rows = db
       .select({
         attempt: attempts,
         ats: applications.ats,
+        companyName: applications.companyName,
         postingTitle: applications.postingTitle,
       })
       .from(attempts)
       .innerJoin(applications, eq(attempts.applicationId, applications.id))
-      .where(applicationId === undefined ? undefined : eq(attempts.applicationId, applicationId))
+      .where(whereClause)
       .orderBy(desc(attempts.startedAt))
       .limit(limit)
       .all();
 
     return context.json({
+      now: clock.now(),
+      counts,
       attempts: rows.map((row) => ({
         applicationId: row.attempt.applicationId,
         ats: row.ats,
         browserMs: row.attempt.browserMs,
+        captchaSeen: row.attempt.captchaSeen,
+        codeUsed: row.attempt.codeUsed,
+        companyName: row.companyName,
         costMicros: row.attempt.costMicros,
         endedAt: row.attempt.endedAt,
+        errorCode: row.attempt.errorCode,
         id: row.attempt.id,
         outcome: row.attempt.outcome,
         postingTitle: row.postingTitle,
@@ -1350,19 +1620,26 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
   routes.get("/live-checks", (context) => context.json({ results: readLiveCheckResults(db, 100) }));
 
-  routes.post("/live-checks", async (context) => {
-    const owner = context.get("owner");
+  async function runLiveChecksNow(actorId: string) {
     const job = enqueueLiveCheckNow(db, clock);
 
     await recordAdminAudit(db, clock, {
-      actorId: owner.userId,
+      actorId,
       action: "live-checks.run",
       reason: "Run the daily live checks now",
       detail: { jobId: job.id },
     });
 
-    return context.json({ jobId: job.id });
-  });
+    return job.id;
+  }
+
+  routes.post("/live-checks", async (context) =>
+    context.json({ jobId: await runLiveChecksNow(context.get("owner").userId) }),
+  );
+
+  routes.post("/live-checks/run", async (context) =>
+    context.json({ jobId: await runLiveChecksNow(context.get("owner").userId) }),
+  );
 
   routes.post("/fixtures/capture", validJson(captureBody), async (context) => {
     if (deps.providers === null) {

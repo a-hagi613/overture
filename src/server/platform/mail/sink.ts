@@ -32,6 +32,7 @@ export function createSinkMailSender(clock: Clock) {
         from: env.MAIL_FROM,
         subject: copy.mail.magicLinkSubject,
         body: copy.mail.magicLinkBody(mail.url),
+        replyTo: null,
         sentAt: clock.now(),
       };
 
@@ -48,6 +49,7 @@ export function createSinkMailSender(clock: Clock) {
         from: env.MAIL_FROM,
         subject: mail.subject,
         body: mail.body,
+        replyTo: null,
         sentAt: clock.now(),
       };
 
@@ -64,6 +66,7 @@ export function createSinkMailSender(clock: Clock) {
         from: env.MAIL_FROM,
         subject: mail.subject,
         body: mail.body,
+        replyTo: null,
         sentAt: clock.now(),
       };
 
@@ -80,6 +83,7 @@ export function createSinkMailSender(clock: Clock) {
         from: env.MAIL_FROM,
         subject: copy.mail.accountDeletedSubject,
         body: copy.mail.accountDeletedBody(mail.name),
+        replyTo: null,
         sentAt: clock.now(),
       };
 
@@ -96,6 +100,7 @@ export function createSinkMailSender(clock: Clock) {
         from: env.MAIL_FROM,
         subject: mail.subject,
         body: mail.body,
+        replyTo: null,
         sentAt: clock.now(),
       };
 
@@ -112,6 +117,7 @@ export function createSinkMailSender(clock: Clock) {
         from: env.MAIL_FROM,
         subject: mail.subject,
         body: mail.body,
+        replyTo: null,
         sentAt: clock.now(),
       };
 
@@ -119,7 +125,7 @@ export function createSinkMailSender(clock: Clock) {
 
       await Promise.resolve();
     },
-    sendSupportMessage: async (mail) => {
+    sendSupport: async (mail) => {
       failIfAsked();
 
       const sent = {
@@ -128,6 +134,7 @@ export function createSinkMailSender(clock: Clock) {
         from: env.MAIL_FROM,
         subject: mail.subject,
         body: mail.body,
+        replyTo: mail.replyTo,
         sentAt: clock.now(),
       };
 

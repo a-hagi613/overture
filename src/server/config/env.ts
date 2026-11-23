@@ -115,7 +115,7 @@ const envSchema = z
     R2_BUCKET_BACKUPS: z.string().min(1).optional(),
     R2_ENDPOINT: z.url().optional(),
     MAIL_FROM: z.email().default("no-reply@tryoverture.com"),
-    SUPPORT_EMAIL: z.email().default("hello@tryoverture.com"),
+    SUPPORT_EMAIL: z.email().default("admin@tryoverture.com"),
     MAIL_DOMAIN: z
       .string()
       .min(1)

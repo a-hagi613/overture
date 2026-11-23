@@ -14,6 +14,7 @@ on:
           - seed-catalog
           - setup-stripe
           - live-diagnostics
+          - vacuum-db
       rotate_webhook:
         description: "Replace the Stripe webhook endpoint and rotate its signing secret"
         required: false
@@ -26,6 +27,11 @@ on:
         default: false
       reconcile_prices:
         description: "Replace drifted lookup-key prices on the existing products and archive the old prices"
+        required: false
+        type: boolean
+        default: false
+      force_vacuum:
+        description: "Compact the application database even when its freelist is below the 50 MB threshold"
         required: false
         type: boolean
         default: false
@@ -371,3 +377,22 @@ jobs:
           fi
           set -e
           timeout 120s flyctl ssh console -a overture-web -C "bun run /app/scripts/live-diagnostics.ts"
+
+      - name: Check the database sizes before a vacuum on overture-web
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'vacuum-db'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: bun run scripts/vacuum-fly.ts plan
+
+      - name: Compact the application database when its freelist is worth reclaiming
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'vacuum-db'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FORCE_VACUUM: ${{ inputs.force_vacuum }}
+        run: |
+          set -euo pipefail
+          if [ "${FORCE_VACUUM}" = "true" ]; then
+            bun run scripts/vacuum-fly.ts compact --force
+          else
+            bun run scripts/vacuum-fly.ts compact
+          fi

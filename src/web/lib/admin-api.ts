@@ -17,6 +17,66 @@ export const auditRowSchema = z.object({
   detail: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
 });
 
+export const adminAuditPageSchema = z.object({
+  entries: z.array(auditRowSchema),
+  nextCursor: z.string().nullable(),
+});
+
+export const adminAlertProblemSchema = z.object({
+  code: z.enum([
+    "kill_switch_active",
+    "dead_jobs",
+    "mail_cap_reached",
+    "mail_reserve_reached",
+    "mail_cap_near",
+    "backup_unavailable",
+    "backup_lag",
+    "health_degraded",
+  ]),
+  detail: z.string(),
+  id: z.string(),
+  severity: z.enum(["critical", "warning"]),
+  title: z.string(),
+});
+
+export const adminAlertNotificationSchema = z.object({
+  body: z.string(),
+  createdAt: z.number(),
+  detail: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).nullable(),
+  id: z.string(),
+  readAt: z.number().nullable(),
+  title: z.string(),
+  url: z.string(),
+});
+
+export const launchReadinessSchema = z.object({
+  alertNtfyConfigured: z.boolean(),
+  browserConcurrency: z.number(),
+  cfAccessConfigured: z.boolean(),
+  costGate: z.object({
+    completed: z.number(),
+    costGateMet: z.boolean().nullable(),
+    costGateMicros: z.number(),
+    costMicrosPerCompleted: z.number().nullable(),
+  }),
+  dailyCap: z.number(),
+  publicSignupEnabled: z.boolean(),
+  stripeMode: z.enum(["live", "test", "disabled"]),
+});
+
+export const adminAlertsResponseSchema = z.object({
+  notifications: z.array(adminAlertNotificationSchema),
+  now: z.number(),
+  problems: z.array(adminAlertProblemSchema),
+  readiness: launchReadinessSchema,
+  unreadCount: z.number(),
+});
+
+export const ackAlertsResponseSchema = z.object({
+  acknowledged: z.number(),
+  readAt: z.number(),
+});
+
 export const overviewSchema = z.object({
   now: z.number(),
   jobs: z.record(z.string(), z.number()),
@@ -46,6 +106,66 @@ export const overviewSchema = z.object({
   }),
   audit: z.array(auditRowSchema),
 });
+
+export const jobStatusSchema = z.enum(["queued", "running", "failed", "dead", "done"]);
+
+export const jobStatusFilterSchema = z.enum([
+  "all",
+  "queued",
+  "running",
+  "failed",
+  "dead",
+  "completed",
+]);
+
+export const jobRowSchema = z.object({
+  attempts: z.number(),
+  createdAt: z.number(),
+  dedupeKey: z.string().nullable(),
+  id: z.string(),
+  kind: z.string(),
+  lastError: z.string().nullable(),
+  lockedUntil: z.number().nullable(),
+  maxAttempts: z.number(),
+  payloadPreview: z.string(),
+  priority: z.number(),
+  runAt: z.number(),
+  status: jobStatusSchema,
+  updatedAt: z.number(),
+});
+
+export const jobsResponseSchema = z.object({
+  counts: z.object({
+    queued: z.number(),
+    running: z.number(),
+    done: z.number(),
+    failed: z.number(),
+    dead: z.number(),
+    total: z.number(),
+  }),
+  countsByKindStatus: z.array(
+    z.object({
+      kind: z.string(),
+      status: jobStatusSchema,
+      total: z.number(),
+    }),
+  ),
+  kinds: z.array(z.string()),
+  jobs: z.array(jobRowSchema),
+  limit: z.number(),
+  now: z.number(),
+  total: z.number(),
+});
+
+export const jobActionResponseSchema = z.object({ job: jobRowSchema });
+
+export type JobRow = z.infer<typeof jobRowSchema>;
+
+export type JobStatus = z.infer<typeof jobStatusSchema>;
+
+export type JobStatusFilter = z.infer<typeof jobStatusFilterSchema>;
+
+export type JobsResponse = z.infer<typeof jobsResponseSchema>;
 
 export const providerReportRowSchema = z.object({
   ats: z.string(),
@@ -402,9 +522,127 @@ export type LabReportRow = z.infer<typeof labReportRowSchema>;
 
 export type AuditRow = z.infer<typeof auditRowSchema>;
 
+export type AdminAuditPage = z.infer<typeof adminAuditPageSchema>;
+
+export type AdminAlertProblem = z.infer<typeof adminAlertProblemSchema>;
+
+export type AdminAlertNotification = z.infer<typeof adminAlertNotificationSchema>;
+
+export type LaunchReadiness = z.infer<typeof launchReadinessSchema>;
+
+export type AdminAlertsResponse = z.infer<typeof adminAlertsResponseSchema>;
+
 export type KillSwitchRow = z.infer<typeof killSwitchRowSchema>;
 
 export type GrantRow = z.infer<typeof grantRowSchema>;
+
+export const systemDatabaseSizesSchema = z.object({
+  fileBytes: z.number(),
+  freeBytes: z.number(),
+  freelistCount: z.number(),
+  pageCount: z.number(),
+  pageSize: z.number(),
+  walBytes: z.number(),
+});
+
+export const backupReplicationSchema = z.discriminatedUnion("replication", [
+  z.object({ replication: z.literal("unconfigured") }),
+  z.object({ readAgeSeconds: z.number().nullable(), replication: z.literal("unknown") }),
+  z.object({ readAgeSeconds: z.number(), replication: z.literal("unavailable") }),
+  z.object({
+    lagSeconds: z.number(),
+    readAgeSeconds: z.number(),
+    replicaTxid: z.string(),
+    replication: z.literal("ok"),
+  }),
+]);
+
+export const degradedFlagSchema = z.object({
+  degraded: z.literal(true),
+  metrics: z.array(
+    z.object({
+      allowance: z.number(),
+      metric: z.string(),
+      share: z.number(),
+      used: z.number(),
+    }),
+  ),
+  since: z.string(),
+  version: z.literal(1),
+});
+
+export const liveCheckResultSchema = z.object({
+  check: z.string(),
+  detail: z.looseObject({ error: z.string().optional(), skipped: z.string().optional() }),
+  durationMs: z.number(),
+  id: z.string(),
+  ok: z.boolean(),
+  runId: z.string(),
+  startedAt: z.number(),
+});
+
+export const systemReportSchema = z.object({
+  backups: backupReplicationSchema,
+  catalog: z.object({
+    boards: z.number(),
+    bySource: z.array(z.object({ closed: z.number(), open: z.number(), source: z.string() })),
+    closedPostings: z.number(),
+    lastPolledAt: z.number().nullable(),
+    lastSeenAt: z.number().nullable(),
+    openPostings: z.number(),
+  }),
+  databases: z.object({
+    app: systemDatabaseSizesSchema.nullable(),
+    catalog: systemDatabaseSizesSchema.nullable(),
+  }),
+  degraded: degradedFlagSchema.nullable(),
+  generatedAt: z.number(),
+  integrations: z.object({
+    browserProvider: z.enum(["browser_use", "kernel", "local"]).nullable(),
+    cfAccessConfigured: z.boolean(),
+    cloudflareEmailConfigured: z.boolean(),
+    demoLoginEnabled: z.boolean(),
+    ntfyConfigured: z.boolean(),
+    publicSignupEnabled: z.boolean(),
+    stripeMode: z.enum(["live", "test", "unconfigured"]),
+    turnstileConfigured: z.boolean(),
+  }),
+  liveChecks: z.object({
+    latestRunAt: z.number().nullable(),
+    results: z.array(liveCheckResultSchema),
+  }),
+  runtime: z.object({
+    bunVersion: z.string(),
+    heapTotalBytes: z.number(),
+    heapUsedBytes: z.number(),
+    loadAverage: z.tuple([z.number(), z.number(), z.number()]),
+    rssBytes: z.number(),
+    uptimeSeconds: z.number(),
+  }),
+  volume: z
+    .object({
+      freeBytes: z.number(),
+      mount: z.string(),
+      totalBytes: z.number(),
+      usedRatio: z.number(),
+    })
+    .nullable(),
+});
+
+export const systemCheckpointSchema = z.object({
+  afterWalBytes: z.number(),
+  beforeWalBytes: z.number(),
+  busy: z.number(),
+  checkpointed: z.number(),
+});
+
+export const liveChecksRunSchema = z.object({ jobId: z.string() });
+
+export type SystemReport = z.infer<typeof systemReportSchema>;
+
+export type SystemCheckpoint = z.infer<typeof systemCheckpointSchema>;
+
+export type LiveCheckResult = z.infer<typeof liveCheckResultSchema>;
 
 export type MailHealth = z.infer<typeof mailHealthSchema>;
 
@@ -415,6 +653,16 @@ export type AdminResult<T> = { ok: true; data: T } | { ok: false; refusal: Admin
 const refusalBodySchema = z.object({
   error: adminRefusalCodeSchema,
 });
+
+export class AdminHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`The admin request did not go through (${String(status)}).`);
+    this.name = "AdminHttpError";
+    this.status = status;
+  }
+}
 
 async function adminRequest<T>(response: Response, schema: z.ZodType<T>) {
   const raw: unknown = await response.json();
@@ -427,7 +675,7 @@ async function adminRequest<T>(response: Response, schema: z.ZodType<T>) {
   }
 
   if (!response.ok) {
-    throw new Error(`The admin request did not go through (${String(response.status)}).`);
+    throw new AdminHttpError(response.status);
   }
 
   const loaded: AdminResult<T> = { ok: true, data: schema.parse(raw) };
@@ -461,7 +709,8 @@ type AdminWriteBody =
   | { reason: string }
   | { value: string }
   | { providers: string[]; pages: string[]; sessionsPerPage: number }
-  | { urls?: string[] };
+  | { urls?: string[] }
+  | { id?: string };
 
 async function adminWrite<T>(
   method: "POST" | "PUT",
@@ -497,7 +746,73 @@ async function adminPut<T>(path: string, body: AdminWriteBody, schema: z.ZodType
 
 export const loadOverview = async () => adminGet("/admin/api/overview", overviewSchema);
 
+export const loadAdminAlerts = async () => adminGet("/admin/api/alerts", adminAlertsResponseSchema);
+
+export const ackAdminAlerts = async (id?: string) =>
+  adminPost("/admin/api/alerts/ack", id === undefined ? {} : { id }, ackAlertsResponseSchema);
+
+export interface AdminAuditFilterInput {
+  action?: string;
+  actorId?: string;
+  targetUserId?: string;
+  q?: string;
+  limit?: number;
+  before?: string | null;
+}
+
+export const loadAdminAudit = async (input: AdminAuditFilterInput) => {
+  const search = new URLSearchParams();
+
+  if (input.action !== undefined && input.action.trim().length > 0) {
+    search.set("action", input.action.trim());
+  }
+
+  if (input.actorId !== undefined && input.actorId.trim().length > 0) {
+    search.set("actorId", input.actorId.trim());
+  }
+
+  if (input.targetUserId !== undefined && input.targetUserId.trim().length > 0) {
+    search.set("targetUserId", input.targetUserId.trim());
+  }
+
+  if (input.q !== undefined && input.q.trim().length > 0) {
+    search.set("q", input.q.trim());
+  }
+
+  if (input.limit !== undefined) {
+    search.set("limit", String(input.limit));
+  }
+
+  if (input.before !== undefined && input.before !== null && input.before.trim().length > 0) {
+    search.set("before", input.before.trim());
+  }
+
+  const query = search.toString();
+  const path = query.length === 0 ? "/admin/api/audit" : `/admin/api/audit?${query}`;
+
+  return adminGet(path, adminAuditPageSchema);
+};
+
 export const loadSettings = async () => adminGet("/admin/api/settings", settingsResponseSchema);
+
+export const loadJobs = async (input: { status: JobStatusFilter; kind: string; limit: number }) => {
+  const search = new URLSearchParams({
+    limit: String(input.limit),
+    status: input.status,
+  });
+
+  if (input.kind.length > 0) {
+    search.set("kind", input.kind);
+  }
+
+  return adminGet(`/admin/api/jobs?${search.toString()}`, jobsResponseSchema);
+};
+
+export const retryJob = async (id: string) =>
+  adminPost(`/admin/api/jobs/${encodeURIComponent(id)}/retry`, null, jobActionResponseSchema);
+
+export const cancelJob = async (id: string) =>
+  adminPost(`/admin/api/jobs/${encodeURIComponent(id)}/cancel`, null, jobActionResponseSchema);
 
 export const loadProviderReport = async () =>
   adminGet("/admin/api/provider-report", providerReportSchema);
@@ -518,6 +833,14 @@ export const runPersonioProbe = async (urls?: string[]) =>
 
 export const loadMailHealth = async (days: number) =>
   adminGet(`/admin/api/mail-health?days=${String(days)}`, mailHealthSchema);
+
+export const loadSystem = async () => adminGet("/admin/api/system", systemReportSchema);
+
+export const runWalCheckpoint = async () =>
+  adminPost("/admin/api/system/checkpoint", null, systemCheckpointSchema);
+
+export const runLiveChecksNow = async () =>
+  adminPost("/admin/api/live-checks/run", null, liveChecksRunSchema);
 
 export const saveSetting = async (settingKey: string, value: string) =>
   adminPut(`/admin/api/settings/${settingKey}`, { value }, settingResponseSchema);
@@ -735,3 +1058,245 @@ export const reinstateUser = async (id: string, reason: string) =>
     { reason },
     adminSuspendResponseSchema,
   );
+
+export const attemptOutcomeFilterSchema = z.enum([
+  "all",
+  "completed",
+  "challenge_blocked",
+  "error",
+  "timeout",
+]);
+
+export const attemptProviderSchema = z.enum(["browser_use", "kernel", "local"]);
+
+export const attemptOutcomeSchema = z.enum([
+  "sent",
+  "unconfirmed",
+  "captcha_blocked",
+  "code_timeout",
+  "posting_closed",
+  "form_changed",
+  "blocked",
+  "upload_failed",
+  "duplicate",
+  "identity_mismatch",
+  "needs_review",
+  "provider_error",
+  "timeout",
+  "crash",
+  "interrupted",
+]);
+
+export const attemptRowSchema = z.object({
+  applicationId: z.string(),
+  ats: z.string().nullable(),
+  browserMs: z.number().nullable(),
+  captchaSeen: z.boolean(),
+  codeUsed: z.boolean(),
+  companyName: z.string(),
+  costMicros: z.number().nullable(),
+  endedAt: z.number().nullable(),
+  errorCode: z.string().nullable(),
+  id: z.string(),
+  liveUrl: z.string(),
+  outcome: attemptOutcomeSchema.nullable(),
+  postingTitle: z.string(),
+  provider: attemptProviderSchema,
+  providerSessionId: z.string().nullable(),
+  proxyBytes: z.number().nullable(),
+  replayUrl: z.string(),
+  startedAt: z.number(),
+});
+
+export const attemptsCountsSchema = z.object({
+  active: z.number(),
+  all: z.number(),
+  challenge_blocked: z.number(),
+  completed: z.number(),
+  error: z.number(),
+  timeout: z.number(),
+});
+
+export const attemptsResponseSchema = z.object({
+  attempts: z.array(attemptRowSchema),
+  counts: attemptsCountsSchema,
+  now: z.number(),
+});
+
+export const attemptLiveSchema = z.object({
+  liveViewUrl: z.string().nullable(),
+  recordingUrl: z.string().nullable(),
+  status: z.enum(["active", "stopped"]),
+});
+
+export const attemptReplaySchema = z.object({
+  recordingUrl: z.string(),
+});
+
+const attemptUnavailableBodySchema = z.object({
+  error: z.enum(["not_found", "provider_unavailable"]),
+});
+
+export const llmUsageTotalsSchema = z.object({
+  cachedTokens: z.number(),
+  calls: z.number(),
+  costMicros: z.number(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+});
+
+export const llmUsageRowSchema = z.object({
+  cachedTokens: z.number(),
+  costMicros: z.number(),
+  createdAt: z.number(),
+  id: z.string(),
+  inputTokens: z.number(),
+  model: z.string(),
+  outputTokens: z.number(),
+  purpose: z.string(),
+  userId: z.string().nullable(),
+});
+
+export const llmUsagePurposeRowSchema = llmUsageTotalsSchema.extend({
+  purpose: z.string(),
+});
+
+export const llmUsageModelRowSchema = llmUsageTotalsSchema.extend({
+  model: z.string(),
+  unexpected: z.boolean(),
+});
+
+export const llmUsageCapsSchema = z.object({
+  dailySpendCapMicros: z.number(),
+  monthlySpendCapMicros: z.number().nullable(),
+  taggingDailyCapMicros: z.number(),
+  userDailyCapMicros: z.number(),
+});
+
+export const llmUsageResponseSchema = z.object({
+  allTime: llmUsageTotalsSchema,
+  byModel: z.array(llmUsageModelRowSchema),
+  byPurpose: z.array(llmUsagePurposeRowSchema),
+  caps: llmUsageCapsSchema,
+  expectedModel: z.string(),
+  month: llmUsageTotalsSchema,
+  now: z.number(),
+  rows: z.array(llmUsageRowSchema),
+  today: llmUsageTotalsSchema,
+  totals: llmUsageTotalsSchema,
+});
+
+export type AttemptOutcomeFilter = z.infer<typeof attemptOutcomeFilterSchema>;
+
+export type AttemptOutcome = z.infer<typeof attemptOutcomeSchema>;
+
+export type AttemptRow = z.infer<typeof attemptRowSchema>;
+
+export type AttemptsCounts = z.infer<typeof attemptsCountsSchema>;
+
+export type AttemptsResponse = z.infer<typeof attemptsResponseSchema>;
+
+export type AttemptLive = z.infer<typeof attemptLiveSchema>;
+
+export type AttemptReplay = z.infer<typeof attemptReplaySchema>;
+
+export type AttemptViewResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; refusal: AdminRefusalCode }
+  | { ok: false; unavailable: "not_found" | "provider_unavailable" };
+
+export type LlmUsageTotals = z.infer<typeof llmUsageTotalsSchema>;
+
+export type LlmUsageRow = z.infer<typeof llmUsageRowSchema>;
+
+export type LlmUsagePurposeRow = z.infer<typeof llmUsagePurposeRowSchema>;
+
+export type LlmUsageModelRow = z.infer<typeof llmUsageModelRowSchema>;
+
+export type LlmUsageCaps = z.infer<typeof llmUsageCapsSchema>;
+
+export type LlmUsageResponse = z.infer<typeof llmUsageResponseSchema>;
+
+async function adminOptionalView<T>(path: string, schema: z.ZodType<T>) {
+  const response = await fetch(path);
+  const raw: unknown = await response.json();
+  const refusal = refusalBodySchema.safeParse(raw);
+
+  if (!response.ok && refusal.success) {
+    const denied: AttemptViewResult<T> = { ok: false, refusal: refusal.data.error };
+
+    return denied;
+  }
+
+  const unavailable = attemptUnavailableBodySchema.safeParse(raw);
+
+  if (response.status === 404 && unavailable.success) {
+    const missing: AttemptViewResult<T> = { ok: false, unavailable: unavailable.data.error };
+
+    return missing;
+  }
+
+  if (!response.ok) {
+    throw new Error(`The admin request did not go through (${String(response.status)}).`);
+  }
+
+  const loaded: AttemptViewResult<T> = { ok: true, data: schema.parse(raw) };
+
+  return loaded;
+}
+
+export const fetchAdminAttempts = async (
+  input: {
+    applicationId?: string | undefined;
+    limit?: number | undefined;
+    outcome?: AttemptOutcomeFilter | undefined;
+  } = {},
+) => {
+  const search = new URLSearchParams();
+
+  if (input.applicationId !== undefined && input.applicationId.trim().length > 0) {
+    search.set("applicationId", input.applicationId.trim());
+  }
+
+  if (input.outcome !== undefined && input.outcome !== "all") {
+    search.set("outcome", input.outcome);
+  }
+
+  if (input.limit !== undefined) {
+    search.set("limit", String(input.limit));
+  }
+
+  const query = search.toString();
+
+  return adminGet(
+    query.length === 0 ? "/admin/api/attempts" : `/admin/api/attempts?${query}`,
+    attemptsResponseSchema,
+  );
+};
+
+export const fetchAdminAttemptLive = async (id: string) =>
+  adminOptionalView(`/admin/api/attempts/${encodeURIComponent(id)}/live`, attemptLiveSchema);
+
+export const fetchAdminAttemptReplay = async (id: string) =>
+  adminOptionalView(`/admin/api/attempts/${encodeURIComponent(id)}/replay`, attemptReplaySchema);
+
+export const fetchAdminLlmUsage = async (
+  input: { limit?: number | undefined; purpose?: string | undefined } = {},
+) => {
+  const search = new URLSearchParams();
+
+  if (input.purpose !== undefined && input.purpose.trim().length > 0) {
+    search.set("purpose", input.purpose.trim());
+  }
+
+  if (input.limit !== undefined) {
+    search.set("limit", String(input.limit));
+  }
+
+  const query = search.toString();
+
+  return adminGet(
+    query.length === 0 ? "/admin/api/llm-usage" : `/admin/api/llm-usage?${query}`,
+    llmUsageResponseSchema,
+  );
+};

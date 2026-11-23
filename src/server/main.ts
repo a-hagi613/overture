@@ -533,9 +533,20 @@ const billingNoticeJobHandlers: JobHandlers = {
   },
 };
 
+const retriedTestJobs = new Set<string>();
+
 const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
   ? {
       "test.ping": async (payload) => {
+        await Promise.resolve(payload);
+      },
+      "test.retryable": async (payload) => {
+        if (!retriedTestJobs.has(payload)) {
+          retriedTestJobs.add(payload);
+
+          throw new Error("the test job failed once");
+        }
+
         await Promise.resolve(payload);
       },
       "test.otel": async (payload) => {
@@ -952,6 +963,7 @@ const app = createApp({
   catalogDb,
   clock,
   databasePath,
+  degraded: degradedFlag,
   staticRoot: env.STATIC_ROOT,
   testRoutes: env.ENABLE_TEST_ROUTES,
   jobHandlers: allJobHandlers,
@@ -959,7 +971,6 @@ const app = createApp({
   objects,
   llm: anthropicLlmPort,
   spendGate,
-  mail: mailSender,
   mailboxes,
   resolver,
   liveCheckAddress: liveCheckAddressValue,
@@ -971,6 +982,7 @@ const app = createApp({
   catalogWorker,
   eraser,
   exports,
+  mail: mailSender,
   payments,
   shutdown: shutdownController.signal,
 });

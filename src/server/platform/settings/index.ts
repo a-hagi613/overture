@@ -29,7 +29,7 @@ const SETTING_DEFAULTS = {
   "llm.cap_global_day_usd": "10",
   "llm.cap_tagging_day_usd": "1",
   "browser.provider": "browser_use",
-  "browser.max_concurrent_sessions": "3",
+  "browser.max_concurrent_sessions": "0",
   "checkin.after_days": "21",
   "checkin.close_after_days": "45",
   "invite.grant_quantity": "300",

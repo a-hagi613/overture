@@ -5,10 +5,22 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 
-import { readSession } from "../auth/session.ts";
+import { validJson, validQuery } from "./validators.ts";
+import { readSession, readSessionUser } from "../auth/session.ts";
 import { calendarItemsOf } from "../calendar/items.ts";
+import {
+  createCalendarCustomEvent,
+  deleteCalendarCustomEvent,
+  listCalendarCustomEvents,
+} from "../calendar/custom-events.ts";
+import { demoLocked } from "../demo/guard.ts";
 import { localDateAt } from "../platform/local-time.ts";
 import { createTimeZoneService } from "../profile/time-zone.ts";
+import { API_ERRORS } from "../../shared/api-errors.ts";
+import {
+  calendarEventInputSchema,
+  calendarEventsQuerySchema,
+} from "../../shared/calendar-events.ts";
 
 const CALENDAR_MAX_DAYS = 42;
 
@@ -95,6 +107,78 @@ export function createCalendarRoutes(deps: { auth: Auth; clock: Clock; db: AppDa
     items.sort((left, right) => left.at - right.at || left.id.localeCompare(right.id));
 
     return context.json({ items, timeZone });
+  });
+
+  routes.get("/calendar/events", validQuery(calendarEventsQuerySchema), async (context) => {
+    context.header("Cache-Control", "private, no-store");
+
+    const user = await readSessionUser(auth, context.req.raw.headers);
+
+    if (user === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    const { from, to } = context.req.valid("query");
+
+    const events = listCalendarCustomEvents(
+      db,
+      user.id,
+      from === undefined || to === undefined ? null : { from, to },
+    );
+
+    return context.json({ events });
+  });
+
+  routes.post("/calendar/events", validJson(calendarEventInputSchema), async (context) => {
+    context.header("Cache-Control", "private, no-store");
+
+    const user = await readSessionUser(auth, context.req.raw.headers);
+
+    if (user === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    const locked = demoLocked(user.role);
+
+    if (locked !== null) {
+      return locked;
+    }
+
+    const input = context.req.valid("json");
+
+    const event = createCalendarCustomEvent(db, deps.clock, user.id, {
+      company: input.company,
+      dayKey: input.dayKey,
+      kind: input.kind,
+      time: input.time,
+      title: input.title,
+    });
+
+    return context.json({ event }, 201);
+  });
+
+  routes.delete("/calendar/events/:id", async (context) => {
+    context.header("Cache-Control", "private, no-store");
+
+    const user = await readSessionUser(auth, context.req.raw.headers);
+
+    if (user === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    const locked = demoLocked(user.role);
+
+    if (locked !== null) {
+      return locked;
+    }
+
+    const deleted = deleteCalendarCustomEvent(db, user.id, context.req.param("id"));
+
+    if (!deleted) {
+      return context.json({ error: API_ERRORS.notFound }, 404);
+    }
+
+    return context.json({ ok: true });
   });
 
   return routes;

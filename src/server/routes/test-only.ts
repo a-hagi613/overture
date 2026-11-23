@@ -52,6 +52,7 @@ import {
   sessions,
   stripeEvents,
   subscriptions,
+  supportTickets,
   tagImports,
   users,
 } from "../platform/db/schema.ts";
@@ -369,9 +370,12 @@ const seedAttemptBody = z.object({
       "interrupted",
       "identity_mismatch",
     ])
+    .nullable()
     .default("sent"),
   at: z.number().int().nullish(),
   startedAt: z.number().int().optional(),
+  endedAt: z.number().int().nullable().optional(),
+  errorCode: z.string().nullable().optional(),
   browserMs: z.number().int().nonnegative().default(0),
   proxyBytes: z.number().int().nonnegative().default(0),
   costMicros: z.number().int().nonnegative().default(0),
@@ -2209,6 +2213,9 @@ export function createTestRoutes(
       return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
+    const defaultEndedAt = rest.outcome === null ? null : startedAt + rest.browserMs;
+    const resolvedEndedAt = rest.endedAt === undefined ? defaultEndedAt : rest.endedAt;
+
     db.insert(attempts)
       .values({
         applicationId,
@@ -2216,7 +2223,8 @@ export function createTestRoutes(
         captchaSeen: rest.captchaSeen,
         codeUsed: rest.codeUsed,
         costMicros: rest.costMicros,
-        endedAt: startedAt + rest.browserMs,
+        endedAt: resolvedEndedAt,
+        errorCode: rest.errorCode ?? null,
         id,
         leaseUntil: startedAt + 15 * 60_000,
         n: rest.n ?? 1,
@@ -2446,10 +2454,34 @@ export function createTestRoutes(
       from: sent.from,
       subject: sent.subject,
       body: sent.body,
+      replyTo: sent.replyTo,
       sentAt: sent.sentAt,
     }));
 
     return context.json({ messages: captured });
+  });
+
+  routes.get("/support-tickets", validQuery(userQuery), (context) => {
+    const { userId } = context.req.valid("query");
+
+    const tickets = db
+      .select()
+      .from(supportTickets)
+      .where(eq(supportTickets.userId, userId))
+      .orderBy(asc(supportTickets.createdAt))
+      .all()
+      .map((ticket) => ({
+        category: ticket.category,
+        createdAt: ticket.createdAt,
+        hasMessage: ticket.messageEnc.length > 0,
+        id: ticket.id,
+        referenceId: ticket.referenceId,
+        status: ticket.status,
+        subject: ticket.subject,
+        userId: ticket.userId,
+      }));
+
+    return context.json({ tickets });
   });
 
   routes.post("/mail/clear", (context) => {

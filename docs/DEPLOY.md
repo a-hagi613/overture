@@ -12,14 +12,15 @@ No secret value ever appears in this repository: secrets are set with `fly secre
 | File | Role |
 |---|---|
 | `Dockerfile` | Multi-stage build on Bun 1.4: installs, builds the SPA (`dist/`), ships a slim runtime with Litestream 0.5.18 (checksum-verified) |
-| `scripts/docker-entrypoint.sh` | On start: Litestream restores `/data/app.sqlite` from the replica if it does not exist, then runs `litestream replicate -exec "bun run /app/src/server/main.ts"`; migrations run inside `main.ts`. With `LITESTREAM_RESTORE_ONLY=true` it restores, runs the read-only restored-database check and never starts `main.ts` |
+| `scripts/docker-entrypoint.sh` | On start: Litestream restores `/data/app.sqlite` from the replica if it does not exist, then runs `litestream replicate -exec "bun run /app/src/server/main.ts"`; migrations run inside `main.ts`. With `LITESTREAM_RESTORE_ONLY=true` it restores, runs the read-only restored-database check and never starts `main.ts`. With `VACUUM_ONLY=true` it compacts the application database instead, with Litestream and the server stopped |
 | `litestream.yml` | Continuous replication (1 s sync) to R2 `overture-backups`, nightly snapshot (`interval: 24h`) kept 30 days (`retention: 720h`); the L0 retention check runs every 5 minutes so its ListObjects cost stays bounded (#281) |
 | Deleted accounts in backups | The 35-day lifecycle on `overture-backups` (`app.sqlite/`) and the 30-day snapshot retention are the replay window for an erased account: only keyless ciphertext can come back, because `user_keys` is destroyed first (SPEC §13.2). R2 object deletes are not part of a replay |
 | `fly.toml` | App `overture-web`, region `yyz`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health`; `PUBLIC_SIGNUP_ENABLED = "false"` keeps production invite-only (owner, invited and verified users, and the demo account) until M3 public sign-up ships, while `DEMO_LOGIN_ENABLED = "true"` keeps the demo account |
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`), a `security-and-restore` job (gitleaks over the history, the private-files guard, and the Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations, untouched `bg_jobs`), and the `ci-ok` aggregator every other job feeds |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
-| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets), `live-diagnostics` (runtime names present/missing and integer SQLite counts). Skips with a green notice while `FLY_API_TOKEN` is unset |
+| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
+| `.github/workflows/vacuum-db.yml` | Weekly (Sundays 05:00 UTC, also `workflow_dispatch` with `dry_run` and `force`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise dry-runs `/data/app.sqlite`, and only when its freelist exceeds 50 MB (or `force` is set) restarts the one machine in maintenance mode, vacuums it, restarts the server and polls `/api/health` |
 | `scripts/check-restored-db.ts` | Restored-database checks, read-only: PRAGMA `integrity_check`, applied-migration count, per-table row counts, untouched `bg_jobs`, zero outbound requests |
 | `scripts/restore-drill.ts` | `DRILL_TARGET=local` (CI round-trip) or `DRILL_TARGET=fly` (throwaway machine drill); never starts the app server |
 | `litestream-drill.yml` | Restore-only Litestream config for drills: same bucket, dedicated read-only `R2_DRILL_*` credential |
@@ -220,18 +221,23 @@ Run the daily check once from the owner's terminal (`POST https://admin.tryovert
 confirm `mail.sending` and `mail` pass. If the records were just created, Cloudflare usually propagates in 5–15
 minutes; re-run `--check` until it prints `verdict: ready`.
 
-## M3-10: landing and pricing on Workers Static Assets (owner runbook)
+## M3-10: the landing on Workers Static Assets (owner runbook)
 
-The redrawn landing (`/`) and pricing (`/pricing`) pages are prerendered by the main build and deployed as
-Workers Static Assets (`workers/marketing`, [#284](https://github.com/a-hagi613/overture/issues/284), ADR 0033).
-Cloudflare attaches the Worker to two explicit routes on `tryoverture.com` and no others:
+The landing (`/`) is prerendered by the main build and deployed as Workers Static Assets (`workers/marketing`,
+[#284](https://github.com/a-hagi613/overture/issues/284), ADR 0033). Cloudflare attaches the Worker to one explicit
+route on `tryoverture.com` and no others. The front-end rebuild (ADR 0037, proposed) removes the `/pricing` page and
+its `tryoverture.com/pricing*` route, and pricing becomes the landing's Pricing section; until it lands, that route is
+still attached. The route list comes from `src/shared/marketing-paths.ts` through `workers/marketing/src/routes.ts`.
 
 | Route | Serves |
 |---|---|
 | `tryoverture.com/` | `dist-marketing/index.html` |
-| `tryoverture.com/pricing*` | `dist-marketing/pricing/index.html`; the `*` covers the query string and `/pricing/` |
 
-Everything else — the app routes in `src/web/route-table.tsx` (`/board`, `/inbox`, `/settings`, …), `/api/*`,
+When the first deploy after the rebuild goes out, open **Workers & Pages → overture-marketing → Settings → Domains &
+Routes** and confirm only `tryoverture.com/` is listed; delete `tryoverture.com/pricing*` if it is still there.
+
+Everything else — the app routes in `src/web/route-table.tsx` (`/home` after the rebuild, `/board`, `/inbox`,
+`/profile/…`, …), `/api/*`,
 `/webhooks/*`, `/assets/*`, `/sw.js`, the manifest and the icons — matches no route and goes straight to
 `overture-web` on Fly. ADR 0022 still holds: the marketing pages are on the app's origin, and the app's own HTML and
 assets are still served by Fly.
@@ -243,8 +249,9 @@ Workers spending limit blocks script invocations (ADR 0033, `docs/research/cloud
 `scripts/prerender.tsx` writes `dist-marketing` after `vite build`: one self-contained HTML file per page (the built
 stylesheet is inlined, so the page is styled with the origin down) plus a `_headers` file carrying the app's CSP and
 security headers. The app's `/assets/*.js` bundle is still referenced for hydration, so a signed-in visitor at `/`
-gets the home screen when Fly is up. Terms and Privacy stay on Fly until they are prerendered; they are linked from
-both pages but are not part of this deployment.
+gets the landing too (the rebuild moves the app's Home to `/home`, reached from the landing's sign-in link). Terms and
+Privacy stay on Fly until they are prerendered; they are linked from the landing but are not part of this
+deployment.
 
 ### Deploy
 
@@ -267,8 +274,8 @@ release's `/assets/` bundle. The page still renders; its hydration waits for the
 
 ### Verify
 
-- **Both pages answer with the origin down.** Stop the machine on purpose (`fly scale count 0 -a overture-web`), then
-  `curl -sS -o /dev/null -w '%{http_code}\n' https://tryoverture.com/` and `…/pricing` return `200`; start it again
+- **The landing answers with the origin down.** Stop the machine on purpose (`fly scale count 0 -a overture-web`), then
+  `curl -sS -o /dev/null -w '%{http_code}\n' https://tryoverture.com/` returns `200`; start it again
   with `fly scale count 1 -a overture-web`. The same check during a normal deploy shows the pages up through the
   10–30 s restart (SPEC §3.1).
 - **No Worker invocation for app traffic.** Cloudflare dashboard → **Workers & Pages → overture-marketing → Metrics**:
@@ -278,10 +285,9 @@ release's `/assets/` bundle. The page still renders; its hydration waits for the
 - **In the repository.**
   `bun node_modules/playwright/cli.js test test/e2e/marketing-worker.test.ts --workers=1` proves every route in
   `src/web/route-table.tsx` and every API/webhook/asset prefix matches no Worker route, that the config is
-  assets-only, and that both pages serve from `dist-marketing` while a stand-in origin answers 503.
+  assets-only, and that the landing serves from `dist-marketing` while a stand-in origin answers 503.
 
-A route pattern without a wildcard matches the entire URL, query string included, so the pricing route ends in `*`.
-The root is matched exactly (`tryoverture.com/`): a landing URL with a query string (`/?utm_source=…`) matches no
+A route pattern without a wildcard matches the entire URL, query string included. The root is matched exactly (`tryoverture.com/`): a landing URL with a query string (`/?utm_source=…`) matches no
 Worker route and goes to Fly. That keeps arbitrary paths away from the Worker at the cost of falling back to the
 origin for tagged landing links.
 
@@ -290,9 +296,9 @@ origin for tagged landing links.
 - **A bad page, same routes:** `cd workers/marketing && bunx wrangler rollback` reverts to the previous deployment;
   `bunx wrangler deployments list` shows the versions.
 - **Send everything back to Fly:** `cd workers/marketing && bunx wrangler delete` removes the Worker and its
-  routes (or delete the two routes under **Settings → Domains & Routes**). `/` and `/pricing` are then proxied to
+  route (or delete it under **Settings → Domains & Routes**). `/` is then proxied to
   `overture-web` exactly as before #284; DNS does not change.
-- **The routes are missing or the Worker is unavailable:** the zone serves both paths from Fly, with the usual
+- **The route is missing or the Worker is unavailable:** the zone serves `/` from Fly, with the usual
   10–30 s deploy downtime.
 
 No migration, secret or DNS record is part of this deployment.
@@ -338,7 +344,9 @@ The webhook endpoint is `https://tryoverture.com/api/webhooks/stripe` and subscr
 `src/server/billing/webhooks.ts` handles. The billing portal configuration cancels at period end, updates payment
 methods, shows invoice history and switches a subscription between the Week and Month prices with
 `proration_behavior=none`; it returns to `https://tryoverture.com/settings/billing` and links the site's privacy and
-terms pages.
+terms pages. The rebuild moves Billing to `/profile/billing` (ADR 0037, proposed): when its change lands the app's
+portal sessions pass `return_url` `/profile/billing`, and the configuration's default return URL in
+`scripts/setup-stripe.ts` must stop naming `/settings/billing`; change it and re-run the script then (audit H5).
 
 A second run reuses the active lookup-key prices, keeps the existing webhook (its secret is not rotated) and verifies
 the portal configuration, so no duplicate product, price or endpoint appears. `rotate_webhook=true` deletes the old
@@ -575,17 +583,29 @@ startup past Fly's health-check grace period.
 to write without `--confirm` and refuses while another process holds the write lock; `--dry-run` only reports. It is
 safe to re-run: a file with no free pages is left alone.
 
-1. Stop the app machine (`fly machine stop <id> -a overture-web`) so neither the server nor Litestream holds the file.
-2. Start a one-off machine on the deployed image with the `data` volume mounted at `/data`, the way the restore drill
-   does (`fly machines run <image> ... --volume data:/data`), and dry-run to record the sizes:
-   `bun run /app/scripts/vacuum-app-db.ts /data/app.sqlite --dry-run`
-3. Run it again with `--confirm` and check the report: `after` has a freelist of 0, a much smaller file, and
-   `integrity_check: ok`.
-4. Destroy the one-off machine, start the app machine, and watch `curl -fsS https://overture-web.fly.dev/api/health`;
-   Litestream uploads the smaller file on its next snapshot.
+A Fly volume attaches to exactly one machine, even while that machine is stopped, so a second volume-attached machine
+cannot vacuum the live file. `scripts/vacuum-fly.ts` therefore uses the one production machine in a short maintenance
+window:
 
-Do not schedule this script, do not run it while the server is serving, and do not run it against `catalog.sqlite`
-(which is rebuilt from feeds anyway).
+1. `bun run scripts/vacuum-fly.ts plan` runs the dry run over SSH on the running machine and reports its sizes. It
+   never writes.
+2. `bun run scripts/vacuum-fly.ts compact` repeats the dry run and stops there unless the freelist is above 50 MB or
+   `--force` is passed. Then it sets `VACUUM_ONLY=true` on the machine and restarts it; `scripts/docker-entrypoint.sh`
+   fixes the volume's ownership, drops to the `app` user, runs
+   `scripts/vacuum-app-db.ts /data/app.sqlite --confirm`, writes its output and exit code to `/tmp`, and holds the
+   machine open. Litestream and the server never start in that mode.
+3. In a `finally` path the workflow restores the normal environment, restarts the machine, waits for it to start and
+   polls `https://tryoverture.com/api/health` for 120 s. A failed vacuum still restarts the server, and a failed health
+   check fails the job so it alerts instead of serving.
+
+The script verifies `integrity_check` before it reports success, and SQLite leaves the file unchanged when the
+checkpoint stays busy or the vacuum aborts. If a run ever reports a failed integrity check, stop the machine and
+restore from the replica (the same Litestream restore the drill exercises) before serving traffic.
+
+The weekly `vacuum-db.yml` job does this every Sunday at 05:00 UTC; `ops-live.yml` offers the same run as the
+`vacuum-db` action with `force_vacuum`. Both refuse on a release that predates the maintenance mode (deploy `main`
+first), and it runs in the quiet 05:00 UTC slot so a deploy rarely overlaps it. Do not run it against
+`catalog.sqlite` (which is rebuilt from feeds anyway).
 
 ## Restore drill safety
 

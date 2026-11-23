@@ -100,8 +100,9 @@ experiment that has been **removed**. There is one design, and this is it.
 
 Product vocabulary, screens and behaviour come from `docs/SPEC.md`. This file governs how the
 product looks. Until §13's redraws land, boards that still say `Hold`, show the old nav (Job Board, Holds, Answer Bank) or a Live Tab are
-read as `Queued`/`Review` and the destinations in `docs/SPEC.md` §15 (six since ADR 0029: Home, Ready, Board,
-Review, Inbox, Profile); their *visual treatment* is what is fixed here.
+read as `Queued`/`Review` and the destinations in `docs/SPEC.md` §15 (six in the sidebar since ADR 0037: Home,
+Board, Ready, Review, Inbox, Calendar; Profile and Support open from the profile menu); their *visual treatment* is
+what is fixed here.
 
 ---
 
@@ -161,10 +162,16 @@ dot, the Applied tray, the logo stroke. Not links, not hover, not focus, not dec
 text uses `--acct`, never `--acc`, because `--acc` is 3.6:1 on paper.
 
 Statuses differ in lightness as well as hue. "Needs you" (a Review) is the only red. Applied and Submitted
-are the only orange states. Board column rules: Queued `ink`, Applied `acc`, Screening · Interviewing · Offer
-`ok`, Closed `mut`. Queued is ink because most of it needs nothing from the user; a Queued card waiting on a
-Review carries the red "Needs you" pill instead. App chrome — selected cards, active tabs, meters, KPI
-numerals — uses ink, never orange.
+are the only orange states. The Board shows five lanes that group the seven Stages (ADR 0037, Glossary **Board
+lane**); lane rules: Queued `ink`, Ready `ok`, Applied `acc`, Waiting (Screening · Interviewing · Offer) `ok`,
+Closed `mut`. Queued is ink because most of it needs nothing from the user; a Queued card waiting on a Review
+carries the red "Needs you" pill instead. App chrome — selected cards, active tabs, meters, KPI numerals — uses
+ink, never orange.
+
+The 2026-11-23 rebuild breaks this rule in three places that are not yet decided (ADR 0037, open items): the
+first Board lane is labelled "On hold" (a banned word) with an orange rule, nav count badges are orange, and the
+active nav marker is orange. The one italic emphasis word of a page title is orange too; that one is accepted
+(§3).
 
 Measured on the shipped hexes (text needs 4.5:1, 3:1 at ≥24px):
 
@@ -235,7 +242,7 @@ Inline numbers in tables and metadata are mono and tabular. `Yes` in serif besid
 |---|---|---|---|---|---|---|
 | Hero display (serif) | `text-hero` | clamp(44px, 6vw, 88px) | 44 | 1.06 | -.02em | Final emphasis word only |
 | Section heading (serif) | `text-section` | clamp(32px, 4.2vw, 56px) | 32 | 1.08 | -.015em | Final emphasis word only |
-| Page title (serif) | `text-page-title` | clamp(32px, 3vw, 42px) | 32 | 1.08 | -.01em | Never |
+| Page title (serif) | `text-page-title` | clamp(32px, 3vw, 42px) | 32 | 1.08 | -.01em | Final emphasis word only, `text-signal` |
 | Card / item title (serif) | `text-card-title` | clamp(22px, 1.8vw, 26px) | 22 | 1.20 | — | Never |
 | Metric numeral (serif) | `text-metric` | clamp(40px, 3.5vw, 52px) | 40 | 1.00 | — | Never (tabular upright) |
 | Lead / Intro (sans) | `text-base` | 16 | 16 | 1.60 | — | Never |
@@ -245,7 +252,7 @@ Inline numbers in tables and metadata are mono and tabular. `Yes` in serif besid
 
 **Strict typography, component library & mobile rules (enforced by `overture/no-raw-design-styles`):**
 - Every text element uses one of the 9 tokens above — never arbitrary `text-[...px]` or un-tokenized Tailwind scale jumps (`text-lg` through `text-9xl`).
-- Italic serif is reserved **strictly** for the final emphasis word of Hero and Section headings (`h1`/`h2`) — never numerals, step badges, or card titles.
+- Italic serif is reserved **strictly** for the final emphasis word of Hero, Section and page headings (`h1`/`h2`) — never numerals, step badges, or card titles. In the app the page title's emphasis word is `italic text-signal` ("Good morning, *Sam.*", "Ready to *send*"); it is the only orange type in app chrome (ADR 0037).
 - **Single-source shadcn/ui & 21st.dev component system (`src/web/components/ui/*`):** Never hand-roll buttons, cards, badges, inputs, tabs, switches, dialogs, command palettes, SVG charts, or calendars from scratch. Compose every screen from the shared primitives (`Button`, `Card`, `Badge`, `Input`, `Switch`, `Separator`, `Tabs`, `ScrollArea`, `ChartArea` via `recharts`, `Calendar` via `react-day-picker`, `CommandDialog` via `cmdk` + Radix Dialog, `AnimatedBeam`, and `lucide-react` icons), styled exclusively with Ember `@theme` tokens.
 - Mobile (`390px`) is a first-class layout target alongside tablet (`768px`), laptop (`1280px`), and widescreen (`1440px+`): metadata lines stack cleanly instead of wrapping mid-phrase, previews swap to native `390px` mobile screens under `lg` (`1024px`), and touch targets stay `≥ 40–44px`.
 
@@ -266,10 +273,10 @@ nudges aside).
 | Bento | 12 columns · gap 28 · row gap 64 · rows 424 424 420 330 |
 | Connector | 1160 design units, scales to 1400 |
 | Home content | padding 26/36 · 18/16 at 390 · 32/64 at 1920 |
-| Sidebar / rail | 268 · 76 · 300 at 1920 |
-| Board column | 252 wide, gap 16 · up to 340 |
+| Sidebar / rail | 268 · 296 from 1700 · rail 76 |
+| Board lane | five lanes, min 264 each, share the width (`repeat(5, minmax(264px, 1fr))`) |
 | Sheet | 468 · 520 at 1920 · bottom sheet 566 high at 390 |
-| KPI grid | auto-fit min 210, gap 16 · 2×2 under 1100 |
+| Home grid | one column · two from 1024 (`lg`) |
 
 Section rhythm on the landing is space, not dividers: 96px above and below, 88–120 on the hero, how it
 works and the band. The band is the only full-bleed colour change. Texture bookends: the hero, and the
@@ -281,12 +288,12 @@ layout, rail), 900 (connector becomes lists), 1099/1100 (bento and KPI), 1279/12
 
 | Width | What happens |
 |---|---|
-| 390 | Phone. Landing one column, hero stacked, bento and band as vertical lists, nav on a second row. Home: sidebar hidden, 2×2 KPIs, bottom tab bar. Board: stage pills, card stack, bottom sheet |
+| 390 | Phone. Landing one column, hero stacked, bento and band as vertical lists, nav on a second row. App: sidebar hidden, bottom tab bar (Home, Board, Search, Profile, More). Home: one column. Board: lane tabs, card stack, bottom sheet |
 | 768 | Landing stacks the hero; bento single column (max 600). App: 76px icon rail replaces the sidebar; board columns scroll in their own box |
-| 1024 | Hero two columns again; connector scales with its container; bento still one column to 1099. App: icon rail, KPIs 2×2 to 1099, four across from 1100 |
+| 1024 | Hero two columns again; connector scales with its container; bento still one column to 1099. App: icon rail; Home cards two across |
 | 1280 | Full 268px sidebar returns. Landing and app on the desktop layout at 1200 max |
 | 1440 | Reference width. Container 1200 (padding 48). Bento on a 12-column grid with the path; sheet 468 over the board |
-| 1920 | From 1700: container 1440, hero visual zoomed 1.18, connector 1400, display to 124. App: sidebar 300, main padding 64, KPI numerals 66, chart 270 high, columns to 340, sheet 520 |
+| 1920 | From 1700: container 1440, hero visual zoomed 1.18, connector 1400, display to 124. App: sidebar 296, main padding 56, content max 1440, sheet 520 |
 
 ## 5. Shape and depth
 
@@ -383,11 +390,19 @@ still changes; nothing moves.
 | Path and travelling dot | custom | Animated Beam, made elegant: one dot on a dotted path |
 | Where it applies connector | custom | Animated Beam |
 | Overnight list | Card, ScrollArea | Animated List |
-| ⌘K search | Command | none |
+| ⌘K workspace search | Dialog + Command (`cmdk`), `GET /api/workspace/search` | none |
 | Usage meter | Progress | none |
 | Applications chart | Chart (Recharts) | none |
 | Date range control | ToggleGroup | none |
 | Detail view | Sheet, Drawer, Tabs | none |
+| Board lanes and drag | Card, ScrollArea; drag with `@dnd-kit/core` | none |
+| Toasts with Undo | Sonner | none |
+| Calendar month and day picker | Calendar (`react-day-picker`) | none |
+| Tooltips, popovers, switches | Radix via `src/web/components/ui/*` | none |
+
+The rebuild's stack (Radix dialog, popover, scroll-area, separator, slot, switch, tabs and tooltip; `cmdk`,
+`sonner`, `motion`, `recharts`, `react-day-picker`, `@dnd-kit/core`, `class-variance-authority`, `clsx`,
+`tailwind-merge`) is recorded in ADR 0037.
 
 **Buttons.** Primary is ink with paper text, hover lightens to muted (dark: to near-white). Heights 40
 in the app, 46 on the landing, 52 in the hero, 48 on phone; icon button 40/44. Radius 6. Ghost
@@ -418,8 +433,13 @@ full-contrast ink text; 12px between the two buttons. Under 860px the nav collap
 and a 44px menu button; the sheet rises 8px over .4s and holds the links, Theme and Sign in. The menu
 button carries `aria-expanded` and a label that changes between Open menu and Close menu.
 
-Sidebar items: active = card surface, hairline, 3px orange marker on the left edge (top edge in the tab
-bar). Under 1280 the sidebar becomes a 76px icon rail; under 768 a 64px tab bar.
+Sidebar items: active = card surface, hairline, a 2px marker on the left edge (top edge in the tab bar); the
+build draws it orange (§2). The sidebar holds, top to bottom: the lockup and a collapse button, Search (⌘K), the
+six destinations (Home, Board, Ready, Review, Inbox, Calendar), the Profile menu (Resume, Details, Preferences,
+Account, Billing), Support and Notifications, then the theme toggle and the usage card. Under 1280, or when collapsed on desktop (remembered per
+browser), the sidebar becomes a 76px icon rail; under 768 a 64px tab bar with Home, Board, Search, Profile and
+More, where More opens a sheet with the other destinations. There is no Settings destination: account and billing
+are Profile pages (ADR 0037).
 
 A nav count badge is live product data, never a drawn sample: Ready counts the Applications waiting for
 approval, Review the open Reviews, Inbox the unread employer mail. No badge shows at zero, and the link's
@@ -503,7 +523,7 @@ them here removes the qualities that make this look authored rather than assembl
 | `nested-cards` | 75 | Board columns and specimen sheets exist to show nesting. Flattening a specimen stops it being a specimen |
 | `overused-font` | 50 | A face is not slop because other people use it; slop is using it with no rule. Ours is semantic and written down: serif is a person's words, mono is a machine's fact, sans is the interface. A distinctive face with a weak rule reads worse than a common face with a strong one |
 | `cream-palette` | 18 | The paper *is* the metaphor. A job hunt is paperwork, applications, letters. A cool grey ground turns this into a dashboard |
-| `italic-serif-display` | 13 | Italic marks the owner's own voice — a signal, not a gradient. It appears where a person is speaking and nowhere else |
+| `italic-serif-display` | 13 | Italic marks the owner's own voice — a signal, not a gradient. It appears where a person is speaking, and since ADR 0037 on the one emphasis word of a heading (§3) |
 | `undersized-ui-text` | 7 | 10.5–11px tracked caps are a print convention for column headers and status pills, always paired with a larger line, always at 4.5:1. The remaining hits are a PDF mock rendered at page scale |
 | `numbered-section-labels` | 6 | `fig. 1`, `01 ·` are a canvas device only: the boards read as a plate book, while the app ships no fig, folio or section-number labels (#307) |
 | `tight-leading` | 4 | Display type is set at 1.02–1.15 by design; body stays at 1.55 and is never flagged |
@@ -546,23 +566,24 @@ screen, then built to match. Visual treatment stays; words, structure and behavi
 
 | Board | Change |
 |---|---|
-| Every app board | **Redrawn and built on Home, Ready, Board, Review, Profile, Settings, Notifications and Inbox; card detail is still to do.** Seven destinations on desktop in this order: Home, Ready, Board, Review, Inbox, Calendar, Profile (Ready added by ADR 0029, Calendar by ADR 0034; the phone tab bar keeps six), Settings from the avatar; no "Job Board", "Holds", "Answer Bank", "Activity", "Personal workspace"; one "Applications left" figure, no "Match Scores" counter; `--hold` tokens renamed `--need` |
-| Job Board | **Redrawn and built as Board.** Queued replaces Hold as the first column, ink rule; red "Needs you" pill on cards waiting on a Review. The Ready column sits between Queued and Applied with the green rule (ADR 0029): cards show "Ready to send" with a Send button until approved, then their send time, and hold Sending and Checking with the employer until confirmed sent |
+| Every app board | **Redrawn and built on Home, Ready, Board, Review, Profile, Settings, Notifications and Inbox; card detail is still to do. Since the 2026-11-23 rebuild (ADR 0037) the built shell leads the boards: six sidebar destinations (Home, Board, Ready, Review, Inbox, Calendar), the Profile menu with five pages, Support, ⌘K search, a collapsible sidebar, and a phone tab bar of Home, Board, Search, Profile and More. Every app board needs the new shell redrawn.** Before that: seven destinations on desktop in this order: Home, Ready, Board, Review, Inbox, Calendar, Profile (Ready added by ADR 0029, Calendar by ADR 0034; the phone tab bar keeps six), Settings from the avatar; no "Job Board", "Holds", "Answer Bank", "Activity", "Personal workspace"; one "Applications left" figure, no "Match Scores" counter; `--hold` tokens renamed `--need` |
+| Job Board | **Redrawn and built as Board; rebuilt on 2026-11-23 as five lanes (Queued, Ready, Applied, Waiting, Closed) that group the seven Stages, with drag between lanes (ADR 0037). Redraw the Board boards to five lanes; the build's first-lane label "On hold" is a banned word and is not to be drawn.** Queued replaces Hold as the first column, ink rule; red "Needs you" pill on cards waiting on a Review. The Ready column sits between Queued and Applied with the green rule (ADR 0029): cards show "Ready to send" with a Send button until approved, then their send time, and hold Sending and Checking with the employer until confirmed sent |
 | Ready | **New, drawn and built (ADR 0029, `w5-ready`, #195).** The Ready destination, heading "Ready to send": approval cards with the job, employer, resume file, every answer as it will be typed with its source, the cover letter and what changed; Send, Skip, Edit an answer; approved cards with their send time and Undo; "Send all"; empty and all-approved states; phone and desktop |
 | Holds | **Redrawn as Review (file `w5-holds`).** Becomes Review: open questions grouped by jobs unlocked |
 | Answer Bank, Resume | **Redrawn: folded into Profile.** Fold into Profile: resume, facts by tier, targets with live count, skip list, job-search address |
-| Settings | **Redrawn; the legal card (Terms, Privacy, the consent version you agreed to) is added by #214.** No approval mode (approval is not a setting: every send is approved, ADR 0029), no "Overnight window", no user-set company limit or daily caps, no UTC reset; the fixed limits explained (10 a day, 08:00–20:00 local, one company per 30 days, reset at local midnight). **Account pages drawn (`d207-*`):** Notifications, Export, Delete account, Support access, Terms and privacy, as five tabs under Settings; **Export is built (#224)**, the rest follow their tickets |
+| Settings | **Folded into Profile by the 2026-11-23 rebuild (ADR 0037): Profile → Account (notifications, export, delete, legal, sign out) and Profile → Billing. The support access log has no screen yet (audit H7). Redraw these as Profile pages.** Before that: **Redrawn; the legal card (Terms, Privacy, the consent version you agreed to) is added by #214.** No approval mode (approval is not a setting: every send is approved, ADR 0029), no "Overnight window", no user-set company limit or daily caps, no UTC reset; the fixed limits explained (10 a day, 08:00–20:00 local, one company per 30 days, reset at local midnight). **Account pages drawn (`d207-*`):** Notifications, Export, Delete account, Support access, Terms and privacy, as five tabs under Settings; **Export is built (#224)**, the rest follow their tickets |
 | Onboarding 1–4 | **Welcome/Sign in and Resume drawn and built (`w5-onb`, #215), Your facts drawn and built (`w5-onb-questions`, #128); What you want and Forwarding & start are drawn and build in #216 and #217.** Five steps: Sign in · Resume · Your facts · What you want · Forward ATS mail (the filter guide and the paste fallback) + consent + trial + Start; invited sign-in states are drawn with Sign In; no "Connect inbox", no Gmail, no "Memory Base" |
 | Sign In | **Google, LinkedIn and an emailed link only; no password, sign-up, forgot or reset screens (ADR 0035).** Dark uses the sign-in dark ground (§2, ADR 0027) |
 | Product states | **Pause reasons drawn on Home (`w5-home-paused`, #157).** No Gmail connect states; add `confirming` ("Checking with the employer"), each pause reason, out of applications |
-| Billing (M3, #240) | **Drawn at 1280 and 390, light and dark, in `design/reference/{settings-billing,onb-trial,billing-plans,home-paused-billing,out-of-applications}` (sources `design/reference/source/w5-settings-billing`, `w5-onb-trial`, `w5-billing-plans`, `w5-home-paused-billing`, `w5-out-of-applications`).** Settings **Plan and billing** (`/settings/billing`) is the sixth tab of `SettingsAccountTabs`: current plan with Applications left and renewal, Week or Month switch at renewal, cancel at period end, Stripe portal and invoices. **Onboarding step 6** (`/onboarding/trial`, after step 5): verify a card for 3 free Applications, one per card; card declined; card already used. **Choose a plan** with the Checkout return states (started, not finished, checking the payment). **Home paused** for "Plan ended" and "Payment didn't go through", each with its fix. **Out of Applications** and the **invited M2 grant running out** (the grant's Applications left and end date). Copy uses the glossary words only and no banned words. Not yet on the canvas: see the PR for the publish status |
+| Billing (M3, #240) | **Drawn at 1280 and 390, light and dark, in `design/reference/{settings-billing,onb-trial,billing-plans,home-paused-billing,out-of-applications}` (sources `design/reference/source/w5-settings-billing`, `w5-onb-trial`, `w5-billing-plans`, `w5-home-paused-billing`, `w5-out-of-applications`).** Settings **Plan and billing** (`/settings/billing`, now Profile → Billing at `/profile/billing`, ADR 0037) was the sixth tab of `SettingsAccountTabs`: current plan with Applications left and renewal, Week or Month switch at renewal, cancel at period end, Stripe portal and invoices. **Onboarding step 6** (`/onboarding/trial`, after step 5): verify a card for 3 free Applications, one per card; card declined; card already used. **Choose a plan** with the Checkout return states (started, not finished, checking the payment). **Home paused** for "Plan ended" and "Payment didn't go through", each with its fix. **Out of Applications** and the **invited M2 grant running out** (the grant's Applications left and end date). Copy uses the glossary words only and no banned words. Not yet on the canvas: see the PR for the publish status |
 | Calendar | **Drawn (#292, `w5-calendar-month`, `w5-calendar-empty`, `w5-calendar-entry`) and built (#294; phone agenda, empty and dark states #295, with the agenda opening on today and the Calendar busy while a month loads).** A month grid with Sent, Stage move, Offer, Closed, Check-in and Interview chips and a day panel on desktop; a compact grid, agenda and day bottom sheet on the phone; the Calendar button sits in the Home and Board headers. The canvas is the reference at 390 and 1280, light and dark. The `w5-calendar-*` boards live on canvas v125 and are not yet exported to `design/reference/source/`; the Home and Board header baselines in `test/e2e/chrome-baselines/` were refreshed from the rendered shell to include the Calendar button. Interview items arrive with #296 (`.ics` parser); the Interview chip styling is in place until then |
 | Code paste | **New, drawn with the M2 Inbox boards (#205) and built (#223).** Home's "needs a code" card, shown five minutes into a verification-code wait with the countdown to expiry, and the paste sheet in its four states (waiting, still waiting, window closed, code accepted). Results and the address it points at follow the spec; the canvas is the reference in `design/reference/code-wait/` and `design/reference/code-paste/` at 390 and 1280, light and dark |
 | Ready email | **New, drawn and built (ADR 0029, `w5-ready-email`, #196).** One Recap per daily preparation run: the new Ready Applications by employer and job title, how many Reviews are open, one link to the Ready page, no answers and no send button |
 | Daily digest | Morning summary of **yesterday** (sends between 08:00 and 20:00); "Needs you", not "Hold" |
 | M2 boards | **Built or drawn (ADR 0030), one ticket each on #6:** onboarding What you want and Forwarding & start (drawn as `onbw-4` and `onbw-5`); **Inbox drawn and built (#218, `w5-inbox-*`): threads, message, attachments, "Couldn't verify sender", empty and address explainer; the code-paste prompt drawn and built (#205, #223), see the Code paste row, and the Profile forwarding-address card in #230**; **notifications drawn and built (`d206-notifications`, #221): the in-app list with unread state and Mark all as read, and the header bell**; push copy, the recap and auto-move drawn (`d206-push`, `d206-recap`, `d206-auto-move`), with the pushes, the recap email and the auto-move toast built by #222, #196 and #219; Settings account pages (notifications, **export drawn and built (#224)**, support access log; **Delete account drawn and built (#225) to `design/reference/settings-delete`**); **admin people screens (users, invites, user detail and suspension) drawn and built (#226) to `design/reference/{users,invites,user}`; Mail health drawn (`w5-admin-mail-health`) and built (#229) to `design/reference/mail-health`; Reveal, audit and ATS probe status still to build (#227)**; sign-in invite and password states; **Terms, Privacy and the consent card drawn and built (`d203`, #214), with the Settings legal card** |
 | Landing | **Redrawn (#239): boards `lp-1280` and `lp-1280-dark` (1280), `w5-landing-phone` and `lp-390-dark` (390) on the canvas Landing page, reference in `design/reference/landing/`.** Daytime sends (08:00–20:00); card verified for the trial (no "No credit card"); five ATSes, no Workday; no glow on the travelling-dot tiles |
-| Pricing | **Drawn (#239): boards `pricing-1280`, `pricing-1280-dark`, `pricing-390`, `pricing-390-dark` on the canvas Pricing page, reference in `design/reference/pricing/`.** Trial (card verified, 3 applications once per card), Week $12 for 70 over 7 days, Month $35 for 300 over 30 days; "Never charged for failure"; Terms and Privacy in the footer |
+| Pricing | **The `/pricing` page was removed by the 2026-11-23 rebuild (ADR 0037); pricing lives in the landing's Pricing section, at Week $9.99 for 50 and Month $29.99 for 250 (`src/shared/plans.ts`). The boards below are history.** Drawn (#239): boards `pricing-1280`, `pricing-1280-dark`, `pricing-390`, `pricing-390-dark` on the canvas Pricing page, reference in `design/reference/pricing/`.** Trial (card verified, 3 applications once per card), Week $12 for 70 over 7 days, Month $35 for 300 over 30 days; "Never charged for failure"; Terms and Privacy in the footer |
+| Built without a board (2026-11-23, ADR 0037) | **To draw from the build:** Profile → Resume, Details, Preferences, Account and Billing; Support (`/support`); sign-up (`/signup`); the ⌘K workspace search dialog; Home's control band (Pause or Resume and today's sends against the daily limit); the phone More sheet; the landing's dashboard preview. **Not to draw as built:** the landing's live counter and company-logo strip (invented figures and real employers' marks, audit B1) and the "On hold" lane label (audit M6) |
 | Landing 1440 and 1920 (`w5-landing`, `lp-1440-dark`, `lp-1920`, `lp-1920-dark`) | **Still the pre-ADR-0028 wording (Workday, "No credit card"). Not in scope for #239; to be removed from the canvas in the page.** |
 | Live Tab (3 boards) | Deleted: users never see a browser |
 | Mobile reference | Deleted, already marked to retire |

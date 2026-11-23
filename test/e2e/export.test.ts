@@ -860,3 +860,92 @@ test("a large mailbox builds without holding the archive in memory", async ({ ex
 
   await owner.dispose();
 });
+
+test("an export carries custom calendar events and support tickets", async ({ exportServer }) => {
+  const { owner, userId } = await ownerContextFor(exportServer.url);
+
+  await seedOwner(owner);
+
+  const support = await owner.post("/api/support", {
+    data: {
+      category: "account",
+      message: "Please check the address on my account.",
+      subject: "Address question",
+    },
+  });
+
+  expect(support.status()).toBe(201);
+
+  const { referenceId } = z
+    .object({ ok: z.literal(true), referenceId: z.string() })
+    .parse(await support.json());
+
+  const created = await owner.post("/api/calendar/events", {
+    data: {
+      company: "Acme",
+      dayKey: "2026-12-02",
+      kind: "interview",
+      time: "09:30",
+      title: "Acme call",
+    },
+  });
+
+  expect(created.status()).toBe(201);
+
+  const requested = await owner.post("/api/account/export");
+
+  expect(requested.status()).toBe(202);
+
+  await waitForReady(owner);
+
+  const state = exportStateSchema.parse(await (await owner.get("/api/account/export")).json());
+
+  expect(state.downloadUrl).not.toBeNull();
+
+  const archive = await downloadArchive(owner, state.downloadUrl ?? "");
+
+  const calendarEvents = unzipJson(
+    archive,
+    "calendar-events.json",
+    z.array(
+      z.object({
+        company: z.string(),
+        dayKey: z.string(),
+        kind: z.string(),
+        time: z.string().nullable(),
+        title: z.string(),
+      }),
+    ),
+  );
+
+  expect(calendarEvents).toMatchObject([
+    { company: "Acme", dayKey: "2026-12-02", kind: "interview", time: "09:30", title: "Acme call" },
+  ]);
+
+  const supportTickets = unzipJson(
+    archive,
+    "support-tickets.json",
+    z.array(
+      z.object({
+        category: z.string(),
+        message: z.string(),
+        referenceId: z.string(),
+        status: z.string(),
+        subject: z.string(),
+        userId: z.string(),
+      }),
+    ),
+  );
+
+  expect(supportTickets).toHaveLength(1);
+  expect(supportTickets[0]).toMatchObject({
+    category: "account",
+    message: "Please check the address on my account.",
+    referenceId,
+    status: "open",
+    subject: "Address question",
+    userId,
+  });
+
+  await owner.dispose();
+});

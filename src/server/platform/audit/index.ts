@@ -1,4 +1,5 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, lt, or, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase } from "../db/client.ts";
@@ -74,14 +75,129 @@ export async function recordAdminAudit(db: AppDatabase, clock: Clock, entry: Adm
   }
 }
 
+export interface AdminAuditQuery {
+  action?: string | undefined;
+  actorId?: string | undefined;
+  targetUserId?: string | undefined;
+  q?: string | undefined;
+  limit: number;
+  before?: string | undefined;
+}
+
+export interface AuditCursor {
+  at: number;
+  id: string | null;
+}
+
+export interface AdminAuditPage {
+  entries: AdminAuditRow[];
+  nextCursor: string | null;
+}
+
+const BARE_CURSOR = /^\d+$/u;
+const COMPOSITE_CURSOR = /^(?<at>\d+):(?<id>.+)$/u;
+
+export function parseAuditCursor(raw: string) {
+  const trimmed = raw.trim();
+
+  if (BARE_CURSOR.test(trimmed)) {
+    const at = Number(trimmed);
+
+    return Number.isSafeInteger(at) ? ({ at, id: null } satisfies AuditCursor) : null;
+  }
+
+  const match = COMPOSITE_CURSOR.exec(trimmed);
+
+  if (match?.groups === undefined) {
+    return null;
+  }
+
+  const at = Number(match.groups.at);
+  const id = match.groups.id ?? "";
+
+  if (!Number.isSafeInteger(at) || id.length === 0) {
+    return null;
+  }
+
+  return { at, id } satisfies AuditCursor;
+}
+
+export function formatAuditCursor(row: { at: number; id: string }) {
+  return `${String(row.at)}:${row.id}`;
+}
+
 export function listAdminAudit(db: AppDatabase, limit: number) {
   return db
     .select()
     .from(adminAudit)
-    .orderBy(desc(adminAudit.at))
+    .orderBy(desc(adminAudit.at), desc(adminAudit.id))
     .limit(limit)
     .all()
     .map((row) => auditRowOfStored(row));
+}
+
+export function queryAdminAudit(db: AppDatabase, query: AdminAuditQuery) {
+  const conditions: SQL[] = [];
+  const action = query.action?.trim() ?? "";
+  const actorId = query.actorId?.trim() ?? "";
+  const targetUserId = query.targetUserId?.trim() ?? "";
+  const needle = query.q?.trim().toLowerCase() ?? "";
+
+  if (action.length > 0) {
+    conditions.push(eq(adminAudit.action, action));
+  }
+
+  if (actorId.length > 0) {
+    conditions.push(eq(adminAudit.actorId, actorId));
+  }
+
+  if (targetUserId.length > 0) {
+    conditions.push(eq(adminAudit.targetUserId, targetUserId));
+  }
+
+  if (needle.length > 0) {
+    conditions.push(
+      sql`(instr(lower(${adminAudit.action}), ${needle}) > 0 OR instr(lower(${adminAudit.reason}), ${needle}) > 0 OR instr(lower(${adminAudit.detail}), ${needle}) > 0 OR instr(lower(${adminAudit.actorId}), ${needle}) > 0 OR instr(lower(coalesce(${adminAudit.targetUserId}, '')), ${needle}) > 0)`,
+    );
+  }
+
+  if (query.before !== undefined && query.before.trim().length > 0) {
+    const cursor = parseAuditCursor(query.before);
+
+    if (cursor !== null) {
+      const clause =
+        cursor.id === null
+          ? lt(adminAudit.at, cursor.at)
+          : or(
+              lt(adminAudit.at, cursor.at),
+              and(eq(adminAudit.at, cursor.at), lt(adminAudit.id, cursor.id)),
+            );
+
+      if (clause !== undefined) {
+        conditions.push(clause);
+      }
+    }
+  }
+
+  const limit = Math.min(Math.max(1, Math.trunc(query.limit)), 200);
+  const whereClause = conditions.length === 0 ? undefined : and(...conditions);
+
+  const rows = db
+    .select()
+    .from(adminAudit)
+    .where(whereClause)
+    .orderBy(desc(adminAudit.at), desc(adminAudit.id))
+    .limit(limit + 1)
+    .all();
+
+  const page = rows.slice(0, limit);
+  const hasMore = rows.length > limit;
+  const last = page.at(-1);
+
+  return {
+    entries: page.map((row) => auditRowOfStored(row)),
+    nextCursor: hasMore && last !== undefined ? formatAuditCursor(last) : null,
+  } satisfies AdminAuditPage;
 }
 
 export function listAdminAuditForActor(db: AppDatabase, actorId: string) {

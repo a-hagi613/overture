@@ -414,6 +414,13 @@
       "when": 1795492500000,
       "tag": "0058_steep_killmonger",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "6",
+      "when": 1795492600000,
+      "tag": "0059_support_calendar",
+      "breakpoints": true
     }
   ]
 }

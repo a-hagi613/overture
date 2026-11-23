@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 
 import { copy } from "../../../shared/copy.ts";
 import type { ProviderReport } from "../../lib/admin-api.ts";
@@ -75,6 +76,20 @@ export function ProviderReportPage() {
         lead={copy.admin.reportLead}
         plain={copy.admin.reportTitlePlain}
       />
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link
+          className="inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
+          to="/admin/attempts"
+        >
+          {copy.admin.reportInspectAttempts}
+        </Link>
+        <Link
+          className="inline-flex min-h-11 items-center rounded-md border border-input bg-card px-3.5 text-[13px] font-semibold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
+          to="/admin/llm"
+        >
+          {copy.admin.reportInspectLlm}
+        </Link>
+      </div>
       <section aria-labelledby="admin-report-sends" className="mt-7">
         <h2 className="font-serif text-[26px] leading-[1.1]" id="admin-report-sends">
           {copy.admin.reportSendHeading}

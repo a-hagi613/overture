@@ -6,12 +6,12 @@ import { join, resolve } from "node:path";
 
 import type { AppDatabase, CatalogDatabase } from "./platform/db/client.ts";
 import type { BackupMonitor } from "./platform/ports/backup.ts";
+import type { DegradedFlagReader } from "./platform/degraded.ts";
 import type { ClientIpConfig } from "./auth/client-ip.ts";
 import type { Auth } from "./auth/index.ts";
 import type { AdjustableClock } from "./platform/ports/clock.ts";
 import type { JobHandlers } from "./platform/jobs/run-due.ts";
 import type { LlmPort } from "./platform/ports/llm.ts";
-import type { MailSender } from "./platform/mail/port.ts";
 import type { ObjectStore } from "./platform/ports/object-store.ts";
 import type { Payments } from "./platform/ports/payments.ts";
 import type { PreparationService } from "./pipeline/prepare.ts";
@@ -22,6 +22,7 @@ import type { CatalogSweepWorker } from "./catalog/sweep-worker-runner.ts";
 import type { AccountEraser } from "./account/erase.ts";
 import type { ExportService } from "./export/service.ts";
 import type { SpendGate } from "./billing/spend.ts";
+import type { MailSender } from "./platform/mail/port.ts";
 
 import { readSession } from "./auth/session.ts";
 import { createHealthRoutes } from "./routes/health.ts";
@@ -70,6 +71,7 @@ export interface AppDependencies {
   clock: AdjustableClock;
   backups: BackupMonitor;
   databasePath: string;
+  degraded: DegradedFlagReader;
   staticRoot: string;
   testRoutes: boolean;
   jobHandlers: JobHandlers;
@@ -77,7 +79,6 @@ export interface AppDependencies {
   objects: ObjectStore;
   llm: LlmPort;
   spendGate: SpendGate;
-  mail: MailSender;
   mailboxes: ReturnType<typeof createMailboxService>;
   resolver: DNSResolver;
   liveCheckAddress: string;
@@ -88,6 +89,7 @@ export interface AppDependencies {
   catalogWorker: CatalogSweepWorker;
   eraser: AccountEraser;
   exports: ExportService;
+  mail: MailSender;
   payments: Payments | null;
   /** Aborted on shutdown; long-lived responses (the event stream) end with it. */
   shutdown: AbortSignal;
@@ -166,8 +168,10 @@ export function createApp(deps: AppDependencies) {
 
   const adminApi = createAdminApi(deps.db, deps.clock, deps.auth, {
     backupObjects: createConfiguredBackupStore(),
+    backups: deps.backups,
     catalogDb: deps.catalogDb,
     databasePath: deps.databasePath,
+    degraded: deps.degraded,
     objects: deps.objects,
     payments: deps.payments,
     providers: deps.providers,
@@ -241,7 +245,7 @@ export function createApp(deps: AppDependencies) {
       clock: deps.clock,
       db: deps.db,
       mail: deps.mail,
-      supportEmail: env.SUPPORT_EMAIL,
+      personal,
     }),
   );
   app.route(
@@ -286,7 +290,6 @@ export function createApp(deps: AppDependencies) {
       auth: deps.auth,
       clock: deps.clock,
       db: deps.db,
-      matching,
       personal,
       reviews: deps.reviews,
     }),
