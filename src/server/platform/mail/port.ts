@@ -9,6 +9,7 @@ export interface SentMail {
   from: string;
   subject: string;
   body: string;
+  replyTo: string | null;
   sentAt: number;
 }
 
@@ -41,6 +42,14 @@ export interface OutboundBillingNoticeMail {
   body: string;
 }
 
+export interface OutboundSupportMail {
+  to: string;
+  subject: string;
+  body: string;
+  /** The signed-in person's address, so the support desk can reply to them directly. */
+  replyTo: string;
+}
+
 export interface MailSender {
   sendMagicLink: (mail: OutboundMagicLinkMail) => Promise<void>;
   sendCheck: (mail: OutboundCheckMail) => Promise<void>;
@@ -48,4 +57,5 @@ export interface MailSender {
   sendAccountDeleted: (mail: OutboundAccountDeletedMail) => Promise<void>;
   sendExportReady: (mail: OutboundExportReadyMail) => Promise<void>;
   sendBillingNotice: (mail: OutboundBillingNoticeMail) => Promise<void>;
+  sendSupport: (mail: OutboundSupportMail) => Promise<void>;
 }

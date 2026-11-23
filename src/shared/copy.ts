@@ -364,6 +364,25 @@ export const copy = {
     exportReadySubject: "Your Overture export is ready",
     exportReadyBody: (url: string) =>
       `Your Overture export is ready to download.\n\nOpen Settings in Overture and choose Download export. The link is valid for 24 hours, then the archive is deleted.\n\n${url}\n\nIf you didn't ask for this, write to admin@tryoverture.com.\n`,
+    supportSubject: (referenceId: string, subject: string) => `[${referenceId}] ${subject}`,
+    supportBody: (input: {
+      referenceId: string;
+      category: string;
+      subject: string;
+      message: string;
+      name: string;
+      email: string;
+    }) =>
+      [
+        `New support request ${input.referenceId}`,
+        "",
+        `From: ${input.name} <${input.email}>`,
+        `Category: ${input.category}`,
+        `Subject: ${input.subject}`,
+        "",
+        input.message,
+        "",
+      ].join("\n"),
   },
   stages: {
     queued: "Queued",
