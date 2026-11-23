@@ -10,6 +10,7 @@ import { JobList } from "./job-list.tsx";
 import type { PendingJobAction } from "./job-actions.tsx";
 import { JobTable } from "./job-table.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 
 const FILTER_ORDER = ["dead", "running", "queued", "failed", "completed", "all"] as const;
 
@@ -140,7 +141,12 @@ export function JobsPage() {
   );
 
   if (data === null) {
-    return null;
+    return (
+      <>
+        {heading}
+        <AdminStatusCard failed={false} onRetry={refresh} />
+      </>
+    );
   }
 
   if (data.kind === "failed") {

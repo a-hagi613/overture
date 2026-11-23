@@ -9,6 +9,7 @@ import {
 import { PreferenceRow } from "./notification-preference-row.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle, dsEyebrow } from "./ui/ds.ts";
+import { SectionSkeleton } from "./section-skeleton.tsx";
 
 export function SettingsNotifications() {
   const preferences = useNotificationPreferences();
@@ -31,6 +32,10 @@ export function SettingsNotifications() {
       },
     );
   };
+
+  if (preferences.isPending) {
+    return <SectionSkeleton />;
+  }
 
   return (
     <Card

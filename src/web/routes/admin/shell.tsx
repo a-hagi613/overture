@@ -6,6 +6,7 @@ import type { Me } from "../../lib/me-api.ts";
 import { copy } from "../../../shared/copy.ts";
 import { BrandMark } from "../../components/brand-mark.tsx";
 import { NavGlyph } from "../../components/nav-glyph.tsx";
+import { RouteErrorBoundary } from "../../components/route-error-boundary.tsx";
 import { RouteFallback } from "../../components/route-fallback.tsx";
 import { isCrossOrigin, useMeQuery } from "../../lib/me-api.ts";
 import { AdminChipNav } from "./admin-chip-nav.tsx";
@@ -63,9 +64,11 @@ export function AdminShell() {
           className="min-w-0 flex-1 outline-none px-4 pb-10 pt-4 md:px-8 md:pt-6"
         >
           <AdminChipNav />
-          <Suspense fallback={<RouteFallback />}>
-            <Outlet />
-          </Suspense>
+          <RouteErrorBoundary>
+            <Suspense fallback={<RouteFallback />}>
+              <Outlet />
+            </Suspense>
+          </RouteErrorBoundary>
         </main>
       </div>
     </div>

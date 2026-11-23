@@ -10,6 +10,7 @@ import { AdminGateScreen } from "./gate-screen.tsx";
 import { MailAlertCard } from "./mail-alert-card.tsx";
 import { mailColumnLayout, mailPanelId } from "./mail-columns.ts";
 import { MailEmployerRow } from "./mail-employer-row.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 
 const ranges = [
   { days: 7, label: copy.admin.mailRange7 },
@@ -46,7 +47,7 @@ export function MailHealthPage() {
   }
 
   if (data === null) {
-    return null;
+    return <AdminStatusCard failed={false} onRetry={refresh} />;
   }
 
   const view: MailHealth = data;

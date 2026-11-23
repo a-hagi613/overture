@@ -11,6 +11,7 @@ import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle, dsEyebrow } from "./ui/ds.ts";
 import { Input } from "./ui/input.tsx";
+import { SectionSkeleton } from "./section-skeleton.tsx";
 
 const moneyFormat = new Intl.NumberFormat("en-US");
 
@@ -123,6 +124,10 @@ export function TargetsSection() {
     }
 
     setNewLocation(null);
+  }
+
+  if (targetsQuery.isPending) {
+    return <SectionSkeleton />;
   }
 
   return (

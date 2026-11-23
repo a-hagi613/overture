@@ -18,6 +18,7 @@ import { AttemptsTable } from "./attempts-table.tsx";
 import { BillingStatCard } from "./billing-stat-card.tsx";
 import { AdminGateScreen } from "./gate-screen.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
+import { AdminStatusCard } from "./admin-status-card.tsx";
 
 const FILTER_BUTTON_CLASS =
   "min-h-11 rounded-md px-3.5 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9";
@@ -63,7 +64,7 @@ export function AttemptsPage() {
   }
 
   if (data === null) {
-    return null;
+    return <AdminStatusCard failed={false} onRetry={refresh} />;
   }
 
   const updateFilters = (nextOutcome: AttemptOutcomeFilter, nextApplicationId: string) => {

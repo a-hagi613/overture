@@ -32,6 +32,7 @@ import {
   shiftMonth,
 } from "../lib/calendar-grid.ts";
 import { browserZone, currentTime } from "../lib/inbox-time.ts";
+import { RouteFallback } from "../components/route-fallback.tsx";
 
 export function CalendarPage() {
   const [params, setParams] = useSearchParams();
@@ -158,6 +159,9 @@ export function CalendarPage() {
     });
   };
 
+  const loaded = data !== undefined;
+  const initialLoading = data === undefined && !isError;
+
   return (
     <div>
       <PageHeader
@@ -187,7 +191,13 @@ export function CalendarPage() {
             {copy.calendar.retry}
           </Button>
         </Card>
-      ) : (
+      ) : null}
+      {initialLoading ? (
+        <div className="mt-6">
+          <RouteFallback />
+        </div>
+      ) : null}
+      {loaded ? (
         <div className="mt-6 grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <CalendarBoard
             buckets={buckets}
@@ -222,7 +232,7 @@ export function CalendarPage() {
             />
           </aside>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

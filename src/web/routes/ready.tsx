@@ -73,10 +73,14 @@ export function ReadyPage() {
     () => () => {
       for (const [id, timer] of skipTimers.current) {
         globalThis.clearTimeout(timer);
-        void fetch(`/api/applications/${encodeURIComponent(id)}/withdraw`, {
-          keepalive: true,
-          method: "POST",
-        });
+        void (async () => {
+          try {
+            await fetch(`/api/applications/${encodeURIComponent(id)}/withdraw`, {
+              keepalive: true,
+              method: "POST",
+            });
+          } catch {}
+        })();
       }
 
       skipTimers.current.clear();

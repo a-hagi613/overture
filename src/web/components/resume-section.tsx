@@ -17,6 +17,7 @@ import { Badge } from "./ui/badge.tsx";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle, dsEyebrow } from "./ui/ds.ts";
+import { SectionSkeleton } from "./section-skeleton.tsx";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) {
@@ -146,6 +147,10 @@ export function ResumeSection() {
     uploadButtonLabel = copy.nav.profilePages.resumeUploading;
   } else if (filename === null) {
     uploadButtonLabel = copy.nav.profilePages.resumeUploadPdf;
+  }
+
+  if (resumeQuery.isPending && current === null) {
+    return <SectionSkeleton />;
   }
 
   return (
