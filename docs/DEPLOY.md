@@ -1084,10 +1084,20 @@ Routing and the Worker with `auth='pass'` and the matching code within `live_che
 Settings value). Failures raise `alert.raised`, create an owner notification, and push to the phone when
 `ALERT_NTFY_URL` is set as a Fly secret.
 
-No Grafana is provisioned by this repository: the OTLP endpoint and dashboards remain in the owner's Grafana account.
-The application computes the SPEC §16.5 alert thresholds from its own database and machine, so the daily check and
-the test-only drill route exercise every alert kind without Grafana. If dashboards are wanted, set
-`OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS` on the app and create them by hand in Grafana.
+Observability has two paths. Logs, traces and OTLP metrics still go to the owner's Grafana Cloud account when
+`OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS` are set. Separately, Fly's built-in Grafana
+(`fly-metrics.net`) scrapes the app's private Prometheus listener: with `METRICS_ENABLED=true` (set in `fly.toml`) the
+app serves `GET /metrics` on IPv6 `::` port `9091`, declared by `[metrics]` in `fly.toml` and never mounted on the
+public `:3000` app. The committed dashboard `docs/ops/grafana/overture-prod-dashboard.json` imports as
+"Overture production" and organizes all six rows (Runtime & Catalog, API Latency, Apply & ATS Health, LLM & Tagging,
+Queue/Mail/Billing, Fly System Resources). Select the Prometheus datasource that scrapes `:9091`; the last row uses
+Fly's own `fly_instance_*` series.
+
+`/api/health` stays public and deliberately minimal. The richer answer lives at the HMAC-authenticated
+`GET /internal/ops/health`: set `OPS_HEALTH_SECRET` as a Fly secret, and the sentinel Worker polls it when
+`OVERTURE_OPS_HEALTH_SECRET` is set, paging on RAM above 80 %, NVMe above 75 %, event-loop lag p95 above 500 ms or an
+ATS failure spike. The sentinel sends `x-overture-ops-timestamp` and `x-overture-ops-signature` (HMAC-SHA256 over
+`METHOD\npath\ntimestamp`); a missing, expired or wrong signature fails closed.
 
 ## The Workable feed pass (M2-25)
 

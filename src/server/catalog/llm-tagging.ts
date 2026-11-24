@@ -1,6 +1,6 @@
 import { gunzipSync } from "node:zlib";
 
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, count, countDistinct, eq, inArray, isNull, or } from "drizzle-orm";
 
 import { z } from "zod";
 
@@ -14,6 +14,8 @@ import { enqueueJob } from "../platform/jobs/queue.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 import { checkLlmCaps, nextUtcMidnight } from "../platform/llm/caps.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
+import { defaultMetrics } from "../platform/telemetry/metrics.ts";
+import { measureSqliteQuery } from "../platform/telemetry/sqlite-metrics.ts";
 import { writePostingTags } from "./tag-store.ts";
 import { normalizeTitle } from "./normalize.ts";
 
@@ -329,6 +331,37 @@ export function ensureTagFallbackQueued(db: AppDatabase, clock: Clock) {
   return true;
 }
 
+function recordTagCoverage(deps: TagFallbackDeps) {
+  const openRow = deps.catalogDb
+    .select({ total: count() })
+    .from(postings)
+    .where(isNull(postings.closedAt))
+    .get();
+
+  const open = openRow?.total ?? 0;
+
+  if (open === 0) {
+    defaultMetrics().setTagCoverageRatio("rules", 0);
+    defaultMetrics().setTagCoverageRatio("llm", 0);
+
+    return;
+  }
+
+  const rows = measureSqliteQuery("catalog", "select", () =>
+    deps.catalogDb
+      .select({ classified: countDistinct(postingTags.postingId), source: postingTags.source })
+      .from(postingTags)
+      .innerJoin(postings, eq(postings.id, postingTags.postingId))
+      .where(and(eq(postingTags.dimension, "role"), isNull(postings.closedAt)))
+      .groupBy(postingTags.source)
+      .all(),
+  );
+
+  for (const row of rows) {
+    defaultMetrics().setTagCoverageRatio(row.source, row.classified / open);
+  }
+}
+
 export async function runTagFallbackJob(deps: TagFallbackDeps) {
   const report: TagFallbackReport = {
     leftovers: 0,
@@ -468,6 +501,10 @@ export async function runTagFallbackJob(deps: TagFallbackDeps) {
     deps.clock,
     hasMore ? deps.clock.now() + CONTINUE_DELAY_MS : nextUtcMidnight(deps.clock.now()),
   );
+
+  if (report.leftovers > 0) {
+    recordTagCoverage(deps);
+  }
 
   return report;
 }

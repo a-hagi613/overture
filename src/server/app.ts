@@ -63,6 +63,7 @@ import {
 } from "./host-routing.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createInternalCatalogRoutes } from "./routes/internal-catalog.ts";
+import { createInternalOpsHealthRoutes } from "./routes/internal-ops.ts";
 import { createMailRoutes } from "./routes/mail.ts";
 import { createWorkspaceSearchRoutes } from "./routes/workspace-search.ts";
 import { createSupportAccessRoutes } from "./routes/support-access.ts";
@@ -74,8 +75,16 @@ import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { createConfiguredBackupStore } from "./platform/object-store.ts";
 import { securityHeaders } from "./security-headers.ts";
 import { logError } from "./platform/log.ts";
+import { httpMetricsMiddleware } from "./platform/telemetry/http-metrics.ts";
 import type { CatalogHotSwap } from "./catalog/hot-swap.ts";
 import { API_ERRORS } from "../shared/api-errors.ts";
+
+export interface OpsHealthConfig {
+  /** The shared HMAC secret; an empty value makes the route answer 403 rather than leak anything. */
+  secret: string;
+  /** The rolling event-loop p95 the endpoint reports. */
+  eventLoopLagP95Ms?: (() => number | null) | undefined;
+}
 
 export interface AppDependencies {
   db: AppDatabase;
@@ -107,6 +116,8 @@ export interface AppDependencies {
   mail: MailSender;
   payments: Payments | null;
   personal?: PersonalCrypto | undefined;
+  /** When set, mounts the HMAC-authenticated internal ops health answer (never the public one). */
+  opsHealth?: OpsHealthConfig | undefined;
   /** Aborted on shutdown; long-lived responses (the event stream) end with it. */
   shutdown: AbortSignal;
 }
@@ -346,6 +357,7 @@ export function createApp(deps: AppDependencies) {
   adminHost.onError(jsonError);
 
   app.use("*", securityHeaders(env.NODE_ENV === "production"));
+  app.use("*", httpMetricsMiddleware());
 
   const splitHosts = !adminHostSharesMainHostname();
 
@@ -574,6 +586,21 @@ export function createApp(deps: AppDependencies) {
         objects: deps.objects,
         secret: env.CATALOG_REFRESH_SECRET,
         ...(deps.catalogStagingDir !== undefined && { stagingDir: deps.catalogStagingDir }),
+      }),
+    );
+  }
+
+  if (deps.opsHealth !== undefined) {
+    app.route(
+      "/",
+      createInternalOpsHealthRoutes({
+        db: deps.db,
+        clock: deps.clock,
+        secret: deps.opsHealth.secret,
+        databasePath: deps.databasePath,
+        ...(deps.opsHealth.eventLoopLagP95Ms !== undefined && {
+          eventLoopLagP95Ms: deps.opsHealth.eventLoopLagP95Ms,
+        }),
       }),
     );
   }

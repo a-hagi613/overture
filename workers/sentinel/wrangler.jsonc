@@ -17,6 +17,9 @@
   },
   "vars": {
     "OVERTURE_HEALTH_URL": "https://tryoverture.com/api/health",
+    // The signed ops endpoint (WS-21). With no OVERTURE_OPS_HEALTH_SECRET set the sentinel skips
+    // this check and keeps the public probe only.
+    "OVERTURE_OPS_HEALTH_URL": "https://tryoverture.com/internal/ops/health",
   },
   "r2_buckets": [
     {
