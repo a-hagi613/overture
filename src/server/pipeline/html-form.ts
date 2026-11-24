@@ -23,7 +23,9 @@ export type HtmlFormPath =
   | "clearcompany_html"
   | "join_com_html"
   | "pinpoint_html"
-  | "batch4_html";
+  | "batch4_html"
+  | "jobvite_html"
+  | "herp_html";
 
 export interface HtmlFormReadOptions<P extends HtmlFormPath = HtmlFormPath> {
   /** The path recorded beside the questions, and the prefix of the form signature. */

@@ -11,12 +11,14 @@ import {
   isApplySupportedAts,
   isBatch1Ats,
   isBatchFourAts,
+  isWaveTwoAts,
   PLAN_CACHE_ATS,
+  WAVE_2_ATS,
 } from "./ats.ts";
 
 describe("the ATS registry", () => {
   test("ships an apply adapter for every batch that has landed", () => {
-    const batches = [BATCH_1_ATS, BATCH_2_ATS, BATCH_3_ATS, BATCH_4_ATS];
+    const batches = [BATCH_1_ATS, BATCH_2_ATS, BATCH_3_ATS, BATCH_4_ATS, WAVE_2_ATS];
 
     for (const ats of batches.flat()) {
       expect(ATS_REGISTRY[ats].applySupported).toBe(true);
@@ -44,6 +46,18 @@ describe("the ATS registry", () => {
       expect(isBatchFourAts(ats)).toBe(true);
       expect(isBatch1Ats(ats)).toBe(false);
     }
+  });
+
+  test("ships Wave 2's two boards through the Wave 2 readers", () => {
+    expect(WAVE_2_ATS).toEqual(["jobvite", "herp"]);
+
+    for (const ats of WAVE_2_ATS) {
+      expect(isWaveTwoAts(ats)).toBe(true);
+      expect(isBatchFourAts(ats)).toBe(false);
+      expect(ATS_REGISTRY[ats].wave).toBe("wave2");
+    }
+
+    expect(isWaveTwoAts("workday")).toBe(false);
   });
 
   test("has one registry entry for every accepted ATS value", () => {

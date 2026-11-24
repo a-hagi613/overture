@@ -2,10 +2,11 @@
  * The applicant tracking systems Overture ingests. Shared by the catalog and application schemas.
  *
  * The registry is the approved Stapply no-login board set (issue #563): the five boards Overture already
- * applies to, Wave 1A's pure guest-apply boards, and Wave 1B's boards whose employer may gate the form
- * behind a login. A board's wave says where its feed came from; `applySupported` says whether Overture has
- * a deterministic apply adapter for it, which is the five shipped adapters plus every wave's batches that
- * have shipped their form readers and browser adapters (issues #572, #571, #569 and #574).
+ * applies to, Wave 1A's pure guest-apply boards, Wave 1B's boards whose employer may gate the form
+ * behind a login, and Wave 2's multi-step guest boards. A board's wave says where its feed came from;
+ * `applySupported` says whether Overture has a deterministic apply adapter for it, which is the five
+ * shipped adapters plus every wave's batches that have shipped their form readers and browser adapters
+ * (issues #572, #571, #569, #574 and #633).
  */
 export const SHIPPED_ATS = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
 
@@ -77,6 +78,9 @@ export const BATCH_4_ATS = [
   "varbi",
 ] as const;
 
+/** The Wave 2 boards whose deterministic adapters and form readers ship in issue #633. */
+export const WAVE_2_ATS = ["jobvite", "herp"] as const;
+
 /** The apply-supported boards whose form plan is cached by signature (every board but Greenhouse). */
 export const PLAN_CACHE_ATS = [
   "lever",
@@ -87,9 +91,10 @@ export const PLAN_CACHE_ATS = [
   ...BATCH_2_ATS,
   ...BATCH_3_ATS,
   ...BATCH_4_ATS,
+  ...WAVE_2_ATS,
 ] as const;
 
-export const ATS_VALUES = [...SHIPPED_ATS, ...WAVE_1A_ATS, ...WAVE_1B_ATS] as const;
+export const ATS_VALUES = [...SHIPPED_ATS, ...WAVE_1A_ATS, ...WAVE_1B_ATS, ...WAVE_2_ATS] as const;
 
 export type Ats = (typeof ATS_VALUES)[number];
 
@@ -103,7 +108,9 @@ export type BatchThreeAts = (typeof BATCH_3_ATS)[number];
 
 export type BatchFourAts = (typeof BATCH_4_ATS)[number];
 
-export type AtsWave = "shipped" | "wave1a" | "wave1b";
+export type WaveTwoAts = (typeof WAVE_2_ATS)[number];
+
+export type AtsWave = "shipped" | "wave1a" | "wave1b" | "wave2";
 
 export interface AtsRegistryEntry {
   /** The wave that brought the board's feed in. */
@@ -141,6 +148,8 @@ export const ATS_REGISTRY = {
   catsone: { applySupported: true, wave: "wave1b" },
   onlyfy: { applySupported: true, wave: "wave1b" },
   varbi: { applySupported: true, wave: "wave1b" },
+  jobvite: { applySupported: true, wave: "wave2" },
+  herp: { applySupported: true, wave: "wave2" },
 } as const satisfies Record<Ats, AtsRegistryEntry>;
 
 /**
@@ -154,6 +163,7 @@ export const APPLY_SUPPORTED_ATS = [
   ...BATCH_2_ATS,
   ...BATCH_3_ATS,
   ...BATCH_4_ATS,
+  ...WAVE_2_ATS,
 ] as const;
 
 /** Every board with a deterministic apply adapter, in registry order. */
@@ -187,4 +197,15 @@ export function isBatch1Ats(ats: string): ats is BatchOneAts {
  */
 export function isBatchFourAts(ats: string): ats is BatchFourAts {
   return BATCH_4_ATS.some((candidate) => candidate === ats);
+}
+
+/**
+ * Whether a board belongs to Wave 2, whose multi-step applicants share one reader
+ * and browser adapter family (issue #633).
+ *
+ * @param ats The board's ATS value.
+ * @returns True for Wave 2's boards.
+ */
+export function isWaveTwoAts(ats: string): ats is WaveTwoAts {
+  return WAVE_2_ATS.some((candidate) => candidate === ats);
 }

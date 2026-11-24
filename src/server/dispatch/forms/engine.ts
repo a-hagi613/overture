@@ -1481,9 +1481,19 @@ export async function fillField(scope: FormScope, id: string, value: string) {
       return false;
     }
 
-    await options.nth(index).check();
+    try {
+      await options.nth(index).check();
+    } catch {
+      await options
+        .nth(index)
+        .check({ force: true })
+        .catch(() => undefined);
+    }
 
-    return true;
+    return await options
+      .nth(index)
+      .isChecked()
+      .catch(() => false);
   }
 
   if (widget.tag === "input" && FILLABLE_INPUT_TYPES.has(widget.type)) {
