@@ -572,7 +572,6 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           ALERT_NTFY_URL: ${{ secrets.ALERT_NTFY_URL }}
           CATALOG_REFRESH_SECRET: ${{ secrets.CATALOG_REFRESH_SECRET }}
-          ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
           ALLOWED_SIGNUP_EMAILS: ${{ secrets.ALLOWED_SIGNUP_EMAILS }}
           ENABLE_CATALOG_R2_HOT_SWAP: ${{ inputs.enable_catalog_r2_hot_swap }}
         run: |
@@ -588,11 +587,6 @@ jobs:
             echo "::add-mask::$CATALOG_REFRESH_SECRET"
             set_args+=("CATALOG_REFRESH_SECRET=$CATALOG_REFRESH_SECRET")
             key_names+=("CATALOG_REFRESH_SECRET")
-          fi
-          if [ -n "${ADMIN_EMAILS:-}" ]; then
-            echo "::add-mask::$ADMIN_EMAILS"
-            set_args+=("ADMIN_EMAILS=$ADMIN_EMAILS")
-            key_names+=("ADMIN_EMAILS")
           fi
           if [ -n "${ALLOWED_SIGNUP_EMAILS:-}" ]; then
             echo "::add-mask::$ALLOWED_SIGNUP_EMAILS"

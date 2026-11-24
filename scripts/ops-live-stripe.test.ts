@@ -110,25 +110,21 @@ test("setup-stripe summarizes the configured environment and variable names only
   expect(run).not.toMatch(/echo\s+"?\$\{?STRIPE_SECRET_KEY\}?"?/u);
 });
 
-test("sync-ops-secrets binds the admin and signup allowlists", () => {
+test("sync-ops-secrets binds the signup allowlist", () => {
   const env = syncOpsSecrets.env ?? {};
 
-  expect(env.ADMIN_EMAILS).toBe(secretRef("ADMIN_EMAILS"));
   expect(env.ALLOWED_SIGNUP_EMAILS).toBe(secretRef("ALLOWED_SIGNUP_EMAILS"));
 });
 
-test("sync-ops-secrets imports the allowlists by name without printing their values", () => {
+test("sync-ops-secrets imports the allowlist by name without printing its value", () => {
   const run = runOf(syncOpsSecrets);
 
-  expect(run).toContain('set_args+=("ADMIN_EMAILS=$ADMIN_EMAILS")');
   expect(run).toContain('set_args+=("ALLOWED_SIGNUP_EMAILS=$ALLOWED_SIGNUP_EMAILS")');
-  expect(run).toContain('key_names+=("ADMIN_EMAILS")');
   expect(run).toContain('key_names+=("ALLOWED_SIGNUP_EMAILS")');
-  expect(run).toContain('echo "::add-mask::$ADMIN_EMAILS"');
   expect(run).toContain('echo "::add-mask::$ALLOWED_SIGNUP_EMAILS"');
-  expect(run.indexOf('set_args+=("ADMIN_EMAILS=$ADMIN_EMAILS")')).toBeLessThan(
+  expect(run.indexOf('set_args+=("ALLOWED_SIGNUP_EMAILS=$ALLOWED_SIGNUP_EMAILS")')).toBeLessThan(
     run.indexOf("flyctl secrets import -a overture-web"),
   );
 
-  expect(run).not.toMatch(/echo\s+"?\$\{?(?:ADMIN_EMAILS|ALLOWED_SIGNUP_EMAILS)\}?"?/u);
+  expect(run).not.toMatch(/echo\s+"?\$\{?ALLOWED_SIGNUP_EMAILS\}?"?/u);
 });

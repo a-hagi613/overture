@@ -20,7 +20,7 @@ to Fly), against names only.
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`), a `security-and-restore` job (gitleaks over the history, the private-files guard, and the Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations, untouched `bg_jobs`), and the `ci-ok` aggregator every other job feeds |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
-| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets; `stripe_env` chooses the `sandbox` or `production` Stripe account, default `sandbox`), `sync-ops-secrets` (pushes the optional ops secrets and flags, including `ADMIN_EMAILS` and `ALLOWED_SIGNUP_EMAILS`, to `overture-web`), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
+| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets; `stripe_env` chooses the `sandbox` or `production` Stripe account, default `sandbox`), `sync-ops-secrets` (pushes the optional ops secrets and flags, including `ALLOWED_SIGNUP_EMAILS`, to `overture-web`), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
 | `.github/workflows/ops-admin-host.yml` | `workflow_dispatch` only, for the admin host: `status` (certificate table, Fly secret names only, app status), `add-cert` (idempotent certificate for `admin.tryoverture.com`, then the same report), `set-access-secrets` (pushes the Cloudflare Access values held as repository secrets to Fly, names only afterwards). Fails with a clear message while `FLY_API_TOKEN` is unset |
 | `.github/workflows/stapply-daily.yml` | Daily at 15:30 UTC (one hour after Stapply's 14:30 snapshot) and on `workflow_dispatch`; skips with a green notice until the R2 repository secrets or `CATALOG_REFRESH_SECRET` are configured. Builds `catalog.sqlite` with DuckDB from the 28 per-board `jobs.parquet` files, delta-syncs it against the previous R2 snapshot, tags it, vacuums and compresses it, then publishes `catalog/latest.sqlite.zst`, `catalog/latest.json` and `catalog/snapshots/YYYY-MM-DD.sqlite.zst` to R2 or relays the signed refresh to `overture-web` |
 | `.github/workflows/vacuum-db.yml` | Weekly (Sundays 05:00 UTC, also `workflow_dispatch` with `dry_run` and `force`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise dry-runs `/data/app.sqlite`, and only when its freelist exceeds 50 MB (or `force` is set) restarts the one machine in maintenance mode, vacuums it, restarts the server and polls `/api/health` |
@@ -471,21 +471,20 @@ with the drift message.
 Against a test key this creates test-mode products, prices, a webhook and a portal; delete them in the dashboard when
 you are done. `--rotate-webhook` replaces the endpoint and writes the new `STRIPE_WEBHOOK_SECRET` to the env file.
 
-## Admin and signup allowlists (optional, owner runbook)
+## Signup allowlist for regular testers (optional, owner runbook)
 
-`sync-ops-secrets` also pushes two optional allowlist values from repository secrets to `overture-web`:
+`sync-ops-secrets` also pushes the optional regular-testers allowlist from a repository secret to `overture-web`:
 
 ```sh
-gh secret set ADMIN_EMAILS -R a-hagi613/overture
 gh secret set ALLOWED_SIGNUP_EMAILS -R a-hagi613/overture
 gh workflow run ops-live.yml -f action=sync-ops-secrets -R a-hagi613/overture
 ```
 
-When either repository secret is set, the action masks it, adds `ADMIN_EMAILS=…` or `ALLOWED_SIGNUP_EMAILS=…` to the
-same single `flyctl secrets import -a overture-web` call as the other ops secrets, and lists only the variable names in
-the step summary. Unset secrets are skipped, so a run never clears a value already on the app; remove one deliberately
-with `flyctl secrets unset -a overture-web ADMIN_EMAILS` (or `ALLOWED_SIGNUP_EMAILS`). A run with nothing to import
-fails with `No secrets or flags were configured to sync.` The action still finishes by polling the health route.
+When the repository secret is set, the action masks it, adds `ALLOWED_SIGNUP_EMAILS=…` to the same single
+`flyctl secrets import -a overture-web` call as the other ops secrets, and lists only the variable name in the step
+summary. An unset secret is skipped, so a run never clears a value already on the app; remove it deliberately with
+`flyctl secrets unset -a overture-web ALLOWED_SIGNUP_EMAILS`. A run with nothing to import fails with
+`No secrets or flags were configured to sync.` The action still finishes by polling the health route.
 
 ## Push notifications and the catalog seed (owner runbook)
 
