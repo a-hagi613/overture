@@ -14,18 +14,6 @@ import { SegmentedControlItem } from "./ui/segmented-control-item.tsx";
 
 type ChartStyle = "area" | "bar";
 
-const RANGE_KEYS: readonly HomeRangeKey[] = ["7D", "30D", "90D"];
-
-const RANGE_LABELS: Record<HomeRangeKey, string> = {
-  "7D": copy.home.ranges.d7,
-  "30D": copy.home.ranges.d30,
-  "90D": copy.home.ranges.d90,
-};
-
-function isRangeKey(value: string): value is HomeRangeKey {
-  return value === "7D" || value === "30D" || value === "90D";
-}
-
 function subtitleFor(rangeKey: HomeRangeKey) {
   if (rangeKey === "30D") {
     return copy.home.chart.perDay30;
@@ -50,12 +38,8 @@ function formatPointLabel(at: number, rangeKey: HomeRangeKey) {
   );
 }
 
-export function HomeChart(props: {
-  onRangeChange: (next: HomeRangeKey) => void;
-  range: HomeRange;
-  rangeKey: HomeRangeKey;
-}) {
-  const { onRangeChange, range, rangeKey } = props;
+export function HomeChart(props: { range: HomeRange; rangeKey: HomeRangeKey }) {
+  const { range, rangeKey } = props;
   const [chartStyle, setChartStyle] = useState<ChartStyle>("area");
   const total = range.chart.points.reduce((sum, point) => sum + point.count, 0);
   const subtitle = subtitleFor(rangeKey);
@@ -66,7 +50,11 @@ export function HomeChart(props: {
   }));
 
   return (
-    <Card ariaLabelledBy="home-chart" className="mt-5 flex flex-col p-5 md:p-6">
+    <Card
+      ariaLabelledBy="home-chart"
+      className="mt-5 flex flex-col p-5 md:p-6"
+      dataTestId="home-chart"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2.5">
@@ -98,22 +86,6 @@ export function HomeChart(props: {
               <BarChart3 aria-hidden="true" size={14} />
               <span>{copy.home.chart.barLabel}</span>
             </SegmentedControlItem>
-          </SegmentedControl>
-
-          <SegmentedControl
-            ariaLabel={copy.home.rangeLabel}
-            onValueChange={(value) => {
-              if (isRangeKey(value)) {
-                onRangeChange(value);
-              }
-            }}
-            value={rangeKey}
-          >
-            {RANGE_KEYS.map((key) => (
-              <SegmentedControlItem key={key} value={key}>
-                {RANGE_LABELS[key]}
-              </SegmentedControlItem>
-            ))}
           </SegmentedControl>
         </div>
       </div>

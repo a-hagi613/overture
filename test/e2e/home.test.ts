@@ -5,6 +5,7 @@ import type { APIRequestContext } from "@playwright/test";
 
 import type { AppServer } from "./app-server.ts";
 
+import { AxeBuilder } from "@axe-core/playwright";
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, test as appTest } from "./app.fixture.ts";
 import {
@@ -31,6 +32,7 @@ const serverNow = Date.UTC(2026, 10, 17, 11, 15, 0);
 
 const homeBoardSchema = z.object({
   applicationsLeft: z.number(),
+  nextPrepAt: z.number(),
   nextSendAt: z.number().nullable(),
   pauseReason: z.string().nullable(),
   planApplications: z.number(),
@@ -292,6 +294,7 @@ test("Home reports the board ranges, the open Reviews and the recent Inbox", asy
   expect(home.sentToday).toBe(7);
   expect(home.queued).toBe(12);
   expect(home.nextSendAt).toBe(Date.UTC(2026, 10, 17, 11, 40, 0));
+  expect(home.nextPrepAt).toBe(Date.UTC(2026, 10, 18, 7, 0, 0));
   expect(home.ranges["7D"].applicationsSent).toBe(37);
   expect(home.ranges["7D"].sentDelta).toBe(6);
   expect(home.ranges["7D"].replies).toBe(9);
@@ -322,4 +325,160 @@ test("Home reports the board ranges, the open Reviews and the recent Inbox", asy
   expect(home.recentInbox[3]?.detail).toBe("Moved to Closed");
 
   await owner.dispose();
+});
+
+test("Home puts actions above the chart and the outcomes strip follows 7D, 30D and 90D", async ({
+  browser,
+  homeServer,
+}) => {
+  const request = await storeFor(homeServer.url);
+
+  await moveClockTo(request, serverNow);
+  await request.post("/__test__/home/sample", { data: { email: authTestIdentity.ownerEmail } });
+
+  const storageState = await request.storageState();
+
+  await request.dispose();
+
+  async function checkWidth(width: number) {
+    const context = await browser.newContext({
+      deviceScaleFactor: 1,
+      storageState,
+      viewport: { height: 900, width },
+    });
+
+    const page = await context.newPage();
+
+    try {
+      await page.clock.setFixedTime(new Date(2026, 10, 17, 11, 0, 0));
+      await page.goto(`${homeServer.url}/home`);
+
+      await expect(page.getByText("Sending active")).toBeVisible();
+
+      const outcomes = page.getByTestId("home-outcomes");
+
+      await expect(outcomes.getByText("Applications sent")).toBeVisible();
+      await expect(outcomes.getByText("37", { exact: true })).toBeVisible();
+      await expect(outcomes.getByText("+6 vs the previous 7 days")).toBeVisible();
+      await expect(outcomes.getByText("Replies", { exact: true })).toBeVisible();
+      await expect(outcomes.getByText("9", { exact: true })).toBeVisible();
+      await expect(outcomes.getByText("Interviews", { exact: true })).toBeVisible();
+      await expect(outcomes.getByText("3", { exact: true })).toBeVisible();
+
+      const chart = await page.getByTestId("home-chart").boundingBox();
+
+      expect(chart).not.toBeNull();
+
+      const actions = await Promise.all([
+        page.locator("#home-needs-you").boundingBox(),
+        page.locator("#home-ready-title").boundingBox(),
+        page.getByTestId("home-failures").boundingBox(),
+      ]);
+
+      for (const box of actions) {
+        expect(box).not.toBeNull();
+
+        if (box !== null && chart !== null) {
+          expect(box.y, `${String(width)}px action above the chart`).toBeLessThan(chart.y);
+        }
+      }
+
+      await expect(page.getByTestId("home-failures")).toContainText("Couldn't apply");
+      await expect(page.getByTestId("home-failures")).toContainText("Ferro Cloud, DevOps Engineer");
+      await expect(page.getByTestId("home-activity")).toContainText("Sent · confirmed");
+
+      await outcomes.getByRole("button", { name: "30D" }).click();
+      await expect(outcomes.getByText("69", { exact: true })).toBeVisible();
+      await expect(outcomes.getByText("+69 vs the previous 30 days")).toBeVisible();
+
+      await outcomes.getByRole("button", { name: "90D" }).click();
+      await expect(outcomes.getByText("69", { exact: true })).toBeVisible();
+      await expect(page.getByText("Weekly applications sent · Last 90 days")).toBeVisible();
+
+      await outcomes.getByRole("button", { name: "7D" }).click();
+      await expect(outcomes.getByText("37", { exact: true })).toBeVisible();
+      await expect(page.getByText("Daily applications sent · Last 7 days")).toBeVisible();
+
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      );
+
+      expect(overflow, `${String(width)}px`).toBe(false);
+    } finally {
+      await context.close();
+    }
+  }
+
+  await Promise.all([checkWidth(1280), checkWidth(390)]);
+});
+
+test("Home shows All caught up with the next preparation run when nothing waits", async ({
+  browser,
+  homeServer,
+}) => {
+  const request = await storeFor(homeServer.url);
+
+  await moveClockTo(request, serverNow);
+  await request.post("/__test__/home/sample", {
+    data: { email: authTestIdentity.ownerEmail, variant: "caught_up" },
+  });
+
+  const storageState = await request.storageState();
+
+  await request.dispose();
+
+  async function checkVariant(width: number, theme: string) {
+    const context = await browser.newContext({
+      deviceScaleFactor: 1,
+      storageState,
+      viewport: { height: 900, width },
+    });
+
+    const page = await context.newPage();
+
+    try {
+      await page.clock.setFixedTime(new Date(2026, 10, 17, 11, 0, 0));
+
+      if (theme === "dark") {
+        await page.addInitScript(() => {
+          globalThis.localStorage.setItem("overture.theme", "dark");
+        });
+      }
+
+      await page.goto(`${homeServer.url}/home`);
+
+      const caughtUp = page.getByTestId("home-caught-up");
+
+      await expect(caughtUp).toBeVisible();
+      await expect(page.getByRole("heading", { name: "All caught up" })).toBeVisible();
+      await expect(caughtUp).toContainText("Next preparation run at 07:00");
+      await expect(page.getByTestId("home-failures")).toHaveCount(0);
+      await expect(page.locator("#home-needs-you")).toHaveCount(0);
+      await expect(page.locator("#home-ready-title")).toHaveCount(0);
+      await expect(page.getByTestId("home-chart")).toBeVisible();
+
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+      });
+
+      const results = await new AxeBuilder({ page }).analyze();
+
+      expect(results.violations, `${String(width)}px ${theme}`).toEqual([]);
+
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      );
+
+      expect(overflow, `${String(width)}px ${theme}`).toBe(false);
+    } finally {
+      await context.close();
+    }
+  }
+
+  await Promise.all([
+    checkVariant(1280, "light"),
+    checkVariant(1280, "dark"),
+    checkVariant(390, "light"),
+    checkVariant(390, "dark"),
+  ]);
 });

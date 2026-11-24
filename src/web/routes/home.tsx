@@ -7,18 +7,22 @@ import type { CodeWait } from "../lib/code-wait-api.ts";
 import { copy } from "../../shared/copy.ts";
 import { authClient } from "../lib/auth-client.ts";
 import { CodePasteError, isAtAskTime, useCodeWaits, usePasteCode } from "../lib/code-wait-api.ts";
+import { homeActionStateOf, isAllCaughtUp } from "../lib/home-bands.ts";
 import { firstNameOf } from "../lib/identity.ts";
 import { useHomeData } from "../lib/home-api.ts";
 import { CodePasteSheet } from "../components/code-paste-sheet.tsx";
 import type { CodePasteMode } from "../components/code-paste-sheet.tsx";
 import { HomeActivity } from "../components/home-activity.tsx";
 import { HomeBillingNotice } from "../components/home-billing-notice.tsx";
+import { HomeCaughtUp } from "../components/home-caught-up.tsx";
 import { HomeChart } from "../components/home-chart.tsx";
 import { HomeCheckIn } from "../components/home-checkin.tsx";
 import { HomeCodeWait } from "../components/home-code-wait.tsx";
 import { HomeControlBand } from "../components/home-control-band.tsx";
+import { HomeFailures } from "../components/home-failures.tsx";
 import { HomeInbox } from "../components/home-inbox.tsx";
 import { HomeNeedsYou } from "../components/home-needs-you.tsx";
+import { HomeOutcomes } from "../components/home-outcomes.tsx";
 import { HomePauseBanner } from "../components/home-pause-banner.tsx";
 import { HomeQueue } from "../components/home-queue.tsx";
 import { HomeReadyCard } from "../components/home-ready-card.tsx";
@@ -112,6 +116,13 @@ export function HomePage() {
   const activeSheet: OpenSheet | null =
     sheet ??
     (requestedWait === null ? null : { error: null, mode: "waiting", wait: requestedWait });
+
+  const codeWaitAsking = wait !== null && asked;
+  const showReady = home !== undefined && home.ready.ready > 0;
+  const showNeedsYou = home !== undefined && home.reviews.total > 0;
+  const showCheckIn = home !== undefined && home.checkIns.length > 0;
+  const showFailures = home !== undefined && home.activity.failed.length > 0;
+  const caughtUp = home !== undefined && isAllCaughtUp(homeActionStateOf(home), codeWaitAsking);
 
   const closeSheet = useCallback(() => {
     setSheet(null);
@@ -213,19 +224,6 @@ export function HomePage() {
         <HomePauseBanner reason={home.pauseReason} />
       )}
 
-      {wait === null || !asked ? null : (
-        <HomeCodeWait
-          onNoCode={() => {
-            openSheet(wait, "no_code");
-          }}
-          onPaste={() => {
-            openSheet(wait, "waiting");
-          }}
-          serverNow={codeWaits?.now}
-          wait={wait}
-        />
-      )}
-
       {homePending ? (
         <div aria-busy="true" className="mt-6 space-y-5">
           <span className="sr-only">{copy.shell.loadingPage}</span>
@@ -235,12 +233,15 @@ export function HomePage() {
               <div className="h-20 w-full rounded bg-muted" />
             </div>
           </Card>
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             <Card className="p-6">
-              <div className="h-32 animate-pulse rounded bg-muted" />
+              <div className="h-24 animate-pulse rounded bg-muted" />
             </Card>
             <Card className="p-6">
-              <div className="h-32 animate-pulse rounded bg-muted" />
+              <div className="h-24 animate-pulse rounded bg-muted" />
+            </Card>
+            <Card className="p-6">
+              <div className="h-24 animate-pulse rounded bg-muted" />
             </Card>
           </div>
         </div>
@@ -271,54 +272,84 @@ export function HomePage() {
             planApplications={home.planApplications}
           />
           <HomeControlBand home={home} />
+          {range === null ? null : (
+            <HomeOutcomes onRangeChange={setRangeKey} range={range} rangeKey={rangeKey} />
+          )}
         </>
       )}
 
+      <div data-testid="home-actions">
+        {wait === null || !asked ? null : (
+          <HomeCodeWait
+            onNoCode={() => {
+              openSheet(wait, "no_code");
+            }}
+            onPaste={() => {
+              openSheet(wait, "waiting");
+            }}
+            serverNow={codeWaits?.now}
+            wait={wait}
+          />
+        )}
+        {home === undefined ? null : (
+          <>
+            {showReady || showNeedsYou ? (
+              <div
+                className={
+                  showReady && showNeedsYou ? "mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2" : "mt-5"
+                }
+              >
+                {showReady ? <HomeReadyCard readyCount={home.ready.ready} /> : null}
+                {showNeedsYou ? (
+                  <HomeNeedsYou
+                    applications={home.reviews.applications}
+                    reviews={home.reviews.list}
+                    total={home.reviews.total}
+                  />
+                ) : null}
+              </div>
+            ) : null}
+
+            {showFailures ? (
+              <HomeFailures failed={home.activity.failed} now={home.now} zone={home.timeZone} />
+            ) : null}
+
+            {showCheckIn ? (
+              <div className="mt-5">
+                <HomeCheckIn checkIns={home.checkIns} />
+              </div>
+            ) : null}
+
+            {caughtUp ? <HomeCaughtUp nextPrepAt={home.nextPrepAt} zone={home.timeZone} /> : null}
+          </>
+        )}
+      </div>
+
       {home === undefined || range === null ? null : (
-        <>
-          <HomeChart onRangeChange={setRangeKey} range={range} rangeKey={rangeKey} />
+        <div data-testid="home-progress">
+          <HomeChart range={range} rangeKey={rangeKey} />
 
-          <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <HomeReadyCard readyCount={home.ready.ready} />
-            <HomeNeedsYou
-              applications={home.reviews.applications}
-              reviews={home.reviews.list}
-              total={home.reviews.total}
-            />
-          </div>
+          {home.activity.sent.length === 0 ? null : (
+            <HomeActivity now={home.now} sent={home.activity.sent} zone={home.timeZone} />
+          )}
 
-          {paused || home.checkIns.length > 0 ? (
-            <div className="mt-5 flex flex-wrap items-stretch gap-5">
-              {paused ? (
-                <HomeQueue
-                  position={home.queue.position}
-                  sendAt={home.queue.sendAt}
-                  zone={home.timeZone}
-                />
-              ) : null}
-              {home.checkIns.length > 0 ? <HomeCheckIn checkIns={home.checkIns} /> : null}
+          {paused ? (
+            <div className="mt-5">
+              <HomeQueue
+                position={home.queue.position}
+                sendAt={home.queue.sendAt}
+                zone={home.timeZone}
+              />
             </div>
           ) : null}
 
-          {paused ? (
-            <>
-              <HomeActivity
-                failed={home.activity.failed}
-                now={home.now}
-                sent={home.activity.sent}
-                zone={home.timeZone}
-              />
-              {home.strengthen === null ? null : (
-                <HomeStrengthen missing={home.strengthen.missing} />
-              )}
-            </>
-          ) : null}
+          {home.strengthen === null ? null : <HomeStrengthen missing={home.strengthen.missing} />}
 
           <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
             <HomeInbox now={home.now} rows={home.recentInbox} zone={home.timeZone} />
             <HomeSchedule now={home.now} zone={home.timeZone} />
           </div>
-        </>
+        </div>
       )}
 
       {activeSheet === null ? null : (

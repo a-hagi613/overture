@@ -633,6 +633,13 @@ export const copy = {
     usageLowQuota: "Running low — choose a plan",
     usageAria: (count: number) => `${String(count)} applications left`,
     daySoFar: "The day so far",
+    outcomes: {
+      interviews: "Interviews",
+      replies: "Replies",
+    },
+    caughtUp: {
+      nextLabel: "Next preparation run at",
+    },
     ready: {
       action: "Send applications",
       countBadge: (count: number) => `${String(count)} ready`,
