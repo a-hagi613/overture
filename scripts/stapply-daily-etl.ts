@@ -34,34 +34,53 @@ import {
   countSupportedPostings,
   createStapplyStaging,
   dropStapplyStaging,
+  markClassificationAttempted,
+  selectClassificationTargets,
   stageStapplyRows,
   tagSourceSummary,
+  untaggedPostingCount,
   unresolvedRoleCount,
+  writePostingClassifications,
+  writeStagedSkills,
 } from "../src/server/catalog/stapply-delta.ts";
+import { classifierCacheKey, runClassificationPipeline } from "../src/server/catalog/classifier.ts";
+import {
+  CLASSIFICATION_CACHE_KEY,
+  decompressClassificationCache,
+  emptyClassificationCache,
+  mergeClassificationCache,
+  parseClassificationCache,
+  serializeClassificationCache,
+} from "../src/server/catalog/classification-cache.ts";
+import { createOnnxEmbedder } from "../src/server/catalog/embedder.ts";
+import { createHaikuBatchClassifier } from "../src/server/catalog/haiku-classifier.ts";
+import { ESCO_VERSION } from "../src/server/catalog/esco-taxonomy.ts";
 import {
   rebuildPostingLocations,
   rebuildPostingsFts,
   seedGeoPlaces,
 } from "../src/server/catalog/geo-store.ts";
 import { salaryUsdUpdateSql } from "../src/server/catalog/salary-usd.ts";
-import {
-  STAPPLY_LLM_BATCH_SIZE,
-  STAPPLY_LLM_MAX_ROWS,
-  createAnthropicStapplyClassifier,
-  runStapplyLlmTagging,
-} from "../src/server/catalog/stapply-tagging.ts";
 import { rebuildSupplyFacets } from "../src/server/catalog/supply-facets.ts";
 import {
   compressCatalogSnapshot,
   decompressCatalogSnapshot,
   downloadPreviousCatalog,
+  fetchClassificationCacheRelay,
   notifyCatalogRefresh,
   publishCatalogSnapshot,
+  putClassificationCacheRelay,
+  readClassificationCacheObject,
   relayCatalogSnapshot,
+  writeClassificationCacheObject,
 } from "../src/server/catalog/stapply-refresh.ts";
 import type { Ats } from "../src/shared/ats.ts";
 import type { CatalogDatabase } from "../src/server/platform/db/client.ts";
 import type { CatalogManifest, StapplyIngestRow } from "../src/server/catalog/stapply-daily.ts";
+import type { AmbiguousClassificationItem } from "../src/server/catalog/haiku-classifier.ts";
+import type { ClassificationCache } from "../src/server/catalog/classification-cache.ts";
+import type { PostingClassificationWrite } from "../src/server/catalog/stapply-delta.ts";
+import type { TaggingReport } from "../src/server/catalog/tagging-report.ts";
 
 const DAY_MS = 86_400_000;
 const STAGE_CHUNK = 5000;
@@ -76,7 +95,10 @@ const args = parseArgs({
     "allow-row-drop": { type: "boolean" },
     "dry-run": { type: "boolean" },
     "skip-llm": { type: "boolean" },
-    "max-llm-rows": { type: "string" },
+    "skip-embeddings": { type: "boolean" },
+    "max-classify-rows": { type: "string" },
+    "accept-top1": { type: "string" },
+    "accept-margin": { type: "string" },
     "tag-unsupported": { type: "boolean" },
     "zstd-level": { type: "string" },
   },
@@ -99,10 +121,29 @@ if (!Number.isFinite(freshnessDays) || freshnessDays < 0) {
   throw new TypeError("--freshness-days must be zero or a positive number");
 }
 
-const maxLlmRows = Number(args.values["max-llm-rows"] ?? String(STAPPLY_LLM_MAX_ROWS));
+const maxClassifyRows = Number(args.values["max-classify-rows"] ?? "60000");
 
-if (!Number.isInteger(maxLlmRows) || maxLlmRows < 0) {
-  throw new TypeError("--max-llm-rows must be a non-negative integer");
+if (!Number.isInteger(maxClassifyRows) || maxClassifyRows < 0) {
+  throw new TypeError("--max-classify-rows must be a non-negative integer");
+}
+
+const acceptTop1 = Number(args.values["accept-top1"] ?? "0.78");
+const acceptMargin = Number(args.values["accept-margin"] ?? "0.06");
+
+if (!Number.isFinite(acceptTop1) || !Number.isFinite(acceptMargin)) {
+  throw new TypeError("--accept-top1 and --accept-margin must be numbers");
+}
+
+/**
+ * Every signed request in the run has to carry a strictly newer timestamp than the last one the runtime accepted, so
+ * the cache read, the cache write and the publish calls take turns from one monotonic counter.
+ */
+let lastSignedMs = 0;
+
+function nextSignedMs() {
+  lastSignedMs = Math.max(clock.now(), lastSignedMs + 1);
+
+  return lastSignedMs;
 }
 
 const zstdLevel = Number(args.values["zstd-level"] ?? "12");
@@ -146,7 +187,7 @@ function objectStoreFromEnv() {
 
 const objects = outDir === undefined ? objectStoreFromEnv() : createDiskObjectStore(outDir);
 
-function classifierFromEnv() {
+function haikuClassifierFromEnv() {
   const apiKey = envValue("ANTHROPIC_API_KEY");
 
   if (apiKey === undefined) {
@@ -155,7 +196,91 @@ function classifierFromEnv() {
 
   const model = envValue("CATALOG_LLM_MODEL");
 
-  return createAnthropicStapplyClassifier(model === undefined ? { apiKey } : { apiKey, model });
+  return createHaikuBatchClassifier(model === undefined ? { apiKey } : { apiKey, model });
+}
+
+function embedderFromEnv() {
+  if (args.values["skip-embeddings"] === true) {
+    return null;
+  }
+
+  const model = envValue("CATALOG_EMBEDDING_MODEL");
+
+  return createOnnxEmbedder(model === undefined ? {} : { model });
+}
+
+function relayCredentials() {
+  const origin = envValue("CATALOG_REFRESH_ORIGIN") ?? "https://tryoverture.com";
+  const secret = envValue("CATALOG_REFRESH_SECRET");
+
+  return secret === undefined ? null : { origin, secret };
+}
+
+/**
+ * Reads the classification cache through R2 when the runner has the repository's R2 secrets, or through the signed
+ * Fly relay otherwise. A missing object (Day 1's 404) and a read failure both mean an empty cache.
+ * @returns The cache for this taxonomy version.
+ */
+async function loadClassificationCache(): Promise<ClassificationCache> {
+  try {
+    let compressed: Uint8Array<ArrayBuffer> | null = null;
+
+    if (objects !== null) {
+      compressed = await readClassificationCacheObject(objects, CLASSIFICATION_CACHE_KEY);
+    } else {
+      const relay = relayCredentials();
+
+      if (relay !== null) {
+        compressed = await fetchClassificationCacheRelay({
+          ...relay,
+          nowMs: nextSignedMs(),
+        });
+      }
+    }
+
+    if (compressed === null) {
+      return emptyClassificationCache(ESCO_VERSION);
+    }
+
+    return parseClassificationCache(decompressClassificationCache(compressed), ESCO_VERSION);
+  } catch (error) {
+    progress(`classification cache read failed (${String(error)}); starting cold`);
+
+    return emptyClassificationCache(ESCO_VERSION);
+  }
+}
+
+/**
+ * Writes the Tier-2 and Tier-3 classifications back as the run's last network step.
+ * @param cache The merged cache.
+ * @returns The write mode.
+ */
+async function saveClassificationCache(cache: ClassificationCache) {
+  if (args.values["dry-run"] === true) {
+    return "dry_run";
+  }
+
+  const compressed = serializeClassificationCache(cache);
+
+  if (objects !== null) {
+    await writeClassificationCacheObject(objects, CLASSIFICATION_CACHE_KEY, compressed);
+
+    return objects.kind;
+  }
+
+  const relay = relayCredentials();
+
+  if (relay === null) {
+    return "none";
+  }
+
+  const result = await putClassificationCacheRelay({
+    ...relay,
+    nowMs: nextSignedMs(),
+    compressedBytes: compressed,
+  });
+
+  return result.outcome === "delivered" ? "relay" : "relay_endpoint_missing";
 }
 
 async function prepareCatalog() {
@@ -309,18 +434,88 @@ async function main() {
   const rowCount = countPostings(catalog.db);
   const supportedCount = countSupportedPostings(catalog.db);
 
-  const llm =
-    args.values["skip-llm"] === true || maxLlmRows === 0
-      ? { considered: 0, sent: 0, tagged: 0, skipped: 0, available: false }
-      : await runStapplyLlmTagging({
-          db: catalog.db,
-          classifier: classifierFromEnv(),
-          now,
-          limit: maxLlmRows,
-          batchSize: STAPPLY_LLM_BATCH_SIZE,
-        });
+  const skillsTagged = writeStagedSkills(catalog.db);
 
-  progress(`llm tagging: ${String(llm.tagged)} tagged, ${String(llm.skipped)} left`);
+  progress(`staged skills: ${String(skillsTagged)} postings`);
+
+  const targets = selectClassificationTargets(catalog.db, maxClassifyRows);
+  const byKey = new Map<string, { item: AmbiguousClassificationItem; postingIds: string[] }>();
+
+  for (const target of targets) {
+    const key = classifierCacheKey(target.title, target.department);
+    const entry = byKey.get(key) ?? {
+      item: {
+        key,
+        title: target.title,
+        department: target.department,
+        jobCategory: target.jobCategory,
+        language: target.language,
+      },
+      postingIds: [],
+    };
+
+    entry.postingIds.push(target.id);
+    byKey.set(key, entry);
+  }
+
+  const items = [...byKey.values()].map((entry) => entry.item);
+  const cache = await loadClassificationCache();
+  const embedder = embedderFromEnv();
+  const haiku = args.values["skip-llm"] === true ? null : haikuClassifierFromEnv();
+
+  progress(
+    `classifying ${String(items.length)} unique title/department pairs for ${String(targets.length)} postings`,
+  );
+
+  const pipeline = await runClassificationPipeline({
+    cache,
+    crossBoardDupesRemoved: delta.duplicates,
+    embedder,
+    haiku,
+    items,
+    thresholds: {
+      acceptMargin,
+      acceptTop1,
+      escoMin: 0.74,
+      secondaryMin: 0.74,
+    },
+    totalPostings: rowCount,
+  });
+
+  const writes: PostingClassificationWrite[] = [];
+  const unresolvedIds: string[] = [];
+
+  for (const [key, entry] of byKey) {
+    const classification = pipeline.results.get(key);
+
+    if (classification === undefined) {
+      unresolvedIds.push(...entry.postingIds);
+      continue;
+    }
+
+    for (const postingId of entry.postingIds) {
+      writes.push({ classification, postingId, skillRequirements: [] });
+    }
+  }
+
+  writePostingClassifications(catalog.db, writes, now);
+  markClassificationAttempted(catalog.db, unresolvedIds, now);
+
+  const cacheMode = await saveClassificationCache(
+    mergeClassificationCache(cache, pipeline.updates),
+  );
+
+  const taggingReport: TaggingReport = {
+    ...pipeline.report,
+    cross_board_dupes_removed: delta.duplicates,
+    still_untagged: untaggedPostingCount(catalog.db),
+    total_postings: rowCount,
+    unique_title_dept_pairs: items.length,
+  };
+
+  progress(
+    `classification: ${String(taggingReport.tier1_esco_rules)} rules, ${String(taggingReport.tier2_embeddings)} embeddings, ${String(taggingReport.tier3_haiku_resolved)} haiku; ${String(taggingReport.still_untagged)} still untagged; cache ${cacheMode}`,
+  );
 
   rebuildSupplyFacets(catalog.db);
 
@@ -363,6 +558,7 @@ async function main() {
     sqliteBytes,
     rowCount,
     supportedCount,
+    tagging: taggingReport,
   });
 
   if (
@@ -417,8 +613,10 @@ async function main() {
       rowCount,
       supportedCount,
       unresolved,
+      skillsTagged,
     },
-    llm,
+    tagging: taggingReport,
+    classificationCache: cacheMode,
     perBoard: perBoardSummary,
     tagSources,
     integrity,
@@ -444,7 +642,12 @@ async function publishArtifacts(
       return { mode: objects.kind, pruned: published.pruned.length };
     }
 
-    const notified = await notifyCatalogRefresh({ origin, secret, manifest, nowMs: clock.now() });
+    const notified = await notifyCatalogRefresh({
+      origin,
+      secret,
+      manifest,
+      nowMs: nextSignedMs(),
+    });
 
     return {
       mode:
@@ -466,7 +669,7 @@ async function publishArtifacts(
     secret,
     manifest,
     compressedBytes,
-    nowMs: clock.now(),
+    nowMs: nextSignedMs(),
   });
 
   return {

@@ -129,6 +129,16 @@ export const postings = sqliteTable(
     applySupported: integer("apply_supported", { mode: "boolean" }).notNull().default(false),
     dedupeKey: text("dedupe_key").notNull(),
     contentHash: text("content_hash"),
+    /** The feed's own category string (`job_category` for Stapply), kept for the classifier and never shown raw. */
+    jobCategory: text("job_category"),
+    /** The Level-1 broad category the classifier resolved, from `ROLE_GROUPS`. */
+    primaryCategory: text("primary_category"),
+    /** The Level-2 granular role the classifier resolved. */
+    primaryRole: text("primary_role"),
+    /** The Level-3 ESCO v1.2.1 occupation code, when an alias or the embedding tier resolved one. */
+    escoCode: text("esco_code"),
+    /** When the three-tier classifier last attempted this posting, so a bounded run still progresses each day. */
+    classifiedAt: integer("classified_at"),
     skillsJson: text("skills_json"),
     descriptionGz: blob("description_gz", { mode: "buffer" }),
     descriptionHash: text("description_hash"),
@@ -184,9 +194,13 @@ export const postingTags = sqliteTable(
     postingId: text("posting_id")
       .notNull()
       .references(() => postings.id, { onDelete: "cascade" }),
-    dimension: text("dimension", { enum: ["role", "subrole", "seniority"] }).notNull(),
+    dimension: text("dimension", {
+      enum: ["role", "subrole", "seniority", "granular_role", "skill", "esco"],
+    }).notNull(),
     value: text("value").notNull(),
     source: text("source", { enum: ["rules", "model", "llm", "import"] }).notNull(),
+    /** The classifier's confidence for a weighted tag (a cosine similarity or a model score); null when unweighted. */
+    weight: real("weight"),
   },
   (t) => [
     primaryKey({ columns: [t.postingId, t.dimension, t.value] }),

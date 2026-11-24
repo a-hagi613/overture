@@ -36,6 +36,13 @@
       "when": 1795530355778,
       "tag": "0004_geo_rtree_contentless_fts5",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1795600000000,
+      "tag": "0005_esco_classification",
+      "breakpoints": true
     }
   ]
 }

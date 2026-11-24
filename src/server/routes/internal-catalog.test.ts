@@ -19,9 +19,11 @@ import {
   compressCatalogSnapshot,
 } from "../catalog/stapply-refresh.ts";
 import type { CatalogManifest } from "../catalog/stapply-daily.ts";
+import { CLASSIFICATION_CACHE_KEY } from "../catalog/classification-cache.ts";
 import {
   CATALOG_REFRESH_PATH,
   CATALOG_SNAPSHOT_PATH,
+  CLASSIFICATION_CACHE_PATH,
   createInternalCatalogRoutes,
 } from "./internal-catalog.ts";
 import { openCatalogDatabase } from "../platform/db/client.ts";
@@ -431,6 +433,91 @@ describe("PUT /internal/catalog/snapshot", () => {
     expect(upload.status).toBe(401);
     expect(await upload.json()).toEqual({ error: "stale_timestamp" });
     expect(existsSync(stagingDir)).toBe(false);
+
+    hotSwap.close();
+  });
+});
+
+describe("/internal/catalog/classification-cache", () => {
+  function signedGet(app: Hono, timestampMs: number, secret = SECRET) {
+    return app.request(CLASSIFICATION_CACHE_PATH, {
+      headers: catalogRefreshHeaders(secret, timestampMs, ""),
+      method: "GET",
+    });
+  }
+
+  function signedPut(
+    app: Hono,
+    body: Uint8Array<ArrayBuffer>,
+    timestampMs: number,
+    secret = SECRET,
+  ) {
+    return app.request(CLASSIFICATION_CACHE_PATH, {
+      body,
+      headers: {
+        "content-type": "application/zstd",
+        ...catalogRefreshHeaders(secret, timestampMs, catalogSha256(body)),
+      },
+      method: "PUT",
+    });
+  }
+
+  test("round-trips a signed cache and 404s on the first day", async () => {
+    const { app, objects, hotSwap } = setup();
+
+    expect((await signedGet(app, NOW)).status).toBe(404);
+
+    const payload = compressCatalogSnapshot(new TextEncoder().encode('{"entries":{}}'));
+    expect((await signedPut(app, payload, NOW + 1)).status).toBe(204);
+    expect(await objects.get(CLASSIFICATION_CACHE_KEY)).not.toBeNull();
+
+    const read = await signedGet(app, NOW + 2);
+
+    expect(read.status).toBe(200);
+    expect(new Uint8Array(await read.arrayBuffer())).toEqual(payload);
+
+    hotSwap.close();
+  });
+
+  test("refuses an unsigned read and an unsigned write", async () => {
+    const { app, hotSwap } = setup();
+    const payload = compressCatalogSnapshot(new TextEncoder().encode("{}"));
+
+    expect((await app.request(CLASSIFICATION_CACHE_PATH, { method: "GET" })).status).toBe(401);
+    expect(
+      (await app.request(CLASSIFICATION_CACHE_PATH, { body: payload, method: "PUT" })).status,
+    ).toBe(401);
+
+    hotSwap.close();
+  });
+
+  test("refuses a replayed timestamp and a bad signature", async () => {
+    const { app, hotSwap } = setup();
+    const payload = compressCatalogSnapshot(new TextEncoder().encode("{}"));
+
+    expect((await signedPut(app, payload, NOW)).status).toBe(204);
+    expect((await signedPut(app, payload, NOW)).status).toBe(409);
+    expect((await signedGet(app, NOW + 1, "another-secret")).status).toBe(401);
+
+    hotSwap.close();
+  });
+
+  test("refuses a body that does not match the signed digest", async () => {
+    const { app, hotSwap } = setup();
+    const payload = compressCatalogSnapshot(new TextEncoder().encode("{}"));
+    const other = compressCatalogSnapshot(new TextEncoder().encode('{"tampered":true}'));
+
+    const response = await app.request(CLASSIFICATION_CACHE_PATH, {
+      body: other,
+      headers: {
+        "content-type": "application/zstd",
+        ...catalogRefreshHeaders(SECRET, NOW, catalogSha256(payload)),
+      },
+      method: "PUT",
+    });
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "bad_signature" });
 
     hotSwap.close();
   });
