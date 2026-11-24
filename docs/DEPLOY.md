@@ -691,19 +691,28 @@ landing page.
 
 ### Rollback
 
-The workflow only adds and reports; removal stays with an authenticated operator. To take the admin host out of
-service:
+The workflow only adds and reports; removal stays with an authenticated operator. Taking the admin host out of service
+is a DNS change **first**; the Access values stay on the shared app because production now refuses to boot without
+them:
 
 ```sh
 flyctl certs remove admin.tryoverture.com -a overture-web
-flyctl secrets unset CF_ACCESS_AUD CF_ACCESS_TEAM_DOMAIN CF_ACCESS_JWKS_URL -a overture-web
-gh secret delete CF_ACCESS_AUD -R a-hagi613/overture
-gh secret delete CF_ACCESS_TEAM_DOMAIN -R a-hagi613/overture
 ```
 
 Then delete the `admin` CNAME and any `_acme-challenge` validation record in the Cloudflare DNS zone, and delete the
 Access application. Deleting the DNS record takes the host offline; deleting only the certificate breaks HTTPS. The app
 still refuses requests without an Access assertion (`401 access_required`), but do not leave the host public.
+
+Do not `flyctl secrets unset CF_ACCESS_AUD CF_ACCESS_TEAM_DOMAIN` on the current release: that restart stops the app
+for the public host too. Remove those secrets only after deploying a release that no longer requires them (or rolling
+back to a release from before the fail-closed change), and delete the repository secrets at the same time:
+
+```sh
+# only after a release whose env check does not require the Access values is deployed
+flyctl secrets unset CF_ACCESS_AUD CF_ACCESS_TEAM_DOMAIN CF_ACCESS_JWKS_URL -a overture-web
+gh secret delete CF_ACCESS_AUD -R a-hagi613/overture
+gh secret delete CF_ACCESS_TEAM_DOMAIN -R a-hagi613/overture
+```
 
 ## After a deploy
 

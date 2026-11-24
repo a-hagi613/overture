@@ -94,6 +94,7 @@ import {
   setSetting,
 } from "../platform/settings/index.ts";
 import {
+  findInvite,
   inviteEmailHash,
   inviteStatus,
   INVITE_GRANT_DAYS_KEY,
@@ -1250,10 +1251,9 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
       return context.json({ error: "user_exists" }, 409);
     }
 
-    const emailHash = inviteEmailHash(inviteSecret, email);
-    const existing = db.select().from(invites).where(eq(invites.emailHash, emailHash)).get();
+    const existing = findInvite(db, authSecretConfig.accepted, email);
 
-    if (existing !== undefined) {
+    if (existing !== null) {
       if (existing.acceptedAt !== null) {
         return context.json({ error: "already_accepted" }, 409);
       }
@@ -1263,6 +1263,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
       }
     }
 
+    const emailHash = existing?.emailHash ?? inviteEmailHash(inviteSecret, email);
     const id = existing?.id ?? crypto.randomUUID();
 
     const emailEnc = await deps.personal.sealFor(
@@ -1273,7 +1274,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
 
     const createdAt = new Date(clock.now());
 
-    if (existing === undefined) {
+    if (existing === null) {
       db.insert(invites)
         .values({
           id,
