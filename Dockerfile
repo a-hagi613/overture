@@ -31,6 +31,10 @@ WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/dist ./dist
+# The marketing Worker ships the HTML this same build wrote, so `deploy-workers` extracts `dist-marketing` from the
+# running machine instead of rebuilding it (a second build scanned different files and hashed `/assets/main-*.js`
+# differently, which 404'd and stopped the landing from hydrating). See docs/DEPLOY.md, M3-10.
+COPY --from=build /app/dist-marketing ./dist-marketing
 COPY --from=build /app/src ./src
 COPY --from=build /app/drizzle ./drizzle
 COPY --from=build /app/drizzle-catalog ./drizzle-catalog

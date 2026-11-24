@@ -1,4 +1,12 @@
-@import "tailwindcss";
+/*
+ * Tailwind scans a fixed scope, not the project root, so the stylesheet is byte-identical whether the build runs on a
+ * full checkout or inside the Docker build context (`.dockerignore` drops `docs/`, `test/`, `design/` and friends).
+ * That determinism is what keeps `dist/assets/main-*.js` hash-stable across the Fly image and the marketing Worker:
+ * every Tailwind class found outside `src/` used to add CSS, which changed the CSS chunk hash and cascaded into the
+ * `main-*.js` filename that the prerendered marketing HTML references.
+ */
+@import "tailwindcss" source("../");
+@source "../../index.html";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
