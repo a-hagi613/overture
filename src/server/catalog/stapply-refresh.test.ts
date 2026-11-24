@@ -23,6 +23,7 @@ import {
   downloadPreviousCatalog,
   notifyCatalogRefresh,
   publishCatalogSnapshot,
+  pruneCatalogSnapshots,
   readPreviousCatalogManifest,
   relayCatalogSnapshot,
 } from "./stapply-refresh.ts";
@@ -187,6 +188,57 @@ describe("publishCatalogSnapshot", () => {
     const download = downloadPreviousCatalog({ objects, decompress: decompressCatalogSnapshot });
 
     expect(download).rejects.toThrow(/does not match its manifest/u);
+  });
+
+  test("keeps the newest dated snapshots and deletes the older ones", async () => {
+    const objects = scratchStore();
+    const { compressedBytes, manifest } = artifacts();
+
+    for (const day of ["01", "02", "03", "04", "05", "06", "07", "08", "09"]) {
+      await objects.put(`catalog/snapshots/2026-11-${day}.sqlite.zst`, compressedBytes);
+    }
+
+    const published = await publishCatalogSnapshot({
+      objects,
+      manifest: { ...manifest, version: "2026-11-10" },
+      compressedBytes,
+      keepSnapshots: 7,
+    });
+
+    expect(published.pruned).toEqual([
+      "catalog/snapshots/2026-11-01.sqlite.zst",
+      "catalog/snapshots/2026-11-02.sqlite.zst",
+      "catalog/snapshots/2026-11-03.sqlite.zst",
+    ]);
+
+    const remaining: string[] = [];
+
+    for await (const key of objects.list("catalog/snapshots")) {
+      remaining.push(key);
+    }
+
+    expect(remaining.toSorted()).toEqual([
+      "catalog/snapshots/2026-11-04.sqlite.zst",
+      "catalog/snapshots/2026-11-05.sqlite.zst",
+      "catalog/snapshots/2026-11-06.sqlite.zst",
+      "catalog/snapshots/2026-11-07.sqlite.zst",
+      "catalog/snapshots/2026-11-08.sqlite.zst",
+      "catalog/snapshots/2026-11-09.sqlite.zst",
+      "catalog/snapshots/2026-11-10.sqlite.zst",
+    ]);
+    expect(await objects.get("catalog/latest.sqlite.zst")).toEqual(new Uint8Array(compressedBytes));
+  });
+
+  test("prunes to one snapshot at the floor", async () => {
+    const objects = scratchStore();
+
+    await objects.put("catalog/snapshots/2026-11-01.sqlite.zst", new Uint8Array([1]));
+    await objects.put("catalog/snapshots/2026-11-02.sqlite.zst", new Uint8Array([2]));
+
+    expect(await pruneCatalogSnapshots(objects, 0)).toEqual([
+      "catalog/snapshots/2026-11-01.sqlite.zst",
+    ]);
+    expect(await pruneCatalogSnapshots(objects)).toEqual([]);
   });
 
   test("returns null when there is no previous manifest", async () => {

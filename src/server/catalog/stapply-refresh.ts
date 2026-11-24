@@ -176,16 +176,50 @@ export function createCatalogRefreshVerifier(
 
 export type CatalogFetch = (url: string, init: RequestInit) => Promise<Response>;
 
+export const CATALOG_SNAPSHOT_RETENTION = 7;
+
 export interface CatalogPublishInput {
   readonly objects: ObjectStore;
   readonly manifest: CatalogManifest;
   readonly compressedBytes: Uint8Array<ArrayBuffer>;
+  readonly keepSnapshots?: number;
 }
 
 /**
- * Uploads the dated snapshot, then `catalog/latest.sqlite.zst`, then the manifest, in that order.
+ * Keeps the newest dated snapshots and deletes the rest. The names sort chronologically, so the last `keep` are the
+ * newest; retention is what keeps a daily artifact inside the bucket's free tier.
+ * @param objects The store.
+ * @param keep How many dated snapshots to keep.
+ * @returns The deleted keys.
+ */
+export async function pruneCatalogSnapshots(
+  objects: ObjectStore,
+  keep: number = CATALOG_SNAPSHOT_RETENTION,
+) {
+  const keys: string[] = [];
+
+  for await (const key of objects.list(CATALOG_SNAPSHOT_PREFIX)) {
+    keys.push(key);
+  }
+
+  const keepKeys = new Set(keys.toSorted().slice(-Math.max(1, keep)));
+  const deleted: string[] = [];
+
+  for (const key of keys.toSorted()) {
+    if (!keepKeys.has(key)) {
+      await objects.delete(key);
+      deleted.push(key);
+    }
+  }
+
+  return deleted;
+}
+
+/**
+ * Uploads the dated snapshot, then `catalog/latest.sqlite.zst`, then the manifest, in that order, then prunes dated
+ * snapshots beyond the retention window.
  * @param input The store, the manifest and the compressed snapshot.
- * @returns The keys written.
+ * @returns The keys written and the snapshots deleted.
  */
 export async function publishCatalogSnapshot(input: CatalogPublishInput) {
   const snapshotKey = catalogSnapshotKey(input.manifest.version);
@@ -197,7 +231,9 @@ export async function publishCatalogSnapshot(input: CatalogPublishInput) {
     new TextEncoder().encode(`${JSON.stringify(input.manifest)}\n`),
   );
 
-  return { snapshotKey, latestKey: CATALOG_LATEST_KEY, manifestKey: CATALOG_MANIFEST_KEY };
+  const pruned = await pruneCatalogSnapshots(input.objects, input.keepSnapshots);
+
+  return { snapshotKey, latestKey: CATALOG_LATEST_KEY, manifestKey: CATALOG_MANIFEST_KEY, pruned };
 }
 
 /**

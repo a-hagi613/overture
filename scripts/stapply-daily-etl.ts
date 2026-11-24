@@ -89,7 +89,7 @@ if (!Number.isInteger(maxLlmRows) || maxLlmRows < 0) {
   throw new TypeError("--max-llm-rows must be a non-negative integer");
 }
 
-const zstdLevel = Number(args.values["zstd-level"] ?? "19");
+const zstdLevel = Number(args.values["zstd-level"] ?? "12");
 
 if (!Number.isInteger(zstdLevel) || zstdLevel < 1 || zstdLevel > 22) {
   throw new TypeError("--zstd-level must be an integer between 1 and 22");
@@ -339,7 +339,9 @@ async function main() {
 
   const publish = await publishArtifacts(manifest, compressedBytes);
 
-  progress(`published ${publish} (${String(compressedBytes.byteLength)} bytes)`);
+  progress(
+    `published ${publish.mode} (${String(compressedBytes.byteLength)} bytes, ${String(publish.pruned)} old snapshots pruned)`,
+  );
 
   const perBoardSummary: Partial<Record<Ats, number>> = {};
 
@@ -352,7 +354,8 @@ async function main() {
     version,
     builtAt,
     mode: objects === null ? "relay" : objects.kind,
-    publish,
+    publish: publish.mode,
+    prunedSnapshots: publish.pruned,
     seed,
     freshnessDays: freshnessCutoffMs === null ? null : freshnessDays,
     sqlite: {
@@ -389,24 +392,28 @@ async function publishArtifacts(
   compressedBytes: Uint8Array<ArrayBuffer>,
 ) {
   if (args.values["dry-run"] === true) {
-    return "dry_run";
+    return { mode: "dry_run", pruned: 0 };
   }
 
   const origin = envValue("CATALOG_REFRESH_ORIGIN") ?? "https://tryoverture.com";
   const secret = envValue("CATALOG_REFRESH_SECRET");
 
   if (objects !== null) {
-    await publishCatalogSnapshot({ objects, manifest, compressedBytes });
+    const published = await publishCatalogSnapshot({ objects, manifest, compressedBytes });
 
     if (secret === undefined) {
-      return objects.kind;
+      return { mode: objects.kind, pruned: published.pruned.length };
     }
 
     const notified = await notifyCatalogRefresh({ origin, secret, manifest, nowMs: now });
 
-    return notified.outcome === "delivered"
-      ? `${objects.kind}+refresh`
-      : `${objects.kind}+refresh_endpoint_missing`;
+    return {
+      mode:
+        notified.outcome === "delivered"
+          ? `${objects.kind}+refresh`
+          : `${objects.kind}+refresh_endpoint_missing`,
+      pruned: published.pruned.length,
+    };
   }
 
   if (secret === undefined) {
@@ -423,7 +430,10 @@ async function publishArtifacts(
     nowMs: now,
   });
 
-  return relay.outcome === "delivered" ? "relay" : "relay_endpoint_missing";
+  return {
+    mode: relay.outcome === "delivered" ? "relay" : "relay_endpoint_missing",
+    pruned: 0,
+  };
 }
 
 const summary = await main();
