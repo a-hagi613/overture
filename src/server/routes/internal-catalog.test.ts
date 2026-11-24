@@ -245,6 +245,36 @@ describe("PUT /internal/catalog/snapshot", () => {
     hotSwap.close();
   });
 
+  test("refuses to move the published snapshot backwards", async () => {
+    const { app, hotSwap, objects, directory } = setup();
+    const newer = buildCatalog(join(directory, "v2.sqlite"), "Beta");
+    const older = buildCatalog(join(directory, "v1.sqlite"), "Alpha");
+
+    const newerManifest = manifestFor("2026-11-23", newer);
+
+    await objects.put(
+      CATALOG_MANIFEST_KEY,
+      new TextEncoder().encode(`${JSON.stringify(newerManifest)}\n`),
+    );
+
+    const compressed = compressCatalogSnapshot(older);
+
+    const upload = await app.request(CATALOG_SNAPSHOT_PATH, {
+      body: compressed,
+      headers: {
+        "content-type": "application/zstd",
+        "x-overture-catalog-version": "2026-11-22",
+        ...catalogRefreshHeaders(SECRET, NOW, catalogSha256(compressed)),
+      },
+      method: "PUT",
+    });
+
+    expect(upload.status).toBe(409);
+    expect(await upload.json()).toEqual({ error: "stale_version" });
+
+    hotSwap.close();
+  });
+
   test("rejects an unsigned relay upload", async () => {
     const { app, hotSwap, directory } = setup();
     const compressed = compressCatalogSnapshot(buildCatalog(join(directory, "v1.sqlite"), "Alpha"));

@@ -73,6 +73,22 @@ export function createInternalCatalogRoutes(deps: {
   const verify = deps.verifier ?? createCatalogRefreshVerifier(secret);
   const routes = new Hono();
 
+  async function storedVersion() {
+    const bytes = await objects.get(CATALOG_MANIFEST_KEY);
+
+    if (bytes === null) {
+      return null;
+    }
+
+    try {
+      const parsed = catalogManifestSchema.safeParse(JSON.parse(new TextDecoder().decode(bytes)));
+
+      return parsed.success ? parsed.data.version : null;
+    } catch {
+      return null;
+    }
+  }
+
   routes.post(CATALOG_REFRESH_PATH, async (context) => {
     const body = await readBodyCapped(context.req.raw, CATALOG_REFRESH_MAX_BYTES);
 
@@ -166,6 +182,12 @@ export function createInternalCatalogRoutes(deps: {
 
     if (version === undefined || !/^\d{4}-\d{2}-\d{2}$/u.test(version)) {
       return context.json({ error: API_ERRORS.invalidRequest }, 400);
+    }
+
+    const stored = await storedVersion();
+
+    if (stored !== null && version < stored) {
+      return context.json({ error: "stale_version" }, 409);
     }
 
     try {
