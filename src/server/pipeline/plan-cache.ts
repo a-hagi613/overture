@@ -22,9 +22,42 @@ const cachedQuestionSchema = z.object({
   position: z.number().int().min(0),
 });
 
+/**
+ * The actions a self-healed selector may perform. Every one writes an answer;
+ * none clicks a submit, apply or confirm control.
+ */
+export const SELF_HEAL_ACTIONS = ["fill", "select", "check", "radio"] as const;
+
+export type SelfHealAction = (typeof SELF_HEAL_ACTIONS)[number];
+
+export interface SelfHealPatch {
+  action: SelfHealAction;
+  confidence: number;
+  selector: string;
+}
+
+export interface SelfHealState {
+  /** True once the one LLM healing attempt for this form signature has run. */
+  attempted: boolean;
+  /** Verified selectors, keyed by the plan field name or label they answer. */
+  patches: Record<string, SelfHealPatch>;
+}
+
+const selfHealPatchSchema = z.object({
+  action: z.enum(SELF_HEAL_ACTIONS),
+  confidence: z.number().min(0).max(1),
+  selector: z.string().min(1),
+});
+
+const selfHealStateSchema = z.object({
+  attempted: z.boolean(),
+  patches: z.record(z.string(), selfHealPatchSchema),
+});
+
 const cachedPlanSchema = z.object({
   readPath: z.enum(FORM_READ_PATHS),
   questions: z.array(cachedQuestionSchema),
+  selfHeal: selfHealStateSchema.optional(),
 });
 
 export interface CachedPlanQuestion {
@@ -40,6 +73,8 @@ export interface CachedPlanQuestion {
 export interface CachedPlan {
   readPath: FormReadPath;
   questions: CachedPlanQuestion[];
+  /** The audited self-heal patches this form signature has collected. */
+  selfHeal?: SelfHealState | undefined;
 }
 
 export interface PlanCacheEntry {
@@ -126,6 +161,11 @@ export function createPlanCache(deps: { db: AppDatabase; clock: Clock }) {
   function put(ats: PlanCacheAts, formSignature: string, plan: CachedPlan) {
     const now = clock.now();
 
+    const existing = get(ats, formSignature);
+
+    const stored =
+      existing?.plan.selfHeal === undefined ? plan : { ...plan, selfHeal: existing.plan.selfHeal };
+
     db.insert(planCache)
       .values({
         ats,
@@ -133,14 +173,49 @@ export function createPlanCache(deps: { db: AppDatabase; clock: Clock }) {
         hits: 0,
         failures: 0,
         id: crypto.randomUUID(),
-        plan: JSON.stringify(plan),
+        plan: JSON.stringify(stored),
         updatedAt: now,
       })
       .onConflictDoUpdate({
-        set: { failures: 0, hits: 0, plan: JSON.stringify(plan), updatedAt: now },
+        set: { failures: 0, hits: 0, plan: JSON.stringify(stored), updatedAt: now },
         target: [planCache.ats, planCache.formSignature],
       })
       .run();
+  }
+
+  function selfHealState(ats: PlanCacheAts, formSignature: string) {
+    return (get(ats, formSignature)?.plan.selfHeal ?? {
+      attempted: false,
+      patches: {},
+    }) satisfies SelfHealState;
+  }
+
+  function saveSelfHeal(ats: PlanCacheAts, formSignature: string, state: SelfHealState) {
+    const now = clock.now();
+    const existing = get(ats, formSignature);
+
+    const plan = JSON.stringify({
+      ...(existing?.plan ?? { questions: [], readPath: "browser" }),
+      selfHeal: state,
+    });
+
+    db.insert(planCache)
+      .values({
+        ats,
+        formSignature,
+        hits: 0,
+        failures: 0,
+        id: crypto.randomUUID(),
+        plan,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        set: { plan, updatedAt: now },
+        target: [planCache.ats, planCache.formSignature],
+      })
+      .run();
+
+    return true;
   }
 
   function recordHit(id: string) {
@@ -177,7 +252,15 @@ export function createPlanCache(deps: { db: AppDatabase; clock: Clock }) {
       .run();
   }
 
-  return { get, match: matchQuestions, put, recordFailure, recordHit };
+  return {
+    get,
+    match: matchQuestions,
+    put,
+    recordFailure,
+    recordHit,
+    saveSelfHeal,
+    selfHealState,
+  };
 }
 
 export type PlanCache = ReturnType<typeof createPlanCache>;

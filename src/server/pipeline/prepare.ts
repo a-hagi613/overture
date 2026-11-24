@@ -58,6 +58,7 @@ import { answerIsValid, formatFactValue } from "./answer-value.ts";
 import { prepareUsersOfFacts, returnStaleApprovals } from "./approval-invalidation.ts";
 import { wordCount } from "./grounding.ts";
 import { INITIAL_CONSENT_VERSION } from "../../shared/consent.ts";
+import { knockoutPreScan, knockoutProfileFromFacts } from "../dispatch/knockout.ts";
 import {
   attachApplication,
   detachApplication,
@@ -763,6 +764,7 @@ export function createPreparationService(deps: {
         city: postings.city,
         region: postings.region,
         locationRaw: postings.locationRaw,
+        workplace: postings.workplace,
         language: postings.language,
         title: postings.title,
         descriptionGz: postings.descriptionGz,
@@ -808,6 +810,51 @@ export function createPreparationService(deps: {
       return updated ? { status: "skipped" as const, blocked: 0 } : null;
     }
 
+    const factRows = await factsService.list(row.userId);
+    const factValues = indexFacts(factRows);
+    const settings = await targetsService.read(row.userId);
+
+    const posting: PostingPlace = {
+      companyName: row.companyName,
+      countryCode: row.countryCode,
+      city: row.city,
+      region: row.region,
+      locationRaw: row.locationRaw,
+    };
+
+    const knockout = knockoutPreScan({
+      posting: {
+        countryCode: posting.countryCode,
+        description: descriptionText(row.descriptionGz),
+        locationRaw: posting.locationRaw,
+        title: row.title,
+        workplace: row.workplace,
+      },
+      profile: knockoutProfileFromFacts(factValues),
+    });
+
+    if (knockout !== null) {
+      logInfo(
+        "prepare",
+        `application ${applicationId} skipped: ${knockout.statusReason} (${knockout.explanation})`,
+      );
+
+      const skipped = updatePreparableApplication(db, applicationId, {
+        status: "skipped",
+        statusReason: knockout.statusReason,
+        stage: null,
+        updatedAt: clock.now(),
+      });
+
+      if (!skipped) {
+        return null;
+      }
+
+      syncReviews({ applicationId, ats: row.ats, userId: row.userId, blocked: [] });
+
+      return { status: "skipped" as const, blocked: 0, knockout };
+    }
+
     const loginWall = await loadQuestions(row);
 
     if (loginWall !== null) {
@@ -846,18 +893,7 @@ export function createPreparationService(deps: {
             resume.textEnc,
           );
 
-    const factRows = await factsService.list(row.userId);
-    const factValues = indexFacts(factRows);
-    const settings = await targetsService.read(row.userId);
     const questionRows = catalog.forPosting(row.postingId);
-
-    const posting: PostingPlace = {
-      companyName: row.companyName,
-      countryCode: row.countryCode,
-      city: row.city,
-      region: row.region,
-      locationRaw: row.locationRaw,
-    };
 
     const blocked: BlockedQuestion[] = [];
     const resolutions = new Map<string, PlanResolution>();

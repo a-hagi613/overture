@@ -104,6 +104,26 @@ const FAILED_REASON_TEXT = new Map<string, string>([
   ["code_timeout", "The verification code never arrived, so nothing was sent."],
   ["crash", "The browser session stopped before anything was sent."],
   ["form_changed", "The form changed after we had filled it in, so we stopped before sending."],
+  [
+    "knockout_ineligible",
+    "This role's stated requirements rule your profile out, so Overture skipped it.",
+  ],
+  [
+    "knockout_work_authorization",
+    "This role requires work authorization your profile does not have, so Overture skipped it.",
+  ],
+  [
+    "knockout_sponsorship",
+    "This role does not offer the visa sponsorship your profile needs, so Overture skipped it.",
+  ],
+  [
+    "knockout_experience",
+    "This role asks for more years of experience than your profile lists, so Overture skipped it.",
+  ],
+  [
+    "knockout_location",
+    "This role requires living somewhere you are not open to relocating to, so Overture skipped it.",
+  ],
   ["posting_closed", "This posting closed before sending."],
   ["provider_error", "The browser session failed before anything was sent."],
   ["timeout", "The employer's site took too long to answer, so nothing was sent."],
