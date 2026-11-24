@@ -13,7 +13,7 @@ export function SwitchLine({ row, onChanged }: { row: KillSwitchRow; onChanged: 
   };
 
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border py-3 first:border-t-0">
       <div className="min-w-0">
         <p className="font-mono text-sm font-semibold">{`${row.scope}/${row.key}`}</p>
         <p className="text-xs text-muted-foreground">
@@ -22,7 +22,7 @@ export function SwitchLine({ row, onChanged }: { row: KillSwitchRow; onChanged: 
         </p>
       </div>
       <button
-        className="inline-flex h-9 flex-none items-center justify-center rounded-md border border-input bg-card px-3 text-sm font-semibold hover:bg-muted"
+        className="inline-flex min-h-11 flex-none items-center justify-center rounded-md border border-input bg-card px-3 text-sm font-semibold hover:bg-muted md:min-h-9"
         onClick={() => {
           void flip();
         }}

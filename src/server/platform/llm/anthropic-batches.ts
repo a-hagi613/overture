@@ -7,6 +7,7 @@ import type { BatchProvider, DurableBatches, ProviderBatch } from "./durable-bat
 
 import { batchPricesFor } from "./models.ts";
 import { BatchGoneError } from "./durable-batches.ts";
+import { defaultMetrics } from "../telemetry/metrics.ts";
 
 const API_VERSION = "2023-06-01";
 const MAX_TOKENS = 1024;
@@ -291,7 +292,26 @@ export function createAnthropicLlmPort(config: AnthropicLlmConfig, batches: Dura
         return [];
       }
 
-      return batches.run(requests);
+      const calls = await batches.run(requests);
+
+      const purposeByCustomId = new Map(
+        requests.map((request) => [request.customId, request.purpose]),
+      );
+
+      for (const result of calls) {
+        defaultMetrics().recordLlmCall({
+          cacheWriteTokens: result.cacheWriteTokens,
+          cachedTokens: result.cachedTokens,
+          costMicros: result.costMicros,
+          inputTokens: result.inputTokens,
+          model: result.model,
+          outputTokens: result.outputTokens,
+          purpose: purposeByCustomId.get(result.customId) ?? "unknown",
+          status: result.result.ok ? "ok" : "error",
+        });
+      }
+
+      return calls;
     },
     estimateSingleCostMicros: (request) =>
       costMicrosFor(config.model, {
@@ -336,7 +356,7 @@ export function createAnthropicLlmPort(config: AnthropicLlmConfig, batches: Dura
 
       const message = messageSchema.parse(body);
 
-      return {
+      const result = {
         model: message.model,
         text: message.text,
         inputTokens: message.usage.input_tokens,
@@ -350,6 +370,14 @@ export function createAnthropicLlmPort(config: AnthropicLlmConfig, batches: Dura
           output: message.usage.output_tokens,
         }),
       };
+
+      defaultMetrics().recordLlmCall({
+        ...result,
+        purpose: "resume",
+        status: "ok",
+      });
+
+      return result;
     },
   };
 

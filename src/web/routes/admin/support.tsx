@@ -21,7 +21,7 @@ const FILTER_ORDER = ["open", "in_progress", "resolved", "closed", "all"] as con
 const LIST_LIMIT = 50;
 
 const FILTER_BUTTON =
-  "inline-flex min-h-11 items-center rounded-md px-3.5 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
+  "inline-flex min-h-11 min-w-11 items-center rounded-md px-3.5 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
 
 const CARD = "rounded-lg border border-border bg-card px-6 py-5 shadow-sh";
 
@@ -109,14 +109,7 @@ export function AdminSupportPage() {
   };
 
   if (refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={refusal}
-        onPasskeyDone={() => {
-          refresh();
-        }}
-      />
-    );
+    return <AdminGateScreen code={refusal} />;
   }
 
   const heading = (

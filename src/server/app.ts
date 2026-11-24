@@ -48,6 +48,8 @@ import { stripUntrustedIpHeaders } from "./auth/client-ip.ts";
 import { crossSiteRefusal } from "./auth/csrf.ts";
 import { DEMO_SIGN_IN_PATH } from "./auth/demo-paths.ts";
 import { env, labEnvironment, masterKeyring } from "./config/env.ts";
+import { accessVerifier } from "./platform/access/configured.ts";
+import { resolveAdminAccessOwner } from "./admin/access-owner.ts";
 import { demoLocked } from "./demo/guard.ts";
 import { createProfileRoutes } from "./routes/profile.ts";
 import { createOnboardingRoutes } from "./routes/onboarding.ts";
@@ -63,6 +65,7 @@ import {
 } from "./host-routing.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
 import { createInternalCatalogRoutes } from "./routes/internal-catalog.ts";
+import { createInternalOpsHealthRoutes } from "./routes/internal-ops.ts";
 import { createMailRoutes } from "./routes/mail.ts";
 import { createWorkspaceSearchRoutes } from "./routes/workspace-search.ts";
 import { createSupportAccessRoutes } from "./routes/support-access.ts";
@@ -74,8 +77,16 @@ import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { createConfiguredBackupStore } from "./platform/object-store.ts";
 import { securityHeaders } from "./security-headers.ts";
 import { logError } from "./platform/log.ts";
+import { httpMetricsMiddleware } from "./platform/telemetry/http-metrics.ts";
 import type { CatalogHotSwap } from "./catalog/hot-swap.ts";
 import { API_ERRORS } from "../shared/api-errors.ts";
+
+export interface OpsHealthConfig {
+  /** The shared HMAC secret; an empty value makes the route answer 403 rather than leak anything. */
+  secret: string;
+  /** The rolling event-loop p95 the endpoint reports. */
+  eventLoopLagP95Ms?: (() => number | null) | undefined;
+}
 
 export interface AppDependencies {
   db: AppDatabase;
@@ -107,6 +118,8 @@ export interface AppDependencies {
   mail: MailSender;
   payments: Payments | null;
   personal?: PersonalCrypto | undefined;
+  /** When set, mounts the HMAC-authenticated internal ops health answer (never the public one). */
+  opsHealth?: OpsHealthConfig | undefined;
   /** Aborted on shutdown; long-lived responses (the event stream) end with it. */
   shutdown: AbortSignal;
 }
@@ -258,7 +271,7 @@ export function createApp(deps: AppDependencies) {
     origin === undefined ? [] : [origin],
   );
 
-  const adminApi = createAdminApi(deps.db, deps.clock, deps.auth, {
+  const adminApi = createAdminApi(deps.db, deps.clock, {
     backupObjects: createConfiguredBackupStore(),
     backups: deps.backups,
     catalogDb: deps.catalogDb,
@@ -300,7 +313,7 @@ export function createApp(deps: AppDependencies) {
     return next();
   });
   adminHost.route("/admin/api", adminApi);
-  adminHost.route("/api", createMeRoutes(deps.auth));
+  adminHost.route("/api", createMeRoutes(deps.auth, deps.db, deps.clock));
   adminHost.all("/api/auth/*", async (context) => {
     if (new URL(context.req.url).pathname === DEMO_SIGN_IN_PATH) {
       return context.json({ error: API_ERRORS.notFound }, 404);
@@ -313,6 +326,25 @@ export function createApp(deps: AppDependencies) {
     const { pathname } = new URL(context.req.url);
 
     if (!isAdminPageRequest(context.req.method, pathname, context.req.header("accept") ?? "")) {
+      return next();
+    }
+
+    const identity = accessVerifier === null ? null : await accessVerifier.verify(context.req.raw);
+
+    if (identity !== null) {
+      const resolved = await resolveAdminAccessOwner(deps.db, deps.clock, identity);
+
+      if (!resolved.ok) {
+        return new Response(adminOwnerRefusalPage(env.OWNER_EMAIL), {
+          headers: { "Cache-Control": "no-store", "Content-Type": "text/html; charset=utf-8" },
+          status: 403,
+        });
+      }
+
+      if (pathname === "/signin" || pathname === "/signup") {
+        return context.redirect("/admin", 302);
+      }
+
       return next();
     }
 
@@ -346,6 +378,7 @@ export function createApp(deps: AppDependencies) {
   adminHost.onError(jsonError);
 
   app.use("*", securityHeaders(env.NODE_ENV === "production"));
+  app.use("*", httpMetricsMiddleware());
 
   const splitHosts = !adminHostSharesMainHostname();
 
@@ -422,7 +455,7 @@ export function createApp(deps: AppDependencies) {
       db: deps.db,
     }),
   );
-  app.route("/api", createMeRoutes(deps.auth));
+  app.route("/api", createMeRoutes(deps.auth, deps.db, deps.clock));
   app.route("/api", createWaitlistRoutes({ clientIpConfig, clock: deps.clock, db: deps.db }));
   app.route("/api", createSupportAccessRoutes(deps.db, deps.auth));
   app.route(
@@ -574,6 +607,21 @@ export function createApp(deps: AppDependencies) {
         objects: deps.objects,
         secret: env.CATALOG_REFRESH_SECRET,
         ...(deps.catalogStagingDir !== undefined && { stagingDir: deps.catalogStagingDir }),
+      }),
+    );
+  }
+
+  if (deps.opsHealth !== undefined) {
+    app.route(
+      "/",
+      createInternalOpsHealthRoutes({
+        db: deps.db,
+        clock: deps.clock,
+        secret: deps.opsHealth.secret,
+        databasePath: deps.databasePath,
+        ...(deps.opsHealth.eventLoopLagP95Ms !== undefined && {
+          eventLoopLagP95Ms: deps.opsHealth.eventLoopLagP95Ms,
+        }),
       }),
     );
   }

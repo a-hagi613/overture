@@ -38,14 +38,7 @@ export function ProviderReportPage() {
   const [running, setRunning] = useState(false);
 
   if (refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={refusal}
-        onPasskeyDone={() => {
-          refresh();
-        }}
-      />
-    );
+    return <AdminGateScreen code={refusal} />;
   }
 
   const heading = (
@@ -155,7 +148,7 @@ export function ProviderReportPage() {
               />
             </label>
             <button
-              className="h-10 rounded-md border border-input bg-card px-4 text-sm font-semibold hover:bg-muted disabled:opacity-60"
+              className="min-h-11 rounded-md border border-input bg-card px-4 text-sm font-semibold hover:bg-muted disabled:opacity-60 md:min-h-10"
               disabled={running}
               onClick={() => {
                 void start();

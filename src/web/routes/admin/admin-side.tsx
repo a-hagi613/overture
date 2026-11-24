@@ -1,5 +1,4 @@
 import { copy } from "../../../shared/copy.ts";
-import { passkeyAgeText } from "../../lib/admin-date.ts";
 import { loadAdminSession } from "../../lib/admin-api.ts";
 import { useAdminResource } from "../../lib/admin-resource.ts";
 import { initialsOf } from "../../lib/identity.ts";
@@ -17,15 +16,11 @@ export function AdminSideIdentity() {
     <div className="flex flex-col gap-4">
       <section className="rounded-lg border border-border bg-card px-3.5 py-3 shadow-sh">
         <p className="text-eyebrow font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          {copy.admin.passkeyEyebrow}
+          {copy.admin.accessEyebrow}
         </p>
-        <p className="mt-1.5 text-sm font-semibold">
-          {data.passkeyAssertedAt === null
-            ? copy.admin.passkeyJustNow
-            : passkeyAgeText(data.passkeyAssertedAt, data.now)}
-        </p>
+        <p className="mt-1.5 text-sm font-semibold">{copy.admin.accessVerified}</p>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          {copy.admin.passkeyNote}
+          {copy.admin.accessNote}
         </p>
       </section>
       <div className="flex items-center gap-2.5 px-1">

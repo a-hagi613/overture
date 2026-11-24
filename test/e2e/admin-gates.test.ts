@@ -181,7 +181,7 @@ test("the admin host keeps its own Turnstile host and magic-link session when th
     await page.goto(link);
 
     await expect(page).toHaveURL(`${adminOrigin}/admin`);
-    await expect(page.getByRole("heading", { name: "Assert your passkey" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Background jobs" })).toBeVisible();
 
     const sessionCookie = (await page.context().cookies()).find(
       (cookie) => cookie.name.includes("session") && cookie.domain.includes("localhost"),
@@ -284,64 +284,110 @@ async function accessServerIssue(claims: { audience?: string; issuer?: string })
   return token;
 }
 
-test("the admin API refuses a valid Access credential without the owner's session", async ({
-  request,
+test("a valid Access token opens the admin directly with no magic link or passkey", async ({
+  page,
   adminIsolatedAppUrl,
   accessServer,
 }) => {
   const token = await accessServer.issueToken({ email: authTestIdentity.ownerEmail });
 
-  const refused = await request.get(`${adminIsolatedAppUrl}/admin/api/overview`, {
-    headers: { "cf-access-jwt-assertion": token },
-  });
+  await page.context().addCookies([
+    {
+      name: "CF_Authorization",
+      value: token,
+      domain: "localhost",
+      path: "/",
+      expires: -1,
+      httpOnly: true,
+      secure: false,
+      sameSite: "Lax",
+    },
+  ]);
 
-  expect(refused.status()).toBe(401);
-  expect(await refused.json()).toEqual({ error: "sign_in_required" });
+  await page.goto(`${adminIsolatedAppUrl}/signin`);
+
+  await expect(page).toHaveURL(`${adminIsolatedAppUrl}/admin`);
+  await expect(page.getByRole("heading", { name: "Background jobs" })).toBeVisible();
+
+  const overview = await page.request.get(`${adminIsolatedAppUrl}/admin/api/overview`);
+
+  expect(overview.status()).toBe(200);
 });
 
-test("the admin API refuses a session that is not the owner or has no recent passkey", async ({
+test("a valid Access token for a non-owner is refused by the API and the page", async ({
+  request,
+  adminIsolatedAppUrl,
+  accessServer,
+}) => {
+  const token = await accessServer.issueToken({ email: "someone.else@example.com" });
+  const headers = { "cf-access-jwt-assertion": token };
+
+  const refused = await request.get(`${adminIsolatedAppUrl}/admin/api/overview`, { headers });
+
+  expect(refused.status()).toBe(403);
+  expect(await refused.json()).toEqual({ error: "owner_required" });
+
+  const pageRefused = await request.get(`${adminIsolatedAppUrl}/admin`, {
+    headers: { ...headers, accept: "text/html" },
+  });
+
+  expect(pageRefused.status()).toBe(403);
+  expect(pageRefused.headers()["content-type"]).toContain("text/html");
+  expect(await pageRefused.text()).toContain(`Sign out and use ${authTestIdentity.ownerEmail}.`);
+});
+
+test("a suspended owner is refused even with a valid Access token", async ({
   request,
   adminIsolatedAppServer,
   adminIsolatedAppUrl,
   accessServer,
 }) => {
-  const cookieHeader = await ownerCookieHeader(adminIsolatedAppUrl);
   const token = await accessServer.issueToken({ email: authTestIdentity.ownerEmail });
-  const headers = { "cf-access-jwt-assertion": token, cookie: cookieHeader };
+  const headers = { "cf-access-jwt-assertion": token };
 
-  const noPasskey = await request.get(`${adminIsolatedAppUrl}/admin/api/overview`, { headers });
+  const allowed = await request.get(`${adminIsolatedAppUrl}/admin/api/overview`, { headers });
 
-  expect(noPasskey.status()).toBe(403);
-  expect(await noPasskey.json()).toEqual({ error: "passkey_required" });
+  expect(allowed.status()).toBe(200);
 
   const state = await request.get(`${adminIsolatedAppServer.url}/__test__/auth/state`);
-  const stateBody = userStateSchema.parse(await state.json());
-  const ownerId = stateBody.users[0]?.id;
+
+  const ownerId = userStateSchema
+    .parse(await state.json())
+    .users.find((user) => user.email === authTestIdentity.ownerEmail)?.id;
 
   expect(ownerId).toBeDefined();
 
-  await request.post(`${adminIsolatedAppServer.url}/__test__/auth/role`, {
-    data: { userId: ownerId, role: "user" },
+  await request.post(`${adminIsolatedAppServer.url}/__test__/user/suspend`, {
+    data: { suspended: true, userId: ownerId },
   });
 
-  const nonOwner = await request.get(`${adminIsolatedAppUrl}/admin/api/overview`, { headers });
-
-  expect(nonOwner.status()).toBe(403);
-  expect(await nonOwner.json()).toEqual({ error: "owner_required" });
-});
-
-test("the admin API refuses an Access identity that is not the signed-in owner's mailbox", async ({
-  request,
-  adminIsolatedAppUrl,
-  accessServer,
-}) => {
-  const cookieHeader = await ownerCookieHeader(adminIsolatedAppUrl);
-  const foreignIdentity = await accessServer.issueToken({ email: "someone.else@example.com" });
-
-  const refused = await request.get(`${adminIsolatedAppUrl}/admin/api/overview`, {
-    headers: { "cf-access-jwt-assertion": foreignIdentity, cookie: cookieHeader },
-  });
+  const refused = await request.get(`${adminIsolatedAppUrl}/admin/api/overview`, { headers });
 
   expect(refused.status()).toBe(403);
   expect(await refused.json()).toEqual({ error: "owner_required" });
+
+  const pageRefused = await request.get(`${adminIsolatedAppUrl}/admin`, {
+    headers: { ...headers, accept: "text/html" },
+  });
+
+  expect(pageRefused.status()).toBe(403);
+});
+
+test("the main host never accepts an Access JWT as a sign-in or admin credential", async ({
+  request,
+  adminAppServer,
+  accessServer,
+}) => {
+  const token = await accessServer.issueToken({ email: authTestIdentity.ownerEmail });
+  const headers = { "cf-access-jwt-assertion": token };
+
+  const me = await request.get(`${adminAppServer.url}/api/me`, { headers });
+
+  expect(me.status()).toBe(200);
+  expect(meResponseSchema.parse(await me.json()).user).toBeNull();
+
+  const adminApi = await request.get(`${adminAppServer.url}/admin/api/overview`, { headers });
+
+  expect(adminApi.status()).toBe(401);
+  expect(await adminApi.json()).toEqual({ error: "access_required" });
 });

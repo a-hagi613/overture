@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { R2BucketBinding, SentinelBucket } from "../../workers/sentinel/src/bucket.ts";
 
 import { runSentinel } from "../../workers/sentinel/src/index.ts";
+import { opsHealthHeaders } from "../../workers/sentinel/src/ops-health.ts";
 import { usageMetrics, usageResponseSchema } from "../../workers/sentinel/src/usage.ts";
 
 const MINUTE = 60_000;
@@ -35,6 +36,7 @@ const stateSchema = z.object({
       health: z.string(),
       manifest: z.string(),
       usage: z.string(),
+      ops: z.string().nullish(),
       degraded: z.boolean(),
       flag: z.string(),
       alerts: z.array(z.string()),
@@ -78,10 +80,13 @@ interface Servers {
   healthUrl: string;
   graphqlUrl: string;
   ntfyUrl: string;
+  opsUrl: string;
+  opsHeaders: { signature: string; timestamp: string }[];
   alerts: Alert[];
   setHealth: (status: number, body: string) => void;
   setGraphql: (status: number, body: string) => void;
   setNtfy: (status: number) => void;
+  setOps: (status: number, body: string) => void;
   stop: () => Promise<void>;
 }
 
@@ -98,6 +103,8 @@ function startServers() {
   let health = { status: 200, body: "<pending>" };
   let graphql = { status: 200, body: "{}" };
   let ntfy = { status: 200 };
+  let ops = { status: 200, body: "{}" };
+  const opsHeaders: { signature: string; timestamp: string }[] = [];
   const alerts: Alert[] = [];
 
   const healthServer = Bun.serve({
@@ -108,6 +115,18 @@ function startServers() {
   const graphqlServer = Bun.serve({
     port: 0,
     fetch: () => new Response(graphql.body, { status: graphql.status }),
+  });
+
+  const opsServer = Bun.serve({
+    port: 0,
+    fetch(request) {
+      opsHeaders.push({
+        signature: request.headers.get("x-overture-ops-signature") ?? "",
+        timestamp: request.headers.get("x-overture-ops-timestamp") ?? "",
+      });
+
+      return new Response(ops.body, { status: ops.status });
+    },
   });
 
   const ntfyServer = Bun.serve({
@@ -127,6 +146,8 @@ function startServers() {
     healthUrl: `http://127.0.0.1:${String(healthServer.port)}/api/health`,
     graphqlUrl: `http://127.0.0.1:${String(graphqlServer.port)}/graphql`,
     ntfyUrl: `http://127.0.0.1:${String(ntfyServer.port)}/topic`,
+    opsUrl: `http://127.0.0.1:${String(opsServer.port)}/internal/ops/health`,
+    opsHeaders,
     alerts,
     setHealth: (status: number, body: string) => {
       health = { status, body };
@@ -137,8 +158,16 @@ function startServers() {
     setNtfy: (status: number) => {
       ntfy = { status };
     },
+    setOps: (status: number, body: string) => {
+      ops = { status, body };
+    },
     stop: async () => {
-      await Promise.all([healthServer.stop(true), graphqlServer.stop(true), ntfyServer.stop(true)]);
+      await Promise.all([
+        healthServer.stop(true),
+        graphqlServer.stop(true),
+        ntfyServer.stop(true),
+        opsServer.stop(true),
+      ]);
     },
   } satisfies Servers;
 }
@@ -210,6 +239,35 @@ async function startHarness() {
 
 async function run(harness: Harness, at = NOW) {
   return runSentinel(harness.env, { now: () => at });
+}
+
+interface OpsOverrides {
+  ats?: { attempts: number; failures: number; failureRate: number; windowMs: number };
+  disk?: { mount: string; usedRatio: number };
+  eventLoopLag?: { p95Ms: number | null };
+  memory?: { rssBytes: number; totalBytes: number; usedRatio: number };
+  status?: string;
+}
+
+function opsBody(overrides: OpsOverrides = {}) {
+  return JSON.stringify({
+    ats: overrides.ats ?? { attempts: 0, failures: 0, failureRate: 0, windowMs: 3_600_000 },
+    disk: overrides.disk ?? { mount: "/data", usedRatio: 0.4 },
+    eventLoopLag: overrides.eventLoopLag ?? { p95Ms: 20 },
+    memory: overrides.memory ?? { rssBytes: 1_048_576, totalBytes: 4_194_304, usedRatio: 0.4 },
+    status: overrides.status ?? "ok",
+  });
+}
+
+async function runWithOps(harness: Harness, at = NOW) {
+  return runSentinel(
+    {
+      ...harness.env,
+      OVERTURE_OPS_HEALTH_SECRET: "sentinel-ops-health-secret",
+      OVERTURE_OPS_HEALTH_URL: harness.servers.opsUrl,
+    },
+    { now: () => at },
+  );
 }
 
 async function usageWith(id: string, used: number) {
@@ -529,6 +587,104 @@ test("a state object that cannot be parsed is recorded and does not stop the run
   expect(result.errors.join(" ")).toContain("state object unreadable");
 
   await harness.servers.stop();
+});
+
+test("without an ops secret the sentinel keeps its old behaviour", async () => {
+  const harness = await startHarness();
+
+  await harness.writeManifest(NOW - HOUR);
+
+  const result = await run(harness);
+
+  expect(result).not.toHaveProperty("ops");
+  expect(harness.servers.opsHeaders).toHaveLength(0);
+  expect((await harness.lastRun())?.ops ?? null).toBeNull();
+
+  await harness.servers.stop();
+});
+
+test("a healthy signed ops answer alerts nothing and signs the request", async () => {
+  const harness = await startHarness();
+
+  await harness.writeManifest(NOW - HOUR);
+  harness.servers.setOps(200, opsBody());
+
+  const result = await runWithOps(harness);
+
+  expect(result.ops).toBe("ok");
+  expect(result.alerts).toHaveLength(0);
+  expect(harness.servers.alerts).toHaveLength(0);
+  expect((await harness.lastRun())?.ops).toBe("ok");
+
+  const [signed] = harness.servers.opsHeaders;
+
+  expect(signed?.signature).toHaveLength(64);
+  expect(signed?.timestamp).toBe(String(NOW));
+
+  await harness.servers.stop();
+});
+
+test("an over-ceiling resource alerts once with every breach, then recovers", async () => {
+  const harness = await startHarness();
+
+  await harness.writeManifest(NOW - HOUR);
+  harness.servers.setOps(
+    200,
+    opsBody({
+      ats: { attempts: 10, failures: 6, failureRate: 0.6, windowMs: 3_600_000 },
+      disk: { mount: "/data", usedRatio: 0.8 },
+      eventLoopLag: { p95Ms: 600 },
+      memory: { rssBytes: 3, totalBytes: 4, usedRatio: 0.9 },
+    }),
+  );
+
+  const over = await runWithOps(harness);
+
+  expect(over.ops).toBe("failing");
+  expect(over.alerts).toContain("ops.thresholds");
+  expect(harness.servers.alerts.at(-1)?.body).toContain("RAM at 90%");
+  expect(harness.servers.alerts.at(-1)?.body).toContain("NVMe /data at 80%");
+  expect(harness.servers.alerts.at(-1)?.body).toContain("event-loop lag p95 600 ms");
+  expect(harness.servers.alerts.at(-1)?.body).toContain("ATS apply failures 60% of 10 attempts");
+
+  const repeated = await runWithOps(harness, NOW + 10 * MINUTE);
+
+  expect(repeated.alerts).toHaveLength(0);
+  expect(harness.servers.alerts).toHaveLength(1);
+
+  harness.servers.setOps(200, opsBody());
+
+  const recovered = await runWithOps(harness, NOW + 20 * MINUTE);
+
+  expect(recovered.ops).toBe("ok");
+  expect(recovered.alerts).toContain("ops.recovered");
+
+  await harness.servers.stop();
+});
+
+test("an unreadable or failing ops endpoint alerts and is recorded", async () => {
+  const harness = await startHarness();
+
+  await harness.writeManifest(NOW - HOUR);
+  harness.servers.setOps(500, "not now");
+
+  const result = await runWithOps(harness);
+
+  expect(result.ops).toBe("failed");
+  expect(result.alerts).toContain("ops.health");
+  expect(harness.servers.alerts.at(-1)?.body).toContain("HTTP 500");
+  expect((await harness.lastRun())?.ops).toBe("failed");
+
+  await harness.servers.stop();
+});
+
+test("the Worker's WebCrypto signature matches the shared HMAC vector", async () => {
+  const headers = await opsHealthHeaders("shared-ops-secret", NOW);
+
+  expect(headers["x-overture-ops-signature"]).toBe(
+    "b98d5da956d7680dd063cebf760da36723f69a45c33e5b564fad6696866ead99",
+  );
+  expect(headers["x-overture-ops-timestamp"]).toBe(String(NOW));
 });
 
 test("the cron stays under 10k invocations a month and sets a CPU limit", async () => {

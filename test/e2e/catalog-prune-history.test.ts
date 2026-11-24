@@ -82,11 +82,10 @@ function displayOf(cards: readonly Card[]) {
 
 test("Board, Ready, Inbox and the cost report keep reading user history after the catalog is pruned", async ({
   page,
-  captureAppServer,
   captureAppUrl,
   accessServer,
 }) => {
-  const { owner, userId } = await ownerContextFor(captureAppServer.url);
+  const { owner, userId } = await ownerContextFor(captureAppUrl);
 
   const companyId = await seedCompany(owner, COMPANY, "ferro.example");
   const boardId = await seedBoard(owner, companyId, "greenhouse", "ferro");
@@ -213,6 +212,8 @@ test("Board, Ready, Inbox and the cost report keep reading user history after th
   );
 
   expect(after.providers.find((row) => row.ats === "greenhouse")).toEqual(greenhouse);
+
+  await page.context().addCookies((await owner.storageState()).cookies);
 
   await page.goto(`${captureAppUrl}/board`);
   await expect(page.getByText(COMPANY).filter({ visible: true }).first()).toBeVisible();

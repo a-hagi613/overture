@@ -7,6 +7,8 @@ import type { Clock } from "../platform/ports/clock.ts";
 import { clientIp } from "../auth/client-ip.ts";
 import { countSupportedSupply } from "../catalog/supply.ts";
 import { consumeRateLimit } from "../platform/rate-limit.ts";
+import { defaultMetrics } from "../platform/telemetry/metrics.ts";
+import { measureSqliteQuery } from "../platform/telemetry/sqlite-metrics.ts";
 import { supplyFiltersOf, supplyQuerySchema } from "../../shared/supply.ts";
 import { validQuery } from "./validators.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
@@ -41,7 +43,13 @@ export function createSupplyRoutes(deps: {
       return context.json({ error: API_ERRORS.rateLimited }, 429);
     }
 
-    const totals = countSupportedSupply(catalogDb, supplyFiltersOf(context.req.valid("query")));
+    const startedAt = performance.now();
+
+    const totals = measureSqliteQuery("catalog", "select", () =>
+      countSupportedSupply(catalogDb, supplyFiltersOf(context.req.valid("query"))),
+    );
+
+    defaultMetrics().recordSupplyQuery(performance.now() - startedAt);
 
     context.header("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
     context.header("CDN-Cache-Control", "public, max-age=300");

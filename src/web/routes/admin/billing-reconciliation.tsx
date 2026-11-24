@@ -12,12 +12,12 @@ import { BillingStatCard } from "./billing-stat-card.tsx";
 import { BillingTabs } from "./billing-tabs.tsx";
 import { ReconcileBanner } from "./billing-reconcile-banner.tsx";
 import { ReconcilePayments } from "./billing-reconcile-payments.tsx";
+import { billingLinkClass } from "./billing-labels.ts";
 import { formatRunDay } from "./billing-reconcile-format.ts";
 
 const PAYMENTS_ID = "billing-reconcile-payments";
 
-const BUTTON_LINK =
-  "inline-flex min-h-11 items-center rounded-md px-3 text-sm font-semibold underline underline-offset-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
+const BUTTON_LINK = billingLinkClass;
 
 interface ReconcileData {
   reconciliation: BillingReconciliation | null;
@@ -46,14 +46,7 @@ export function BillingReconciliationPage() {
   ]);
 
   if (refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={refusal}
-        onPasskeyDone={() => {
-          refresh();
-        }}
-      />
-    );
+    return <AdminGateScreen code={refusal} />;
   }
 
   if (data === null) {
@@ -77,7 +70,7 @@ export function BillingReconciliationPage() {
           {copy.admin.billingReconcileCrumbAdmin}
           {copy.admin.billingReconcileCrumbSeparator}
         </span>
-        <Link to="/admin/billing" className="underline underline-offset-2">
+        <Link to="/admin/billing" className={billingLinkClass}>
           {copy.admin.billingUserCrumbRoot}
         </Link>
       </nav>
