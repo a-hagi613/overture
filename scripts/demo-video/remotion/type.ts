@@ -1,0 +1,60 @@
+import { EMBER, FONT } from "./theme.ts";
+
+export const type = {
+  body: {
+    fontFamily: FONT.sans,
+    fontSize: 16,
+    fontWeight: 400,
+    letterSpacing: "-0.005em",
+    lineHeight: 1.5,
+  },
+  eyebrow: {
+    color: EMBER.inkMuted,
+    fontFamily: FONT.sans,
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: "0.14em",
+    lineHeight: 1.2,
+    textTransform: "uppercase" as const,
+  },
+  lockup: {
+    color: EMBER.foreground,
+    fontFamily: FONT.serif,
+    fontSize: 26,
+    fontWeight: 400,
+    letterSpacing: "-0.01em",
+    lineHeight: 1,
+  },
+  mono: {
+    color: EMBER.inkMuted,
+    fontFamily: FONT.mono,
+    fontSize: 12,
+    fontWeight: 400,
+    letterSpacing: "0.02em",
+  },
+  pill: {
+    color: EMBER.signalText,
+    fontFamily: FONT.sans,
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: "0.14em",
+    lineHeight: 1,
+    textTransform: "uppercase" as const,
+  },
+  titleDesktop: {
+    color: EMBER.foreground,
+    fontFamily: FONT.serif,
+    fontSize: 40,
+    fontWeight: 400,
+    letterSpacing: "-0.015em",
+    lineHeight: 1.06,
+  },
+  titleMobile: {
+    color: EMBER.foreground,
+    fontFamily: FONT.serif,
+    fontSize: 34,
+    fontWeight: 400,
+    letterSpacing: "-0.015em",
+    lineHeight: 1.04,
+  },
+};

@@ -36,6 +36,9 @@ test-results/
 playwright-report/
 blob-report/
 
+# Demo video source frames, regenerated from the live app
+scripts/demo-video/assets/captures/
+
 data/
 test/e2e/.tmp/
 

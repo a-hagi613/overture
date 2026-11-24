@@ -103,8 +103,20 @@ export const LANDING_COPY = {
     badge: "Inside the workspace",
     headingItalic: "one place.",
     headingPlain: "Every application in ",
-    hint: "Click a tab to see each screen",
-    viewLabel: "View",
+    hint: "Press play, or open it full screen",
+    player: {
+      close: "Close walkthrough",
+      description:
+        "A silent walkthrough of the Demo account: Home, Ready, Review, the Applications board and the employer Inbox. Every screen shows sample data.",
+      expand: "Open full screen",
+      note: "30s loop · silent",
+      pause: "Pause walkthrough",
+      play: "Play walkthrough",
+      restart: "Restart walkthrough",
+      sampleData: "Sample data",
+      title: "Workspace walkthrough",
+    },
+    videoName: "Overture demo workspace walkthrough",
   },
   whereItApplies: {
     appliedBadge: "Applied",

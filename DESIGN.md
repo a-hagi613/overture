@@ -343,7 +343,7 @@ is the only live mark.
 | Travel | ≤12px for reveals (stamp 6, summary 10) |
 | Rotation | ≤6° (stack offsets 1.6–2.6, glide 4, stamp 3) |
 | Tick | 800ms state timer drives every loop |
-| Forbidden | springs, bounce, overshoot, parallax, auto-playing video |
+| Forbidden | springs, bounce, overshoot, parallax, auto-playing video (the workspace walkthrough below is the one recorded exception) |
 
 The four choreographed surfaces, so nobody re-invents them:
 
@@ -363,6 +363,14 @@ The four choreographed surfaces, so nobody re-invents them:
 4. **Path** (How it works) — a dotted path threads the six tiles through the gutters with a numbered
    node at each. One orange dot walks it at ~520px/s and rests .55s on each node, which lights with an
    orange ring.
+
+**The workspace walkthrough.** "Inside the workspace" is the one recorded surface: two silent, muted H.264
+recordings of the seeded Demo workspace (1280×800 desktop, 720×1280 phone), each with a poster frame. The
+desktop recording plays on `lg` and up, the phone recording below it. Both loop and auto-play only while the
+player is in view, and always offer pause, restart and an expanded cinema dialog. Camera moves ease with
+`cubic-bezier(.2,.7,.2,1)`; they never spring, bounce or overshoot. Under `prefers-reduced-motion` the poster
+holds still until the person presses play. The four chapter pills — Auto-prepared queue, Answer once reuse
+forever, Kanban pipeline, Employer inbox — and the progress dots are the recording's only live orange marks.
 
 **Reduced motion.** Every animation has a static state. With `animate` off or under
 `prefers-reduced-motion`, transitions and keyframes are disabled and each loop shows one finished frame
