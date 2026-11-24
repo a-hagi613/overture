@@ -16,6 +16,7 @@ import type { FormScope, LiveFormExpectation, LiveFormProblem } from "../forms/e
 import { checkPostingIdentity } from "../posting-identity.ts";
 
 import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identity.ts";
+import { fillControlledField } from "../forms/widgets.ts";
 import { findResumeFileInput, readFormQuestions } from "./hosted.ts";
 import type { PlannedResume } from "./shared.ts";
 
@@ -118,9 +119,7 @@ async function fillByLabel(scope: FormScope, field: SendPlanField) {
     return true;
   }
 
-  await control.fill(answer);
-
-  return true;
+  return fillControlledField(scope.page, control, answer);
 }
 
 async function fillPlannedField(scope: FormScope, field: SendPlanField) {

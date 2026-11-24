@@ -9,8 +9,11 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ResumeService } from "../profile/resume.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
+import type { LlmPort } from "../platform/ports/llm.ts";
+import type { PlanCacheAts } from "../pipeline/plan-cache.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
-import type { LiveFormProblem } from "./forms/engine.ts";
+import type { FormScope, LiveFormProblem } from "./forms/engine.ts";
+import type { SendPlanField } from "../pipeline/send-plan.ts";
 import type {
   BrowserProvider,
   BrowserProviderRegistry,
@@ -94,6 +97,8 @@ import { recordApplicationEvent } from "./outcomes.ts";
 import { acquireBrowserSession } from "./browser/session-slots.ts";
 import { nextSendSlot as nextSlotInWindow, parseSendWindow, planningWindow } from "./planning.ts";
 import { openApprovedPlan } from "../pipeline/approved-plan.ts";
+import { createPlanCache } from "../pipeline/plan-cache.ts";
+import { createFormSelfHealer, planFieldSignature } from "./forms/self-heal.ts";
 import { recordPostingFailure } from "../matching/posting-flags.ts";
 
 class ReservationRefusedError extends Error {
@@ -123,6 +128,7 @@ const sendPayloadSchema = z.object({ applicationId: z.string().min(1) });
 export interface DispatcherDeps {
   db: AppDatabase;
   clock: Clock;
+  llm: LlmPort;
   providers: BrowserProviderRegistry;
   hardTimeoutMs: number;
   preparation: PreparationService;
@@ -283,6 +289,7 @@ export function createDispatcher(deps: DispatcherDeps) {
   const {
     db,
     clock,
+    llm,
     providers,
     hardTimeoutMs,
     preparation,
@@ -297,6 +304,13 @@ export function createDispatcher(deps: DispatcherDeps) {
   } = deps;
 
   const codeWaitSignal = combineSignals(signal, deps.codeWaitSignal);
+
+  const formSelfHealer = createFormSelfHealer({
+    cache: createPlanCache({ clock, db }),
+    clock,
+    db,
+    llm,
+  });
 
   const activeAttempts = new Set<string>();
   const activeAttemptRuns = new Set<Promise<boolean>>();
@@ -819,7 +833,24 @@ export function createDispatcher(deps: DispatcherDeps) {
 
       await applySendProxyTrim(context);
 
+      const healAts: PlanCacheAts | null = plan.ats === "greenhouse" ? null : plan.ats;
+      const healRunCap = new Set<string>();
+
+      const healSignature = healAts === null ? null : planFieldSignature(healAts, plan.fields);
+
       const attemptHooks = {
+        healField:
+          healAts === null || healSignature === null
+            ? undefined
+            : async (scope: FormScope, field: SendPlanField) =>
+                formSelfHealer.healField({
+                  ats: healAts,
+                  field,
+                  runCap: healRunCap,
+                  scope,
+                  signature: healSignature,
+                  userId: plan.userId,
+                }),
         onCodeTyped: () => {
           updateAttempt(attemptId, { codeUsed: true });
         },

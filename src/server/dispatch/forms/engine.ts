@@ -3,6 +3,12 @@ import type { Locator, Page, Response } from "playwright-core";
 import type { QuestionFieldType } from "../../../shared/questions.ts";
 
 import { mapQuestionByRules } from "../../catalog/question-rules.ts";
+import {
+  clickComboboxOption,
+  fillControlledField,
+  openComboboxPortal,
+  typeComboboxQuery,
+} from "./widgets.ts";
 
 export const FORM_APPEAR_MS = 15_000;
 export const CONFIRMATION_WAIT_MS = 10_000;
@@ -10,7 +16,6 @@ export const APPLICATION_RESPONSE_MS = 30_000;
 
 const COMBOBOX_MENU_MS = 5000;
 const COMBOBOX_REVEAL_MS = 1000;
-const COMBOBOX_KEY_DELAY_MS = 50;
 
 const DOM_STABILITY_TIMEOUT_MS = 3000;
 const DOM_STABILITY_QUIET_MS = 150;
@@ -182,7 +187,7 @@ async function verifyComboboxChoice(field: Locator, option: ComboboxOption | und
 }
 
 async function chooseFromCombobox(page: Page, field: Locator, wanted: string) {
-  await field.click();
+  await openComboboxPortal(page, field);
 
   const list = await comboboxList(page, field);
 
@@ -213,9 +218,15 @@ async function chooseFromCombobox(page: Page, field: Locator, wanted: string) {
     return false;
   }
 
-  await field.pressSequentially(query, { delay: COMBOBOX_KEY_DELAY_MS });
+  const typedOptions = await typeComboboxQuery(page, field, query);
 
-  const searched = await optionEntries(list);
+  if (!typedOptions) {
+    await field.press("Escape");
+
+    return false;
+  }
+
+  const searched = await optionEntries(await comboboxList(page, field));
 
   if (searched.length === 0) {
     return false;
@@ -1437,7 +1448,15 @@ export async function fillField(scope: FormScope, id: string, value: string) {
   }
 
   if ((await field.getAttribute("role")) === "combobox") {
-    return chooseFromCombobox(scope.page, field, value);
+    if (await chooseFromCombobox(scope.page, field, value)) {
+      return true;
+    }
+
+    if (await openComboboxPortal(scope.page, field)) {
+      return (await clickComboboxOption(scope.page, field, value)) !== null;
+    }
+
+    return false;
   }
 
   const widget = await field.evaluate((element) => ({
@@ -1446,9 +1465,7 @@ export async function fillField(scope: FormScope, id: string, value: string) {
   }));
 
   if (widget.tag === "textarea") {
-    await field.fill(value);
-
-    return true;
+    return fillControlledField(scope.page, field, value);
   }
 
   if (widget.tag === "select") {
@@ -1497,9 +1514,7 @@ export async function fillField(scope: FormScope, id: string, value: string) {
   }
 
   if (widget.tag === "input" && FILLABLE_INPUT_TYPES.has(widget.type)) {
-    await field.fill(value);
-
-    return true;
+    return fillControlledField(scope.page, field, value);
   }
 
   return false;

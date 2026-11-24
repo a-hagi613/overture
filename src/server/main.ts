@@ -877,6 +877,7 @@ const activeDispatcher =
         db,
         clock,
         hardTimeoutMs: env.SEND_HARD_TIMEOUT_MS,
+        llm: anthropicLlmPort,
         mail: mailSender,
         mailboxes,
         outcomes,
