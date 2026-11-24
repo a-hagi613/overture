@@ -323,6 +323,12 @@ The sync fails the job when `/app/dist-marketing/index.html` is missing: shippin
 proxy answers `HEAD /` differently while a machine is cold or restarting, and a `HEAD` never proves the hydrate
 payload downloads) and fails on a non-200 or an empty body, so a mismatch stops the deploy instead of a visitor.
 
+A `deploy-workers` run that fails before `wrangler deploy` leaves the previous Worker version live while Fly already
+serves the new release, so `/` can 404 its assets until the Worker is updated. Recover by re-running the job
+(`gh run rerun <run-id> --failed`) or by running the manual snippet above; both only read the machine and deploy the
+page, so they are safe to repeat. The cross-check in the `container` CI job and the pre-deploy verify make a silent
+drift impossible, which is the failure this ordering trades against.
+
 For a manual deploy, never build twice: take the page from the machine that serves its assets, exactly as the
 workflow does.
 
