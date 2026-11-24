@@ -259,9 +259,11 @@ test("Calendar is not a top-level item and Home opens it at /applications?view=c
     /^Review/u,
     /^Applications/u,
     /^Inbox/u,
+    /^Resume & Cover Letter/u,
+    /^Job Preferences/u,
+    /^Application Answers/u,
     /^Notifications/u,
     /^Support/u,
-    /^Profile/u,
   ]);
   await expect(nav.getByRole("link", { name: "Calendar" })).toHaveCount(0);
   await side.context.close();
