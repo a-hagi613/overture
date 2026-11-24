@@ -3,15 +3,14 @@ import type { SQL } from "drizzle-orm";
 
 import type { CatalogDatabase } from "../platform/db/client.ts";
 import type { SupplyFilters } from "../../shared/supply.ts";
+import type { SupplyTotals } from "./supply-facets.ts";
 
 import { postings, postingTags } from "../platform/db/catalog-schema.ts";
 import { resolvedLocationCondition } from "./location-filter.ts";
 import { catalogRevision } from "./revision.ts";
+import { supplyFacetTotals } from "./supply-facets.ts";
 
-export interface SupplyTotals {
-  total: number;
-  byAts: { ats: string; count: number }[];
-}
+export type { SupplyTotals } from "./supply-facets.ts";
 
 interface SupplyCache {
   revision: string;
@@ -79,10 +78,27 @@ function countByAts(db: CatalogDatabase, filters: SupplyFilters) {
 }
 
 /**
+ * The live, index-backed count. It is the fallback behind the `supply_facets` rollup for city and raw-text
+ * places, and the oracle the rollup's parity tests compare against (issue #631).
+ * @param db The catalog database.
+ * @param filters The validated public filters.
+ * @returns The supported open Posting count, split by the ATS that hosts the board.
+ */
+export function countSupplyLive(db: CatalogDatabase, filters: SupplyFilters) {
+  return countByAts(db, filters);
+}
+
+function countSupply(db: CatalogDatabase, filters: SupplyFilters) {
+  return supplyFacetTotals(db, filters) ?? countByAts(db, filters);
+}
+
+/**
  * Counts the open Postings Overture can apply to for the public landing's supply preview (issue #567):
- * `status = 'open'`, `apply_supported = 1`, and the optional role, location and remote filters. The
- * grouped count reads through `postings_apply_supported_status` and returns no company, title or other
- * per-row field, so the response is public aggregate data only.
+ * `status = 'open'`, `apply_supported = 1`, and the optional role, location and remote filters. It answers
+ * from the precomputed `supply_facets` rollup when the filters are a combination the rollup stores (role,
+ * country/region, remote), and falls back to the indexed live query for city or raw-text places (issue
+ * #631). Neither path returns a company, title or other per-row field, so the response is public aggregate
+ * data only.
  *
  * Results are cached per catalog handle under `catalogRevision`, exactly as the candidate match count is,
  * so a burst of landing requests reads one scan and the next sweep or import invalidates every entry.
@@ -94,7 +110,7 @@ export function countSupportedSupply(db: CatalogDatabase, filters: SupplyFilters
   const revision = catalogRevision(db);
 
   if (revision === null) {
-    return countByAts(db, filters);
+    return countSupply(db, filters);
   }
 
   let cache = caches.get(db);
@@ -114,7 +130,7 @@ export function countSupportedSupply(db: CatalogDatabase, filters: SupplyFilters
     return cached;
   }
 
-  const totals = countByAts(db, filters);
+  const totals = countSupply(db, filters);
 
   cache.entries.set(key, totals);
 
