@@ -171,6 +171,8 @@ const envSchema = z
     DATABASE_URL: z.string().min(1).default("data/overture.db"),
     DATABASE_PATH: z.string().min(1).optional(),
     CATALOG_DATABASE_PATH: z.string().min(1).optional(),
+    CATALOG_R2_HOT_SWAP: booleanFromString.default(false),
+    CATALOG_REFRESH_SECRET: z.string().min(1).optional(),
     STATIC_ROOT: z.string().min(1).default("dist"),
     ENABLE_TEST_ROUTES: booleanFromString.default(false),
     DEMO_LOGIN_ENABLED: booleanFromString.default(false),

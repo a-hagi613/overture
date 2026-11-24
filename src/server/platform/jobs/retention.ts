@@ -59,6 +59,14 @@ export interface CatalogPruneSummary {
   readonly postingsHeld: number;
 }
 
+const EMPTY_CATALOG_PRUNE: CatalogPruneSummary = {
+  descriptionsCapped: false,
+  descriptionsNulled: 0,
+  postingsCapped: false,
+  postingsDeleted: 0,
+  postingsHeld: 0,
+};
+
 async function deleteInChunks(db: AppDatabase, table: Table, where: ReturnType<typeof sql>) {
   const key = sql.raw(TABLE_KEYS[table]);
   const name = sql.raw(table);
@@ -267,6 +275,7 @@ async function pruneClosedPostings(
  * @param catalogDb The catalog database.
  * @param clock The clock that fixes both cutoffs.
  * @param limits Optional smaller bounds for one run.
+ * @param options Set `readOnly` when the catalog is a read-only R2 hot-swap and must not be pruned.
  * @returns What the run nulled, deleted and held.
  */
 export async function pruneCatalog(
@@ -274,7 +283,14 @@ export async function pruneCatalog(
   catalogDb: CatalogDatabase,
   clock: Clock,
   limits: CatalogRetentionLimits = {},
+  options: { readOnly?: boolean } = {},
 ) {
+  if (options.readOnly === true) {
+    logInfo("retention.catalog", "skipped: the catalog is a read-only R2 hot-swap");
+
+    return EMPTY_CATALOG_PRUNE;
+  }
+
   const startedAt = performance.now();
   const now = clock.now();
   const closeBefore = now - CATALOG_CLOSED_POSTING_RETENTION_MS;
@@ -314,6 +330,7 @@ export async function runRetention(
   catalogDb: CatalogDatabase,
   clock: Clock,
   limits: CatalogRetentionLimits = {},
+  options: { readOnly?: boolean } = {},
 ) {
   const now = clock.now();
 
@@ -349,7 +366,7 @@ export async function runRetention(
     sql`status IN ('applied', 'failed') AND updated_at < ${now - LLM_BATCH_RETENTION_MS}`,
   );
 
-  const catalog = await pruneCatalog(db, catalogDb, clock, limits);
+  const catalog = await pruneCatalog(db, catalogDb, clock, limits, options);
 
   return { attempts, cancelledJobs, deadJobs, doneJobs, events, llmBatches, ...catalog };
 }
@@ -366,9 +383,10 @@ export async function retentionJobHandler(
   db: AppDatabase,
   catalogDb: CatalogDatabase,
   clock: Clock,
+  options: { readOnly?: boolean } = {},
 ) {
   try {
-    await runRetention(db, catalogDb, clock);
+    await runRetention(db, catalogDb, clock, {}, options);
   } finally {
     ensureRetentionQueued(db, clock);
   }

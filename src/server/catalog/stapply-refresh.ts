@@ -136,7 +136,7 @@ export function createCatalogRefreshVerifier(
 ) {
   let lastAcceptedMs = Number.NEGATIVE_INFINITY;
 
-  const verify = (input: CatalogRefreshVerifierInput) => {
+  const verify: (input: CatalogRefreshVerifierInput) => CatalogRefreshVerdict = (input) => {
     const timestamp = headerValue(input.headers, CATALOG_TIMESTAMP_HEADER);
     const signature = headerValue(input.headers, CATALOG_SIGNATURE_HEADER);
 

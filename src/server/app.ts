@@ -61,6 +61,7 @@ import {
   mainHostAdminApiRefusal,
 } from "./host-routing.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
+import { createInternalCatalogRoutes } from "./routes/internal-catalog.ts";
 import { createMailRoutes } from "./routes/mail.ts";
 import { createWorkspaceSearchRoutes } from "./routes/workspace-search.ts";
 import { createSupportAccessRoutes } from "./routes/support-access.ts";
@@ -72,11 +73,13 @@ import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { createConfiguredBackupStore } from "./platform/object-store.ts";
 import { securityHeaders } from "./security-headers.ts";
 import { logError } from "./platform/log.ts";
+import type { CatalogHotSwap } from "./catalog/hot-swap.ts";
 import { API_ERRORS } from "../shared/api-errors.ts";
 
 export interface AppDependencies {
   db: AppDatabase;
   catalogDb: CatalogDatabase;
+  catalogHotSwap?: CatalogHotSwap | undefined;
   clock: AdjustableClock;
   backups: BackupMonitor;
   databasePath: string;
@@ -556,6 +559,19 @@ export function createApp(deps: AppDependencies) {
       secret: env.INBOUND_HMAC_SECRET,
     }),
   );
+
+  if (deps.catalogHotSwap !== undefined && env.CATALOG_REFRESH_SECRET !== undefined) {
+    app.route(
+      "/",
+      createInternalCatalogRoutes({
+        clock: deps.clock,
+        hotSwap: deps.catalogHotSwap,
+        objects: deps.objects,
+        secret: env.CATALOG_REFRESH_SECRET,
+      }),
+    );
+  }
+
   app.route(
     "/",
     createStripeWebhookRoutes({

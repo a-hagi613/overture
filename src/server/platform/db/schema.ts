@@ -15,6 +15,7 @@ import { CALENDAR_CUSTOM_EVENT_KINDS } from "../../../shared/calendar-events.ts"
 import { CHECKIN_ANSWERS } from "../../../shared/checkins.ts";
 import { APPLY_SUPPORTED_ATS, ATS_VALUES, PLAN_CACHE_ATS } from "../../../shared/ats.ts";
 import { SUPPORT_CATEGORIES, SUPPORT_TICKET_STATUSES } from "../../../shared/support.ts";
+import { POSTING_FLAG_REASONS } from "../../../shared/posting-flags.ts";
 
 const timestamp = (name: string) => integer(name, { mode: "timestamp" });
 
@@ -835,6 +836,23 @@ export const postingUserState = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.postingId] })],
+);
+
+/**
+ * A Posting that keeps failing on the live form, kept in `app.sqlite` because the catalog is a read-only artifact the
+ * app hot-swaps and never writes (issue #576). `posting_id` is a plain logical id into `catalog.sqlite`, exactly like
+ * `posting_user_state`, so a swap never leaves a dangling foreign key. A row is created on the first failure so
+ * `fail_count` can reach the reason's threshold; only a row at or over the threshold is excluded from matching.
+ */
+export const catalogPostingFlags = sqliteTable(
+  "catalog_posting_flags",
+  {
+    postingId: text("posting_id").primaryKey(),
+    flagReason: text("flag_reason", { enum: POSTING_FLAG_REASONS }).notNull(),
+    failCount: integer("fail_count").notNull().default(1),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [index("catalog_posting_flags_updated").on(t.updatedAt)],
 );
 
 /**
