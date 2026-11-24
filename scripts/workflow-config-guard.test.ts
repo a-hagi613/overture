@@ -590,7 +590,7 @@ test("a deploy workflow that prints the Cloudflare API token is reported", () =>
 
 test("a deploy workflow that does not check out the CI run's head SHA is reported", () => {
   const deploy = workersDeployWorkflow().replaceAll(
-    "ref: ${{ github.event.workflow_run.head_sha }}",
+    `ref: \${{ github.event.workflow_run.head_sha }}`,
     "ref: main",
   );
 

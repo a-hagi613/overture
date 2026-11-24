@@ -528,10 +528,11 @@ export function findWorkersDeployProblems(input: WorkersDeployInput) {
 
   if (job === null) {
     problems.push("deploy.yml has no deploy-workers job, so the Cloudflare Workers never deploy");
+
     return problems;
   }
 
-  if (!/^    needs:\s*deploy\s*$/mu.test(job)) {
+  if (!/^ {4}needs:\s*deploy\s*$/mu.test(job)) {
     problems.push("deploy-workers does not wait for the Fly deploy that ships the matching assets");
   }
 
@@ -539,7 +540,7 @@ export function findWorkersDeployProblems(input: WorkersDeployInput) {
     problems.push("deploy-workers runs even when the Fly deploy was skipped");
   }
 
-  if (!job.includes("ref: ${{ github.event.workflow_run.head_sha }}")) {
+  if (!job.includes(`ref: \${{ github.event.workflow_run.head_sha }}`)) {
     problems.push("deploy-workers does not check out the CI run's head SHA");
   }
 
@@ -577,11 +578,11 @@ export function findWorkersDeployProblems(input: WorkersDeployInput) {
     );
   }
 
-  if (!job.includes("CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}")) {
+  if (!job.includes(`CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}`)) {
     problems.push("deploy-workers does not pass CLOUDFLARE_API_TOKEN from the repository secrets");
   }
 
-  if (!job.includes("CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}")) {
+  if (!job.includes(`CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}`)) {
     problems.push("deploy-workers does not pass CLOUDFLARE_ACCOUNT_ID from the repository secrets");
   }
 
