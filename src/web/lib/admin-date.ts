@@ -19,13 +19,3 @@ export function adminDayTime(at: number, now: number) {
     ? copy.admin.todayAt(time)
     : copy.admin.dateAt(adminDay(at), time);
 }
-
-export function passkeyAgeText(at: number, now: number) {
-  const minutes = Math.max(0, Math.floor((now - at) / 60_000));
-
-  if (minutes < 1) {
-    return copy.admin.passkeyJustNow;
-  }
-
-  return minutes === 1 ? copy.admin.passkeyMinute(1) : copy.admin.passkeyMinutes(minutes);
-}

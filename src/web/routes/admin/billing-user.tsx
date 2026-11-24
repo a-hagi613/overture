@@ -17,14 +17,7 @@ export function BillingUserPage() {
   const { data, failed, refusal, refresh } = useAdminResource(load, ["billing-user", id]);
 
   if (refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={refusal}
-        onPasskeyDone={() => {
-          refresh();
-        }}
-      />
-    );
+    return <AdminGateScreen code={refusal} />;
   }
 
   if (data === null) {

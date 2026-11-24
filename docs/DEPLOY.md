@@ -16,7 +16,7 @@ to Fly), against names only.
 | `scripts/docker-entrypoint.sh` | On start: Litestream restores `/data/app.sqlite` from the replica if it does not exist, then runs `litestream replicate -exec "bun run /app/src/server/main.ts"`; migrations run inside `main.ts`. With `LITESTREAM_RESTORE_ONLY=true` it restores, runs the read-only restored-database check and never starts `main.ts`. With `VACUUM_ONLY=true` it compacts the application database instead, with Litestream and the server stopped |
 | `litestream.yml` | Continuous replication (1 s sync) to R2 `overture-backups`, nightly snapshot (`interval: 24h`) kept 30 days (`retention: 720h`); the L0 retention check runs every 5 minutes so its ListObjects cost stays bounded (#281) |
 | Deleted accounts in backups | The 35-day lifecycle on `overture-backups` (`app.sqlite/`) and the 30-day snapshot retention are the replay window for an erased account: only keyless ciphertext can come back, because `user_keys` is destroyed first (SPEC §13.2). R2 object deletes are not part of a replay |
-| `fly.toml` | App `overture-web`, region `yyz`, `kill_signal = "SIGTERM"`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health`; `PUBLIC_SIGNUP_ENABLED = "false"` keeps production invite-only (owner, invited and verified users, and the demo account) until M3 public sign-up ships, while `DEMO_LOGIN_ENABLED = "true"` keeps the demo account |
+| `fly.toml` | App `overture-web`, region `yyz`, `kill_signal = "SIGTERM"`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health`; `PUBLIC_SIGNUP_ENABLED = "false"` keeps production invite-only (owner, invited and verified users, and the demo account) until M3 public sign-up ships, while `ALLOWED_SIGNUP_EMAILS` can name comma-separated tester addresses that may still sign up, and `DEMO_LOGIN_ENABLED = "true"` keeps the demo account |
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`), a `security-and-restore` job (gitleaks over the history, the private-files guard, and the Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations, untouched `bg_jobs`), and the `ci-ok` aggregator every other job feeds |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
@@ -667,9 +667,9 @@ at V2, because V1 has been retired.
 
 The Admin Portal is the same process as the app, selected by the `Host` header: a request to
 `admin.tryoverture.com/admin/api/*` reaches the admin API, and any other host gets the normal app. In production the
-admin host sits behind a Cloudflare Zero Trust Access application with a policy for the owner's email only, on top of
-the app's own owner check and the passkey window. The values are already in `src/server/config/env.ts`; this section
-provisions what the deployment needs around them.
+admin host sits behind a Cloudflare Zero Trust Access application with a policy for the owner's email only, and the
+app trusts only a verified Access identity for `OWNER_EMAIL`; there is no second sign-in and no passkey. The values
+are already in `src/server/config/env.ts`; this section provisions what the deployment needs around them.
 
 There are two ways in:
 
@@ -678,17 +678,17 @@ There are two ways in:
    `https://admin.tryoverture.com/admin` in a new tab. Regular users, the demo account and anonymous visitors never
    see it, because `GET /api/me` returns `adminOrigin: null` for them (#512).
 2. **Straight to the admin host.** Go to `https://admin.tryoverture.com/admin`; a bare
-   `https://admin.tryoverture.com/` redirects there. Cloudflare Access asks for the owner's email first, then the app
-   asks you to sign in with the owner account, and the first visit asks you to add a passkey (later visits ask for the
-   passkey again only once the last assertion is more than 12 hours old).
+   `https://admin.tryoverture.com/` redirects there. Cloudflare Access asks for the owner's identity first and the
+   app then opens `/admin` directly: there is no magic-link step and no passkey step, and `/signin` redirects to
+   `/admin` for the verified owner.
 
 Only the owner account enters. A test or demo account cannot enter by design: the Access policy names the owner's
-email, the session must carry the `owner` role, the one-click demo sign-in endpoint is refused on the admin host, and
-a signed-in non-owner gets a plain page naming the owner account instead of the portal. The admin host serves its own
-sign-in: magic links are verified and their session cookie is set on `admin.tryoverture.com`. Social sign-in buttons
-are hidden there because the Google and LinkedIn clients register the `tryoverture.com` callback only. The Turnstile
-widget must allow both hosts; `TURNSTILE_HOSTNAMES` defaults to the `APP_ORIGIN` and `ADMIN_ORIGIN` hostnames when it
-is unset.
+email, and any other verified identity gets `403 owner_required` (the plain page naming the owner account for a
+browser navigation). A missing or invalid Access credential fails closed with `401 access_required` on the admin API.
+The admin host still serves its own `/api/me` and auth routes, but the owner session comes from Access; magic links
+remain available for the main app. Social sign-in buttons are hidden on the admin host because the Google and
+LinkedIn clients register the `tryoverture.com` callback only. The Turnstile widget must allow both hosts;
+`TURNSTILE_HOSTNAMES` defaults to the `APP_ORIGIN` and `ADMIN_ORIGIN` hostnames when it is unset.
 
 ### 1. Add the Fly certificate from the workflow
 
@@ -741,8 +741,8 @@ Then run **Actions → Ops admin host → Run workflow → `action: set-access-s
 `flyctl secrets set`, and confirms with `flyctl secrets list` **names only**. `CF_ACCESS_JWKS_URL` is optional and only
 overrides the certs URL; when both are set it must name the same team.
 
-Cloudflare Access gates the host before the app's own owner check and passkey window: without an Access assertion the
-admin API answers `401 access_required`, so never point DNS at the app without the Access application in place.
+Cloudflare Access gates the host before the app's owner check: without an Access assertion the admin API answers
+`401 access_required`, so never point DNS at the app without the Access application in place.
 
 ### 4. Verify the whole path
 
@@ -765,9 +765,9 @@ Paste the full result on the issue or pull request. The matching unit tests run 
 `bun test scripts/check-admin-host.test.ts`.
 
 Finally sign in as the owner, open `/profile/account` and confirm the **Admin Portal** card, then open `/admin` on
-`tryoverture.com` and confirm the handoff card opens `https://admin.tryoverture.com/admin` through Access and the
-passkey. Open `https://admin.tryoverture.com/` on its own and confirm it lands on `/admin` rather than the public
-landing page.
+`tryoverture.com` and confirm the handoff card opens `https://admin.tryoverture.com/admin` through Access with no
+second sign-in. Open `https://admin.tryoverture.com/` on its own and confirm it lands on `/admin` rather than the
+public landing page.
 
 ### Rollback
 

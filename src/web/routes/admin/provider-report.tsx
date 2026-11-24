@@ -38,14 +38,7 @@ export function ProviderReportPage() {
   const [running, setRunning] = useState(false);
 
   if (refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={refusal}
-        onPasskeyDone={() => {
-          refresh();
-        }}
-      />
-    );
+    return <AdminGateScreen code={refusal} />;
   }
 
   const heading = (

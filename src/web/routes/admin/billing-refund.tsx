@@ -17,14 +17,7 @@ export function BillingRefundPage() {
   const { data, failed, refusal, refresh } = useAdminResource(load, ["billing-refund", id]);
 
   if (refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={refusal}
-        onPasskeyDone={() => {
-          refresh();
-        }}
-      />
-    );
+    return <AdminGateScreen code={refusal} />;
   }
 
   if (data === null) {

@@ -92,14 +92,7 @@ export function UsersPage() {
   }, [request]);
 
   if (refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={refusal}
-        onPasskeyDone={() => {
-          void refresh();
-        }}
-      />
-    );
+    return <AdminGateScreen code={refusal} />;
   }
 
   if (data === null) {
