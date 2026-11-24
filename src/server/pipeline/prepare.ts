@@ -20,9 +20,11 @@ import type { LoginWallEvidence, LoginWallFormRead } from "./login-wall.ts";
 import {
   applicationAnswers,
   applications,
+  mailboxes,
   profiles,
   questions as questionsTable,
   resumes,
+  users,
 } from "../platform/db/schema.ts";
 import { companies, companyBoards, postings } from "../platform/db/catalog-schema.ts";
 
@@ -42,8 +44,14 @@ import { countriesNamedIn } from "../catalog/question-normalize.ts";
 import { mapQuestionsWithLlm } from "../catalog/question-mapping.ts";
 import { createQuestionCatalog, questionInputsFromAts } from "../catalog/questions.ts";
 import { logInfo } from "../platform/log.ts";
+import { planEmailAddress } from "../../shared/apply-alias.ts";
 import { isCountryScopedFactKey } from "../../shared/facts.ts";
-import { indexFacts, isUnsupportedBlock, resolveQuestion } from "./answer-plan.ts";
+import {
+  indexFacts,
+  isUnsupportedBlock,
+  resolveQuestion,
+  withEmailAddress,
+} from "./answer-plan.ts";
 import { answerIsValid, formatFactValue } from "./answer-value.ts";
 import { prepareUsersOfFacts, returnStaleApprovals } from "./approval-invalidation.ts";
 import { wordCount } from "./grounding.ts";
@@ -1198,8 +1206,24 @@ export function createPreparationService(deps: {
 
     const row = { ...application, ...postingRow, ats };
 
+    const profile = db.select().from(profiles).where(eq(profiles.userId, row.userId)).get();
+
     const factRows = await factsService.list(row.userId);
-    const factIndex = indexFacts(factRows);
+    const storedFacts = indexFacts(factRows);
+
+    const email = planEmailAddress(
+      profile?.usePersonalEmail ?? true,
+      db
+        .select({ applyAddress: mailboxes.applyAddress })
+        .from(mailboxes)
+        .where(eq(mailboxes.userId, row.userId))
+        .get()?.applyAddress ?? null,
+      db.select({ email: users.email }).from(users).where(eq(users.id, row.userId)).get()?.email ??
+        "",
+    );
+
+    const factIndex = email === "" ? storedFacts : withEmailAddress(storedFacts, email);
+
     const settings = await targetsService.read(row.userId);
 
     const posting: PostingPlace = {
@@ -1215,8 +1239,6 @@ export function createPreparationService(deps: {
       .from(resumes)
       .where(and(eq(resumes.userId, row.userId), eq(resumes.isCurrent, true)))
       .get();
-
-    const profile = db.select().from(profiles).where(eq(profiles.userId, row.userId)).get();
 
     const fields = await Promise.all(
       catalog.forPosting(row.postingId).map(async (question) => {

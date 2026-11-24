@@ -155,23 +155,47 @@ function normaliseSubdomain(subdomain: z.infer<typeof subdomainSchema>) {
   };
 }
 
+async function findZone(config: EmailSendingConfig, names: readonly string[]) {
+  const results = await Promise.all(
+    names.map(async (name) => {
+      const query = new URLSearchParams({ name });
+      const text = await request(config, `/zones?${query.toString()}`);
+      const parsed = zoneListSchema.parse(JSON.parse(text));
+      const [zone] = parsed.result;
+
+      return zone?.id ?? null;
+    }),
+  );
+
+  return results.find((id) => id !== null) ?? null;
+}
+
+/**
+ * The Cloudflare zone that owns a sending domain. A subdomain such as `notify.tryoverture.com` belongs
+ * to the zone `tryoverture.com`, so the lookup walks up the labels until Cloudflare answers.
+ * @param config The Email Sending configuration, with an optional explicit zone id.
+ * @returns The zone id.
+ */
 export async function resolveZoneId(config: EmailSendingConfig) {
   if (config.zoneId !== null) {
     return config.zoneId;
   }
 
-  const query = new URLSearchParams({ name: config.domain });
-  const text = await request(config, `/zones?${query.toString()}`);
-  const parsed = zoneListSchema.parse(JSON.parse(text));
-  const [zone] = parsed.result;
+  const labels = config.domain.split(".").filter((label) => label !== "");
+  const names = labels.map((_, index) => labels.slice(index).join("."));
 
-  if (zone === undefined) {
+  const zone = await findZone(
+    config,
+    names.filter((name) => name.split(".").length >= 2),
+  );
+
+  if (zone === null) {
     throw new Error(
-      `Cloudflare returned no zone named ${config.domain} to this token; set CLOUDFLARE_ZONE_ID.`,
+      `Cloudflare returned no zone for ${config.domain} to this token; set CLOUDFLARE_ZONE_ID.`,
     );
   }
 
-  return zone.id;
+  return zone;
 }
 
 export async function listSendingSubdomains(config: EmailSendingConfig, zoneId: string) {

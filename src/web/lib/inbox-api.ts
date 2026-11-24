@@ -152,6 +152,58 @@ export function useMailbox() {
   });
 }
 
+const applyEmailSchema = z.object({
+  applyAddress: z.string().nullable(),
+  personalEmail: z.string(),
+  usePersonalEmail: z.boolean(),
+});
+
+export type ApplyEmail = z.infer<typeof applyEmailSchema>;
+
+async function loadApplyEmail() {
+  const response = await fetch("/api/profile/apply-email");
+
+  if (!response.ok) {
+    throw new Error(`The apply-email request did not go through.`);
+  }
+
+  return applyEmailSchema.parse(await response.json());
+}
+
+async function saveApplyEmail(usePersonalEmail: boolean) {
+  const response = await fetch("/api/profile/apply-email", {
+    body: JSON.stringify({ usePersonalEmail }),
+    headers: { "Content-Type": "application/json" },
+    method: "PUT",
+  });
+
+  if (!response.ok) {
+    throw new Error(`The apply-email save did not go through (${String(response.status)}).`);
+  }
+
+  return applyEmailSchema.parse(await response.json());
+}
+
+export function useApplyEmail() {
+  return useQuery({
+    queryFn: loadApplyEmail,
+    queryKey: ["apply-email"],
+    retry: false,
+  });
+}
+
+export function useSaveApplyEmail() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: saveApplyEmail,
+    onSuccess: (saved) => {
+      queryClient.setQueryData(["apply-email"], saved);
+      void queryClient.invalidateQueries({ queryKey: ["profile-facts"] });
+    },
+  });
+}
+
 export function attachmentHref(id: string) {
   return `/api/attachments/${encodeURIComponent(id)}`;
 }

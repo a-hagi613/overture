@@ -28,6 +28,10 @@ primary sources before building (last section).
 This supersedes ADR 0005's generated `first.last@mail.tryoverture.com` job-search address. It also removes the
 risk that one shared `mail.tryoverture.com` domain is blocklisted for every user at once.
 
+*Amended by ADR 0040 (issue #566): every account is assigned a readable apply alias on `ALIAS_EMAIL_DOMAIN` again,
+used on new application forms unless the person chooses their personal email in Profile → Account. The forwarding
+address in this section is unchanged.*
+
 ## Inbound mail goes through Cloudflare Email Routing and an Email Worker
 
 - Email Routing on the apex `tryoverture.com` sends the catch-all to one Email Worker. Literal rules such as `hello@`

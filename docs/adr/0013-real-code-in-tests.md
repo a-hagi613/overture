@@ -127,7 +127,13 @@ case or duplicates, a same-connection write and a sweep-worker connection's WAL 
 stays bounded, the count query probes `posting_tags` by its primary key rather than scanning it, and 25 interleaved
 filter changes stay under 500ms p95 while catalog writes run, #426), the unit-test
 allowlist (`lint-config-guard.test.ts`: every path the allowlist names exists, and every unit test file in `src/` or
-`scripts/` is named, so a deleted test cannot leave a stale entry), the design-token lint pattern
+`scripts/` is named, so a deleted test cannot leave a stale entry), the apply-alias generator (`src/shared/apply-alias.test.ts`: a handle is the first and last name in
+lowercase ASCII, never a reserved system local part or its first dot-label, and a new plan uses the alias or the
+sign-in email rather than the editable email Fact, #566), the personal-email preference
+(`src/server/profile/apply-email.test.ts`: it defaults to the assigned alias, saves with a `profile.updated`
+announcement, and a read-only check provisions no mailbox, #566), the sending-domain zone lookup
+(`src/server/platform/mail/sending-domain.test.ts`: a notify subdomain resolves the zone that owns its parent, an
+explicit zone id answers without a request, and a domain with no owning zone fails clearly, #566), the design-token lint pattern
 (`design-scale-guard.test.ts`: every arbitrary `text-[…px]`/`text-[…rem]`, `text-lg`…`text-9xl` and off-scale
 spacing utility is rejected, while the nine typography tokens, the 4px scale and layout widths pass), the live topic
 map and the billing poll cap (`src/web/lib/live-events.test.ts` and `src/web/lib/billing-poll.test.ts`: every

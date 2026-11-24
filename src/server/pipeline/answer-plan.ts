@@ -123,6 +123,27 @@ function revisionFor(facts: FactIndex, key: string, scope: string) {
   return facts.revisions.get(revisionKey(key, scope)) ?? null;
 }
 
+/**
+ * The facts a plan is answered from for the address a new application puts on its email questions
+ * (issue #566): the assigned alias, or the sign-in email in personal mode. The stored Tier 1 `email`
+ * fact stays the person's own, editable value and is never used for a new plan.
+ * @param facts The indexed facts from the profile.
+ * @param address The alias or sign-in email to answer email questions with.
+ * @returns A copy of the facts whose `email` entries are that address.
+ */
+export function withEmailAddress(facts: FactIndex, address: string) {
+  const unscoped = new Map(facts.unscoped);
+  const details = new Map(facts.details);
+  const all = new Map(facts.all);
+  const revision = revisionFor(facts, "email", "");
+
+  unscoped.set("email", address);
+  details.set("email", { confirmed: true, value: address });
+  all.set("email", [{ revision: revision ?? 0, scope: "", value: address }]);
+
+  return { ...facts, all, details, unscoped };
+}
+
 type QuestionScope = { kind: "country"; code: string } | { kind: "multiple" } | { kind: "generic" };
 
 type ScopedLookup =

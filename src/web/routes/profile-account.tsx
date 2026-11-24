@@ -8,6 +8,7 @@ import { AccountPacingCard } from "../components/account-pacing-card.tsx";
 import { AccountSessionsCard } from "../components/account-sessions-card.tsx";
 import { AccountSupportAccessCard } from "../components/account-support-access-card.tsx";
 import { PageHeader } from "../components/page-header.tsx";
+import { SettingsApplyEmailCard } from "../components/settings-apply-email-card.tsx";
 import { SettingsCalendarFeed } from "../components/settings-calendar-feed.tsx";
 import { SettingsForwardingCard } from "../components/settings-forwarding-card.tsx";
 import { SettingsNotifications } from "../components/settings-notifications.tsx";
@@ -40,6 +41,8 @@ export function ProfileAccountPage() {
         <div id="forwarding">
           <SettingsForwardingCard />
         </div>
+
+        <SettingsApplyEmailCard />
 
         <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
           <SettingsNotifications />

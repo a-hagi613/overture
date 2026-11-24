@@ -28,7 +28,13 @@ describe("the live topic map", () => {
 
   test("refreshes profile facts from its own topic and from the review alias", () => {
     expect(isLiveTopic("profile.updated")).toBe(true);
-    expect(keysOf("profile.updated")).toEqual(["home", "nav", "profile-facts"]);
+    expect(keysOf("profile.updated")).toEqual([
+      "home",
+      "nav",
+      "profile-facts",
+      "apply-email",
+      "ready",
+    ]);
     expect(keysOf("review.resolved")).toContain("profile-facts");
   });
 

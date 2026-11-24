@@ -428,6 +428,13 @@
       "when": 1795492700000,
       "tag": "0060_useful_firebird",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "6",
+      "when": 1795492800000,
+      "tag": "0061_typical_sharon_carter",
+      "breakpoints": true
     }
   ]
 }

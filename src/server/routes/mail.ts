@@ -12,10 +12,13 @@ import type { createMailboxService } from "../inbox/mailboxes.ts";
 
 import { codePatterns } from "../inbox/codes.ts";
 import { resolveCodeWaitWithPaste } from "../inbox/waits.ts";
+import { demoLocked } from "../demo/guard.ts";
 import { applications, attempts, codeWaits } from "../platform/db/schema.ts";
-import { isDemoRole } from "../../shared/demo.ts";
+import { createApplyEmailService } from "../profile/apply-email.ts";
+import { applyEmailInputSchema } from "../../shared/apply-alias.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 import { CODE_WAIT_ERRORS, codeWaitAskDelayMs } from "../../shared/code-wait.ts";
+import { isDemoRole } from "../../shared/demo.ts";
 
 const codeBodySchema = z.object({
   code: z.string().regex(codePatterns.greenhouse, "Enter the 8-character code."),
@@ -31,6 +34,7 @@ export function createMailRoutes(deps: {
 }) {
   const { db, clock, auth, personal, mailboxes, secretSet } = deps;
   const routes = new Hono();
+  const applyEmail = createApplyEmailService({ db, clock, mailboxes });
 
   routes.get("/profile/mailbox", async (context) => {
     if (!secretSet) {
@@ -56,6 +60,32 @@ export function createMailRoutes(deps: {
       firstForwardedAt: mailbox.firstForwardedAt,
       forwardingWorks: mailbox.firstForwardedAt !== null,
     });
+  });
+
+  routes.get("/profile/apply-email", async (context) => {
+    const user = await readSessionUser(auth, context.req.raw.headers);
+
+    if (user === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    return context.json(await applyEmail.ensure(user.id, secretSet && !isDemoRole(user.role)));
+  });
+
+  routes.put("/profile/apply-email", validJson(applyEmailInputSchema), async (context) => {
+    const user = await readSessionUser(auth, context.req.raw.headers);
+
+    if (user === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    const locked = demoLocked(user.role);
+
+    if (locked !== null) {
+      return locked;
+    }
+
+    return context.json(await applyEmail.save(user.id, context.req.valid("json")));
   });
 
   routes.get("/mail/code-waits", async (context) => {

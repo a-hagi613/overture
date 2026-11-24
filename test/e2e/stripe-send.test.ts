@@ -349,7 +349,7 @@ test("with a Fact or Target for every mappable required question, the Stripe sen
   expect(stripe.fixture.state.applicationPaths).toEqual([STRIPE_PATH]);
   expect(stripe.fixture.state.applicationContentTypes).toEqual(["application/json"]);
   expect(stripe.fixture.state.submissions).toBe(1);
-  expect(stripe.fixture.state.lastForm["email"]).toBe("maya.okafor@mail.overture.test");
+  expect(stripe.fixture.state.lastForm["email"]).toBe("maya.okafor@example.com");
 
   expect(attempts).toHaveLength(1);
   expect(attempts[0]?.outcome).toBe("sent");

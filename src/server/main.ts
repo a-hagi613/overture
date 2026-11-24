@@ -13,7 +13,14 @@ import {
 } from "./admin/key-rotation.ts";
 import { createAuth } from "./auth/index.ts";
 import type { AuthOptions } from "./auth/index.ts";
-import { catalogDatabasePath, databasePath, env, labBaseUrl, masterKeyring } from "./config/env.ts";
+import {
+  aliasEmailDomain,
+  catalogDatabasePath,
+  databasePath,
+  env,
+  labBaseUrl,
+  masterKeyring,
+} from "./config/env.ts";
 import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
 import { MailCapExceededError } from "./platform/mail/errors.ts";
 import { createPayments } from "./billing/index.ts";
@@ -295,7 +302,14 @@ if (env.PUBLIC_SIGNUP_ENABLED) {
 }
 
 const pushSender = createPushSender(env, clock);
-const mailboxes = createMailboxService(db, clock, env.INBOUND_HMAC_SECRET ?? "", env.MAIL_DOMAIN);
+
+const mailboxes = createMailboxService(
+  db,
+  clock,
+  env.INBOUND_HMAC_SECRET ?? "",
+  env.MAIL_DOMAIN,
+  aliasEmailDomain,
+);
 
 const objects =
   env.R2_ACCOUNT_ID !== undefined &&
