@@ -77,6 +77,31 @@ export function useModalSheet(
       onCloseRef.current();
     };
 
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusable = [...node.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+        (element) => element.offsetParent !== null && !element.matches(":disabled"),
+      );
+
+      const first = focusable.at(0);
+      const last = focusable.at(-1);
+
+      if (first === undefined || last === undefined) {
+        return;
+      }
+
+      if (event.shiftKey && globalThis.document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && globalThis.document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
     const onClick = (event: MouseEvent) => {
       if (event.target !== node) {
         return;
@@ -97,10 +122,12 @@ export function useModalSheet(
 
     node.addEventListener("cancel", onCancel);
     node.addEventListener("click", onClick);
+    node.addEventListener("keydown", onKeyDown);
 
     return () => {
       node.removeEventListener("cancel", onCancel);
       node.removeEventListener("click", onClick);
+      node.removeEventListener("keydown", onKeyDown);
 
       unregisterHost();
 
