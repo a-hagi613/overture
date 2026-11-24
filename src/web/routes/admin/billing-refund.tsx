@@ -9,7 +9,7 @@ import { AdminPageHeading } from "./page-heading.tsx";
 import { AdminStatusCard } from "./admin-status-card.tsx";
 import { BillingRow } from "./billing-row.tsx";
 import { RefundForm } from "./refund-form.tsx";
-import { billingPlanLabel, periodSpan } from "./billing-labels.ts";
+import { billingLinkClass, billingPlanLabel, periodSpan } from "./billing-labels.ts";
 
 export function BillingRefundPage() {
   const { id = "" } = useParams();
@@ -21,7 +21,16 @@ export function BillingRefundPage() {
   }
 
   if (data === null) {
-    return <AdminStatusCard failed={failed} onRetry={refresh} />;
+    return (
+      <>
+        <AdminPageHeading
+          italic={copy.admin.billingRefundTitleItalic}
+          lead={copy.admin.billingRefundLead}
+          plain={copy.admin.billingRefundTitlePlain}
+        />
+        <AdminStatusCard failed={failed} onRetry={refresh} />
+      </>
+    );
   }
 
   const { user } = data;
@@ -37,7 +46,7 @@ export function BillingRefundPage() {
           plain={copy.admin.billingRefundTitlePlain}
         />
         <p className="mt-5 text-sm text-muted-foreground">{copy.admin.billingUserNotRefundable}</p>
-        <Link to={back} className="mt-3 inline-block underline">
+        <Link to={back} className={`mt-3 ${billingLinkClass}`}>
           {copy.admin.billingRefundBack}
         </Link>
       </>
@@ -50,11 +59,11 @@ export function BillingRefundPage() {
         aria-label={copy.admin.billingUserCrumbRoot}
         className="mt-4 text-sm text-muted-foreground"
       >
-        <Link to="/admin/billing" className="underline underline-offset-2">
+        <Link to="/admin/billing" className={billingLinkClass}>
           {copy.admin.billingUserCrumbRoot}
         </Link>
         {" / "}
-        <Link to={back} className="underline underline-offset-2">
+        <Link to={back} className={billingLinkClass}>
           {user.name.length > 0 ? user.name : copy.admin.billingUserNameFallback}
         </Link>
       </nav>

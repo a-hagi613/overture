@@ -3,6 +3,9 @@ import type { BillingFilter, BillingPeriod } from "../../lib/admin-api.ts";
 
 export type BillingStateKey = "trial" | "paying" | "ending" | "paused" | "ended" | "none";
 
+export const billingLinkClass =
+  "inline-flex min-h-11 items-center rounded-md px-2 text-sm font-semibold underline underline-offset-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal md:min-h-9";
+
 export const BILLING_FILTER_ORDER: readonly BillingFilter[] = [
   "all",
   "trial",

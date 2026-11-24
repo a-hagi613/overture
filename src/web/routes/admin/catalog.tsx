@@ -95,7 +95,7 @@ export function CatalogPage() {
         <p className="text-xs text-muted-foreground">{copy.admin.catalogProbeLead}</p>
         <div className="flex flex-wrap items-center gap-3">
           <button
-            className="min-h-9 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground shadow-sh hover:bg-muted"
+            className="min-h-11 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground shadow-sh hover:bg-muted md:min-h-9"
             disabled={running}
             onClick={() => {
               void runProbe();

@@ -158,7 +158,7 @@ export function InvitesPage() {
             />
           </label>
           <button
-            className="inline-flex h-10 items-center justify-center rounded-md border border-foreground bg-foreground px-4 text-sm font-semibold text-card hover:opacity-90 disabled:opacity-60"
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-foreground bg-foreground px-4 text-sm font-semibold text-card hover:opacity-90 disabled:opacity-60 md:min-h-10"
             disabled={busy || !email.includes("@")}
             type="submit"
           >
