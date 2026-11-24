@@ -339,8 +339,29 @@ test("a second sign-in method on the same verified email joins the one account",
   expect(state.accounts.map((account) => account.providerId)).toContain("google");
 });
 
-test("the sign-up route renders the account creation form", async ({ page, isolatedAppServer }) => {
+test("the sign-up route shows the waitlist while public sign-up is closed", async ({
+  page,
+  isolatedAppServer,
+}) => {
   await page.goto(`${isolatedAppServer.url}/signup`);
-  await expect(page.getByRole("button", { name: "Sign up with Google" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Join the waitlist" })).toBeVisible();
   await expect(page.getByLabel("Email")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign up with Google" })).toHaveCount(0);
+});
+
+test("the sign-up route renders the account creation form when public sign-up is open", async ({
+  page,
+  _identityServerWorker,
+}) => {
+  const server = await startFreshAppServer(_identityServerWorker, {
+    PUBLIC_SIGNUP_ENABLED: "true",
+  });
+
+  try {
+    await page.goto(`${server.url}/signup`);
+    await expect(page.getByRole("button", { name: "Sign up with Google" })).toBeVisible();
+    await expect(page.getByLabel("Email")).toBeVisible();
+  } finally {
+    await server.stop();
+  }
 });

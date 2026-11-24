@@ -61,6 +61,9 @@ export function createMeteredMailSender(db: AppDatabase, clock: Clock, adapter: 
     sendCheck: async (mail) => {
       await metered("system", async () => adapter.sendCheck(mail));
     },
+    sendWaitlistInvite: async (mail) => {
+      await metered("system", async () => adapter.sendWaitlistInvite(mail));
+    },
     sendCodeWait: async (mail) => {
       await metered("system", async () => adapter.sendCodeWait(mail));
     },

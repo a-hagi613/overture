@@ -21,6 +21,7 @@ export function createMeRoutes(auth: Auth) {
       mePayload(session?.user ?? null, {
         adminOrigin: env.ADMIN_ORIGIN,
         adminOwnerEmail: onAdminHost ? env.OWNER_EMAIL : null,
+        publicSignupEnabled: env.PUBLIC_SIGNUP_ENABLED,
         socialProviders: onAdminHost ? [] : enabledSocialProviders,
         turnstileScriptUrl: env.TURNSTILE_SCRIPT_URL,
         turnstileSiteKey: env.TURNSTILE_SITE_KEY,

@@ -101,6 +101,14 @@ import {
   INVITE_GRANT_DAYS_KEY,
   INVITE_GRANT_QUANTITY_KEY,
 } from "../auth/invites.ts";
+import {
+  markWaitlistInvited,
+  waitlistCounts,
+  waitlistEntriesFor,
+  waitlistEntryById,
+} from "../waitlist/store.ts";
+import type { WaitlistEntryRow } from "../waitlist/store.ts";
+import { WAITLIST_FILTERS, WAITLIST_ORDERS } from "../../shared/waitlist.ts";
 import { isSameMailbox, normaliseEmail } from "../auth/email.ts";
 import { readMailHealth } from "../inbox/health.ts";
 import { buildStorageReport } from "../storage/report.ts";
@@ -215,6 +223,12 @@ const tagImportBody = z.object({
 });
 
 const inviteBody = z.object({ email: z.email() });
+
+const waitlistQuery = z.object({
+  status: z.enum(WAITLIST_FILTERS).default("all"),
+  q: z.string().trim().default(""),
+  order: z.enum(WAITLIST_ORDERS).default("newest"),
+});
 
 const llmUsageQuery = z.object({
   purpose: z.string().min(1).optional(),
@@ -352,6 +366,19 @@ function integrationsOf() {
 export { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
 
 export { isAdminHost } from "../host-routing.ts";
+
+function waitlistView(row: WaitlistEntryRow) {
+  return {
+    createdAt: row.createdAt,
+    email: row.email,
+    id: row.id,
+    invitedAt: row.invitedAt,
+    status: row.status,
+    targetLocation: row.targetLocation,
+    targetRole: row.targetRole,
+    updatedAt: row.updatedAt,
+  };
+}
 
 function jobActionResponse(context: Context<AdminEnv>, result: JobActionOutcome) {
   if (result.outcome === "not_found") {
@@ -1359,6 +1386,104 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     }
 
     return context.json({ invite: await invitationView(row, owner.userId) });
+  });
+
+  routes.get("/waitlist", validQuery(waitlistQuery), (context) => {
+    const { status, q, order } = context.req.valid("query");
+    const rows = waitlistEntriesFor(db, { order, q, status });
+
+    return context.json({
+      counts: waitlistCounts(db),
+      entries: rows.map((row) => waitlistView(row)),
+      total: rows.length,
+    });
+  });
+
+  routes.post("/waitlist/:id/invite", async (context) => {
+    const owner = context.get("owner");
+    const row = waitlistEntryById(db, context.req.param("id"));
+
+    if (row === null) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    if (row.status === "joined") {
+      return context.json({ emailed: false, entry: waitlistView(row) });
+    }
+
+    const existing = findInvite(db, authSecretConfig.accepted, row.email);
+
+    if (existing !== null && (existing.acceptedAt !== null || existing.revokedAt === null)) {
+      const updated = markWaitlistInvited(db, clock, row.id) ?? row;
+
+      return context.json({ emailed: false, entry: waitlistView(updated) });
+    }
+
+    const inviteId = existing?.id ?? crypto.randomUUID();
+    const emailHash = existing?.emailHash ?? inviteEmailHash(inviteSecret, row.email);
+
+    const emailEnc = await deps.personal.sealFor(
+      owner.userId,
+      { table: "invites", column: "email_enc", rowId: inviteId },
+      row.email,
+    );
+
+    const createdAt = new Date(clock.now());
+
+    if (existing === null) {
+      db.insert(invites)
+        .values({
+          id: inviteId,
+          emailHash,
+          emailEnc,
+          invitedBy: owner.userId,
+          acceptedAt: null,
+          acceptedUserId: null,
+          revokedAt: null,
+          grantId: null,
+          createdAt,
+        })
+        .run();
+    } else {
+      db.update(invites)
+        .set({
+          acceptedAt: null,
+          acceptedUserId: null,
+          createdAt,
+          emailEnc,
+          grantId: null,
+          invitedBy: owner.userId,
+          revokedAt: null,
+        })
+        .where(eq(invites.id, inviteId))
+        .run();
+    }
+
+    try {
+      await deps.mail.sendWaitlistInvite({
+        to: row.email,
+        url: `${env.APP_ORIGIN ?? env.ADMIN_ORIGIN}/signin`,
+      });
+    } catch (error) {
+      db.update(invites)
+        .set({ revokedAt: new Date(clock.now()) })
+        .where(eq(invites.id, inviteId))
+        .run();
+      logError("admin.waitlist.invite", error);
+
+      return context.json({ error: "mail_failed" }, 502);
+    }
+
+    await recordAdminAudit(db, clock, {
+      actorId: owner.userId,
+      action: "waitlist.invite",
+      reason: `Invited ${row.email} from the waitlist`,
+      detail: { email: row.email, inviteId, waitlistId: row.id },
+    });
+
+    const updated = markWaitlistInvited(db, clock, row.id) ?? row;
+
+    return context.json({ emailed: true, entry: waitlistView(updated) }, 201);
   });
 
   routes.get("/grants", (context) => {

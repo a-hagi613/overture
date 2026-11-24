@@ -6,7 +6,8 @@ export type AdminStatusKey =
   | "invited"
   | "pending"
   | "accepted"
-  | "revoked";
+  | "revoked"
+  | "joined";
 
 const tones: Record<AdminStatusKey, string> = {
   accepted: "bg-ok-soft text-ok",
@@ -15,6 +16,7 @@ const tones: Record<AdminStatusKey, string> = {
   pending: "bg-muted text-muted-foreground",
   revoked: "bg-muted text-muted-foreground",
   suspended: "bg-need-soft text-need",
+  joined: "bg-ok-soft text-ok",
 };
 
 const labels: Record<AdminStatusKey, string> = {
@@ -24,6 +26,7 @@ const labels: Record<AdminStatusKey, string> = {
   pending: copy.admin.statusPending,
   revoked: copy.admin.statusRevoked,
   suspended: copy.admin.statusSuspended,
+  joined: copy.admin.statusJoined,
 };
 
 export function AdminStatusPill({ status }: { status: AdminStatusKey }) {

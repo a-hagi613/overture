@@ -14,6 +14,7 @@ export const adminDestinations = [
   { end: true, glyph: "sliders", label: copy.admin.navLlmSpend, to: "/admin/llm" },
   { end: false, glyph: "users", label: copy.admin.navUsers, to: "/admin/users" },
   { end: false, glyph: "mail", label: copy.admin.navInvites, to: "/admin/invites" },
+  { end: true, glyph: "clock", label: copy.admin.navWaitlist, to: "/admin/waitlist" },
   { end: false, glyph: "tag", label: copy.admin.navGrants, to: "/admin/grants" },
   { end: false, glyph: "card", label: copy.admin.navBilling, to: "/admin/billing" },
   { end: false, glyph: "link", label: copy.admin.navSwitches, to: "/admin/settings" },
