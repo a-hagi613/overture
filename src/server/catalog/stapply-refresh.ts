@@ -1,4 +1,9 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createWriteStream } from "node:fs";
+import { Readable, Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { createZstdDecompress } from "node:zlib";
+
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { CatalogManifest } from "./stapply-daily.ts";
 
@@ -61,6 +66,79 @@ export function decompressCatalogSnapshot(compressedBytes: Uint8Array<ArrayBuffe
   return new Uint8Array(Bun.zstdDecompressSync(compressedBytes));
 }
 
+export type CatalogStreamStage = "decompress" | "write";
+
+/**
+ * A streaming decompress that failed at one named stage, so a caller can tell a corrupt artifact (and a corrupt
+ * artifact is fine to retry from the other object key) from a full disk (a write failure).
+ */
+export class CatalogStreamStageError extends Error {
+  readonly stage: CatalogStreamStage;
+
+  constructor(stage: CatalogStreamStage, message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "CatalogStreamStageError";
+    this.stage = stage;
+  }
+}
+
+/**
+ * Streams a `catalog.sqlite.zst` payload through zstd into `destinationPath`, hashing and counting the uncompressed
+ * bytes as they pass so a multi-gigabyte catalog never sits in the Bun heap.
+ *
+ * Each stage tags its own failure: an error from the input or the decompressor is a `decompress` stage failure, an
+ * error from the destination file is a `write` stage failure. `pipeline` closes every stream on any failure, so no
+ * file descriptor leaks on a refused refresh.
+ * @param stream The compressed snapshot from the object store.
+ * @param destinationPath The file to write the uncompressed SQLite bytes to.
+ * @returns The uncompressed byte count and its SHA-256 as lowercase hex.
+ */
+export async function decompressCatalogStreamToFile(
+  stream: ReadableStream<Uint8Array>,
+  destinationPath: string,
+) {
+  const hash = createHash("sha256");
+  const decompressor = createZstdDecompress();
+  const sink = createWriteStream(destinationPath);
+  const source = Readable.from(stream);
+  const stages: CatalogStreamStage[] = [];
+  let bytes = 0;
+
+  const meter = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      bytes += chunk.byteLength;
+      hash.update(chunk);
+      callback(null, chunk);
+    },
+  });
+
+  source.once("error", () => {
+    stages.push("decompress");
+  });
+  decompressor.once("error", () => {
+    stages.push("decompress");
+  });
+  sink.once("error", () => {
+    stages.push("write");
+  });
+
+  try {
+    await pipeline(source, decompressor, meter, sink);
+  } catch (error) {
+    const stage = stages[0] ?? "decompress";
+
+    throw new CatalogStreamStageError(
+      stage,
+      stage === "write"
+        ? `could not write ${destinationPath}`
+        : `the catalog artifact is not zstd (${destinationPath})`,
+      { cause: error },
+    );
+  }
+
+  return { bytes, sha256: hash.digest("hex") };
+}
+
 /**
  * @param bytes The uncompressed catalog file.
  * @returns Its SHA-256 as lowercase hex.
@@ -105,6 +183,39 @@ function headerValue(headers: Readonly<Record<string, string | undefined>>, name
   return null;
 }
 
+/**
+ * The cheap header check a caller can run before reading a body: the timestamp and signature must be present, and the
+ * timestamp must be a finite epoch-ms value inside the skew window. It deliberately does not check the HMAC (that
+ * needs the body) or replay state (that belongs to the verifier closure).
+ * @param headers The request headers.
+ * @param nowMs The receiver's clock.
+ * @param maxSkewMs The accepted clock difference; five minutes by default.
+ * @returns The refusal reason, or null when the headers are worth streaming a body for.
+ */
+export function catalogRefreshHeaderRefusal(
+  headers: Readonly<Record<string, string | undefined>>,
+  nowMs: number,
+  maxSkewMs: number = CATALOG_REFRESH_MAX_SKEW_MS,
+) {
+  const timestamp = headerValue(headers, CATALOG_TIMESTAMP_HEADER);
+
+  if (timestamp === null) {
+    return "missing_timestamp";
+  }
+
+  if (headerValue(headers, CATALOG_SIGNATURE_HEADER) === null) {
+    return "missing_signature";
+  }
+
+  const timestampMs = Number(timestamp);
+
+  if (!Number.isFinite(timestampMs) || Math.abs(nowMs - timestampMs) > maxSkewMs) {
+    return "stale_timestamp";
+  }
+
+  return null;
+}
+
 export type CatalogRefreshVerdict =
   | { readonly ok: true; readonly timestampMs: number }
   | { readonly ok: false; readonly reason: CatalogRefreshRejection };
@@ -137,22 +248,15 @@ export function createCatalogRefreshVerifier(
   let lastAcceptedMs = Number.NEGATIVE_INFINITY;
 
   const verify: (input: CatalogRefreshVerifierInput) => CatalogRefreshVerdict = (input) => {
-    const timestamp = headerValue(input.headers, CATALOG_TIMESTAMP_HEADER);
-    const signature = headerValue(input.headers, CATALOG_SIGNATURE_HEADER);
+    const refusal = catalogRefreshHeaderRefusal(input.headers, input.nowMs, maxSkewMs);
 
-    if (timestamp === null) {
-      return { ok: false, reason: "missing_timestamp" };
+    if (refusal !== null) {
+      return { ok: false, reason: refusal };
     }
 
-    if (signature === null) {
-      return { ok: false, reason: "missing_signature" };
-    }
-
+    const timestamp = headerValue(input.headers, CATALOG_TIMESTAMP_HEADER) ?? "";
+    const signature = headerValue(input.headers, CATALOG_SIGNATURE_HEADER) ?? "";
     const timestampMs = Number(timestamp);
-
-    if (!Number.isFinite(timestampMs) || Math.abs(input.nowMs - timestampMs) > maxSkewMs) {
-      return { ok: false, reason: "stale_timestamp" };
-    }
 
     if (timestampMs <= lastAcceptedMs) {
       return { ok: false, reason: "replayed_timestamp" };

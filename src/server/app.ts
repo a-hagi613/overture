@@ -80,6 +80,8 @@ export interface AppDependencies {
   db: AppDatabase;
   catalogDb: CatalogDatabase;
   catalogHotSwap?: CatalogHotSwap | undefined;
+  /** Where a relay upload stages the compressed snapshot; defaults to the OS temp dir. */
+  catalogStagingDir?: string | undefined;
   clock: AdjustableClock;
   backups: BackupMonitor;
   databasePath: string;
@@ -569,6 +571,7 @@ export function createApp(deps: AppDependencies) {
         hotSwap: deps.catalogHotSwap,
         objects: deps.objects,
         secret: env.CATALOG_REFRESH_SECRET,
+        ...(deps.catalogStagingDir !== undefined && { stagingDir: deps.catalogStagingDir }),
       }),
     );
   }

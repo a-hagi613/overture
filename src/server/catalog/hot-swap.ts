@@ -13,9 +13,9 @@ import { catalogManifestSchema } from "./stapply-daily.ts";
 import {
   CATALOG_LATEST_KEY,
   CATALOG_MANIFEST_KEY,
-  catalogSha256,
+  CatalogStreamStageError,
   catalogSnapshotKey,
-  decompressCatalogSnapshot,
+  decompressCatalogStreamToFile,
 } from "./stapply-refresh.ts";
 
 /**
@@ -34,7 +34,7 @@ const pointerSchema = z.object({
   appliedAt: z.number().int().nonnegative(),
 });
 
-const integrityCheckSchema = z.array(z.object({ integrity_check: z.string() }));
+const quickCheckSchema = z.array(z.object({ quick_check: z.string() }));
 
 export type CatalogPointer = z.infer<typeof pointerSchema>;
 
@@ -80,7 +80,7 @@ export interface CatalogHotSwapOptions {
   /** The stable path the app reads: `catalog.sqlite` on the Fly volume. */
   catalogPath: string;
   /** The R2 (or disk, in tests) object store the artifacts are fetched from. */
-  objects: Pick<ObjectStore, "get">;
+  objects: Pick<ObjectStore, "get" | "getStream">;
   /** Epoch-ms clock, injectable for tests. */
   now?: () => number;
   /** Where to report a swap or a refused refresh. Defaults to silence. */
@@ -105,9 +105,9 @@ function openVerified(path: string, version: string) {
   let verdict: string;
 
   try {
-    const [check] = integrityCheckSchema.parse(sqlite.query("PRAGMA integrity_check").all());
+    const [check] = quickCheckSchema.parse(sqlite.query("PRAGMA quick_check(1)").all());
 
-    verdict = check?.integrity_check ?? "missing";
+    verdict = check?.quick_check ?? "missing";
   } catch (error) {
     sqlite.close();
 
@@ -123,7 +123,7 @@ function openVerified(path: string, version: string) {
 
     throw new CatalogRefreshError(
       "integrity_check_failed",
-      `catalog ${version} failed PRAGMA integrity_check: ${verdict}`,
+      `catalog ${version} failed PRAGMA quick_check: ${verdict}`,
     );
   }
 
@@ -135,7 +135,7 @@ function openVerified(path: string, version: string) {
  * before it is trusted, and swaps the handle atomically so a failed refresh can never take the live catalog down.
  *
  * The app only ever reads the catalog: a refresh writes a new `catalog.<version>.sqlite` beside the old one, verifies
- * its SHA-256 and `PRAGMA integrity_check`, then points `catalog.sqlite` at it and drains the previous handle.
+ * its SHA-256 and `PRAGMA quick_check`, then points `catalog.sqlite` at it and drains the previous handle.
  *
  * The `db` it exposes keeps one identity for the life of the process. Drizzle reads the active connection through its
  * own `session` field, so a swap adopts the new handle's fields onto that object instead of replacing it: every
@@ -251,7 +251,7 @@ export function createCatalogHotSwap(options: CatalogHotSwapOptions) {
         return already;
       }
 
-      if (manifest.version < active.version) {
+      if (active.version !== "local" && manifest.version < active.version) {
         const stale: CatalogApplyResult = {
           applied: false,
           reason: "stale_version",
@@ -262,33 +262,14 @@ export function createCatalogHotSwap(options: CatalogHotSwapOptions) {
       }
     }
 
-    const compressed =
-      (await objects.get(CATALOG_LATEST_KEY)) ??
-      (await objects.get(catalogSnapshotKey(manifest.version)));
+    const stream =
+      (await objects.getStream(CATALOG_LATEST_KEY)) ??
+      (await objects.getStream(catalogSnapshotKey(manifest.version)));
 
-    if (compressed === null) {
+    if (stream === null) {
       throw new CatalogRefreshError(
         "artifact_missing",
         `neither ${CATALOG_LATEST_KEY} nor ${catalogSnapshotKey(manifest.version)} is in the bucket`,
-      );
-    }
-
-    let bytes: Uint8Array<ArrayBuffer>;
-
-    try {
-      bytes = decompressCatalogSnapshot(compressed);
-    } catch (error) {
-      throw new CatalogRefreshError("decompress_failed", "the catalog artifact is not zstd", {
-        cause: error,
-      });
-    }
-
-    const digest = catalogSha256(bytes);
-
-    if (digest !== manifest.sha256) {
-      throw new CatalogRefreshError(
-        "checksum_mismatch",
-        `catalog ${manifest.version} has sha256 ${digest}, manifest says ${manifest.sha256}`,
       );
     }
 
@@ -297,7 +278,38 @@ export function createCatalogHotSwap(options: CatalogHotSwapOptions) {
 
     try {
       await mkdir(directory, { recursive: true });
-      await writeFile(temporary, bytes);
+    } catch (error) {
+      throw new CatalogRefreshError("write_failed", `could not create ${directory}`, {
+        cause: error,
+      });
+    }
+
+    let digest: string;
+
+    try {
+      ({ sha256: digest } = await decompressCatalogStreamToFile(stream, temporary));
+    } catch (error) {
+      await rm(temporary, { force: true });
+
+      if (error instanceof CatalogStreamStageError && error.stage === "decompress") {
+        throw new CatalogRefreshError("decompress_failed", "the catalog artifact is not zstd", {
+          cause: error,
+        });
+      }
+
+      throw new CatalogRefreshError("write_failed", `could not write ${target}`, { cause: error });
+    }
+
+    if (digest !== manifest.sha256) {
+      await rm(temporary, { force: true });
+
+      throw new CatalogRefreshError(
+        "checksum_mismatch",
+        `catalog ${manifest.version} has sha256 ${digest}, manifest says ${manifest.sha256}`,
+      );
+    }
+
+    try {
       await rename(temporary, target);
     } catch (error) {
       await rm(temporary, { force: true });

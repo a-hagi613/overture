@@ -415,7 +415,8 @@ jobs:
           timeout 30s flyctl status -a overture-web || true
           echo "::endgroup::"
           echo "::group::/data and the processes on overture-web"
-          timeout 30s flyctl ssh console -a overture-web -C "sh -c 'ls -lh /data; df -h /data; ps aux'" || true
+          # oven/bun:1.4.5-slim has no ps, so list processes straight from /proc.
+          timeout 30s flyctl ssh console -a overture-web -C "sh -c 'ls -lh /data; df -h /data; for p in /proc/[0-9]*; do [ -r \"\$p/cmdline\" ] && printf \"%s \" \"\${p#/proc/}\" && tr \"\\0\" \" \" < \"\$p/cmdline\" && echo \"\"; done'" || true
           echo "::endgroup::"
 
       - name: Delete only the catalog database files on the overture-web volume
@@ -458,29 +459,38 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           set -euo pipefail
+          machine_id="$(flyctl machines list -a overture-web --json | jq -r '[.[] | select((.config.metadata // {}).fly_process_group == "app")][0].id // empty')"
+          if [ -z "$machine_id" ]; then
+            machine_id="$(flyctl machines list -a overture-web --json | jq -r '[.[] | select(.state == "started")][0].id // empty')"
+          fi
+          if [ -z "$machine_id" ]; then
+            echo "::error::Found no app machine to restart on overture-web."
+            exit 1
+          fi
           loopback_healthy() {
             timeout 30s flyctl ssh console -a overture-web \
               -C "sh -c 'curl -fsS -m 3 http://127.0.0.1:3000/api/health >/dev/null 2>&1'" >/dev/null 2>&1
           }
           if loopback_healthy; then
             echo "overture-web answers on port 3000; restarting the app machine."
-            machine_id="$(flyctl machines list -a overture-web --json | jq -r '[.[] | select((.config.metadata // {}).fly_process_group == "app")][0].id // empty')"
-            if [ -z "$machine_id" ]; then
-              machine_id="$(flyctl machines list -a overture-web --json | jq -r '[.[] | select(.state == "started")][0].id // empty')"
-            fi
-            if [ -z "$machine_id" ]; then
-              echo "::error::Found no app machine to restart on overture-web."
-              exit 1
-            fi
             flyctl machine restart "$machine_id" -a overture-web
             exit 0
           fi
-          # A process that never reached port 3000 is stuck inside the catalog migration. Kill only the Bun server
-          # child: Litestream is its parent, sees the child exit, flushes the application database WAL and exits, and
-          # Fly restarts the machine immediately onto an empty catalog.sqlite.
+          # A process that never reached port 3000 is stuck inside the catalog migration. The image has no process
+          # tools, so read /proc directly and match only a bun process running the server entrypoint; PID 1, the
+          # shell, and the parent replicator never match, and Fly restarts the machine once the child is gone.
           echo "overture-web does not answer on port 3000 yet; killing the hung Bun server so Fly restarts it."
-          timeout 30s flyctl ssh console -a overture-web \
-            -C "pkill -9 -f 'bun run /app/src/server/main.ts' || true" || true
+          kill_output="$(timeout 30s flyctl ssh console -a overture-web -C "sh -c 'for p in /proc/[0-9]*; do [ \"\$p\" = /proc/1 ] && continue; [ -r \"\$p/cmdline\" ] || continue; cmd=\"\$(tr \"\\0\" \" \" < \"\$p/cmdline\" 2>/dev/null)\"; case \"\$cmd\" in \"bun \"*|\"/*/bun \"*|\"sh -c bun \"*|\"/bin/sh -c bun \"*) case \"\$cmd\" in *\" /app/src/server/main.ts\"*) kill -9 \"\${p#/proc/}\" 2>/dev/null && echo \"killed \${p#/proc/}\" ;; esac ;; esac; done'" 2>&1)" || true
+          printf '%s\n' "$kill_output"
+          case "$kill_output" in
+            *"killed "*)
+              echo "the hung Bun server was killed; Fly restarts it onto the empty catalog."
+              ;;
+            *)
+              echo "no hung Bun server was found; restarting the app machine."
+              flyctl machine restart "$machine_id" -a overture-web
+              ;;
+          esac
 
       - name: Wait for overture-web to serve health after the catalog reset
         if: steps.guard.outputs.skip != 'true' && inputs.action == 'reset-catalog'

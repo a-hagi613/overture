@@ -373,15 +373,62 @@ test("a catalog reset that deletes before it shows the diagnostics is reported",
 });
 
 test("a catalog reset that kills Litestream is reported", () => {
+  const workflow = recoveryWorkflow();
+
+  const restart =
+    readWorkflowStep(workflow, "Restart overture-web onto an empty catalog database") ?? "";
+
+  const problems = findRecoveryWorkflowProblems({
+    opsLive: workflow.replace(restart, `${restart}\n          pkill -9 -f litestream || true`),
+  });
+
+  expect(problems.some((problem) => problem.includes("kills Litestream"))).toBe(true);
+});
+
+test("a catalog reset that still calls ps aux is reported", () => {
   const workflow = recoveryWorkflow().replace(
-    "pkill -9 -f 'bun run",
-    "pkill -9 -f litestream || pkill -9 -f 'bun run",
+    "for p in /proc/[0-9]*; do [ -r",
+    "ps aux; for p in /proc/[0-9]*; do [ -r",
   );
 
   expect(
     findRecoveryWorkflowProblems({ opsLive: workflow }).some((problem) =>
-      problem.includes("kills Litestream"),
+      problem.includes("calls ps aux"),
     ),
+  ).toBe(true);
+});
+
+test("a catalog reset that does not read the process list from /proc is reported", () => {
+  const workflow = recoveryWorkflow();
+  const diagnostics = readWorkflowStep(workflow, RESET_DIAGNOSTICS_STEP) ?? "";
+
+  const problems = findRecoveryWorkflowProblems({
+    opsLive: workflow.replace(diagnostics, diagnostics.replaceAll("/proc/", "/procX/")),
+  });
+
+  expect(problems.some((problem) => problem.includes("through /proc"))).toBe(true);
+});
+
+test("a catalog reset that still calls pkill is reported", () => {
+  const workflow = recoveryWorkflow();
+
+  const restart =
+    readWorkflowStep(workflow, "Restart overture-web onto an empty catalog database") ?? "";
+
+  const problems = findRecoveryWorkflowProblems({
+    opsLive: workflow.replace(restart, `${restart}\n          pkill -9 bun || true`),
+  });
+
+  expect(problems.some((problem) => problem.includes("calls pkill"))).toBe(true);
+});
+
+test("a catalog reset that never scans /proc for the Bun child is reported", () => {
+  const problems = findRecoveryWorkflowProblems({
+    opsLive: recoveryWorkflow().replaceAll("/proc/", "/procX/"),
+  });
+
+  expect(
+    problems.some((problem) => problem.includes("does not find the Bun child through /proc")),
   ).toBe(true);
 });
 

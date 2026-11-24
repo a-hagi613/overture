@@ -12,6 +12,7 @@ import {
   CATALOG_LATEST_KEY,
   CATALOG_MANIFEST_KEY,
   catalogSha256,
+  catalogSnapshotKey,
   compressCatalogSnapshot,
 } from "./stapply-refresh.ts";
 import type { CatalogManifest } from "./stapply-daily.ts";
@@ -76,6 +77,27 @@ async function publish(
 
 function companyNames(db: ReturnType<typeof createCatalogHotSwap>["db"]) {
   return db.all<{ name: string }>(sql`select name from companies`).map((row) => row.name);
+}
+
+function recorded(objects: ReturnType<typeof createDiskObjectStore>) {
+  const buffered: string[] = [];
+  const streamed: string[] = [];
+
+  const wrapped = {
+    ...objects,
+    get: async (key: string) => {
+      buffered.push(key);
+
+      return objects.get(key);
+    },
+    getStream: async (key: string) => {
+      streamed.push(key);
+
+      return objects.getStream(key);
+    },
+  };
+
+  return { buffered, objects: wrapped, streamed };
 }
 
 async function refusal(run: Promise<CatalogApplyResult>) {
@@ -340,6 +362,89 @@ describe("the read-only catalog hot-swap", () => {
 
       expectRefusal(failure, "invalid_manifest");
       expect(hotSwap.activeVersion()).toBeNull();
+    } finally {
+      hotSwap.close();
+    }
+  });
+
+  test("an adopted local catalog is replaced by a dated R2 snapshot", async () => {
+    const { catalogPath, directory } = scratch();
+    const objects = createDiskObjectStore(join(directory, "objects"));
+    buildCatalog(catalogPath, "Local");
+    const hotSwap = createCatalogHotSwap({ catalogPath, objects });
+
+    try {
+      await hotSwap.coldBoot();
+
+      expect(hotSwap.activeVersion()).toBe("local");
+      expect(companyNames(hotSwap.db)).toEqual(["Local"]);
+
+      const remote = buildCatalog(join(directory, "remote.sqlite"), "Remote");
+
+      await publish(objects, manifestFor("2026-11-24", remote), remote);
+
+      expect(await hotSwap.applyManifest(manifestFor("2026-11-24", remote))).toEqual({
+        applied: true,
+        version: "2026-11-24",
+        path: join(directory, "catalog.2026-11-24.sqlite"),
+      });
+      expect(hotSwap.activeVersion()).toBe("2026-11-24");
+      expect(companyNames(hotSwap.db)).toEqual(["Remote"]);
+    } finally {
+      hotSwap.close();
+    }
+  });
+
+  test("a corrupt artifact is refused, leaves no temp file and keeps the active catalog serving", async () => {
+    const { catalogPath, directory } = scratch();
+    const objects = createDiskObjectStore(join(directory, "objects"));
+    const first = buildCatalog(join(directory, "v1.sqlite"), "Alpha");
+
+    await publish(objects, manifestFor("2026-11-22", first), first);
+
+    const hotSwap = createCatalogHotSwap({ catalogPath, objects });
+
+    try {
+      await hotSwap.coldBoot();
+
+      await objects.put(CATALOG_LATEST_KEY, new TextEncoder().encode("not a zstd frame at all"));
+
+      const failure = await refusal(hotSwap.applyManifest(manifestFor("2026-11-23", first)));
+
+      expectRefusal(failure, "decompress_failed");
+      expect(hotSwap.activeVersion()).toBe("2026-11-22");
+      expect(companyNames(hotSwap.db)).toEqual(["Alpha"]);
+      expect(existsSync(join(directory, "catalog.2026-11-23.sqlite.tmp"))).toBe(false);
+      expect(existsSync(join(directory, "catalog.2026-11-23.sqlite"))).toBe(false);
+    } finally {
+      hotSwap.close();
+    }
+  });
+
+  test("a refresh reads the artifact as a stream and never buffers the compressed key", async () => {
+    const { catalogPath, directory } = scratch();
+    const objects = createDiskObjectStore(join(directory, "objects"));
+    const first = buildCatalog(join(directory, "v1.sqlite"), "Alpha");
+
+    await publish(objects, manifestFor("2026-11-22", first), first);
+
+    const records = recorded(objects);
+    const hotSwap = createCatalogHotSwap({ catalogPath, objects: records.objects });
+
+    try {
+      await hotSwap.coldBoot();
+
+      records.buffered.length = 0;
+      records.streamed.length = 0;
+
+      const second = buildCatalog(join(directory, "v2.sqlite"), "Beta");
+
+      await publish(objects, manifestFor("2026-11-23", second), second);
+      expect((await hotSwap.applyManifest(manifestFor("2026-11-23", second))).applied).toBe(true);
+
+      expect(records.streamed).toContain(CATALOG_LATEST_KEY);
+      expect(records.buffered).not.toContain(CATALOG_LATEST_KEY);
+      expect(records.buffered).not.toContain(catalogSnapshotKey("2026-11-23"));
     } finally {
       hotSwap.close();
     }

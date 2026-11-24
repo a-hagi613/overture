@@ -92,6 +92,7 @@ jobs:
           R2_BUCKET_FILES: ${{ secrets.R2_BUCKET_FILES }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           CATALOG_REFRESH_SECRET: ${{ secrets.CATALOG_REFRESH_SECRET }}
+          CATALOG_REFRESH_ORIGIN: https://overture-web.fly.dev
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CATALOG_LLM_MODEL: ${{ vars.CATALOG_LLM_MODEL || '' }}
         run: |

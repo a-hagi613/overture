@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -11,8 +11,11 @@ import { createCatalogHotSwap } from "../catalog/hot-swap.ts";
 import {
   CATALOG_LATEST_KEY,
   CATALOG_MANIFEST_KEY,
+  CATALOG_SIGNATURE_HEADER,
+  CATALOG_TIMESTAMP_HEADER,
   catalogRefreshHeaders,
   catalogSha256,
+  catalogSnapshotKey,
   compressCatalogSnapshot,
 } from "../catalog/stapply-refresh.ts";
 import type { CatalogManifest } from "../catalog/stapply-daily.ts";
@@ -24,6 +27,7 @@ import {
 import { openCatalogDatabase } from "../platform/db/client.ts";
 import { migrateCatalogDatabase } from "../platform/db/migrate.ts";
 import { createDiskObjectStore } from "../platform/ports/object-store.ts";
+import type { ObjectStore } from "../platform/ports/object-store.ts";
 import { companies } from "../platform/db/catalog-schema.ts";
 
 const NOW = 1_800_000_000_000;
@@ -62,11 +66,39 @@ function manifestFor(version: string, bytes: Uint8Array<ArrayBuffer>) {
   } satisfies CatalogManifest;
 }
 
-function setup() {
+function instrument(disk: ReturnType<typeof createDiskObjectStore>) {
+  const buffered: string[] = [];
+  const streamed: string[] = [];
+
+  const objects = {
+    ...disk,
+    get: async (key: string) => {
+      buffered.push(key);
+
+      return disk.get(key);
+    },
+    put: async (key: string, data: Uint8Array<ArrayBuffer>) => {
+      buffered.push(key);
+      await disk.put(key, data);
+    },
+    putStream: async (key: string, data: AsyncIterable<Uint8Array>) => {
+      streamed.push(key);
+
+      return disk.putStream(key, data);
+    },
+  } satisfies ObjectStore;
+
+  return { buffered, objects, streamed };
+}
+
+function setup(options: { instrument?: boolean } = {}) {
   const directory = mkdtempSync(join(tmpdir(), "catalog-refresh-"));
   scratchDirectories.push(directory);
 
-  const objects = createDiskObjectStore(join(directory, "objects"));
+  const disk = createDiskObjectStore(join(directory, "objects"));
+  const probe = options.instrument === true ? instrument(disk) : null;
+  const objects = probe?.objects ?? disk;
+  const stagingDir = join(directory, "staging");
   const hotSwap = createCatalogHotSwap({ catalogPath: join(directory, "catalog.sqlite"), objects });
 
   const app = new Hono();
@@ -78,10 +110,19 @@ function setup() {
       hotSwap,
       objects,
       secret: SECRET,
+      stagingDir,
     }),
   );
 
-  return { app, directory, hotSwap, objects };
+  return { app, directory, hotSwap, objects, probe, stagingDir };
+}
+
+function leftoverTempFiles(stagingDir: string) {
+  try {
+    return readdirSync(stagingDir).filter((name) => name.endsWith(".zst.tmp"));
+  } catch {
+    return [];
+  }
 }
 
 async function signedPost(
@@ -286,6 +327,110 @@ describe("PUT /internal/catalog/snapshot", () => {
     });
 
     expect(upload.status).toBe(401);
+
+    hotSwap.close();
+  });
+
+  test("streams a relay upload to R2 and leaves no staged temp file", async () => {
+    const { app, hotSwap, directory, probe, stagingDir } = setup({ instrument: true });
+    const bytes = buildCatalog(join(directory, "v1.sqlite"), "Alpha");
+    const compressed = compressCatalogSnapshot(bytes);
+
+    const upload = await app.request(CATALOG_SNAPSHOT_PATH, {
+      body: compressed,
+      headers: {
+        "content-type": "application/zstd",
+        "x-overture-catalog-version": "2026-11-22",
+        ...catalogRefreshHeaders(SECRET, NOW, catalogSha256(compressed)),
+      },
+      method: "PUT",
+    });
+
+    expect(upload.status).toBe(204);
+    expect(probe?.streamed).toContain(catalogSnapshotKey("2026-11-22"));
+    expect(probe?.streamed).toContain(CATALOG_LATEST_KEY);
+    expect(probe?.buffered).not.toContain(catalogSnapshotKey("2026-11-22"));
+    expect(probe?.buffered).not.toContain(CATALOG_LATEST_KEY);
+    expect(leftoverTempFiles(stagingDir)).toEqual([]);
+
+    hotSwap.close();
+  });
+
+  test("leaves no staged temp file when a relay upload is refused", async () => {
+    const { app, hotSwap, directory, stagingDir } = setup();
+    const compressed = compressCatalogSnapshot(buildCatalog(join(directory, "v1.sqlite"), "Alpha"));
+
+    const upload = await app.request(CATALOG_SNAPSHOT_PATH, {
+      body: compressed,
+      headers: { "content-type": "application/zstd", "x-overture-catalog-version": "2026-11-22" },
+      method: "PUT",
+    });
+
+    expect(upload.status).toBe(401);
+    expect(leftoverTempFiles(stagingDir)).toEqual([]);
+
+    hotSwap.close();
+  });
+
+  test("refuses a relay upload without a signature before creating the staging directory", async () => {
+    const { app, hotSwap, directory, stagingDir } = setup();
+    const compressed = compressCatalogSnapshot(buildCatalog(join(directory, "v1.sqlite"), "Alpha"));
+
+    const upload = await app.request(CATALOG_SNAPSHOT_PATH, {
+      body: compressed,
+      headers: {
+        "content-type": "application/zstd",
+        "x-overture-catalog-version": "2026-11-22",
+        [CATALOG_TIMESTAMP_HEADER]: String(NOW),
+      },
+      method: "PUT",
+    });
+
+    expect(upload.status).toBe(401);
+    expect(await upload.json()).toEqual({ error: "missing_signature" });
+    expect(existsSync(stagingDir)).toBe(false);
+
+    hotSwap.close();
+  });
+
+  test("refuses a relay upload without a timestamp before creating the staging directory", async () => {
+    const { app, hotSwap, directory, stagingDir } = setup();
+    const compressed = compressCatalogSnapshot(buildCatalog(join(directory, "v1.sqlite"), "Alpha"));
+
+    const upload = await app.request(CATALOG_SNAPSHOT_PATH, {
+      body: compressed,
+      headers: {
+        "content-type": "application/zstd",
+        "x-overture-catalog-version": "2026-11-22",
+        [CATALOG_SIGNATURE_HEADER]: "deadbeef",
+      },
+      method: "PUT",
+    });
+
+    expect(upload.status).toBe(401);
+    expect(await upload.json()).toEqual({ error: "missing_timestamp" });
+    expect(existsSync(stagingDir)).toBe(false);
+
+    hotSwap.close();
+  });
+
+  test("refuses a stale relay upload before creating the staging directory", async () => {
+    const { app, hotSwap, directory, stagingDir } = setup();
+    const compressed = compressCatalogSnapshot(buildCatalog(join(directory, "v1.sqlite"), "Alpha"));
+
+    const upload = await app.request(CATALOG_SNAPSHOT_PATH, {
+      body: compressed,
+      headers: {
+        "content-type": "application/zstd",
+        "x-overture-catalog-version": "2026-11-22",
+        ...catalogRefreshHeaders(SECRET, NOW - 10 * 60_000, catalogSha256(compressed)),
+      },
+      method: "PUT",
+    });
+
+    expect(upload.status).toBe(401);
+    expect(await upload.json()).toEqual({ error: "stale_timestamp" });
+    expect(existsSync(stagingDir)).toBe(false);
 
     hotSwap.close();
   });

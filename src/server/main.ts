@@ -1,7 +1,10 @@
+import { dirname } from "node:path";
+
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { createApp } from "./app.ts";
+import { CATALOG_SNAPSHOT_MAX_BYTES } from "./routes/internal-catalog.ts";
 import {
   assertMasterKeyCoverage,
   enqueueMasterKeyRotation,
@@ -1159,6 +1162,7 @@ const app = createApp({
   db,
   catalogDb,
   catalogHotSwap: catalogHotSwap ?? undefined,
+  catalogStagingDir: dirname(catalogDatabasePath),
   clock,
   databasePath,
   degraded: degradedFlag,
@@ -1186,7 +1190,7 @@ const app = createApp({
   shutdown: shutdownController.signal,
 });
 
-const SERVER_IDLE_TIMEOUT_ABOVE_SSE_HEARTBEAT_SECONDS = 60;
+const SERVER_IDLE_TIMEOUT_ABOVE_SSE_HEARTBEAT_SECONDS = 120;
 const SHUTDOWN_QUIET_GRACE_MS = 2000;
 const SHUTDOWN_HARD_EXIT_GRACE_MS = 1000;
 const SHUTDOWN_FLUSH_RESERVE_MS = 10_000;
@@ -1195,6 +1199,7 @@ const server = Bun.serve({
   port: env.PORT,
   fetch: async (request) => app.fetch(requestWithAbsoluteUrl(request)),
   idleTimeout: SERVER_IDLE_TIMEOUT_ABOVE_SSE_HEARTBEAT_SECONDS,
+  maxRequestBodySize: CATALOG_SNAPSHOT_MAX_BYTES,
 });
 
 process.stdout.write(`overture listening on ${String(server.port)}\n`);

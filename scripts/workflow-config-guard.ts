@@ -289,8 +289,18 @@ export function findRecoveryWorkflowProblems(input: RecoveryWorkflowInput) {
     }
   }
 
-  const diagnosticsAt = source.indexOf("ps aux");
+  const diagnosticsAt = source.indexOf("/data and the processes");
   const deleteAt = source.indexOf("rm -f /data/catalog.sqlite");
+
+  if (/\bps\s+aux\b/u.test(diagnostics)) {
+    problems.push(
+      "ops-live.yml reset-catalog calls ps aux; oven/bun:1.4.5-slim ships no procps, so list /proc instead",
+    );
+  }
+
+  if (!diagnostics.includes("/proc/")) {
+    problems.push("ops-live.yml reset-catalog does not list the processes through /proc");
+  }
 
   if (diagnosticsAt === -1) {
     problems.push("ops-live.yml reset-catalog does not show the volume and processes first");
@@ -302,11 +312,21 @@ export function findRecoveryWorkflowProblems(input: RecoveryWorkflowInput) {
     problems.push("ops-live.yml reset-catalog does not restart the app machine");
   }
 
-  if (!restart.includes("bun run /app/src/server/main.ts")) {
+  if (!restart.includes("/app/src/server/main.ts")) {
     problems.push("ops-live.yml reset-catalog does not kill only the hung Bun server");
   }
 
-  if (/pkill[^\n]*litestream/u.test(restart)) {
+  if (/\bpkill\b/u.test(restart)) {
+    problems.push(
+      "ops-live.yml reset-catalog calls pkill; oven/bun:1.4.5-slim ships no pkill, so scan /proc and send SIGKILL",
+    );
+  }
+
+  if (!restart.includes("/proc/")) {
+    problems.push("ops-live.yml reset-catalog does not find the Bun child through /proc");
+  }
+
+  if (/(?:pkill|killall|kill)[^\n]*litestream/iu.test(restart)) {
     problems.push("ops-live.yml reset-catalog kills Litestream; only the Bun child may be killed");
   }
 
