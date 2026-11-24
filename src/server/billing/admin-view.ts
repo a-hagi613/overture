@@ -7,6 +7,7 @@ import type { BillingDb } from "./ledger.ts";
 
 import { adminAudit, grants, profiles, users } from "../platform/db/schema.ts";
 import { balancesPerGrant } from "./ledger.ts";
+import type { MarginBaselineComparison, MarginReport } from "./margin.ts";
 import { REFUND_AUDIT_ACTION } from "./refunds.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -225,6 +226,50 @@ export function billingUsersPage(
 
 function displayName(name: string, email: string) {
   return name.trim() === "" ? email : name;
+}
+
+/** The admin margin page: the measured report plus the actual-versus-baseline comparison. */
+export interface MarginAdminView extends MarginReport {
+  comparison: MarginBaselineComparison[];
+}
+
+/**
+ * Puts the actual cost per Application beside what an Application earns net of
+ * Stripe's domestic fee on each paid plan, so the owner sees headroom or a loss
+ * without doing the arithmetic. The baselines are read from the report's own
+ * plan rows, so the page can never disagree with the table beside it.
+ * @param report The measured margin report.
+ * @returns The report plus one comparison row per paid plan baseline.
+ */
+export function marginAdminView(report: MarginReport) {
+  const actualMicrosPerApplication = report.actual?.totalMicrosPerApplication ?? null;
+
+  const comparison = (["month", "week"] as const).flatMap((plan) => {
+    const row = report.plans.find((candidate) => candidate.plan === plan);
+
+    if (row === undefined) {
+      return [];
+    }
+
+    return [
+      {
+        actualMicrosPerApplication,
+        applications: row.applications,
+        costShareOfNetRevenue:
+          actualMicrosPerApplication === null
+            ? null
+            : actualMicrosPerApplication / row.netRevenueMicrosPerApplication,
+        marginMicrosPerApplication:
+          actualMicrosPerApplication === null
+            ? null
+            : row.netRevenueMicrosPerApplication - actualMicrosPerApplication,
+        netRevenueMicrosPerApplication: row.netRevenueMicrosPerApplication,
+        plan,
+      } satisfies MarginBaselineComparison,
+    ];
+  });
+
+  return { ...report, comparison } satisfies MarginAdminView;
 }
 
 /**

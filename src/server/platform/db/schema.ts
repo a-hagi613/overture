@@ -796,6 +796,7 @@ export const grants = sqliteTable(
   (t) => [
     uniqueIndex("grants_stripe_invoice_id_unique").on(t.stripeInvoiceId),
     index("grants_user_starts").on(t.userId, t.startsAt),
+    index("grants_paying_subscribers").on(t.source, t.startsAt, t.expiresAt, t.userId),
   ],
 );
 
@@ -890,6 +891,10 @@ export const applications = sqliteTable(
     approvedPlanEnc: text("approved_plan_enc"),
     changes: text("changes"),
     sentAt: integer("sent_at"),
+    browserCostMicros: integer("browser_cost_micros").notNull().default(0),
+    retryCostMicros: integer("retry_cost_micros").notNull().default(0),
+    llmCostMicros: integer("llm_cost_micros").notNull().default(0),
+    costRecordedAt: integer("cost_recorded_at"),
     closedReason: text("closed_reason", {
       enum: ["rejected", "no_response", "withdrawn", "offer_declined", "offer_accepted", "other"],
     }),

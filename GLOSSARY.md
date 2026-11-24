@@ -296,6 +296,13 @@ completed Applications, completion rate, challenge and code rates, p50/p95 durat
 Application against the $0.03 gate — plus the synthetic lab's results per provider and lab page.
 _Avoid_: browser stats, vendor dashboard
 
+**Variable cost**:
+What one Application actually spent, kept on its row: the browser spend of the try that sent it, the browser spend of
+every other attempted try (the retries), and the person's Application-purpose model spend attributed to it, all in
+integer micros (ADR 0041). It is the per-Application record; the plan rows still report the monthly average of
+ADR 0026.
+_Avoid_: unit cost, true cost, all-in cost
+
 **Form probe**:
 The admin job that reads up to twenty open Personio forms over plain HTTP and records a result per form before the Personio kill switch is released: `readable`, an honest `needs_review` for a required custom question with no rule, `unreadable`, or `unsupported` for a control the flow cannot fill. It never submits.
 _Avoid_: test run, dry run, smoke test

@@ -83,7 +83,12 @@ spoofed MIME type cannot pass HTML as a resume), the
 billing webhook's transaction (a pause notice and the planner/prep jobs a resume queues commit with the Stripe event
 and roll back with it, a stale out-of-order failure cannot pause a paid user, a price Overture does not sell
 grants nothing, an older subscription event cannot regress a newer one, and `invoice.paid` promotes a failed status
-and wakes Home), the Stripe adapter's line choice (a basil invoice reads its subscription from
+and wakes Home), the per-Application variable cost (`application-cost.test.ts`: the sending try's browser spend is the
+base, every other attempted try lands in retry cost so a retry never double counts a send, a second refresh writes
+nothing, the person's Application-purpose model spend is split across their completed Applications without losing a
+micro, and only measured Applications inside the window are averaged, #570), the active paying-subscriber count
+(`budgets.test.ts`: overlapping paid periods count one person once, trial and admin grants never count, and the count
+is planned through the covering `grants_paying_subscribers` index rather than the grants table, #570), the Stripe adapter's line choice (a basil invoice reads its subscription from
 `parent.subscription_details` and a Week to Month proration reads the new plan's line), the checkout coordinator
 (concurrent double clicks share one Checkout Session and one Stripe idempotency key), the admin billing list (the
 owner's filter and page run in SQL and the stat counts agree with the page), the preparation status guard (a result

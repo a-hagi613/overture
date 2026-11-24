@@ -31,12 +31,14 @@ import {
 } from "../billing/ledger.ts";
 import { getSetting, isKillSwitchEnabled, setKillSwitch } from "../platform/settings/index.ts";
 import { raiseAlert } from "../platform/alerts.ts";
+import { logError } from "../platform/log.ts";
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import { localDayStart } from "../platform/local-time.ts";
 import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 import { ProviderUnavailableError, browserModeForAttempt } from "./browser/provider.ts";
 import { applySendProxyTrim } from "./browser/proxy-trim.ts";
+import { recordApplicationVariableCosts } from "./application-cost.ts";
 import { runAshbyAttempt } from "./ats/ashby.ts";
 import type { AshbyRun } from "./ats/ashby.ts";
 import { runGreenhouseAttempt } from "./ats/greenhouse.ts";
@@ -1121,6 +1123,12 @@ export function createDispatcher(deps: DispatcherDeps) {
         outcome: finished?.outcome ?? outcome,
         proxyBytes: usage.proxyBytes,
       });
+
+      try {
+        recordApplicationVariableCosts(db, { at: clock.now(), userId: claimed.userId });
+      } catch (error) {
+        logError("dispatch.cost", error);
+      }
     }
 
     return true;
