@@ -1,13 +1,15 @@
 import { request as apiRequest } from "@playwright/test";
 import { z } from "zod";
 
-import type { APIRequestContext, Browser } from "@playwright/test";
+import type { APIRequestContext, Browser, BrowserContext, Page } from "@playwright/test";
 
 import type { AppServer } from "./app-server.ts";
+import type { IdentityServer } from "./identity-server-test.fixture.ts";
 
 import { AxeBuilder } from "@axe-core/playwright";
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
+import { startIdentityServer } from "./identity-server-test.fixture.ts";
 import { latestMailLink, requestMagicLink } from "./sign-in.ts";
 
 const test = appTest.extend<{ pausedServer: AppServer }>({
@@ -199,54 +201,73 @@ for (const width of [1280, 390]) {
   }
 }
 
-test("every pause reason shows the drawn copy and one fix", async ({ browser, pausedServer }) => {
-  const request = await apiRequest.newContext({ baseURL: pausedServer.url });
+test.describe.serial("every pause reason", () => {
+  let identity: IdentityServer | undefined;
+  let appServer: AppServer | undefined;
+  let request: APIRequestContext;
+  let context: BrowserContext;
+  let page: Page;
 
-  await seedPausedHome(request, pausedServer.url);
-
-  const storageState = await request.storageState();
-
-  const context = await browser.newContext({
-    deviceScaleFactor: 1,
-    storageState,
-    viewport: { height: 1071, width: 1280 },
-  });
-
-  const page = await context.newPage();
-
-  await page.clock.setFixedTime(new Date(2026, 10, 17, 11, 0, 0));
-
-  async function checkReason(index: number) {
-    const entry: (typeof pauseReasons)[number] | undefined = pauseReasons[index];
-
-    if (entry === undefined) {
-      return;
+  function appServerUrl() {
+    if (appServer === undefined) {
+      throw new Error("The app server is not running.");
     }
 
-    await setPauseReason(request, entry.reason);
-    await page.goto(`${pausedServer.url}/home`);
-
-    await expect(page.getByText(entry.title).first()).toBeVisible();
-    await expect(page.getByText(entry.copy).first()).toBeVisible();
-
-    if (entry.href === null) {
-      await expect(page.getByRole("button", { name: entry.action })).toBeVisible();
-    } else {
-      await expect(page.getByRole("link", { name: entry.action })).toHaveAttribute(
-        "href",
-        entry.href,
-      );
-    }
-
-    const results = await new AxeBuilder({ page }).analyze();
-
-    expect(results.violations, entry.reason).toEqual([]);
-
-    await checkReason(index + 1);
+    return appServer.url;
   }
 
-  await checkReason(0);
+  test.beforeAll(async ({ browser }) => {
+    identity = await startIdentityServer();
+    appServer = await startFreshAppServer(identity);
 
-  await request.dispose();
-  await context.close();
+    request = await apiRequest.newContext({ baseURL: appServer.url });
+
+    await seedPausedHome(request, appServer.url);
+
+    const storageState = await request.storageState();
+
+    context = await browser.newContext({
+      deviceScaleFactor: 1,
+      storageState,
+      viewport: { height: 1071, width: 1280 },
+    });
+
+    page = await context.newPage();
+
+    await page.clock.setFixedTime(new Date(2026, 10, 17, 11, 0, 0));
+  });
+
+  test.afterAll(async () => {
+    await context.close();
+    await request.dispose();
+    await appServer?.stop();
+    await identity?.stop();
+  });
+
+  function pauseReasonTest(entry: (typeof pauseReasons)[number]) {
+    test(`pause reason ${entry.reason} shows the drawn copy and one fix`, async () => {
+      await setPauseReason(request, entry.reason);
+      await page.goto(`${appServerUrl()}/home`);
+
+      await expect(page.getByText(entry.title).first()).toBeVisible();
+      await expect(page.getByText(entry.copy).first()).toBeVisible();
+
+      if (entry.href === null) {
+        await expect(page.getByRole("button", { name: entry.action })).toBeVisible();
+      } else {
+        await expect(page.getByRole("link", { name: entry.action })).toHaveAttribute(
+          "href",
+          entry.href,
+        );
+      }
+
+      const results = await new AxeBuilder({ page }).analyze();
+
+      expect(results.violations, entry.reason).toEqual([]);
+    });
+  }
+
+  for (const entry of pauseReasons) {
+    pauseReasonTest(entry);
+  }
 });
