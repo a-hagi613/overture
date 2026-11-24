@@ -180,7 +180,7 @@ export async function readFormQuestions(page: Page, config: BrowserFormConfig) {
 
         const legend = element.closest("fieldset")?.querySelector("legend");
 
-        if (legend !== null) {
+        if (legend !== null && legend !== undefined) {
           return legend.textContent
             .replaceAll(/[*✱]/gu, "")
             .replaceAll(/\s+/gu, " ")
