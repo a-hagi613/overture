@@ -60,6 +60,8 @@ export const METRIC_ATTRIBUTE_NAMES = [
 
 export type MetricAttributes = Readonly<Record<string, string | number>>;
 
+const ALLOWED_METRIC_ATTRIBUTES = new Set<string>(METRIC_ATTRIBUTE_NAMES);
+
 /**
  * Whether an attribute must never become a metric label. It rejects the shared denylist plus the
  * identifiers WS-21 names explicitly: a user, a job, an email address or a raw URL would turn one
@@ -100,11 +102,11 @@ export function sanitizeMetricAttributes(attributes: MetricAttributes | undefine
   }
 
   for (const [key, value] of Object.entries(attributes)) {
-    if (isDeniedMetricAttribute(key)) {
+    if (isDeniedMetricAttribute(key) || !ALLOWED_METRIC_ATTRIBUTES.has(key)) {
       continue;
     }
 
-    clean[key.replaceAll(".", "_")] = value;
+    clean[key] = value;
   }
 
   return clean;
@@ -382,12 +384,6 @@ export class MetricsRecorder {
 
   setTagCoverageRatio(tier: string, ratio: number) {
     this.tagCoverageByTier.set(tier, Math.min(1, Math.max(0, ratio)));
-  }
-
-  /** Test seam: forget the sampled gauge values. */
-  resetSampledValues() {
-    this.queueDepthByKind.clear();
-    this.tagCoverageByTier.clear();
   }
 }
 

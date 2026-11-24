@@ -158,7 +158,7 @@ async function checkOpsHealth(context: SentinelContext) {
     key: "ops.thresholds",
     windowMs: FAILURE_REPEAT_MS,
     title: "Overture resources over their ceiling",
-    body: problems.join("; "),
+    body: `${problems.join("; ")}; see docs/runbooks/ops-resource-ceilings.md`,
     tags: "rotating_light",
   });
 

@@ -34,7 +34,8 @@ Every ten minutes it does three things:
    `METHOD\npath\ntimestamp`. It pages when RAM is above 80 %, NVMe `/data` above 75 %, event-loop
    lag p95 above 500 ms, or the last hour's ATS apply failure rate is above 30 % of at least five
    attempts. Without the secret the check is skipped and the three checks above behave exactly as
-   before, so a test environment without the secret keeps working.
+   before, so a test environment without the secret keeps working. The thresholds alert body points
+   at `docs/runbooks/ops-resource-ceilings.md`.
 
 The sentinel **never revokes the R2 token**. Revoking it would stop Litestream and lose the backups;
 ADR 0033 rejects that guard explicitly. R2 is bounded by design, lifecycle rules and these alerts.
