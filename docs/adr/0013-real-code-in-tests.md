@@ -129,7 +129,10 @@ filter changes stay under 500ms p95 while catalog writes run, #426), the unit-te
 allowlist (`lint-config-guard.test.ts`: every path the allowlist names exists, and every unit test file in `src/` or
 `scripts/` is named, so a deleted test cannot leave a stale entry), the design-token lint pattern
 (`design-scale-guard.test.ts`: every arbitrary `text-[…px]`/`text-[…rem]`, `text-lg`…`text-9xl` and off-scale
-spacing utility is rejected, while the nine typography tokens, the 4px scale and layout widths pass), the live topic
+spacing utility is rejected, while the nine typography tokens, the 4px scale and layout widths pass), the theme boot
+CSP hash (`src/shared/security-headers.test.ts`: the inline boot script in `index.html` hashes to the SHA-256 admitted
+by the app's `script-src` and the marketing `_headers`, so the landing is themed without an origin request and a policy
+edit cannot drift from the file), the live topic
 map and the billing poll cap (`src/web/lib/live-events.test.ts` and `src/web/lib/billing-poll.test.ts`: every
 dedicated topic — billing, mailbox and profile — refreshes its own queries while its older alias keeps working, and
 the Checkout-return poll stops when the plan arrives, when the page was not a Checkout return, or at its cap), and

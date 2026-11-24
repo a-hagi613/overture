@@ -356,6 +356,51 @@ test("crossing to the desktop layout closes the phone More sheet and frees the p
   await request.dispose();
 });
 
+test("closing stacked sheets gives scrolling back to the page", async ({ uiServer, browser }) => {
+  const request = await apiRequest.newContext({ baseURL: uiServer.url });
+  const userId = await seedBoardOwner(request, uiServer.url);
+
+  await seedTrackerBoard(request, userId);
+
+  const storageState = await request.storageState();
+  const context = await browser.newContext({ storageState, viewport: { height: 844, width: 390 } });
+  const page = await context.newPage();
+
+  await page.goto(`${uiServer.url}/board`);
+
+  const card = page.locator('section[aria-label="Applied"] button[data-card]').first();
+
+  await card.click();
+
+  const sheet = page.locator(SHEET);
+
+  await expect(sheet).toBeVisible();
+
+  await page.goBack();
+  await expect(sheet).toHaveCount(0);
+
+  await page.getByRole("button", { exact: true, name: copy.nav.profilePages.mobileMore }).click();
+
+  const navSheet = page.locator('dialog[aria-labelledby="mobile-nav-sheet-title"]');
+
+  await expect(navSheet).toBeVisible();
+
+  await page.goForward();
+  await expect(sheet).toBeVisible();
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
+
+  await page.setViewportSize({ height: 900, width: 1280 });
+  await expect(navSheet).toHaveCount(0);
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
+
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
+
+  await context.close();
+  await request.dispose();
+});
+
 test("a toast raised while the board sheet is open stays in the top layer and its Undo works", async ({
   uiServer,
   browser,

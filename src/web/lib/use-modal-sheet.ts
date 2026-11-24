@@ -6,6 +6,27 @@ import { registerTopLayerHost } from "./top-layer-host.ts";
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+let openSheetCount = 0;
+let savedOverflow: string | null = null;
+
+function lockBodyScroll() {
+  if (openSheetCount === 0) {
+    savedOverflow = globalThis.document.body.style.overflow;
+    globalThis.document.body.style.overflow = "hidden";
+  }
+
+  openSheetCount += 1;
+
+  return () => {
+    openSheetCount -= 1;
+
+    if (openSheetCount === 0 && savedOverflow !== null) {
+      globalThis.document.body.style.overflow = savedOverflow;
+      savedOverflow = null;
+    }
+  };
+}
+
 interface ModalSheetOptions {
   focusSelector?: string;
   scrollLock?: boolean;
@@ -32,11 +53,7 @@ export function useModalSheet(
     }
 
     const opener = globalThis.document.activeElement;
-    const previousOverflow = globalThis.document.body.style.overflow;
-
-    if (scrollLock) {
-      globalThis.document.body.style.overflow = "hidden";
-    }
+    const unlockScroll = scrollLock ? lockBodyScroll() : null;
 
     if (!node.open) {
       node.showModal();
@@ -91,9 +108,7 @@ export function useModalSheet(
         node.close();
       }
 
-      if (scrollLock) {
-        globalThis.document.body.style.overflow = previousOverflow;
-      }
+      unlockScroll?.();
 
       if (opener instanceof HTMLElement) {
         opener.focus();
