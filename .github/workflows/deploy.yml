@@ -185,6 +185,9 @@ jobs:
         if: steps.guard.outputs.skip != 'true'
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Set up flyctl (superfly/flyctl-actions/setup-flyctl @ master @ 98172f7)
+        if: steps.guard.outputs.skip != 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
       - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
         if: steps.guard.outputs.skip != 'true'
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
@@ -203,9 +206,58 @@ jobs:
       - name: Install dependencies
         if: steps.guard.outputs.skip != 'true'
         run: bun install --frozen-lockfile
-      - name: Build the marketing assets and app
+      # The Worker serves the prerendered page together with the app's `/assets/*` bundle, so it must ship the HTML of
+      # the release that is now live on Fly, not a second build of the same commit: `.dockerignore` gives the Docker
+      # build context a different set of files for Tailwind to scan, which changed the CSS and cascaded into a
+      # different `main-*.js` hash. The Worker's HTML referenced a `main-*.js` that only existed in its own build, the
+      # origin answered 404, and the landing never hydrated (blank live count, frozen hero counter). Extract the build
+      # from the machine instead, and fail loudly rather than ship HTML whose assets the origin does not have.
+      - name: Sync dist-marketing from the deployed overture-web machine
         if: steps.guard.outputs.skip != 'true'
-        run: bun run build
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          rm -rf dist-marketing
+          # flyctl prints its own connection text (for example "Connecting to fdaa:…") on stdout, which corrupts a raw
+          # gzip stream fed to tar. `-q` silences that progress, and the archive travels base64-encoded between
+          # sentinel markers so only the payload lines can ever reach `tar`: a stray notice is discarded, and a
+          # missing frame or corrupt payload fails the job instead of shipping half a page.
+          begin_marker=OVERTURE-TAR-BEGIN
+          end_marker=OVERTURE-TAR-END
+          archive="$(mktemp)"
+          status=0
+          # A hung SSH console must not hold the deploy-main concurrency group for six hours.
+          timeout 180s flyctl ssh console -q -a overture-web -C \
+            "printf '%s\n' '${begin_marker}'; tar -czf - -C /app dist-marketing | base64; printf '%s\n' '${end_marker}'" \
+            > "$archive" || status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "::error::Could not extract /app/dist-marketing from overture-web (exit $status); the marketing Worker ships prerendered HTML, so refusing to deploy without it."
+            exit 1
+          fi
+          if [ ! -s "$archive" ]; then
+            echo "::error::flyctl returned nothing while extracting /app/dist-marketing; refusing to deploy HTML that cannot hydrate."
+            exit 1
+          fi
+          status=0
+          awk -v begin="$begin_marker" -v end="$end_marker" '
+            $0 == begin { inside = 1; started = 1; next }
+            $0 == end { inside = 0; closed = 1; next }
+            inside { print }
+            END { if (!started || !closed) exit 3 }
+          ' "$archive" | base64 -d | tar -xzf - || status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "::error::The archive from overture-web was not a clean base64 tar stream (exit $status); refusing to deploy, because stray flyctl output must never reach tar."
+            exit 1
+          fi
+          if [ ! -f dist-marketing/index.html ] || ! grep -q '<div id="root">' dist-marketing/index.html; then
+            echo "::error::/app/dist-marketing/index.html is missing or not a prerendered page on overture-web; refusing to deploy HTML that cannot hydrate."
+            exit 1
+          fi
+          echo "synced $(find dist-marketing -type f | wc -l) file(s) from overture-web"
+      - name: Verify the synced marketing assets answer from the Fly release (before the Worker ships)
+        if: steps.guard.outputs.skip != 'true'
+        run: bun run scripts/verify-marketing-assets.ts --dir dist-marketing --base https://overture-web.fly.dev
       - name: Deploy the inbound mail Worker
         if: steps.guard.outputs.skip != 'true'
         working-directory: workers/inbound-mail
@@ -222,6 +274,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: bunx wrangler deploy
+      - name: Verify the live landing hydrates from the Fly release (after the Worker ships)
+        if: steps.guard.outputs.skip != 'true'
+        # Cloudflare can serve the previous deployment for a few seconds after `wrangler deploy`, so retry.
+        run: bun run scripts/verify-marketing-assets.ts --dir dist-marketing --base https://tryoverture.com --attempts 5
       - name: Deploy the sentinel Worker
         if: steps.guard.outputs.skip != 'true'
         working-directory: workers/sentinel

@@ -184,6 +184,8 @@
           "scripts/lint-config-guard.test.ts",
           "scripts/ops-live-stripe.test.ts",
           "scripts/setup-stripe.test.ts",
+          "scripts/tailwind-source-scope.test.ts",
+          "scripts/verify-marketing-assets.test.ts",
           "scripts/vacuum-app-db.test.ts",
           "scripts/vacuum-fly.test.ts",
           "scripts/workflow-config-guard.test.ts",

@@ -501,6 +501,23 @@ const WORKER_DEPLOYS: readonly WorkerDeploy[] = [
   { name: "Deploy the sentinel Worker", directory: "workers/sentinel", keepVars: true },
 ];
 
+/**
+ * The step that copies the running Fly release's `dist-marketing` into the job. The Worker's page and the origin's
+ * `/assets/*` bundle must come from one build: rebuilding the same commit in this job produced a different
+ * `main-*.js` hash (`.dockerignore` changes what Tailwind scans), every landing asset 404'd and React never hydrated.
+ */
+export const MARKETING_SYNC_STEP = "Sync dist-marketing from the deployed overture-web machine";
+
+/** The check that the freshly synced page's assets exist on the release that will serve them. */
+export const MARKETING_PRE_DEPLOY_VERIFY_STEP =
+  "Verify the synced marketing assets answer from the Fly release (before the Worker ships)";
+
+/** The check that the live zone serves the deployed page's assets after the Worker ships. */
+export const MARKETING_POST_DEPLOY_VERIFY_STEP =
+  "Verify the live landing hydrates from the Fly release (after the Worker ships)";
+
+const FLYCTL_SETUP_SHA = "98172f70657cb3e15db199af139be99bd3e61200";
+
 function readJobBlock(source: string, name: string) {
   const marker = `\n  ${name}:`;
   const start = source.indexOf(marker);
@@ -517,8 +534,9 @@ function readJobBlock(source: string, name: string) {
 
 /**
  * Checks the deploy workflow ships the three Cloudflare Workers without wiping dashboard-set values or leaking the
- * API token. A deploy that forgot `--keep-vars` would erase the owner's forwarding address and alert topic, and one
- * that deployed the marketing Worker before the build would ship a missing `dist-marketing` directory.
+ * API token, and that the marketing Worker ships the Fly release's own prerendered page instead of a second build.
+ * A deploy that forgot `--keep-vars` would erase the owner's forwarding address and alert topic; one that rebuilt the
+ * marketing assets hashed `/assets/main-*.js` differently than the origin serving it, so every landing asset 404'd.
  * @param input The deploy workflow source.
  * @returns Every rule the deploy workflow breaks, empty when it is safe.
  */
@@ -567,14 +585,125 @@ export function findWorkersDeployProblems(input: WorkersDeployInput) {
     }
   }
 
-  const buildAt = job.indexOf("bun run build");
   const marketingAt = job.indexOf("      - name: Deploy the marketing Worker");
+  const syncAt = job.indexOf(`      - name: ${MARKETING_SYNC_STEP}`);
+  const preVerifyAt = job.indexOf(`      - name: ${MARKETING_PRE_DEPLOY_VERIFY_STEP}`);
+  const postVerifyAt = job.indexOf(`      - name: ${MARKETING_POST_DEPLOY_VERIFY_STEP}`);
 
-  if (buildAt === -1) {
-    problems.push("deploy-workers does not run bun run build, so dist-marketing is missing");
-  } else if (marketingAt !== -1 && buildAt > marketingAt) {
+  if (job.includes("bun run build")) {
     problems.push(
-      "deploy-workers deploys the marketing Worker before the build writes dist-marketing",
+      "deploy-workers runs bun run build; the marketing page must come from the Fly release, because a second build hashes /assets/main-*.js differently than the origin serving it",
+    );
+  }
+
+  if (!job.includes(`superfly/flyctl-actions/setup-flyctl@${FLYCTL_SETUP_SHA}`)) {
+    problems.push(
+      "deploy-workers does not set up flyctl, so it cannot extract dist-marketing from the deployed machine",
+    );
+  }
+
+  const sync = readWorkflowStep(job, MARKETING_SYNC_STEP);
+
+  if (sync === null) {
+    problems.push(
+      "deploy-workers does not sync dist-marketing from the deployed Fly machine, so the marketing page can drift from the release serving its assets",
+    );
+  } else {
+    if (!sync.includes("flyctl ssh console") || !sync.includes("-a overture-web")) {
+      problems.push("deploy-workers does not extract dist-marketing from the overture-web machine");
+    }
+
+    const sshLine = sync.split("\n").find((line) => line.includes("flyctl ssh console")) ?? "";
+
+    if (!/\s(?:-q|--quiet)\b/u.test(sshLine)) {
+      problems.push(
+        "deploy-workers runs flyctl ssh console without -q, so its connection text lands on stdout and corrupts the extracted archive",
+      );
+    }
+
+    if (!sync.includes("OVERTURE-TAR-BEGIN") || !sync.includes("OVERTURE-TAR-END")) {
+      problems.push(
+        "deploy-workers does not frame the synced archive between sentinel markers, so stray flyctl output can reach tar",
+      );
+    }
+
+    if (!sync.includes("base64 -d") || !sync.includes("tar -xzf -")) {
+      problems.push(
+        "deploy-workers does not decode the framed base64 archive into tar, so binary-safe extraction is gone",
+      );
+    }
+
+    if (/flyctl ssh console[^\n]*\|[^\n]*tar -xzf/u.test(sync)) {
+      problems.push(
+        "deploy-workers pipes flyctl stdout straight into tar, so any connection text corrupts the archive",
+      );
+    }
+
+    if (!sync.includes("dist-marketing")) {
+      problems.push("deploy-workers never writes dist-marketing while syncing from Fly");
+    }
+
+    if (!sync.includes("exit 1")) {
+      problems.push(
+        "deploy-workers continues without dist-marketing instead of failing loudly, so stale HTML could ship",
+      );
+    }
+  }
+
+  if (preVerifyAt === -1) {
+    problems.push(
+      "deploy-workers does not verify the synced marketing assets before deploying the Worker",
+    );
+  }
+
+  if (postVerifyAt === -1) {
+    problems.push(
+      "deploy-workers does not verify the live landing's assets after deploying the Worker",
+    );
+  }
+
+  if (marketingAt !== -1) {
+    for (const [name, at] of [
+      [MARKETING_SYNC_STEP, syncAt],
+      [MARKETING_PRE_DEPLOY_VERIFY_STEP, preVerifyAt],
+    ] as const) {
+      if (at > marketingAt) {
+        problems.push(
+          `deploy-workers deploys the marketing Worker before "${name}", so the page can ship without its assets`,
+        );
+      }
+    }
+
+    if (postVerifyAt !== -1 && postVerifyAt < marketingAt) {
+      problems.push(
+        "deploy-workers checks the live landing before it deploys the marketing Worker, so it verifies the previous page",
+      );
+    }
+  }
+
+  const preVerify = readWorkflowStep(job, MARKETING_PRE_DEPLOY_VERIFY_STEP) ?? "";
+  const postVerify = readWorkflowStep(job, MARKETING_POST_DEPLOY_VERIFY_STEP) ?? "";
+
+  for (const [name, step, base] of [
+    [MARKETING_PRE_DEPLOY_VERIFY_STEP, preVerify, "https://overture-web.fly.dev"],
+    [MARKETING_POST_DEPLOY_VERIFY_STEP, postVerify, "https://tryoverture.com"],
+  ] as const) {
+    if (!step.includes("scripts/verify-marketing-assets.ts")) {
+      problems.push(`deploy-workers runs "${name}" without scripts/verify-marketing-assets.ts`);
+    }
+
+    if (!step.includes(`--base ${base}`)) {
+      problems.push(`deploy-workers runs "${name}" against a base other than ${base}`);
+    }
+
+    if (!step.includes("--dir dist-marketing")) {
+      problems.push(`deploy-workers runs "${name}" without the synced dist-marketing directory`);
+    }
+  }
+
+  if (postVerify !== "" && !postVerify.includes("--attempts")) {
+    problems.push(
+      "deploy-workers checks the live landing without retrying, so a slow Cloudflare rollout fails a good deploy",
     );
   }
 
@@ -584,6 +713,12 @@ export function findWorkersDeployProblems(input: WorkersDeployInput) {
 
   if (!job.includes(`CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}`)) {
     problems.push("deploy-workers does not pass CLOUDFLARE_ACCOUNT_ID from the repository secrets");
+  }
+
+  if (!job.includes(`FLY_API_TOKEN: \${{ secrets.FLY_API_TOKEN }}`)) {
+    problems.push(
+      "deploy-workers does not pass FLY_API_TOKEN, so it cannot read the deployed page",
+    );
   }
 
   const printsToken = job

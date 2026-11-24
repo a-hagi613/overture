@@ -8,6 +8,9 @@ import {
   findRecoveryWorkflowProblems,
   findVacuumWorkflowProblems,
   findWorkersDeployProblems,
+  MARKETING_POST_DEPLOY_VERIFY_STEP,
+  MARKETING_PRE_DEPLOY_VERIFY_STEP,
+  MARKETING_SYNC_STEP,
   readBunVersions,
   readWorkflowStep,
 } from "./workflow-config-guard.ts";
@@ -497,6 +500,20 @@ function workersDeployWorkflow() {
   return readFileSync(".github/workflows/deploy.yml", "utf8");
 }
 
+function workersStepBlock(source: string, name: string) {
+  const marker = `      - name: ${name}`;
+  const start = source.indexOf(marker);
+
+  if (start === -1) {
+    return "";
+  }
+
+  const rest = source.slice(start + marker.length);
+  const end = rest.search(/^ {6}- /mu);
+
+  return end === -1 ? source.slice(start) : source.slice(start, start + marker.length + end);
+}
+
 test("the shipped deploy workflow ships the three Cloudflare Workers safely", () => {
   expect(findWorkersDeployProblems({ deploy: workersDeployWorkflow() })).toStrictEqual([]);
 });
@@ -558,19 +575,184 @@ test("a deploy workflow that drops --keep-vars on the sentinel Worker is reporte
   ).toBe(true);
 });
 
-test("a deploy workflow that deploys marketing before the build is reported", () => {
-  const deploy = workersDeployWorkflow();
-  const build = readWorkflowStep(deploy, "Build the marketing assets and app") ?? "";
-  const withoutBuild = deploy.replace(build, "");
+test("a deploy workflow that rebuilds the marketing assets instead of syncing them is reported", () => {
+  const deploy = workersDeployWorkflow().replace(
+    "      - name: Sync dist-marketing from the deployed overture-web machine",
+    "      - name: Build the marketing assets and app",
+  );
 
-  const reordered = withoutBuild.replace(
+  expect(
+    findWorkersDeployProblems({ deploy }).some((problem) => problem.includes("bun run build")),
+  ).toBe(false);
+
+  const rebuilding = deploy.replace(
+    "        run: |\n          set -euo pipefail\n          rm -rf dist-marketing",
+    "        run: bun run build\n          set -euo pipefail\n          rm -rf dist-marketing",
+  );
+
+  expect(
+    findWorkersDeployProblems({ deploy: rebuilding }).some(
+      (problem) => problem.includes("bun run build") && problem.includes("/assets/main-*.js"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that does not sync dist-marketing from Fly is reported", () => {
+  const deploy = workersDeployWorkflow().replace(
+    `      - name: ${MARKETING_SYNC_STEP}`,
+    "      - name: Copy the marketing directory",
+  );
+
+  expect(
+    findWorkersDeployProblems({ deploy }).some((problem) =>
+      problem.includes("does not sync dist-marketing from the deployed Fly machine"),
+    ),
+  ).toBe(true);
+});
+
+test("a sync that can continue without the extracted page is reported", () => {
+  const deploy = workersDeployWorkflow();
+  const sync = readWorkflowStep(deploy, MARKETING_SYNC_STEP) ?? "";
+
+  expect(sync).not.toBe("");
+
+  const withoutFailLoud = deploy.replace(sync, sync.replaceAll("exit 1", "true"));
+
+  expect(
+    findWorkersDeployProblems({ deploy: withoutFailLoud }).some((problem) =>
+      problem.includes("stale HTML could ship"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that skips the flyctl setup cannot extract the page and is reported", () => {
+  const deploy = workersDeployWorkflow().replaceAll(
+    "superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200",
+    "superfly/flyctl-actions/setup-flyctl@master",
+  );
+
+  expect(
+    findWorkersDeployProblems({ deploy }).some((problem) =>
+      problem.includes("does not set up flyctl"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that drops -q from flyctl ssh console is reported", () => {
+  const deploy = workersDeployWorkflow().replace(
+    "flyctl ssh console -q -a overture-web",
+    "flyctl ssh console -a overture-web",
+  );
+
+  expect(
+    findWorkersDeployProblems({ deploy }).some((problem) => problem.includes("without -q")),
+  ).toBe(true);
+});
+
+test("a deploy workflow that drops the sentinel framing around the archive is reported", () => {
+  const deploy = workersDeployWorkflow().replaceAll("OVERTURE-TAR-BEGIN", "unframed");
+  const problems = findWorkersDeployProblems({ deploy });
+
+  expect(problems.some((problem) => problem.includes("sentinel markers"))).toBe(true);
+
+  expect(
+    findWorkersDeployProblems({
+      deploy: workersDeployWorkflow().replaceAll("OVERTURE-TAR-END", "unframed"),
+    }).some((problem) => problem.includes("sentinel markers")),
+  ).toBe(true);
+});
+
+test("a deploy workflow that stops decoding the base64 archive is reported", () => {
+  const deploy = workersDeployWorkflow().replace("| base64 -d | tar -xzf -", "| tar -xzf -");
+
+  expect(
+    findWorkersDeployProblems({ deploy }).some((problem) =>
+      problem.includes("binary-safe extraction"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that pipes flyctl straight into tar is reported", () => {
+  const deploy = workersDeployWorkflow().replace(
+    '          archive="$(mktemp)"',
+    `          archive="$(mktemp)"
+          flyctl ssh console -q -a overture-web -C "tar -czf - -C /app dist-marketing" | tar -xzf -`,
+  );
+
+  expect(
+    findWorkersDeployProblems({ deploy }).some((problem) =>
+      problem.includes("pipes flyctl stdout straight into tar"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that syncs the page after the marketing deploy is reported", () => {
+  const deploy = workersDeployWorkflow();
+  const sync = workersStepBlock(deploy, MARKETING_SYNC_STEP);
+  const withoutSync = deploy.replace(sync, "");
+
+  const reordered = withoutSync.replace(
     "      - name: Deploy the sentinel Worker",
-    `${build}      - name: Deploy the sentinel Worker`,
+    `${sync}      - name: Deploy the sentinel Worker`,
   );
 
   expect(
     findWorkersDeployProblems({ deploy: reordered }).some((problem) =>
-      problem.includes("before the build"),
+      problem.includes('before "Sync dist-marketing'),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that deploys the marketing Worker before verifying its assets is reported", () => {
+  const deploy = workersDeployWorkflow();
+  const verify = workersStepBlock(deploy, MARKETING_PRE_DEPLOY_VERIFY_STEP);
+  const withoutVerify = deploy.replace(verify, "");
+
+  const reordered = withoutVerify.replace(
+    "      - name: Deploy the sentinel Worker",
+    `${verify}      - name: Deploy the sentinel Worker`,
+  );
+
+  expect(
+    findWorkersDeployProblems({ deploy: reordered }).some((problem) =>
+      problem.includes("deploys the marketing Worker before"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that does not verify the live landing after the deploy is reported", () => {
+  const deploy = workersDeployWorkflow().replace(
+    `      - name: ${MARKETING_POST_DEPLOY_VERIFY_STEP}`,
+    "      - name: Done",
+  );
+
+  expect(
+    findWorkersDeployProblems({ deploy }).some((problem) =>
+      problem.includes("after deploying the Worker"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that verifies the wrong origin in either direction is reported", () => {
+  const deploy = workersDeployWorkflow();
+
+  const swapped = deploy
+    .replace("--base https://overture-web.fly.dev", "--base https://tryoverture.com")
+    .replace(
+      "--base https://tryoverture.com --attempts",
+      "--base https://overture-web.fly.dev --attempts",
+    );
+
+  const problems = findWorkersDeployProblems({ deploy: swapped });
+
+  expect(
+    problems.some((problem) =>
+      problem.includes("against a base other than https://overture-web.fly.dev"),
+    ),
+  ).toBe(true);
+  expect(
+    problems.some((problem) =>
+      problem.includes("against a base other than https://tryoverture.com"),
     ),
   ).toBe(true);
 });
