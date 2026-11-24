@@ -78,13 +78,14 @@ const shellPaths = new Set([
   "*",
 ]);
 
-const redirectedPaths = new Map(
-  [
+const redirectedPaths = new Map<string, string>([
+  ["/onboarding", "/onboarding/resume"],
+  ...[
     ...routeSource.matchAll(
       /path:\s*"(?<from>[^"]+)"[^}]*?<(?:Navigate replace|PreserveSearchRedirect)\s+to="(?<to>[^"#]+)/gu,
     ),
-  ].map((match) => [match.groups?.from ?? "", match.groups?.to ?? ""]),
-);
+  ].map((match) => [match.groups?.from ?? "", match.groups?.to ?? ""] as const),
+]);
 
 const FONT_SETTLE_TIMEOUT_MS = 5000;
 

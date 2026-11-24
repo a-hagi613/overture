@@ -4,11 +4,7 @@ import { toast } from "sonner";
 import { OnboardingLoadState } from "../components/onboarding-load-state.tsx";
 import { OnboardingResumeCard } from "../components/onboarding-resume-card.tsx";
 import { OnboardingShell } from "../components/onboarding-shell.tsx";
-import {
-  useFinishOnboardingStep,
-  useOnboardingState,
-  useUploadOnboardingResume,
-} from "../lib/onboarding-api.ts";
+import { useOnboardingState, useUploadOnboardingResume } from "../lib/onboarding-api.ts";
 
 export function OnboardingResumePage() {
   const navigate = useNavigate();
@@ -17,7 +13,6 @@ export function OnboardingResumePage() {
   const suffix = preview ? "?preview=1" : "";
   const { data: state, isFetching, isPending, refetch } = useOnboardingState();
   const upload = useUploadOnboardingResume();
-  const finish = useFinishOnboardingStep();
 
   return (
     <OnboardingShell step={2}>
@@ -31,14 +26,10 @@ export function OnboardingResumePage() {
         />
       ) : (
         <OnboardingResumeCard
-          backTo={`/onboarding${suffix}`}
+          backTo="/home"
           error={upload.isError && !preview}
           onContinue={async () => {
-            if (!preview) {
-              await finish.mutateAsync(2);
-            }
-
-            await navigate(`/onboarding/facts${suffix}`);
+            await navigate(`/onboarding/targets${suffix}`);
           }}
           onUpload={(file) => {
             upload.mutate(file, {

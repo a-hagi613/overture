@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { and, eq, inArray } from "drizzle-orm";
 import { validJson } from "./validators.ts";
 
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
@@ -8,9 +9,13 @@ import { readSessionUser } from "../auth/session.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
+import type { MatchingService } from "../matching/score.ts";
 import type { SpendGate } from "../billing/spend.ts";
 
 import { retryWhenBusy } from "../platform/db/busy.ts";
+import { applicationsLeft } from "../billing/ledger.ts";
+import { postingUserState } from "../platform/db/schema.ts";
+import { postings } from "../platform/db/catalog-schema.ts";
 import { startOnboarding } from "../profile/onboarding-start.ts";
 import { createConsentService } from "../profile/consent.ts";
 import { createLanguagesService } from "../profile/languages.ts";
@@ -28,8 +33,12 @@ import { env, masterKeyring } from "../config/env.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { isDemoRole } from "../../shared/demo.ts";
 import {
+  ONBOARDING_MATCH_PICK_LIMIT,
   ONBOARDING_STEP_COUNT,
+  onboardingCurrentEmployerInputSchema,
   onboardingFactsInputSchema,
+  onboardingMatchSelectionInputSchema,
+  onboardingPrepareInputSchema,
   onboardingTimezoneInputSchema,
 } from "../../shared/onboarding.ts";
 import { targetsInputSchema } from "../../shared/targets.ts";
@@ -53,6 +62,7 @@ export function createOnboardingRoutes(deps: {
   personal?: PersonalCrypto | undefined;
   reviews: ReviewService;
   spendGate?: SpendGate | undefined;
+  matching: MatchingService;
 }) {
   const { db, clock, auth, llm, objects, reviews: reviewService } = deps;
 
@@ -156,6 +166,59 @@ export function createOnboardingRoutes(deps: {
     };
   }
 
+  function savedPostingIds(userId: string) {
+    return db
+      .select({ postingId: postingUserState.postingId })
+      .from(postingUserState)
+      .where(and(eq(postingUserState.userId, userId), eq(postingUserState.state, "saved")))
+      .all()
+      .map((row) => row.postingId);
+  }
+
+  async function matchesView(userId: string) {
+    const preview = await deps.matching.preview(userId, 9);
+    const saved = savedPostingIds(userId);
+    const available = new Set(preview.items.map((item) => item.id));
+
+    return {
+      matches: preview.items,
+      pickLimit: ONBOARDING_MATCH_PICK_LIMIT,
+      poolCount: preview.poolCount,
+      selected: saved.filter((id) => available.has(id)),
+    };
+  }
+
+  function saveSelection(userId: string, postingIds: readonly string[]) {
+    const unique = [...new Set(postingIds)];
+
+    if (unique.length > 0) {
+      const open = deps.catalogDb
+        .select({ id: postings.id })
+        .from(postings)
+        .where(and(inArray(postings.id, unique), eq(postings.status, "open")))
+        .all()
+        .map((row) => row.id);
+
+      if (open.length !== unique.length) {
+        return null;
+      }
+    }
+
+    db.transaction((tx) => {
+      tx.delete(postingUserState)
+        .where(and(eq(postingUserState.userId, userId), eq(postingUserState.state, "saved")))
+        .run();
+
+      for (const postingId of unique) {
+        tx.insert(postingUserState)
+          .values({ userId, postingId, state: "saved", updatedAt: clock.now() })
+          .run();
+      }
+    });
+
+    return unique;
+  }
+
   const routes = new Hono();
 
   routes.get("/onboarding", async (context) => {
@@ -198,6 +261,107 @@ export function createOnboardingRoutes(deps: {
     return context.json(await view(account));
   });
 
+  routes.get("/onboarding/matches", async (context) => {
+    const account = await readSessionUser(auth, context.req.raw.headers);
+
+    if (account === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    context.header("Cache-Control", "no-store");
+
+    return context.json(await matchesView(account.id));
+  });
+
+  routes.put(
+    "/onboarding/matches",
+    validJson(onboardingMatchSelectionInputSchema),
+    async (context) => {
+      const account = await readSessionUser(auth, context.req.raw.headers);
+
+      if (account === null) {
+        return context.json({ error: API_ERRORS.signInRequired }, 401);
+      }
+
+      const state = await progress.read(account.id);
+
+      if (state.onboardedAt !== null) {
+        return context.json({ error: "already_onboarded" }, 409);
+      }
+
+      const saved = saveSelection(account.id, context.req.valid("json").postingIds);
+
+      if (saved === null) {
+        return context.json({ error: API_ERRORS.notFound }, 404);
+      }
+
+      context.header("Cache-Control", "no-store");
+
+      return context.json(await matchesView(account.id));
+    },
+  );
+
+  routes.post(
+    "/onboarding/current-employer",
+    validJson(onboardingCurrentEmployerInputSchema),
+    async (context) => {
+      const account = await readSessionUser(auth, context.req.raw.headers);
+
+      if (account === null) {
+        return context.json({ error: API_ERRORS.signInRequired }, 401);
+      }
+
+      await skipCompanies.setCurrentEmployer(account.id, context.req.valid("json").name);
+
+      return context.json(await view(account));
+    },
+  );
+
+  routes.post("/onboarding/prepare", validJson(onboardingPrepareInputSchema), async (context) => {
+    const account = await readSessionUser(auth, context.req.raw.headers);
+
+    if (account === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    if (!account.emailVerified) {
+      return context.json({ error: "email_unverified" }, 403);
+    }
+
+    const locked = demoLocked(account.role);
+
+    if (locked !== null) {
+      return locked;
+    }
+
+    const consentState = consent.read(account.id);
+
+    if (consentState.accepted?.version !== consentState.current.version) {
+      return context.json({ error: "consent_required" }, 409);
+    }
+
+    if (applicationsLeft(db, account.id, clock.now()) <= 0) {
+      return context.json({ error: "trial_required" }, 402);
+    }
+
+    const postingIds = [...new Set(context.req.valid("json").postingIds)];
+
+    if (postingIds.length === 0) {
+      return context.json({ error: "selection_required" }, 409);
+    }
+
+    await retryWhenBusy(() => startOnboarding(db, clock, account.id), "onboarding.start");
+
+    const prepared = await deps.matching.prepareChosen(
+      account.id,
+      postingIds.slice(0, ONBOARDING_MATCH_PICK_LIMIT),
+    );
+
+    context.header("Cache-Control", "no-store");
+
+    return context.json({ onboarding: await view(account), prepared: prepared.length });
+  });
+
   routes.post("/onboarding/:step", async (context) => {
     const account = await readSessionUser(auth, context.req.raw.headers);
 
@@ -217,6 +381,10 @@ export function createOnboardingRoutes(deps: {
 
     if (finished === 2 && (await resumes.current(account.id)) === null) {
       return context.json({ error: "resume_required" }, 409);
+    }
+
+    if (finished === 3 && savedPostingIds(account.id).length === 0) {
+      return context.json({ error: "selection_required" }, 409);
     }
 
     await progress.finish(account.id, finished);

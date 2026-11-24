@@ -240,11 +240,10 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
       await expect(page.getByRole("heading", { level: 1, name: "Contact Support" })).toBeVisible();
 
       const previewSteps = [
-        { heading: /Welcome/u, path: "/onboarding?preview=1" },
         { heading: /Resume/u, path: "/onboarding/resume?preview=1" },
-        { heading: /Your info/u, path: "/onboarding/facts?preview=1" },
         { heading: /Job preferences/u, path: "/onboarding/targets?preview=1" },
-        { heading: /Mail forwarding/u, path: "/onboarding/forward?preview=1" },
+        { heading: /Your matches/u, path: "/onboarding/matches?preview=1" },
+        { heading: /Verify a card/u, path: "/onboarding/trial?preview=1" },
       ] as const;
 
       await inSequence(previewSteps, async (step) => {

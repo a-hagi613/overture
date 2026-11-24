@@ -185,14 +185,14 @@ publicTest.describe("public sign-up with spend protection", () => {
       const link = await latestMailLink(publicUrl, page.request, NEW_EMAIL);
 
       await page.goto(link);
-      await expect(page.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
+      await expect(page.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
 
       const state = onboardingSchema.parse(
         await (await page.request.get(`${publicUrl}/api/onboarding`)).json(),
       );
 
       expect(state.needsOnboarding).toBe(true);
-      expect(state.step).toBe(1);
+      expect(state.step).toBe(2);
 
       const home = homeSchema.parse(await (await page.request.get(`${publicUrl}/api/home`)).json());
 
@@ -226,7 +226,7 @@ publicTest.describe("public sign-up with spend protection", () => {
       await setTurnstileScenario(request, publicUrl, { action: "signin" });
       await page.goto(`${publicUrl}/signin`);
       await page.getByRole("button", { name: "Continue with Google" }).click();
-      await expect(page.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
+      await expect(page.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
 
       const state = await verifyAuthState(publicUrl, request);
 

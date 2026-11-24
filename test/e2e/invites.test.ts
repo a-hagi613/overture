@@ -111,7 +111,7 @@ test("an invited email joins by magic link, gets one grant of 300, and cannot be
   ).not.toContain(guestEmail);
 
   await signInByMagicLink(page, appUrl, page.request, guestEmail);
-  await expect(page.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
   await page.goto(`${appUrl}/home`);
   await expect(
     page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
@@ -140,7 +140,7 @@ test("an invited email joins by magic link, gets one grant of 300, and cannot be
   expect(grants[0]?.source).toBe("admin");
 
   await signInByMagicLink(page, appUrl, page.request, guestEmail);
-  await expect(page.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
   await page.goto(`${appUrl}/home`);
   await expect(
     page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
@@ -183,7 +183,7 @@ test("an invite is accepted by Google and by LinkedIn, each granting 300 once", 
   await identityServer.setPersona(guestPersona("google-guest", googleEmail));
   await page.goto(`${appUrl}/signin`);
   await page.getByRole("button", { name: "Continue with Google" }).click();
-  await expect(page.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
   await page.goto(`${appUrl}/home`);
   await expect(
     page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
@@ -197,7 +197,7 @@ test("an invite is accepted by Google and by LinkedIn, each granting 300 once", 
   await identityServer.setPersona(guestPersona("linkedin-guest", linkedInEmail));
   await linkedInPage.goto(`${appUrl}/signin`);
   await linkedInPage.getByRole("button", { name: "Continue with LinkedIn" }).click();
-  await expect(linkedInPage.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
+  await expect(linkedInPage.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
   await linkedInPage.goto(`${appUrl}/home`);
   await expect(
     linkedInPage.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
@@ -292,7 +292,7 @@ test("a suspended user cannot sign in", async ({
   await identityServer.setPersona(guestPersona("suspended-google", suspendedEmail));
   await page.goto(`${appUrl}/signin`);
   await page.getByRole("button", { name: "Continue with Google" }).click();
-  await expect(page.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
 
   const signedIn = await verifyAuthState(appUrl, request);
   const guest = signedIn.users.find((user) => user.email === suspendedEmail);

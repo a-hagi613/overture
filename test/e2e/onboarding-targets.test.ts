@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { request as apiRequest } from "@playwright/test";
 import { z } from "zod";
 
@@ -100,6 +102,18 @@ test("choices come from open Postings, the count follows them, and the browser z
   await page.getByLabel("Minimum salary").fill("120,000");
   await page.getByLabel("Minimum salary").blur();
 
+  const uploaded = await request.post("/api/profile/resume", {
+    multipart: {
+      file: {
+        buffer: Buffer.from(readFileSync("test/e2e/fixtures/resume-text.pdf")),
+        mimeType: "application/pdf",
+        name: "resume.pdf",
+      },
+    },
+  });
+
+  expect(uploaded.status()).toBe(201);
+
   await expect
     .poll(async () =>
       settingsSchema.parse(await (await request.get("/api/profile/settings")).json()),
@@ -127,11 +141,11 @@ test("choices come from open Postings, the count follows them, and the browser z
 
   await page.getByRole("button", { name: "Continue" }).click();
 
-  await expect(page).toHaveURL(/\/onboarding\/forward$/u);
+  await expect(page).toHaveURL(/\/onboarding\/matches$/u);
 
   const state = stateSchema.parse(await (await request.get("/api/onboarding")).json());
 
-  expect(state.step).toBe(5);
+  expect(state.step).toBe(3);
 
   await context.close();
   await request.dispose();

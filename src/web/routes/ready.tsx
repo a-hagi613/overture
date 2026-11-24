@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { copy } from "../../shared/copy.ts";
 import { READY_DWELL_MAX_MS } from "../../shared/ready-approval.ts";
 import { PageHeader } from "../components/page-header.tsx";
+import { PostApprovalCard } from "../components/post-approval-card.tsx";
 import { ReadyApprovedList } from "../components/ready-approved-list.tsx";
 import { ReadyCard } from "../components/ready-card.tsx";
 import { ReadyConfirmDialog } from "../components/ready-confirm-dialog.tsx";
@@ -565,6 +566,8 @@ export function ReadyPage() {
           ) : null}
         </section>
       ) : null}
+
+      {approvedCards.length > 0 ? <PostApprovalCard /> : null}
 
       {approvedCards.length > 0 ? (
         <ReadyApprovedList

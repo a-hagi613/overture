@@ -1,10 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
-import type { OnboardingFactsInput, OnboardingTargetsView } from "../../shared/onboarding.ts";
+import type { OnboardingTargetsView } from "../../shared/onboarding.ts";
 import type { TargetsInput } from "../../shared/targets.ts";
 
-import { SALARY_PERIOD_WORDS } from "../../shared/onboarding.ts";
 import { EMPLOYMENT_TYPES, SENIORITIES, WORKPLACES } from "../../shared/tag-taxonomy.ts";
 import { targetsInputSchema } from "../../shared/targets.ts";
 import { saveSkipCompanies } from "./profile-api.ts";
@@ -35,37 +34,6 @@ const onboardingStateSchema = z.object({
   step: z.number(),
 });
 
-const onboardingFactsSchema = z.object({
-  answers: z.object({
-    eeo: z.object({
-      disability: z.string(),
-      enabled: z.boolean(),
-      ethnicity: z.string(),
-      gender: z.string(),
-      veteran: z.string(),
-    }),
-    hear: z.string(),
-    jobTitle: z.string(),
-    salary: z.array(
-      z.object({
-        amount: z.string(),
-        currency: z.string(),
-        period: z.enum(SALARY_PERIOD_WORDS),
-      }),
-    ),
-    workAuth: z.record(z.string(), z.string()),
-  }),
-  countries: z.array(z.object({ code: z.string(), name: z.string() })),
-  currencies: z.array(z.string()),
-  unlocks: z.object({
-    eeo: z.number(),
-    hear: z.number(),
-    jobTitle: z.number(),
-    salary: z.number(),
-    workAuth: z.number(),
-  }),
-});
-
 const onboardingTargetsSchema: z.ZodType<OnboardingTargetsView> = z.object({
   choices: z.object({
     employmentTypes: z.array(z.enum(EMPLOYMENT_TYPES)),
@@ -86,11 +54,37 @@ const timezoneSavedSchema = z.object({
   timezone: z.string().nullable(),
 });
 
+const onboardingMatchSchema = z.object({
+  company: z.string(),
+  employmentType: z.string(),
+  id: z.string(),
+  location: z.string().nullable(),
+  reason: z.string().nullable(),
+  salaryCurrency: z.string().nullable(),
+  salaryMinMinor: z.number().nullable(),
+  salaryPeriod: z.enum(["year", "month", "hour"]).nullable(),
+  score: z.number(),
+  strong: z.boolean(),
+  title: z.string(),
+  why: z.array(z.string()),
+  workplace: z.string(),
+});
+
+const onboardingMatchesSchema = z.object({
+  matches: z.array(onboardingMatchSchema),
+  pickLimit: z.number(),
+  poolCount: z.number(),
+  selected: z.array(z.string()),
+});
+
+const prepareResultSchema = z.object({
+  onboarding: onboardingStateSchema,
+  prepared: z.number(),
+});
+
 export type OnboardingState = z.infer<typeof onboardingStateSchema>;
 
 export const stateKey = ["onboarding-state"] as const;
-
-export const factsKey = ["onboarding-facts"] as const;
 
 export const targetsKey = ["onboarding-targets"] as const;
 
@@ -124,22 +118,6 @@ export async function uploadOnboardingResume(file: File) {
   );
 }
 
-export async function fetchOnboardingFacts() {
-  return onboardingFactsSchema.parse(await jsonFrom(await fetch("/api/onboarding/facts")));
-}
-
-export async function saveOnboardingFacts(input: OnboardingFactsInput) {
-  return onboardingFactsSchema.parse(
-    await jsonFrom(
-      await fetch("/api/onboarding/facts", {
-        body: JSON.stringify(input),
-        headers: { "content-type": "application/json" },
-        method: "PUT",
-      }),
-    ),
-  );
-}
-
 export async function fetchOnboardingTargets() {
   return onboardingTargetsSchema.parse(await jsonFrom(await fetch("/api/onboarding/targets")));
 }
@@ -168,6 +146,52 @@ export async function saveOnboardingTimezone(timezone: string) {
   );
 }
 
+export type OnboardingMatches = z.infer<typeof onboardingMatchesSchema>;
+
+export type OnboardingMatchView = z.infer<typeof onboardingMatchSchema>;
+
+export const matchesKey = ["onboarding-matches"] as const;
+
+export async function fetchOnboardingMatches() {
+  return onboardingMatchesSchema.parse(await jsonFrom(await fetch("/api/onboarding/matches")));
+}
+
+export async function saveOnboardingMatches(postingIds: string[]) {
+  return onboardingMatchesSchema.parse(
+    await jsonFrom(
+      await fetch("/api/onboarding/matches", {
+        body: JSON.stringify({ postingIds }),
+        headers: { "content-type": "application/json" },
+        method: "PUT",
+      }),
+    ),
+  );
+}
+
+export async function saveCurrentEmployer(name: string) {
+  return onboardingStateSchema.parse(
+    await jsonFrom(
+      await fetch("/api/onboarding/current-employer", {
+        body: JSON.stringify({ name }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      }),
+    ),
+  );
+}
+
+export async function prepareOnboarding(postingIds: string[]) {
+  return prepareResultSchema.parse(
+    await jsonFrom(
+      await fetch("/api/onboarding/prepare", {
+        body: JSON.stringify({ postingIds }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      }),
+    ),
+  );
+}
+
 export function useOnboardingState() {
   return useQuery({ queryFn: fetchOnboardingState, queryKey: stateKey, retry: 1 });
 }
@@ -183,31 +207,13 @@ export function useFinishOnboardingStep() {
   });
 }
 
-export function useOnboardingFacts() {
-  return useQuery({ queryFn: fetchOnboardingFacts, queryKey: factsKey, retry: 1 });
-}
-
 export function useUploadOnboardingResume() {
   const client = useQueryClient();
 
   return useMutation({
     mutationFn: uploadOnboardingResume,
     onSuccess: async () => {
-      await Promise.all([
-        client.invalidateQueries({ queryKey: stateKey }),
-        client.invalidateQueries({ queryKey: factsKey }),
-      ]);
-    },
-  });
-}
-
-export function useSaveOnboardingFacts() {
-  const client = useQueryClient();
-
-  return useMutation({
-    mutationFn: saveOnboardingFacts,
-    onSuccess: (view) => {
-      client.setQueryData(factsKey, view);
+      await client.invalidateQueries({ queryKey: stateKey });
     },
   });
 }
@@ -252,7 +258,59 @@ export function useSaveOnboardingSkipCompanies() {
         client.invalidateQueries({ queryKey: ["profile-skip-companies"] }),
         client.invalidateQueries({ queryKey: stateKey }),
         client.invalidateQueries({ queryKey: targetsKey }),
+        client.invalidateQueries({ queryKey: matchesKey }),
         client.invalidateQueries({ queryKey: ["home"] }),
+      ]);
+    },
+  });
+}
+
+export function useSaveCurrentEmployer() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: saveCurrentEmployer,
+    onSuccess: async (state) => {
+      client.setQueryData(stateKey, state);
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["profile-skip-companies"] }),
+        client.invalidateQueries({ queryKey: targetsKey }),
+        client.invalidateQueries({ queryKey: matchesKey }),
+        client.invalidateQueries({ queryKey: ["home"] }),
+      ]);
+    },
+  });
+}
+
+export function useOnboardingMatches() {
+  return useQuery({ queryFn: fetchOnboardingMatches, queryKey: matchesKey, retry: 1 });
+}
+
+export function useSaveOnboardingMatches() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: saveOnboardingMatches,
+    onSuccess: (view) => {
+      client.setQueryData(matchesKey, view);
+    },
+  });
+}
+
+export function usePrepareOnboarding() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: prepareOnboarding,
+    onSuccess: async ({ onboarding }) => {
+      client.setQueryData(stateKey, onboarding);
+      await Promise.all([
+        client.invalidateQueries({ queryKey: stateKey }),
+        client.invalidateQueries({ queryKey: ["home"] }),
+        client.invalidateQueries({ queryKey: ["nav"] }),
+        client.invalidateQueries({ queryKey: ["ready"] }),
+        client.invalidateQueries({ queryKey: ["board"] }),
+        client.invalidateQueries({ queryKey: ["billing"] }),
       ]);
     },
   });

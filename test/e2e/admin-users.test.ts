@@ -67,7 +67,7 @@ test("the owner invites, grants and suspends a person from the admin", async ({
   await expect(page.getByText("Never signed in")).toBeVisible();
 
   await signInByMagicLink(page, appUrl, page.request, guestEmail);
-  await expect(page.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
 
   const state = await verifyAuthState(appUrl, page.request);
   const guest = state.users.find((user) => user.email === guestEmail);

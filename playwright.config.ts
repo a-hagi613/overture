@@ -129,6 +129,10 @@ export default defineConfig({
       },
     },
     {
+      name: "onboarding-matches-boards",
+      testMatch: /board-match-onboarding-matches\.test\.ts/u,
+    },
+    {
       name: "onboarding-resume-boards",
       testMatch: /board-match-onboarding-resume\.test\.ts/u,
       expect: {
