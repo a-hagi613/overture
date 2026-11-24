@@ -354,8 +354,10 @@ The webhook endpoint is `https://tryoverture.com/webhooks/stripe` and subscribes
 `customer.created`, `customer.updated`, `invoice.paid`, `invoice.payment_failed`, and `customer.subscription.created`,
 `customer.subscription.updated` and `customer.subscription.deleted`. Each delivery is verified against
 `Stripe-Signature` and claimed once in `stripe_events`, so a retry is a no-op. Refunds are not a webhook: the admin
-refund path writes the ledger row in the same transaction as the Stripe refund, and the daily reconciliation compares
-Stripe's invoices and refunds with the ledger, so a `charge.refunded` delivery would add no state and the endpoint does
+refund asks Stripe for the refund first, then records the refunded grant, its ledger row and its audit entry in one
+local transaction; a crash between those two steps leaves a Stripe refund with no local record, which the daily
+reconciliation reports as `refund_without_ledger` rather than losing silently. Because the reconciliation compares
+Stripe's invoices and refunds with the ledger, a `charge.refunded` delivery would add no state and the endpoint does
 not subscribe to it. The billing portal configuration cancels at period end, updates payment
 methods, shows invoice history and switches a subscription between the Week and Month prices with
 `proration_behavior=none`; it returns to `https://tryoverture.com/profile/billing` and links the site's privacy and

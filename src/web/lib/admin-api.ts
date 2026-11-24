@@ -104,6 +104,13 @@ export const overviewSchema = z.object({
     warnedAt: z.number().nullable(),
     reserveRefusedAt: z.number().nullable(),
     refusedAt: z.number().nullable(),
+    baseCap: z.number(),
+    perSubscriber: z.number(),
+    subscribers: z.number(),
+    warningAt: z.number(),
+    warningShare: z.number(),
+    capReached: z.boolean(),
+    reserveReached: z.boolean(),
   }),
   audit: z.array(auditRowSchema),
 });
@@ -1265,6 +1272,7 @@ export const llmUsageCapsSchema = z.object({
   monthlySpendCapMicros: z.number().nullable(),
   taggingDailyCapMicros: z.number(),
   userDailyCapMicros: z.number(),
+  subscriberUserDailyCapMicros: z.number(),
 });
 
 export const llmUsageResponseSchema = z.object({

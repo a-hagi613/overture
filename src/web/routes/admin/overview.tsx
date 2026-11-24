@@ -27,11 +27,11 @@ function gateState(cost: Overview["cost"]) {
 }
 
 function mailStopNote(mail: Overview["mail"]) {
-  if (mail.refusedAt !== null) {
+  if (mail.capReached) {
     return copy.admin.overviewMailRefused;
   }
 
-  return mail.reserveRefusedAt === null ? null : copy.admin.overviewMailReservePaused;
+  return mail.reserveReached ? copy.admin.overviewMailReservePaused : null;
 }
 
 export function OverviewPage() {

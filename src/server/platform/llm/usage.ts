@@ -4,7 +4,7 @@ import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 import { llmUsage } from "../db/schema.ts";
 import { getSetting } from "../settings/index.ts";
-import { llmDayBudget } from "./budget.ts";
+import { llmDayBudget, llmSubscriberUserDayBudgetMicros } from "./budget.ts";
 
 export const DAY_MS = 86_400_000;
 
@@ -276,6 +276,7 @@ export function readAdminLlmUsage(db: AppDatabase, clock: Clock, query: AdminLlm
       subscribers: dailyBudget.subscribers,
       monthlySpendCapMicros,
       userDailyCapMicros: parseUsdSettingMicros(db, "llm.cap_user_day_usd"),
+      subscriberUserDailyCapMicros: llmSubscriberUserDayBudgetMicros(db),
       taggingDailyCapMicros: parseUsdSettingMicros(db, "llm.cap_tagging_day_usd"),
     },
   };

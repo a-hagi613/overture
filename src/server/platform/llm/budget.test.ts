@@ -10,6 +10,7 @@ import {
   DEFAULT_SPEND_ALERT_RATIO,
   llmDayBudget,
   llmSpendAlertRatio,
+  llmSubscriberUserDayBudgetMicros,
   llmUserDayBudgetMicros,
 } from "./budget.ts";
 
@@ -153,4 +154,8 @@ test("scaling clamps negative inputs instead of shrinking a budget", () => {
   expect(scaledBudget(-5, 300_000, 2)).toBe(600_000);
   expect(scaledBudget(10_000_000, -1, 2)).toBe(10_000_000);
   expect(scaledBudget(10_000_000, 300_000, -2)).toBe(10_000_000);
+});
+
+test("the paying subscriber's user budget is reported beside the invited-user base", () => {
+  expect(llmSubscriberUserDayBudgetMicros(memoryDatabase())).toBe(500_000);
 });

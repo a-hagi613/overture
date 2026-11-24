@@ -90,11 +90,22 @@ export function llmDayBudgetMicros(db: AppDatabase, at: number) {
  * @returns The budget in micros.
  */
 export function llmUserDayBudgetMicros(db: AppDatabase, userId: string, at: number) {
-  const baseMicros = capMicros(db, "llm.cap_user_day_usd");
-
   return isPayingSubscriber(db, userId, at)
-    ? baseMicros + settingMicros(db, "llm.cap_subscriber_user_day_usd")
-    : baseMicros;
+    ? llmSubscriberUserDayBudgetMicros(db)
+    : capMicros(db, "llm.cap_user_day_usd");
+}
+
+/**
+ * The daily budget a paying subscriber's own calls get: the invited-user base
+ * plus the subscriber share. It is what the admin LLM page shows beside the
+ * base, whether or not a particular person is paying right now.
+ * @param db The application database.
+ * @returns The budget in micros.
+ */
+export function llmSubscriberUserDayBudgetMicros(db: AppDatabase) {
+  return (
+    capMicros(db, "llm.cap_user_day_usd") + settingMicros(db, "llm.cap_subscriber_user_day_usd")
+  );
 }
 
 /**

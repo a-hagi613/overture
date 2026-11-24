@@ -77,6 +77,8 @@ export interface MailBudget {
   /** The most the month may spend on notices, leaving the reserve untouched. */
   noticeLimit: number;
   warningAt: number;
+  /** The share of the cap at which the owner is warned. */
+  warningShare: number;
 }
 
 export interface MailSendDecision {
@@ -142,6 +144,7 @@ export function mailBudget(db: Pick<AppDatabase, "select">, atMs: number) {
     reserve,
     subscribers,
     warningAt: Math.ceil(cap * warningShare),
+    warningShare,
   };
 }
 
@@ -163,8 +166,25 @@ export function readMailUsage(db: Pick<AppDatabase, "select">, month: string) {
   };
 }
 
+/**
+ * The month's counter and budget, plus whether each stop is in force *now*.
+ * The stored stamps record the first refusal of the month; a cap raised by a
+ * new paying subscriber lifts the stop, so the overview reads the live counts
+ * against the current budget rather than the stamps.
+ * @param db The application database.
+ * @param atMs The instant to read the month and the budget at.
+ * @returns The usage, the budget and the two live stop flags.
+ */
 export function readMailSummary(db: Pick<AppDatabase, "select">, atMs: number) {
-  return { ...readMailUsage(db, monthKey(atMs)), ...mailBudget(db, atMs) };
+  const usage = readMailUsage(db, monthKey(atMs));
+  const budget = mailBudget(db, atMs);
+
+  return {
+    ...usage,
+    ...budget,
+    capReached: usage.total >= budget.cap,
+    reserveReached: usage.total >= budget.noticeLimit && usage.total < budget.cap,
+  };
 }
 
 function limitReason(budget: MailBudget, usage: MailUsage, category: MailCategory) {

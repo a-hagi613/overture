@@ -24,6 +24,10 @@ export function PlanCards({ rows }: { rows: MarginPlanRow[] }) {
             {copy.admin.marginShortCost} {costLabel(row)}
             {copy.admin.marginSeparator}
             {copy.admin.marginShortRevenue} {formatUsd(row.netRevenueMicrosPerApplication, 3)}
+            {" · "}
+            {copy.admin.marginInternational(
+              formatUsd(row.internationalNetRevenueMicrosPerApplication, 3),
+            )}
           </p>
           <p className="mt-1 text-sm">
             {copy.admin.marginShortMargin} {marginLabel(row)}

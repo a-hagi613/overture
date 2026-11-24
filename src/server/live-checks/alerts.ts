@@ -268,7 +268,7 @@ export function evaluateAlerts(db: AppDatabase, clock: Clock, metrics: AlertMetr
   const spendCeilingRatio = llmSpendAlertRatio(db);
 
   const overSpend = metrics.llmSpend.filter(
-    (entry) => entry.capMicros > 0 && entry.spentMicros > entry.capMicros * spendCeilingRatio,
+    (entry) => entry.capMicros > 0 && entry.spentMicros >= entry.capMicros * spendCeilingRatio,
   );
 
   const [firstOverSpend] = overSpend;

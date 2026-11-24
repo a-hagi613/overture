@@ -125,3 +125,16 @@ test("the admin sets the alert share", () => {
     sqlite.close();
   }
 });
+
+test("a full-share alert fires when spend reaches the budget exactly", () => {
+  const { db, sqlite } = freshDatabase();
+
+  try {
+    setSetting(db, clock, "llm.spend_alert_ratio", "1", "test");
+
+    expect(llmSpendRaised(db, 9_900_000)).toBe(false);
+    expect(llmSpendRaised(db, 10_000_000)).toBe(true);
+  } finally {
+    sqlite.close();
+  }
+});

@@ -44,6 +44,11 @@ export function PlanTable({ rows }: { rows: MarginPlanRow[] }) {
               <td className="px-4 py-5 tabular-nums">{costLabel(row)}</td>
               <td className="px-4 py-5 tabular-nums">
                 {formatUsd(row.netRevenueMicrosPerApplication, 3)}
+                <span className="block text-xs text-muted-foreground">
+                  {copy.admin.marginInternational(
+                    formatUsd(row.internationalNetRevenueMicrosPerApplication, 3),
+                  )}
+                </span>
               </td>
               <td className="px-4 py-5 tabular-nums">{marginLabel(row)}</td>
               <td className="px-4 py-5">

@@ -2634,6 +2634,7 @@ export const copy = {
     marginSeparator: " · ",
     marginShortCost: "Cost",
     marginShortRevenue: "Net revenue",
+    marginInternational: (amount: string) => `Intl ${amount}`,
     marginShortMargin: "Margin",
     marginGateOver: (gate: string) => `Over ${gate}`,
     marginGateUnder: (gate: string) => `Under ${gate}`,
@@ -2966,8 +2967,8 @@ export const copy = {
     llmStatCacheHint: (cached: string, input: string) =>
       `${cached} cached of ${input} input tokens`,
     llmStatCacheEmpty: "No input tokens recorded yet",
-    llmCapsFootnote: (userCap: string, taggingCap: string) =>
-      `Per-user daily cap: ${userCap} · Tagging daily cap: ${taggingCap}`,
+    llmCapsFootnote: (userCap: string, subscriberCap: string, taggingCap: string) =>
+      `Per-user daily cap: ${userCap} (${subscriberCap} while a paid period runs) · Tagging daily cap: ${taggingCap}`,
     llmUnexpectedHeading: "Unexpected Anthropic model detected",
     llmUnexpectedBody: (expected: string, models: string) =>
       `Configured model is ${expected}, but recorded calls used ${models}. Verify ANTHROPIC_MODEL and pricing rows before spend grows.`,

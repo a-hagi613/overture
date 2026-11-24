@@ -333,3 +333,17 @@ test("a budget raised by paid growth no longer halts a paying subscriber's mail"
 
   expect(reserveMailSend(db, clock, "auth").reason).toBeNull();
 });
+
+test("a cap raised by a new paying subscriber lifts the live stop flags", () => {
+  const db = memoryDatabase();
+
+  db.insert(mailUsage)
+    .values({ month: monthKey(AT), noticeSends: 2700 })
+    .run();
+
+  expect(readMailSummary(db, AT)).toMatchObject({ capReached: true, reserveReached: false });
+
+  addGrant(db, "paying", "period");
+
+  expect(readMailSummary(db, AT)).toMatchObject({ cap: 2950, capReached: false });
+});
