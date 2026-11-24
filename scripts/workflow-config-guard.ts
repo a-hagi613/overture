@@ -518,6 +518,33 @@ export const MARKETING_POST_DEPLOY_VERIFY_STEP =
 
 const FLYCTL_SETUP_SHA = "98172f70657cb3e15db199af139be99bd3e61200";
 
+const REMOTE_SHELL_SYNTAX = /[;|&]/u;
+
+/**
+ * Every command handed to `flyctl ssh console -C` in a workflow step, in the exact text `flyctl` receives. The
+ * machine's SSH server word-splits that string with shell-like quoting and then execs the first word, so it never
+ * interprets `;`, `|` or `&&`: a multi-statement command has to travel as one `sh -c '…'` word instead.
+ * @param step The workflow step source, continuations included.
+ * @returns The `-C`/`--command` payloads in source order.
+ */
+export function flyctlRemoteCommands(step: string) {
+  const flattened = step.replaceAll(/\\\r?\n\s*/gu, " ");
+  const commands: string[] = [];
+
+  for (const match of flattened.matchAll(
+    /flyctl ssh console\b[^"'\n]*?(?:\s-C|\s--command)\s+(?:"(?<doubleQuoted>(?:[^"\\]|\\.)*)"|'(?<singleQuoted>[^']*)'|(?<bare>\S+))/gu,
+  )) {
+    const command =
+      match.groups?.["doubleQuoted"] ?? match.groups?.["singleQuoted"] ?? match.groups?.["bare"];
+
+    if (command !== undefined) {
+      commands.push(command);
+    }
+  }
+
+  return commands;
+}
+
 function readJobBlock(source: string, name: string) {
   const marker = `\n  ${name}:`;
   const start = source.indexOf(marker);
@@ -613,7 +640,11 @@ export function findWorkersDeployProblems(input: WorkersDeployInput) {
       problems.push("deploy-workers does not extract dist-marketing from the overture-web machine");
     }
 
-    const sshLine = sync.split("\n").find((line) => line.includes("flyctl ssh console")) ?? "";
+    const sshLine =
+      sync
+        .split("\n")
+        .find((line) => line.includes("flyctl ssh console") && !line.trimStart().startsWith("#")) ??
+      "";
 
     if (!/\s(?:-q|--quiet)\b/u.test(sshLine)) {
       problems.push(
@@ -637,6 +668,25 @@ export function findWorkersDeployProblems(input: WorkersDeployInput) {
       problems.push(
         "deploy-workers pipes flyctl stdout straight into tar, so any connection text corrupts the archive",
       );
+    }
+
+    for (const remote of flyctlRemoteCommands(sync)) {
+      if (!REMOTE_SHELL_SYNTAX.test(remote)) {
+        continue;
+      }
+
+      if (!/^sh\s+-c\s+\S/u.test(remote)) {
+        problems.push(
+          "deploy-workers passes a multi-statement command straight to flyctl ssh console -C, which the machine execs without a shell, so only the first word runs and the sentinels never frame the archive; wrap the remote command in sh -c",
+        );
+        continue;
+      }
+
+      if (!/\bset\s+-[A-Za-z]*e|&&|\|\|/u.test(remote)) {
+        problems.push(
+          "deploy-workers wraps the remote command in sh -c without set -e, so a failed tar or base64 still exits 0 and ships an empty archive",
+        );
+      }
     }
 
     if (!sync.includes("dist-marketing")) {

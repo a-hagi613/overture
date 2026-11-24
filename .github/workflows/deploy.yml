@@ -227,9 +227,21 @@ jobs:
           end_marker=OVERTURE-TAR-END
           archive="$(mktemp)"
           status=0
+          # `flyctl ssh console -C` hands the string to the machine's SSH server, which word-splits it with shell-like
+          # quoting and then execs the first word directly: it never interprets `;`, `|` or `&&`. Passing the
+          # multi-statement extraction bare made the remote `printf` print the whole script as literal arguments, so
+          # the sentinels never framed anything and the job died on `gzip: stdin: unexpected end of file`. Wrapping it
+          # in `sh -c '…'` gives the machine one command whose single argument is the whole script, and `set -e` turns
+          # a failed `tar` (or `base64`) into the console's exit code instead of a silently empty payload.
+          #
+          # The tarball is named after this shell's pid, because a manual recovery running the snippet in docs/DEPLOY.md
+          # must never truncate or delete the copy a deploy is still streaming; the exit trap removes it on success and
+          # on failure, so the machine keeps no partial archive either way.
+          remote_archive="/tmp/overture-dist-marketing-$$.tgz"
+          #
           # A hung SSH console must not hold the deploy-main concurrency group for six hours.
           timeout 180s flyctl ssh console -q -a overture-web -C \
-            "printf '%s\n' '${begin_marker}'; tar -czf - -C /app dist-marketing | base64; printf '%s\n' '${end_marker}'" \
+            "sh -c 'set -e; trap \"rm -f ${remote_archive}\" EXIT; tar -czf ${remote_archive} -C /app dist-marketing; echo ${begin_marker}; base64 ${remote_archive}; echo ${end_marker}'" \
             > "$archive" || status=$?
           if [ "$status" -ne 0 ]; then
             echo "::error::Could not extract /app/dist-marketing from overture-web (exit $status); the marketing Worker ships prerendered HTML, so refusing to deploy without it."
