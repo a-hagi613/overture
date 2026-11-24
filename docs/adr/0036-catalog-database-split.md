@@ -12,8 +12,8 @@ This amends ADR 0002 with a second database file on the same Fly volume:
   `question_variants`. Litestream replicates this file to R2 continuously, and the weekly restore drill restores it.
 - `/data/catalog.sqlite` (`CATALOG_DATABASE_PATH`, defaults to `catalog.sqlite` beside the application file,
   `synchronous=NORMAL`, migrated from `drizzle-catalog/`) holds the public job catalog: `companies`, `company_boards`,
-  `postings`, `posting_tags`, `posting_questions` and the `postings_fts` index with its triggers. It is **excluded from
-  `litestream.yml`**.
+  `postings`, `posting_tags`, `posting_questions`, the `supply_facets` `/api/supply` rollup and the `postings_fts`
+  index with its triggers. It is **excluded from `litestream.yml`**.
 
 ## Why
 
@@ -43,6 +43,10 @@ interval streams far more to R2 than the user data that actually needs a backup,
   row). Each phase writes at most 20 chunks of 500 rows per run so no single write lock is held long, and the next
   run continues. A Posting any unsent Application still points at is left for the next sweep to reconcile, and nothing
   in `app.sqlite` is written: an Application keeps its own snapshot.
+- **The `/api/supply` rollup is derived, never authoritative.** `supply_facets` is rebuilt from the open
+  apply-supported Postings at the end of an ETL/snapshot pass before the file is sealed, and the active snapshot is
+  read-only. A snapshot that predates the rollup simply falls back to the live indexed count, so an old file still
+  answers the landing correctly until the next run replaces it.
 
 `scripts/verify-db.ts` verifies both files in one run: `app.sqlite` is WAL, `synchronous=FULL`, STRICT, still contains
 no catalog table and no catalog foreign key; `catalog.sqlite` is WAL, `synchronous=NORMAL`, STRICT, has every catalog

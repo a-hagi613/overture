@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { openCatalogDatabase, openDatabase } from "./client.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "./migrate.ts";
+import { rebuildSupplyFacets } from "../../catalog/supply-facets.ts";
 
 const NOW = 1_800_000_000_000;
 const ROWS = 2000;
@@ -299,6 +300,12 @@ test("the catalog candidate and requisition hot paths search their new indexes",
 
     expect(names).toContain("postings_apply_supported_status");
     expect(names).toContain("postings_company_requisition");
+    expect(names).toContain("posting_tags_dimension_value_posting");
+    expect(names).not.toContain("posting_tags_dimension_value");
+    expect(names).toContain("postings_supply_ats");
+    expect(names).toContain("postings_supply_country");
+    expect(names).toContain("postings_live_city");
+    expect(names).toContain("postings_live_region");
 
     const candidate = sqlite
       .query(
@@ -316,7 +323,7 @@ test("the catalog candidate and requisition hot paths search their new indexes",
       .map((row) => planSchema.parse(row).detail)
       .join("\n");
 
-    expect(candidate).toContain("postings_apply_supported_status");
+    expect(candidate).toContain("postings_supply_ats");
     expect(candidate).not.toMatch(/SCAN p\b/u);
 
     const requisition = sqlite
@@ -328,6 +335,71 @@ test("the catalog candidate and requisition hot paths search their new indexes",
       .join("\n");
 
     expect(requisition).toContain("postings_company_requisition");
+
+    const supply = planOf(
+      sqlite,
+      `select ats, count(*) from postings
+         where closed_at is null and status = 'open' and apply_supported = 1
+           and exists (select 1 from posting_tags t where t.posting_id = postings.id
+             and t.dimension in ('role', 'subrole') and t.value = ?)
+           and country_code = ? and workplace = 'remote'
+         group by ats`,
+      "Engineer",
+      "US",
+    );
+
+    expect(supply).toContain("postings_supply_country");
+    expect(supply).toContain("posting_tags_dimension_value_posting");
+    expect(supply).not.toMatch(/SCAN postings\b/u);
+
+    const unfiltered = planOf(
+      sqlite,
+      `select ats, count(*) from postings
+         where closed_at is null and status = 'open' and apply_supported = 1
+         group by ats`,
+    );
+
+    expect(unfiltered).toContain("postings_supply_ats");
+    expect(unfiltered).not.toMatch(/TEMP B-TREE/u);
+
+    const city = planOf(
+      sqlite,
+      `select ats, count(*) from postings indexed by postings_live_city
+         where closed_at is null and status = 'open' and apply_supported = 1
+           and country_code = ? and lower(city) = ?
+         group by ats`,
+      "US",
+      "nowhere",
+    );
+
+    expect(city).toContain("postings_live_city");
+    expect(city).not.toMatch(/SCAN postings\b/u);
+
+    const region = planOf(
+      sqlite,
+      `select ats, count(*) from postings indexed by postings_live_region
+         where closed_at is null and status = 'open' and apply_supported = 1
+           and country_code = ? and (lower(region) = ? or lower(region) = ?)
+         group by ats`,
+      "US",
+      "texas",
+      "tx",
+    );
+
+    expect(region).toContain("postings_live_region");
+    expect(region).not.toMatch(/SCAN postings\b/u);
+
+    rebuildSupplyFacets(db);
+
+    const facets = planOf(
+      sqlite,
+      "select ats, sum(postings) from supply_facets where role = ? and country_code = ? group by ats",
+      "Engineer",
+      "US",
+    );
+
+    expect(facets).toContain("supply_facets");
+    expect(facets).not.toMatch(/SCAN supply_facets\b/u);
   } finally {
     db.$client.close();
   }

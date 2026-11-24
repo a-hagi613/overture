@@ -35,6 +35,7 @@ import {
   createAnthropicStapplyClassifier,
   runStapplyLlmTagging,
 } from "../src/server/catalog/stapply-tagging.ts";
+import { rebuildSupplyFacets } from "../src/server/catalog/supply-facets.ts";
 import {
   compressCatalogSnapshot,
   decompressCatalogSnapshot,
@@ -159,9 +160,7 @@ async function prepareCatalog() {
   catalog.db.$client.run("PRAGMA foreign_keys = ON");
   catalog.db.$client.run("PRAGMA synchronous = OFF");
 
-  if (previous === null && args.values.db === undefined) {
-    migrateCatalogDatabase(catalog.db, "drizzle-catalog");
-  }
+  migrateCatalogDatabase(catalog.db, "drizzle-catalog");
 
   return { catalog, previous };
 }
@@ -301,6 +300,10 @@ async function main() {
         });
 
   progress(`llm tagging: ${String(llm.tagged)} tagged, ${String(llm.skipped)} left`);
+
+  rebuildSupplyFacets(catalog.db);
+
+  progress("supply facets rebuilt");
 
   const unresolved = unresolvedRoleCount(catalog.db);
   const tagSources = tagSourceSummary(catalog.db);
