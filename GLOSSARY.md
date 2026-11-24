@@ -103,7 +103,7 @@ Stage is what is stored and what a move writes; the Board groups the seven into 
 _Avoid_: column, phase, Hold
 
 **Board lane**:
-One of the five columns the Board shows (ADR 0037; seven Stage columns before it), each
+One of the five columns the Board view of Applications shows (ADR 0037; seven Stage columns before it), each
 grouping Stages: Queued, Ready, Applied, Interviews (the `waiting` lane: Screening, Interviewing and Offer) and Closed. A lane is a view:
 dropping a card on a lane writes one Stage, and only after the server accepts the move.
 _Avoid_: On hold, Hold, column (as the object)
@@ -137,7 +137,8 @@ _Avoid_: AI work, compute, usage
 
 **Fact**:
 Something true about the user that answers application questions, such as work authorisation or notice period.
-_Avoid_: Answer Bank, Memory Base, saved answer (as a place)
+Shown in the app as a **saved answer**; the collection is **Saved answers** on Profile.
+_Avoid_: Answer Bank, Memory Base
 
 **Derived answer**:
 An answer that code builds from a saved Fact or a Target the user set: a city, region and country combined, a US-state
@@ -146,7 +147,8 @@ the user did not give.
 _Avoid_: inferred answer, computed answer
 
 **Tier**:
-How a Fact is gathered: Tier 1 in onboarding, Tier 2 under "Strengthen your profile", Tier 3 learned from a Review.
+How a Fact is gathered: Tier 1 from the resume and profile, Tier 2 under "Strengthen your profile", Tier 3 learned
+from a Review.
 
 **Country scope**:
 The country a country-scoped Fact applies to, as an ISO country code. Work authorisation and sponsorship are
