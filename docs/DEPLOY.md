@@ -300,12 +300,78 @@ deployment.
 
 ### Deploy
 
-`dist-marketing` must exist (the build writes it):
+The Worker must serve the HTML of the release that is **already live on Fly**, because the page hydrates from that
+release's `/assets/*` bundle. A second `bun run build` is not equivalent: `.dockerignore` gives the Docker build
+context a smaller file set for Tailwind to scan, so the same commit hashed `/assets/main-*.js` differently inside the
+image than on a full checkout. The Worker then referenced a `main-*.js` that only existed in its own build, the origin
+answered 404, and the landing never hydrated (blank live supply count, frozen hero counter). `src/web/styles.css`
+pins Tailwind's scan to `src/` and `index.html` so the two contexts now agree, and the deploy no longer rebuilds the
+page at all.
+
+`deploy-workers` therefore syncs the page from the running machine and verifies it twice:
 
 ```sh
-bun run build
+# what .github/workflows/deploy.yml runs, in order
+remote_archive="/tmp/overture-dist-marketing-$$.tgz"
+flyctl ssh console -q -a overture-web -C \
+  "sh -c 'set -e; trap \"rm -f ${remote_archive}\" EXIT; tar -czf ${remote_archive} -C /app dist-marketing; echo OVERTURE-TAR-BEGIN; base64 ${remote_archive}; echo OVERTURE-TAR-END'" \
+  > archive.txt
+awk '$0 == "OVERTURE-TAR-BEGIN" { inside = 1; started = 1; next }
+     $0 == "OVERTURE-TAR-END" { inside = 0; closed = 1; next }
+     inside { print }
+     END { if (!started || !closed) exit 3 }' archive.txt | base64 -d | tar -xzf -
+bun run scripts/verify-marketing-assets.ts --dir dist-marketing --base https://overture-web.fly.dev
+cd workers/marketing && bunx wrangler deploy
+bun run scripts/verify-marketing-assets.ts --dir dist-marketing --base https://tryoverture.com --attempts 5
+```
+
+`flyctl ssh console -C` does not run its argument through a shell: the machine's SSH server splits the string into
+words (honouring quotes) and executes the first word with the rest as its arguments, so a bare `;`, `|` or `&&` is
+just another argument. A pipeline passed bare therefore makes the remote `printf` print the script as literal text —
+that is exactly how the deploy failed with `gzip: stdin: unexpected end of file`. Always wrap a multi-statement remote
+command in `sh -c '…'`, whose single argument is the whole script, and `set -e` inside it so a failed `tar` or `base64`
+becomes the console's exit code instead of an empty archive. The script itself stays free of single quotes, because
+the wrapper owns them; the sentinels are plain words, so `echo` needs no quoting.
+
+The remote tarball is named after the local shell's pid and removed by an `EXIT` trap, so a manual recovery can run
+next to a deploy without either copy truncating or deleting the archive the other is still streaming. The local
+`${remote_archive}` is expanded by your shell, not by the machine, which is why the value is interpolated into the
+quoted command rather than computed remotely.
+
+`flyctl ssh console` also prints its own connection text (for example `Connecting to fdaa:…`) on stdout, and a raw
+gzip stream fed straight to `tar` would be corrupted by it. The step passes `-q` to silence the progress indicators
+and carries the archive base64-encoded between sentinel markers, so only payload lines reach `tar`: a stray notice is
+discarded, and a missing frame or corrupt payload fails the job instead of extracting a partial page.
+
+The sync fails the job when `/app/dist-marketing/index.html` is missing: shipping stale HTML is never the fallback.
+`scripts/verify-marketing-assets.ts` fetches every `/assets/*` the page references with `GET` (never `HEAD`: the Fly
+proxy answers `HEAD /` differently while a machine is cold or restarting, and a `HEAD` never proves the hydrate
+payload downloads) and fails on a non-200 or an empty body, so a mismatch stops the deploy instead of a visitor.
+
+A `deploy-workers` run that fails before `wrangler deploy` leaves the previous Worker version live while Fly already
+serves the new release, so `/` can 404 its assets until the Worker is updated. Recover by re-running the job
+(`gh run rerun <run-id> --failed`) or by running the manual snippet above; both only read the machine and deploy the
+page, so they are safe to repeat. The cross-check in the `container` CI job and the pre-deploy verify make a silent
+drift impossible, which is the failure this ordering trades against.
+
+For a manual deploy, never build twice: take the page from the machine that serves its assets, exactly as the
+workflow does.
+
+```sh
+mkdir -p dist-marketing
+remote_archive="/tmp/overture-dist-marketing-$$.tgz"
+flyctl ssh console -q -a overture-web -C \
+  "sh -c 'set -e; trap \"rm -f ${remote_archive}\" EXIT; tar -czf ${remote_archive} -C /app dist-marketing; echo OVERTURE-TAR-BEGIN; base64 ${remote_archive}; echo OVERTURE-TAR-END'" \
+  > archive.txt
+awk '$0 == "OVERTURE-TAR-BEGIN" { inside = 1; started = 1; next }
+     $0 == "OVERTURE-TAR-END" { inside = 0; closed = 1; next }
+     inside { print }
+     END { if (!started || !closed) exit 3 }' archive.txt | base64 -d | tar -xzf -
+bun run scripts/verify-marketing-assets.ts --dir dist-marketing --base https://overture-web.fly.dev
 cd workers/marketing
 bunx wrangler deploy
+cd ../..
+bun run scripts/verify-marketing-assets.ts --dir dist-marketing --base https://tryoverture.com --attempts 5
 ```
 
 Wrangler needs a Cloudflare API token (or `wrangler login`) with **Workers Scripts: Edit** and **Workers Routes:
@@ -313,9 +379,6 @@ Edit** on the `tryoverture.com` zone, plus **Zone: Read** for `zone_name`. Put t
 and the account id in `CLOUDFLARE_ACCOUNT_ID` in the operator's environment only, never in the repository. `bun run
 dry-run` builds the same Worker without deploying, and CI runs it after `bun run verify` (which produces
 `dist-marketing`).
-
-Deploy the Worker after the Fly release: until the matching release is live, the page can reference the previous
-release's `/assets/` bundle. The page still renders; its hydration waits for the new release.
 
 ### Verify
 
@@ -331,6 +394,9 @@ release's `/assets/` bundle. The page still renders; its hydration waits for the
   `bun node_modules/playwright/cli.js test test/e2e/marketing-worker.test.ts --workers=1` proves every route in
   `src/web/route-table.tsx` and every API/webhook/asset prefix matches no Worker route, that the config is
   assets-only, and that the landing serves from `dist-marketing` while a stand-in origin answers 503.
+  `bun node_modules/playwright/cli.js test test/e2e/marketing-hydration.test.ts --workers=1` serves the built
+  `dist-marketing/index.html` at `/` against the app's own `/assets/*` and `/api/supply` (after `bun run build`), and
+  fails on a missing asset, any console error or any `>= 400` response, or a live count that never leaves `—`.
 
 A route pattern without a wildcard matches the entire URL, query string included. The root is matched exactly (`tryoverture.com/`): a landing URL with a query string (`/?utm_source=…`) matches no
 Worker route and goes to Fly. That keeps arbitrary paths away from the Worker at the cost of falling back to the
@@ -530,8 +596,9 @@ gh workflow run ops-live.yml -f action=seed-catalog -R a-hagi613/overture
 ```
 
 The action makes one bounded `flyctl ssh console -a overture-web -C <command>` call per step, because
-`flyctl` runs that command directly rather than through a shell, so `&&` chaining does not work. Each call
-runs under its own `timeout` and stops the action on a timeout (exit 124) or a non-zero exit:
+`flyctl` runs that command directly rather than through a shell, so `&&` chaining does not work (wrap multi-step work
+in `sh -c '…'` instead; see the marketing sync above). Each call runs under its own `timeout` and stops the action on
+a timeout (exit 124) or a non-zero exit:
 
 1. `mkdir -p /data/seed` (60 s, root) and `chown app:app /data/seed` (60 s, root);
 2. as the unprivileged `app` user, `fetch-seed.ts --dir /data/seed` (300 s) downloads the pinned

@@ -5,13 +5,18 @@
  */
 export const THEME_BOOT_SCRIPT_HASH = "sha256-u/CaloeB9iEmoIBLvpcbkLGHBziQNGzLq0ZT8UQstPY=";
 
+/**
+ * The policy every app and marketing response carries. Cloudflare Web Analytics is injected by the zone, so the
+ * script and connect directives admit its beacon and collector: a blocked beacon logs a console error on every page
+ * and hides real hydration failures.
+ */
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
-  `script-src 'self' '${THEME_BOOT_SCRIPT_HASH}' https://challenges.cloudflare.com`,
+  `script-src 'self' '${THEME_BOOT_SCRIPT_HASH}' https://challenges.cloudflare.com https://static.cloudflareinsights.com`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob:",
-  "connect-src 'self'",
+  "connect-src 'self' https://cloudflareinsights.com",
   "frame-src https://challenges.cloudflare.com",
   "worker-src 'self'",
   "manifest-src 'self'",

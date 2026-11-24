@@ -22,6 +22,7 @@ export function LandingLiveCounter() {
     <output
       aria-live="polite"
       className="mt-4 inline-flex items-center gap-2 text-xs text-muted-foreground sm:text-sm"
+      data-testid="hero-counter"
     >
       <span
         aria-hidden="true"
@@ -34,6 +35,7 @@ export function LandingLiveCounter() {
         <motion.span
           animate={{ opacity: 1, y: 0 }}
           className="font-mono font-semibold tabular-nums text-foreground"
+          data-testid="hero-counter-value"
           initial={{ opacity: 0.4, y: -2 }}
           key={count}
           transition={{ duration: 0.25 }}

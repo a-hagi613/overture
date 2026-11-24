@@ -42,3 +42,31 @@ test("the shell never asks an origin for the theme boot", () => {
 
   expect(shell).not.toContain("theme-boot.js");
 });
+
+function directive(name: string) {
+  return CONTENT_SECURITY_POLICY.split("; ")
+    .find((entry) => entry.startsWith(`${name} `))
+    ?.slice(name.length + 1);
+}
+
+test("the CSP admits Cloudflare Web Analytics, which the zone injects into every page", () => {
+  expect(directive("script-src")).toContain("https://static.cloudflareinsights.com");
+  expect(directive("connect-src")).toContain("https://cloudflareinsights.com");
+});
+
+test("admitting the analytics beacon does not widen script execution beyond those origins", () => {
+  const script = directive("script-src") ?? "";
+
+  const origins = script
+    .split(" ")
+    .filter((token) => token !== "")
+    .filter((token) => token !== "'self'" && !token.startsWith("'sha256-"));
+
+  expect(origins.toSorted()).toStrictEqual([
+    "https://challenges.cloudflare.com",
+    "https://static.cloudflareinsights.com",
+  ]);
+  expect(script).not.toContain("'unsafe-inline'");
+  expect(script).not.toContain("'unsafe-eval'");
+  expect(script).not.toContain("https://*");
+});

@@ -307,6 +307,21 @@ jobs:
           tags: overture:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Check the image ships the marketing page next to its assets
+        run: |
+          set -euo pipefail
+          docker create --name overture-files overture:ci
+          docker cp overture-files:/app/dist-marketing/index.html /tmp/dist-marketing-index.html
+          docker cp overture-files:/app/dist /tmp/dist
+          docker rm overture-files
+          grep -q '<div id="root">' /tmp/dist-marketing-index.html
+          for ref in $(grep -o '/assets/[^"]*' /tmp/dist-marketing-index.html | sort -u); do
+            if [ ! -f "/tmp/dist${ref}" ]; then
+              echo "::error::dist-marketing references ${ref}, which the image does not ship in /app/dist; the landing would not hydrate."
+              exit 1
+            fi
+          done
+          echo "dist-marketing and dist agree inside the image"
       - name: Start the container and check the health route
         run: |
           set -euo pipefail
