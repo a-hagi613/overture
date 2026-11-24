@@ -71,6 +71,11 @@ const resumeScope = (resumeId: string, column: string) => ({
   rowId: resumeId,
 });
 
+const resumeObjectScope = (userId: string, resumeId: string) => ({
+  ...resumeScope(resumeId, "bytes"),
+  userId,
+});
+
 export function createResumeService(deps: {
   db: AppDatabase;
   clock: Clock;
@@ -204,7 +209,7 @@ export function createResumeService(deps: {
 
     const base64 = await openOrNull({
       personal,
-      scope: resumeScope(row.id, "bytes"),
+      scope: resumeObjectScope(userId, row.id),
       sealed: decodeUtf8(stored),
       userId,
     });
@@ -237,7 +242,7 @@ export function createResumeService(deps: {
 
       const sealedFile = await personal.sealFor(
         userId,
-        resumeScope(id, "bytes"),
+        resumeObjectScope(userId, id),
         Buffer.from(bytes).toString("base64"),
       );
 

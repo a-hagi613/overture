@@ -15,6 +15,122 @@ const oauthPairs = [
 
 const localHostnames = ["localhost", "127.0.0.1"];
 
+const MIN_SECRET_LENGTH = 16;
+
+/** One versioned Better Auth secret, as `BETTER_AUTH_SECRETS` names it. */
+export interface VersionedAuthSecret {
+  version: number;
+  value: string;
+}
+
+/** The Better Auth signing secrets this process accepts, current first. */
+export interface AuthSecretConfig {
+  /** The secret new tokens and invites are signed with. */
+  current: string;
+  /** Every accepted secret, current first; undefined keeps the single-secret deployment unchanged. */
+  secrets?: VersionedAuthSecret[];
+  /** Every accepted secret value, for HMAC lookups that must still read what an older secret signed. */
+  accepted: readonly string[];
+  /** The legacy `BETTER_AUTH_SECRET` fallback for payloads written before versioned secrets. */
+  legacy?: string;
+}
+
+/**
+ * Parses `BETTER_AUTH_SECRETS` (`"2:<new>,1:<old>"`) into Better Auth's ordered `secrets`
+ * option, falling back to the single `BETTER_AUTH_SECRET` deployment.
+ * @param source The two environment names and their values.
+ * @returns The current secret, the versioned list when set, and every accepted value.
+ */
+export function parseBetterAuthSecrets(source: {
+  BETTER_AUTH_SECRET?: string | undefined;
+  BETTER_AUTH_SECRETS?: string | undefined;
+}) {
+  const raw = source.BETTER_AUTH_SECRETS?.trim();
+  const legacy = source.BETTER_AUTH_SECRET;
+
+  if (raw === undefined || raw.length === 0) {
+    if (legacy === undefined) {
+      throw new Error(
+        "Set BETTER_AUTH_SECRET or BETTER_AUTH_SECRETS: Better Auth needs at least one signing secret.",
+      );
+    }
+
+    return { accepted: [legacy], current: legacy };
+  }
+
+  const seen = new Set<number>();
+
+  const secrets = raw.split(",").map((entry, index) => {
+    const at = entry.indexOf(":");
+    const versionText = at === -1 ? "" : entry.slice(0, at).trim();
+    const value = at === -1 ? "" : entry.slice(at + 1).trim();
+    const position = index + 1;
+
+    if (!/^[1-9]\d*$/u.test(versionText)) {
+      throw new Error(
+        `BETTER_AUTH_SECRETS entry ${String(position)} must be "<version>:<secret>" with a positive integer version.`,
+      );
+    }
+
+    if (value.length < MIN_SECRET_LENGTH) {
+      throw new Error(
+        `BETTER_AUTH_SECRETS version ${versionText} needs at least ${String(MIN_SECRET_LENGTH)} characters.`,
+      );
+    }
+
+    const version = Number(versionText);
+
+    if (seen.has(version)) {
+      throw new Error(`BETTER_AUTH_SECRETS lists version ${versionText} more than once.`);
+    }
+
+    seen.add(version);
+
+    return { version, value };
+  });
+
+  const [current] = secrets;
+
+  if (current === undefined) {
+    throw new Error("BETTER_AUTH_SECRETS must list at least one version.");
+  }
+
+  const outOfOrder = secrets.findIndex(
+    (secret, index) => index > 0 && secret.version >= (secrets[index - 1]?.version ?? 0),
+  );
+
+  if (outOfOrder !== -1) {
+    throw new Error(
+      "BETTER_AUTH_SECRETS must list versions highest first, with the current version first (for example 2:<new>,1:<old>).",
+    );
+  }
+
+  const config: AuthSecretConfig = {
+    accepted: [...new Set([...secrets.map((secret) => secret.value), ...(legacy ? [legacy] : [])])],
+    current: current.value,
+    secrets,
+  };
+
+  if (legacy !== undefined) {
+    config.legacy = legacy;
+  }
+
+  return config;
+}
+
+/**
+ * The Better Auth options that carry a secret chain: `secrets` first (current key first), with
+ * the legacy single secret as the fallback for payloads written before versioned secrets.
+ * @param config The parsed environment secrets.
+ * @returns The `secret` and `secrets` fields to pass to `betterAuth`.
+ */
+export function betterAuthSecretOptions(config: AuthSecretConfig) {
+  return {
+    secret: config.legacy ?? config.current,
+    secrets: config.secrets,
+  };
+}
+
 /**
  * The hostnames the Turnstile widget may use when `TURNSTILE_HOSTNAMES` is unset: both origins,
  * because the owner signs in on the admin host as well as the app host.
@@ -89,7 +205,8 @@ const envSchema = z
           .filter((host) => host.length > 0),
       )
       .optional(),
-    BETTER_AUTH_SECRET: z.string().min(16),
+    BETTER_AUTH_SECRET: z.string().min(16).optional(),
+    BETTER_AUTH_SECRETS: z.string().min(1).optional(),
     OWNER_EMAIL: z.email(),
     TURNSTILE_SITE_KEY: z.string().min(1),
     TURNSTILE_SECRET: z.string().min(1),
@@ -222,6 +339,24 @@ const envSchema = z
         });
       }
 
+      if (value.CF_ACCESS_AUD === undefined) {
+        context.addIssue({
+          code: "custom",
+          message:
+            "Production admin host mode needs CF_ACCESS_AUD: the admin API must never run without its Cloudflare Access audience.",
+          path: ["CF_ACCESS_AUD"],
+        });
+      }
+
+      if (value.CF_ACCESS_TEAM_DOMAIN === undefined) {
+        context.addIssue({
+          code: "custom",
+          message:
+            "Production admin host mode needs CF_ACCESS_TEAM_DOMAIN so the Access token's iss claim is verified: CF_ACCESS_JWKS_URL alone cannot name the issuer.",
+          path: ["CF_ACCESS_TEAM_DOMAIN"],
+        });
+      }
+
       const hostnames = resolveTurnstileHostnames(
         value.TURNSTILE_HOSTNAMES,
         value.APP_ORIGIN,
@@ -246,6 +381,16 @@ const envSchema = z
           path: ["TURNSTILE_HOSTNAMES"],
         });
       }
+    }
+
+    try {
+      parseBetterAuthSecrets(value);
+    } catch (error) {
+      context.addIssue({
+        code: "custom",
+        message: error instanceof Error ? error.message : String(error),
+        path: ["BETTER_AUTH_SECRETS"],
+      });
     }
 
     for (const [idName, secretName] of oauthPairs) {
@@ -340,6 +485,9 @@ export const checkedEnvSchema = envSchema.superRefine((value, context) => {
 });
 
 export const env = checkedEnvSchema.parse(process.env);
+
+/** The current Better Auth secret, its rotation chain, and the legacy fallback (issue #578). */
+export const authSecretConfig: AuthSecretConfig = parseBetterAuthSecrets(env);
 
 /** The current master key and every older key still configured for the dual-read window. */
 export const masterKeyring: MasterKeyring = parseMasterKeyring(process.env, env.MASTER_KEY_CURRENT);

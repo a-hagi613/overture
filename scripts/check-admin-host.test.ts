@@ -261,20 +261,20 @@ describe("check-admin-host Fly output", () => {
     expect(missingAccessSecrets([])).toEqual([
       "ADMIN_ORIGIN",
       "CF_ACCESS_AUD",
-      "CF_ACCESS_TEAM_DOMAIN or CF_ACCESS_JWKS_URL",
+      "CF_ACCESS_TEAM_DOMAIN",
     ]);
     expect(missingAccessSecrets(["ADMIN_ORIGIN", "CF_ACCESS_AUD"])).toEqual([
-      "CF_ACCESS_TEAM_DOMAIN or CF_ACCESS_JWKS_URL",
+      "CF_ACCESS_TEAM_DOMAIN",
     ]);
   });
 
-  test("either JWKS source satisfies the verifier, and neither one leaves it missing", () => {
+  test("the team domain is required and a JWKS URL cannot replace it", () => {
     expect(
       missingAccessSecrets(["ADMIN_ORIGIN", "CF_ACCESS_AUD", "CF_ACCESS_TEAM_DOMAIN"]),
     ).toEqual([]);
-    expect(missingAccessSecrets(["ADMIN_ORIGIN", "CF_ACCESS_AUD", "CF_ACCESS_JWKS_URL"])).toEqual(
-      [],
-    );
+    expect(missingAccessSecrets(["ADMIN_ORIGIN", "CF_ACCESS_AUD", "CF_ACCESS_JWKS_URL"])).toEqual([
+      "CF_ACCESS_TEAM_DOMAIN",
+    ]);
     expect(
       missingAccessSecrets([
         "ADMIN_ORIGIN",
@@ -286,7 +286,9 @@ describe("check-admin-host Fly output", () => {
   });
 
   test("an audience without an origin is still missing the origin", () => {
-    expect(missingAccessSecrets(["CF_ACCESS_AUD", "CF_ACCESS_JWKS_URL"])).toEqual(["ADMIN_ORIGIN"]);
+    expect(missingAccessSecrets(["CF_ACCESS_AUD", "CF_ACCESS_TEAM_DOMAIN"])).toEqual([
+      "ADMIN_ORIGIN",
+    ]);
   });
 
   test("recognises an issued certificate in flyctl's JSON", () => {

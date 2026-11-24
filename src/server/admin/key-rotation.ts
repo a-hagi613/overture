@@ -272,6 +272,45 @@ export function masterKeyCoverageProblem(db: Pick<AppDatabase, "select">, keyrin
 }
 
 /**
+ * How long a retired master key must stay archived offline before destruction: the
+ * `snapshot.retention` in `litestream.yml` (720h / 30 days). Backups from before a rotation
+ * only open with the key they were written under.
+ */
+export const MASTER_KEY_RETENTION_HOURS = 720;
+
+/**
+ * The retention warning for a configured key that no `user_keys` row uses any more. A key whose
+ * rows are gone may be removed from the live process, but its value must stay archived for at
+ * least `MASTER_KEY_RETENTION_HOURS` so the backups written under it still restore.
+ * @param db The application database.
+ * @param keyring The configured keys.
+ * @returns A clear operator message, or undefined when every configured key still wraps rows.
+ */
+export function masterKeyRetirementWarning(
+  db: Pick<AppDatabase, "select">,
+  keyring: MasterKeyring,
+) {
+  const current = keyring.current.version;
+
+  const held = new Map(
+    db
+      .select({ total: count(), version: userKeys.masterKeyVersion })
+      .from(userKeys)
+      .groupBy(userKeys.masterKeyVersion)
+      .all()
+      .map((row) => [row.version, row.total]),
+  );
+
+  const retired = keyring.keys
+    .filter((key) => key.version < current && (held.get(key.version) ?? 0) === 0)
+    .map((key) => `MASTER_KEY_V${String(key.version)}`);
+
+  return retired.length === 0
+    ? undefined
+    : `${retired.join(", ")} ${retired.length === 1 ? "wraps" : "wrap"} no user_keys row: keep the value archived offline for at least ${String(MASTER_KEY_RETENTION_HOURS)}h (litestream.yml snapshot.retention, 30 days) and remove it from the live secrets only after user_keys has 0 rows on that version and a post-rotation Litestream snapshot plus restore drill passes.`;
+}
+
+/**
  * Refuses to start a process whose stored data keys it could never open.
  * @param db The application database.
  * @param keyring The configured keys.

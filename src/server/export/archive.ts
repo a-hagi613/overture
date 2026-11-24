@@ -195,10 +195,11 @@ const resumeScope = (resumeId: string, column: string) => ({
   table: "resumes",
 });
 
-const mailObjectScope = (objectKey: string) => ({
+const mailObjectScope = (userId: string, objectKey: string) => ({
   column: "body",
   rowId: objectKey,
   table: "mail_objects",
+  userId,
 });
 
 const messageScope = (messageId: string, column: string) => ({
@@ -607,12 +608,8 @@ export function* exportEntries(deps: ExportArchiveDeps, userId: string) {
                         modifiedAt: new Date(now),
                         name: file,
                         read: () =>
-                          objectEntry(
-                            objects,
-                            personal,
-                            userId,
-                            attachment.objectKey,
-                            mailObjectScope,
+                          objectEntry(objects, personal, userId, attachment.objectKey, (key) =>
+                            mailObjectScope(userId, key),
                           ),
                       });
 
@@ -720,9 +717,10 @@ export function* exportEntries(deps: ExportArchiveDeps, userId: string) {
                 modifiedAt: new Date(now),
                 name: file,
                 read: () =>
-                  objectEntry(objects, personal, userId, row.objectKey, () =>
-                    resumeScope(row.id, "bytes"),
-                  ),
+                  objectEntry(objects, personal, userId, row.objectKey, () => ({
+                    ...resumeScope(row.id, "bytes"),
+                    userId,
+                  })),
               });
 
               return JSON.stringify({
@@ -764,7 +762,12 @@ async function* objectEntry(
   personal: PersonalCrypto,
   userId: string,
   objectKey: string,
-  scopeOf: (key: string) => { table: string; column: string; rowId: string },
+  scopeOf: (key: string) => {
+    table: string;
+    column: string;
+    rowId: string;
+    userId?: string;
+  },
 ) {
   const stored = await objects.get(objectKey);
 

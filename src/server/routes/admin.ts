@@ -47,7 +47,7 @@ import {
 } from "../platform/db/schema.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags, readTagImports } from "../catalog/tag-import.ts";
 import { createAccessVerifier } from "../platform/access/index.ts";
-import { catalogDatabasePath, env } from "../config/env.ts";
+import { authSecretConfig, catalogDatabasePath, env } from "../config/env.ts";
 import { hasRecentPasskeyAssertion, lastPasskeyAssertionAt } from "../platform/passkey/index.ts";
 import {
   listAdminAudit,
@@ -334,9 +334,7 @@ const ATS_NAMES = ["greenhouse", "lever", "ashby", "workable", "personio"] as co
 function integrationsOf() {
   return {
     browserProvider: env.BROWSER_PROVIDER ?? null,
-    cfAccessConfigured: Boolean(
-      env.CF_ACCESS_AUD && (env.CF_ACCESS_TEAM_DOMAIN || env.CF_ACCESS_JWKS_URL),
-    ),
+    cfAccessConfigured: Boolean(env.CF_ACCESS_AUD && env.CF_ACCESS_TEAM_DOMAIN),
     cloudflareEmailConfigured:
       env.CLOUDFLARE_EMAIL_API_TOKEN !== undefined &&
       env.CLOUDFLARE_ACCOUNT_ID !== undefined &&
@@ -410,7 +408,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     return context.json({ error: ADMIN_REFUSAL_CODES.accessRequired }, 401);
   });
 
-  const inviteSecret = env.BETTER_AUTH_SECRET;
+  const inviteSecret = authSecretConfig.current;
 
   function grantViewOf(grantId: string | null) {
     if (grantId === null) {

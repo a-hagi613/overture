@@ -25,14 +25,28 @@ export function inviteEmailHash(secret: string, email: string) {
   return createHmac("sha256", secret).update(normaliseEmail(email)).digest("hex");
 }
 
-export function findInvite(db: AppDatabase, secret: string, email: string) {
-  return (
-    db
+/**
+ * Finds an invite by the hash of any accepted Better Auth secret, so a pending invite created
+ * before a non-destructive secret rotation still opens during the dual-read window.
+ * @param db The application database.
+ * @param secrets Every accepted secret, current first.
+ * @param email The invited address.
+ * @returns The invite row, or null.
+ */
+export function findInvite(db: AppDatabase, secrets: readonly string[], email: string) {
+  for (const secret of secrets) {
+    const invite = db
       .select()
       .from(invites)
       .where(eq(invites.emailHash, inviteEmailHash(secret, email)))
-      .get() ?? null
-  );
+      .get();
+
+    if (invite !== undefined) {
+      return invite;
+    }
+  }
+
+  return null;
 }
 
 export function inviteStatus(invite: InviteRow) {
@@ -43,8 +57,8 @@ export function inviteStatus(invite: InviteRow) {
   return invite.revokedAt === null ? "pending" : "revoked";
 }
 
-export function liveInviteFor(db: AppDatabase, secret: string, email: string) {
-  const invite = findInvite(db, secret, email);
+export function liveInviteFor(db: AppDatabase, secrets: readonly string[], email: string) {
+  const invite = findInvite(db, secrets, email);
 
   if (invite === null) {
     return null;
@@ -53,8 +67,8 @@ export function liveInviteFor(db: AppDatabase, secret: string, email: string) {
   return invite.revokedAt === null ? invite : null;
 }
 
-export function pendingInviteFor(db: AppDatabase, secret: string, email: string) {
-  const invite = liveInviteFor(db, secret, email);
+export function pendingInviteFor(db: AppDatabase, secrets: readonly string[], email: string) {
+  const invite = liveInviteFor(db, secrets, email);
 
   if (invite === null) {
     return null;

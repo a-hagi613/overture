@@ -28,8 +28,12 @@ Bun.env.TURNSTILE_SECRET ??= "admin-key-rotation-test-secret";
 
 Bun.env.MASTER_KEY_V1 ??= Buffer.alloc(32, 7).toString("base64");
 
-const { enqueueMasterKeyRotation, masterKeyCoverageProblem, runMasterKeyRotation } =
-  await import("./key-rotation.ts");
+const {
+  enqueueMasterKeyRotation,
+  masterKeyCoverageProblem,
+  masterKeyRetirementWarning,
+  runMasterKeyRotation,
+} = await import("./key-rotation.ts");
 
 const NOW = 1_795_000_000_000;
 const scope = { column: "value_enc", rowId: "fact-1", table: "facts" };
@@ -351,6 +355,23 @@ describe("the master-key rotation", () => {
     expect(masterKeyCoverageProblem(db, during)).toBeUndefined();
     expect(masterKeyCoverageProblem(db, after)).toContain("2 row(s) under MASTER_KEY_V1");
     expect(masterKeyCoverageProblem(db, after)).toContain("not configured");
+
+    sqlite.close();
+  });
+
+  test("a retired key with no rows warns to keep it archived for the Litestream window", async () => {
+    const { db, sqlite } = await seeded(2);
+
+    expect(masterKeyRetirementWarning(db, during)).toBeUndefined();
+
+    await runMasterKeyRotation({ clock: createClock(), db, keyring: during });
+
+    const warning = masterKeyRetirementWarning(db, during);
+
+    expect(warning).toContain("MASTER_KEY_V1");
+    expect(warning).toContain("720h");
+    expect(warning).toContain("litestream.yml snapshot.retention");
+    expect(warning).toContain("post-rotation Litestream snapshot plus restore drill");
 
     sqlite.close();
   });

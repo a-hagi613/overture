@@ -108,6 +108,44 @@ test("opening with a different associated data scope fails", async () => {
   ).rejects.toThrow("operation failed for an operation-specific reason");
 });
 
+test("a user-bound scope binds the person into the associated data", async () => {
+  const keyring = masterKeyringFor(keyVersionBytes(1));
+  const userKey = await createUserKey(keyring.current.bytes, 1);
+
+  const bound = {
+    table: "mail_objects",
+    column: "body",
+    rowId: "mail/user-a/raw/1.eml",
+    userId: "user-a",
+  };
+
+  const sealed = await sealValue(keyring, userKey, bound, "the raw message");
+
+  expect(openValue(keyring, userKey, bound, sealed)).resolves.toBe("the raw message");
+});
+
+test("an object sealed before user_id was bound still opens through the legacy fallback", async () => {
+  const keyring = masterKeyringFor(keyVersionBytes(1));
+  const userKey = await createUserKey(keyring.current.bytes, 1);
+  const legacy = { table: "mail_objects", column: "body", rowId: "mail/user-a/raw/1.eml" };
+  const sealed = await sealValue(keyring, userKey, legacy, "the raw message");
+
+  expect(openValue(keyring, userKey, { ...legacy, userId: "user-a" }, sealed)).resolves.toBe(
+    "the raw message",
+  );
+});
+
+test("a user-bound ciphertext is refused for another person's scope", async () => {
+  const keyring = masterKeyringFor(keyVersionBytes(1));
+  const userKey = await createUserKey(keyring.current.bytes, 1);
+  const scopeA = { table: "resumes", column: "bytes", rowId: "resume-1", userId: "user-a" };
+  const sealed = await sealValue(keyring, userKey, scopeA, "the pdf");
+
+  expect(openValue(keyring, userKey, { ...scopeA, userId: "user-b" }, sealed)).rejects.toThrow(
+    "operation failed for an operation-specific reason",
+  );
+});
+
 test("shredding the user key makes every value unreadable", async () => {
   const keyring = masterKeyringFor(keyVersionBytes(1));
   const userKey = await createUserKey(keyring.current.bytes, 1);

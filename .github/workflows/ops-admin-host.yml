@@ -147,8 +147,8 @@ jobs:
           if [ -z "${CF_ACCESS_AUD:-}" ]; then
             missing="${missing} CF_ACCESS_AUD"
           fi
-          if [ -z "${CF_ACCESS_TEAM_DOMAIN:-}" ] && [ -z "${CF_ACCESS_JWKS_URL:-}" ]; then
-            missing="${missing} (CF_ACCESS_TEAM_DOMAIN or CF_ACCESS_JWKS_URL)"
+          if [ -z "${CF_ACCESS_TEAM_DOMAIN:-}" ]; then
+            missing="${missing} CF_ACCESS_TEAM_DOMAIN"
           fi
           if [ -n "$missing" ]; then
             echo "::error::Missing repository secrets:${missing}. Add them with gh secret set <NAME> -R a-hagi613/overture, then re-run set-access-secrets (docs/DEPLOY.md, admin host)."
@@ -188,21 +188,15 @@ jobs:
 
           present="$(flyctl secrets list -a overture-web --json | jq -r '.[] | (.name // .Name // empty)')"
           if [ -n "$team" ] && [ -z "$jwks" ] && grep -qx 'CF_ACCESS_JWKS_URL' <<<"$present"; then
-            echo "Removing the stale CF_ACCESS_JWKS_URL so it cannot override the new team domain."
+            echo "Removing the stale CF_ACCESS_JWKS_URL so it cannot override the new team domain's certs URL."
             flyctl secrets unset -a overture-web CF_ACCESS_JWKS_URL
-          fi
-          if [ -z "$team" ] && [ -n "$jwks" ] && grep -qx 'CF_ACCESS_TEAM_DOMAIN' <<<"$present"; then
-            echo "Removing the stale CF_ACCESS_TEAM_DOMAIN so it cannot pin the old issuer."
-            flyctl secrets unset -a overture-web CF_ACCESS_TEAM_DOMAIN
           fi
 
           args=(
             "ADMIN_ORIGIN=https://admin.tryoverture.com"
             "CF_ACCESS_AUD=$CF_ACCESS_AUD"
+            "CF_ACCESS_TEAM_DOMAIN=$team"
           )
-          if [ -n "$team" ]; then
-            args+=("CF_ACCESS_TEAM_DOMAIN=$team")
-          fi
           if [ -n "$jwks" ]; then
             args+=("CF_ACCESS_JWKS_URL=$jwks")
           fi
