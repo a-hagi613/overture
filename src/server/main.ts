@@ -1254,7 +1254,21 @@ function handleShutdown(signal: string) {
     } catch (error) {
       logError("shutdown", error);
     } finally {
+      // The last-resort abort closes the browsers still open at the end of the drain budget. Wait
+      // for those handlers to record the interruption (attempt outcome, credit release and next
+      // slot) before the database closes: a teardown that lands after the close leaves the
+      // Application in `sending`, repaired only by the next boot's recovery.
       activeAttemptController.abort();
+
+      const stuck =
+        (await activeDispatcher?.drain(Math.max(0, drainDeadline - performance.now()))) ?? 0;
+
+      if (stuck > 0) {
+        logError(
+          "shutdown",
+          new Error(`${String(stuck)} send(s) did not record their interruption in the budget`),
+        );
+      }
 
       await quietGrace(flushReserveMs);
       await Promise.race([stopTelemetry(), quietGrace(flushReserveMs)]);

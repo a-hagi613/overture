@@ -898,8 +898,9 @@ On `SIGINT`/`SIGTERM` (`fly logs` shows the three lines in order):
    and be marked `done` before exit. A send waiting for a pasted or mailed verification code stops immediately
    instead of spending the budget: the signal ends that wait because the shutdown also stops the paste route and new
    `mail.ingest` claims, so the code cannot arrive; that attempt is released as `interrupted` and does not use one of
-   its two tries. Only at the end of the budget does the last-resort abort close the browser, and the handler records
-   the interruption;
+   its two tries. Only at the end of the budget does the last-resort abort close the browser, and the shutdown waits
+   for the handler to record the interruption (attempt outcome, credit release and next slot) before it closes the
+   databases;
 4. flush OTel, close `app.sqlite` and `catalog.sqlite`, then `overture shutdown: stopped in <ms>` and exit 0, with a
    SIGKILL backstop one second past the budget. A SIGKILL or exit 1 here means Litestream killed the child: the
    budget and the Litestream deadline have drifted apart again.

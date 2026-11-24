@@ -289,6 +289,7 @@ export function createDispatcher(deps: DispatcherDeps) {
   const codeWaitSignal = combineSignals(signal, deps.codeWaitSignal);
 
   const activeAttempts = new Set<string>();
+  const activeAttemptRuns = new Set<Promise<boolean>>();
 
   function updateAttempt(attemptId: string, values: Partial<AttemptRow>) {
     db.update(attempts).set(values).where(eq(attempts.id, attemptId)).run();
@@ -541,6 +542,18 @@ export function createDispatcher(deps: DispatcherDeps) {
   }
 
   async function runAttempt(applicationId: string) {
+    const run = startAttempt(applicationId);
+
+    activeAttemptRuns.add(run);
+
+    try {
+      return await run;
+    } finally {
+      activeAttemptRuns.delete(run);
+    }
+  }
+
+  async function startAttempt(applicationId: string) {
     const provider = providers.pick();
 
     if (switchedOffAtSend(applicationId, provider.id)) {
@@ -1419,7 +1432,36 @@ export function createDispatcher(deps: DispatcherDeps) {
     return job.inserted;
   }
 
+  /**
+   * Waits for the sends still in flight to finish, so each one persists its teardown (the attempt
+   * outcome, the credit release and the next slot) before the caller closes the database. The
+   * shutdown calls it after the last-resort abort: a handler whose write lands after the close
+   * leaves the Application in `sending`, and only the next boot's recovery repairs it.
+   * @param timeoutMs How long the caller can wait.
+   * @returns How many attempts were still running when the wait ended.
+   */
+  async function drain(timeoutMs: number) {
+    if (activeAttemptRuns.size === 0) {
+      return 0;
+    }
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const deadline = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, Math.max(0, timeoutMs));
+    });
+
+    await Promise.race([Promise.allSettled([...activeAttemptRuns]), deadline]);
+
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+
+    return activeAttemptRuns.size;
+  }
+
   return {
+    drain,
     ensureRecoveryQueued,
     enqueueSend,
     recover,

@@ -94,7 +94,9 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
   claiming new jobs, stops accepting, ends every open `/api/events` stream, waits for in-flight jobs, requeues what
   is left, flushes OTel, closes both SQLite handles, logs `shutdown: stopped in <ms>` and exits 0, with a SIGKILL
   backstop one second past the budget. An active browser send is drained rather than aborted: its browser stays open
-  until the budget runs out, so a 60–180 s submission can finish and commit its ledger state. A send waiting for a
+  until the budget runs out, so a 60–180 s submission can finish and commit its ledger state. Only at the end of the
+  budget does a last-resort abort close the browser, and the shutdown waits for that handler to record its
+  `interrupted` attempt (outcome, credit release and next slot) before it closes the databases. A send waiting for a
   pasted or mailed verification code does not wait for the budget: the shutdown stops the paste route and the claim
   of `mail.ingest`, so that wait ends at once and the send is released as `interrupted` (no attempt used) instead of
   holding the machine for an input that cannot arrive. A send that has not reached `submit_clicked_at` when it stops
