@@ -7,6 +7,8 @@ import {
   applicationLlmMicrosByUser,
   APPLICATION_LLM_PURPOSES,
 } from "../dispatch/application-spend.ts";
+import { recordedApplicationCostsByUser, recordedCostTotal } from "../dispatch/application-cost.ts";
+import type { RecordedApplicationCost } from "../dispatch/application-cost.ts";
 import { COST_GATE_MICROS, COST_REPORT_WINDOW_DAYS, isAttempted } from "../dispatch/report.ts";
 import { attempts, grants, llmUsage, mailUsage, users } from "../platform/db/schema.ts";
 
@@ -44,6 +46,79 @@ export const PLAN_APPLICATIONS: Record<MarginPlan, number> = {
 };
 
 /**
+ * Net revenue per Application after Stripe's domestic fee (ADR 0018): what one
+ * Application earns on the Month plan ($0.1144) and the Week plan ($0.1866).
+ * The actual per-Application cost is compared against these.
+ */
+export const MONTH_NET_MICROS_PER_APPLICATION = netRevenueMicrosPerApplication(
+  PLAN_PRICE_MICROS.month,
+  PLAN_APPLICATIONS.month,
+);
+
+export const WEEK_NET_MICROS_PER_APPLICATION = netRevenueMicrosPerApplication(
+  PLAN_PRICE_MICROS.week,
+  PLAN_APPLICATIONS.week,
+);
+
+/**
+ * The measured variable cost of one completed Application, split by what spent
+ * it (ADR 0041). `llm` and `retry` are parts of the same total, never an
+ * alternative accounting of it.
+ */
+export interface ActualApplicationCost {
+  applications: number;
+  llmMicrosPerApplication: number;
+  browserMicrosPerApplication: number;
+  retryMicrosPerApplication: number;
+  totalMicrosPerApplication: number;
+}
+
+const emptyRecordedCost = () =>
+  ({
+    applications: 0,
+    browserMicros: 0,
+    llmMicros: 0,
+    retryMicros: 0,
+  }) satisfies RecordedApplicationCost;
+
+function addRecordedCost(into: RecordedApplicationCost, cost: RecordedApplicationCost) {
+  into.applications += cost.applications;
+  into.browserMicros += cost.browserMicros;
+  into.llmMicros += cost.llmMicros;
+  into.retryMicros += cost.retryMicros;
+}
+
+/**
+ * Averages the stored cost totals over the Applications that reported one.
+ * @param cost The stored totals.
+ * @returns The per-Application breakdown, or null when nothing reported a cost.
+ */
+export function actualApplicationCost(cost: RecordedApplicationCost) {
+  if (cost.applications === 0) {
+    return null;
+  }
+
+  return {
+    applications: cost.applications,
+    browserMicrosPerApplication: Math.round(cost.browserMicros / cost.applications),
+    llmMicrosPerApplication: Math.round(cost.llmMicros / cost.applications),
+    retryMicrosPerApplication: Math.round(cost.retryMicros / cost.applications),
+    totalMicrosPerApplication: Math.round(recordedCostTotal(cost) / cost.applications),
+  } satisfies ActualApplicationCost;
+}
+
+/** The actual cost per Application beside the Regular Stripe net revenue baselines (ADR 0018). */
+export interface MarginBaselineComparison {
+  plan: "month" | "week";
+  applications: number;
+  netRevenueMicrosPerApplication: number;
+  actualMicrosPerApplication: number | null;
+  marginMicrosPerApplication: number | null;
+  /** The actual cost as a share of the net revenue one Application brings in. */
+  costShareOfNetRevenue: number | null;
+}
+
+/**
  * Fixed monthly infrastructure: Fly machine $13.39, volume $1.50, Cloudflare
  * Workers $5.00 and the domain $0.87 (`docs/research/cost-m1.md` §1). Reported
  * beside the per-Application cost, never inside it (ADR 0026).
@@ -79,6 +154,8 @@ export interface MarginPlanRow {
   marginMicrosPerApplication: number | null;
   marginRatio: number | null;
   costGateMet: boolean | null;
+  /** The actual cost per Application from the stored per-Application columns, once one is measured. */
+  actual: ActualApplicationCost | null;
 }
 
 function planByUser(db: AppDatabase) {
@@ -127,7 +204,7 @@ function emptyTotals() {
   } satisfies Totals;
 }
 
-function rowFor(plan: MarginPlan, totals: Totals) {
+function rowFor(plan: MarginPlan, totals: Totals, recorded: RecordedApplicationCost) {
   const priceMicros = PLAN_PRICE_MICROS[plan];
   const applications = PLAN_APPLICATIONS[plan];
   const costMicros = totals.browserMicros + totals.anthropicMicros;
@@ -157,7 +234,8 @@ function rowFor(plan: MarginPlan, totals: Totals) {
     marginMicrosPerApplication: margin,
     marginRatio: margin === null || netPerApplication === 0 ? null : margin / netPerApplication,
     costGateMet: costPerCompleted === null ? null : costPerCompleted <= COST_GATE_MICROS,
-  };
+    actual: actualApplicationCost(recorded),
+  } satisfies MarginPlanRow;
 }
 
 /**
@@ -239,6 +317,25 @@ export function buildMarginReport(db: AppDatabase, clock: Clock) {
   const overallCost = overall.browserMicros + overall.anthropicMicros;
   const completed = overall.sent;
 
+  const recordedByUser = recordedApplicationCostsByUser(db, sinceMs);
+  const overallRecorded = emptyRecordedCost();
+  const recordedByPlan = new Map<MarginPlan, RecordedApplicationCost>();
+
+  for (const [userId, cost] of recordedByUser) {
+    addRecordedCost(overallRecorded, cost);
+
+    const plan = plans.get(userId);
+
+    if (plan === undefined || plan === null) {
+      continue;
+    }
+
+    const planCost = recordedByPlan.get(plan) ?? emptyRecordedCost();
+
+    addRecordedCost(planCost, cost);
+    recordedByPlan.set(plan, planCost);
+  }
+
   const otherAnthropic = db
     .select({ total: sql<number>`coalesce(sum(${llmUsage.costMicros}), 0)` })
     .from(llmUsage)
@@ -275,12 +372,19 @@ export function buildMarginReport(db: AppDatabase, clock: Clock) {
       completed === 0 ? null : Math.round(overall.browserMicros / completed),
     anthropicMicrosPerCompleted:
       completed === 0 ? null : Math.round(overall.anthropicMicros / completed),
+    actual: actualApplicationCost(overallRecorded),
     stripe: {
       domesticRate: STRIPE_DOMESTIC_FEE_RATE,
       fixedFeeMicros: STRIPE_FIXED_FEE_MICROS,
       internationalRate: STRIPE_INTERNATIONAL_FEE_RATE,
     },
-    plans: MARGIN_PLANS.map((plan) => rowFor(plan, byPlan.get(plan) ?? emptyTotals())),
+    plans: MARGIN_PLANS.map((plan) =>
+      rowFor(
+        plan,
+        byPlan.get(plan) ?? emptyTotals(),
+        recordedByPlan.get(plan) ?? emptyRecordedCost(),
+      ),
+    ),
     beside: {
       fixedInfraMicrosPerMonth: FIXED_INFRA_MICROS_PER_MONTH,
       mail: {

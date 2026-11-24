@@ -18,9 +18,11 @@ import {
 } from "../platform/db/schema.ts";
 import { commitForApplication, releaseForApplication } from "../billing/ledger.ts";
 import { getSetting } from "../platform/settings/index.ts";
+import { logError } from "../platform/log.ts";
 import { openApprovedPlan } from "../pipeline/approved-plan.ts";
 import { recordSnapshotSent } from "../pipeline/review-events.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
+import { recordApplicationVariableCosts } from "./application-cost.ts";
 
 const HOUR_MS = 60 * 60_000;
 
@@ -293,6 +295,12 @@ export function createOutcomes(deps: OutcomeDeps) {
 
     if (!recorded) {
       return false;
+    }
+
+    try {
+      recordApplicationVariableCosts(db, { at, userId: input.plan.userId });
+    } catch (error) {
+      logError("dispatch.cost", error);
     }
 
     const source = input.confirmedBy === "email" ? "email" : "system";
@@ -639,6 +647,12 @@ export function createOutcomes(deps: OutcomeDeps) {
           .where(eq(applications.id, application.id))
           .run();
       });
+
+      try {
+        recordApplicationVariableCosts(db, { at: clock.now(), userId: application.userId });
+      } catch (error) {
+        logError("dispatch.cost", error);
+      }
 
       recordApplicationEvent(db, clock, {
         applicationId: application.id,

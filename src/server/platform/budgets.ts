@@ -92,7 +92,14 @@ export function scaledBudget(base: number, perSubscriber: number, subscribers: n
   return Math.max(0, base) + Math.max(0, perSubscriber) * people;
 }
 
-function payingGrantsAt(at: number) {
+/**
+ * The ledger predicate for a paid period that is running at one instant. It is
+ * exported so a test can prove the subscriber-count query reads the covering
+ * index rather than a copy of the same predicate.
+ * @param at The instant to check, in epoch milliseconds.
+ * @returns The Drizzle condition.
+ */
+export function payingGrantsAt(at: number) {
   return and(
     eq(grants.source, PAYING_GRANT_SOURCE),
     lte(grants.startsAt, at),

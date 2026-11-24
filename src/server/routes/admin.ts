@@ -72,6 +72,7 @@ import {
   BILLING_USERS_PAGE_SIZE,
   billingUserView,
   billingUsersPage,
+  marginAdminView,
 } from "../billing/admin-view.ts";
 import { REFUND_REASONS, refundGrant } from "../billing/refunds.ts";
 import { reconciliationForAdmin } from "../billing/reconcile.ts";
@@ -1667,7 +1668,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     return context.json({ recordingUrl });
   });
 
-  routes.get("/margin", (context) => context.json(buildMarginReport(db, clock)));
+  routes.get("/margin", (context) => context.json(marginAdminView(buildMarginReport(db, clock))));
 
   routes.get("/provider-report", (context) =>
     context.json({ lab: buildLabReport(db), providers: buildProviderReport(db, clock) }),
