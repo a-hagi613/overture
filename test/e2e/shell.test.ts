@@ -170,7 +170,7 @@ test("the phone header and tab bar reach search, notifications, the profile hub 
   await Promise.all(
     [
       "Resume & Cover Letter",
-      "Personal Details",
+      "Saved answers",
       "Job Preferences",
       "Billing",
       "Account",

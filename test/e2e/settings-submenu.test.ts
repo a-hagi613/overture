@@ -24,7 +24,7 @@ test("the sidebar Profile submenu opens on hover and navigates to Account cleanl
   await expect(profileLink).toHaveAttribute("aria-expanded", "true");
 
   await Promise.all(
-    ["Resume & Cover Letter", "Personal Details", "Job Preferences", "Billing", "Account"].map(
+    ["Resume & Cover Letter", "Saved answers", "Job Preferences", "Billing", "Account"].map(
       async (item) => {
         await expect(aside.getByRole("menuitem", { name: item })).toBeVisible();
       },

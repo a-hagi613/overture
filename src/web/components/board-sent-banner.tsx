@@ -2,7 +2,7 @@ import { CheckCircle2 } from "lucide-react";
 
 import { copy } from "../../shared/copy.ts";
 import type { ApplicationDetail } from "../lib/board-api.ts";
-import { providerName, stamp } from "../lib/board-format.ts";
+import { stamp } from "../lib/board-format.ts";
 
 export function BoardSentBanner({ detail }: { detail: ApplicationDetail }) {
   const { dossier } = detail;
@@ -26,10 +26,7 @@ export function BoardSentBanner({ detail }: { detail: ApplicationDetail }) {
       <CheckCircle2 aria-hidden="true" className="mt-0.5 shrink-0 text-ok" size={18} />
       <div className="min-w-0">
         <p className="font-mono text-xs text-foreground">
-          {copy.board.dossier.sentVia(
-            providerName(sentVia.provider),
-            stamp(sentVia.submittedAt, detail.timeZone),
-          )}
+          {copy.board.dossier.sentVia(detail.company, stamp(sentVia.submittedAt, detail.timeZone))}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           {`${copy.board.dossier.sentOnce} ${confirmed}`}

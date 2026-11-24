@@ -85,7 +85,7 @@ async function expectOnboardingMatchesBoard(
 
 for (const width of [1280, 390]) {
   for (const theme of ["light", "dark"]) {
-    test(`the Your facts step matches the board at ${String(width)}px in ${theme}`, async ({
+    test(`the Saved answers step matches the board at ${String(width)}px in ${theme}`, async ({
       browser,
       onboardingServer,
     }) => {

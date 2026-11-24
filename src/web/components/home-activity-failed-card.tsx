@@ -2,6 +2,7 @@ import type { HomeActivityFailedRow } from "../lib/home-api.ts";
 
 import { copy } from "../../shared/copy.ts";
 import { stampText } from "../lib/home-time.ts";
+import { ApplyRecovery } from "./apply-recovery.tsx";
 import { dsMono } from "./ui/ds.ts";
 
 export function HomeActivityFailedCard(props: {
@@ -21,9 +22,7 @@ export function HomeActivityFailedCard(props: {
           {`${row.company}, ${row.title}`}
         </p>
         <p className="mt-1.5 text-sm leading-relaxed text-foreground">{row.reason}</p>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          {copy.home.activity.nothingCharged}
-        </p>
+        <ApplyRecovery applyUrl={row.applyUrl} company={row.company} />
       </div>
       <span className={`${dsMono} shrink-0 pt-0.5`}>{stampText(row.at, now, zone)}</span>
     </fieldset>

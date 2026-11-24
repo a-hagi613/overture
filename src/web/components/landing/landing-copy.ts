@@ -87,7 +87,7 @@ export const LANDING_COPY = {
       body: "Overture fills out the application form with a tailored cover letter and submits it directly on your behalf with confirmation tracking.",
       confirmed: "Confirmed · 12:18 pm",
       coverBadge: "Tailored cover letter",
-      meta: "Shopify · Submitted directly via Greenhouse",
+      meta: "Shopify · Submitted directly on their careers page",
       quote:
         "“Six years scaling 1,200+ retail accounts at 99.2% on-time dispatch is why Shopify's Merchant Operations role stood out…”",
       role: "Merchant Operations Manager",

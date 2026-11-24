@@ -37,7 +37,7 @@ const homeActivitySchema = z.object({
   }),
 });
 
-const postingClosedReason = "The role closed before Overture could send.";
+const postingClosedReason = "This posting closed before sending.";
 
 async function applicationDetailFor(owner: APIRequestContext, applicationId: string) {
   const response = await owner.get(`/api/applications/${encodeURIComponent(applicationId)}`);

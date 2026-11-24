@@ -36,6 +36,7 @@ import { parseSendWindow } from "../dispatch/planning.ts";
 import { nextSendAtOf, sendQueueOf } from "../pipeline/send-queue.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { copy, failedReasonText } from "../../shared/copy.ts";
+import { safeHttpUrl } from "../../shared/http-url.ts";
 import { TIER_1_FACT_KEYS, TIER_2_FACT_KEYS } from "../../shared/facts.ts";
 
 const MAX_REVIEW_ROWS = 4;
@@ -120,6 +121,7 @@ interface HomeActivityFailedView {
   company: string;
   title: string;
   at: number;
+  applyUrl: string | null;
   reason: string;
 }
 
@@ -329,9 +331,11 @@ export function createHomeRoutes(deps: {
 
     const failedRows = db
       .select({
+        applyUrl: applications.applyUrl,
         at: sql<number>`coalesce(${applications.sentAt}, ${applications.updatedAt})`,
         company: applications.companyName,
         id: applications.id,
+        postingUrl: applications.postingUrl,
         reason: applications.statusReason,
         title: applications.postingTitle,
       })
@@ -347,6 +351,7 @@ export function createHomeRoutes(deps: {
       failed: failedRows.map(
         (row) =>
           ({
+            applyUrl: safeHttpUrl(row.applyUrl) ?? safeHttpUrl(row.postingUrl),
             at: row.at,
             company: row.company,
             id: row.id,

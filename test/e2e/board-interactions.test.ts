@@ -486,7 +486,7 @@ for (const [width, scheme] of [
 
     const banner = page.getByRole("region", { name: "How this was sent" });
 
-    await expect(banner).toContainText("Sent via Greenhouse");
+    await expect(banner).toContainText("Sent directly to Halden Systems’ careers page");
     await expect(banner).toContainText("One submission. Nothing is sent after it.");
 
     await page.getByRole("tab", COVER_TAB).click();
@@ -494,14 +494,14 @@ for (const [width, scheme] of [
     await expect(page.getByText("maya-okafor-resume.pdf", { exact: true })).toBeVisible();
     await expect(page.getByText("The stored copy matches the bytes that were sent.")).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "What Overture wrote from your facts" }),
+      page.getByRole("heading", { name: "What Overture wrote from your saved answers" }),
     ).toBeVisible();
     await expect(page.getByText("current_city · revision 1")).toBeVisible();
-    await expect(page.getByText("From your facts", { exact: true })).toBeVisible();
+    await expect(page.getByText("From your saved answers", { exact: true })).toBeVisible();
     await expect(page.getByText("Typed here").first()).toBeVisible();
     await expect(page.getByText("L1 · ", { exact: false }).first()).toBeVisible();
     await expect(page.getByText("The PDF was not restyled or regenerated")).toBeVisible();
-    await expect(page.getByText("No fact was invented")).toBeVisible();
+    await expect(page.getByText("No saved answer was invented")).toBeVisible();
 
     const overflows = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -522,7 +522,7 @@ for (const [width, scheme] of [
     });
     await captureSheet(page, base);
     await captureSection(page, "The file is sent as-is", `${base}-file`);
-    await captureSection(page, "What Overture wrote from your facts", `${base}-trace`);
+    await captureSection(page, "What Overture wrote from your saved answers", `${base}-trace`);
     await captureSection(page, "What did not happen", `${base}-did-not-happen`);
 
     await context.close();
@@ -545,7 +545,7 @@ test("a sentence with no recorded source says so and withholds the no-invention 
   await page.getByRole("tab", COVER_TAB).click();
 
   await expect(page.getByText("No source recorded")).toBeVisible();
-  await expect(page.getByText("No fact was invented")).toHaveCount(0);
+  await expect(page.getByText("No saved answer was invented")).toHaveCount(0);
   await expect(page.getByText("The PDF was not restyled or regenerated")).toBeVisible();
 
   await context.close();
@@ -652,7 +652,7 @@ test("an application that was not sent says so on the cover tab", async ({
 
   await expect(page.getByText("This application has not been sent yet.")).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "What Overture wrote from your facts" }),
+    page.getByRole("heading", { name: "What Overture wrote from your saved answers" }),
   ).toHaveCount(0);
 
   await context.close();

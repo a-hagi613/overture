@@ -149,7 +149,7 @@ test("a seeded user's shell shows the live counts at 1280 and 390", async ({
 
   const sideNav = page.getByRole("navigation", { name: "Main" });
   const readyLabel = `Ready, ${String(counts.ready)} to send`;
-  const reviewLabel = `Review, ${String(counts.review)} waiting`;
+  const reviewLabel = `Review, ${String(counts.review)} to answer`;
   const inboxLabel = `Inbox, ${String(counts.inboxUnread)} unread`;
 
   await expect(sideNav).toBeVisible();

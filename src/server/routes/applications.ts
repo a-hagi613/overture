@@ -33,6 +33,7 @@ import {
   isBoardStage,
 } from "../../shared/board.ts";
 import { buildDossier } from "../../shared/dossier.ts";
+import { safeHttpUrl } from "../../shared/http-url.ts";
 
 const STRONG_SCORE = 80;
 
@@ -702,6 +703,7 @@ export function createApplicationRoutes(
             },
       note,
       posting: {
+        applyUrl: safeHttpUrl(application.applyUrl) ?? safeHttpUrl(application.postingUrl),
         ats: application.ats,
         id: application.postingId,
         location: application.locationRaw,
