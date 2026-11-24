@@ -372,6 +372,14 @@ export function createPreparationService(deps: {
 
   const targetsService = createTargetsService({ db, clock });
 
+  function markQuestionsFetched(postingId: string) {
+    catalogDb
+      .update(postings)
+      .set({ questionsFetchedAt: clock.now() })
+      .where(eq(postings.id, postingId))
+      .run();
+  }
+
   async function loadQuestions(posting: {
     postingId: string;
     ats: "greenhouse" | "lever" | "ashby" | "workable" | "personio";
@@ -447,6 +455,8 @@ export function createPreparationService(deps: {
       const inputs = questionInputsFromAts(atsQuestions, [posting.companyName]);
 
       await recordQuestions(inputs);
+
+      markQuestionsFetched(posting.postingId);
 
       return null;
     }
@@ -557,11 +567,7 @@ export function createPreparationService(deps: {
       });
     }
 
-    catalogDb
-      .update(postings)
-      .set({ questionsFetchedAt: clock.now() })
-      .where(eq(postings.id, posting.postingId))
-      .run();
+    markQuestionsFetched(posting.postingId);
 
     return null;
   }
