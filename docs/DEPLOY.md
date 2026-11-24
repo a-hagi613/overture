@@ -20,7 +20,7 @@ to Fly), against names only.
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`), a `security-and-restore` job (gitleaks over the history, the private-files guard, and the Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations, untouched `bg_jobs`), and the `ci-ok` aggregator every other job feeds |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
-| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
+| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets; `stripe_env` chooses the `sandbox` or `production` Stripe account, default `sandbox`), `sync-ops-secrets` (pushes the optional ops secrets and flags, including `ALLOWED_SIGNUP_EMAILS`, to `overture-web`), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
 | `.github/workflows/ops-admin-host.yml` | `workflow_dispatch` only, for the admin host: `status` (certificate table, Fly secret names only, app status), `add-cert` (idempotent certificate for `admin.tryoverture.com`, then the same report), `set-access-secrets` (pushes the Cloudflare Access values held as repository secrets to Fly, names only afterwards). Fails with a clear message while `FLY_API_TOKEN` is unset |
 | `.github/workflows/stapply-daily.yml` | Daily at 15:30 UTC (one hour after Stapply's 14:30 snapshot) and on `workflow_dispatch`; skips with a green notice until the R2 repository secrets or `CATALOG_REFRESH_SECRET` are configured. Builds `catalog.sqlite` with DuckDB from the 28 per-board `jobs.parquet` files, delta-syncs it against the previous R2 snapshot, tags it, vacuums and compresses it, then publishes `catalog/latest.sqlite.zst`, `catalog/latest.json` and `catalog/snapshots/YYYY-MM-DD.sqlite.zst` to R2 or relays the signed refresh to `overture-web` |
 | `.github/workflows/vacuum-db.yml` | Weekly (Sundays 05:00 UTC, also `workflow_dispatch` with `dry_run` and `force`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise dry-runs `/data/app.sqlite`, and only when its freelist exceeds 50 MB (or `force` is set) restarts the one machine in maintenance mode, vacuums it, restarts the server and polls `/api/health` |
@@ -355,29 +355,47 @@ Regular Stripe Billing handles the charges and Stripe Tax calculates the tax; Ov
 payment processor (ADR 0018, ADR 0031). `scripts/setup-stripe.ts` creates the two recurring prices and the webhook the
 app verifies, and configures the billing portal; it is idempotent, so the same run can be repeated safely.
 
-### 1. Store the key as a repository secret
+### 1. Store the keys as repository secrets
+
+The owner keeps two Stripe accounts, each with its own secret key, plus the legacy single-key name as a fallback:
 
 ```sh
-gh secret set STRIPE_SECRET_KEY -b <sk_live_…-from-the-Stripe-dashboard> -R a-hagi613/overture
+gh secret set STRIPE_SANDBOX_SECRET_KEY -b <sk_test_…-from-the-Sandbox-dashboard> -R a-hagi613/overture
+gh secret set STRIPE_PROD_SECRET_KEY -b <sk_live_…-from-the-Production-dashboard> -R a-hagi613/overture
 ```
 
-A restricted key (`rk_live_…`) works when it grants write access to Products, Prices, Webhooks and Billing Portal
-configurations; the script accepts `sk_test_`, `rk_test_`, `sk_live_` and `rk_live_` prefixes and refuses any other.
-The key is never printed, committed or written to a file other than the temporary env file below. The script prints
-only the key's mode (`test` or `live`) and public Stripe ids (`prod_…`, `price_…`, `we_…`, `bpc_…`).
+`setup-stripe` reads `STRIPE_SANDBOX_SECRET_KEY` for `stripe_env=sandbox` and `STRIPE_PROD_SECRET_KEY` for
+`stripe_env=production`; in production it falls back to the older `STRIPE_SECRET_KEY` repository secret when the
+production name is unset. It fails with a clear `::error::` naming the missing secret rather than guessing.
+
+A restricted key (`rk_test_…` / `rk_live_…`) works when it grants write access to Products, Prices, Webhooks and
+Billing Portal configurations; the script accepts `sk_test_`, `rk_test_`, `sk_live_` and `rk_live_` prefixes and
+refuses any other. The key is never printed, committed or written to a file other than the temporary env file below.
+The script prints only the key's mode (`test` or `live`) and public Stripe ids (`prod_…`, `price_…`, `we_…`,
+`bpc_…`).
 
 ### 2. Run the setup from GitHub Actions
 
 ```sh
-gh workflow run ops-live.yml -f action=setup-stripe -R a-hagi613/overture
+gh workflow run ops-live.yml -f action=setup-stripe -f stripe_env=sandbox -R a-hagi613/overture
+gh workflow run ops-live.yml -f action=setup-stripe -f stripe_env=production -R a-hagi613/overture
 ```
 
+`stripe_env` is a choice input (`sandbox` or `production`) that defaults to `sandbox`, so a run without it configures
+the sandbox account. The workflow picks that account's secret, masks it with `::add-mask::`, and only then exports it
+to the script and to `flyctl secrets import`; an unknown value stops the run.
+
 The workflow reads the Fly secret names, passes `--rotate-webhook` automatically when `STRIPE_WEBHOOK_SECRET` is not on
-the app yet (or when the `rotate_webhook` input is `true`), runs the script, masks every secret it is about to set and
-sets them on `overture-web` in one `flyctl secrets import` call, so the values never appear in a command line. A fresh 32-byte `CARD_FINGERPRINT_SECRET` is generated
+the app yet, when the `rotate_webhook` input is `true`, or when the app currently runs the other account's key
+(`CURRENT_STRIPE_ENV`, read over SSH from the key prefix only and never printed, differs from `stripe_env`), runs the
+script, masks every secret it is about to set and
+sets them on `overture-web` in one `flyctl secrets import` call, so the values never appear in a command line. That
+last check makes a `sandbox` ↔ `production` switch rotate the webhook even when the caller omits `rotate_webhook`, so
+the app always receives the matching account's signing secret in the same import. A fresh 32-byte `CARD_FINGERPRINT_SECRET` is generated
 with `openssl rand -hex 32` only when the app does not have one. The script's `STRIPE_WEBHOOK_SECRET` lands in
 `/tmp/stripe-setup.env` (mode `0600`), which an `always()` step deletes; the workflow finishes by polling
-`https://tryoverture.com/api/health`.
+`https://tryoverture.com/api/health`. The step summary records the configured `stripe_env` and the variable names
+written to the app, never their values.
 
 | Plan | Product | Price | Lookup key |
 |---|---|---|---|
@@ -456,6 +474,21 @@ with the drift message.
 
 Against a test key this creates test-mode products, prices, a webhook and a portal; delete them in the dashboard when
 you are done. `--rotate-webhook` replaces the endpoint and writes the new `STRIPE_WEBHOOK_SECRET` to the env file.
+
+## Signup allowlist for regular testers (optional, owner runbook)
+
+`sync-ops-secrets` also pushes the optional regular-testers allowlist from a repository secret to `overture-web`:
+
+```sh
+gh secret set ALLOWED_SIGNUP_EMAILS -R a-hagi613/overture
+gh workflow run ops-live.yml -f action=sync-ops-secrets -R a-hagi613/overture
+```
+
+When the repository secret is set, the action masks it, adds `ALLOWED_SIGNUP_EMAILS=…` to the same single
+`flyctl secrets import -a overture-web` call as the other ops secrets, and lists only the variable name in the step
+summary. An unset secret is skipped, so a run never clears a value already on the app; remove it deliberately with
+`flyctl secrets unset -a overture-web ALLOWED_SIGNUP_EMAILS`. A run with nothing to import fails with
+`No secrets or flags were configured to sync.` The action still finishes by polling the health route.
 
 ## Push notifications and the catalog seed (owner runbook)
 

@@ -32,6 +32,14 @@ on:
         required: false
         type: boolean
         default: false
+      stripe_env:
+        description: "Stripe environment to configure on overture-web"
+        required: false
+        type: choice
+        options:
+          - sandbox
+          - production
+        default: sandbox
       force_vacuum:
         description: "Compact the application database even when its freelist is below the 50 MB threshold"
         required: false
@@ -297,26 +305,55 @@ jobs:
           else
             echo "fingerprint_present=false" >> "$GITHUB_OUTPUT"
           fi
+          current_stripe_env="unknown"
+          probe="$(timeout 30s flyctl ssh console -a overture-web -C "sh -c 'case \"\${STRIPE_SECRET_KEY:-}\" in sk_test_*|rk_test_*) printf sandbox;; sk_live_*|rk_live_*) printf production;; \"\") printf none;; *) printf unknown;; esac'" 2>/dev/null)" || probe=""
+          case "$probe" in
+            sandbox|production|none) current_stripe_env="$probe" ;;
+          esac
+          echo "current_stripe_env=$current_stripe_env" >> "$GITHUB_OUTPUT"
+          echo "::notice::The Stripe environment currently active on overture-web is ${current_stripe_env}."
 
       - name: Create the plans, webhook and portal and set the Fly secrets
         if: steps.guard.outputs.skip != 'true' && inputs.action == 'setup-stripe'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_ENV: ${{ inputs.stripe_env || 'sandbox' }}
+          STRIPE_SANDBOX_SECRET_KEY: ${{ secrets.STRIPE_SANDBOX_SECRET_KEY }}
+          STRIPE_PROD_SECRET_KEY: ${{ secrets.STRIPE_PROD_SECRET_KEY }}
+          STRIPE_SECRET_KEY_LEGACY: ${{ secrets.STRIPE_SECRET_KEY }}
           APP_ORIGIN: https://tryoverture.com
           ROTATE_WEBHOOK: ${{ inputs.rotate_webhook }}
           RECONCILE_PRICES: ${{ inputs.reconcile_prices }}
           WEBHOOK_PRESENT: ${{ steps.stripe-secrets.outputs.webhook_present }}
+          CURRENT_STRIPE_ENV: ${{ steps.stripe-secrets.outputs.current_stripe_env }}
           FINGERPRINT_PRESENT: ${{ steps.stripe-secrets.outputs.fingerprint_present }}
         run: |
           set -euo pipefail
-          if [ -z "${STRIPE_SECRET_KEY:-}" ]; then
-            echo "::error::The STRIPE_SECRET_KEY repository secret is not set. Add it with gh secret set STRIPE_SECRET_KEY -R a-hagi613/overture, then re-run."
-            exit 1
-          fi
+          stripe_env="${STRIPE_ENV:-sandbox}"
+          case "$stripe_env" in
+            sandbox)
+              STRIPE_SECRET_KEY="${STRIPE_SANDBOX_SECRET_KEY:-}"
+              if [ -z "$STRIPE_SECRET_KEY" ]; then
+                echo "::error::The STRIPE_SANDBOX_SECRET_KEY repository secret is not set. Add it with gh secret set STRIPE_SANDBOX_SECRET_KEY -R a-hagi613/overture, then re-run with stripe_env=sandbox."
+                exit 1
+              fi
+              ;;
+            production)
+              STRIPE_SECRET_KEY="${STRIPE_PROD_SECRET_KEY:-${STRIPE_SECRET_KEY_LEGACY:-}}"
+              if [ -z "$STRIPE_SECRET_KEY" ]; then
+                echo "::error::The STRIPE_PROD_SECRET_KEY repository secret is not set and no legacy STRIPE_SECRET_KEY fallback is available. Add it with gh secret set STRIPE_PROD_SECRET_KEY -R a-hagi613/overture, then re-run with stripe_env=production."
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::Unknown stripe_env '${stripe_env}'; expected sandbox or production."
+              exit 1
+              ;;
+          esac
           echo "::add-mask::$STRIPE_SECRET_KEY"
+          export STRIPE_SECRET_KEY
           extra_args=(--out-env /tmp/stripe-setup.env)
-          if [ "${ROTATE_WEBHOOK}" = "true" ] || [ "${WEBHOOK_PRESENT}" != "true" ]; then
+          if [ "${ROTATE_WEBHOOK}" = "true" ] || [ "${WEBHOOK_PRESENT}" != "true" ] || [ "${CURRENT_STRIPE_ENV}" != "${stripe_env}" ]; then
             extra_args+=(--rotate-webhook)
           fi
           if [ "${RECONCILE_PRICES}" = "true" ]; then
@@ -335,17 +372,29 @@ jobs:
             "STRIPE_PRICE_WEEK=$week"
             "STRIPE_PRICE_MONTH=$month"
           )
+          set_names=("STRIPE_SECRET_KEY" "STRIPE_PRICE_WEEK" "STRIPE_PRICE_MONTH")
           if grep -q '^STRIPE_WEBHOOK_SECRET=' /tmp/stripe-setup.env; then
             webhook_secret="$(value STRIPE_WEBHOOK_SECRET)"
             echo "::add-mask::$webhook_secret"
             set_args+=("STRIPE_WEBHOOK_SECRET=$webhook_secret")
+            set_names+=("STRIPE_WEBHOOK_SECRET")
           fi
           if [ "${FINGERPRINT_PRESENT}" != "true" ]; then
             fingerprint="$(openssl rand -hex 32)"
             echo "::add-mask::$fingerprint"
             set_args+=("CARD_FINGERPRINT_SECRET=$fingerprint")
+            set_names+=("CARD_FINGERPRINT_SECRET")
           fi
           printf '%s\n' "${set_args[@]}" | flyctl secrets import -a overture-web
+          {
+            echo "### Stripe environment configured on overture-web"
+            echo ""
+            echo "Configured \`stripe_env\`: \`${stripe_env}\`."
+            echo ""
+            echo "Variable names set on overture-web (values are never printed):"
+            echo ""
+            printf -- '- `%s`\n' "${set_names[@]}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify the production health route
         if: steps.guard.outputs.skip != 'true' && inputs.action == 'setup-stripe'
@@ -531,6 +580,7 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           ALERT_NTFY_URL: ${{ secrets.ALERT_NTFY_URL }}
           CATALOG_REFRESH_SECRET: ${{ secrets.CATALOG_REFRESH_SECRET }}
+          ALLOWED_SIGNUP_EMAILS: ${{ secrets.ALLOWED_SIGNUP_EMAILS }}
           ENABLE_CATALOG_R2_HOT_SWAP: ${{ inputs.enable_catalog_r2_hot_swap }}
         run: |
           set -euo pipefail
@@ -545,6 +595,11 @@ jobs:
             echo "::add-mask::$CATALOG_REFRESH_SECRET"
             set_args+=("CATALOG_REFRESH_SECRET=$CATALOG_REFRESH_SECRET")
             key_names+=("CATALOG_REFRESH_SECRET")
+          fi
+          if [ -n "${ALLOWED_SIGNUP_EMAILS:-}" ]; then
+            echo "::add-mask::$ALLOWED_SIGNUP_EMAILS"
+            set_args+=("ALLOWED_SIGNUP_EMAILS=$ALLOWED_SIGNUP_EMAILS")
+            key_names+=("ALLOWED_SIGNUP_EMAILS")
           fi
           if [ "${ENABLE_CATALOG_R2_HOT_SWAP:-false}" = "true" ]; then
             set_args+=("CATALOG_R2_HOT_SWAP=true")
