@@ -44,6 +44,12 @@ import {
 import { readCatsoneQuestions, CATSONE_FORM_SELECTOR } from "../dispatch/ats/catsone.ts";
 import { readOnlyfyQuestions, ONLYFY_FORM_SELECTOR } from "../dispatch/ats/onlyfy.ts";
 import { readVarbiQuestions, VARBI_FORM_SELECTOR } from "../dispatch/ats/varbi.ts";
+import {
+  acceptJobviteConsent,
+  readJobviteQuestions,
+  JOBVITE_FORM_SELECTOR,
+} from "../dispatch/ats/jobvite.ts";
+import { readHerpQuestions, HERP_FORM_SELECTOR } from "../dispatch/ats/herp.ts";
 import type { LoginWallEvidence } from "../pipeline/login-wall.ts";
 import { detectLoginWall } from "../pipeline/login-wall.ts";
 import { assetExtension, formSignature, sanitiseFormHtml } from "./sanitise.ts";
@@ -92,6 +98,8 @@ export const FORM_FIELD_SELECTORS = {
   catsone: `${CATSONE_FORM_SELECTOR} input:not([type='hidden'])`,
   onlyfy: `${ONLYFY_FORM_SELECTOR} input:not([type='hidden'])`,
   varbi: `${VARBI_FORM_SELECTOR} input:not([type='hidden'])`,
+  jobvite: `${JOBVITE_FORM_SELECTOR} input:not([type='hidden']), ${JOBVITE_FORM_SELECTOR} select`,
+  herp: `${HERP_FORM_SELECTOR} input:not([type='hidden']), ${HERP_FORM_SELECTOR} textarea, ${HERP_FORM_SELECTOR} select`,
 } as const satisfies Record<FixtureAts, string>;
 
 export const FORM_RENDER_TIMEOUT_MS = 20_000;
@@ -270,6 +278,10 @@ async function withFormPage<T>(
         throw new LoginWallError(verdict.evidence);
       }
 
+      if (ats === "jobvite" && !(await acceptJobviteConsent(page))) {
+        throw new FormNotRenderedError(ats);
+      }
+
       await waitForForm(page, ats);
 
       const raw = await page.content();
@@ -393,6 +405,14 @@ async function questionsFor(ats: FixtureAts, page: Page) {
 
   if (ats === "varbi") {
     return readVarbiQuestions(page);
+  }
+
+  if (ats === "jobvite") {
+    return readJobviteQuestions(page);
+  }
+
+  if (ats === "herp") {
+    return readHerpQuestions(page);
   }
 
   return readAshbyQuestions(page);

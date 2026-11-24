@@ -53,7 +53,7 @@ function catalogTables() {
   return tablesSchema.parse(
     catalog.sqlite
       .query(
-        "select name, sql as structure from sqlite_master where type = 'table' and name not like 'sqlite_%' and name not like '__drizzle_%' and sql not like 'CREATE VIRTUAL TABLE%' and name not like 'postings_fts_%'",
+        "select name, sql as structure from sqlite_master where type = 'table' and name not like 'sqlite_%' and name not like '__drizzle_%' and sql not like 'CREATE VIRTUAL TABLE%' and name not like 'postings_fts_%' and name not like 'geo_places_rtree_%'",
       )
       .all(),
   );

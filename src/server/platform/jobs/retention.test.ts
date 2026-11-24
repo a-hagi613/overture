@@ -207,7 +207,7 @@ describe("pruning the catalog by age", () => {
     );
 
     catalogSqlite.run(
-      "insert into postings_fts (rowid, title, company, location, department) values (?, 'Engineer ancient', 'Ferro Cloud', null, null)",
+      "insert into postings_fts (rowid, title, company, department, skills_text, esco_synonyms, location_text) values (?, 'Engineer ancient', 'Ferro Cloud', '', '', '', '')",
       [rowid],
     );
 

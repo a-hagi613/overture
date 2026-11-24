@@ -326,7 +326,13 @@ function fixture() {
 }
 
 function filter(overrides: Partial<SupplyFilters> = {}) {
-  return { location: null, remote: false, role: null, ...overrides } satisfies SupplyFilters;
+  return {
+    location: null,
+    radiusKm: null,
+    remote: false,
+    role: null,
+    ...overrides,
+  } satisfies SupplyFilters;
 }
 
 function countQueries(queries: readonly LoggedQuery[]) {

@@ -7,6 +7,8 @@ import { companies, companyBoards, postings } from "../src/server/platform/db/ca
 import { contentHash } from "../src/server/catalog/content-hash.ts";
 import { salaryPeriodForColumn, storePostingTags } from "../src/server/catalog/tag-store.ts";
 import { tagPosting } from "../src/server/catalog/tag-rules.ts";
+import { rebuildPostingLocations, seedGeoPlaces } from "../src/server/catalog/geo-store.ts";
+import { salaryUsdUpdateSql } from "../src/server/catalog/salary-usd.ts";
 
 const COMPANY_NAMES = [
   "Northwind Systems",
@@ -203,6 +205,31 @@ export function seedTemplateCatalog(db: ReturnType<typeof openCatalogDatabase>["
 
       storePostingTags(db, postingId, tags, now);
     }
+  }
+
+  seedGeoPlaces(db, {
+    only: [
+      "Toronto",
+      "Mississauga",
+      "Markham",
+      "Brampton",
+      "Ottawa",
+      "Vancouver",
+      "New York City",
+      "Austin",
+      "London",
+      "Berlin",
+      "San Francisco",
+      "Palo Alto",
+      "San Jose",
+    ],
+  });
+  rebuildPostingLocations(db);
+
+  const salaryUpdate = salaryUsdUpdateSql();
+
+  if (salaryUpdate !== null) {
+    db.$client.run(salaryUpdate);
   }
 }
 

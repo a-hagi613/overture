@@ -22,7 +22,12 @@ const CACHE_MAX = 256;
 const caches = new WeakMap<CatalogDatabase, SupplyCache>();
 
 function cacheKeyOf(filters: SupplyFilters) {
-  return JSON.stringify([filters.role, filters.location?.toLowerCase() ?? null, filters.remote]);
+  return JSON.stringify([
+    filters.role,
+    filters.location?.toLowerCase() ?? null,
+    filters.radiusKm,
+    filters.remote,
+  ]);
 }
 
 function roleCondition(db: CatalogDatabase, role: NonNullable<SupplyFilters["role"]>) {
@@ -52,7 +57,9 @@ function filtersCondition(db: CatalogDatabase, filters: SupplyFilters) {
   }
 
   if (filters.location !== null) {
-    conditions.push(resolvedLocationCondition(filters.location));
+    conditions.push(
+      resolvedLocationCondition(db, filters.location, { radiusKm: filters.radiusKm }),
+    );
   }
 
   if (filters.remote) {

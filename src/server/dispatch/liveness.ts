@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { Ats as RegistryAts } from "../../shared/ats.ts";
-import { isBatchFourAts } from "../../shared/ats.ts";
+import { isBatchFourAts, isWaveTwoAts } from "../../shared/ats.ts";
 import type { BoardRegion } from "../catalog/board-feed.ts";
 import type { Env } from "../config/env.ts";
 
@@ -139,7 +139,7 @@ export function createPostingLiveness(env: Env) {
         return "open";
       }
 
-      if (target.ats === "personio" || isBatchFourAts(target.ats)) {
+      if (target.ats === "personio" || isBatchFourAts(target.ats) || isWaveTwoAts(target.ats)) {
         return "unknown";
       }
 

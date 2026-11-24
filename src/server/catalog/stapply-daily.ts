@@ -13,8 +13,30 @@ import { salaryPeriodForColumn } from "./tag-store.ts";
 import { tagPosting } from "./tag-rules.ts";
 
 /**
+ * The hard ceiling for the uncompressed `catalog.sqlite` (issue #630). The `overture-web` machine has a
+ * 10 GB `/data` volume and keeps the previous snapshot beside the new one for a hot swap; staying under
+ * 2.5 GB leaves room for two snapshots, the zstd file and the app database with wide headroom.
+ */
+export const CATALOG_SIZE_BUDGET_BYTES = 2_500_000_000;
+
+/**
+ * Refuses a snapshot that would leave too little room for the next build.
+ * @param bytes The uncompressed `catalog.sqlite` size.
+ * @returns The same size, when it fits.
+ */
+export function assertCatalogSizeWithinBudget(bytes: number) {
+  if (bytes >= CATALOG_SIZE_BUDGET_BYTES) {
+    throw new Error(
+      `catalog.sqlite is ${String(bytes)} bytes, over the ${String(CATALOG_SIZE_BUDGET_BYTES)} byte budget; prune the snapshot before publishing`,
+    );
+  }
+
+  return bytes;
+}
+
+/**
  * The Stapply public snapshot base. Each board publishes `jobs.parquet` and a combined `all.parquet`; the daily pass
- * reads only the 28 per-board files, with column projection, and never `all.parquet` (issue #568).
+ * reads only the 30 per-board files, with column projection, and never `all.parquet` (issue #568).
  */
 export const STAPPLY_JOBS_BASE_URL = "https://storage.stapply.ai/jobs/v1";
 
@@ -73,7 +95,7 @@ export interface StapplyBoardSource {
 }
 
 /**
- * The 28 verified boards of issue #563, each pointing at its own `jobs.parquet`.
+ * The 30 verified boards of issues #563 and #633, each pointing at its own `jobs.parquet`.
  * @param baseUrl The snapshot base, `https://storage.stapply.ai/jobs/v1` in production.
  * @returns One source per ATS in the registry, in registry order.
  */

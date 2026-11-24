@@ -4,7 +4,13 @@ import { z } from "zod";
 
 import type { FormQuestion } from "./send-plan.ts";
 import type { QuestionFieldType } from "../../shared/questions.ts";
-import type { BatchFourAts, BatchOneAts, BatchThreeAts, BatchTwoAts } from "../../shared/ats.ts";
+import type {
+  BatchFourAts,
+  BatchOneAts,
+  BatchThreeAts,
+  BatchTwoAts,
+  WaveTwoAts,
+} from "../../shared/ats.ts";
 import { isBatchFourAts } from "../../shared/ats.ts";
 
 import { formSignature, sanitiseFormHtml } from "../fixtures/sanitise.ts";
@@ -13,6 +19,9 @@ import { assertNoLiveTraffic, LiveServiceRequestError } from "../platform/outbou
 import type { LoginWallFormRead } from "./login-wall.ts";
 import { detectLoginWall } from "./login-wall.ts";
 import { readBatch4FormHtml } from "./batch4-forms.ts";
+import { readHerpFormHtml, readJobviteFormHtml } from "./wave2-forms.ts";
+import { herpApplyUrl } from "../dispatch/ats/herp.ts";
+import { jobviteApplyUrl } from "../dispatch/ats/jobvite.ts";
 import { readBreezyFormHtml } from "./breezy-form.ts";
 import { personioApplyUrl, readPersonioFormHtml } from "./personio-form.ts";
 import {
@@ -56,6 +65,8 @@ export const FORM_READ_PATHS = [
   "careerplug_html",
   "jazzhr_html",
   "batch4_html",
+  "jobvite_html",
+  "herp_html",
   "browser",
 ] as const;
 
@@ -91,7 +102,8 @@ export type FormReadAts =
   | BatchOneAts
   | BatchTwoAts
   | BatchThreeAts
-  | BatchFourAts;
+  | BatchFourAts
+  | WaveTwoAts;
 
 export interface FormReadTarget {
   ats: FormReadAts;
@@ -980,6 +992,20 @@ export function createPlainFormReader(
     return await fetchFormPage(input.applyUrl ?? input.url, readBatch4FormHtml);
   }
 
+  async function jobvite(input: FormReadTarget) {
+    const posting = input.applyUrl ?? input.url;
+    const url = jobviteApplyUrl(posting) ?? posting;
+
+    return await fetchFormPage(url, readJobviteFormHtml);
+  }
+
+  async function herp(input: FormReadTarget) {
+    const posting = input.applyUrl ?? input.url;
+    const url = herpApplyUrl(posting) ?? posting;
+
+    return await fetchFormPage(url, readHerpFormHtml);
+  }
+
   return {
     async read(input: FormReadTarget) {
       try {
@@ -1041,6 +1067,14 @@ export function createPlainFormReader(
 
         if (isBatchFourAts(input.ats)) {
           return await batch4(input);
+        }
+
+        if (input.ats === "jobvite") {
+          return await jobvite(input);
+        }
+
+        if (input.ats === "herp") {
+          return await herp(input);
         }
 
         return await pinpoint(input);

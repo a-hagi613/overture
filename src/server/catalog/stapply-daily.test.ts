@@ -194,7 +194,9 @@ describe("buildStapplyIngestQuery", () => {
     expect(sql).not.toMatch(/read_parquet\('[^']*all\.parquet/iu);
     expect(sql).toContain("https://storage.example/jobs/greenhouse/jobs.parquet");
     expect(sql).toContain("https://storage.example/jobs/varbi/jobs.parquet");
-    expect(sql.match(/read_parquet\(/gu) ?? []).toHaveLength(28);
+    expect(sql).toContain("https://storage.example/jobs/jobvite/jobs.parquet");
+    expect(sql).toContain("https://storage.example/jobs/herp/jobs.parquet");
+    expect(sql.match(/read_parquet\(/gu) ?? []).toHaveLength(30);
   });
 
   test("adds the seed horizon only when one is given", () => {
