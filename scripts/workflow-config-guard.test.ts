@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   findAdminHostWorkflowProblems,
   findBunVersionDrift,
+  findRecoveryWorkflowProblems,
   findVacuumWorkflowProblems,
   readBunVersions,
   readWorkflowStep,
@@ -301,6 +302,145 @@ test("an admin-host workflow that echoes a braced Access value is reported", () 
   expect(
     findAdminHostWorkflowProblems({ workflow }).some((problem) =>
       problem.includes("prints a Cloudflare Access value"),
+    ),
+  ).toBe(true);
+});
+
+function recoveryWorkflow() {
+  return readFileSync(".github/workflows/ops-live.yml", "utf8");
+}
+
+const RESET_DIAGNOSTICS_STEP =
+  "Show the overture-web status, volume and processes before a catalog reset";
+
+const RESET_DELETE_STEP = "Delete only the catalog database files on the overture-web volume";
+
+const SYNC_HEALTH_STEP = "Verify the production health route after the ops secrets sync";
+
+test("the shipped recovery actions never touch the application database and never print a secret", () => {
+  expect(findRecoveryWorkflowProblems({ opsLive: recoveryWorkflow() })).toStrictEqual([]);
+});
+
+test("an ops-live workflow without the recovery actions is reported", () => {
+  const workflow = recoveryWorkflow().replace("          - reset-catalog\n", "");
+
+  expect(
+    findRecoveryWorkflowProblems({ opsLive: workflow }).some((problem) =>
+      problem.includes("reset-catalog action"),
+    ),
+  ).toBe(true);
+});
+
+test("a catalog reset that deletes the application database is reported", () => {
+  const workflow = recoveryWorkflow().replace(
+    "/data/catalog.sqlite-journal",
+    "/data/app.sqlite /data/catalog.sqlite-journal",
+  );
+
+  expect(
+    findRecoveryWorkflowProblems({ opsLive: workflow }).some((problem) =>
+      problem.includes("never touched"),
+    ),
+  ).toBe(true);
+});
+
+test("a catalog reset that shows no diagnostics first is reported", () => {
+  const workflow = recoveryWorkflow();
+  const diagnostics = readWorkflowStep(workflow, RESET_DIAGNOSTICS_STEP) ?? "";
+  const withoutDiagnostics = workflow.replace(diagnostics, "");
+
+  expect(
+    findRecoveryWorkflowProblems({ opsLive: withoutDiagnostics }).some((problem) =>
+      problem.includes("volume and processes first"),
+    ),
+  ).toBe(true);
+});
+
+test("a catalog reset that deletes before it shows the diagnostics is reported", () => {
+  const workflow = recoveryWorkflow();
+  const diagnostics = readWorkflowStep(workflow, RESET_DIAGNOSTICS_STEP) ?? "";
+  const deletion = readWorkflowStep(workflow, RESET_DELETE_STEP) ?? "";
+
+  const reordered = workflow
+    .replace(diagnostics, "")
+    .replace(deletion, `${deletion}${diagnostics}`);
+
+  expect(
+    findRecoveryWorkflowProblems({ opsLive: reordered }).some((problem) =>
+      problem.includes("deletes before it shows the diagnostics"),
+    ),
+  ).toBe(true);
+});
+
+test("a catalog reset that kills Litestream is reported", () => {
+  const workflow = recoveryWorkflow().replace(
+    "pkill -9 -f 'bun run",
+    "pkill -9 -f litestream || pkill -9 -f 'bun run",
+  );
+
+  expect(
+    findRecoveryWorkflowProblems({ opsLive: workflow }).some((problem) =>
+      problem.includes("kills Litestream"),
+    ),
+  ).toBe(true);
+});
+
+test("an ops-secrets sync that does not mask a value is reported", () => {
+  const workflow = recoveryWorkflow().replace('echo "::add-mask::$ALERT_NTFY_URL"\n', "");
+
+  expect(
+    findRecoveryWorkflowProblems({ opsLive: workflow }).some((problem) =>
+      problem.includes("mask ALERT_NTFY_URL"),
+    ),
+  ).toBe(true);
+});
+
+test("an ops-secrets sync that prints a value is reported", () => {
+  const workflow = recoveryWorkflow().replace(
+    "          set_args=()",
+    '          echo "$ALERT_NTFY_URL"\n          set_args=()',
+  );
+
+  expect(
+    findRecoveryWorkflowProblems({ opsLive: workflow }).some((problem) =>
+      problem.includes("prints a secret value"),
+    ),
+  ).toBe(true);
+});
+
+test("an ops-secrets sync that writes values into the step summary is reported", () => {
+  const workflow = recoveryWorkflow().replace(
+    `printf -- '- \`%s\`\\n' "\${key_names[@]}"`,
+    `printf -- '- %s\\n' "\${set_args[@]}"`,
+  );
+
+  expect(
+    findRecoveryWorkflowProblems({ opsLive: workflow }).some((problem) =>
+      problem.includes("step summary"),
+    ),
+  ).toBe(true);
+});
+
+test("an ops-secrets sync that accepts an empty configuration is reported", () => {
+  const workflow = recoveryWorkflow().replace(
+    "::error::No secrets or flags were configured to sync.",
+    "::notice::nothing to do",
+  );
+
+  expect(
+    findRecoveryWorkflowProblems({ opsLive: workflow }).some((problem) =>
+      problem.includes("refuse an empty sync"),
+    ),
+  ).toBe(true);
+});
+
+test("an ops-secrets sync without a health check is reported", () => {
+  const workflow = recoveryWorkflow();
+  const health = readWorkflowStep(workflow, SYNC_HEALTH_STEP) ?? "";
+
+  expect(
+    findRecoveryWorkflowProblems({ opsLive: workflow.replace(health, "") }).some((problem) =>
+      problem.includes("does not verify the health route"),
     ),
   ).toBe(true);
 });

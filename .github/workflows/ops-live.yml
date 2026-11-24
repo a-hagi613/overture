@@ -15,6 +15,8 @@ on:
           - setup-stripe
           - live-diagnostics
           - vacuum-db
+          - reset-catalog
+          - sync-ops-secrets
       rotate_webhook:
         description: "Replace the Stripe webhook endpoint and rotate its signing secret"
         required: false
@@ -32,6 +34,11 @@ on:
         default: false
       force_vacuum:
         description: "Compact the application database even when its freelist is below the 50 MB threshold"
+        required: false
+        type: boolean
+        default: false
+      enable_catalog_r2_hot_swap:
+        description: "Set CATALOG_R2_HOT_SWAP=true on overture-web during sync-ops-secrets"
         required: false
         type: boolean
         default: false
@@ -396,3 +403,168 @@ jobs:
           else
             bun run scripts/vacuum-fly.ts compact
           fi
+
+      - name: Show the overture-web status, volume and processes before a catalog reset
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'reset-catalog'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          # Diagnostics are best effort: an unresponsive or down machine must never hide the status that explains why.
+          echo "::group::flyctl status -a overture-web"
+          timeout 30s flyctl status -a overture-web || true
+          echo "::endgroup::"
+          echo "::group::/data and the processes on overture-web"
+          timeout 30s flyctl ssh console -a overture-web -C "sh -c 'ls -lh /data; df -h /data; ps aux'" || true
+          echo "::endgroup::"
+
+      - name: Delete only the catalog database files on the overture-web volume
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'reset-catalog'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          # The catalog is rebuildable from the feeds (ADR 0036), so deleting it is ordinary recovery work. The
+          # application database is never touched: it holds every account, application and message.
+          remote_command="rm -f /data/catalog.sqlite /data/catalog.sqlite-wal /data/catalog.sqlite-shm /data/catalog.sqlite-journal /data/catalog-*.sqlite* && ls -lh /data"
+          case "$remote_command" in
+            *app.sqlite*)
+              echo "::error::Refusing to run a catalog reset that names app.sqlite; the application database is never touched."
+              exit 1
+              ;;
+          esac
+          status=0
+          output="$(timeout 60s flyctl ssh console -a overture-web -C "sh -c '$remote_command'" 2>&1)" || status=$?
+          printf '%s\n' "$output"
+          {
+            echo "### Catalog database files removed"
+            echo ""
+            echo '```'
+            printf '%s\n' "$output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -eq 124 ]; then
+            echo "::error::The catalog file removal did not answer within 60s (machine down or unresponsive)."
+            exit 1
+          fi
+          if [ "$status" -ne 0 ]; then
+            echo "::error::The catalog file removal failed on overture-web (exit $status)."
+            exit 1
+          fi
+
+      - name: Restart overture-web onto an empty catalog database
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'reset-catalog'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          loopback_healthy() {
+            timeout 30s flyctl ssh console -a overture-web \
+              -C "sh -c 'curl -fsS -m 3 http://127.0.0.1:3000/api/health >/dev/null 2>&1'" >/dev/null 2>&1
+          }
+          if loopback_healthy; then
+            echo "overture-web answers on port 3000; restarting the app machine."
+            machine_id="$(flyctl machines list -a overture-web --json | jq -r '[.[] | select((.config.metadata // {}).fly_process_group == "app")][0].id // empty')"
+            if [ -z "$machine_id" ]; then
+              machine_id="$(flyctl machines list -a overture-web --json | jq -r '[.[] | select(.state == "started")][0].id // empty')"
+            fi
+            if [ -z "$machine_id" ]; then
+              echo "::error::Found no app machine to restart on overture-web."
+              exit 1
+            fi
+            flyctl machine restart "$machine_id" -a overture-web
+            exit 0
+          fi
+          # A process that never reached port 3000 is stuck inside the catalog migration. Kill only the Bun server
+          # child: Litestream is its parent, sees the child exit, flushes the application database WAL and exits, and
+          # Fly restarts the machine immediately onto an empty catalog.sqlite.
+          echo "overture-web does not answer on port 3000 yet; killing the hung Bun server so Fly restarts it."
+          timeout 30s flyctl ssh console -a overture-web \
+            -C "pkill -9 -f 'bun run /app/src/server/main.ts' || true" || true
+
+      - name: Wait for overture-web to serve health after the catalog reset
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'reset-catalog'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          for attempt in $(seq 1 36); do
+            if health="$(curl -fsS -m 5 https://tryoverture.com/api/health)"; then
+              printf '%s\n' "$health"
+              echo "overture-web recovered on attempt $attempt."
+              timeout 30s flyctl status -a overture-web || true
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::The health route did not answer within 180s after the catalog reset."
+          status_output="$(timeout 30s flyctl status -a overture-web 2>&1 || true)"
+          log_output="$(timeout 30s flyctl logs -a overture-web --no-tail 2>&1 | tail -n 80 || true)"
+          printf '%s\n' "$status_output" "$log_output"
+          {
+            echo "### Catalog reset did not recover"
+            echo ""
+            echo "The health route did not answer within 180s. Machine status:"
+            echo '```'
+            printf '%s\n' "$status_output"
+            echo '```'
+            echo "Last 80 log lines:"
+            echo '```'
+            printf '%s\n' "$log_output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: Sync the ops secrets and flags to overture-web
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'sync-ops-secrets'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          ALERT_NTFY_URL: ${{ secrets.ALERT_NTFY_URL }}
+          CATALOG_REFRESH_SECRET: ${{ secrets.CATALOG_REFRESH_SECRET }}
+          ENABLE_CATALOG_R2_HOT_SWAP: ${{ inputs.enable_catalog_r2_hot_swap }}
+        run: |
+          set -euo pipefail
+          set_args=()
+          key_names=()
+          if [ -n "${ALERT_NTFY_URL:-}" ]; then
+            echo "::add-mask::$ALERT_NTFY_URL"
+            set_args+=("ALERT_NTFY_URL=$ALERT_NTFY_URL")
+            key_names+=("ALERT_NTFY_URL")
+          fi
+          if [ -n "${CATALOG_REFRESH_SECRET:-}" ]; then
+            echo "::add-mask::$CATALOG_REFRESH_SECRET"
+            set_args+=("CATALOG_REFRESH_SECRET=$CATALOG_REFRESH_SECRET")
+            key_names+=("CATALOG_REFRESH_SECRET")
+          fi
+          if [ "${ENABLE_CATALOG_R2_HOT_SWAP:-false}" = "true" ]; then
+            set_args+=("CATALOG_R2_HOT_SWAP=true")
+            key_names+=("CATALOG_R2_HOT_SWAP=true")
+          fi
+          if [ "${#set_args[@]}" -eq 0 ]; then
+            echo "::error::No secrets or flags were configured to sync."
+            exit 1
+          fi
+          printf '%s\n' "${set_args[@]}" | flyctl secrets import -a overture-web
+          {
+            echo "### Ops secrets synced to overture-web"
+            echo ""
+            echo "Imported names only; values are never printed:"
+            echo ""
+            printf -- '- `%s`\n' "${key_names[@]}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify the production health route after the ops secrets sync
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'sync-ops-secrets'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          for attempt in $(seq 1 24); do
+            if curl -fsS -m 5 https://tryoverture.com/api/health; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::The health route did not answer within 120s after the ops secrets sync."
+          timeout 30s flyctl logs -a overture-web --no-tail | tail -n 80 || true
+          exit 1
