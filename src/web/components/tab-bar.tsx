@@ -26,7 +26,6 @@ export function TabBar({ counts }: { counts: NavCounts }) {
 
         return (
           <NavLink
-            aria-label={navLabel(destination.glyph, count)}
             className={({ isActive }) =>
               `relative flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${
                 isActive ? "text-foreground" : "text-foreground hover:bg-muted"
@@ -38,6 +37,7 @@ export function TabBar({ counts }: { counts: NavCounts }) {
           >
             {({ isActive }) => (
               <>
+                <span className="sr-only">{navLabel(destination.glyph, count)}</span>
                 {isActive ? (
                   <span
                     aria-hidden="true"

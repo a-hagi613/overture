@@ -683,7 +683,7 @@ export const copy = {
       resumedToast: "Sending resumed.",
       resumeErrorToast: "Could not update sending status. Try again.",
       runningTitle: "Sending is active",
-      viewBoard: "View Tracker",
+      viewBoard: "View Applications",
       windowNote: "Sends 8 am – 8 pm local time",
     },
     schedule: {
@@ -704,7 +704,7 @@ export const copy = {
       title: "Out of Applications.",
       copy: "Approved Applications wait for your next period or a new plan. Nothing is sent without an Application left. Ready Applications stay ready.",
       choosePlan: "Choose a plan",
-      seeBoard: "See the Tracker",
+      seeBoard: "See Applications",
     },
     grantEnding: {
       title: "Invite grant running out.",
@@ -1271,7 +1271,7 @@ export const copy = {
     allCount: (count: number) => `All ${String(count)}`,
     attachments: (count: number) => `Attachments (${String(count)})`,
     backToInbox: "← Inbox",
-    boardLink: (title: string) => `${title}, on the Tracker →`,
+    boardLink: (title: string) => `${title}, in Applications →`,
     codeUsed: "Code used",
     unverifiedLabel: "Couldn't verify sender",
     download: "Download",
@@ -1944,7 +1944,7 @@ export const copy = {
       approvedAll: (count: number) =>
         `${String(count)} ${plural(count, "application", "applications")} scheduled to send.`,
       unapproved: "Back in Ready. Nothing is sent until you press Send.",
-      skipped: "Skipped. It left the Tracker.",
+      skipped: "Skipped. It left Applications.",
       saved: "Answer saved.",
       planChanged: "The plan changed. The card reloaded; review it and press Send again.",
       refused: (count: number) =>
@@ -2036,9 +2036,9 @@ export const copy = {
     openPosting: "Open original posting",
     moveStage: "Move stage",
     archive: "Archive",
-    archiveNote: "Archiving withdraws this application. It leaves the Tracker.",
+    archiveNote: "Archiving withdraws this application. It leaves Applications.",
     archiveOnlyQueued: "Only a queued application can be archived.",
-    loadFailed: "The Tracker could not be loaded right now.",
+    loadFailed: "Applications could not be loaded right now.",
     detailLoadFailed: "This application could not be loaded right now.",
     sectionsLabel: "Application sections",
     tabs: {
@@ -2186,8 +2186,8 @@ export const copy = {
     dismiss: "Dismiss",
     dismissNote: (count: number) =>
       count === 1
-        ? "Dismissing skips this application. It leaves the Tracker."
-        : `Dismissing skips these ${String(count)} applications. They leave the Tracker.`,
+        ? "Dismissing skips this application. It leaves Applications."
+        : `Dismissing skips these ${String(count)} applications. They leave Applications.`,
     back: "All questions",
     loadFailed: "Review questions could not be loaded right now.",
     saveFailed: "Could not save your answer right now. Try again.",
@@ -2545,7 +2545,7 @@ export const copy = {
       titleItalic: "never arrived.",
       body:
         "The verification code never arrived, so nothing was sent. The Application ends here and can be " +
-        "tried again later from Tracker.",
+        "tried again later from Applications.",
       pill: "Window closed",
       primary: "Back to Home",
       secondary: "Open Board",
@@ -2566,7 +2566,8 @@ export const copy = {
     timeLeft: "Time left",
     invalid: "Enter the 8-character code from the email.",
     errors: {
-      expired: "That wait has closed, so nothing was sent. Try the Application again from Tracker.",
+      expired:
+        "That wait has closed, so nothing was sent. Try the Application again from Applications.",
       notFound: "That wait is no longer open.",
       failed: "The code did not go through. Try again.",
     },
