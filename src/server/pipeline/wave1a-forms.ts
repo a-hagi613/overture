@@ -207,3 +207,163 @@ export function pinpointApplyUrl(url: string) {
 
   return `${parsed.origin}${prefix}/postings/${encodeURIComponent(id)}/applications/new`;
 }
+
+export const TEAMTAILOR_LABELS: ReadonlyMap<string, string> = new Map([
+  ["candidate[first_name]", "First name"],
+  ["candidate[last_name]", "Last name"],
+  ["candidate[email]", "Email"],
+  ["candidate[phone]", "Phone"],
+  ["candidate[location]", "Location"],
+  ["candidate[linkedin]", "LinkedIn"],
+  ["candidate[resume]", "Resume"],
+  ["candidate[cover_letter]", "Cover letter"],
+  ["candidate[consent]", "Privacy policy"],
+]);
+
+export const ZOHO_RECRUIT_LABELS: ReadonlyMap<string, string> = new Map([
+  ["first_name", "First name"],
+  ["firstname", "First name"],
+  ["last_name", "Last name"],
+  ["lastname", "Last name"],
+  ["email", "Email"],
+  ["phone", "Phone"],
+  ["mobile", "Phone"],
+  ["current_employer", "Current employer"],
+  ["current_job_title", "Current job title"],
+  ["linkedin", "LinkedIn"],
+  ["website", "Website"],
+  ["city", "City"],
+  ["resume", "Resume"],
+]);
+
+export const BAMBOOHR_LABELS: ReadonlyMap<string, string> = new Map([
+  ["firstName", "First name"],
+  ["lastName", "Last name"],
+  ["email", "Email"],
+  ["phoneNumber", "Phone"],
+  ["city", "City"],
+  ["country", "Country"],
+  ["linkedinUrl", "LinkedIn"],
+  ["websiteUrl", "Website"],
+  ["resume", "Resume"],
+  ["coverLetter", "Cover letter"],
+]);
+
+export const RECRUITEE_LABELS: ReadonlyMap<string, string> = new Map([
+  ["candidate[name]", "Full name"],
+  ["candidate[email]", "Email"],
+  ["candidate[phone]", "Phone"],
+  ["candidate[location]", "Location"],
+  ["candidate[linkedin]", "LinkedIn"],
+  ["candidate[cv]", "Resume"],
+  ["candidate[cover_letter]", "Cover letter"],
+]);
+
+export const HIREOLOGY_LABELS: ReadonlyMap<string, string> = new Map([
+  ["first_name", "First name"],
+  ["last_name", "Last name"],
+  ["email", "Email"],
+  ["phone", "Phone"],
+  ["city", "City"],
+  ["state", "State"],
+  ["resume", "Resume"],
+]);
+
+const TEAMTAILOR_SKIPPED_NAMES: ReadonlySet<string> = new Set([
+  "candidate[utm_source]",
+  "candidate[website_url]",
+]);
+
+const ZOHO_RECRUIT_SKIPPED_NAMES: ReadonlySet<string> = new Set(["jobId", "recruiterId", "source"]);
+
+const BAMBOOHR_SKIPPED_NAMES: ReadonlySet<string> = new Set(["jobId", "source"]);
+
+const RECRUITEE_SKIPPED_NAMES: ReadonlySet<string> = new Set(["candidate[utm_source]"]);
+
+const HIREOLOGY_SKIPPED_NAMES: ReadonlySet<string> = new Set(["job_id", "source"]);
+
+export async function readTeamtailorFormHtml(rawHtml: string) {
+  return readHtmlForm(rawHtml, {
+    labels: TEAMTAILOR_LABELS,
+    path: "teamtailor_html",
+    skipNames: TEAMTAILOR_SKIPPED_NAMES,
+  });
+}
+
+export async function readZohoRecruitFormHtml(rawHtml: string) {
+  return readHtmlForm(rawHtml, {
+    labels: ZOHO_RECRUIT_LABELS,
+    path: "zoho_recruit_html",
+    skipNames: ZOHO_RECRUIT_SKIPPED_NAMES,
+  });
+}
+
+export async function readBambooHRFormHtml(rawHtml: string) {
+  return readHtmlForm(rawHtml, {
+    labels: BAMBOOHR_LABELS,
+    path: "bamboohr_html",
+    skipNames: BAMBOOHR_SKIPPED_NAMES,
+  });
+}
+
+export async function readRecruiteeFormHtml(rawHtml: string) {
+  return readHtmlForm(rawHtml, {
+    labels: RECRUITEE_LABELS,
+    path: "recruitee_html",
+    skipNames: RECRUITEE_SKIPPED_NAMES,
+  });
+}
+
+export async function readHireologyFormHtml(rawHtml: string) {
+  return readHtmlForm(rawHtml, {
+    labels: HIREOLOGY_LABELS,
+    path: "hireology_html",
+    skipNames: HIREOLOGY_SKIPPED_NAMES,
+  });
+}
+
+/**
+ * Rewrites a posting URL to a board's separate apply page, keeping any prefix and
+ * query the catalog recorded. A URL that is not this board's posting form is
+ * returned unchanged by the caller, never guessed.
+ */
+function withApplySuffix(url: string, posting: RegExp, suffix: string) {
+  const parsed = parsedUrl(url);
+
+  if (parsed === null) {
+    return null;
+  }
+
+  const path = parsed.pathname.replace(/\/+$/u, "");
+
+  if (path.endsWith(suffix)) {
+    return `${parsed.origin}${path}${parsed.search}`;
+  }
+
+  if (!posting.test(path)) {
+    return null;
+  }
+
+  return `${parsed.origin}${path}${suffix}${parsed.search}`;
+}
+
+/**
+ * Teamtailor serves the posting at `/jobs/{id}` and the form at its
+ * `/applications/new` suffix.
+ *
+ * @param url a posting or apply URL, absolute
+ * @returns the apply URL, or null when the URL is not a Teamtailor posting
+ */
+export function teamtailorApplyUrl(url: string) {
+  return withApplySuffix(url, /\/jobs\/[^/]+$/u, "/applications/new");
+}
+
+/**
+ * Recruitee serves the posting at `/o/{slug}` and the form at its `/c/new` suffix.
+ *
+ * @param url a posting or apply URL, absolute
+ * @returns the apply URL, or null when the URL is not a Recruitee posting
+ */
+export function recruiteeApplyUrl(url: string) {
+  return withApplySuffix(url, /\/o\/[^/]+$/u, "/c/new");
+}

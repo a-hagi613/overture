@@ -14,6 +14,11 @@ import type { QuestionFieldType } from "../../shared/questions.ts";
  */
 export type HtmlFormPath =
   | "personio_html"
+  | "teamtailor_html"
+  | "zoho_recruit_html"
+  | "bamboohr_html"
+  | "recruitee_html"
+  | "hireology_html"
   | "softgarden_html"
   | "clearcompany_html"
   | "join_com_html"
@@ -119,6 +124,7 @@ interface RawForm {
 
 interface OpenGroup {
   labelIds: string[];
+  legendId: string | null;
 }
 
 function cleanText(value: string) {
@@ -335,9 +341,11 @@ export async function readHtmlForm<P extends HtmlFormPath>(
   const groupStack: OpenGroup[] = [];
   const selectStack: RawControl[] = [];
   const labelled = new Map<string, string>();
-  const labelStack: { id: string; text: string }[] = [];
+  const labelStack: { controls: RawControl[]; id: string; text: string }[] = [];
   const idStack: { id: string; text: string }[] = [];
+  const legendStack: { group: OpenGroup; text: string }[] = [];
   const unhandled: string[] = [];
+  let legendCounter = 0;
 
   const currentForm = () => formStack.at(-1);
 
@@ -351,6 +359,12 @@ export async function readHtmlForm<P extends HtmlFormPath>(
     }
 
     form.controls.push(control);
+
+    const label = labelStack.at(-1);
+
+    if (label !== undefined) {
+      label.controls.push(control);
+    }
 
     return true;
   };
@@ -383,19 +397,52 @@ export async function readHtmlForm<P extends HtmlFormPath>(
         }
       },
     })
-    .on("[role='group']", {
+    .on("[role='group'], fieldset", {
       element(element) {
+        legendCounter += 1;
+
+        const legendId =
+          element.tagName === "fieldset" ? `html-form-legend-${String(legendCounter)}` : null;
+
         const group: OpenGroup = {
           labelIds: (element.getAttribute("aria-labelledby") ?? "")
             .split(CLEAN_SPACE)
             .filter((id) => id !== ""),
+          legendId,
         };
+
+        if (legendId !== null) {
+          group.labelIds.push(legendId);
+          legendStack.push({ group, text: "" });
+        }
 
         groupStack.push(group);
 
         element.onEndTag(() => {
+          if (legendId !== null) {
+            legendStack.pop();
+          }
+
           groupStack.pop();
         });
+      },
+    })
+    .on("legend", {
+      element(element) {
+        element.onEndTag(() => {
+          const entry = legendStack.at(-1);
+
+          if (entry !== undefined && entry.group.legendId !== null) {
+            labelled.set(entry.group.legendId, cleanLabel(entry.text));
+          }
+        });
+      },
+      text(text) {
+        const entry = legendStack.at(-1);
+
+        if (entry !== undefined) {
+          entry.text += text.text;
+        }
       },
     })
     .on("[id]", {
@@ -424,13 +471,25 @@ export async function readHtmlForm<P extends HtmlFormPath>(
     })
     .on("label", {
       element(element) {
-        labelStack.push({ id: element.getAttribute("for") ?? "", text: "" });
+        labelStack.push({ controls: [], id: element.getAttribute("for") ?? "", text: "" });
 
         element.onEndTag(() => {
           const entry = labelStack.pop();
 
-          if (entry !== undefined && entry.id !== "") {
-            labelled.set(entry.id, cleanText(entry.text));
+          if (entry === undefined) {
+            return;
+          }
+
+          const text = cleanLabel(entry.text);
+
+          if (entry.id !== "") {
+            labelled.set(entry.id, text);
+          }
+
+          for (const control of entry.controls) {
+            if (control.ownLabel === "") {
+              control.ownLabel = text;
+            }
           }
         });
       },
@@ -578,7 +637,12 @@ export async function readHtmlForm<P extends HtmlFormPath>(
       return [];
     }
 
-    return [{ ...control, ownLabel: labelled.get(control.id) ?? "" }];
+    return [
+      {
+        ...control,
+        ownLabel: control.ownLabel === "" ? (labelled.get(control.id) ?? "") : control.ownLabel,
+      },
+    ];
   });
 
   const questions = groupedQuestions(controls, labelled, labels).filter(
