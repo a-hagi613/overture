@@ -365,6 +365,23 @@ const BATCH2_PAGES = {
   hireology: HIREOLOGY_PAGE,
 } as const;
 
+const BATCH2_NAMES: readonly (keyof typeof BATCH2_PAGES)[] = [
+  "teamtailor",
+  "zoho_recruit",
+  "bamboohr",
+  "recruitee",
+  "hireology",
+];
+
+async function fetchBatch2Page(input: RequestInfo | URL) {
+  const href = input instanceof Request ? input.url : input.toString();
+  const { host } = new URL(href);
+
+  const board = BATCH2_NAMES.find((name) => host.includes(name.replace("_recruit", "")));
+
+  return await Promise.resolve(new Response(BATCH2_PAGES[board ?? "teamtailor"], { status: 200 }));
+}
+
 describe("the Batch 2 form readers", () => {
   test("reads Teamtailor's candidate fields, resume and question", async () => {
     const read = await readTeamtailorFormHtml(TEAMTAILOR_PAGE);

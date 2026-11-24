@@ -322,11 +322,6 @@ export async function readHireologyFormHtml(rawHtml: string) {
   });
 }
 
-/**
- * Rewrites a posting URL to a board's separate apply page, keeping any prefix and
- * query the catalog recorded. A URL that is not this board's posting form is
- * returned unchanged by the caller, never guessed.
- */
 function withApplySuffix(url: string, posting: RegExp, suffix: string) {
   const parsed = parsedUrl(url);
 

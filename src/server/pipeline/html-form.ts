@@ -433,7 +433,7 @@ export async function readHtmlForm<P extends HtmlFormPath>(
           const entry = legendStack.at(-1);
 
           if (entry !== undefined && entry.group.legendId !== null) {
-            labelled.set(entry.group.legendId, cleanLabel(entry.text));
+            labelled.set(entry.group.legendId, cleanText(entry.text));
           }
         });
       },
@@ -480,7 +480,7 @@ export async function readHtmlForm<P extends HtmlFormPath>(
             return;
           }
 
-          const text = cleanLabel(entry.text);
+          const text = cleanText(entry.text);
 
           if (entry.id !== "") {
             labelled.set(entry.id, text);

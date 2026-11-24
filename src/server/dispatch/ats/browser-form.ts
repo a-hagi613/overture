@@ -372,7 +372,7 @@ async function fillByLabel(scope: FormScope, field: SendPlanField) {
     });
 
     if (kind === "select") {
-      await control.selectOption({ label: answer, timeout: 5000 });
+      await control.selectOption({ label: answer }, { timeout: 5000 });
 
       return true;
     }
