@@ -6,6 +6,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { FormQuestion } from "./send-plan.ts";
 import type { FormReadPath } from "./form-read.ts";
 import type { QuestionFieldType } from "../../shared/questions.ts";
+import type { ApplySupportedAts } from "../../shared/ats.ts";
 
 import { planCache } from "../platform/db/schema.ts";
 import { FORM_READ_PATHS } from "./form-read.ts";
@@ -89,10 +90,12 @@ function matchQuestions(fresh: readonly FormQuestion[], cached: readonly CachedP
   return matched;
 }
 
+export type PlanCacheAts = Exclude<ApplySupportedAts, "greenhouse">;
+
 export function createPlanCache(deps: { db: AppDatabase; clock: Clock }) {
   const { db, clock } = deps;
 
-  function get(ats: "lever" | "ashby" | "workable" | "personio", formSignature: string) {
+  function get(ats: PlanCacheAts, formSignature: string) {
     const row = db
       .select()
       .from(planCache)
@@ -120,11 +123,7 @@ export function createPlanCache(deps: { db: AppDatabase; clock: Clock }) {
     return { failures: row.failures, hits: row.hits, id: row.id, plan: parsed.data };
   }
 
-  function put(
-    ats: "lever" | "ashby" | "workable" | "personio",
-    formSignature: string,
-    plan: CachedPlan,
-  ) {
+  function put(ats: PlanCacheAts, formSignature: string, plan: CachedPlan) {
     const now = clock.now();
 
     db.insert(planCache)

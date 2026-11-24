@@ -4,7 +4,8 @@
  * The registry is the approved Stapply no-login board set (issue #563): the five boards Overture already
  * applies to, Wave 1A's pure guest-apply boards, and Wave 1B's boards whose employer may gate the form
  * behind a login. A board's wave says where its feed came from; `applySupported` says whether Overture has
- * a deterministic apply adapter for it, and only the five shipped adapters do until later waves land.
+ * a deterministic apply adapter for it, which is the five shipped adapters plus the Wave 1A batches that
+ * have shipped their form readers and browser adapters.
  */
 export const SHIPPED_ATS = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
 
@@ -37,11 +38,28 @@ export const WAVE_1B_ATS = [
   "varbi",
 ] as const;
 
+/** The Batch 3 Wave 1A boards whose deterministic adapters and form readers ship in issue #569. */
+export const BATCH_3_ATS = [
+  "breezy",
+  "softgarden",
+  "clearcompany",
+  "join_com",
+  "pinpoint",
+] as const;
+
+/** The apply-supported boards whose form plan is cached by signature (every board but Greenhouse). */
+export const PLAN_CACHE_ATS = ["lever", "ashby", "workable", "personio", ...BATCH_3_ATS] as const;
+
 export const ATS_VALUES = [...SHIPPED_ATS, ...WAVE_1A_ATS, ...WAVE_1B_ATS] as const;
 
 export type Ats = (typeof ATS_VALUES)[number];
 
 export type ShippedAts = (typeof SHIPPED_ATS)[number];
+
+export type BatchThreeAts = (typeof BATCH_3_ATS)[number];
+
+/** Every board with a deterministic apply adapter, in registry order. */
+export type ApplySupportedAts = ShippedAts | BatchThreeAts;
 
 export type AtsWave = "shipped" | "wave1a" | "wave1b";
 
@@ -67,11 +85,11 @@ export const ATS_REGISTRY = {
   bamboohr: { applySupported: false, wave: "wave1a" },
   recruitee: { applySupported: false, wave: "wave1a" },
   hireology: { applySupported: false, wave: "wave1a" },
-  breezy: { applySupported: false, wave: "wave1a" },
-  softgarden: { applySupported: false, wave: "wave1a" },
-  clearcompany: { applySupported: false, wave: "wave1a" },
-  join_com: { applySupported: false, wave: "wave1a" },
-  pinpoint: { applySupported: false, wave: "wave1a" },
+  breezy: { applySupported: true, wave: "wave1a" },
+  softgarden: { applySupported: true, wave: "wave1a" },
+  clearcompany: { applySupported: true, wave: "wave1a" },
+  join_com: { applySupported: true, wave: "wave1a" },
+  pinpoint: { applySupported: true, wave: "wave1a" },
   hiringthing: { applySupported: false, wave: "wave1a" },
   rippling: { applySupported: false, wave: "wave1a" },
   gem: { applySupported: false, wave: "wave1a" },
@@ -84,16 +102,16 @@ export const ATS_REGISTRY = {
 } as const satisfies Record<Ats, AtsRegistryEntry>;
 
 /**
- * The ATS boards with a deterministic apply adapter. The five shipped boards alone are `true` until a later
- * wave ships its adapter; every other board's postings are ingest-only and never match a user.
+ * The ATS boards with a deterministic apply adapter: the five shipped boards and Batch 3's five Wave 1A
+ * boards. Every other board's postings are ingest-only and never match a user.
  */
-export const APPLY_SUPPORTED_ATS: readonly ShippedAts[] = SHIPPED_ATS;
+export const APPLY_SUPPORTED_ATS = [...SHIPPED_ATS, ...BATCH_3_ATS] as const;
 
 /**
  * Whether Overture can apply to a board through a deterministic adapter.
  * @param ats The board's ATS value.
- * @returns True for the five shipped adapters.
+ * @returns True for the shipped adapters and the Wave 1A batches that have shipped.
  */
-export function isApplySupportedAts(ats: string): ats is ShippedAts {
+export function isApplySupportedAts(ats: string): ats is ApplySupportedAts {
   return APPLY_SUPPORTED_ATS.some((candidate) => candidate === ats);
 }

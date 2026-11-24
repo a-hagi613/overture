@@ -46,6 +46,12 @@ import { runWorkableAttempt } from "./ats/workable.ts";
 import type { WorkableRun } from "./ats/workable.ts";
 import { runPersonioAttempt } from "./ats/personio.ts";
 import type { PersonioRun } from "./ats/personio.ts";
+import { runBreezyAttempt } from "./ats/breezy.ts";
+import { runSoftgardenAttempt } from "./ats/softgarden.ts";
+import { runClearCompanyAttempt } from "./ats/clearcompany.ts";
+import { runJoinComAttempt } from "./ats/join-com.ts";
+import { runPinpointAttempt } from "./ats/pinpoint.ts";
+import type { BrowserFormRun } from "./ats/browser-form.ts";
 import {
   CODE_WAIT_TIMEOUT_MS,
   createCodeWait,
@@ -100,7 +106,7 @@ export interface DispatcherDeps {
 
 type AttemptRow = typeof attempts.$inferSelect;
 
-type AttemptRun = GreenhouseRun | LeverRun | AshbyRun | WorkableRun | PersonioRun;
+type AttemptRun = GreenhouseRun | LeverRun | AshbyRun | WorkableRun | PersonioRun | BrowserFormRun;
 
 const zeroUsage: BrowserUsage = { browserMs: 0, costMicros: 0, proxyBytes: 0 };
 
@@ -771,6 +777,26 @@ export function createDispatcher(deps: DispatcherDeps) {
 
         if (plan.ats === "personio") {
           return runPersonioAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "breezy") {
+          return runBreezyAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "softgarden") {
+          return runSoftgardenAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "clearcompany") {
+          return runClearCompanyAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "join_com") {
+          return runJoinComAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "pinpoint") {
+          return runPinpointAttempt(page, planForRun, attemptHooks);
         }
 
         return runAshbyAttempt(page, planForRun, attemptHooks);

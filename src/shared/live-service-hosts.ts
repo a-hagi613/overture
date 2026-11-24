@@ -9,6 +9,11 @@ const ATS_DOMAINS = [
   "personio.de",
   "smartrecruiters.com",
   "recruitee.com",
+  "breezy.hr",
+  "softgarden.io",
+  "clearcompany.com",
+  "join.com",
+  "pinpointhq.com",
   "hiring.cafe",
 ] as const;
 

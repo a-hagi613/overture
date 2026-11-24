@@ -1,9 +1,11 @@
 import type { Page } from "playwright-core";
 
+import type { ApplySupportedAts } from "../../shared/ats.ts";
+
 import { isFixtureHost } from "../../shared/live-service-hosts.ts";
 
 export interface PostingIdentity {
-  ats: "greenhouse" | "lever" | "ashby" | "workable" | "personio";
+  ats: ApplySupportedAts;
   url: string;
   boardToken: string;
   jobId: string;
@@ -28,8 +30,27 @@ const WORKABLE_BOARD_HOSTS: ReadonlySet<string> = new Set(["apply.workable.com"]
 
 const PERSONIO_HOST = /^(?<token>[a-z0-9-]+)\.jobs\.personio\.(?:com|de)$/iu;
 
+const BREEZY_HOST = /^(?<token>[a-z0-9-]+)\.breezy\.hr$/iu;
+
+const SOFTGARDEN_HOST = /^(?<token>[a-z0-9-]+)\.softgarden\.io$/iu;
+
+const PINPOINT_HOST = /^(?<token>[a-z0-9-]+)\.pinpointhq\.com$/iu;
+
+const BOARD_HOST_PATTERNS = {
+  breezy: BREEZY_HOST,
+  pinpoint: PINPOINT_HOST,
+  softgarden: SOFTGARDEN_HOST,
+} as const;
+
+const JOIN_HOST = /^(?:[a-z0-9-]+\.)?join\.com$/iu;
+
+const CLEARCOMPANY_HOST = /^(?:(?<token>[a-z0-9-]+)\.)?clearcompany\.com$/iu;
+
 const personioToken = (host: string) =>
   PERSONIO_HOST.exec(host)?.groups?.["token"]?.toLowerCase() ?? null;
+
+const tokenFromHost = (pattern: RegExp, host: string) =>
+  pattern.exec(host)?.groups?.["token"]?.toLowerCase() ?? null;
 
 const hostnameOf = (host: string) => {
   try {
@@ -39,7 +60,9 @@ const hostnameOf = (host: string) => {
   }
 };
 
-const sameHost = (ats: PostingIdentity["ats"], expected: string, live: string) => {
+const firstSegment = (segments: readonly string[]) => segments[0] ?? "";
+
+const sameHost = (ats: ApplySupportedAts, expected: string, live: string) => {
   if (ats === "personio") {
     if (expected === live && isFixtureHost(hostnameOf(expected))) {
       return true;
@@ -67,6 +90,22 @@ const sameHost = (ats: PostingIdentity["ats"], expected: string, live: string) =
     return WORKABLE_BOARD_HOSTS.has(expected) && WORKABLE_BOARD_HOSTS.has(live);
   }
 
+  if (ats === "breezy" || ats === "softgarden" || ats === "pinpoint") {
+    const pattern = BOARD_HOST_PATTERNS[ats];
+    const expectedToken = tokenFromHost(pattern, expected);
+    const liveToken = tokenFromHost(pattern, live);
+
+    return expectedToken !== null && liveToken !== null && expectedToken === liveToken;
+  }
+
+  if (ats === "join_com") {
+    return JOIN_HOST.test(expected) && JOIN_HOST.test(live);
+  }
+
+  if (ats === "clearcompany") {
+    return CLEARCOMPANY_HOST.test(expected) && CLEARCOMPANY_HOST.test(live);
+  }
+
   return ASHBY_BOARD_HOSTS.has(expected) && ASHBY_BOARD_HOSTS.has(live);
 };
 
@@ -76,7 +115,98 @@ const pathSegments = (pathname: string) =>
     .filter((segment) => segment !== "")
     .map((segment) => decodeURIComponent(segment));
 
-function postingPath(ats: PostingIdentity["ats"], url: URL) {
+function jobIdFromPath(ats: ApplySupportedAts, segments: readonly string[]) {
+  if (ats === "greenhouse") {
+    const jobsIndex = segments.indexOf("jobs");
+
+    return jobsIndex < 1 ? null : (segments[jobsIndex + 1] ?? null);
+  }
+
+  if (ats === "workable") {
+    const jobsIndex = segments.indexOf("j");
+
+    return jobsIndex === -1 ? null : (segments[jobsIndex + 1] ?? null);
+  }
+
+  if (ats === "breezy") {
+    const pIndex = segments.indexOf("p");
+    const friendly = pIndex === -1 ? undefined : segments[pIndex + 1];
+
+    return friendly === undefined ? null : (friendly.split("-")[0] ?? null);
+  }
+
+  if (ats === "softgarden") {
+    const jobIndex = segments.indexOf("job");
+
+    return jobIndex === -1 ? null : (segments[jobIndex + 1] ?? null);
+  }
+
+  if (ats === "join_com") {
+    const companiesIndex = segments.indexOf("companies");
+
+    return companiesIndex === -1 ? null : (segments[companiesIndex + 2] ?? null);
+  }
+
+  if (ats === "pinpoint") {
+    const postingIndex = segments.indexOf("postings");
+
+    return postingIndex === -1 ? null : (segments[postingIndex + 1] ?? null);
+  }
+
+  if (ats === "clearcompany") {
+    return segments[1] ?? null;
+  }
+
+  const [boardToken, jobId] = segments;
+
+  return boardToken === undefined || jobId === undefined ? null : jobId;
+}
+
+function boardTokenFrom(ats: ApplySupportedAts, url: URL, segments: readonly string[]) {
+  const host = url.host.toLowerCase();
+
+  if (ats === "breezy") {
+    return tokenFromHost(BREEZY_HOST, host) ?? firstSegment(segments);
+  }
+
+  if (ats === "softgarden") {
+    return tokenFromHost(SOFTGARDEN_HOST, host) ?? firstSegment(segments);
+  }
+
+  if (ats === "pinpoint") {
+    const hostToken = tokenFromHost(PINPOINT_HOST, host);
+
+    if (hostToken !== null) {
+      return hostToken;
+    }
+
+    const postingIndex = segments.indexOf("postings");
+    const prefix = postingIndex === -1 ? [] : segments.slice(0, postingIndex);
+    const last = prefix.at(-1);
+
+    if (last !== undefined && /^[a-z]{2}(?:-[a-z]{2})?$/iu.test(last)) {
+      return prefix.at(-2) ?? "";
+    }
+
+    return last ?? firstSegment(segments);
+  }
+
+  if (ats === "join_com") {
+    const companiesIndex = segments.indexOf("companies");
+
+    return companiesIndex === -1 ? firstSegment(segments) : (segments[companiesIndex + 1] ?? "");
+  }
+
+  if (ats === "clearcompany") {
+    return (
+      tokenFromHost(CLEARCOMPANY_HOST, host.replace(/^apply\./u, "")) ?? firstSegment(segments)
+    );
+  }
+
+  return firstSegment(segments);
+}
+
+function postingPath(ats: ApplySupportedAts, url: URL) {
   if (ats === "personio") {
     const boardToken = personioToken(url.host.toLowerCase()) ?? "";
     const jobId = /^\/job\/(?<id>\d+)(?:\/apply)?\/?$/u.exec(url.pathname)?.groups?.["id"];
@@ -92,29 +222,17 @@ function postingPath(ats: PostingIdentity["ats"], url: URL) {
   }
 
   const segments = pathSegments(url.pathname);
+  const boardToken = boardTokenFrom(ats, url, segments);
 
-  if (ats === "greenhouse") {
-    const jobsIndex = segments.indexOf("jobs");
-    const boardToken = segments[jobsIndex - 1];
-    const jobId = segments[jobsIndex + 1];
+  if (ats === "clearcompany") {
+    const jobId = url.searchParams.get("jobId") ?? jobIdFromPath(ats, segments);
 
-    return jobsIndex < 1 || boardToken === undefined || jobId === undefined
-      ? null
-      : { boardToken, jobId };
+    return jobId === null || boardToken === "" ? null : { boardToken, jobId };
   }
 
-  if (ats === "workable") {
-    const jobsIndex = segments.indexOf("j");
-    const jobId = segments[jobsIndex + 1];
+  const jobId = jobIdFromPath(ats, segments);
 
-    return jobsIndex === -1 || jobId === undefined
-      ? null
-      : { boardToken: segments[jobsIndex - 1] ?? "", jobId };
-  }
-
-  const [boardToken, jobId] = segments;
-
-  return boardToken === undefined || jobId === undefined ? null : { boardToken, jobId };
+  return jobId === null || boardToken === "" ? null : { boardToken, jobId };
 }
 
 const normalizedCompany = (value: string) =>
@@ -123,7 +241,7 @@ const normalizedCompany = (value: string) =>
     .toLowerCase()
     .replaceAll(/[^\p{L}\p{N}]+/gu, "");
 
-const companyFromTitle = (ats: PostingIdentity["ats"], title: string) => {
+const companyFromTitle = (ats: ApplySupportedAts, title: string) => {
   if (ats === "lever") {
     const index = title.lastIndexOf(" - ");
     const company = index === -1 ? "" : title.slice(0, index).trim();
@@ -145,6 +263,13 @@ const companyFromTitle = (ats: PostingIdentity["ats"], title: string) => {
 
   return company === "" ? null : company;
 };
+
+const TITLE_HAS_COMPANY: ReadonlySet<ApplySupportedAts> = new Set([
+  "greenhouse",
+  "lever",
+  "ashby",
+  "workable",
+]);
 
 const mismatch: (reason: PostingIdentityMismatch) => PostingIdentityCheck = (reason) => ({
   ok: false,
@@ -192,6 +317,10 @@ export async function checkPostingIdentity(page: Page, expected: PostingIdentity
   }
 
   if (expected.ats === "personio") {
+    return matched;
+  }
+
+  if (!TITLE_HAS_COMPANY.has(expected.ats)) {
     return matched;
   }
 

@@ -86,7 +86,9 @@ owner's filter and page run in SQL and the stat counts agree with the page), the
 written after the user approved the Application matches no row instead of overwriting a newer status), the Anthropic model and its batch prices (`models.test.ts`: `ANTHROPIC_MODEL` defaults to the model SPEC §8.6 names,
 a dated 5.5 model id is priced from the exact 5.5 row rather than the 4.5 haiku prefix, and a model with no price row
 is refused, #387), the Personio form reader (a server-rendered form's fields, required star, documents and
-unsupported controls are read without a browser), the provider and cost report (completion and cost divide
+unsupported controls are read without a browser), the Wave 1A form readers (`wave1a-forms.test.ts`: Breezy's
+`#portal-data` questionnaire and the Softgarden, ClearCompany, JOIN and Pinpoint HTML forms are read with their
+labels, options, file slots, board-namespaced signatures and apply URLs, #569), the provider and cost report (completion and cost divide
 distinct attempted Applications, so a failure-then-success retry counts once and an email-confirmed send counts as
 completed, while attempt counts and page-confirmed sends stay diagnostics, #417), the email receipt match
 (`outcomes.test.ts`: a Confirming Application is charged only by the one message that names its employer and role
