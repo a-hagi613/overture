@@ -6,10 +6,11 @@ Overture finds jobs for one person, prepares every application and sends it when
 
 Lint, format, typecheck and tests define what is allowed. ADR 0023 lists the rules and ADR 0013 the testing rules.
 
-- **Inner loop while editing (seconds, no heavy queue wait):** batch edits, run `bun fmt` (`~0.3s`) and targeted unit tests (`bun test src/...`, `~1s`) as you go. Never run `bun lint --fix`, `bun check`, `bun run build`, or `bun run verify` after every edit.
-- **Pre-push gate (once at the end):** run `bun lint --fix`, `bun fmt`, and ONE `bun run verify` (writes the `HEAD+tree` verify stamp so `.githooks/pre-push` validates in `< 0.2s` instead of running `verify` twice).
-- **Playwright e2e:** off by default locally (fast delta CI handles browser regression). Backend/API PRs may run targeted non-browser e2e; browser Playwright runs locally ONLY when authoring/editing a browser spec or capturing required `390/1280` UI screenshots, always a single spec file with `--workers=1`. Never use `--no-verify`.
-- Done means `bun run verify` passes locally, and you paste its summary in your report; e2e and the container build run in CI.
+- **Local inner loop (seconds, zero heavy queue):** batch edits, run ONLY fast `bun fmt` (`~0.3s`) and targeted unit tests (`bun test src/...`, `~1–2s`) locally. Do **not** run local `bun lint`, `bun check`, `bun run build`, or `bun run verify` during parallel build waves.
+- **Instant pre-push (`~0.3s`) + authoritative CI `gate`:** `.githooks/pre-push` runs `bun fmt --check` (`0.3s`) and defers full 7-check `verify` (`scripts/verify.ts` runs `lint`, `format`, `typecheck`, `unit`, `build`, `lint-config`, `db` in parallel) to GitHub Actions `gate` (set `OVERTURE_LOCAL_VERIFY=1` if opting into local pre-push verify + stamp). Never use `--no-verify`.
+- **Single-sweep CI fix:** watch `gh pr checks <n> --watch --fail-fast`. If `gate` fails, fetch the **full** failed log (`gh run view <id> --log-failed` — NEVER truncate with `tail`), read EVERY error across all 7 parallel checks at once, fix EVERY error in ONE edit batch + ONE commit, run `bun fmt` + targeted `bun test`, and push once so Push #2 is 100% green.
+- **Playwright e2e:** off locally during parallel build waves (fast delta CI handles browser regression). Run local browser Playwright ONLY when authoring/editing a browser spec or capturing required `390/1280` UI screenshots, always a single spec file with `--workers=1`.
+- Done means CI `gate` (`verify` 7/7 checks), required CI shards, and CodeQL are 100% green, and you paste the CI verification summary in your report; e2e and the container build run in CI.
 - The commands are `bun lint`, `bun fmt --check`, `bun check`, `bun test src`, `bun run build`, `bun run lint:config`
   and `bun run db:verify`; `bun run verify` runs them all in parallel. `bun run lint:parity` compares lint findings with
   a canary Bun.
@@ -48,11 +49,6 @@ The five default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready
 
 Single-context: `GLOSSARY.md` and `docs/adr/` at the repository root. See `docs/agents/domain.md`.
 
-### Independent review (Greptile)
+### Independent review (Greptile & CodeQL)
 
-Greptile is installed on this repository and runs **on request only** (`.greptile/config.json` sets `autoReview: []`; there are 50 credits a month).
-
-- Ask for a review on anything high-risk or substantial (auth, billing/ledger, migrations, job recovery/shutdown, deploy/CI, shared contracts, cross-cutting refactors over ~300 lines or ~15 files) with `gh pr comment <n> --body "@greptileai review this pull request"`; add `review this at plus` for extra depth. Ask for `apex` only with the orchestrator's approval.
-- Skip it for docs, copy, formatting, version bumps and single-file fixes with tests.
-- Wait for the review, fix P0/P1 before `worker_done`, reply with reasoning for anything intentionally not fixed, and never weaken a rule or test to satisfy it.
-- The full protocol, tiers, waiting times and the spend line are in `docs/agents/greptile-review.md`.
+Greptile is **OFF during active build waves** (neither workers nor the orchestrator post `@greptileai`; reserve remaining monthly credits for an optional pre-launch audit). Automatic GitHub **CodeQL** (`.github/workflows/codeql.yml`) covers security scanning on every PR in parallel with CI: fix real High/Medium security findings, and push back with clear reasoning on verifiable false positives or low-impact test-only warnings.

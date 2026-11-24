@@ -15,6 +15,12 @@ if [ "$saw_ref" -eq 1 ] && [ "$has_non_delete" -eq 0 ]; then
   exit 0
 fi
 
+if [ "${OVERTURE_LOCAL_VERIFY:-0}" != "1" ]; then
+  bun fmt --check
+  printf 'pre-push: format ok; full verify deferred to GitHub Actions gate\n'
+  exit 0
+fi
+
 if bun scripts/stamp.ts check >/dev/null 2>&1; then
   printf 'pre-push: verify stamp valid for HEAD + tree, skipping duplicate run\n'
   exit 0

@@ -21,10 +21,11 @@ const stampSchema = z.object({
   fingerprint: z.string().min(1),
 });
 
-function runCommand(command: readonly string[], cwd: string) {
+function spawnWithLocalVerify(command: readonly string[], cwd: string, localVerify: "0" | "1") {
   const result = Bun.spawnSync({
     cmd: [...command],
     cwd,
+    env: { ...process.env, OVERTURE_LOCAL_VERIFY: localVerify },
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -34,6 +35,10 @@ function runCommand(command: readonly string[], cwd: string) {
     stdout: result.stdout.toString(),
     stderr: result.stderr.toString(),
   };
+}
+
+function runCommand(command: readonly string[], cwd: string) {
+  return spawnWithLocalVerify(command, cwd, "1");
 }
 
 function runGit(args: readonly string[], cwd: string) {
@@ -295,6 +300,37 @@ test("failed verify clears any existing stamp and does not write a new one", () 
 
     expect(failed.exitCode).not.toBe(0);
     expect(existsSync(stampFile)).toBe(false);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("default pre-push runs format check and defers full verify to CI", () => {
+  const fixture = createTempRepo();
+
+  try {
+    const cleanPush = spawnWithLocalVerify(
+      ["git", "push", "origin", "HEAD:refs/heads/feature"],
+      fixture.repoDir,
+      "0",
+    );
+
+    expect(cleanPush.exitCode, `${cleanPush.stdout}${cleanPush.stderr}`).toBe(0);
+    expect(`${cleanPush.stdout}${cleanPush.stderr}`).toContain(
+      "pre-push: format ok; full verify deferred to GitHub Actions gate",
+    );
+    expect(countRuns(fixture.runsLog)).toBe(0);
+
+    writeFileSync(join(fixture.repoDir, "src/ok.ts"), "export const   value=2;\n");
+
+    const dirtyPush = spawnWithLocalVerify(
+      ["git", "push", "origin", "HEAD:refs/heads/feature"],
+      fixture.repoDir,
+      "0",
+    );
+
+    expect(dirtyPush.exitCode).not.toBe(0);
+    expect(countRuns(fixture.runsLog)).toBe(0);
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
