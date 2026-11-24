@@ -611,6 +611,18 @@ test("a sheet is truly modal, keeps focus inside, and returns it on Escape", asy
   await request.dispose();
 });
 
+async function watchThemeSwitch(page: Page) {
+  await page.evaluate(() => {
+    const observer = new MutationObserver(() => {
+      if (document.documentElement.classList.contains("theme-switching")) {
+        document.documentElement.dataset.themeSwitchSeen = "1";
+      }
+    });
+
+    observer.observe(document.documentElement, { attributeFilter: ["class"] });
+  });
+}
+
 test("the theme flip cross-fades and stays instant under reduced motion", async ({
   uiServer,
   browser,
@@ -646,13 +658,19 @@ test("the theme flip cross-fades and stays instant under reduced motion", async 
     `'sha256-${createHash("sha256").update(bootCode, "utf8").digest("base64")}'`,
   );
 
-  const switched = await page.evaluate(() => {
-    document.querySelector<HTMLElement>('[role="switch"]')?.click();
+  const accountMenuName = new RegExp(copy.nav.accountMenuLabel, "u");
 
-    return document.documentElement.className;
-  });
+  await page.getByRole("button", { name: accountMenuName }).click();
 
-  expect(switched).toContain("theme-switching");
+  const modeItem = page.getByRole("menuitem", { name: copy.shell.darkMode });
+
+  await expect(modeItem).toBeVisible();
+
+  await watchThemeSwitch(page);
+
+  await modeItem.click();
+
+  expect(await page.evaluate(() => document.documentElement.dataset.themeSwitchSeen)).toBe("1");
   await expect(page.locator("html")).toHaveClass(/dark/u);
   await expect(page.locator("html")).not.toHaveClass(/theme-switching/u, { timeout: 2000 });
 
@@ -670,17 +688,20 @@ test("the theme flip cross-fades and stays instant under reduced motion", async 
   await reducedPage.goto(`${uiServer.url}/home`);
   await expect(reducedPage.getByRole("heading", { level: 1 })).toBeVisible();
 
-  const flip = await reducedPage.evaluate(() => {
-    const switchControl = document.querySelector<HTMLElement>('[role="switch"]');
+  await reducedPage.getByRole("button", { name: accountMenuName }).click();
 
-    switchControl?.click();
+  const reducedModeItem = reducedPage.getByRole("menuitem", { name: copy.shell.darkMode });
 
-    return {
-      duration: getComputedStyle(document.querySelector("main") ?? document.body)
-        .transitionDuration,
-      switching: document.documentElement.classList.contains("theme-switching"),
-    };
-  });
+  await expect(reducedModeItem).toBeVisible();
+
+  await watchThemeSwitch(reducedPage);
+
+  await reducedModeItem.click();
+
+  const flip = await reducedPage.evaluate(() => ({
+    duration: getComputedStyle(document.querySelector("main") ?? document.body).transitionDuration,
+    switching: document.documentElement.dataset.themeSwitchSeen === "1",
+  }));
 
   expect(flip.switching).toBe(true);
   expect(Number(flip.duration.slice(0, -1))).toBeLessThan(0.01);
