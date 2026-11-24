@@ -34,13 +34,26 @@ export const NAV_DESTINATIONS = [
 
 export type PrimaryNavKey = (typeof NAV_DESTINATIONS)[number]["glyph"];
 
-export const PROFILE_SUBMENU = [
+export const JOB_PROFILE_SUBMENU = [
   { key: "resume", label: copy.nav.profileMenu.resume, to: "/profile/resume" },
-  { key: "details", label: copy.nav.profileMenu.details, to: "/profile/details" },
   { key: "preferences", label: copy.nav.profileMenu.preferences, to: "/profile/preferences" },
-  { key: "billing", label: copy.nav.profileMenu.billing, to: "/profile/billing" },
-  { key: "account", label: copy.nav.profileMenu.account, to: "/profile/account" },
+  { key: "details", label: copy.nav.profileMenu.details, to: "/profile/details" },
 ] as const;
+
+export const ACCOUNT_SUBMENU = [
+  { key: "billing", label: copy.nav.profileMenu.billing, to: "/profile/billing" },
+  { key: "account", label: copy.nav.accountSettings, to: "/profile/account" },
+] as const;
+
+export const PROFILE_SUBMENU = [...JOB_PROFILE_SUBMENU, ...ACCOUNT_SUBMENU] as const;
+
+export function isJobProfilePath(pathname: string) {
+  return (
+    pathname === "/profile/resume" ||
+    pathname === "/profile/details" ||
+    pathname === "/profile/preferences"
+  );
+}
 
 export const NO_NAV_COUNTS: NavCounts = { inboxUnread: 0, ready: 0, review: 0 };
 

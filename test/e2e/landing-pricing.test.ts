@@ -50,10 +50,10 @@ test.describe("public landing and embedded pricing, readable without JavaScript"
     expect(text).toContain("handled.");
     expect(text).toContain("Pay only for applications sent.");
     expect(text).toContain(PLAN.weekPrice);
-    expect(text).toContain(`${String(PLAN.weekApps)} confirmed job applications`);
+    expect(text).toContain(`${String(PLAN.weekApps)} confirmed applications`);
     expect(text).toContain(PLAN.monthPrice);
-    expect(text).toContain(`${String(PLAN.monthApps)} confirmed job applications`);
-    expect(text).toContain(`${String(TRIAL_APPS)} confirmed job applications`);
+    expect(text).toContain(`${String(PLAN.monthApps)} confirmed applications`);
+    expect(text).toContain(`${String(TRIAL_APPS)} confirmed applications`);
     expect(text).toContain(`over ${String(PLAN.weekDays)} days`);
     expect(html).toContain('href="/signin"');
     expect(html).toContain('href="/signup"');
@@ -61,7 +61,7 @@ test.describe("public landing and embedded pricing, readable without JavaScript"
     expect(html).toContain('href="/privacy"');
     expect(html).toContain('href="#pricing"');
     expect(text).toContain(
-      `daytime hours (${String(SEND.startHour).padStart(2, "0")}:00 to ${String(SEND.endHour).padStart(2, "0")}:00 local time)`,
+      `between ${String(SEND.startHour).padStart(2, "0")}:00 to ${String(SEND.endHour).padStart(2, "0")}:00 local time`,
     );
   });
 

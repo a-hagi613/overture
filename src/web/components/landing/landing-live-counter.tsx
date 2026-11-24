@@ -27,9 +27,10 @@ export function LandingLiveCounter() {
       <span
         aria-hidden="true"
         className="relative flex h-2.5 w-2.5 flex-none items-center justify-center"
+        key={`dot-${String(count)}`}
       >
-        <span className="absolute inset-0 rounded-full bg-signal animate-live-ping" />
-        <span className="relative h-2 w-2 rounded-full bg-signal ring-2 ring-signal-soft animate-hint-pulse" />
+        <span className="live-dot-wave-tick absolute inset-0 rounded-full bg-signal animate-live-ping-once" />
+        <span className="live-dot-core-tick relative h-2 w-2 rounded-full bg-signal ring-2 ring-signal-soft animate-live-core-once" />
       </span>
       <span className="flex items-baseline gap-1.5">
         <motion.span

@@ -9,7 +9,6 @@ import { LandingHeroStack } from "../components/landing/landing-hero-stack.tsx";
 import { LandingHowItWorks } from "../components/landing/landing-how-it-works.tsx";
 import { LandingPricingSection } from "../components/landing/landing-pricing-section.tsx";
 import { LandingSupplyPreview } from "../components/landing/landing-supply-preview.tsx";
-import { LandingWhereItApplies } from "../components/landing/landing-where-it-applies.tsx";
 import { dsContainer } from "../components/ui/ds.ts";
 
 /**
@@ -28,18 +27,19 @@ export function LandingPage() {
       <main id="main-content" tabIndex={-1}>
         <section className="relative">
           <LandingGrain variant="hero" />
-          <div className={`${dsContainer} relative z-10 pb-16 pt-8 sm:pb-24 sm:pt-14`}>
-            <div className="grid grid-cols-1 items-center gap-x-14 gap-y-10 lg:grid-cols-2">
+          <div
+            className={`${dsContainer} relative z-10 pb-20 pt-10 sm:pb-28 sm:pt-16 lg:pb-28 lg:pt-16`}
+          >
+            <div className="grid grid-cols-1 items-center gap-x-12 gap-y-12 lg:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)] xl:gap-x-14">
               <LandingHeroCopy />
               <LandingHeroStack />
             </div>
           </div>
         </section>
 
-        <LandingSupplyPreview />
         <LandingHowItWorks />
         <LandingDashboardPreview />
-        <LandingWhereItApplies />
+        <LandingSupplyPreview />
         <LandingPricingSection />
         <LandingFaqSection />
         <LandingClosingSection />

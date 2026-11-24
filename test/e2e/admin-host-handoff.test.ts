@@ -150,7 +150,7 @@ async function checkHandoffViewports(
   await checkHandoffViewports(browser, state, handoffUrl, rest);
 }
 
-test("the owner sees the Admin Portal link in the Profile menu and on the account page", async ({
+test("the owner sees the Admin Portal link on the account page and not in the sidebar account menu", async ({
   browser,
   handoffServer,
 }) => {
@@ -164,12 +164,12 @@ test("the owner sees the Admin Portal link in the Profile menu and on the accoun
   await expect(accountLink).toBeVisible();
   await expect(accountLink).toHaveAttribute("href", `${HANDOFF_ADMIN_ORIGIN}/admin`);
 
-  await page.getByRole("link", { name: "Profile", exact: true }).first().hover();
-
-  const menuItem = page.getByRole("menuitem", { name: /Admin Portal/u });
-
-  await expect(menuItem).toBeVisible();
-  await expect(menuItem).toHaveAttribute("href", `${HANDOFF_ADMIN_ORIGIN}/admin`);
+  await page
+    .locator("[data-shell-sidebar]")
+    .getByRole("button", { name: /Account menu/u })
+    .click();
+  await expect(page.getByRole("menuitem", { name: "Account settings" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /Admin Portal/u })).toHaveCount(0);
 
   const me = await meOf(page, handoffServer.url);
 
@@ -231,7 +231,10 @@ test("a regular user never sees the Admin Portal link", async ({ browser, handof
 
   await expect(page.getByText("Admin Portal", { exact: true })).toHaveCount(0);
 
-  await page.getByRole("link", { name: "Profile", exact: true }).first().hover();
+  await page
+    .locator("[data-shell-sidebar]")
+    .getByRole("button", { name: /Account menu/u })
+    .click();
 
   await expect(page.getByRole("menuitem", { name: /Admin Portal/u })).toHaveCount(0);
 

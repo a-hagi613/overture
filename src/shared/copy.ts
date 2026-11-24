@@ -177,6 +177,16 @@ export const copy = {
     inbox: "Inbox",
     calendar: "Calendar",
     profile: "Profile",
+    jobProfile: "Career",
+    jobProfileMenuLabel: "Career sections",
+    accountMenuLabel: "Account menu",
+    accountSettings: "Account settings",
+    accountSectionLabel: "Account",
+    signOut: "Sign out",
+    signingOut: "Signing out…",
+    userFallback: "Account",
+    sidebarDrawerTitle: "Workspace navigation",
+    sidebarDrawerDescription: "Navigate workspace pages and account settings.",
     support: "Support",
     search: "Search",
     profileHub: {
@@ -187,7 +197,7 @@ export const copy = {
     profileMenu: {
       label: "Profile sections",
       resume: "Resume & Cover Letter",
-      details: "Saved answers",
+      details: "Application Answers",
       preferences: "Job Preferences",
       billing: "Billing",
       account: "Account",
@@ -448,12 +458,12 @@ export const copy = {
     captchaUnavailable: "The bot check could not load. Check your connection and try again.",
     sampleLabel: "Sample data",
     story: {
-      pill: "Automated job search",
+      pill: "Your workspace",
       backdropRole: "Air Canada · Network Operations Planner",
       backdropQueue: "Ready · sends about 14:10",
-      heading: "The job hunt,",
-      headingItalic: "handled.",
-      deck: "Finds fresh roles on company career pages and submits tailored applications on your behalf.",
+      heading: "Your search,",
+      headingItalic: "still moving.",
+      deck: "Check the roles lined up for you, answer any open questions, and read replies from employers.",
       receiptAria: "Sample of an applied application, sample data",
       receiptTitle: "Financial Planning Analyst",
       receiptMeta: "Stripe · San Francisco, CA · Hybrid · Greenhouse",
@@ -466,14 +476,29 @@ export const copy = {
       receiptStamp: "10:42 · 11 answers from saved answers · Resume unchanged",
       stamp: "Applied",
       pillar01: "01",
-      pillar01Title: "Direct to employers",
-      pillar01Detail: "Submits straight to company career pages instead of stale job boards.",
+      pillar01Title: "Ready to send",
+      pillar01Detail: "Approve queued roles or let Overture apply on your schedule.",
       pillar02: "02",
-      pillar02Title: "Tailored to each role",
-      pillar02Detail: "Matches your resume and writes a fresh cover letter for every opening.",
+      pillar02Title: "Needs your answer",
+      pillar02Detail: "Reply once to new employer questions and we save it for next time.",
       pillar03: "03",
-      pillar03Title: "Every reply tracked",
-      pillar03Detail: "Follow every sent application and employer reply in one workspace.",
+      pillar03Title: "Employer inbox",
+      pillar03Detail: "Every confirmation, recruiter note, and interview invite in one place.",
+    },
+    signUpStory: {
+      pill: "Get started",
+      heading: "Upload once.",
+      headingItalic: "Apply daily.",
+      deck: "Add your resume, set the roles and places you want, and Overture applies straight on company career pages.",
+      pillar01: "01",
+      pillar01Title: "Two-minute setup",
+      pillar01Detail: "Upload your resume and tell us the roles, locations, and pay you want.",
+      pillar02: "02",
+      pillar02Title: "You stay in control",
+      pillar02Detail: "Review drafts first or turn on daily sending whenever you are ready.",
+      pillar03: "03",
+      pillar03Title: "3 free applications",
+      pillar03Detail: "See real submissions go out to employers before you pick a plan.",
     },
   },
   waitlist: {
@@ -923,13 +948,13 @@ export const copy = {
     eyebrow: "Legal",
     lastUpdated: "Last updated 21 November 2026",
     metaSeparator: " · ",
-    effective: "Effective when the plans open to the public",
-    footerName: "Overture",
+    effective: "Effective: November 24, 2026",
+    footerName: "Overture Inc.",
     footerContact: "admin@tryoverture.com",
     footerSeparator: " · ",
     footerLinksLabel: "Legal pages",
     draftNotice:
-      "Draft for owner review, not legal advice. Billing terms take effect when the plans open to the public.",
+      "Published by Overture Inc. These terms govern use of the Overture platform and related services. Direct legal or compliance inquiries to admin@tryoverture.com.",
     termsLink: "Terms of Service",
     privacyLink: "Privacy Policy",
     contactHref: "mailto:admin@tryoverture.com",
@@ -938,146 +963,238 @@ export const copy = {
       title: "Terms of Service",
       sections: [
         {
-          heading: "Who we are",
+          heading: "1. Agreement and Contracting Entity",
           blocks: [
             {
               kind: "paragraphWithLink",
-              before: "Overture is a job-search service run by Overture. You can reach us at ",
+              before:
+                'These Terms of Service constitute a binding agreement between you and Overture Inc. ("Overture," "we," "us," or "our") governing your access to and use of the Overture web platform, application automation workflows, and related services (collectively, the "Service"). Questions regarding these Terms may be directed to ',
               after: ".",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
             },
-          ],
-        },
-        {
-          heading: "What Overture does",
-          blocks: [
             {
               kind: "paragraph",
-              text: "Overture finds jobs that fit what you want, prepares each application from the resume and facts you save, and sends an application only after you approve it. You can skip or edit an application before you send it.",
+              text: "By creating an account, connecting an authentication provider, uploading career materials, or submitting an application through the Service, you confirm that you are at least 18 years of age, possess the legal capacity to enter into this agreement, and accept these Terms and our Privacy Policy.",
             },
           ],
         },
         {
-          heading: "Your account",
+          heading: "2. Scope of the Service",
           blocks: [
             {
               kind: "paragraph",
-              text: "You sign in with Google, LinkedIn or an emailed link. Keep your sign-in details to yourself, and tell us if you think someone else has used your account.",
+              text: "Overture provides automated job discovery, structured resume and response extraction, tailored application preparation, and controlled application submission workflows. Overture prepares candidate submissions using the documents, preferences, and factual answers you supply and transmits an application to a third-party employer only after you authorize submission.",
+            },
+            {
+              kind: "paragraph",
+              text: "You may review, modify, or skip any prepared application before transmission. Once an application is transmitted to an employer or external applicant tracking system, Overture cannot recall or alter the submission.",
             },
           ],
         },
         {
-          heading: "Your resume and facts",
+          heading: "3. Account Registration and Security",
           blocks: [
             {
               kind: "paragraph",
-              text: "You own what you give Overture. We use it to prepare the applications you approve and for nothing else. The Privacy Policy explains how we keep it safe.",
-            },
-          ],
-        },
-        {
-          heading: "Plans and payment",
-          blocks: [
-            {
-              kind: "paragraph",
-              text: "Overture is a paid service after the free trial. The Week plan costs $9.99 and includes 50 applications over 7 days. The Month plan costs $29.99 and includes 250 applications over 30 days. Checkout shows the price in your local currency, and taxes are added where they apply. Stripe processes the payment for Overture.",
-            },
-            {
-              kind: "paragraph",
-              text: "Accounts invited during the beta keep the applications their invite included. They choose a plan when those run out.",
-            },
-          ],
-        },
-        {
-          heading: "Free trial",
-          blocks: [
-            {
-              kind: "paragraph",
-              text: "A new account can try Overture with 3 applications at no charge. The trial starts after a card is checked with Stripe: Stripe verifies the card with a temporary authorisation and does not charge it. One card gets one trial. To enforce that, we keep a keyed fingerprint of the card, not the card number, apart from your account. It is not linked to you and it survives deleting your account.",
-            },
-          ],
-        },
-        {
-          heading: "Renewal",
-          blocks: [
-            {
-              kind: "paragraph",
-              text: "The Week and Month plans are subscriptions. Each one renews automatically at the end of its period at the price you agreed, until you cancel. Every paid period issues its allowance in full: 50 applications for Week over 7 days, 250 for Month over 30 days. Unused applications do not roll over. They expire when the period ends and are never refunded.",
-            },
-            {
-              kind: "paragraph",
-              text: "If a renewal payment fails, Overture pauses preparing and sending new applications until the payment succeeds or you choose another plan. Applications already sent are not affected.",
-            },
-          ],
-        },
-        {
-          heading: "Cancelling",
-          blocks: [
-            {
-              kind: "paragraph",
-              text: "You can cancel at any time from Profile \u2192 Settings, which opens the Stripe customer portal. Cancelling stops the next renewal. Your current period keeps running to its end, and its remaining applications stay usable until then. If you move between Week and Month, the new plan starts at your next renewal, not straight away.",
-            },
-          ],
-        },
-        {
-          heading: "Refunds and failed applications",
-          blocks: [
-            {
-              kind: "paragraph",
-              text: "We do not give refunds by default, including for a period you cancel part-way through or for applications you did not use. A failed application is different: if Overture could not send an application, you are never charged for it and it never uses one of your applications. You can try it again within your allowance.",
+              text: "Access to the Service requires authentication through a supported identity provider, such as Google or LinkedIn, or through a single-use verification link sent to your registered email address. You are responsible for maintaining the confidentiality of your authentication credentials and email inbox.",
             },
             {
               kind: "paragraphWithLink",
-              before: "If you think you were charged in error, write to ",
-              after: " and we will look at it.",
+              before:
+                "You agree to provide accurate account information and to notify Overture promptly at ",
+              after: " if you suspect unauthorized access to or compromise of your account.",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
             },
           ],
         },
         {
-          heading: "What you agree to on each application",
+          heading: "4. User Content and License Grant",
           blocks: [
             {
               kind: "paragraph",
-              text: "Each application you approve records the version of the consent text you agreed to. You can read every version in Profile \u2192 Settings.",
+              text: 'You retain full ownership of all resumes, cover letters, employment histories, saved form responses, job targets, forwarded job correspondence, and other materials you submit to the Service ("User Content").',
+            },
+            {
+              kind: "paragraph",
+              text: "You grant Overture Inc. a non-exclusive, worldwide, royalty-free license solely as necessary to host, parse, structure, format, transmit, and maintain records of User Content to operate, secure, and deliver the Service at your direction.",
+            },
+            {
+              kind: "paragraph",
+              text: "You represent and warrant that all User Content is truthful, accurate, and non-misleading, and that your provision and authorized submission of User Content does not infringe any third-party intellectual property, confidentiality, or contractual obligations.",
             },
           ],
         },
         {
-          heading: "What we cannot promise",
+          heading: "5. Acceptable Use and Platform Integrity",
           blocks: [
             {
               kind: "paragraph",
-              text: "Overture cannot make an employer reply, and it does not decide who is hired. Each employer's form and rules still apply to your application.",
+              text: "You agree to use the Service strictly for lawful personal career search activities. Without limiting the foregoing, you shall not:",
+            },
+            {
+              kind: "bullets",
+              items: [
+                "Submit fabricated credentials, impersonate another individual, or provide deceptive responses to employers.",
+                "Circumvent, manipulate, or probe trial eligibility limits, payment verification mechanisms, rate limits, or security controls.",
+                "Share, resell, sublicense, or operate an account on behalf of multiple distinct applicants or commercial staffing operations without written authorization.",
+                "Decompile, reverse engineer, scrape, or interfere with the availability or integrity of Overture infrastructure.",
+              ],
             },
           ],
         },
         {
-          heading: "Suspension and ending",
+          heading: "6. Subscription Plans, Allowances, and Beta Invitations",
           blocks: [
             {
               kind: "paragraph",
-              text: "We may suspend an account that breaks these terms or puts other people at risk. You can stop using Overture at any time and delete your account from Profile \u2192 Settings.",
+              text: "Following any applicable trial or invitation allowance, continued application submissions require an active paid subscription. Overture offers recurring subscription tiers denominated in United States Dollars at checkout, with localized currency conversion and applicable transaction taxes presented prior to purchase:",
+            },
+            {
+              kind: "bullets",
+              items: [
+                "Week Plan: $9.99 per 7-day billing period, including an allowance of up to 50 submitted applications.",
+                "Month Plan: $29.99 per 30-day billing period, including an allowance of up to 250 submitted applications.",
+              ],
+            },
+            {
+              kind: "paragraph",
+              text: "Accounts provisioned through an authorized beta invitation retain the specific application allowance associated with that invitation. Upon exhaustion of that balance, transitioning to further submissions requires selecting a paid subscription plan.",
             },
           ],
         },
         {
-          heading: "Changes",
+          heading: "7. Free Trial Eligibility and Card Verification",
           blocks: [
             {
               kind: "paragraph",
-              text: "If we change these terms, we will tell you by email before the change takes effect. A change to a price applies from your next renewal.",
+              text: "Eligible new accounts may receive a complimentary trial allowance of up to 3 submitted applications. Activation of the free trial requires payment card verification processed through Stripe using a temporary authorization hold that does not result in an immediate charge.",
+            },
+            {
+              kind: "paragraph",
+              text: "Free trial eligibility is strictly limited to one trial per payment instrument. To enforce this restriction without retaining raw payment card numbers, Overture derives and stores a keyed cryptographic fingerprint of the verified card in an isolated record detached from your user account. That fingerprint persists following account deletion solely to prevent duplicate trial redemptions.",
             },
           ],
         },
         {
-          heading: "Contact",
+          heading: "8. Automatic Renewal, Expiration, and Payment Failures",
           blocks: [
+            {
+              kind: "paragraph",
+              text: "Both the Week Plan and Month Plan are auto-renewing subscriptions. Unless canceled prior to the end of the active billing period, your subscription automatically renews at the conclusion of each 7-day or 30-day cycle at the disclosed rate, and your designated payment method is charged through Stripe.",
+            },
+            {
+              kind: "paragraph",
+              text: "Each billing cycle grants a fresh allowance of 50 applications (Week Plan) or 250 applications (Month Plan). Unused application allowances expire at the close of each billing cycle, do not roll over to subsequent cycles, and carry no monetary or credit value.",
+            },
+            {
+              kind: "paragraph",
+              text: "If a scheduled renewal charge fails, Overture suspends new application preparation and transmission until payment is successfully settled or an alternative valid payment method or plan is selected. Historical records of previously submitted applications remain accessible.",
+            },
+          ],
+        },
+        {
+          heading: "9. Cancellation and Plan Modifications",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "You may cancel your subscription at any time through the billing settings inside your Profile, which launches the Stripe Customer Portal. Cancellation prevents future recurring charges at the next billing boundary; your current subscription remains active through the end of the paid period, and any remaining application allowance stays available until expiration.",
+            },
+            {
+              kind: "paragraph",
+              text: "Upgrades or switches between the Week Plan and Month Plan take effect at the start of the next billing cycle rather than mid-cycle.",
+            },
+          ],
+        },
+        {
+          heading: "10. Refunds and Failed Submission Protections",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "All subscription fees are non-refundable once charged, including for partial billing cycles, early cancellation, or unused application allowances, except where required by applicable law.",
+            },
+            {
+              kind: "paragraph",
+              text: "If Overture is unable to complete and transmit an approved application due to a system failure or unhandled employer form error, that attempt does not consume your application allowance and incurs no per-application charge, allowing you to retry or resolve the item within your active allowance.",
+            },
             {
               kind: "paragraphWithLink",
-              before: "Questions about these terms: ",
+              before: "If you believe a billing error or duplicate charge occurred, contact ",
+              after: " promptly for review.",
+              href: "mailto:admin@tryoverture.com",
+              link: "admin@tryoverture.com",
+            },
+          ],
+        },
+        {
+          heading: "11. Consent Records and Auditability",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Whenever you authorize Overture to submit an application, the Service records the exact immutable version identifier and timestamp of the authorization disclosure in effect at the time of your approval. You may inspect every historical consent version and your acceptance history within Account Settings.",
+            },
+          ],
+        },
+        {
+          heading: "12. Third-Party Employers and Disclaimer of Outcomes",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Overture acts strictly as a technical preparation and submission tool at your direction. Overture is not a staffing agency or employer, does not guarantee employer responses, interview selections, or employment offers, and has no control over external hiring criteria, assessment platforms, or third-party applicant tracking system availability.",
+            },
+            {
+              kind: "paragraph",
+              text: 'THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, OR STATUTORY, INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT, TO THE MAXIMUM EXTENT PERMITTED BY LAW.',
+            },
+          ],
+        },
+        {
+          heading: "13. Limitation of Liability",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, OVERTURE INC. AND ITS OFFICERS, DIRECTORS, EMPLOYEES, AND AFFILIATES SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF EMPLOYMENT OPPORTUNITY, DATA, OR PROFITS, ARISING OUT OF OR RELATED TO YOUR USE OF THE SERVICE.",
+            },
+            {
+              kind: "paragraph",
+              text: "IN ALL EVENTS, OVERTURE INC.'S AGGREGATE LIABILITY FOR CLAIMS ARISING UNDER THESE TERMS SHALL NOT EXCEED THE GREATER OF THE TOTAL SUBSCRIPTION FEES PAID BY YOU TO OVERTURE INC. IN THE THREE (3) MONTHS PRECEDING THE CLAIM OR ONE HUNDRED UNITED STATES DOLLARS ($100.00).",
+            },
+          ],
+        },
+        {
+          heading: "14. Suspension and Termination",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Overture may suspend or terminate your access immediately upon reasonable determination that you have violated these Terms, engaged in fraudulent activity, or created material operational or security risk for the Service or third parties.",
+            },
+            {
+              kind: "paragraph",
+              text: "You may terminate your account at any time by deleting your account from Account Settings, subject to survival of provisions relating to accrued payment obligations, intellectual property, disclaimers, limitations of liability, and dispute terms.",
+            },
+          ],
+        },
+        {
+          heading: "15. Amendments to Terms",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Overture Inc. may update these Terms from time to time to reflect legal, operational, or pricing changes. We will provide advance notice by email to your registered address before material revisions take effect. Any modification to subscription pricing applies beginning on your next renewal cycle following notice.",
+            },
+          ],
+        },
+        {
+          heading: "16. Governing Law and Notices",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "These Terms are governed by the laws of the State of Delaware, United States, without regard to conflict-of-law principles, except where mandatory consumer protection laws in your jurisdiction apply.",
+            },
+            {
+              kind: "paragraphWithLink",
+              before:
+                "Legal notices and formal inquiries under these Terms must be sent to Overture Inc. at ",
               after: ".",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
@@ -1090,11 +1207,12 @@ export const copy = {
       title: "Privacy Policy",
       sections: [
         {
-          heading: "Who we are",
+          heading: "1. Scope and Data Controller",
           blocks: [
             {
               kind: "paragraphWithLink",
-              before: "Overture is run by Overture. Contact us at ",
+              before:
+                'This Privacy Policy describes how Overture Inc. ("Overture," "we," "us," or "our") collects, processes, stores, and safeguards personal information in connection with the Overture platform and related services. For privacy inquiries or rights requests, contact ',
               after: ".",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
@@ -1102,62 +1220,75 @@ export const copy = {
           ],
         },
         {
-          heading: "What we collect",
+          heading: "2. Categories of Personal Information Collected",
           blocks: [
+            {
+              kind: "paragraph",
+              text: "Depending on how you interact with the Service, Overture Inc. collects and processes the following categories of information:",
+            },
             {
               kind: "bullets",
               items: [
-                "Your account: your email and, if you sign in with Google or LinkedIn, the name and photo that Google or LinkedIn shares.",
-                "Your resume, the facts you save, your targets and your skip list.",
-                "Your forwarding address, and the job emails you forward to it.",
-                "Application records: what was filled in, what you approved, what was sent and when.",
-                "The consent versions you agreed to, and the records needed to keep the service running and secure.",
-                "Billing records: your plan, the invoices Stripe issues, the payment status, and the last four digits and expiry of the card Stripe holds. We never store the full card number.",
+                "Account and Identity Data: Your email address and, when authenticating through Google or LinkedIn, the name and profile image authorized by your identity provider.",
+                "Career and Application Data: Uploaded resumes, cover letters, work history, structured application answers, target roles, locations, compensation preferences, and employer skip lists.",
+                "Forwarding Mailbox Data: Your assigned Overture forwarding address and job correspondence or employer updates routed to that address.",
+                "Submission and Audit Records: Prepared application payloads, user approval states, timestamps, external submission outcomes, and the specific version identifiers of authorization disclosures you accepted.",
+                "Billing and Transaction Metadata: Active subscription tier, billing period allowances, invoice records, payment status, and limited card metadata (last four digits and expiration date) returned by our payment processor. Full card numbers are never transmitted to or stored on Overture servers.",
+                "Operational and Security Telemetry: Authentication session records, rate-limiting events, diagnostic error telemetry, and security audit logs necessary to operate and protect the platform.",
               ],
             },
           ],
         },
         {
-          heading: "Why we use it",
+          heading: "3. Purposes and Legal Bases of Processing",
           blocks: [
             {
               kind: "paragraph",
-              text: "To find jobs for you, prepare and send the applications you approve, email you what you asked for (sign-in and verification links, the daily recap), take and track your payments, and keep Overture safe.",
+              text: "We process personal data solely for specified, legitimate operational purposes:",
+            },
+            {
+              kind: "bullets",
+              items: [
+                "Contractual Performance: Authenticating your account, matching job opportunities, drafting tailored application responses, and transmitting applications you approve.",
+                "User Communications: Delivering authentication links, email verification notices, critical status alerts, and requested application recaps.",
+                "Billing and Fraud Prevention: Processing subscription charges, administering trial eligibility via decoupled card fingerprinting, and satisfying tax and financial accounting obligations.",
+                "Security and Reliability: Enforcing access controls, diagnosing technical failures, preventing abuse, and maintaining service availability.",
+              ],
             },
           ],
         },
         {
-          heading: "Who processes it for us",
+          heading: "4. Automated Matching and Submission Workflows",
           blocks: [
             {
               kind: "paragraph",
-              text: "These companies process data on our behalf. We update this list when it changes.",
+              text: "Overture uses automated parsing, job-matching algorithms, language generation, and controlled browser automation solely to prepare applications from your verified profile information and execute submissions you approve. When you approve an application, the relevant personal details and documents are transmitted directly to the prospective employer's designated application portal, where they become subject to that employer's privacy practices.",
+            },
+          ],
+        },
+        {
+          heading: "5. Infrastructure Categories and Sub-Processors",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Overture Inc. does not sell personal information or permit third-party model providers to train foundational models on your private career documents. To deliver the Service securely and reliably, we engage vetted service providers subject to strict contractual confidentiality, data protection, and security obligations across the following operational functions:",
+            },
+            {
+              kind: "bullets",
+              items: [
+                "Cloud Infrastructure and Encrypted Storage: Managed compute hosting, relational database storage, DNS routing, object storage, and background job orchestration.",
+                "Automated Browser Execution Environments: Isolated cloud execution environments used exclusively to load and complete employer application forms at your direction.",
+                "Language Model Inference Services: Enterprise API inference endpoints configured without data-retention for training to normalize job descriptions and draft application answers from your saved facts.",
+                "Transactional Messaging and Security Telemetry: Email delivery gateways, operational health monitoring, error diagnostics, and immutable security audit pipelines.",
+              ],
             },
             {
               kind: "processors",
-              companyLabel: "Company",
-              doesLabel: "What it does for Overture",
+              companyLabel: "Payment Sub-Processor",
+              doesLabel: "Role and Responsibilities",
               rows: [
-                { does: "Hosts the Overture app and its database.", name: "Fly" },
                 {
-                  does: "Domain name service, email, file storage and background workers.",
-                  name: "Cloudflare",
-                },
-                {
-                  does: "Cloud browsers that fill in job application forms for you.",
-                  name: "Browser Use",
-                },
-                {
-                  does: "A backup cloud browser, used only when the main one cannot be used.",
-                  name: "Kernel",
-                },
-                {
-                  does: "The language model that matches jobs and drafts answers from your facts.",
-                  name: "Anthropic",
-                },
-                { does: "Service logs and health monitoring.", name: "Grafana Cloud" },
-                {
-                  does: "Takes payments, holds the card details and calculates tax.",
+                  does: "Processes subscription payments, executes temporary trial card verification authorizations, issues invoices, calculates applicable taxes, and provides the self-service customer billing portal.",
                   name: "Stripe",
                 },
               ],
@@ -1165,51 +1296,87 @@ export const copy = {
           ],
         },
         {
-          heading: "Payments and card details",
+          heading: "6. Payment Processing and Trial Card Fingerprinting",
           blocks: [
             {
               kind: "paragraph",
-              text: "Stripe processes payments for Overture as a sub-processor; Overture is the seller and is responsible for the taxes on each charge. Card details go from your browser to Stripe and are never stored by Overture. Stripe sends us the plan, the invoices, the payment status and the last four digits and expiry of the card, and we keep those records to run your allowance, answer questions and meet tax and accounting rules.",
+              text: "Stripe processes payments on behalf of Overture Inc. as a payment sub-processor, while Overture Inc. remains the merchant of record responsible for applicable taxes. Payment card numbers flow directly from your browser to Stripe over encrypted channels and never touch Overture infrastructure. Stripe provides Overture with subscription status, invoice identifiers, and the card's last four digits and expiration date for account administration and accounting compliance.",
             },
             {
               kind: "paragraph",
-              text: "For the free trial we store a keyed fingerprint of the card, not the card number. It is not linked to your account and it survives deleting your account, so one card cannot start a second trial.",
+              text: "To enforce our limit of one free trial per payment instrument without storing raw card numbers, Overture generates and retains a keyed cryptographic fingerprint of the verified card. That fingerprint is stored independently of your user profile, contains no direct identity attributes, and survives account deletion solely to prevent repeat trial abuse.",
             },
           ],
         },
         {
-          heading: "How we keep it safe",
+          heading: "7. Security Safeguards and Access Governance",
           blocks: [
             {
               kind: "paragraph",
-              text: "Your files and answers are encrypted. Access to your data is limited to what the service needs, and every time staff open a user's data it is recorded.",
+              text: "Overture implements administrative, technical, and organizational safeguards proportionate to the sensitivity of career and identity records. Stored resumes, documents, and saved form answers are encrypted at rest, transport channels are secured with TLS, production access follows least-privilege controls, and any authorized staff access to user records is logged for security auditing.",
             },
           ],
         },
         {
-          heading: "Your rights",
+          heading: "8. Data Retention and Account Deletion",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "We retain your account profile, career materials, and application history for as long as your account remains active. You may delete your account at any time from Account Settings, which permanently removes your user profile, career documents, and associated billing metadata from Overture systems.",
+            },
+            {
+              kind: "paragraph",
+              text: "Following deletion, Stripe retains statutory invoice and transaction records required for tax, audit, and regulatory compliance, and Overture retains the non-identifiable keyed trial card fingerprint described in Section 6.",
+            },
+          ],
+        },
+        {
+          heading: "9. Your Privacy Rights and Data Controls",
           blocks: [
             {
               kind: "paragraphWithLink",
               before:
-                "You can export your data and delete your account from Profile \u2192 Settings. For anything else, write to ",
+                "You can export a copy of your account data or initiate self-service account deletion directly inside Account Settings. To request access, correction, restriction, or additional information regarding your personal data under applicable privacy laws, write to ",
               after: ".",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
             },
+          ],
+        },
+        {
+          heading: "10. International Data Transfers",
+          blocks: [
             {
               kind: "paragraph",
-              text: "Deleting your account removes your billing records with it. Stripe keeps the invoices it must keep for tax and accounting. The keyed card fingerprint used for the free trial is not linked to you and is kept so the same card cannot start a second trial.",
+              text: "Overture operates cloud infrastructure primarily in the United States and allied jurisdictions. Where personal data is transferred across borders, we rely on appropriate contractual safeguards and encryption controls to maintain consistent protection standards.",
             },
           ],
         },
         {
-          heading: "Changes and contact",
+          heading: "11. Children's Privacy",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "The Service is intended exclusively for adults seeking employment and is not directed to individuals under the age of 18. We do not knowingly collect personal data from minors.",
+            },
+          ],
+        },
+        {
+          heading: "12. Changes to This Privacy Policy",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "We may revise this Privacy Policy periodically to reflect changes in our data practices, operational architecture, or legal obligations. When material changes occur, we will notify you by email at your registered address prior to the effective date of the update.",
+            },
+          ],
+        },
+        {
+          heading: "13. Contact Information",
           blocks: [
             {
               kind: "paragraphWithLink",
               before:
-                "If we change this policy, we will tell you by email before the change takes effect. Questions: ",
+                "Questions, complaints, or privacy requests concerning this Privacy Policy may be sent to Overture Inc. at ",
               after: ".",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",

@@ -20,7 +20,7 @@ export function LandingPricingSection() {
       className="border-y border-border bg-sidebar"
       id="pricing"
     >
-      <div className={`${dsContainer} py-16 sm:py-24`}>
+      <div className={`${dsContainer} pb-14 pt-12 sm:pb-20 sm:pt-16`}>
         <div className="mx-auto max-w-2xl text-center">
           <Badge size="eyebrow" variant="signal">
             {LANDING_COPY.pricing.badge}

@@ -4,6 +4,7 @@ import {
   Briefcase,
   Calendar,
   CircleHelp,
+  ClipboardList,
   CreditCard,
   FileText,
   Home,
@@ -14,7 +15,6 @@ import {
   Settings,
   SlidersHorizontal,
   SquareKanban,
-  User,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
@@ -32,10 +32,10 @@ const QUICK_LINKS = [
   { icon: Inbox, label: copy.nav.inbox, to: "/inbox" },
   { icon: Calendar, label: copy.nav.calendar, to: "/applications?view=calendar" },
   { icon: FileText, label: copy.nav.profileMenu.resume, to: "/profile/resume" },
-  { icon: User, label: copy.nav.profileMenu.details, to: "/profile/details" },
   { icon: SlidersHorizontal, label: copy.nav.profileMenu.preferences, to: "/profile/preferences" },
+  { icon: ClipboardList, label: copy.nav.profileMenu.details, to: "/profile/details" },
   { icon: CreditCard, label: copy.nav.profileMenu.billing, to: "/profile/billing" },
-  { icon: Settings, label: copy.nav.profileMenu.account, to: "/profile/account" },
+  { icon: Settings, label: copy.nav.accountSettings, to: "/profile/account" },
   { icon: MessageCircle, label: copy.nav.support, to: "/support" },
   { icon: Bell, label: copy.shell.notificationsEmpty, to: "/notifications" },
 ] as const;

@@ -64,5 +64,5 @@ export function SignUpPage() {
     content = <WaitlistCard />;
   }
 
-  return <SignInLayout>{content}</SignInLayout>;
+  return <SignInLayout mode="signup">{content}</SignInLayout>;
 }

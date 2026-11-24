@@ -6,12 +6,11 @@ import { BrandMark } from "../brand-mark.tsx";
 import { Button } from "../ui/button.tsx";
 import { Card } from "../ui/card.tsx";
 import { dsContainer, dsNavLink } from "../ui/ds.ts";
-import { Separator } from "../ui/separator.tsx";
 import { LANDING_COPY } from "./landing-copy.ts";
 
 const NAV_LINKS = [
   { href: "#how-it-works", label: LANDING_COPY.nav.howItWorks },
-  { href: "#where-it-applies", label: LANDING_COPY.nav.jobBoards },
+  { href: "#live-jobs", label: LANDING_COPY.nav.liveJobs },
   { href: "#pricing", label: LANDING_COPY.nav.pricing },
   { href: "#faq", label: LANDING_COPY.nav.faq },
 ] as const;
@@ -19,6 +18,7 @@ const NAV_LINKS = [
 export function LandingHeader() {
   const { label, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   const toggleMenu = () => {
     setMenuOpen((current) => !current);
@@ -27,6 +27,19 @@ export function LandingHeader() {
   const closeMenu = () => {
     setMenuOpen(false);
   };
+
+  useEffect(() => {
+    const updateScrolled = () => {
+      setScrolled(globalThis.scrollY > 8);
+    };
+
+    updateScrolled();
+    globalThis.addEventListener("scroll", updateScrolled, { passive: true });
+
+    return () => {
+      globalThis.removeEventListener("scroll", updateScrolled);
+    };
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -49,8 +62,16 @@ export function LandingHeader() {
     </>
   );
 
+  const solidHeader = scrolled || menuOpen;
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/90 backdrop-blur-md">
+    <header
+      className={`sticky top-0 z-40 w-full border-b transition-colors duration-200 ${
+        solidHeader
+          ? "border-border/60 bg-background/80 shadow-sh backdrop-blur-md"
+          : "border-transparent bg-transparent backdrop-blur-none"
+      }`}
+    >
       <div
         className={`${dsContainer} relative flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4 sm:py-5`}
       >
@@ -80,7 +101,6 @@ export function LandingHeader() {
           <Button asChild variant="primary">
             <a href="/signup">{LANDING_COPY.nav.startTrial}</a>
           </Button>
-          <Separator className="mx-1 h-7 bg-input" orientation="vertical" />
           <Button ariaLabel={label} onClick={toggleTheme} size="iconLg" variant="outline">
             {themeIcons}
           </Button>

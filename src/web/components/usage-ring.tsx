@@ -14,13 +14,20 @@ export function UsageRing() {
     <div className="relative h-11 w-11">
       <span className="sr-only">{copy.home.usageAria(left)}</span>
       <svg aria-hidden="true" className="h-11 w-11" viewBox="0 0 44 44">
-        <circle cx="22" cy="22" fill="none" r={RADIUS} stroke="var(--line2)" strokeWidth="1.5" />
         <circle
           cx="22"
           cy="22"
           fill="none"
           r={RADIUS}
-          stroke="var(--meter)"
+          stroke="var(--color-border)"
+          strokeWidth="1.5"
+        />
+        <circle
+          cx="22"
+          cy="22"
+          fill="none"
+          r={RADIUS}
+          stroke="var(--color-signal)"
           strokeDasharray={`${String(share * CIRCUMFERENCE)} ${String(CIRCUMFERENCE)}`}
           strokeDashoffset="0"
           strokeLinecap="round"
@@ -28,7 +35,7 @@ export function UsageRing() {
           transform="rotate(-90 22 22)"
         />
       </svg>
-      <span className="num absolute inset-0 flex items-center justify-center text-xs font-bold">
+      <span className="absolute inset-0 flex items-center justify-center font-mono text-xs font-semibold tabular-nums text-foreground">
         {copy.home.usageCount(left)}
       </span>
     </div>
