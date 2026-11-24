@@ -211,7 +211,13 @@ export async function readFormQuestions(page: Page, config: BrowserFormConfig) {
       };
 
       const groupLabelFor = (element: Element) => {
-        const legend = element.closest("fieldset")?.querySelector("legend");
+        const fieldset = element.closest("fieldset");
+
+        if (fieldset === null || !root.contains(fieldset)) {
+          return "";
+        }
+
+        const legend = fieldset.querySelector("legend");
 
         if (legend !== null && legend !== undefined) {
           return legend.textContent

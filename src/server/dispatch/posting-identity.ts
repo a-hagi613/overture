@@ -431,7 +431,7 @@ function postingPath(ats: ApplySupportedAts, url: URL) {
     }
 
     const jobId = segments.at(-1);
-    const boardToken = segments[0];
+    const [boardToken] = segments;
 
     return jobId === undefined || boardToken === undefined ? null : { boardToken, jobId };
   }
