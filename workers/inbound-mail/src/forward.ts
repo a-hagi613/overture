@@ -7,7 +7,6 @@ import { byteLength, truncateBytes } from "./text.ts";
 export const INBOUND_FORWARD_MAX_BYTES = 4 * 1024 * 1024;
 export const INBOUND_FORWARD_MAX_ATTACHMENTS = 32;
 export const INBOUND_FORWARD_PREVIEW_BYTES = 200 * 1024;
-export const INBOUND_FORWARD_HTML_PREVIEW_BYTES = 512 * 1024;
 export const INBOUND_FORWARD_SUBJECT_MAX = 998;
 export const INBOUND_ATTACHMENT_SPILL_PREFIX = "mail-attachments/";
 export const DEFAULT_FORWARD_FROM = "notify@notify.tryoverture.com";
@@ -73,37 +72,16 @@ function attachmentType(attachment: Attachment) {
   return SAFE_MIME_TYPE.test(candidate) ? candidate : "application/octet-stream";
 }
 
-function htmlToText(html: string) {
-  return html
-    .replaceAll(/<script[\s\S]*?<\/script>/giu, " ")
-    .replaceAll(/<style[\s\S]*?<\/style>/giu, " ")
-    .replaceAll(/<br\s*\/?>/giu, "\n")
-    .replaceAll(/<\/p>/giu, "\n")
-    .replaceAll(/<[^>]+>/gu, " ")
-    .replaceAll("&nbsp;", " ")
-    .replaceAll("&quot;", '"')
-    .replaceAll(/&#0?39;/gu, "'")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&amp;", "&")
-    .replaceAll(/[ \t]+/gu, " ")
-    .replaceAll(/\n{3,}/gu, "\n\n")
-    .trim();
-}
-
 function previewOf(parsed: Email) {
-  const { html, text: plain } = parsed;
-  let text = "";
+  const { text } = parsed;
 
-  if (plain !== undefined && plain.trim() !== "") {
-    text = plain;
-  } else if (html !== undefined && html !== "") {
-    text = htmlToText(html.slice(0, INBOUND_FORWARD_HTML_PREVIEW_BYTES));
+  if (text === undefined || text.trim() === "") {
+    return { text: "This message has no plain-text part.", truncated: false, htmlOnly: true };
   }
 
   const preview = truncateBytes(text, INBOUND_FORWARD_PREVIEW_BYTES);
 
-  return { text: preview, truncated: preview.length < text.length };
+  return { text: preview, truncated: preview.length < text.length, htmlOnly: false };
 }
 
 function subjectOf(parsed: Email) {
@@ -227,6 +205,10 @@ function forwardedText(
 
   if (preview.truncated) {
     lines.push("", `[Message truncated. Open Overture for the full message: ${inboxUrl}]`);
+  }
+
+  if (preview.htmlOnly) {
+    lines.push("", `[This message is HTML. Open it in Overture: ${inboxUrl}]`);
   }
 
   if (spilled.length > 0) {

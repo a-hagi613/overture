@@ -376,6 +376,29 @@ test("an alias message over 4 MiB keeps its attachments in R2 and links to the I
   expect(spill.objects.get(attachmentKeys[0] ?? "")?.byteLength).toBe(4 * 1024 * 1024 + 256 * 1024);
 });
 
+test("an HTML-only message links to the Inbox instead of rendering the HTML", async () => {
+  const queue = fakeInboundQueue();
+  const spill = fakeInboundSpill();
+  const email = fakeInboundEmail();
+
+  const { message } = forwardableMessage(
+    fixture("html-only-invite.eml"),
+    "ada.chen.4k@tryoverture.com",
+  );
+
+  await worker.email(
+    message,
+    inboundTestEnvironment("https://overture.invalid", queue, spill, email),
+  );
+
+  const sent = firstSentEmail(email);
+
+  expect(sent.text).toContain("This message has no plain-text part.");
+  expect(sent.text).toContain("[This message is HTML. Open it in Overture:");
+  expect(sent.text).toContain("https://overture.invalid/inbox");
+  expect(sent.text).not.toContain("secret");
+});
+
 test("a long body is truncated in the copy with a link to the Inbox", async () => {
   const queue = fakeInboundQueue();
   const spill = fakeInboundSpill();

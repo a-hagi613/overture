@@ -25,8 +25,8 @@ The Worker never calls `message.forward()`. It builds a clean copy with the stru
 - Only `In-Reply-To`, `References`, `Thread-Index`, `Thread-Topic` and `X-*` headers are copied. `From`, `To`, `Date`,
   `Message-ID`, `MIME-Version`, `Content-*` and every other inbound header are dropped, because Email Sending rejects
   anything outside its allow-list (at most 20 named headers, 2 KB per value and 16 KB in total).
-- The body is plain text: the original `text/plain`, or a text rendering of the HTML part. The full MIME still goes to
-  the app, which stores the HTML and attachments in the Inbox.
+- The body is the original `text/plain`. An HTML-only message carries a short placeholder and a link to the Inbox,
+  where the HTML is stored; the copy never renders inbound HTML.
 - A copy whose attachments would push it over 4 MiB (the 5 MiB `send_email` cap leaves headroom) is sent without them,
   and one with more than 32 attachments sends the first 32 and links to the rest in the Inbox. Attachments removed by
   the 4 MiB guard are written to `INBOUND_SPILL` under `mail-attachments/{reference}/` (R2 encrypts objects at rest)
