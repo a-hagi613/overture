@@ -43,7 +43,6 @@ export const LEFTOVER_SCAN_LIMIT = 2000;
  */
 export const YIELD_EVERY = 25;
 
-/** A run that left leftovers behind queues its continuation a minute later instead of waiting for UTC midnight. */
 const CONTINUE_DELAY_MS = 60_000;
 
 const LLM_TAG_SOURCE: (typeof postingTags.$inferInsert)["source"] = "llm";
@@ -99,7 +98,6 @@ export interface TagFallbackReport {
   blockedCap: "user" | "global" | "tagging" | null;
 }
 
-/** A leftover Posting without its description: the description is fetched only for the batch's representatives. */
 interface LeftoverPosting {
   id: string;
   companyId: string;
@@ -140,13 +138,6 @@ export function fallbackCacheKey(companyId: string, title: string, department: s
   return parts.join("|");
 }
 
-/**
- * The untagged Postings, filtered in SQL. `isNull(postingTags.value)` keeps every Posting that already carries a
- * role tag out of the result set, so the scan never reads a tagged row's description, and the SQL `LIMIT` bounds how
- * many rows a single run materializes.
- * @param db The catalog database.
- * @returns The leftover Postings, without their descriptions.
- */
 function selectLeftovers(db: CatalogDatabase) {
   return db
     .select({
@@ -189,13 +180,6 @@ function companyIdsOf(leftovers: readonly LeftoverPosting[]) {
   return [...new Set(leftovers.map((posting) => posting.companyId))];
 }
 
-/**
- * The LLM tags already recorded for the companies this run is about, keyed so a repeated title can reuse them. The
- * lookup is scoped: a catalog-wide read of every `llm` tag cost memory proportional to the whole catalog on boot.
- * @param db The catalog database.
- * @param companyIds The companies the selected leftovers belong to.
- * @returns The recorded tags by cache key; empty when there is nothing to tag.
- */
 function cachedTagsByCacheKey(db: CatalogDatabase, companyIds: readonly string[]) {
   const byCacheKey = new Map<string, CachedTag[]>();
 
@@ -237,13 +221,6 @@ function cachedTagsByCacheKey(db: CatalogDatabase, companyIds: readonly string[]
   return byCacheKey;
 }
 
-/**
- * Reads the compressed descriptions of the given Postings only. It runs right before the requests are built, for the
- * batch's representative ids, so an idle or already-tagged catalog never loads a description at all.
- * @param db The catalog database.
- * @param postingIds The representative Postings of the batch.
- * @returns The gzipped descriptions by posting id.
- */
 function descriptionsById(db: CatalogDatabase, postingIds: readonly string[]) {
   const byId = new Map<string, Buffer | null>();
 
@@ -264,23 +241,14 @@ function descriptionsById(db: CatalogDatabase, postingIds: readonly string[]) {
   return byId;
 }
 
-/**
- * Builds one request per group, yielding the event loop periodically so the synchronous gunzip of a large batch never
- * holds the thread for the whole run.
- * @param groups The batch's groups.
- * @param descriptions The gzipped descriptions of the batch's representatives.
- * @returns The requests to send.
- */
 async function buildRequests(
   groups: readonly LeftoverGroup[],
   descriptions: ReadonlyMap<string, Buffer | null>,
+  offset = 0,
+  requests: LlmRequest[] = [],
 ) {
-  const requests: LlmRequest[] = [];
-
-  for (const [index, group] of groups.entries()) {
-    if (index > 0 && index % YIELD_EVERY === 0) {
-      await yieldToEventLoop();
-    }
+  for (const [position, group] of groups.slice(offset, offset + YIELD_EVERY).entries()) {
+    const index = offset + position;
 
     requests.push({
       purpose: TAG_FALLBACK_PURPOSE,
@@ -296,7 +264,15 @@ async function buildRequests(
     });
   }
 
-  return requests;
+  const next = offset + YIELD_EVERY;
+
+  if (next >= groups.length) {
+    return requests;
+  }
+
+  await yieldToEventLoop();
+
+  return buildRequests(groups, descriptions, next, requests);
 }
 
 function groupLeftovers(leftovers: readonly LeftoverPosting[]) {
@@ -482,8 +458,6 @@ export async function runTagFallbackJob(deps: TagFallbackDeps) {
     }
   }
 
-  // A run that tagged nothing (the model answered outside the taxonomy, or every call failed) must not queue itself a
-  // minute later and spend again: it waits for tomorrow's run instead.
   const hasMore =
     !report.blocked &&
     report.tagged > 0 &&

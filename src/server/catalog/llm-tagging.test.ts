@@ -93,13 +93,18 @@ function seedCompany(sqlite: TestDatabases["catalog"]["sqlite"], companyId: stri
   );
 }
 
+function descriptionGzFor(description: string | null | undefined) {
+  if (description === null || description === undefined) {
+    return null;
+  }
+
+  return Buffer.from(Bun.gzipSync(description));
+}
+
 function seedPosting(sqlite: TestDatabases["catalog"]["sqlite"], posting: SeededPosting) {
   const companyId = posting.companyId ?? "company-1";
   const department = posting.department ?? null;
-  const descriptionGz =
-    posting.description === undefined || posting.description === null
-      ? null
-      : Buffer.from(Bun.gzipSync(posting.description));
+  const descriptionGz = descriptionGzFor(posting.description);
 
   sqlite.run(
     `insert into postings (id, board_id, company_id, ats, ats_job_id, url, apply_url_norm, title, title_norm,
@@ -132,12 +137,7 @@ function seedPosting(sqlite: TestDatabases["catalog"]["sqlite"], posting: Seeded
   }
 }
 
-interface FakeLlm {
-  batches: LlmRequest[][];
-  port: LlmPort;
-}
-
-function fakeLlm(onBatch?: () => void): FakeLlm {
+function fakeLlm(onBatch?: () => void) {
   const batches: LlmRequest[][] = [];
 
   return {
@@ -151,7 +151,7 @@ function fakeLlm(onBatch?: () => void): FakeLlm {
           onBatch();
         }
 
-        return requests.map((request) => ({
+        const calls = requests.map((request) => ({
           customId: request.customId,
           result: { ok: true as const, value: { role: "Design", subrole: null } },
           model: "fake-haiku",
@@ -161,18 +161,28 @@ function fakeLlm(onBatch?: () => void): FakeLlm {
           outputTokens: 1,
           costMicros: 1,
         }));
+
+        await Bun.sleep(0);
+
+        return calls;
       },
       estimateSingleCostMicros: () => 0,
-      runSingle: async () => ({
-        model: "fake-haiku",
-        text: null,
-        inputTokens: 0,
-        cachedTokens: 0,
-        cacheWriteTokens: 0,
-        outputTokens: 0,
-        costMicros: 0,
-      }),
-    },
+      runSingle: async () => {
+        const call = {
+          model: "fake-haiku",
+          text: null,
+          inputTokens: 0,
+          cachedTokens: 0,
+          cacheWriteTokens: 0,
+          outputTokens: 0,
+          costMicros: 0,
+        };
+
+        await Bun.sleep(0);
+
+        return call;
+      },
+    } satisfies LlmPort,
   };
 }
 
@@ -248,9 +258,10 @@ describe("runTagFallbackJob", () => {
     expect(selection?.sql).toContain('"posting_tags"."value" is null');
     expect(selection?.params).toContain(LEFTOVER_SCAN_LIMIT);
 
-    expect(descriptionQueries(queries)).toEqual([
-      expect.objectContaining({ params: ["posting-open"] }),
-    ]);
+    const [descriptionQuery] = descriptionQueries(queries);
+
+    expect(descriptionQueries(queries).length).toBe(1);
+    expect(descriptionQuery?.params).toEqual(["posting-open"]);
 
     expect(tagRowsFor(catalog.sqlite, "posting-tagged")).toEqual([
       { dimension: "role", source: "rules", value: "Design" },

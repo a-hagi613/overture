@@ -18,10 +18,6 @@ const journalSchema = z.object({
   entries: z.array(z.object({ tag: z.string(), when: z.number() })),
 });
 
-/**
- * A table rebuild in a migration: Drizzle writes one as `CREATE __new_x`, `DROP TABLE x`, `RENAME TO x`. Those need
- * foreign keys off; everything else (add column, create index, backfill) is additive and safe with them on.
- */
 const TABLE_REBUILD_SQL = /\b(?:drop\s+table|rename\s+to)\b/iu;
 
 function hasMigrationsTable(client: AppDatabase["$client"]) {
@@ -44,12 +40,6 @@ function appliedMigrationCount(client: AppDatabase["$client"]) {
   ).total;
 }
 
-/**
- * The `when` of the last applied migration, which is what Drizzle compares a journal entry against to decide whether
- * it is pending.
- * @param client The SQLite client.
- * @returns The last applied journal millisecond, or 0 when nothing has been applied.
- */
 function appliedMigrationAt(client: AppDatabase["$client"]) {
   if (!hasMigrationsTable(client)) {
     return 0;
@@ -62,13 +52,6 @@ function appliedMigrationAt(client: AppDatabase["$client"]) {
   );
 }
 
-/**
- * Reads the SQL of every migration Drizzle would still apply. It returns `null` when the journal or a pending file
- * cannot be read, in which case the caller keeps the conservative path and lets `migrate()` report the real error.
- * @param migrationsFolder The Drizzle migrations folder.
- * @param appliedAt The last applied journal millisecond.
- * @returns The pending migration SQL, or `null` when it cannot be inspected.
- */
 function pendingMigrationSql(migrationsFolder: string, appliedAt: number) {
   try {
     const journal = journalSchema.parse(
@@ -89,12 +72,6 @@ function pendingMigrationSql(migrationsFolder: string, appliedAt: number) {
   }
 }
 
-/**
- * Whether the migrations still to apply rebuild a table, which is the only case that needs foreign keys off.
- * @param client The SQLite client.
- * @param migrationsFolder The Drizzle migrations folder.
- * @returns `true` when a pending migration drops or renames a table, or when the pending set cannot be inspected.
- */
 function pendingMigrationsRebuildTables(client: AppDatabase["$client"], migrationsFolder: string) {
   const pending = pendingMigrationSql(migrationsFolder, appliedMigrationAt(client));
 
