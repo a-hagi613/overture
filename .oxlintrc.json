@@ -217,6 +217,7 @@
           "src/server/inbox/waits.test.ts",
           "src/server/lab/limit.test.ts",
           "src/server/matching/applications.test.ts",
+          "src/server/notify/code-wait-email.test.ts",
           "src/server/pipeline/answer-plan.test.ts",
           "src/server/pipeline/approved-plan.test.ts",
           "src/server/pipeline/email-notes.test.ts",

@@ -106,6 +106,7 @@ import {
   parsePushNotifyPayload,
   runNotificationPushJob,
 } from "./notify/push.ts";
+import { sendCodeWaitEmailFallback } from "./notify/code-wait-email.ts";
 import {
   APPLY_FAILURES_JOB_KIND,
   ensureApplyFailuresQueued,
@@ -535,8 +536,14 @@ const readyNotifyJobHandlers: JobHandlers = {
 const pushNotifyJobHandlers: JobHandlers = {
   [PUSH_NOTIFY_JOB_KIND]: async (payload) => {
     const { notificationId } = parsePushNotifyPayload(payload);
+    const pushed = await runNotificationPushJob({ clock, db, push: pushSender }, notificationId);
 
-    await runNotificationPushJob({ clock, db, push: pushSender }, notificationId);
+    if (pushed.userId !== null && pushed.kind === "code_wait") {
+      await sendCodeWaitEmailFallback(
+        { appOrigin, clock, db, mail: mailSender },
+        { notificationId, userId: pushed.userId },
+      );
+    }
   },
   [APPLY_FAILURES_JOB_KIND]: async () => {
     try {
@@ -720,9 +727,11 @@ const activeDispatcher =
   browserProviders === null
     ? null
     : createDispatcher({
+        appOrigin,
         db,
         clock,
         hardTimeoutMs: env.SEND_HARD_TIMEOUT_MS,
+        mail: mailSender,
         mailboxes,
         outcomes,
         personal,

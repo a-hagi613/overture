@@ -19,6 +19,7 @@ import type {
   RemoteBrowser,
 } from "./browser/provider.ts";
 import type { createMailboxService } from "../inbox/mailboxes.ts";
+import type { MailSender } from "../platform/mail/port.ts";
 import type { Outcomes } from "./outcomes.ts";
 
 import { applications, attempts, profiles, users } from "../platform/db/schema.ts";
@@ -52,7 +53,9 @@ import {
   markCodeConsumed,
   waitForCode,
 } from "../inbox/waits.ts";
+import { codeWaitAskDelayMs } from "../../shared/code-wait.ts";
 import { createNotification } from "../notify/notifications.ts";
+import { sendCodeWaitEmailFallback } from "../notify/code-wait-email.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { copy } from "../../shared/copy.ts";
 import { recordApplicationEvent } from "./outcomes.ts";
@@ -94,6 +97,8 @@ export interface DispatcherDeps {
   personal: PersonalCrypto;
   mailboxes: ReturnType<typeof createMailboxService>;
   outcomes: Outcomes;
+  mail: MailSender;
+  appOrigin: string;
   proxyCountry: string;
   signal?: AbortSignal;
 }
@@ -209,6 +214,8 @@ export function createDispatcher(deps: DispatcherDeps) {
     personal,
     mailboxes,
     outcomes,
+    mail,
+    appOrigin,
     proxyCountry,
     signal,
   } = deps;
@@ -708,17 +715,32 @@ export function createDispatcher(deps: DispatcherDeps) {
             return null;
           }
 
+          const askDelayMs = codeWaitAskDelayMs(mailbox.firstForwardedAt !== null);
+
           const resolved = await waitForCode(
             { db, clock, personal },
             {
-              onAskToPaste: () => {
-                createNotification(db, clock, {
-                  body: copy.notifications.codeWait.body(CODE_WAIT_TIMEOUT_MS / 60_000),
+              askDelayMs,
+              onAskToPaste: async () => {
+                const notificationId = createNotification(db, clock, {
+                  body: copy.notifications.codeWait.body(
+                    plan.companyName,
+                    CODE_WAIT_TIMEOUT_MS / 60_000,
+                  ),
                   kind: copy.notifications.codeWait.kind,
-                  title: copy.notifications.codeWait.title(plan.companyName),
-                  url: copy.notifications.codeWait.url,
+                  title: copy.notifications.codeWait.title,
+                  url: copy.notifications.codeWait.url(wait.id),
                   userId: claimed.userId,
                 });
+
+                if (notificationId === null) {
+                  return;
+                }
+
+                await sendCodeWaitEmailFallback(
+                  { appOrigin, clock, db, mail },
+                  { notificationId, userId: claimed.userId },
+                );
               },
               waitId: wait.id,
             },

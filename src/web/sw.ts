@@ -107,18 +107,32 @@ addEventListener("activate", (event) => {
 });
 
 addEventListener("push", (event) => {
+  event.waitUntil(showPush(event));
+});
+
+/**
+ * Show a notification for one push event. A payload that is missing, not JSON
+ * or not an object still gets a notification: a push event that shows nothing
+ * is a silent push, and Apple revokes the subscription after too many (#565).
+ * @param event The push event whose data may be malformed.
+ */
+async function showPush(event: PushEventLike) {
   const payload = readPushPayload(event);
 
-  event.waitUntil(
-    registration.showNotification(payload.title ?? "Overture", {
+  try {
+    await registration.showNotification(payload.title ?? "Overture update", {
       badge: "/icons/icon-192.png",
       body: payload.body ?? "Open Overture for the latest.",
       data: { url: payload.url ?? "/" },
       icon: "/icons/icon-192.png",
       tag: payload.tag ?? "overture",
-    }),
-  );
-});
+    });
+  } catch (error) {
+    void error;
+  }
+}
+
+export { showPush };
 
 addEventListener("notificationclick", (event) => {
   event.notification.close();

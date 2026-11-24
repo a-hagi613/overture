@@ -30,6 +30,25 @@ export function parsePushNotifyPayload(payload: string) {
 }
 
 /**
+ * Whether the user still holds a push endpoint. Rows exist only for granted
+ * subscriptions and are deleted the moment a push service answers 404/410 in
+ * `runNotificationPushJob`, so a row is the whole answer and no migration is
+ * needed (#565).
+ * @param db The application database.
+ * @param userId The user whose endpoints are counted.
+ * @returns True when at least one subscription row exists.
+ */
+export function hasActivePushEndpoint(db: Pick<AppDatabase, "select">, userId: string) {
+  return (
+    db
+      .select({ id: pushSubscriptions.id })
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.userId, userId))
+      .get() !== undefined
+  );
+}
+
+/**
  * Queue one push for a notification row. The notification itself is written
  * first, so the in-app list never waits on a push endpoint.
  * @param db The application database.
@@ -49,7 +68,8 @@ export function enqueueNotificationPush(db: DatabaseWriter, clock: Clock, notifi
  * the next job attempt unless another subscription received the push.
  * @param deps The database, clock and push sender.
  * @param notificationId The notification to push.
- * @returns The delivery counts.
+ * @returns The delivery counts and the notification's user, so the caller can
+ * fall back to email once the rows are pruned (#565).
  */
 export async function runNotificationPushJob(deps: PushNotifyDeps, notificationId: string) {
   const notification = deps.db
@@ -59,18 +79,36 @@ export async function runNotificationPushJob(deps: PushNotifyDeps, notificationI
     .get();
 
   if (notification === undefined || notification.pushedAt !== null) {
-    return { gone: 0, sent: 0, skipped: true };
+    return {
+      gone: 0,
+      kind: notification?.kind ?? null,
+      sent: 0,
+      skipped: true,
+      userId: notification?.userId ?? null,
+    };
   }
 
   if (isDemoUser(deps.db, notification.userId)) {
-    return { gone: 0, sent: 0, skipped: true };
+    return {
+      gone: 0,
+      kind: notification.kind,
+      sent: 0,
+      skipped: true,
+      userId: notification.userId,
+    };
   }
 
   if (
     isNotificationKind(notification.kind) &&
     !notificationPreferenceEnabled(deps.db, notification.userId, notification.kind)
   ) {
-    return { gone: 0, sent: 0, skipped: true };
+    return {
+      gone: 0,
+      kind: notification.kind,
+      sent: 0,
+      skipped: true,
+      userId: notification.userId,
+    };
   }
 
   const subscriptions = deps.db
@@ -80,7 +118,13 @@ export async function runNotificationPushJob(deps: PushNotifyDeps, notificationI
     .all();
 
   if (deps.push === null || subscriptions.length === 0) {
-    return { gone: 0, sent: 0, skipped: true };
+    return {
+      gone: 0,
+      kind: notification.kind,
+      sent: 0,
+      skipped: true,
+      userId: notification.userId,
+    };
   }
 
   const payload = {
@@ -147,5 +191,5 @@ export async function runNotificationPushJob(deps: PushNotifyDeps, notificationI
       .run();
   }
 
-  return { gone, sent, skipped: false };
+  return { gone, kind: notification.kind, sent, skipped: false, userId: notification.userId };
 }

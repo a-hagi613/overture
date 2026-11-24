@@ -15,7 +15,7 @@ import { resolveCodeWaitWithPaste } from "../inbox/waits.ts";
 import { applications, attempts, codeWaits } from "../platform/db/schema.ts";
 import { isDemoRole } from "../../shared/demo.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
-import { CODE_WAIT_ERRORS } from "../../shared/code-wait.ts";
+import { CODE_WAIT_ERRORS, codeWaitAskDelayMs } from "../../shared/code-wait.ts";
 
 const codeBodySchema = z.object({
   code: z.string().regex(codePatterns.greenhouse, "Enter the 8-character code."),
@@ -65,6 +65,9 @@ export function createMailRoutes(deps: {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
+    const mailbox = mailboxes.readFor(user.id);
+    const forwardedAt = mailbox === null ? null : mailbox.firstForwardedAt;
+
     const rows = db
       .select({
         id: codeWaits.id,
@@ -97,6 +100,9 @@ export function createMailRoutes(deps: {
         company: row.company,
         title: row.title,
         startedAt: row.startedAt.getTime(),
+        askAt:
+          row.startedAt.getTime() +
+          codeWaitAskDelayMs(forwardedAt !== null && forwardedAt <= row.startedAt.getTime()),
         expiresAt: row.expiresAt.getTime(),
       })),
     });

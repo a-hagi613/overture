@@ -536,6 +536,17 @@ export const copy = {
         "Overture",
         "",
       ].join("\n"),
+    codeWaitBody: (input: { minutes: number; url: string }) =>
+      [
+        "An application stopped at a verification step.",
+        "",
+        `Overture asked for the code in the app, but your phone could not be reached, so this email is the alert. Paste the code within ${countWord(input.minutes)} minutes, or the Application ends and can be tried again later.`,
+        "",
+        input.url,
+        "",
+        "Overture",
+        "",
+      ].join("\n"),
     exportReadySubject: "Your Overture export is ready",
     exportReadyBody: (url: string) =>
       `Your Overture export is ready to download.\n\nOpen Profile \u2192 Settings in Overture and choose Download export. The link is valid for 24 hours, then the archive is deleted.\n\n${url}\n\nIf you didn't ask for this, write to admin@tryoverture.com.\n`,
@@ -634,8 +645,7 @@ export const copy = {
       body:
         "The form asked for a code sent to your email. Paste it in Overture within ten minutes, or the " +
         "Application ends and can be tried again later.",
-      asked:
-        "Five minutes have passed with no forwarded mail. The form stays open until the timer ends.",
+      asked: "No forwarded mail yet. The form stays open until the timer ends.",
       paste: "Paste the code",
       noCode: "No code yet",
     },
@@ -2424,10 +2434,10 @@ export const copy = {
       thisDevice: "Notifications on this device",
     },
     codeWait: {
-      title: (company: string) => `${company} needs a code`,
-      body: (minutes: number) =>
-        `The form asked for a code sent to your email. Paste it in Overture within ${countWord(minutes)} minutes, or the Application ends and can be tried again later.`,
-      url: "/",
+      title: "Needs a verification code",
+      body: (company: string, minutes: number) =>
+        `The form for ${company} asked for a code sent to your email. Paste it in Overture within ${countWord(minutes)} minutes, or the Application ends and can be tried again later.`,
+      url: (waitId: string) => `/home?codeWait=${encodeURIComponent(waitId)}`,
       kind: "code_wait",
     },
     stageMove: {

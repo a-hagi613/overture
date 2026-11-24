@@ -57,6 +57,23 @@ export function createSinkMailSender(clock: Clock) {
 
       await Promise.resolve();
     },
+    sendCodeWait: async (mail) => {
+      failIfAsked();
+
+      const sent = {
+        id: randomUUID(),
+        to: mail.to,
+        from: env.MAIL_FROM,
+        subject: mail.subject,
+        body: mail.body,
+        replyTo: null,
+        sentAt: clock.now(),
+      };
+
+      captured.push(sent);
+
+      await Promise.resolve();
+    },
     sendReadyRecap: async (mail) => {
       failIfAsked();
 
