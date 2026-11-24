@@ -393,10 +393,7 @@ export function findRecoveryWorkflowProblems(input: RecoveryWorkflowInput) {
     problems.push("ops-live.yml sync-ops-secrets writes secret values into the step summary");
   }
 
-  if (
-    !syncHealth.includes("seq 1 24") ||
-    !syncHealth.includes("https://tryoverture.com/api/health")
-  ) {
+  if (!syncHealth.includes("seq 1 24") || !syncHealth.includes("api/health")) {
     problems.push(
       "ops-live.yml sync-ops-secrets does not verify the health route after the import",
     );

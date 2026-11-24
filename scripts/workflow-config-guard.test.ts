@@ -315,6 +315,8 @@ const RESET_DIAGNOSTICS_STEP =
 
 const RESET_DELETE_STEP = "Delete only the catalog database files on the overture-web volume";
 
+const SYNC_HEALTH_STEP = "Verify the production health route after the ops secrets sync";
+
 test("the shipped recovery actions never touch the application database and never print a secret", () => {
   expect(findRecoveryWorkflowProblems({ opsLive: recoveryWorkflow() })).toStrictEqual([]);
 });
@@ -428,6 +430,17 @@ test("an ops-secrets sync that accepts an empty configuration is reported", () =
   expect(
     findRecoveryWorkflowProblems({ opsLive: workflow }).some((problem) =>
       problem.includes("refuse an empty sync"),
+    ),
+  ).toBe(true);
+});
+
+test("an ops-secrets sync without a health check is reported", () => {
+  const workflow = recoveryWorkflow();
+  const health = readWorkflowStep(workflow, SYNC_HEALTH_STEP) ?? "";
+
+  expect(
+    findRecoveryWorkflowProblems({ opsLive: workflow.replace(health, "") }).some((problem) =>
+      problem.includes("does not verify the health route"),
     ),
   ).toBe(true);
 });
