@@ -855,7 +855,6 @@ export const copy = {
     effective: "Effective when the plans open to the public",
     footerName: "Overture",
     footerContact: "admin@tryoverture.com",
-    footerAddress: "[POSTAL ADDRESS]",
     footerSeparator: " · ",
     footerLinksLabel: "Legal pages",
     draftNotice:
@@ -873,7 +872,7 @@ export const copy = {
             {
               kind: "paragraphWithLink",
               before: "Overture is a job-search service run by Overture. You can reach us at ",
-              after: ". Our postal address is [POSTAL ADDRESS].",
+              after: ".",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
             },
@@ -1025,7 +1024,7 @@ export const copy = {
             {
               kind: "paragraphWithLink",
               before: "Overture is run by Overture. Contact us at ",
-              after: ". Our postal address is [POSTAL ADDRESS].",
+              after: ".",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
             },

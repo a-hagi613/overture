@@ -38,7 +38,8 @@ test("a signed-out visitor reaches the Terms and the Privacy Policy from sign-in
 
   await expect(page).toHaveURL(/\/terms$/u);
   await expect(page.getByRole("heading", { level: 1, name: "Terms of Service" })).toBeVisible();
-  await expect(page.getByText("[POSTAL ADDRESS]").first()).toBeVisible();
+  await expect(page.getByText("[POSTAL ADDRESS]")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "admin@tryoverture.com" }).first()).toBeVisible();
 
   const termsResults = await new AxeBuilder({ page }).analyze();
 
