@@ -108,7 +108,7 @@ function redactAndStripUrl(attributes: Attributes) {
   }
 }
 
-class RedactingSpanProcessor implements SpanProcessor {
+export class RedactingSpanProcessor implements SpanProcessor {
   private readonly inner: SpanProcessor;
 
   constructor(inner: SpanProcessor) {
@@ -134,7 +134,7 @@ class RedactingSpanProcessor implements SpanProcessor {
   }
 }
 
-class RedactingLogExporter implements LogRecordExporter {
+export class RedactingLogExporter implements LogRecordExporter {
   private readonly inner: LogRecordExporter;
 
   constructor(inner: LogRecordExporter) {
