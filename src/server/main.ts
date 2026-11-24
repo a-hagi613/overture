@@ -262,10 +262,30 @@ createEventLoopLagMonitor({
   },
 }).start();
 
+const appMigrationStarted = performance.now();
+
+logInfo("boot", `applying application database migrations to ${databasePath}`);
+
 migrateDatabase(db, "drizzle");
 
-if (localCatalog !== null) {
+logInfo(
+  "boot",
+  `application database migrations finished in ${String(Math.round(performance.now() - appMigrationStarted))} ms`,
+);
+
+if (localCatalog === null) {
+  logInfo("boot", "skipping local catalog database migrations: R2 hot-swap active");
+} else {
+  const catalogMigrationStarted = performance.now();
+
+  logInfo("boot", `applying catalog database migrations to ${catalogDatabasePath}`);
+
   migrateCatalogDatabase(catalogDb, "drizzle-catalog");
+
+  logInfo(
+    "boot",
+    `catalog database migrations finished in ${String(Math.round(performance.now() - catalogMigrationStarted))} ms`,
+  );
 }
 
 assertMasterKeyCoverage(db, masterKeyring);

@@ -193,6 +193,218 @@ export function findAdminHostWorkflowProblems(input: AdminHostWorkflowInput) {
   return problems;
 }
 
+export interface RecoveryWorkflowInput {
+  readonly opsLive: string;
+}
+
+const RECOVERY_ACTIONS = ["reset-catalog", "sync-ops-secrets"] as const;
+
+const RESET_DIAGNOSTICS_STEP =
+  "Show the overture-web status, volume and processes before a catalog reset";
+
+const RESET_DELETE_STEP = "Delete only the catalog database files on the overture-web volume";
+const RESET_RESTART_STEP = "Restart overture-web onto an empty catalog database";
+const RESET_WAIT_STEP = "Wait for overture-web to serve health after the catalog reset";
+const SYNC_STEP = "Sync the ops secrets and flags to overture-web";
+const SYNC_HEALTH_STEP = "Verify the production health route after the ops secrets sync";
+const SYNC_SECRET_NAMES = ["ALERT_NTFY_URL", "CATALOG_REFRESH_SECRET"] as const;
+
+function workflowInputBlock(source: string, name: string) {
+  const marker = `\n      ${name}:`;
+  const start = source.indexOf(marker);
+
+  if (start === -1) {
+    return null;
+  }
+
+  const rest = source.slice(start + marker.length);
+  const end = rest.search(/^\s{6}[A-Za-z_][\w-]*:/mu);
+
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+/**
+ * Checks the production recovery actions stay safe to run against the live machine. A catalog reset that removed
+ * the application database would destroy every account and application, and an ops-secrets sync that printed a value
+ * would leak it into the job log, so both are checked on the workflow source before they ship.
+ * @param input The ops-live workflow source.
+ * @returns Every safety rule the recovery actions break, empty when they are safe.
+ */
+export function findRecoveryWorkflowProblems(input: RecoveryWorkflowInput) {
+  const problems: string[] = [];
+  const source = input.opsLive;
+  const lines = source.split("\n");
+
+  for (const action of RECOVERY_ACTIONS) {
+    if (!lines.some((line) => line.trim() === `- ${action}`)) {
+      problems.push(`ops-live.yml does not offer the ${action} action`);
+    }
+  }
+
+  const hotSwapInput = workflowInputBlock(source, "enable_catalog_r2_hot_swap");
+
+  if (hotSwapInput === null) {
+    problems.push("ops-live.yml does not offer the enable_catalog_r2_hot_swap input");
+  } else {
+    if (!/type:\s*boolean/u.test(hotSwapInput)) {
+      problems.push("ops-live.yml enable_catalog_r2_hot_swap is not a boolean input");
+    }
+
+    if (!/default:\s*false/u.test(hotSwapInput)) {
+      problems.push("ops-live.yml enable_catalog_r2_hot_swap does not default to false");
+    }
+  }
+
+  const diagnostics = readWorkflowStep(source, RESET_DIAGNOSTICS_STEP) ?? "";
+  const deletion = readWorkflowStep(source, RESET_DELETE_STEP) ?? "";
+  const restart = readWorkflowStep(source, RESET_RESTART_STEP) ?? "";
+  const wait = readWorkflowStep(source, RESET_WAIT_STEP) ?? "";
+
+  for (const [name, step] of [
+    [RESET_DIAGNOSTICS_STEP, diagnostics],
+    [RESET_DELETE_STEP, deletion],
+    [RESET_RESTART_STEP, restart],
+    [RESET_WAIT_STEP, wait],
+  ] as const) {
+    if (!step.includes("inputs.action == 'reset-catalog'")) {
+      problems.push(`ops-live.yml runs "${name}" outside the reset-catalog guard`);
+    }
+  }
+
+  if (!deletion.includes("rm -f /data/catalog.sqlite")) {
+    problems.push("ops-live.yml reset-catalog does not delete the catalog database files");
+  }
+
+  if (deletion.includes("/data/app.sqlite")) {
+    problems.push(
+      "ops-live.yml reset-catalog names /data/app.sqlite; the application database is never touched",
+    );
+  }
+
+  for (const line of deletion.split("\n")) {
+    if (/\brm\b/u.test(line) && !line.includes("/data/catalog.sqlite")) {
+      problems.push(
+        "ops-live.yml reset-catalog deletes a path that is not a catalog database file",
+      );
+    }
+  }
+
+  const diagnosticsAt = source.indexOf("ps aux");
+  const deleteAt = source.indexOf("rm -f /data/catalog.sqlite");
+
+  if (diagnosticsAt === -1) {
+    problems.push("ops-live.yml reset-catalog does not show the volume and processes first");
+  } else if (deleteAt !== -1 && diagnosticsAt > deleteAt) {
+    problems.push("ops-live.yml reset-catalog deletes before it shows the diagnostics");
+  }
+
+  if (!restart.includes("flyctl machine restart")) {
+    problems.push("ops-live.yml reset-catalog does not restart the app machine");
+  }
+
+  if (!restart.includes("bun run /app/src/server/main.ts")) {
+    problems.push("ops-live.yml reset-catalog does not kill only the hung Bun server");
+  }
+
+  if (/pkill[^\n]*litestream/u.test(restart)) {
+    problems.push("ops-live.yml reset-catalog kills Litestream; only the Bun child may be killed");
+  }
+
+  if (!wait.includes("seq 1 36")) {
+    problems.push("ops-live.yml reset-catalog does not wait up to 180s for the health route");
+  }
+
+  if (!wait.includes("flyctl logs -a overture-web --no-tail") || !wait.includes("tail -n 80")) {
+    problems.push("ops-live.yml reset-catalog does not print the last 80 log lines on failure");
+  }
+
+  if (!wait.includes("exit 1")) {
+    problems.push("ops-live.yml reset-catalog does not fail when the health route never answers");
+  }
+
+  const sync = readWorkflowStep(source, SYNC_STEP) ?? "";
+  const syncHealth = readWorkflowStep(source, SYNC_HEALTH_STEP) ?? "";
+
+  for (const [name, step] of [
+    [SYNC_STEP, sync],
+    [SYNC_HEALTH_STEP, syncHealth],
+  ] as const) {
+    if (!step.includes("inputs.action == 'sync-ops-secrets'")) {
+      problems.push(`ops-live.yml runs "${name}" outside the sync-ops-secrets guard`);
+    }
+  }
+
+  for (const secret of SYNC_SECRET_NAMES) {
+    if (!sync.includes(`::add-mask::$${secret}`)) {
+      problems.push(
+        `ops-live.yml sync-ops-secrets does not mask ${secret} before it reaches a command`,
+      );
+    }
+
+    if (!sync.includes(`${secret}: \${{ secrets.${secret} }}`)) {
+      problems.push(
+        `ops-live.yml sync-ops-secrets does not read ${secret} from the repository secrets`,
+      );
+    }
+  }
+
+  if (!sync.includes(`ENABLE_CATALOG_R2_HOT_SWAP: \${{ inputs.enable_catalog_r2_hot_swap }}`)) {
+    problems.push("ops-live.yml sync-ops-secrets does not pass the hot-swap input through");
+  }
+
+  if (!sync.includes(`\${ENABLE_CATALOG_R2_HOT_SWAP:-false}" = "true"`)) {
+    problems.push(
+      "ops-live.yml sync-ops-secrets sets CATALOG_R2_HOT_SWAP without checking the input",
+    );
+  }
+
+  if (!sync.includes("No secrets or flags were configured to sync.")) {
+    problems.push("ops-live.yml sync-ops-secrets does not refuse an empty sync");
+  }
+
+  if (!sync.includes(`printf '%s\\n' "\${set_args[@]}" | flyctl secrets import -a overture-web`)) {
+    problems.push("ops-live.yml sync-ops-secrets does not import the collected values");
+  }
+
+  const printsValue = sync
+    .split("\n")
+    .filter((line) => /^\s*(?:echo|printf)\b/u.test(line))
+    .some(
+      (line) =>
+        SYNC_SECRET_NAMES.some((secret) => new RegExp(`\\$\\{?${secret}\\b`, "u").test(line)) &&
+        !line.includes("::add-mask::"),
+    );
+
+  if (printsValue) {
+    problems.push("ops-live.yml sync-ops-secrets prints a secret value");
+  }
+
+  const summaryAt = sync.indexOf('>> "$GITHUB_STEP_SUMMARY"');
+  const summaryStart = summaryAt === -1 ? -1 : sync.lastIndexOf("{\n", summaryAt);
+
+  const summaryBlock =
+    summaryAt === -1 || summaryStart === -1 ? "" : sync.slice(summaryStart, summaryAt);
+
+  if (!summaryBlock.includes(`"\${key_names[@]}"`)) {
+    problems.push("ops-live.yml sync-ops-secrets does not list the imported secret names");
+  }
+
+  if (summaryBlock.includes(`\${set_args[@]}`)) {
+    problems.push("ops-live.yml sync-ops-secrets writes secret values into the step summary");
+  }
+
+  if (
+    !syncHealth.includes("seq 1 24") ||
+    !syncHealth.includes("https://tryoverture.com/api/health")
+  ) {
+    problems.push(
+      "ops-live.yml sync-ops-secrets does not verify the health route after the import",
+    );
+  }
+
+  return problems;
+}
+
 export interface VacuumWorkflowInput {
   readonly entrypoint: string;
   readonly opsLive: string;
