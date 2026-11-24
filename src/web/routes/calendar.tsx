@@ -80,7 +80,16 @@ export function CalendarPage() {
 
   useEffect(() => {
     if (params.get("month") !== monthKey) {
-      setParams({ month: monthKey }, { replace: true });
+      setParams(
+        (previous) => {
+          const next = new URLSearchParams(previous);
+
+          next.set("month", monthKey);
+
+          return next;
+        },
+        { replace: true },
+      );
     }
   }, [monthKey, params, setParams]);
 

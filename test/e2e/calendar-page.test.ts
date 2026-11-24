@@ -132,12 +132,12 @@ test("the month grid shows each day's events and the day panel lists them", asyn
 
   await expect(panel.getByRole("heading", { name: "Tue, Nov 17" })).toBeVisible();
   await expect(panel.getByText("3 sent")).toBeVisible();
-  await expect(panel.getByRole("link", { name: "View on Tracker" })).toHaveCount(3);
+  await expect(panel.getByRole("link", { name: "View in Applications" })).toHaveCount(3);
   await expect(panel).toContainText("Halden Systems");
   await expect(panel).toContainText("09:12");
 
-  await panel.getByRole("link", { name: "View on Tracker" }).first().click();
-  await expect(page).toHaveURL(/\/board\?card=/u);
+  await panel.getByRole("link", { name: "View in Applications" }).first().click();
+  await expect(page).toHaveURL(/\/applications\?card=/u);
 
   await page.goBack();
   await expectNoHorizontalOverflow(page);
@@ -245,41 +245,40 @@ test("a Stage move shows on the open Calendar without a reload", async ({
   await seeded.owner.dispose();
 });
 
-test("Calendar is in Main navigation and Home opens it", async ({ browser, isolatedAppServer }) => {
+test("Calendar is not a top-level item and Home opens it at /applications?view=calendar", async ({
+  browser,
+  isolatedAppServer,
+}) => {
   const seeded = await seedMonth(isolatedAppServer);
   const side = await openCalendar(browser, seeded, { path: "/home", width: 1280 });
   const nav = side.page.getByRole("navigation", { name: "Main" });
 
   await expect(nav.getByRole("link")).toHaveText([
     /^Home/u,
-    /^Tracker/u,
     /^Ready/u,
     /^Review/u,
+    /^Applications/u,
     /^Inbox/u,
-    /^Calendar/u,
-    /^Profile/u,
-    /^Support/u,
     /^Notifications/u,
+    /^Support/u,
+    /^Profile/u,
   ]);
-
-  await nav.getByRole("link", { name: "Calendar" }).click();
-  await expect(side.page).toHaveURL(/\/calendar/u);
-  await expect(nav.getByRole("link", { name: "Calendar" })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: "Calendar" })).toHaveCount(0);
   await side.context.close();
 
   const home = await openCalendar(browser, seeded, { path: "/home", width: 1280 });
 
   await home.page.getByRole("main").getByRole("link", { name: "Open Calendar" }).click();
-  await expect(home.page).toHaveURL(/\/calendar/u);
+  await expect(home.page).toHaveURL(/\/applications\?view=calendar(?:&month=\d{4}-\d{2})?$/u);
+  await expect(home.page.getByRole("heading", { level: 1, name: "Job Calendar" })).toBeVisible();
   await home.context.close();
 
   const phone = await openCalendar(browser, seeded, { path: "/home", width: 390 });
-  const tabs = phone.page.getByRole("navigation", { name: "Quick sections" });
+  const tabs = phone.page.getByRole("navigation", { name: "Primary" });
 
-  await expect(tabs.getByRole("link")).toHaveCount(1);
-  await tabs.getByRole("button", { name: "Tracker" }).click();
-  await phone.page.getByRole("link", { exact: true, name: "Calendar" }).click();
-  await expect(phone.page).toHaveURL(/\/calendar/u);
+  await expect(tabs.getByRole("link")).toHaveCount(5);
+  await phone.page.getByRole("main").getByRole("link", { name: "Open Calendar" }).click();
+  await expect(phone.page).toHaveURL(/\/applications\?view=calendar(?:&month=\d{4}-\d{2})?$/u);
   await phone.context.close();
   await seeded.owner.dispose();
 });
@@ -331,7 +330,7 @@ test("on the phone the grid and inline day panel show each day's items", async (
   const panel = page.getByRole("complementary", { name: "Day panel" });
 
   await expect(panel.getByRole("heading", { name: "Tue, Nov 17" })).toBeVisible();
-  await expect(panel.getByRole("link", { name: "View on Tracker" })).toHaveCount(3);
+  await expect(panel.getByRole("link", { name: "View in Applications" })).toHaveCount(3);
   await expect(panel).toContainText("Halden Systems");
   await expect(panel).toContainText("Northwind Labs");
   await expect(panel).toContainText("Ferro Cloud");

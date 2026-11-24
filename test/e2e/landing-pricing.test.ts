@@ -103,7 +103,7 @@ test.describe("public landing served and checked in the browser", () => {
       page.getByRole("heading", { level: 2, name: "Pay only for applications sent." }),
     ).toBeVisible();
 
-    await inSequence(["Home", "Tracker", "Inbox", "Calendar", "Profile"], async (tabLabel) => {
+    await inSequence(["Home", "Applications", "Inbox", "Calendar", "Profile"], async (tabLabel) => {
       const tab = page.getByRole("button", { name: tabLabel });
 
       await expect(tab).toBeVisible();

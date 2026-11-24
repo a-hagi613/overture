@@ -243,7 +243,7 @@ layout, rail), 1099/1100 (KPI), 1279/1280 (sidebar), 1700 (large screens).
 
 | Width | What happens |
 |---|---|
-| 390 | Phone. Landing one column, hero stacked, nav on a second row. App: sidebar hidden, bottom tab bar (Home, Board, Search, Profile, More). Home: one column. Board: lane tabs, card stack, bottom sheet |
+| 390 | Phone. Landing one column, hero stacked, nav on a second row. App: sidebar hidden, slim top header (title, Search, Notifications, Profile) and a bottom tab bar (Home, Ready, Review, Applications, Inbox). Home: one column. Applications: lane tabs, card stack, bottom sheet |
 | 768 | Landing stacks the hero. App: 76px icon rail replaces the sidebar; board columns scroll in their own box |
 | 1024 | Hero two columns again. App: icon rail; Home cards two across |
 | 1280 | Full 268px sidebar returns. Landing and app on the desktop layout at 1200 max |
@@ -437,12 +437,13 @@ and a 44px menu button; the sheet rises 8px over .4s and holds the links, Theme 
 button carries `aria-expanded` and a label that changes between Open menu and Close menu.
 
 Sidebar items: active = card surface, hairline, a 2px `signal` marker on the left edge (top edge in
-the tab bar) — the active nav marker is one of the four sanctioned orange uses (§2). The sidebar holds, top to bottom: the lockup and a collapse button, Search (⌘K), the six
-destinations (Home, Board, Ready, Review, Inbox, Calendar), the Profile menu (Resume, Details,
-Preferences, Account, Billing), Support and Notifications, then the theme toggle and the usage card. Under
-1280, or when collapsed on desktop (remembered per browser), the sidebar becomes a 76px icon rail; under
-768 a 64px tab bar with Home, Board, Search, Profile and More, where More opens a sheet with the other
-destinations. There is no Settings destination: account and billing are Profile pages (ADR 0037).
+the tab bar) — the active nav marker is one of the four sanctioned orange uses (§2). The sidebar holds, top to bottom: the lockup and a collapse button, Search (⌘K), the five
+primary destinations (Home, Ready, Review, Applications, Inbox), then Notifications, Support and the
+Profile menu (Resume & Cover Letter, Personal Details, Job Preferences, Billing, Account), then the theme
+toggle and the usage card. Under 1280, or when collapsed on desktop (remembered per browser), the sidebar
+becomes a 76px icon rail; under 768 a slim top header carries the page title plus Search, Notifications and
+Profile, and a 64px tab bar carries the same five primary destinations. Profile opens the `/profile` hub
+on the phone. There is no Settings destination: account and billing are Profile pages (ADR 0037).
 
 The URL owns the open panel and the current filter, so refresh, Back and a shared link restore the view:
 the Board uses `?card=<application>&filter=<lane>` (the phone stage lane; `application` is read as the
@@ -517,7 +518,7 @@ z-index here and outside it; a z-index cannot cross the top layer. Because a mod
 rest of the document inert, the shared overlays join it: the Toaster is portaled into the open sheet's
 `<dialog>`, so a toast and its Undo stay visible and clickable while the sheet is open, and ⌘K closes an
 open sheet before the command palette opens. Hiding a sheet with `md:hidden` is not a close: the sheet
-unmounts when the phone More menu crosses to the desktop layout.
+unmounts when the phone layout crosses to the desktop one.
 
 ## 9. Patterns
 

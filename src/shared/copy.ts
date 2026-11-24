@@ -135,16 +135,22 @@ export const copy = {
   },
   nav: {
     label: "Main",
-    tabBarLabel: "Quick sections",
+    tabBarLabel: "Primary",
+    mobileActionsLabel: "Page actions",
     home: "Home",
     ready: "Ready",
-    board: "Tracker",
+    applications: "Applications",
     review: "Review",
     inbox: "Inbox",
     calendar: "Calendar",
     profile: "Profile",
     support: "Support",
     search: "Search",
+    profileHub: {
+      titlePlain: "Your ",
+      titleItalic: "Profile",
+      lead: "Everything about you and your search, in one place.",
+    },
     profileMenu: {
       label: "Profile sections",
       resume: "Resume & Cover Letter",
@@ -213,7 +219,6 @@ export const copy = {
       billingNoPlan: "Free plan",
       billingRemaining: (left: number, total: number) =>
         `${String(left)} of ${String(total)} applications left`,
-      mobileMore: "More",
       notFoundTitlePlain: "Page ",
       notFoundTitleItalic: "not found",
       notFoundHome: "Back to Home",
@@ -1179,7 +1184,7 @@ export const copy = {
     jumpToDate: "Pick a date",
     monthSelectAria: "Select month",
     yearSelectAria: "Select year",
-    viewApplication: "View on Tracker",
+    viewApplication: "View in Applications",
     dateLocale: "en-US",
     today: "Today",
     previousMonth: "Previous month",
@@ -1248,7 +1253,7 @@ export const copy = {
     searchPlaceholder: "Search messages…",
     selectThreadTitle: "Select a message",
     selectThreadBody: "Choose a conversation on the left to read the full thread.",
-    viewOnTracker: "View on Tracker",
+    viewOnTracker: "View in Applications",
     filterAll: "All",
     filterUnread: "Unread",
     forwardingSectionTitle: "Email forwarding",
@@ -1957,10 +1962,9 @@ export const copy = {
       `${capitalize(countWord(applications))} ${applications === 1 ? "application" : "applications"} across six stages`,
     titlePlain: "Your",
     titleItalic: "Board",
-    trackerTitlePlain: "Job",
-    trackerTitleItalic: "Tracker",
-    trackerLead:
-      "Track every application from match to decision. Drag cards across stages to update.",
+    trackerTitlePlain: "Your",
+    trackerTitleItalic: "Applications",
+    trackerLead: "Every application from match to decision. Drag cards across stages to update.",
     lanes: {
       applied: "Applied",
       closed: "Closed",
@@ -2466,8 +2470,8 @@ export const copy = {
     stageMove: {
       title: (stage: string) => `Moved to ${stage}`,
       body: (input: { company: string; title: string; stage: string }) =>
-        `${input.title} at ${input.company} is now in ${input.stage}. Open the Tracker to undo it.`,
-      url: "/board",
+        `${input.title} at ${input.company} is now in ${input.stage}. Open Applications to undo it.`,
+      url: "/applications",
       kind: "stage_move",
     },
     review: {
@@ -2511,8 +2515,8 @@ export const copy = {
     noResponse: {
       title: "Closed as No response",
       body: (input: { company: string; title: string }) =>
-        `${input.title} at ${input.company} had no reply after 45 days, so it moved to Closed. Open the Tracker to undo it.`,
-      url: "/board",
+        `${input.title} at ${input.company} had no reply after 45 days, so it moved to Closed. Open Applications to undo it.`,
+      url: "/applications",
       kind: "stage_move",
     },
   },

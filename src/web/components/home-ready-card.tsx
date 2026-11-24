@@ -78,7 +78,7 @@ export function HomeReadyCard({ readyCount }: { readyCount: number }) {
           </Button>
         ) : (
           <Button asChild className="w-full" size="default" variant="secondary">
-            <Link to="/board">
+            <Link to="/applications">
               <span>{copy.home.control.viewBoard}</span>
               <ArrowRight aria-hidden="true" className="h-4 w-4" />
             </Link>

@@ -689,7 +689,7 @@ export const DEMO_NOTIFICATIONS: readonly {
     kind: "offer",
     read: true,
     title: "An offer arrived",
-    url: "/board",
+    url: "/applications",
   },
   {
     atDaysAgo: 22,
@@ -697,7 +697,7 @@ export const DEMO_NOTIFICATIONS: readonly {
     kind: "stage_move",
     read: true,
     title: "Moved to Screening",
-    url: "/board",
+    url: "/applications",
   },
   {
     atDaysAgo: 19,

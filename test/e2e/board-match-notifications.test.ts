@@ -61,7 +61,7 @@ const todayRows = [
     body: "Based on their email. Undo if it is wrong.",
     kind: "stage_move",
     title: "Moved to Screening: Halden Systems",
-    url: "/board",
+    url: "/applications",
   },
   {
     at: at(12, 20),

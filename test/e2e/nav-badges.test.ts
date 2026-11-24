@@ -100,16 +100,15 @@ test("a fresh user's shell shows no nav badges at 1280 and 390", async ({
 
   await page.setViewportSize({ height: 844, width: 390 });
 
-  const tabBar = page.getByRole("navigation", { name: "Quick sections" });
+  const tabBar = page.getByRole("navigation", { name: "Primary" });
 
   await expect(tabBar).toBeVisible();
   await expect(page.locator("[data-nav-badge]")).toHaveCount(0);
-  await expect(tabBar.locator('[data-nav-badge-dot="board"]')).toHaveCount(0);
+  await expect(tabBar.getByRole("button")).toHaveCount(0);
 
-  await tabBar.getByRole("button", { name: "Tracker" }).click();
   await Promise.all(
     destinations.map(async (destination) => {
-      await expect(page.getByRole("link", { exact: true, name: destination })).toBeVisible();
+      await expect(tabBar.getByRole("link", { exact: true, name: destination })).toBeVisible();
     }),
   );
   await expect(page.locator("[data-nav-badge]")).toHaveCount(0);
@@ -164,21 +163,16 @@ test("a seeded user's shell shows the live counts at 1280 and 390", async ({
 
   await page.setViewportSize({ height: 844, width: 390 });
 
-  const tabBar = page.getByRole("navigation", { name: "Quick sections" });
+  const tabBar = page.getByRole("navigation", { name: "Primary" });
 
   await expect(tabBar).toBeVisible();
-  await expect(tabBar.locator('[data-nav-badge-dot="board"]')).toHaveCount(1);
+  await expect(tabBar.locator('[data-nav-badge="ready"]')).toHaveText(String(counts.ready));
+  await expect(tabBar.locator('[data-nav-badge="review"]')).toHaveText(String(counts.review));
+  await expect(tabBar.locator('[data-nav-badge="inbox"]')).toHaveText(String(counts.inboxUnread));
 
-  await tabBar.getByRole("button", { name: "Tracker" }).click();
-  await expect(page.locator('[data-nav-badge="ready"]').filter({ visible: true })).toHaveText(
-    String(counts.ready),
-  );
-  await expect(page.locator('[data-nav-badge="review"]').filter({ visible: true })).toHaveText(
-    String(counts.review),
-  );
-  await expect(page.locator('[data-nav-badge="inbox"]').filter({ visible: true })).toHaveText(
-    String(counts.inboxUnread),
-  );
+  await expect(tabBar.getByRole("link", { exact: true, name: readyLabel })).toBeVisible();
+  await expect(tabBar.getByRole("link", { exact: true, name: reviewLabel })).toBeVisible();
+  await expect(tabBar.getByRole("link", { exact: true, name: inboxLabel })).toBeVisible();
 
   await context.close();
   await request.dispose();

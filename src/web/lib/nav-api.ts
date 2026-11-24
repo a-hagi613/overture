@@ -13,7 +13,7 @@ export type NavCounts = z.infer<typeof navCountsSchema>;
 
 export type NavKey =
   | "home"
-  | "board"
+  | "applications"
   | "ready"
   | "review"
   | "inbox"
@@ -21,14 +21,18 @@ export type NavKey =
   | "profile"
   | "support";
 
+/**
+ * The five primary destinations, in the same order on the phone tab bar and the desktop sidebar.
+ */
 export const NAV_DESTINATIONS = [
   { glyph: "home", to: "/home" },
-  { glyph: "board", to: "/board" },
   { glyph: "ready", to: "/ready" },
   { glyph: "review", to: "/review" },
+  { glyph: "applications", to: "/applications" },
   { glyph: "inbox", to: "/inbox" },
-  { glyph: "calendar", to: "/calendar" },
 ] as const satisfies readonly { glyph: NavKey; to: string }[];
+
+export type PrimaryNavKey = (typeof NAV_DESTINATIONS)[number]["glyph"];
 
 export const PROFILE_SUBMENU = [
   { key: "resume", label: copy.nav.profileMenu.resume, to: "/profile/resume" },
@@ -90,4 +94,53 @@ export function navLabel(key: NavKey, count: number) {
   }
 
   return key === "inbox" ? copy.nav.inboxCount(count) : copy.nav[key];
+}
+
+/**
+ * The page title the slim phone header shows for a workspace path.
+ *
+ * @param pathname The current location pathname.
+ * @param search The current location search, used to name the calendar view.
+ * @returns The destination title, or the product name for an unknown path.
+ */
+export function navTitleForPath(pathname: string, search = "") {
+  if (pathname.startsWith("/applications")) {
+    return new URLSearchParams(search).get("view") === "calendar"
+      ? copy.nav.calendar
+      : copy.nav.applications;
+  }
+
+  if (pathname.startsWith("/profile")) {
+    return copy.nav.profile;
+  }
+
+  if (pathname.startsWith("/inbox")) {
+    return copy.nav.inbox;
+  }
+
+  if (pathname === "/ready") {
+    return copy.nav.ready;
+  }
+
+  if (pathname === "/review") {
+    return copy.nav.review;
+  }
+
+  if (pathname === "/home") {
+    return copy.nav.home;
+  }
+
+  if (pathname === "/notifications") {
+    return copy.shell.notificationsEmpty;
+  }
+
+  if (pathname === "/support") {
+    return copy.nav.support;
+  }
+
+  if (pathname === "/calendar") {
+    return copy.nav.calendar;
+  }
+
+  return copy.app.name;
 }

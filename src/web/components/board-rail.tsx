@@ -1,6 +1,5 @@
 import {
   Bell,
-  Calendar,
   CircleHelp,
   Home,
   Inbox,
@@ -14,7 +13,7 @@ import {
 } from "lucide-react";
 import { NavLink } from "react-router";
 
-import type { NavCounts, NavKey } from "../lib/nav-api.ts";
+import type { NavCounts, PrimaryNavKey } from "../lib/nav-api.ts";
 
 import { copy } from "../../shared/copy.ts";
 import { BrandMark } from "./brand-mark.tsx";
@@ -25,9 +24,8 @@ import { UsageRing } from "./usage-ring.tsx";
 import { NAV_DESTINATIONS, navBadgeClass, navBadgeCount, navLabel } from "../lib/nav-api.ts";
 import { useTheme } from "../lib/theme-context.ts";
 
-const RAIL_ICONS: Record<Exclude<NavKey, "profile" | "support">, typeof Home> = {
-  board: SquareKanban,
-  calendar: Calendar,
+const RAIL_ICONS: Record<PrimaryNavKey, typeof Home> = {
+  applications: SquareKanban,
   home: Home,
   inbox: Inbox,
   ready: Send,
@@ -101,14 +99,7 @@ export function BoardRail({
             </NavLink>
           );
         })}
-        <SidebarProfileMenu wide={false} />
-        <NavLink
-          aria-label={copy.nav.support}
-          className={({ isActive }) => `rl ${isActive ? "on" : ""}`}
-          to="/support"
-        >
-          <MessageCircle aria-hidden="true" size={20} />
-        </NavLink>
+        <Separator className="my-1 w-9" />
         <NavLink
           aria-label={
             unreadNotifications > 0
@@ -125,6 +116,14 @@ export function BoardRail({
             </span>
           ) : null}
         </NavLink>
+        <NavLink
+          aria-label={copy.nav.support}
+          className={({ isActive }) => `rl ${isActive ? "on" : ""}`}
+          to="/support"
+        >
+          <MessageCircle aria-hidden="true" size={20} />
+        </NavLink>
+        <SidebarProfileMenu wide={false} />
       </nav>
       <div className="mt-auto flex flex-col items-center gap-2.5">
         <Button

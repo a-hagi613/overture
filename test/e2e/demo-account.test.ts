@@ -236,8 +236,8 @@ test("test@email.com signs in with one click and every main screen is populated"
   ).toBeVisible();
   await expect(page.getByText("Paper Kite").first()).toBeVisible();
 
-  await page.goto(`${demoServer.url}/board`);
-  await expect(page.getByRole("heading", { name: "Job Tracker" })).toBeVisible();
+  await page.goto(`${demoServer.url}/applications`);
+  await expect(page.getByRole("heading", { name: "Your Applications" })).toBeVisible();
   await expect(page.getByText("Tidepool Analytics").first()).toBeVisible();
 
   await page.goto(`${demoServer.url}/review`);
@@ -682,6 +682,6 @@ test("test@email.com signs out of this device from Settings without demo_locked"
     page.getByRole("heading", { level: 1, name: /The job hunt, handled\./u }),
   ).toBeVisible();
 
-  await page.goto(`${demoServer.url}/board`);
+  await page.goto(`${demoServer.url}/applications`);
   await expect(page).toHaveURL(/\/signin$/u);
 });

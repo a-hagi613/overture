@@ -8,11 +8,25 @@ import { expect, test } from "./app.fixture.ts";
 
 type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
 
-const desktopDestinations = ["Home", "Tracker", "Ready", "Review", "Inbox", "Calendar", "Profile"];
+const desktopDestinations = [
+  "Home",
+  "Ready",
+  "Review",
+  "Applications",
+  "Inbox",
+  "Notifications",
+  "Support",
+  "Profile",
+];
 
-async function expectDesktopDestinations(locator: ReturnType<Page["getByRole"]>) {
+const phoneDestinations = ["Home", "Ready", "Review", "Applications", "Inbox"];
+
+async function expectDestinations(
+  locator: ReturnType<Page["getByRole"]>,
+  destinations: readonly string[],
+) {
   await Promise.all(
-    desktopDestinations.map(async (destination) => {
+    destinations.map(async (destination) => {
       await expect(locator.getByRole("link", { name: destination }).first()).toBeVisible();
     }),
   );
@@ -69,9 +83,9 @@ test("the shell lists workspace destinations on desktop and navigates to Account
   const sideNav = shellPage.getByRole("navigation", { name: "Main" });
 
   await expect(sideNav).toBeVisible();
-  await expectDesktopDestinations(sideNav);
+  await expectDestinations(sideNav, desktopDestinations);
   await expect(
-    shellPage.getByRole("navigation", { name: "Quick sections" }).getByRole("link", {
+    shellPage.getByRole("navigation", { name: "Primary" }).getByRole("link", {
       name: "Home",
     }),
   ).toBeHidden();
@@ -92,37 +106,173 @@ test("the shell lists workspace destinations on desktop and navigates to Account
   await desktop.close();
 });
 
-test("the shell shows the phone tab bar at 390 and the desktop rail at 1280", async ({
-  page,
+test("the phone shows a slim header and five direct tab destinations, with no popup menus", async ({
+  browser,
   appServerUrl,
   ownerStorageState,
 }) => {
-  const context = await page.context().browser()?.newContext({ storageState: ownerStorageState });
-
-  if (context === undefined) {
-    throw new Error("A shell context could not be opened.");
-  }
-
+  const context = await browser.newContext({ storageState: ownerStorageState });
   const shellPage = await context.newPage();
 
   await shellPage.setViewportSize({ width: 390, height: 844 });
   await openShell(shellPage, appServerUrl, "light");
 
   const sideNav = shellPage.getByRole("navigation", { name: "Main" });
-  const tabBar = shellPage.getByRole("navigation", { name: "Quick sections" });
+  const tabBar = shellPage.getByRole("navigation", { name: "Primary" });
+  const header = shellPage.locator("[data-mobile-header]");
 
   await expect(tabBar).toBeVisible();
-  await expect(tabBar.getByRole("link", { name: "Home" })).toBeVisible();
-  await expect(tabBar.getByRole("button", { name: "Tracker" })).toBeVisible();
-  await expect(tabBar.getByRole("button", { name: "Profile" })).toBeVisible();
-  await expect(tabBar.getByRole("button", { name: "More" })).toBeVisible();
+  await expectDestinations(tabBar, phoneDestinations);
+  await expect(tabBar.getByRole("button")).toHaveCount(0);
+  await expect(header).toBeVisible();
+  await expect(header.getByText("Home", { exact: true })).toBeVisible();
+  await expect(header.getByRole("button", { name: "Search" })).toHaveCSS("width", "44px");
+  await expect(header.getByRole("link", { name: "Notifications" })).toHaveAttribute(
+    "href",
+    "/notifications",
+  );
+  await expect(header.getByRole("link", { name: "Profile" })).toHaveAttribute("href", "/profile");
   await expect(sideNav).toBeHidden();
 
   await shellPage.setViewportSize({ width: 1280, height: 900 });
   await expect(sideNav).toBeVisible();
   await expect(tabBar).toBeHidden();
+  await expect(header).toBeHidden();
 
   await context.close();
+});
+
+test("the phone header and tab bar reach search, notifications, the profile hub and every destination in one tap", async ({
+  browser,
+  appServerUrl,
+  ownerStorageState,
+}) => {
+  const context = await browser.newContext({ storageState: ownerStorageState });
+  const shellPage = await context.newPage();
+
+  await shellPage.setViewportSize({ width: 390, height: 844 });
+  await openShell(shellPage, appServerUrl, "light");
+
+  const header = shellPage.locator("[data-mobile-header]");
+  const tabBar = shellPage.getByRole("navigation", { name: "Primary" });
+
+  await header.getByRole("button", { name: "Search" }).click();
+  await expect(shellPage.getByPlaceholder("Search applications, reviews, emails")).toBeVisible();
+  await shellPage.keyboard.press("Escape");
+
+  await header.getByRole("link", { name: "Profile" }).click();
+  await expect(shellPage).toHaveURL(/\/profile$/u);
+  await expect(shellPage.getByRole("heading", { level: 1, name: "Your Profile" })).toBeVisible();
+  await expect(header.getByText("Profile", { exact: true })).toBeVisible();
+
+  const hub = shellPage.getByRole("navigation", { name: "Profile sections" });
+
+  await Promise.all(
+    [
+      "Resume & Cover Letter",
+      "Personal Details",
+      "Job Preferences",
+      "Billing",
+      "Account",
+      "Support",
+    ].map(async (label) => {
+      await expect(hub.getByRole("link", { name: label })).toBeVisible();
+    }),
+  );
+
+  await expect(hub.getByRole("switch", { name: "Switch to dark mode" })).toBeVisible();
+  await shellPage.getByRole("link", { name: "Job Preferences" }).click();
+  await expect(shellPage).toHaveURL(/\/profile\/preferences$/u);
+
+  await tabBar.getByRole("link", { name: "Applications" }).click();
+  await expect(shellPage).toHaveURL(/\/applications$/u);
+  await expect(
+    shellPage.getByRole("heading", { level: 1, name: "Your Applications" }),
+  ).toBeVisible();
+  await expect(header.getByText("Applications", { exact: true })).toBeVisible();
+
+  await shellPage.goto(`${appServerUrl}/board?card=abc`);
+  await expect(shellPage).toHaveURL(/\/applications\?card=abc$/u);
+
+  await shellPage.goto(`${appServerUrl}/calendar?month=2026-11`);
+  await expect(shellPage).toHaveURL(/\/applications\?view=calendar&month=2026-11$/u);
+  await expect(shellPage.getByRole("heading", { level: 1, name: "Job Calendar" })).toBeVisible();
+  await expect(header.getByText("Calendar", { exact: true })).toBeVisible();
+
+  await shellPage.goto(`${appServerUrl}/search?q=platform`);
+  await expect(shellPage).toHaveURL(/\/applications\?q=platform$/u);
+
+  await shellPage.setViewportSize({ width: 1280, height: 900 });
+  await shellPage.goto(`${appServerUrl}/profile`);
+  await expect(shellPage).toHaveURL(/\/profile\/resume$/u);
+
+  await context.close();
+});
+
+test("the navigation, phone header, profile hub and Applications page render at 390 and 1280", async ({
+  browser,
+  appServerUrl,
+  ownerStorageState,
+}) => {
+  const sizes = [
+    { theme: "light", width: 390 },
+    { theme: "dark", width: 390 },
+    { theme: "light", width: 1280 },
+    { theme: "dark", width: 1280 },
+  ] as const;
+
+  await Promise.all(
+    sizes.map(async ({ theme, width }) => {
+      const context = await browser.newContext({
+        storageState: ownerStorageState,
+        viewport: { height: 844, width },
+      });
+
+      if (theme === "dark") {
+        await context.addInitScript(() => {
+          globalThis.localStorage.setItem("overture.theme", "dark");
+        });
+      }
+
+      const page = await context.newPage();
+
+      await page.goto(`${appServerUrl}/home`);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+      });
+      await page.screenshot({
+        fullPage: true,
+        path: join(process.cwd(), `test/e2e/.tmp/nav-home-${String(width)}-${theme}.png`),
+      });
+
+      await page.goto(`${appServerUrl}/applications`);
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Your Applications" }),
+      ).toBeVisible();
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+      });
+      await page.screenshot({
+        fullPage: true,
+        path: join(process.cwd(), `test/e2e/.tmp/nav-applications-${String(width)}-${theme}.png`),
+      });
+
+      if (width === 390) {
+        await page.goto(`${appServerUrl}/profile`);
+        await expect(page.getByRole("heading", { level: 1, name: "Your Profile" })).toBeVisible();
+        await page.evaluate(async () => {
+          await document.fonts.ready;
+        });
+        await page.screenshot({
+          fullPage: true,
+          path: join(process.cwd(), `test/e2e/.tmp/nav-profile-hub-${String(width)}-${theme}.png`),
+        });
+      }
+
+      await context.close();
+    }),
+  );
 });
 
 test("the shell is axe clean at 390 and 1280 in light and dark", async ({

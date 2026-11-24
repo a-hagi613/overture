@@ -72,7 +72,7 @@ test("search by title, company, location and department stays under 50 ms on the
   ).toBe(true);
 });
 
-test("authenticated /api/search lists matching postings and /search redirects to /board", async ({
+test("authenticated /api/search lists matching postings and /search redirects to /applications", async ({
   ownerPage,
   appServerUrl,
 }) => {
@@ -90,7 +90,7 @@ test("authenticated /api/search lists matching postings and /search redirects to
   ).toBe(true);
 
   await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent(QUERIES.title)}`);
-  await expect(ownerPage).toHaveURL(/\/board\?q=Senior/u);
+  await expect(ownerPage).toHaveURL(/\/applications\?q=Senior/u);
   await expect(ownerPage.getByRole("heading", { level: 1 })).toBeVisible();
 
   await ownerPage.keyboard.press("Control+k");
