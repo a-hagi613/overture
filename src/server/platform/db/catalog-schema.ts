@@ -155,6 +155,8 @@ export const postings = sqliteTable(
     index("postings_ats_closed_last_seen").on(t.ats, t.closedAt, t.lastSeenAt),
     index("postings_apply_supported_status").on(t.applySupported, t.status),
     index("postings_company_requisition").on(t.companyId, t.requisitionId),
+    index("postings_primary_category").on(t.primaryCategory),
+    index("postings_esco_code").on(t.escoCode),
     index("postings_open_location")
       .on(t.city, t.countryCode, t.locationRaw, t.workplace, t.closedAt)
       .where(sql`closed_at is null`),
