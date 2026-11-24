@@ -32,7 +32,7 @@ export function LegalShell({ children }: { children: ReactNode }) {
           <div className="mt-5 space-y-1.5 text-xs leading-relaxed text-muted-foreground">
             <p>{copy.legal.draftNotice}</p>
             <p>
-              {`${copy.legal.footerName}${copy.legal.footerSeparator}${copy.legal.footerContact}${copy.legal.footerSeparator}${copy.legal.footerAddress}`}
+              {`${copy.legal.footerName}${copy.legal.footerSeparator}${copy.legal.footerContact}`}
             </p>
             <nav aria-label={copy.legal.footerLinksLabel} className="flex items-center gap-3 pt-1">
               <Link
