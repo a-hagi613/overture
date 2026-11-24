@@ -224,7 +224,9 @@ test("drafted prose expands, saved answers collapse, and A, E and S triage one c
   await expect(northwind.getByText("Saved answer").first()).toBeVisible();
 
   await expect(
-    cobalt.getByText("All answers come directly from your saved answers — nothing newly written."),
+    cobalt.getByText(
+      "All answers come directly from your saved answers. Nothing here was newly written.",
+    ),
   ).toBeVisible();
   await expect(cobalt.getByRole("button", { name: /Show \d+ saved answers/u })).toBeVisible();
 

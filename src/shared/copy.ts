@@ -99,8 +99,8 @@ export type PauseReason = (typeof PAUSE_REASONS)[number];
 
 const FAILED_REASON_TEXT = new Map<string, string>([
   ["ats_flagged", "The employer's site flagged the application, so nothing was sent."],
-  ["blocked", "The employer's site blocked the attempt before anything was sent."],
-  ["captcha_blocked", "A challenge stopped the attempt, so nothing was sent."],
+  ["blocked", "The employer's site blocked the application before anything was sent."],
+  ["captcha_blocked", "A challenge stopped that application, so nothing was sent."],
   ["code_timeout", "The verification code never arrived, so nothing was sent."],
   ["crash", "The browser session stopped before anything was sent."],
   ["form_changed", "The form changed after we had filled it in, so we stopped before sending."],
@@ -402,7 +402,7 @@ export const copy = {
     trust: "Google, LinkedIn or an emailed link",
     refusedHeading: "This email isn't invited yet.",
     refusedBody:
-      "Overture is invite-only during the beta. Google, LinkedIn and an emailed link all need an invite for the same email.",
+      "Overture is invite-only during the beta. Google, LinkedIn and emailed links each need an invite for that email.",
     refusedDescription:
       "If you expected an invite, check that you are using the email it was sent to.",
     refusedField:
@@ -417,7 +417,7 @@ export const copy = {
     suspendedHelp: "If you think this is a mistake, write to us and we will look at it.",
     suspendedEmail: "Email admin@tryoverture.com",
     emailNotVerified:
-      "That provider has not verified your email, so this app cannot let it in. Verify the address and try again.",
+      "Google or LinkedIn has not verified this email, so Overture cannot sign you in. Verify the address and try again.",
     linkFailed: "The link did not work. It may be used or expired. Ask for a new one.",
     genericError: "Sign-in did not go through. Try again.",
     rateLimited: "Too many tries. Wait a few minutes and ask again.",
@@ -648,7 +648,7 @@ export const copy = {
     usageSentTodayShort: (sent: number, cap: number) =>
       `${String(sent)} of ${String(cap)} sent today`,
     usageResetsMidnight: "Resets at midnight",
-    usageLowQuota: "Running low — choose a plan",
+    usageLowQuota: "Running low. Choose a plan",
     usageAria: (count: number) => `${String(count)} applications left`,
     daySoFar: "The day so far",
     outcomes: {
@@ -966,7 +966,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "We do not give refunds by default, including for a period you cancel part-way through or for applications you did not use. A failed application is different: if Overture could not send an application, that attempt is never charged and never uses one of your applications. You can try it again within your allowance.",
+              text: "We do not give refunds by default, including for a period you cancel part-way through or for applications you did not use. A failed application is different: if Overture could not send an application, you are never charged for it and it never uses one of your applications. You can try it again within your allowance.",
             },
             {
               kind: "paragraphWithLink",
@@ -1264,7 +1264,7 @@ export const copy = {
     addressFilterHeading: "Add the",
     addressFilterItalic: "filter.",
     addressFilterSkip:
-      "Skipping this is fine. Without the filter, a verification code is asked for as a paste, within ten minutes. The first forwarded mail shows here and on Profile.",
+      "Skipping this is fine. Without the filter, you paste each verification code by hand within ten minutes. The first forwarded mail shows here and on Profile.",
     addressHowLink: "Email forwarding settings",
     addressLead:
       "Employer replies, interview invites, and confirmations forwarded from your email.",
@@ -1325,7 +1325,7 @@ export const copy = {
       "Set the action to forward to your forwarding address, then save the rule.",
       "Outlook may ask you to confirm the forwarding address first. Follow the prompt it shows.",
     ],
-    readOnly: "Read-only inbox — reply directly from your own email client.",
+    readOnly: "Read-only inbox. Reply directly from your own email client.",
     unreadAria: "Unread",
     unreadCount: (count: number) => `Unread ${String(count)}`,
     unverifiedNote:
@@ -1406,7 +1406,7 @@ export const copy = {
     signedOutMessage: "You are signed out on your other devices.",
     signedOutToasts: "Signed out everywhere",
     exportPage: {
-      eyebrow: "— Settings",
+      eyebrow: "Settings",
       titlePlain: "Export your ",
       titleItalic: "data",
       lead: "A copy of what Overture holds about you",
@@ -1595,7 +1595,7 @@ export const copy = {
     supportAccessDetail:
       "Each time support opens your account, it is recorded here with the reason.",
     supportAccessPage: {
-      eyebrow: "— Settings",
+      eyebrow: "Settings",
       titlePlain: "Support",
       titleItalic: "access log",
       lead: "Every time support opened your account, and why",
@@ -1911,7 +1911,8 @@ export const copy = {
     approveLast: "Approve",
     writtenTitle: "Written for this role",
     savedTitle: "From your saved answers",
-    savedOnlyNote: "All answers come directly from your saved answers — nothing newly written.",
+    savedOnlyNote:
+      "All answers come directly from your saved answers. Nothing here was newly written.",
     showSaved: (count: number) =>
       `Show ${String(count)} saved ${plural(count, "answer", "answers")}`,
     hideSaved: (count: number) =>
@@ -2165,7 +2166,7 @@ export const copy = {
       fileTitle: "The file is sent as-is",
       fileTitleMismatch: "The stored file is not the file that was sent",
       fileBody:
-        "The employer receives these bytes and nothing else. Overture never opens the PDF for editing, never rewrites its text and never renames it.",
+        "The employer receives these bytes and nothing else. Overture never opens the PDF for editing; its text and file name stay as you uploaded them.",
       fileMatch: "The stored copy matches the bytes that were sent.",
       fileMismatch:
         "The stored copy does not match the bytes that were sent. Check this before you rely on it.",
@@ -2242,14 +2243,14 @@ export const copy = {
     queued: "Queued, waiting on this answer",
     closestFact: "Closest saved answer on file",
     closestFactNote:
-      "Nothing in your resume or your saved answers answers this question. Answer it once and Overture reuses it for every application that asks.",
+      "Nothing in your resume or your saved answers covers this question. Answer it once and Overture reuses it for every application that asks.",
     closestFactKnown: (label: string) =>
       `${label} is on file. Confirming it here updates that saved answer for every form that asks.`,
     answerPlaceholder: "Type your answer",
     checkboxYes: "Yes",
     yourAnswer: "Your answer",
     answerNote:
-      "Nothing on the posting answers this for you. Your answer is what gets sent; the switch decides whether Overture may reuse it.",
+      "Nothing on the posting answers this for you. Your answer is what gets sent. The switch decides whether Overture may reuse it in future applications.",
     saveForFuture: {
       label: "Save to my saved answers for future applications",
       reusableNote: "This is a reusable answer, so it is on by default.",
@@ -2260,8 +2261,8 @@ export const copy = {
     },
     savedToReady: (count: number) =>
       count === 1
-        ? "Saved — 1 application moved to Ready"
-        : `Saved — ${String(count)} applications moved to Ready`,
+        ? "Saved. 1 application moved to Ready"
+        : `Saved. ${String(count)} applications moved to Ready`,
     savedScoped: (count: number) =>
       count === 1
         ? "Saved for this application."
@@ -2296,14 +2297,13 @@ export const copy = {
     setupTitlePlain: "Set up your",
     setupTitleItalic: "workspace",
     setupIntro:
-      "Four quick steps: add your resume and preferences, see real openings, then unlock your first three applications. Progress saves automatically.",
+      "Four quick steps: add your resume and preferences, see real openings, then begin your first three applications. Progress saves automatically.",
     steps: ["Sign in", "Resume & preferences", "Your matches", "Trial card"],
     stepPosition: (step: number, total: number) => `Step ${String(step)} of ${String(total)}`,
     stepSeparator: "·",
     resumeTitlePlain: "Upload your",
     resumeTitleItalic: "resume",
-    resumeIntro:
-      "Upload a single PDF resume. Overture submits your exact file unchanged without reformatting or editing.",
+    resumeIntro: "Upload a single PDF resume. Overture submits your exact file unchanged.",
     resumeLabel: "Resume",
     resumeRequired: "Required to continue",
     resumeChoose: "Upload a PDF",
@@ -2313,7 +2313,7 @@ export const copy = {
     resumeReads:
       "We extract your contact details, work history, and skills so you can verify them in the next step.",
     resumeUnreadable:
-      "This PDF could not be parsed automatically. Upload another file, or continue and add the details from Profile → Details after setup.",
+      "This PDF could not be parsed automatically. Upload another file, or continue and add the details from Profile → Saved answers after setup.",
     resumeUploadFailed: "Upload failed. Please select a valid PDF under 10 MB.",
     resumeMeta: (pages: number, size: string) =>
       `PDF · ${String(pages)} ${plural(pages, "page", "pages")} · ${size}`,
@@ -2327,7 +2327,7 @@ export const copy = {
     wantTitlePlain: "Job",
     wantTitleItalic: "preferences",
     wantIntro:
-      "Define the roles, locations, and compensation criteria Overture uses to match open positions. You can update these anytime in Profile.",
+      "Pick the roles, locations and salary you want. Overture matches open roles against them, and you can change them anytime in Profile.",
     atLeastOne: "Select at least one",
     roles: "Roles",
     cities: "Locations",
@@ -2336,7 +2336,7 @@ export const copy = {
     seniority: "Seniority",
     salaryFloor: "Minimum salary",
     salaryFloorUnit: "per year",
-    salaryFloorNote: "Positions advertising a salary below this threshold are excluded.",
+    salaryFloorNote: "Overture skips roles that advertise a salary below this.",
     companiesToSkip: "Blocked employers",
     addCompanyPlaceholder: "Add a company to block",
     companiesToSkipNote: "Overture never prepares or sends an application to a blocked employer.",
