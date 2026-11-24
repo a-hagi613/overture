@@ -7,6 +7,7 @@ import {
   findBunVersionDrift,
   findRecoveryWorkflowProblems,
   findVacuumWorkflowProblems,
+  findWorkersDeployProblems,
   readBunVersions,
   readWorkflowStep,
 } from "./workflow-config-guard.ts";
@@ -489,5 +490,111 @@ test("an ops-secrets sync without a health check is reported", () => {
     findRecoveryWorkflowProblems({ opsLive: workflow.replace(health, "") }).some((problem) =>
       problem.includes("does not verify the health route"),
     ),
+  ).toBe(true);
+});
+
+function workersDeployWorkflow() {
+  return readFileSync(".github/workflows/deploy.yml", "utf8");
+}
+
+test("the shipped deploy workflow ships the three Cloudflare Workers safely", () => {
+  expect(findWorkersDeployProblems({ deploy: workersDeployWorkflow() })).toStrictEqual([]);
+});
+
+test("a deploy workflow without the deploy-workers job is reported", () => {
+  const deploy = workersDeployWorkflow().replace("  deploy-workers:", "  deploy-workers-disabled:");
+
+  expect(
+    findWorkersDeployProblems({ deploy }).some((problem) =>
+      problem.includes("no deploy-workers job"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that skips a Worker is reported", () => {
+  const deploy = workersDeployWorkflow().replace(
+    "      - name: Deploy the sentinel Worker",
+    "      - name: Deploy something else",
+  );
+
+  expect(
+    findWorkersDeployProblems({ deploy }).some((problem) => problem.includes("workers/sentinel")),
+  ).toBe(true);
+});
+
+test("a deploy workflow that drops --keep-vars on the inbound mail Worker is reported", () => {
+  const deploy = workersDeployWorkflow();
+  const step = readWorkflowStep(deploy, "Deploy the inbound mail Worker") ?? "";
+
+  const problems = findWorkersDeployProblems({
+    deploy: deploy.replace(
+      step,
+      step.replace("bunx wrangler deploy --keep-vars", "bunx wrangler deploy"),
+    ),
+  });
+
+  expect(
+    problems.some(
+      (problem) => problem.includes("workers/inbound-mail") && problem.includes("--keep-vars"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that drops --keep-vars on the sentinel Worker is reported", () => {
+  const deploy = workersDeployWorkflow();
+  const step = readWorkflowStep(deploy, "Deploy the sentinel Worker") ?? "";
+
+  const problems = findWorkersDeployProblems({
+    deploy: deploy.replace(
+      step,
+      step.replace("bunx wrangler deploy --keep-vars", "bunx wrangler deploy"),
+    ),
+  });
+
+  expect(
+    problems.some(
+      (problem) => problem.includes("workers/sentinel") && problem.includes("--keep-vars"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that deploys marketing before the build is reported", () => {
+  const deploy = workersDeployWorkflow();
+  const build = readWorkflowStep(deploy, "Build the marketing assets and app") ?? "";
+  const withoutBuild = deploy.replace(build, "");
+
+  const reordered = withoutBuild.replace(
+    "      - name: Deploy the sentinel Worker",
+    `${build}      - name: Deploy the sentinel Worker`,
+  );
+
+  expect(
+    findWorkersDeployProblems({ deploy: reordered }).some((problem) =>
+      problem.includes("before the build"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that prints the Cloudflare API token is reported", () => {
+  const deploy = workersDeployWorkflow().replace(
+    '          echo "::add-mask::$CLOUDFLARE_API_TOKEN"',
+    '          echo "$CLOUDFLARE_API_TOKEN"',
+  );
+
+  expect(
+    findWorkersDeployProblems({ deploy }).some((problem) =>
+      problem.includes("prints the Cloudflare API token"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that does not check out the CI run's head SHA is reported", () => {
+  const deploy = workersDeployWorkflow().replaceAll(
+    "ref: ${{ github.event.workflow_run.head_sha }}",
+    "ref: main",
+  );
+
+  expect(
+    findWorkersDeployProblems({ deploy }).some((problem) => problem.includes("head SHA")),
   ).toBe(true);
 });
