@@ -107,7 +107,9 @@ export function parseStapplyLlmAnswer(text: string, count: number) {
 function requestPrompt(items: readonly StapplyLeftover[]) {
   return JSON.stringify({
     task: "classify these postings",
-    format: { results: [{ index: 0, role: "one of the role groups or null", subrole: "a subrole or null" }] },
+    format: {
+      results: [{ index: 0, role: "one of the role groups or null", subrole: "a subrole or null" }],
+    },
     postings: items.map((item, index) => ({
       index,
       company: item.companyName,
@@ -163,7 +165,11 @@ export function createAnthropicStapplyClassifier(config: AnthropicClassifierConf
     }
 
     const body = anthropicResponseSchema.parse(await response.json());
-    const text = body.content.flatMap((block) => (block.text === undefined ? [] : [block.text])).join("");
+
+    const text = body.content
+      .flatMap((block) => (block.text === undefined ? [] : [block.text]))
+      .join("");
+
     const accepted = parseStapplyLlmAnswer(text, items.length);
     const classifications: StapplyClassification[] = [];
 
@@ -218,7 +224,7 @@ export async function runStapplyLlmTagging(input: StapplyLlmTaggingInput) {
     let classifications: readonly StapplyClassification[];
 
     try {
-      classifications = await input.classifier?.(batch) ?? [];
+      classifications = (await input.classifier?.(batch)) ?? [];
     } catch {
       report.skipped += leftovers.length - offset;
 

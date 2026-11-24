@@ -90,7 +90,7 @@ describe("catalogRefreshSignature", () => {
   });
 
   test("rejects a tampered body, a stale timestamp, missing headers and a bad signature", () => {
-    const body = "{\"version\":\"2026-11-23\"}";
+    const body = '{"version":"2026-11-23"}';
     const timestamp = String(NOW);
     const signature = catalogRefreshSignature(SECRET, timestamp, body);
 

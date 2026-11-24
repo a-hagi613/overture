@@ -29,23 +29,17 @@ const LEFTOVER: StapplyLeftover = {
 
 describe("parseStapplyLlmAnswer", () => {
   test("accepts a bare array and an object with results", () => {
+    expect(parseStapplyLlmAnswer('[{"index":0,"role":"Operations","subrole":null}]', 1)).toEqual(
+      new Map([[0, { role: "Operations", subrole: null }]]),
+    );
     expect(
-      parseStapplyLlmAnswer('[{"index":0,"role":"Operations","subrole":null}]', 1),
-    ).toEqual(new Map([[0, { role: "Operations", subrole: null }]]));
-    expect(
-      parseStapplyLlmAnswer(
-        '{"results":[{"index":0,"role":"Sales","subrole":null}]}',
-        1,
-      ),
+      parseStapplyLlmAnswer('{"results":[{"index":0,"role":"Sales","subrole":null}]}', 1),
     ).toEqual(new Map([[0, { role: "Sales", subrole: null }]]));
   });
 
   test("tolerates a fenced code block", () => {
     expect(
-      parseStapplyLlmAnswer(
-        '```json\n[{"index":0,"role":"Legal","subrole":null}]\n```',
-        1,
-      ),
+      parseStapplyLlmAnswer('```json\n[{"index":0,"role":"Legal","subrole":null}]\n```', 1),
     ).toEqual(new Map([[0, { role: "Legal", subrole: null }]]));
   });
 
@@ -85,9 +79,7 @@ describe("createAnthropicStapplyClassifier", () => {
     expect(requests).toHaveLength(1);
     expect(requests[0]?.url).toBe("https://api.anthropic.com/v1/messages");
 
-    const body = anthropicRequestSchema.parse(
-      JSON.parse(z.string().parse(requests[0]?.init.body)),
-    );
+    const body = anthropicRequestSchema.parse(JSON.parse(z.string().parse(requests[0]?.init.body)));
 
     const headers = new Headers(requests[0]?.init.headers);
 
@@ -119,7 +111,9 @@ describe("createAnthropicStapplyClassifier", () => {
       fetchImpl: async () => {
         await Promise.resolve();
 
-        return Response.json({ content: [{ type: "text", text: '[{"index":0,"role":"Wizard"}]' }] });
+        return Response.json({
+          content: [{ type: "text", text: '[{"index":0,"role":"Wizard"}]' }],
+        });
       },
     });
 

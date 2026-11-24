@@ -384,7 +384,9 @@ function closeAbsentPostings(db: CatalogDatabase, input: StapplyDeltaInput) {
 
 function pruneClosedPostings(db: CatalogDatabase, cutoff: number) {
   return db.$client
-    .query(`DELETE FROM postings WHERE status = 'closed' AND closed_at IS NOT NULL AND closed_at < ?`)
+    .query(
+      `DELETE FROM postings WHERE status = 'closed' AND closed_at IS NOT NULL AND closed_at < ?`,
+    )
     .run(cutoff).changes;
 }
 
@@ -572,13 +574,15 @@ export type TagSourceSummary = z.infer<typeof tagSourceSummarySchema>;
  * @returns One row per distinct `tag_source`.
  */
 export function tagSourceSummary(db: CatalogDatabase) {
-  return z.array(tagSourceSummarySchema).parse(
-    db.$client
-      .query(
-        "SELECT tag_source AS source, count(*) AS count FROM postings GROUP BY tag_source ORDER BY count DESC",
-      )
-      .all(),
-  );
+  return z
+    .array(tagSourceSummarySchema)
+    .parse(
+      db.$client
+        .query(
+          "SELECT tag_source AS source, count(*) AS count FROM postings GROUP BY tag_source ORDER BY count DESC",
+        )
+        .all(),
+    );
 }
 
 /**

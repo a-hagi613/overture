@@ -167,7 +167,9 @@ async function openDuck(connectionSource: string) {
   await connection.run("SET TimeZone = 'UTC'");
   await connection.run("SET memory_limit = '3GB'");
   await connection.run("SET threads = 4");
-  await connection.run(`SET temp_directory = '${join(workDir, "duckdb-tmp").replaceAll("'", "''")}'`);
+  await connection.run(
+    `SET temp_directory = '${join(workDir, "duckdb-tmp").replaceAll("'", "''")}'`,
+  );
 
   if (connectionSource.startsWith("http")) {
     await connection.run("INSTALL httpfs; LOAD httpfs;");
@@ -177,9 +179,9 @@ async function openDuck(connectionSource: string) {
 }
 
 function integrityCheck(catalogDb: CatalogDatabase) {
-  const rows = z.array(z.record(z.string(), z.unknown())).parse(
-    catalogDb.$client.query("PRAGMA integrity_check").all(),
-  );
+  const rows = z
+    .array(z.record(z.string(), z.unknown()))
+    .parse(catalogDb.$client.query("PRAGMA integrity_check").all());
 
   const verdict = rows.map((row) => Object.values(row).join(" ")).join("; ");
 
@@ -205,8 +207,7 @@ async function main() {
     `${seed ? "seed" : "delta"} run against ${String(previous?.manifest.rowCount ?? 0)} existing rows`,
   );
 
-  const freshnessCutoffMs =
-    seed && freshnessDays > 0 ? seedFreshnessCutoffMs(now) : null;
+  const freshnessCutoffMs = seed && freshnessDays > 0 ? seedFreshnessCutoffMs(now) : null;
 
   createStapplyStaging(catalog.db);
 
@@ -222,10 +223,15 @@ async function main() {
   progress("streaming the 28 boards through DuckDB, one board at a time");
 
   const perBoard: { ats: Ats; rows: number }[] = [];
-  let staged = 0;
-  let skipped = 0;
+  const totals = { staged: 0, skipped: 0 };
 
-  for (const board of boards) {
+  const stageBoard: (index: number) => Promise<void> = async (index) => {
+    const board = boards[index];
+
+    if (board === undefined) {
+      return;
+    }
+
     const boardStarted = performance.now();
 
     const streamed = await streamStapplyIngest({
@@ -242,8 +248,8 @@ async function main() {
 
     flush();
 
-    staged += streamed.rows;
-    skipped += streamed.skipped;
+    totals.staged += streamed.rows;
+    totals.skipped += streamed.skipped;
 
     progress(
       `${board.ats}: ${String(streamed.rows)} rows in ${String(Math.round(performance.now() - boardStarted))} ms`,
@@ -252,10 +258,14 @@ async function main() {
     if (streamed.rows > 0) {
       perBoard.push({ ats: board.ats, rows: streamed.rows });
     }
-  }
+
+    await stageBoard(index + 1);
+  };
+
+  await stageBoard(0);
 
   progress(
-    `staged ${String(staged)} rows (${String(skipped)} unusable) in ${String(Math.round(performance.now() - started))} ms`,
+    `staged ${String(totals.staged)} rows (${String(totals.skipped)} unusable) in ${String(Math.round(performance.now() - started))} ms`,
   );
 
   const delta = applyStapplyDelta(catalog.db, {
@@ -296,7 +306,9 @@ async function main() {
   const integrity = integrityCheck(catalog.db);
   catalog.sqlite.close();
 
-  progress(`integrity ${integrity}; compressing ${String(rowCount)} rows at zstd level ${String(zstdLevel)}`);
+  progress(
+    `integrity ${integrity}; compressing ${String(rowCount)} rows at zstd level ${String(zstdLevel)}`,
+  );
 
   const sqliteBytes = new Uint8Array(readFileSync(catalogPath));
   const compressedBytes = compressCatalogSnapshot(sqliteBytes, zstdLevel);
@@ -309,7 +321,9 @@ async function main() {
     supportedCount,
   });
 
-  if (isRowDrop(previous?.manifest.rowCount ?? null, rowCount, args.values["allow-row-drop"] === true)) {
+  if (
+    isRowDrop(previous?.manifest.rowCount ?? null, rowCount, args.values["allow-row-drop"] === true)
+  ) {
     throw new Error(
       `refusing to publish ${String(rowCount)} rows against the previous ${String(previous?.manifest.rowCount ?? 0)}; pass --allow-row-drop after checking upstream`,
     );
@@ -333,7 +347,11 @@ async function main() {
     publish,
     seed,
     freshnessDays: freshnessCutoffMs === null ? null : freshnessDays,
-    sqlite: { path: catalogPath, bytes: sqliteBytes.byteLength, zstdBytes: compressedBytes.byteLength },
+    sqlite: {
+      path: catalogPath,
+      bytes: sqliteBytes.byteLength,
+      zstdBytes: compressedBytes.byteLength,
+    },
     manifest: { ...manifest, zstdBytes: compressedBytes.byteLength },
     previousRows: previous?.manifest.rowCount ?? null,
     rows: {
@@ -345,7 +363,7 @@ async function main() {
       closed: delta.closed,
       pruned: delta.pruned,
       tagged: delta.tagged,
-      skipped,
+      skipped: totals.skipped,
       rowCount,
       supportedCount,
       unresolved,

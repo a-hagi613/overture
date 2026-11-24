@@ -286,11 +286,7 @@ export async function relayCatalogSnapshot(input: CatalogRelayInput) {
     "content-type": "application/zstd",
     "x-overture-catalog-version": input.manifest.version,
     "x-overture-catalog-sha256": input.manifest.sha256,
-    ...catalogRefreshHeaders(
-      input.secret,
-      input.nowMs,
-      catalogSha256(input.compressedBytes),
-    ),
+    ...catalogRefreshHeaders(input.secret, input.nowMs, catalogSha256(input.compressedBytes)),
   };
 
   const upload = await call(`${origin}/internal/catalog/snapshot`, {

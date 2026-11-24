@@ -136,19 +136,25 @@ function postingFor(db: CatalogDatabase, atsJobId: string) {
 }
 
 function tagsFor(db: CatalogDatabase, postingId: string) {
-  return z.array(storedTagSchema).parse(
-    db.$client
-      .query(
-        "SELECT dimension, value, source FROM posting_tags WHERE posting_id = ? ORDER BY dimension",
-      )
-      .all(postingId),
-  );
+  return z
+    .array(storedTagSchema)
+    .parse(
+      db.$client
+        .query(
+          "SELECT dimension, value, source FROM posting_tags WHERE posting_id = ? ORDER BY dimension",
+        )
+        .all(postingId),
+    );
 }
 
 describe("applyStapplyDelta", () => {
   test("creates the company, board and postings and writes the rule tags", () => {
     const db = catalogDatabase();
-    const rows = [ingestRow({ ats_id: "job-1" }), ingestRow({ ats_id: "job-2", requisition_id: "R-2" })];
+
+    const rows = [
+      ingestRow({ ats_id: "job-1" }),
+      ingestRow({ ats_id: "job-2", requisition_id: "R-2" }),
+    ];
 
     stage(db, rows);
     const report = runDelta(db, rows);
@@ -174,7 +180,9 @@ describe("applyStapplyDelta", () => {
         source: z.string(),
       })
       .parse(
-        db.$client.query("SELECT ats, board_token, region, status, source FROM company_boards").get(),
+        db.$client
+          .query("SELECT ats, board_token, region, status, source FROM company_boards")
+          .get(),
       );
 
     expect(board).toMatchObject({
@@ -199,6 +207,7 @@ describe("applyStapplyDelta", () => {
 
   test("a rerun with the same content inserts nothing, keeps the posting id and preserves an LLM tag", () => {
     const db = catalogDatabase();
+
     const first = [ingestRow({ ats_id: "job-1" })];
 
     stage(db, first);
@@ -234,6 +243,7 @@ describe("applyStapplyDelta", () => {
 
   test("a changed content hash rewrites the row and re-tags it", () => {
     const db = catalogDatabase();
+
     const first = [ingestRow({ ats_id: "job-1" })];
 
     stage(db, first);
@@ -269,7 +279,11 @@ describe("applyStapplyDelta", () => {
 
   test("closes a posting the board no longer lists and prunes one closed for more than 30 days", () => {
     const db = catalogDatabase();
-    const first = [ingestRow({ ats_id: "job-1" }), ingestRow({ ats_id: "job-2", requisition_id: "R-2" })];
+
+    const first = [
+      ingestRow({ ats_id: "job-1" }),
+      ingestRow({ ats_id: "job-2", requisition_id: "R-2" }),
+    ];
 
     stage(db, first);
     runDelta(db, first);
@@ -303,7 +317,11 @@ describe("applyStapplyDelta", () => {
 
   test("reopens a posting that returns with the same content", () => {
     const db = catalogDatabase();
-    const first = [ingestRow({ ats_id: "job-1" }), ingestRow({ ats_id: "job-2", requisition_id: "R-2" })];
+
+    const first = [
+      ingestRow({ ats_id: "job-1" }),
+      ingestRow({ ats_id: "job-2", requisition_id: "R-2" }),
+    ];
 
     stage(db, first);
     runDelta(db, first);
@@ -319,7 +337,10 @@ describe("applyStapplyDelta", () => {
 
     const firstSeenAt = postingFor(db, "job-2")?.first_seen_at;
 
-    const returning = [ingestRow({ ats_id: "job-1" }), ingestRow({ ats_id: "job-2", requisition_id: "R-2" })];
+    const returning = [
+      ingestRow({ ats_id: "job-1" }),
+      ingestRow({ ats_id: "job-2", requisition_id: "R-2" }),
+    ];
 
     stage(db, returning);
     const report = runDelta(db, returning);
@@ -331,7 +352,13 @@ describe("applyStapplyDelta", () => {
 
   test("collapses the same requisition across boards, preferring the apply-supported one", () => {
     const db = catalogDatabase();
-    const shared = { company: "Northwind Systems", company_norm: "northwind systems", requisition_id: "ENG-7" };
+
+    const shared = {
+      company: "Northwind Systems",
+      company_norm: "northwind systems",
+      requisition_id: "ENG-7",
+    };
+
     const rows = [
       ingestRow({
         ...shared,
@@ -355,14 +382,15 @@ describe("applyStapplyDelta", () => {
     expect(report.duplicates).toBe(1);
     expect(report.inserted).toBe(1);
     expect(
-      z.object({ ats: z.string(), job: z.string() }).parse(
-        db.$client.query("SELECT ats, ats_job_id AS job FROM postings").get(),
-      ),
+      z
+        .object({ ats: z.string(), job: z.string() })
+        .parse(db.$client.query("SELECT ats, ats_job_id AS job FROM postings").get()),
     ).toEqual({ ats: "greenhouse", job: "gh-1" });
   });
 
   test("gives companies whose names slugify alike their own board", () => {
     const db = catalogDatabase();
+
     const rows = [
       ingestRow({ ats_id: "job-1", company: "Acme Inc.", company_norm: "acme inc." }),
       ingestRow({
@@ -378,7 +406,9 @@ describe("applyStapplyDelta", () => {
 
     expect(report.inserted).toBe(2);
     expect(
-      z.object({ n: z.number() }).parse(db.$client.query("SELECT count(*) AS n FROM company_boards").get()),
+      z
+        .object({ n: z.number() })
+        .parse(db.$client.query("SELECT count(*) AS n FROM company_boards").get()),
     ).toEqual({ n: 2 });
   });
 
@@ -408,6 +438,7 @@ describe("applyStapplyDelta", () => {
 
   test("a board that returned no rows closes nothing", () => {
     const db = catalogDatabase();
+
     const first = [ingestRow({ ats_id: "job-1" })];
 
     stage(db, first);

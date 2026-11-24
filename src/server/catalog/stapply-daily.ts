@@ -80,11 +80,14 @@ export interface StapplyBoardSource {
 export function stapplyBoardSources(baseUrl: string = STAPPLY_JOBS_BASE_URL) {
   const trimmed = baseUrl.replace(/\/+$/u, "");
 
-  return ATS_VALUES.map((ats) => ({
-    ats,
-    applySupported: ATS_REGISTRY[ats].applySupported,
-    url: `${trimmed}/${ats}/jobs.parquet`,
-  } satisfies StapplyBoardSource));
+  return ATS_VALUES.map(
+    (ats) =>
+      ({
+        ats,
+        applySupported: ATS_REGISTRY[ats].applySupported,
+        url: `${trimmed}/${ats}/jobs.parquet`,
+      }) satisfies StapplyBoardSource,
+  );
 }
 
 export interface StapplyIngestQueryInput {
@@ -282,6 +285,7 @@ function boardTokenFor(companyName: string) {
     .replaceAll(/[^a-z0-9]+/gu, "-")
     .replaceAll(/^-+|-+$/gu, "")
     .slice(0, 80);
+
   const suffix = createHash("sha256").update(companyName.toLowerCase()).digest("hex").slice(0, 8);
 
   return slug === "" ? `stapply-${suffix}` : `${slug}-${suffix}`;

@@ -89,7 +89,7 @@ function fixtureRow(overrides: FixtureRow = {}) {
     salary_period: "YEAR",
     salary_summary: "CAD 120,000 - 160,000",
     description: "a description that must never be read",
-    raw: "{\"must\":\"never be read\"}",
+    raw: '{"must":"never be read"}',
     ...overrides,
   };
 }
@@ -128,9 +128,7 @@ async function writeBoardParquet(directory: string, ats: string, rows: readonly 
 
     if (rows.length > 0) {
       const values = rows
-        .map(
-          (row) => `(${COLUMNS.map(([name]) => sqlLiteral(row[name] ?? null)).join(", ")})`,
-        )
+        .map((row) => `(${COLUMNS.map(([name]) => sqlLiteral(row[name] ?? null)).join(", ")})`)
         .join(", ");
 
       await connection.run(`INSERT INTO fixture VALUES ${values}`);
@@ -277,7 +275,12 @@ describe("streamStapplyIngest", () => {
 
   test("prefers the apply-supported board for the same company and requisition", async () => {
     const directory = scratchDirectory();
-    const shared = { company: "Northwind Systems", requisition_id: "ENG-7", title: "Data Engineer" };
+
+    const shared = {
+      company: "Northwind Systems",
+      requisition_id: "ENG-7",
+      title: "Data Engineer",
+    };
 
     await writeBoardParquet(directory, "greenhouse", [
       fixtureRow({ ...shared, ats_id: "gh-1", source_updated_at: "2026-11-18T00:00:00Z" }),
@@ -297,7 +300,12 @@ describe("streamStapplyIngest", () => {
 
   test("keeps the newest source update when both duplicates are apply-supported", async () => {
     const directory = scratchDirectory();
-    const shared = { company: "Northwind Systems", requisition_id: "ENG-8", title: "Data Engineer" };
+
+    const shared = {
+      company: "Northwind Systems",
+      requisition_id: "ENG-8",
+      title: "Data Engineer",
+    };
 
     await writeBoardParquet(directory, "greenhouse", [
       fixtureRow({ ...shared, ats_id: "older", source_updated_at: "2026-11-18T00:00:00Z" }),
