@@ -255,9 +255,59 @@ describe("the login-wall pre-flight", () => {
     expect(detectLoginWall({ html, requestedUrl: APPLY_URL })).toEqual({ wall: false });
   });
 
-  test("does not read sign-in copy that only exists inside a script", () => {
+  test("lets a guest form on the redirect target override the redirect", () => {
+    expect(
+      detectLoginWall({
+        finalUrl: "https://jobs.example.com/register?job=9f2",
+        html: `<html><body>${GUEST_FORM}</body></html>`,
+        requestedUrl: APPLY_URL,
+      }),
+    ).toEqual({ wall: false });
+  });
+
+  test("keeps a simple guest form when the page only hints at sign-in", () => {
+    const simpleForm = `<form action="/submit" method="post">
+      <input type="text" name="full_name" />
+      <input type="email" name="email" />
+      <button type="submit">Send</button>
+    </form>`;
+
+    expect(
+      detectLoginWall({
+        html: `<html><body><p>Sign in to apply faster</p>${simpleForm}</body></html>`,
+        requestedUrl: APPLY_URL,
+      }),
+    ).toEqual({ wall: false });
+
+    expect(
+      detectLoginWall({
+        html: `<html><body><p>Sign in or create an account</p>${simpleForm}</body></html>`,
+        requestedUrl: APPLY_URL,
+      }),
+    ).toEqual({ wall: false });
+  });
+
+  test("skips a simple form when the page says an account is required", () => {
+    const html = `<html><body>
+      <p>Create an account to apply</p>
+      <form action="/submit" method="post">
+        <input type="text" name="full_name" />
+        <input type="email" name="email" />
+        <button type="submit">Send</button>
+      </form>
+    </body></html>`;
+
+    expect(evidenceFor({ html, requestedUrl: APPLY_URL })).toEqual({
+      markers: ["sign_in_copy"],
+      signals: ["gate"],
+      url: APPLY_URL,
+    });
+  });
+
+  test("does not read sign-in copy that only exists inside a script or a comment", () => {
     const html = `<html><body>
       <script>document.title = "You must sign in to apply";</script>
+      <!-- You must sign in to apply -->
       <p>Applications for this role are reviewed weekly.</p>
     </body></html>`;
 

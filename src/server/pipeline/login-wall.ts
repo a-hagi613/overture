@@ -148,13 +148,6 @@ const APPLICATION_FORM = /apply|application/iu;
 
 const BARE_PATH_EXTENSION = /\.(?:aspx?|html?|php|jsp|xhtml)$/gu;
 
-const HIDDEN_CONTENT =
-  /<(?:script|style|template|noscript)\b[^>]*>[\s\S]*?<\/(?:script|style|template|noscript)\s*>/giu;
-
-const HTML_COMMENT = /<!--[\s\S]*?-->/gu;
-
-const HTML_TAG = /<[^>]+>/gu;
-
 const WHITESPACE = /\s+/gu;
 
 const MAX_SCANNED_HTML_CHARS = 512_000;
@@ -287,23 +280,24 @@ function redirectGate(requestedUrl: string, finalUrl: string | null) {
   return null;
 }
 
-function pageText(html: string) {
-  return html
-    .replaceAll(HIDDEN_CONTENT, " ")
-    .replaceAll(HTML_COMMENT, " ")
-    .replaceAll(HTML_TAG, " ")
-    .replaceAll(WHITESPACE, " ")
-    .trim()
-    .toLowerCase();
-}
-
 function scanPage(source: string) {
   const html = source.slice(0, MAX_SCANNED_HTML_CHARS);
   const inputs: ScannedInput[] = [];
   const forms: string[] = [];
+  const visible: string[] = [];
   let textareas = 0;
+  let hidden = 0;
 
   new HTMLRewriter()
+    .on("script, style, template, noscript", {
+      element(element) {
+        hidden += 1;
+
+        element.onEndTag(() => {
+          hidden -= 1;
+        });
+      },
+    })
     .on("input", {
       element(element) {
         inputs.push({
@@ -333,9 +327,16 @@ function scanPage(source: string) {
         );
       },
     })
+    .onDocument({
+      text(chunk) {
+        if (hidden === 0) {
+          visible.push(chunk.text);
+        }
+      },
+    })
     .transform(html);
 
-  const text = pageText(html);
+  const text = visible.join(" ").replaceAll(WHITESPACE, " ").trim().toLowerCase();
 
   const hasFile = inputs.some((input) => input.type === "file");
   const hasPassword = inputs.some((input) => input.type === "password");
@@ -369,7 +370,10 @@ function gateMarkers(page: ScannedPage) {
   }
 
   const gated =
-    page.strongCopy || (!page.optionalCopy && (page.weakCopy || page.password || page.signInForm));
+    page.strongCopy ||
+    (!page.weakGuestForm &&
+      !page.optionalCopy &&
+      (page.weakCopy || page.password || page.signInForm));
 
   if (!gated) {
     return markers;
@@ -409,6 +413,13 @@ export function detectLoginWall(input: LoginWallInput) {
   const markers: LoginWallMarker[] = [];
   let url: string | null = null;
 
+  const html = input.html ?? "";
+  const page = html.trim() === "" ? null : scanPage(html);
+
+  if (page?.strongGuestForm === true) {
+    return { wall: false } satisfies LoginWallVerdict;
+  }
+
   const redirect = redirectGate(input.requestedUrl, input.finalUrl ?? null);
 
   if (redirect !== null) {
@@ -419,8 +430,8 @@ export function detectLoginWall(input: LoginWallInput) {
     url = redirectUrl;
   }
 
-  if (input.html !== null && input.html !== undefined && input.html.trim() !== "") {
-    const gate = gateMarkers(scanPage(input.html));
+  if (page !== null) {
+    const gate = gateMarkers(page);
 
     if (gate.length > 0) {
       signals.push("gate");
