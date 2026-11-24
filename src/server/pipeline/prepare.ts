@@ -38,6 +38,7 @@ import { guardPosting } from "./guard/posting-guard.ts";
 import { createOpenTextService, isCoverLetterQuestion } from "./open-text.ts";
 import { isKillSwitchEnabled } from "../platform/settings/index.ts";
 import { createTargetsService } from "../profile/targets.ts";
+import { readScopedAnswers, scopedAnswer } from "./application-answers.ts";
 import type { SpendGate } from "../billing/spend.ts";
 import { ungatedSpend } from "../billing/spend.ts";
 import { greenhouseBoardUrl } from "./greenhouse-board-url.ts";
@@ -117,6 +118,8 @@ interface StoredSentence {
   resumeLineIds: string[];
   byUser?: boolean | undefined;
 }
+
+type ApplicationAnswerKind = "open_text" | "cover_letter" | "fact";
 
 interface BlockedQuestion {
   questionId: string;
@@ -333,7 +336,7 @@ export function createPreparationService(deps: {
     userId: string;
     applicationId: string;
     questionId: string;
-    kind: "open_text" | "cover_letter";
+    kind: ApplicationAnswerKind;
     sentences: StoredSentence[];
     words: number;
   }) {
@@ -380,6 +383,23 @@ export function createPreparationService(deps: {
       .set({ sentencesEnc: sealed, wordCount: input.words, updatedAt: at })
       .where(eq(applicationAnswers.id, existing.id))
       .run();
+  }
+
+  async function saveApplicationAnswer(input: {
+    applicationId: string;
+    kind: ApplicationAnswerKind;
+    questionId: string;
+    userId: string;
+    value: string;
+  }) {
+    await saveSentences({
+      applicationId: input.applicationId,
+      kind: input.kind,
+      questionId: input.questionId,
+      sentences: [{ byUser: true, resumeLineIds: [], sentence: input.value }],
+      userId: input.userId,
+      words: wordCount(input.value),
+    });
   }
 
   const targetsService = createTargetsService({ db, clock });
@@ -842,6 +862,11 @@ export function createPreparationService(deps: {
     const blocked: BlockedQuestion[] = [];
     const resolutions = new Map<string, PlanResolution>();
 
+    const scopedAnswers = await readScopedAnswers(
+      { db, personal },
+      { applicationId, userId: row.userId },
+    );
+
     const openTextQuestions: {
       questionId: string;
       text: string;
@@ -863,6 +888,19 @@ export function createPreparationService(deps: {
           kind,
           required: question.required,
         });
+
+        continue;
+      }
+
+      const scoped = scopedAnswer(scopedAnswers.get(question.questionId), {
+        fieldType: question.fieldType,
+        options,
+        prompt: question.textDisplay,
+        questionId: question.questionId,
+      });
+
+      if (scoped !== null) {
+        resolutions.set(question.questionId, scoped);
 
         continue;
       }
@@ -1250,6 +1288,11 @@ export function createPreparationService(deps: {
       .where(and(eq(resumes.userId, row.userId), eq(resumes.isCurrent, true)))
       .get();
 
+    const scopedAnswers = await readScopedAnswers(
+      { db, personal },
+      { applicationId, userId: row.userId },
+    );
+
     const fields = await Promise.all(
       catalog.forPosting(row.postingId).map(async (question) => {
         const options = optionsSchema.parse(JSON.parse(question.options));
@@ -1274,6 +1317,34 @@ export function createPreparationService(deps: {
             sentences: saved ?? [],
             source: saved === null ? null : "open_text",
             unit: null,
+          } satisfies SendPlanField;
+        }
+
+        const scoped = scopedAnswer(scopedAnswers.get(question.questionId), {
+          fieldType: question.fieldType,
+          options,
+          prompt: question.textDisplay,
+          questionId: question.questionId,
+        });
+
+        if (scoped !== null) {
+          return {
+            answer: scoped.value,
+            answerKind: question.answerKind,
+            block: null,
+            factKey: question.factKey,
+            factRevision: null,
+            fieldName: question.fieldName,
+            fieldType: question.fieldType,
+            file: null,
+            label: question.textDisplay,
+            options,
+            questionId: question.questionId,
+            required: question.required,
+            scope: "",
+            sentences: [],
+            source: "fact",
+            unit: scoped.unit,
           } satisfies SendPlanField;
         }
 
@@ -1419,6 +1490,11 @@ export function createPreparationService(deps: {
       .where(and(eq(resumes.userId, row.userId), eq(resumes.isCurrent, true)))
       .get();
 
+    const scopedAnswers = await readScopedAnswers(
+      { db, personal },
+      { applicationId, userId: row.userId },
+    );
+
     return Promise.all(
       catalog.forPosting(row.postingId).map(async (question) => {
         const options = optionsSchema.parse(JSON.parse(question.options));
@@ -1432,6 +1508,17 @@ export function createPreparationService(deps: {
             resolution: openTextResolution(saved, question.required),
             sentences: saved ?? [],
           });
+        }
+
+        const scoped = scopedAnswer(scopedAnswers.get(question.questionId), {
+          fieldType: question.fieldType,
+          options,
+          prompt: question.textDisplay,
+          questionId: question.questionId,
+        });
+
+        if (scoped !== null) {
+          return toPreparedAnswer({ question, options, resolution: scoped, sentences: [] });
         }
 
         const resolution = resolveQuestion({
@@ -1459,6 +1546,7 @@ export function createPreparationService(deps: {
     openAttemptReviews,
     prepare,
     prepareMany,
+    saveApplicationAnswer,
     sendPlanFor,
   };
 }

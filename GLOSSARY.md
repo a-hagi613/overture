@@ -104,7 +104,7 @@ _Avoid_: column, phase, Hold
 
 **Board lane**:
 One of the five columns the Board shows (ADR 0037; seven Stage columns before it), each
-grouping Stages: Queued, Ready, Applied, Waiting (Screening, Interviewing and Offer) and Closed. A lane is a view:
+grouping Stages: Queued, Ready, Applied, Interviews (the `waiting` lane: Screening, Interviewing and Offer) and Closed. A lane is a view:
 dropping a card on a lane writes one Stage, and only after the server accepts the move.
 _Avoid_: On hold, Hold, column (as the object)
 

@@ -7,7 +7,6 @@ import type { CalendarDate } from "../lib/calendar-grid.ts";
 import { copy } from "../../shared/copy.ts";
 import { CalendarBoard } from "../components/calendar-board.tsx";
 import { CalendarDayPanel } from "../components/calendar-day-panel.tsx";
-import { PageHeader } from "../components/page-header.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
 import { dsBody, dsCardTitle } from "../components/ui/ds.ts";
@@ -173,16 +172,6 @@ export function CalendarPage() {
 
   return (
     <div>
-      <PageHeader
-        lead={copy.calendar.lead}
-        titleNode={
-          <>
-            {copy.calendar.titlePlain}{" "}
-            <em className="italic text-signal">{copy.calendar.titleItalic}</em>
-          </>
-        }
-      />
-
       {isError && data === undefined ? (
         <Card className="mt-6 px-7 py-11 text-center">
           <div role="alert">

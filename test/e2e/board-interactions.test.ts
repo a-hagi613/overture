@@ -61,6 +61,14 @@ async function openSeeded(browser: Browser, appServerUrl: string, width: number)
   return { context, page, request };
 }
 
+async function openBoardView(page: Page) {
+  await page
+    .getByRole("group", { name: "Application views" })
+    .getByRole("button", { name: "Board" })
+    .click();
+  await expect(page.getByRole("group", { name: "Stages" })).toBeVisible();
+}
+
 async function dragCardTo(
   page: Page,
   card: ReturnType<Page["locator"]>,
@@ -93,11 +101,11 @@ test("dragging a card on desktop moves it and locks it", async ({ boardServer, b
     throw new Error("the applied card has no id");
   }
 
-  await dragCardTo(page, card, page.locator('section[aria-label="Waiting"]'));
+  await dragCardTo(page, card, page.locator('section[aria-label="Interviews"]'));
 
-  await expect(page.locator(`section[aria-label="Waiting"] button[data-card="${id}"]`)).toHaveCount(
-    1,
-  );
+  await expect(
+    page.locator(`section[aria-label="Interviews"] button[data-card="${id}"]`),
+  ).toHaveCount(1);
 
   const state = await cardState(request, id);
 
@@ -141,6 +149,9 @@ test("holding a card on the phone and dropping it on a stage moves and locks it"
   browser,
 }) => {
   const { context, page, request } = await openSeeded(browser, boardServer.url, 390);
+
+  await openBoardView(page);
+
   const card = page.locator("button[data-card]").filter({ visible: true }).first();
   const id = await card.getAttribute("data-card");
 
@@ -154,7 +165,9 @@ test("holding a card on the phone and dropping it on a stage moves and locks it"
     return { height: rect.height, width: rect.width, x: rect.x, y: rect.y };
   });
 
-  const stage = page.getByRole("button", { name: "Waiting" });
+  const stage = page
+    .getByRole("group", { name: "Stages" })
+    .getByRole("button", { name: "Interviews" });
 
   const stageBox = await stage.evaluate((element) => {
     const rect = element.getBoundingClientRect();
@@ -189,29 +202,34 @@ test("holding a card on the phone and dropping it on a stage moves and locks it"
 test("tapping the phone stage tabs changes the visible lane", async ({ boardServer, browser }) => {
   const { context, page, request } = await openSeeded(browser, boardServer.url, 390);
 
-  await expect(page.getByRole("group", { name: "Stages" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Applied" })).toHaveAttribute(
+  await openBoardView(page);
+
+  const stages = page.getByRole("group", { name: "Stages" });
+
+  await expect(stages.getByRole("button", { name: "Applied" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
   await expect(page.locator('section[aria-label="Applied"]')).toBeVisible();
+  await expect(stages.getByRole("button", { name: "Closed" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Waiting" }).click();
-  await expect(page.getByRole("button", { name: "Waiting" })).toHaveAttribute(
+  await stages.getByRole("button", { name: "Interviews" }).click();
+  await expect(stages.getByRole("button", { name: "Interviews" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await expect(page.locator('section[aria-label="Waiting"]')).toBeVisible();
+  await expect(page.locator('section[aria-label="Interviews"]')).toBeVisible();
 
-  await page.getByRole("button", { name: "Closed" }).click();
-  await expect(page.getByRole("button", { name: "Closed" })).toHaveAttribute(
+  await page.getByRole("button", { name: /Show closed/u }).click();
+  await stages.getByRole("button", { name: "Closed" }).click();
+  await expect(stages.getByRole("button", { name: "Closed" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
   await expect(page.locator('section[aria-label="Closed"]')).toBeVisible();
 
-  await page.getByRole("button", { name: "Queued" }).click();
-  await expect(page.getByRole("button", { name: "Queued" })).toHaveAttribute(
+  await stages.getByRole("button", { name: "Queued" }).click();
+  await expect(stages.getByRole("button", { name: "Queued" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
@@ -382,17 +400,26 @@ async function openCard(
       throw new Error("the selected card is in no stage");
     }
 
+    await openBoardView(page);
+
+    if (stage === "closed") {
+      await page.getByRole("button", { name: /Show closed/u }).click();
+    }
+
     const mobileTabLabels = new Map<string, string>([
       ["applied", "Applied"],
       ["closed", "Closed"],
-      ["interviewing", "Waiting"],
-      ["offer", "Waiting"],
+      ["interviewing", "Interviews"],
+      ["offer", "Interviews"],
       ["queued", "Queued"],
       ["ready", "Ready"],
-      ["screening", "Waiting"],
+      ["screening", "Interviews"],
     ]);
 
-    await page.getByRole("button", { name: mobileTabLabels.get(stage) ?? "Applied" }).click();
+    await page
+      .getByRole("group", { name: "Stages" })
+      .getByRole("button", { name: mobileTabLabels.get(stage) ?? "Applied" })
+      .click();
   }
 
   await page.locator(`button[data-card="${cardId}"]`).filter({ visible: true }).click();

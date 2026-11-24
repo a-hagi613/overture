@@ -1992,12 +1992,40 @@ export const copy = {
     trackerTitlePlain: "Your",
     trackerTitleItalic: "Applications",
     trackerLead: "Every application from match to decision. Drag cards across stages to update.",
+    listLead: "Every application from match to decision, newest update first.",
+    views: {
+      label: "Application views",
+      board: "Board",
+      list: "List",
+      calendar: "Calendar",
+    },
     lanes: {
       applied: "Applied",
       closed: "Closed",
       ready: "Ready",
       review: "Queued",
-      waiting: "Waiting",
+      waiting: "Interviews",
+    },
+    offers: {
+      title: "Offers",
+      lead: (count: number) =>
+        count === 1
+          ? "One offer is waiting for your decision."
+          : `${String(count)} offers are waiting for your decision.`,
+      open: (company: string) => `Open the offer from ${company}`,
+    },
+    closed: {
+      show: (count: number) => `Show closed (${String(count)})`,
+      hide: "Hide closed",
+      hiddenNote: "Closed applications stay out of the way until you ask for them.",
+    },
+    list: {
+      label: "Applications list",
+      all: "All",
+      emptyTitle: "No applications here yet",
+      emptyBody: "When Overture finds a match, it appears here and on the board.",
+      count: (count: number) => `${String(count)} ${count === 1 ? "application" : "applications"}`,
+      updated: (date: string) => `Updated ${date}`,
     },
     openReview: "Open",
     openReady: "Open",
@@ -2207,7 +2235,24 @@ export const copy = {
     checkboxYes: "Yes",
     yourAnswer: "Your answer",
     answerNote:
-      "Saved as a fact and reused whenever a form asks this. Posting text never answers it for you.",
+      "Nothing on the posting answers this for you. Your answer is what gets sent; the switch decides whether Overture may reuse it.",
+    saveForFuture: {
+      label: "Save to my saved answers for future applications",
+      reusableNote: "This is a reusable answer, so it is on by default.",
+      specificNote: "This answer looks specific to these applications, so it is off by default.",
+      onNote: "Overture reuses this answer whenever another form asks the same thing.",
+      offNote:
+        "Overture uses this answer only for these applications and never saves it to your facts.",
+    },
+    savedToReady: (count: number) =>
+      count === 1
+        ? "Saved — 1 application moved to Ready"
+        : `Saved — ${String(count)} applications moved to Ready`,
+    savedScoped: (count: number) =>
+      count === 1
+        ? "Saved for this application."
+        : `Saved for these ${String(count)} applications.`,
+    openReady: "Open Ready",
     save: (count: number) =>
       `Save answer · unlocks ${String(count)} ${count === 1 ? "job" : "jobs"}`,
     dismiss: "Dismiss",

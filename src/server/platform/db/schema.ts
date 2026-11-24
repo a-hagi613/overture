@@ -1075,7 +1075,7 @@ export const applicationAnswers = sqliteTable(
       .notNull()
       .references(() => questions.id, { onDelete: "cascade" }),
     userId: cascadeUserId(),
-    kind: text("kind", { enum: ["open_text", "cover_letter"] }).notNull(),
+    kind: text("kind", { enum: ["open_text", "cover_letter", "fact"] }).notNull(),
     sentencesEnc: text("sentences_enc").notNull(),
     wordCount: integer("word_count").notNull(),
     createdAt: integer("created_at").notNull(),
