@@ -5,6 +5,8 @@ const DEFAULT_COOLDOWN_MS = 60_000;
 export interface EventLoopLagMonitorOptions {
   /** Called once per stall with how long the loop was blocked, in milliseconds. */
   onLag: (lagMs: number) => void;
+  /** Called once per timer tick with the drift, so a metric can record every sample, not only stalls. */
+  onSample?: (lagMs: number) => void;
   /** The timer interval, which is also the amount of drift that counts as normal. */
   intervalMs?: number;
   /** Drift above this is reported as a stall. */
@@ -50,6 +52,8 @@ export function createEventLoopLagMonitor(options: EventLoopLagMonitorOptions) {
     const lagMs = at - expectedAt - intervalMs;
 
     expectedAt = at;
+
+    options.onSample?.(lagMs);
 
     if (lagMs < thresholdMs) {
       return lagMs;

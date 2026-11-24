@@ -5,6 +5,7 @@ import type { R2BucketBinding } from "./bucket.ts";
 import { pushAlert } from "./alert.ts";
 import { r2Bucket } from "./bucket.ts";
 import { probeHealth } from "./health.ts";
+import { opsHealthProblems, probeOpsHealth } from "./ops-health.ts";
 import { markAlert, readState, shouldAlert, writeState } from "./state.ts";
 import {
   clearDegradedFlag,
@@ -27,6 +28,9 @@ export interface SentinelEnv {
   CLOUDFLARE_ACCOUNT_TAG?: string;
   CLOUDFLARE_ANALYTICS_TOKEN?: string;
   CLOUDFLARE_GRAPHQL_URL?: string;
+  /** The signed ops endpoint; when unset the ops checks stay off and the public probe is unchanged. */
+  OVERTURE_OPS_HEALTH_URL?: string;
+  OVERTURE_OPS_HEALTH_SECRET?: string;
 }
 
 export interface SentinelRunOptions {
@@ -38,6 +42,8 @@ export interface SentinelRun {
   health: "ok" | "failing";
   manifest: ManifestFreshness;
   usage: UsageResult | "unconfigured" | "failed";
+  /** Present only when the signed ops endpoint is configured. */
+  ops?: "ok" | "failing" | "failed";
   degraded: boolean;
   /** What this run did to `ops/degraded.json`. `kept` means usage was unknown and the flag stood. */
   flag: "written" | "unchanged" | "cleared" | "kept" | "absent" | "failed";
@@ -102,6 +108,61 @@ async function notify(context: SentinelContext, request: AlertRequest) {
   context.alerts.push(request.key);
 
   return true;
+}
+
+async function checkOpsHealth(context: SentinelContext) {
+  const url = context.env.OVERTURE_OPS_HEALTH_URL;
+  const secret = context.env.OVERTURE_OPS_HEALTH_SECRET;
+
+  if (url === undefined || url === "" || secret === undefined || secret === "") {
+    return "unconfigured" as const;
+  }
+
+  const probe = await probeOpsHealth(url, secret, context.fetch, () => context.at);
+
+  if (!probe.ok || probe.body === undefined) {
+    context.state.ops = "failing";
+
+    await notify(context, {
+      key: "ops.health",
+      windowMs: HEALTH_REPEAT_MS,
+      title: "Overture ops health check failing",
+      body: `${url}: ${probe.detail}`,
+      tags: "rotating_light",
+    });
+
+    return "failed" as const;
+  }
+
+  const problems = opsHealthProblems(probe.body);
+
+  if (problems.length === 0) {
+    if (context.state.ops === "failing") {
+      await notify(context, {
+        key: "ops.recovered",
+        windowMs: CONDITION_REPEAT_MS,
+        title: "Overture resource ceilings recovered",
+        body: "RAM, NVMe, event-loop lag and ATS failures are inside their ceilings again",
+        tags: "white_check_mark",
+      });
+    }
+
+    context.state.ops = "ok";
+
+    return "ok" as const;
+  }
+
+  context.state.ops = "failing";
+
+  await notify(context, {
+    key: "ops.thresholds",
+    windowMs: FAILURE_REPEAT_MS,
+    title: "Overture resources over their ceiling",
+    body: `${problems.join("; ")}; see docs/runbooks/ops-resource-ceilings.md`,
+    tags: "rotating_light",
+  });
+
+  return "failing" as const;
 }
 
 async function checkHealth(context: SentinelContext) {
@@ -371,6 +432,7 @@ export async function runSentinel(env: SentinelEnv, options: SentinelRunOptions)
   const health = await checkHealth(context);
   const manifest = await checkManifest(context);
   const { usage, degraded, flag } = await checkUsage(context);
+  const ops = await checkOpsHealth(context);
 
   const record: SentinelRunRecord = {
     at: new Date(context.at).toISOString(),
@@ -383,11 +445,15 @@ export async function runSentinel(env: SentinelEnv, options: SentinelRunOptions)
     errors: context.errors.slice(0, RUN_LIST_LIMIT),
   };
 
+  if (ops !== "unconfigured") {
+    record.ops = ops;
+  }
+
   context.state.lastRun = record;
 
   await writeState(r2Bucket(env.FILES), context.state);
 
-  return {
+  const result: SentinelRun = {
     health,
     manifest,
     usage,
@@ -396,6 +462,12 @@ export async function runSentinel(env: SentinelEnv, options: SentinelRunOptions)
     alerts: context.alerts,
     errors: context.errors,
   };
+
+  if (ops !== "unconfigured") {
+    result.ops = ops;
+  }
+
+  return result;
 }
 
 const sentinel = {

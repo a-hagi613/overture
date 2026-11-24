@@ -1,18 +1,11 @@
-import { enableVirtualAuthenticator, signInOwnerOnAdmin } from "./admin-sign-in.ts";
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, test } from "./admin.fixture.ts";
 
-const PASSKEY_WINDOW_MS = 13 * 60 * 60 * 1000;
-
-test("the owner opens the admin after registering and asserting a passkey, and the passkey gate closes again after 12 hours", async ({
+test("the owner opens the admin straight through Cloudflare Access, with no passkey gate", async ({
   page,
-  adminIsolatedAppServer,
   adminIsolatedAppUrl,
   accessServer,
 }) => {
-  await enableVirtualAuthenticator(page);
-  await signInOwnerOnAdmin(page, adminIsolatedAppUrl);
-
   const token = await accessServer.issueToken({ email: authTestIdentity.ownerEmail });
 
   await page.context().addCookies([
@@ -29,26 +22,17 @@ test("the owner opens the admin after registering and asserting a passkey, and t
   ]);
 
   await page.goto(`${adminIsolatedAppUrl}/admin`);
-  await expect(page.getByRole("heading", { name: "Assert your passkey" })).toBeVisible();
-
-  await page.getByRole("button", { name: "Add your passkey" }).click();
 
   await expect(page.getByRole("heading", { name: "Background jobs" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recent admin actions" })).toBeVisible();
+  await expect(page.getByText("Assert your passkey")).toHaveCount(0);
+  await expect(page.getByText("Add your passkey")).toHaveCount(0);
 
   await page.goto(`${adminIsolatedAppUrl}/admin/settings`);
 
   await expect(page.getByRole("heading", { name: "Kill switches", exact: true })).toBeVisible();
 
-  await page.request.post(`${adminIsolatedAppServer.url}/__test__/clock/offset`, {
-    data: { offsetMs: PASSKEY_WINDOW_MS },
-  });
+  const overview = await page.request.get(`${adminIsolatedAppUrl}/admin/api/overview`);
 
-  await page.goto(`${adminIsolatedAppUrl}/admin`);
-  await expect(page.getByRole("heading", { name: "Assert your passkey" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Assert your passkey" })).toBeVisible();
-
-  await page.request.post(`${adminIsolatedAppServer.url}/__test__/clock/offset`, {
-    data: { offsetMs: 0 },
-  });
+  expect(overview.status()).toBe(200);
 });

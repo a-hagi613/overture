@@ -4,7 +4,6 @@ import type { Context } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
 
-import type { Auth } from "../auth/index.ts";
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { BackupMonitor } from "../platform/ports/backup.ts";
 import type { DegradedFlagReader } from "../platform/degraded.ts";
@@ -13,9 +12,9 @@ import type { BrowserProviderRegistry } from "../dispatch/browser/provider.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { InviteRow } from "../auth/invites.ts";
-import { readSession } from "../auth/session.ts";
 import { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
 import type { AdminEnv } from "./admin-refusals.ts";
+import { resolveAdminAccessOwner } from "../admin/access-owner.ts";
 import { createAdminRevealRoutes } from "./admin-reveal.ts";
 import type { JobActionOutcome } from "../admin/jobs.ts";
 import { cancelAdminJob, JOB_STATUS_FILTERS, listAdminJobs, retryAdminJob } from "../admin/jobs.ts";
@@ -46,9 +45,8 @@ import {
   users,
 } from "../platform/db/schema.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags, readTagImports } from "../catalog/tag-import.ts";
-import { createAccessVerifier } from "../platform/access/index.ts";
+import { accessVerifier } from "../platform/access/configured.ts";
 import { authSecretConfig, catalogDatabasePath, env } from "../config/env.ts";
-import { hasRecentPasskeyAssertion, lastPasskeyAssertionAt } from "../platform/passkey/index.ts";
 import {
   listAdminAudit,
   parseAuditCursor,
@@ -109,7 +107,7 @@ import {
 } from "../waitlist/store.ts";
 import type { WaitlistEntryRow } from "../waitlist/store.ts";
 import { WAITLIST_FILTERS, WAITLIST_ORDERS } from "../../shared/waitlist.ts";
-import { isSameMailbox, normaliseEmail } from "../auth/email.ts";
+import { normaliseEmail } from "../auth/email.ts";
 import { readMailHealth } from "../inbox/health.ts";
 import { buildStorageReport } from "../storage/report.ts";
 import { checkpointDatabase } from "../storage/database-sizes.ts";
@@ -392,49 +390,27 @@ function jobActionResponse(context: Context<AdminEnv>, result: JobActionOutcome)
   return context.json({ job: result.job });
 }
 
-export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: AdminDeps) {
-  const verifier = createAccessVerifier({
-    jwksUrl: env.CF_ACCESS_JWKS_URL,
-    teamDomain: env.CF_ACCESS_TEAM_DOMAIN,
-    audience: env.CF_ACCESS_AUD,
-  });
-
+export function createAdminApi(db: AppDatabase, clock: Clock, deps: AdminDeps) {
   const routes = new Hono<AdminEnv>();
 
   routes.use("*", async (context, next) => {
-    if (verifier !== null) {
-      const identity = await verifier.verify(context.req.raw);
+    const identity = accessVerifier === null ? null : await accessVerifier.verify(context.req.raw);
 
-      if (identity === null) {
-        return context.json({ error: ADMIN_REFUSAL_CODES.accessRequired }, 401);
-      }
-
-      const session = await readSession(auth, context.req.raw.headers);
-
-      if (session === null) {
-        return context.json({ error: ADMIN_REFUSAL_CODES.signInRequired }, 401);
-      }
-
-      if (session.user.role !== "owner") {
-        return context.json({ error: ADMIN_REFUSAL_CODES.ownerRequired }, 403);
-      }
-
-      if (!isSameMailbox(identity.email, session.user.email)) {
-        return context.json({ error: ADMIN_REFUSAL_CODES.ownerRequired }, 403);
-      }
-
-      if (!hasRecentPasskeyAssertion(db, clock, session.user.id)) {
-        return context.json({ error: ADMIN_REFUSAL_CODES.passkeyRequired }, 403);
-      }
-
-      context.set("owner", { userId: session.user.id, email: session.user.email });
-
-      await next();
-
-      return context.res;
+    if (identity === null) {
+      return context.json({ error: ADMIN_REFUSAL_CODES.accessRequired }, 401);
     }
 
-    return context.json({ error: ADMIN_REFUSAL_CODES.accessRequired }, 401);
+    const resolved = await resolveAdminAccessOwner(db, clock, identity);
+
+    if (!resolved.ok) {
+      return context.json({ error: ADMIN_REFUSAL_CODES.ownerRequired }, 403);
+    }
+
+    context.set("owner", resolved.owner);
+
+    await next();
+
+    return context.res;
   });
 
   const inviteSecret = authSecretConfig.current;
@@ -582,7 +558,6 @@ export function createAdminApi(db: AppDatabase, clock: Clock, auth: Auth, deps: 
     return context.json({
       now: clock.now(),
       owner: { email: row?.email ?? owner.email, name: row?.name ?? "" },
-      passkeyAssertedAt: lastPasskeyAssertionAt(db, owner.userId)?.getTime() ?? null,
     });
   });
 

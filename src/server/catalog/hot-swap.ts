@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 
 import { z } from "zod";
@@ -9,6 +9,7 @@ import type { CatalogManifest } from "./stapply-daily.ts";
 
 import { createClock } from "../platform/ports/clock.ts";
 import { openReadOnlyCatalogDatabase } from "../platform/db/client.ts";
+import { defaultMetrics } from "../platform/telemetry/metrics.ts";
 import { catalogManifestSchema } from "./stapply-daily.ts";
 import {
   CATALOG_LATEST_KEY,
@@ -239,7 +240,7 @@ export function createCatalogHotSwap(options: CatalogHotSwapOptions) {
     pendingDrains.add(timer);
   }
 
-  async function applyManifest(manifest: CatalogManifest) {
+  async function applyManifestOnce(manifest: CatalogManifest) {
     if (active !== null) {
       if (active.version === manifest.version) {
         const already: CatalogApplyResult = {
@@ -355,6 +356,34 @@ export function createCatalogHotSwap(options: CatalogHotSwapOptions) {
     const applied: CatalogApplyResult = { applied: true, version: manifest.version, path: target };
 
     return applied;
+  }
+
+  async function applyManifest(manifest: CatalogManifest) {
+    const startedAt = performance.now();
+
+    try {
+      const result = await applyManifestOnce(manifest);
+
+      if (result.applied) {
+        const bytes = await stat(result.path)
+          .then((info) => info.size)
+          .catch(() => 0);
+
+        defaultMetrics().recordCatalogSwap({
+          bytes,
+          durationMs: performance.now() - startedAt,
+          postings: manifest.rowCount,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      defaultMetrics().recordCatalogSwapFailure(
+        error instanceof CatalogRefreshError ? error.reason : "unknown",
+      );
+
+      throw error;
+    }
   }
 
   async function readPointer() {

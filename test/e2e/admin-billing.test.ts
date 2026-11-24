@@ -2,11 +2,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import type { APIRequestContext, Page, Request as PlaywrightRequest } from "@playwright/test";
 import { z } from "zod";
 
-import {
-  enableVirtualAuthenticator,
-  openAdminAsOwner,
-  signInOwnerOnAdmin,
-} from "./admin-sign-in.ts";
+import { openAdminAsOwner } from "./admin-sign-in.ts";
 import { adminUrlOf, expect, startFreshAdminServer, test as adminTest } from "./admin.fixture.ts";
 import type { AppServer } from "./app-server.ts";
 import { authTestIdentity } from "./auth.fixture.ts";
@@ -99,7 +95,7 @@ async function seedPaidMonth(request: APIRequestContext, appUrl: string) {
   return ownerId;
 }
 
-test("the owner passkey gates the billing pages until the passkey is added", async ({
+test("the owner opens the billing pages directly through Cloudflare Access", async ({
   page,
   billingAdminUrl,
   billingAdminServer,
@@ -108,30 +104,13 @@ test("the owner passkey gates the billing pages until the passkey is added", asy
   test.setTimeout(120_000);
 
   await seedPaidMonth(page.request, billingAdminServer.url);
-  await enableVirtualAuthenticator(page);
-  await signInOwnerOnAdmin(page, billingAdminUrl);
-  await page.context().addCookies([
-    {
-      name: "CF_Authorization",
-      value: await accessServer.issueToken({ email: authTestIdentity.ownerEmail }),
-      domain: "localhost",
-      path: "/",
-      expires: -1,
-      httpOnly: true,
-      secure: false,
-      sameSite: "Lax",
-    },
-  ]);
+  await openAdminAsOwner(page, billingAdminUrl, accessServer.issueToken);
 
   await page.goto(`${billingAdminUrl}/admin/billing`);
 
-  await expect(page.getByRole("button", { name: "Add your passkey" })).toBeVisible();
-  await expect(page.getByRole("table")).toHaveCount(0);
-
-  await page.getByRole("button", { name: "Add your passkey" }).click();
-
   await expect(page.getByRole("heading", { name: "Billing", exact: true })).toBeVisible();
   await expect(page.getByRole("table")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add your passkey" })).toHaveCount(0);
 });
 
 test("the billing list filters rows and opens a user's billing view without card data", async ({

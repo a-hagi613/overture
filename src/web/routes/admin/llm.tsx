@@ -30,14 +30,7 @@ export function LlmUsagePage() {
   const { data, failed, refusal, refresh } = useAdminResource(load, ["llm-usage", purpose]);
 
   if (refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={refusal}
-        onPasskeyDone={() => {
-          refresh();
-        }}
-      />
-    );
+    return <AdminGateScreen code={refusal} />;
   }
 
   if (data === null) {

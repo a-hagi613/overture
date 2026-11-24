@@ -22,14 +22,7 @@ export function AdminSettingsPage() {
   const refusal = settings.refusal ?? switches.refusal ?? alerts.refusal;
 
   if (refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={refusal}
-        onPasskeyDone={() => {
-          invalidateAdmin();
-        }}
-      />
-    );
+    return <AdminGateScreen code={refusal} />;
   }
 
   const heading = (

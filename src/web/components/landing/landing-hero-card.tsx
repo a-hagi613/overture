@@ -40,7 +40,7 @@ export function LandingHeroCard({
         scale: stamped ? 0.99 : 1,
         y: stamped ? 2 : 0,
       }}
-      className={`absolute inset-x-0 top-0 z-10 flex h-[274px] flex-col overflow-hidden rounded-xl border bg-card px-4 py-3.5 shadow-lift transition-colors duration-300 sm:inset-x-2.5 sm:h-[280px] sm:px-5 sm:py-4 ${
+      className={`absolute inset-x-0 top-0 z-10 flex h-[292px] flex-col overflow-hidden rounded-xl border bg-card px-4 py-3.5 shadow-lift transition-colors duration-300 sm:inset-x-2.5 sm:h-[304px] sm:px-5 sm:py-4 ${
         stamped ? "border-signal" : "border-input"
       }`}
       exit={
@@ -99,18 +99,20 @@ export function LandingHeroCard({
               reducedMotion ? { duration: 0 } : { delay: 0.12 + rowIdx * 0.11, duration: 0.34 }
             }
           >
-            <span className="truncate text-xs text-muted-foreground">{row.ask}</span>
+            <span className="truncate text-xs text-muted-foreground sm:text-sm">{row.ask}</span>
             <span
               aria-hidden="true"
               className="relative block h-0 border-t border-dotted border-ok after:absolute after:-right-0.5 after:-top-1 after:h-1.5 after:w-1.5 after:rounded-full after:bg-ok"
             />
-            <span className="truncate text-xs font-semibold text-foreground">{row.fact}</span>
+            <span className="truncate text-xs font-semibold text-foreground sm:text-sm">
+              {row.fact}
+            </span>
           </motion.div>
         ))}
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-2.5">
-        <span className="truncate text-xs text-muted-foreground">{card.footNote}</span>
+        <span className="truncate text-xs text-muted-foreground sm:text-sm">{card.footNote}</span>
         <span className={`${dsMono} flex-none`}>{card.viaLine}</span>
       </div>
 
