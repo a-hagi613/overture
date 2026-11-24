@@ -30,7 +30,7 @@ function seedPosting(
   ats: "greenhouse" | "lever",
   role: "Operations" | "Software Engineering",
   workplace: "hybrid" | "remote",
-  options: { closed?: boolean } = {},
+  options: { closed?: boolean; granularRole?: string } = {},
 ) {
   const closed = options.closed === true;
 
@@ -60,6 +60,14 @@ function seedPosting(
       "INSERT INTO posting_tags (posting_id, dimension, value, source) VALUES (?, 'role', ?, 'rules')",
     )
     .run(id, role);
+
+  if (options.granularRole !== undefined) {
+    sqlite
+      .prepare(
+        "INSERT INTO posting_tags (posting_id, dimension, value, source) VALUES (?, 'granular_role', ?, 'rules')",
+      )
+      .run(id, options.granularRole);
+  }
 }
 
 function createTestApp() {
@@ -80,8 +88,12 @@ function createTestApp() {
 
   catalog.sqlite.run("BEGIN");
   seedPosting(catalog.sqlite, "gh-swe-remote", "greenhouse", "Software Engineering", "remote");
-  seedPosting(catalog.sqlite, "gh-swe-remote-2", "greenhouse", "Software Engineering", "remote");
-  seedPosting(catalog.sqlite, "lever-ops-remote", "lever", "Operations", "remote");
+  seedPosting(catalog.sqlite, "gh-swe-remote-2", "greenhouse", "Software Engineering", "remote", {
+    granularRole: "Software Engineer",
+  });
+  seedPosting(catalog.sqlite, "lever-ops-remote", "lever", "Operations", "remote", {
+    granularRole: "Operations Manager",
+  });
   seedPosting(catalog.sqlite, "lever-ops-hybrid", "lever", "Operations", "hybrid");
   seedPosting(catalog.sqlite, "gh-swe-closed", "greenhouse", "Software Engineering", "remote", {
     closed: true,
@@ -148,20 +160,40 @@ describe("GET /api/supply", () => {
       await (await request(app, "/api/supply?role=Design")).json(),
     );
 
+    const byCategoryAlias = supplyCountsSchema.parse(
+      await (await request(app, "/api/supply?category=Software%20Engineering")).json(),
+    );
+
+    const byGranularRole = supplyCountsSchema.parse(
+      await (await request(app, "/api/supply?granularRole=Software%20Engineer")).json(),
+    );
+
+    const granularWins = supplyCountsSchema.parse(
+      await (
+        await request(app, "/api/supply?role=Operations&granularRole=Software%20Engineer&remote=1")
+      ).json(),
+    );
+
     expect(byRole.total).toBe(2);
     expect(byLocation.total).toBe(4);
     expect(remote.total).toBe(3);
     expect(both.total).toBe(2);
     expect(nothing.total).toBe(0);
+    expect(byCategoryAlias.total).toBe(2);
+    expect(byGranularRole.total).toBe(1);
+    expect(granularWins.total).toBe(1);
   });
 
-  test("refuses an unknown role or a one-character location with invalid_request", async () => {
+  test("refuses an unknown role, granular role or a one-character location with invalid_request", async () => {
     const app = createTestApp();
     const role = await request(app, "/api/supply?role=Wizard");
+    const granular = await request(app, "/api/supply?granularRole=Wizard");
     const location = await request(app, "/api/supply?location=a");
 
     expect(role.status).toBe(400);
     expect(await role.json()).toMatchObject({ error: "invalid_request" });
+    expect(granular.status).toBe(400);
+    expect(await granular.json()).toMatchObject({ error: "invalid_request" });
     expect(location.status).toBe(400);
     expect(await location.json()).toMatchObject({ error: "invalid_request" });
   });

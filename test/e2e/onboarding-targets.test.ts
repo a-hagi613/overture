@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 
+import { AxeBuilder } from "@axe-core/playwright";
 import { request as apiRequest } from "@playwright/test";
 import { z } from "zod";
 
@@ -50,6 +51,81 @@ async function storageStateFor(request: APIRequestContext, appServerUrl: string)
 
   return request.storageState();
 }
+
+test("the searchable category and Level-2 role picker adds a granular target and counts live", async ({
+  browser,
+  onboardingServer,
+}) => {
+  const request = await apiRequest.newContext({ baseURL: onboardingServer.url });
+
+  const storageState = await storageStateFor(request, onboardingServer.url);
+
+  const context = await browser.newContext({
+    storageState,
+    viewport: { height: 1100, width: 1280 },
+  });
+
+  const page = await context.newPage();
+
+  await page.goto(`${onboardingServer.url}/onboarding/targets`);
+
+  const platform = page.getByRole("button", { name: "Platform Engineer" });
+  const london = page.getByRole("button", { name: "London" });
+  const remote = page.getByRole("button", { exact: true, name: "Remote" });
+  const hybrid = page.getByRole("button", { exact: true, name: "Hybrid" });
+  const senior = page.getByRole("button", { name: "Senior" });
+
+  await platform.click();
+  await expect(platform).toHaveAttribute("aria-pressed", "true");
+  await london.click();
+  await expect(london).toHaveAttribute("aria-pressed", "true");
+  await remote.click();
+  await expect(remote).toHaveAttribute("aria-pressed", "true");
+  await hybrid.click();
+  await expect(hybrid).toHaveAttribute("aria-pressed", "true");
+  await senior.click();
+  await expect(senior).toHaveAttribute("aria-pressed", "true");
+
+  await expect(page.getByTestId("targets-match-count")).toHaveText("3");
+
+  await page.getByLabel("Category", { exact: true }).selectOption("Healthcare");
+
+  const role = page.getByLabel("Add a specific role", { exact: true });
+
+  await role.fill("Registered Nurse");
+  await role.press("Enter");
+
+  await expect(page.getByRole("button", { name: "Registered Nurse" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByTestId("targets-match-count")).toHaveText("4");
+
+  await page.setViewportSize({ width: 390, height: 1000 });
+
+  const overflow = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+
+  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
+
+  const results = await new AxeBuilder({ page }).analyze();
+
+  expect(results.violations).toEqual([]);
+
+  await page.setViewportSize({ width: 1280, height: 1100 });
+  await page.getByRole("button", { name: "Registered Nurse" }).click();
+
+  await expect(page.getByRole("button", { name: "Registered Nurse" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await expect(page.getByTestId("targets-match-count")).toHaveText("3");
+
+  await context.close();
+  await request.dispose();
+});
 
 test("choices come from open Postings, the count follows them, and the browser zone is saved", async ({
   browser,

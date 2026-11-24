@@ -9,6 +9,8 @@ import { resolvedLocationCondition } from "../../catalog/location-filter.ts";
 
 export interface SearchFilters {
   role: string | null;
+  /** A Level-2 ESCO role (WS-17b); when set it is the role filter and `role` is only its category hint. */
+  granularRole: string | null;
   seniority: Seniority | null;
   workplace: Workplace | null;
   location: string | null;
@@ -77,22 +79,29 @@ export function ftsMatchExpression(text: string) {
   return match.length === 0 ? null : match;
 }
 
-function tagMatches(dimension: "role" | "seniority", value: string) {
+function tagMatches(dimensions: readonly string[], value: string) {
   return sql`exists (
     select 1 from posting_tags pt
-    where pt.posting_id = postings.id and pt.dimension = ${dimension} and pt.value = ${value}
+    where pt.posting_id = postings.id
+      and pt.dimension in (${sql.join(
+        dimensions.map((dimension) => sql`${dimension}`),
+        sql`, `,
+      )})
+      and pt.value = ${value}
   )`;
 }
 
 function filterConditions(db: CatalogDatabase, filters: SearchFilters, nowMs: number) {
   const parts: SQL[] = [];
 
-  if (filters.role !== null) {
-    parts.push(tagMatches("role", filters.role));
+  if (filters.granularRole !== null) {
+    parts.push(tagMatches(["granular_role", "role"], filters.granularRole));
+  } else if (filters.role !== null) {
+    parts.push(tagMatches(["role", "subrole", "granular_role"], filters.role));
   }
 
   if (filters.seniority !== null) {
-    parts.push(tagMatches("seniority", filters.seniority));
+    parts.push(tagMatches(["seniority"], filters.seniority));
   }
 
   if (filters.workplace !== null) {
@@ -170,13 +179,27 @@ function likeExpression(text: string) {
   );
 }
 
+function roleWeight(value: string | null) {
+  if (value === null) {
+    return { column: sql`0 as tagWeight`, order: sql`rank, id` };
+  }
+
+  return {
+    column: sql`(select max(coalesce(pt.weight, 0)) from posting_tags pt
+      where pt.posting_id = postings.id
+        and pt.dimension in ('role', 'subrole', 'granular_role')
+        and pt.value = ${value}) as tagWeight`,
+    order: sql`tagWeight desc, rank, id`,
+  };
+}
+
 /**
  * Runs one catalog search. The keyword half reads the contentless `postings_fts` index through `bm25()`;
  * when that index is empty (a bare test fixture) the same query falls back to an indexed LIKE over the
  * posting columns, so a search never silently returns nothing.
  * @param db The catalog database.
  * @param query The validated search text, filters and limit.
- * @returns The matching postings, best rank first.
+ * @returns The matching postings, best rank first, primary-label matches ahead of secondary labels.
  */
 export function searchPostings(db: CatalogDatabase, query: SearchQuery) {
   const match = ftsMatchExpression(query.text);
@@ -190,15 +213,18 @@ export function searchPostings(db: CatalogDatabase, query: SearchQuery) {
   const filters = filterConditions(db, query.filters, nowMs);
   const filterFilter = filters.length === 0 ? sql`` : sql`and ${sql.join(filters, sql` and `)}`;
   const useFts = ftsHasRows(db);
+  const weight = roleWeight(query.filters.granularRole ?? query.filters.role);
 
   if (useFts) {
     return db.all<SearchHitRow>(sql`
-      select id, title, company, location, department, url, applyUrl, ats, closedAt, postedAt, rank
+      select id, title, company, location, department, url, applyUrl, ats, closedAt, postedAt, rank,
+        tagWeight
       from (
         select postings.id, postings.title, c.name as company,
           postings.location_raw as location, postings.department, postings.url,
           coalesce(postings.apply_url, postings.apply_url_norm) as applyUrl, postings.ats,
           postings.closed_at as closedAt, postings.posted_at as postedAt, f.rank as rank,
+          ${weight.column},
           row_number() over (
             partition by postings.dedupe_key
             order by postings.closed_at is not null, postings.first_seen_at, postings.id
@@ -209,7 +235,7 @@ export function searchPostings(db: CatalogDatabase, query: SearchQuery) {
         where postings_fts match ${match} ${openFilter} ${filterFilter}
       )
       where rn = 1
-      order by rank, id
+      order by ${weight.order}
       limit ${query.limit}
     `);
   }
@@ -221,12 +247,14 @@ export function searchPostings(db: CatalogDatabase, query: SearchQuery) {
   }
 
   return db.all<SearchHitRow>(sql`
-    select id, title, company, location, department, url, applyUrl, ats, closedAt, postedAt, rank
+    select id, title, company, location, department, url, applyUrl, ats, closedAt, postedAt, rank,
+      tagWeight
     from (
       select postings.id, postings.title, c.name as company,
         postings.location_raw as location, postings.department, postings.url,
         coalesce(postings.apply_url, postings.apply_url_norm) as applyUrl, postings.ats,
         postings.closed_at as closedAt, postings.posted_at as postedAt, 0 as rank,
+        ${weight.column},
         row_number() over (
           partition by postings.dedupe_key
           order by postings.closed_at is not null, postings.first_seen_at, postings.id
@@ -236,7 +264,7 @@ export function searchPostings(db: CatalogDatabase, query: SearchQuery) {
       where ${like} ${openFilter} ${filterFilter}
     )
     where rn = 1
-    order by rank, id
+    order by ${weight.order}
     limit ${query.limit}
   `);
 }

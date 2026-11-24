@@ -24,6 +24,7 @@ afterEach(() => {
 function noFilters(overrides: Partial<SearchFilters> = {}) {
   const filters: SearchFilters = {
     role: null,
+    granularRole: null,
     seniority: null,
     workplace: null,
     location: null,
@@ -197,6 +198,52 @@ describe("searchPostings on the contentless FTS index", () => {
 });
 
 describe("search filters", () => {
+  test("matches a Level-1 category and a Level-2 granular role across multi-label Postings, primary label first", () => {
+    const target = fixture([
+      { id: "primary-swe", title: "Backend Engineer" },
+      { id: "hybrid-role", title: "Backend Engineer" },
+    ]);
+
+    const tag = target.sqlite.prepare(
+      "insert into posting_tags (posting_id, dimension, value, source, weight) values (?, ?, ?, 'rules', ?)",
+    );
+
+    tag.run("primary-swe", "role", "Software Engineering", 1);
+    tag.run("primary-swe", "granular_role", "Backend Engineer", 1);
+    tag.run("hybrid-role", "role", "Data & Analytics", 1);
+    tag.run("hybrid-role", "granular_role", "Data Scientist", 1);
+    tag.run("hybrid-role", "role", "Software Engineering", 0.4);
+    tag.run("hybrid-role", "granular_role", "Backend Engineer", 0.4);
+
+    const byCategory = searchPostings(target.db, {
+      filters: noFilters({ role: "Software Engineering" }),
+      limit: 10,
+      nowMs: NOW,
+      openOnly: true,
+      text: "Backend",
+    });
+
+    const byGranular = searchPostings(target.db, {
+      filters: noFilters({ granularRole: "Backend Engineer", role: "Software Engineering" }),
+      limit: 10,
+      nowMs: NOW,
+      openOnly: true,
+      text: "Backend",
+    });
+
+    expect(byCategory.map((hit) => hit.id)).toEqual(["primary-swe", "hybrid-role"]);
+    expect(byGranular.map((hit) => hit.id)).toEqual(["primary-swe", "hybrid-role"]);
+    expect(
+      searchPostings(target.db, {
+        filters: noFilters({ granularRole: "Data Scientist" }),
+        limit: 10,
+        nowMs: NOW,
+        openOnly: true,
+        text: "Backend",
+      }).map((hit) => hit.id),
+    ).toEqual(["hybrid-role"]);
+  });
+
   test("the location filter routes a city through posting_locations", () => {
     const { db } = fixture(SEARCH_ROWS);
 

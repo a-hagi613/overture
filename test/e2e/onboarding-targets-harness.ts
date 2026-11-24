@@ -87,7 +87,7 @@ interface PostingSeed {
   employmentType: "full_time" | "part_time";
   language: string;
   locationRaw: string;
-  tags: { dimension: "role" | "seniority"; value: string }[];
+  tags: { dimension: "role" | "seniority" | "granular_role"; value: string }[];
   title: string;
   url: string;
   workplace: "onsite" | "remote" | "hybrid";
@@ -363,6 +363,25 @@ export async function seedOnboardingTargetsFlow(request: APIRequestContext, appS
       ],
       title: "Product Manager",
       url: "https://onboarding-targets.example/flow-5",
+      workplace: "hybrid",
+    },
+    {
+      ats: "greenhouse",
+      atsJobId: "flow-granular-nurse",
+      boardId: board.boardId,
+      city: "London",
+      companyId: board.companyId,
+      countryCode: "GB",
+      employmentType: "full_time",
+      language: "en",
+      locationRaw: "London, England, United Kingdom",
+      tags: [
+        { dimension: "role", value: "Healthcare" },
+        { dimension: "granular_role", value: "Registered Nurse" },
+        { dimension: "seniority", value: "senior" },
+      ],
+      title: "Registered Nurse",
+      url: "https://onboarding-targets.example/flow-6",
       workplace: "hybrid",
     },
   ];

@@ -35,6 +35,8 @@ interface PostingSeed {
   city: string | null;
   closed: boolean;
   countryCode: string;
+  extraTags?: readonly { dimension: "role" | "granular_role"; value: string }[];
+  granularRole?: string;
   id: string;
   locationRaw: string;
   role: string;
@@ -279,6 +281,14 @@ function insertSeed(sqlite: Database, seed: PostingSeed) {
     );
   sqlite.prepare(INSERT_TAG).run(seed.id, "role", seed.role);
 
+  if (seed.granularRole !== undefined) {
+    sqlite.prepare(INSERT_TAG).run(seed.id, "granular_role", seed.granularRole);
+  }
+
+  for (const tag of seed.extraTags ?? []) {
+    sqlite.prepare(INSERT_TAG).run(seed.id, tag.dimension, tag.value);
+  }
+
   if (seed.subrole !== undefined) {
     sqlite.prepare(INSERT_TAG).run(seed.id, "subrole", seed.subrole);
   }
@@ -327,6 +337,7 @@ function fixture() {
 
 function filter(overrides: Partial<SupplyFilters> = {}) {
   return {
+    granularRole: null,
     location: null,
     radiusKm: null,
     remote: false,
@@ -371,6 +382,62 @@ describe("countSupportedSupply", () => {
     expect(countSupportedSupply(target.db, filter({ role: "Software Engineering" })).total).toBe(5);
     expect(countSupportedSupply(target.db, filter({ role: "Operations" })).total).toBe(4);
     expect(countSupportedSupply(target.db, filter({ role: "Design" })).total).toBe(0);
+  });
+
+  test("filters by Level-1 category, Level-2 granular role and every label a multi-label Posting carries", () => {
+    const target = fixture();
+
+    insertSeed(target.sqlite, {
+      ats: "greenhouse",
+      applySupported: true,
+      city: "Austin",
+      closed: false,
+      countryCode: "US",
+      extraTags: [
+        { dimension: "role", value: "Data & Analytics" },
+        { dimension: "granular_role", value: "Data Scientist" },
+      ],
+      granularRole: "Software Engineer",
+      id: "gh-hybrid-swe-data",
+      locationRaw: "Austin, TX",
+      role: "Software Engineering",
+      workplace: "remote",
+    });
+    insertSeed(target.sqlite, {
+      ats: "lever",
+      applySupported: true,
+      city: "London",
+      closed: false,
+      countryCode: "GB",
+      id: "lever-legacy-backend",
+      locationRaw: "London, United Kingdom",
+      role: "Backend Engineer",
+      workplace: "hybrid",
+    });
+
+    rebuildSupplyFacets(target.db);
+
+    expect(countSupportedSupply(target.db, filter()).total).toBe(11);
+    expect(countSupportedSupply(target.db, filter({ role: "Software Engineering" })).total).toBe(6);
+    expect(countSupportedSupply(target.db, filter({ role: "Data & Analytics" })).total).toBe(1);
+    expect(
+      countSupportedSupply(target.db, filter({ granularRole: "Software Engineer" })).total,
+    ).toBe(1);
+    expect(countSupportedSupply(target.db, filter({ granularRole: "Data Scientist" })).total).toBe(
+      1,
+    );
+    expect(
+      countSupportedSupply(target.db, filter({ granularRole: "Backend Engineer" })).total,
+    ).toBe(1);
+    expect(
+      countSupportedSupply(
+        target.db,
+        filter({ granularRole: "Software Engineer", role: "Data & Analytics" }),
+      ).total,
+    ).toBe(1);
+    expect(
+      countSupportedSupply(target.db, filter({ granularRole: "Registered Nurse" })).total,
+    ).toBe(0);
   });
 
   test("filters by location, remote, and both together", () => {

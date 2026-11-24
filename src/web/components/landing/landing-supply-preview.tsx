@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { SupplyCounts } from "../../../shared/supply.ts";
 import type { RoleGroup } from "../../../shared/tag-taxonomy.ts";
 
-import { ROLE_GROUPS } from "../../../shared/tag-taxonomy.ts";
+import { escoRoleCategory } from "../../../shared/esco-roles.ts";
 import { LANDING_COPY } from "./landing-copy.ts";
 import { LandingSupplyFilters } from "./landing-supply-filters.tsx";
 import { LandingSupplyStatus } from "./landing-supply-status.tsx";
@@ -15,10 +15,6 @@ import { useSupplyCounts } from "../../lib/supply-api.ts";
 const LOCATION_DEBOUNCE_MS = 350;
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
-
-function roleFromValue(value: string) {
-  return ROLE_GROUPS.find((role) => role === value) ?? null;
-}
 
 function locationFromDraft(value: string) {
   const trimmed = value.trim();
@@ -47,7 +43,8 @@ function statusOf(counts: SupplyCounts | null, failed: boolean, loading: boolean
  * @returns The supply preview section on the landing.
  */
 export function LandingSupplyPreview() {
-  const [role, setRole] = useState<RoleGroup | null>(null);
+  const [category, setCategory] = useState<RoleGroup | null>(null);
+  const [granularRole, setGranularRole] = useState<string | null>(null);
   const [locationDraft, setLocationDraft] = useState("");
   const [location, setLocation] = useState<string | null>(null);
   const [radius, setRadius] = useState<string | null>(null);
@@ -63,7 +60,13 @@ export function LandingSupplyPreview() {
     };
   }, [locationDraft]);
 
-  const { counts, failed, loading, retry } = useSupplyCounts({ location, radius, remote, role });
+  const { counts, failed, loading, retry } = useSupplyCounts({
+    granularRole,
+    location,
+    radius,
+    remote,
+    role: category,
+  });
 
   const status = statusOf(counts, failed, loading);
 
@@ -96,16 +99,23 @@ export function LandingSupplyPreview() {
           </div>
           <div>
             <LandingSupplyFilters
+              category={category}
+              granularRole={granularRole}
               locationDraft={locationDraft}
+              onCategoryChange={(next) => {
+                setCategory(next);
+                setGranularRole((current) =>
+                  current !== null && next !== null && escoRoleCategory(current) !== next
+                    ? null
+                    : current,
+                );
+              }}
+              onGranularRoleChange={setGranularRole}
               onLocationChange={setLocationDraft}
               onRadiusChange={setRadius}
               onRemoteChange={setRemote}
-              onRoleChange={(value) => {
-                setRole(roleFromValue(value));
-              }}
               radius={radius}
               remote={remote}
-              role={role}
             />
             <LandingSupplyStatus
               caption={captions[status]}

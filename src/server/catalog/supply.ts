@@ -24,13 +24,14 @@ const caches = new WeakMap<CatalogDatabase, SupplyCache>();
 function cacheKeyOf(filters: SupplyFilters) {
   return JSON.stringify([
     filters.role,
+    filters.granularRole,
     filters.location?.toLowerCase() ?? null,
     filters.radiusKm,
     filters.remote,
   ]);
 }
 
-function roleCondition(db: CatalogDatabase, role: NonNullable<SupplyFilters["role"]>) {
+function roleCondition(db: CatalogDatabase, value: string) {
   return exists(
     db
       .select({ one: sql`1` })
@@ -38,8 +39,8 @@ function roleCondition(db: CatalogDatabase, role: NonNullable<SupplyFilters["rol
       .where(
         and(
           eq(postingTags.postingId, postings.id),
-          inArray(postingTags.dimension, ["role", "subrole"]),
-          eq(postingTags.value, role),
+          inArray(postingTags.dimension, ["role", "subrole", "granular_role"]),
+          eq(postingTags.value, value),
         ),
       ),
   );
@@ -52,8 +53,10 @@ function filtersCondition(db: CatalogDatabase, filters: SupplyFilters) {
     eq(postings.applySupported, true),
   ];
 
-  if (filters.role !== null) {
-    conditions.push(roleCondition(db, filters.role));
+  const roleValue = filters.granularRole ?? filters.role;
+
+  if (roleValue !== null) {
+    conditions.push(roleCondition(db, roleValue));
   }
 
   if (filters.location !== null) {

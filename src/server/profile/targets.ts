@@ -11,6 +11,8 @@ import { normalizeTitle } from "../catalog/normalize.ts";
 import { resolveLocation } from "../catalog/geo.ts";
 import { resolvedLocationCondition } from "../catalog/location-filter.ts";
 import { catalogRevision } from "../catalog/revision.ts";
+import { ESCO_ROLE_NAMES } from "../../shared/esco-roles.ts";
+import { ROLE_GROUPS } from "../../shared/tag-taxonomy.ts";
 import { emptyTargets, targetsInputSchema } from "../../shared/targets.ts";
 
 const roleTagSchema = z.object({ value: z.string() });
@@ -66,6 +68,10 @@ function wordsOf(value: string) {
     .filter((word) => word.length > 0 && !STOP_WORDS.has(word));
 }
 
+const KNOWN_LABELS = new Set(
+  [...ROLE_GROUPS, ...ESCO_ROLE_NAMES].map((label) => label.toLowerCase()),
+);
+
 export function roleTargetMatches(target: string, tagValues: readonly string[]) {
   const targetWords = new Set(wordsOf(target));
 
@@ -117,7 +123,7 @@ function normalizeFilters(
   }
 
   return {
-    roles: sortedUnique(parsed.roles.flatMap((role) => wordsOf(role))),
+    roles: sortedUnique(parsed.roles.map((role) => role.trim())),
     seniorities: sortedUnique(parsed.seniorities),
     workplaces: sortedUnique(parsed.workplaces),
     employmentTypes: sortedUnique(parsed.employmentTypes),
@@ -132,7 +138,7 @@ function normalizeFilters(
 
 function cacheKeyOf(filters: MatchFilters) {
   return JSON.stringify([
-    filters.roles,
+    filters.roles.map((role) => role.toLowerCase()),
     filters.seniorities,
     filters.workplaces,
     filters.employmentTypes,
@@ -156,22 +162,42 @@ function salaryCondition(floorMinor: number | null, currency: string | null) {
   );
 }
 
+/**
+ * The role tags a candidate's target roles match. A target that is a known Level-1 category or a known Level-2
+ * ESCO role must match that exact label (WS-17b), so choosing `Software Engineering` never picks up every posting
+ * whose granular role merely shares a word. A free-text target keeps the original word-overlap behaviour.
+ * @param db The catalog database.
+ * @param roles The candidate's target roles, as typed or picked.
+ * @returns The tag values that should be searched.
+ */
 export function matchedRoleTags(db: CatalogDatabase, roles: readonly string[]) {
-  const wanted = new Set(roles.flatMap((role) => wordsOf(role)));
-
-  if (wanted.size === 0) {
+  if (roles.length === 0) {
     return [];
   }
 
   const tagRows = db
     .selectDistinct({ value: postingTags.value })
     .from(postingTags)
-    .where(inArray(postingTags.dimension, ["role", "subrole"]))
+    .where(inArray(postingTags.dimension, ["role", "subrole", "granular_role"]))
     .all();
 
   const values = tagRows.map((row) => roleTagSchema.parse(row).value);
+  const wanted = new Set(roles.map((role) => role.toLowerCase()));
+  const exact = values.filter((value) => wanted.has(value.toLowerCase()));
 
-  return values.filter((value) => wordsOf(value).some((word) => wanted.has(word)));
+  const freeTextWords = new Set(
+    roles.filter((role) => !KNOWN_LABELS.has(role.toLowerCase())).flatMap((role) => wordsOf(role)),
+  );
+
+  if (freeTextWords.size === 0) {
+    return [...new Set(exact)];
+  }
+
+  const fuzzy = values.filter(
+    (value) => !exact.includes(value) && wordsOf(value).some((word) => freeTextWords.has(word)),
+  );
+
+  return [...new Set([...exact, ...fuzzy])];
 }
 
 function countMatches(db: CatalogDatabase, filters: MatchFilters) {
@@ -195,7 +221,7 @@ function countMatches(db: CatalogDatabase, filters: MatchFilters) {
         .where(
           and(
             eq(postingTags.postingId, postings.id),
-            inArray(postingTags.dimension, ["role", "subrole"]),
+            inArray(postingTags.dimension, ["role", "subrole", "granular_role"]),
             inArray(postingTags.value, roleTags),
           ),
         ),

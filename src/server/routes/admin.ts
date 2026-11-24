@@ -45,6 +45,8 @@ import {
   users,
 } from "../platform/db/schema.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags, readTagImports } from "../catalog/tag-import.ts";
+import { readPublishedTagging } from "../catalog/tagging-report.ts";
+import { CATALOG_MANIFEST_KEY } from "../catalog/stapply-refresh.ts";
 import { accessVerifier } from "../platform/access/configured.ts";
 import { authSecretConfig, catalogDatabasePath, env } from "../config/env.ts";
 import {
@@ -1061,7 +1063,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, deps: AdminDeps) {
     return context.json({ scope: scopeCheck.data, key, enabled, reason });
   });
 
-  routes.get("/catalog", (context) => {
+  routes.get("/catalog", async (context) => {
     const ats = ATS_NAMES.map((name) => {
       const hourlyLimitSetting = getSetting(db, `limits.ats_hourly.${name}`);
 
@@ -1080,7 +1082,17 @@ export function createAdminApi(db: AppDatabase, clock: Clock, deps: AdminDeps) {
       };
     });
 
-    return context.json({ discoveredAt: null, ats });
+    const report = await readPublishedTagging({
+      key: CATALOG_MANIFEST_KEY,
+      objects: deps.objects,
+    });
+
+    return context.json({
+      discoveredAt: null,
+      ats,
+      manifestVersion: report.manifestVersion,
+      tagging: report.tagging,
+    });
   });
 
   routes.get("/mail-health", validQuery(mailHealthQuery), (context) => {

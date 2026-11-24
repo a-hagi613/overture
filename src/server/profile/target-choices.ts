@@ -40,7 +40,7 @@ export function targetChoices(db: CatalogDatabase) {
     .select({ total: count(), value: postingTags.value })
     .from(postingTags)
     .innerJoin(postings, eq(postings.id, postingTags.postingId))
-    .where(and(open, inArray(postingTags.dimension, ["role", "subrole"])))
+    .where(and(open, inArray(postingTags.dimension, ["role", "subrole", "granular_role"])))
     .groupBy(postingTags.value)
     .orderBy(desc(count()), postingTags.value)
     .limit(MAX_ROLE_CHOICES)

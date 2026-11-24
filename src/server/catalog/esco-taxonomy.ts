@@ -1,4 +1,5 @@
 import { ROLE_GROUPS } from "../../shared/tag-taxonomy.ts";
+import { ESCO_ROLE_NAMES } from "../../shared/esco-roles.ts";
 
 import type { RoleGroup } from "../../shared/tag-taxonomy.ts";
 
@@ -76,10 +77,9 @@ export function escoOccupationByCode(code: string) {
   return byCode.get(code) ?? null;
 }
 
-/** Every Level-2 role present in the baked dataset, sorted for a stable UI and tests. */
-export const ESCO_ROLES: readonly string[] = [
-  ...new Set(occupations.map((occupation) => occupation.role)),
-].toSorted((left, right) => left.localeCompare(right, "en"));
+/** Every Level-2 role present in the baked dataset, sorted for a stable UI and tests. Shared with the browser's
+ * compact picker vocabulary so the server and the client can never drift. */
+export const ESCO_ROLES: readonly string[] = ESCO_ROLE_NAMES;
 
 /** The Level-1 categories the dataset covers, in `ROLE_GROUPS` order. */
 export const ESCO_CATEGORIES: readonly RoleGroup[] = ROLE_GROUPS.filter((category) =>

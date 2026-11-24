@@ -151,6 +151,106 @@ test("the live count updates as targets are edited, and Save stores them", async
   await request.dispose();
 });
 
+async function seedGranularPosting(appServerUrl: string) {
+  const company = createdSchema.parse(
+    await (
+      await fetch(`${appServerUrl}/__test__/catalog/companies`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Granular Target Co", domain: "granular-target.example" }),
+      })
+    ).json(),
+  );
+
+  const board = createdSchema.parse(
+    await (
+      await fetch(`${appServerUrl}/__test__/catalog/boards`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          companyId: company.id,
+          ats: "greenhouse",
+          boardToken: "granular-target",
+        }),
+      })
+    ).json(),
+  );
+
+  const response = await fetch(`${appServerUrl}/__test__/catalog/postings/bulk`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      postings: [
+        {
+          ats: "greenhouse",
+          atsJobId: "granular-1",
+          boardId: board.id,
+          city: "Toronto",
+          companyId: company.id,
+          countryCode: "CA",
+          employmentType: "full_time",
+          language: "en",
+          locationRaw: "Toronto, ON",
+          region: "Ontario",
+          tags: [
+            { dimension: "role", value: "Healthcare" },
+            { dimension: "granular_role", value: "Registered Nurse" },
+            { dimension: "seniority", value: "senior" },
+          ],
+          title: "Registered Nurse",
+          url: "https://granular-target.example/1",
+          workplace: "remote",
+        },
+      ],
+    }),
+  });
+
+  expect(response.ok).toBe(true);
+}
+
+test("a granular Level-2 role can be searched and added from Profile targets, and the count follows", async ({
+  isolatedAppServer: { url: appServerUrl },
+  browser,
+}) => {
+  await seedPostings(appServerUrl);
+  await seedGranularPosting(appServerUrl);
+
+  const { request, storageState } = await ownerStorage(appServerUrl);
+
+  await request.put("/api/profile/languages", { data: { languages: ["en"] } });
+  await request.put("/api/profile/targets", { data: baseTargets });
+
+  const context = await browser.newContext({ baseURL: appServerUrl, storageState });
+  const page = await context.newPage();
+
+  await page.goto("/profile/preferences");
+  await expect(page.getByTestId("targets-matched-count")).toHaveText("1");
+
+  await page.getByLabel("Category", { exact: true }).selectOption("Healthcare");
+
+  const role = page.getByLabel("Add a specific role", { exact: true });
+
+  await role.fill("Registered Nurse");
+  await role.press("Enter");
+
+  await expect(page.getByRole("button", { name: "Registered Nurse" })).toBeVisible();
+  await expect(page.getByTestId("targets-matched-count")).toHaveText("2");
+
+  await page.getByRole("button", { name: "Save targets" }).click();
+
+  await page.reload();
+
+  await expect(page.getByRole("button", { name: "Registered Nurse" })).toBeVisible();
+  await expect(page.getByTestId("targets-matched-count")).toHaveText("2");
+
+  const results = await new AxeBuilder({ page }).include("#profile-targets").analyze();
+
+  expect(results.violations).toEqual([]);
+
+  await context.close();
+  await request.dispose();
+});
+
 test("the skip list is prefilled from the resume, and companies add and remove", async ({
   isolatedAppServer: { url: appServerUrl },
   browser,
