@@ -484,3 +484,116 @@ export function findVacuumWorkflowProblems(input: VacuumWorkflowInput) {
 
   return problems;
 }
+
+export interface WorkersDeployInput {
+  readonly deploy: string;
+}
+
+interface WorkerDeploy {
+  readonly name: string;
+  readonly directory: string;
+  readonly keepVars: boolean;
+}
+
+const WORKER_DEPLOYS: readonly WorkerDeploy[] = [
+  { name: "Deploy the inbound mail Worker", directory: "workers/inbound-mail", keepVars: true },
+  { name: "Deploy the marketing Worker", directory: "workers/marketing", keepVars: false },
+  { name: "Deploy the sentinel Worker", directory: "workers/sentinel", keepVars: true },
+];
+
+function readJobBlock(source: string, name: string) {
+  const marker = `\n  ${name}:`;
+  const start = source.indexOf(marker);
+
+  if (start === -1) {
+    return null;
+  }
+
+  const rest = source.slice(start + marker.length);
+  const end = rest.search(/^\s{2}[A-Za-z_][\w-]*:/mu);
+
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+/**
+ * Checks the deploy workflow ships the three Cloudflare Workers without wiping dashboard-set values or leaking the
+ * API token. A deploy that forgot `--keep-vars` would erase the owner's forwarding address and alert topic, and one
+ * that deployed the marketing Worker before the build would ship a missing `dist-marketing` directory.
+ * @param input The deploy workflow source.
+ * @returns Every rule the deploy workflow breaks, empty when it is safe.
+ */
+export function findWorkersDeployProblems(input: WorkersDeployInput) {
+  const problems: string[] = [];
+  const job = readJobBlock(input.deploy, "deploy-workers");
+
+  if (job === null) {
+    problems.push("deploy.yml has no deploy-workers job, so the Cloudflare Workers never deploy");
+
+    return problems;
+  }
+
+  if (!/^ {4}needs:\s*deploy\s*$/mu.test(job)) {
+    problems.push("deploy-workers does not wait for the Fly deploy that ships the matching assets");
+  }
+
+  if (!job.includes("needs.deploy.outputs.skip != 'true'")) {
+    problems.push("deploy-workers runs even when the Fly deploy was skipped");
+  }
+
+  if (!job.includes(`ref: \${{ github.event.workflow_run.head_sha }}`)) {
+    problems.push("deploy-workers does not check out the CI run's head SHA");
+  }
+
+  for (const worker of WORKER_DEPLOYS) {
+    const step = readWorkflowStep(job, worker.name);
+
+    if (step === null) {
+      problems.push(`deploy-workers does not deploy ${worker.directory}`);
+      continue;
+    }
+
+    if (!step.includes(`working-directory: ${worker.directory}`)) {
+      problems.push(`deploy-workers runs "${worker.name}" outside ${worker.directory}`);
+    }
+
+    if (!step.includes("bunx wrangler deploy")) {
+      problems.push(`deploy-workers does not deploy ${worker.directory} with wrangler`);
+    }
+
+    if (worker.keepVars && !step.includes("bunx wrangler deploy --keep-vars")) {
+      problems.push(
+        `deploy-workers deploys ${worker.directory} without --keep-vars, wiping the dashboard-set vars and secrets`,
+      );
+    }
+  }
+
+  const buildAt = job.indexOf("bun run build");
+  const marketingAt = job.indexOf("      - name: Deploy the marketing Worker");
+
+  if (buildAt === -1) {
+    problems.push("deploy-workers does not run bun run build, so dist-marketing is missing");
+  } else if (marketingAt !== -1 && buildAt > marketingAt) {
+    problems.push(
+      "deploy-workers deploys the marketing Worker before the build writes dist-marketing",
+    );
+  }
+
+  if (!job.includes(`CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}`)) {
+    problems.push("deploy-workers does not pass CLOUDFLARE_API_TOKEN from the repository secrets");
+  }
+
+  if (!job.includes(`CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}`)) {
+    problems.push("deploy-workers does not pass CLOUDFLARE_ACCOUNT_ID from the repository secrets");
+  }
+
+  const printsToken = job
+    .split("\n")
+    .filter((line) => /^\s*(?:echo|printf)\b/u.test(line))
+    .some((line) => /\$\{?CLOUDFLARE_API_TOKEN\b/u.test(line) && !line.includes("::add-mask::"));
+
+  if (printsToken) {
+    problems.push("deploy-workers prints the Cloudflare API token");
+  }
+
+  return problems;
+}

@@ -17,6 +17,8 @@ jobs:
   deploy:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.guard.outputs.skip }}
     steps:
       - name: Skip unless FLY_API_TOKEN is set (docs/DEPLOY.md, one-time step 6)
         id: guard
@@ -151,3 +153,81 @@ jobs:
           echo "::group::flyctl logs -a overture-web (last 120 lines)"
           timeout 30s flyctl logs -a overture-web --no-tail | tail -n 120 || true
           echo "::endgroup::"
+
+  deploy-workers:
+    # The marketing Worker serves the pages built from this commit, so it ships only after the Fly release that
+    # matches it, and only when the Fly deploy was not skipped for a missing FLY_API_TOKEN.
+    if: github.event.workflow_run.conclusion == 'success' && needs.deploy.outputs.skip != 'true'
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip unless CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are set (docs/DEPLOY.md, M3-10)
+        id: guard
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "::add-mask::$CLOUDFLARE_API_TOKEN"
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not set yet (docs/DEPLOY.md, M3-10); skipping the Worker deploy."
+            {
+              echo "### Worker deploy skipped"
+              echo ""
+              echo "The \`CLOUDFLARE_API_TOKEN\` or \`CLOUDFLARE_ACCOUNT_ID\` repository secret is not set yet (see docs/DEPLOY.md, M3-10)."
+              echo "The Fly release went out; the Cloudflare Workers still serve their previous version."
+              echo "Once both secrets are set, the next successful CI run on \`main\` deploys them."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v7
+        if: steps.guard.outputs.skip != 'true'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        if: steps.guard.outputs.skip != 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.5
+      - name: Cache Bun dependencies
+        if: steps.guard.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+      - name: Install dependencies
+        if: steps.guard.outputs.skip != 'true'
+        run: bun install --frozen-lockfile
+      - name: Build the marketing assets and app
+        if: steps.guard.outputs.skip != 'true'
+        run: bun run build
+      - name: Deploy the inbound mail Worker
+        if: steps.guard.outputs.skip != 'true'
+        working-directory: workers/inbound-mail
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        # --keep-vars is mandatory: the owner sets OWNER_FORWARD_TO in the dashboard and INBOUND_HMAC_SECRET as a
+        # Worker secret, and a deploy without it would wipe the forwarding address and stop inbound verification.
+        run: bunx wrangler deploy --keep-vars
+      - name: Deploy the marketing Worker
+        if: steps.guard.outputs.skip != 'true'
+        working-directory: workers/marketing
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bunx wrangler deploy
+      - name: Deploy the sentinel Worker
+        if: steps.guard.outputs.skip != 'true'
+        working-directory: workers/sentinel
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        # --keep-vars is mandatory: ALERT_NTFY_URL and the analytics token are dashboard-set secrets, and a deploy
+        # without it would silence the spend alerts.
+        run: bunx wrangler deploy --keep-vars
