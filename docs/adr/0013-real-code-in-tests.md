@@ -168,9 +168,10 @@ export every 60 s, the span and log queues carry fixed bounds, and no metric ins
 identifier, #580). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
 depend on the runner. The mail count runs the real SQLite file and the real migrations, so the invariant is exercised
-against the shipped schema rather than a stand-in. CI stays under two minutes on pull requests: six shards balanced by
-per-file time, and a pull request runs only the e2e files its committed reach map says its diff can reach, with
-everything unclassified running the full suite. Main always runs all of them. No sleeps and no lowered timeouts; CI
+against the shipped schema rather than a stand-in. CI stays under two minutes on pull requests: one to twelve shards
+sized by the plan's measured load (a full run takes twelve), and a pull request runs only the e2e files its committed
+reach map says its diff can reach, with everything unclassified running the full suite. Main always runs all of them,
+and the nightly run records the timings and the reach map from the full suite. No sleeps and no lowered timeouts; CI
 retries a failed Playwright test once with its trace recorded on the first retry and stops a shard after ten failures,
 while a local run never retries and keeps the trace of a failure.
 
