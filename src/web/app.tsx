@@ -1,5 +1,6 @@
 import { PanelLeftClose } from "lucide-react";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, Outlet, useNavigate } from "react-router";
 
 import { copy } from "../shared/copy.ts";
@@ -22,6 +23,7 @@ import { useLiveUpdates } from "./lib/live-events.ts";
 import { useMediaQuery } from "./lib/media-query.ts";
 import { useNavCounts } from "./lib/nav-api.ts";
 import { useUnreadNotificationCount } from "./lib/notifications-api.ts";
+import { closeTopLayerHost, useTopLayerHost } from "./lib/top-layer-host.ts";
 
 const collapsedStorageKey = "overture.rail";
 
@@ -31,7 +33,20 @@ export function AppShell() {
   const navCounts = useNavCounts();
   const unreadNotifications = useUnreadNotificationCount();
   const desktop = useMediaQuery("(min-width: 1280px)");
+  const overlayHost = useTopLayerHost();
   const [searchOpen, setSearchOpen] = useState(false);
+
+  const changeSearchOpen = useCallback((open: boolean) => {
+    if (open) {
+      closeTopLayerHost();
+    }
+
+    setSearchOpen(open);
+  }, []);
+
+  const openSearch = useCallback(() => {
+    changeSearchOpen(true);
+  }, [changeSearchOpen]);
 
   const [railCollapsed, setRailCollapsed] = useState(() => {
     const stored = globalThis.localStorage.getItem(collapsedStorageKey);
@@ -92,11 +107,7 @@ export function AppShell() {
               </Button>
             </div>
             <Separator />
-            <SidebarSearchButton
-              onOpen={() => {
-                setSearchOpen(true);
-              }}
-            />
+            <SidebarSearchButton onOpen={openSearch} />
             <Separator />
             <div className="flex flex-1 flex-col">
               <SideNav counts={navCounts} showLabels unreadNotifications={unreadNotifications} />
@@ -110,9 +121,7 @@ export function AppShell() {
           <BoardRail
             counts={navCounts}
             onExpand={toggleRail}
-            onOpenSearch={() => {
-              setSearchOpen(true);
-            }}
+            onOpenSearch={openSearch}
             unreadNotifications={unreadNotifications}
           />
         )}
@@ -139,14 +148,12 @@ export function AppShell() {
         </main>
         <TabBar
           counts={navCounts}
-          onOpenSearch={() => {
-            setSearchOpen(true);
-          }}
+          onOpenSearch={openSearch}
           unreadNotifications={unreadNotifications}
         />
       </div>
-      <WorkspaceSearchDialog onOpenChange={setSearchOpen} open={searchOpen} />
-      <Toaster />
+      <WorkspaceSearchDialog onOpenChange={changeSearchOpen} open={searchOpen} />
+      {overlayHost === null ? <Toaster /> : createPortal(<Toaster />, overlayHost)}
     </div>
   );
 }

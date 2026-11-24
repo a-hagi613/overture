@@ -33,7 +33,7 @@ export function BoardAnswers({ detail }: { detail: ApplicationDetail }) {
   }
 
   return (
-    <ul aria-label={copy.board.tabs.answers} className="list-none pt-5" role="tabpanel">
+    <ul className="list-none pt-5">
       {snapshot.answers.map((answer) => {
         const source = answerSource(answer);
 

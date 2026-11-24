@@ -13,9 +13,8 @@ import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle } from "./ui/ds.ts";
 import { Input } from "./ui/input.tsx";
-import { Tabs } from "./ui/tabs.tsx";
-import { TabsList } from "./ui/tabs-list.tsx";
-import { TabsTrigger } from "./ui/tabs-trigger.tsx";
+import { SegmentedControl } from "./ui/segmented-control.tsx";
+import { SegmentedControlItem } from "./ui/segmented-control-item.tsx";
 
 type FilterKey = "all" | "unread";
 
@@ -123,7 +122,9 @@ export function InboxWorkspace({ routeThreadId }: { routeThreadId: string | null
               className="flex min-h-0 flex-col border-border bg-sidebar lg:border-r"
             >
               <div className="space-y-3 border-b border-border p-3.5">
-                <Tabs
+                <SegmentedControl
+                  ariaLabel={copy.inbox.filterLabel}
+                  className="grid w-full grid-cols-2"
                   onValueChange={(value) => {
                     if (value === "all" || value === "unread") {
                       setFilter(value);
@@ -131,11 +132,9 @@ export function InboxWorkspace({ routeThreadId }: { routeThreadId: string | null
                   }}
                   value={filter}
                 >
-                  <TabsList ariaLabel={copy.inbox.filterLabel} className="grid w-full grid-cols-2">
-                    <TabsTrigger value="all">{`${copy.inbox.filterAll} (${String(counts.all)})`}</TabsTrigger>
-                    <TabsTrigger value="unread">{`${copy.inbox.filterUnread} (${String(counts.unread)})`}</TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                  <SegmentedControlItem value="all">{`${copy.inbox.filterAll} (${String(counts.all)})`}</SegmentedControlItem>
+                  <SegmentedControlItem value="unread">{`${copy.inbox.filterUnread} (${String(counts.unread)})`}</SegmentedControlItem>
+                </SegmentedControl>
 
                 <div className="relative">
                   <Search

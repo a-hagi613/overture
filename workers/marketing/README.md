@@ -35,7 +35,8 @@ and `/name/` redirects to it.
 
 `dist-marketing` is written by `scripts/prerender.tsx` after `vite build`:
 
-- one HTML file per page with the built stylesheet inlined, so the page is styled with the origin down;
+- one HTML file per page with the built stylesheet inlined and the theme boot inline in `<head>` (admitted by a CSP
+  hash), so the page is fully styled and themed with the origin down and never waits on Fly for an asset;
 - the app's `/assets/*.js` bundle is still referenced for hydration; after the rebuild (ADR 0037) a signed-in visitor
   at `/` gets the landing as well, and the app's Home is `/home`;
 - `_headers`, generated from `src/shared/security-headers.ts`, sends the app's CSP and security headers

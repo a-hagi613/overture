@@ -285,6 +285,7 @@
           "src/shared/apply-alias.test.ts",
           "src/shared/dossier.test.ts",
           "src/shared/host-match.test.ts",
+          "src/shared/security-headers.test.ts",
           "src/shared/support.test.ts",
           "src/web/lib/admin-resource.test.ts",
           "src/web/lib/billing-poll.test.ts",

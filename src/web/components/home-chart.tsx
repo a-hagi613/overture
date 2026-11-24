@@ -9,9 +9,8 @@ import { Card } from "./ui/card.tsx";
 import { ChartArea } from "./ui/chart-area.tsx";
 import { ChartBar } from "./ui/chart-bar.tsx";
 import { dsBody, dsCardTitle } from "./ui/ds.ts";
-import { Tabs } from "./ui/tabs.tsx";
-import { TabsList } from "./ui/tabs-list.tsx";
-import { TabsTrigger } from "./ui/tabs-trigger.tsx";
+import { SegmentedControl } from "./ui/segmented-control.tsx";
+import { SegmentedControlItem } from "./ui/segmented-control-item.tsx";
 
 type ChartStyle = "area" | "bar";
 
@@ -82,7 +81,8 @@ export function HomeChart(props: {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Tabs
+          <SegmentedControl
+            ariaLabel={copy.home.chart.styleLabel}
             onValueChange={(value) => {
               if (value === "area" || value === "bar") {
                 setChartStyle(value);
@@ -90,19 +90,18 @@ export function HomeChart(props: {
             }}
             value={chartStyle}
           >
-            <TabsList ariaLabel={copy.home.chart.styleLabel}>
-              <TabsTrigger className="gap-1.5 px-2.5" value="area">
-                <TrendingUp aria-hidden="true" size={14} />
-                <span>{copy.home.chart.areaLabel}</span>
-              </TabsTrigger>
-              <TabsTrigger className="gap-1.5 px-2.5" value="bar">
-                <BarChart3 aria-hidden="true" size={14} />
-                <span>{copy.home.chart.barLabel}</span>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+            <SegmentedControlItem className="gap-1.5 px-2.5" value="area">
+              <TrendingUp aria-hidden="true" size={14} />
+              <span>{copy.home.chart.areaLabel}</span>
+            </SegmentedControlItem>
+            <SegmentedControlItem className="gap-1.5 px-2.5" value="bar">
+              <BarChart3 aria-hidden="true" size={14} />
+              <span>{copy.home.chart.barLabel}</span>
+            </SegmentedControlItem>
+          </SegmentedControl>
 
-          <Tabs
+          <SegmentedControl
+            ariaLabel={copy.home.rangeLabel}
             onValueChange={(value) => {
               if (isRangeKey(value)) {
                 onRangeChange(value);
@@ -110,14 +109,12 @@ export function HomeChart(props: {
             }}
             value={rangeKey}
           >
-            <TabsList ariaLabel={copy.home.rangeLabel}>
-              {RANGE_KEYS.map((key) => (
-                <TabsTrigger key={key} value={key}>
-                  {RANGE_LABELS[key]}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+            {RANGE_KEYS.map((key) => (
+              <SegmentedControlItem key={key} value={key}>
+                {RANGE_LABELS[key]}
+              </SegmentedControlItem>
+            ))}
+          </SegmentedControl>
         </div>
       </div>
 

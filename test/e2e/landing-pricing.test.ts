@@ -104,11 +104,11 @@ test.describe("public landing served and checked in the browser", () => {
     ).toBeVisible();
 
     await inSequence(["Home", "Tracker", "Inbox", "Calendar", "Profile"], async (tabLabel) => {
-      const tab = page.getByRole("tab", { name: tabLabel });
+      const tab = page.getByRole("button", { name: tabLabel });
 
       await expect(tab).toBeVisible();
       await tab.click();
-      await expect(tab).toHaveAttribute("aria-selected", "true");
+      await expect(tab).toHaveAttribute("aria-pressed", "true");
     });
 
     const landing = await new AxeBuilder({ page }).analyze();

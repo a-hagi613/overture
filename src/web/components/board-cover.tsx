@@ -12,7 +12,7 @@ export function BoardCover({ detail }: { detail: ApplicationDetail }) {
   }
 
   return (
-    <div aria-label={copy.board.tabs.cover} className="space-y-5 pt-5" role="tabpanel">
+    <div className="space-y-5 pt-5">
       {dossier.file === null ? null : <BoardFileAsSent file={dossier.file} />}
       <BoardFactsTrace trace={dossier.factsTrace} />
       <BoardDidNotHappen keys={dossier.didNotHappen} />

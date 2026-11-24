@@ -325,6 +325,12 @@ The primitives (`Button`, `Card`, `Badge`, `Tabs`, `Switch`, nav links) use `tra
 ease-out`; the tokens are in `src/web/styles.css` and `transition` inherits the ease-out curve by default.
 Never add a bespoke `transition-all` to a UI surface.
 
+The theme toggle cross-fades the surface colours over 180ms (`.theme-switching`, colour properties only,
+so nothing reflows) and removes the class when it ends. A theme is chosen before first paint by the inline
+`theme-boot` script in `<head>` (admitted by a CSP hash, so it needs no origin request), so a refresh in
+dark never flashes light. Under `prefers-reduced-motion` the blanket reset shortens the cross-fade to an
+instant change.
+
 ### Marketing motion
 
 The landing choreography is the exception: 400–700ms, paper-like, elegant, never playful. The orange dot
@@ -409,10 +415,20 @@ hairline; Match score in italic serif with the note on the right. The same compo
 phone and the landing, enlarged. Interactive cards lift their shadow and move their border to
 `foreground/30` on hover; no colour.
 
-**Tabs.** Active = ink text + 2px ink underline. Phone stage tabs are pills, not tabs.
+**Tabs.** Active = ink text + 2px ink underline. The Board detail sheet's Timeline / Answers / Cover
+set is the one real tab set: each trigger carries `aria-controls` and each visible panel is a
+`role="tabpanel"` with `aria-labelledby` and `tabIndex=0`. Every other view switch (chart style and range,
+phone stage lanes, inbox filter, profile tiers, forwarding provider, landing preview) swaps content in
+place rather than owning a panel, so it is a segmented control: `role="group"` with `aria-pressed`
+buttons, one tab stop, arrow keys move and activate, Home/End jump to the ends. Phone stage tabs are
+pills, not tabs.
 
 **Sheet.** Desktop side sheet 468 wide (520 at 1700+; the Board detail sheet 500/540); phone bottom sheet
 82dvh with a 44×5 grab handle and the documented 16px top radius. Same content, different chrome.
+Every sheet is a native `<dialog>` opened with `showModal()`: it is in the top layer, background content
+is inert, Tab cannot leave it, Escape and a backdrop click close it, focus moves in on open and returns
+to the opener on close, and the body does not scroll behind it. `aria-modal="true"` is truthful because
+of the top layer, not a claim.
 
 **Navigation.** Right side of the landing reads Sign in, Start free, a 28px hairline, then the theme
 icon — so the toggle is a utility, not a third call to action. Sign in is a 44px outline button with
@@ -427,6 +443,14 @@ Preferences, Account, Billing), Support and Notifications, then the theme toggle
 1280, or when collapsed on desktop (remembered per browser), the sidebar becomes a 76px icon rail; under
 768 a 64px tab bar with Home, Board, Search, Profile and More, where More opens a sheet with the other
 destinations. There is no Settings destination: account and billing are Profile pages (ADR 0037).
+
+The URL owns the open panel and the current filter, so refresh, Back and a shared link restore the view:
+the Board uses `?card=<application>&filter=<lane>` (the phone stage lane; `application` is read as the
+pre-#545 alias), and Review uses `?question=<review>&filter=<category>`. Opening a card or a question
+pushes one history entry, so Back closes it; closing, stepping to the next card and changing a filter
+replace the current entry so browsing does not fill history. Defaults stay as before: with no `filter`
+the Board opens on **Applied** and Review shows every category, and no `card`/`question` means no sheet
+and the first visible review or card.
 
 A nav count badge is live product data, never a drawn sample: Ready counts the Applications waiting for
 approval, Review the open Reviews, Inbox the unread employer mail. No badge shows at zero, and the link's
@@ -484,13 +508,16 @@ inside a shadow, never nest a sheet in a card, and never put text directly on th
 |---|---|---|
 | 20 | `z-20` | Sidebar, icon rail, sticky board header |
 | 50 | `z-50` | Phone tab bar, dialogs, command palette, popovers, menus |
-| 60 | `z-60` | Sheet scrim and sheet (detail sheet, code-paste sheet, phone More) |
+| 60 | `z-60` | A sheet panel and its scrim while it is not modal (none ship today) |
 | 70 | `z-70` | Toasts (Sonner) |
 
-Nothing sits above 70. The sheets are native `<dialog>` elements rendered with the `open` attribute, which
-keeps them in the normal document layer at z-60 with the scrim (also z-60, before the panel); `open` does not
-put a dialog in the top layer. A true top-layer modal (`showModal()`, `inert`, a focus trap and Escape
-restoration) is #545 item 3 and is not shipped yet.
+Nothing sits above 70 in the document layer. Every sheet is a native `<dialog>` opened with
+`showModal()`, so the panel and its `::backdrop` scrim live in the browser's top layer, above every
+z-index here and outside it; a z-index cannot cross the top layer. Because a modal `<dialog>` makes the
+rest of the document inert, the shared overlays join it: the Toaster is portaled into the open sheet's
+`<dialog>`, so a toast and its Undo stay visible and clickable while the sheet is open, and ⌘K closes an
+open sheet before the command palette opens. Hiding a sheet with `md:hidden` is not a close: the sheet
+unmounts when the phone More menu crosses to the desktop layout.
 
 ## 9. Patterns
 

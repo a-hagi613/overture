@@ -137,7 +137,7 @@ test("the month grid shows each day's events and the day panel lists them", asyn
   await expect(panel).toContainText("09:12");
 
   await panel.getByRole("link", { name: "View on Tracker" }).first().click();
-  await expect(page).toHaveURL(/\/board\?application=/u);
+  await expect(page).toHaveURL(/\/board\?card=/u);
 
   await page.goBack();
   await expectNoHorizontalOverflow(page);

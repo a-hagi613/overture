@@ -135,7 +135,10 @@ announcement, and a read-only check provisions no mailbox, #566), the sending-do
 (`src/server/platform/mail/sending-domain.test.ts`: a notify subdomain resolves the zone that owns its parent, an
 explicit zone id answers without a request, and a domain with no owning zone fails clearly, #566), the design-token lint pattern
 (`design-scale-guard.test.ts`: every arbitrary `text-[…px]`/`text-[…rem]`, `text-lg`…`text-9xl` and off-scale
-spacing utility is rejected, while the nine typography tokens, the 4px scale and layout widths pass), the live topic
+spacing utility is rejected, while the nine typography tokens, the 4px scale and layout widths pass), the theme boot
+CSP hash (`src/shared/security-headers.test.ts`: the inline boot script in `index.html` hashes to the SHA-256 admitted
+by the app's `script-src` and the marketing `_headers`, so the landing is themed without an origin request and a policy
+edit cannot drift from the file), the live topic
 map and the billing poll cap (`src/web/lib/live-events.test.ts` and `src/web/lib/billing-poll.test.ts`: every
 dedicated topic — billing, mailbox and profile — refreshes its own queries while its older alias keeps working, and
 the Checkout-return poll stops when the plan arrives, when the page was not a Checkout return, or at its cap), and

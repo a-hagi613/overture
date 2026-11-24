@@ -68,7 +68,7 @@ export function AddressSection() {
           <dt className={dsEyebrow}>{address.repliesTo}</dt>
           <dd className="mt-1 text-sm font-semibold">
             <Link
-              className="inline-flex items-center gap-1 text-signal-text hover:underline"
+              className="inline-flex max-md:min-h-11 items-center gap-1 text-signal-text hover:underline"
               to="/inbox"
             >
               <span>{address.repliesToValue}</span>

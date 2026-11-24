@@ -2,7 +2,7 @@ import { useDroppable } from "@dnd-kit/core";
 
 import { MOBILE_TAB_PREFIX } from "../lib/tracker-lanes.ts";
 import type { TrackerLaneKey } from "../lib/tracker-lanes.ts";
-import { TabsTrigger } from "./ui/tabs-trigger.tsx";
+import { SegmentedControlItem } from "./ui/segmented-control-item.tsx";
 
 export function TrackerMobileTab({
   activeDragLane,
@@ -32,12 +32,12 @@ export function TrackerMobileTab({
 
   return (
     <div className="min-w-0 flex-1" ref={setNodeRef}>
-      <TabsTrigger
+      <SegmentedControlItem
         className={`w-full whitespace-nowrap px-1.5 text-xs transition ${dropClass}`}
         value={lane}
       >
         {label}
-      </TabsTrigger>
+      </SegmentedControlItem>
     </div>
   );
 }

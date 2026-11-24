@@ -1704,7 +1704,7 @@ publishing version 2 leaves version 1 and an already sent Snapshot on version 1 
 
 Plus: route reachability for every page, interactive/layout guards (`interactive-*`, `layout-guards-*`), WCAG AA `axe` checks on every route, and seeded per-screen E2E checks across 390 / 1280 px light and dark (ADR 0038).
 
-### 16.2 Unit tests (eighty-one files, `bun:test`, beside their code)
+### 16.2 Unit tests (eighty-two files, `bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
@@ -1791,6 +1791,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/shared/copy.test.ts` | no canvas annotation is a copy string or key |
 | `src/shared/dossier.test.ts` | the file is sent as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key, and a "did not happen" line appears only when the stored data proves it |
 | `src/shared/host-match.test.ts` | a host matches only its own domain or a real subdomain of it, after trimming, lower-casing and dropping a trailing root dot, so `evilgreenhouse.io` never matches `greenhouse.io` |
+| `src/shared/security-headers.test.ts` | the inline theme boot in `index.html` hashes to the SHA-256 admitted by the app's `script-src` and the marketing `_headers`, so the landing is themed without an origin request and the policy cannot drift from the file |
 
 ### 16.3 CI
 
