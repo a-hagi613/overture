@@ -46,8 +46,11 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
 5. Set only the backup and app secrets on the app (values come from the previous step, never the repo):
    `fly secrets set R2_ACCOUNT_ID=… R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… R2_BUCKET_BACKUPS=overture-backups R2_BUCKET_FILES=overture-files -a overture-web`
    With `R2_BUCKET_FILES` set the app stores encrypted resumes and mail in R2, and a half-set R2 files config (the
-   bucket without the three credentials, or the credentials partly set) stops the server at boot.
-   Sign-in (M1-06) adds `BETTER_AUTH_SECRET` (at least 16 random characters), `OWNER_EMAIL`,
+   bucket without the three credentials, or the credentials partly set) stops the server at boot. Every new sealed
+   object binds its `user_id` into the associated data; objects written before that change still open through the
+   legacy associated data once, and the app logs `crypto.aad.legacy_fallback` for each such read.
+   Sign-in (M1-06) adds `BETTER_AUTH_SECRET` (at least 16 random characters, or `BETTER_AUTH_SECRETS` for a
+   non-destructive rotation: see the Better Auth secret rotation runbook below), `OWNER_EMAIL`,
    `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` (a Turnstile widget for `tryoverture.com`), and optionally
    `TURNSTILE_HOSTNAMES` (defaults to the `APP_ORIGIN` and `ADMIN_ORIGIN` hostnames, so both
    `tryoverture.com` and `admin.tryoverture.com` must be allowed on the widget; never localhost or 127.0.0.1 in
@@ -475,6 +478,43 @@ Each command's output is appended to the run's step summary under its own headin
 by checking `https://tryoverture.com/api/health`. The seed files stay in `/data/seed` so a later run
 reuses the verified download; the backfill job itself is picked up by the app's job worker.
 
+## Better Auth secret rotation (issue #578)
+
+Better Auth signs and encrypts sessions with `BETTER_AUTH_SECRET`. Rotating it with a single secret would sign out
+every session and strand any payload still encrypted with the old value. `BETTER_AUTH_SECRETS` instead lists the
+secrets by version, current first, and Better Auth reads every version while writing new values under the first:
+
+```sh
+openssl rand -base64 32                       # the new secret, never copy it into the repo or a log
+fly secrets set -a overture-web \
+  BETTER_AUTH_SECRETS="2:<new>,1:<old>" \
+  BETTER_AUTH_SECRET=<old>
+```
+
+The order matters: the first entry is the current signing/encryption key, every later entry is decryption-only.
+Keeping the old `BETTER_AUTH_SECRET` alongside it is the backward-compatible fallback for bare-hex payloads written
+before versioned secrets existed. The process starts with either form, so this is safe on its own:
+
+```sh
+fly secrets set -a overture-web BETTER_AUTH_SECRETS="2:<new>,1:<old>"
+```
+
+Then:
+
+1. **Deploy or restart** and confirm a fresh sign-in works on the public host and an existing session still opens
+   (no sign-out wave). Check `/api/health`.
+2. **Keep version 1 for at least the session lifetime** (`session.expiresIn` is 30 days). New sessions are written
+   under version 2 immediately, so every old token either refreshes or expires during this window. Pending invites
+   hashed with the old secret also continue to open because invites are looked up against every accepted secret.
+3. **Retire the old version** only after that window: set `BETTER_AUTH_SECRETS="2:<new>"` and unset
+   `BETTER_AUTH_SECRET`. This is the only step that would sign out a session that never refreshed; if you need to
+   roll back before it, restore both values exactly as they were.
+4. **Verify** one fresh sign-in and one old-session refresh after retirement, then remove the archived old value from
+   your own secret store only when no backup or pending invite can still need it.
+
+There is no database migration in this rotation: sessions keep living in the `sessions` table, and only the envelope
+header of their stored tokens changes. The same runbook repeats with `3:<newest>,2:<previous>`.
+
 ## Master-key rotation (owner runbook, issue #541)
 
 Rotating the master key re-wraps every person's data key under a new `MASTER_KEY_V<n>`; it never re-encrypts
@@ -536,16 +576,20 @@ ADR 0039.
    re-wrapped under V2 keep opening, and new keys wrap under V1 again. Do not leave it there: run the job
    again before removing V1.
 
-7. **Remove the old secret** once you are satisfied:
+7. **Remove the old secret from the live process only after the retention guard passes**:
 
    ```sh
    fly secrets unset -a overture-web MASTER_KEY_V1
    ```
 
    The restart verifies that no `user_keys` row still needs V1. If one does, the process refuses to start
-   instead of serving unreadable values; re-set `MASTER_KEY_V1`, run the job again, and repeat. Keep the
-   `overture-backups` restore window in mind: backups from before the rotation only open with the old key, so
-   keep V1 in your own secret store (never in the repo) for as long as those backups are retained.
+   instead of serving unreadable values; re-set `MASTER_KEY_V1`, run the job again, and repeat. Before unsetting,
+   confirm `user_keys` has **0** rows on V1 (step 5's dry run) and keep the V1 value **archived offline** for at
+   least `litestream.yml`'s `snapshot.retention` (**720h / 30 days**) after the last row moves. The app logs a
+   `master_key.retirement` warning naming any configured key that wraps no row; that warning is the reminder, not
+   permission to destroy the value. Backups from before the rotation only open with the old key, so do not destroy
+   the archive until a post-rotation Litestream snapshot **and a restore drill** pass. Keep the value in your own
+   secret store (never in the repo) for as long as those backups are retained.
 
 The next rotation repeats the same steps with `MASTER_KEY_V3` and `MASTER_KEY_CURRENT=3`; the chain then starts
 at V2, because V1 has been retired.
@@ -617,15 +661,16 @@ gh secret set CF_ACCESS_AUD -R a-hagi613/overture
 gh secret set CF_ACCESS_TEAM_DOMAIN -R a-hagi613/overture
 ```
 
-`CF_ACCESS_JWKS_URL` can replace `CF_ACCESS_TEAM_DOMAIN` when you prefer to pin the full
-`https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` URL.
+`CF_ACCESS_JWKS_URL` can override the certs URL when you prefer to pin the full
+`https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` URL, but production still needs
+`CF_ACCESS_TEAM_DOMAIN` with `CF_ACCESS_AUD`: it is the only value that names the issuer whose `iss` claim is
+verified, so a JWKS URL alone stops the server at boot.
 
 Then run **Actions → Ops admin host → Run workflow → `action: set-access-secrets`**. It refuses unless
-`CF_ACCESS_AUD` and one of the two JWKS names are repository secrets, masks every value with `::add-mask::`, sets
-`ADMIN_ORIGIN=https://admin.tryoverture.com`, `CF_ACCESS_AUD` and the JWKS source on `overture-web` with
-`flyctl secrets set`, and confirms with `flyctl secrets list` **names only**. It removes the stale JWKS source when you
-switch from `CF_ACCESS_JWKS_URL` to `CF_ACCESS_TEAM_DOMAIN` (and the reverse), and refuses when both are set but name
-different teams.
+`CF_ACCESS_AUD` and `CF_ACCESS_TEAM_DOMAIN` are repository secrets, masks every value with `::add-mask::`, sets
+`ADMIN_ORIGIN=https://admin.tryoverture.com`, `CF_ACCESS_AUD` and `CF_ACCESS_TEAM_DOMAIN` on `overture-web` with
+`flyctl secrets set`, and confirms with `flyctl secrets list` **names only**. `CF_ACCESS_JWKS_URL` is optional and only
+overrides the certs URL; when both are set it must name the same team.
 
 Cloudflare Access gates the host before the app's own owner check and passkey window: without an Access assertion the
 admin API answers `401 access_required`, so never point DNS at the app without the Access application in place.
@@ -657,19 +702,28 @@ landing page.
 
 ### Rollback
 
-The workflow only adds and reports; removal stays with an authenticated operator. To take the admin host out of
-service:
+The workflow only adds and reports; removal stays with an authenticated operator. Taking the admin host out of service
+is a DNS change **first**; the Access values stay on the shared app because production now refuses to boot without
+them:
 
 ```sh
 flyctl certs remove admin.tryoverture.com -a overture-web
-flyctl secrets unset CF_ACCESS_AUD CF_ACCESS_TEAM_DOMAIN CF_ACCESS_JWKS_URL -a overture-web
-gh secret delete CF_ACCESS_AUD -R a-hagi613/overture
-gh secret delete CF_ACCESS_TEAM_DOMAIN -R a-hagi613/overture
 ```
 
 Then delete the `admin` CNAME and any `_acme-challenge` validation record in the Cloudflare DNS zone, and delete the
 Access application. Deleting the DNS record takes the host offline; deleting only the certificate breaks HTTPS. The app
 still refuses requests without an Access assertion (`401 access_required`), but do not leave the host public.
+
+Do not `flyctl secrets unset CF_ACCESS_AUD CF_ACCESS_TEAM_DOMAIN` on the current release: that restart stops the app
+for the public host too. Remove those secrets only after deploying a release that no longer requires them (or rolling
+back to a release from before the fail-closed change), and delete the repository secrets at the same time:
+
+```sh
+# only after a release whose env check does not require the Access values is deployed
+flyctl secrets unset CF_ACCESS_AUD CF_ACCESS_TEAM_DOMAIN CF_ACCESS_JWKS_URL -a overture-web
+gh secret delete CF_ACCESS_AUD -R a-hagi613/overture
+gh secret delete CF_ACCESS_TEAM_DOMAIN -R a-hagi613/overture
+```
 
 ## After a deploy
 

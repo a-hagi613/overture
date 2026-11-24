@@ -289,6 +289,8 @@ jobs:
             -e ENABLE_TEST_ROUTES=false \
             -e MASTER_KEY_V1="$master_key_v1" \
             -e BETTER_AUTH_SECRET=e2e-auth-secret-0123456789abcdef \
+            -e CF_ACCESS_AUD=ci-access-audience \
+            -e CF_ACCESS_TEAM_DOMAIN=ci.cloudflareaccess.com \
             -e GOOGLE_CLIENT_ID=e2e-google-client-id \
             -e GOOGLE_CLIENT_SECRET=e2e-google-client-secret \
             -e LINKEDIN_CLIENT_ID=e2e-linkedin-client-id \

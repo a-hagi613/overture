@@ -7,6 +7,7 @@ import {
   enqueueMasterKeyRotation,
   MASTER_KEY_ROTATION_JOB_BATCHES,
   MASTER_KEY_ROTATION_JOB_KIND,
+  masterKeyRetirementWarning,
   masterKeyRotationPayloadSchema,
   runMasterKeyRotation,
 } from "./admin/key-rotation.ts";
@@ -222,6 +223,12 @@ migrateDatabase(db, "drizzle");
 migrateCatalogDatabase(catalogDb, "drizzle-catalog");
 
 assertMasterKeyCoverage(db, masterKeyring);
+
+const retirementWarning = masterKeyRetirementWarning(db, masterKeyring);
+
+if (retirementWarning !== undefined) {
+  logInfo("master_key.retirement", retirementWarning);
+}
 
 const catalogBoards = catalogDb
   .select({ one: sql`1` })
@@ -899,6 +906,12 @@ const masterKeyRotationJobHandlers: JobHandlers = {
 
     if (!dryRun && summary.remaining > 0) {
       enqueueMasterKeyRotation(db, clock, { dryRun: false });
+    }
+
+    const warning = masterKeyRetirementWarning(db, masterKeyring);
+
+    if (!dryRun && warning !== undefined) {
+      logInfo("master_key.retirement", warning);
     }
   },
 };

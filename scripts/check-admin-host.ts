@@ -9,9 +9,7 @@ const PROBE_TIMEOUT_MS = 12_000;
 const DNS_TIMEOUT_MS = 10_000;
 const FLYCTL_TIMEOUT_MS = 30_000;
 
-const REQUIRED_ACCESS_SECRETS = ["ADMIN_ORIGIN", "CF_ACCESS_AUD"] as const;
-const JWKS_ACCESS_SECRETS = ["CF_ACCESS_TEAM_DOMAIN", "CF_ACCESS_JWKS_URL"] as const;
-const JWKS_SECRET_ALTERNATIVE = "CF_ACCESS_TEAM_DOMAIN or CF_ACCESS_JWKS_URL";
+const REQUIRED_ACCESS_SECRETS = ["ADMIN_ORIGIN", "CF_ACCESS_AUD", "CF_ACCESS_TEAM_DOMAIN"] as const;
 
 const ACCESS_HOST = "cloudflareaccess.com";
 const secretNamePattern = /^[A-Z][A-Z0-9_]*$/u;
@@ -264,20 +262,16 @@ export function secretNamesFrom(output: string) {
 /**
  * Names the Cloudflare Access secrets that are missing from Fly.
  *
- * `ADMIN_ORIGIN` and `CF_ACCESS_AUD` are always required; the JWKS source is one of `CF_ACCESS_TEAM_DOMAIN` or
- * `CF_ACCESS_JWKS_URL`, matching `accessJwksUrlFromEnv` in `src/server/platform/access/index.ts`.
+ * `ADMIN_ORIGIN`, `CF_ACCESS_AUD` and `CF_ACCESS_TEAM_DOMAIN` are always required in production: the team
+ * domain is the only value that names the issuer whose `iss` claim is verified. `CF_ACCESS_JWKS_URL` is an
+ * optional certs-URL override and cannot replace it.
  * @param present The secret names Fly reports.
- * @returns The required names that are absent, with the JWKS pair named as one alternative.
+ * @returns The required names that are absent.
  */
 export function missingAccessSecrets(present: readonly string[]) {
   const available = new Set(present);
-  const missing: string[] = REQUIRED_ACCESS_SECRETS.filter((name) => !available.has(name));
 
-  if (!JWKS_ACCESS_SECRETS.some((name) => available.has(name))) {
-    missing.push(JWKS_SECRET_ALTERNATIVE);
-  }
-
-  return missing;
+  return REQUIRED_ACCESS_SECRETS.filter((name) => !available.has(name));
 }
 
 const certificateStatusSchema = z.looseObject({
@@ -563,8 +557,8 @@ function secretsCheck(options: CheckOptions) {
 
   const detail =
     missing.length === 0
-      ? "Fly has ADMIN_ORIGIN, CF_ACCESS_AUD and a Cloudflare Access JWKS source (CF_ACCESS_TEAM_DOMAIN or CF_ACCESS_JWKS_URL)"
-      : `Fly is missing ${missing.join(", ")}; the Access verifier needs ADMIN_ORIGIN, CF_ACCESS_AUD and at least one of CF_ACCESS_TEAM_DOMAIN or CF_ACCESS_JWKS_URL`;
+      ? "Fly has ADMIN_ORIGIN, CF_ACCESS_AUD and CF_ACCESS_TEAM_DOMAIN (an optional CF_ACCESS_JWKS_URL override may also be set)"
+      : `Fly is missing ${missing.join(", ")}; the Access verifier needs ADMIN_ORIGIN, CF_ACCESS_AUD and CF_ACCESS_TEAM_DOMAIN so the token's iss is verified`;
 
   return { detail, name: "secrets", status } satisfies CheckResult;
 }

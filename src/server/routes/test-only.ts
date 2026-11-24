@@ -970,7 +970,7 @@ export function createTestRoutes(
 
         const sealed = await personal.sealFor(
           body.userId,
-          { column: "body", rowId: objectKey, table: "mail_objects" },
+          { column: "body", rowId: objectKey, table: "mail_objects", userId: body.userId },
           bytes.toString("base64"),
         );
 

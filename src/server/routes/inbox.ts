@@ -240,6 +240,7 @@ export function createInboxRoutes(deps: {
         column: "body",
         rowId: attachment.message_attachments.objectKey,
         table: "mail_objects",
+        userId: user.id,
       },
       sealed: new TextDecoder().decode(stored),
       userId: user.id,

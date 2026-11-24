@@ -80,7 +80,7 @@ export function createMailIngest(deps: {
   async function sealObject(userId: string, key: string, bytes: Uint8Array<ArrayBuffer>) {
     const sealed = await personal.sealFor(
       userId,
-      { table: "mail_objects", column: "body", rowId: key },
+      { table: "mail_objects", column: "body", rowId: key, userId },
       Buffer.from(bytes).toString("base64"),
     );
 
@@ -111,7 +111,7 @@ export function createMailIngest(deps: {
       Buffer.from(
         await personal.openFor(
           mailbox.userId,
-          { table: "mail_objects", column: "body", rowId: job.objectKey },
+          { table: "mail_objects", column: "body", rowId: job.objectKey, userId: mailbox.userId },
           sealed,
         ),
         "base64",

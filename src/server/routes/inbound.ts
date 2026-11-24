@@ -132,7 +132,7 @@ export function createInboundRoutes(deps: {
 
     const sealed = await personal.sealFor(
       mailbox.userId,
-      { table: "mail_objects", column: "body", rowId: objectKey },
+      { table: "mail_objects", column: "body", rowId: objectKey, userId: mailbox.userId },
       Buffer.from(body).toString("base64"),
     );
 

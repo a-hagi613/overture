@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
+import type { SecretConfig } from "better-auth/crypto";
+
+import {
+  symmetricDecodeJWT,
+  symmetricEncodeJWT,
+  symmetricDecrypt,
+  symmetricEncrypt,
+} from "better-auth/crypto";
+
 Bun.env.BETTER_AUTH_SECRET ??= "env-test-secret-value-1234";
 
 Bun.env.MASTER_KEY_V1 ??= Buffer.from(new Uint8Array(32).fill(3)).toString("base64");
@@ -10,13 +19,20 @@ Bun.env.TURNSTILE_SECRET ??= "turnstile-secret";
 
 Bun.env.TURNSTILE_SITE_KEY ??= "turnstile-site";
 
-const { checkedEnvSchema, resolveTurnstileHostnames, turnstileDefaultHostnames } =
-  await import("./env.ts");
+const {
+  betterAuthSecretOptions,
+  checkedEnvSchema,
+  parseBetterAuthSecrets,
+  resolveTurnstileHostnames,
+  turnstileDefaultHostnames,
+} = await import("./env.ts");
 
 const productionEnv = {
   ADMIN_ORIGIN: "https://admin.tryoverture.com",
   APP_ORIGIN: "https://tryoverture.com",
   BETTER_AUTH_SECRET: "env-test-secret-value-1234",
+  CF_ACCESS_AUD: "access-audience",
+  CF_ACCESS_TEAM_DOMAIN: "overture.cloudflareaccess.com",
   NODE_ENV: "production",
   OWNER_EMAIL: "owner@example.test",
   TURNSTILE_SECRET: "turnstile-secret",
@@ -85,5 +101,190 @@ describe("production Turnstile hosts", () => {
     expect(() => {
       checkedEnvSchema.parse({ ...productionEnv, ADMIN_ORIGIN: "http://127.0.0.1:3000" });
     }).toThrow("must not include 127.0.0.1");
+  });
+});
+
+describe("production Cloudflare Access issuer", () => {
+  test("the admin host needs both the audience and the team domain", () => {
+    expect(() => {
+      checkedEnvSchema.parse({ ...productionEnv, CF_ACCESS_AUD: undefined });
+    }).toThrow("needs CF_ACCESS_AUD");
+
+    expect(() => {
+      checkedEnvSchema.parse({ ...productionEnv, CF_ACCESS_TEAM_DOMAIN: undefined });
+    }).toThrow("needs CF_ACCESS_TEAM_DOMAIN");
+  });
+
+  test("a JWKS URL cannot replace the team domain that names the issuer", () => {
+    expect(() => {
+      checkedEnvSchema.parse({
+        ...productionEnv,
+        CF_ACCESS_JWKS_URL: "https://overture.cloudflareaccess.com/cdn-cgi/access/certs",
+        CF_ACCESS_TEAM_DOMAIN: undefined,
+      });
+    }).toThrow("CF_ACCESS_JWKS_URL alone cannot name the issuer");
+  });
+
+  test("development and test may omit both", () => {
+    expect(() => {
+      checkedEnvSchema.parse({
+        ...productionEnv,
+        CF_ACCESS_AUD: undefined,
+        CF_ACCESS_TEAM_DOMAIN: undefined,
+        NODE_ENV: "test",
+      });
+    }).not.toThrow();
+  });
+});
+
+describe("better-auth secrets", () => {
+  const oldSecret = "old-secret-value-0123456789";
+  const newSecret = "new-secret-value-9876543210";
+
+  test("a single BETTER_AUTH_SECRET keeps the unchanged deployment", () => {
+    expect(parseBetterAuthSecrets({ BETTER_AUTH_SECRET: oldSecret })).toStrictEqual({
+      accepted: [oldSecret],
+      current: oldSecret,
+    });
+  });
+
+  test("versioned secrets are current first and keep the legacy secret readable", () => {
+    const parsed = parseBetterAuthSecrets({
+      BETTER_AUTH_SECRET: oldSecret,
+      BETTER_AUTH_SECRETS: `2:${newSecret},1:${oldSecret}`,
+    });
+
+    expect(parsed.current).toBe(newSecret);
+    expect(parsed.legacy).toBe(oldSecret);
+    expect(parsed.secrets).toStrictEqual([
+      { version: 2, value: newSecret },
+      { version: 1, value: oldSecret },
+    ]);
+    expect(parsed.accepted).toEqual([newSecret, oldSecret]);
+  });
+
+  test("a rotation without the legacy single secret still lists every version", () => {
+    const parsed = parseBetterAuthSecrets({ BETTER_AUTH_SECRETS: `2:${newSecret},1:${oldSecret}` });
+
+    expect(parsed.legacy).toBeUndefined();
+    expect(parsed.accepted).toEqual([newSecret, oldSecret]);
+  });
+
+  test("a malformed or incomplete list is refused", () => {
+    expect(() => parseBetterAuthSecrets({})).toThrow("Set BETTER_AUTH_SECRET");
+    expect(() => parseBetterAuthSecrets({ BETTER_AUTH_SECRETS: newSecret })).toThrow(
+      "<version>:<secret>",
+    );
+    expect(() => parseBetterAuthSecrets({ BETTER_AUTH_SECRETS: `0:${newSecret}` })).toThrow(
+      "<version>:<secret>",
+    );
+    expect(() =>
+      parseBetterAuthSecrets({ BETTER_AUTH_SECRETS: `2:${newSecret},2:${oldSecret}` }),
+    ).toThrow("more than once");
+    expect(() => parseBetterAuthSecrets({ BETTER_AUTH_SECRETS: "2:short" })).toThrow(
+      "at least 16 characters",
+    );
+    expect(() =>
+      parseBetterAuthSecrets({ BETTER_AUTH_SECRETS: `1:${oldSecret},2:${newSecret}` }),
+    ).toThrow("versions highest first");
+  });
+});
+
+const ROTATION_OLD = "old-secret-value-0123456789";
+const ROTATION_NEW = "new-secret-value-9876543210";
+
+function secretConfig(parsed: ReturnType<typeof parseBetterAuthSecrets>) {
+  if (parsed.secrets === undefined) {
+    return parsed.current;
+  }
+
+  const [first] = parsed.secrets;
+
+  if (first === undefined) {
+    throw new Error("a versioned secret list cannot be empty");
+  }
+
+  const config: SecretConfig = {
+    currentVersion: first.version,
+    keys: new Map(parsed.secrets.map((secret) => [secret.version, secret.value])),
+  };
+
+  if (parsed.legacy !== undefined) {
+    config.legacySecret = parsed.legacy;
+  }
+
+  return config;
+}
+
+describe("non-destructive Better Auth secret rotation", () => {
+  test("the options wire the current chain and the legacy fallback into better-auth", () => {
+    expect(
+      betterAuthSecretOptions(parseBetterAuthSecrets({ BETTER_AUTH_SECRET: ROTATION_OLD })),
+    ).toStrictEqual({ secret: ROTATION_OLD, secrets: undefined });
+
+    expect(
+      betterAuthSecretOptions(
+        parseBetterAuthSecrets({
+          BETTER_AUTH_SECRET: ROTATION_OLD,
+          BETTER_AUTH_SECRETS: `2:${ROTATION_NEW},1:${ROTATION_OLD}`,
+        }),
+      ),
+    ).toStrictEqual({
+      secret: ROTATION_OLD,
+      secrets: [
+        { version: 2, value: ROTATION_NEW },
+        { version: 1, value: ROTATION_OLD },
+      ],
+    });
+  });
+
+  test("a session token encrypted under the old single secret still opens after the rotation", async () => {
+    const before = parseBetterAuthSecrets({ BETTER_AUTH_SECRET: ROTATION_OLD });
+
+    const during = parseBetterAuthSecrets({
+      BETTER_AUTH_SECRET: ROTATION_OLD,
+      BETTER_AUTH_SECRETS: `2:${ROTATION_NEW},1:${ROTATION_OLD}`,
+    });
+
+    const token = await symmetricEncodeJWT({ session: "before" }, secretConfig(before), "session");
+
+    expect(
+      await symmetricDecodeJWT<{ session: string }>(token, secretConfig(during), "session"),
+    ).toMatchObject({ session: "before" });
+  });
+
+  test("a new token keeps opening through the dual-read window and after the old key is retired", async () => {
+    const during = parseBetterAuthSecrets({
+      BETTER_AUTH_SECRET: ROTATION_OLD,
+      BETTER_AUTH_SECRETS: `2:${ROTATION_NEW},1:${ROTATION_OLD}`,
+    });
+
+    const token = await symmetricEncodeJWT({ session: "after" }, secretConfig(during), "session");
+
+    expect(
+      await symmetricDecodeJWT<{ session: string }>(token, secretConfig(during), "session"),
+    ).toMatchObject({ session: "after" });
+
+    const v2Only = parseBetterAuthSecrets({ BETTER_AUTH_SECRETS: `2:${ROTATION_NEW}` });
+
+    expect(
+      await symmetricDecodeJWT<{ session: string }>(token, secretConfig(v2Only), "session"),
+    ).toMatchObject({ session: "after" });
+  });
+
+  test("the legacy single secret opens bare-hex payloads during the transition", async () => {
+    const during = parseBetterAuthSecrets({
+      BETTER_AUTH_SECRET: ROTATION_OLD,
+      BETTER_AUTH_SECRETS: `2:${ROTATION_NEW},1:${ROTATION_OLD}`,
+    });
+
+    const payload = await symmetricEncrypt({
+      data: "stored before the rotation",
+      key: ROTATION_OLD,
+    });
+
+    expect(await symmetricDecrypt({ data: payload, key: secretConfig(during) })).toBe(
+      "stored before the rotation",
+    );
   });
 });

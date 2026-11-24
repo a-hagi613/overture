@@ -72,7 +72,10 @@ test("the cache policy only marks hashed files immutable", () => {
   expect(staticCacheHeaders("/assets/app-123.js")).toEqual({
     "Cache-Control": "public, max-age=31536000, immutable",
   });
-  expect(staticCacheHeaders("/sw.js")).toEqual({ "Cache-Control": "no-cache" });
+  expect(staticCacheHeaders("/sw.js")).toEqual({
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "CDN-Cache-Control": "no-store",
+  });
   expect(staticCacheHeaders("/app-shell.html")).toEqual({ "Cache-Control": "no-cache" });
   expect(staticCacheHeaders("/favicon.ico")).toBeUndefined();
 });
@@ -87,6 +90,7 @@ test("the extensionless service worker is served uncached from the build root", 
   expect(worker.status).toBe(200);
   expect(worker.headers.get("Content-Type")).toBe("text/javascript; charset=utf-8");
   expect(worker.headers.get("Cache-Control")).toBe("no-cache, no-store, must-revalidate");
+  expect(worker.headers.get("CDN-Cache-Control")).toBe("no-store");
   expect(worker.headers.get("Pragma")).toBe("no-cache");
   expect(worker.headers.get("Service-Worker-Allowed")).toBe("/");
   expect(worker.headers.get("X-Content-Type-Options")).toBe("nosniff");
@@ -100,6 +104,19 @@ test("the extensionless service worker answers a plain 404 before a build", asyn
   expect(worker.headers.get("Content-Type")).toBe("text/plain; charset=utf-8");
   expect(worker.headers.get("Cache-Control")).toBe("no-store");
   expect(await worker.text()).toBe("Not found");
+});
+
+test("the /sw.js alias is served with the same no-store cache contract", async () => {
+  const root = staticRoot();
+
+  writeFileSync(join(root, "sw.js"), "self.addEventListener('install', () => {});");
+
+  const worker = await staticResponseFrom(root, "http://localhost/sw.js");
+
+  expect(worker?.status).toBe(200);
+  expect(worker?.headers.get("Cache-Control")).toBe("no-cache, no-store, must-revalidate");
+  expect(worker?.headers.get("CDN-Cache-Control")).toBe("no-store");
+  expect(await worker?.text()).toContain("addEventListener");
 });
 
 test("the app registers the extensionless service worker", () => {

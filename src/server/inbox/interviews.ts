@@ -53,7 +53,7 @@ export function createInterviewCalendar(deps: {
 
     const base64 = await personal.openFor(
       userId,
-      { column: "body", rowId: objectKey, table: "mail_objects" },
+      { column: "body", rowId: objectKey, table: "mail_objects", userId },
       sealed,
     );
 

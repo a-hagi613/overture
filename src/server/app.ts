@@ -180,6 +180,7 @@ export async function serviceWorkerResponse(root: string) {
   return new Response(worker, {
     headers: {
       "Cache-Control": "no-cache, no-store, must-revalidate",
+      "CDN-Cache-Control": "no-store",
       "Content-Type": "text/javascript; charset=utf-8",
       Pragma: "no-cache",
       "Service-Worker-Allowed": "/",
@@ -206,7 +207,14 @@ export function staticCacheHeaders(pathname: string) {
     return { "Cache-Control": "public, max-age=31536000, immutable" };
   }
 
-  const revalidate = pathname === "/sw.js" || pathname === "/" || pathname.endsWith(".html");
+  if (pathname === "/sw.js") {
+    return {
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "CDN-Cache-Control": "no-store",
+    };
+  }
+
+  const revalidate = pathname === "/" || pathname.endsWith(".html");
 
   return revalidate ? { "Cache-Control": "no-cache" } : undefined;
 }

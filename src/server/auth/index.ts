@@ -12,7 +12,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { MailSender } from "../platform/mail/port.ts";
 
 import { copy } from "../../shared/copy.ts";
-import { env } from "../config/env.ts";
+import { authSecretConfig, betterAuthSecretOptions, env } from "../config/env.ts";
 import {
   accounts,
   passkeys,
@@ -113,7 +113,7 @@ export const enabledSocialProviders = providerConfigs.map((config) => config.pro
 
 const ownerEmail = env.OWNER_EMAIL;
 
-const inviteHashSecret = env.BETTER_AUTH_SECRET;
+const inviteHashSecrets = authSecretConfig.accepted;
 
 export function isAllowedEmail(email: string) {
   return isSameMailbox(email, ownerEmail);
@@ -137,7 +137,7 @@ export function createAuth(
   const mayJoin = (email: string) =>
     env.PUBLIC_SIGNUP_ENABLED ||
     isAllowedEmail(email) ||
-    liveInviteFor(db, inviteHashSecret, email) !== null ||
+    liveInviteFor(db, inviteHashSecrets, email) !== null ||
     verifiedUserWithEmail(db, email) !== null;
 
   const discardUnverifiedAccount = async (email: string) => {
@@ -218,7 +218,7 @@ export function createAuth(
         }),
       },
     },
-    secret: env.BETTER_AUTH_SECRET,
+    ...betterAuthSecretOptions(authSecretConfig),
     database: drizzleAdapter(db, {
       provider: "sqlite",
       schema: {
@@ -348,7 +348,7 @@ export function createAuth(
             const email = user.email.trim().toLowerCase();
 
             const invite = user.emailVerified
-              ? pendingInviteFor(db, inviteHashSecret, email)
+              ? pendingInviteFor(db, inviteHashSecrets, email)
               : null;
 
             await options.onUserCreated?.({ id: user.id, email: user.email });
@@ -377,7 +377,7 @@ export function createAuth(
             const email = user.email.trim().toLowerCase();
 
             const invite = user.emailVerified
-              ? pendingInviteFor(db, inviteHashSecret, email)
+              ? pendingInviteFor(db, inviteHashSecrets, email)
               : null;
 
             await Promise.resolve(invite);

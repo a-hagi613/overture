@@ -1,5 +1,9 @@
 import { Buffer } from "node:buffer";
 
+import { metrics } from "@opentelemetry/api";
+
+import { logInfo } from "./log.ts";
+
 export interface StoredUserKey {
   keyVersion: number;
   wrappedDek: string;
@@ -10,6 +14,12 @@ export interface SealScope {
   table: string;
   column: string;
   rowId: string;
+  /**
+   * The person the sealed value belongs to. Every new sealed R2 object (mail bodies,
+   * attachments, resumes) binds this into its associated data; sealed database columns keep
+   * the legacy `table:column:row_id` form so their existing ciphertexts stay readable.
+   */
+  userId?: string;
 }
 
 /** One master key, at the version it is stored under. */
@@ -165,9 +175,31 @@ export function storedUserKeyBlob(userKey: StoredUserKey) {
   ]);
 }
 
-function associatedData(scope: SealScope) {
+function legacyAssociatedData(scope: SealScope) {
   return `${scope.table}:${scope.column}:${scope.rowId}`;
 }
+
+function associatedData(scope: SealScope) {
+  return scope.userId === undefined
+    ? legacyAssociatedData(scope)
+    : `${scope.table}:${scope.column}:${scope.userId}:${scope.rowId}`;
+}
+
+function associatedDataCandidates(scope: SealScope) {
+  const candidates: readonly [string, string?] =
+    scope.userId === undefined
+      ? [legacyAssociatedData(scope)]
+      : [associatedData(scope), legacyAssociatedData(scope)];
+
+  return candidates;
+}
+
+const legacyAadFallbackReads = metrics
+  .getMeter("overture.crypto")
+  .createCounter("overture.crypto.aad_legacy_fallback_reads", {
+    description:
+      "Sealed R2 reads that opened only through the legacy table:column:row_id AAD, written before user_id was bound.",
+  });
 
 function joinDataAndTag(data: Uint8Array<ArrayBuffer>, tag: Uint8Array<ArrayBuffer>) {
   const joined = new Uint8Array(data.length + tag.length);
@@ -353,17 +385,53 @@ export async function openValue(
     new Uint8Array(Buffer.from(tag, "base64")),
   );
 
-  const plaintext = await crypto.subtle.decrypt(
-    {
-      name: "AES-GCM",
-      iv: new Uint8Array(Buffer.from(iv, "base64")),
-      additionalData: new TextEncoder().encode(associatedData(scope)),
-    },
-    dek,
-    joined,
-  );
+  const decryptIv = new Uint8Array(Buffer.from(iv, "base64"));
+  const [primary, fallback] = associatedDataCandidates(scope);
 
-  return new TextDecoder().decode(plaintext);
+  const decrypt = async (candidate: string) =>
+    crypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: decryptIv,
+        additionalData: new TextEncoder().encode(candidate),
+      },
+      dek,
+      joined,
+    );
+
+  let failure: unknown;
+
+  const decryptOrNull = async (candidate: string) => {
+    try {
+      return await decrypt(candidate);
+    } catch (error) {
+      failure = error;
+
+      return null;
+    }
+  };
+
+  const opened = await decryptOrNull(primary);
+
+  if (opened !== null) {
+    return new TextDecoder().decode(opened);
+  }
+
+  if (fallback !== undefined) {
+    const legacy = await decryptOrNull(fallback);
+
+    if (legacy !== null) {
+      legacyAadFallbackReads.add(1);
+      logInfo(
+        "crypto.aad.legacy_fallback",
+        `opened a sealed ${scope.table}.${scope.column} object with legacy associated data; it will be sealed with user_id after its next write`,
+      );
+
+      return new TextDecoder().decode(legacy);
+    }
+  }
+
+  throw failure instanceof Error ? failure : new Error("The sealed value could not be opened.");
 }
 
 function b64of(bytes: Uint8Array) {
