@@ -1,12 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import {
   MARKETING_SYNC_FIXTURES,
   marketingSyncSandbox,
   marketingSyncScript,
-  marketingSyncToolsAvailable,
   removeMarketingSyncSandboxes,
   snapshotTree,
 } from "./fly-marketing-sync-sandbox.ts";
@@ -834,66 +833,60 @@ test("a deploy workflow that does not check out the CI run's head SHA is reporte
 
 afterEach(removeMarketingSyncSandboxes);
 
-test.skipIf(!marketingSyncToolsAvailable)(
-  "the shipped marketing sync extracts dist-marketing byte-for-byte through a no-shell flyctl exec",
-  () => {
-    const sandbox = marketingSyncSandbox();
+test("the shipped marketing sync extracts dist-marketing byte-for-byte through a no-shell flyctl exec", () => {
+  const sandbox = marketingSyncSandbox();
 
-    const { body, remote } = marketingSyncScript(
-      readFileSync(".github/workflows/deploy.yml", "utf8"),
-    );
+  const { body, remote } = marketingSyncScript(
+    readFileSync(".github/workflows/deploy.yml", "utf8"),
+  );
 
-    expect(remote.startsWith("sh -c '")).toBe(true);
-    expect(body).toContain("flyctl ssh console");
+  expect(remote.startsWith("sh -c '")).toBe(true);
+  expect(body).toContain("flyctl ssh console");
 
-    const { output, status } = sandbox.run(body);
+  const { output, status } = sandbox.run(body);
 
-    expect(output).not.toContain("::error::");
-    expect(status).toBe(0);
-    expect(output).toContain(`synced ${MARKETING_SYNC_FIXTURES.length} file(s) from overture-web`);
+  expect(output).not.toContain("::error::");
+  expect(status).toBe(0);
+  expect(output).toContain(`synced ${MARKETING_SYNC_FIXTURES.length} file(s) from overture-web`);
 
-    expect(snapshotTree(join(sandbox.workDirectory, "dist-marketing"))).toStrictEqual(
-      snapshotTree(join(sandbox.appDirectory, "dist-marketing")),
-    );
-  },
-);
+  expect(snapshotTree(join(sandbox.workDirectory, "dist-marketing"))).toStrictEqual(
+    snapshotTree(join(sandbox.appDirectory, "dist-marketing")),
+  );
+  expect(readdirSync(sandbox.remoteTmp)).toStrictEqual([]);
+});
 
-test.skipIf(!marketingSyncToolsAvailable)(
-  "the marketing sync fails the job when the machine has no dist-marketing to send",
-  () => {
-    const sandbox = marketingSyncSandbox();
+test("the marketing sync fails the job when the machine has no dist-marketing to send", () => {
+  const sandbox = marketingSyncSandbox();
 
-    const { body } = marketingSyncScript(readFileSync(".github/workflows/deploy.yml", "utf8"));
+  const { body } = marketingSyncScript(readFileSync(".github/workflows/deploy.yml", "utf8"));
 
-    rmSync(join(sandbox.appDirectory, "dist-marketing"), { force: true, recursive: true });
+  rmSync(join(sandbox.appDirectory, "dist-marketing"), { force: true, recursive: true });
 
-    const { output, status } = sandbox.run(body);
+  const { output, status } = sandbox.run(body);
 
-    expect(status).not.toBe(0);
-    expect(output).toContain("Could not extract /app/dist-marketing from overture-web");
-    expect(existsSync(join(sandbox.workDirectory, "dist-marketing", "index.html"))).toBe(false);
-  },
-);
+  expect(status).not.toBe(0);
+  expect(output).toContain("Could not extract /app/dist-marketing from overture-web");
+  expect(existsSync(join(sandbox.workDirectory, "dist-marketing", "index.html"))).toBe(false);
+  expect(readdirSync(sandbox.remoteTmp)).toStrictEqual([]);
+});
 
-test.skipIf(!marketingSyncToolsAvailable)(
-  "the unwrapped marketing sync fails loudly instead of extracting a frame",
-  () => {
-    const sandbox = marketingSyncSandbox();
+test("the unwrapped marketing sync fails loudly instead of extracting a frame", () => {
+  const sandbox = marketingSyncSandbox();
 
-    const { body, remote } = marketingSyncScript(
-      readFileSync(".github/workflows/deploy.yml", "utf8"),
-    );
+  const { body, remote } = marketingSyncScript(
+    readFileSync(".github/workflows/deploy.yml", "utf8"),
+  );
 
-    const unwrapped = `printf '%s\\n' '\${begin_marker}'; tar -czf - -C /app dist-marketing | base64; printf '%s\\n' '\${end_marker}'`;
+  const unwrapped = `printf '%s\\n' '\${begin_marker}'; tar -czf - -C /app dist-marketing | base64; printf '%s\\n' '\${end_marker}'`;
 
-    expect(remote).not.toBe("");
-    expect(body).toContain(remote);
+  expect(remote).not.toBe("");
+  expect(body).toContain(remote);
 
-    const { output, status } = sandbox.run(body.replace(remote, unwrapped));
+  const { output, status } = sandbox.run(body.replace(remote, unwrapped));
 
-    expect(status).not.toBe(0);
-    expect(output).toContain("The archive from overture-web was not a clean base64 tar stream");
-    expect(output).toMatch(/unexpected end of file/u);
-    expect(existsSync(join(sandbox.workDirectory, "dist-marketing", "index.html"))).toBe(false);
-  },
-);
+  expect(status).not.toBe(0);
+  expect(output).toContain("The archive from overture-web was not a clean base64 tar stream");
+  expect(output).toMatch(/unexpected end of file/u);
+  expect(existsSync(join(sandbox.workDirectory, "dist-marketing", "index.html"))).toBe(false);
+  expect(readdirSync(sandbox.remoteTmp)).toStrictEqual([]);
+});

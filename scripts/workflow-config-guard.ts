@@ -532,7 +532,7 @@ export function flyctlRemoteCommands(step: string) {
   const commands: string[] = [];
 
   for (const match of flattened.matchAll(
-    /flyctl ssh console\b[^"'\n]*?(?:\s-C|\s--command)\s+(?:"(?<doubleQuoted>[^"]*)"|'(?<singleQuoted>[^']*)'|(?<bare>\S+))/gu,
+    /flyctl ssh console\b[^"'\n]*?(?:\s-C|\s--command)\s+(?:"(?<doubleQuoted>(?:[^"\\]|\\.)*)"|'(?<singleQuoted>[^']*)'|(?<bare>\S+))/gu,
   )) {
     const command =
       match.groups?.["doubleQuoted"] ?? match.groups?.["singleQuoted"] ?? match.groups?.["bare"];

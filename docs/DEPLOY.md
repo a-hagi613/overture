@@ -312,8 +312,9 @@ page at all.
 
 ```sh
 # what .github/workflows/deploy.yml runs, in order
+remote_archive="/tmp/overture-dist-marketing-$$.tgz"
 flyctl ssh console -q -a overture-web -C \
-  "sh -c 'set -e; tar -czf /tmp/overture-dist-marketing.tgz -C /app dist-marketing; echo OVERTURE-TAR-BEGIN; base64 /tmp/overture-dist-marketing.tgz; echo OVERTURE-TAR-END; rm -f /tmp/overture-dist-marketing.tgz'" \
+  "sh -c 'set -e; trap \"rm -f ${remote_archive}\" EXIT; tar -czf ${remote_archive} -C /app dist-marketing; echo OVERTURE-TAR-BEGIN; base64 ${remote_archive}; echo OVERTURE-TAR-END'" \
   > archive.txt
 awk '$0 == "OVERTURE-TAR-BEGIN" { inside = 1; started = 1; next }
      $0 == "OVERTURE-TAR-END" { inside = 0; closed = 1; next }
@@ -331,6 +332,11 @@ that is exactly how the deploy failed with `gzip: stdin: unexpected end of file`
 command in `sh -c '…'`, whose single argument is the whole script, and `set -e` inside it so a failed `tar` or `base64`
 becomes the console's exit code instead of an empty archive. The script itself stays free of single quotes, because
 the wrapper owns them; the sentinels are plain words, so `echo` needs no quoting.
+
+The remote tarball is named after the local shell's pid and removed by an `EXIT` trap, so a manual recovery can run
+next to a deploy without either copy truncating or deleting the archive the other is still streaming. The local
+`${remote_archive}` is expanded by your shell, not by the machine, which is why the value is interpolated into the
+quoted command rather than computed remotely.
 
 `flyctl ssh console` also prints its own connection text (for example `Connecting to fdaa:…`) on stdout, and a raw
 gzip stream fed straight to `tar` would be corrupted by it. The step passes `-q` to silence the progress indicators
@@ -353,8 +359,9 @@ workflow does.
 
 ```sh
 mkdir -p dist-marketing
+remote_archive="/tmp/overture-dist-marketing-$$.tgz"
 flyctl ssh console -q -a overture-web -C \
-  "sh -c 'set -e; tar -czf /tmp/overture-dist-marketing.tgz -C /app dist-marketing; echo OVERTURE-TAR-BEGIN; base64 /tmp/overture-dist-marketing.tgz; echo OVERTURE-TAR-END; rm -f /tmp/overture-dist-marketing.tgz'" \
+  "sh -c 'set -e; trap \"rm -f ${remote_archive}\" EXIT; tar -czf ${remote_archive} -C /app dist-marketing; echo OVERTURE-TAR-BEGIN; base64 ${remote_archive}; echo OVERTURE-TAR-END'" \
   > archive.txt
 awk '$0 == "OVERTURE-TAR-BEGIN" { inside = 1; started = 1; next }
      $0 == "OVERTURE-TAR-END" { inside = 0; closed = 1; next }

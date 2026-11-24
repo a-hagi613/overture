@@ -108,7 +108,10 @@ function shlex(raw) {
 }
 
 const app = process.env["FIXTURE_APP"] ?? "/app";
-const argv = shlex(args[at + 1] ?? "").map((word) => word.replaceAll("/app", app));
+const remoteTmp = process.env["FIXTURE_REMOTE_TMP"] ?? "/tmp";
+const argv = shlex(args[at + 1] ?? "").map((word) =>
+  word.replaceAll(/\/tmp\/|\/app/gu, (path) => (path === "/app" ? app : remoteTmp + "/")),
+);
 
 if (argv.length === 0) {
   process.exit(64);
@@ -121,18 +124,24 @@ process.exit(child.exitCode);
 
 const sandboxes: string[] = [];
 
-/** Whether this host has the shell tools the marketing sync step shells out to (a skip, never a silent pass). */
-export const marketingSyncToolsAvailable = [
-  "bash",
-  "awk",
-  "base64",
-  "find",
-  "grep",
-  "tar",
-  "timeout",
-].every((tool) => Boolean(Bun.which(tool)));
+const MARKETING_SYNC_TOOLS = ["bash", "awk", "base64", "find", "grep", "tar", "timeout"];
 
-/** Deletes every sandbox this process created, so a passing run leaves no temp trees behind. */
+/**
+ * Fails the test when a shell tool the marketing sync step shells out to is missing, instead of skipping the check:
+ * the copy has to stay covered on every host the suite runs on.
+ * @throws {Error} When any required tool is absent from `PATH`.
+ */
+export function requireMarketingSyncTools() {
+  const missing = MARKETING_SYNC_TOOLS.filter((tool) => !Bun.which(tool));
+
+  if (missing.length > 0) {
+    throw new Error(
+      `the marketing sync step needs ${missing.join(", ")} on PATH; install them so the copy stays covered`,
+    );
+  }
+}
+
+/** Deletes every sandbox this process created, so a run leaves no temp trees behind even when an assertion fails. */
 export function removeMarketingSyncSandboxes() {
   for (const directory of sandboxes.splice(0)) {
     rmSync(directory, { force: true, recursive: true });
@@ -192,7 +201,8 @@ export function snapshotTree(root: string) {
 
 /**
  * A sandbox holding a fake deployed `/app/dist-marketing`, a `flyctl` stub on `PATH`, and a working directory for the
- * step. `run` executes the step's script with bash exactly as GitHub Actions does, against the stub.
+ * step. `run` executes the step's script with bash exactly as GitHub Actions does, against the stub, with `TMPDIR`
+ * and the machine's `/tmp` both mapped inside the sandbox so a failed run leaves nothing behind on the host.
  *
  * The stub reproduces the machine side of `flyctl ssh console -C`: the SSH server word-splits the command with
  * shell-like quoting (go-shlex) and then execs `argv[0]` with no shell, so `;`, `|` and `&&` stay inert arguments and
@@ -201,14 +211,20 @@ export function snapshotTree(root: string) {
  * @returns The sandbox's paths and a `run` that executes a step script in it.
  */
 export function marketingSyncSandbox() {
+  requireMarketingSyncTools();
+
   const root = mkdtempSync(join(tmpdir(), "fly-marketing-sync-"));
   const bin = join(root, "bin");
   const workDirectory = join(root, "work");
   const appDirectory = join(root, "app");
+  const localTmp = join(root, "tmp");
+  const remoteTmp = join(root, "remote-tmp");
 
   sandboxes.push(root);
   mkdirSync(bin, { recursive: true });
   mkdirSync(workDirectory, { recursive: true });
+  mkdirSync(localTmp, { recursive: true });
+  mkdirSync(remoteTmp, { recursive: true });
   writeFileSync(join(bin, "flyctl"), FLYCTL_STUB);
   chmodSync(join(bin, "flyctl"), 0o755);
 
@@ -221,6 +237,7 @@ export function marketingSyncSandbox() {
 
   return {
     appDirectory,
+    remoteTmp,
     workDirectory,
     run(body: string) {
       const result = Bun.spawnSync(["bash", "-c", body], {
@@ -228,7 +245,9 @@ export function marketingSyncSandbox() {
         env: {
           ...Bun.env,
           FIXTURE_APP: appDirectory,
+          FIXTURE_REMOTE_TMP: remoteTmp,
           PATH: `${bin}:${Bun.env["PATH"] ?? ""}`,
+          TMPDIR: localTmp,
         },
         stderr: "pipe",
         stdout: "pipe",
