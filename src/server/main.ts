@@ -1256,6 +1256,16 @@ function handleShutdown(signal: string) {
     } finally {
       activeAttemptController.abort();
 
+      const stuck =
+        (await activeDispatcher?.drain(Math.max(0, drainDeadline - performance.now()))) ?? 0;
+
+      if (stuck > 0) {
+        logError(
+          "shutdown",
+          new Error(`${String(stuck)} send(s) were still running at the drain deadline`),
+        );
+      }
+
       await quietGrace(flushReserveMs);
       await Promise.race([stopTelemetry(), quietGrace(flushReserveMs)]);
 

@@ -87,6 +87,14 @@ export function createCloudflareMailSender(config: CloudflareMailConfig) {
     sendCheck: async (mail) => {
       await sendEmail(config, mail.to, mail.subject, mail.body);
     },
+    sendWaitlistInvite: async (mail) => {
+      await sendEmail(
+        config,
+        mail.to,
+        copy.mail.waitlistInviteSubject,
+        copy.mail.waitlistInviteBody(mail.url),
+      );
+    },
     sendCodeWait: async (mail) => {
       await sendEmail(config, mail.to, mail.subject, mail.body);
     },

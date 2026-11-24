@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { waitlistInviteResponseSchema, waitlistResponseSchema } from "../../shared/waitlist.ts";
+
 export const adminRefusalCodeSchema = z.enum([
   "access_required",
   "sign_in_required",
@@ -1132,6 +1134,29 @@ export const loadUser = async (id: string) =>
 export const loadAdminSession = async () => adminGet("/admin/api/session", adminSessionSchema);
 
 export const loadInvites = async () => adminGet("/admin/api/invites", invitesResponseSchema);
+
+export type WaitlistResponse = z.infer<typeof waitlistResponseSchema>;
+
+export const loadWaitlist = async (input: {
+  status: "all" | "pending" | "invited" | "joined";
+  q: string;
+  order: "newest" | "oldest";
+}) => {
+  const search = new URLSearchParams({
+    order: input.order,
+    q: input.q,
+    status: input.status,
+  });
+
+  return adminGet(`/admin/api/waitlist?${search.toString()}`, waitlistResponseSchema);
+};
+
+export const inviteWaitlistEntry = async (id: string) =>
+  adminPost(
+    `/admin/api/waitlist/${encodeURIComponent(id)}/invite`,
+    null,
+    waitlistInviteResponseSchema,
+  );
 
 export const createInvite = async (email: string) =>
   adminPost("/admin/api/invites", { email }, inviteCreateResponseSchema);

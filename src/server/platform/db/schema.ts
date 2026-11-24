@@ -1312,6 +1312,31 @@ export const calendarCustomEvents = sqliteTable(
 );
 
 /**
+ * One person who asked for an invite while public sign-up is closed (WS-22). The email is stored as typed but
+ * normalized to `trim().toLowerCase()`, and it is unique, so a repeat submission updates the row instead of adding
+ * another. `status` moves `pending` → `invited` (an admin sent an invite) → `joined` (the invited email signed up).
+ */
+export const waitlistEntries = sqliteTable(
+  "waitlist_entries",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull().unique(),
+    targetRole: text("target_role"),
+    targetLocation: text("target_location"),
+    status: text("status", { enum: ["pending", "invited", "joined"] })
+      .notNull()
+      .default("pending"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+    invitedAt: integer("invited_at"),
+  },
+  (t) => [
+    index("waitlist_entries_status_created").on(t.status, t.createdAt),
+    index("waitlist_entries_created").on(t.createdAt),
+  ],
+);
+
+/**
  * One support request, kept for the Admin Portal Support Queue (ADM-2, M5). The message is sealed with the person's
  * key like every other body they write; the subject, category and status are read by admins. `reference_id` is the
  * short id the person sees and quotes.

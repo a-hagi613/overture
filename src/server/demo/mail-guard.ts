@@ -20,6 +20,11 @@ export function createDemoSafeMailSender(db: AppDatabase, sender: MailSender) {
         await sender.sendCheck(mail);
       }
     },
+    sendWaitlistInvite: async (mail) => {
+      if (allowed(mail.to)) {
+        await sender.sendWaitlistInvite(mail);
+      }
+    },
     sendCodeWait: async (mail) => {
       if (allowed(mail.to)) {
         await sender.sendCodeWait(mail);

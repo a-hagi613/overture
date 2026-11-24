@@ -56,6 +56,7 @@ import {
   supportTickets,
   tagImports,
   users,
+  waitlistEntries,
 } from "../platform/db/schema.ts";
 import {
   companies,
@@ -71,6 +72,7 @@ import { postingDisplayFor } from "../matching/applications.ts";
 import { attachApplication, ensureOpenReview } from "../pipeline/review-store.ts";
 import { ensureApplyFailuresQueued } from "../notify/failure-digest.ts";
 import { createNotification } from "../notify/notifications.ts";
+import { recordWaitlistEntry } from "../waitlist/store.ts";
 import { NOTIFICATION_KINDS } from "../../shared/notifications.ts";
 import { runDueJobs } from "../platform/jobs/run-due.ts";
 import {
@@ -233,6 +235,12 @@ const seedPostingQuestionBody = z.object({
 });
 
 const sampleLedgerBody = z.object({ email: z.email() });
+
+const waitlistSeedBody = z.object({
+  email: z.email(),
+  targetLocation: z.string().max(120).optional(),
+  targetRole: z.string().max(120).optional(),
+});
 
 const homeSampleBody = z.object({
   email: z.email(),
@@ -3557,6 +3565,31 @@ export function createTestRoutes(
       subscriptions: db.select().from(subscriptions).all(),
     }),
   );
+
+  routes.get("/waitlist", (context) => {
+    const email = context.req.query("email")?.trim().toLowerCase();
+
+    const rows = db
+      .select()
+      .from(waitlistEntries)
+      .orderBy(asc(waitlistEntries.createdAt))
+      .all()
+      .filter((row) => email === undefined || email === "" || row.email === email);
+
+    return context.json({ entries: rows });
+  });
+
+  routes.post("/waitlist", validJson(waitlistSeedBody), (context) => {
+    const body = context.req.valid("json");
+
+    return context.json({
+      entry: recordWaitlistEntry(db, clock, {
+        email: body.email,
+        targetLocation: body.targetLocation,
+        targetRole: body.targetRole,
+      }),
+    });
+  });
 
   routes.get("/auth/state", (context) => {
     const allUsers = db.select().from(users).all();
