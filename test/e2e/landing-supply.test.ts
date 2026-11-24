@@ -24,7 +24,7 @@ const test = appTest.extend<{ supplyServer: AppServer }>({
 
 const createdSchema = z.object({ id: z.string() });
 
-const ATS_VALUES = ["greenhouse", "lever", "hiringthing"] as const;
+const ATS_VALUES = ["greenhouse", "lever"] as const;
 
 interface PostingSeed {
   ats: (typeof ATS_VALUES)[number];
@@ -86,17 +86,6 @@ const OPEN_SEEDS: readonly PostingSeed[] = [
     title: "Business Operations Manager",
     url: "https://supply.example/lever-ops-hybrid",
     workplace: "hybrid",
-  },
-  {
-    ats: "hiringthing",
-    atsJobId: "supply-sr-swe-remote",
-    city: "Austin",
-    countryCode: "US",
-    locationRaw: "Austin, TX",
-    role: "Software Engineering",
-    title: "Staff Engineer",
-    url: "https://supply.example/sr-swe-remote",
-    workplace: "remote",
   },
 ];
 
