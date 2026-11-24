@@ -107,7 +107,7 @@ import {
 } from "../waitlist/store.ts";
 import type { WaitlistEntryRow } from "../waitlist/store.ts";
 import { WAITLIST_FILTERS, WAITLIST_ORDERS } from "../../shared/waitlist.ts";
-import { isSameMailbox, normaliseEmail } from "../auth/email.ts";
+import { normaliseEmail } from "../auth/email.ts";
 import { readMailHealth } from "../inbox/health.ts";
 import { buildStorageReport } from "../storage/report.ts";
 import { checkpointDatabase } from "../storage/database-sizes.ts";
