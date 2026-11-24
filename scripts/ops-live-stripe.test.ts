@@ -47,6 +47,7 @@ function step(name: string) {
 }
 
 const setupStripe = step("Create the plans, webhook and portal and set the Fly secrets");
+const stripeSecrets = step("Read the Fly secret names for the Stripe action");
 const syncOpsSecrets = step("Sync the ops secrets and flags to overture-web");
 
 function runOf(target: WorkflowStep) {
@@ -98,6 +99,31 @@ test("setup-stripe masks and exports the selected key before the script runs", (
   expect(mask).toBeGreaterThanOrEqual(0);
   expect(exported).toBeGreaterThan(mask);
   expect(script).toBeGreaterThan(exported);
+});
+
+test("stripe-secrets classifies the app's Stripe mode from the key prefix without printing it", () => {
+  const run = runOf(stripeSecrets);
+
+  expect(run).toContain("sk_test_*|rk_test_*) printf sandbox");
+  expect(run).toContain("sk_live_*|rk_live_*) printf production");
+  expect(run).toContain("current_stripe_env=");
+  expect(run).toContain("$GITHUB_OUTPUT");
+  expect(run).toMatch(/flyctl ssh console -a overture-web -C/u);
+  expect(run).toContain("::notice::");
+  expect(run).not.toMatch(/echo\s+"?\$\{?STRIPE_SECRET_KEY\}?"?/u);
+  expect(run).not.toMatch(/printf %s "\$\{STRIPE_SECRET_KEY/u);
+});
+
+test("setup-stripe rotates the webhook when the app's Stripe mode differs from stripe_env", () => {
+  const env = setupStripe.env ?? {};
+  const run = runOf(setupStripe);
+  const guard = run.search(/\$\{CURRENT_STRIPE_ENV\}" != "\$\{stripe_env\}"/u);
+
+  expect(env.CURRENT_STRIPE_ENV).toBe(
+    ["$", "{{ steps.stripe-secrets.outputs.current_stripe_env }}"].join(""),
+  );
+  expect(guard).toBeGreaterThanOrEqual(0);
+  expect(guard).toBeLessThan(run.indexOf("extra_args+=(--rotate-webhook)"));
 });
 
 test("setup-stripe summarizes the configured environment and variable names only", () => {

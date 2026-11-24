@@ -386,8 +386,12 @@ the sandbox account. The workflow picks that account's secret, masks it with `::
 to the script and to `flyctl secrets import`; an unknown value stops the run.
 
 The workflow reads the Fly secret names, passes `--rotate-webhook` automatically when `STRIPE_WEBHOOK_SECRET` is not on
-the app yet (or when the `rotate_webhook` input is `true`), runs the script, masks every secret it is about to set and
-sets them on `overture-web` in one `flyctl secrets import` call, so the values never appear in a command line. A fresh 32-byte `CARD_FINGERPRINT_SECRET` is generated
+the app yet, when the `rotate_webhook` input is `true`, or when the app currently runs the other account's key
+(`CURRENT_STRIPE_ENV`, read over SSH from the key prefix only and never printed, differs from `stripe_env`), runs the
+script, masks every secret it is about to set and
+sets them on `overture-web` in one `flyctl secrets import` call, so the values never appear in a command line. That
+last check makes a `sandbox` ↔ `production` switch rotate the webhook even when the caller omits `rotate_webhook`, so
+the app always receives the matching account's signing secret in the same import. A fresh 32-byte `CARD_FINGERPRINT_SECRET` is generated
 with `openssl rand -hex 32` only when the app does not have one. The script's `STRIPE_WEBHOOK_SECRET` lands in
 `/tmp/stripe-setup.env` (mode `0600`), which an `always()` step deletes; the workflow finishes by polling
 `https://tryoverture.com/api/health`. The step summary records the configured `stripe_env` and the variable names

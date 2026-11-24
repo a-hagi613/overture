@@ -305,6 +305,13 @@ jobs:
           else
             echo "fingerprint_present=false" >> "$GITHUB_OUTPUT"
           fi
+          current_stripe_env="unknown"
+          probe="$(timeout 30s flyctl ssh console -a overture-web -C "sh -c 'case \"\${STRIPE_SECRET_KEY:-}\" in sk_test_*|rk_test_*) printf sandbox;; sk_live_*|rk_live_*) printf production;; \"\") printf none;; *) printf unknown;; esac'" 2>/dev/null)" || probe=""
+          case "$probe" in
+            sandbox|production|none) current_stripe_env="$probe" ;;
+          esac
+          echo "current_stripe_env=$current_stripe_env" >> "$GITHUB_OUTPUT"
+          echo "::notice::The Stripe environment currently active on overture-web is ${current_stripe_env}."
 
       - name: Create the plans, webhook and portal and set the Fly secrets
         if: steps.guard.outputs.skip != 'true' && inputs.action == 'setup-stripe'
@@ -318,6 +325,7 @@ jobs:
           ROTATE_WEBHOOK: ${{ inputs.rotate_webhook }}
           RECONCILE_PRICES: ${{ inputs.reconcile_prices }}
           WEBHOOK_PRESENT: ${{ steps.stripe-secrets.outputs.webhook_present }}
+          CURRENT_STRIPE_ENV: ${{ steps.stripe-secrets.outputs.current_stripe_env }}
           FINGERPRINT_PRESENT: ${{ steps.stripe-secrets.outputs.fingerprint_present }}
         run: |
           set -euo pipefail
@@ -345,7 +353,7 @@ jobs:
           echo "::add-mask::$STRIPE_SECRET_KEY"
           export STRIPE_SECRET_KEY
           extra_args=(--out-env /tmp/stripe-setup.env)
-          if [ "${ROTATE_WEBHOOK}" = "true" ] || [ "${WEBHOOK_PRESENT}" != "true" ]; then
+          if [ "${ROTATE_WEBHOOK}" = "true" ] || [ "${WEBHOOK_PRESENT}" != "true" ] || [ "${CURRENT_STRIPE_ENV}" != "${stripe_env}" ]; then
             extra_args+=(--rotate-webhook)
           fi
           if [ "${RECONCILE_PRICES}" = "true" ]; then
