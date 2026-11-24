@@ -325,7 +325,7 @@ for (const board of WAVE_1A) {
 
     expect(detail.application.status).toBe("ready");
     expect(detail.application.approvedAt).toBeNull();
-    expect(JSON.parse(detail.application.changes ?? "[]")).toEqual(["A field was removed"]);
+    expect(JSON.parse(detail.application.changes ?? "[]")).toEqual(["The form changed"]);
     expect(hosted.fixture.state[board].submissions).toBe(0);
     expect(await applicationsLeft(owner)).toBe(3);
 
