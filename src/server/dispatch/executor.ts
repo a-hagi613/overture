@@ -1432,14 +1432,6 @@ export function createDispatcher(deps: DispatcherDeps) {
     return job.inserted;
   }
 
-  /**
-   * Waits for the sends still in flight to finish, so each one persists its teardown (the attempt
-   * outcome, the credit release and the next slot) before the caller closes the database. The
-   * shutdown calls it after the last-resort abort: a handler whose write lands after the close
-   * leaves the Application in `sending`, and only the next boot's recovery repairs it.
-   * @param timeoutMs How long the caller can wait.
-   * @returns How many attempts were still running when the wait ended.
-   */
   async function drain(timeoutMs: number) {
     if (activeAttemptRuns.size === 0) {
       return 0;
@@ -1451,7 +1443,7 @@ export function createDispatcher(deps: DispatcherDeps) {
       timer = setTimeout(resolve, Math.max(0, timeoutMs));
     });
 
-    await Promise.race([Promise.allSettled([...activeAttemptRuns]), deadline]);
+    await Promise.race([Promise.allSettled(activeAttemptRuns), deadline]);
 
     if (timer !== undefined) {
       clearTimeout(timer);
