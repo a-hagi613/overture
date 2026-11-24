@@ -13,6 +13,10 @@ on:
         description: "Skip the Haiku pass over newly inserted unresolved postings"
         type: boolean
         default: false
+      skip_embeddings:
+        description: "Skip the local ONNX embedding pass (Tier 2)"
+        type: boolean
+        default: false
 
 concurrency:
   group: stapply-daily
@@ -69,6 +73,14 @@ jobs:
           key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-bun-
+      - name: Cache the ONNX embedding model
+        if: steps.guard.outputs.skip != 'true' && inputs.skip_embeddings != true
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: ${{ runner.os }}-hf-multilingual-e5-small-qint8
+          restore-keys: |
+            ${{ runner.os }}-hf-
       - name: Install dependencies
         if: steps.guard.outputs.skip != 'true'
         run: bun install --frozen-lockfile
@@ -86,6 +98,7 @@ jobs:
         env:
           ALLOW_ROW_DROP: ${{ inputs.allow_row_drop == true && '1' || '' }}
           SKIP_LLM: ${{ inputs.skip_llm == true && '1' || '' }}
+          SKIP_EMBEDDINGS: ${{ inputs.skip_embeddings == true && '1' || '' }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -93,6 +106,7 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           CATALOG_REFRESH_SECRET: ${{ secrets.CATALOG_REFRESH_SECRET }}
           CATALOG_REFRESH_ORIGIN: https://overture-web.fly.dev
+          CATALOG_EMBEDDING_MODEL: ${{ vars.CATALOG_EMBEDDING_MODEL || '' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CATALOG_LLM_MODEL: ${{ vars.CATALOG_LLM_MODEL || '' }}
         run: |
@@ -103,6 +117,9 @@ jobs:
           fi
           if [ "$SKIP_LLM" = "1" ]; then
             flags+=(--skip-llm)
+          fi
+          if [ "$SKIP_EMBEDDINGS" = "1" ]; then
+            flags+=(--skip-embeddings)
           fi
           bun run scripts/stapply-daily-etl.ts "${flags[@]}" | tee stapply-daily.json
       - name: Report the run outcome

@@ -6,6 +6,7 @@ import type { Clock } from "../ports/clock.ts";
 import { retryWhenBusy } from "../db/busy.ts";
 import { logError } from "../log.ts";
 import { bgJobs } from "../db/schema.ts";
+import { defaultMetrics } from "../telemetry/metrics.ts";
 import { publishEvent } from "../sse/stream.ts";
 import type { JobClass } from "./classes.ts";
 import {
@@ -31,6 +32,16 @@ async function runJob(
   job: ClaimedJob,
   handler: (payload: string) => Promise<void>,
 ) {
+  const startedAt = performance.now();
+
+  function record(status: string) {
+    defaultMetrics().recordBgJob({
+      durationMs: performance.now() - startedAt,
+      kind: job.kind,
+      status,
+    });
+  }
+
   try {
     await retryWhenBusy(
       () => publishEvent(db, clock, "job.started", JSON.stringify({ id: job.id })),
@@ -54,6 +65,8 @@ async function runJob(
       "jobs.done",
     );
 
+    record("done");
+
     return true;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -72,6 +85,8 @@ async function runJob(
       } catch (bookkeepingError) {
         logError("jobs.retry", bookkeepingError);
       }
+
+      record("retry");
 
       return false;
     }
@@ -105,6 +120,8 @@ async function runJob(
     } catch (bookkeepingError) {
       logError("jobs.failed", bookkeepingError);
     }
+
+    record(isDead ? "dead" : "failed");
 
     return false;
   }

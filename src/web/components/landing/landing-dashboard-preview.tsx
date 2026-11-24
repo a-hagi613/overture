@@ -41,8 +41,8 @@ export function LandingDashboardPreview() {
     setThemeOverride(!previewDark);
   };
 
-  const desktopSrc = `/previews/${activeScreen}-${previewDark ? "dark" : "light"}.png?v=5`;
-  const mobileSrc = `/previews/${activeScreen}-mobile-${previewDark ? "dark" : "light"}.png?v=5`;
+  const desktopSrc = `/previews/${activeScreen}-${previewDark ? "dark" : "light"}.png?v=6`;
+  const mobileSrc = `/previews/${activeScreen}-mobile-${previewDark ? "dark" : "light"}.png?v=6`;
   const altText = `Overture ${activeDef?.label ?? "Home"} screen (${previewDark ? "dark" : "light"} mode)`;
 
   return (
@@ -141,13 +141,21 @@ export function LandingDashboardPreview() {
 
         <div className="bg-background">
           <div className="mx-auto w-full max-w-[390px] overflow-hidden bg-background sm:my-4 sm:rounded-xl sm:border sm:border-border sm:shadow-sh lg:hidden">
-            <img alt={altText} className="block h-auto w-full" src={mobileSrc} />
+            <img
+              alt={altText}
+              className="block h-auto w-full"
+              height={844}
+              src={mobileSrc}
+              width={390}
+            />
           </div>
           <div className="hidden aspect-[1280/860] w-full overflow-hidden bg-background lg:block">
             <img
               alt={altText}
               className="block h-full w-full object-cover object-top"
+              height={860}
               src={desktopSrc}
+              width={1280}
             />
           </div>
         </div>

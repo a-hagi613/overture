@@ -1,5 +1,7 @@
 import type { AnswerKind } from "../../shared/questions.ts";
 
+import { classifyFieldLabel, factKeyForFieldKind } from "../dispatch/forms/field-heuristics.ts";
+
 export interface RuleMapping {
   answerKind: AnswerKind;
   factKey: string | null;
@@ -239,6 +241,12 @@ function mapQuestionByRulesValue(text: string) {
 
   if (CONSENT_PATTERN.test(folded)) {
     return CONSENT_MAPPING;
+  }
+
+  const multiLingualKind = classifyFieldLabel(text);
+
+  if (multiLingualKind !== null) {
+    return { answerKind: "fact" as const, factKey: factKeyForFieldKind(multiLingualKind) };
   }
 
   return null;

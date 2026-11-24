@@ -18,6 +18,7 @@ import {
 import type { FormScope, LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
 import { detectLoginWall } from "../../pipeline/login-wall.ts";
 import { checkPostingIdentity } from "../posting-identity.ts";
+import { fillControlledField } from "../forms/widgets.ts";
 
 import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identity.ts";
 import type { PlannedResume } from "./shared.ts";
@@ -62,6 +63,12 @@ export interface BrowserFormPlan {
 export interface BrowserFormHooks {
   onWillSubmit: () => void;
   onResponse: (status: number | null) => void;
+  /**
+   * The audited ARIA self-heal, wired only by the dispatcher. It runs after the
+   * deterministic locator for an answered field missed, and must write the
+   * answer into the live control or report that it could not.
+   */
+  healField?: ((scope: FormScope, field: SendPlanField) => Promise<boolean>) | undefined;
 }
 
 export type BrowserFormOutcome =
@@ -434,9 +441,7 @@ async function fillByLabel(scope: FormScope, field: SendPlanField) {
       return true;
     }
 
-    await control.fill(answer);
-
-    return true;
+    return await fillControlledField(scope.page, control, answer);
   } catch {
     return false;
   }
@@ -464,7 +469,11 @@ async function fillPlannedField(scope: FormScope, field: SendPlanField) {
   return fillByLabel(scope, field);
 }
 
-async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanField[]) {
+async function fillPlannedFields(
+  scope: FormScope,
+  fields: readonly SendPlanField[],
+  healField?: (scope: FormScope, field: SendPlanField) => Promise<boolean>,
+) {
   const fillFrom: (index: number) => Promise<boolean> = async (index) => {
     const field = fields[index];
 
@@ -476,7 +485,12 @@ async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanFiel
       return fillFrom(index + 1);
     }
 
-    const filled = await fillPlannedField(scope, field);
+    let filled = await fillPlannedField(scope, field);
+
+    if (!filled && healField !== undefined) {
+      filled = await healField(scope, field);
+    }
+
     const rest = await fillFrom(index + 1);
 
     return (filled || !field.required) && rest;
@@ -503,6 +517,7 @@ async function fillPresentFields(
   scope: FormScope,
   fields: readonly SendPlanField[],
   seen: Set<string>,
+  healField?: (scope: FormScope, field: SendPlanField) => Promise<boolean>,
 ) {
   const fillFrom: (index: number) => Promise<boolean> = async (index) => {
     const field = fields[index];
@@ -517,7 +532,13 @@ async function fillPresentFields(
 
     seen.add(field.fieldName ?? field.label);
 
-    if (!(await fillPlannedField(scope, field)) && field.required) {
+    let filled = await fillPlannedField(scope, field);
+
+    if (!filled && healField !== undefined) {
+      filled = await healField(scope, field);
+    }
+
+    if (!filled && field.required) {
       return false;
     }
 
@@ -878,7 +899,7 @@ export const runBrowserFormAttempt: (
   const expectations = expectationsFor(plan, liveResumeField, config);
 
   if (config.nextControl === undefined) {
-    if (!(await fillPlannedFields(scope, plan.fields))) {
+    if (!(await fillPlannedFields(scope, plan.fields, hooks.healField))) {
       return {
         confirmationSeen: false,
         outcome: "fill_failed",
@@ -908,7 +929,7 @@ export const runBrowserFormAttempt: (
         return null;
       }
 
-      if (!(await fillPresentFields(scope, plan.fields, seen))) {
+      if (!(await fillPresentFields(scope, plan.fields, seen, hooks.healField))) {
         return {
           confirmationSeen: false,
           outcome: "fill_failed",

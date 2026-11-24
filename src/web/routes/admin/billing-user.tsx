@@ -9,7 +9,7 @@ import { AdminPageHeading } from "./page-heading.tsx";
 import { AdminStatusCard } from "./admin-status-card.tsx";
 import { BillingStatePill } from "./billing-format.tsx";
 import { BillingRow } from "./billing-row.tsx";
-import { billingPlanLabel, dayOf, periodSpan } from "./billing-labels.ts";
+import { billingLinkClass, billingPlanLabel, dayOf, periodSpan } from "./billing-labels.ts";
 
 export function BillingUserPage() {
   const { id = "" } = useParams();
@@ -17,18 +17,16 @@ export function BillingUserPage() {
   const { data, failed, refusal, refresh } = useAdminResource(load, ["billing-user", id]);
 
   if (refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={refusal}
-        onPasskeyDone={() => {
-          refresh();
-        }}
-      />
-    );
+    return <AdminGateScreen code={refusal} />;
   }
 
   if (data === null) {
-    return <AdminStatusCard failed={failed} onRetry={refresh} />;
+    return (
+      <>
+        <AdminPageHeading italic="" lead="" plain={copy.admin.billingTitlePlain} />
+        <AdminStatusCard failed={failed} onRetry={refresh} />
+      </>
+    );
   }
 
   const { user } = data;
@@ -45,7 +43,7 @@ export function BillingUserPage() {
         aria-label={copy.admin.billingUserCrumbRoot}
         className="mt-4 text-sm text-muted-foreground"
       >
-        <Link to="/admin/billing" className="underline underline-offset-2">
+        <Link to="/admin/billing" className={billingLinkClass}>
           {copy.admin.billingUserCrumbRoot}
         </Link>
       </nav>

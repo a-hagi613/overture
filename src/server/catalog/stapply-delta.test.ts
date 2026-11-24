@@ -388,6 +388,63 @@ describe("applyStapplyDelta", () => {
     ).toEqual({ ats: "greenhouse", job: "gh-1" });
   });
 
+  test("collapses a cross-board mirror without a requisition by strict title and location", () => {
+    const db = catalogDatabase();
+
+    const shared = {
+      company: "Northwind Systems",
+      company_norm: "northwind systems",
+      location: "Berlin, DE",
+      requisition_id: null,
+      title: "Data Engineer",
+    };
+
+    const rows = [
+      ingestRow({ ...shared, ats_id: "varbi-1", source_key: "varbi", source_updated_at_ms: NOW }),
+      ingestRow({
+        ...shared,
+        ats_id: "gh-1",
+        source_key: "greenhouse",
+        source_updated_at_ms: NOW - DAY_MS,
+      }),
+    ];
+
+    stage(db, rows);
+    const report = runDelta(db, rows);
+
+    expect(report.duplicates).toBe(1);
+    expect(report.inserted).toBe(1);
+    expect(
+      z
+        .object({ ats: z.string(), job: z.string() })
+        .parse(db.$client.query("SELECT ats, ats_job_id AS job FROM postings").get()),
+    ).toEqual({ ats: "greenhouse", job: "gh-1" });
+  });
+
+  test("keeps two same-board openings that share a title and location when the requisition is null", () => {
+    const db = catalogDatabase();
+
+    const shared = {
+      company: "Northwind Systems",
+      company_norm: "northwind systems",
+      location: "Berlin, DE",
+      requisition_id: null,
+      source_key: "greenhouse",
+      title: "Data Engineer",
+    };
+
+    const rows = [
+      ingestRow({ ...shared, ats_id: "gh-1" }),
+      ingestRow({ ...shared, ats_id: "gh-2" }),
+    ];
+
+    stage(db, rows);
+    const report = runDelta(db, rows);
+
+    expect(report.duplicates).toBe(0);
+    expect(report.inserted).toBe(2);
+  });
+
   test("gives companies whose names slugify alike their own board", () => {
     const db = catalogDatabase();
 

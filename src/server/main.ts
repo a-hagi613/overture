@@ -69,6 +69,11 @@ import {
 } from "./platform/jobs/retention.ts";
 import { startJobWorker } from "./platform/jobs/scheduler.ts";
 import { startTelemetry, trace } from "./platform/telemetry/otel.ts";
+import {
+  createPrometheusMetricsHandler,
+  prometheusExporter,
+} from "./platform/telemetry/prometheus.ts";
+import { createEventLoopLagStats } from "./platform/telemetry/runtime-stats.ts";
 import { createDiskObjectStore } from "./platform/ports/object-store.ts";
 import { createR2ObjectStore } from "./platform/ports/r2-object-store.ts";
 import {
@@ -256,12 +261,17 @@ if (catalogHotSwap === null) {
   catalogDb = catalogHotSwap.db;
 }
 
+const eventLoopLagStats = createEventLoopLagStats();
+
 createEventLoopLagMonitor({
   onLag: (lagMs) => {
     logError(
       "event-loop-lag",
       new Error(`the event loop was blocked for ${String(Math.round(lagMs))} ms`),
     );
+  },
+  onSample: (lagMs) => {
+    eventLoopLagStats.sample(lagMs);
   },
 }).start();
 
@@ -877,6 +887,7 @@ const activeDispatcher =
         db,
         clock,
         hardTimeoutMs: env.SEND_HARD_TIMEOUT_MS,
+        llm: anthropicLlmPort,
         mail: mailSender,
         mailboxes,
         outcomes,
@@ -1187,6 +1198,12 @@ const app = createApp({
   mail: mailSender,
   payments,
   personal,
+  ...(env.OPS_HEALTH_SECRET !== undefined && {
+    opsHealth: {
+      secret: env.OPS_HEALTH_SECRET,
+      eventLoopLagP95Ms: () => eventLoopLagStats.p95(),
+    },
+  }),
   shutdown: shutdownController.signal,
 });
 
@@ -1203,6 +1220,32 @@ const server = Bun.serve({
 });
 
 process.stdout.write(`overture listening on ${String(server.port)}\n`);
+
+function startMetricsServer() {
+  if (!env.METRICS_ENABLED) {
+    return null;
+  }
+
+  try {
+    const metricsServer = Bun.serve({
+      port: env.METRICS_PORT,
+      hostname: env.METRICS_HOST,
+      fetch: createPrometheusMetricsHandler({ exporter: prometheusExporter }),
+    });
+
+    process.stdout.write(
+      `prometheus metrics on [${env.METRICS_HOST}]:${String(metricsServer.port)}/metrics\n`,
+    );
+
+    return metricsServer;
+  } catch (error) {
+    logError("metrics", error);
+
+    return null;
+  }
+}
+
+const metricsServer = startMetricsServer();
 
 let shuttingDown = false;
 
@@ -1249,6 +1292,7 @@ function handleShutdown(signal: string) {
     try {
       await Promise.race([server.stop(false), quietGrace(budgetMs)]);
       await server.stop(true);
+      await metricsServer?.stop(true);
       await worker?.drain(Math.max(0, drainDeadline - performance.now()));
       catalogWorker.stop();
     } catch (error) {

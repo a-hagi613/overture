@@ -21,6 +21,7 @@ import { currentSubscriptionOf, subscriptionBlocksCheckout } from "../billing/su
 import { createPaymentsWebhookService } from "../billing/webhooks.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { logError } from "../platform/log.ts";
+import { defaultMetrics } from "../platform/telemetry/metrics.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { InvalidWebhookSignatureError } from "../platform/ports/payments.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
@@ -334,6 +335,8 @@ export function createStripeWebhookRoutes(deps: {
 
       throw error;
     }
+
+    defaultMetrics().recordBillingEvent({ event: event.type, plan: event.plan ?? "unknown" });
 
     let trialCard = null;
 

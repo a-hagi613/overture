@@ -2,12 +2,7 @@ import { z } from "zod";
 
 import { waitlistInviteResponseSchema, waitlistResponseSchema } from "../../shared/waitlist.ts";
 
-export const adminRefusalCodeSchema = z.enum([
-  "access_required",
-  "sign_in_required",
-  "owner_required",
-  "passkey_required",
-]);
+export const adminRefusalCodeSchema = z.enum(["access_required", "owner_required"]);
 
 export const auditRowSchema = z.object({
   id: z.string(),
@@ -393,7 +388,6 @@ export const adminUserDetailSchema = z.object({
 export const adminSessionSchema = z.object({
   now: z.number(),
   owner: z.object({ email: z.string(), name: z.string() }),
-  passkeyAssertedAt: z.number().nullable(),
 });
 
 export const adminSuspendResponseSchema = z.object({

@@ -321,12 +321,25 @@ export function createCandidateService(deps: CandidateDeps) {
         value: postingTags.value,
       })
       .from(postingTags)
-      .where(inArray(postingTags.postingId, [...postingIds]))
+      .where(
+        and(
+          inArray(postingTags.postingId, [...postingIds]),
+          inArray(postingTags.dimension, ["role", "subrole", "seniority"]),
+        ),
+      )
       .all();
 
     const tagsById = new Map<string, CandidatePosting["tags"]>();
 
     for (const tag of tagRows) {
+      if (
+        tag.dimension !== "role" &&
+        tag.dimension !== "subrole" &&
+        tag.dimension !== "seniority"
+      ) {
+        continue;
+      }
+
       const list = tagsById.get(tag.postingId) ?? [];
 
       list.push({ dimension: tag.dimension, value: tag.value });

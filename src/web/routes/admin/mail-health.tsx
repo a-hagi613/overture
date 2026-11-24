@@ -36,14 +36,7 @@ export function MailHealthPage() {
   }, [openCompanyId]);
 
   if (refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={refusal}
-        onPasskeyDone={() => {
-          refresh();
-        }}
-      />
-    );
+    return <AdminGateScreen code={refusal} />;
   }
 
   if (data === null) {
@@ -82,7 +75,7 @@ export function MailHealthPage() {
             {ranges.map((range) => (
               <button
                 aria-pressed={days === range.days}
-                className={`h-10 px-4 text-sm font-semibold ${
+                className={`min-h-11 px-4 text-sm font-semibold md:min-h-10 ${
                   days === range.days
                     ? "bg-card text-foreground shadow-sh"
                     : "text-muted-foreground hover:bg-muted"
