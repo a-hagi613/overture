@@ -553,6 +553,23 @@ describe("runStapplyLlmTagging", () => {
     });
   });
 
+  test("the leftover query needs the staging tables, so tagging runs before they are dropped", () => {
+    const db = catalogDatabase();
+
+    const rows = [
+      ingestRow({ ats_id: "job-1", title: "Zookeeper", department: null, requisition_id: "R-1" }),
+    ];
+
+    stage(db, rows);
+    runDelta(db, rows);
+
+    expect(selectStapplyLeftovers(db, 10)).toHaveLength(1);
+
+    dropStapplyStaging(db);
+
+    expect(() => selectStapplyLeftovers(db, 10)).toThrow(/no such table/u);
+  });
+
   test("honours the run's row ceiling", async () => {
     const db = catalogDatabase();
 

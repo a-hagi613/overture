@@ -275,16 +275,12 @@ async function main() {
     tagSupportedOnly: args.values["tag-unsupported"] !== true,
   });
 
-  dropStapplyStaging(catalog.db);
-
   progress(
     `delta: ${String(delta.inserted)} new, ${String(delta.updated)} changed, ${String(delta.closed)} closed, ${String(delta.pruned)} pruned, ${String(delta.tagged)} tagged`,
   );
 
   const rowCount = countPostings(catalog.db);
   const supportedCount = countSupportedPostings(catalog.db);
-  const unresolved = unresolvedRoleCount(catalog.db);
-  const tagSources = tagSourceSummary(catalog.db);
 
   const llm =
     args.values["skip-llm"] === true || maxLlmRows === 0
@@ -298,6 +294,11 @@ async function main() {
         });
 
   progress(`llm tagging: ${String(llm.tagged)} tagged, ${String(llm.skipped)} left`);
+
+  const unresolved = unresolvedRoleCount(catalog.db);
+  const tagSources = tagSourceSummary(catalog.db);
+
+  dropStapplyStaging(catalog.db);
 
   catalog.db.$client.run("PRAGMA optimize");
   catalog.db.$client.run("PRAGMA wal_checkpoint(TRUNCATE)");
