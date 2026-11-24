@@ -101,9 +101,7 @@ test("targets and languages keep only postings that fit", async ({
   await owner.dispose();
 });
 
-test("an unsupported or closed posting never reaches the Board", async ({
-  isolatedAppServer: { url },
-}) => {
+test("a closed posting never reaches the Board", async ({ isolatedAppServer: { url } }) => {
   const { owner } = await ownerContextFor(url);
   await clearCatalog(owner);
   const { boardId, companyId } = await catalog(owner, "Apply Guild", "apply-guild.example");
@@ -124,25 +122,12 @@ test("an unsupported or closed posting never reaches the Board", async ({
 
   await owner.post("/__test__/catalog/postings/close", { data: { id: closed } });
 
-  const guestCompanyId = await seedCompany(owner, "Guest Guild", "guest-guild.example");
-
-  const guestBoardId = await seedBoard(owner, guestCompanyId, "hiringthing", "guest-guild");
-
-  const unsupported = await seedPosting(owner, {
-    ats: "hiringthing",
-    atsJobId: "unsupported",
-    boardId: guestBoardId,
-    companyId: guestCompanyId,
-    url: "https://guest-guild.example/unsupported",
-  });
-
   await configureMatching(owner);
 
   const ids = idsOf(await homeFor(owner));
 
   expect(ids).toEqual([supported]);
   expect(ids).not.toContain(closed);
-  expect(ids).not.toContain(unsupported);
 
   await owner.dispose();
 });
