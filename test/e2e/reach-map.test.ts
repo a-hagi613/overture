@@ -348,3 +348,48 @@ test("the marker scan follows helper imports that a test file never names", () =
     true,
   );
 });
+
+test("oxlint and oxfmt config edits do not trigger full e2e runs", () => {
+  const map = buildReachMap();
+  const allTests = everyTest();
+
+  const lintOnlyPlan = computePlan({
+    changed: [".oxlintrc.json", ".oxfmtrc.json"],
+    isMain: false,
+    shardCount: 6,
+    map,
+    seconds: {},
+    allTests,
+  });
+
+  expect(lintOnlyPlan.full).toBe(false);
+  expect(lintOnlyPlan.selected).toEqual([]);
+
+  const lintWithUnitTestPlan = computePlan({
+    changed: [".oxlintrc.json", "src/server/billing/ledger.test.ts"],
+    isMain: false,
+    shardCount: 6,
+    map,
+    seconds: {},
+    allTests,
+  });
+
+  expect(lintWithUnitTestPlan.full).toBe(false);
+  expect(lintWithUnitTestPlan.selected).toEqual([]);
+
+  const boardVisitors = allTests.filter((file) =>
+    map.tests[file]?.routes.includes("/applications"),
+  );
+
+  const lintWithBoardCardPlan = computePlan({
+    changed: [".oxlintrc.json", ".oxfmtrc.json", "src/web/components/tracker-card.tsx"],
+    isMain: false,
+    shardCount: 6,
+    map,
+    seconds: {},
+    allTests,
+  });
+
+  expect(lintWithBoardCardPlan.full).toBe(false);
+  expect(lintWithBoardCardPlan.selected).toEqual(boardVisitors);
+});

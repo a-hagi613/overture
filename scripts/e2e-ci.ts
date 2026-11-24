@@ -58,8 +58,6 @@ const alwaysFull = [
   /^vite\.config\./u,
   /^drizzle\.config\./u,
   /^playwright\.config\./u,
-  /^\.oxlintrc\.json$/u,
-  /^\.oxfmtrc\.json$/u,
   /^index\.html$/u,
   /^Dockerfile$/u,
   /^\.dockerignore$/u,
@@ -82,6 +80,8 @@ const ignored = [
   /^profile\/README\.md$/u,
   /^design\/reference\/source\//u,
   /^design\/review\//u,
+  /^\.oxlintrc\.json$/u,
+  /^\.oxfmtrc\.json$/u,
 ];
 
 function isE2eTestFile(file: string) {
@@ -1263,7 +1263,7 @@ function selectionReason(
   }
 
   if (touched === 0) {
-    return "the diff touches only documentation, so no e2e file runs";
+    return "the diff touches only documentation or lint/format config, so no e2e file runs";
   }
 
   if (rule) {
