@@ -17,6 +17,18 @@ function initialsFor(name: string, email: string) {
   return trimmedEmail.length > 0 ? trimmedEmail.charAt(0).toUpperCase() : "O";
 }
 
+/**
+ * The initials are painted with `after:content-[attr(data-initials)]` instead of a text child.
+ * The phone header's profile link is named "Profile" through `aria-label`, and axe's
+ * `label-content-name-mismatch` reads every descendant text node (aria-hidden included), so an
+ * initials text child there is treated as visible text missing from the link's accessible name.
+ * CSS generated content keeps the same pixels without adding text to that link.
+ * @param props The session identity and the avatar size.
+ * @param props.email The session email, used for the first letter when there is no name.
+ * @param props.name The display name the initials come from.
+ * @param props.size `md` in the sidebar, `sm` in the phone header.
+ * @returns The decorative avatar bubble.
+ */
 export function UserAvatar({
   email = "",
   name = "",
@@ -31,9 +43,8 @@ export function UserAvatar({
   return (
     <span
       aria-hidden="true"
-      className={`${sizeClass} inline-flex shrink-0 items-center justify-center rounded-full bg-foreground font-semibold uppercase text-primary-ink`}
-    >
-      {initialsFor(name, email)}
-    </span>
+      className={`${sizeClass} inline-flex shrink-0 items-center justify-center rounded-full bg-foreground font-semibold uppercase text-primary-ink after:content-[attr(data-initials)]`}
+      data-initials={initialsFor(name, email)}
+    />
   );
 }
